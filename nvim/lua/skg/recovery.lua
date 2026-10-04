@@ -40,7 +40,7 @@ function M.document (buf)
     '- Buffer name: ' .. vim.api.nvim_buf_get_name(buf),
     '- View URI: ' .. tostring(vim.b[buf].skg_view_uri),
     '- Captured UTC: ' .. os.date('!%Y-%m-%dT%H:%M:%SZ'),
-    '- Source-set and git diff mode: unavailable to this client',
+    '- Repo-set and git diff mode: unavailable to this client',
     '- Search enrichment: ' .. enrichment_note,
     baseline_available
       and '- Baseline: verified client clean baseline'
@@ -48,7 +48,7 @@ function M.document (buf)
           .. ' but no verified edit diff can be produced)'),
     '',
     '* Exact snapshots',
-    'Each source block is one JSON string. JSON decoding reproduces every'
+    'Each repo block is one JSON string. JSON decoding reproduces every'
       .. ' character, including tabs and trailing newlines.',
     '',
     '** Clean baseline',

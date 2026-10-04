@@ -471,7 +471,7 @@ mod relationship_default_tests {
       & tree . get (member_treeid) . unwrap () . value () . kind
     else { panic! ("member should be active"); };
     assert_eq! ( rendered_member . viewStats . relRepo, None,
-      "the owner-home default must not render a fake relSource override" );
+      "the owner-home default must not render a fake relRepo override" );
   }
 }
 

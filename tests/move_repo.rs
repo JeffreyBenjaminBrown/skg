@@ -54,9 +54,9 @@ fn tantivy_repo_for_id (
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
   run_with_shared_test_stores (
-    "skg-test-move-source",
+    "skg-test-move-repo",
     |s| Box::pin ( async move {
-      s . reset ("test_move_node_to_another_owned_source", "tests/move_repo/fixtures") ?;
+      s . reset ("test_move_node_to_another_owned_repo", "tests/move_repo/fixtures") ?;
       test_move_node_to_another_owned_repo (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_move_node_referenced_by_extra_id", "tests/move_repo/fixtures") ?;
@@ -65,19 +65,19 @@ fn all_tests
       s . reset ("test_move_multiple_nodes", "tests/move_repo/fixtures") ?;
       test_move_multiple_nodes (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_move_to_foreign_source_rejected", "tests/move_repo/fixtures") ?;
+      s . reset ("test_move_to_foreign_repo_rejected", "tests/move_repo/fixtures") ?;
       test_move_to_foreign_repo_rejected (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_move_from_foreign_source_rejected", "tests/move_repo/fixtures") ?;
+      s . reset ("test_move_from_foreign_repo_rejected", "tests/move_repo/fixtures") ?;
       test_move_from_foreign_repo_rejected (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_move_and_merge_simultaneously_rejected", "tests/move_repo/fixtures") ?;
       test_move_and_merge_simultaneously_rejected (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_no_source_change_produces_no_moves", "tests/move_repo/fixtures") ?;
+      s . reset ("test_no_repo_change_produces_no_moves", "tests/move_repo/fixtures") ?;
       test_no_repo_change_produces_no_moves (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_source_only_change_with_populated_pool", "tests/move_repo/fixtures") ?;
+      s . reset ("test_repo_only_change_with_populated_pool", "tests/move_repo/fixtures") ?;
       test_repo_only_change_with_populated_pool (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
@@ -94,16 +94,16 @@ async fn test_move_node_to_another_owned_repo (
     // a (public) contains b (public) contains c (public).
     // Edit b's repo to private.
     let org_text : &str = indoc! {"
-      * (skg (node (id a) (source public))) a
-      ** (skg (node (id b) (source private))) b
-      *** (skg (node (id c) (source public))) c
+      * (skg (node (id a) (repo public))) a
+      ** (skg (node (id b) (repo private))) b
+      *** (skg (node (id c) (repo public))) c
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
           org_text, &config
           , None ) ?;
     assert_eq!(save_plan . repo_moves . len(), 1,
-               "Expected exactly 1 source move");
+               "Expected exactly 1 repo move");
     assert_eq!(save_plan . repo_moves[0] . pid . 0, "b");
     assert_eq!(save_plan . repo_moves[0] . old_repo . as_str(), "public");
     assert_eq!(save_plan . repo_moves[0] . new_repo . as_str(), "private");
@@ -134,7 +134,7 @@ async fn test_move_node_to_another_owned_repo (
         nodecomplete_from_id (&config, &ID::new ("b"))
 ?;
       assert_eq!(node_b . home_repo, RepoName::from ("private"),
-                 "NodeComplete read from disk should have source=private"); }
+                 "NodeComplete read from disk should have repo=private"); }
 
     { // Graph: repo should be updated
       let (pid, repo) : (ID, RepoName) =
@@ -142,13 +142,13 @@ async fn test_move_node_to_another_owned_repo (
         . expect ("b should exist in graph");
       assert_eq!(pid . 0, "b");
       assert_eq!(repo . as_str(), "private",
-                 "graph should show source=private for b"); }
+                 "graph should show repo=private for b"); }
 
     { // Tantivy: repo should be updated
       let repo : Option<String> =
         tantivy_repo_for_id (&tantivy_index, "b", "b")?;
       assert_eq!(repo . as_deref(), Some ("private"),
-                 "Tantivy should show source=private for b"); }
+                 "Tantivy should show repo=private for b"); }
 
     { // Other nodes unchanged
       let node_a : NodeComplete =
@@ -185,9 +185,9 @@ async fn test_move_node_referenced_by_extra_id (
 
     // Use extra_ids (a-alias, b-alias, c-alias) instead of PIDs.
     let org_text : &str = indoc! {"
-      * (skg (node (id a-alias) (source public))) a
-      ** (skg (node (id b-alias) (source private))) b
-      *** (skg (node (id c-alias) (source public))) c
+      * (skg (node (id a-alias) (repo public))) a
+      ** (skg (node (id b-alias) (repo private))) b
+      *** (skg (node (id c-alias) (repo public))) c
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
@@ -195,9 +195,9 @@ async fn test_move_node_referenced_by_extra_id (
 
     // repo_moves should use the PID, not the extra_id
     assert_eq!(save_plan . repo_moves . len(), 1,
-               "Expected exactly 1 source move");
+               "Expected exactly 1 repo move");
     assert_eq!(save_plan . repo_moves[0] . pid . 0, "b",
-               "SourceMove should use PID, not extra_id");
+               "RepoMove should use PID, not extra_id");
 
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
@@ -246,16 +246,16 @@ async fn test_move_multiple_nodes (
 
     // Move both b and c to private.
     let org_text : &str = indoc! {"
-      * (skg (node (id a) (source public))) a
-      ** (skg (node (id b) (source private))) b
-      *** (skg (node (id c) (source private))) c
+      * (skg (node (id a) (repo public))) a
+      ** (skg (node (id b) (repo private))) b
+      *** (skg (node (id c) (repo private))) c
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
           org_text, &config
           , None ) ?;
     assert_eq!(save_plan . repo_moves . len(), 2,
-               "Expected 2 source moves");
+               "Expected 2 repo moves");
 
     let move_pids : Vec<&str> =
       save_plan . repo_moves . iter()
@@ -302,24 +302,24 @@ async fn test_move_to_foreign_repo_rejected (
 
     // Try to move b to foreign repo.
     let org_text : &str = indoc! {"
-      * (skg (node (id a) (source public))) a
-      ** (skg (node (id b) (source foreign))) b
-      *** (skg (node (id c) (source public))) c
+      * (skg (node (id a) (repo public))) a
+      ** (skg (node (id b) (repo foreign))) b
+      *** (skg (node (id c) (repo public))) c
     "};
     let result =
       buffer_to_validated_saveplan (
         org_text, &config
         , None ) ;
     assert!(result . is_err(),
-            "Moving to foreign source should be rejected");
+            "Moving to foreign repo should be rejected");
     if let Err (SaveError::DatabaseError (e)) = &result {
       let inner : &dyn Error = e . as_ref();
       assert!(inner . downcast_ref::<BufferValidationError>()
               . map_or (false, |bve| matches!(
                 bve, BufferValidationError::CannotMoveToOrFromForeignRepo(_, _, _))),
-              "Expected CannotMoveToOrFromForeignSource, got: {}", e);
+              "Expected CannotMoveToOrFromForeignRepo, got: {}", e);
     } else if let Err (other) = &result {
-      panic!("Expected DatabaseError wrapping CannotMoveToOrFromForeignSource, got: {:?}", other);
+      panic!("Expected DatabaseError wrapping CannotMoveToOrFromForeignRepo, got: {:?}", other);
     }
 
     { // FS: nothing should have changed
@@ -337,14 +337,14 @@ async fn test_move_from_foreign_repo_rejected (
 
     // Try to move foreign-node to public.
     let org_text : &str = indoc! {"
-      * (skg (node (id foreign-node) (source public))) foreign-node
+      * (skg (node (id foreign-node) (repo public))) foreign-node
     "};
     let result =
       buffer_to_validated_saveplan (
         org_text, &config
         , None ) ;
     assert!(result . is_err(),
-            "Moving from foreign source should be rejected");
+            "Moving from foreign repo should be rejected");
 
     { // FS: nothing should have changed
       assert!( temp_fixtures . join ("foreign/foreign-node.skg") . exists(),
@@ -359,10 +359,10 @@ async fn test_move_and_merge_simultaneously_rejected (
 ) -> Result<(), Box<dyn Error>> {
     // Move b to private AND merge b into stay.
     let org_text : &str = indoc! {"
-      * (skg (node (id a) (source public))) a
-      ** (skg (node (id b) (source private) (editRequest (merge stay)))) b
-      *** (skg (node (id c) (source public))) c
-      * (skg (node (id stay) (source public))) stay
+      * (skg (node (id a) (repo public))) a
+      ** (skg (node (id b) (repo private) (editRequest (merge stay)))) b
+      *** (skg (node (id c) (repo public))) c
+      * (skg (node (id stay) (repo public))) stay
     "};
     let result =
       buffer_to_validated_saveplan (
@@ -390,16 +390,16 @@ async fn test_no_repo_change_produces_no_moves (
 ) -> Result<(), Box<dyn Error>> {
     // Save with same repos as on disk.
     let org_text : &str = indoc! {"
-      * (skg (node (id a) (source public))) a
-      ** (skg (node (id b) (source public))) b
-      *** (skg (node (id c) (source public))) c
+      * (skg (node (id a) (repo public))) a
+      ** (skg (node (id b) (repo public))) b
+      *** (skg (node (id c) (repo public))) c
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
           org_text, &config
           , None ) ?;
     assert_eq!(save_plan . repo_moves . len(), 0,
-               "No source changes => no source moves");
+               "No repo changes => no repo moves");
 
     Ok (()) }
 
@@ -419,9 +419,9 @@ async fn test_repo_only_change_with_populated_pool (
     // Change only b's repo to private.
     // Title, body, contains — all identical to disk.
     let org_text : &str = indoc! {"
-      * (skg (node (id a) (source public))) a
-      ** (skg (node (id b) (source private))) b
-      *** (skg (node (id c) (source public))) c
+      * (skg (node (id a) (repo public))) a
+      ** (skg (node (id b) (repo private))) b
+      *** (skg (node (id c) (repo public))) c
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
@@ -429,7 +429,7 @@ async fn test_repo_only_change_with_populated_pool (
 
     // The repo move must be detected even with populated pool.
     assert_eq!(save_plan . repo_moves . len(), 1,
-               "Source-only change should produce a SourceMove");
+               "Repo-only change should produce a RepoMove");
     assert_eq!(save_plan . repo_moves[0] . pid . 0, "b");
 
     // The save instruction for b must not have been filtered out.

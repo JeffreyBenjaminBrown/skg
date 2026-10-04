@@ -7,7 +7,7 @@
 -- elisp:
 -- - what the server EMITS: 'quote_herald' in server/org_to_text.rs
 --   escapes only backslash and double-quote inside strings; bare atoms
---   may contain any non-delimiter bytes (e.g. the sourceHerald atom
+--   may contain any non-delimiter bytes (e.g. the homeRepoHerald atom
 --   '⌂:public'); counts are bare integers; dotted notation appears in
 --   a few responses (busy-initializing, titles-by-ids).
 -- - what the server PARSES: the Rust 'sexp' crate (Cargo.toml), which

@@ -45,7 +45,7 @@ pub fn handle_titles_by_ids_request (
     ActiveRepoSet::named (
       config,
       RepoSetName::from ("all"))
-    . expect ("reserved source-set all should always resolve");
+    . expect ("reserved repo-set all should always resolve");
   handle_titles_by_ids_request_with_repo_set (
     stream, request, tantivy_index, config,
     diff_mode_enabled, &active, graph ) }

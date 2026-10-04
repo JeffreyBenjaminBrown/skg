@@ -37,7 +37,7 @@ fn deleting_the_properties_folder_is_accepted_and_inert (
       let uri : Result<ViewUri, String> = Ok (
         ViewUri::ContentView ("properties-folder-deletion-test" . to_string ()));
       let with_properties = indoc! {"
-        * (skg (node (id brie) (source main))) brie
+        * (skg (node (id brie) (repo main))) brie
         ** (skg propertiesFolder)
         *** (skg (property noSearchMatching))
       "};
@@ -48,7 +48,7 @@ fn deleting_the_properties_folder_is_accepted_and_inert (
       assert! (first . saved_view . contains ("propertiesFolder"));
 
       let without_properties =
-        "* (skg (node (id brie) (source main))) brie\n";
+        "* (skg (node (id brie) (repo main))) brie\n";
       let second = update_from_and_rerender_buffer (
         &mut stream, without_properties, config, tantivy, &graph, false,
         &uri, &mut views_state ) . await ?;
@@ -65,7 +65,7 @@ fn deleting_the_properties_folder_is_accepted_and_inert (
 #[test]
 fn whitespace_only_body_under_writeProtected_is_not_an_edit () {
   let input : &str =
-    "* (skg (node (id shown) (source main) writeProtected)) shown\n\n";
+    "* (skg (node (id shown) (repo main) writeProtected)) shown\n\n";
   let (_viewforest, parsing_errors, _warnings) =
     org_to_uninterpreted_viewforest (input) . unwrap ();
   assert! ( ! parsing_errors . iter () . any ( |error| matches! (
@@ -100,8 +100,8 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
   let uri : Result<ViewUri, String> = Ok (
     ViewUri::ContentView ("write-protected-edits-test" . to_string ()));
   let rendered = indoc! {"
-    * (skg (node (id 1) (source main))) 1
-    ** (skg (node (id 2) (source main) writeProtected)) 2
+    * (skg (node (id 1) (repo main))) 1
+    ** (skg (node (id 2) (repo main) writeProtected)) 2
   "};
   let first = update_from_and_rerender_buffer (
     &mut stream, rendered, config, tantivy, &graph, false,
@@ -112,7 +112,7 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
   // the root's new self-content relationship.
   let with_new_self_occurrence : String = first . saved_view . replacen (
     '\n',
-    "\n** (skg (node (id 1) (source main) writeProtected)) new self occurrence\n",
+    "\n** (skg (node (id 1) (repo main) writeProtected)) new self occurrence\n",
     1);
   let second = update_from_and_rerender_buffer (
     &mut stream, &with_new_self_occurrence, config, tantivy, &graph, false,

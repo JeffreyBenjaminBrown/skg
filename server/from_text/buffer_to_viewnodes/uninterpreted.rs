@@ -147,7 +147,7 @@ mod imported_body_tests {
 
   #[test]
   fn literal_headings_drawers_and_mixed_fences_remain_one_body_on_save () {
-    let body : &str = ":PROPERTIES:\n:ID: example-not-a-node\n:END:\n* literal heading\n,* existing comma heading\n```org\n** fenced heading\n```\n#+begin_src org\n* source heading\n#+end_src";
+    let body : &str = ":PROPERTIES:\n:ID: example-not-a-node\n:END:\n* literal heading\n,* existing comma heading\n```org\n** fenced heading\n```\n#+begin_src org\n* repo heading\n#+end_src";
     let rendered : String = format! ("* File root\n{}\n",
       crate::body_view_escape::encode_body_for_view (body));
     let parsed : Vec<ViewNodeLineCol> =

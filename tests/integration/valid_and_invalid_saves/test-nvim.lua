@@ -17,7 +17,7 @@ local lock = require('skg.lock')
 
 local content_buffer_name = 'skg://skg-content-view'
 local original_content =
-  '* (skg (node (id 1) (source main))) 1\n'
+  '* (skg (node (id 1) (repo main))) 1\n'
   .. '** (skg (node (id 1))) 1'
 
 local function test_invalid_save ()

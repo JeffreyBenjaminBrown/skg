@@ -2,6 +2,6 @@
 # automatically read and these particular cases re-run before any
 # novel cases are generated.
 #
-# It is recommended to check this file in to source control so that
+# It is recommended to check this file in to repo control so that
 # everyone who runs the test benefits from these saved cases.
-cc 61c060c18b9eac1c286a047825d3a9cae4997fd5b171500d7ee95c9ad6229ca3 # shrinks to contains = [], subs_raw = [], hides_raw = [RelPartner { relSource: SourceName("S2"), member: ID("id0") }, RelPartner { relSource: SourceName("S0"), member: ID("id1") }]
+cc 61c060c18b9eac1c286a047825d3a9cae4997fd5b171500d7ee95c9ad6229ca3 # shrinks to contains = [], subs_raw = [], hides_raw = [RelPartner { relRepo: RepoName("S2"), member: ID("id0") }, RelPartner { relRepo: RepoName("S0"), member: ID("id1") }]

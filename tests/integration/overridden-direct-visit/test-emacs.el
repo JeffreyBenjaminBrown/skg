@@ -1,7 +1,7 @@
 ;;; Regression test: an ordinary visit to overridden Z opens Z raw.
 ;;; It must not inject overrider R as an independent sibling. Z and R
 ;;; deliberately share the title "cooking", come from different
-;;; sources, and subscribe to each other.
+;;; repos, and subscribe to each other.
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
@@ -28,7 +28,7 @@
               (lambda (buf)
                 (with-current-buffer buf
                   (and (boundp 'skg-view-uri) skg-view-uri
-                       (equal skg-contentView-initialRoot-source
+                       (equal skg-contentView-initialRoot-repo
                               "public"))))
               (buffer-list)))
            10))
@@ -54,7 +54,7 @@
               (lambda (buf)
                 (with-current-buffer buf
                   (and (boundp 'skg-view-uri) skg-view-uri
-                       (equal skg-contentView-initialRoot-source
+                       (equal skg-contentView-initialRoot-repo
                               "Cheese"))))
               (buffer-list)))
            10))
@@ -84,7 +84,7 @@
               (lambda (buf)
                 (with-current-buffer buf
                   (and (boundp 'skg-view-uri) skg-view-uri
-                       (equal skg-contentView-initialRoot-source
+                       (equal skg-contentView-initialRoot-repo
                               "public"))))
               (buffer-list)))
            10))

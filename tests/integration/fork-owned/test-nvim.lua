@@ -53,11 +53,11 @@ local function goto_line_containing (snippet, description)
   T.fail(description or ('could not find a line containing: ' .. snippet))
 end
 
----Move the cursor onto the headline carrying (id ID) (source owned) in
+---Move the cursor onto the headline carrying (id ID) (repo owned) in
 ---the current buffer. Fails the test if it is not found.
 local function goto_owned_headline (id)
   return goto_line_containing(
-    string.format('(id %s) (source owned)', id),
+    string.format('(id %s) (repo owned)', id),
     string.format("could not find %s's headline", id))
 end
 
@@ -105,15 +105,15 @@ vim.api.nvim_set_current_buf(confirm_buf)
 T.check(T.buffer_text(confirm_buf):find('(id M)', 1, true),
         'confirmation buffer does not list M')
 print('fork_node produced a fork-confirmation listing M')
--- Approving before picking a source is refused.
+-- Approving before picking a repo is refused.
 local approved_early_ok = pcall(save.approve_fork)
 T.check(not approved_early_ok,
-        'approve must be refused until a source is picked')
-print('approve refused until a source is picked')
--- Pick the clone's source, then approve.
-local clone_line = goto_line_starting_with('* (skg (node (source ',
+        'approve must be refused until a repo is picked')
+print('approve refused until a repo is picked')
+-- Pick the clone's repo, then approve.
+local clone_line = goto_line_starting_with('* (skg (node (repo ',
   'could not find the clone-to-be headline')
-metadata.change_source_at_line(clone_line, 'owned')
+metadata.change_repo_at_line(clone_line, 'owned')
 save.approve_fork()
 
 -- 5. Reopen Q fresh: override substitution now draws the clone in M's

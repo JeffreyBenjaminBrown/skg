@@ -37,7 +37,7 @@ fn boolprop_state_response_body (
   let (pid, repo, value, owned) = boolprop_state (
     &runtime . graph, &runtime . config, &id, property) ?;
   Ok (format! (
-    "(id {}) (property {}) (value {}) (source {}) (user-owned {})",
+    "(id {}) (property {}) (value {}) (repo {}) (user-owned {})",
     quoted (&pid . 0), quoted (property . wire_name ()),
     quoted (if value { "true" } else { "false" }),
     quoted (&repo . 0), quoted (if owned { "true" } else { "false" })))

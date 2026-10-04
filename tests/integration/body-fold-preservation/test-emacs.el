@@ -65,10 +65,10 @@ metadata stripped from headlines so headlines read like `* title'."
       (let ((inhibit-read-only t)) (erase-buffer))
       (insert
        (concat
-        "* (skg (node (source main))) root\n"
+        "* (skg (node (repo main))) root\n"
         "root body line one\n"
         "root body line two\n"
-        "** (skg (node (source main))) child\n"
+        "** (skg (node (repo main))) child\n"
         "child body line\n"))
       (skg-content-view-mode)
       (setq skg-view-uri (org-id-uuid))

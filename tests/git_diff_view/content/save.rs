@@ -207,9 +207,9 @@ async fn test_diff_mode_as_subscribee_regenerates_phantom_children (
     setup_gitrepo_with_subscribee_fixtures,
     |config, tantivy, _gitrepo_path| { Box::pin(async move {
       let input = "\
-* (skg (node (id 1) (source main))) 1
+* (skg (node (id 1) (repo main))) 1
 ** (skg subscribeeFolder)
-*** (skg (node (id 11) (source main))) 11
+*** (skg (node (id 11) (repo main))) 11
 **** (skg (node (id moves) (unstaged newM))) moves
 ";
 
@@ -227,9 +227,9 @@ async fn test_diff_mode_as_subscribee_regenerates_phantom_children (
 
       assert_buffer_contains(
         &response . saved_view,
-        "*** (skg (node (id 11) (source main))) 11\n\
-         **** (skg (node (id gets-removed) (source main) writeProtected (unstaged removedX removedM))) gets-removed\n\
-         **** (skg (node (id moves) (source main))) moves" );
+        "*** (skg (node (id 11) (repo main))) 11\n\
+         **** (skg (node (id gets-removed) (repo main) writeProtected (unstaged removedX removedM))) gets-removed\n\
+         **** (skg (node (id moves) (repo main))) moves" );
       Ok (( )) }) }) . await
 }
 
@@ -248,9 +248,9 @@ async fn test_diff_mode_removed_subscribee_shows_removedM (
     setup_gitrepo_with_removed_subscribee_fixtures,
     |config, tantivy, _gitrepo_path| { Box::pin(async move {
       let input = "\
-* (skg (node (id 1) (source main))) 1
+* (skg (node (id 1) (repo main))) 1
 ** (skg subscribeeFolder)
-*** (skg (node (id 11) (source main))) 11
+*** (skg (node (id 11) (repo main))) 11
 ";
 
       let graph : InRustGraphHandle =
@@ -267,7 +267,7 @@ async fn test_diff_mode_removed_subscribee_shows_removedM (
 
       assert_buffer_contains(
         &response . saved_view,
-        "*** (skg (node (id 22) (source main) writeProtected (unstaged removedM))) 22" );
+        "*** (skg (node (id 22) (repo main) writeProtected (unstaged removedM))) 22" );
       Ok (( )) }) }) . await
 }
 
@@ -284,9 +284,9 @@ async fn test_diff_mode_removed_subscribee_staged_shows_stagedM (
     setup_gitrepo_with_removed_subscribee_fixtures_staged,
     |config, tantivy, _gitrepo_path| { Box::pin(async move {
       let input = "\
-* (skg (node (id 1) (source main))) 1
+* (skg (node (id 1) (repo main))) 1
 ** (skg subscribeeFolder)
-*** (skg (node (id 11) (source main))) 11
+*** (skg (node (id 11) (repo main))) 11
 ";
 
       let graph : InRustGraphHandle =
@@ -303,7 +303,7 @@ async fn test_diff_mode_removed_subscribee_staged_shows_stagedM (
 
       assert_buffer_contains(
         &response . saved_view,
-        "*** (skg (node (id 22) (source main) writeProtected (staged removedM))) 22" );
+        "*** (skg (node (id 22) (repo main) writeProtected (staged removedM))) 22" );
       Ok (( )) }) }) . await
 }
 
@@ -320,10 +320,10 @@ async fn test_diff_mode_added_subscribee_shows_newM (
     setup_gitrepo_with_added_subscribee_fixtures,
     |config, tantivy, _gitrepo_path| { Box::pin(async move {
       let input = "\
-* (skg (node (id 1) (source main))) 1
+* (skg (node (id 1) (repo main))) 1
 ** (skg subscribeeFolder)
-*** (skg (node (id 11) (source main))) 11
-*** (skg (node (id 22) (source main))) 22
+*** (skg (node (id 11) (repo main))) 11
+*** (skg (node (id 22) (repo main))) 22
 ";
 
       let graph : InRustGraphHandle =
@@ -340,8 +340,8 @@ async fn test_diff_mode_added_subscribee_shows_newM (
 
       assert_buffer_contains(
         &response . saved_view,
-        "*** (skg (node (id 11) (source main))) 11\n\
-         *** (skg (node (id 22) (source main) (unstaged newM))) 22" );
+        "*** (skg (node (id 11) (repo main))) 11\n\
+         *** (skg (node (id 22) (repo main) (unstaged newM))) 22" );
       Ok (( )) }) }) . await
 }
 

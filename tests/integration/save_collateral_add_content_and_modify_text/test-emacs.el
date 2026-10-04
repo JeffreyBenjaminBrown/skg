@@ -8,7 +8,7 @@
 ;;;
 ;;; Known limitation: collateral completion currently fails when the saved
 ;;; buffer introduced a brand-new node, because build_child_creation_data
-;;; can't find a source for the new UUID. So buffer A is NOT updated.
+;;; can't find a repo for the new UUID. So buffer A is NOT updated.
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")

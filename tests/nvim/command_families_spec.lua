@@ -34,11 +34,11 @@ local function unstub_save ()
   package.loaded['skg.save'] = nil
 end
 
----Stub the config's owned sources.
+---Stub the config's owned repos.
 local config = require('skg.config')
-local real_owned_sources = config.owned_sources
-local function stub_owned_sources (sources)
-  config.owned_sources = function () return sources end
+local real_owned_repos = config.owned_repos
+local function stub_owned_repos (repos)
+  config.owned_repos = function () return repos end
 end
 
 describe('skg.modify_graph.goto_biggest_branch', function ()
@@ -78,18 +78,18 @@ end)
 describe('skg.modify_graph replacements', function ()
   before_each(function ()
     stub_save()
-    stub_owned_sources({ 'public' })
+    stub_owned_repos({ 'public' })
   end)
   after_each(function ()
     unstub_save()
-    config.owned_sources = real_owned_sources
+    config.owned_repos = real_owned_repos
     pcall(vim.api.nvim_buf_delete,
           vim.api.nvim_get_current_buf(), { force = true })
   end)
 
   local container_and_leaf = table.concat({
-    '* (skg (node (id parent) (source public))) container',
-    '** (skg (node (id child) (source public))) the leaf title',
+    '* (skg (node (id parent) (repo public))) container',
+    '** (skg (node (id child) (repo public))) the leaf title',
     'leaf body',
     '*** (skg aliasFolder) scaffolding under it' }, '\n')
 
@@ -98,15 +98,15 @@ describe('skg.modify_graph replacements', function ()
     vim.api.nvim_win_set_cursor(0, { 3, 2 }) -- in the body
     modify_graph.replace_content_with_link()
     assert.are.equal(table.concat({
-      '* (skg (node (id parent) (source public))) container',
+      '* (skg (node (id parent) (repo public))) container',
       '** [[id:child][the leaf title]]' }, '\n'), buffer_text())
     assert.are.equal(1, saved_count)
   end)
 
   it('rejects a node with no id', function ()
     buffer_with(table.concat({
-      '* (skg (node (id parent) (source public))) container',
-      '** (skg (node (source public))) no id here' }, '\n'))
+      '* (skg (node (id parent) (repo public))) container',
+      '** (skg (node (repo public))) no id here' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     local ok, err = pcall(modify_graph.replace_content_with_link)
     assert.is_false(ok)
@@ -115,8 +115,8 @@ describe('skg.modify_graph replacements', function ()
 
   it('rejects a foreign container', function ()
     buffer_with(table.concat({
-      '* (skg (node (id parent) (source foreign-src))) container',
-      '** (skg (node (id child) (source public))) leaf' }, '\n'))
+      '* (skg (node (id parent) (repo foreign-src))) container',
+      '** (skg (node (id child) (repo public))) leaf' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     local ok, err = pcall(modify_graph.replace_content_with_link)
     assert.is_false(ok)
@@ -125,8 +125,8 @@ describe('skg.modify_graph replacements', function ()
 
   it('rejects a write-protected container', function ()
     buffer_with(table.concat({
-      '* (skg (node (id parent) (source public) writeProtected)) container',
-      '** (skg (node (id child) (source public))) leaf' }, '\n'))
+      '* (skg (node (id parent) (repo public) writeProtected)) container',
+      '** (skg (node (id child) (repo public))) leaf' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     local ok, err = pcall(modify_graph.replace_content_with_link)
     assert.is_false(ok)
@@ -136,8 +136,8 @@ describe('skg.modify_graph replacements', function ()
   it('replaces a link with content, warning about existing nodes',
      function ()
     buffer_with(table.concat({
-      '* (skg (node (id parent) (source public))) container',
-      '** (skg (node (id old-node) (source public)))'
+      '* (skg (node (id parent) (repo public))) container',
+      '** (skg (node (id old-node) (repo public)))'
       .. ' see [[id:target][target label]]' }, '\n'))
     local notified = {}
     local original_notify = vim.notify
@@ -146,7 +146,7 @@ describe('skg.modify_graph replacements', function ()
     modify_graph.replace_link_with_content()
     vim.notify = original_notify
     assert.are.equal(table.concat({
-      '* (skg (node (id parent) (source public))) container',
+      '* (skg (node (id parent) (repo public))) container',
       '** (skg (node (id target) writeProtected (viewRequests'
       .. ' definitiveView))) target label' }, '\n'), buffer_text())
     local warned = false
@@ -160,24 +160,24 @@ describe('skg.modify_graph replacements', function ()
   it('rejects a leaf with several links, a non-id link, and'
      .. ' descendants', function ()
     buffer_with(table.concat({
-      '* (skg (node (id parent) (source public))) container',
-      '** (skg (node (source public))) [[id:a][one]] and'
+      '* (skg (node (id parent) (repo public))) container',
+      '** (skg (node (repo public))) [[id:a][one]] and'
       .. ' [[id:b][two]]' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     local ok, err = pcall(modify_graph.replace_link_with_content)
     assert.is_false(ok)
     assert.is_truthy(tostring(err):find('exactly one link', 1, true))
     buffer_with(table.concat({
-      '* (skg (node (id parent) (source public))) container',
-      '** (skg (node (source public))) [[https://x][web link]]' },
+      '* (skg (node (id parent) (repo public))) container',
+      '** (skg (node (repo public))) [[https://x][web link]]' },
       '\n'))
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     ok, err = pcall(modify_graph.replace_link_with_content)
     assert.is_false(ok)
     assert.is_truthy(tostring(err):find('not an id link', 1, true))
     buffer_with(table.concat({
-      '* (skg (node (id parent) (source public))) container',
-      '** (skg (node (source public))) [[id:a][one]]',
+      '* (skg (node (id parent) (repo public))) container',
+      '** (skg (node (repo public))) [[id:a][one]]',
       '*** a descendant' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     ok, err = pcall(modify_graph.replace_link_with_content)
@@ -229,9 +229,9 @@ describe('skg.view_requests', function ()
 end)
 
 describe('skg.metadata_edit', function ()
-  before_each(function () stub_owned_sources({ 'public' }) end)
+  before_each(function () stub_owned_repos({ 'public' }) end)
   after_each(function ()
-    config.owned_sources = real_owned_sources
+    config.owned_repos = real_owned_repos
     for _, buf in ipairs(vim.api.nvim_list_bufs()) do
       local name = vim.api.nvim_buf_get_name(buf)
       if name:find('skg://metadata%-edit') then
@@ -244,7 +244,7 @@ describe('skg.metadata_edit', function ()
 
   it('opens the expanded view and commits an edit back', function ()
     local source_buf = buffer_with(
-      '* (skg (node (id abc) (source public))) my title')
+      '* (skg (node (id abc) (repo public))) my title')
     metadata_edit.edit_metadata()
     local edit_buf = vim.api.nvim_get_current_buf()
     assert.is_truthy(vim.api.nvim_buf_get_name(edit_buf)
@@ -260,14 +260,14 @@ describe('skg.metadata_edit', function ()
     metadata_edit.commit(edit_buf)
     assert.are.equal(source_buf, vim.api.nvim_get_current_buf())
     assert.are.equal(
-      '* (skg (node (id abc) (source public) writeProtected)) my title',
+      '* (skg (node (id abc) (repo public) writeProtected)) my title',
       buffer_text())
   end)
 
-  it('builds the empty-node view and commits just the source',
+  it('builds the empty-node view and commits just the repo',
      function ()
     -- Mirrors the empty-node skeleton cases of
-    -- test-skg-insert-heading-source-prompt.el.
+    -- test-skg-insert-heading-repo-prompt.el.
     local source_buf = buffer_with('* just a plain headline')
     metadata_edit.edit_metadata()
     local edit_buf = vim.api.nvim_get_current_buf()
@@ -279,7 +279,7 @@ describe('skg.metadata_edit', function ()
     metadata_edit.commit(edit_buf)
     assert.are.equal(source_buf, vim.api.nvim_get_current_buf())
     assert.are.equal(
-      '* (skg (node (source public))) just a plain headline',
+      '* (skg (node (repo public))) just a plain headline',
       buffer_text())
   end)
 

@@ -31,13 +31,13 @@ on scratch data instead. Instances share nothing but the binary.
    path = "owned/main"
    ```
    Paths are relative to the data root, the config file's directory.
-   A source is writable iff its path lies under `owned/` (the
+   A repo is writable iff its path lies under `owned/` (the
    `owned_folder` config field); any other path is read-only. The old
    `user_owns_it` and `db_name` keys are rejected, and there is no
    TypeDB anymore.
    `./target/debug/skg check-config <scratch>/skgconfig.toml` validates
    a config without starting a server.
-2. Seed `owned/main/1.skg` (a source folder may also start empty):
+2. Seed `owned/main/1.skg` (a repo folder may also start empty):
    ```yaml
    title: "verify root"
    pid: "1"
@@ -78,7 +78,7 @@ The essentials:
   appears in `owned/main/`.
 
 Org export needs no server: `./target/debug/skg export-org
-<scratch>/skgconfig.toml <source-set> <output-dir>` (run it from the
+<scratch>/skgconfig.toml <repo-set> <output-dir>` (run it from the
 scratch dir, as the output dir is relative to the working directory).
 
 Good probes: view a nonexistent id (renders an `(skg (unknown ...))`

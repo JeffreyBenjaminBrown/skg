@@ -1,11 +1,11 @@
--- PURPOSE: The interactive source/source-set pickers.
+-- PURPOSE: The interactive repo/repo-set pickers.
 -- The Lua port of the prompt half of elisp/skg-config.el
 -- ('skg--completing-read-with-cycle' and friends). The elisp built
 -- them on completing-read with S-left/S-right cycling in the
 -- minibuffer; here they ride vim.fn.input with TAB completion plus
 -- temporary command-line mappings that cycle via setcmdline. One
--- deviation: the C-? list-all-sources helper key inside the prompt is
--- dropped (few terminals deliver C-?); :SkgViewSourceList shows the
+-- deviation: the C-? list-all-repos helper key inside the prompt is
+-- dropped (few terminals deliver C-?); :SkgViewRepoList shows the
 -- same list.
 
 local config = require('skg.config')
@@ -85,57 +85,57 @@ function M.completing_read_with_cycle (prompt, collection, opts)
   return answer
 end
 
----Choose an owned source, cycling with S-arrows; no prompt when only
----one source is owned. Nil when none are configured or user aborts.
----@param prompt string|nil defaults to 'Source: '
+---Choose an owned repo, cycling with S-arrows; no prompt when only
+---one repo is owned. Nil when none are configured or user aborts.
+---@param prompt string|nil defaults to 'Repo: '
 ---@return string|nil
-function M.prompt_for_owned_source (prompt)
-  local owned = config.owned_sources()
+function M.prompt_for_owned_repo (prompt)
+  local owned = config.owned_repos()
   if not owned or #owned == 0 then
-    vim.notify('No owned skg sources found')
+    vim.notify('No owned skg repos found')
     return nil end
   if #owned == 1 then return owned[1] end
-  return M.completing_read_with_cycle(prompt or 'Source: ', owned, {
+  return M.completing_read_with_cycle(prompt or 'Repo: ', owned, {
     require_match = true, cycle_values = owned })
 end
 
----Choose a source to replace CURRENT_SOURCE: free-typed names are
----accepted, S-arrows cycle owned sources, TAB completes all names.
----@param current_source string
+---Choose a repo to replace CURRENT_REPO: free-typed names are
+---accepted, S-arrows cycle owned repos, TAB completes all names.
+---@param current_repo string
 ---@return string|nil
-function M.prompt_for_source_change (current_source)
-  local owned = config.owned_sources() or {}
-  local names = config.source_names() or {}
+function M.prompt_for_repo_change (current_repo)
+  local owned = config.owned_repos() or {}
+  local names = config.repo_names() or {}
   return M.completing_read_with_cycle(
-    'Source (S-left/right cycle, TAB completes): ', names, {
-      initial_input = current_source, cycle_values = owned })
+    'Repo (S-left/right cycle, TAB completes): ', names, {
+      initial_input = current_repo, cycle_values = owned })
 end
 
----Choose a source-set name, with completion and cycling.
+---Choose a repo-set name, with completion and cycling.
 ---@return string|nil
-function M.prompt_for_source_set ()
-  local source_sets = config.source_set_names()
-  if not source_sets then
-    vim.notify('No skg source-sets found')
+function M.prompt_for_repo_set ()
+  local repo_sets = config.repo_set_names()
+  if not repo_sets then
+    vim.notify('No skg repo-sets found')
     return nil end
   return M.completing_read_with_cycle(
-    'Most private source to make available (S-left/right cycle): ', source_sets, {
-      require_match = true, cycle_values = source_sets,
+    'Most private repo to make available (S-left/right cycle): ', repo_sets, {
+      require_match = true, cycle_values = repo_sets,
       initial_input = 'all' })
 end
 
----Display an org buffer listing configured sources and their paths.
-function M.view_source_list ()
-  local source_paths = config.source_paths()
-  if not source_paths or #source_paths == 0 then
-    vim.notify('No skg sources found')
+---Display an org buffer listing configured repos and their paths.
+function M.view_repo_list ()
+  local repo_paths = config.repo_paths()
+  if not repo_paths or #repo_paths == 0 then
+    vim.notify('No skg repos found')
     return end
   local lines = {}
-  for _, entry in ipairs(source_paths) do
+  for _, entry in ipairs(repo_paths) do
     table.insert(lines,
       string.format('* %s\n%s', entry.name, entry.path))
   end
-  local buf = messages.scratch_org_buffer('skg://sources',
+  local buf = messages.scratch_org_buffer('skg://repos',
                                           table.concat(lines, '\n'))
   vim.api.nvim_set_current_buf(buf)
 end

@@ -97,7 +97,7 @@ backup_and_reset_test_data
 AVAILABLE_PORT=$(find_available_port)
 echo "Using port $AVAILABLE_PORT for test server..."
 
-# NOTE: source path is relative ("skg-data"), and the config itself
+# NOTE: repo path is relative ("skg-data"), and the config itself
 # lives one directory below $TEST_DIR so that a relative-config-path
 # launch yields config.data_root = "data" (also relative) -- the
 # scenario this test is designed to exercise.

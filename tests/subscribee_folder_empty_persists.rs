@@ -53,7 +53,7 @@ async fn empty_subscribee_folder_persists_impl (
   // s subscribes to nothing (fixture has no subscribes_to), but the buffer
   // still shows a subscribeeFolder -- the editable interface the user just emptied.
   let input_org_text : &str = indoc! {"
-    * (skg (node (id s) (source main))) s
+    * (skg (node (id s) (repo main))) s
     ** (skg subscribeeFolder)
   "};
 
@@ -101,7 +101,7 @@ async fn empty_subscriber_folder_removed_impl (
 ) -> Result<(), Box<dyn Error>> {
   // Nobody subscribes to s, but the buffer carries a subscriberFolder under it.
   let input_org_text : &str = indoc! {"
-    * (skg (node (id s) (source main))) s
+    * (skg (node (id s) (repo main))) s
     ** (skg subscriberFolder)
   "};
 

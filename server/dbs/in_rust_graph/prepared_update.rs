@@ -249,7 +249,7 @@ pub(crate) fn prepare_graph_update (
     validate_local_internal_indexes (
       &base, &candidate, &batch . final_graph_definitions, &changes) };
   tracing::info! (
-    "incremental graph work: graph_nodes={} normalized_definitions={} affected_ids={} owners_reindexed={} override_sources_checked={} override_targets_checked={} override_chain_steps={} local_index_keys_checked={} local_node_checks={} local_identity_checks={} local_relationship_checks={}",
+    "incremental graph work: graph_nodes={} normalized_definitions={} affected_ids={} owners_reindexed={} override_repos_checked={} override_targets_checked={} override_chain_steps={} local_index_keys_checked={} local_node_checks={} local_identity_checks={} local_relationship_checks={}",
     base . nodes . len (),
     batch . final_graph_definitions . len (),
     changes . affected_ids . len (),

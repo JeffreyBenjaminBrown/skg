@@ -39,19 +39,19 @@ use skg::types::views_state::{OpenViews, ViewUri};
 /// title to "N-edited" -- a real change, so saving forks N. (N's
 /// children stay write-protected foreign content.)
 const FORK_BUFFER : &str = indoc! {"
-  * (skg (node (id P) (source owned))) P-container
-  ** (skg (node (id N) (source foreign))) N-edited
-  *** (skg (node (id N1) (source foreign) writeProtected)) N1
-  *** (skg (node (id N2) (source foreign) writeProtected)) N2
+  * (skg (node (id P) (repo owned))) P-container
+  ** (skg (node (id N) (repo foreign))) N-edited
+  *** (skg (node (id N1) (repo foreign) writeProtected)) N1
+  *** (skg (node (id N2) (repo foreign) writeProtected)) N2
   "};
 
 /// A foreign node N opened as a bare ROOT -- no owned ancestor to infer
 /// a clone repo from. Editing its title forks it; the clone's repo
 /// must then default to the user's first owned repo.
 const FORK_ROOT_BUFFER : &str = indoc! {"
-  * (skg (node (id N) (source foreign))) N-edited
-  ** (skg (node (id N1) (source foreign) writeProtected)) N1
-  ** (skg (node (id N2) (source foreign) writeProtected)) N2
+  * (skg (node (id N) (repo foreign))) N-edited
+  ** (skg (node (id N1) (repo foreign) writeProtected)) N1
+  ** (skg (node (id N2) (repo foreign) writeProtected)) N2
   "};
 
 /// Case 1 of TODO/fork-fixes.org: a BARE new headline (no metadata at
@@ -60,9 +60,9 @@ const FORK_ROOT_BUFFER : &str = indoc! {"
 /// error -- appending it edits N's contains, which forks N, and the
 /// new node rides that fork, adopting the clone's repo.
 const FORK_WITH_BARE_NEW_CHILD_BUFFER : &str = indoc! {"
-  * (skg (node (id N) (source foreign))) N-original
-  ** (skg (node (id N1) (source foreign) writeProtected)) N1
-  ** (skg (node (id N2) (source foreign) writeProtected)) N2
+  * (skg (node (id N) (repo foreign))) N-original
+  ** (skg (node (id N1) (repo foreign) writeProtected)) N1
+  ** (skg (node (id N2) (repo foreign) writeProtected)) N2
   ** Can I add to this?
   "};
 
@@ -70,20 +70,20 @@ const FORK_WITH_BARE_NEW_CHILD_BUFFER : &str = indoc! {"
 /// then move old content N1 beneath it. The new node and its inherited
 /// `contains N1` edge must both adopt the clone's owned repo.
 const FORK_WITH_NEW_PARENT_FOR_OLD_CHILD_BUFFER : &str = indoc! {"
-  * (skg (node (id N) (source foreign))) N-original
+  * (skg (node (id N) (repo foreign))) N-original
   ** New parent
-  *** (skg (node (id N1) (source foreign) writeProtected)) N1
-  ** (skg (node (id N2) (source foreign) writeProtected)) N2
+  *** (skg (node (id N1) (repo foreign) writeProtected)) N1
+  ** (skg (node (id N2) (repo foreign) writeProtected)) N2
   "};
 
 /// Same shape, but the new node EXPLICITLY claims the foreign repo:
 /// a deliberate attempt to create a node in a read-only repo, which
 /// must stay rejected.
 const FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER : &str = indoc! {"
-  * (skg (node (id N) (source foreign))) N-original
-  ** (skg (node (id N1) (source foreign) writeProtected)) N1
-  ** (skg (node (id N2) (source foreign) writeProtected)) N2
-  ** (skg (node (source foreign))) Can I add to this?
+  * (skg (node (id N) (repo foreign))) N-original
+  ** (skg (node (id N1) (repo foreign) writeProtected)) N1
+  ** (skg (node (id N2) (repo foreign) writeProtected)) N2
+  ** (skg (node (repo foreign))) Can I add to this?
   "};
 
 /// The explicit 'skg-fork-node' gesture: an OWNED node (P) carries
@@ -91,14 +91,14 @@ const FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER : &str = indoc! {"
 /// own save; saving adds a clone C that overrides P, built from P's disk
 /// snapshot.
 const EXPLICIT_FORK_BUFFER : &str = indoc! {"
-  * (skg (node (id P) (source owned) (viewRequests fork))) P-container
-  ** (skg (node (id N) (source foreign) writeProtected)) N
+  * (skg (node (id P) (repo owned) (viewRequests fork))) P-container
+  ** (skg (node (id N) (repo foreign) writeProtected)) N
   "};
 
 /// An explicit fork request on a brand-new (id-less) headline: enrichment
 /// mints a fresh pid that is not in the graph, so the fork is rejected.
 const EXPLICIT_FORK_UNKNOWN_BUFFER : &str = indoc! {"
-  * (skg (node (source owned) (viewRequests fork))) Brand New
+  * (skg (node (repo owned) (viewRequests fork))) Brand New
   "};
 
 fn clone_overriding_on_disk (
@@ -170,7 +170,7 @@ fn all_tests
       s . reset ("fork_monogamy", fixtures) ?;
       fork_monogamy (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("fork_source_inactive", fixtures) ?;
+      s . reset ("fork_repo_inactive", fixtures) ?;
       fork_repo_inactive (
         &s . config ) . await ?;
       s . reset ("fork_confirmation_gates_commit", fixtures) ?;
@@ -179,7 +179,7 @@ fn all_tests
       s . reset ("fork_from_bare_new_child_plan", fixtures) ?;
       fork_from_bare_new_child_plan (
         &s . config ) . await ?;
-      s . reset ("fork_new_parent_adopts_relationship_sources", fixtures) ?;
+      s . reset ("fork_new_parent_adopts_relationship_repos", fixtures) ?;
       fork_new_parent_adopts_relationship_repos (
         &s . config ) . await ?;
       s . reset ("fork_from_bare_new_child_commits", fixtures) ?;
@@ -192,19 +192,19 @@ fn all_tests
       s . reset ("fork_no_owned_ancestor_defaults", two_owned) ?;
       fork_no_owned_ancestor_defaults (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("fork_user_set_source_overrides", two_owned) ?;
+      s . reset ("fork_user_set_repo_overrides", two_owned) ?;
       fork_user_set_repo_overrides (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("fork_default_prefers_active_owned_source", two_owned) ?;
+      s . reset ("fork_default_prefers_active_owned_repo", two_owned) ?;
       fork_default_prefers_active_owned_repo (
         &s . config ) . await ?;
-      s . reset ("fork_user_set_source_not_owned_rejected", two_owned) ?;
+      s . reset ("fork_user_set_repo_not_owned_rejected", two_owned) ?;
       fork_user_set_repo_not_owned_rejected (
         &s . config ) . await ?;
-      s . reset ("explicit_new_child_source_confirms_clone_source", two_owned) ?;
+      s . reset ("explicit_new_child_repo_confirms_clone_repo", two_owned) ?;
       explicit_new_child_repo_confirms_clone_repo (
         &s . config ) . await ?;
-      s . reset ("disagreeing_new_child_sources_leave_clone_source_unconfirmed", two_owned) ?;
+      s . reset ("disagreeing_new_child_repos_leave_clone_repo_unconfirmed", two_owned) ?;
       disagreeing_new_child_repos_leave_clone_repo_unconfirmed (
         &s . config ) . await ?;
       s . reset ("explicit_fork_save_instruction", fixtures) ?;
@@ -242,7 +242,7 @@ async fn explicit_fork_save_instruction (
   assert_eq! ( members_of ( c . overrides_view_of . or_default () ), vec! [ ID::from ("P") ],
     "clone overrides P" );
   assert_eq! ( c . home_repo, RepoName::from ("owned"),
-    "clone defaults to the config-first owned source; got {:?}",
+    "clone defaults to the config-first owned repo; got {:?}",
     c . home_repo );
   assert_ne! ( c . pid, ID::from ("P"),
     "clone has a fresh pid, not P's" );
@@ -287,7 +287,7 @@ async fn explicit_fork_round_trip_and_monogamy (
   assert_eq! ( members_of ( clone . subscribes_to . or_default () ), vec! [ ID::from ("P") ],
     "the clone subscribes to P" );
   assert! ( config . user_owns_repo (& clone . home_repo),
-    "the clone lives in an owned source" );
+    "the clone lives in an owned repo" );
   // P is untouched (still owns its container role).
   assert_eq! ( members_of (& node_from_disk (config, "P") ? . contains),
                vec! [ ID::from ("N") ],
@@ -323,7 +323,7 @@ async fn fork_default_prefers_active_owned_repo (
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
     FORK_ROOT_BUFFER, config, Some (&active) )  ?;
   assert_eq! ( save_plan . fork_specs . len (), 1,
-    "the fork must resolve, not dead-end on an inactive default source" );
+    "the fork must resolve, not dead-end on an inactive default repo" );
   assert_eq! ( save_plan . fork_specs[0] . clone . 0 . home_repo,
                RepoName::from ("owned2"),
     "with 'owned' inactive, the default must prefer the active owned 'owned2'; got {:?}",
@@ -346,9 +346,9 @@ async fn fork_user_set_repo_not_owned_rejected (
         BufferValidationError::ForkRepoNotOwned (orig, repo)
           if *orig == ID::from ("N")
              && *repo == RepoName::from ("foreign") )),
-        "expected ForkSourceNotOwned(N, foreign), got {:?}", errors ); }
+        "expected ForkRepoNotOwned(N, foreign), got {:?}", errors ); }
     other => panic! (
-      "expected ForkSourceNotOwned rejecting a non-owned chosen source, got {:?}",
+      "expected ForkRepoNotOwned rejecting a non-owned chosen repo, got {:?}",
       other ), }
   Ok (( )) }
 
@@ -372,8 +372,8 @@ async fn fork_no_owned_ancestor_defaults (
     "a fork with no owned ancestor must complete: {:?}", response . errors );
   let c : NodeComplete = clone_on_disk (config) ?;
   assert_eq! ( c . home_repo, RepoName::from ("owned"),
-    "with no owned ancestor and no user-set source, the clone defaults to \
-     the first owned source (alphabetically 'owned'); got {:?}", c . home_repo );
+    "with no owned ancestor and no user-set repo, the clone defaults to \
+     the first owned repo (alphabetically 'owned'); got {:?}", c . home_repo );
   let root_line : &str = response . saved_view . lines () . next ()
     . ok_or ("the saved root view must not be empty") ?;
   assert! ( root_line . contains (&format! ("(id {})", c . pid . 0))
@@ -407,7 +407,7 @@ async fn fork_user_set_repo_overrides (
     "the user-set fork must commit: {:?}", response . errors );
   let c : NodeComplete = clone_on_disk (config) ?;
   assert_eq! ( c . home_repo, RepoName::from ("owned2"),
-    "the user-set source 'owned2' must override the inferred 'owned'; \
+    "the user-set repo 'owned2' must override the inferred 'owned'; \
      got {:?}", c . home_repo );
   Ok (( )) }
 
@@ -419,29 +419,29 @@ async fn explicit_new_child_repo_confirms_clone_repo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let buffer : &str = indoc! {"
-    * (skg (node (id N) (source foreign))) N-original
-    ** (skg (node (id N1) (source foreign) writeProtected)) N1
-    ** (skg (node (id N2) (source foreign) writeProtected)) N2
-    ** (skg (node (source owned2))) Can I add to this?
+    * (skg (node (id N) (repo foreign))) N-original
+    ** (skg (node (id N1) (repo foreign) writeProtected)) N1
+    ** (skg (node (id N2) (repo foreign) writeProtected)) N2
+    ** (skg (node (repo owned2))) Can I add to this?
     "};
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
     buffer, config, None )  ?;
   assert_eq! ( save_plan . fork_specs . len (), 1 );
   let spec : &ForkSpec = & save_plan . fork_specs[0];
   assert_eq! ( spec . clone . 0 . home_repo, RepoName::from ("owned2"),
-    "the clone's source must be the new child's explicit source" );
+    "the clone's repo must be the new child's explicit repo" );
   assert! ( spec . repo_confirmed,
-    "an explicitly-specified source must be confirmed" );
+    "an explicitly-specified repo must be confirmed" );
   let confirmation : String =
     skg::from_text::fork::build_fork_confirmation_buffer (
       & save_plan . fork_specs );
-  assert! ( confirmation . contains ("(source owned2)"),
-    "the buffer must show the specified source as settled:\n{}",
+  assert! ( confirmation . contains ("(repo owned2)"),
+    "the buffer must show the specified repo as settled:\n{}",
     confirmation );
-  assert! ( ! confirmation . contains ("(source PICK-A-SOURCE)"),
+  assert! ( ! confirmation . contains ("(repo PICK-A-REPO)"),
     // (The instructions body may MENTION the placeholder; only the
     // metadata form matters.)
-    "no placeholder source when the source was specified:\n{}",
+    "no placeholder repo when the repo was specified:\n{}",
     confirmation );
   Ok (( )) }
 
@@ -452,15 +452,15 @@ async fn disagreeing_new_child_repos_leave_clone_repo_unconfirmed (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let buffer : &str = indoc! {"
-    * (skg (node (id N) (source foreign))) N-original
-    ** (skg (node (source owned))) New thing one
-    ** (skg (node (source owned2))) New thing two
+    * (skg (node (id N) (repo foreign))) N-original
+    ** (skg (node (repo owned))) New thing one
+    ** (skg (node (repo owned2))) New thing two
     "};
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
     buffer, config, None )  ?;
   assert_eq! ( save_plan . fork_specs . len (), 1 );
   assert! ( ! save_plan . fork_specs[0] . repo_confirmed,
-    "disagreeing explicit child sources must not confirm a clone source" );
+    "disagreeing explicit child repos must not confirm a clone repo" );
   Ok (( )) }
 
 /// The confirmation stage: a save that finds forks but is NOT approved
@@ -532,7 +532,7 @@ async fn fork_from_bare_new_child_plan (
         _ => None } )
     . expect ("the new node must survive as a Save instruction");
   assert_eq! ( new_node . home_repo, clone . home_repo,
-    "the new node must adopt the clone's source" );
+    "the new node must adopt the clone's repo" );
   assert_eq! ( new_node . pid, clone . contains [2] . member,
     "the clone's last child must be the new node" );
   Ok (( )) }
@@ -553,11 +553,11 @@ async fn fork_new_parent_adopts_relationship_repos (
         _ => None } )
     . expect ("the new parent must survive as a Save instruction");
   assert_eq! (new_parent . home_repo, clone_repo,
-    "the new parent must adopt the clone's source");
+    "the new parent must adopt the clone's repo");
   assert_eq! (members_of (&new_parent . contains), vec![ID::from ("N1")]);
   assert! (new_parent . contains . iter ()
            . all (|member| member . relRepo == clone_repo),
-    "the new parent's inherited relationships must adopt the clone source: {:?}",
+    "the new parent's inherited relationships must adopt the clone repo: {:?}",
     new_parent . contains);
   Ok (( )) }
 
@@ -587,7 +587,7 @@ async fn fork_from_bare_new_child_commits (
     . find ( |node| node . title == "Can I add to this?" )
     . ok_or ("the new node must be on disk") ?;
   assert_eq! ( new_node . home_repo, clone . home_repo,
-    "the new node must land in the clone's source" );
+    "the new node must land in the clone's repo" );
   assert_eq! ( clone . home_repo, RepoName::from ("owned") );
   assert! ( clone . contains . iter () . any ( |m| m . member == new_node . pid ),
     "the clone must contain the new node: {:?}", clone . contains );
@@ -596,7 +596,7 @@ async fn fork_from_bare_new_child_commits (
     "N's own contains must be untouched" );
   Ok (( )) }
 
-/// An EXPLICITLY foreign-repod new node stays a rejection: only an
+/// An EXPLICITLY foreign-repo new node stays a rejection: only an
 /// inherited (guessed) foreign repo rides the fork.
 async fn explicitly_foreign_new_child_still_rejected (
   config : &SkgConfig,
@@ -664,9 +664,9 @@ async fn fork_repo_inactive (
         BufferValidationError::ForkRepoInactive (orig, repo)
           if *orig == ID::from ("N")
              && *repo == RepoName::from ("owned") )),
-        "expected ForkSourceInactive(N, owned), got {:?}", errors ); }
+        "expected ForkRepoInactive(N, owned), got {:?}", errors ); }
     other => panic! (
-      "expected ForkSourceInactive, got {:?}", other ), }
+      "expected ForkRepoInactive, got {:?}", other ), }
   Ok (( )) }
 
 /// The SavePlan a foreign edit produces carries one ForkSpec whose
@@ -694,9 +694,9 @@ async fn fork_save_instruction (
   assert! ( c . hides_from_its_subscriptions . or_default () . is_empty (),
     "clone records no hides" );
   assert! ( config . user_owns_repo (& c . home_repo),
-    "clone lives in an owned source, got {:?}", c . home_repo );
+    "clone lives in an owned repo, got {:?}", c . home_repo );
   assert_eq! ( c . home_repo, RepoName::from ("owned"),
-    "clone's source is inferred from the owned ancestor P" );
+    "clone's repo is inferred from the owned ancestor P" );
   assert_ne! ( c . pid, ID::from ("N"),
     "clone has a fresh pid, not N's" );
   Ok (( )) }

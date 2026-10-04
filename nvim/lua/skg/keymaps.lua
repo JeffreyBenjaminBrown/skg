@@ -91,10 +91,10 @@ M.commands = {
                       desc = 'Make this view of its node read-only' },
   SetMergeRequest = { module = 'skg.metadata', fn = 'set_merge_request',
                       desc = 'Request merging another node into this one' },
-  SetSource = { module = 'skg.metadata', fn = 'set_source',
-                desc = "Change the node's source (in-buffer; save applies)" },
-  SetSourceRecursive = { module = 'skg.metadata', fn = 'set_source_recursive',
-                         desc = 'Change source here and in matching descendants' },
+  SetRepo = { module = 'skg.metadata', fn = 'set_repo',
+                desc = "Change the node's repo (in-buffer; save applies)" },
+  SetRepoRecursive = { module = 'skg.metadata', fn = 'set_repo_recursive',
+                         desc = 'Change repo here and in matching descendants' },
   SetPropertySearchMatching = { module = 'skg.boolprop', fn = 'set_search_matching',
                                 desc = 'Stage search matching for this node' },
   SetPropertySearchMatchingRecursive = { module = 'skg.boolprop',
@@ -109,14 +109,14 @@ M.commands = {
   ViewDiffMode = { module = 'skg.diff_mode', fn = 'toggle',
                    desc = 'Toggle git diff annotations in all views' },
   ViewNewEmpty = { module = 'skg.view_new_empty', fn = 'view_new_empty',
-                   desc = 'Open a fresh root node in a chosen source' },
+                   desc = 'Open a fresh root node in a chosen repo' },
   HeraldsToggle = { module = 'skg.heralds', fn = 'toggle',
                     desc = 'Toggle herald display of metadata', pass_buf = true },
-  ToggleSourceOverlayOnLinks = {
-    module = 'skg.link_annotations', fn = 'toggle_source_overlay',
-    desc = 'Toggle source suffixes on Skg links', pass_buf = true },
-  LimitSourceSet = { module = 'skg.source_sets', fn = 'set_active_source_set',
-                     desc = 'Limit display and search to one source-set' },
+  ToggleRepoOverlayOnLinks = {
+    module = 'skg.link_annotations', fn = 'toggle_repo_overlay',
+    desc = 'Toggle repo suffixes on Skg links', pass_buf = true },
+  LimitRepoSet = { module = 'skg.repo_sets', fn = 'set_active_repo_set',
+                     desc = 'Limit display and search to one repo-set' },
   ViewMetadata = { module = 'skg.metadata_edit', fn = 'edit_metadata',
                    desc = "Edit the node's metadata as an org tree" },
   ViewOrgAncestry = { module = 'skg.org_ancestry', fn = 'view_org_ancestry',
@@ -151,13 +151,13 @@ M.commands = {
                                   fn = 'git_add_if_new_recursive_preview',
                                   desc = 'Preview the git add script for this subtree' },
   StageMoves = { module = 'skg.stage_moves', fn = 'stage_moves',
-                 desc = 'Script staging cross-source node moves' },
+                 desc = 'Script staging cross-repo node moves' },
   DiffReport = { module = 'skg.diff_report', fn = 'diff_report',
                  desc = 'Semantic report of git-visible graph changes' },
   ExportToOrg = { module = 'skg.export', fn = 'export_some_to_org',
-                  desc = 'Export a source-set to plain .org files' },
+                  desc = 'Export a repo-set to plain .org files' },
   ImportMdAndOrg = { module = 'skg.import_md_and_org', fn = 'import_md_and_org',
-                     desc = 'Preview and import Markdown/Org into an owned source' },
+                     desc = 'Preview and import Markdown/Org into an owned repo' },
   RebuildEphemeralDataStores = { module = 'skg.misc_requests', fn = 'rebuild_ephemeral_data_stores',
                  desc = 'Rebuild the graph and Tantivy from the .skg files' },
   StripBodyWhitespace = { module = 'skg.misc_requests',
@@ -165,12 +165,12 @@ M.commands = {
                           desc = 'Strip trailing whitespace from every body on disk' },
   CloseAllSkgBuffers = { module = 'skg.buffer', fn = 'close_all_skg_buffers',
                          desc = 'Kill every skg view buffer' },
-  ListSourceSets = { module = 'skg.source_sets', fn = 'list_source_sets',
-                     desc = 'List the configured source-sets' },
-  ActiveSourceSet = { module = 'skg.source_sets', fn = 'active_source_set',
-                      desc = 'Echo the active source-set' },
-  ViewSourceList = { module = 'skg.picker', fn = 'view_source_list',
-                     desc = 'List configured sources and their paths' },
+  ListRepoSets = { module = 'skg.repo_sets', fn = 'list_repo_sets',
+                     desc = 'List the configured repo-sets' },
+  ActiveRepoSet = { module = 'skg.repo_sets', fn = 'active_repo_set',
+                      desc = 'Echo the active repo-set' },
+  ViewRepoList = { module = 'skg.picker', fn = 'view_repo_list',
+                     desc = 'List configured repos and their paths' },
   BeginningOfLine = { module = 'skg.metadata', fn = 'beginning_of_line',
                       desc = 'Toggle between line start and title start' },
 }
@@ -205,7 +205,7 @@ function M.define_ex_commands ()
 end
 
 ---The content-view keybindings: {lhs, command-name} pairs under
----<localleader>, plus motions. The single source of truth for the
+---<localleader>, plus motions. The single repo of truth for the
 ---C-c chord translations; docs/COMMANDS-nvim.org is generated to
 ---match.
 M.content_view_bindings = {
@@ -241,8 +241,8 @@ M.content_view_bindings = {
   { 'sd', 'SetDefinitive' },             -- C-c s d
   { 'sw', 'SetWriteProtected' },          -- C-c s w
   { 'sm', 'SetMergeRequest' },           -- C-c s m
-  { 'ss', 'SetSource' },                 -- C-c s s
-  { 'sS', 'SetSourceRecursive' },        -- C-c s S
+  { 'ss', 'SetRepo' },                 -- C-c s s
+  { 'sS', 'SetRepoRecursive' },        -- C-c s S
   { 'sx', 'SetPropertySearchMatching' },
   { 'sX', 'SetPropertySearchMatchingRecursive' },
   { 'mc', 'ReplaceLinkWithContent' },    -- C-c m c
@@ -251,8 +251,8 @@ M.content_view_bindings = {
   { 'vd', 'ViewDiffMode' },              -- C-c v d
   { 've', 'ViewNewEmpty' },              -- C-c v e
   { 'vh', 'HeraldsToggle' },             -- C-c v h
-  { 'vl', 'LimitSourceSet' },            -- C-c v l
-  { 'vL', 'ToggleSourceOverlayOnLinks' }, -- C-c v L
+  { 'vl', 'LimitRepoSet' },            -- C-c v l
+  { 'vL', 'ToggleRepoOverlayOnLinks' }, -- C-c v L
   { 'vm', 'ViewMetadata' },              -- C-c v m
   { 'vo', 'ViewOrgAncestry' },           -- C-c v o
   { 'vr', 'ReadableIdsToggle' },         -- C-c v r
@@ -289,7 +289,7 @@ M.report_bindings = {
   { 'gi', 'GotoById' }, { 'Gi', 'GotoByIdAndCloseThis' },
   { 'gm', 'GotoInGit' }, { 'Gm', 'GotoInGitAndCloseThis' },
   { 'gM', 'GotoInGitParent' }, { 'GM', 'GotoInGitParentAndCloseThis' },
-  { 've', 'ViewNewEmpty' }, { 'vl', 'LimitSourceSet' },
+  { 've', 'ViewNewEmpty' }, { 'vl', 'LimitRepoSet' },
   { 'vs', 'ViewIdStack' },
   { 'in', 'IdNext' }, { 'ip', 'IdPrev' },
   { 'u', 'IdPush' },

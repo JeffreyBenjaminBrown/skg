@@ -11,7 +11,7 @@
 (defun test--with-skg-content-view (org-text config-text body-fn)
   "Run BODY-FN in a temp skg content-view buffer with ORG-TEXT.
 CONFIG-TEXT is written to a temporary skgconfig.toml so that
-skg-config-dir is set and skg--owned-sources works."
+skg-config-dir is set and skg--owned-repos works."
   (let* ((config-dir (make-temp-file "skg-test-config" t))
          (config-file (expand-file-name "skgconfig.toml" config-dir))
          (skg-config-dir (file-name-as-directory config-dir)))
@@ -26,7 +26,7 @@ skg-config-dir is set and skg--owned-sources works."
       (delete-file config-file)
       (delete-directory config-dir))))
 
-(defvar test--config-two-owned-sources
+(defvar test--config-two-owned-repos
   (concat "[[repos]]\n"
           "name = \"public\"\n"
           "path = \"owned/public\"\n\n"
@@ -34,14 +34,14 @@ skg-config-dir is set and skg--owned-sources works."
           "name = \"private\"\n"
           "path = \"owned/private\"\n"
           "")
-  "Config text with two owned sources (paths under owned/ = owned).")
+  "Config text with two owned repos (paths under owned/ = owned).")
 
 (ert-deftest test-insert-heading-at-root ()
-  "C-return on a root headline prompts for source in the minibuffer
-and inserts metadata with the chosen source on the new headline."
+  "C-return on a root headline prompts for repo in the minibuffer
+and inserts metadata with the chosen repo on the new headline."
   (test--with-skg-content-view
-   "* (skg (node (id a) (source public))) a\n"
-   test--config-two-owned-sources
+   "* (skg (node (id a) (repo public))) a\n"
+   test--config-two-owned-repos
    (lambda ()
      (let ((source-buffer (current-buffer)))
 
@@ -49,7 +49,7 @@ and inserts metadata with the chosen source on the new headline."
        (should (org-at-heading-p))
        (should (= (org-outline-level) 1))
 
-       ;; C-return: inserts a new heading and prompts for source.
+       ;; C-return: inserts a new heading and prompts for repo.
        (cl-letf (((symbol-function 'completing-read)
                   (lambda (_prompt _coll &rest _) "private")))
          (org-insert-heading-respect-content))
@@ -60,11 +60,11 @@ and inserts metadata with the chosen source on the new headline."
                          (point-min) (point-max))))
            ;; Original headline unchanged.
            (should (string-match-p
-                    "^\\* (skg (node (id a) (source public))) a$"
+                    "^\\* (skg (node (id a) (repo public))) a$"
                     content))
-           ;; New headline has metadata with chosen source.
+           ;; New headline has metadata with chosen repo.
            (should (string-match-p
-                    "^\\* (skg (node (source private))) $"
+                    "^\\* (skg (node (repo private))) $"
                     content))
            (should (= 2 (how-many "^\\* " (point-min) (point-max))))))
 

@@ -225,11 +225,11 @@ describe('skg.heralds', function ()
 
   it('displays staged/unstaged axes', function ()
     local removed =
-      herald_text('(skg (node (id 1) (source s) (unstaged removedM)))')
+      herald_text('(skg (node (id 1) (repo s) (unstaged removedM)))')
     assert.is_truthy(removed:find('unstaged'))
     assert.is_truthy(removed:find('M'))
     local new_both =
-      herald_text('(skg (node (id 2) (source s) (unstaged newX newM)))')
+      herald_text('(skg (node (id 2) (repo s) (unstaged newX newM)))')
     assert.is_truthy(new_both:find('unstaged'))
     assert.is_truthy(new_both:find('X'))
     assert.is_truthy(new_both:find('M'))
@@ -242,7 +242,7 @@ describe('skg.heralds', function ()
 
   it('displays the inactive-node placeholder in blue', function ()
     local chunks = heralds.chunks_from_metadata('(skg inactiveNode)')
-    assert.are.equal('node from inactive source',
+    assert.are.equal('node from inactive repo',
                      heralds.chunks_text(chunks))
     assert.are.equal('SkgHeraldBlue', chunks[1][2])
   end)
@@ -254,7 +254,7 @@ describe('skg.heralds', function ()
     local original = herald_rules.request_herald_rules
     herald_rules.request_herald_rules = install_fixture_rules
     local buf = scratch_buffer_with({
-      '(skg (node (id 1) (source s) (rels (contains (out 2)))))' })
+      '(skg (node (id 1) (repo s) (rels (contains (out 2)))))' })
     local enabled = heralds.enable(buf)
     herald_rules.request_herald_rules = original
     assert.is_true(enabled)

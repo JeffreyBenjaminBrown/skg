@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Migrate a config (and its data tree) to the author-folder layout:
-# every OWNED source's directory moves under the owned folder
+# every OWNED repo's directory moves under the owned folder
 # (default "owned"), its 'path' in the config is updated, and the
-# retired 'user_owns_it' lines are deleted. Foreign sources are left
+# retired 'user_owns_it' lines are deleted. Foreign repos are left
 # where they are (anything not under the owned folder is foreign).
 #
 # USAGE:
@@ -28,7 +28,7 @@ if "user_owns_it" not in text:
     print(f"{config_path}: already migrated (no user_owns_it); nothing to do")
     sys.exit(0)
 
-blocks = re.split(r'(?=^\[\[sources\]\]$)', text, flags=re.M)
+blocks = re.split(r'(?=^\[\[repos\]\]$)', text, flags=re.M)
 out = [blocks[0]]
 for block in blocks[1:]:
     m_path = re.search(r'^path[ \t]*=[ \t]*"([^"]+)"', block, flags=re.M)
@@ -42,7 +42,7 @@ for block in blocks[1:]:
             new_dir = data_root / new_rel
             if old_dir.exists():
                 if str(new_dir).startswith(str(old_dir) + "/"):
-                    # e.g. a source whose path IS the owned folder's
+                    # e.g. a repo whose path IS the owned folder's
                     # name: "owned" -> "owned/owned" needs a hop.
                     tmp = data_root / (old_rel + ".migrating")
                     shutil.move(str(old_dir), str(tmp))

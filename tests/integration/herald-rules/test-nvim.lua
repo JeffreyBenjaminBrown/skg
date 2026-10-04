@@ -26,7 +26,7 @@ end
 
 -- The fetched table should drive the lens engine end to end.
 local chunks = heralds.chunks_from_metadata(
-  '(skg (node (id 1) (source main) writeProtected))')
+  '(skg (node (id 1) (repo main) writeProtected))')
 local herald_text = chunks and heralds.chunks_text(chunks) or nil
 
 if herald_text and herald_text:find('☮', 1, true) then

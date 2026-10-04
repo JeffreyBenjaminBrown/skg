@@ -1,6 +1,6 @@
 -- PURPOSE: Read configuration from skgconfig.toml.
 -- The Lua port of elisp/skg-config.el's parsing half. The interactive
--- source pickers that elisp kept in the same file (built on
+-- repo pickers that elisp kept in the same file (built on
 -- completing-read with S-arrow cycling) live in skg.picker instead,
 -- since they are UI, not parsing. Like the elisp, this is a
 -- hand-rolled line scan of the narrow TOML subset skgconfig.toml
@@ -50,8 +50,8 @@ function M.port_from_toml (file)
 end
 
 ---The `owned_folder' setting from FILE, defaulting to 'owned'.
----Sources whose path sits under this folder are owned; all others
----are foreign. Replaces the retired per-source 'user_owns_it' key.
+---Repos whose path sits under this folder are owned; all others
+---are foreign. Replaces the retired per-repo 'user_owns_it' key.
 ---@param file string
 ---@return string
 function M.owned_folder_from_toml (file)
@@ -62,39 +62,39 @@ function M.owned_folder_from_toml (file)
   return 'owned'
 end
 
----Names of the OWNED sources in FILE, in declaration order. A source
+---Names of the OWNED repos in FILE, in declaration order. A repo
 ---is owned iff its path (resolved against FILE's directory, the data
 ---root) sits under the data root's owned_folder (default 'owned') --
----the author-folder layout, mirroring the server's rule. A source
+---the author-folder layout, mirroring the server's rule. A repo
 ---with no 'name' key defaults its name to its path, also mirroring
 ---the server.
 ---@param file string
 ---@return string[]
-function M.owned_sources_from_toml (file)
+function M.owned_repos_from_toml (file)
   local owned_folder = M.owned_folder_from_toml(file)
   local data_root = file:match('^(.*/)') or './'
   local owned_root = data_root .. owned_folder .. '/'
-  local sources = {}
-  local in_sources = false
+  local repos = {}
+  local in_repos = false
   local current_name, current_path = nil, nil
   local function flush ()
-    if in_sources and current_path then
+    if in_repos and current_path then
       local abs = current_path
       if not abs:match('^/') then abs = data_root .. abs end
       if not abs:match('/$') then abs = abs .. '/' end
       if abs == owned_root
          or abs:sub(1, #owned_root) == owned_root
       then
-        table.insert(sources, current_name or current_path) end
+        table.insert(repos, current_name or current_path) end
     end
     current_name, current_path = nil, nil
   end
   for _, line in ipairs(trimmed_lines(file)) do
     if line:match('^%[%[repos%]%]') then
-      flush(); in_sources = true
+      flush(); in_repos = true
     elseif line:match('^%[%[') then
-      flush(); in_sources = false
-    elseif in_sources then
+      flush(); in_repos = false
+    elseif in_repos then
       local name = line:match('^name[ \t]*=[ \t]*"([^"]+)"')
       local path = line:match('^path[ \t]*=[ \t]*"([^"]+)"')
       if name then current_name = name end
@@ -102,7 +102,7 @@ function M.owned_sources_from_toml (file)
     end
   end
   flush()
-  return sources
+  return repos
 end
 
 ---Name strings from each [[TABLE_NAME]] entry in FILE.
@@ -125,18 +125,18 @@ function M.table_names_from_toml (file, table_name)
 end
 
 ---@param file string
----@return string[] configured source names
-function M.source_names_from_toml (file)
+---@return string[] configured repo names
+function M.repo_names_from_toml (file)
   return M.table_names_from_toml(file, 'repos')
 end
 
 ---Pairs of {name, absolute dir} for each [[repos]] entry in FILE.
----Relative source paths are resolved against the directory of FILE,
+---Relative repo paths are resolved against the directory of FILE,
 ---matching what the server's 'make_paths_absolute' does at
 ---config-load time.
 ---@param file string
 ---@return table[] each {name = ..., path = ...}
-function M.source_paths_from_toml (file)
+function M.repo_paths_from_toml (file)
   local config_dir = vim.fn.fnamemodify(file, ':h')
   local result = {}
   local current_table = nil
@@ -175,52 +175,52 @@ end
 -- ── wrappers over the active config ────────────────────────────────
 
 ---@return table[]|nil (name, absolute-path) pairs, or nil without config
-function M.source_paths ()
+function M.repo_paths ()
   local file = M.config_file()
-  return file and M.source_paths_from_toml(file) or nil
+  return file and M.repo_paths_from_toml(file) or nil
 end
 
 ---@return string[]|nil
-function M.source_names ()
+function M.repo_names ()
   local file = M.config_file()
-  return file and M.source_names_from_toml(file) or nil
+  return file and M.repo_names_from_toml(file) or nil
 end
 
----The source-set choices, in privacy order, ending with 'all'.
----A source-set is a prefix of the config's privacy order: each
----source names the set of itself and everything more public;
----'all' means every source.
----@return string[]|nil source-set choices, 'all' last, or nil
-function M.source_set_names ()
+---The repo-set choices, in privacy order, ending with 'all'.
+---A repo-set is a prefix of the config's privacy order: each
+---repo names the set of itself and everything more public;
+---'all' means every repo.
+---@return string[]|nil repo-set choices, 'all' last, or nil
+function M.repo_set_names ()
   local file = M.config_file()
   if not file then return nil end
-  local names = M.source_names_from_toml(file)
+  local names = M.repo_names_from_toml(file)
   table.insert(names, 'all')
   return names
 end
 
----@return string[]|nil owned source names, or nil without config
-function M.owned_sources ()
+---@return string[]|nil owned repo names, or nil without config
+function M.owned_repos ()
   local file = M.config_file()
-  return file and M.owned_sources_from_toml(file) or nil
+  return file and M.owned_repos_from_toml(file) or nil
 end
 
----@param source_name string
----@return string|nil absolute directory for SOURCE_NAME, or nil
-function M.source_dir (source_name)
-  for _, entry in ipairs(M.source_paths() or {}) do
-    if entry.name == source_name then return entry.path end
+---@param repo_name string
+---@return string|nil absolute directory for REPO_NAME, or nil
+function M.repo_dir (repo_name)
+  for _, entry in ipairs(M.repo_paths() or {}) do
+    if entry.name == repo_name then return entry.path end
   end
   return nil
 end
 
----The absolute path of ID.skg within SOURCE's directory, or nil if
----SOURCE is not declared in the config.
+---The absolute path of ID.skg within REPO's directory, or nil if
+---REPO is not declared in the config.
 ---@param id string
----@param source string
+---@param repo string
 ---@return string|nil
-function M.abs_path_for_id_and_source (id, source)
-  local dir = M.source_dir(source)
+function M.abs_path_for_id_and_repo (id, repo)
+  local dir = M.repo_dir(repo)
   if dir then return dir .. '/' .. id .. '.skg' end
   return nil
 end

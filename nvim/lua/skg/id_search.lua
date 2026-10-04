@@ -115,13 +115,13 @@ function M.extract_id_from_metadata_sexp (sexp)
   return nil
 end
 
----The source from SEXP, same shapes as the id extractor.
+---The repo from SEXP, same shapes as the id extractor.
 ---@param sexp any
 ---@return string|nil
-function M.extract_source_from_metadata_sexp (sexp)
+function M.extract_repo_from_metadata_sexp (sexp)
   for _, holder in ipairs({ 'node', 'diffPhantom', 'deleted' }) do
     local values = metadata.sexp_cdr_at_path(
-      sexp, { 'skg', holder, 'source' })
+      sexp, { 'skg', holder, 'repo' })
     if values and values[1] ~= nil then
       return sexpr.atom_text(values[1]) end
   end

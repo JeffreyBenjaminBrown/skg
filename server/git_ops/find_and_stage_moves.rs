@@ -84,7 +84,7 @@ fn detect_moves (
     for (id, sight) in
       sights_in_repo (skgrepo)
       . map_err ( |e| format! (
-        "Could not read git status for source '{}': {}",
+        "Could not read git status for repo '{}': {}",
         repo_name, e )) ? {
       sights . entry (id) . or_default ()
         . insert ( repo_name . clone (), sight ); }}
@@ -288,9 +288,9 @@ fn render_moves_script (
 /// unrelated relationship-record changes along with the move.
 const MIXED_MOVES_HEADER : &str =
 "# MOVES DETECTED BUT NOT STAGED: each node below moved (its title\n\
- # left one source and arrived in another), but the move is mixed\n\
+ # left one repo and arrived in another), but the move is mixed\n\
  # into section files that already existed -- the destination file\n\
- # already recorded relationships for the node, or the old source\n\
+ # already recorded relationships for the node, or the old repo\n\
  # keeps a titleless section. Staging those files whole could stage\n\
  # more than the move. Review and stage these by hand:\n";
 
@@ -298,11 +298,11 @@ const MIXED_MOVES_HEADER : &str =
 /// existence check precedes 'git rm'.
 const STAGE_MOVES_HEADER : &str =
 "# Run this from the skg data root (bash). Each entry below names one\n\
- # node's .skg file, the source it moved out of, and the source it\n\
- # moved into. The loop stages each move: 'git rm' in the old source,\n\
+ # node's .skg file, the repo it moved out of, and the repo it\n\
+ # moved into. The loop stages each move: 'git rm' in the old repo,\n\
  # 'git add' in the new one. 'git rm' deletes whatever is there, with\n\
  # no distinct output if the file is still present, so before removing\n\
- # we check that the file is ALREADY gone from the old source's\n\
+ # we check that the file is ALREADY gone from the old repo's\n\
  # worktree -- which is how the move was detected. A still-present\n\
  # file means the move was not actually done on disk, so we skip it\n\
  # rather than delete it.\n";

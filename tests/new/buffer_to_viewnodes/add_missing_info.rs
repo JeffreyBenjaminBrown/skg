@@ -30,11 +30,11 @@ fn all_tests
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
       test_add_missing_info_comprehensive (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_source_inheritance_multi_level",
+      s . reset ("test_repo_inheritance_multi_level",
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
       test_repo_inheritance_multi_level (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_sourceless_folder_member_gets_graph_source",
+      s . reset ("test_repoless_folder_member_gets_graph_repo",
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
       test_repoless_folder_member_gets_graph_repo (
         &s . config ) . await ?;
@@ -56,7 +56,7 @@ async fn test_repoless_folder_member_gets_graph_repo (
   // (a link-stack paste yields a write-protected node with only an id).
   let input : &str =
     indoc! {"
-            * (skg (node (id owner) (source main))) owner
+            * (skg (node (id owner) (repo main))) owner
             ** (skg subscribeeFolder)
             *** (skg (node (id root) writeProtected)) subscribee reference
         "};
@@ -71,9 +71,9 @@ async fn test_repoless_folder_member_gets_graph_repo (
     MpViewnodeKind::Vognode (MpVognode::Active (t)) => {
       assert_eq! (
         t . home_repo, Some (RepoName::from ("main")),
-        "Sourceless folder member should inherit its source from the \
-         graph (node root-pid lives in source 'main'), not stay \
-         sourceless." );
+        "Repoless folder member should inherit its repo from the \
+         graph (node root-pid lives in repo 'main'), not stay \
+         repoless." );
       assert_eq! (
         t . id . as_ref() . unwrap() . 0, "root-pid",
         "The referenced id 'root' should have resolved to its pid \
@@ -98,7 +98,7 @@ async fn test_add_missing_info_logic (
   // Also tests repo inheritance from parent to children.
   let with_missing_info: &str =
     indoc! {"
-            * (skg (node (id root) (source main))) root
+            * (skg (node (id root) (repo main))) root
             ** (skg aliasFolder) aliases
             *** new alias
             *** (skg alias) preexisting alias
@@ -107,12 +107,12 @@ async fn test_add_missing_info_logic (
         "};
   let without_missing_info: &str =
     indoc! {"
-            * (skg (node (id root-pid) (source main))) root
+            * (skg (node (id root-pid) (repo main))) root
             ** (skg aliasFolder) aliases
             *** (skg alias) new alias
             *** (skg alias) preexisting alias
-            ** (skg (node (id unpredictable) (source main))) no id
-            *** (skg (node (id unpredictable) (source main))) also no id
+            ** (skg (node (id unpredictable) (repo main))) no id
+            *** (skg (node (id unpredictable) (repo main))) also no id
         "};
   let mut after_adding_missing_info : MpViewForest =
     org_to_uninterpreted_viewforest (
@@ -149,8 +149,8 @@ async fn test_add_missing_info_logic (
 fn test_na_affectsParent_under_visible_parent_becomes_isContainer () {
   let input : &str =
     indoc! {"
-            * (skg (node (id root) (source main) (affectsParent na))) root
-            ** (skg (node (id moved) (source main) (affectsParent na))) moved
+            * (skg (node (id root) (repo main) (affectsParent na))) root
+            ** (skg (node (id moved) (repo main) (affectsParent na))) moved
         "};
   let mut viewforest : MpViewForest =
     org_to_uninterpreted_viewforest (input) . unwrap() . 0;
@@ -190,25 +190,25 @@ async fn test_repo_inheritance_logic (
   // with explicit repos overriding inheritance at various depths.
   let input: &str =
     indoc! {"
-            * (skg (node (id 1) (source main))) _
+            * (skg (node (id 1) (repo main))) _
             ** (skg (node (id 11))) _
-            *** (skg (node (id 111) (source alt))) _
+            *** (skg (node (id 111) (repo alt))) _
             **** (skg (node (id 1111))) _
             *** (skg (node (id 112))) _
             * (skg (node (id 2))) _
-            ** (skg (node (id 21) (source alt))) _
+            ** (skg (node (id 21) (repo alt))) _
             ** (skg (node (id 22))) _
         "};
 
   let expected: &str =
     indoc! {"
-            * (skg (node (id 1) (source main))) _
-            ** (skg (node (id 11) (source main))) _
-            *** (skg (node (id 111) (source alt))) _
-            **** (skg (node (id 1111) (source alt))) _
-            *** (skg (node (id 112) (source main))) _
+            * (skg (node (id 1) (repo main))) _
+            ** (skg (node (id 11) (repo main))) _
+            *** (skg (node (id 111) (repo alt))) _
+            **** (skg (node (id 1111) (repo alt))) _
+            *** (skg (node (id 112) (repo main))) _
             * (skg (node (id 2))) _
-            ** (skg (node (id 21) (source alt))) _
+            ** (skg (node (id 21) (repo alt))) _
             ** (skg (node (id 22))) _
         "};
 
@@ -224,7 +224,7 @@ async fn test_repo_inheritance_logic (
     compare_viewnode_trees(
       actual_viewforest . root(),
       expected_viewforest . root()),
-    "Source inheritance: Forests not equivalent.\n\
-     Expected sources to inherit from parent, with explicit sources overriding." );
+    "Repo inheritance: Forests not equivalent.\n\
+     Expected repos to inherit from parent, with explicit repos overriding." );
 
   Ok (( )) }

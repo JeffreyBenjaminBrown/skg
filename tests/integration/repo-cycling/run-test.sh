@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Integration test for source cycling in the metadata edit buffer.
-# Verifies that S-left / S-right cycle through owned sources only.
+# Integration test for repo cycling in the metadata edit buffer.
+# Verifies that S-left / S-right cycle through owned repos only.
 
 set -e
 
@@ -10,7 +10,7 @@ PROJECT_ROOT="$(cd "$TEST_DIR/../../.." && pwd)"
 
 source "$TEST_DIR/../test-lib.sh"
 
-echo "=== SKG Source Cycling Integration Test ==="
+echo "=== SKG Repo Cycling Integration Test ==="
 
 cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
 

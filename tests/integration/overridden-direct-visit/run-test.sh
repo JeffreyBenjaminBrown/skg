@@ -5,7 +5,7 @@
 # - Starts an independent skg server with test config
 # - Uses Emacs and nvim to visit an overridden node and require the raw root
 #   without an independent overrider sibling
-# - Exercises same-title nodes from different sources; the Emacs client also
+# - Exercises same-title nodes from different repos; the Emacs client also
 #   revisits the raw view through switch-to-view and checks close/reopen lifecycle
 
 set -e  # Exit on any error
@@ -13,7 +13,7 @@ set -e  # Exit on any error
 TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$TEST_DIR/../../.." && pwd)"
 
-# Source common test library
+# Repo common test library
 source "$TEST_DIR/../test-lib.sh"
 
 echo "=== SKG Overridden Direct Visit Integration Test ==="

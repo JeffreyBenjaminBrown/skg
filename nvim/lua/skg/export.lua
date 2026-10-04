@@ -1,5 +1,5 @@
 -- PURPOSE: Export Skg data to plain .org files. All the logic is in
--- Rust; this command picks a source-set (client-side, with the
+-- Rust; this command picks a repo-set (client-side, with the
 -- cycling selector) and an output dir, sends the request, and shows
 -- the server's report. The Lua port of elisp/skg-request-export-org.el.
 
@@ -12,25 +12,25 @@ local state = require('skg.state')
 
 local M = {}
 
----Export SOURCE_SET (prompted when absent; choose a public-facing set
+---Export REPO_SET (prompted when absent; choose a public-facing set
 ---so private notes stay private) to OUTPUT_DIR, which the SERVER
 ---resolves against its own project root -- possibly inside a
 ---container whose filesystem differs from this editor's, hence no
 ---path completion on the prompt. Defaults to 'org-exports'.
----@param source_set string|nil
+---@param repo_set string|nil
 ---@param output_dir string|nil
-function M.export_some_to_org (source_set, output_dir, approved_pids)
-  source_set = source_set or picker.prompt_for_source_set()
-  if not source_set then return end
+function M.export_some_to_org (repo_set, output_dir, approved_pids)
+  repo_set = repo_set or picker.prompt_for_repo_set()
+  if not repo_set then return end
   if not output_dir then
     output_dir = vim.fn.input(
       "Export to dir (relative to the server's project root)"
       .. ' [org-exports]: ')
     if output_dir == '' then output_dir = 'org-exports' end
   end
-  if source_set == 'all' then
-    vim.notify("Exporting source-set 'all'; consider a public-facing"
-               .. ' source-set so private notes are not exported.')
+  if repo_set == 'all' then
+    vim.notify("Exporting repo-set 'all'; consider a public-facing"
+               .. ' repo-set so private notes are not exported.')
   end
   state.register_response_handler('export-to-org',
     function (_payload_text, response)
@@ -48,12 +48,12 @@ function M.export_some_to_org (source_set, output_dir, approved_pids)
         'This export includes text selected below home. Include it?'
       local pids = payload.string_list(payload.field(response, 'pids'))
       if vim.fn.confirm(prompt, '&Include\n&Decline', 2) == 1 then
-        M.export_some_to_org(source_set, output_dir, pids) end
+        M.export_some_to_org(repo_set, output_dir, pids) end
     end, false)
   state.lp_reset()
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'export to org'),
-    sexpr.pair(sexpr.symbol('source-set'), source_set),
+    sexpr.pair(sexpr.symbol('repo-set'), repo_set),
     sexpr.pair(sexpr.symbol('output-dir'), output_dir) }
   if approved_pids and #approved_pids > 0 then
     local approval = { sexpr.symbol('allow-overPrivateText-telescopes') }

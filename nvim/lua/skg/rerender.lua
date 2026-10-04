@@ -1,5 +1,5 @@
 -- PURPOSE: The rerender stream (rerender-lock -> rerender-view* ->
--- rerender-done), shared by the diff-mode toggle, the source-set
+-- rerender-done), shared by the diff-mode toggle, the repo-set
 -- switch, and the explicit rerender-all request. The Lua port of
 -- elisp/skg-request-rerender-all-views.el.
 

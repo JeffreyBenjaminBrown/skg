@@ -70,7 +70,7 @@ pub fn resolve_document_links (
             link . range . start < edit . range . end) {
             document . diagnostics . push (Diagnostic {
               range : link . range . clone (),
-              message : "Link overlaps another source conversion; left unchanged"
+              message : "Link overlaps another repo conversion; left unchanged"
                 . to_string (), });
             continue; }
           document . source_edits . push (SourceEdit {
@@ -532,12 +532,12 @@ mod tests {
   #[test]
   fn maps_absolute_paths_by_whole_components () {
     let original : PathBuf = normalized_input_path (
-      Path::new ("folder/source.md"), "/host/notes/folder/other.org",
+      Path::new ("folder/repo.md"), "/host/notes/folder/other.org",
       Path::new ("/container/notes"), Some (Path::new ("/host/notes")))
       .unwrap ();
     assert_eq! (original, Path::new ("folder/other.org"));
     assert! (normalized_input_path (
-      Path::new ("folder/source.md"), "/host/notes-old/other.org",
+      Path::new ("folder/repo.md"), "/host/notes-old/other.org",
       Path::new ("/container/notes"), Some (Path::new ("/host/notes")))
       .is_none ());
   }

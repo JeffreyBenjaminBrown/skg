@@ -162,7 +162,7 @@ fn home_move_to_more_private_clamps_relRepos_up (
       buffer, &disk, &RequestedRelRepos::default (), &graph, &config) . unwrap ();
   assert_eq! ( resolved . contains, vec! [
     pm ("private", "child") ],
-    "the sticky public source rises to the new, more private home" );
+    "the sticky public repo rises to the new, more private home" );
 }
 
 #[test]
@@ -244,7 +244,7 @@ fn explicit_repo_at_or_more_private_than_floor_is_honored (
     apply_sticky_relRepos_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
   assert_eq! ( resolved . contains, vec! [
     pm ("trusted", "child") ],
-    "an explicit source at or more private than the default wins outright" );
+    "an explicit repo at or more private than the default wins outright" );
 }
 
 #[test]
@@ -269,7 +269,7 @@ fn explicit_repo_more_public_than_floor_is_rejected (
     apply_sticky_relRepos_in_graph (buffer, &disk, &explicit, &graph, &config)
     . unwrap_err ();
   assert! ( err . contains ("child"),   "names the member: {}", err );
-  assert! ( err . contains ("public"),  "names the offered relSource: {}", err );
+  assert! ( err . contains ("public"),  "names the offered relRepo: {}", err );
   assert! ( err . contains ("private"), "names the floor: {}", err );
 }
 
@@ -297,7 +297,7 @@ fn explicit_relRepo_moves_a_sticky_edge_to_its_default (
     apply_sticky_relRepos_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
   assert_eq! ( resolved . contains, vec! [
     pm ("public", "child") ],
-    "an explicit source AT the default lowers the sticky edge's privacy" );
+    "an explicit repo AT the default lowers the sticky edge's privacy" );
 }
 
 #[test]
@@ -348,7 +348,7 @@ fn explicit_more_public_than_default_is_rejected_and_names_the_default (
   assert! ( err . contains ("'trusted'"),
             "the floor named is the default: {}", err );
   assert! ( ! err . contains ("'private'"),
-            "the sticky source is not the floor: {}", err );
+            "the sticky repo is not the floor: {}", err );
 }
 
 #[test]
@@ -610,7 +610,7 @@ fn owned_to_foreign_explicit_owned_repo_is_allowed_and_foreign_refused (
     .. RequestedRelRepos::default () };
   let error : String = apply_sticky_relRepos_in_graph (
     owner, &disk, &refused, &graph, &config ) . unwrap_err ();
-  assert! (error . contains ("non-owned source 'foreign'"), "{}", error);
+  assert! (error . contains ("non-owned repo 'foreign'"), "{}", error);
 }
 
 #[test]
@@ -643,7 +643,7 @@ fn explicit_alias_relRepo_is_load_bearing_and_validated (
       RepoName::from ("public"), "nickname" . to_string ()) ]);
   let error : String = apply_sticky_relRepos_in_graph (
     buffer, &disk, &explicit, &graph, &foreign_config ) . unwrap_err ();
-  assert! (error . contains ("non-owned relSource 'private'"), "{}", error);
+  assert! (error . contains ("non-owned relRepo 'private'"), "{}", error);
 }
 
 #[test]
@@ -669,7 +669,7 @@ fn restricted_delete_refusal_sees_inactive_sections (
       &config, &active, &ID::new ("n") );
   assert! ( refusal . is_err (), "private section must refuse" );
   assert! ( refusal . unwrap_err ()
-            . contains ("inactive sources") );
+            . contains ("inactive repos") );
   assert! ( refuse_delete_with_inactive_sections (
     &config, &active, &ID::new ("only-public") ) . is_ok (),
     "a node with no inactive sections deletes fine" );
@@ -699,19 +699,19 @@ fn relrepo_fact_and_request_round_trip_separately (
     config_with_order ( & ["public", "private"] );
   let rendered : String =
     viewnode_to_string (&viewnode, &config) . unwrap ();
-  assert! ( rendered . contains ("(relSource private)"),
-            "expected a relSource atom in: {}", rendered );
+  assert! ( rendered . contains ("(relRepo private)"),
+            "expected a relRepo atom in: {}", rendered );
   assert! ( rendered . contains (
-    "(editRequest (relSource secret))"),
-    "expected a relSource request in: {}", rendered );
+    "(editRequest (relRepo secret))"),
+    "expected a relRepo request in: {}", rendered );
   let full_sexp : String = format! ("(skg {})", rendered);
   let parsed = parse_metadata_to_viewnodemd (&full_sexp) . unwrap ();
   assert_eq! ( parsed . viewStats . relRepo,
                Some ( RepoName::from ("private") ),
-               "relSource did not round-trip through render+parse" );
+               "relRepo did not round-trip through render+parse" );
   assert_eq! ( parsed . relRepo_request,
                Some ( RepoName::from ("secret") ),
-               "relSource request did not round-trip" );
+               "relRepo request did not round-trip" );
 }
 
 #[test]
@@ -720,26 +720,26 @@ fn relrepo_requests_are_contextual_and_singular (
   use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
 
   assert! ( parse_metadata_to_viewnodemd (
-    "(skg alias (relSource private) (editRequest (relSource secret)))" )
+    "(skg alias (relRepo private) (editRequest (relRepo secret)))" )
             . is_ok (),
-            "Alias is the only scaffold which carries a relSource" );
+            "Alias is the only scaffold which carries a relRepo" );
   for malformed in [
-    "(skg (node (id n)) (editRequest (relSource private)))",
-    "(skg id (relSource private))",
-    "(skg (node (id n) (editRequest delete) (editRequest (relSource private))))",
+    "(skg (node (id n)) (editRequest (relRepo private)))",
+    "(skg id (relRepo private))",
+    "(skg (node (id n) (editRequest delete) (editRequest (relRepo private))))",
     "(skg (unknown (id absent) (editRequest delete)))",
     "(skg (unknown (id absent) (viewStats cycle)))",
   ] {
     assert! ( parse_metadata_to_viewnodemd (malformed) . is_err (),
-              "malformed relSource metadata was accepted: {}",
+              "malformed relRepo metadata was accepted: {}",
               malformed );
   }
   let (_, error, _) = crate::serve::parse_metadata_sexp::viewnode_from_metadata (
     &parse_metadata_to_viewnodemd (
-      "(skg (node (id n) (source public) writeProtected (editRequest (relSource private))))" )
+      "(skg (node (id n) (repo public) writeProtected (editRequest (relRepo private))))" )
     . unwrap (), "N" . to_string (), None );
   assert! ( error . is_some (),
-            "write-protected relSource request must be rejected" );
+            "write-protected relRepo request must be rejected" );
 }
 
 #[test]
@@ -806,7 +806,7 @@ fn unknown_relrepo_fact_and_request_round_trip_separately (
   let config : SkgConfig = config_with_order ( & ["public", "private"] );
   let rendered : String = viewnode_to_string (&unknown, &config) . unwrap ();
   assert! ( rendered . contains (
-    "(unknown (id absent-raw) (viewStats (relSource private)) (editRequest (relSource secret)))"),
+    "(unknown (id absent-raw) (viewStats (relRepo private)) (editRequest (relRepo secret)))"),
             "Unknown facts and requests must serialize in stable order: {}", rendered );
   let parsed = parse_metadata_to_viewnodemd (
     &format! ("(skg {})", rendered) ) . unwrap ();

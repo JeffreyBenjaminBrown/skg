@@ -94,7 +94,7 @@ stamps (viewRequests fork) into the headline's own (skg (node ...)) --
 targeting the headline's OWN id, never an (overridesHere N) marker it may
 carry -- and auto-saves (unlike `skg-request-definitive-view'). The server
 returns the usual fork-confirmation buffer; Emacs prompts for the clone's
-source (unless already specified), then approve with C-c C-c or decline
+repo (unless already specified), then approve with C-c C-c or decline
 with C-c C-k."
   (interactive)
   (if (buffer-modified-p)

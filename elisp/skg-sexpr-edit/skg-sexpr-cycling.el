@@ -38,7 +38,7 @@ Returns the new value. If FIELD-VALUE is not in VALUES, starts at index 0."
 
 (defun skg-sexp-edit--cycle-values-for-field (field-name field-value)
   "Return the list of values to cycle through for FIELD-NAME.
-FIELD-VALUE is the current headline text, needed for source defaulting.
+FIELD-VALUE is the current headline text, needed for repo defaulting.
 Returns nil if the field is not cycleable."
   (cond
    ((string= field-name "writeProtected")
@@ -47,8 +47,8 @@ Returns nil if the field is not cycleable."
     '("true (default)" "false" "na"))
    ((string= field-name "editRequest")
     '("none (default)" "delete" "merge"))
-   ((string= field-name "source") ;; from the config
-    (skg-sexp-edit--source-cycle-values field-value))
+   ((string= field-name "repo") ;; from the config
+    (skg-sexp-edit--repo-cycle-values field-value))
    ((string= field-name "viewRequests")
     ;; Only the bare-atom request 'definitiveView' is field-cycleable.
     ;; The '(folder RELNAME)' / '(path ROLENAME)' requests are structured
@@ -56,19 +56,19 @@ Returns nil if the field is not cycleable."
     '("none (default)"
       "definitiveView"))))
 
-(defun skg-sexp-edit--source-cycle-values (field-value)
-  "Return source names from config as a cycle list.
+(defun skg-sexp-edit--repo-cycle-values (field-value)
+  "Return repo names from config as a cycle list.
 If FIELD-VALUE has a ' (default)' suffix, prepend it so cycling
-starts there rather than jumping to a bare source name."
-  (let ((sources (skg--owned-sources)))
-    (when sources
+starts there rather than jumping to a bare repo name."
+  (let ((repos (skg--owned-repos)))
+    (when repos
       (if (string-suffix-p " (default)" field-value)
           (cons field-value
                 (remove (substring field-value 0
                                    (- (length field-value)
                                       (length " (default)")))
-                        sources))
-        sources))))
+                        repos))
+        repos))))
 
 ;;
 ;; Dispatch
@@ -95,9 +95,9 @@ Dispatch is based on the parent headline text."
             (let ((id (read-string
                        "Enter merge target ID (or paste a link): ")))
               (org-edit-headline (concat "merge " id))))))
-       ;; source with no config: prompt
-       ((string= parent "source")
-        (org-edit-headline (read-string "Source: " field-value)))
+       ;; repo with no config: prompt
+       ((string= parent "repo")
+        (org-edit-headline (read-string "Repo: " field-value)))
        (t
         (user-error "Field '%s' is not cycleable" parent))))))
 

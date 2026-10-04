@@ -26,18 +26,18 @@
                t)))
     (should (equal (cdr (assoc 'fork-approved sexp)) "true"))))
 
-(ert-deftest test-save-request-sexp-omits-fork-sources-by-default ()
-  "Without chosen sources, the save request carries no fork-sources field."
+(ert-deftest test-save-request-sexp-omits-fork-repos-by-default ()
+  "Without chosen repos, the save request carries no fork-repos field."
   (let ((sexp (skg--save-request-sexp
                "uri-1"
                '(:point-lines-below-focused-headline 0
                  :point-column 0
                  :point-screen-lines-below-window-start 0)
                t)))
-    (should-not (assoc 'fork-sources sexp))))
+    (should-not (assoc 'fork-repos sexp))))
 
-(ert-deftest test-save-request-sexp-includes-fork-sources-when-set ()
-  "With chosen sources, the request carries (fork-sources ((N . X) ...))."
+(ert-deftest test-save-request-sexp-includes-fork-repos-when-set ()
+  "With chosen repos, the request carries (fork-repos ((N . X) ...))."
   (let* ((sexp (skg--save-request-sexp
                 "uri-1"
                 '(:point-lines-below-focused-headline 0
@@ -45,9 +45,9 @@
                   :point-screen-lines-below-window-start 0)
                 t
                 '(("N" . "owned2") ("M" . "owned"))))
-         (entry (assoc 'fork-sources sexp)))
+         (entry (assoc 'fork-repos sexp)))
     (should entry)
-    ;; The field is (fork-sources ((N . X) (M . Y))) -- a list, not a
+    ;; The field is (fork-repos ((N . X) (M . Y))) -- a list, not a
     ;; dotted pair -- so the alist is the cadr.
     (should (equal (cadr entry)
                    '(("N" . "owned2") ("M" . "owned"))))))
@@ -129,40 +129,40 @@
     (should (= skg-lp--pending-count 0))
     (should-not (assoc 'save-result skg-response-handler-map))))
 
-(ert-deftest test-fork-sources-from-confirmation-buffer-walks-two-levels ()
-  "skg--fork-sources-from-confirmation-buffer pairs each clone-to-be
-parent's (source X) with each child's (id N)."
+(ert-deftest test-fork-repos-from-confirmation-buffer-walks-two-levels ()
+  "skg--fork-repos-from-confirmation-buffer pairs each clone-to-be
+parent's (repo X) with each child's (id N)."
   (with-temp-buffer
     (insert "# FORK CONFIRMATION\n")
-    (insert "* (skg (node (source owned2) (viewStats (sourceHerald ⌂:owned2)))) N-edited\n")
-    (insert "** (skg (node (id N) (source foreign) (affectsParent false) writeProtected (rels \"aO\"))) N-original\n")
+    (insert "* (skg (node (repo owned2) (viewStats (homeRepoHerald ⌂:owned2)))) N-edited\n")
+    (insert "** (skg (node (id N) (repo foreign) (affectsParent false) writeProtected (rels \"aO\"))) N-original\n")
     (org-mode)
-    (should (equal (skg--fork-sources-from-confirmation-buffer)
+    (should (equal (skg--fork-repos-from-confirmation-buffer)
                    '(("N" . "owned2"))))))
 
-(ert-deftest test-fork-sources-walk-does-not-leak-source-across-clones ()
+(ert-deftest test-fork-repos-walk-does-not-leak-repo-across-clones ()
   "A metadata-less level-1 headline must not leak the previous clone's
-source to a later fork's child (parent-source resets on every level 1)."
+repo to a later fork's child (parent-repo resets on every level 1)."
   (with-temp-buffer
-    (insert "* (skg (node (source ownedA))) A-edited\n")
-    (insert "** (skg (node (id N1) (source foreign) writeProtected)) N1-original\n")
+    (insert "* (skg (node (repo ownedA))) A-edited\n")
+    (insert "** (skg (node (id N1) (repo foreign) writeProtected)) N1-original\n")
     ;; A stray/garbled level-1 headline with no skg metadata.
     (insert "* plain heading, no metadata\n")
-    (insert "** (skg (node (id N2) (source foreign) writeProtected)) N2-original\n")
+    (insert "** (skg (node (id N2) (repo foreign) writeProtected)) N2-original\n")
     (org-mode)
-    ;; N1 -> ownedA; N2 must NOT inherit ownedA (its parent has no source).
-    (should (equal (skg--fork-sources-from-confirmation-buffer)
+    ;; N1 -> ownedA; N2 must NOT inherit ownedA (its parent has no repo).
+    (should (equal (skg--fork-repos-from-confirmation-buffer)
                    '(("N1" . "ownedA"))))))
 
 (ert-deftest test-show-fork-confirmation-builds-editable-navigable-buffer ()
   "skg--show-fork-confirmation inserts the content into an EDITABLE
-content-view buffer (so the user can rotate each clone's source), records
+content-view buffer (so the user can rotate each clone's repo), records
 the origin, leaves skg-view-uri nil, and binds approve/decline plus an
 ordinary-save refusal on C-x C-s."
   (let ((origin (generate-new-buffer "*fork-origin*")))
     (unwind-protect
         (let ((buf (skg--show-fork-confirmation
-                    "# FORK CONFIRMATION\n* (skg (node (source owned))) N-edited\n** (skg (node (id N) (source foreign) (affectsParent false) writeProtected (rels \"aO\"))) N-original\n"
+                    "# FORK CONFIRMATION\n* (skg (node (repo owned))) N-edited\n** (skg (node (id N) (repo foreign) (affectsParent false) writeProtected (rels \"aO\"))) N-original\n"
                     origin)))
           (unwind-protect
               (with-current-buffer buf
@@ -189,7 +189,7 @@ ordinary-save refusal on C-x C-s."
           (when (get-buffer result-name) (kill-buffer result-name))
           (setq confirm
                 (skg--show-fork-confirmation
-                 "* (skg (node (source owned))) N-edited\n** (skg (node (id N) (source foreign) writeProtected)) N-original\n"
+                 "* (skg (node (repo owned))) N-edited\n** (skg (node (id N) (repo foreign) writeProtected)) N-original\n"
                  origin))
           (setq confirm-window (get-buffer-window confirm t))
           (should (window-live-p confirm-window))
@@ -224,7 +224,7 @@ ordinary-save refusal on C-x C-s."
 skg-content-view-mode-map (which would break C-x C-s in real views)."
   (let ((origin (generate-new-buffer "*fork-origin-3*")))
     (let ((buf (skg--show-fork-confirmation
-                "* (skg (node (source owned))) N-edited\n"
+                "* (skg (node (repo owned))) N-edited\n"
                 origin)))
       (unwind-protect
           (should (eq (lookup-key skg-content-view-mode-map (kbd "C-x C-s"))
@@ -232,49 +232,49 @@ skg-content-view-mode-map (which would break C-x C-s in real views)."
         (kill-buffer buf)
         (when (buffer-live-p origin) (kill-buffer origin))))))
 
-(ert-deftest test-fork-choose-placeholder-sources-prompts-with-suggestion ()
-  "skg--fork-choose-placeholder-sources prompts once per placeholder
-clone, offering the server's suggested source (the comment above the
+(ert-deftest test-fork-choose-placeholder-repos-prompts-with-suggestion ()
+  "skg--fork-choose-placeholder-repos prompts once per placeholder
+clone, offering the server's suggested repo (the comment above the
 clone) as the default, and writes the choice into the metadata."
   (with-temp-buffer
     (insert "* Fork confirmation -- what this buffer is\n")
     (insert "Some explanation.\n")
-    (insert "# Suggested source for the clone below: owned2\n")
-    (insert "* (skg (node (source PICK-A-SOURCE) (viewStats (sourceHerald ⌂:PICK-A-SOURCE)))) N-edited\n")
-    (insert "** (skg (node (id N) (source foreign) (affectsParent false) writeProtected)) N-original\n")
+    (insert "# Suggested repo for the clone below: owned2\n")
+    (insert "* (skg (node (repo PICK-A-REPO) (viewStats (homeRepoHerald ⌂:PICK-A-REPO)))) N-edited\n")
+    (insert "** (skg (node (id N) (repo foreign) (affectsParent false) writeProtected)) N-original\n")
     (org-mode)
     (let ((offered-defaults nil))
-      (cl-letf (((symbol-function 'skg--owned-sources)
+      (cl-letf (((symbol-function 'skg--owned-repos)
                  (lambda () '("owned" "owned2")))
                 ((symbol-function 'skg--completing-read-with-cycle)
                  (lambda (_prompt _collection _pred _req _init _hist def
                                   &rest _)
                    (push def offered-defaults)
                    def))) ;; the user accepts the default
-        (skg--fork-choose-placeholder-sources))
+        (skg--fork-choose-placeholder-repos))
       (should (equal offered-defaults '("owned2")))
-      (should (string-match-p "(source owned2)" (buffer-string)))
+      (should (string-match-p "(repo owned2)" (buffer-string)))
       (should (string-match-p "⌂:owned2" (buffer-string)))
-      (should-not (string-match-p "(source PICK-A-SOURCE)"
+      (should-not (string-match-p "(repo PICK-A-REPO)"
                                   (buffer-string))))))
 
-(ert-deftest test-fork-choose-placeholder-sources-skips-specified-clones ()
-  "A clone whose source is already real (the user specified it in the
+(ert-deftest test-fork-choose-placeholder-repos-skips-specified-clones ()
+  "A clone whose repo is already real (the user specified it in the
 saved metadata, so the server omitted the placeholder) prompts nothing."
   (with-temp-buffer
-    (insert "* (skg (node (source owned2) (viewStats (sourceHerald ⌂:owned2)))) N-edited\n")
-    (insert "** (skg (node (id N) (source foreign) (affectsParent false) writeProtected)) N-original\n")
+    (insert "* (skg (node (repo owned2) (viewStats (homeRepoHerald ⌂:owned2)))) N-edited\n")
+    (insert "** (skg (node (id N) (repo foreign) (affectsParent false) writeProtected)) N-original\n")
     (org-mode)
     (cl-letf (((symbol-function 'skg--completing-read-with-cycle)
                (lambda (&rest _)
-                 (error "must not prompt for a specified source"))))
-      (skg--fork-choose-placeholder-sources))
-    (should (string-match-p "(source owned2)" (buffer-string)))))
+                 (error "must not prompt for a specified repo"))))
+      (skg--fork-choose-placeholder-repos))
+    (should (string-match-p "(repo owned2)" (buffer-string)))))
 
 (ert-deftest test-approve-fork-errors-when-origin-is-gone ()
   "skg-approve-fork refuses when the originating buffer is dead."
   (let ((origin (generate-new-buffer "*fork-origin-2*")))
-    (let ((buf (skg--show-fork-confirmation "* (skg (node (id N) (source foreign) writeProtected)) N\n"
+    (let ((buf (skg--show-fork-confirmation "* (skg (node (id N) (repo foreign) writeProtected)) N\n"
                                             origin)))
       (kill-buffer origin) ;; origin dies before approval
       (unwind-protect

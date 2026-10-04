@@ -56,7 +56,7 @@ pub fn handle_import_md_and_org_request (
       let input : String = match value_from_request_sexp ("input-directory", request) {
         Ok (input) => input,
         Err (error) => return refuse (stream, &error), };
-      let repo : String = match value_from_request_sexp ("destination-source", request) {
+      let repo : String = match value_from_request_sexp ("destination-repo", request) {
         Ok (repo) => repo,
         Err (error) => return refuse (stream, &error), };
       let host_answer : Option<String> =
@@ -181,7 +181,7 @@ mod tests {
   fn approval_is_session_bound_single_use_and_replaced_by_new_preview () {
     let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
     let input : PathBuf = temp . path () . join ("input");
-    let repo : PathBuf = temp . path () . join ("source");
+    let repo : PathBuf = temp . path () . join ("repo");
     fs::create_dir (&input) . unwrap ();
     fs::create_dir (&repo) . unwrap ();
     fs::write (input . join ("note.md"), "# Note\nBody\n") . unwrap ();
@@ -199,7 +199,7 @@ mod tests {
     let (mut server_stream, _) = listener . accept () . unwrap ();
     let mut client : BufReader<TcpStream> = BufReader::new (client_stream);
     let preview_request : String = format! (
-      "((request . \"import md and org\") (action . \"preview\") (input-directory . \"{}\") (destination-source . \"notes\"))",
+      "((request . \"import md and org\") (action . \"preview\") (input-directory . \"{}\") (destination-repo . \"notes\"))",
       input . display ());
     let mut pending : Option<PendingImport> = None;
     handle_import_md_and_org_request (

@@ -147,9 +147,9 @@ describe('skg.linkstack paste and pop', function ()
   it('beside a writeable instance, paste_node stays write-protected',
      function ()
     local text, notified = paste_node_in_view(
-      '* (skg (node (id id-1) (source main))) Writeable')
+      '* (skg (node (id id-1) (repo main))) Writeable')
     assert.are.equal(
-      '* (skg (node (id id-1) (source main))) Writeable\n'
+      '* (skg (node (id id-1) (repo main))) Writeable\n'
       .. '* (skg (node (id id-1) writeProtected)) Title from stack\n',
       text)
     assert.are.equal('NOTE: Pasting node readonly because a writeable'

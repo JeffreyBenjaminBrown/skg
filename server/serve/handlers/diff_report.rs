@@ -23,7 +23,7 @@ pub fn handle_diff_report_request (
     ActiveRepoSet::named (
       config,
       RepoSetName::from ("all"))
-    . expect ("reserved source-set all should always resolve");
+    . expect ("reserved repo-set all should always resolve");
   handle_diff_report_request_with_repo_set (
     stream, request, config, &active ) }
 
@@ -47,7 +47,7 @@ pub fn handle_diff_report_request_with_repo_set (
         (report, warnings) } )
     } else {
       Err (format! (
-        "Diff report requires active source-set all; current active source-set is {}",
+        "Diff report requires active repo-set all; current active repo-set is {}",
         active . name )) };
   let (content, errors, warnings)
     : (String, Vec<String>, Vec<String>) =

@@ -13,7 +13,7 @@ print('=== PHASE 1: construct content view with tab-bearing body ===')
 -- Real tabs and real newlines inside the body lines, exactly as the
 -- elisp test's org-text (a literal tab character on the third line).
 local org_text = table.concat({
-  '* (skg (node (id bwt-root) (source main))) bwt-root',
+  '* (skg (node (id bwt-root) (repo main))) bwt-root',
   'line one',
   '\t(elisp-code)',
   'line three',

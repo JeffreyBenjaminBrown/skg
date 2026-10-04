@@ -333,7 +333,7 @@ fn private_repo_edge_is_omitted_from_restricted_export () {
     fs::read_to_string ( dir . path () . join ("r.org") ) . unwrap ();
   assert! ( content . contains ("Public child"), "{}", content );
   assert! ( ! content . contains ("Private child"),
-            "an edge from a private source leaked into a main-only export:\n{}",
+            "an edge from a private repo leaked into a main-only export:\n{}",
             content );
   { // Under "all", both children render.
     let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();

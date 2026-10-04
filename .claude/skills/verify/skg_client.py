@@ -60,7 +60,7 @@ if __name__ == "__main__":
     elif mode == "import":
         # Preview and approval must share one connection: the approval
         # token is bound to the session that previewed.
-        input_dir, source = sys . argv [2], sys . argv [3]
+        input_dir, repo = sys . argv [2], sys . argv [3]
         msgs = []
         with socket . create_connection (( HOST, PORT )) as s:
             def send ( fields ):
@@ -71,7 +71,7 @@ if __name__ == "__main__":
                 msgs . append ( m )
                 return m
             preview = [ ( "action", "preview" ), ( "input-directory", input_dir ),
-                        ( "destination-source", source ) ]
+                        ( "destination-repo", repo ) ]
             m = send ( preview )
             if "host-mapping-needed" in m:  # blank: leave absolute links unresolved
                 m = send ( preview + [ ( "host-root", "" ) ] )

@@ -247,7 +247,7 @@ proptest! {
         . find ( |n| n . member == m . member );
       prop_assert_eq! (
         found . map ( |n| &n . relRepo ), Some ( &m . relRepo ),
-        "member {:?} changed source", m . member );
+        "member {:?} changed repo", m . member );
     }
   }
 }

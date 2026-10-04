@@ -272,17 +272,17 @@ fn edge_and_target_deletions_do_not_create_override_errors () {
   let (edge_affected, edge_full) = affected_and_full (
     vec![
       node ("target", "owned", &[]),
-      node ("source", "owned", &["target"]),
+      node ("repo", "owned", &["target"]),
     ],
     vec![DefineNode::Save (SaveNode (
-      node ("source", "owned", &[]))) ]);
+      node ("repo", "owned", &[]))) ]);
   assert_eq! (edge_affected, edge_full);
   assert! (edge_affected . is_empty ());
 
   let (delete_affected, delete_full) = affected_and_full (
     vec![
       node ("target", "owned", &[]),
-      node ("source", "owned", &["target"]),
+      node ("repo", "owned", &["target"]),
     ],
     vec![DefineNode::Delete (DeleteNode {
       id : ID::from ("target"), home_repo : RepoName::from ("owned"),

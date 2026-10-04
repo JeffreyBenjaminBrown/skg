@@ -1,6 +1,6 @@
-* Fixtures for move_source tests
+* Fixtures for move_repo tests
 
-Three sources: public (owned), private (owned), foreign (read-only).
+Three repos: public (owned), private (owned), foreign (read-only).
 
 ** Containment graph
 ```
@@ -17,7 +17,7 @@ Three sources: public (owned), private (owned), foreign (read-only).
 
 ** What the tests do
 - Move b (and sometimes c) from public to private.
-- Verify the filesystem, graph, and Tantivy all reflect the new source.
+- Verify the filesystem, graph, and Tantivy all reflect the new repo.
 - Verify containment relationships survive the move.
-- Test error cases: move to/from foreign, move + merge, source-only change with populated pool.
+- Test error cases: move to/from foreign, move + merge, repo-only change with populated pool.
 - Test that extra_ids are preserved and that nodes referenced by extra_id (not PID) still move correctly.

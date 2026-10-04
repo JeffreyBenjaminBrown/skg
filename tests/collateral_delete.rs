@@ -102,7 +102,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       views_state . open_views . register_view (
         &graph . load_full (), l_uri . clone (), l_vf, &l_pids );
       let delete_buffer : String =
-        "* (skg (node (id L) (source main) (editRequest delete))) [[id:X][to X]]\n"
+        "* (skg (node (id L) (repo main) (editRequest delete))) [[id:X][to X]]\n"
         . to_string ();
       let (mut stream, read_end) : (TcpStream, TcpStream) = mk_pair ();
       let response : SaveResponse =
@@ -140,7 +140,7 @@ fn dead_links_warn_on_save
     "/tmp/tantivy-test-dead-links",
     |config, _tantivy| Box::pin ( async move {
       let buffer : &str =
-        "* (skg (node (id P) (source main))) P links to [[id:does-not-exist][nowhere]] and [[id:X][to X]]\n";
+        "* (skg (node (id P) (repo main))) P links to [[id:does-not-exist][nowhere]] and [[id:X][to X]]\n";
       let ( _vf, _plan, warnings ) =
         buffer_to_validated_saveplan (
           buffer, config, None )  ?;

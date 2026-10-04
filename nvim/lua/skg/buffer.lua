@@ -143,7 +143,7 @@ end
 function M.capture_clean_baseline (buf)
   vim.b[buf].skg_clean_baseline = M.text(buf)
   vim.b[buf].skg_clean_baseline_context =
-    'source-set unavailable; git diff mode unavailable'
+    'repo-set unavailable; git diff mode unavailable'
   vim.b[buf].skg_search_enrichment_includes_user_edits = false
 end
 

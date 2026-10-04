@@ -2,15 +2,15 @@
 ;;;
 ;;; PURPOSE: Ask the server for a shell script that stages every
 ;;; detected node "move" -- a node whose .skg file vanished from one
-;;; source's git repo and appeared in another -- and display it.
+;;; Skg repo's Git repo and appeared in another -- and display it.
 
 (require 'skg-length-prefix)
 
 (defun skg-stage-moves ()
   "Display git instructions staging every detected node move.
-A node has moved when its .skg file vanished from exactly one source's
+A node has moved when its .skg file vanished from exactly one repo's
 git repo (committed there, now gone from the worktree) and appeared in
-exactly one other source. The server returns a shell script; review it,
+exactly one other repo. The server returns a shell script; review it,
 then run it from the skg data root."
   (interactive)
   (let ((tcp-proc (skg-tcp-connect-to-rust)))

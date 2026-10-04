@@ -121,7 +121,7 @@ pub fn decide_for_overPrivateText_pids (
     operation : operation . to_string (),
     pids      : overPrivateText_pids . clone (),
     prompt    : format! (
-      "{} would reveal title or body text selected below its node's home source for {}. Include that text?",
+      "{} would reveal title or body text selected below its node's home repo for {}. Include that text?",
       operation_label (operation), pid_phrase (&overPrivateText_pids) ),
   }
 }
@@ -198,7 +198,7 @@ fn warning_for (
   pids      : &[ID],
 ) -> String {
   format! (
-    "{} includes title or body text selected below its node's home source for {}.",
+    "{} includes title or body text selected below its node's home repo for {}.",
     operation_label (operation), pid_phrase (pids) )
 }
 

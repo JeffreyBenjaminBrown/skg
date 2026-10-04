@@ -43,56 +43,56 @@ fn setup_inbound_fixtures_staged (
 /// worktree -- so everything those folders show must come from the
 /// inverse scan.
 const INPUT : &str = "\
-* (skg (node (id N1) (source main))) N1
+* (skg (node (id N1) (repo main))) N1
 ** (skg overriderFolder)
-* (skg (node (id N2) (source main))) N2
+* (skg (node (id N2) (repo main))) N2
 ** (skg overriderFolder)
-* (skg (node (id N3) (source main))) N3
+* (skg (node (id N3) (repo main))) N3
 ** (skg overriderFolder)
-*** (skg (node (id new-r) (source main))) new-r
-* (skg (node (id N4) (source main))) N4
+*** (skg (node (id new-r) (repo main))) new-r
+* (skg (node (id N4) (repo main))) N4
 ** (skg overriderFolder)
-*** (skg (node (id newfile-r) (source main))) newfile-r
-* (skg (node (id SN) (source main))) SN
+*** (skg (node (id newfile-r) (repo main))) newfile-r
+* (skg (node (id SN) (repo main))) SN
 ** (skg subscriberFolder)
-*** (skg (node (id new-s) (source main))) new-s
-* (skg (node (id HN) (source main))) HN
+*** (skg (node (id new-s) (repo main))) new-s
+* (skg (node (id HN) (repo main))) HN
 ** (skg hiderFolder)
-*** (skg (node (id new-h) (source main))) new-h
+*** (skg (node (id new-h) (repo main))) new-h
 ";
 
 const EXPECTED_UNSTAGED : &str = "\
-* (skg (node (id N1) (source main))) N1
+* (skg (node (id N1) (repo main))) N1
 ** (skg overriderFolder)
-*** (skg (node (id del-r) (source main) writeProtected (unstaged removedX removedM))) del-r
-* (skg (node (id N2) (source main))) N2
+*** (skg (node (id del-r) (repo main) writeProtected (unstaged removedX removedM))) del-r
+* (skg (node (id N2) (repo main))) N2
 ** (skg overriderFolder)
-*** (skg (node (id edge-r) (source main) writeProtected (unstaged removedM))) edge-r
-* (skg (node (id N3) (source main))) N3
+*** (skg (node (id edge-r) (repo main) writeProtected (unstaged removedM))) edge-r
+* (skg (node (id N3) (repo main))) N3
 ** (skg overriderFolder)
-*** (skg (node (id new-r) (source main) (unstaged newM))) new-r
-* (skg (node (id N4) (source main))) N4
+*** (skg (node (id new-r) (repo main) (unstaged newM))) new-r
+* (skg (node (id N4) (repo main))) N4
 ** (skg overriderFolder)
-*** (skg (node (id newfile-r) (source main) (unstaged newX newM))) newfile-r
-* (skg (node (id SN) (source main))) SN
+*** (skg (node (id newfile-r) (repo main) (unstaged newX newM))) newfile-r
+* (skg (node (id SN) (repo main))) SN
 ** (skg subscriberFolder)
-*** (skg (node (id del-s) (source main) writeProtected (unstaged removedX removedM))) del-s
-*** (skg (node (id new-s) (source main) (unstaged newM))) new-s
-* (skg (node (id HN) (source main))) HN
+*** (skg (node (id del-s) (repo main) writeProtected (unstaged removedX removedM))) del-s
+*** (skg (node (id new-s) (repo main) (unstaged newM))) new-s
+* (skg (node (id HN) (repo main))) HN
 ** (skg hiderFolder)
-*** (skg (node (id edge-h) (source main) writeProtected (unstaged removedM))) edge-h
-*** (skg (node (id new-h) (source main) (unstaged newM))) new-h
+*** (skg (node (id edge-h) (repo main) writeProtected (unstaged removedM))) edge-h
+*** (skg (node (id new-h) (repo main) (unstaged newM))) new-h
 ";
 
 const EXPECTED_STAGED : &str = "\
-*** (skg (node (id del-r) (source main) writeProtected (staged removedX removedM))) del-r
-*** (skg (node (id edge-r) (source main) writeProtected (staged removedM))) edge-r
-*** (skg (node (id new-r) (source main) (staged newM))) new-r
-*** (skg (node (id newfile-r) (source main) (staged newX newM))) newfile-r
-*** (skg (node (id del-s) (source main) writeProtected (staged removedX removedM))) del-s
-*** (skg (node (id new-s) (source main) (staged newM))) new-s
-*** (skg (node (id edge-h) (source main) writeProtected (staged removedM))) edge-h
-*** (skg (node (id new-h) (source main) (staged newM))) new-h
+*** (skg (node (id del-r) (repo main) writeProtected (staged removedX removedM))) del-r
+*** (skg (node (id edge-r) (repo main) writeProtected (staged removedM))) edge-r
+*** (skg (node (id new-r) (repo main) (staged newM))) new-r
+*** (skg (node (id newfile-r) (repo main) (staged newX newM))) newfile-r
+*** (skg (node (id del-s) (repo main) writeProtected (staged removedX removedM))) del-s
+*** (skg (node (id new-s) (repo main) (staged newM))) new-s
+*** (skg (node (id edge-h) (repo main) writeProtected (staged removedM))) edge-h
+*** (skg (node (id new-h) (repo main) (staged newM))) new-h
 ";
 
 #[test]

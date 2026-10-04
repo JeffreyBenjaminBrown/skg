@@ -122,12 +122,12 @@ describe('skg.sexpr.parse printing', function ()
     round_trips('((busy-initializing . "still loading"))')
     round_trips('((response-type "titles-by-ids") (content '
                 .. '((3861db2c-aaaa . "title one") (deadbeef . "two"))))')
-    round_trips('(skg (node (id 7) (source main) (unstaged newX newM)))')
-    round_trips('(skg (node (id 9) (source main) writeProtected '
+    round_trips('(skg (node (id 7) (repo main) (unstaged newX newM)))')
+    round_trips('(skg (node (id 9) (repo main) writeProtected '
                 .. '(staged removedM) (unstaged newM)))')
     round_trips('(skg alias (staged newM))')
     round_trips('(skg (textChanged staged unstaged))')
-    round_trips('(skg (node (id x) (viewStats (sourceHerald ⌂:public) '
+    round_trips('(skg (node (id x) (viewStats (homeRepoHerald ⌂:public) '
                 .. 'cycle (overridesHere 4))))')
     round_trips('(skg (node (id x) (rels "2(1,1)L 3S")))')
   end)
@@ -177,7 +177,7 @@ describe('skg.sexpr.parse.find_sexp_end', function ()
 
   it('handles herald characters that confuse Emacs forward-sexp',
      function ()
-    local line = '(skg (node (id 7) (viewStats (sourceHerald ⌂:pub))))'
+    local line = '(skg (node (id 7) (viewStats (homeRepoHerald ⌂:pub))))'
     assert.are.equal(#line, sexpr.find_sexp_end(line))
   end)
 

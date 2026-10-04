@@ -25,7 +25,7 @@ From PowerShell, in the package folder:
 - =bash/status-all.sh=
 
 If the chosen folder already contains =skgconfig.toml=, the script checks
-that every configured source folder exists and is a git repository.
+that every configured repo folder exists and is a git repository.
 
 If there is no config yet, but =public/= or =private/= exists and is
 nonempty, the script quits instead of guessing what to do with existing

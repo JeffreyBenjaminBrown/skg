@@ -60,7 +60,7 @@ For example, =containsHerald= uses ={= without a closing =}=:
 wrong position, because Emacs's syntax tables treat braces as
 paired delimiters.
 
-Similarly, =sourceHerald= uses =⌂:= and =linksHerald= uses =→=,
+Similarly, =homeRepoHerald= uses =⌂:= and =linksHerald= uses =→=,
 which can confuse sexp navigation depending on syntax table
 settings.
 

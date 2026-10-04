@@ -38,7 +38,7 @@ pub fn handle_export_to_org_request (
   let prepared : Result<
     (ActiveRepoSet, Vec<NodeComplete>, PathBuf), String> = ( || {
     let name : String =
-      value_from_request_sexp ("source-set", request) ?;
+      value_from_request_sexp ("repo-set", request) ?;
     let active : ActiveRepoSet =
       ActiveRepoSet::named (config, RepoSetName::from (name))
       . map_err ( |e| e . to_string () ) ?;

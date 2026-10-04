@@ -11,7 +11,7 @@
 
 (let ((host-prompts 0)
       (approvals 0)
-      (source-dir (getenv "SKG_TEST_SOURCE_DIR")))
+      (repo-dir (getenv "SKG_TEST_REPO_DIR")))
   (cl-letf (((symbol-function 'read-string)
              (lambda (&rest _)
                (cl-incf host-prompts)
@@ -36,7 +36,7 @@
              host-prompts approvals)))
   (unless (= host-prompts 1) (error "Expected one host-root prompt"))
   (unless (= approvals 1) (error "Expected one explicit approval"))
-  (unless (file-exists-p (expand-file-name "import-root.skg" source-dir))
+  (unless (file-exists-p (expand-file-name "import-root.skg" repo-dir))
     (error "Explicit Org root ID was not published"))
   ;; The import result schedules an asynchronous refresh. Let that finish
   ;; before issuing the next request on the same length-prefixed connection.
@@ -55,14 +55,14 @@
       (skg-request-save-buffer)
       (unless (skg-test-wait-for-response 15)
         (error "Saving imported view timed out"))))
-  (let ((files (directory-files source-dir nil "\\.skg$")))
+  (let ((files (directory-files repo-dir nil "\\.skg$")))
     (unless (= (length files) 7)
       (error "Literal heading became a node: expected 7 files, got %d"
              (length files)))
     (unless (cl-some
              (lambda (file)
                (with-temp-buffer
-                 (insert-file-contents (expand-file-name file source-dir))
+                 (insert-file-contents (expand-file-name file repo-dir))
                  (goto-char (point-min))
                  (search-forward
                   (concat "First line" (make-string 2 ?\\) "\n")
@@ -70,7 +70,7 @@
              files)
       (error "Markdown hard break did not become an Org double-backslash break")))
   (with-temp-buffer
-    (insert-file-contents (expand-file-name "import-root.skg" source-dir))
+    (insert-file-contents (expand-file-name "import-root.skg" repo-dir))
     (unless (string-match-p "\\* not a heading" (buffer-string))
       (error "Literal heading was lost from the saved root")))
   (message "PASS: mixed import, approval, literal body, save")

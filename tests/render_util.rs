@@ -22,7 +22,7 @@ fn test_viewnode_to_text_no_metadata () {
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
     . expect ("ActiveNode rendering never fails");
-  assert_metadata_eq! ( result, "* (skg (node (id test) (source main))) Test Title\n" ); }
+  assert_metadata_eq! ( result, "* (skg (node (id test) (repo main))) Test Title\n" ); }
 
 #[test]
 fn test_viewnode_to_text_with_body () {
@@ -41,7 +41,7 @@ fn test_viewnode_to_text_with_body () {
   let result : String =
     viewnode_to_text ( 2, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
     . expect ("ActiveNode rendering never fails");
-  assert_metadata_eq! ( result, "** (skg (node (id test) (source main))) Test Title\nTest body content\n" ); }
+  assert_metadata_eq! ( result, "** (skg (node (id test) (repo main))) Test Title\nTest body content\n" ); }
 
 #[test]
 fn test_viewnode_to_text_with_metadata () {
@@ -72,7 +72,7 @@ fn test_viewnode_to_text_with_id_metadata () {
   let result : String =
     viewnode_to_text ( 3, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
     . expect ("ActiveNode rendering never fails");
-  assert_metadata_eq! ( result, "*** (skg (node (id test123) (source main) writeProtected)) Test Title\n" ); }
+  assert_metadata_eq! ( result, "*** (skg (node (id test123) (repo main) writeProtected)) Test Title\n" ); }
 
 #[test]
 fn repo_name_with_whitespace_is_one_round_trippable_atom () {
@@ -98,14 +98,14 @@ fn repo_name_with_whitespace_is_one_round_trippable_atom () {
     . expect ("ActiveNode rendering never fails");
   assert_eq! (
     rendered,
-    "* (skg (node (id cheese-node) (source \"Mr Cheese\") (viewStats (sourceHerald \"⌂:Mr Cheese\")))) Cooking\n" );
+    "* (skg (node (id cheese-node) (repo \"Mr Cheese\") (viewStats (homeRepoHerald \"⌂:Mr Cheese\")))) Cooking\n" );
   let metadata = parse_metadata_to_viewnodemd (
     rendered
       . split_once (" Cooking")
       . expect ("rendered headline has title") . 0
       . strip_prefix ("* ")
       . expect ("rendered headline has bullet") )
-    . expect ("quoted source should parse");
+    . expect ("quoted repo should parse");
   assert_eq! (
     metadata . home_repo, Some (RepoName::from ("Mr Cheese")) );
 }
@@ -127,7 +127,7 @@ fn test_metadata_ordering () {
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
     . expect ("ActiveNode rendering never fails");
-  assert_metadata_eq! ( result, "* (skg (node (id xyz) (source main) (viewStats cycle))) Test\n" ); }
+  assert_metadata_eq! ( result, "* (skg (node (id xyz) (repo main) (viewStats cycle))) Test\n" ); }
 
 #[test]
 fn test_rel_heralds_emitted () {
@@ -154,4 +154,4 @@ fn test_rel_heralds_emitted () {
             "rels not emitted verbatim: {}", with_rels );
   let neither : String = mk ( None );
   assert! ( ! neither . contains ("(rels ") );
-  assert_metadata_eq! ( neither, "* (skg (node (id n) (source main))) N\n" ); }
+  assert_metadata_eq! ( neither, "* (skg (node (id n) (repo main))) N\n" ); }

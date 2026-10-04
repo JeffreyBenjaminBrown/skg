@@ -23,7 +23,7 @@ print('=== SKG Focus and Folded Markers Integration Test ===')
 -- PHASE 1: create the test buffer.
 print('=== PHASE 1: Creating test buffer ===')
 local content = table.concat({
-  '* (skg (node (id 1) (source main))) 1',
+  '* (skg (node (id 1) (repo main))) 1',
   '** (skg (node (id 2))) 2',
   '** (skg (node (id 3))) 3',
   '*** (skg (node (id 4))) 4',

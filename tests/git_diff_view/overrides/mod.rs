@@ -39,24 +39,24 @@ fn setup_overrides_fixtures_staged (
 
 const EXPECTED_UNSTAGED : &str = "\
 ** (skg overriddenFolder)
-*** (skg (node (id Z) (source main))) Z
-*** (skg (node (id W) (source main) writeProtected (unstaged removedM))) W
-*** (skg (node (id O) (source main) (unstaged newM))) O
+*** (skg (node (id Z) (repo main))) Z
+*** (skg (node (id W) (repo main) writeProtected (unstaged removedM))) W
+*** (skg (node (id O) (repo main) (unstaged newM))) O
 ** (skg hiddenFolder)
-*** (skg (node (id ha) (source main))) ha
-*** (skg (node (id hb) (source main) writeProtected (unstaged removedM))) hb
-*** (skg (node (id hc) (source main) (unstaged newM))) hc
+*** (skg (node (id ha) (repo main))) ha
+*** (skg (node (id hb) (repo main) writeProtected (unstaged removedM))) hb
+*** (skg (node (id hc) (repo main) (unstaged newM))) hc
 ";
 
 const EXPECTED_STAGED : &str = "\
 ** (skg overriddenFolder)
-*** (skg (node (id Z) (source main))) Z
-*** (skg (node (id W) (source main) writeProtected (staged removedM))) W
-*** (skg (node (id O) (source main) (staged newM))) O
+*** (skg (node (id Z) (repo main))) Z
+*** (skg (node (id W) (repo main) writeProtected (staged removedM))) W
+*** (skg (node (id O) (repo main) (staged newM))) O
 ** (skg hiddenFolder)
-*** (skg (node (id ha) (source main))) ha
-*** (skg (node (id hb) (source main) writeProtected (staged removedM))) hb
-*** (skg (node (id hc) (source main) (staged newM))) hc
+*** (skg (node (id ha) (repo main))) ha
+*** (skg (node (id hb) (repo main) writeProtected (staged removedM))) hb
+*** (skg (node (id hc) (repo main) (staged newM))) hc
 ";
 
 #[test]
@@ -156,12 +156,12 @@ async fn emptied_requested_folders_still_render_in_diff_mode (
         initial_diff_view );
       let request : String = initial_diff_view
         . replace (
-          "(id E) (source main) (affectsParent na)",
-          "(id E) (source main) (affectsParent na) \
+          "(id E) (repo main) (affectsParent na)",
+          "(id E) (repo main) (affectsParent na) \
            (viewRequests (folder overrides_view_of) (folder hides_from_its_subscriptions))" )
         . replace (
-          "(id EN) (source main) (affectsParent na)",
-          "(id EN) (source main) (affectsParent na) \
+          "(id EN) (repo main) (affectsParent na)",
+          "(id EN) (repo main) (affectsParent na) \
            (viewRequests (folder overrides_view_of))" );
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
@@ -172,17 +172,17 @@ async fn emptied_requested_folders_still_render_in_diff_mode (
           &mut stream, &request, &config, &tantivy, &graph,
           true, &Err (String::new ()), &mut views_state ) . await ? };
       assert_buffer_contains ( &response . saved_view, "\
-* (skg (node (id E) (source main))) E
+* (skg (node (id E) (repo main))) E
 ** (skg overriddenFolder)
-*** (skg (node (id EZ) (source main) writeProtected (unstaged removedM))) EZ
+*** (skg (node (id EZ) (repo main) writeProtected (unstaged removedM))) EZ
 ** (skg hiddenFolder)
-*** (skg (node (id EH) (source main) writeProtected (unstaged removedM))) EH
-* (skg (node (id EN) (source main))) EN
+*** (skg (node (id EH) (repo main) writeProtected (unstaged removedM))) EH
+* (skg (node (id EN) (repo main))) EN
 ** (skg overriderFolder)
-*** (skg (node (id ER) (source main) writeProtected (unstaged removedM))) ER
-* (skg (node (id ES) (source main))) ES
+*** (skg (node (id ER) (repo main) writeProtected (unstaged removedM))) ER
+* (skg (node (id ES) (repo main))) ES
 ** (skg subscribeeFolder)
-*** (skg (node (id EB) (source main) writeProtected (unstaged removedM))) EB
+*** (skg (node (id EB) (repo main) writeProtected (unstaged removedM))) EB
 " ); }
     { // Outside diff mode, the emptied folders still do not appear.
       let mut warnings : Vec<String> = Vec::new ();
@@ -222,13 +222,13 @@ async fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
     = (&s . config, &mut s . tantivy);
     let graph = graph_handle_from_config (&config)?;
     let input : &str = "\
-* (skg (node (id R) (source main))) R
+* (skg (node (id R) (repo main))) R
 ** (skg overriddenFolder)
-*** (skg (node (id Z) (source main))) Z
-*** (skg (node (id O) (source main))) O
+*** (skg (node (id Z) (repo main))) Z
+*** (skg (node (id O) (repo main))) O
 ** (skg hiddenFolder)
-*** (skg (node (id ha) (source main))) ha
-*** (skg (node (id hc) (source main))) hc
+*** (skg (node (id ha) (repo main))) ha
+*** (skg (node (id hc) (repo main))) hc
 ";
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : true,

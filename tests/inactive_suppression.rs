@@ -58,9 +58,9 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
       { // An EDITED now-inactive definitive node: write suppressed,
         // warning attached, containment preserved.
         let buffer = indoc! {"
-          * (skg (node (id root) (source public))) root
-          ** (skg (node (id active-b) (source public) writeProtected)) active-b
-          ** (skg (node (id private-a) (source private))) edited private title
+          * (skg (node (id root) (repo public))) root
+          ** (skg (node (id active-b) (repo public) writeProtected)) active-b
+          ** (skg (node (id private-a) (repo private))) edited private title
         "};
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
@@ -80,9 +80,9 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
       { // The same stale node UNTOUCHED: the noop filter drops its
         // instruction before suppression looks, so no warning.
         let buffer = indoc! {"
-          * (skg (node (id root) (source public))) root
-          ** (skg (node (id active-b) (source public) writeProtected)) active-b
-          ** (skg (node (id private-a) (source private))) private title must not leak
+          * (skg (node (id root) (repo public))) root
+          ** (skg (node (id active-b) (repo public) writeProtected)) active-b
+          ** (skg (node (id private-a) (repo private))) private title must not leak
           private body must not leak
         "};
         let (_viewforest, plan, warnings) =
@@ -100,19 +100,19 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
       { // Moving a node into an inactive repo: move suppressed,
         // warning attached, node unmoved.
         let buffer = indoc! {"
-          * (skg (node (id root) (source public))) root
-          ** (skg (node (id active-b) (source private))) active-b
+          * (skg (node (id root) (repo public))) root
+          ** (skg (node (id active-b) (repo private))) active-b
         "};
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
             buffer, config, Some (&active) )  ?;
         assert! (
           plan . repo_moves . is_empty (),
-          "a move into an inactive source must be suppressed" );
+          "a move into an inactive repo must be suppressed" );
         assert! (
           ! save_ids (&plan . define_nodes)
             . contains (&ID::from ("active-b")),
-          "the write claiming the inactive source must be suppressed" );
+          "the write claiming the inactive repo must be suppressed" );
         assert! (
           warnings . iter () . any ( |w| w . contains (
             "remain unchanged in graph")),

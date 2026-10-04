@@ -23,7 +23,7 @@
       (error "git %s failed in %s" args dir))))
 
 (defun test-skg-git-add--setup ()
-  "Create a fresh data-root with a source dir + skgconfig.toml.
+  "Create a fresh data-root with a repo dir + skgconfig.toml.
 
 Initial state:
 - old.skg      : committed (present in HEAD).
@@ -57,9 +57,9 @@ Returns the absolute data-root path."
     (setq skg-config-dir (file-name-as-directory root))
     root))
 
-(defun test-skg-git-add--in-index-p (source-dir file)
-  "Return t if FILE is in the git index of SOURCE-DIR."
-  (let ((default-directory source-dir))
+(defun test-skg-git-add--in-index-p (repo-dir file)
+  "Return t if FILE is in the git index of REPO-DIR."
+  (let ((default-directory repo-dir))
     (zerop (call-process "git" nil nil nil
                          "ls-files" "--error-unmatch" file))))
 
@@ -69,11 +69,11 @@ Returns the absolute data-root path."
     (with-current-buffer buf
       (erase-buffer)
       (insert
-       "* (skg (node (id new) (source main) (unstaged newX newM))) new\n"
+       "* (skg (node (id new) (repo main) (unstaged newX newM))) new\n"
        "body\n"
-       "** (skg (node (id child) (source main) (unstaged newX newM))) child\n"
-       "** (skg (node (id old) (source main) (unstaged newM))) old\n"
-       "* (skg (node (id staged) (source main) (staged newX))) staged\n")
+       "** (skg (node (id child) (repo main) (unstaged newX newM))) child\n"
+       "** (skg (node (id old) (repo main) (unstaged newM))) old\n"
+       "* (skg (node (id staged) (repo main) (staged newX))) staged\n")
       (skg-content-view-mode)
       (goto-char (point-min)))
     buf))
@@ -88,10 +88,10 @@ Returns the absolute data-root path."
     (let ((kill-buffer-query-functions nil))
       (kill-buffer "*test-skg-git-add-view*"))))
 
-(defun test-skg-git-add--staged-blob-hash (source-dir file)
-  "Return the git hash of FILE's current staged blob in SOURCE-DIR."
+(defun test-skg-git-add--staged-blob-hash (repo-dir file)
+  "Return the git hash of FILE's current staged blob in REPO-DIR."
   (with-temp-buffer
-    (let ((default-directory source-dir))
+    (let ((default-directory repo-dir))
       (call-process "git" nil t nil "ls-files" "-s" file))
     (string-trim (buffer-string))))
 
@@ -132,7 +132,7 @@ Returns the absolute data-root path."
             (goto-char (point-min))
             (should
              (equal
-              (skg--subtree-unstaged-new-file-id-and-source-pairs)
+              (skg--subtree-unstaged-new-file-id-and-repo-pairs)
               '(("new" . "main")
                 ("child" . "main")))))))
     (test-skg-git-add--teardown)))
@@ -148,7 +148,7 @@ Returns the absolute data-root path."
             (search-forward "body")
             (should
              (equal
-              (skg--subtree-unstaged-new-file-id-and-source-pairs)
+              (skg--subtree-unstaged-new-file-id-and-repo-pairs)
               '(("new" . "main")
                 ("child" . "main")))))))
     (test-skg-git-add--teardown)))
@@ -202,9 +202,9 @@ ellipsis object to `call-process' instead of a string."
         (setq ids (nreverse ids))
         (with-current-buffer buf
           (erase-buffer)
-          (insert "* (skg (node (id old) (source main) (unstaged newM))) old\n")
+          (insert "* (skg (node (id old) (repo main) (unstaged newM))) old\n")
           (dolist (id ids)
-            (insert (format "** (skg (node (id %s) (source main) (unstaged newX newM))) %s\n"
+            (insert (format "** (skg (node (id %s) (repo main) (unstaged newX newM))) %s\n"
                             id id)))
           (skg-content-view-mode)
           (goto-char (point-min)))
@@ -234,7 +234,7 @@ files, rather than reporting 0 files as if the user did it right
   (let ((messages nil)
         (skg--git-diff-mode-enabled nil))
     (with-temp-buffer
-      (insert "* (skg (node (id old) (source main))) old\n")
+      (insert "* (skg (node (id old) (repo main))) old\n")
       (org-mode)
       (goto-char (point-min))
       (cl-letf (((symbol-function 'message)
@@ -253,7 +253,7 @@ files, rather than reporting 0 files as if the user did it right
   (let ((messages nil)
         (skg--git-diff-mode-enabled t))
     (with-temp-buffer
-      (insert "* (skg (node (id old) (source main))) old\n")
+      (insert "* (skg (node (id old) (repo main))) old\n")
       (org-mode)
       (goto-char (point-min))
       (cl-letf (((symbol-function 'message)

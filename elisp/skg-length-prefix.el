@@ -67,7 +67,7 @@ because the sexp crate emits simple strings unquoted."
                     (one-shot (cddr handler-entry)))
                 (funcall handler tcp-proc payload)
                 (when (and (memq response-type
-                                 '(save-result rerender-done active-source-set
+                                 '(save-result rerender-done active-repo-set
                                    delete-references-result
                                    rebuild-ephemeral-data-stores))
                            (fboundp 'skg-link-annotations-invalidate-all))

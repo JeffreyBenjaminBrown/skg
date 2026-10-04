@@ -23,7 +23,7 @@ and hide INTERNAL from M-x completion."
 (skg-alias skg-save                   skg-request-save-buffer)
 (skg-alias skg-set-definitive         skg-request-definitive-view)
 (skg-alias skg-fork                    skg-fork-node)
-(skg-alias skg-limit-source-set       skg-set-active-source-set)
+(skg-alias skg-limit-repo-set       skg-set-active-repo-set)
 (skg-alias skg-view-heralds-mode      heralds-minor-mode)
 (skg-alias skg-view-metadata          skg-edit-metadata)
 
@@ -36,7 +36,7 @@ and hide INTERNAL from M-x completion."
   (global-set-key (kbd "C-c f i")   #'skg-search-interactive)
   (global-set-key (kbd "C-c f l")   #'skg-search-make-link)
   (global-set-key (kbd "C-c g i")   #'skg-goto-by-id) ;; Global because it works from ANY buffer: it only reads a typed/pasted ID (TODO/more.org).
-  (global-set-key (kbd "C-c v l")   #'skg-limit-source-set))
+  (global-set-key (kbd "C-c v l")   #'skg-limit-repo-set))
 
 (with-eval-after-load 'magit ;; Magit
   ;; Popping to the id stack would make no sense here,
@@ -141,11 +141,11 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c s d") #'skg-set-definitive)
     (define-key map (kbd "C-c s w") #'skg-set-write-protected)
     (define-key map (kbd "C-c s m") #'skg-set-merge-request)
-    (define-key map (kbd "C-c s r") #'skg-set-relSource)
-    (define-key map (kbd "C-c s R") #'skg-set-relSource-recursive)
+    (define-key map (kbd "C-c s r") #'skg-set-relRepo)
+    (define-key map (kbd "C-c s R") #'skg-set-relRepo-recursive)
     (define-key map (kbd "C-c s x") #'skg-set-property-search-matching)
-    (define-key map (kbd "C-c s s") #'skg-set-source)
-    (define-key map (kbd "C-c s S") #'skg-set-source-recursive))
+    (define-key map (kbd "C-c s s") #'skg-set-repo)
+    (define-key map (kbd "C-c s S") #'skg-set-repo-recursive))
   (progn;; graph modifications
     (define-key map (kbd "C-c m c") #'skg-replace-link-with-content)
     (define-key map (kbd "C-c m f") #'skg-fork-node)
@@ -155,8 +155,8 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c v d") #'skg-view-diff-mode)
     (define-key map (kbd "C-c v e") #'skg-view-new-empty)
     (define-key map (kbd "C-c v h") #'skg-view-heralds-mode)
-    (define-key map (kbd "C-c v l") #'skg-limit-source-set)
-    (define-key map (kbd "C-c v L") #'skg-toggle-source-overlay-on-links)
+    (define-key map (kbd "C-c v l") #'skg-limit-repo-set)
+    (define-key map (kbd "C-c v L") #'skg-toggle-repo-overlay-on-links)
     (define-key map (kbd "C-c v m") #'skg-view-metadata)
     (define-key map (kbd "C-c v o") #'skg-view-org-ancestry)
     (define-key map (kbd "C-c v r") #'skg-readable-ids-mode)
@@ -207,7 +207,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c G M")   #'skg-goto-in-magit-parent-and-close-this))
   (progn;; view
     (define-key map (kbd "C-c v e") #'skg-view-new-empty)
-    (define-key map (kbd "C-c v l") #'skg-limit-source-set)
+    (define-key map (kbd "C-c v l") #'skg-limit-repo-set)
     (define-key map (kbd "C-c v s") #'skg-view-id-stack))
   (progn;; id navigation
     (define-key map (kbd "C-c i n") #'skg-id-next)

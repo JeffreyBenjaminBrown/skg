@@ -120,7 +120,7 @@ fn unconfigured_repo_and_msv_relations_are_covered (
     RelPartner::at_relRepo ( RepoName::from ("public"),
                           ID::new ("t") ) ] );
   node . hides_from_its_subscriptions = MSV::Specified (
-    rel_partners_at_relRepo ( & RepoName::from ("nonexistent-source"),
+    rel_partners_at_relRepo ( & RepoName::from ("nonexistent-repo"),
                     vec! [ ID::new ("t") ] ));
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes ( & [ node, target ] );

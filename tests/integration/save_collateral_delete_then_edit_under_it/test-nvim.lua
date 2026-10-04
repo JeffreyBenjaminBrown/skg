@@ -169,8 +169,8 @@ do
     sexpr.read('(skg (node (viewRequests (folder aliases))))'))
 end
 vim.api.nvim_buf_set_lines(buf1, -1, -1, false, {
-  '* (skg (node (id subee) (source main))) subee',
-  '** (skg (node (id subee-1) (source main))) subee-1' })
+  '* (skg (node (id subee) (repo main))) subee',
+  '** (skg (node (id subee-1) (repo main))) subee-1' })
 require('skg.save').request_save_buffer()
 T.check(T.wait_for_response(15), 'phase 2: save response arrived')
 print('Buffer 1 after multi-root save:\n' .. T.buffer_text(buf1))
@@ -197,9 +197,9 @@ vim.api.nvim_buf_set_name(buf2, 'skg://skg-test-buf2')
 vim.bo[buf2].filetype = 'org'
 vim.b[buf2].skg_view_uri = require('skg.buffer').generate_uuid()
 vim.api.nvim_buf_set_lines(buf2, 0, -1, false, {
-  '* (skg (node (id 11) (source main) writeProtected)) 11',
-  '* (skg (node (id subee) (source main))) subee',
-  '** (skg (node (id subee-1) (source main))) subee-1' })
+  '* (skg (node (id 11) (repo main) writeProtected)) 11',
+  '* (skg (node (id subee) (repo main))) subee',
+  '** (skg (node (id subee-1) (repo main))) subee-1' })
 vim.api.nvim_set_current_buf(buf2)
 require('skg.save').request_save_buffer()
 T.check(T.wait_for_response(15), 'phase 3: save response arrived')
@@ -284,8 +284,8 @@ print('=== PHASE 8: Add new-root under deletedScaff in buffer 1 ===')
 -- after the delete pipeline started cleaning up references to the
 -- deleted node, buffer 1 no longer contains a DeletedScaff, so this
 -- phase now exercises adding a top-level root via metadata-only
--- insertion (the BufferRoot, like a DeletedScaff, supplies no source
--- to inherit, so explicit (source main) is still required).
+-- insertion (the BufferRoot, like a DeletedScaff, supplies no repo
+-- to inherit, so explicit (repo main) is still required).
 vim.api.nvim_set_current_buf(buf1)
 do
   local subee_row = nth_line_with_title(buf1, 'subee', 1)
@@ -294,7 +294,7 @@ do
   local insertion_row = end_of_subtree_row(buf1, subee_row)
   insert_lines_before(buf1, insertion_row,
     { string.rep('*', subee_depth)
-      .. ' (skg (node (source main))) new-root' })
+      .. ' (skg (node (repo main))) new-root' })
 end
 print('Buffer 1 after inserting new-root:\n' .. T.buffer_text(buf1))
 require('skg.save').request_save_buffer()

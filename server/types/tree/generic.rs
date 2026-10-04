@@ -18,16 +18,16 @@ pub fn pid_and_repo_from_ancestor (
         v . pid_and_repo ()
         . map ( |(pid, repo)| (pid . clone (), repo . clone ()) )
         . ok_or_else (|| format!(
-          "{}: ancestor {} has no source",
+          "{}: ancestor {} has no repo",
           caller, generation )),
       ViewNodeKind::Phantom (p) =>
         p . pid_and_repo ()
         . map ( |(pid, repo)| (pid . clone (), repo . clone ()) )
         . ok_or_else (|| format!(
-          "{}: ancestor {} has no source",
+          "{}: ancestor {} has no repo",
           caller, generation )),
       _ => Err( format!(
-        "{}: ancestor {} cannot provide PID and source",
+        "{}: ancestor {} cannot provide PID and repo",
         caller, generation )) } )
   . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
   . map_err( |e| -> Box<dyn Error> { e . into() } ) }

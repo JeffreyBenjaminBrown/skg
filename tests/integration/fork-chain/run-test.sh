@@ -7,7 +7,7 @@
 # container draws the chain end D, marked (overridesHere N), and the save
 # accepts the chain-end carrier.
 #
-# Sources: public + private (owned) and foreign (read-only).
+# Repos: public + private (owned) and foreign (read-only).
 
 set -e
 
@@ -26,7 +26,7 @@ restore_chain_fixtures() {
   git -C "$PROJECT_ROOT" checkout -- \
     "tests/integration/fork-chain/data/public" \
     "tests/integration/fork-chain/data/foreign" 2>/dev/null || true
-  # Remove any clones the test wrote into the owned sources.
+  # Remove any clones the test wrote into the owned repos.
   find "$TEST_DIR/data/owned/public" -name '*.skg' ! -name 'P.skg' -delete 2>/dev/null || true
   find "$TEST_DIR/data/owned/private" -name '*.skg' -delete 2>/dev/null || true
 }

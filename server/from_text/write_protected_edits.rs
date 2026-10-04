@@ -154,7 +154,7 @@ fn write_protected_changes (
   if previous . title != current . title { changes . push (format! (
     "changed title from {:?} to {:?}", previous . title, current . title)); }
   if previous . home_repo != current . home_repo { changes . push (format! (
-    "changed source from {} to {}", previous . home_repo, current . home_repo)); }
+    "changed repo from {} to {}", previous . home_repo, current . home_repo)); }
   if previous . content != current . content {
     changes . push ("changed content membership" . to_string ()); }
   if previous . aliases != current . aliases {
@@ -538,25 +538,25 @@ mod tests {
   #[test]
   fn catches_title_content_and_writable_folder_edits_but_not_child_text () {
     let original = forest (indoc! {"
-      * (skg (node (id owner) (source main) writeProtected)) owner
-      ** (skg (node (id content) (source main))) content
+      * (skg (node (id owner) (repo main) writeProtected)) owner
+      ** (skg (node (id content) (repo main))) content
       ** (skg subscribeeFolder)
-      *** (skg (node (id subscribee) (source main))) subscribee
+      *** (skg (node (id subscribee) (repo main))) subscribee
     "});
     let mut child_text_changed = forest (indoc! {"
-      * (skg (node (id owner) (source main) writeProtected (viewRequests definitiveView))) owner
-      ** (skg (node (id content) (source main))) changed child text
+      * (skg (node (id owner) (repo main) writeProtected (viewRequests definitiveView))) owner
+      ** (skg (node (id content) (repo main))) changed child text
       ** (skg subscribeeFolder)
-      *** (skg (node (id subscribee) (source main))) subscribee
+      *** (skg (node (id subscribee) (repo main))) subscribee
     "});
     assert! (errors_and_normalize_new_writeProtected_occurrences (
       &mut child_text_changed, &original) . is_empty ());
 
     let mut changed = forest (indoc! {"
-      * (skg (node (id owner) (source main) writeProtected)) changed owner
-      ** (skg (node (id other) (source main))) other content
+      * (skg (node (id owner) (repo main) writeProtected)) changed owner
+      ** (skg (node (id other) (repo main))) other content
       ** (skg subscribeeFolder)
-      *** (skg (node (id other-subscribee) (source main))) other subscribee
+      *** (skg (node (id other-subscribee) (repo main))) other subscribee
     "});
     let errors = errors_and_normalize_new_writeProtected_occurrences (
       &mut changed, &original);
@@ -569,12 +569,12 @@ mod tests {
   #[test]
   fn allows_a_new_writeProtected_occurrence_and_parks_its_viewnode_children () {
     let original = forest (indoc! {"
-      * (skg (node (id root) (source main))) root
+      * (skg (node (id root) (repo main))) root
     "});
     let mut current = forest (indoc! {"
-      * (skg (node (id root) (source main))) root
-      ** (skg (node (id root) (source main) writeProtected)) new self occurrence
-      *** (skg (node (id child) (source main))) child
+      * (skg (node (id root) (repo main))) root
+      ** (skg (node (id root) (repo main) writeProtected)) new self occurrence
+      *** (skg (node (id child) (repo main))) child
     "});
     assert! (errors_and_normalize_new_writeProtected_occurrences (
       &mut current, &original) . is_empty ());
@@ -590,7 +590,7 @@ mod tests {
   fn body_on_an_writeProtected_occurrence_is_a_parse_error () {
     let (_forest, errors, _warnings) = org_to_uninterpreted_viewforest (
       indoc! {"
-        * (skg (node (id owner) (source main) writeProtected)) owner
+        * (skg (node (id owner) (repo main) writeProtected)) owner
         body that would otherwise disappear
       "}) . unwrap ();
     assert! (matches! (&errors[..],
@@ -602,13 +602,13 @@ mod tests {
   #[test]
   fn boolprops_surface_edits_report_owner_identity_and_concrete_changes () {
     let original = forest (indoc! {"
-      * (skg (node (id owner) (source main))) Owner title
+      * (skg (node (id owner) (repo main))) Owner title
       ** (skg propertiesFolder)
       *** (skg (property hadId))
       *** (skg (property noSearchMatching))
     "});
     let mut changed = forest (indoc! {"
-      * (skg (node (id owner) (source main))) Owner title
+      * (skg (node (id owner) (repo main))) Owner title
       ** (skg propertiesFolder) edited folder headline
       added folder body
       *** (skg (property noSearchMatching)) renamed
@@ -632,12 +632,12 @@ mod tests {
   #[test]
   fn deleting_the_properties_projection_is_inert () {
     let original = forest (indoc! {"
-      * (skg (node (id owner) (source main))) Owner title
+      * (skg (node (id owner) (repo main))) Owner title
       ** (skg propertiesFolder)
       *** (skg (property noSearchMatching))
     "});
     let mut without_projection = forest (indoc! {"
-      * (skg (node (id owner) (source main))) Owner title
+      * (skg (node (id owner) (repo main))) Owner title
     "});
     assert! (errors_and_normalize_new_writeProtected_occurrences (
       &mut without_projection, &original) . is_empty ());
@@ -646,14 +646,14 @@ mod tests {
   #[test]
   fn deleting_an_optional_sibling_does_not_make_the_properties_surface_edited () {
     let original = forest (indoc! {"
-      * (skg (node (id owner) (source main))) Owner title
+      * (skg (node (id owner) (repo main))) Owner title
       ** (skg aliasFolder) aliases
       *** (skg alias) Another name
       ** (skg propertiesFolder)
       *** (skg (property noSearchMatching))
     "});
     let mut without_alias_projection = forest (indoc! {"
-      * (skg (node (id owner) (source main))) Owner title
+      * (skg (node (id owner) (repo main))) Owner title
       ** (skg propertiesFolder)
       *** (skg (property noSearchMatching))
     "});

@@ -13,8 +13,8 @@ T.client.connect()
 herald_rules.request_herald_rules()
 T.check(T.wait_for_response(10), 'herald rules arrived')
 
-local view_text = '* (skg (node (id src) (source public))) '
-  .. 'Source [[id:old-dest][café]]\n'
+local view_text = '* (skg (node (id src) (repo public))) '
+  .. 'Repo [[id:old-dest][café]]\n'
   .. '[[id:gone][gone]] [[id:private-node][private]]\n'
 local buf = buffer.open_org_buffer_from_text(
   view_text, 'skg://link-integration', 'link-integration')
@@ -38,28 +38,28 @@ T.check(T.wait_for(function ()
 end, 10), 'initial resolved, missing, and inactive statuses arrived')
 T.check(buffer.text(buf) == view_text and not vim.bo[buf].modified,
         'initial annotations leave buffer text and modified state alone')
-T.check(vim.b[buf].skg_link_source_suffix ~= true,
-        'source suffix starts off')
-local source_sets = require('skg.source_sets')
+T.check(vim.b[buf].skg_link_repo_suffix ~= true,
+        'repo suffix starts off')
+local repo_sets = require('skg.repo_sets')
 local state = require('skg.state')
-source_sets.set_active_source_set('all')
+repo_sets.set_active_repo_set('all')
 T.check(T.wait_for(function ()
   return status('private-node', 'resolved')
          and state.lp_pending_count == 0 end, 10),
-  'widening the source-set refreshes a link target without a headline')
-source_sets.set_active_source_set('public')
+  'widening the repo-set refreshes a link target without a headline')
+repo_sets.set_active_repo_set('public')
 T.check(T.wait_for(function ()
   return status('private-node', 'inactive')
          and state.lp_pending_count == 0 end, 10),
-  'narrowing the source-set hides its source again')
-annotations.toggle_source_overlay(buf)
+  'narrowing the repo-set hides its repo again')
+annotations.toggle_repo_overlay(buf)
 T.check(suffix('⌂:PUB') and suffix('⌂:missing')
         and suffix('⌂:inactive') and not suffix('PRIV'),
         'suffixes distinguish visible and unavailable targets')
 save.replace_buffer_with_new_content(buf, view_text)
-T.check(vim.b[buf].skg_link_source_suffix == true
+T.check(vim.b[buf].skg_link_repo_suffix == true
         and not vim.bo[buf].modified,
-        'source toggle and clean state survive replacement')
+        'repo toggle and clean state survive replacement')
 
 vim.api.nvim_buf_set_lines(buf, -1, -1, false,
                            { '[[id:new][new]]' })
@@ -82,7 +82,7 @@ assert(os.rename(data .. '/private/private-node.skg',
 misc.rebuild_ephemeral_data_stores()
 T.check(T.wait_for(function ()
   return status('private-node', 'resolved') end, 10),
-  'source move refreshes inactive target')
+  'repo move refreshes inactive target')
 assert(os.remove(data .. '/public/dest.skg'))
 misc.rebuild_ephemeral_data_stores()
 T.check(T.wait_for(function () return status('old-dest', 'missing') end, 10),

@@ -57,7 +57,7 @@ fn strip_body_whitespace_and_refresh_caches (
     . count ();
   if changed . is_empty () {
     return Ok ( format! (
-      "No body has trailing whitespace ({} files checked, in owned sources).",
+      "No body has trailing whitespace ({} files checked, in owned repos).",
       owned_checked )); }
   let new_graph = Arc::new (InRustGraph::from_nodecompletes (&all_nodes));
   { let tantivy_nodes : Vec<NodeTantivy> =
@@ -77,7 +77,7 @@ fn strip_body_whitespace_and_refresh_caches (
       . collect::<Vec<String>> ()
       . join (", ") };
   Ok ( format! (
-    "Stripped trailing whitespace from {} of {} files in owned sources ({}).",
+    "Stripped trailing whitespace from {} of {} files in owned repos ({}).",
     changed . len (), owned_checked, breakdown )) }
 
 /// Reads every node from every repo in the config, then strips
@@ -109,7 +109,7 @@ pub fn strip_body_whitespace_on_disk (
       else { Some (stripped) };
     write_nodecomplete_to_repo (node, config)
       . map_err ( |e| format! (
-        "Writing node {} to source {}: {}",
+        "Writing node {} to repo {}: {}",
         node . pid . as_str (), node . home_repo, e) ) ?;
     changed . push ( node . clone () ); }
   Ok (( all_nodes, changed )) }

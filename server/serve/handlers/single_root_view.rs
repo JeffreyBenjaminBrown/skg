@@ -49,7 +49,7 @@ pub fn handle_single_root_view_request (
             format_buffer_response_sexp (
               &String::new (),
               &vec! [format! (
-                "Node {} is not in active source-set {}",
+                "Node {} is not in active repo-set {}",
                 node_id,
                 active_repo_set . name )],
               &[] );
@@ -63,7 +63,7 @@ pub fn handle_single_root_view_request (
             format_buffer_response_sexp (
               &String::new (),
               &vec! [format! (
-                "Error checking source-set visibility: {}", e )],
+                "Error checking repo-set visibility: {}", e )],
               &[] );
           send_response_with_length_prefix (
             stream,

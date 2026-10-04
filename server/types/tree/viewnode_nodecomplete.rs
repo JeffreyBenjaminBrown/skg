@@ -52,9 +52,9 @@ pub fn pid_and_repo_from_treenode (
       v . pid_and_repo ()
       . map ( |(pid, repo)| (pid . clone (), repo . clone ()) )
       . ok_or_else (|| format!(
-        "{}: vognode has no source", caller_name ) . into () ),
+        "{}: vognode has no repo", caller_name ) . into () ),
     _ => Err ( format! (
-      "{}: expected a vognode with PID and source",
+      "{}: expected a vognode with PID and repo",
       caller_name ) . into() ),
   }}
 

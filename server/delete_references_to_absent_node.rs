@@ -94,7 +94,7 @@ pub fn preview_warning_org (
   if ! preview . structural . is_empty () {
     text . push_str ("** Structured relationships to remove\n");
     for o in &preview . structural {
-      text . push_str (&format! ("- {} / {} / {} (source {})\n",
+      text . push_str (&format! ("- {} / {} / {} (repo {})\n",
         o . owner_pid, o . field . label (), o . raw_id, o . relRepo)); }}
   if ! preview . links . is_empty () {
     text . push_str ("** Text links left unchanged\n");
@@ -111,7 +111,7 @@ pub fn result_org (
     "* Absent-reference cleanup complete\n\nRemoved {} structured membership(s) from {} owned telescope(s). Text links were left unchanged.\n",
     preview . structural . len (), preview . changed_nodes ());
   for occurrence in &preview . structural {
-    result . push_str (&format! ("- {}: {} in source {}\n",
+    result . push_str (&format! ("- {}: {} in repo {}\n",
       occurrence . owner_pid, occurrence . field . label (),
       occurrence . relRepo)); }
   result

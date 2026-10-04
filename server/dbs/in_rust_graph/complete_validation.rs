@@ -140,7 +140,7 @@ pub fn format_complete_graph_errors (errors : &[CompleteGraphError]) -> String {
           "id '{}' is both primary {:?} and extra on {:?}",
           id, primary_owners, extra_owners),
       CompleteGraphError::UnconfiguredNodeHome { pid, repo } => format! (
-        "node '{}' has unconfigured home source '{}'", pid, repo),
+        "node '{}' has unconfigured home repo '{}'", pid, repo),
       CompleteGraphError::Override (violation) =>
         format_override_invariant_violations (&[violation . clone ()])
           . lines () . skip (1) . collect::<Vec<&str>> () . join (" "),

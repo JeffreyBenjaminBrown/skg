@@ -67,7 +67,7 @@ impl TryFrom<MpActiveNode> for ActiveNode {
     let id = u . id . ok_or_else(
       || format!("Node '{}' has no ID", u . title))?;
     let repo = u . home_repo . ok_or_else(
-      || format!("Node '{}' has no source", u . title))?;
+      || format!("Node '{}' has no repo", u . title))?;
     Ok(ActiveNode {
       title          : u . title,
       id,
@@ -93,7 +93,7 @@ impl TryFrom<MpPhantomDiff> for PhantomDiff {
     let id = u . id . ok_or_else(
       || format!("Phantom '{}' has no ID", u . title))?;
     let repo = u . home_repo . ok_or_else(
-      || format!("Phantom '{}' has no source", u . title))?;
+      || format!("Phantom '{}' has no repo", u . title))?;
     Ok(PhantomDiff {
       title      : u . title,
       id,

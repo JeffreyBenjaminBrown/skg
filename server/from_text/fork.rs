@@ -167,7 +167,7 @@ pub fn fork_spec_from_buffer_node (
 /// already said where this material belongs, so the clone of the
 /// foreign parent goes there too and the confirmation flow does not
 /// ask again. Per foreign node N, this records the one owned repo
-/// its new explicitly-repod immediate Active children agree on;
+/// its new explicit-repo immediate Active children agree on;
 /// nothing is recorded when they disagree (ambiguous -- the flow then
 /// asks) or when there are none. 'new_nodes_with_explicit_repos' is
 /// enrichment's new-nodes set MINUS its inherited-repo set: only a
@@ -210,7 +210,7 @@ pub fn explicit_new_child_repos_for_foreign_vognodes (
 /// server would reject it as an unknown repo anyway). Must match
 /// 'skg-fork-repo-placeholder' in
 /// [[../../elisp/skg-request-save.el]].
-pub const FORK_REPO_PLACEHOLDER : &str = "PICK-A-SOURCE";
+pub const FORK_REPO_PLACEHOLDER : &str = "PICK-A-REPO";
 
 /// Build the fork-confirmation buffer. Its head is an org headline
 /// whose BODY holds the explanation (foldable; a long '#' comment
@@ -239,14 +239,14 @@ pub fn build_fork_confirmation_buffer (
   let mut out : String = String::new ();
   out . push_str (
     "* Fork confirmation -- what this buffer is\n\
-     Forking turns a node into an editable clone, in a source you\n\
+     Forking turns a node into an editable clone, in a repo you\n\
      own, that subscribes to and overrides the original. Each\n\
      top-level headline below is a clone-to-be; its child is the\n\
      original it forks (real id, marked \"pO\": its visible parent\n\
      overrides it).\n\
      APPROVE with C-c C-c: the origin buffer is re-saved, committing\n\
-     each fork into the source its clone-to-be shows. A clone still\n\
-     showing PICK-A-SOURCE needs a real source first: Emacs prompts\n\
+     each fork into the repo its clone-to-be shows. A clone still\n\
+     showing PICK-A-REPO needs a real repo first: Emacs prompts\n\
      for each, or set one yourself with C-c s s on the clone-to-be's\n\
      headline.\n\
      DECLINE with C-c C-k (or kill this buffer): nothing is written.\n" );
@@ -257,16 +257,16 @@ pub fn build_fork_confirmation_buffer (
         spec . clone . 0 . home_repo . 0 . as_str ()
       } else {
         out . push_str ( & format! (
-          "# Suggested source for the clone below: {}\n",
+          "# Suggested repo for the clone below: {}\n",
           spec . clone . 0 . home_repo ));
         FORK_REPO_PLACEHOLDER };
     out . push_str ( & format! (
-      "* (skg (node (source {}) (viewStats (sourceHerald {})))) {}\n",
+      "* (skg (node (repo {}) (viewStats (homeRepoHerald {})))) {}\n",
       metadata_value_atom (shown_repo),
       metadata_value_atom (&format! ("⌂:{}", shown_repo)),
       spec . clone . 0 . title ));
     out . push_str ( & format! (
-      "** (skg (node (id {}) (source {}) (affectsParent false) writeProtected \
+      "** (skg (node (id {}) (repo {}) (affectsParent false) writeProtected \
        (viewStats parentOverrides))) {}\n",
       spec . original_id . 0,
       metadata_value_atom (&spec . original_repo),

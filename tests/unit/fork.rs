@@ -69,7 +69,7 @@ fn owned_foreign_N_infers_nothing () {
   let map = owned_ancestor_repos_for_foreign_vognodes (
     & build_forest (), & config );
   assert! ( ! map . contains_key (& ID::from ("N")),
-    "owned -> foreign -> N must infer no source; got {:?}",
+    "owned -> foreign -> N must infer no repo; got {:?}",
     map . get (& ID::from ("N")) ); }
 
 #[test]
@@ -80,7 +80,7 @@ fn owned_N_still_infers_the_owned_repo () {
     & build_forest (), & config );
   assert_eq! ( map . get (& ID::from ("M")),
                Some (& RepoName::from ("owned2")),
-    "owned -> M must infer the owned ancestor's source" ); }
+    "owned -> M must infer the owned ancestor's repo" ); }
 
 #[test]
 fn scaffold_ancestor_is_skipped () {
@@ -146,23 +146,23 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
   // -- the elisp walk keys off the level.)
   assert! ( lines . iter () . any ( |l|
       l . starts_with (
-        & format! ("* (skg (node (source {})", FORK_REPO_PLACEHOLDER) )
+        & format! ("* (skg (node (repo {})", FORK_REPO_PLACEHOLDER) )
       && l . ends_with ("N-edited") ),
-    "clone-to-be parent (level-1, edited title, placeholder source) missing:\n{}", buf );
+    "clone-to-be parent (level-1, edited title, placeholder repo) missing:\n{}", buf );
   // The computed repo is shown only as a SUGGESTION comment,
   // DIRECTLY above the clone-to-be (the client parses that adjacency
   // for the prompt's default).
   assert! ( lines . windows (2) . any ( |w|
-      w[0] . starts_with ("# Suggested source")
+      w[0] . starts_with ("# Suggested repo")
       && w[0] . contains ("owned2")
       && w[1] . starts_with ("* (skg") ),
-    "the clone's suggested source must sit directly above it:\n{}", buf );
-  assert! ( ! buf . contains ("(id N) (source owned2)"),
+    "the clone's suggested repo must sit directly above it:\n{}", buf );
+  assert! ( ! buf . contains ("(id N) (repo owned2)"),
     "the clone-to-be must carry no id:\n{}", buf );
   // The original child: a LEVEL-2 headline ("** "), real id, foreign
   // repo, write-protected, independent, pO, original title.
   assert! ( lines . iter () . any ( |l|
-      l . starts_with ("** (skg (node (id N) (source foreign)")
+      l . starts_with ("** (skg (node (id N) (repo foreign)")
       && l . contains ("(affectsParent false)")
       && l . contains ("writeProtected")
       && l . contains ("parentOverrides")
@@ -178,16 +178,16 @@ fn confirmation_buffer_shows_a_confirmed_repo_as_settled () {
     build_fork_confirmation_buffer ( & [ fork_spec_n_edited (true) ] );
   let lines : Vec<&str> = buf . lines () . collect ();
   assert! ( lines . iter () . any ( |l|
-      l . starts_with ("* (skg (node (source owned2)")
+      l . starts_with ("* (skg (node (repo owned2)")
       && l . ends_with ("N-edited") ),
-    "a confirmed clone must show its real source:\n{}", buf );
+    "a confirmed clone must show its real repo:\n{}", buf );
   assert! ( ! buf . contains (
-      & format! ("(source {})", FORK_REPO_PLACEHOLDER) ),
+      & format! ("(repo {})", FORK_REPO_PLACEHOLDER) ),
     // (The instructions body may MENTION the placeholder; only the
     // metadata form matters.)
-    "no placeholder source when every source is confirmed:\n{}", buf );
-  assert! ( ! buf . contains ("# Suggested source"),
-    "no suggestion comment when every source is confirmed:\n{}", buf ); }
+    "no placeholder repo when every repo is confirmed:\n{}", buf );
+  assert! ( ! buf . contains ("# Suggested repo"),
+    "no suggestion comment when every repo is confirmed:\n{}", buf ); }
 
 #[test]
 fn fork_clone_preserves_only_the_search_matching_property () {

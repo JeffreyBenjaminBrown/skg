@@ -44,7 +44,7 @@ pub(crate) fn read_all_skg_files_from_repos_read_only (
     read_all_skg_files_from_repos_impl (config, false)?;
   if ! violations . is_empty () {
     return Err (io::Error::new (io::ErrorKind::InvalidData,
-      "Configured sources have telescope violations; resolve them before import")); }
+      "Configured repos have telescope violations; resolve them before import")); }
   Ok (nodes)
 }
 
@@ -243,7 +243,7 @@ pub fn read_skg_sections_from_folder (
     config . repos . get (repo_name)
     . ok_or_else(|| io::Error::new(
       io::ErrorKind::NotFound,
-      format!("Source '{}' not found in config", repo_name)))?;
+      format!("Repo '{}' not found in config", repo_name)))?;
   let mut sections : Vec<(RepoName, NodeFS)> = Vec::new ();
   let entries : ReadDir = // an iterator
     fs::read_dir (&repo . path) ?;
@@ -329,7 +329,7 @@ fn report_ids_claimed_by_two_nodes(
     content . push_str ("#+title: IDs claimed by more than one node\n");
     content . push_str ("#+date: <generated at initialization>\n\n");
     content . push_str( &format!(
-      "{} id(s) claimed by more than one node. Same-id files ACROSS SOURCES are not this: those are the sections of one privacy telescope (docs/telescopes.org). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n",
+      "{} id(s) claimed by more than one node. Same-id files ACROSS REPOS are not this: those are the sections of one privacy telescope (docs/telescopes.org). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n",
       count));
     let mut sorted_ids: Vec<(&ID, &Vec<(ID, RepoName)>)> =
       // for deterministic output

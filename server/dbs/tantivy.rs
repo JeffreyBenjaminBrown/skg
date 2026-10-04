@@ -50,7 +50,7 @@ pub(crate) fn tantivy_index_from_index (
   let no_search_matching_field : schema::Field =
     schema . get_field ("no_search_matching") ?;
   let repo_field : schema::Field =
-    schema . get_field ("source") ?;
+    schema . get_field ("repo") ?;
   let context_origin_type_field : schema::Field =
     schema . get_field ("context_origin_type") ?;
   let is_title_field : schema::Field =
@@ -112,7 +112,7 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
   schema_builder . add_text_field(
     "no_search_matching", schema::STRING | schema::STORED);
   schema_builder . add_text_field(
-    "source", schema::STRING | schema::STORED);
+    "repo", schema::STRING | schema::STORED);
   schema_builder . add_text_field(
     "context_origin_type", schema::STRING | schema::STORED);
   schema_builder . add_text_field(
@@ -146,7 +146,7 @@ pub fn title_and_repo_by_id (
     pick_title_doc ( tantivy_index, &searcher, id, &doc_addresses ) ?;
   if was_fallback {
     tracing::warn! (
-      "title_and_source_by_id: no is_title=\"true\" document \
+      "title_and_repo_by_id: no is_title=\"true\" document \
        found for ID {}. Falling back to first title_or_alias.",
       id ); }
   let title : String =

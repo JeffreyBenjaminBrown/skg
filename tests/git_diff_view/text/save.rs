@@ -144,11 +144,11 @@ async fn test_move_text_changed_scaffold_respawns (
       // Below, user moves the textChanged scaffold
       // from first among its siblings to last.
       let input = "\
-* (skg (node (id 1) (source main))) 1 has a new title.
-** (skg (node (id 11) (source main))) 11
+* (skg (node (id 1) (repo main))) 1 has a new title.
+** (skg (node (id 11) (repo main))) 11
 11 has a new body.
 *** (skg (textChanged unstaged))
-** (skg (node (id 12) (source main))) 12
+** (skg (node (id 12) (repo main))) 12
 ** (skg (textChanged unstaged))
 ";
 

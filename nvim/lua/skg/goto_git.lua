@@ -1,6 +1,6 @@
 -- PURPOSE: From a node in a view, jump to git's picture of its .skg
 -- file: ask the server for the file's path, open a git UI on that
--- source's repo, and land on the file (or, for the parent variant, on
+-- repo's repo, and land on the file (or, for the parent variant, on
 -- the first changed line containing this node's id). The Lua port of
 -- elisp/skg-request-file-path.el, re-targeted per the settled plan:
 -- neogit (baked into the docker image) plays magit for the status
@@ -19,7 +19,7 @@ local state = require('skg.state')
 
 local M = {}
 
----{id, source} for the node on the current line, or nil with a
+---{id, repo} for the node on the current line, or nil with a
 ---message.
 ---@return table|nil
 function M.node_info_at_point ()
@@ -31,14 +31,14 @@ function M.node_info_at_point ()
   if not id then
     vim.notify("No id in this line's metadata.")
     return nil end
-  local source = id_search.extract_source_from_metadata_sexp(sexp)
-  if not source then
-    vim.notify('Could not extract id or source from metadata.')
+  local repo = id_search.extract_repo_from_metadata_sexp(sexp)
+  if not repo then
+    vim.notify('Could not extract id or repo from metadata.')
     return nil end
-  return { id = id, source = source }
+  return { id = id, repo = repo }
 end
 
----{id, source} for the parent heading's node, or nil with a message.
+---{id, repo} for the parent heading's node, or nil with a message.
 ---@return table|nil
 function M.parent_info_at_point ()
   local line = metadata.current_line_number()
@@ -53,19 +53,19 @@ function M.parent_info_at_point ()
     vim.notify('Parent heading has no node metadata.')
     return nil end
   local id = id_search.extract_id_from_metadata_sexp(sexp)
-  local source = id_search.extract_source_from_metadata_sexp(sexp)
-  if not (id and source) then
-    vim.notify('Could not extract id or source from parent.')
+  local repo = id_search.extract_repo_from_metadata_sexp(sexp)
+  if not (id and repo) then
+    vim.notify('Could not extract id or repo from parent.')
     return nil end
-  return { id = id, source = source }
+  return { id = id, repo = repo }
 end
 
----Request the on-disk path for ID within SOURCE; HANDLER receives the
+---Request the on-disk path for ID within REPO; HANDLER receives the
 ---resolved absolute path (or is not called, with a message shown).
 ---@param id string
----@param source string
+---@param repo string
 ---@param handler fun(resolved_path: string)
-function M.request_file_path (id, source, handler)
+function M.request_file_path (id, repo, handler)
   state.register_response_handler('get-file-path',
     function (_payload_text, response)
       local content = payload.field_text(response, 'content')
@@ -87,7 +87,7 @@ function M.request_file_path (id, source, handler)
   client.send_string(sexpr.to_string({
     sexpr.pair(sexpr.symbol('request'), 'get file path'),
     sexpr.pair(sexpr.symbol('id'), id),
-    sexpr.pair(sexpr.symbol('source'), source) }) .. '\n')
+    sexpr.pair(sexpr.symbol('repo'), repo) }) .. '\n')
 end
 
 ---Open a git status view (neogit) for the repo holding RESOLVED_PATH
@@ -217,7 +217,7 @@ end
 function M.goto_in_git ()
   local info = M.node_info_at_point()
   if not info then return end
-  M.request_file_path(info.id, info.source,
+  M.request_file_path(info.id, info.repo,
                       M.open_git_status_at_file)
 end
 
@@ -228,7 +228,7 @@ function M.goto_in_git_parent ()
   if not node then return end
   local parent = M.parent_info_at_point()
   if not parent then return end
-  M.request_file_path(parent.id, parent.source, function (path)
+  M.request_file_path(parent.id, parent.repo, function (path)
     M.open_plain_diff_at(path, node.id)
   end)
 end

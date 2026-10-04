@@ -227,17 +227,17 @@ fn prepare_repo_set_fixture_copy (
     PathBuf::from (config_path);
   let repo_root : &Path =
     repo_config_path . parent ()
-    . ok_or ("source set fixture config has no parent")?;
+    . ok_or ("repo set fixture config has no parent")?;
   let target_root : PathBuf =
     PathBuf::from (format! (
-      "/tmp/skg-source-set-fixtures-{}", test_name));
+      "/tmp/skg-repo-set-fixtures-{}", test_name));
   if target_root . exists () {
     fs::remove_dir_all (&target_root)?; }
   copy_dir_recursively (repo_root, &target_root)?;
   prepare_git_diff_fixture (&target_root)?;
   Ok (target_root . join (
     repo_config_path . file_name ()
-    . ok_or ("source set fixture config has no filename")?)) }
+    . ok_or ("repo set fixture config has no filename")?)) }
 
 fn copy_dir_recursively (
   repo : &Path,

@@ -85,7 +85,7 @@ fn selected_snapshots_distinguish_head_index_and_worktree () {
   let gitrepo : Repository =
     Repository::init (tmp . path ()) . unwrap ();
   let repo_dir : PathBuf =
-    tmp . path () . join ("source");
+    tmp . path () . join ("repo");
   fs::create_dir (&repo_dir) . unwrap ();
   write_node (&repo_dir, "a", "head");
   commit_all (&gitrepo, "head");

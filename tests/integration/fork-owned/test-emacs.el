@@ -31,7 +31,7 @@
 Fails the test if it is not found."
   (goto-char (point-min))
   (unless (re-search-forward
-           (regexp-quote (format "(id %s) (source owned)" id)) nil t)
+           (regexp-quote (format "(id %s) (repo owned)" id)) nil t)
     (test-fail "could not find %s's headline:\n%s" id (buffer-string))))
 
 (defun integration-test-fork-owned ()
@@ -69,17 +69,17 @@ Fails the test if it is not found."
       (unless (string-match-p "(id M)" (buffer-string))
         (test-fail "confirmation buffer does not list M:\n%s" (buffer-string)))
       (message "✓ skg-fork-node produced a fork-confirmation listing M")
-      ;; Approving before picking a source is refused.
+      ;; Approving before picking a repo is refused.
       (condition-case nil
           (progn (skg-approve-fork)
-                 (test-fail "approve must be refused until a source is picked"))
+                 (test-fail "approve must be refused until a repo is picked"))
         (error nil))
-      (message "✓ approve refused until a source is picked")
-      ;; Pick the clone's source, then approve.
+      (message "✓ approve refused until a repo is picked")
+      ;; Pick the clone's repo, then approve.
       (goto-char (point-min))
-      (re-search-forward "^\\* (skg (node (source ")
+      (re-search-forward "^\\* (skg (node (repo ")
       (beginning-of-line)
-      (skg--change-source-at-point "owned")
+      (skg--change-repo-at-point "owned")
       (skg-approve-fork)))
 
   ;; 5. Reopen Q fresh: override substitution now draws the clone in M's

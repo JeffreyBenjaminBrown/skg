@@ -12,7 +12,7 @@
 -- the 'skg' namespace uniformly.
 --
 -- Like the elisp version, the herald rule table (fetched from the
--- server at connect time, session-only, no on-disk source) is captured
+-- server at connect time, session-only, no on-disk repo) is captured
 -- before the reload and re-installed after -- protected so that a
 -- load error in some other module cannot lose the table for the rest
 -- of the session. The reload error itself still propagates.

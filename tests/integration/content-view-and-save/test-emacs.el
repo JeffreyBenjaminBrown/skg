@@ -34,8 +34,8 @@
             (message "Content view received")
             (message "Content: %s" content)
 
-            ;; Verify exact content: should include source metadata
-            (let ((expected-content "* (skg (node (id 1) (source main) (affectsParent na))) 1\n"))
+            ;; Verify exact content: should include repo metadata
+            (let ((expected-content "* (skg (node (id 1) (repo main) (affectsParent na))) 1\n"))
               (if (string= content expected-content)
                   (progn
                     (message "✓ PASS: Buffer content exactly matches expected")
@@ -92,8 +92,8 @@
             (message "Updated buffer content: %s" updated-content)
 
             ;; Verify the structure: should have original line and new line with UUID
-            (if (and (string-match-p "\\* (skg (node (id 1) (source main)" updated-content)
-                     (string-match "\\*\\* (skg (node (id \\([^)]+\\)) (source main).*) 2" updated-content))
+            (if (and (string-match-p "\\* (skg (node (id 1) (repo main)" updated-content)
+                     (string-match "\\*\\* (skg (node (id \\([^)]+\\)) (repo main).*) 2" updated-content))
                 (progn
                   ;; Extract the new UUID for verification
                   (when (string-match "\\*\\* (skg (node (id \\([^)]+\\)).*) 2" updated-content)
@@ -104,7 +104,7 @@
                   (message "✓ PASS: Found new UUID in saved content"))
               (progn
                 (message "✗ FAIL: Expected content structure not found after save")
-                (message "Expected: * (skg (node (id 1) (source main) ...)) 1 and ** (skg (node (id UUID) (source main) ...)) 2")
+                (message "Expected: * (skg (node (id 1) (repo main) ...)) 1 and ** (skg (node (id UUID) (repo main) ...)) 2")
                 (message "Got: %s" updated-content)
                 (kill-emacs 1)))))
       (progn

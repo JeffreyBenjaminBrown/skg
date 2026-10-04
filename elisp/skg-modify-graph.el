@@ -110,7 +110,7 @@ outline heuristic, not a precise graph-content query."
   "Replace the branch at point with a link to its former root.
 Point may be on the headline or in its body.  The root must be an
 existing ActiveNode with an ID.  Its org-parent must be a definitive
-ActiveNode whose source is owned by the user.  The whole org subtree
+ActiveNode whose repo is owned by the user.  The whole org subtree
 at point is replaced by a same-level headline whose title is an
 org id link to the former root, then the buffer is saved."
   (interactive)
@@ -130,7 +130,7 @@ org id link to the former root, then the buffer is saved."
   "Replace the leaf at point with content linked from that leaf.
 Point may be on the headline or in the body.  The leaf must have
 exactly one org bracket link in its title plus body, no
-org-descendents, and a definitive ActiveNode org-parent whose source
+org-descendents, and a definitive ActiveNode org-parent whose repo
 is owned by the user.  The link must be an id link.  The leaf is
 replaced by a write-protected same-level ActiveNode for the link
 target, then the buffer is saved."
@@ -172,12 +172,12 @@ target, then the buffer is saved."
 
 (defun skg--check-content-link-replacement-container (metadata-sexp)
   "Signal a user error if METADATA-SEXP is not an editable container."
-  (let ((source (skg--node-source metadata-sexp)))
-    (unless source
-      (user-error "Cannot replace this branch with a link: container has no source"))
-    (unless (member source (skg--owned-sources))
-      (user-error "Cannot replace this branch with a link: container source is not owned: %s"
-                  source))
+  (let ((repo (skg--node-repo metadata-sexp)))
+    (unless repo
+      (user-error "Cannot replace this branch with a link: container has no repo"))
+    (unless (member repo (skg--owned-repos))
+      (user-error "Cannot replace this branch with a link: container repo is not owned: %s"
+                  repo))
     (when (skg--node-write-protected-p metadata-sexp)
       (user-error "Cannot replace this branch with a link: container is write-protected"))))
 

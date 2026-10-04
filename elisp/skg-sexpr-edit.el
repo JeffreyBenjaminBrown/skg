@@ -51,7 +51,7 @@ Kill the buffer to cancel without saving."
 ;;
 
 (defun skg-sexp-edit--commit ()
-  "Save changes from sexp-edit buffer back to the source sexp."
+  "Save changes from sexp-edit buffer back to the repo sexp."
   (interactive)
   (let* ((org-text (buffer-substring-no-properties
                     (point-min) (point-max)))
@@ -185,29 +185,29 @@ the labels skg, node, writeProtected become (skg (node writeProtected))."
 (defun skg-edit-metadata--open-empty-node-view (title)
   "Populate minimal metadata on the metadata-less headline at point,
 then open its metadata view.  TITLE is the headline's existing title.
-The view pre-fills the chosen source (Q2: saving needs a source, so the
+The view pre-fills the chosen repo (Q2: saving needs a repo, so the
 user confronts that choice immediately) and leaves every other editable
-field childless, so an untouched save yields just (skg (node (source X)))."
+field childless, so an untouched save yields just (skg (node (repo X)))."
   (skg--populate-minimal-node-metadata)
   (let* (( source-buffer (current-buffer) )
          ( headline (skg-get-current-headline-text) )
          ( split (skg-split-as-stars-metadata-title headline) )
          ( metadata-str (cadr split) )
-         ( source (skg--node-source (read metadata-str)) )
+         ( repo (skg--node-repo (read metadata-str)) )
          ( sexp-start (+ (line-beginning-position)
                          (length (car split))) )
          ( sexp-end (+ sexp-start (length metadata-str)) )
          ( org-text (skg-edit-metadata--empty-node-org-text
-                     source title) ))
+                     repo title) ))
     (skg-sexp-edit--open-edit-buffer
      org-text source-buffer sexp-start sexp-end t)
-    (skg-sexp-edit--goto-field-value "source")))
+    (skg-sexp-edit--goto-field-value "repo")))
 
-(defun skg-edit-metadata--empty-node-org-text (source title)
+(defun skg-edit-metadata--empty-node-org-text (repo title)
   "Build org text for the empty-node metadata view.
-SOURCE is pre-filled under the `source' field.  TITLE, if non-blank,
+REPO is pre-filled under the `repo' field.  TITLE, if non-blank,
 appears under a display-only `title' group; otherwise `title' is shown
-childless.  Every editable field other than source appears childless,
+childless.  Every editable field other than repo appears childless,
 so the strip step (`skg-activeNode-strip-defaults-from-org') drops the
 ones the user never populates -- key and all."
   (let* (( title-group
@@ -218,8 +218,8 @@ ones the user never populates -- key and all."
          ( node-skeleton
            (append (list (cons 1 "skg")
                          (cons 2 "node")
-                         (cons 3 "source")
-                         (cons 4 source))
+                         (cons 3 "repo")
+                         (cons 4 repo))
                    (mapcar (lambda (field)
                              (cons 3 field))
                            (mapcar #'car
@@ -232,16 +232,16 @@ ones the user never populates -- key and all."
 ;;
 
 (defun skg-sexp-edit--after-insert-heading (&rest _)
-  "After `org-insert-heading-respect-content', give new roots a source.
+  "After `org-insert-heading-respect-content', give new roots a repo.
 Only acts in skg-content-view-mode buffers when a level-1 heading was
-created.  Routes through `skg-set-source', which on a metadata-less
-headline prompts for an owned source and writes minimal node metadata
+created.  Routes through `skg-set-repo', which on a metadata-less
+headline prompts for an owned repo and writes minimal node metadata
 -- the quick path, no edit buffer.  (The full metadata view is reserved
 for an explicit `skg-edit-metadata'/C-c v m.)"
   (when (and (derived-mode-p 'skg-content-view-mode)
              (org-at-heading-p)
              (= (org-outline-level) 1))
-    (skg-set-source)))
+    (skg-set-repo)))
 
 (advice-add 'org-insert-heading-respect-content :after
             #'skg-sexp-edit--after-insert-heading)
@@ -253,8 +253,8 @@ for an explicit `skg-edit-metadata'/C-c v m.)"
 (defun skg-edit-metadata ()
   "Edit the metadata sexp on the current headline in an org buffer.
 Opens a temporary org buffer with the sexp converted to org headlines.
-If the headline has no metadata, populates a minimal (skg (node (source X)))
-in place and opens the empty-node view over it -- source pre-filled, the
+If the headline has no metadata, populates a minimal (skg (node (repo X)))
+in place and opens the empty-node view over it -- repo pre-filled, the
 other editable fields childless (see `skg-edit-metadata--open-empty-node-view').
 Use C-c C-c to save changes back to the source buffer.
 Kill the buffer to cancel without saving."
@@ -283,6 +283,6 @@ Kill the buffer to cancel without saving."
                              sexp-as-org)) ))
           (skg-sexp-edit--open-edit-buffer
            org-text source-buffer sexp-start sexp-end is-activeNode)
-          (skg-sexp-edit--goto-field-value "source"))))))
+          (skg-sexp-edit--goto-field-value "repo"))))))
 
 (provide 'skg-sexpr-edit)

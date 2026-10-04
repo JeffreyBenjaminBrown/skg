@@ -104,7 +104,7 @@ fn hiddenoutside_edits_from_tree (
 #[test]
 fn unknown_members_write_their_editable_relationship_owners_only () {
   let input = indoc! {"
-    * (skg (node (id owner) (source main))) owner
+    * (skg (node (id owner) (repo main))) owner
     ** (skg (unknown (id content-unknown)))
     ** (skg subscribeeFolder)
     *** (skg (unknown (id subscribee-unknown)))
@@ -193,11 +193,11 @@ async fn save_instructions_from_org_with_disk (
 fn test_extract_nonmergeSavePlan_basic() {
   let input: &str =
     indoc! {"
-            * (skg (node (id root1) (source main))) root node 1
+            * (skg (node (id root1) (repo main))) root node 1
             Root body content
-            ** (skg (node (id child1) (source main))) child 1
+            ** (skg (node (id child1) (repo main))) child 1
             Child body
-            * (skg (node (id root2) (source main) (editRequest delete))) root node 2
+            * (skg (node (id root2) (repo main) (editRequest delete))) root node 2
             Root 2 body
         "};
 
@@ -245,12 +245,12 @@ fn test_extract_nonmergeSavePlan_basic() {
 fn test_extract_nonmergeSavePlan_with_aliases() {
   let input: &str =
     indoc! {"
-            * (skg (node (id main) (source main))) main node
+            * (skg (node (id main) (repo main))) main node
             Main body
             ** (skg aliasFolder) aliases
             *** (skg alias) first alias
             *** (skg alias) second alias
-            ** (skg (node (id content_child) (source main))) content child
+            ** (skg (node (id content_child) (repo main))) content child
             Content body
         "};
 
@@ -289,9 +289,9 @@ fn test_extract_nonmergeSavePlan_with_aliases() {
 fn test_extract_nonmergeSavePlan_no_aliases() {
   let input: &str =
     indoc! {"
-            * (skg (node (id node1) (source main))) node without aliases
+            * (skg (node (id node1) (repo main))) node without aliases
             Body content
-            ** (skg (node (id child1) (source main))) regular child
+            ** (skg (node (id child1) (repo main))) regular child
             Child body
         "};
 
@@ -321,10 +321,10 @@ fn inactive_placeholders_emit_neither_savenode_nor_contains () {
   // tests/repo_sets.rs. Position in the buffer is irrelevant here.
   let input : &str =
     indoc! {"
-            * (skg (node (id root) (source main))) root
-            ** (skg (node (id active-a) (source main))) active A
-            ** (skg (inactiveNode (id hidden) (source private)))
-            ** (skg (node (id active-b) (source main))) active B
+            * (skg (node (id root) (repo main))) root
+            ** (skg (node (id active-a) (repo main))) active A
+            ** (skg (inactiveNode (id hidden) (repo private)))
+            ** (skg (node (id active-b) (repo main))) active B
         "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
@@ -347,13 +347,13 @@ fn test_extract_nonmergeSavePlan_multiple_alias_folders() {
   // (validate_tree rejects this). The function should error.
   let input: &str =
     indoc! {"
-            * (skg (node (id main) (source main))) main node
+            * (skg (node (id main) (repo main))) main node
             ** (skg aliasFolder) first alias folder
             *** (skg alias) alias one
             *** (skg alias) alias two
             ** (skg aliasFolder) second alias folder
             *** (skg alias) alias three
-            ** (skg (node (id content1) (source main))) content node
+            ** (skg (node (id content1) (repo main))) content node
         "};
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
@@ -372,13 +372,13 @@ fn test_extract_nonmergeSavePlan_multiple_alias_folders() {
 fn test_extract_nonmergeSavePlan_mixed_relations() {
   let input: &str =
     indoc! {"
-            * (skg (node (id root) (source main))) root node
-            ** (skg (node (id unrelated1) (source main) (affectsParent false))) unrelated child
-            ** (skg (node (id content1) (source main))) content child 1
+            * (skg (node (id root) (repo main))) root node
+            ** (skg (node (id unrelated1) (repo main) (affectsParent false))) unrelated child
+            ** (skg (node (id content1) (repo main))) content child 1
             ** (skg aliasFolder) aliases
             *** (skg alias) my alias
-            ** (skg (node (id content2) (source main))) content child 2
-            ** (skg (node (id unrelated2) (source main) (affectsParent false))) another unrelated child
+            ** (skg (node (id content2) (repo main))) content child 2
+            ** (skg (node (id unrelated2) (repo main) (affectsParent false))) another unrelated child
         "};
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
@@ -405,9 +405,9 @@ fn extraction_preserves_content_and_independent_children (
 ) {
   let input: &str =
     indoc! {"
-            * (skg (node (id root) (source main))) root
-            ** (skg (node (id ordinary) (source main))) ordinary
-            ** (skg (node (id independent) (source main) (affectsParent false))) independent
+            * (skg (node (id root) (repo main))) root
+            ** (skg (node (id ordinary) (repo main))) ordinary
+            ** (skg (node (id independent) (repo main) (affectsParent false))) independent
         "};
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
@@ -429,12 +429,12 @@ fn extraction_skips_alias_and_id_display_nodes (
 ) {
   let input: &str =
     indoc! {"
-            * (skg (node (id root) (source main))) root
+            * (skg (node (id root) (repo main))) root
             ** (skg aliasFolder) aliases
             *** (skg alias) alias text
             ** (skg idFolder) IDs
             *** (skg id) extra-id
-            ** (skg (node (id child) (source main))) child
+            ** (skg (node (id child) (repo main))) child
         "};
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
@@ -459,14 +459,14 @@ fn extraction_collects_subscribees_without_hidden_branches (
 ) {
   let input: &str =
     indoc! {"
-            * (skg (node (id subscriber) (source main))) subscriber
+            * (skg (node (id subscriber) (repo main))) subscriber
             ** (skg subscribeeFolder)
-            *** (skg (node (id subscribee) (source main))) subscribee
+            *** (skg (node (id subscribee) (repo main))) subscribee
             **** (skg hiddenInSubscribeeFolder)
-            ***** (skg (node (id hidden-in) (source main))) hidden in child
-            **** (skg (node (id subscribee-content) (source main))) subscribee content
+            ***** (skg (node (id hidden-in) (repo main))) hidden in child
+            **** (skg (node (id subscribee-content) (repo main))) subscribee content
             *** (skg hiddenOutsideOfSubscribeeFolder)
-            **** (skg (node (id hidden-outside) (source main))) hidden outside child
+            **** (skg (node (id hidden-outside) (repo main))) hidden outside child
         "};
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
@@ -500,10 +500,10 @@ fn extraction_collects_overridden_folder (
 ) {
   let input: &str =
     indoc! {"
-            * (skg (node (id overrider) (source main))) overrider
+            * (skg (node (id overrider) (repo main))) overrider
             ** (skg overriddenFolder)
-            *** (skg (node (id overridden-a) (source main))) overridden A
-            *** (skg (node (id overridden-b) (source main))) overridden B
+            *** (skg (node (id overridden-a) (repo main))) overridden A
+            *** (skg (node (id overridden-b) (repo main))) overridden B
         "};
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
@@ -532,7 +532,7 @@ fn empty_overridden_folder_means_empty_override_set (
 ) {
   let input: &str =
     indoc! {"
-            * (skg (node (id overrider) (source main))) overrider
+            * (skg (node (id overrider) (repo main))) overrider
             ** (skg overriddenFolder)
         "};
 
@@ -552,15 +552,15 @@ fn read_only_folder_members_save_themselves_but_not_their_owner (
 ) {
   let input: &str =
     indoc! {"
-            * (skg (node (id owner) (source main))) owner
+            * (skg (node (id owner) (repo main))) owner
             ** (skg subscriberFolder)
-            *** (skg (node (id subscriber) (source main))) subscriber
+            *** (skg (node (id subscriber) (repo main))) subscriber
             ** (skg overriderFolder)
-            *** (skg (node (id overrider) (source main))) overrider
+            *** (skg (node (id overrider) (repo main))) overrider
             ** (skg hiderFolder)
-            *** (skg (node (id hider) (source main))) hider
+            *** (skg (node (id hider) (repo main))) hider
             ** (skg hiddenFolder)
-            *** (skg (node (id hidden) (source main))) hidden
+            *** (skg (node (id hidden) (repo main))) hidden
         "};
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
@@ -588,11 +588,11 @@ fn subscribee_hiderel_intent_collects_visible_content (
 ) {
   let input : &str =
     indoc! {"
-            * (skg (node (id subscriber) (source main))) subscriber
+            * (skg (node (id subscriber) (repo main))) subscriber
             ** (skg subscribeeFolder)
-            *** (skg (node (id subscribee) (source main))) subscribee
-            **** (skg (node (id a) (source main))) a
-            **** (skg (node (id b) (source main))) b
+            *** (skg (node (id subscribee) (repo main))) subscribee
+            **** (skg (node (id a) (repo main))) a
+            **** (skg (node (id b) (repo main))) b
             "};
 
   assert_eq!(
@@ -608,12 +608,12 @@ fn subscribee_hiderel_intents_preserve_subscribee_tree_order (
 ) {
   let input : &str =
     indoc! {"
-            * (skg (node (id subscriber) (source main))) subscriber
+            * (skg (node (id subscriber) (repo main))) subscriber
             ** (skg subscribeeFolder)
-            *** (skg (node (id first) (source main))) first
-            **** (skg (node (id first-child) (source main))) first child
-            *** (skg (node (id second) (source main))) second
-            **** (skg (node (id second-child) (source main))) second child
+            *** (skg (node (id first) (repo main))) first
+            **** (skg (node (id first-child) (repo main))) first child
+            *** (skg (node (id second) (repo main))) second
+            **** (skg (node (id second-child) (repo main))) second child
             "};
 
   assert_eq!(
@@ -635,11 +635,11 @@ fn subscribee_hiderel_intent_uses_only_children (
 ) {
   let input : &str =
     indoc! {"
-            * (skg (node (id subscriber) (source main))) subscriber
+            * (skg (node (id subscriber) (repo main))) subscriber
             ** (skg subscribeeFolder)
-            *** (skg (node (id subscribee) (source main))) subscribee
-            **** (skg (node (id child) (source main))) child
-            ***** (skg (node (id grandchild) (source main))) grandchild
+            *** (skg (node (id subscribee) (repo main))) subscribee
+            **** (skg (node (id child) (repo main))) child
+            ***** (skg (node (id grandchild) (repo main))) grandchild
             "};
 
   assert_eq!(
@@ -655,9 +655,9 @@ fn subscribee_hiderel_intent_ignores_writeProtected_subscribee (
 ) {
   let input : &str =
     indoc! {"
-            * (skg (node (id subscriber) (source main))) subscriber
+            * (skg (node (id subscriber) (repo main))) subscriber
             ** (skg subscribeeFolder)
-            *** (skg (node (id subscribee) (source main) writeProtected (viewRequests definitiveView))) subscribee
+            *** (skg (node (id subscribee) (repo main) writeProtected (viewRequests definitiveView))) subscribee
             "};
 
   assert_eq!(
@@ -674,10 +674,10 @@ fn subscribee_hiderel_intent_ignores_writeProtected_subscriber (
   // instance of that subscriber.
   let input : &str =
     indoc! {"
-            * (skg (node (id subscriber) (source main) writeProtected (viewRequests definitiveView))) subscriber
+            * (skg (node (id subscriber) (repo main) writeProtected (viewRequests definitiveView))) subscriber
             ** (skg subscribeeFolder)
-            *** (skg (node (id subscribee) (source main))) subscribee
-            **** (skg (node (id a) (source main))) a
+            *** (skg (node (id subscribee) (repo main))) subscribee
+            **** (skg (node (id a) (repo main))) a
             "};
 
   assert_eq!(
@@ -689,13 +689,13 @@ fn subscribee_hiderel_intent_excludes_non_content_delete_and_phantom_children (
 ) {
   let input : &str =
     indoc! {"
-            * (skg (node (id subscriber) (source main))) subscriber
+            * (skg (node (id subscriber) (repo main))) subscriber
             ** (skg subscribeeFolder)
-            *** (skg (node (id subscribee) (source main))) subscribee
-            **** (skg (node (id keep) (source main))) keep
-            **** (skg (node (id independent) (source main) (affectsParent false))) independent
-            **** (skg (node (id delete-me) (source main) (editRequest delete))) delete me
-            **** (skg (node (id phantom) (source main))) phantom
+            *** (skg (node (id subscribee) (repo main))) subscribee
+            **** (skg (node (id keep) (repo main))) keep
+            **** (skg (node (id independent) (repo main) (affectsParent false))) independent
+            **** (skg (node (id delete-me) (repo main) (editRequest delete))) delete me
+            **** (skg (node (id phantom) (repo main))) phantom
             "};
   let mut viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
@@ -716,14 +716,14 @@ fn subscribee_hiderel_intent_ignores_hidden_scaffold_contents (
 ) {
   let input : &str =
     indoc! {"
-            * (skg (node (id subscriber) (source main))) subscriber
+            * (skg (node (id subscriber) (repo main))) subscriber
             ** (skg subscribeeFolder)
-            *** (skg (node (id subscribee) (source main))) subscribee
+            *** (skg (node (id subscribee) (repo main))) subscribee
             **** (skg hiddenInSubscribeeFolder)
-            ***** (skg (node (id hidden-in) (source main))) hidden in child
-            **** (skg (node (id visible) (source main))) visible
+            ***** (skg (node (id hidden-in) (repo main))) hidden in child
+            **** (skg (node (id visible) (repo main))) visible
             *** (skg hiddenOutsideOfSubscribeeFolder)
-            **** (skg (node (id hidden-outside) (source main))) hidden outside child
+            **** (skg (node (id hidden-outside) (repo main))) hidden outside child
             "};
 
   assert_eq!(
@@ -739,15 +739,15 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
 ) {
   let input: &str =
     indoc! {"
-            * (skg (node (id root) (source main))) root
+            * (skg (node (id root) (repo main))) root
             Root body
             ** (skg aliasFolder) aliases
             *** (skg alias) root alias
-            ** (skg (node (id child) (source main))) child
+            ** (skg (node (id child) (repo main))) child
             Child body
             ** (skg subscribeeFolder)
-            *** (skg (node (id subscribee) (source main))) subscribee
-            * (skg (node (id doomed) (source main) (editRequest delete))) doomed
+            *** (skg (node (id subscribee) (repo main))) subscribee
+            * (skg (node (id doomed) (repo main) (editRequest delete))) doomed
             Doomed body
         "};
 
@@ -783,15 +783,15 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
 ) {
   let input: &str =
     indoc! {"
-            * (skg (node (id root) (source main))) root
+            * (skg (node (id root) (repo main))) root
             Root body
-            ** (skg (node (id independent) (source main) (affectsParent false))) independent
-            ** (skg (node (id content) (source main))) content
+            ** (skg (node (id independent) (repo main) (affectsParent false))) independent
+            ** (skg (node (id content) (repo main))) content
             ** (skg aliasFolder) aliases
             *** (skg alias) root alias
             ** (skg subscribeeFolder)
-            *** (skg (node (id subscribee) (source main))) subscribee
-            * (skg (node (id doomed) (source main) (editRequest delete))) doomed
+            *** (skg (node (id subscribee) (repo main))) subscribee
+            * (skg (node (id doomed) (repo main) (editRequest delete))) doomed
             Doomed body
         "};
 
@@ -904,10 +904,10 @@ async fn subscribee_as_such_child_list_removal_does_not_save_subscribee (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-                * (skg (node (id r) (source owned))) r
+                * (skg (node (id r) (repo owned))) r
                 ** (skg subscribeeFolder)
-                *** (skg (node (id e) (source foreign))) subscribee-e
-                **** (skg (node (id e2) (source foreign))) e2
+                *** (skg (node (id e) (repo foreign))) subscribee-e
+                **** (skg (node (id e2) (repo foreign))) e2
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
@@ -923,10 +923,10 @@ async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-                * (skg (node (id r) (source owned))) r
+                * (skg (node (id r) (repo owned))) r
                 ** (skg subscribeeFolder)
-                *** (skg (node (id e) (source foreign))) subscribee-e
-                **** (skg (node (id e2) (source foreign))) e2
+                *** (skg (node (id e) (repo foreign))) subscribee-e
+                **** (skg (node (id e2) (repo foreign))) e2
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
@@ -966,10 +966,10 @@ async fn subscribee_as_such_child_list_removal_infers_subscriber_hide (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-                * (skg (node (id r) (source owned))) r
+                * (skg (node (id r) (repo owned))) r
                 ** (skg subscribeeFolder)
-                *** (skg (node (id e) (source foreign))) subscribee-e
-                **** (skg (node (id e2) (source foreign))) e2
+                *** (skg (node (id e) (repo foreign))) subscribee-e
+                **** (skg (node (id e2) (repo foreign))) e2
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
@@ -989,11 +989,11 @@ async fn moving_subscribee_as_such_child_to_subscriber_does_not_hide (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-                * (skg (node (id r) (source owned))) r
+                * (skg (node (id r) (repo owned))) r
                 ** (skg subscribeeFolder)
-                *** (skg (node (id e) (source foreign))) subscribee-e
-                **** (skg (node (id e2) (source foreign))) e2
-                ** (skg (node (id e1) (source foreign) writeProtected)) e1
+                *** (skg (node (id e) (repo foreign))) subscribee-e
+                **** (skg (node (id e2) (repo foreign))) e2
+                ** (skg (node (id e1) (repo foreign) writeProtected)) e1
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
@@ -1012,12 +1012,12 @@ async fn subscribee_as_such_visible_child_removes_subscriber_hide (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-                * (skg (node (id R) (source main))) R
+                * (skg (node (id R) (repo main))) R
                 ** (skg subscribeeFolder)
-                *** (skg (node (id E1) (source main))) subscribee-1
-                **** (skg (node (id E11) (source main))) E11
-                **** (skg (node (id H) (source main))) H
-                **** (skg (node (id E12) (source main))) E12
+                *** (skg (node (id E1) (repo main))) subscribee-1
+                **** (skg (node (id E11) (repo main))) E11
+                **** (skg (node (id H) (repo main))) H
+                **** (skg (node (id E12) (repo main))) E12
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
@@ -1037,13 +1037,13 @@ async fn subscribee_as_such_unhide_preserves_unrelated_hides (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-                * (skg (node (id R) (source main))) R
+                * (skg (node (id R) (repo main))) R
                 ** (skg subscribeeFolder)
-                *** (skg (node (id E1) (source main))) subscribee-1
-                **** (skg (node (id hidden-in-E1) (source main))) hidden-in-E1
-                **** (skg (node (id E11) (source main))) E11
-                *** (skg (node (id E2) (source main))) subscribee-2
-                **** (skg (node (id E21) (source main))) E21
+                *** (skg (node (id E1) (repo main))) subscribee-1
+                **** (skg (node (id hidden-in-E1) (repo main))) hidden-in-E1
+                **** (skg (node (id E11) (repo main))) E11
+                *** (skg (node (id E2) (repo main))) subscribee-2
+                **** (skg (node (id E21) (repo main))) E21
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
@@ -1061,11 +1061,11 @@ async fn overlapping_subscribee_hiderel_conflict_rejects_save (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-                * (skg (node (id R) (source main))) R
+                * (skg (node (id R) (repo main))) R
                 ** (skg subscribeeFolder)
-                *** (skg (node (id E1) (source main))) E1
-                **** (skg (node (id shared) (source main))) shared
-                *** (skg (node (id E2) (source main))) E2
+                *** (skg (node (id E1) (repo main))) E1
+                **** (skg (node (id shared) (repo main))) shared
+                *** (skg (node (id E2) (repo main))) E2
                 "};
       let result : Result<Vec<DefineNode>, Box<dyn Error>> =
         save_instructions_from_org_with_disk (
@@ -1089,8 +1089,8 @@ async fn ordinary_owned_child_list_edit_still_changes_contains (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-                * (skg (node (id r) (source owned))) r
-                ** (skg (node (id r1) (source owned))) r1
+                * (skg (node (id r) (repo owned))) r
+                ** (skg (node (id r1) (repo owned))) r1
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
@@ -1105,12 +1105,12 @@ async fn ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-                * (skg (node (id r) (source owned))) r
+                * (skg (node (id r) (repo owned))) r
                 ** (skg subscribeeFolder)
-                *** (skg (node (id e) (source foreign))) subscribee-e
-                **** (skg (node (id e2) (source foreign))) e2
-                * (skg (node (id e) (source foreign))) subscribee-e
-                ** (skg (node (id e1) (source foreign))) e1
+                *** (skg (node (id e) (repo foreign))) subscribee-e
+                **** (skg (node (id e2) (repo foreign))) e2
+                * (skg (node (id e) (repo foreign))) subscribee-e
+                ** (skg (node (id e1) (repo foreign))) e1
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
@@ -1129,10 +1129,10 @@ fn idfolder_resident_activeNode_saves_itself_but_is_not_content (
 ) {
   let input : &str =
     indoc! {"
-            * (skg (node (id root) (source main))) root
+            * (skg (node (id root) (repo main))) root
             ** (skg idFolder) ids
-            *** (skg (node (id display-child) (source main))) display child
-            ** (skg (node (id real-child) (source main))) real child
+            *** (skg (node (id display-child) (repo main))) display child
+            ** (skg (node (id real-child) (repo main))) real child
             "};
 
   let viewforest : Tree<ViewNode> =
@@ -1156,10 +1156,10 @@ async fn recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-                * (skg (node (id r) (source owned))) r
+                * (skg (node (id r) (repo owned))) r
                 ** (skg subscribeeFolder)
-                *** (skg (node (id e) (source foreign))) subscribee-e
-                **** (skg (node (id e2) (source foreign))) e2
+                *** (skg (node (id e) (repo foreign))) subscribee-e
+                **** (skg (node (id e2) (repo foreign))) e2
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
@@ -1178,10 +1178,10 @@ async fn foreign_subscribee_as_such_title_edit_is_rejected (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-                * (skg (node (id r) (source owned))) r
+                * (skg (node (id r) (repo owned))) r
                 ** (skg subscribeeFolder)
-                *** (skg (node (id e) (source foreign))) changed title
-                **** (skg (node (id e2) (source foreign))) e2
+                *** (skg (node (id e) (repo foreign))) changed title
+                **** (skg (node (id e2) (repo foreign))) e2
                 "};
       let result : Result<Vec<DefineNode>, Box<dyn Error>> =
         save_instructions_from_org_with_disk (
@@ -1207,10 +1207,10 @@ async fn owned_as_subscribee_title_edit_is_rejected (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-                * (skg (node (id a) (source owned))) a
+                * (skg (node (id a) (repo owned))) a
                 ** (skg subscribeeFolder)
-                *** (skg (node (id r) (source owned))) changed title
-                **** (skg (node (id r1) (source owned))) r1
+                *** (skg (node (id r) (repo owned))) changed title
+                **** (skg (node (id r1) (repo owned))) r1
                 "};
       let result : Result<Vec<DefineNode>, Box<dyn Error>> =
         save_instructions_from_org_with_disk (
@@ -1236,11 +1236,11 @@ async fn owned_as_subscribee_body_edit_is_rejected (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-                * (skg (node (id a) (source owned))) a
+                * (skg (node (id a) (repo owned))) a
                 ** (skg subscribeeFolder)
-                *** (skg (node (id r) (source owned))) r
+                *** (skg (node (id r) (repo owned))) r
                 body text that should not be accepted here
-                **** (skg (node (id r1) (source owned))) r1
+                **** (skg (node (id r1) (repo owned))) r1
                 "};
       let result : Result<Vec<DefineNode>, Box<dyn Error>> =
         save_instructions_from_org_with_disk (
@@ -1265,11 +1265,11 @@ async fn owned_as_subscribee_body_edit_is_rejected (
 fn test_extract_nonmergeSavePlan_deep_nesting() {
   let input: &str =
     indoc! {"
-            * (skg (node (id level1) (source main))) level 1
-            ** (skg (node (id level2a) (source main))) level 2a
-            *** (skg (node (id level3a) (source main))) level 3a
-            **** (skg (node (id level4) (source main))) level 4
-            ** (skg (node (id level2b) (source main))) level 2b
+            * (skg (node (id level1) (repo main))) level 1
+            ** (skg (node (id level2a) (repo main))) level 2a
+            *** (skg (node (id level3a) (repo main))) level 3a
+            **** (skg (node (id level4) (repo main))) level 4
+            ** (skg (node (id level2b) (repo main))) level 2b
         "};
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
@@ -1307,7 +1307,7 @@ fn test_extract_nonmergeSavePlan_deep_nesting() {
 fn test_extract_nonmergeSavePlan_error_missing_id() {
   let input: &str =
     indoc! {"
-            * (skg (node (id good_node) (source main))) good node
+            * (skg (node (id good_node) (repo main))) good node
             * node without ID
         "};
 
@@ -1336,7 +1336,7 @@ fn test_extract_nonmergeSavePlan_empty_input() {
 fn test_extract_nonmergeSavePlan_only_aliases() {
   let input: &str =
     indoc! {"
-            * (skg (node (id main) (source main))) main node
+            * (skg (node (id main) (repo main))) main node
             ** (skg aliasFolder) aliases only
             *** (skg alias) alias one
             *** (skg alias) alias two
@@ -1362,18 +1362,18 @@ fn test_extract_nonmergeSavePlan_only_aliases() {
 fn test_extract_nonmergeSavePlan_complex_scenario() {
   let input: &str =
     indoc! {"
-            * (skg (node (id doc1) (source main))) Document 1
+            * (skg (node (id doc1) (repo main))) Document 1
             Document body
             ** (skg aliasFolder) Doc1 Aliases
             *** (skg alias) First Document
             *** (skg alias) Primary Doc
-            ** (skg (node (id section1) (source main))) Section 1
+            ** (skg (node (id section1) (repo main))) Section 1
             Section 1 body
-            *** (skg (node (id subsection1a) (source main))) Subsection 1a
-            ** (skg (node (id section2) (source main) (editRequest delete))) Section 2
-            ** (skg (node (id section3) (source main))) Section 3
-            * (skg (node (id doc2) (source main))) Document 2
-            ** (skg (node (id ref_section) (source main) (affectsParent false))) Reference Section
+            *** (skg (node (id subsection1a) (repo main))) Subsection 1a
+            ** (skg (node (id section2) (repo main) (editRequest delete))) Section 2
+            ** (skg (node (id section3) (repo main))) Section 3
+            * (skg (node (id doc2) (repo main))) Document 2
+            ** (skg (node (id ref_section) (repo main) (affectsParent false))) Reference Section
         "};
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
@@ -1424,9 +1424,9 @@ fn would_be_diff_phantom_child_is_excluded_from_contains (
 ) {
   let input : &str =
     indoc! {"
-            * (skg (node (id root) (source main))) root
-            ** (skg (node (id a) (source main))) a
-            ** (skg (node (id b) (source main))) b
+            * (skg (node (id root) (repo main))) root
+            ** (skg (node (id a) (repo main))) a
+            ** (skg (node (id b) (repo main))) b
         "};
   let mut viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
@@ -1442,10 +1442,10 @@ fn toDelete_member_is_excluded_from_subscribees (
 ) {
   let input : &str =
     indoc! {"
-            * (skg (node (id subscriber) (source main))) subscriber
+            * (skg (node (id subscriber) (repo main))) subscriber
             ** (skg subscribeeFolder)
-            *** (skg (node (id keep) (source main))) keep
-            *** (skg (node (id doomed) (source main) (editRequest delete))) doomed
+            *** (skg (node (id keep) (repo main))) keep
+            *** (skg (node (id doomed) (repo main) (editRequest delete))) doomed
         "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
@@ -1460,10 +1460,10 @@ fn would_be_diff_phantom_member_is_excluded_from_subscribees (
 ) {
   let input : &str =
     indoc! {"
-            * (skg (node (id subscriber) (source main))) subscriber
+            * (skg (node (id subscriber) (repo main))) subscriber
             ** (skg subscribeeFolder)
-            *** (skg (node (id keep) (source main))) keep
-            *** (skg (node (id ghost) (source main))) ghost
+            *** (skg (node (id keep) (repo main))) keep
+            *** (skg (node (id ghost) (repo main))) ghost
         "};
   let mut viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
@@ -1479,10 +1479,10 @@ fn toDelete_member_is_excluded_from_overriddens (
 ) {
   let input : &str =
     indoc! {"
-            * (skg (node (id overrider) (source main))) overrider
+            * (skg (node (id overrider) (repo main))) overrider
             ** (skg overriddenFolder)
-            *** (skg (node (id keep) (source main))) keep
-            *** (skg (node (id doomed) (source main) (editRequest delete))) doomed
+            *** (skg (node (id keep) (repo main))) keep
+            *** (skg (node (id doomed) (repo main) (editRequest delete))) doomed
         "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
@@ -1497,10 +1497,10 @@ fn independent_member_is_excluded_from_overriddens (
 ) {
   let input : &str =
     indoc! {"
-            * (skg (node (id overrider) (source main))) overrider
+            * (skg (node (id overrider) (repo main))) overrider
             ** (skg overriddenFolder)
-            *** (skg (node (id keep) (source main))) keep
-            *** (skg (node (id bystander) (source main) (affectsParent false))) bystander
+            *** (skg (node (id keep) (repo main))) keep
+            *** (skg (node (id bystander) (repo main) (affectsParent false))) bystander
         "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
@@ -1519,10 +1519,10 @@ fn would_be_diff_phantom_child_still_counts_as_visible_content (
   // 'active_child_counts_as_visible_content'.
   let input : &str =
     indoc! {"
-            * (skg (node (id subscriber) (source main))) subscriber
+            * (skg (node (id subscriber) (repo main))) subscriber
             ** (skg subscribeeFolder)
-            *** (skg (node (id subscribee) (source main))) subscribee
-            **** (skg (node (id still-visible) (source main))) still visible
+            *** (skg (node (id subscribee) (repo main))) subscribee
+            **** (skg (node (id still-visible) (repo main))) still visible
         "};
   let mut viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
@@ -1546,19 +1546,19 @@ fn duplicate_members_of_defining_folders_are_silently_deduplicated (
   // (TODO/local-instruction-collection/3_plan.org).
   let input : &str =
     indoc! {"
-            * (skg (node (id owner) (source main))) owner
+            * (skg (node (id owner) (repo main))) owner
             ** (skg aliasFolder) aliases
             *** (skg alias) echo
             *** (skg alias) other
             *** (skg alias) echo
             ** (skg subscribeeFolder)
-            *** (skg (node (id s1) (source main) writeProtected)) s1
-            *** (skg (node (id s2) (source main) writeProtected)) s2
-            *** (skg (node (id s1) (source main) writeProtected)) s1
+            *** (skg (node (id s1) (repo main) writeProtected)) s1
+            *** (skg (node (id s2) (repo main) writeProtected)) s2
+            *** (skg (node (id s1) (repo main) writeProtected)) s1
             ** (skg overriddenFolder)
-            *** (skg (node (id o1) (source main) writeProtected)) o1
-            *** (skg (node (id o2) (source main) writeProtected)) o2
-            *** (skg (node (id o1) (source main) writeProtected)) o1
+            *** (skg (node (id o1) (repo main) writeProtected)) o1
+            *** (skg (node (id o2) (repo main) writeProtected)) o2
+            *** (skg (node (id o1) (repo main) writeProtected)) o1
         "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
@@ -1592,11 +1592,11 @@ fn reordering_subscribees_reorders_subscribes_to (
   // emit subscribes_to = [c, a, b].
   let input : &str =
     indoc! {"
-            * (skg (node (id owner) (source main))) owner
+            * (skg (node (id owner) (repo main))) owner
             ** (skg subscribeeFolder)
-            *** (skg (node (id c) (source main))) c
-            *** (skg (node (id a) (source main))) a
-            *** (skg (node (id b) (source main))) b
+            *** (skg (node (id c) (repo main))) c
+            *** (skg (node (id a) (repo main))) a
+            *** (skg (node (id b) (repo main))) b
         "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
@@ -1614,10 +1614,10 @@ fn removing_one_subscribee_keeps_the_rest (
   // the rest: subscribes_to = [a, c], neither empty nor unspecified.
   let input : &str =
     indoc! {"
-            * (skg (node (id owner) (source main))) owner
+            * (skg (node (id owner) (repo main))) owner
             ** (skg subscribeeFolder)
-            *** (skg (node (id a) (source main))) a
-            *** (skg (node (id c) (source main))) c
+            *** (skg (node (id a) (repo main))) a
+            *** (skg (node (id c) (repo main))) c
         "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
@@ -1635,10 +1635,10 @@ fn reordering_overridden_folder_is_harmless (
   // the same set, and nothing else about the owner changes.
   let input : &str =
     indoc! {"
-            * (skg (node (id owner) (source main))) owner
+            * (skg (node (id owner) (repo main))) owner
             ** (skg overriddenFolder)
-            *** (skg (node (id b) (source main))) b
-            *** (skg (node (id a) (source main))) a
+            *** (skg (node (id b) (repo main))) b
+            *** (skg (node (id a) (repo main))) a
         "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
@@ -1668,9 +1668,9 @@ fn deleting_from_hiddenFolder_emits_no_hide_change (
   // the plain hiddenFolder did not.
   let input : &str =
     indoc! {"
-            * (skg (node (id owner) (source main))) owner
+            * (skg (node (id owner) (repo main))) owner
             ** (skg hiddenFolder)
-            *** (skg (node (id hidden) (source main))) hidden
+            *** (skg (node (id hidden) (repo main))) hidden
         "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);

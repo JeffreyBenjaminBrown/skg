@@ -2,8 +2,8 @@
 # Shared helpers for the data/bash/*.sh repo-loop scripts.
 #
 # Source this file, then loop over one of:
-#   skg_all_repos     -- every source in skgconfig.toml
-#   skg_owned_repos   -- only sources with user_owns_it = true
+#   skg_all_repos     -- every repo in skgconfig.toml
+#   skg_owned_repos   -- only repos with user_owns_it = true
 # Each prints one repo path (relative to the data dir) per line.
 #
 # Operate on a repo with "$SKG_DATA_DIR/$repo", e.g.
@@ -12,7 +12,7 @@
 #   done
 #
 # The repo lists are derived from skgconfig.toml on every call, so adding,
-# removing, or re-owning a source there is reflected immediately -- there is
+# removing, or re-owning a repo there is reflected immediately -- there is
 # no separate list of repositories to keep in sync.
 
 # Resolve paths relative to this library's own location. These stay relative
@@ -24,11 +24,11 @@ SKG_DATA_DIR="$SKG_LIB_DIR/.."
 SKG_CONFIG="${SKG_CONFIG:-$SKG_DATA_DIR/skgconfig.toml}"
 
 # Print the `path` of each [[repos]] block in skgconfig.toml.
-# $1 = "all" (every source) or "owned". A source is owned iff its
+# $1 = "all" (every repo) or "owned". A repo is owned iff its
 # path sits under the config's owned_folder (default "owned") --
-# the author-folder layout; the per-source user_owns_it key is
+# the author-folder layout; the per-repo user_owns_it key is
 # retired.
-_skg_sources() {
+_skg_repos() {
   if [ ! -f "$SKG_CONFIG" ]; then
     echo "lib.sh: config not found: $SKG_CONFIG" >&2
     return 1
@@ -50,7 +50,7 @@ _skg_sources() {
       have = 0; path = ""
     }
     # A [[repos]] header opens a new block...
-    /^[[:space:]]*\[\[sources\]\][[:space:]]*$/ { flush(); have = 1; next }
+    /^[[:space:]]*\[\[repos\]\][[:space:]]*$/ { flush(); have = 1; next }
     # ...any other table header ([x] or [[x]]) closes the current one.
     /^[[:space:]]*\[/                           { flush(); next }
     have && /^[[:space:]]*path[[:space:]]*=/ {
@@ -60,5 +60,5 @@ _skg_sources() {
   ' "$SKG_CONFIG"
 }
 
-skg_all_repos()   { _skg_sources all; }
-skg_owned_repos() { _skg_sources owned; }
+skg_all_repos()   { _skg_repos all; }
+skg_owned_repos() { _skg_repos owned; }

@@ -15,12 +15,12 @@ pub fn validate_repo_paths_creating_owned_ones_if_needed (
     if !repo . path . exists() { // If it doesn't exist
       if repo . user_owns_it { // and it's owned, create it
         fs::create_dir_all(&repo . path)?;
-        tracing::info!("Created directory for source '{}': {:?}",
+        tracing::info!("Created directory for repo '{}': {:?}",
                   repo_name, repo . path);
       } else { // and it's foreign, fail
         return Err(io::Error::new(
           io::ErrorKind::NotFound,
-          format!("Foreign source '{}' path does not exist: {:?}",
+          format!("Foreign repo '{}' path does not exist: {:?}",
                   repo_name, repo . path )) ); }} }
   Ok(( )) }
 
@@ -76,13 +76,13 @@ fn reject_retired_config_keys (
   if has_repo_sets {
     return Err ( concat! (
       "This config defines [[repo_sets]], a retired mechanism. ",
-      "Source-sets are now the PREFIXES of the [[repos]] order: ",
-      "list your sources most-public-first, and select a set by ",
-      "naming the most private source to make available (or 'all'). ",
+      "Repo-sets are now the PREFIXES of the [[repos]] order: ",
+      "list your repos most-public-first, and select a set by ",
+      "naming the most private repo to make available (or 'all'). ",
       "See TODO/user-owned_autofork_chain/5_plan.org, work item ",
       "privacy-order. Delete the [[repo_sets]] entries and, if a ",
       "deleted set was your default_repo_set, replace that with a ",
-      "source name or 'all'." ) . into () ); }
+      "repo name or 'all'." ) . into () ); }
   let has_user_owns_it : bool =
     parsed . as_ref ()
     . and_then ( |v| v . get ("repos") )
@@ -92,11 +92,11 @@ fn reject_retired_config_keys (
     . unwrap_or (false);
   if has_user_owns_it {
     return Err ( concat! (
-      "This config sets 'user_owns_it' on a source, a retired key. ",
-      "Ownership is now derived from the source's path: sources ",
+      "This config sets 'user_owns_it' on a repo, a retired key. ",
+      "Ownership is now derived from the repo's path: repos ",
       "under the config's owned_folder (default \"owned\", intended ",
       "layout DATA_ROOT/AUTHOR/REPO) are owned; all others are ",
-      "foreign. Move each owned source's directory under that ",
+      "foreign. Move each owned repo's directory under that ",
       "folder, update its 'path', and delete the 'user_owns_it' ",
       "lines. bash/migrate-to-author-folders.sh does this for a ",
       "whole config at once. See ",
@@ -248,7 +248,7 @@ pub fn load_config_with_overrides (
       repo . path = new_path . clone();
     } else {
       return Err(format!(
-        "Source '{}' not found in config", repo_name) . into()); }}
+        "Repo '{}' not found in config", repo_name) . into()); }}
   validate_repo_paths_creating_owned_ones_if_needed(
     &config . repos)?;
   Ok (config) }
@@ -257,12 +257,12 @@ fn validate_repo_sets (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
   if config . repos . contains_key (&RepoName::from ("all")) {
-    return Err ("Configured source may not be named 'all'" . into ()); }
+    return Err ("Configured repo may not be named 'all'" . into ()); }
   if config . default_repo_set . 0 != "all"
   && ! config . repos . contains_key (
        &RepoName::from ( config . default_repo_set . 0 . as_str () )) {
     return Err (format! (
-      "default_repo_set '{}' names no configured source. It must be 'all' or the name of the most private source to make available.",
+      "default_repo_set '{}' names no configured repo. It must be 'all' or the name of the most private repo to make available.",
       config . default_repo_set
     ) . into ()); }
   Ok (()) }

@@ -2,7 +2,7 @@
 -- client. The Lua mirror of test-emacs.el in this directory: fork a
 -- foreign N into a public clone C (implicit fork), then run
 -- skg.view_requests.fork_node on the DRAWN SUBSTITUTE C and rotate
--- its clone to a PRIVATE source, forming the chain D overrides C
+-- its clone to a PRIVATE repo, forming the chain D overrides C
 -- overrides N. Viewing N's container then draws the chain end D,
 -- marked (overridesHere N), and the save accepts that chain-end
 -- carrier.
@@ -74,7 +74,7 @@ T.check(T.buffer_text(p_buf):find('(id N)', 1, true),
         "P's view does not show foreign N")
 
 -- 2. Implicit fork: make N definitive and edit its title.
-local n_line = goto_line_containing('(id N) (source foreign)',
+local n_line = goto_line_containing('(id N) (repo foreign)',
   "could not find N's headline")
 local n_line_text =
   vim.api.nvim_buf_get_lines(p_buf, n_line - 1, n_line, false)[1]
@@ -88,9 +88,9 @@ save.request_save_buffer()
 local confirm_buf_1 = T.wait_for_buffer('skg://fork-confirmation', 10)
 T.check(confirm_buf_1, 'no fork-confirmation for N appeared')
 vim.api.nvim_set_current_buf(confirm_buf_1)
-local clone_line_1 = goto_line_starting_with('* (skg (node (source ',
+local clone_line_1 = goto_line_starting_with('* (skg (node (repo ',
   'could not find the clone-to-be headline')
-metadata.change_source_at_line(clone_line_1, 'public')
+metadata.change_repo_at_line(clone_line_1, 'public')
 save.approve_fork()
 print('foreign N forked into a public clone')
 
@@ -107,24 +107,24 @@ goto_line_containing('(overridesHere N)',
   'could not find the drawn substitute')
 view_requests.fork_node()
 
--- 6. In the confirmation buffer, rotate the clone-to-be's source to
+-- 6. In the confirmation buffer, rotate the clone-to-be's repo to
 --    PRIVATE, then approve -> private D overrides C.
 local confirm_buf_2 = T.wait_for_buffer('skg://fork-confirmation', 10)
 T.check(confirm_buf_2, 'no fork-confirmation for the clone appeared')
 vim.api.nvim_set_current_buf(confirm_buf_2)
-local clone_line_2 = goto_line_starting_with('* (skg (node (source ',
+local clone_line_2 = goto_line_starting_with('* (skg (node (repo ',
   'could not find the clone-to-be headline')
-metadata.change_source_at_line(clone_line_2, 'private')
+metadata.change_repo_at_line(clone_line_2, 'private')
 save.approve_fork()
-print('the public clone was forked into a private clone (source rotated)')
+print('the public clone was forked into a private clone (repo rotated)')
 
--- 7. Reopen P (all sources active): the chain end D -- a PRIVATE-source
+-- 7. Reopen P (all repos active): the chain end D -- a PRIVATE-repo
 --    node -- is now drawn in N's place, still marked (overridesHere N).
 p_buf = reopen_P()
 local function chain_end_drawn ()
   for _, line in ipairs(vim.api.nvim_buf_get_lines(p_buf, 0, -1, false)) do
     if line:find('(overridesHere N)', 1, true)
-       and line:find('(source private)', 1, true) then
+       and line:find('(repo private)', 1, true) then
       return true
     end
   end

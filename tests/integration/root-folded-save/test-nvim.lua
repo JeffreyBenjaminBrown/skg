@@ -23,15 +23,15 @@ print('=== PHASE 1: request single-root view from server ===')
 -- stays deterministic; then activate the skg fold model so the
 -- overview-fold step below takes effect exactly as in the real flow.
 local org_text = table.concat({
-  '* (skg (node (id rfs-root) (source main))) rfs-root',
+  '* (skg (node (id rfs-root) (repo main))) rfs-root',
   'rfs-root body',
-  '** (skg (node (id rfs-c1) (source main))) rfs-c1',
+  '** (skg (node (id rfs-c1) (repo main))) rfs-c1',
   'rfs-c1 body',
-  '** (skg (node (id rfs-c2) (source main))) rfs-c2',
+  '** (skg (node (id rfs-c2) (repo main))) rfs-c2',
   'rfs-c2 body',
-  '*** (skg (node (id rfs-g1) (source main))) rfs-g1',
+  '*** (skg (node (id rfs-g1) (repo main))) rfs-g1',
   'rfs-g1 body',
-  '** (skg (node (id rfs-c3) (source main))) rfs-c3',
+  '** (skg (node (id rfs-c3) (repo main))) rfs-c3',
   'rfs-c3 body',
 }, '\n')
 

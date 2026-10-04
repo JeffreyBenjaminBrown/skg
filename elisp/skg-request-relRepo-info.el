@@ -1,39 +1,39 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: `skg-set-relSource' -- request the relSource
+;;; PURPOSE: `skg-set-relRepo' -- request the relRepo
 ;;; of one relationship edge, informed by the server's
-;;; 'relSource info' endpoint
+;;; 'relRepo info' endpoint
 ;;; (BUG-and-fix_make-edge-more-public.org). The buffer-local
 ;;; helpers it drives live in skg-metadata.el.
 
 (require 'skg-length-prefix)
 (require 'skg-metadata)
 
-(defun skg-set-relSource (&optional recursive)
-  "Set the relSource of the relationship or alias at point.
+(defun skg-set-relRepo (&optional recursive)
+  "Set the relRepo of the relationship or alias at point.
 
 With a prefix argument RECURSIVE, instead run
-`skg-set-relSource-recursive', which prompts for a
-relationship kind and a source and applies the source throughout the
+`skg-set-relRepo-recursive', which prompts for a
+relationship kind and a repo and applies the repo throughout the
 subtree at point.
 
 The headline at point represents one edge: `contains' for a content
 child, the folder's relation for a writable PartnerFolder member. This
-command asks the server for the edge's DEFAULT source and its CURRENT
-source, then
+command asks the server for the edge's DEFAULT repo and its CURRENT
+repo, then
 prompts -- with both tab-completion and S-left/S-right cycling,
-like the other source dialogs -- over the sources at least as
+like the other repo dialogs -- over the repos at least as
 private as the default (more public ones could leak an endpoint's
 ID and would be rejected at save), plus a no-override choice. The
 minibuffer starts pre-filled with a pending request when one is
-offerable, else the current relSource or default, so RET preserves the
+offerable, else the current relRepo or default, so RET preserves the
 most specific available choice.
 
-Choosing a source writes an `(editRequest (relSource SOURCE))'
+Choosing a repo writes an `(editRequest (relRepo REPO))'
 metadata request. The no-override choice removes that request, which on save means the edge
-keeps its saved source (sticky), NOT that it resets to its default.
+keeps its saved repo (sticky), NOT that it resets to its default.
 To lower an edge's privacy to its default (e.g. after making the
-more private endpoint's home more public), choose the default relSource
+more private endpoint's home more public), choose the default relRepo
 itself; once saved at the default, the display fact and its red ~herald
 stop being rendered.
 
@@ -41,16 +41,16 @@ Refuses on read-only folder members (the edge belongs to the other
 end) and on root headlines (no edge). Like other metadata edits,
 this only modifies the buffer; it does NOT save. Call
 `skg-request-save-buffer' afterward. The server re-validates at
-save time, so a stale or hand-typed source more public than the
+save time, so a stale or hand-typed repo more public than the
 edge's default is still rejected there."
   (interactive "P")
   (if recursive
-      (skg-set-relSource-recursive)
-    (skg--set-relSource-at-point)))
+      (skg-set-relRepo-recursive)
+    (skg--set-relRepo-at-point)))
 
-(defun skg--set-relSource-at-point ()
-  "The single-edge path of `skg-set-relSource': classify
-the edge at point, ask the server for its (default, current) sources,
+(defun skg--set-relRepo-at-point ()
+  "The single-edge path of `skg-set-relRepo': classify
+the edge at point, ask the server for its (default, current) repos,
 and prompt from the reply."
   (let ((buffer (current-buffer))
         (marker (point-marker)))
@@ -60,34 +60,34 @@ and prompt from the reply."
                  (unless (and (org-up-heading-safe)
                               (org-up-heading-safe))
                    (user-error "Alias has no owning node headline"))
-                 (skg--current-node-source)))
-              (current (skg--relSource-current-value)))
-          (skg--set-relSource-from-info
+                 (skg--current-node-repo)))
+              (current (skg--relRepo-current-value)))
+          (skg--set-relRepo-from-info
            buffer marker
-           (format "((response-type relSource-info) (default %S)%s)"
+           (format "((response-type relRepo-info) (default %S)%s)"
                    default
                    (if current
                        (format " (current %S)" current)
                      ""))))
       (let ((edge (skg--rel-at-point)))
         (skg-register-response-handler
-         'relSource-info
+         'relRepo-info
          (lambda (_tcp-proc payload)
-           (skg--set-relSource-from-info buffer marker payload))
+           (skg--set-relRepo-from-info buffer marker payload))
          t)
         (skg-lp-reset)
         (process-send-string
          (skg-tcp-connect-to-rust)
          (concat
           (prin1-to-string
-           `((request . "relSource info")
+           `((request . "relRepo info")
              (owner . ,(plist-get edge :owner))
              (member . ,(plist-get edge :member))
              (relation . ,(plist-get edge :relation))))
           "\n"))))))
 
-(defun skg--set-relSource-from-info (buffer marker payload)
-  "Handle the relSource-info response for `skg-set-relSource'.
+(defun skg--set-relRepo-from-info (buffer marker payload)
+  "Handle the relRepo-info response for `skg-set-relRepo'.
 Parses PAYLOAD, then prompts and applies the choice at MARKER in
 BUFFER. The prompt runs from a zero-delay timer so the minibuffer
 opens outside the network process filter."
@@ -100,19 +100,19 @@ opens outside the network process filter."
      0 nil
      (lambda ()
        (if (not (buffer-live-p buffer))
-           (message "skg: buffer vanished before the relSource prompt")
+           (message "skg: buffer vanished before the relRepo prompt")
          (with-current-buffer buffer
            (save-excursion
              (goto-char marker)
              (when err
-               (message "relSource info: %s -- offering every source; the save will validate."
+               (message "relRepo info: %s -- offering every repo; the save will validate."
                         err))
-             (let* ((ladder (skg--source-names))
-                    (requested (skg--relSource-requested-value))
-                    (choices (append (skg--relSource-choices
+             (let* ((ladder (skg--repo-names))
+                    (requested (skg--relRepo-requested-value))
+                    (choices (append (skg--relRepo-choices
                                       ladder default)
-                                     (list skg--relSource-no-override)))
-                    (prompt (concat "relSource (S-left/right cycle"
+                                     (list skg--relRepo-no-override)))
+                    (prompt (concat "relRepo (S-left/right cycle"
                                     (when default
                                       (format "; default %s" default))
                                     (when current
@@ -132,7 +132,7 @@ opens outside the network process filter."
                              prompt choices nil t prefill nil nil nil
                              choices)))
                (message "%s"
-                        (skg--apply-relSource-choice
+                        (skg--apply-relRepo-choice
                          choice))))))))))
 
-(provide 'skg-request-relSource-info)
+(provide 'skg-request-relRepo-info)

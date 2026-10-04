@@ -90,7 +90,7 @@ fn unknown_home_is_hard_but_edge_provenance_is_a_warning () {
   let mut owner = node ("owner", "public");
   owner . contains = vec![
     RelPartner::at_relRepo (
-      RepoName::from ("unconfigured-relSource"), ID::from ("dangling")),
+      RepoName::from ("unconfigured-relRepo"), ID::from ("dangling")),
   ];
   let unknown_home = node ("unknown-home", "unconfigured-home");
   let report = validate_complete_graph (&config (), &[owner, unknown_home]);

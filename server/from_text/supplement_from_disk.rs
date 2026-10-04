@@ -281,7 +281,7 @@ pub fn refuse_delete_with_inactive_sections (
       config, &repo_name, pid . clone () ) {
       if std::path::Path::new (&path) . is_file () {
         return Err ( format! (
-          "Cannot delete '{}': it has telescope sections in inactive sources. Widen the source-set (e.g. to 'all') and retry.",
+          "Cannot delete '{}': it has telescope sections in inactive repos. Widen the repo-set (e.g. to 'all') and retry.",
           pid )); }} }
   Ok (( )) }
 
@@ -406,15 +406,15 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
       Some (repo) => {
         if config . repo_position (repo) . is_none () {
           return Err ( format! (
-            "Cannot save {} (relation '{}'): member '{}' requested unconfigured source '{}'.",
+            "Cannot save {} (relation '{}'): member '{}' requested unconfigured repo '{}'.",
             owner_pid, relation_label, member, repo )); }
         if ! config . user_owns_repo (repo) {
           return Err ( format! (
-            "Cannot save {} (relation '{}'): member '{}' requested non-owned source '{}'. relSources must be owned.",
+            "Cannot save {} (relation '{}'): member '{}' requested non-owned repo '{}'. relRepos must be owned.",
             owner_pid, relation_label, member, repo )); }
         if config . is_strictly_more_public (repo, &owner_home) {
           return Err ( format! (
-            "Cannot save {} (relation '{}'): member '{}' requested source '{}', which is more public than the owner's home '{}'.",
+            "Cannot save {} (relation '{}'): member '{}' requested repo '{}', which is more public than the owner's home '{}'.",
             owner_pid, relation_label, member, repo, owner_home )); }
         let default : RepoName = default_floor_for (member);
         let sticky  : RepoName =
@@ -425,10 +425,10 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
         if config . is_strictly_more_public (repo, &floor) {
           Err ( format! (
             "Cannot save {} (relation '{}'): member '{}' requested \
-             source '{}', but this edge's floor is '{}'. An edge's \
+             repo '{}', but this edge's floor is '{}'. An edge's \
              privacy can never move more public than its applicable \
-             default, nor more public than its current relSource when \
-             that source already precedes the default. To publicize \
+             default, nor more public than its current relRepo when \
+             that repo already precedes the default. To publicize \
              the edge further, first \
              publicize the more private endpoint's home.",
             owner_pid, relation_label, member, repo, floor ))
@@ -491,15 +491,15 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
         if let Some (repo) = explicit_repo {
           if config . repo_position (repo) . is_none () {
             return Err ( format! (
-              "Cannot save {} (alias '{}'): requested unconfigured source '{}'.",
+              "Cannot save {} (alias '{}'): requested unconfigured repo '{}'.",
               owner_pid, m . member, repo )); }
           if ! config . user_owns_repo (repo) {
             return Err ( format! (
-              "Cannot save {} (alias '{}'): requested non-owned relSource '{}'. Alias relSources must be owned.",
+              "Cannot save {} (alias '{}'): requested non-owned relRepo '{}'. Alias relRepos must be owned.",
               owner_pid, m . member, repo )); }
           if config . is_strictly_more_public (repo, &owner_home) {
             return Err ( format! (
-              "Cannot save {} (alias '{}'): requested source '{}' is more public than the owner's home '{}'.",
+              "Cannot save {} (alias '{}'): requested repo '{}' is more public than the owner's home '{}'.",
               owner_pid, m . member, repo, owner_home )); }
           m . relRepo = repo . clone ();
         } else {

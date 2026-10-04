@@ -194,34 +194,34 @@ fn format_buffer_validation_error (
     BufferValidationError::InconsistentRepos(id, repos) => {
       let repo_list: Vec<String> =
         repos . iter() . map(|s| s . 0 . clone()) . collect();
-      format!( "Multiple viewnodes with ID {} have inconsistent sources:\n- Sources: {:?}\n- All instances of the same ID must have the same source.\n",
+      format!( "Multiple viewnodes with ID {} have inconsistent repos:\n- Repos: {:?}\n- All instances of the same ID must have the same repo.\n",
               id . 0, repo_list) },
     BufferValidationError::ModifiedForeignNode(id, repo) => {
-      format!("Cannot modify node from foreign (read-only) source:\n- ID: {}\n- Source: {}\n- Foreign sources can only be viewed, not modified.\n",
+      format!("Cannot modify node from foreign (read-only) repo:\n- ID: {}\n- Repo: {}\n- Foreign repos can only be viewed, not modified.\n",
               id . 0, repo) },
     BufferValidationError::CreatedForeignNode(id, repo) => {
-      format!("Cannot create node in foreign (read-only) source:\n- ID: {}\n- Source: {}\n- Foreign sources can only be viewed, not modified.\n",
+      format!("Cannot create node in foreign (read-only) repo:\n- ID: {}\n- Repo: {}\n- Foreign repos can only be viewed, not modified.\n",
               id . 0, repo) },
     BufferValidationError::CannotMoveToOrFromForeignRepo(id, disk_repo, buffer_repo) => {
-      format!("Cannot move node between sources:\n- ID: {}\n- Source on disk: {}\n- Source from buffer: {}\n- One or both sources are foreign (read-only).\n",
+      format!("Cannot move node between repos:\n- ID: {}\n- Repo on disk: {}\n- Repo from buffer: {}\n- One or both repos are foreign (read-only).\n",
               id . 0, disk_repo, buffer_repo) },
     BufferValidationError::CannotMoveAndMergeSimultaneously(id) => {
       format!("Cannot move and merge a node simultaneously:\n- ID: {}\n- Please save the move and merge in separate operations.\n",
               id . 0) },
     BufferValidationError::RepoNotInConfig(id, repo) => {
-      format!("Node references a source that does not exist in config:\n- ID: {}\n- Source: {}\n- Please check your config file and ensure this source is defined.\n",
+      format!("Node references a repo that does not exist in config:\n- ID: {}\n- Repo: {}\n- Please check your config file and ensure this repo is defined.\n",
               id . 0, repo) },
     BufferValidationError::ForkRepoUnresolved(id) => {
-      format!("Cannot fork a foreign node -- no owned source for the clone:\n- Foreign node: {}\n- It has no owned ancestor in the view to inherit a source from.\n- Set the clone's source in the fork-confirmation buffer (C-c s s), then approve.\n",
+      format!("Cannot fork a foreign node -- no owned repo for the clone:\n- Foreign node: {}\n- It has no owned ancestor in the view to inherit a repo from.\n- Set the clone's repo in the fork-confirmation buffer (C-c s s), then approve.\n",
               id . 0) },
     BufferValidationError::ForkAlreadyExists(original, existing) => {
       format!("Cannot fork a node you have already forked:\n- Foreign node: {}\n- Your existing clone: {}\n- A node may have at most one user-owned override. Edit the existing clone instead.\n",
               original . 0, existing . 0) },
     BufferValidationError::ForkRepoInactive(id, repo) => {
-      format!("Cannot fork into an inactive source:\n- Foreign node: {}\n- Clone's resolved source: {}\n- That source is not in the active source-set. Activate it first; an invisible clone is never created silently.\n",
+      format!("Cannot fork into an inactive repo:\n- Foreign node: {}\n- Clone's resolved repo: {}\n- That repo is not in the active repo-set. Activate it first; an invisible clone is never created silently.\n",
               id . 0, repo) },
     BufferValidationError::ForkRepoNotOwned(id, repo) => {
-      format!("Cannot fork into a source you do not own:\n- Foreign node: {}\n- Clone's chosen source: {}\n- Pick an owned source for the clone (C-c s s in the confirmation buffer).\n",
+      format!("Cannot fork into a repo you do not own:\n- Foreign node: {}\n- Clone's chosen repo: {}\n- Pick an owned repo for the clone (C-c s s in the confirmation buffer).\n",
               id . 0, repo) },
     BufferValidationError::ForkRequestOnUnknownNode(id) => {
       format!("Cannot fork an unsaved node:\n- Node: {}\n- It is not in the graph. Only a saved node can be forked; save it first, then fork.\n",
@@ -258,7 +258,7 @@ fn format_buffer_validation_error (
       format!("Edited server-owned properties surface:\n- Owner ID: {}\n- Owner title: {}\n- Changes: {}\n- No changes were saved. Use skg-set-property-search-matching for noSearchMatching. HadId and WasOverloaded are provenance and have no setter.\n",
               owner_id . 0, owner_title, changes . join ("; ")) },
     BufferValidationError::BoolPropEditOnForeignNode (id, repo) => {
-      format!("Cannot change a property on a foreign node:\n- ID: {}\n- Source: {}\n- Property changes never create an implicit fork. Visit an owned node instead.\n",
+      format!("Cannot change a property on a foreign node:\n- ID: {}\n- Repo: {}\n- Property changes never create an implicit fork. Visit an owned node instead.\n",
               id . 0, repo) },
     BufferValidationError::BoolPropEditOnUnknownNode (id) => {
       format!("Cannot change a property on an unsaved or unknown node:\n- ID: {}\n- Save the node first, then run the property setter.\n",

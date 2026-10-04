@@ -398,7 +398,7 @@ fn bucket_reports (
       match (existed_before, exists_after, root_before, root_after) {
         (true, true, false, true) => "modified, newly orphaned",
         (true, true, _,     _) if moved_across_repos =>
-          "modified, moved across sources",
+          "modified, moved across repos",
         (true, true, _,     _)    => "modified, other",
         (false, true, _,    true) => "new roots",
         (true, false, _,     _) if pid_preserved_as_extra_id =>
@@ -627,7 +627,7 @@ const BUCKET_NAMES : &[&str] = &[
   "deleted roots",
   "deleted nodes, not roots",
   "deleted nodes, probably via merger",
-  "modified, moved across sources",
+  "modified, moved across repos",
   "modified, other",
   "new nodes, not roots",
 ];

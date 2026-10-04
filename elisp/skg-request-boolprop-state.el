@@ -120,8 +120,8 @@ true-content subtree.  This modifies metadata but does not save."
                  ((skg--node-write-protected-p meta) "write-protected")
                  ((skg-sexp-cdr-at-path meta '(skg node editRequest))
                   "already has an editRequest")
-                 ((not (member (skg--node-source meta)
-                               (skg--owned-sources))) "foreign source"))))
+                 ((not (member (skg--node-repo meta)
+                               (skg--owned-repos))) "foreign repo"))))
           (cond
            ((equal reason "duplicate occurrence") nil)
            (reason (push (format "%s (%s)" (or id "no-id") reason) skipped))

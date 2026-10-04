@@ -46,36 +46,36 @@ fn setup_filter_fixtures_staged (
 /// The worktree state of the view, as a user's diff-mode buffer
 /// would hold it (B expanded as a definitive subscribee-as-such).
 const INPUT : &str = "\
-* (skg (node (id S) (source main))) S
+* (skg (node (id S) (repo main))) S
 ** (skg subscribeeFolder)
-*** (skg (node (id B) (source main))) B
+*** (skg (node (id B) (repo main))) B
 **** (skg hiddenInSubscribeeFolder)
-***** (skg (node (id h1) (source main))) h1
-***** (skg (node (id h2) (source main))) h2
-***** (skg (node (id h3) (source main))) h3
-**** (skg (node (id v) (source main))) v
-**** (skg (node (id h4) (source main))) h4
+***** (skg (node (id h1) (repo main))) h1
+***** (skg (node (id h2) (repo main))) h2
+***** (skg (node (id h3) (repo main))) h3
+**** (skg (node (id v) (repo main))) v
+**** (skg (node (id h4) (repo main))) h4
 *** (skg hiddenOutsideOfSubscribeeFolder)
-**** (skg (node (id h5) (source main))) h5
+**** (skg (node (id h5) (repo main))) h5
 ";
 
 const EXPECTED_UNSTAGED : &str = "\
-***** (skg (node (id h1) (source main))) h1
-***** (skg (node (id h2) (source main) (unstaged newM))) h2
-***** (skg (node (id h3) (source main) (unstaged newM))) h3
-***** (skg (node (id h4) (source main) writeProtected (unstaged removedM))) h4
-**** (skg (node (id h5) (source main) (unstaged newM))) h5
-**** (skg (node (id h3) (source main) writeProtected (unstaged removedM))) h3
-**** (skg (node (id h6) (source main) writeProtected (unstaged removedM))) h6
+***** (skg (node (id h1) (repo main))) h1
+***** (skg (node (id h2) (repo main) (unstaged newM))) h2
+***** (skg (node (id h3) (repo main) (unstaged newM))) h3
+***** (skg (node (id h4) (repo main) writeProtected (unstaged removedM))) h4
+**** (skg (node (id h5) (repo main) (unstaged newM))) h5
+**** (skg (node (id h3) (repo main) writeProtected (unstaged removedM))) h3
+**** (skg (node (id h6) (repo main) writeProtected (unstaged removedM))) h6
 ";
 
 const EXPECTED_STAGED : &str = "\
-***** (skg (node (id h2) (source main) (staged newM))) h2
-***** (skg (node (id h3) (source main) (staged newM))) h3
-***** (skg (node (id h4) (source main) writeProtected (staged removedM))) h4
-**** (skg (node (id h5) (source main) (staged newM))) h5
-**** (skg (node (id h3) (source main) writeProtected (staged removedM))) h3
-**** (skg (node (id h6) (source main) writeProtected (staged removedM))) h6
+***** (skg (node (id h2) (repo main) (staged newM))) h2
+***** (skg (node (id h3) (repo main) (staged newM))) h3
+***** (skg (node (id h4) (repo main) writeProtected (staged removedM))) h4
+**** (skg (node (id h5) (repo main) (staged newM))) h5
+**** (skg (node (id h3) (repo main) writeProtected (staged removedM))) h3
+**** (skg (node (id h6) (repo main) writeProtected (staged removedM))) h6
 ";
 
 #[test]
@@ -154,10 +154,10 @@ async fn emptied_filter_folders_still_render_in_diff_mode (
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
   let input : &str = "\
-* (skg (node (id S2) (source main))) S2
+* (skg (node (id S2) (repo main))) S2
 ** (skg subscribeeFolder)
-*** (skg (node (id B2) (source main))) B2
-**** (skg (node (id x2) (source main))) x2
+*** (skg (node (id B2) (repo main))) B2
+**** (skg (node (id x2) (repo main))) x2
 ";
     let graph = graph_handle_from_config (&config)?;
     { let mut views_state : ViewsState = ViewsState {
@@ -169,10 +169,10 @@ async fn emptied_filter_folders_still_render_in_diff_mode (
         true, &Err (String::new ()), &mut views_state ) . await ?;
       assert_buffer_contains ( &response . saved_view, "\
 **** (skg hiddenInSubscribeeFolder)
-***** (skg (node (id x2) (source main) writeProtected (unstaged removedM))) x2
-**** (skg (node (id x2) (source main))) x2
+***** (skg (node (id x2) (repo main) writeProtected (unstaged removedM))) x2
+**** (skg (node (id x2) (repo main))) x2
 *** (skg hiddenOutsideOfSubscribeeFolder)
-**** (skg (node (id y2) (source main) writeProtected (unstaged removedM))) y2
+**** (skg (node (id y2) (repo main) writeProtected (unstaged removedM))) y2
 " ); }
     { // The same save outside diff mode creates neither folder.
       let mut views_state : ViewsState = ViewsState {

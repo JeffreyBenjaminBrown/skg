@@ -22,7 +22,7 @@ pub fn nodecomplete_from_index_or_head (
 ) -> Result<NodeComplete, Box<dyn StdError>> {
   let repo_config : &SkgfileRepo =
     config . repos . get (src)
-    . ok_or_else ( || format! ( "Source '{}' not found in config",
+    . ok_or_else ( || format! ( "Repo '{}' not found in config",
                                 src )) ?;
   let repo_path : &Path =
     Path::new ( &repo_config . path );

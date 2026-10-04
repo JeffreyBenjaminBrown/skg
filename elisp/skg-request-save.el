@@ -9,7 +9,7 @@
 (require 'skg-buffer)
 (require 'skg-lock-buffers)
 
-(defun skg-request-save-buffer (&optional fork-approved fork-sources
+(defun skg-request-save-buffer (&optional fork-approved fork-repos
                                           hoist-approved-pids
                                           text-approved-pids)
   "Send the current buffer contents to Rust for processing.
@@ -37,12 +37,12 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
   (skg--lock-all-skg-buffers)
   (condition-case err
       (skg--send-save-buffer
-       fork-approved fork-sources hoist-approved-pids text-approved-pids)
+       fork-approved fork-repos hoist-approved-pids text-approved-pids)
     (error
      (skg--cancel-locally-failed-save)
      (signal (car err) (cdr err)))))
 
-(defun skg--send-save-buffer (fork-approved fork-sources
+(defun skg--send-save-buffer (fork-approved fork-repos
                                             hoist-approved-pids
                                             text-approved-pids)
   "Serialize and send a save after the stream guard and locks are held."
@@ -71,7 +71,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
                                     skg-view-uri
                                     save-point-position
                                     fork-approved
-                                    fork-sources
+                                    fork-repos
                                     hoist-approved-pids
                                     text-approved-pids))
                                   "\n"))
@@ -125,14 +125,14 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
        'telescope-hoist-confirmation
        (lambda (_tcp-proc payload)
          (skg--telescope-hoist-confirmation-handler
-          save-buffer payload fork-approved fork-sources
+          save-buffer payload fork-approved fork-repos
           text-approved-pids))
        nil)
       (skg-register-response-handler
        'overPrivateText-telescope-confirmation
        (lambda (_tcp-proc payload)
          (skg--save-text-release-confirmation-handler
-          save-buffer payload fork-approved fork-sources
+          save-buffer payload fork-approved fork-repos
           hoist-approved-pids))
        nil)
 
@@ -224,15 +224,15 @@ internal edit; it is restored before any request is sent."
   (skg--unlock-all-save-locked))
 
 (defun skg--save-request-sexp (view-uri save-point-position
-                                        &optional fork-approved fork-sources
+                                        &optional fork-approved fork-repos
                                         hoist-approved-pids
                                         text-approved-pids)
   "Build the save-buffer request sexp. When FORK-APPROVED is non-nil,
 include (fork-approved . \"true\") so the server commits any forks it
-finds instead of returning a fork-confirmation. FORK-SOURCES, when
-non-nil, is an alist ((N . SOURCE) ...) pairing each forked node's id
-with the owned source the user chose for its clone; it rides out as the
-field (fork-sources ((N . SOURCE) ...))."
+finds instead of returning a fork-confirmation. FORK-REPOS, when
+non-nil, is an alist ((N . REPO) ...) pairing each forked node's id
+with the owned repo the user chose for its clone; it rides out as the
+field (fork-repos ((N . REPO) ...))."
   (append
    `((request . "save buffer")
      (view-uri . ,view-uri)
@@ -250,8 +250,8 @@ field (fork-sources ((N . SOURCE) ...))."
                      :point-screen-lines-below-window-start))))
    (when fork-approved
      '((fork-approved . "true")))
-   (when fork-sources
-     (list (list 'fork-sources fork-sources)))
+   (when fork-repos
+     (list (list 'fork-repos fork-repos)))
    (when hoist-approved-pids
      `((hoist-approved-pids ,@hoist-approved-pids)))
    (when text-approved-pids
@@ -371,13 +371,13 @@ which would trigger overlay modification-hooks if still present."
         (skg--finish-pending-fork-result save-buffer payload))
     (skg--unlock-all-save-locked)) )
 
-(defconst skg-fork-source-placeholder "PICK-A-SOURCE"
-  "Sentinel source the server pre-fills for a clone-to-be whose source
+(defconst skg-fork-repo-placeholder "PICK-A-REPO"
+  "Sentinel repo the server pre-fills for a clone-to-be whose repo
 the user has not specified (in the saved metadata or a prior round).
-`skg--fork-choose-placeholder-sources' prompts for a replacement per
+`skg--fork-choose-placeholder-repos' prompts for a replacement per
 carrying clone (the user can also set one with C-c s s);
 `skg-approve-fork' refuses while any remains. Must match
-FORK_SOURCE_PLACEHOLDER in server/from_text/fork.rs.")
+FORK_REPO_PLACEHOLDER in server/from_text/fork.rs.")
 
 (defvar-local skg--fork-origin-buffer nil
   "In a fork-confirmation buffer, the source buffer whose save raised the
@@ -483,7 +483,7 @@ Record that buffer and FORK-COUNT on ORIGIN, then kill CONFIRMATION."
   "Handle a `fork-confirmation' LP message: the save edited foreign
 node(s) and was not pre-approved, so NOTHING was committed. Show the
 confirmation buffer (which lists the nodes that would be forked) and,
-interactively, prompt for any clone source not yet specified, then ask
+interactively, prompt for any clone repo not yet specified, then ask
 whether to approve.
 
 Terminal, like `skg--save-result-handler': remove the streaming handlers
@@ -514,8 +514,8 @@ it), end the stream, and unlock."
          ;; The interactive flow below runs OUTSIDE it: a refusal
          ;; (user-error) from `skg-approve-fork' must reach the user,
          ;; not the log -- nesting it here used to swallow the
-         ;; \"pick a source first\" refusal, so approving with a
-         ;; placeholder source silently did nothing.
+         ;; \"pick a repo first\" refusal, so approving with a
+         ;; placeholder repo silently did nothing.
          (condition-case err
              (let* ((response (read payload))
                     (content (cadr (assoc 'content response)))
@@ -530,21 +530,21 @@ it), end the stream, and unlock."
       ;; In batch (tests) the caller drives skg-approve-fork /
       ;; skg-decline-fork directly; interactively, ask now. Quitting
       ;; (C-g) any prompt leaves the confirmation buffer open: set
-      ;; sources with C-c s s and approve with C-c C-c, or decline
+      ;; repos with C-c s s and approve with C-c C-c, or decline
       ;; with C-c C-k.
       (with-current-buffer confirm-buf
-        (skg--fork-choose-placeholder-sources)
+        (skg--fork-choose-placeholder-repos)
         (if (yes-or-no-p "Fork the listed node(s)? ")
             (skg-approve-fork)
           (skg-decline-fork))))))
 
 (defun skg--telescope-hoist-confirmation-handler
-    (save-buffer payload fork-approved fork-sources
+    (save-buffer payload fork-approved fork-repos
                  &optional text-approved-pids)
   "Handle the text-free terminal Hoist challenge for SAVE-BUFFER.
 The server has committed nothing.  On approval, reissue the same save with
 the exact candidate PIDs; on Abort, leave the buffer and every .skg file
-untouched.  FORK-APPROVED and FORK-SOURCES survive if this challenge arose
+untouched.  FORK-APPROVED and FORK-REPOS survive if this challenge arose
 on a retry that had already received fork authority."
   (setq skg-response-handler-map
         (assoc-delete-all 'collateral-view skg-response-handler-map))
@@ -579,7 +579,7 @@ on a retry that had already received fork authority."
           (if (yes-or-no-p prompt)
               (with-current-buffer save-buffer
                 (skg-request-save-buffer
-                 fork-approved fork-sources approved-pids
+                 fork-approved fork-repos approved-pids
                  text-approved-pids))
             (message
              "Hoist aborted; nothing was saved. Repair the .skg sections manually."))))
@@ -588,7 +588,7 @@ on a retry that had already received fork authority."
               "telescope-hoist-confirmation handler error: %S" err))))
 
 (defun skg--save-text-release-confirmation-handler
-    (save-buffer payload fork-approved fork-sources hoist-approved-pids)
+    (save-buffer payload fork-approved fork-repos hoist-approved-pids)
   "Handle a save-rerender text release challenge.
 The filesystem save has succeeded, but the server has not released the
 staged saved/collateral text or changed its open-view registry.  Approval
@@ -618,7 +618,7 @@ unchanged."
           (if (yes-or-no-p prompt)
               (with-current-buffer save-buffer
                 (skg-request-save-buffer
-                 fork-approved fork-sources hoist-approved-pids
+                 fork-approved fork-repos hoist-approved-pids
                  approved-pids))
             (message
              "Save succeeded; protected rerender text remains withheld and buffers are unchanged."))))
@@ -626,22 +626,22 @@ unchanged."
      (skg-log 'error 'save
               "save text-release confirmation handler error: %S" err))))
 
-(defun skg--fork-suggested-source-above-point ()
-  "Return the suggested source named by the comment directly above the
+(defun skg--fork-suggested-repo-above-point ()
+  "Return the suggested repo named by the comment directly above the
 headline at point, or nil. The server writes that comment above each
-clone-to-be whose source the user has not yet specified."
+clone-to-be whose repo the user has not yet specified."
   (save-excursion
     (forward-line -1)
     (when (looking-at
-           "^# Suggested source for the clone below: \\(.+\\)$")
+           "^# Suggested repo for the clone below: \\(.+\\)$")
       (string-trim (match-string 1)))))
 
-(defun skg--fork-choose-placeholder-sources ()
-  "Prompt for an owned source for each clone-to-be still carrying
-`skg-fork-source-placeholder', writing the choice into the buffer.
-The server's suggested source (the comment above the clone) is the
-default; S-left/S-right cycle through the sources you own. A no-op
-when every clone's source is already specified -- notably when the
+(defun skg--fork-choose-placeholder-repos ()
+  "Prompt for an owned repo for each clone-to-be still carrying
+`skg-fork-repo-placeholder', writing the choice into the buffer.
+The server's suggested repo (the comment above the clone) is the
+default; S-left/S-right cycle through the repos you own. A no-op
+when every clone's repo is already specified -- notably when the
 saved metadata itself specified it (the server then omits the
 placeholder), per TODO/fork-fixes.org: no redundant ask."
   (save-excursion
@@ -651,18 +651,18 @@ placeholder), per TODO/fork-fixes.org: no redundant ask."
       (let ((sexp (skg--metadata-sexp-at-point-or-nil)))
         (when (and (= (org-current-level) 1)
                    sexp
-                   (equal (skg--node-source sexp)
-                          skg-fork-source-placeholder))
+                   (equal (skg--node-repo sexp)
+                          skg-fork-repo-placeholder))
           (let* ((title (nth 2 (skg-split-as-stars-metadata-title
                                 (skg-get-current-headline-text))))
-                 (suggested (skg--fork-suggested-source-above-point))
-                 (owned (skg--owned-sources))
+                 (suggested (skg--fork-suggested-repo-above-point))
+                 (owned (skg--owned-repos))
                  (default (or suggested (car owned)))
                  (choice (skg--completing-read-with-cycle
-                          (format "Source for the clone \"%s\" (default %s): "
+                          (format "Repo for the clone \"%s\" (default %s): "
                                   title default)
                           owned nil t nil nil default nil owned)))
-            (skg--change-source-at-point
+            (skg--change-repo-at-point
              (if (string-empty-p choice) default choice)))))
       (forward-line 1))))
 
@@ -670,7 +670,7 @@ placeholder), per TODO/fork-fixes.org: no redundant ask."
   "Show CONTENT in the *SKG Fork Confirmation* buffer, recording
 SAVE-BUFFER as its origin, and return the buffer. The buffer is a
 navigable content view (so id-push / search work). It is editable so
-each clone's source can be set (the handler's minibuffer prompts write
+each clone's repo can be set (the handler's minibuffer prompts write
 into it; C-c s s on a clone-to-be works too), but it is NOT an ordinary
 save target: skg-view-uri is left nil (tripping the nil-view-uri save
 guard) and C-x C-s is rebound to refuse, because a stray normal save of
@@ -710,21 +710,21 @@ its id-less clone-to-be parents would create bare nodes. Only C-c C-c
 
 (defun skg--fork-confirmation-refuse-save ()
   "Refuse an ordinary save of the fork-confirmation buffer.
-Its clone-to-be parents are id-less owned-source nodes; saving them as
+Its clone-to-be parents are id-less owned-repo nodes; saving them as
 ordinary content would create bare nodes. Approve with C-c C-c (commits
 the forks) or decline with C-c C-k."
   (interactive)
   (user-error
    "This is the fork-confirmation buffer; use C-c C-c to approve or C-c C-k to decline"))
 
-(defun skg--fork-sources-from-confirmation-buffer ()
-  "Walk the fork-confirmation buffer; return an alist ((N . SOURCE) ...).
-Each level-1 headline is a clone-to-be carrying (source SOURCE) and no
+(defun skg--fork-repos-from-confirmation-buffer ()
+  "Walk the fork-confirmation buffer; return an alist ((N . REPO) ...).
+Each level-1 headline is a clone-to-be carrying (repo REPO) and no
 id; each of its level-2 children is an original carrying (id N). The
-clone's SOURCE (rotated by the user, or the default) is paired with each
-child's id N -- the key by which the server applies the chosen source."
+clone's REPO (rotated by the user, or the default) is paired with each
+child's id N -- the key by which the server applies the chosen repo."
   (let ((pairs nil)
-        (parent-source nil))
+        (parent-repo nil))
     (save-excursion
       (goto-char (point-min))
       (while (re-search-forward org-heading-regexp nil t)
@@ -735,47 +735,47 @@ child's id N -- the key by which the server applies the chosen source."
            ((= level 1)
             ;; Always rebind on a level-1 headline -- even a
             ;; metadata-less or garbled one -- so it cannot leak a prior
-            ;; clone-to-be's source to a later fork's child.
-            (setq parent-source (and sexp (skg--node-source sexp))))
-           ((and (= level 2) sexp parent-source)
+            ;; clone-to-be's repo to a later fork's child.
+            (setq parent-repo (and sexp (skg--node-repo sexp))))
+           ((and (= level 2) sexp parent-repo)
             (let ((id (skg--node-id sexp)))
               (when id
-                (push (cons id parent-source) pairs))))))
+                (push (cons id parent-repo) pairs))))))
         (forward-line 1)))
     (nreverse pairs)))
 
 (defun skg-approve-fork ()
   "Approve the forks listed in this *SKG Fork Confirmation* buffer:
-extract each clone's chosen source, re-save the originating buffer with
-the forks approved (carrying those sources), and replace the confirmation
+extract each clone's chosen repo, re-save the originating buffer with
+the forks approved (carrying those repos), and replace the confirmation
 pane with a result buffer.  The result changes from \"saving\" to the
 server-confirmed success or failure when the approved save finishes.
 
-Interactively, first prompts for any clone source still at
-`skg-fork-source-placeholder' (as the confirmation handler already did
+Interactively, first prompts for any clone repo still at
+`skg-fork-repo-placeholder' (as the confirmation handler already did
 when the buffer appeared -- this catches placeholders that survived,
 e.g. after quitting those prompts). Refuses if any placeholder remains
-anyway; the confirmation buffer is left open so you can set sources by
+anyway; the confirmation buffer is left open so you can set repos by
 hand (C-c s s)."
   (interactive)
   (unless noninteractive
-    (skg--fork-choose-placeholder-sources))
+    (skg--fork-choose-placeholder-repos))
   (let ((origin skg--fork-origin-buffer)
-        (fork-sources (skg--fork-sources-from-confirmation-buffer)))
+        (fork-repos (skg--fork-repos-from-confirmation-buffer)))
     (unless (buffer-live-p origin)
       (error "The buffer that requested these forks is no longer open"))
     (when (seq-some (lambda (pair)
-                      (string= (cdr pair) skg-fork-source-placeholder))
-                    fork-sources)
+                      (string= (cdr pair) skg-fork-repo-placeholder))
+                    fork-repos)
       (user-error
-       "Pick a source for each clone first: point on a clone-to-be headline, then C-c s s"))
+       "Pick a repo for each clone first: point on a clone-to-be headline, then C-c s s"))
     ;; The atom must survive to the re-save (which commits the fork; the
     ;; server then drops it on re-render), so suppress the kill-hook strip.
     (setq skg--fork-suppress-strip-on-kill t)
     (skg--replace-fork-confirmation-with-result
-     (current-buffer) origin (length fork-sources))
+     (current-buffer) origin (length fork-repos))
     (with-current-buffer origin
-      (skg-request-save-buffer t fork-sources))))
+      (skg-request-save-buffer t fork-repos))))
 
 (defun skg-decline-fork ()
   "Decline the forks; nothing was written. Strip any lingering explicit

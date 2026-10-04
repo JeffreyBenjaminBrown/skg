@@ -33,7 +33,7 @@ use tempfile::TempDir;
 fn test_repo_move_updates_collateral_view_metadata (
 ) -> Result<(), Box<dyn Error>> {
   let test_name : &str =
-    "skg-test-collateral-source-move";
+    "skg-test-collateral-repo-move";
   let temp_dir : TempDir =
     TempDir::new()?;
   copy_dir_all (
@@ -69,9 +69,9 @@ fn test_repo_move_updates_collateral_view_metadata (
         diff_mode_enabled : false,
         open_views        : OpenViews::new (), };
       let uri_1 : ViewUri =
-        ViewUri::ContentView ( "source-move-buffer-1" . to_string() );
+        ViewUri::ContentView ( "repo-move-buffer-1" . to_string() );
       let uri_2 : ViewUri =
-        ViewUri::ContentView ( "source-move-buffer-2" . to_string() );
+        ViewUri::ContentView ( "repo-move-buffer-2" . to_string() );
       views_state . open_views . register_view (
         &graph . load_full (), uri_1 . clone(), viewforest . clone(), &pids );
       views_state . open_views . register_view (
@@ -79,8 +79,8 @@ fn test_repo_move_updates_collateral_view_metadata (
 
       let save_input : String =
         initial_buffer . replace (
-          "(id b) (source public)",
-          "(id b) (source private)" );
+          "(id b) (repo public)",
+          "(id b) (repo private)" );
       let (mut stream, read_end) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       let save_response : SaveResponse =
@@ -123,7 +123,7 @@ fn test_repo_move_updates_collateral_view_metadata (
   assert! (
     buffer_has_repo_for_title (
       &collateral_buffer, "b", "private" ),
-    "collateral view should show b's new source:\n{}",
+    "collateral view should show b's new repo:\n{}",
     collateral_buffer );
 
   cleanup_test_tantivy (
@@ -134,7 +134,7 @@ fn test_repo_move_updates_collateral_view_metadata (
 fn successful_save_consumes_relRepo_edit_request (
 ) -> Result<(), Box<dyn Error>> {
   let test_name : &str =
-    "skg-test-consume-relSource-edit-request";
+    "skg-test-consume-relRepo-edit-request";
   let temp_dir : TempDir = TempDir::new () ?;
   copy_dir_all (
     Path::new ("tests/move_repo/fixtures"), temp_dir . path () ) ?;
@@ -150,8 +150,8 @@ fn successful_save_consumes_relRepo_edit_request (
     let (initial_buffer, _pids, _viewforest) = multi_root_view (
       &config, None, &[ID::new ("a")], false ) ?;
     let save_input : String = initial_buffer . replace (
-      "(id b) (source public)",
-      "(id b) (source public) (editRequest (relSource private))" );
+      "(id b) (repo public)",
+      "(id b) (repo public) (editRequest (relRepo private))" );
     assert_ne! (save_input, initial_buffer,
       "fixture rendering should expose b's active-node metadata");
 
@@ -163,15 +163,15 @@ fn successful_save_consumes_relRepo_edit_request (
       &mut stream, &save_input, &config, &tantivy, &graph, false,
       &Err (String::new ()), &mut views_state ) . await ?;
     assert! (response . errors . is_empty (),
-      "relSource save should succeed: {:?}", response . errors);
+      "relRepo save should succeed: {:?}", response . errors);
     Result::<_, Box<dyn Error>>::Ok (response . saved_view)
   } ) ?;
 
   let b_line : &str = saved . lines ()
     . find (|line| line . contains ("(id b)"))
     . unwrap_or_else (|| panic! ("rerender omitted b:\n{}", saved));
-  assert! (b_line . contains ("(relSource private)"),
-    "the completed relSource remains as display state:\n{}", b_line);
+  assert! (b_line . contains ("(relRepo private)"),
+    "the completed relRepo remains as display state:\n{}", b_line);
   assert! (!saved . contains ("(editRequest"),
     "a successful rerender must not echo consumed edit requests:\n{}", saved);
 
@@ -240,7 +240,7 @@ fn buffer_has_repo_for_title (
   let id_fragment : String =
     format! ("(id {})", title);
   let repo_fragment : String =
-    format! ("(source {})", repo);
+    format! ("(repo {})", repo);
   let title_suffix : String =
     format! (") {}", title);
   buffer . lines() . any ( |line|

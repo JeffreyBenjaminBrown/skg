@@ -90,7 +90,7 @@ end
 print('=== SKG Aliases View Request Integration Test ===')
 
 local expected_with_aliases =
-  '* (skg (node (id test-node) (source main) (affectsParent na)'
+  '* (skg (node (id test-node) (repo main) (affectsParent na)'
   .. ' (rels (aliases 2)))) Test Node\n'
   .. '** (skg aliasFolder)\n'
   .. '*** (skg alias) first alias\n'

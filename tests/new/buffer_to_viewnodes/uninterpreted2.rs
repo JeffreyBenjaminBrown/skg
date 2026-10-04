@@ -121,7 +121,7 @@ fn test_org_to_uninterpreted_nodes2_inactive_placeholder() {
   // an anonymous, dataless, titleless placeholder.
   let input: &str =
     indoc! {"
-            * (skg (inactiveNode (id hidden) (source private) (unstaged newM)))
+            * (skg (inactiveNode (id hidden) (repo private) (unstaged newM)))
         "};
 
   let viewforest: Tree<MpViewnode> =
@@ -209,7 +209,7 @@ fn test_org_to_uninterpreted_nodes2_body_spacing() {
 fn test_org_to_uninterpreted_nodes2_indented_star_is_body_text() {
   let input: &str =
     indoc! {"
-            * (skg (node (id afff132a-e822-46cb-aed4-5725b7d1b0c5) (source public) (affectsParent na))) [#A] pressing*
+            * (skg (node (id afff132a-e822-46cb-aed4-5725b7d1b0c5) (repo public) (affectsParent na))) [#A] pressing*
               * = org-roam transplant first needs
             ** dogfood it
         "};

@@ -241,7 +241,7 @@ fn telescope_shape_is_not_a_duplicate () {
       before: snapshot (vec! []),
       after: snap_after });
   assert! (report . duplicate_ids . is_empty (),
-           "multi-source single-pid claims flagged as duplicates");
+           "multi-repo single-pid claims flagged as duplicates");
   assert! (
     report . buckets . iter ()
       . any ( |bucket| ! bucket . nodes . is_empty () ),
@@ -260,7 +260,7 @@ fn bucket_order_frontloads_problematic_categories () {
       "deleted roots",
       "deleted nodes, not roots",
       "deleted nodes, probably via merger",
-      "modified, moved across sources",
+      "modified, moved across repos",
       "modified, other",
       "new nodes, not roots" ] );
 }
@@ -344,7 +344,7 @@ fn repo_move_uses_its_own_bucket () {
   let move_bucket : &NodeBucket =
     report . buckets . iter ()
       . find ( |bucket| bucket . name ==
-        "modified, moved across sources" )
+        "modified, moved across repos" )
       . unwrap ();
   assert! (
     move_bucket . nodes . iter ()

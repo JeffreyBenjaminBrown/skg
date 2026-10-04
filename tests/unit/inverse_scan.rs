@@ -194,7 +194,7 @@ fn relRepo_gates_deleted_stage_signs () {
       &owner, NodeRelation::OverridesViewOf, &diffs,
       Some (&public_only) );
   assert! ( gated . is_empty (),
-    "a Deleted-stage sign recorded at an inactive source must not \
+    "a Deleted-stage sign recorded at an inactive repo must not \
      surface: {:?}", gated );
   let ungated : HashMap<ID, MembershipAxes> =
     inverse_scan_for_inbound_folder (

@@ -226,7 +226,7 @@ String-literal children of the header are collected into a prefix.
 When any list child fires, the prefix is concatenated (no
 separator) before each of its outputs. When no list child fires
 but the prefix is non-empty, the prefix is emitted alone -- so
-rules like (RED deleted \"DELETED\" (id) (source)) serve as a
+rules like (RED deleted \"DELETED\" (id) (repo)) serve as a
 label for the structure even when their sub-rules are vacuous."
   (let* ((new-color
            (or (alist-get 'color header) current-color))

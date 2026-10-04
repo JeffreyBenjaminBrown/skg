@@ -102,13 +102,13 @@ If there is no active region, do nothing."
       (user-error "Headline has no skg metadata"))
     (read metadata-str)))
 
-(defun skg--current-node-source ()
-  "Return the source string for the ActiveNode headline at point."
+(defun skg--current-node-repo ()
+  "Return the repo string for the ActiveNode headline at point."
   (let* ((sexp (skg--current-headline-metadata-sexp))
-         (source-values (skg-sexp-cdr-at-path sexp '(skg node source))))
-    (unless source-values
-      (user-error "Node has no source"))
-    (format "%s" (car source-values))))
+         (repo-values (skg-sexp-cdr-at-path sexp '(skg node repo))))
+    (unless repo-values
+      (user-error "Node has no repo"))
+    (format "%s" (car repo-values))))
 
 (defun skg--headline-metadata-empty-p ()
   "Return non-nil if the headline at point has no skg metadata."
@@ -119,146 +119,146 @@ If there is no active region, do nothing."
 
 (defun skg--populate-minimal-node-metadata ()
   "Write minimal ActiveNode metadata onto the metadata-less headline at point.
-Prompts for an owned source (no prompt when only one source is owned)
-and inserts (skg (node (source SOURCE))).  Returns the chosen source.
+Prompts for an owned repo (no prompt when only one repo is owned)
+and inserts (skg (node (repo REPO))).  Returns the chosen repo.
 Reuses `skg-edit-metadata-at-point', which formats and spaces the sexp
 correctly relative to the existing title."
-  (let (( source (skg--prompt-for-owned-source) ))
+  (let (( repo (skg--prompt-for-owned-repo) ))
     (skg-edit-metadata-at-point
-     `(skg (node (source ,(intern source)))))
-    source))
+     `(skg (node (repo ,(intern repo)))))
+    repo))
 
-(defun skg-set-source (&optional recursive)
-  "Prompt for and change the source of the node at point.
-Starts with the current source as minibuffer text.  S-left/S-right cycle
-through owned sources, C-? displays all configured sources and
-their paths, and typed source names are accepted directly.
+(defun skg-set-repo (&optional recursive)
+  "Prompt for and change the repo of the node at point.
+Starts with the current repo as minibuffer text.  S-left/S-right cycle
+through owned repos, C-? displays all configured repos and
+their paths, and typed repo names are accepted directly.
 With a prefix argument RECURSIVE, changes every true content
-descendent whose source matches the source at point.
+descendent whose repo matches the repo at point.
 Only descendents for which affectsParent=true are traversed.
 On a headline that has no metadata yet, instead populates it minimally
 via `skg--populate-minimal-node-metadata' (RECURSIVE is then moot).
 
 When the move would leave content relationships stuck at their old,
-more private sources (the sticky rule never lowers an edge's privacy
+more private repos (the sticky rule never lowers an edge's privacy
 without an explicit gesture; see
 TODO/MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org),
 offers to publicize them in the same go by writing
-`(editRequest (relSource ...))' requests; declining leaves them and mentions that
-`skg-set-relSource-recursive' (C-c s R) can publicize them
+`(editRequest (relRepo ...))' requests; declining leaves them and mentions that
+`skg-set-relRepo-recursive' (C-c s R) can publicize them
 later.
 
 Write-protected instances are NOT changed -- the save would silently
-ignore their source edits -- and produce a loud warning, with the
+ignore their repo edits -- and produce a loud warning, with the
 full ID list in *Messages*.
 
 Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive "P")
   (if (skg--headline-metadata-empty-p)
       (skg--populate-minimal-node-metadata)
-    (let* ((current-source (skg--current-node-source))
-           (new-source (string-trim
-                        (skg--prompt-for-source-change current-source))))
-      (unless (string-empty-p new-source)
-        (skg--validate-source-name new-source)
-        (if (string= current-source new-source)
-            (message "Source unchanged: %s" current-source)
-          (skg--set-source-and-handle-stuck-edges
-           current-source new-source recursive))))))
+    (let* ((current-repo (skg--current-node-repo))
+           (new-repo (string-trim
+                        (skg--prompt-for-repo-change current-repo))))
+      (unless (string-empty-p new-repo)
+        (skg--validate-repo-name new-repo)
+        (if (string= current-repo new-repo)
+            (message "Repo unchanged: %s" current-repo)
+          (skg--set-repo-and-handle-stuck-edges
+           current-repo new-repo recursive))))))
 
-(defun skg-set-source-recursive ()
-  "Prompt for and recursively change the source of the node at point.
-This is the recursive form of `skg-set-source': it changes every
-content-descendent whose source matches the source at point.
+(defun skg-set-repo-recursive ()
+  "Prompt for and recursively change the repo of the node at point.
+This is the recursive form of `skg-set-repo': it changes every
+content-descendent whose repo matches the repo at point.
 Only descendents for which affectsParent=true are traversed.
 Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive)
-  (skg-set-source t))
+  (skg-set-repo t))
 
-(defun skg--set-source-and-handle-stuck-edges (old-source new-source recursive)
-  "The body of `skg-set-source' once a real move is requested:
+(defun skg--set-repo-and-handle-stuck-edges (old-repo new-repo recursive)
+  "The body of `skg-set-repo' once a real move is requested:
 analyze which content edges the move would leave stuck at more
-private sources, retarget the sources (skipping write-protected
+private repos, retarget the repos (skipping write-protected
 instances), offer to publicize the stuck edges in the same go, and
 report -- loudly, when write-protected instances were skipped."
-  (let* ((stuck ;; analyzed BEFORE any rewrite: it needs the old sources
-          (skg--analyze-move-stuck-edges old-source new-source recursive))
+  (let* ((stuck ;; analyzed BEFORE any rewrite: it needs the old repos
+          (skg--analyze-move-stuck-edges old-repo new-repo recursive))
          (change-result (if recursive
-                            (skg--change-source-recursive old-source
-                                                          new-source)
-                          (skg--change-source-at-point-unless-write-protected
-                           new-source)))
+                            (skg--change-repo-recursive old-repo
+                                                          new-repo)
+                          (skg--change-repo-at-point-unless-write-protected
+                           new-repo)))
          (changed-count (car change-result))
          (write-protected-ids (cdr change-result))
          (fixed-count
           (when (and stuck
                      (y-or-n-p
-                      (format "This move would leave %d content relationship%s in their old, more private source%s. Publicize them too? "
+                      (format "This move would leave %d content relationship%s in their old, more private repo%s. Publicize them too? "
                               (length stuck)
                               (if (= (length stuck) 1) "" "s")
                               (if (= (length stuck) 1) "" "s"))))
-            (skg--apply-stuck-relSources stuck))))
+            (skg--apply-stuck-relRepos stuck))))
     (dolist (id write-protected-ids)
-      (message "skg-set-source: write-protected instance NOT changed (the save would ignore it): %s"
+      (message "skg-set-repo: write-protected instance NOT changed (the save would ignore it): %s"
                id))
     (message "%s"
              (concat
-              (format "Source changed from %s to %s on %d node%s. Save to apply."
-                      old-source new-source changed-count
+              (format "Repo changed from %s to %s on %d node%s. Save to apply."
+                      old-repo new-repo changed-count
                       (if (= changed-count 1) "" "s"))
               (cond
                (fixed-count
                 (format " Also publicized %d relationship%s."
                         fixed-count (if (= fixed-count 1) "" "s")))
                (stuck
-                " Relationships kept their old, more private sources; C-c s R can publicize them later."))
+                " Relationships kept their old, more private repos; C-c s R can publicize them later."))
               (when write-protected-ids
                 (format "  WARNING: %d write-protected node%s NOT changed -- the save would silently ignore them. See *Messages* for the ID list."
                         (length write-protected-ids)
                         (if (= (length write-protected-ids) 1) "" "s")))))))
 
-(defun skg--analyze-move-stuck-edges (old-source new-source recursive)
-  "With point on the node a `skg-set-source' move starts from, and
-BEFORE any source is rewritten: return the true content edges
-the move would leave stuck in a more private source than their new
-default, as a list of (MARKER . SOURCE) -- MARKER at the child
-headline, SOURCE the edge's new default. Only edges without an
-existing `(relSource ...)' atom qualify: an atom-carrying edge was
-already assigned a deliberate relSource. The walk's root itself is always
+(defun skg--analyze-move-stuck-edges (old-repo new-repo recursive)
+  "With point on the node a `skg-set-repo' move starts from, and
+BEFORE any repo is rewritten: return the true content edges
+the move would leave stuck in a more private repo than their new
+default, as a list of (MARKER . REPO) -- MARKER at the child
+headline, REPO the edge's new default. Only edges without an
+existing `(relRepo ...)' atom qualify: an atom-carrying edge was
+already assigned a deliberate relRepo. The walk's root itself is always
 retargeted (unless write-protected); its org-parent lies outside the
-move, so its source counts as unchanging. With RECURSIVE nil only
+move, so its repo counts as unchanging. With RECURSIVE nil only
 the point node moves, so only its own edge and its direct
 children's edges are examined."
   (save-excursion
     (let* ((stuck '())
            (start-level (org-outline-level))
-           (consider ;; point on a candidate child C, whose inbound edge is examined; the arguments say whether each endpoint's source is about to be retargeted
+           (consider ;; point on a candidate child C, whose inbound edge is examined; the arguments say whether each endpoint's repo is about to be retargeted
             (lambda (parent-retargets-p child-retargets-p)
               (when (skg--relationship-kind-matches-p 'contained)
                 (let* ((child-meta (skg--metadata-sexp-at-point-or-nil))
-                       (child-source (skg--node-source child-meta))
-                       (child-moves ;; a write-protected instance is skipped by the retargeting walk, so its source does not actually change
+                       (child-repo (skg--node-repo child-meta))
+                       (child-moves ;; a write-protected instance is skipped by the retargeting walk, so its repo does not actually change
                         (and child-retargets-p
                              (not (skg--node-write-protected-p child-meta))))
-                       (parent-source
+                       (parent-repo
                         (save-excursion
                           (org-up-heading-safe)
-                          (skg--node-source
+                          (skg--node-repo
                            (skg--metadata-sexp-at-point-or-nil))))
-                       (eff (lambda (source retargets-p)
+                       (eff (lambda (repo retargets-p)
                               (if (and retargets-p
-                                       (equal source old-source))
-                                  new-source
-                                source)))
-                       (source (skg--content-edge-stuck-source
-                               parent-source
-                               (funcall eff parent-source
+                                       (equal repo old-repo))
+                                  new-repo
+                                repo)))
+                       (repo (skg--content-edge-stuck-repo
+                               parent-repo
+                               (funcall eff parent-repo
                                         parent-retargets-p)
-                               child-source
-                               (funcall eff child-source child-moves))))
-                  (when source
+                               child-repo
+                               (funcall eff child-repo child-moves))))
+                  (when repo
                     (push (cons (copy-marker (line-beginning-position))
-                                source)
+                                repo)
                           stuck)))))))
       (funcall consider nil t) ;; the root's own inbound edge
       (outline-next-heading)
@@ -277,77 +277,77 @@ children's edges are examined."
             (outline-next-heading))))
       (nreverse stuck))))
 
-(defun skg--content-edge-stuck-source (parent-eff-old parent-eff-new
+(defun skg--content-edge-stuck-repo (parent-eff-old parent-eff-new
                                       child-eff-old child-eff-new)
-  "The source to which the content edge at point (from its view-parent
-to the headline at point) should be publicized after a source move,
+  "The repo to which the content edge at point (from its view-parent
+to the headline at point) should be publicized after a repo move,
 or nil when the move does not strand it: nil when the edge carries
-an explicit `(editRequest (relSource ...))' request (deliberately
-sourced), when a
-default cannot be computed (a source unknown to the config -- the
+an explicit `(editRequest (relRepo ...))' request (deliberately
+repo-specified), when a
+default cannot be computed (a repo unknown to the config -- the
 save validates anyway), or when the edge's default does not become
-more public. The four arguments are the endpoints' sources before
+more public. The four arguments are the endpoints' repos before
 and after the move."
-  (unless (skg--relSource-requested-value)
-    (let ((old-default (skg--more-private-of-sources
+  (unless (skg--relRepo-requested-value)
+    (let ((old-default (skg--more-private-of-repos
                         parent-eff-old child-eff-old))
-          (new-default (skg--more-private-of-sources
+          (new-default (skg--more-private-of-repos
                         parent-eff-new child-eff-new)))
       (when (and old-default new-default
-                 (skg--strictly-more-public-source-p new-default
+                 (skg--strictly-more-public-repo-p new-default
                                                      old-default))
         new-default))))
 
-(defun skg--apply-stuck-relSources (stuck)
-  "Write a relSource request at each (MARKER . SOURCE) in
+(defun skg--apply-stuck-relRepos (stuck)
+  "Write a relRepo request at each (MARKER . REPO) in
 STUCK, then free the markers. Returns the number of requests written."
   (save-excursion
     (dolist (entry stuck)
       (goto-char (car entry))
-      (skg--apply-relSource-choice (cdr entry))
+      (skg--apply-relRepo-choice (cdr entry))
       (set-marker (car entry) nil))
     (length stuck)))
 
-(defun skg--change-source-at-point-unless-write-protected (new-source)
-  "Set the source at point to NEW-SOURCE, unless the instance is
+(defun skg--change-repo-at-point-unless-write-protected (new-repo)
+  "Set the repo at point to NEW-REPO, unless the instance is
 write-protected -- the save would silently ignore that edit. Returns
-(CHANGED-COUNT . WRITE-PROTECTED-IDS), matching `skg--change-source-recursive'."
+(CHANGED-COUNT . WRITE-PROTECTED-IDS), matching `skg--change-repo-recursive'."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (if (skg--node-write-protected-p meta)
         (cons 0 (list (or (skg--node-id meta) "(no id)")))
-      (cons (skg--change-source-at-point new-source) nil))))
+      (cons (skg--change-repo-at-point new-repo) nil))))
 
-(defun skg--more-private-of-sources (a b)
-  "The more private of sources A and B per the config's privacy
+(defun skg--more-private-of-repos (a b)
+  "The more private of repos A and B per the config's privacy
 order (later in the ladder = more private), or nil when either
-names no configured source."
-  (let ((pa (skg--source-privacy-position a))
-        (pb (skg--source-privacy-position b)))
+names no configured repo."
+  (let ((pa (skg--repo-privacy-position a))
+        (pb (skg--repo-privacy-position b)))
     (when (and pa pb)
       (if (> pa pb) a b))))
 
-(defun skg--strictly-more-public-source-p (a b)
-  "Non-nil iff source A is strictly more public than source B per
+(defun skg--strictly-more-public-repo-p (a b)
+  "Non-nil iff repo A is strictly more public than repo B per
 the config's privacy order. Nil when either is unknown."
-  (let ((pa (skg--source-privacy-position a))
-        (pb (skg--source-privacy-position b)))
+  (let ((pa (skg--repo-privacy-position a))
+        (pb (skg--repo-privacy-position b)))
     (and pa pb (< pa pb))))
 
-(defun skg--source-privacy-position (source)
-  "SOURCE's index in the config's privacy order (0 = most public),
-or nil when SOURCE is nil or names no configured source."
-  (and source
-       (seq-position (skg--source-names) source #'string=)))
+(defun skg--repo-privacy-position (repo)
+  "REPO's index in the config's privacy order (0 = most public),
+or nil when REPO is nil or names no configured repo."
+  (and repo
+       (seq-position (skg--repo-names) repo #'string=)))
 
-(defconst skg--relSource-unsupported-folder-atoms
+(defconst skg--relRepo-unsupported-folder-atoms
   '(subscriberFolder overriderFolder hiderFolder hiddenFolder
     hiddenInSubscribeeFolder hiddenOutsideOfSubscribeeFolder)
-  "The PartnerFolder scaffold atoms where an explicit relSource
+  "The PartnerFolder scaffold atoms where an explicit relRepo
 request is unsupported from this side.  HiddenOutside membership is
-editable as a derived filter, but hide sources are still derived and
+editable as a derived filter, but hide repos are still derived and
 cannot carry this request.
-`skg-set-relSource' refuses on a member of one of these:
-the edge belongs to the other end, so setting its source here would
+`skg-set-relRepo' refuses on a member of one of these:
+the edge belongs to the other end, so setting its repo here would
 be meaningless.")
 
 (defconst skg--writable-folder-relations
@@ -387,10 +387,10 @@ member of a read-only folder, or with an ID missing."
              (and (consp parent-sexp)
                   (seq-find (lambda (atom)
                               (memq atom (cdr parent-sexp)))
-                            skg--relSource-unsupported-folder-atoms))))
+                            skg--relRepo-unsupported-folder-atoms))))
         (when readonly-atom
           (user-error
-           "Cannot set the relationship's source from this read-only %s position"
+           "Cannot set the relationship's repo from this read-only %s position"
            readonly-atom)))
       (let ((writable-folder
              (and (consp parent-sexp)
@@ -420,29 +420,29 @@ member of a read-only folder, or with an ID missing."
          (t (user-error
              "The parent headline is neither a node nor a writable folder")))))))
 
-(defun skg--relSource-current-value ()
-  "Return the displayed `(relSource NAME)' fact at point, if any."
+(defun skg--relRepo-current-value ()
+  "Return the displayed `(relRepo NAME)' fact at point, if any."
   (let* ((metadata (or (skg--metadata-sexp-at-point-or-nil) '(skg)))
          (alias-p (memq 'alias (cdr metadata)))
          (unknown-p (skg--unknown-headline-p metadata))
          (values (skg-sexp-cdr-at-path
                   metadata
-                  (cond (alias-p '(skg relSource))
-                        (unknown-p '(skg unknown viewStats relSource))
-                        (t '(skg node viewStats relSource))))))
+                  (cond (alias-p '(skg relRepo))
+                        (unknown-p '(skg unknown viewStats relRepo))
+                        (t '(skg node viewStats relRepo))))))
     (when values
       (format "%s" (car values)))))
 
-(defun skg--relSource-requested-value ()
-  "Return the pending `(editRequest (relSource NAME))' value at point."
+(defun skg--relRepo-requested-value ()
+  "Return the pending `(editRequest (relRepo NAME))' value at point."
   (let* ((metadata (or (skg--metadata-sexp-at-point-or-nil) '(skg)))
          (alias-p (memq 'alias (cdr metadata)))
          (unknown-p (skg--unknown-headline-p metadata))
          (values (skg-sexp-cdr-at-path
                   metadata
-                  (cond (alias-p '(skg editRequest relSource))
-                        (unknown-p '(skg unknown editRequest relSource))
-                        (t '(skg node editRequest relSource))))))
+                  (cond (alias-p '(skg editRequest relRepo))
+                        (unknown-p '(skg unknown editRequest relRepo))
+                        (t '(skg node editRequest relRepo))))))
     (when values
       (format "%s" (car values)))))
 
@@ -453,7 +453,7 @@ member of a read-only folder, or with an ID missing."
                  '(skg node editRequest))))
     (and values
          (not (and (consp (car values))
-                   (eq (caar values) 'relSource))))))
+                   (eq (caar values) 'relRepo))))))
 
 (defun skg--alias-headline-p ()
   "Return non-nil when point is on an alias scaffold headline."
@@ -461,32 +461,32 @@ member of a read-only folder, or with an ID missing."
        (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
          (and metadata (memq 'alias (cdr metadata))))))
 
-(defun skg--relSource-choices (ladder default)
-  "The source-name menu for `skg-set-relSource': the tail
-of LADDER (the configured sources, most public first) starting at
-DEFAULT -- exactly the sources the save's default floor can accept.
+(defun skg--relRepo-choices (ladder default)
+  "The repo-name menu for `skg-set-relRepo': the tail
+of LADDER (the configured repos, most public first) starting at
+DEFAULT -- exactly the repos the save's default floor can accept.
 When DEFAULT is nil or na from LADDER, the whole LADDER (the
 server's save-time floor check backstops any stale offer)."
   (or (and default (member default ladder))
       ladder))
 
-(defconst skg--relSource-no-override
+(defconst skg--relRepo-no-override
   "(no override: follow sticky-else-default)"
-  "The menu entry that REMOVES the pending `(editRequest (relSource ...))' request instead of
-setting one. For an edge already on disk this means the SAVED source
+  "The menu entry that REMOVES the pending `(editRequest (relRepo ...))' request instead of
+setting one. For an edge already on disk this means the SAVED repo
 survives (sticky); it does NOT mean \"reset to the default\". To
-lower an edge's privacy to its default, choose the default relSource
+lower an edge's privacy to its default, choose the default relRepo
 explicitly.")
 
-(defun skg--apply-relSource-choice (choice)
-  "Apply CHOICE -- a source name, or
-`skg--relSource-no-override' -- to the headline at point.
+(defun skg--apply-relRepo-choice (choice)
+  "Apply CHOICE -- a repo name, or
+`skg--relRepo-no-override' -- to the headline at point.
 Edits only the buffer; returns a message string describing what the
 next save will do with the edge."
   (when (skg--node-edit-request-at-point-p)
-    (user-error "Cannot request a relSource where delete or merge is pending"))
-  (if (equal choice skg--relSource-no-override)
-      (if (skg--relSource-requested-value)
+    (user-error "Cannot request a relRepo where delete or merge is pending"))
+  (if (equal choice skg--relRepo-no-override)
+      (if (skg--relRepo-requested-value)
           (progn
             (cond
              ((skg--alias-headline-p)
@@ -500,23 +500,23 @@ next save will do with the edge."
               ;; The display fact stays under viewStats; only the request goes.
               (skg-edit-metadata-at-point
                '(skg (node (DELETE (editRequest)))))))
-            "Override removed: on save the member keeps its saved (sticky) source, or its default if new. Save to apply.")
+            "Override removed: on save the member keeps its saved (sticky) repo, or its default if new. Save to apply.")
         "No override present; nothing to remove.")
     (progn
       (cond
        ((skg--alias-headline-p)
         (skg-edit-metadata-at-point
-         `(skg (ENSURE (editRequest (relSource ,(intern choice)))))))
+         `(skg (ENSURE (editRequest (relRepo ,(intern choice)))))))
         ((skg--unknown-headline-p
          (skg--metadata-sexp-at-point-or-nil))
         (skg-edit-metadata-at-point
-         `(skg (unknown (ENSURE (editRequest (relSource ,(intern choice))))))))
+         `(skg (unknown (ENSURE (editRequest (relRepo ,(intern choice))))))))
        (t
-        ;; The display fact remains under viewStats; source intent is separate.
+        ;; The display fact remains under viewStats; repo intent is separate.
         (skg-edit-metadata-at-point '(skg (node (editRequest))))
         (skg-edit-metadata-at-point
-         `(skg (node (editRequest (ENSURE (relSource ,(intern choice)))))))))
-      (format "relSource set to '%s'. Save to apply."
+         `(skg (node (editRequest (ENSURE (relRepo ,(intern choice)))))))))
+      (format "relRepo set to '%s'. Save to apply."
               choice))))
 
 (defconst skg--relationship-kind-menu-tree
@@ -524,29 +524,29 @@ next save will do with the edge."
      ("container" nil
       "The node would CONTAIN its view-parent -- the shape of a containerward ancestry graft. The edge belongs to the graft's own contains list, wherever that list is drawn definitively; it cannot be set from the graft's position.")
      ("contained" contained
-      "The view-parent contains the node: ordinary content. Sets the source of each parent-contains-child edge."))
+      "The view-parent contains the node: ordinary content. Sets the repo of each parent-contains-child edge."))
     ("links_to"
      ("mentioner" nil
-      "Links are inferred from body text; they carry no false relSource, so there is nothing to set.")
+      "Links are inferred from body text; they carry no false relRepo, so there is nothing to set.")
      ("mentioned" nil
-      "Links are inferred from body text; they carry no false relSource, so there is nothing to set."))
+      "Links are inferred from body text; they carry no false relRepo, so there is nothing to set."))
     ("subscribes_to"
      ("subscriber" nil
       "A subscriberFolder member: the subscribes edge belongs to the member (the subscriber), not to the view-parent. Read-only from here.")
      ("subscribee" subscribee
-      "A member of the view-parent's subscribeeFolder. Sets the source of each anchor-subscribes-to-member edge."))
+      "A member of the view-parent's subscribeeFolder. Sets the repo of each anchor-subscribes-to-member edge."))
     ("hides_from_its_subscriptions"
      ("hider" nil
-      "Hide sources are derived at save, floored at the most public explaining subscription; the hiderFolder is read-only.")
+      "Hide repos are derived at save, floored at the most public explaining subscription; the hiderFolder is read-only.")
      ("hidden" nil
-      "Hide sources are derived at save, floored at the most public explaining subscription; the hiddenFolder is read-only."))
+      "Hide repos are derived at save, floored at the most public explaining subscription; the hiddenFolder is read-only."))
     ("overrides_view_of"
      ("overrider" nil
       "An overriderFolder member: the overrides edge belongs to the member (the overrider), not to the view-parent. Read-only from here.")
      ("overridden" overridden
-      "A member of the view-parent's overriddenFolder. Sets the source of each anchor-overrides-view-of-member edge.")))
+      "A member of the view-parent's overriddenFolder. Sets the repo of each anchor-overrides-view-of-member edge.")))
   "The relationship-kind menu for
-`skg-set-relSource-recursive': one entry per node-node
+`skg-set-relRepo-recursive': one entry per node-node
 relation in docs/data-model_technical.org, each listing its two roles as
 (ROLE-NAME KIND-OR-NIL DESCRIPTION). ROLE-NAME is the role the
 VIEW-CHILD would play toward its view-parent. KIND-OR-NIL is the
@@ -559,8 +559,8 @@ explains why the edge cannot be set from that position.")
   "The continuation `skg--select-relationship-kind' stores in its
 menu buffer, called with the chosen kind symbol.")
 
-(defun skg-set-relSource-recursive ()
-  "Set the relSource of every matching relationship edge in the
+(defun skg-set-relRepo-recursive ()
+  "Set the relRepo of every matching relationship edge in the
 subtree at point.
 
 First presents an org-menu of the schema's five node-node relations
@@ -571,11 +571,11 @@ position: `contained' (ordinary content), `subscribee' (a
 subscribeeFolder member) and `overridden' (an overriddenFolder member);
 RET on any other role explains why it cannot be set from there.
 
-Then prompts for a source over the whole ladder, plus the
-no-override choice that instead REMOVES existing `(relSource ...)'
-atoms. Unlike `skg-set-relSource', no per-edge default is
+Then prompts for a repo over the whole ladder, plus the
+no-override choice that instead REMOVES existing `(relRepo ...)'
+atoms. Unlike `skg-set-relRepo', no per-edge default is
 fetched: the subtree's edges have different defaults, so the save's
-floor check (see `apply_sticky_relSources') is what validates each one.
+floor check (see `apply_sticky_relRepos') is what validates each one.
 
 The walk starts at the node at point (inclusive: its own edge to
 its view-parent counts when it matches) and recurses only on
@@ -595,25 +595,25 @@ NOT save. Call `skg-request-save-buffer' afterward."
     (skg--select-relationship-kind
      (lambda (kind)
        (unless (buffer-live-p buffer)
-         (user-error "skg: buffer vanished before the relSource prompt"))
+         (user-error "skg: buffer vanished before the relRepo prompt"))
        (with-current-buffer buffer
          (save-excursion
            (goto-char marker)
-           (let* ((ladder (skg--source-names))
+           (let* ((ladder (skg--repo-names))
                   (choices (append ladder
-                                   (list skg--relSource-no-override)))
+                                   (list skg--relRepo-no-override)))
                   (choice (skg--completing-read-with-cycle
-                           (format "Source for every '%s' edge in the subtree (S-left/right cycle; the save validates each edge's floor): "
+                           (format "Repo for every '%s' edge in the subtree (S-left/right cycle; the save validates each edge's floor): "
                                    kind)
                            choices nil t nil nil nil nil choices))
-                  (count (skg--set-relSource-recursive-walk
+                  (count (skg--set-relRepo-recursive-walk
                           kind choice)))
              (message "%s"
                       (if (equal choice
-                                 skg--relSource-no-override)
-                          (format "Override removed on %d '%s' edge%s: on save each keeps its saved (sticky) source, or its default if new. Save to apply."
+                                 skg--relRepo-no-override)
+                          (format "Override removed on %d '%s' edge%s: on save each keeps its saved (sticky) repo, or its default if new. Save to apply."
                                   count kind (if (= count 1) "" "s"))
-                        (format "relSource set to '%s' on %d '%s' edge%s. Save to apply."
+                        (format "relRepo set to '%s' on %d '%s' edge%s. Save to apply."
                                 choice count kind
                                 (if (= count 1) "" "s")))))))))))
 
@@ -676,9 +676,9 @@ explains the refusal; q aborts."
         (kill-buffer))
       (funcall continuation kind)))))
 
-(defun skg--set-relSource-recursive-walk (kind choice)
-  "Apply CHOICE (a source name, or
-`skg--relSource-no-override') to every headline in the
+(defun skg--set-relRepo-recursive-walk (kind choice)
+  "Apply CHOICE (a repo name, or
+`skg--relRepo-no-override') to every headline in the
 subtree at point, the headline at point included, whose relationship
 to its view-parent is of KIND (`contained', `subscribee' or
 `overridden'; see `skg--relationship-kind-matches-p'). Recurses only
@@ -687,22 +687,22 @@ nodes and subscribee-as-such members, prunes non-true
 (affectsParent=false) nodes -- except the walk's root, which the
 user chose deliberately -- and prunes scaffolds other than the two
 writable folders. Returns the number of edges true."
-  (let ((targets (skg--relSource-recursive-targets kind)))
+  (let ((targets (skg--relRepo-recursive-targets kind)))
     ;; Do not let a late conflict leave earlier targets edited.  This
     ;; preflight is deliberately before the first metadata rewrite.
     (dolist (marker targets)
       (save-excursion
         (goto-char marker)
         (when (skg--node-edit-request-at-point-p)
-          (user-error "Cannot request a relSource where delete or merge is pending"))))
+          (user-error "Cannot request a relRepo where delete or merge is pending"))))
     (dolist (marker targets)
       (save-excursion
         (goto-char marker)
-        (skg--apply-relSource-choice choice))
+        (skg--apply-relRepo-choice choice))
       (set-marker marker nil))
     (length targets)))
 
-(defun skg--relSource-recursive-targets (kind)
+(defun skg--relRepo-recursive-targets (kind)
   "Return markers for the writable relationship targets below point.
 The traversal mirrors the extraction-aware walk used by the recursive
 command, but does not edit anything."
@@ -713,7 +713,7 @@ command, but does not edit anything."
       (when (skg--relationship-kind-matches-p kind)
         (push (copy-marker (line-beginning-position)) targets))
       (when (or (and (skg--activeNode-sexp-p root-meta)
-                     (not (skg--relSource-prune-below-p root-meta)))
+                     (not (skg--relRepo-prune-below-p root-meta)))
                 (skg--writable-folder-sexp-p root-meta))
         (outline-next-heading)
         (while (and (not (eobp))
@@ -725,7 +725,7 @@ command, but does not edit anything."
                   (skg--goto-next-heading-after-subtree)
                 (when (skg--relationship-kind-matches-p kind)
                   (push (copy-marker (line-beginning-position)) targets))
-                (if (skg--relSource-prune-below-p meta)
+                (if (skg--relRepo-prune-below-p meta)
                     (skg--goto-next-heading-after-subtree)
                   (outline-next-heading))))
              ((skg--unknown-headline-p meta)
@@ -744,7 +744,7 @@ relationship to its view-parent is of KIND, writable-and-collected
 from this position: for `contained', the view-parent must be a
 definitive activeNode not in subscribee-as-such position (an
 write-protected or subscribee-as-such parent's contains is not
-collected at save, so a relSource request under one would be
+collected at save, so a relRepo request under one would be
 inert); for `subscribee' and `overridden', the view-parent must be
 the matching writable folder with a definitive anchor."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
@@ -769,7 +769,7 @@ the matching writable folder with a definitive anchor."
                          (skg--folder-anchor-definitive-p)))
                    (t nil))))))))
 
-(defun skg--relSource-prune-below-p (metadata-sexp)
+(defun skg--relRepo-prune-below-p (metadata-sexp)
   "Non-nil iff the walk should not descend below the activeNode
 headline at point (with METADATA-SEXP its parsed metadata): an
 write-protected node's contains is not collected at save, and a
@@ -852,21 +852,21 @@ Does NOT save; call `skg-request-save-buffer' afterward."
         (match-string 1 trimmed)
       trimmed)))
 
-(defun skg--validate-source-name (source)
-  "Signal an error if SOURCE cannot be represented in skg metadata."
-  (when (string-match-p "[[:space:]]" source)
-    (user-error "Source names cannot contain whitespace")))
+(defun skg--validate-repo-name (repo)
+  "Signal an error if REPO cannot be represented in skg metadata."
+  (when (string-match-p "[[:space:]]" repo)
+    (user-error "Repo names cannot contain whitespace")))
 
-(defun skg--change-source-recursive (old-source new-source)
-  "Change OLD-SOURCE to NEW-SOURCE in this content subtree.
+(defun skg--change-repo-recursive (old-repo new-repo)
+  "Change OLD-REPO to NEW-REPO in this content subtree.
 Returns (CHANGED-COUNT . WRITE-PROTECTED-IDS).  The root node is inclusive;
 only descendents for which affectsParent=true are traversed.
 A write-protected instance is NOT edited -- the save would silently
-ignore its source edit (see TODO/problems.org, \"skg-set-source
+ignore its repo edit (see TODO/problems.org, \"skg-set-repo
 silently no-ops on write-protected instances\") -- and its ID is
 collected into WRITE-PROTECTED-IDS instead, for the caller to warn about.
 Its org-descendents are still traversed: they are self-writers, so
-their source edits take effect even under a write-protected parent."
+their repo edits take effect even under a write-protected parent."
   (save-excursion
     (let* ((changed-count 0)
            (write-protected-ids '())
@@ -879,7 +879,7 @@ their source edits take effect even under a write-protected parent."
                           write-protected-ids)
                   (setq changed-count
                         (+ changed-count
-                           (skg--change-source-at-point new-source))))))))
+                           (skg--change-repo-at-point new-repo))))))))
       (funcall change-or-collect) ;; the root
       (outline-next-heading)
       (while (and (not (eobp))
@@ -888,7 +888,7 @@ their source edits take effect even under a write-protected parent."
           (if (not (and (skg--activeNode-sexp-p metadata-sexp)
                         (skg--node-affectsParent-content-of-p metadata-sexp)))
               (skg--goto-next-heading-after-subtree)
-            (when (equal (skg--node-source metadata-sexp) old-source)
+            (when (equal (skg--node-repo metadata-sexp) old-repo)
               (funcall change-or-collect))
             (outline-next-heading))))
       (cons changed-count (nreverse write-protected-ids)))))
@@ -923,12 +923,12 @@ their source edits take effect even under a write-protected parent."
     (or (not affectsParent-values)
         (eq (car affectsParent-values) 'true))))
 
-(defun skg--node-source (metadata-sexp)
-  "Return METADATA-SEXP's node source as a string, or nil."
-  (let ((source-values (skg-sexp-cdr-at-path metadata-sexp
-                                             '(skg node source))))
-    (when source-values
-      (format "%s" (car source-values)))))
+(defun skg--node-repo (metadata-sexp)
+  "Return METADATA-SEXP's node repo as a string, or nil."
+  (let ((repo-values (skg-sexp-cdr-at-path metadata-sexp
+                                             '(skg node repo))))
+    (when repo-values
+      (format "%s" (car repo-values)))))
 
 (defun skg--node-id (metadata-sexp)
   "Return METADATA-SEXP's node ID as a string, or nil."
@@ -954,17 +954,17 @@ their source edits take effect even under a write-protected parent."
   "Return non-nil if METADATA-SEXP has the bare ActiveNode writeProtected marker."
   (skg-sexp-subtree-p metadata-sexp '(skg (node writeProtected))))
 
-(defun skg--change-source-at-point (new-source)
-  "Set the source at point to NEW-SOURCE.
+(defun skg--change-repo-at-point (new-repo)
+  "Set the repo at point to NEW-REPO.
 Returns 1 if the current line was edited."
   (skg-edit-metadata-at-point
-   `(skg (node (ENSURE (source ,(intern new-source)))
+   `(skg (node (ENSURE (repo ,(intern new-repo)))
                (viewStats))))
   (skg-edit-metadata-at-point
    `(skg (node (viewStats
                 (ENSURE
-                 (sourceHerald ,(intern
-                                  (format "⌂:%s" new-source))))))))
+                 (homeRepoHerald ,(intern
+                                  (format "⌂:%s" new-repo))))))))
   1)
 
 (defun skg-parse-headline-metadata (headline-text)

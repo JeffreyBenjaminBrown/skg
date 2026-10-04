@@ -166,7 +166,7 @@ fn intruder_with_child (
   let stars : usize =
     member_line . chars () . take_while ( |c| *c == '*' ) . count ();
   let line : String = format! (
-    "{} (skg (node (id {}) (source public))) {}",
+    "{} (skg (node (id {}) (repo public))) {}",
     "*" . repeat (stars), intruder_id, intruder_id );
   let child : String =
     format! ( "{} {}-child", "*" . repeat (stars + 1), intruder_id );
@@ -383,7 +383,7 @@ async fn path_request_scenarios (
 ) -> Result<(), Box<dyn Error>> {
   let req = | owner : &str, role : &str, title : &str | -> String {
     format! (
-      "* (skg (node (id {}) (source public) (viewRequests (path {})))) {}\n",
+      "* (skg (node (id {}) (repo public) (viewRequests (path {})))) {}\n",
       owner, role, title ) };
   // Each row: (scenario, owner, role, partner-id, birth-span-fragment).
   // Since uniform-heralds, the grafted partner no longer carries the
@@ -470,7 +470,7 @@ async fn folder_request_scenarios (
 ) -> Result<(), Box<dyn Error>> {
   let request_buf = | owner : &str, rel : &str | -> String {
     format! (
-      "* (skg (node (id {}) (source public) (viewRequests (folder {})))) {}\n",
+      "* (skg (node (id {}) (repo public) (viewRequests (folder {})))) {}\n",
       owner, rel, owner ) };
   { // (folder overrides_view_of) on wSub-owner, which overrides nothing and is
     // overridden by nothing: the WRITABLE overriddenFolder appears EMPTY
@@ -534,7 +534,7 @@ async fn saveplan_nodes (
 
 /// A fresh write-protected public member line at the given indentation.
 fn member_line ( stars : usize, id : &str ) -> String {
-  format! ( "{} (skg (node (id {}) (source public) writeProtected)) {}",
+  format! ( "{} (skg (node (id {}) (repo public) writeProtected)) {}",
             "*" . repeat (stars), id, id ) }
 
 fn folder_member_stars ( buf : &str, any_member_fragment : &str ) -> usize {
@@ -752,9 +752,9 @@ fn buffer_save_rejects_second_user_owned_overrider
       // mono-r1 already overrides mono-target on disk; this buffer
       // makes mono-r2 override it too.
       let buffer : &str = indoc! {"
-        * (skg (node (id mono-r2) (source public))) mono-r2
+        * (skg (node (id mono-r2) (repo public))) mono-r2
         ** (skg overriddenFolder)
-        *** (skg (node (id mono-target) (source public) writeProtected)) mono-target
+        *** (skg (node (id mono-target) (repo public) writeProtected)) mono-target
       "};
       let result : Result<SaveResponse, Box<dyn Error>> =
         save (buffer, config, tantivy, &graph) . await;

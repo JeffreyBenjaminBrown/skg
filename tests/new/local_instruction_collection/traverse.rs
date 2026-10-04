@@ -45,18 +45,18 @@ fn entry<'a> (
 fn ordinary_definitive_emissions () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id root) (source main) (editRequest (property noSearchMatching true)))) root
+      * (skg (node (id root) (repo main) (editRequest (property noSearchMatching true)))) root
       Root body
-      ** (skg (node (id child) (source main))) child
-      ** (skg (node (id independent) (source main) (affectsParent false))) independent
+      ** (skg (node (id child) (repo main))) child
+      ** (skg (node (id independent) (repo main) (affectsParent false))) independent
       ** (skg aliasFolder) aliases
       *** (skg alias) nickname
       ** (skg subscribeeFolder)
-      *** (skg (node (id s) (source main) writeProtected)) s
+      *** (skg (node (id s) (repo main) writeProtected)) s
       ** (skg overriddenFolder)
-      *** (skg (node (id o) (source main) writeProtected)) o
-      * (skg (node (id doomed) (source main) (editRequest delete))) doomed
-      * (skg (node (id acquirer) (source main) (editRequest (merge acquiree)))) acquirer
+      *** (skg (node (id o) (repo main) writeProtected)) o
+      * (skg (node (id doomed) (repo main) (editRequest delete))) doomed
+      * (skg (node (id acquirer) (repo main) (editRequest (merge acquiree)))) acquirer
       "} );
   { let root : &IntentsForOneId = entry (&collected, "root");
     assert_eq!( root . title_and_body,
@@ -90,13 +90,13 @@ fn ordinary_definitive_emissions () {
 fn subscribee_as_such_emits_claim_and_visibility () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id subscriber) (source main))) subscriber
+      * (skg (node (id subscriber) (repo main))) subscriber
       ** (skg subscribeeFolder)
-      *** (skg (node (id e) (source main))) e
+      *** (skg (node (id e) (repo main))) e
       Subscribee body
-      **** (skg (node (id visible) (source main))) visible
-      **** (skg (node (id parked) (source main) (affectsParent false))) parked
-      **** (skg (node (id leaving) (source main) (editRequest delete))) leaving
+      **** (skg (node (id visible) (repo main))) visible
+      **** (skg (node (id parked) (repo main) (affectsParent false))) parked
+      **** (skg (node (id leaving) (repo main) (editRequest delete))) leaving
       "} );
   { let e : &IntentsForOneId = entry (&collected, "e");
     // The subscribee-as-such emits no Set* intents, only a text
@@ -127,9 +127,9 @@ fn aliasfolder_under_subscribee_as_such_emits_nothing () {
   // would write the subscribee's aliases.
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id subscriber) (source main))) subscriber
+      * (skg (node (id subscriber) (repo main))) subscriber
       ** (skg subscribeeFolder)
-      *** (skg (node (id e) (source main))) e
+      *** (skg (node (id e) (repo main))) e
       **** (skg aliasFolder) aliases
       ***** (skg alias) sneaky alias
       "} );
@@ -139,16 +139,16 @@ fn aliasfolder_under_subscribee_as_such_emits_nothing () {
 fn folders_under_toDelete_or_writeProtected_owners_emit_nothing () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id doomed) (source main) (editRequest delete))) doomed
+      * (skg (node (id doomed) (repo main) (editRequest delete))) doomed
       ** (skg aliasFolder) aliases
       *** (skg alias) dead alias
       ** (skg subscribeeFolder)
-      *** (skg (node (id s) (source main) writeProtected)) s
-      * (skg (node (id ghost) (source main) writeProtected)) ghost
+      *** (skg (node (id s) (repo main) writeProtected)) s
+      * (skg (node (id ghost) (repo main) writeProtected)) ghost
       ** (skg aliasFolder) aliases
       *** (skg alias) ghost alias
       ** (skg overriddenFolder)
-      *** (skg (node (id o) (source main) writeProtected)) o
+      *** (skg (node (id o) (repo main) writeProtected)) o
       "} );
   { let doomed : &IntentsForOneId = entry (&collected, "doomed");
     assert!( doomed . delete );
@@ -161,11 +161,11 @@ fn folders_under_toDelete_or_writeProtected_owners_emit_nothing () {
 fn definitive_member_of_readonly_folder_emits_for_itself_only () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id owner) (source main))) owner
+      * (skg (node (id owner) (repo main))) owner
       ** (skg subscriberFolder)
-      *** (skg (node (id intruder) (source main))) intruder
+      *** (skg (node (id intruder) (repo main))) intruder
       Intruder body
-      **** (skg (node (id intruder-child) (source main))) intruder child
+      **** (skg (node (id intruder-child) (repo main))) intruder child
       "} );
   { let intruder : &IntentsForOneId = entry (&collected, "intruder");
     assert_eq!( intruder . title_and_body,
@@ -182,9 +182,9 @@ fn definitive_member_of_readonly_folder_emits_for_itself_only () {
 fn definitive_child_of_inactive_vognode_emits () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id root) (source main))) root
-      ** (skg (inactiveNode (id hidden) (source private)))
-      *** (skg (node (id stowaway) (source main))) stowaway
+      * (skg (node (id root) (repo main))) root
+      ** (skg (inactiveNode (id hidden) (repo private)))
+      *** (skg (node (id stowaway) (repo main))) stowaway
       "} );
   { let stowaway : &IntentsForOneId = entry (&collected, "stowaway");
     assert!( stowaway . title_and_body . is_some() ); }
@@ -199,9 +199,9 @@ fn definitive_child_of_inactive_vognode_emits () {
 fn definitive_node_inside_diff_phantom_subtree_emits () {
   let input : &str =
     indoc! {"
-      * (skg (node (id root) (source main))) root
-      ** (skg (node (id fading) (source main))) fading
-      *** (skg (node (id survivor) (source main))) survivor
+      * (skg (node (id root) (repo main))) root
+      ** (skg (node (id fading) (repo main))) fading
+      *** (skg (node (id survivor) (repo main))) survivor
       "};
   let forest : ViewForest = {
     let mut forest : ViewForest = forest_from_org (input);
@@ -235,10 +235,10 @@ fn definitive_node_inside_diff_phantom_subtree_emits () {
 fn writeProtected_subscribee_as_such_emits_nothing () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id subscriber) (source main))) subscriber
+      * (skg (node (id subscriber) (repo main))) subscriber
       ** (skg subscribeeFolder)
-      *** (skg (node (id e) (source main) writeProtected)) e
-      **** (skg (node (id under) (source main) writeProtected)) under
+      *** (skg (node (id e) (repo main) writeProtected)) e
+      **** (skg (node (id under) (repo main) writeProtected)) under
       "} );
   assert!( collected . by_pid . get (&ID::from ("e")) . is_none() );
   assert_eq!( entry (&collected, "subscriber") . visibility, vec![] ); }
@@ -247,10 +247,10 @@ fn writeProtected_subscribee_as_such_emits_nothing () {
 fn definitive_subscribee_under_writeProtected_subscriber_claims_without_visibility () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id subscriber) (source main) writeProtected)) subscriber
+      * (skg (node (id subscriber) (repo main) writeProtected)) subscriber
       ** (skg subscribeeFolder)
-      *** (skg (node (id e) (source main))) e
-      **** (skg (node (id visible) (source main))) visible
+      *** (skg (node (id e) (repo main))) e
+      **** (skg (node (id visible) (repo main))) visible
       "} );
   assert_eq!(
     entry (&collected, "e") . text_claims,
@@ -264,11 +264,11 @@ fn definitive_subscribee_under_writeProtected_subscriber_claims_without_visibili
 fn present_but_empty_folders_differ_from_absent_folders () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id explicit) (source main))) explicit
+      * (skg (node (id explicit) (repo main))) explicit
       ** (skg aliasFolder) aliases
       ** (skg subscribeeFolder)
       ** (skg overriddenFolder)
-      * (skg (node (id silent) (source main))) silent
+      * (skg (node (id silent) (repo main))) silent
       "} );
   { let explicit : &IntentsForOneId = entry (&collected, "explicit");
     // A present-but-empty folder is an explicitly empty field.
@@ -285,19 +285,19 @@ fn present_but_empty_folders_differ_from_absent_folders () {
 fn duplicate_defining_folder_members_dedup_preserving_order () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id owner) (source main))) owner
+      * (skg (node (id owner) (repo main))) owner
       ** (skg aliasFolder) aliases
       *** (skg alias) echo
       *** (skg alias) other
       *** (skg alias) echo
       ** (skg subscribeeFolder)
-      *** (skg (node (id s1) (source main) writeProtected)) s1
-      *** (skg (node (id s2) (source main) writeProtected)) s2
-      *** (skg (node (id s1) (source main) writeProtected)) s1
+      *** (skg (node (id s1) (repo main) writeProtected)) s1
+      *** (skg (node (id s2) (repo main) writeProtected)) s2
+      *** (skg (node (id s1) (repo main) writeProtected)) s1
       ** (skg overriddenFolder)
-      *** (skg (node (id o1) (source main) writeProtected)) o1
-      *** (skg (node (id o2) (source main) writeProtected)) o2
-      *** (skg (node (id o1) (source main) writeProtected)) o1
+      *** (skg (node (id o1) (repo main) writeProtected)) o1
+      *** (skg (node (id o2) (repo main) writeProtected)) o2
+      *** (skg (node (id o1) (repo main) writeProtected)) o1
       "} );
   let owner : &IntentsForOneId = entry (&collected, "owner");
   assert_eq!( owner . aliases,

@@ -98,7 +98,7 @@ fn relation_from_client_string (
     "subscribes_to"     => Ok (NodeRelation::SubscribesTo),
     "overrides_view_of" => Ok (NodeRelation::OverridesViewOf),
     other => Err ( format! (
-      "unsupported relation '{}': the explicit-relSource path covers \
+      "unsupported relation '{}': the explicit-relRepo path covers \
        contains, subscribes_to and overrides_view_of", other )), }}
 
 fn quoted (

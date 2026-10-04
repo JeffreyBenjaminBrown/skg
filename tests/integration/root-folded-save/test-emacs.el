@@ -43,15 +43,15 @@
       (let ((inhibit-read-only t)) (erase-buffer))
       (insert
        (concat
-        "* (skg (node (id rfs-root) (source main))) rfs-root\n"
+        "* (skg (node (id rfs-root) (repo main))) rfs-root\n"
         "rfs-root body\n"
-        "** (skg (node (id rfs-c1) (source main))) rfs-c1\n"
+        "** (skg (node (id rfs-c1) (repo main))) rfs-c1\n"
         "rfs-c1 body\n"
-        "** (skg (node (id rfs-c2) (source main))) rfs-c2\n"
+        "** (skg (node (id rfs-c2) (repo main))) rfs-c2\n"
         "rfs-c2 body\n"
-        "*** (skg (node (id rfs-g1) (source main))) rfs-g1\n"
+        "*** (skg (node (id rfs-g1) (repo main))) rfs-g1\n"
         "rfs-g1 body\n"
-        "** (skg (node (id rfs-c3) (source main))) rfs-c3\n"
+        "** (skg (node (id rfs-c3) (repo main))) rfs-c3\n"
         "rfs-c3 body\n"))
       (skg-content-view-mode)
       (setq skg-view-uri (org-id-uuid))

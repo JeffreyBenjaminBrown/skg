@@ -53,12 +53,12 @@ function Is-Directory-Empty-Or-GitOnly($Path) {
   return $false
 }
 
-function Get-SkgConfigSources($ConfigPath) {
-  $sources = @()
+function Get-SkgConfigRepos($ConfigPath) {
+  $repos = @()
   $current = $null
   foreach ($line in Get-Content -LiteralPath $ConfigPath) {
-    if ($line -match '^\s*\[\[sources\]\]') {
-      if ($current) { $sources += $current }
+    if ($line -match '^\s*\[\[repos\]\]') {
+      if ($current) { $repos += $current }
       $current = [pscustomobject]@{ Name = $null; Path = $null }
     } elseif ($current -and $line -match '^\s*name\s*=\s*"([^"]+)"') {
       $current.Name = $Matches[1]
@@ -66,8 +66,8 @@ function Get-SkgConfigSources($ConfigPath) {
       $current.Path = $Matches[1]
     }
   }
-  if ($current) { $sources += $current }
-  return $sources
+  if ($current) { $repos += $current }
+  return $repos
 }
 
 function Get-SkgConfigPort($ConfigPath) {
@@ -84,24 +84,24 @@ function Validate-Existing-DataRoot($DataRoot) {
   if (!(Test-Path $config)) {
     return $false
   }
-  $sources = @(Get-SkgConfigSources $config)
-  if ($sources.Count -eq 0) {
-    throw "Found $config, but it contains no [[sources]] entries."
+  $repos = @(Get-SkgConfigRepos $config)
+  if ($repos.Count -eq 0) {
+    throw "Found $config, but it contains no [[repos]] entries."
   }
-  foreach ($source in $sources) {
-    if ([string]::IsNullOrWhiteSpace($source.Path)) {
-      throw "Source '$($source.Name)' in $config has no path."
+  foreach ($repo in $repos) {
+    if ([string]::IsNullOrWhiteSpace($repo.Path)) {
+      throw "Skg repo '$($repo.Name)' in $config has no path."
     }
-    if ([System.IO.Path]::IsPathRooted($source.Path)) {
-      $repoPath = $source.Path
+    if ([System.IO.Path]::IsPathRooted($repo.Path)) {
+      $repoPath = $repo.Path
     } else {
-      $repoPath = Join-Path $DataRoot $source.Path
+      $repoPath = Join-Path $DataRoot $repo.Path
     }
     if (!(Test-Path $repoPath -PathType Container)) {
-      throw "Source '$($source.Name)' points to missing folder: $repoPath"
+      throw "Skg repo '$($repo.Name)' points to missing folder: $repoPath"
     }
     if (!(Test-Path (Join-Path $repoPath ".git") -PathType Container)) {
-      throw "Source '$($source.Name)' exists but is not a git repository: $repoPath"
+      throw "Skg repo '$($repo.Name)' exists but is not a git repository: $repoPath"
     }
   }
   Write-Host "Using existing data root: $DataRoot"
@@ -127,11 +127,11 @@ tantivy_folder = ".index.tantivy"
 port = 1731
 beep_when_server_becomes_available = false
 
-[[sources]]
+[[repos]]
 name = "public"
 path = "owned/public"
 
-[[sources]]
+[[repos]]
 name = "private"
 path = "owned/private"
 "@ | Set-Content -Path (Join-Path $DataRoot "skgconfig.toml") -Encoding UTF8

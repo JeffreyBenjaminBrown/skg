@@ -38,7 +38,7 @@
         ;; Real tabs and real newlines inside the body lines:
         (org-text
          (concat
-          "* (skg (node (id bwt-root) (source main))) bwt-root\n"
+          "* (skg (node (id bwt-root) (repo main))) bwt-root\n"
           "line one\n"
           "\t(elisp-code)\n"
           "line three\n")))

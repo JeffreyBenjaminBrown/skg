@@ -1,5 +1,5 @@
 -- Mirrors the config-reader coverage of
--- tests/elisp/test-skg-insert-heading-source-prompt.el (the
+-- tests/elisp/test-skg-insert-heading-repo-prompt.el (the
 -- interleaved-tables test and the reader helpers; the minibuffer
 -- prompt tests live with the picker component instead).
 
@@ -8,7 +8,7 @@ local config = require('skg.config')
 local interleaved_config = table.concat({
   '[[repo_sets]]',
   'name = "public-set"',
-  'sources = ["public"]',
+  'repos = ["public"]',
   '',
   '[[repos]]',
   'name = "public"',
@@ -16,7 +16,7 @@ local interleaved_config = table.concat({
   '',
   '[[repo_sets]]',
   'name = "private-set"',
-  'sources = ["private"]',
+  'repos = ["private"]',
   '',
   '[[repos]]',
   'name = "private"',
@@ -57,39 +57,39 @@ describe('skg.config', function ()
 
   it('does not confuse [[repos]] and [[repo_sets]]', function ()
     assert.are.same({ 'public', 'private', 'foreign' },
-                    config.source_names())
+                    config.repo_names())
     assert.are.same({ 'public', 'private', 'foreign', 'all' },
-                    config.source_set_names())
+                    config.repo_set_names())
     local path_names = {}
-    for _, entry in ipairs(config.source_paths()) do
+    for _, entry in ipairs(config.repo_paths()) do
       table.insert(path_names, entry.name) end
     assert.are.same({ 'public', 'private', 'foreign' }, path_names)
   end)
 
-  it('lists only owned sources', function ()
-    assert.are.same({ 'public', 'private' }, config.owned_sources())
+  it('lists only owned repos', function ()
+    assert.are.same({ 'public', 'private' }, config.owned_repos())
   end)
 
-  it('resolves relative source paths against the config dir',
+  it('resolves relative repo paths against the config dir',
      function ()
     assert.are.equal(config_dir .. '/owned/public-dir',
-                     config.source_dir('public'))
+                     config.repo_dir('public'))
     assert.are.equal(config_dir .. '/owned/private-dir',
-                     config.source_dir('private'))
+                     config.repo_dir('private'))
   end)
 
-  it('computes .skg paths from id and source', function ()
+  it('computes .skg paths from id and repo', function ()
     assert.are.equal(config_dir .. '/owned/public-dir/abc123.skg',
-                     config.abs_path_for_id_and_source(
+                     config.abs_path_for_id_and_repo(
                        'abc123', 'public'))
-    assert.is_nil(config.abs_path_for_id_and_source(
+    assert.is_nil(config.abs_path_for_id_and_repo(
                     'abc123', 'nonexistent'))
   end)
 
   it('returns nil wrappers when no config is active', function ()
     config.config_file_path = nil
-    assert.is_nil(config.source_names())
-    assert.is_nil(config.owned_sources())
-    assert.is_nil(config.source_set_names())
+    assert.is_nil(config.repo_names())
+    assert.is_nil(config.owned_repos())
+    assert.is_nil(config.repo_set_names())
   end)
 end)

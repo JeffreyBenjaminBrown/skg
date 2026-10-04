@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Integration test for the EXPLICIT fork gesture (skg-fork-node).
-# - Starts an independent skg server with a single OWNED source.
+# - Starts an independent skg server with a single OWNED repo.
 # - Emacs opens the owned container Q (whose content is the owned M),
 #   runs skg-fork-node on M, and approves: a clone is created (overrides
 #   M) and drawn in M's place when Q re-renders.
@@ -25,7 +25,7 @@ cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
 restore_fork_fixtures() {
   git -C "$PROJECT_ROOT" checkout -- \
     "tests/integration/fork-owned/data/owned" 2>/dev/null || true
-  # Remove any clone .skg the test wrote into the owned source.
+  # Remove any clone .skg the test wrote into the owned repo.
   find "$TEST_DIR/data/owned/owned" -name '*.skg' \
     ! -name 'Q.skg' ! -name 'M.skg' \
     ! -name 'Q2.skg' ! -name 'M2.skg' \

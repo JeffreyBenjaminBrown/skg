@@ -110,16 +110,16 @@ fn validate_repos_for_selection (
       Path::new ( &skgrepo . path );
     let gitrepo : Repository =
       open_gitrepo (repo_path) . ok_or_else ( || format! (
-        "Cannot compute diff report: source '{}' is not in a git repository.",
+        "Cannot compute diff report: Skg repo '{}' is not in a git repository.",
         repo_name )) ?;
     gitrepo . head () . map_err ( |e| format! (
-      "Cannot compute diff report: source '{}' has no HEAD commit: {}",
+      "Cannot compute diff report: Skg repo '{}' has no HEAD commit: {}",
       repo_name, e )) ?;
     if needs_head && head_is_merge_commit (&gitrepo) . map_err ( |e| format! (
-      "Cannot compute diff report: could not inspect HEAD for source '{}': {}",
+      "Cannot compute diff report: could not inspect HEAD for Skg repo '{}': {}",
       repo_name, e )) ? {
       return Err ( format! (
-        "Cannot compute diff report: HEAD is a merge commit in source '{}'.",
+        "Cannot compute diff report: HEAD is a merge commit in repo '{}'.",
         repo_name )); }} 
   Ok (( )) }
 
@@ -132,7 +132,7 @@ fn read_graph_snapshot (
   let mut sections : Vec<(RepoName, NodeFS)> = Vec::new ();
   for repo_name in config . ordered_repos () {
     let label : String =
-      format! ("read source '{}' from {:?}", repo_name, kind);
+      format! ("read repo '{}' from {:?}", repo_name, kind);
     let mut repo_sections : Vec<(RepoName, NodeFS)> =
       profile_step_result (&label, || match kind {
         SnapshotKind::Head =>
@@ -142,7 +142,7 @@ fn read_graph_snapshot (
         SnapshotKind::Worktree =>
           read_skg_sections_from_folder (&repo_name, config)
             . map_err ( |e| format! (
-              "Reading worktree source '{}': {}", repo_name, e )), }) ?;
+              "Reading worktree repo '{}': {}", repo_name, e )), }) ?;
     sections . append (&mut repo_sections); }
   profile_step ("snapshot_from_sections", || {
     snapshot_from_sections (config, sections) })
@@ -195,12 +195,12 @@ fn snapshot_cache_key (
   for repo_name in repo_names {
     let skgrepo : &SkgfileRepo =
       config . repos . get (&repo_name) . ok_or_else ( || format! (
-        "Source '{}' not found in config", repo_name )) ?;
+        "Repo '{}' not found in config", repo_name )) ?;
     let repo_path : &Path =
       Path::new (&skgrepo . path);
     let gitrepo : Repository =
       open_gitrepo (repo_path) . ok_or_else ( || format! (
-        "Could not open git repo for source '{}'", repo_name )) ?;
+        "Could not open Git repo for Skg repo '{}'", repo_name )) ?;
     let identity : String =
       match kind {
         SnapshotKind::Head =>
@@ -225,7 +225,7 @@ fn head_cache_identity (
     . and_then ( |head| head . peel_to_commit () )
     . map ( |commit| format! ("head:{}", commit . id ()) )
     . map_err ( |e| format! (
-      "Reading HEAD identity for source '{}': {}", repo_name, e ))
+      "Reading HEAD identity for repo '{}': {}", repo_name, e ))
 }
 
 fn index_cache_identity (
@@ -236,7 +236,7 @@ fn index_cache_identity (
     gitrepo . path () . join ("index");
   let bytes : Vec<u8> =
     fs::read (&index_path) . map_err ( |e| format! (
-      "Reading index identity for source '{}' at {:?}: {}",
+      "Reading index identity for repo '{}' at {:?}: {}",
       repo_name, index_path, e )) ?;
   let mut hasher : DefaultHasher =
     DefaultHasher::new ();
@@ -256,7 +256,7 @@ fn changed_paths_by_repo (
       Path::new (&skgrepo . path);
     let gitrepo : Repository =
       open_gitrepo (repo_path) . ok_or_else ( || format! (
-        "Could not open git repo for source '{}'", repo_name )) ?;
+        "Could not open Git repo for Skg repo '{}'", repo_name )) ?;
     let prefix : PathBuf =
       repo_prefix_in_gitrepo (&gitrepo, repo_path) ?;
     let repo_paths : BTreeSet<PathBuf> =
@@ -379,12 +379,12 @@ fn read_telescope_sections_at_endpoint (
   for repo_name in config . ordered_repos () {
     let skgrepo : &SkgfileRepo =
       config . repos . get (&repo_name) . ok_or_else ( || format! (
-        "Source '{}' not found in config", repo_name )) ?;
+        "Repo '{}' not found in config", repo_name )) ?;
     let repo_path : &Path =
       Path::new (&skgrepo . path);
     let gitrepo : Repository =
       open_gitrepo (repo_path) . ok_or_else ( || format! (
-        "Could not open git repo for source '{}'", repo_name )) ?;
+        "Could not open Git repo for Skg repo '{}'", repo_name )) ?;
     let prefix : PathBuf =
       repo_prefix_in_gitrepo (&gitrepo, repo_path) ?;
     let rel_path : PathBuf =
@@ -466,20 +466,20 @@ fn read_section_from_head (
     gitrepo . head ()
       . and_then ( |h| h . peel_to_tree () )
       . map_err ( |e| format! (
-        "Reading HEAD tree for source '{}': {}", repo_name, e )) ?;
+        "Reading HEAD tree for repo '{}': {}", repo_name, e )) ?;
   let entry : git2::TreeEntry =
     match tree . get_path (rel_path) {
       Ok (entry) => entry,
       Err (e) if e . code () == git2::ErrorCode::NotFound =>
         return Ok (None),
       Err (e) => return Err ( format! (
-        "Reading HEAD path {:?} for source '{}': {}",
+        "Reading HEAD path {:?} for repo '{}': {}",
         rel_path, repo_name, e )), };
   if entry . kind () != Some (ObjectType::Blob) {
     return Ok (None); }
   let blob : git2::Blob =
     gitrepo . find_blob (entry . id ()) . map_err ( |e| format! (
-      "Reading HEAD blob {:?} for source '{}': {}",
+      "Reading HEAD blob {:?} for repo '{}': {}",
       rel_path, repo_name, e )) ?;
   parse_blob_section (blob . content (), rel_path)
     . map (Some)
@@ -492,14 +492,14 @@ fn read_section_from_index (
 ) -> Result<Option<NodeFS>, String> {
   let index : git2::Index =
     gitrepo . index () . map_err ( |e| format! (
-      "Reading index for source '{}': {}", repo_name, e )) ?;
+      "Reading index for repo '{}': {}", repo_name, e )) ?;
   let id : git2::Oid =
     match index . get_path (rel_path, 0) {
       Some (entry) => entry . id,
       None => return Ok (None), };
   let blob : git2::Blob =
     gitrepo . find_blob (id) . map_err ( |e| format! (
-      "Reading index blob {:?} for source '{}': {}",
+      "Reading index blob {:?} for repo '{}': {}",
       rel_path, repo_name, e )) ?;
   parse_blob_section (blob . content (), rel_path)
     . map (Some)
@@ -512,14 +512,14 @@ fn read_section_from_worktree (
 ) -> Result<Option<NodeFS>, String> {
   let workdir : &Path =
     gitrepo . workdir () . ok_or_else ( || format! (
-      "Repository for source '{}' has no workdir", repo_name )) ?;
+      "Repository for repo '{}' has no workdir", repo_name )) ?;
   let abs_path : PathBuf =
     workdir . join (rel_path);
   if ! abs_path . exists () {
     return Ok (None); }
   let bytes : Vec<u8> =
     fs::read (&abs_path) . map_err ( |e| format! (
-      "Reading worktree path {:?} for source '{}': {}",
+      "Reading worktree path {:?} for repo '{}': {}",
       abs_path, repo_name, e )) ?;
   parse_blob_section (&bytes, rel_path)
     . map (Some)
@@ -673,19 +673,19 @@ fn read_repo_from_head (
 ) -> Result<Vec<(RepoName, NodeFS)>, String> {
   let skgrepo : &SkgfileRepo =
     config . repos . get (repo_name) . ok_or_else ( || format! (
-      "Source '{}' not found in config", repo_name )) ?;
+      "Repo '{}' not found in config", repo_name )) ?;
   let repo_path : &Path =
     Path::new ( &skgrepo . path );
   let gitrepo : Repository =
     open_gitrepo (repo_path) . ok_or_else ( || format! (
-      "Could not open git repo for source '{}'", repo_name )) ?;
+      "Could not open Git repo for Skg repo '{}'", repo_name )) ?;
   let prefix : PathBuf =
     repo_prefix_in_gitrepo (&gitrepo, repo_path) ?;
   let tree : git2::Tree =
     gitrepo . head ()
       . and_then ( |h| h . peel_to_tree () )
       . map_err ( |e| format! (
-        "Reading HEAD tree for source '{}': {}", repo_name, e )) ?;
+        "Reading HEAD tree for repo '{}': {}", repo_name, e )) ?;
   let mut sections : Vec<(RepoName, NodeFS)> = Vec::new ();
   let mut parse_error : Option<String> = None;
   let walk_result : Result<(), git2::Error> =
@@ -713,7 +713,7 @@ fn read_repo_from_head (
   if let Some (error) = parse_error {
     return Err (error); }
   walk_result . map_err ( |e| format! (
-    "Walking HEAD tree for source '{}': {}", repo_name, e )) ?;
+    "Walking HEAD tree for repo '{}': {}", repo_name, e )) ?;
   Ok (sections)
 }
 
@@ -723,17 +723,17 @@ fn read_repo_from_index (
 ) -> Result<Vec<(RepoName, NodeFS)>, String> {
   let skgrepo : &SkgfileRepo =
     config . repos . get (repo_name) . ok_or_else ( || format! (
-      "Source '{}' not found in config", repo_name )) ?;
+      "Repo '{}' not found in config", repo_name )) ?;
   let repo_path : &Path =
     Path::new ( &skgrepo . path );
   let gitrepo : Repository =
     open_gitrepo (repo_path) . ok_or_else ( || format! (
-      "Could not open git repo for source '{}'", repo_name )) ?;
+      "Could not open Git repo for Skg repo '{}'", repo_name )) ?;
   let prefix : PathBuf =
     repo_prefix_in_gitrepo (&gitrepo, repo_path) ?;
   let index : git2::Index =
     gitrepo . index () . map_err ( |e| format! (
-      "Reading index for source '{}': {}", repo_name, e )) ?;
+      "Reading index for repo '{}': {}", repo_name, e )) ?;
   let mut sections : Vec<(RepoName, NodeFS)> =
     Vec::new ();
   for entry in index . iter () {
@@ -743,7 +743,7 @@ fn read_repo_from_index (
       continue; }
     let blob : git2::Blob =
       gitrepo . find_blob (entry . id) . map_err ( |e| format! (
-        "Reading index blob {:?} for source '{}': {}",
+        "Reading index blob {:?} for repo '{}': {}",
         rel_path, repo_name, e )) ?;
     let node_fs : NodeFS =
       parse_blob_section (blob . content (), &rel_path) ?;
@@ -760,7 +760,7 @@ pub(super) fn repo_prefix_in_gitrepo (
       . unwrap_or_else ( |_| repo_path . to_path_buf () );
   path_relative_to_gitrepo (gitrepo, &canonical_repo_path)
     . ok_or_else ( || format! (
-      "Source path {:?} is not inside its git repository", repo_path ))
+      "Skg repo path {:?} is not inside its Git repository", repo_path ))
 }
 
 pub(super) fn path_is_repo_skg (

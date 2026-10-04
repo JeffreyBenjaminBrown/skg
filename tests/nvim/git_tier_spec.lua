@@ -41,14 +41,14 @@ describe('skg.git_add', function ()
 
   it('collects only unstaged-new files, from the body too', function ()
     buffer_with(table.concat({
-      '* (skg (node (id root-id) (source main) (unstaged newX newM)))'
+      '* (skg (node (id root-id) (repo main) (unstaged newX newM)))'
       .. ' root',
       'a body line',
-      '** (skg (node (id staged-only) (source main) (staged newX)))'
+      '** (skg (node (id staged-only) (repo main) (staged newX)))'
       .. ' staged already',
-      '** (skg (node (id member-only) (source main) (unstaged newM)))'
+      '** (skg (node (id member-only) (repo main) (unstaged newM)))'
       .. ' membership only',
-      '** (skg (node (id also-new) (source main) (unstaged newX)))'
+      '** (skg (node (id also-new) (repo main) (unstaged newX)))'
       .. ' also new' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 2, 3 }) -- in the body
     local plan = git_add.git_add_new_files_recursive_plan()
@@ -62,7 +62,7 @@ describe('skg.git_add', function ()
   end)
 
   it('previews without touching git state', function ()
-    buffer_with('* (skg (node (id n1) (source main)'
+    buffer_with('* (skg (node (id n1) (repo main)'
                 .. ' (unstaged newX))) n1')
     git_add.git_add_if_new_recursive_preview()
     local preview = vim.api.nvim_get_current_buf()
@@ -74,7 +74,7 @@ describe('skg.git_add', function ()
   end)
 
   it('reports the empty plan honestly', function ()
-    buffer_with('* (skg (node (id n1) (source main))) unchanged')
+    buffer_with('* (skg (node (id n1) (repo main))) unchanged')
     local plan = git_add.git_add_new_files_recursive_plan()
     assert.are.same({}, plan.paths)
     assert.is_truthy(plan.script:find('No unstaged new skg files',

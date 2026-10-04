@@ -188,8 +188,8 @@ async fn test_move_id_scaffolds_to_child_aborts (
     |config, tantivy, gitrepo_path| { Box::pin(async move {
       // User moves id scaffolds to be children of 'child' node
       let input = "\
-* (skg (node (id 1) (source main))) 1
-** (skg (node (id child) (source main))) child
+* (skg (node (id 1) (repo main))) 1
+** (skg (node (id child) (repo main))) child
 *** (skg idFolder)
 **** (skg id) 1
 **** (skg id (unstaged removedM)) 2

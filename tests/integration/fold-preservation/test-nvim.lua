@@ -17,8 +17,8 @@ print('=== SKG Fold Preservation Integration Test ===')
 -- PHASE 1: create the buffer with content.
 print('=== PHASE 1: Creating buffer with content ===')
 local content = table.concat({
-  '* (skg (node (source main))) a',
-  '* (skg (node (source main))) b',
+  '* (skg (node (repo main))) a',
+  '* (skg (node (repo main))) b',
   '** c',
   '** d',
   '*** d1',

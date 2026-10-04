@@ -1,6 +1,6 @@
 -- PURPOSE: Edit a headline's metadata sexp as an org tree in a
 -- temporary buffer: ':w' (or <localleader>cc) commits the edited tree
--- back into the source headline; killing the buffer cancels;
+-- back into the repo headline; killing the buffer cancels;
 -- S-left/S-right cycle field values. The Lua port of
 -- elisp/skg-sexpr-edit.el and skg-sexpr-edit/skg-sexpr-cycling.el.
 --
@@ -10,7 +10,7 @@
 -- the title group whatever it holds).
 --
 -- DEVIATION: the elisp advised org-insert-heading-respect-content so
--- a fresh level-1 heading prompted for a source. vim users type
+-- a fresh level-1 heading prompted for a repo. vim users type
 -- headlines rather than calling an insert-heading command, so there
 -- is no equivalent seam; the quick path is <localleader>ss on the new
 -- headline (which populates minimal metadata), or <localleader>vm for
@@ -29,9 +29,9 @@ M.help_text =
   .. ' S-left/S-right cycle values.'
 
 ---Edit the metadata sexp on the current headline. With no metadata,
----populates a minimal (skg (node (source X))) in place and opens the
----empty-node view over it: source pre-filled, the other editable
----fields childless, so an untouched commit yields just the source.
+---populates a minimal (skg (node (repo X))) in place and opens the
+---empty-node view over it: repo pre-filled, the other editable
+---fields childless, so an untouched commit yields just the repo.
 function M.edit_metadata ()
   if not metadata.at_heading_p() then error('Not on a headline') end
   local source_buf = vim.api.nvim_get_current_buf()
@@ -50,43 +50,43 @@ function M.edit_metadata ()
       org_text, nil, split.title) end
   M.open_edit_buffer(org_text, source_buf, line_number,
                      #split.stars, #split.metadata, is_activeNode)
-  M.goto_field_value('source')
+  M.goto_field_value('repo')
 end
 
 ---Populate minimal metadata on the metadata-less headline, then open
----its metadata view with the chosen source pre-filled and every other
+---its metadata view with the chosen repo pre-filled and every other
 ---editable field childless.
 ---@param source_buf integer
 ---@param line_number integer
 ---@param split table
 function M.open_empty_node_view (source_buf, line_number, split)
-  local source = metadata.populate_minimal_node_metadata()
-  if not source then return end
+  local repo = metadata.populate_minimal_node_metadata()
+  if not repo then return end
   local new_split = metadata.split_as_stars_metadata_title(
     metadata.line_text(line_number))
   M.open_edit_buffer(
-    M.empty_node_org_text(source, split.title),
+    M.empty_node_org_text(repo, split.title),
     source_buf, line_number,
     #new_split.stars, #new_split.metadata, true)
-  M.goto_field_value('source')
+  M.goto_field_value('repo')
 end
 
----Org text for the empty-node metadata view: SOURCE pre-filled;
+---Org text for the empty-node metadata view: REPO pre-filled;
 ---TITLE, if non-blank, under a display-only title group; every other
 ---editable field childless, so the strip step drops the ones the user
 ---never populates.
----@param source string
+---@param repo string
 ---@param title string
 ---@return string
-function M.empty_node_org_text (source, title)
+function M.empty_node_org_text (repo, title)
   local headlines = {}
   table.insert(headlines, { level = 1, text = 'title' })
   if title and not title:match('^%s*$') then
     table.insert(headlines, { level = 2, text = title }) end
   table.insert(headlines, { level = 1, text = 'skg' })
   table.insert(headlines, { level = 2, text = 'node' })
-  table.insert(headlines, { level = 3, text = 'source' })
-  table.insert(headlines, { level = 4, text = source })
+  table.insert(headlines, { level = 3, text = 'repo' })
+  table.insert(headlines, { level = 4, text = repo })
   for _, entry in ipairs(defaults.editable_defaults) do
     table.insert(headlines, { level = 3, text = entry.name })
   end
@@ -94,7 +94,7 @@ function M.empty_node_org_text (source, title)
 end
 
 ---Open the edit buffer over ORG_TEXT, remembering where the metadata
----lives in the source (line + byte range) so commit can splice it.
+---lives in the repo (line + byte range) so commit can splice it.
 ---@param org_text string
 ---@param source_buf integer
 ---@param line_number integer
@@ -147,8 +147,8 @@ function M.goto_field_value (field_name)
   end
 end
 
----Commit the edit buffer back into the source headline's metadata,
----then kill the edit buffer and return to the source.
+---Commit the edit buffer back into the repo headline's metadata,
+---then kill the edit buffer and return to the repo.
 ---@param buf integer
 function M.commit (buf)
   local source_buf = vim.b[buf].skg_edit_source_buf
@@ -175,7 +175,7 @@ end
 -- ── value cycling ──────────────────────────────────────────────────
 
 ---The values to cycle through for FIELD_NAME, or nil when the field
----is not cycleable. FIELD_VALUE matters for source defaulting.
+---is not cycleable. FIELD_VALUE matters for repo defaulting.
 ---@param field_name string
 ---@param field_value string
 ---@return string[]|nil
@@ -186,8 +186,8 @@ function M.cycle_values_for_field (field_name, field_value)
     return { 'true (default)', 'false', 'na' } end
   if field_name == 'editRequest' then
     return { 'none (default)', 'delete', 'merge' } end
-  if field_name == 'source' then
-    return M.source_cycle_values(field_value) end
+  if field_name == 'repo' then
+    return M.repo_cycle_values(field_value) end
   if field_name == 'viewRequests' then
     -- Only the bare-atom request is cycleable; (folder X)/(path X) are
     -- structured forms inserted by their dedicated commands.
@@ -195,22 +195,22 @@ function M.cycle_values_for_field (field_name, field_value)
   return nil
 end
 
----Owned source names as a cycle list; a ' (default)'-suffixed current
+---Owned repo names as a cycle list; a ' (default)'-suffixed current
 ---value leads, so cycling starts there.
 ---@param field_value string
 ---@return string[]|nil
-function M.source_cycle_values (field_value)
-  local sources = config.owned_sources()
-  if not sources or #sources == 0 then return nil end
+function M.repo_cycle_values (field_value)
+  local repos = config.owned_repos()
+  if not repos or #repos == 0 then return nil end
   if field_value:match(' %(default%)$') then
     local bare = field_value:gsub(' %(default%)$', '')
     local values = { field_value }
-    for _, name in ipairs(sources) do
+    for _, name in ipairs(repos) do
       if name ~= bare then table.insert(values, name) end
     end
     return values
   end
-  return sources
+  return repos
 end
 
 ---Cycle the headline value at point by DIRECTION (1 or -1); dispatch
@@ -247,8 +247,8 @@ function M.cycle (direction)
           string.rep('*', level) .. ' merge ' .. id)
       end
     end
-  elseif parent == 'source' then
-    local answer = vim.fn.input('Source: ', field_value)
+  elseif parent == 'repo' then
+    local answer = vim.fn.input('Repo: ', field_value)
     if answer ~= '' then
       metadata.replace_line(line,
         string.rep('*', level) .. ' ' .. answer)

@@ -18,7 +18,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
       Box::pin(async move {
         // Create a viewforest with node 1 requesting to merge node 2
         let input = indoc! {"
-          * (skg (node (id 1) (source main) (editRequest (merge 2)))) 1
+          * (skg (node (id 1) (repo main) (editRequest (merge 2)))) 1
         "};
 
         let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
@@ -117,7 +117,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
         assert_eq!( node2_id, &ID::from ("2"),
                     "Node 2 should have ID '2'" );
         assert_eq!( node2_repo, &RepoName::from ("main"),
-                    "Node 2 should have source 'main'" );
+                    "Node 2 should have repo 'main'" );
         Ok(())
       })
     },

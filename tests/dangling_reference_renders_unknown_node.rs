@@ -58,7 +58,7 @@ async fn test_dangling_reference_renders_unknown_node (
       // hides (containers 0) for absent-affectsParent.
       // The unknown line has no headline title -- the id already
       // appears in the metadata, no need to duplicate it.
-      let expected = indoc! {"* (skg (node (id parent) (source main) (affectsParent na))) parent
+      let expected = indoc! {"* (skg (node (id parent) (repo main) (affectsParent na))) parent
                               ** (skg (unknown (id ghost)))
                               "};
       assert_metadata_eq! (rendered, expected,
@@ -83,7 +83,7 @@ async fn buffer_with_unknownnode_child_saves_cleanly_impl (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"
-    * (skg (node (id parent) (source main))) parent
+    * (skg (node (id parent) (repo main))) parent
     ** (skg (unknown (id ghost)))
   "};
   let graph : InRustGraphHandle =

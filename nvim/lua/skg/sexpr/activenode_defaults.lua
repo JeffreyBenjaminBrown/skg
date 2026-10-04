@@ -17,7 +17,7 @@ local M = {}
 
 ---Canonical order for node fields. Fields not in this list go last.
 M.canonical_field_order = {
-  'id', 'source',
+  'id', 'repo',
   'writeProtected', 'affectsParent', 'birth', 'editRequest', 'viewRequests' }
 
 ---Editable field names mapped to their default value text.
@@ -64,18 +64,18 @@ end
 ---Expand default fields in ORG_TEXT for ActiveNode metadata editing:
 ---reorder the '** node' section's fields to canonical order, insert
 ---missing editable fields with defaults, and expand bare boolean
----atoms to have a value child. If DEFAULT_SOURCE is given, insert it
----as the source default and mark a matching existing source value
+---atoms to have a value child. If DEFAULT_REPO is given, insert it
+---as the repo default and mark a matching existing repo value
 ---with '(default)'. If DISPLAY_TITLE is given and non-empty, prepend
 ---a display-only title group.
 ---@param org_text string
----@param default_source string|nil
+---@param default_repo string|nil
 ---@param display_title string|nil
 ---@return string
-function M.expand_defaults_in_org (org_text, default_source,
+function M.expand_defaults_in_org (org_text, default_repo,
                                    display_title)
   local headlines = bijection.extract_headlines(org_text)
-  local expanded = M.expand_headlines(headlines, default_source)
+  local expanded = M.expand_headlines(headlines, default_repo)
   local with_title = M.maybe_prepend_title(expanded, display_title)
   return M.headlines_to_org(with_title)
 end
@@ -95,9 +95,9 @@ function M.maybe_prepend_title (headlines, display_title)
 end
 
 ---@param headlines table[]
----@param default_source string|nil
+---@param default_repo string|nil
 ---@return table[]
-function M.expand_headlines (headlines, default_source)
+function M.expand_headlines (headlines, default_repo)
   local node_index = M.find_node_headline(headlines)
   local child_level = headlines[node_index].level + 1
   local before_node = vim.list_slice(headlines, 1, node_index)
@@ -105,7 +105,7 @@ function M.expand_headlines (headlines, default_source)
   local children, remainder =
     M.group_children(after_node, child_level)
   local expanded_children =
-    M.expand_and_reorder(children, child_level, default_source)
+    M.expand_and_reorder(children, child_level, default_repo)
   return M.concatenated(before_node, expanded_children, remainder)
 end
 
@@ -152,9 +152,9 @@ end
 ---missing defaults. Returns a flat headline list.
 ---@param children table[][]
 ---@param child_level integer
----@param default_source string|nil
+---@param default_repo string|nil
 ---@return table[]
-function M.expand_and_reorder (children, child_level, default_source)
+function M.expand_and_reorder (children, child_level, default_repo)
   local field_map = {}
   for _, group in ipairs(children) do
     table.insert(field_map, { name = group[1].text, group = group })
@@ -173,18 +173,18 @@ function M.expand_and_reorder (children, child_level, default_source)
       seen[field_name] = true
       for _, headline in ipairs(
           M.maybe_expand_field(existing.group, child_level,
-                               field_name, default_source)) do
+                               field_name, default_repo)) do
         table.insert(ordered, headline) end
     elseif M.editable_default_for(field_name) then
       seen[field_name] = true
       table.insert(ordered, { level = child_level, text = field_name })
       table.insert(ordered, { level = child_level + 1,
                               text = M.editable_default_for(field_name) })
-    elseif field_name == 'source' and default_source then
+    elseif field_name == 'repo' and default_repo then
       seen[field_name] = true
-      table.insert(ordered, { level = child_level, text = 'source' })
+      table.insert(ordered, { level = child_level, text = 'repo' })
       table.insert(ordered, { level = child_level + 1,
-                              text = default_source .. ' (default)' })
+                              text = default_repo .. ' (default)' })
     end
   end
   for _, entry in ipairs(field_map) do
@@ -198,22 +198,22 @@ function M.expand_and_reorder (children, child_level, default_source)
 end
 
 ---Expand GROUP for display: a bare 'writeProtected' boolean gains a 'true'
----child; a source value matching DEFAULT_SOURCE gains ' (default)'.
+---child; a repo value matching DEFAULT_REPO gains ' (default)'.
 ---@param group table[]
 ---@param child_level integer
 ---@param field_name string
----@param default_source string|nil
+---@param default_repo string|nil
 ---@return table[]
 function M.maybe_expand_field (group, child_level, field_name,
-                               default_source)
+                               default_repo)
   if #group == 1 and field_name == 'writeProtected' then
     return { group[1], { level = child_level + 1, text = 'true' } } end
-  if field_name == 'source' and default_source and #group == 2 then
+  if field_name == 'repo' and default_repo and #group == 2 then
     local value = vim.trim(group[2].text)
-    if value == default_source then
+    if value == default_repo then
       return { group[1],
                { level = child_level + 1,
-                 text = default_source .. ' (default)' } } end
+                 text = default_repo .. ' (default)' } } end
   end
   return group
 end
@@ -326,7 +326,7 @@ function M.strip_one_field (group, field_name, child_level)
       return nil end
     if M.default_none_p(value_text) and #group == 2 then return nil end
     return group end
-  if field_name == 'source' then
+  if field_name == 'repo' then
     if value_text == nil then return nil end
     return { { level = child_level, text = field_name },
              { level = child_level + 1,

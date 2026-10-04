@@ -5,13 +5,13 @@ pub use super::super::common::*;
 /// The expected git diff view output.
 /// This is what multi_root_view should produce with diff_mode_enabled=true.
 pub const GIT_DIFF_VIEW: &str = "\
-* (skg (node (id 1) (source main))) 1
-** (skg (node (id 11) (source main))) 11
-*** (skg (node (id gets-removed) (source main) writeProtected (unstaged removedX removedM))) gets-removed
+* (skg (node (id 1) (repo main))) 1
+** (skg (node (id 11) (repo main))) 11
+*** (skg (node (id gets-removed) (repo main) writeProtected (unstaged removedX removedM))) gets-removed
 *** (skg (node (id moves) (unstaged newM))) moves
-** (skg (node (id 12) (source main))) 12
-*** (skg (node (id moves) (source main) writeProtected (unstaged removedM))) moves
-* (skg (node (id new) (source main))) new
+** (skg (node (id 12) (repo main))) 12
+*** (skg (node (id moves) (repo main) writeProtected (unstaged removedM))) moves
+* (skg (node (id new) (repo main))) new
 ";
 
 /// Create a git repo with head->worktree transition from content fixtures.
@@ -93,22 +93,22 @@ pub fn setup_gitrepo_with_added_subscribee_fixtures(
 /// write-protected and so gets NO removed-member phantoms; the
 /// definitive root copy of 11 carries them.
 pub const GIT_DIFF_VIEW_WRITE_PROTECTED_NO_GHOSTS: &str = "\
-* (skg (node (id 1) (source main))) 1
-** (skg (node (id 11) (source main) writeProtected)) 11
-** (skg (node (id 12) (source main))) 12
-*** (skg (node (id moves) (source main) writeProtected (unstaged removedM))) moves
-* (skg (node (id 11) (source main))) 11
-** (skg (node (id gets-removed) (source main) writeProtected (unstaged removedX removedM))) gets-removed
+* (skg (node (id 1) (repo main))) 1
+** (skg (node (id 11) (repo main) writeProtected)) 11
+** (skg (node (id 12) (repo main))) 12
+*** (skg (node (id moves) (repo main) writeProtected (unstaged removedM))) moves
+* (skg (node (id 11) (repo main))) 11
+** (skg (node (id gets-removed) (repo main) writeProtected (unstaged removedX removedM))) gets-removed
 ** (skg (node (id moves) (unstaged newM))) moves
 ";
 
 /// Expected output when the transition is staged rather than unstaged.
 pub const GIT_DIFF_VIEW_STAGED: &str = "\
-* (skg (node (id 1) (source main))) 1
-** (skg (node (id 11) (source main))) 11
-*** (skg (node (id gets-removed) (source main) writeProtected (staged removedX removedM))) gets-removed
+* (skg (node (id 1) (repo main))) 1
+** (skg (node (id 11) (repo main))) 11
+*** (skg (node (id gets-removed) (repo main) writeProtected (staged removedX removedM))) gets-removed
 *** (skg (node (id moves) (staged newM))) moves
-** (skg (node (id 12) (source main))) 12
-*** (skg (node (id moves) (source main) writeProtected (staged removedM))) moves
-* (skg (node (id new) (source main))) new
+** (skg (node (id 12) (repo main))) 12
+*** (skg (node (id moves) (repo main) writeProtected (staged removedM))) moves
+* (skg (node (id new) (repo main))) new
 ";

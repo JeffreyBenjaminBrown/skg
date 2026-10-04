@@ -34,7 +34,7 @@ pub(crate) fn prepare_import_publication (
   let mut claims : HashMap<ID, ID> = HashMap::new ();
   for node in nodes {
     if ! config . user_owns_repo (&node . home_repo) {
-      return Err (format! ("Destination source {:?} is not owned",
+      return Err (format! ("Destination repo {:?} is not owned",
         node . home_repo)); }
     for id in node . all_ids () {
       validate_safe_id (id)?;
@@ -42,7 +42,7 @@ pub(crate) fn prepare_import_publication (
         return Err (format! ("ID {} is claimed by both {} and {} in this import",
           id, owner, node . pid)); }
       if let Some ((owner, repo)) = runtime . graph . pid_and_repo (id) {
-        return Err (format! ("ID {} already belongs to {} in source {}",
+        return Err (format! ("ID {} already belongs to {} in repo {}",
           id, owner, repo)); } } }
   check_authoritative_disk_claims (&claims, config)?;
   let definitions : Vec<DefineNode> = nodes . iter () . cloned ()
@@ -103,13 +103,13 @@ fn check_authoritative_disk_claims (
 ) -> Result<(), String> {
   for repo in config . ordered_repos () {
     let sections = read_skg_sections_from_folder (&repo, config)
-      .map_err (|error| format! ("Reading source {}: {}", repo, error))?;
+      .map_err (|error| format! ("Reading repo {}: {}", repo, error))?;
     for (_, section) in sections {
       for id in std::iter::once (&section . pid)
         .chain (section . extra_ids . iter ()) {
         if let Some (new_owner) = claims . get (id) {
           return Err (format! (
-            "ID {} for imported node {} is already claimed on disk by {} in source {}",
+            "ID {} for imported node {} is already claimed on disk by {} in repo {}",
             id, new_owner, section . pid, repo)); } } }
     for pid in claims . values () {
       let path : String = crate::util::path_from_pid_and_repo (

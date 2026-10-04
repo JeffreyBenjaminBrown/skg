@@ -8,7 +8,7 @@
 
 Regression guard for a volatile-session-state bug: the herald rule
 table is fetched once per connect (`skg-request-herald-rules') and has
-no on-disk source.  `skg-reload' unloads `heralds-minor-mode' -- which
+no on-disk repo.  `skg-reload' unloads `heralds-minor-mode' -- which
 wipes the table -- and is supposed to re-install the captured copy
 afterward.  When the re-install was a plain sequential step, any error
 in a reloaded file (a stray edit-in-progress, say) aborted `skg-reload'

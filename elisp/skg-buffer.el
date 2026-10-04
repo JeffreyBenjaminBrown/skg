@@ -117,12 +117,12 @@ an edit command typed via M-x keeps the approval."
   "Whether the snapshot currently being enriched contained unsaved edits.")
 (put 'skg--search-snapshot-was-dirty 'permanent-local t)
 
-(defvar-local skg-contentView-initialRoot-source nil
-  "Source of the initial first root in this skg content view.
+(defvar-local skg-contentView-initialRoot-repo nil
+  "Repo of the initial first root in this skg content view.
 Captured when the view opens and retained only to disambiguate its
 buffer name if another content view opens with the same title.  Later
 view-forest edits do not change it.")
-(put 'skg-contentView-initialRoot-source 'permanent-local t)
+(put 'skg-contentView-initialRoot-repo 'permanent-local t)
 
 (defun skg--capture-clean-baseline ()
   "Record the current normalized view text and available context."
@@ -136,7 +136,7 @@ view-forest edits do not change it.")
         (list :git-diff-mode
               (and (boundp 'skg--git-diff-mode-enabled)
                    skg--git-diff-mode-enabled)
-              :source-set "unavailable"))
+              :repo-set "unavailable"))
   (setq skg--search-enrichment-includes-user-edits nil))
 
 (defun skg-content-view-buffer-name (org-text)
@@ -148,8 +148,8 @@ view-forest edits do not change it.")
       (error "skg: content view has no headline (first 200 chars: %s)"
              (substring (or org-text "") 0 (min 200 (length (or org-text ""))))))))
 
-(defun skg-content-view-source-name (org-text)
-  "Return the initial first root's source from ORG-TEXT, or nil.
+(defun skg-content-view-repo-name (org-text)
+  "Return the initial first root's repo from ORG-TEXT, or nil.
 The first headline of a content view begins with a skg metadata sexp.
 Malformed or absent metadata is tolerated here because it should not
 prevent a view from opening."
@@ -162,36 +162,36 @@ prevent a view from opening."
                (kind (or (assoc 'node (cdr sexp))
                          (assoc 'diffPhantom (cdr sexp))
                          (assoc 'deleted (cdr sexp))))
-               (source (and kind (cadr (assoc 'source (cdr kind))))))
-          (when source (format "%s" source))))
+               (repo (and kind (cadr (assoc 'repo (cdr kind))))))
+          (when repo (format "%s" repo))))
     (error nil)))
 
-(defun skg--source-qualified-buffer-name (buffer-name source)
-  "Append SOURCE in angle brackets to BUFFER-NAME."
-  (format "%s <%s>" buffer-name (skg-sanitize-buffer-name source)))
+(defun skg--repo-qualified-buffer-name (buffer-name repo)
+  "Append REPO in angle brackets to BUFFER-NAME."
+  (format "%s <%s>" buffer-name (skg-sanitize-buffer-name repo)))
 
-(defun skg--generate-contentView-buffer (buffer-name source)
-  "Generate a new content-view buffer named from BUFFER-NAME and SOURCE.
-When BUFFER-NAME is occupied by an skg view from another known source,
-rename that view and the new one with source qualifiers.  Otherwise use
+(defun skg--generate-contentView-buffer (buffer-name repo)
+  "Generate a new content-view buffer named from BUFFER-NAME and REPO.
+When BUFFER-NAME is occupied by an skg view from another known repo,
+rename that view and the new one with repo qualifiers.  Otherwise use
 Emacs's conventional numeric suffix.  Never reuse or erase an existing
 buffer."
   (let ((existing (get-buffer buffer-name)))
     (if (not existing)
         (generate-new-buffer buffer-name)
-      (let* ((existing-source
+      (let* ((existing-repo
               (and (skg-buffer-p existing)
                    (buffer-local-value
-                    'skg-contentView-initialRoot-source existing)))
+                    'skg-contentView-initialRoot-repo existing)))
              (existing-name
-              (and existing-source
-                   (skg--source-qualified-buffer-name
-                    buffer-name existing-source)))
+              (and existing-repo
+                   (skg--repo-qualified-buffer-name
+                    buffer-name existing-repo)))
              (new-name
-              (and source
-                   (skg--source-qualified-buffer-name buffer-name source))))
-        (if (and existing-source source
-                 (not (string= existing-source source))
+              (and repo
+                   (skg--repo-qualified-buffer-name buffer-name repo))))
+        (if (and existing-repo repo
+                 (not (string= existing-repo repo))
                  (not (get-buffer existing-name))
                  (not (get-buffer new-name)))
             (progn
@@ -247,8 +247,8 @@ and truncates to a reasonable length."
   "Open a new buffer and insert ORG-TEXT, enabling org-mode.
 If VIEW-URI is provided, set it as the buffer's skg-view-uri;
 otherwise generate a new UUID."
-  (let* ((source (skg-content-view-source-name org-text))
-         (buffer (skg--generate-contentView-buffer buffer-name source))
+  (let* ((repo (skg-content-view-repo-name org-text))
+         (buffer (skg--generate-contentView-buffer buffer-name repo))
         (uri (or view-uri (org-id-uuid))))
     (with-current-buffer buffer
       (let ((inhibit-read-only t)
@@ -259,7 +259,7 @@ otherwise generate a new UUID."
         (heralds-minor-mode)
         (skg-link-annotations-mode 1))
       (setq skg-view-uri uri)
-      (setq skg-contentView-initialRoot-source source)
+      (setq skg-contentView-initialRoot-repo repo)
       (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
       (set-buffer-modified-p nil)
       (skg--capture-clean-baseline)

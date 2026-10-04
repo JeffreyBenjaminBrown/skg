@@ -515,7 +515,7 @@ fn fork_repos_from_request (
     let Sexp::List (pair) = item else { continue; };
     let Some ( Sexp::Atom ( Atom::S (k) )) = pair . first ()
       else { continue; };
-    if k != "fork-sources" { continue; }
+    if k != "fork-repos" { continue; }
     let Some ( Sexp::List (entries) ) = pair . get (1)
       else { continue; };
     for entry in entries {
@@ -868,7 +868,7 @@ pub fn validate_no_merge_commits (
         match head_is_merge_commit (&gitrepo) {
           Ok (true) => {
             return Err ( format! (
-              "Cannot compute diff: HEAD is a merge commit in source '{}'.",
+              "Cannot compute diff: HEAD is a merge commit in repo '{}'.",
               skgrepo )); },
           Ok (false) => {},
           Err (e) => { // Git error - log but continue
@@ -889,7 +889,7 @@ pub fn compute_diff_for_every_repo (
         repo_diffs . insert ( repo_name . clone(), diff ); },
       Err (e) => { // Log error but continue with other repos
         tracing::warn! (
-          "Failed to compute diff for source '{}': {}",
+          "Failed to compute diff for repo '{}': {}",
           repo_name, e ); }} }
   repo_diffs }
 

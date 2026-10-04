@@ -2,19 +2,19 @@
 ;;;
 ;;; PURPOSE: skg-export-some-to-org -- export Skg data to plain .org
 ;;; files under org-exports/. All the logic is in Rust; this command
-;;; picks a source-set (client-side, with the circular selector) and
+;;; picks a repo-set (client-side, with the circular selector) and
 ;;; sends the "export to org" request, then shows the server's report.
 
-(require 'skg-config)         ; skg--prompt-for-source-set
+(require 'skg-config)         ; skg--prompt-for-repo-set
 (require 'skg-length-prefix)
 (require 'skg-request-save)   ; skg-big-nonfatal-message,
                               ; skg--message-list-nonempty-p,
                               ; skg-errors-and-warnings-to-org-string
 (require 'skg-state)
 
-(defun skg-export-some-to-org (source-set output-dir &optional approved-pids)
+(defun skg-export-some-to-org (repo-set output-dir &optional approved-pids)
   "Export Skg data to .org files under OUTPUT-DIR.
-Prompts for a SOURCE-SET (S-left/S-right cycle, tab completion);
+Prompts for a REPO-SET (S-left/S-right cycle, tab completion);
 only nodes from that set are included, so choose a public-facing
 subset to avoid exporting private notes.  Then prompts for
 OUTPUT-DIR.
@@ -34,13 +34,13 @@ links.  Broken links point to a \"some links might be broken\"
 note.  Existing files are overwritten in place; others are left
 untouched."
   (interactive
-   (list (skg--prompt-for-source-set)
+   (list (skg--prompt-for-repo-set)
          (read-string
           "Export to dir (relative to the server's project root) [org-exports]: "
           nil nil "org-exports")))
-  (when (string= source-set "all")
+  (when (string= repo-set "all")
     (message
-     "Exporting source-set `all'; consider a public-facing source-set so private notes are not exported."))
+     "Exporting repo-set `all'; consider a public-facing repo-set so private notes are not exported."))
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
     (skg-register-response-handler
      'export-to-org
@@ -67,7 +67,7 @@ untouched."
               (pids (mapcar (lambda (pid) (format "%s" pid))
                             (cadr (assoc 'pids response)))))
          (when (y-or-n-p (concat prompt " "))
-           (skg-export-some-to-org source-set output-dir pids))))
+           (skg-export-some-to-org repo-set output-dir pids))))
      nil)
     (skg-lp-reset)
     (process-send-string
@@ -76,7 +76,7 @@ untouched."
       (prin1-to-string
        (append
         `((request . "export to org")
-          (source-set . ,source-set)
+          (repo-set . ,repo-set)
           (output-dir . ,output-dir))
         (when approved-pids
           `((allow-overPrivateText-telescopes ,@approved-pids)))))

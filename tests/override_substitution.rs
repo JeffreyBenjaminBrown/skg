@@ -206,9 +206,9 @@ async fn extraction_honors_the_marker (
         // P's instruction entirely -- the round-trip in its
         // strongest form.
         let buffer = indoc! {"
-          * (skg (node (id P) (source main))) P
-          ** (skg (node (id R) (source main) (viewStats (overridesHere N)) writeProtected)) R
-          ** (skg (node (id M) (source main) writeProtected)) M
+          * (skg (node (id P) (repo main))) P
+          ** (skg (node (id R) (repo main) (viewStats (overridesHere N)) writeProtected)) R
+          ** (skg (node (id M) (repo main) writeProtected)) M
         "};
         assert! (
           opt_saved_node_by_id (
@@ -218,8 +218,8 @@ async fn extraction_honors_the_marker (
            touches P" ); }
       { // Deleting the drawn child deletes the original member.
         let buffer = indoc! {"
-          * (skg (node (id P) (source main))) P
-          ** (skg (node (id M) (source main) writeProtected)) M
+          * (skg (node (id P) (repo main))) P
+          ** (skg (node (id M) (repo main) writeProtected)) M
         "};
         assert_eq! (
           members_of ( & saved_node_by_id (
@@ -228,9 +228,9 @@ async fn extraction_honors_the_marker (
           vec![ ID::from ("M") ] ); }
       { // Reordering the drawn child positions the original.
         let buffer = indoc! {"
-          * (skg (node (id P) (source main))) P
-          ** (skg (node (id M) (source main) writeProtected)) M
-          ** (skg (node (id R) (source main) (viewStats (overridesHere N)) writeProtected)) R
+          * (skg (node (id P) (repo main))) P
+          ** (skg (node (id M) (repo main) writeProtected)) M
+          ** (skg (node (id R) (repo main) (viewStats (overridesHere N)) writeProtected)) R
         "};
         assert_eq! (
           members_of ( & saved_node_by_id (
@@ -239,11 +239,11 @@ async fn extraction_honors_the_marker (
           vec![ ID::from ("M"), ID::from ("N") ] ); }
       { // Moving the drawn child to another parent moves the original.
         let buffer = indoc! {"
-          * (skg (node (id Q) (source main))) Q
-          ** (skg (node (id P) (source main))) P
-          *** (skg (node (id M) (source main) writeProtected)) M
-          ** (skg (node (id P2) (source main))) P2
-          *** (skg (node (id R) (source main) (viewStats (overridesHere N)) writeProtected)) R
+          * (skg (node (id Q) (repo main))) Q
+          ** (skg (node (id P) (repo main))) P
+          *** (skg (node (id M) (repo main) writeProtected)) M
+          ** (skg (node (id P2) (repo main))) P2
+          *** (skg (node (id R) (repo main) (viewStats (overridesHere N)) writeProtected)) R
         "};
         let instructions : Vec<DefineNode> =
           define_nodes_from (buffer, config) . await ?;
@@ -255,10 +255,10 @@ async fn extraction_honors_the_marker (
           vec![ ID::from ("N") ] ); }
       { // Edits to the drawn R save to R; N is untouched.
         let buffer = indoc! {"
-          * (skg (node (id P) (source main))) P
-          ** (skg (node (id R) (source main) (viewStats (overridesHere N)))) R-edited
-          *** (skg (node (id W) (source main) writeProtected)) W
-          ** (skg (node (id M) (source main) writeProtected)) M
+          * (skg (node (id P) (repo main))) P
+          ** (skg (node (id R) (repo main) (viewStats (overridesHere N)))) R-edited
+          *** (skg (node (id W) (repo main) writeProtected)) W
+          ** (skg (node (id M) (repo main) writeProtected)) M
         "};
         let instructions : Vec<DefineNode> =
           define_nodes_from (buffer, config) . await ?;
@@ -274,9 +274,9 @@ async fn extraction_honors_the_marker (
       { // A legacy buffer drawing N raw still saves identically
         // (a noop, like the marked equivalent above).
         let buffer = indoc! {"
-          * (skg (node (id P) (source main))) P
-          ** (skg (node (id N) (source main) writeProtected)) N
-          ** (skg (node (id M) (source main) writeProtected)) M
+          * (skg (node (id P) (repo main))) P
+          ** (skg (node (id N) (repo main) writeProtected)) N
+          ** (skg (node (id M) (repo main) writeProtected)) M
         "};
         assert! (
           opt_saved_node_by_id (
@@ -284,8 +284,8 @@ async fn extraction_honors_the_marker (
             "P" ) . is_none () ); }
       { // Tamper: a marker the server would not have drawn aborts.
         let buffer = indoc! {"
-          * (skg (node (id P) (source main))) P
-          ** (skg (node (id M) (source main) (viewStats (overridesHere W)) writeProtected)) M
+          * (skg (node (id P) (repo main))) P
+          ** (skg (node (id M) (repo main) (viewStats (overridesHere W)) writeProtected)) M
         "};
         match define_nodes_from (buffer, config) . await {
           Err (SaveError::BufferValidationErrors { errors, .. }) => {
@@ -298,10 +298,10 @@ async fn extraction_honors_the_marker (
       { // Subscribee-as-such: the visible-content signal speaks of
         // the original, so no phantom hide of N is inferred.
         let buffer = indoc! {"
-          * (skg (node (id S) (source main))) S
+          * (skg (node (id S) (repo main))) S
           ** (skg subscribeeFolder)
-          *** (skg (node (id E) (source main))) E
-          **** (skg (node (id R) (source main) (viewStats (overridesHere N)) writeProtected)) R
+          *** (skg (node (id E) (repo main))) E
+          **** (skg (node (id R) (repo main) (viewStats (overridesHere N)) writeProtected)) R
         "};
         let instructions : Vec<DefineNode> =
           define_nodes_from (buffer, config) . await ?;
@@ -476,7 +476,7 @@ async fn ownership_and_visibility_gate_substitution (
             config, None,
             &[ ID::from ("P2") ], false, &active ) ?;
         assert! ( marked_lines (&view, "N2") . is_empty (),
-          "R2's source is inactive; N2 draws raw:\n{}", view );
+          "R2's repo is inactive; N2 draws raw:\n{}", view );
         assert! ( view . contains ("(id N2)"), "{}", view ); }
       { // The same overrider substitutes when its Skg repo is active.
         let (view, _pids, _tree) =
@@ -588,8 +588,8 @@ async fn chain_half_visible_keeps_the_original (
           p_file ); }
       { // A marker on a node NOT on N's chain is rejected.
         let buffer = indoc! {"
-          * (skg (node (id P) (source main))) P
-          ** (skg (node (id D) (source other) (viewStats (overridesHere P)) writeProtected)) D
+          * (skg (node (id P) (repo main))) P
+          ** (skg (node (id D) (repo other) (viewStats (overridesHere P)) writeProtected)) D
         "};
         match define_nodes_from (buffer, config) . await {
           Err (SaveError::BufferValidationErrors { errors, .. }) =>

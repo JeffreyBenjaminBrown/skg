@@ -72,7 +72,7 @@ fn repo_inheritance_across_non_content_same_repo () {
     = & b_ref . value () . kind
     else { panic! ("expected ActiveNode") };
   assert! ( ! t . viewStats . homeRepoAtBoundary,
-            "Same source across non-content boundary \
+            "Same repo across non-content boundary \
              should NOT be at boundary" ); }
 
 /// When a non-content child (affectsParent != Affected) has a different repo
@@ -112,5 +112,5 @@ fn repo_inheritance_across_non_content_different_repo () {
     = & b_ref . value () . kind
     else { panic! ("expected ActiveNode") };
   assert! ( t . viewStats . homeRepoAtBoundary,
-            "Different source across non-content boundary \
+            "Different repo across non-content boundary \
              should be at boundary" ); }

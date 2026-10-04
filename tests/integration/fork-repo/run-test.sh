@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Integration test for the fork-confirmation buffer's editable clone
-# source. Two OWNED sources (owned, owned2) plus a FOREIGN one.
+# repo. Two OWNED repos (owned, owned2) plus a FOREIGN one.
 # - Emacs opens owned P (whose content is foreign N), makes N definitive,
 #   edits its title, and saves -> a fork-confirmation buffer.
-# - The clone's source is inferred as "owned"; the test rotates it to
+# - The clone's repo is inferred as "owned"; the test rotates it to
 #   "owned2" in the confirmation buffer, then approves.
-# - The clone must land in "owned2" (the rotated source), not "owned".
+# - The clone must land in "owned2" (the rotated repo), not "owned".
 
 set -e
 
@@ -15,7 +15,7 @@ PROJECT_ROOT="$(cd "$TEST_DIR/../../.." && pwd)"
 
 source "$TEST_DIR/../test-lib.sh"
 
-echo "=== SKG Fork Source-Rotation Integration Test ==="
+echo "=== SKG Fork Repo-Rotation Integration Test ==="
 echo "Test directory: $TEST_DIR"
 
 cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
@@ -23,10 +23,10 @@ cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
 # Restore the fixtures the save mutates, so reruns start clean.
 restore_fork_fixtures() {
   git -C "$PROJECT_ROOT" checkout -- \
-    "tests/integration/fork-source/data/owned" \
-    "tests/integration/fork-source/data/owned2" \
-    "tests/integration/fork-source/data/foreign" 2>/dev/null || true
-  # Remove any clone .skg written into either owned source.
+    "tests/integration/fork-repo/data/owned" \
+    "tests/integration/fork-repo/data/owned2" \
+    "tests/integration/fork-repo/data/foreign" 2>/dev/null || true
+  # Remove any clone .skg written into either owned repo.
   find "$TEST_DIR/data/owned/owned"  -name '*.skg' ! -name 'P.skg' -delete 2>/dev/null || true
   find "$TEST_DIR/data/owned/owned2" -name '*.skg' -delete 2>/dev/null || true
 }

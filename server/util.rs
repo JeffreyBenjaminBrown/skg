@@ -10,7 +10,7 @@ pub fn path_from_pid_and_repo (
 ) -> Result < String, String > {
   let repo_config : &SkgfileRepo =
     config . repos . get (repo)
-    . ok_or_else ( || format! ("Source '{}' not found in config",
+    . ok_or_else ( || format! ("Repo '{}' not found in config",
                                repo) ) ?;
   let f : PathBuf = repo_config . path . clone() ;
   let s: String = pid . 0;

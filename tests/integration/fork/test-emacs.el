@@ -69,7 +69,7 @@
                    (buffer-string))))
 
     ;; 2. Insert bare N under F, and move the existing O headline from
-    ;; F to N.  The bare node must inherit the eventual clone source.
+    ;; F to N.  The bare node must inherit the eventual clone repo.
     (with-current-buffer fork-buffer
       (goto-char (point-min))
       (unless (re-search-forward "^\\*\\* .*?(id O).*$" nil t)
@@ -88,7 +88,7 @@
       (goto-char (point-min))
       (skg-request-save-buffer))
 
-    ;; 3. The confirmation names F; choose the owned source and approve.
+    ;; 3. The confirmation names F; choose the owned repo and approve.
     (let ((confirm-buf
            (skg-test-wait-for
             (lambda () (get-buffer "*SKG Fork Confirmation*")) 10)))
@@ -98,11 +98,11 @@
           (test-fail "confirmation buffer does not list F:\n%s"
                      (buffer-string)))
         (goto-char (point-min))
-        (unless (re-search-forward "^\\* (skg (node (source " nil t)
-          (test-fail "could not find clone-to-be source headline:\n%s"
+        (unless (re-search-forward "^\\* (skg (node (repo " nil t)
+          (test-fail "could not find clone-to-be repo headline:\n%s"
                      (buffer-string)))
         (beginning-of-line)
-        (skg--change-source-at-point "owned")
+        (skg--change-repo-at-point "owned")
         (skg-approve-fork)))
 
     ;; 4. Approval must finish cleanly.  In particular, the checked

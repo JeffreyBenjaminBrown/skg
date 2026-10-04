@@ -54,7 +54,7 @@
       (setq skg-view-uri (org-id-uuid))
 
       ;; Insert the 6 headlines
-      (insert "* (skg (node (id 1) (source main))) 1\n")
+      (insert "* (skg (node (id 1) (repo main))) 1\n")
       (insert "** (skg (node (id 2))) 2\n")
       (insert "** (skg (node (id 3))) 3\n")
       (insert "*** (skg (node (id 4))) 4\n")

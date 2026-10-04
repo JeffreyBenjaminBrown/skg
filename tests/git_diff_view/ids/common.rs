@@ -6,13 +6,13 @@ pub use super::super::common::*;
 /// When an id is added or removed, an idFolder scaffold appears showing the diff.
 /// Individual ids appear as children with diff markers for added/removed.
 pub const GIT_DIFF_VIEW: &str = "\
-* (skg (node (id 1) (source main))) 1
+* (skg (node (id 1) (repo main))) 1
 ** (skg idFolder)
 *** (skg id) 1
 *** (skg id (unstaged removedM)) 2
 *** (skg id (unstaged newM)) 2'
 *** (skg id) 3
-** (skg (node (id child) (source main))) child
+** (skg (node (id child) (repo main))) child
 ";
 
 /// Create a git repo with head->worktree transition from ids fixtures.
@@ -39,11 +39,11 @@ pub fn setup_gitrepo_with_fixtures_staged(
 
 /// Expected diff view when the id changes are staged (not unstaged).
 pub const GIT_DIFF_VIEW_STAGED: &str = "\
-* (skg (node (id 1) (source main))) 1
+* (skg (node (id 1) (repo main))) 1
 ** (skg idFolder)
 *** (skg id) 1
 *** (skg id (staged removedM)) 2
 *** (skg id (staged newM)) 2'
 *** (skg id) 3
-** (skg (node (id child) (source main))) child
+** (skg (node (id child) (repo main))) child
 ";

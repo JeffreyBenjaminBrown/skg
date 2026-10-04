@@ -65,11 +65,11 @@
         ;; c gets editRequest delete; d is removed from b's children;
         ;; e is renamed; f added with d as child.
         (erase-buffer)
-        (insert "* (skg (node (id b) (source main))) b\n")
-        (insert "** (skg (node (id c) (source main) (editRequest delete))) c\n")
-        (insert "** (skg (node (id e) (source main))) e, edited\n")
-        (insert "** (skg (node (id f) (source main))) f\n")
-        (insert "*** (skg (node (id d) (source main))) d\n")))
+        (insert "* (skg (node (id b) (repo main))) b\n")
+        (insert "** (skg (node (id c) (repo main) (editRequest delete))) c\n")
+        (insert "** (skg (node (id e) (repo main))) e, edited\n")
+        (insert "** (skg (node (id f) (repo main))) f\n")
+        (insert "*** (skg (node (id d) (repo main))) d\n")))
     (with-current-buffer buf
       (skg-request-save-buffer))
     (skg-test-wait-for-response)))

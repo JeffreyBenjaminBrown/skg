@@ -243,7 +243,7 @@ pub fn viewnode_from_metadata (
           else if metadata . writeProtected
                && metadata . relRepo_request . is_some ()
           { Some ( BufferValidationError::Other (
-              "relSource request on a write-protected node"
+              "relRepo request on a write-protected node"
               . to_string () )) }
           else { None };
         let t : MpActiveNode = MpActiveNode {
@@ -366,13 +366,13 @@ pub fn parse_metadata_to_viewnodemd (
               &items[1..],
               false, // unstaged
               &mut result . scaffold_membership ) ?; },
-          "relSource" => {
+          "relRepo" => {
             if items . len () != 2 {
               return Err (
-                "relSource requires exactly one source name"
+                "relRepo requires exactly one repo name"
                 . to_string () ); }
             if result . scaffold_relRepo . is_some () {
-              return Err ( "Alias relSource may appear only once"
+              return Err ( "Alias relRepo may appear only once"
                            . to_string () ); }
             result . scaffold_relRepo = Some ( RepoName::from (
               atom_to_string (&items [1]) ? )); },
@@ -381,7 +381,7 @@ pub fn parse_metadata_to_viewnodemd (
             parse_editrequest_sexp (
               &items[1..], &mut request_metadata ) ?;
             if request_metadata . edit_request . is_some () {
-              return Err ( "Only Alias may carry a top-level editRequest relSource"
+              return Err ( "Only Alias may carry a top-level editRequest relRepo"
                            . to_string () ); }
             if result . scaffold_relRepo_request . is_some () {
               return Err ( "Alias editRequest may appear only once"
@@ -419,7 +419,7 @@ pub fn parse_metadata_to_viewnodemd (
           // Note: "alias" as a list like (alias "string") is no longer supported.
           // Use bare "alias" atom instead - the alias string comes from headline title.
           // Legacy format detection - reject with helpful error
-          "id" | "source" | "view" | "code" => {
+          "id" | "repo" | "view" | "code" => {
             return Err ( format! (
               "Legacy metadata format detected (found '{}' at top level). \
                The new format uses (skg [focused] [folded] (node ...)) for ActiveNodes \
@@ -481,7 +481,7 @@ pub fn parse_metadata_to_viewnodemd (
        || result . scaffold_relRepo_request . is_some () )
      && ! matches! ( result . non_vognode,
                      Some (MpViewnodeKind::Qual (Qual::Alias { .. })) )
-  { return Err ( "relSource and its editRequest are valid only on Alias scaffolds"
+  { return Err ( "relRepo and its editRequest are valid only on Alias scaffolds"
                  . to_string () ); }
   Ok (result) }
 
@@ -503,9 +503,9 @@ fn parse_node_sexp (
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
             metadata . id = Some ( ID::from (value)); },
-          "source" => {
+          "repo" => {
             if subitems . len () != 2 {
-              return Err ( "source requires exactly one value" . to_string () ); }
+              return Err ( "repo requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
             metadata . home_repo = Some ( RepoName::from (value) ); },
@@ -642,7 +642,7 @@ fn parse_unknownnode_sexp (
             parse_viewstats_sexp ( &subitems[1..], &mut stats ) ?;
             if stats . relRepo . is_none ()
                || stats . cycle || stats . overridesHere . is_some () {
-              return Err ( "Unknown viewStats supports only relSource"
+              return Err ( "Unknown viewStats supports only relRepo"
                            . to_string () ); }
             metadata . unknown_relRepo = stats . relRepo; },
           "editRequest" => {
@@ -653,7 +653,7 @@ fn parse_unknownnode_sexp (
             parse_editrequest_sexp (
               &subitems[1..], &mut request_metadata ) ?;
             if request_metadata . edit_request . is_some () {
-              return Err ( "Unknown supports only an editRequest relSource"
+              return Err ( "Unknown supports only an editRequest relRepo"
                            . to_string () ); }
             metadata . unknown_relRepo_request =
               request_metadata . relRepo_request; },
@@ -693,9 +693,9 @@ fn parse_deleted_sexp (
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
             metadata . id = Some ( ID::from (value)); },
-          "source" => {
+          "repo" => {
             if subitems . len () != 2 {
-              return Err ( "deleted source requires exactly one value" . to_string () ); }
+              return Err ( "deleted repo requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
             metadata . home_repo = Some ( RepoName::from (value)); },
@@ -727,14 +727,14 @@ fn parse_viewstats_sexp (
       Sexp::List (kv_pair) if kv_pair . len () == 2 => {
         let key : String = atom_to_string ( &kv_pair[0] ) ?;
         match key . as_str () {
-          "sourceHerald" => {}, // output-only, silently discard
+          "homeRepoHerald" => {}, // output-only, silently discard
           "overridesHere" => {
             // LOAD-BEARING, unlike the other view stats: save
             // extraction round-trips the original ID through it.
             let value : String =
               atom_to_string ( &kv_pair[1] ) ?;
             stats . overridesHere = Some ( ID::from (value)); },
-          "relSource" => {
+          "relRepo" => {
             // Display-only repo fact.  A save request must instead
             // appear as (editRequest (relRepo REPO)).
             let value : String =
@@ -764,7 +764,7 @@ fn parse_editrequest_sexp (
             atom_to_string ( &subitems[1] ) ?;
           metadata . edit_request = Some (
             NodeEditRequest::NodeMerge ( ID::from (id_str)));
-        } else if key == "relSource" {
+        } else if key == "relRepo" {
           let repo : String = atom_to_string ( &subitems[1] ) ?;
           metadata . relRepo_request =
             Some ( RepoName::from (repo) );

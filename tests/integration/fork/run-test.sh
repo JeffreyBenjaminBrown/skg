@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Integration test for the fork gesture and its confirmation stage.
-# - Starts an independent skg server with an OWNED + a FOREIGN source.
+# - Starts an independent skg server with an OWNED + a FOREIGN repo.
 # - Emacs opens foreign F as a root and structurally edits its content;
 #   Neovim exercises the simpler foreign-child-under-owned-P gesture.
 # - The save returns a fork-confirmation buffer (nothing committed).
@@ -25,7 +25,7 @@ restore_fork_fixtures() {
   git -C "$PROJECT_ROOT" checkout -- \
     "tests/integration/fork/data/owned" \
     "tests/integration/fork/data/foreign" 2>/dev/null || true
-  # Remove any clone .skg the test wrote into the owned source.
+  # Remove any clone .skg the test wrote into the owned repo.
   find "$TEST_DIR/data/owned/owned" -name '*.skg' ! -name 'P.skg' -delete 2>/dev/null || true
 }
 trap 'cleanup; restore_fork_fixtures' EXIT

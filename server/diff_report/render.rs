@@ -42,7 +42,7 @@ fn render_vanished_nodes (
   out      : &mut String,
   vanished : &[VanishedNodeReport],
 ) {
-  out . push_str ("* vanished nodes (referenced, but existing in no source)\n");
+  out . push_str ("* vanished nodes (referenced, but existing in no repo)\n");
   if vanished . is_empty () {
     out . push_str ("** none\n");
     return; }
@@ -52,11 +52,11 @@ fn render_vanished_nodes (
     out . push_str (&format! ("** {}\n", report . id));
     if report . sightings . is_empty () {
       out . push_str (
-        "*** never present in the git history of any source\n");
+        "*** never present in the git history of any repo\n");
       continue; }
     for sighting in & report . sightings {
       out . push_str (&format! (
-        "*** in source {}\n", sighting . home_repo ));
+        "*** in repo {}\n", sighting . home_repo ));
       out . push_str (&format! (
         "**** title when last present: {}\n", sighting . title ));
       out . push_str (&format! (
@@ -97,9 +97,9 @@ fn render_duplicate_ids (
       "*** {}\n",
       abbreviation_for (&duplicate . id, abbreviations) ));
     out . push_str (&format! ("**** {}\n", duplicate . id));
-    out . push_str ("**** source(s) before these changes\n");
+    out . push_str ("**** repo(s) before these changes\n");
     render_repos (out, &duplicate . before_repos);
-    out . push_str ("**** source(s) after these changes\n");
+    out . push_str ("**** repo(s) after these changes\n");
     render_repos (out, &duplicate . after_repos); }
 }
 
@@ -128,7 +128,7 @@ fn render_node_report (
   out . push_str (&format! ("***** {}\n", node . pid));
   out . push_str (&format! ("***** {}\n", node . title));
   if let Some ((before, after)) = &node . repo_change {
-    out . push_str ("**** source\n");
+    out . push_str ("**** repo\n");
     out . push_str (&format! ("***** was: {}\n", before));
     out . push_str (&format! ("***** is: {}\n", after)); }
   if let Some (diff) = &node . title_diff {

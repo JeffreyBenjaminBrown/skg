@@ -366,7 +366,7 @@ fn lower_one_entry (
     return Ok (NodeIntent::Delete (DeleteNode {
       id     : pid . clone(),
       home_repo : entry . home_repo . ok_or_else ( || format!(
-        "lower_collected_intents: delete entry for {} lacks a source",
+        "lower_collected_intents: delete entry for {} lacks a repo",
         pid )) ?, } )); }
   match entry . title_and_body {
     None =>
@@ -377,7 +377,7 @@ fn lower_one_entry (
       Ok (NodeIntent::Save (NodeSaveIntent {
         pid    : pid . clone(),
         home_repo : entry . home_repo . ok_or_else ( || format!(
-          "lower_collected_intents: save entry for {} lacks a source",
+          "lower_collected_intents: save entry for {} lacks a repo",
           pid )) ?,
         title,
         body,

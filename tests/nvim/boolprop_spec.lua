@@ -22,18 +22,18 @@ local function has_request (line, value)
 end
 
 describe('skg.boolprop staging', function ()
-  local real_owned_sources = config.owned_sources
+  local real_owned_repos = config.owned_repos
   local real_notify = vim.notify
   local real_send_string = client.send_string
   local real_picker = picker.completing_read_with_cycle
 
   before_each(function ()
-    config.owned_sources = function () return { 'main' } end
+    config.owned_repos = function () return { 'main' } end
     vim.notify = function () end
   end)
 
   after_each(function ()
-    config.owned_sources = real_owned_sources
+    config.owned_repos = real_owned_repos
     vim.notify = real_notify
     client.send_string = real_send_string
     picker.completing_read_with_cycle = real_picker
@@ -44,28 +44,28 @@ describe('skg.boolprop staging', function ()
   end)
 
   it('stamps the exact set and clear request shapes', function ()
-    buffer_with({ '* (skg (node (id root) (source main))) root' })
+    buffer_with({ '* (skg (node (id root) (repo main))) root' })
     boolprop._apply(1, true, false)
     assert.is_true(has_request(1, 'true'))
 
-    buffer_with({ '* (skg (node (id root) (source main))) root' })
+    buffer_with({ '* (skg (node (id root) (repo main))) root' })
     boolprop._apply(1, false, false)
     assert.is_true(has_request(1, 'false'))
   end)
 
   it('recurses only through true content and skips ineligible PIDs', function ()
     buffer_with({
-      '* (skg (node (id root) (source main))) root',
-      '** (skg (node (id child) (source main))) child',
-      '** (skg (node (id child) (source main))) duplicate child',
-      '** (skg (node (id protected) (source main) writeProtected)) protected',
-      '** (skg (node (id foreign) (source elsewhere))) foreign',
-      '** (skg (node (id conflict) (source main) (editRequest delete))) conflict',
-      '** (skg (node (id link) (source main) (affectsParent false))) link',
-      '*** (skg (node (id under-link) (source main))) under link',
+      '* (skg (node (id root) (repo main))) root',
+      '** (skg (node (id child) (repo main))) child',
+      '** (skg (node (id child) (repo main))) duplicate child',
+      '** (skg (node (id protected) (repo main) writeProtected)) protected',
+      '** (skg (node (id foreign) (repo elsewhere))) foreign',
+      '** (skg (node (id conflict) (repo main) (editRequest delete))) conflict',
+      '** (skg (node (id link) (repo main) (affectsParent false))) link',
+      '*** (skg (node (id under-link) (repo main))) under link',
       '** (skg aliasFolder) aliases',
-      '*** (skg (node (id under-folder) (source main))) under folder',
-      '* (skg (node (id sibling) (source main))) sibling' })
+      '*** (skg (node (id under-folder) (repo main))) under folder',
+      '* (skg (node (id sibling) (repo main))) sibling' })
 
     boolprop._apply(1, true, true)
 
@@ -85,7 +85,7 @@ describe('skg.boolprop staging', function ()
       return 'no search matching'
     end
     local buf = buffer_with({
-      '* (skg (node (id root) (source main))) root' })
+      '* (skg (node (id root) (repo main))) root' })
     boolprop._request(false)
     assert.is_truthy(sent:find('(request . "property state")', 1, true))
     vim.api.nvim_buf_set_lines(buf, 0, 0, false, { 'preamble' })
@@ -93,7 +93,7 @@ describe('skg.boolprop staging', function ()
     handler('', sexpr.read(
       '((response-type property-state) (id "root")'
       .. ' (property "noSearchMatching") (value "false")'
-      .. ' (source "main") (user-owned "true"))'))
+      .. ' (repo "main") (user-owned "true"))'))
     assert.are.equal('search matching', initial)
     assert.is_true(has_request(2, 'true'))
   end)

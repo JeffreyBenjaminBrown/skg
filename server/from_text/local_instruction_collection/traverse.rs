@@ -339,11 +339,11 @@ fn visit_hiddenOutside_folder (
           ViewNodeKind::Vognode (Vognode::Active (t))
             if member_counts_for_partnerFolder (t) => {
               if t . relRepo_request . is_some () {
-                return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relSources are derived." . to_string ()); }
+                return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
               members . push (t . id . clone ()); },
           ViewNodeKind::Phantom (Phantom::Unknown (unknown)) => {
             if unknown . relRepo_request . is_some () {
-              return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relSources are derived." . to_string ()); }
+              return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
             members . push (unknown . id . clone ()); },
           _ => {}, }}
       collected . instructionMerge_intent (

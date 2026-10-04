@@ -31,7 +31,7 @@
 -- calling it directly. This lets the test assert the resolved path
 -- ITSELF, which is strictly more precise for this regression than
 -- inspecting magit's toplevel afterward: a wrong/double-prefixed path
--- fails the comparison directly at its source, rather than via
+-- fails the comparison directly at its repo, rather than via
 -- magit's directory walk landing somewhere unexpected. b's own id is
 -- not searched for within its own diff (there is no meaningful
 -- "which file" ambiguity to resolve, unlike the parent-diff case in
@@ -108,10 +108,10 @@ do
 end
 
 local info = goto_git.node_info_at_point()
-T.check(info ~= nil, 'node info (id, source) extracted at phantom b')
+T.check(info ~= nil, 'node info (id, repo) extracted at phantom b')
 
 local resolved_path
-goto_git.request_file_path(info.id, info.source,
+goto_git.request_file_path(info.id, info.repo,
   function (path) resolved_path = path end)
 T.check(T.wait_for_response(20),
         'Timeout waiting for get-file-path response')

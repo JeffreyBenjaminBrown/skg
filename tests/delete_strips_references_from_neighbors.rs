@@ -230,8 +230,8 @@ async fn delete_preserves_foreign_referencer (
   let mut stream : TcpStream = TcpStream::connect (
     listener . local_addr () ? ) ?;
   let input_org_text : &str = indoc! {"
-    * (skg (node (id cheese) (source foreign))) cheese
-    ** (skg (node (id victim) (source owned) (editRequest delete))) victim
+    * (skg (node (id cheese) (repo foreign))) cheese
+    ** (skg (node (id victim) (repo owned) (editRequest delete))) victim
   "};
   let response = update_from_and_rerender_buffer (
     &mut stream, input_org_text, config, tantivy, &graph, false,
@@ -272,9 +272,9 @@ async fn delete_in_foreign_subscribee_rerenders_as_unknown (
   let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
   let response = update_from_and_rerender_buffer (
     &mut stream, indoc! {"
-      * (skg (node (id subscriber) (source foreign))) foreign subscriber
+      * (skg (node (id subscriber) (repo foreign))) foreign subscriber
       ** (skg subscribeeFolder)
-      *** (skg (node (id victim) (source owned) (affectsParent false) (editRequest delete))) victim
+      *** (skg (node (id victim) (repo owned) (affectsParent false) (editRequest delete))) victim
     "}, config, tantivy, &graph, false,
     &Err (String::new ()), &mut views_state ) . await ?;
   assert! (response . errors . is_empty (), "{:?}", response . errors);
@@ -300,9 +300,9 @@ async fn delete_in_foreign_overridden_rerenders_as_unknown (
   let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
   let response = update_from_and_rerender_buffer (
     &mut stream, indoc! {"
-      * (skg (node (id overrider) (source foreign))) foreign overrider
+      * (skg (node (id overrider) (repo foreign))) foreign overrider
       ** (skg overriddenFolder)
-      *** (skg (node (id victim) (source owned) (editRequest delete))) victim
+      *** (skg (node (id victim) (repo owned) (editRequest delete))) victim
     "}, config, tantivy, &graph, false,
     &Err (String::new ()), &mut views_state ) . await ?;
   assert! (response . errors . is_empty (), "{:?}", response . errors);
@@ -329,11 +329,11 @@ async fn delete_in_foreign_hiddenoutside_rerenders_as_unknown (
   let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
   let response = update_from_and_rerender_buffer (
     &mut stream, indoc! {"
-      * (skg (node (id hide-subscriber) (source foreign))) foreign hide subscriber
+      * (skg (node (id hide-subscriber) (repo foreign))) foreign hide subscriber
       ** (skg subscribeeFolder)
-      *** (skg (node (id hide-subscribee) (source foreign))) foreign hide subscribee
+      *** (skg (node (id hide-subscribee) (repo foreign))) foreign hide subscribee
       *** (skg hiddenOutsideOfSubscribeeFolder)
-      **** (skg (node (id victim) (source owned) (editRequest delete))) victim
+      **** (skg (node (id victim) (repo owned) (editRequest delete))) victim
     "}, config, tantivy, &graph, false,
     &Err (String::new ()), &mut views_state ) . await ?;
   assert! (response . errors . is_empty (), "{:?}", response . errors);
@@ -360,7 +360,7 @@ async fn delete_strips_references_impl (
 ) -> Result<(), Box<dyn Error>> {
   // Single-root content view of victim with editRequest delete.
   let input_org_text : &str = indoc! {"
-    * (skg (node (id victim) (source main) (editRequest delete))) victim
+    * (skg (node (id victim) (repo main) (editRequest delete))) victim
   "};
 
   let graph : InRustGraphHandle =
@@ -513,7 +513,7 @@ async fn strip_pass_handles_extra_ids_impl (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"
-    * (skg (node (id aliased) (source main) (editRequest delete))) aliased
+    * (skg (node (id aliased) (repo main) (editRequest delete))) aliased
   "};
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;

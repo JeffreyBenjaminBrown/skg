@@ -10,8 +10,8 @@ pub use skg::types::viewnode::ViewNode;
 
 /// The expected initial diff view for a containing b (text changed).
 pub const GIT_DIFF_VIEW: &str = "\
-* (skg (node (id a) (source main))) a
-** (skg (node (id b) (source main))) b
+* (skg (node (id a) (repo main))) a
+** (skg (node (id b) (repo main))) b
 new body
 *** (skg (textChanged unstaged))
 ";
@@ -19,8 +19,8 @@ new body
 /// The initial diff view when b's body change is staged rather
 /// than unstaged.
 pub const GIT_DIFF_VIEW_STAGED: &str = "\
-* (skg (node (id a) (source main))) a
-** (skg (node (id b) (source main))) b
+* (skg (node (id a) (repo main))) a
+** (skg (node (id b) (repo main))) b
 new body
 *** (skg (textChanged staged))
 ";

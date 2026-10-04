@@ -28,8 +28,8 @@
 
 (let* ((data (getenv "SKG_TEST_DATA_DIR"))
        (view-text
-        (concat "* (skg (node (id src) (source public))) "
-                "Source [[id:old-dest][café]]\n"
+        (concat "* (skg (node (id src) (repo public))) "
+                "Repo [[id:old-dest][café]]\n"
                 "[[id:gone][gone]] [[id:private-node][private]]\n"))
        (buffer (skg-open-org-buffer-from-text
                 nil view-text "*skg-link-integration*" "link-integration")))
@@ -41,32 +41,32 @@
     (unless (equal (buffer-string) view-text)
       (error "Annotation changed buffer text"))
     (unless (and (not (buffer-modified-p))
-                 (not skg-link-annotations--source-suffix-enabled))
+                 (not skg-link-annotations--repo-suffix-enabled))
       (error "Initial annotations changed state"))
     (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest _) t)))
-      (skg-set-active-source-set "all"))
+      (skg-set-active-repo-set "all"))
     (link-test-wait
      (lambda () (and (link-test-status "private-node" 'resolved)
                      (= skg-lp--pending-count 0))))
     (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest _) t)))
-      (skg-set-active-source-set "public"))
+      (skg-set-active-repo-set "public"))
     (link-test-wait
      (lambda () (and (link-test-status "private-node" 'inactive)
                      (= skg-lp--pending-count 0))))
-    (skg-toggle-source-overlay-on-links)
+    (skg-toggle-repo-overlay-on-links)
     (unless (and (link-test-suffix "⌂:PUB")
                  (link-test-suffix "⌂:missing")
                  (link-test-suffix "⌂:inactive")
                  (not (link-test-suffix "PRIV")))
-      (error "Source suffixes did not distinguish visible and unavailable links"))
+      (error "Repo suffixes did not distinguish visible and unavailable links"))
     (org-fold-hide-subtree)
     (org-fold-show-all)
     (unless (equal (buffer-string) view-text)
       (error "Folding changed annotated text"))
     (skg-replace-buffer-with-new-content nil view-text)
-    (unless (and skg-link-annotations--source-suffix-enabled
+    (unless (and skg-link-annotations--repo-suffix-enabled
                  (not (buffer-modified-p)))
-      (error "Source toggle or clean state lost across view replacement"))
+      (error "Repo toggle or clean state lost across view replacement"))
     (goto-char (point-max))
     (insert "[[id:new][new]]\n")
     (skg-link-annotations-refresh)

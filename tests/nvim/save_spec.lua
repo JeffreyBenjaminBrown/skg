@@ -1,7 +1,7 @@
 -- Mirrors tests/elisp/test-skg-save-response-folded-root.el (point
 -- and fold restoration, warning channels) and the client-side halves
 -- of test-skg-fork-confirmation.el (request fields, the confirmation
--- buffer's source walk, approve/decline behavior), driven end-to-end
+-- buffer's repo walk, approve/decline behavior), driven end-to-end
 -- through the loopback fake server. The live-server counterparts live
 -- in tests/integration/.
 
@@ -37,7 +37,7 @@ describe('skg.save request strings', function ()
       line)
   end)
 
-  it('adds fork-approved and fork-sources when given', function ()
+  it('adds fork-approved and fork-repos when given', function ()
     -- Mirrors test-skg-fork-confirmation's request-field cases.
     local line = save.save_request_string('uri-1', {
       lines_below_focused_headline = 0,
@@ -46,7 +46,7 @@ describe('skg.save request strings', function ()
       true, { { 'id-a', 'src-1' }, { 'id-b', 'src-2' } })
     assert.is_truthy(line:find('(fork-approved . "true")', 1, true))
     assert.is_truthy(line:find(
-      '(fork-sources (("id-a" . "src-1") ("id-b" . "src-2")))',
+      '(fork-repos (("id-a" . "src-1") ("id-b" . "src-2")))',
       1, true))
   end)
 
@@ -336,7 +336,7 @@ describe('skg.save fork confirmation', function ()
 
   local fork_confirmation_payload =
     '((response-type fork-confirmation)'
-    .. ' (content "* (skg (node (source PICK-A-SOURCE))) clone-to-be'
+    .. ' (content "* (skg (node (repo PICK-A-REPO))) clone-to-be'
     .. '\\n** (skg (node (id foreign-1))) the original")'
     .. ' (to-minibuffer "Approve or decline the fork."))'
 
@@ -374,20 +374,20 @@ describe('skg.save fork confirmation', function ()
     return origin, requests
   end
 
-  it('walks the confirmation buffer for {id, source} pairs',
+  it('walks the confirmation buffer for {id, repo} pairs',
      function ()
-    -- Mirrors the two-level source walk (+ no leak across parents).
+    -- Mirrors the two-level repo walk (+ no leak across parents).
     local buf = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
-      '* (skg (node (source src-one))) clone one',
+      '* (skg (node (repo src-one))) clone one',
       '** (skg (node (id orig-1))) original one',
       '* metadata-less parent',
       '** (skg (node (id orphan))) must not inherit src-one',
-      '* (skg (node (source src-two))) clone two',
+      '* (skg (node (repo src-two))) clone two',
       '** (skg (node (id orig-2))) original two' })
     assert.are.same(
       { { 'orig-1', 'src-one' }, { 'orig-2', 'src-two' } },
-      save.fork_sources_from_confirmation_buffer(buf))
+      save.fork_repos_from_confirmation_buffer(buf))
     vim.api.nvim_buf_delete(buf, { force = true })
   end)
 
@@ -403,27 +403,27 @@ describe('skg.save fork confirmation', function ()
     assert.are.equal(0, state.lp_pending_count) -- balanced
   end)
 
-  it('refuses approval while the placeholder source remains',
+  it('refuses approval while the placeholder repo remains',
      function ()
     save_and_get_confirmation()
     local ok, err = pcall(save.approve_fork)
     assert.is_false(ok)
-    assert.is_truthy(tostring(err):find('Pick a source'))
+    assert.is_truthy(tostring(err):find('Pick a repo'))
   end)
 
-  it('approves after a source is chosen, re-saving with the pairs',
+  it('approves after a repo is chosen, re-saving with the pairs',
      function ()
     local origin, requests = save_and_get_confirmation()
     local confirm = vim.api.nvim_get_current_buf()
     vim.api.nvim_win_set_cursor(0, { 1, 0 })
-    metadata.change_source_at_line(1, 'my-source')
+    metadata.change_repo_at_line(1, 'my-repo')
     save.approve_fork()
     vim.wait(3000, function () return #requests >= 2 end, 10)
     assert.are.equal(2, #requests)
     assert.is_truthy(requests[2]:find(
       '(fork-approved . "true")', 1, true))
     assert.is_truthy(requests[2]:find(
-      '(fork-sources (("foreign-1" . "my-source")))', 1, true))
+      '(fork-repos (("foreign-1" . "my-repo")))', 1, true))
     assert.is_false(vim.api.nvim_buf_is_valid(confirm))
     -- The origin's fork atom survived to the re-save.
     vim.wait(3000, function ()

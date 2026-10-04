@@ -223,10 +223,10 @@ fn qual_metadata_to_string (
       parts . push ( "alias" . to_string () );
       if let Some (repo) = relRepo {
         parts . push ( format! (
-          "(relSource {})", metadata_value_atom (repo) ) ); }
+          "(relRepo {})", metadata_value_atom (repo) ) ); }
       if let Some (repo) = relRepo_request {
         parts . push ( format! (
-          "(editRequest (relSource {}))",
+          "(editRequest (relRepo {}))",
           metadata_value_atom (repo) ) ); }
       append_membership_stage_forms (&mut parts, membership); }
     Qual::TextChanged { staged, unstaged } => {
@@ -287,12 +287,12 @@ fn activeNode_metadata_to_string (
       if let Some (ref repo) =
         activeNode . viewStats . relRepo {
         parts . push ( format! (
-          "(relSource {})", metadata_value_atom (repo) )); }
+          "(relRepo {})", metadata_value_atom (repo) )); }
       if activeNode . viewStats . homeRepoAtBoundary {
         if let Some (src_config)
         = config . repos . get ( &activeNode . home_repo )
         { parts . push ( format! (
-            "(sourceHerald {})",
+            "(homeRepoHerald {})",
             metadata_value_atom (
               & format! ("⌂:{}", src_config . herald_label ()) ) ) ); }}
       if parts . is_empty () { None }
@@ -302,7 +302,7 @@ fn activeNode_metadata_to_string (
                     ) -> Option < String > {
       if let Some (repo) = &activeNode . relRepo_request {
         return Some ( format! (
-          "(editRequest (relSource {}))",
+          "(editRequest (relRepo {}))",
           metadata_value_atom (repo) ) ); }
       activeNode . edit_request () . map ( | edit_req | {
         let edit_str : String = match edit_req {
@@ -345,7 +345,7 @@ fn activeNode_metadata_to_string (
       vec! [ "node" . to_string () ];
     parts . push ( format! ( "(id {})", activeNode . id . 0 ));
     parts . push ( format! (
-      "(source {})", metadata_value_atom (&activeNode . home_repo) ));
+      "(repo {})", metadata_value_atom (&activeNode . home_repo) ));
     // AffectsParent::True is left implicit because it is the default
     // membership relation.
     match activeNode . affectsParent {
@@ -408,7 +408,7 @@ fn phantomDiff_metadata_to_string (
       vec! [ "diffPhantom" . to_string () ];
     parts . push ( format! ( "(id {})", phantom . id . 0 ));
     parts . push ( format! (
-      "(source {})", metadata_value_atom (&phantom . home_repo) ));
+      "(repo {})", metadata_value_atom (&phantom . home_repo) ));
     // affectsParent is implicit Affected and birth Unremarkable on a phantom, so
     // neither atom is emitted; both are passed as such to graphnodestats.
     parts . push ( "writeProtected" . to_string () );
@@ -448,7 +448,7 @@ fn phantomDeleted_metadata_to_string (
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   parts . push ( format! (
-    "(deleted (id {}) (source {}))",
+    "(deleted (id {}) (repo {}))",
     deleted_node . id . 0,
     metadata_value_atom (&deleted_node . home_repo) ));
   parts . join (" ") }
@@ -470,10 +470,10 @@ fn phantomUnknown_metadata_to_string (
     format! ("(id {})", unknown_node . id . 0) ];
   if let Some (repo) = &unknown_node . relRepo {
     unknown_parts . push ( format! (
-      "(viewStats (relSource {}))", metadata_value_atom (repo)) ); }
+      "(viewStats (relRepo {}))", metadata_value_atom (repo)) ); }
   if let Some (repo) = &unknown_node . relRepo_request {
     unknown_parts . push ( format! (
-      "(editRequest (relSource {}))", metadata_value_atom (repo)) ); }
+      "(editRequest (relRepo {}))", metadata_value_atom (repo)) ); }
   parts . push ( format! ( "(unknown {})", unknown_parts . join (" ") ) );
   parts . join (" ") }
 

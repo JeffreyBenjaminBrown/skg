@@ -49,7 +49,7 @@ async fn test_reconcile_alias_folder_children_logic (
   // Create org text with three AliasFolder scenarios
   let org_text : &str =
     indoc! { "
-      * (skg (node (id a) (source main))) a
+      * (skg (node (id a) (repo main))) a
       ** (skg aliasFolder) aliases 1
       *** (skg alias) c
       *** (skg alias) d
@@ -187,7 +187,7 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
 
   let org_text : &str =
     indoc! { "
-      * (skg (node (id a) (source main))) a
+      * (skg (node (id a) (repo main))) a
       ** (skg aliasFolder) aliases
       *** (skg alias) b
       *** (skg focused alias) b

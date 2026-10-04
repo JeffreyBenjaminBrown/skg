@@ -63,7 +63,7 @@ T.check(T.buffer_text(p_buf):find('(id N)', 1, true),
 
 -- 2. Make N definitive (drop its 'writeProtected' marker) and edit its title
 --    -- the fork gesture.
-local n_line = goto_line_containing('(id N) (source foreign)',
+local n_line = goto_line_containing('(id N) (repo foreign)',
   "could not find N's headline")
 local n_line_text =
   vim.api.nvim_buf_get_lines(p_buf, n_line - 1, n_line, false)[1]
@@ -86,10 +86,10 @@ T.check(confirm_text:find('Fork confirmation', 1, true),
         'confirmation buffer lacks its header')
 print('fork-confirmation buffer lists N')
 
--- 5. Pick the clone's source (required), then approve.
-local clone_line = goto_line_starting_with('* (skg (node (source ',
+-- 5. Pick the clone's repo (required), then approve.
+local clone_line = goto_line_starting_with('* (skg (node (repo ',
   'could not find the clone-to-be headline')
-metadata.change_source_at_line(clone_line, 'owned')
+metadata.change_repo_at_line(clone_line, 'owned')
 save.approve_fork()
 
 -- 6. The fork commits and P immediately replaces N with the clone.

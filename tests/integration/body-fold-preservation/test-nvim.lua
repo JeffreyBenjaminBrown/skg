@@ -75,10 +75,10 @@ end
 ---@return integer bufnr
 local function bfp_build_buffer (name)
   local content = table.concat({
-    '* (skg (node (source main))) root',
+    '* (skg (node (repo main))) root',
     'root body line one',
     'root body line two',
-    '** (skg (node (source main))) child',
+    '** (skg (node (repo main))) child',
     -- Two body lines: vim cannot close a SINGLE-line fold (the
     -- documented one-line-body deviation in skg/folds.lua), so a
     -- one-line child body could never reach scenario B's folded

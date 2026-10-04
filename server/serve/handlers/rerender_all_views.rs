@@ -365,7 +365,7 @@ pub fn handle_git_diff_toggle_and_rerender (
       // "\nWarning:", which the Emacs diff-toggle handler treats
       // as a window-pop trigger.
       let msg : String = format! (
-        "Git diff mode requires active source-set all; current active source-set is {}. Switch the source-set to all first.",
+        "Git diff mode requires active repo-set all; current active repo-set is {}. Switch the repo-set to all first.",
         active_repo_set . name . 0 );
       tracing::info! ( msg = %msg, "Git diff mode toggle refused" );
       send_response_with_length_prefix (
@@ -406,7 +406,7 @@ fn git_diff_mode_message (
       repos_not_tracked_in_git (config);
     if ! warnings . is_empty () {
       msg . push_str ("\n\nWarning: diff mode will be incomplete. \
-        These sources are not fully tracked in git:\n");
+        These repos are not fully tracked in git:\n");
       for w in &warnings {
         msg . push_str (&format! ("  - {}\n", w)); }} }
   msg }

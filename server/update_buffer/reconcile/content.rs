@@ -317,7 +317,7 @@ fn replace_raw_content_children_with_visible_overriders (
       let repo : RepoName = graph_snap . pid_and_repo (&effective)
         . map (|(_pid, repo)| repo)
         . ok_or_else (|| format! (
-          "replace_raw_content_children_with_visible_overriders: no source for overrider {}",
+          "replace_raw_content_children_with_visible_overriders: no repo for overrider {}",
           effective . 0 )) ?;
       let overrider : NodeComplete = nodecomplete_rustFirst_by_pid_and_repo (
         graph_snap, config, &effective, &repo ) ?;
@@ -865,7 +865,7 @@ fn build_child_creation_data (
         graph_snap . pid_and_repo (drawn)
         . map ( |(_pid, src)| src )
         . ok_or_else ( || format! (
-          "build_child_creation_data: no source for overrider {}",
+          "build_child_creation_data: no repo for overrider {}",
           drawn . 0 )) ? };
     let skg : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_repo (

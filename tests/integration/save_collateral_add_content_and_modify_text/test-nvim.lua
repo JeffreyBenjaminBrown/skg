@@ -11,7 +11,7 @@
 --
 -- Known limitation: collateral completion currently fails when the
 -- saved buffer introduced a brand-new node, because
--- build_child_creation_data can't find a source for the new UUID. So
+-- build_child_creation_data can't find a repo for the new UUID. So
 -- buffer A picks up the title change and the new child c anyway (per
 -- the elisp test's phase 5 -- the collateral update DOES succeed
 -- here).

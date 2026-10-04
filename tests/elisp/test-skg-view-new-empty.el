@@ -7,12 +7,12 @@
 (require 'skg-view-new-empty)
 
 (ert-deftest test-skg-view-new-empty-opens-blank-content-view ()
-  "The new-view command must not invent a node or ask for its source."
+  "The new-view command must not invent a node or ask for its repo."
   (let (opened)
     (unwind-protect
-        (cl-letf (((symbol-function 'skg--prompt-for-owned-source)
+        (cl-letf (((symbol-function 'skg--prompt-for-owned-repo)
                    (lambda ()
-                     (ert-fail "A blank view must not prompt for a source"))))
+                     (ert-fail "A blank view must not prompt for a repo"))))
           (skg-view-new-empty)
           (setq opened (current-buffer))
           (should (equal (buffer-string) ""))

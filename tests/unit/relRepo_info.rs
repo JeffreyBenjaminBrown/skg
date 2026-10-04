@@ -68,7 +68,7 @@ fn default_is_more_private_of_homes_and_current_is_the_relRepo (
   assert_eq! ( default, RepoName::from ("trusted"),
                "default = more private of the endpoints' homes" );
   assert_eq! ( current, Some ( RepoName::from ("private") ),
-               "current = the source the graph records" );
+               "current = the repo the graph records" );
 }
 
 #[test]
@@ -134,7 +134,7 @@ fn only_atom_bearing_relations_are_accepted (
   assert! ( relation_from_client_string ("overrides_view_of") . is_ok () );
   assert! ( relation_from_client_string (
     "hides_from_its_subscriptions") . is_err (),
-    "hides have no explicit-source path" );
+    "hides have no explicit-repo path" );
   assert! ( relation_from_client_string ("links_to") . is_err () );
 }
 

@@ -29,7 +29,7 @@ pub fn handle_get_file_path_request_with_repo_set (
           &format! ( "Error: {}", e ) ));
       return; } };
   let repo : RepoName = match value_from_request_sexp (
-    "source", request ) {
+    "repo", request ) {
     Ok  (v) => RepoName (v),
     Err (e) => {
       send_response_with_length_prefix (
@@ -44,7 +44,7 @@ pub fn handle_get_file_path_request_with_repo_set (
       & tag_text_response (
         TcpToClient::GetFilePath,
         &format! (
-          "Error: source {} is not in active source-set {}",
+          "Error: repo {} is not in active repo-set {}",
           repo, active . name ) ));
     return; }
   let raw_path : String = match path_from_pid_and_repo (

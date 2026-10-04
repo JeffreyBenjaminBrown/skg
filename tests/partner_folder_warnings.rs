@@ -170,10 +170,10 @@ async fn failed_save_carries_warnings_with_errors (
         (
           graph_handle_from_config (config) ? );
       let buffer : &str = "\
-* (skg (node (id n) (source main))) n
+* (skg (node (id n) (repo main))) n
 ** (skg subscriberFolder) leftover headline text
-*** (skg (node (id r) (source main) writeProtected)) r
-*** (skg (node (id t) (source main) writeProtected)) t
+*** (skg (node (id r) (repo main) writeProtected)) r
+*** (skg (node (id t) (repo main) writeProtected)) t
 ** (skg idFolder)
 *** (skg id) bogus-id
 ";

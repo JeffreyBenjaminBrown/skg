@@ -78,22 +78,22 @@ impl fmt::Display for TelescopeViolation {
       TelescopeViolation::LeakShapedMember {
         relation, relRepo, member, member_home } =>
         write! ( f,
-          "leak-shaped {} member: relationship at relSource '{}' names '{}', whose home '{}' is more private. Move the membership with skg-set-relSource (C-c s r). The leaking file's git history already contains the ID.",
+          "leak-shaped {} member: relationship at relRepo '{}' names '{}', whose home '{}' is more private. Move the membership with skg-set-relRepo (C-c s r). The leaking file's git history already contains the ID.",
           relation, relRepo, member, member_home ),
       TelescopeViolation::UnconfiguredRelRepo {
         relation, relRepo, member } =>
         write! ( f,
-          "{} member '{}' carries relSource '{}', which is not configured",
+          "{} member '{}' carries relRepo '{}', which is not configured",
           relation, member, relRepo ),
       TelescopeViolation::AbsentTargetLeakShapedMember {
         relation, relRepo, member, owner_home } =>
         write! ( f,
-          "leak-shaped {} member with absent target: relationship at relSource '{}' names '{}'; because the target is absent, privacy is judged against the extant owner's home '{}'. Move the membership with skg-set-relSource (C-c s r).",
+          "leak-shaped {} member with absent target: relationship at relRepo '{}' names '{}'; because the target is absent, privacy is judged against the extant owner's home '{}'. Move the membership with skg-set-relRepo (C-c s r).",
           relation, relRepo, member, owner_home ),
       TelescopeViolation::IgnoredForeignPidFolderlision {
         ignored_repos } =>
         write! ( f,
-          "non-owned source(s) [{}] use the same pid as one or more of your files. Skg kept your owned telescope, ignored those non-owned files, and left them untouched. Their contents are unreachable within Skg; inspect the raw .skg files if you need them.",
+          "non-owned repo(s) [{}] use the same pid as one or more of your files. Skg kept your owned telescope, ignored those non-owned files, and left them untouched. Their contents are unreachable within Skg; inspect the raw .skg files if you need them.",
           ignored_repos . iter ()
             . map ( |repo| format! ("'{}'", repo) )
             . collect::<Vec<String>> () . join (", ") ),

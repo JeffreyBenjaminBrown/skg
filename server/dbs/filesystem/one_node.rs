@@ -49,7 +49,7 @@ pub fn nodecomplete_from_pid_and_repo (
   else {
     return Err ( io::Error::new (
       io::ErrorKind::NotFound,
-      format! ("No .skg file for '{}' in any source (caller expected one in '{}')",
+      format! ("No .skg file for '{}' in any repo (caller expected one in '{}')",
                pid, repo ))); };
   fold_telescope ( telescope, & |id : &ID| id . clone () ) }
 
@@ -171,7 +171,7 @@ impl PreparedTelescopeWrite {
   ) -> io::Result<()> {
     for (repo, path, yaml) in &self . writes {
       assert! ( config . user_owns_repo (repo),
-                "write preflight admitted non-owned source '{}'", repo );
+                "write preflight admitted non-owned repo '{}'", repo );
       if let Some (parent) = Path::new (path) . parent () {
         fs::create_dir_all (parent) ?; }
       let unchanged : bool = // byte-stability
@@ -256,7 +256,7 @@ pub(crate) fn prepare_nodecomplete_telescope (
     return Err ( io::Error::new (
       io::ErrorKind::PermissionDenied,
       format! (
-        "Refusing to write '{}': proposed telescope section(s) belong to non-owned source(s) [{}]. No files were changed.",
+        "Refusing to write '{}': proposed telescope section(s) belong to non-owned repo(s) [{}]. No files were changed.",
         pid,
         offending_repos . iter ()
           . map ( |repo| format! ("'{}'", repo) )

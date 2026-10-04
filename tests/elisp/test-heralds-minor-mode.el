@@ -251,14 +251,14 @@ the C token 2aC: the multi-contains \"2\" (yellow), the ancestor \"a\"
   (with-temp-buffer
     ;; ActiveNode with unstaged membership removal (the v.1 'removed-here').
     (erase-buffer)
-    (insert "(skg (node (id 1) (source s) (unstaged removedM)))")
+    (insert "(skg (node (id 1) (repo s) (unstaged removedM)))")
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "unstaged" result))
       (should (string-match "M" result)))
 
     ;; ActiveNode with unstaged file creation + membership add (the v.1 'new').
     (erase-buffer)
-    (insert "(skg (node (id 2) (source s) (unstaged newX newM)))")
+    (insert "(skg (node (id 2) (repo s) (unstaged newX newM)))")
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "unstaged" result))
       (should (string-match "X" result))
@@ -280,14 +280,14 @@ the C token 2aC: the multi-contains \"2\" (yellow), the ancestor \"a\"
 (ert-deftest test-heralds-inactive-node-display ()
   "An anonymous inactive-node placeholder displays as a blue herald.
 The server emits the bare atom `inactiveNode' (like the other
-dataless scaffold markers) -- it carries no id/source, because those
-would leak content the user hid by restricting the source-set."
+dataless scaffold markers) -- it carries no id/repo, because those
+would leak content the user hid by restricting the repo-set."
   (with-temp-buffer
     (insert "(skg inactiveNode)")
     (let ((result (heralds-from-metadata
                    "(skg inactiveNode)")))
       (should (equal (substring-no-properties result)
-                     "node from inactive source"))
+                     "node from inactive repo"))
       (should (eq (get-text-property 0 'face result)
                   'heralds-blue-face)))
     (heralds-minor-mode 1)
@@ -297,7 +297,7 @@ would leak content the user hid by restricting the source-set."
            (display-text (overlay-get display-overlay 'display)))
       (should display-overlay)
       (should (equal (substring-no-properties display-text)
-                     "node from inactive source"))
+                     "node from inactive repo"))
       (should (eq (get-text-property 0 'face display-text)
                   'heralds-blue-face)))))
 
@@ -305,7 +305,7 @@ would leak content the user hid by restricting the source-set."
   "After a major-mode switch orphans overlays, disabling heralds
 should still remove them."
   (with-temp-buffer
-    (insert "(skg (node (id 1) (source s) (rels (contains (out 2)))))\n")
+    (insert "(skg (node (id 1) (repo s) (rels (contains (out 2)))))\n")
     (heralds-minor-mode 1)
     ;; Overlays exist
     (should (cl-some (lambda (ov) (overlay-get ov 'heralds))
@@ -332,7 +332,7 @@ the fixture table."
     (cl-letf (((symbol-function 'skg-request-herald-rules)
                (lambda () (skg-test-install-herald-rules))))
       (with-temp-buffer
-        (insert "(skg (node (id 1) (source s) (rels (contains (out 2)))))\n")
+        (insert "(skg (node (id 1) (repo s) (rels (contains (out 2)))))\n")
         (heralds-minor-mode 1)
         (should heralds-minor-mode)       ;; stayed on
         (should heralds--transform-rules) ;; table recovered

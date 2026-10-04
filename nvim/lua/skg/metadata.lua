@@ -1,6 +1,6 @@
 -- PURPOSE: Utilities to parse and edit skg headline metadata, plus
 -- the user commands that reduce to metadata edits (delete,
--- set-write-protected, set-source, merge requests, ...).
+-- set-write-protected, set-repo, merge requests, ...).
 -- The Lua port of elisp/skg-metadata.el.
 --
 -- The elisp file's biggest hazard -- org-fold's fragility check
@@ -265,10 +265,10 @@ function M.sexp_cdr_at_path (sexp, path)
 end
 
 ---@param metadata_sexp any
----@return string|nil the node's source
-function M.node_source (metadata_sexp)
+---@return string|nil the node's repo
+function M.node_repo (metadata_sexp)
   local values = M.sexp_cdr_at_path(metadata_sexp,
-                                    { 'skg', 'node', 'source' })
+                                    { 'skg', 'node', 'repo' })
   if values and values[1] ~= nil then
     return sexpr.atom_text(values[1]) end
   return nil
@@ -424,66 +424,66 @@ function M.strip_metadata_from_org_text (org_text)
 end
 
 ---Write minimal ActiveNode metadata onto the metadata-less headline
----at point, prompting for an owned source (no prompt when only one).
----@return string|nil the chosen source
+---at point, prompting for an owned repo (no prompt when only one).
+---@return string|nil the chosen repo
 function M.populate_minimal_node_metadata ()
-  local source = picker.prompt_for_owned_source()
-  if not source then return nil end
+  local repo = picker.prompt_for_owned_repo()
+  if not repo then return nil end
   M.edit_metadata_at_point(
-    sexpr.read(string.format('(skg (node (source %s)))', source)))
-  return source
+    sexpr.read(string.format('(skg (node (repo %s)))', repo)))
+  return repo
 end
 
----Prompt for and change the source of the node at point (S-arrows
----cycle owned sources; typed names accepted). With RECURSIVE, also
----changes every true content descendant whose source matches. On
+---Prompt for and change the repo of the node at point (S-arrows
+---cycle owned repos; typed names accepted). With RECURSIVE, also
+---changes every true content descendant whose repo matches. On
 ---a metadata-less headline, populates it minimally instead. Does NOT
 ---save.
 ---@param recursive boolean|nil
-function M.set_source (recursive)
+function M.set_repo (recursive)
   if M.headline_metadata_empty_p() then
     M.populate_minimal_node_metadata()
     return end
   local metadata = M.current_headline_metadata_sexp()
-  local current_source = M.node_source(metadata)
-  if not current_source then error('Node has no source') end
-  local new_source =
-    picker.prompt_for_source_change(current_source)
-  if not new_source then return end
-  new_source = vim.trim(new_source)
-  if new_source == '' then return end
-  if new_source:match('%s') then
-    error('Source names cannot contain whitespace') end
-  if new_source == current_source then
-    vim.notify('Source unchanged: ' .. current_source)
+  local current_repo = M.node_repo(metadata)
+  if not current_repo then error('Node has no repo') end
+  local new_repo =
+    picker.prompt_for_repo_change(current_repo)
+  if not new_repo then return end
+  new_repo = vim.trim(new_repo)
+  if new_repo == '' then return end
+  if new_repo:match('%s') then
+    error('Repo names cannot contain whitespace') end
+  if new_repo == current_repo then
+    vim.notify('Repo unchanged: ' .. current_repo)
     return end
   local changed_count
   if recursive then
     changed_count =
-      M.change_source_recursive(current_source, new_source)
+      M.change_repo_recursive(current_repo, new_repo)
   else
-    changed_count = M.change_source_at_line(
-      M.current_line_number(), new_source) end
+    changed_count = M.change_repo_at_line(
+      M.current_line_number(), new_repo) end
   vim.notify(string.format(
-    'Source changed from %s to %s on %d node%s. Save to apply.',
-    current_source, new_source, changed_count,
+    'Repo changed from %s to %s on %d node%s. Save to apply.',
+    current_repo, new_repo, changed_count,
     changed_count == 1 and '' or 's'))
 end
 
-function M.set_source_recursive ()
-  M.set_source(true)
+function M.set_repo_recursive ()
+  M.set_repo(true)
 end
 
----Change OLD_SOURCE to NEW_SOURCE in this content subtree (root
+---Change OLD_REPO to NEW_REPO in this content subtree (root
 ---inclusive; only affectsParent=true descendants are traversed).
----@param old_source string
----@param new_source string
+---@param old_repo string
+---@param new_repo string
 ---@return integer changed node count
-function M.change_source_recursive (old_source, new_source)
+function M.change_repo_recursive (old_repo, new_repo)
   local start_line = M.current_line_number()
   local start_level = M.outline_level(start_line)
   local changed_count =
-    M.change_source_at_line(start_line, new_source)
+    M.change_repo_at_line(start_line, new_repo)
   local line = M.next_heading_line(start_line)
   while line and (M.outline_level(line) or 0) > start_level do
     local metadata = M.metadata_sexp_at_line_or_nil(line)
@@ -491,25 +491,25 @@ function M.change_source_recursive (old_source, new_source)
             and M.node_affectsParent_content_of_p(metadata)) then
       line = M.next_heading_after_subtree(line)
     else
-      if M.node_source(metadata) == old_source then
+      if M.node_repo(metadata) == old_repo then
         changed_count = changed_count
-          + M.change_source_at_line(line, new_source) end
+          + M.change_repo_at_line(line, new_repo) end
       line = M.next_heading_line(line) end
   end
   return changed_count
 end
 
----Set the source at LINE_NUMBER to NEW_SOURCE (and refresh the
----sourceHerald so the display keeps pace).
+---Set the repo at LINE_NUMBER to NEW_REPO (and refresh the
+---homeRepoHerald so the display keeps pace).
 ---@param line_number integer
----@param new_source string
+---@param new_repo string
 ---@return integer 1
-function M.change_source_at_line (line_number, new_source)
+function M.change_repo_at_line (line_number, new_repo)
   M.edit_metadata_at_line(line_number, sexpr.read(string.format(
-    '(skg (node (ENSURE (source %s)) (viewStats)))', new_source)))
+    '(skg (node (ENSURE (repo %s)) (viewStats)))', new_repo)))
   M.edit_metadata_at_line(line_number, sexpr.read(string.format(
-    '(skg (node (viewStats (ENSURE (sourceHerald ⌂:%s)))))',
-    new_source)))
+    '(skg (node (viewStats (ENSURE (homeRepoHerald ⌂:%s)))))',
+    new_repo)))
   return 1
 end
 

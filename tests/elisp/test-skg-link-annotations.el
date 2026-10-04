@@ -30,7 +30,7 @@
         (should-not
          (cl-some (lambda (overlay) (overlay-get overlay 'after-string))
                   (overlays-in (point-min) (point-max))))
-        (skg-toggle-source-overlay-on-links)
+        (skg-toggle-repo-overlay-on-links)
         (let ((suffixes (cl-loop for overlay in
                                  (overlays-in (point-min) (point-max))
                                  for text = (overlay-get overlay 'after-string)
@@ -42,10 +42,10 @@
         (should (equal (buffer-string) original))
         (should-not (buffer-modified-p))
         (skg-content-view-mode)
-        (should skg-link-annotations--source-suffix-enabled)
+        (should skg-link-annotations--repo-suffix-enabled)
         (skg-link-annotations-mode 1)
-        (skg-toggle-source-overlay-on-links)
-        (should-not skg-link-annotations--source-suffix-enabled)
+        (skg-toggle-repo-overlay-on-links)
+        (should-not skg-link-annotations--repo-suffix-enabled)
         (should (equal (buffer-string) original))))))
 
 (ert-deftest test-skg-link-annotations-discard-stale-and-mismatched-replies ()
@@ -79,7 +79,7 @@
           (should (equal (gethash "node" skg-link-annotations--cache)
                          '(resolved "node" "main")))
           (with-current-buffer second
-            (let ((skg-link-annotations--source-suffix-enabled t))
+            (let ((skg-link-annotations--repo-suffix-enabled t))
               (skg-link-annotations-refresh)
               (should (cl-some
                        (lambda (overlay)
@@ -88,13 +88,13 @@
                                 " [⌂:main]"))
                        (overlays-in (point-min) (point-max))))))
           (with-current-buffer second
-            (puthash "old-source-set"
+            (puthash "old-repo-set"
                      (list second skg-link-annotations--generation
                            (buffer-chars-modified-tick) 20 '("node"))
                      skg-link-annotations--requests))
           (setq skg-link-annotations--epoch 21)
           (skg-link-annotations--handle-response
-           nil "((request-id \"old-source-set\") (results ((\"node\" missing))))")
+           nil "((request-id \"old-repo-set\") (results ((\"node\" missing))))")
           (should (equal (gethash "node" skg-link-annotations--cache)
                          '(resolved "node" "main")))
           (puthash "dead-buffer" (list first 1 1 21 '("node"))

@@ -9,7 +9,7 @@ describe('skg.buffer naming', function ()
   it('extracts the top headline title, metadata stripped', function ()
     assert.are.equal('hello world',
       buffer.extract_top_headline_title(
-        '* (skg (node (id abc) (source main))) hello world\n** child'))
+        '* (skg (node (id abc) (repo main))) hello world\n** child'))
     assert.are.equal('plain title',
       buffer.extract_top_headline_title('* plain title'))
     assert.is_nil(buffer.extract_top_headline_title('no headline here'))

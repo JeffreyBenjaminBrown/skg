@@ -187,7 +187,7 @@ pub fn pid_and_repo_from_required_ancestor (
       _ => None } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?
     . ok_or_else ( || format! (
-      "{}: required ancestor {} has no pid/source", caller, i ) . into () ) }
+      "{}: required ancestor {} has no pid/repo", caller, i ) . into () ) }
 
 /// Deaden a generalized-orphan folder at its BFS visit (TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5): dispose each
 /// direct child, then convert the folder itself to a DeadScaffold and skip its

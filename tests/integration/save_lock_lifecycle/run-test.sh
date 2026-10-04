@@ -14,7 +14,7 @@ set -e  # Exit on any error
 TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$TEST_DIR/../../.." && pwd)"
 
-# Source common test library
+# Repo common test library
 source "$TEST_DIR/../test-lib.sh"
 
 echo "=== SKG Save-Lock Lifecycle Integration Test ==="

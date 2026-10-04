@@ -105,7 +105,7 @@ async fn test_collateral_view_preserves_diff_annotations (
 
   // b should still have textChanged.
   assert_buffer_contains ( &collateral_buffer,
-    "** (skg (node (id b) (source main))) b\n\
+    "** (skg (node (id b) (repo main))) b\n\
      *** (skg (textChanged unstaged))" );
 
   // c should appear with diff new
@@ -205,7 +205,7 @@ async fn test_collateral_view_staged_text_and_unstaged_add (
   // b still has textChanged, attributed to staged (save didn't
   // touch b and didn't stage anything).
   assert_buffer_contains ( &collateral_buffer,
-    "** (skg (node (id b) (source main))) b\n\
+    "** (skg (node (id b) (repo main))) b\n\
      *** (skg (textChanged staged))" );
 
   // c is new on the unstaged side — save wrote c.skg to worktree

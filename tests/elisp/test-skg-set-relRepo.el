@@ -1,10 +1,10 @@
-;;; test-skg-set-relSource.el --- Tests for skg-set-relSource
+;;; test-skg-set-relRepo.el --- Tests for skg-set-relRepo
 ;;;
-;;; skg-set-relSource (C-c s r; formerly
+;;; skg-set-relRepo (C-c s r; formerly
 ;;; skg-privatize-relationship, see
 ;;; BUG-and-fix_make-edge-more-public.org) classifies the edge the
 ;;; headline at point represents, asks the server for that edge's
-;;; (default, current) relSources, and offers the sources at least
+;;; (default, current) relRepos, and offers the repos at least
 ;;; as private as the default plus a no-override choice. These tests
 ;;; cover the pure pieces (edge classification, menu slicing, choice
 ;;; application) and the response handler with the network and
@@ -17,7 +17,7 @@
 (require 'skg-buffer)
 (require 'skg-metadata)
 (require 'skg-config)
-(require 'skg-request-relSource-info)
+(require 'skg-request-relRepo-info)
 
 (defvar test--config-public-private-trusted
   (concat "[[repos]]\n"
@@ -32,16 +32,16 @@
           "name = \"trusted\"\n"
           "path = \"owned/trusted\"\n"
           "")
-  "Config text with three owned sources, in this declared order:
+  "Config text with three owned repos, in this declared order:
 public, private, trusted. (The names don't need to reflect an actual
-privacy order for these tests -- only that `skg--source-names'
+privacy order for these tests -- only that `skg--repo-names'
 returns them in this config order, which is all the client-side menu
 depends on; the server enforces the real floor at save.)")
 
 (defun test--with-skg-content-view (org-text config-text body-fn)
   "Run BODY-FN in a temp skg content-view buffer with ORG-TEXT.
 CONFIG-TEXT is written to a temporary skgconfig.toml so that
-skg-config-dir is set and `skg--source-names' works."
+skg-config-dir is set and `skg--repo-names' works."
   (let* ((config-dir (make-temp-file "skg-test-config" t))
          (config-file (expand-file-name "skgconfig.toml" config-dir))
          (skg-config-dir (file-name-as-directory config-dir)))
@@ -70,8 +70,8 @@ skg-config-dir is set and `skg--source-names' works."
   "A content child's edge: owner = org-parent, relation = contains."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (source public))) owner\n"
-    "** (skg (node (id kid) (source public))) kid\n")
+    "* (skg (node (id owner) (repo public))) owner\n"
+    "** (skg (node (id kid) (repo public))) kid\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -86,9 +86,9 @@ skg-config-dir is set and `skg--source-names' works."
 org-parent), relation = the folder's relation."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id anchor) (source public))) anchor\n"
+    "* (skg (node (id anchor) (repo public))) anchor\n"
     "** (skg subscribeeFolder)\n"
-    "*** (skg (node (id seen) (source public) writeProtected)) seen\n")
+    "*** (skg (node (id seen) (repo public) writeProtected)) seen\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -102,9 +102,9 @@ org-parent), relation = the folder's relation."
   "Refuses (user-error) on a member of a read-only folder."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (source public))) owner\n"
+    "* (skg (node (id owner) (repo public))) owner\n"
     "** (skg subscriberFolder)\n"
-    "*** (skg (node (id sub) (source public))) sub\n")
+    "*** (skg (node (id sub) (repo public))) sub\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -118,7 +118,7 @@ org-parent), relation = the folder's relation."
 (ert-deftest test-rel-refuses-on-root ()
   "Refuses on a root headline: with no org-parent there is no edge."
   (test--with-skg-content-view
-   "* (skg (node (id x) (source public))) x\n"
+   "* (skg (node (id x) (repo public))) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -130,7 +130,7 @@ org-parent), relation = the folder's relation."
   "Refuses on a scaffold headline (no (node ...) form)."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (source public))) owner\n"
+    "* (skg (node (id owner) (repo public))) owner\n"
     "** (skg aliasFolder) aliases\n")
    test--config-public-private-trusted
    (lambda ()
@@ -140,145 +140,145 @@ org-parent), relation = the folder's relation."
      (should-error (skg--rel-at-point)
                    :type 'user-error))))
 
-;; --- Menu slicing: skg--relSource-choices ---
+;; --- Menu slicing: skg--relRepo-choices ---
 
-(ert-deftest test-relSource-choices-slices-at-default ()
+(ert-deftest test-relRepo-choices-slices-at-default ()
   "The menu is the ladder's tail from the default onward."
-  (should (equal (skg--relSource-choices
+  (should (equal (skg--relRepo-choices
                   '("public" "private" "trusted") "private")
                  '("private" "trusted")))
-  (should (equal (skg--relSource-choices
+  (should (equal (skg--relRepo-choices
                   '("public" "private" "trusted") "public")
                  '("public" "private" "trusted")))
-  (should (equal (skg--relSource-choices
+  (should (equal (skg--relRepo-choices
                   '("public" "private" "trusted") "trusted")
                  '("trusted"))))
 
-(ert-deftest test-relSource-choices-full-ladder-fallback ()
+(ert-deftest test-relRepo-choices-full-ladder-fallback ()
   "With no default (or one na from the ladder), the whole ladder
 is offered; the server's save-time floor check backstops."
-  (should (equal (skg--relSource-choices
+  (should (equal (skg--relRepo-choices
                   '("public" "private") nil)
                  '("public" "private")))
-  (should (equal (skg--relSource-choices
+  (should (equal (skg--relRepo-choices
                   '("public" "private") "unknown")
                  '("public" "private"))))
 
-;; --- Choice application: skg--apply-relSource-choice ---
+;; --- Choice application: skg--apply-relRepo-choice ---
 
-(ert-deftest test-apply-relSource-sets-atom ()
-  "Choosing a source writes the (relSource NAME) atom."
+(ert-deftest test-apply-relRepo-sets-atom ()
+  "Choosing a repo writes the (relRepo NAME) atom."
   (test--with-skg-content-view
-   "* (skg (node (id x) (source public))) x\n"
+   "* (skg (node (id x) (repo public))) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (skg--apply-relSource-choice "trusted")
-     (should (string-match-p "(relSource trusted)"
+     (skg--apply-relRepo-choice "trusted")
+     (should (string-match-p "(relRepo trusted)"
                              (test--buffer-line 1))))))
 
-(ert-deftest test-apply-relSource-preserves-existing-viewstats ()
-  "Setting relSource must not disturb a pre-existing viewStats sibling."
+(ert-deftest test-apply-relRepo-preserves-existing-viewstats ()
+  "Setting relRepo must not disturb a pre-existing viewStats sibling."
   (test--with-skg-content-view
-   "* (skg (node (id x) (source public) (viewStats cycle))) x\n"
+   "* (skg (node (id x) (repo public) (viewStats cycle))) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (skg--apply-relSource-choice "public")
+     (skg--apply-relRepo-choice "public")
      (should (string-match-p "cycle" (test--buffer-line 1)))
-     (should (string-match-p "(relSource public)"
+     (should (string-match-p "(relRepo public)"
                              (test--buffer-line 1))))))
 
-(ert-deftest test-apply-relSource-removes-override ()
+(ert-deftest test-apply-relRepo-removes-override ()
   "The no-override choice removes only a pending request, preserving
-the displayed relSource fact; its message says the SAVED source survives
+the displayed relRepo fact; its message says the SAVED repo survives
 (sticky), not that anything resets to the default."
   (test--with-skg-content-view
-   "* (skg (node (id x) (source public) (viewStats (relSource private)) (editRequest (relSource trusted)))) x\n"
+   "* (skg (node (id x) (repo public) (viewStats (relRepo private)) (editRequest (relRepo trusted)))) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (let ((msg (skg--apply-relSource-choice
-                 skg--relSource-no-override)))
+     (let ((msg (skg--apply-relRepo-choice
+                 skg--relRepo-no-override)))
        (should (string-match-p "sticky" msg))
        (should-not (string-match-p "editRequest" (test--buffer-line 1)))
-       (should (string-match-p "(viewStats (relSource private))"
+       (should (string-match-p "(viewStats (relRepo private))"
                                (test--buffer-line 1)))))))
 
-(ert-deftest test-apply-relSource-remove-without-atom-is-noop ()
+(ert-deftest test-apply-relRepo-remove-without-atom-is-noop ()
   "The no-override choice without an atom changes nothing."
   (test--with-skg-content-view
-   "* (skg (node (id x) (source public))) x\n"
+   "* (skg (node (id x) (repo public))) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
      (let ((before (test--buffer-line 1))
-           (msg (skg--apply-relSource-choice
-                 skg--relSource-no-override)))
+           (msg (skg--apply-relRepo-choice
+                 skg--relRepo-no-override)))
        (should (string-match-p "nothing to remove" msg))
        (should (equal (test--buffer-line 1) before))))))
 
-(ert-deftest test-apply-relSource-on-alias-uses-flat-metadata ()
-  "Alias relSource intent is a flat scaffold editRequest, not node viewStats."
+(ert-deftest test-apply-relRepo-on-alias-uses-flat-metadata ()
+  "Alias relRepo intent is a flat scaffold editRequest, not node viewStats."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (source public))) owner\n"
+    "* (skg (node (id owner) (repo public))) owner\n"
     "** (skg aliasFolder)\n"
     "*** (skg alias) nickname\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
      (forward-line 2)
-     (skg--apply-relSource-choice "trusted")
+     (skg--apply-relRepo-choice "trusted")
      (should (string-match-p
-              "(skg alias (editRequest (relSource trusted)))"
+              "(skg alias (editRequest (relRepo trusted)))"
               (test--buffer-line 3)))
      (should-not (string-match-p "viewStats" (test--buffer-line 3)))
-     (should (equal (skg--relSource-requested-value) "trusted"))
-     (skg--apply-relSource-choice
-      skg--relSource-no-override)
+     (should (equal (skg--relRepo-requested-value) "trusted"))
+     (skg--apply-relRepo-choice
+      skg--relRepo-no-override)
      (should (equal (test--buffer-line 3)
                     "*** (skg alias) nickname")))))
 
-(ert-deftest test-apply-relSource-on-unknown-keeps-fact-separate ()
+(ert-deftest test-apply-relRepo-on-unknown-keeps-fact-separate ()
   "An Unknown content member stores intent under its own editRequest."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (source public))) owner\n"
-    "** (skg (unknown (id na) (viewStats (relSource private))))\n")
+    "* (skg (node (id owner) (repo public))) owner\n"
+    "** (skg (unknown (id na) (viewStats (relRepo private))))\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
      (forward-line 1)
-     (skg--apply-relSource-choice "trusted")
+     (skg--apply-relRepo-choice "trusted")
      (should (string-match-p
-              "(unknown (id na) (viewStats (relSource private)) (editRequest (relSource trusted)))"
+              "(unknown (id na) (viewStats (relRepo private)) (editRequest (relRepo trusted)))"
               (test--buffer-line 2)))
-     (skg--apply-relSource-choice
-      skg--relSource-no-override)
-     (should (string-match-p "(viewStats (relSource private))"
+     (skg--apply-relRepo-choice
+      skg--relRepo-no-override)
+     (should (string-match-p "(viewStats (relRepo private))"
                              (test--buffer-line 2)))
      (should-not (string-match-p "editRequest" (test--buffer-line 2))))))
 
-(ert-deftest test-recursive-relSource-preflights-edit-conflicts ()
+(ert-deftest test-recursive-relRepo-preflights-edit-conflicts ()
   "A delete/merge target aborts the recursive operation before any write."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (source public))) owner\n"
-    "** (skg (node (id a) (source public))) a\n"
-    "** (skg (node (id b) (source public) (editRequest delete))) b\n")
+    "* (skg (node (id owner) (repo public))) owner\n"
+    "** (skg (node (id a) (repo public))) a\n"
+    "** (skg (node (id b) (repo public) (editRequest delete))) b\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
      (should-error
-      (skg--set-relSource-recursive-walk 'contained "trusted"))
-     (should-not (string-match-p "relSource" (test--buffer-line 2))))))
+      (skg--set-relRepo-recursive-walk 'contained "trusted"))
+     (should-not (string-match-p "relRepo" (test--buffer-line 2))))))
 
 (ert-deftest test-alias-command-derives-default-locally ()
   "The alias gesture uses its owning node's home without an edge-info request."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (source private))) owner\n"
+    "* (skg (node (id owner) (repo private))) owner\n"
     "** (skg aliasFolder)\n"
     "*** (skg alias) nickname\n")
    test--config-public-private-trusted
@@ -295,17 +295,17 @@ the displayed relSource fact; its message says the SAVED source survives
                  ((symbol-function 'process-send-string)
                   (lambda (&rest _)
                     (ert-fail "alias command must not contact edge endpoint"))))
-         (skg--set-relSource-at-point))
+         (skg--set-relRepo-at-point))
        (should (equal seen-choices
                       (list "private" "trusted"
-                            skg--relSource-no-override)))
-       (should (string-match-p "(relSource trusted)"
+                            skg--relRepo-no-override)))
+       (should (string-match-p "(relRepo trusted)"
                                (test--buffer-line 3)))))))
 
 ;; --- The response handler, network and minibuffer stubbed ---
 
 (defun test--run-info-handler (payload choice-fn)
-  "Run `skg--set-relSource-from-info' on PAYLOAD against
+  "Run `skg--set-relRepo-from-info' on PAYLOAD against
 the buffer at point, with `run-at-time' made synchronous and
 `completing-read' (which `skg--completing-read-with-cycle' wraps)
 stubbed by CHOICE-FN, which receives (PROMPT CHOICES PREFILL) --
@@ -319,16 +319,16 @@ choice."
                (lambda (prompt choices &optional _pred _req init
                         _hist _def _inherit)
                  (funcall choice-fn prompt choices init))))
-      (skg--set-relSource-from-info buffer marker payload))))
+      (skg--set-relRepo-from-info buffer marker payload))))
 
-(ert-deftest test-relSource-handler-slices-and-applies ()
+(ert-deftest test-relRepo-handler-slices-and-applies ()
   "A (default, current) reply offers the slice from the default plus
 the no-override entry, pre-fills the minibuffer with the current
-source, and applies the selection."
+repo, and applies the selection."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (source public))) owner\n"
-    "** (skg (node (id kid) (source public))) kid\n")
+    "* (skg (node (id owner) (repo public))) owner\n"
+    "** (skg (node (id kid) (repo public))) kid\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -336,25 +336,25 @@ source, and applies the selection."
      (beginning-of-line)
      (let (seen-choices seen-prefill)
        (test--run-info-handler
-        "((response-type relSource-info) (default \"private\") (current \"trusted\"))"
+        "((response-type relRepo-info) (default \"private\") (current \"trusted\"))"
         (lambda (_prompt choices prefill)
           (setq seen-choices choices
                 seen-prefill prefill)
           "private"))
        (should (equal seen-choices
                       (list "private" "trusted"
-                            skg--relSource-no-override)))
+                            skg--relRepo-no-override)))
        (should (equal seen-prefill "trusted"))
-       (should (string-match-p "(relSource private)"
+       (should (string-match-p "(relRepo private)"
                                (test--buffer-line 2)))))))
 
-(ert-deftest test-relSource-handler-more-public-current-prefills-default ()
+(ert-deftest test-relRepo-handler-more-public-current-prefills-default ()
   "A legacy CURRENT more public than the default is not among the
 choices, so the prompt pre-fills with the default instead."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (source public))) owner\n"
-    "** (skg (node (id kid) (source public))) kid\n")
+    "* (skg (node (id owner) (repo public))) owner\n"
+    "** (skg (node (id kid) (repo public))) kid\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -362,18 +362,18 @@ choices, so the prompt pre-fills with the default instead."
      (beginning-of-line)
      (let (seen-prefill)
        (test--run-info-handler
-        "((response-type relSource-info) (default \"private\") (current \"public\"))"
+        "((response-type relRepo-info) (default \"private\") (current \"public\"))"
         (lambda (_prompt _choices prefill)
           (setq seen-prefill prefill)
-          skg--relSource-no-override))
+          skg--relRepo-no-override))
        (should (equal seen-prefill "private"))))))
 
-(ert-deftest test-relSource-handler-error-offers-full-ladder ()
+(ert-deftest test-relRepo-handler-error-offers-full-ladder ()
   "An error reply falls back to the full ladder (plus no-override)."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (source public))) owner\n"
-    "** (skg (node (id kid) (source public))) kid\n")
+    "* (skg (node (id owner) (repo public))) owner\n"
+    "** (skg (node (id kid) (repo public))) kid\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -381,30 +381,30 @@ choices, so the prompt pre-fills with the default instead."
      (beginning-of-line)
      (let (seen-choices)
        (test--run-info-handler
-        "((response-type relSource-info) (error \"member 'kid' is not in the graph\"))"
+        "((response-type relRepo-info) (error \"member 'kid' is not in the graph\"))"
         (lambda (_prompt choices _def)
           (setq seen-choices choices)
-          skg--relSource-no-override))
+          skg--relRepo-no-override))
        (should (equal seen-choices
                       (list "public" "private" "trusted"
-                            skg--relSource-no-override)))
-       (should-not (string-match-p "relSource"
+                            skg--relRepo-no-override)))
+       (should-not (string-match-p "relRepo"
                                    (test--buffer-line 2)))))))
 
-;; --- The recursive walk: skg--set-relSource-recursive-walk ---
+;; --- The recursive walk: skg--set-relRepo-recursive-walk ---
 
 (defvar test--recursive-content-tree
   (concat
-   "* (skg (node (id r) (source public))) r\n"
-   "** (skg (node (id a) (source public))) a\n"
-   "*** (skg (node (id b) (source public))) b\n"
-   "** (skg (node (id c) (source public) (affectsParent false))) c\n"
-   "*** (skg (node (id d) (source public))) d\n"
-   "** (skg (node (id e) (source public) writeProtected)) e\n"
-   "*** (skg (node (id f) (source public))) f\n"
+   "* (skg (node (id r) (repo public))) r\n"
+   "** (skg (node (id a) (repo public))) a\n"
+   "*** (skg (node (id b) (repo public))) b\n"
+   "** (skg (node (id c) (repo public) (affectsParent false))) c\n"
+   "*** (skg (node (id d) (repo public))) d\n"
+   "** (skg (node (id e) (repo public) writeProtected)) e\n"
+   "*** (skg (node (id f) (repo public))) f\n"
    "** (skg subscribeeFolder)\n"
-   "*** (skg (node (id g) (source public))) g\n"
-   "**** (skg (node (id h) (source public))) h\n"
+   "*** (skg (node (id g) (repo public))) g\n"
+   "**** (skg (node (id h) (repo public))) h\n"
    "** (skg aliasFolder) aliases\n")
   "A view-root tree exercising the walk's qualification and pruning:
 true content (a, b), an false branch (c, d), an
@@ -430,14 +430,14 @@ subscribee-as-such member are pruned, and folder members are untouched."
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (let ((count (skg--set-relSource-recursive-walk
+     (let ((count (skg--set-relRepo-recursive-walk
                    'contained "trusted")))
        (should (= count 3)) ;; a, b, e
        (dolist (id '("a" "b" "e"))
-         (should (string-match-p "(relSource trusted)"
+         (should (string-match-p "(relRepo trusted)"
                                  (test--line-of-id id))))
        (dolist (id '("r" "c" "d" "f" "g" "h"))
-         (should-not (string-match-p "relSource"
+         (should-not (string-match-p "relRepo"
                                      (test--line-of-id id))))))))
 
 (ert-deftest test-recursive-walk-subscribee ()
@@ -448,13 +448,13 @@ children and subscribee-as-such content untouched."
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (let ((count (skg--set-relSource-recursive-walk
+     (let ((count (skg--set-relRepo-recursive-walk
                    'subscribee "private")))
        (should (= count 1)) ;; g
-       (should (string-match-p "(relSource private)"
+       (should (string-match-p "(relRepo private)"
                                (test--line-of-id "g")))
        (dolist (id '("r" "a" "b" "c" "d" "e" "f" "h"))
-         (should-not (string-match-p "relSource"
+         (should-not (string-match-p "relRepo"
                                      (test--line-of-id id))))))))
 
 (ert-deftest test-recursive-walk-root-edge-inclusive ()
@@ -467,12 +467,12 @@ own edge to its view-parent."
      (goto-char (point-min))
      (search-forward "(id a)")
      (beginning-of-line)
-     (let ((count (skg--set-relSource-recursive-walk
+     (let ((count (skg--set-relRepo-recursive-walk
                    'contained "trusted")))
        (should (= count 2)) ;; a and b
-       (should (string-match-p "(relSource trusted)"
+       (should (string-match-p "(relRepo trusted)"
                                (test--line-of-id "a")))
-       (should (string-match-p "(relSource trusted)"
+       (should (string-match-p "(relRepo trusted)"
                                (test--line-of-id "b")))))))
 
 (ert-deftest test-recursive-walk-overridden-and-member-content ()
@@ -480,29 +480,29 @@ own edge to its view-parent."
 own content children (the member being definitive) match kind
 `contained' through the folder."
   (let ((tree (concat
-               "* (skg (node (id anchor) (source public))) anchor\n"
+               "* (skg (node (id anchor) (repo public))) anchor\n"
                "** (skg overriddenFolder)\n"
-               "*** (skg (node (id o) (source public))) o\n"
-               "**** (skg (node (id oc) (source public))) oc\n")))
+               "*** (skg (node (id o) (repo public))) o\n"
+               "**** (skg (node (id oc) (repo public))) oc\n")))
     (test--with-skg-content-view
      tree test--config-public-private-trusted
      (lambda ()
        (goto-char (point-min))
-       (should (= 1 (skg--set-relSource-recursive-walk
+       (should (= 1 (skg--set-relRepo-recursive-walk
                      'overridden "private")))
-       (should (string-match-p "(relSource private)"
+       (should (string-match-p "(relRepo private)"
                                (test--line-of-id "o")))
-       (should-not (string-match-p "relSource"
+       (should-not (string-match-p "relRepo"
                                    (test--line-of-id "oc")))))
     (test--with-skg-content-view
      tree test--config-public-private-trusted
      (lambda ()
        (goto-char (point-min))
-       (should (= 1 (skg--set-relSource-recursive-walk
+       (should (= 1 (skg--set-relRepo-recursive-walk
                      'contained "private")))
-       (should (string-match-p "(relSource private)"
+       (should (string-match-p "(relRepo private)"
                                (test--line-of-id "oc")))
-       (should-not (string-match-p "relSource"
+       (should-not (string-match-p "relRepo"
                                    (test--line-of-id "o")))))))
 
 (ert-deftest test-recursive-walk-prunes-readonly-folder ()
@@ -510,17 +510,17 @@ own content children (the member being definitive) match kind
 member's content children are not reached."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (source public))) owner\n"
+    "* (skg (node (id owner) (repo public))) owner\n"
     "** (skg subscriberFolder)\n"
-    "*** (skg (node (id s) (source public))) s\n"
-    "**** (skg (node (id sc) (source public))) sc\n")
+    "*** (skg (node (id s) (repo public))) s\n"
+    "**** (skg (node (id sc) (repo public))) sc\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (should (= 0 (skg--set-relSource-recursive-walk
+     (should (= 0 (skg--set-relRepo-recursive-walk
                    'contained "trusted")))
      (dolist (id '("s" "sc"))
-       (should-not (string-match-p "relSource"
+       (should-not (string-match-p "relRepo"
                                    (test--line-of-id id)))))))
 
 (ert-deftest test-recursive-walk-write-protected-folder-anchor ()
@@ -529,16 +529,16 @@ save, so its members do not match -- whether the walk starts at the
 anchor (pruned below the write-protected node) or at the folder itself
 (refused by the anchor-definitiveness check)."
   (let ((tree (concat
-               "* (skg (node (id anchor) (source public) writeProtected)) anchor\n"
+               "* (skg (node (id anchor) (repo public) writeProtected)) anchor\n"
                "** (skg subscribeeFolder)\n"
-               "*** (skg (node (id g) (source public))) g\n")))
+               "*** (skg (node (id g) (repo public))) g\n")))
     (test--with-skg-content-view
      tree test--config-public-private-trusted
      (lambda ()
        (goto-char (point-min))
-       (should (= 0 (skg--set-relSource-recursive-walk
+       (should (= 0 (skg--set-relRepo-recursive-walk
                      'subscribee "trusted")))
-       (should-not (string-match-p "relSource"
+       (should-not (string-match-p "relRepo"
                                    (test--line-of-id "g")))))
     (test--with-skg-content-view
      tree test--config-public-private-trusted
@@ -546,24 +546,24 @@ anchor (pruned below the write-protected node) or at the folder itself
        (goto-char (point-min))
        (search-forward "subscribeeFolder")
        (beginning-of-line)
-       (should (= 0 (skg--set-relSource-recursive-walk
+       (should (= 0 (skg--set-relRepo-recursive-walk
                      'subscribee "trusted")))
-       (should-not (string-match-p "relSource"
+       (should-not (string-match-p "relRepo"
                                    (test--line-of-id "g")))))))
 
 (ert-deftest test-recursive-walk-removes-overrides ()
-  "The no-override choice removes pending source requests throughout
+  "The no-override choice removes pending repo requests throughout
 the subtree, while preserving display facts."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id r) (source public))) r\n"
-    "** (skg (node (id a) (source public) (viewStats (relSource trusted)) (editRequest (relSource trusted)))) a\n"
-    "*** (skg (node (id b) (source public) (viewStats (relSource private)) (editRequest (relSource private)))) b\n")
+    "* (skg (node (id r) (repo public))) r\n"
+    "** (skg (node (id a) (repo public) (viewStats (relRepo trusted)) (editRequest (relRepo trusted)))) a\n"
+    "*** (skg (node (id b) (repo public) (viewStats (relRepo private)) (editRequest (relRepo private)))) b\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (should (= 2 (skg--set-relSource-recursive-walk
-                   'contained skg--relSource-no-override)))
+     (should (= 2 (skg--set-relRepo-recursive-walk
+                   'contained skg--relRepo-no-override)))
      (dolist (id '("a" "b"))
        (should-not (string-match-p "editRequest"
                                    (test--line-of-id id)))))))
@@ -617,8 +617,8 @@ does neither."
     (when (get-buffer "*skg-relationship-kinds*")
       (kill-buffer "*skg-relationship-kinds*"))))
 
-(ert-deftest test-set-relSource-recursive-end-to-end ()
-  "The full command: menu choice, source prompt, walk. Point and
+(ert-deftest test-set-relRepo-recursive-end-to-end ()
+  "The full command: menu choice, repo prompt, walk. Point and
 window plumbing are stubbed as in the other handler tests."
   (test--with-skg-content-view
    test--recursive-content-tree
@@ -632,18 +632,18 @@ window plumbing are stubbed as in the other handler tests."
                         (lambda (buffer &rest _) (set-buffer buffer)))
                        ((symbol-function 'completing-read)
                         (lambda (&rest _) "trusted")))
-               (skg-set-relSource-recursive)
+               (skg-set-relRepo-recursive)
                (test--choose-menu-role "** contained"))
              (with-current-buffer view-buffer
                (dolist (id '("a" "b" "e"))
-                 (should (string-match-p "(relSource trusted)"
+                 (should (string-match-p "(relRepo trusted)"
                                          (test--line-of-id id))))
-               (should-not (string-match-p "relSource"
+               (should-not (string-match-p "relRepo"
                                            (test--line-of-id "g")))))
          (when (get-buffer "*skg-relationship-kinds*")
            (kill-buffer "*skg-relationship-kinds*")))))))
 
-;; --- set-source stuck-edge offer and write-protected warning ---
+;; --- set-repo stuck-edge offer and write-protected warning ---
 ;; (Here rather than in test-skg-metadata.el because these need the
 ;; config harness: the stuck-edge analysis reads the privacy ladder.
 ;; In test--config-public-private-trusted the order is public,
@@ -659,95 +659,95 @@ window plumbing are stubbed as in the other handler tests."
                  nil)))
       (cons (funcall fn) (nreverse messages)))))
 
-(ert-deftest test-set-source-recursive-offers-stuck-edge-fix ()
+(ert-deftest test-set-repo-recursive-offers-stuck-edge-fix ()
   "A publicizing recursive move detects the content edges it would
-leave behind, and on acceptance writes (relSource NEW) atoms on them."
+leave behind, and on acceptance writes (relRepo NEW) atoms on them."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id r) (source private))) r\n"
-    "** (skg (node (id a) (source private))) a\n"
-    "*** (skg (node (id b) (source private))) b\n")
+    "* (skg (node (id r) (repo private))) r\n"
+    "** (skg (node (id a) (repo private))) a\n"
+    "*** (skg (node (id b) (repo private))) b\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
      (let (offer-prompt)
-       (cl-letf (((symbol-function 'skg--prompt-for-source-change)
+       (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
                   (lambda (_current) "public"))
                  ((symbol-function 'y-or-n-p)
                   (lambda (prompt) (setq offer-prompt prompt) t)))
          (let ((msgs (cdr (test--messages-during
-                           (lambda () (skg-set-source t))))))
+                           (lambda () (skg-set-repo t))))))
            (should (string-match-p "2 content relationships" offer-prompt))
            (should (seq-find (lambda (m)
                                (string-match-p "Also publicized 2" m))
                              msgs))))
        (dolist (id '("r" "a" "b"))
-         (should (string-match-p "(source public)"
+         (should (string-match-p "(repo public)"
                                  (test--line-of-id id))))
        (dolist (id '("a" "b"))
-         (should (string-match-p "(relSource public)"
+         (should (string-match-p "(relRepo public)"
                                  (test--line-of-id id))))
-       (should-not (string-match-p "relSource"
+       (should-not (string-match-p "relRepo"
                                    (test--line-of-id "r")))))))
 
-(ert-deftest test-set-source-recursive-decline-mentions-recursive-relsource ()
+(ert-deftest test-set-repo-recursive-decline-mentions-recursive-relrepo ()
   "Declining the stuck-edge offer leaves the edges alone and points
 at C-c s R."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id r) (source private))) r\n"
-    "** (skg (node (id a) (source private))) a\n")
+    "* (skg (node (id r) (repo private))) r\n"
+    "** (skg (node (id a) (repo private))) a\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (cl-letf (((symbol-function 'skg--prompt-for-source-change)
+     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
                 (lambda (_current) "public"))
                ((symbol-function 'y-or-n-p)
                 (lambda (_prompt) nil)))
        (let ((msgs (cdr (test--messages-during
-                         (lambda () (skg-set-source t))))))
+                         (lambda () (skg-set-repo t))))))
          (should (seq-find (lambda (m) (string-match-p "C-c s R" m))
                            msgs))))
-     (should-not (string-match-p "relSource" (test--line-of-id "a"))))))
+     (should-not (string-match-p "relRepo" (test--line-of-id "a"))))))
 
-(ert-deftest test-set-source-recursive-no-offer-when-privatizing ()
+(ert-deftest test-set-repo-recursive-no-offer-when-privatizing ()
   "A privatizing move strands nothing (edges rise automatically), so
 no offer is made."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id r) (source public))) r\n"
-    "** (skg (node (id a) (source public))) a\n")
+    "* (skg (node (id r) (repo public))) r\n"
+    "** (skg (node (id a) (repo public))) a\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (cl-letf (((symbol-function 'skg--prompt-for-source-change)
+     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
                 (lambda (_current) "trusted"))
                ((symbol-function 'y-or-n-p)
                 (lambda (_prompt)
                   (error "Should not offer a stuck-edge fix"))))
-       (test--messages-during (lambda () (skg-set-source t))))
-     (should (string-match-p "(source trusted)" (test--line-of-id "a")))
-     (should-not (string-match-p "relSource" (test--line-of-id "a"))))))
+       (test--messages-during (lambda () (skg-set-repo t))))
+     (should (string-match-p "(repo trusted)" (test--line-of-id "a")))
+     (should-not (string-match-p "relRepo" (test--line-of-id "a"))))))
 
-(ert-deftest test-set-source-recursive-warns-about-write-protected ()
+(ert-deftest test-set-repo-recursive-warns-about-write-protected ()
   "A write-protected matching instance is NOT edited; its ID goes to
 *Messages* and the summary carries a loud WARNING. Edges touching
 it are not offered (they cannot actually publicize)."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id r) (source private))) r\n"
-    "** (skg (node (id e) (source private) writeProtected)) e\n"
-    "*** (skg (node (id f) (source private))) f\n")
+    "* (skg (node (id r) (repo private))) r\n"
+    "** (skg (node (id e) (repo private) writeProtected)) e\n"
+    "*** (skg (node (id f) (repo private))) f\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (cl-letf (((symbol-function 'skg--prompt-for-source-change)
+     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
                 (lambda (_current) "public"))
                ((symbol-function 'y-or-n-p)
                 (lambda (_prompt)
                   (error "Should not offer: both edges touch the write-protected node"))))
        (let ((msgs (cdr (test--messages-during
-                         (lambda () (skg-set-source t))))))
+                         (lambda () (skg-set-repo t))))))
          (should (seq-find (lambda (m)
                              (and (string-match-p "NOT changed" m)
                                   (string-match-p ": e" m)))
@@ -756,74 +756,74 @@ it are not offered (they cannot actually publicize)."
                              (and (string-match-p "WARNING" m)
                                   (string-match-p "\\*Messages\\*" m)))
                            msgs))))
-     (should (string-match-p "(source private)" (test--line-of-id "e")))
+     (should (string-match-p "(repo private)" (test--line-of-id "e")))
      (dolist (id '("r" "f"))
-       (should (string-match-p "(source public)"
+       (should (string-match-p "(repo public)"
                                (test--line-of-id id)))))))
 
-(ert-deftest test-set-source-single-publicizes-a-public-parents-child-edge ()
+(ert-deftest test-set-repo-single-publicizes-a-public-parents-child-edge ()
   "Moving a private child into public offers its public parent's edge too."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id parent) (source public))) parent\n"
-    "** (skg (node (id child) (source private))) child\n")
+    "* (skg (node (id parent) (repo public))) parent\n"
+    "** (skg (node (id child) (repo private))) child\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
      (search-forward "(id child)")
      (beginning-of-line)
-     (cl-letf (((symbol-function 'skg--prompt-for-source-change)
+     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
                 (lambda (_current) "public"))
                ((symbol-function 'y-or-n-p)
                 (lambda (prompt)
                   (should (string-match-p "1 content relationship " prompt))
                   t)))
-       (test--messages-during (lambda () (skg-set-source))))
-     (should (string-match-p "(source public)" (test--line-of-id "child")))
-     (should (string-match-p "(relSource public)"
+       (test--messages-during (lambda () (skg-set-repo))))
+     (should (string-match-p "(repo public)" (test--line-of-id "child")))
+     (should (string-match-p "(relRepo public)"
                              (test--line-of-id "child"))))))
 
-(ert-deftest test-set-source-single-offers-direct-child-edges ()
+(ert-deftest test-set-repo-single-offers-direct-child-edges ()
   "A single (non-recursive) publicizing move offers only the edges it
 actually changes: its direct children's inbound edges whose default
-rises. A child still more private than the new source is left alone."
+rises. A child still more private than the new repo is left alone."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id r) (source private))) r\n"
-    "** (skg (node (id a) (source public))) a\n"
-    "** (skg (node (id c) (source trusted))) c\n")
+    "* (skg (node (id r) (repo private))) r\n"
+    "** (skg (node (id a) (repo public))) a\n"
+    "** (skg (node (id c) (repo trusted))) c\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (cl-letf (((symbol-function 'skg--prompt-for-source-change)
+     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
                 (lambda (_current) "public"))
                ((symbol-function 'y-or-n-p)
                 (lambda (prompt)
                   (should (string-match-p "1 content relationship "
                                           prompt))
                   t)))
-       (test--messages-during (lambda () (skg-set-source))))
-     (should (string-match-p "(source public)" (test--line-of-id "r")))
+       (test--messages-during (lambda () (skg-set-repo))))
+     (should (string-match-p "(repo public)" (test--line-of-id "r")))
      ;; a's edge default rose private->public; c's stayed trusted.
-     (should (string-match-p "(relSource public)" (test--line-of-id "a")))
-     (should-not (string-match-p "relSource" (test--line-of-id "c")))
-     (should (string-match-p "(source trusted)" (test--line-of-id "c"))))))
+     (should (string-match-p "(relRepo public)" (test--line-of-id "a")))
+     (should-not (string-match-p "relRepo" (test--line-of-id "c")))
+     (should (string-match-p "(repo trusted)" (test--line-of-id "c"))))))
 
-(ert-deftest test-set-source-single-write-protected-warns-and-skips ()
+(ert-deftest test-set-repo-single-write-protected-warns-and-skips ()
   "A single move of a write-protected instance edits nothing and warns."
   (test--with-skg-content-view
-   "* (skg (node (id x) (source private) writeProtected)) x\n"
+   "* (skg (node (id x) (repo private) writeProtected)) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (cl-letf (((symbol-function 'skg--prompt-for-source-change)
+     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
                 (lambda (_current) "public")))
        (let ((msgs (cdr (test--messages-during
-                         (lambda () (skg-set-source))))))
+                         (lambda () (skg-set-repo))))))
          (should (seq-find (lambda (m) (string-match-p "WARNING" m))
                            msgs))))
-     (should (string-match-p "(source private)" (test--line-of-id "x")))
-     (should-not (string-match-p "(source public)"
+     (should (string-match-p "(repo private)" (test--line-of-id "x")))
+     (should-not (string-match-p "(repo public)"
                                  (test--line-of-id "x"))))))
 
-(provide 'test-skg-set-relSource)
+(provide 'test-skg-set-relRepo)

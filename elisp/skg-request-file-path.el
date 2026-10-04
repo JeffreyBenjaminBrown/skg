@@ -56,7 +56,7 @@ called from once the request has been issued."
       (kill-buffer buf))))
 
 (defun skg--magit-node-info-at-point ()
-  "Return a cons (id . source) for the node on the current line,
+  "Return a cons (id . repo) for the node on the current line,
 or nil (with a user message) if no valid node metadata is found."
   (save-excursion
     (beginning-of-line)
@@ -70,14 +70,14 @@ or nil (with a user message) if no valid node metadata is found."
         nil)
        (t
         (let (( id     (skg--extract-id-from-metadata-sexp sexp) )
-              ( source (skg--extract-source-from-metadata-sexp sexp) ))
-          (if (and id source)
-              (cons id source)
-            (message "Could not extract id or source from metadata.")
+              ( repo (skg--extract-repo-from-metadata-sexp sexp) ))
+          (if (and id repo)
+              (cons id repo)
+            (message "Could not extract id or repo from metadata.")
             nil)))))))
 
 (defun skg--magit-parent-info-at-point ()
-  "Return a cons (id . source) for the node on the parent heading,
+  "Return a cons (id . repo) for the node on the parent heading,
 or nil (with a user message) if no valid parent metadata is found."
   (let (( parent-sexp nil ))
     (save-excursion
@@ -95,14 +95,14 @@ or nil (with a user message) if no valid parent metadata is found."
       nil)
      (t
       (let (( parent-id     (skg--extract-id-from-metadata-sexp parent-sexp) )
-            ( parent-source (skg--extract-source-from-metadata-sexp parent-sexp) ))
-        (if (and parent-id parent-source)
-            (cons parent-id parent-source)
-          (message "Could not extract id or source from parent.")
+            ( parent-repo (skg--extract-repo-from-metadata-sexp parent-sexp) ))
+        (if (and parent-id parent-repo)
+            (cons parent-id parent-repo)
+          (message "Could not extract id or repo from parent.")
           nil))))))
 
-(defun skg--request-file-path-with-handler (id source handler)
-  "Send a get-file-path request for ID and SOURCE, using HANDLER for the response."
+(defun skg--request-file-path-with-handler (id repo handler)
+  "Send a get-file-path request for ID and REPO, using HANDLER for the response."
   (skg-register-response-handler
    'get-file-path handler t)
   (skg-lp-reset)
@@ -111,7 +111,7 @@ or nil (with a user message) if no valid parent metadata is found."
            (concat (prin1-to-string
                     `((request . "get file path")
                       (id . ,id)
-                      (source . ,source)))
+                      (repo . ,repo)))
                    "\n") ))
     (process-send-string tcp-proc request-sexp)))
 
@@ -134,7 +134,7 @@ Returns nil (after a user message) on error or missing path."
       (unless (require 'magit nil t)
         (user-error "Magit is not installed or loadable"))
       (let* (( resolved-path    (expand-file-name path skg-config-dir) )
-             ( default-directory ;; PITFALL: magit reads this implicitly to find the git repo via magit-toplevel. The .skg source dir is its own repo, separate from the outer project repo.
+             ( default-directory ;; PITFALL: magit reads this implicitly to find the git repo via magit-toplevel. The Skg repo's directory is its own Git repo, separate from the outer project repo.
                (file-name-directory resolved-path) )
              ( repo-root (magit-toplevel default-directory) )
              ( rel-path  (file-relative-name resolved-path repo-root) ))

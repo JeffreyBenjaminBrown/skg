@@ -292,9 +292,9 @@ Return (BUFFER-TEXT . LAST-MESSAGE)."
 (ert-deftest test-skg-paste-node-in-view-beside-writeable-instance ()
   "With a writeable instance present, the paste stays write-protected and says why."
   (let (( result (skg-test--paste-node-in-view
-                  "* (skg (node (id id-1) (source main))) Writeable\n") ))
+                  "* (skg (node (id id-1) (repo main))) Writeable\n") ))
     (should (equal (car result)
-                   (concat "* (skg (node (id id-1) (source main))) Writeable\n"
+                   (concat "* (skg (node (id id-1) (repo main))) Writeable\n"
                            "* (skg (node (id id-1) writeProtected)) Title from stack\n")))
     (should (equal (cdr result)
                    "NOTE: Pasting node readonly because a writeable instance is already present in this same buffer.")) ))

@@ -327,8 +327,8 @@ fn discover_roots (
         parent . pid, target ) ); }
     if ! node_active (parent, active) {
       warnings . push ( format! (
-        "export root {} is in source {} which is inactive under \
-         source-set {}; skipping",
+        "export root {} is in repo {} which is inactive under \
+         repo-set {}; skipping",
         parent . pid, parent . home_repo, active . name ) );
       continue; }
     if let Some (owner) = target_owner . get (&target) {
@@ -607,7 +607,7 @@ fn rewrite_links (
           None => {
             warnings . push ( format! (
               "broken link to {} ({:?}): not exported under this \
-               source-set, and the broken-link note is not either; \
+               repo-set, and the broken-link note is not either; \
                emitting the label as plain text",
               pid, label ) );
             label . to_string () }, }}, } ); }

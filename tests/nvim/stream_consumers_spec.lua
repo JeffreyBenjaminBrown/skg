@@ -1,5 +1,5 @@
 -- Coverage for the rerender stream and its consumers (diff mode,
--- source sets), plus the report-shaped requests (diff report, stage
+-- repo sets), plus the report-shaped requests (diff report, stage
 -- moves, export). Mirrors tests/elisp/test-skg-diff-report.el's
 -- wiring cases and test-skg-warning-channel.el's rerender-done
 -- channel, end-to-end through the loopback fake server.
@@ -12,7 +12,7 @@ local diff_report = require('skg.diff_report')
 local diff_mode = require('skg.diff_mode')
 local lock = require('skg.lock')
 local rerender = require('skg.rerender')
-local source_sets = require('skg.source_sets')
+local repo_sets = require('skg.repo_sets')
 local stage_moves = require('skg.stage_moves')
 
 local function wipe_named (name)
@@ -119,15 +119,15 @@ describe('skg stream consumers', function ()
     assert.is_true(vim.bo[a].modifiable)
   end)
 
-  it('switches the source-set and rides the rerender stream',
+  it('switches the repo-set and rides the rerender stream',
      function ()
     local seen = nil
     server = helpers.connect_to_fake_server(function (line, respond)
-      if line:find('set active source set', 1, true) then
+      if line:find('set active repo set', 1, true) then
         seen = line
         respond(helpers.framed(
-          '((response-type active-source-set) (active "public")'
-          .. ' (content "Active source-set: public"))'))
+          '((response-type active-repo-set) (active "public")'
+          .. ' (content "Active repo-set: public"))'))
         respond(helpers.framed(
           '((response-type rerender-lock) (lock-views ()))'))
         respond(helpers.framed(
@@ -135,11 +135,11 @@ describe('skg stream consumers', function ()
           .. ' (warnings ()))'))
       end
     end)
-    source_sets.set_active_source_set('public')
+    repo_sets.set_active_repo_set('public')
     vim.wait(3000, function ()
       return lock.stream_in_progress == nil and seen ~= nil end, 10)
     assert.are.equal(
-      '((request . "set active source set") (name . "public"))',
+      '((request . "set active repo set") (name . "public"))',
       seen)
   end)
 

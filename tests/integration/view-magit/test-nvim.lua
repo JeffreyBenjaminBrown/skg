@@ -60,7 +60,7 @@ local function open_plain_diff_for_node_at_point ()
   local info = goto_git.node_info_at_point()
   if not info then return nil end
   local resolved_path
-  goto_git.request_file_path(info.id, info.source,
+  goto_git.request_file_path(info.id, info.repo,
     function (path) resolved_path = path end)
   if not T.wait_for_response() then return nil end
   if not resolved_path then return nil end

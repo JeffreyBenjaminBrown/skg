@@ -124,8 +124,8 @@ async fn toggle_refused_under_restricted_set_and_allowed_at_all (
         assert! ( messages [0] . contains ("git-diff-mode"),
                   "{}", messages [0] );
         assert! ( messages [0] . contains (
-            "Git diff mode requires active source-set all; \
-             current active source-set is public" ),
+            "Git diff mode requires active repo-set all; \
+             current active repo-set is public" ),
           "{}", messages [0] );
         assert! ( ! messages [0] . contains ("\\nWarning:")
                   && ! messages [0] . contains ("\nWarning:"),
@@ -161,7 +161,7 @@ async fn switch_refusals_take_the_unwinding_shape (
         skg_env_from_parts (
           config, tantivy, &graph );
       let request_to = |name : &str| -> String {
-        format! ( "((request . \"set active source set\") \
+        format! ( "((request . \"set active repo set\") \
                     (name . \"{}\"))", name ) };
       let switch = |views_state : &mut ViewsState,
                     active : &mut ActiveRepoSet,
@@ -206,11 +206,11 @@ async fn switch_refusals_take_the_unwinding_shape (
                   &enrichment_slot, &search_cancelled,
                   &request_to ("public"));
         assert_eq! ( messages . len (), 3, "{:?}", messages );
-        assert! ( messages [0] . contains ("active-source-set"),
+        assert! ( messages [0] . contains ("active-repo-set"),
                   "{}", messages [0] );
         assert! ( messages [0] . contains (
-            "Cannot switch to source-set public: git diff mode is \
-             on, and it requires active source-set all. Disable \
+            "Cannot switch to repo-set public: git diff mode is \
+             on, and it requires active repo-set all. Disable \
              diff mode first." ),
           "{}", messages [0] );
         assert! ( messages [0] . contains ("(active \"all\")"),
@@ -230,7 +230,7 @@ async fn switch_refusals_take_the_unwinding_shape (
           switch (&mut views_state, &mut active,
                   &enrichment_slot, &search_cancelled,
                   &request_to ("all"));
-        assert! ( messages [0] . contains ("Active source-set: all"),
+        assert! ( messages [0] . contains ("Active repo-set: all"),
                   "{}", messages [0] );
         assert_eq! ( active . name, RepoSetName::from ("all") ); }
       { // The ride-along: an unknown set name answers in the same
@@ -242,7 +242,7 @@ async fn switch_refusals_take_the_unwinding_shape (
                   &enrichment_slot, &search_cancelled,
                   &request_to ("no-such-set"));
         assert_eq! ( messages . len (), 3, "{:?}", messages );
-        assert! ( messages [0] . contains ("active-source-set"),
+        assert! ( messages [0] . contains ("active-repo-set"),
           "the error rides the normal response-type: {}",
           messages [0] );
         assert! ( messages [0] . contains ("no-such-set"),
@@ -264,7 +264,7 @@ async fn switch_refusals_take_the_unwinding_shape (
                   &enrichment_slot, &search_cancelled,
                   &request_to ("private"));
         assert! ( messages [0] . contains (
-                    "Active source-set: private"),
+                    "Active repo-set: private"),
                   "{}", messages [0] );
         assert_eq! ( active . name,
                      RepoSetName::from ("private") ); }
@@ -301,7 +301,7 @@ async fn refusal_first_messages_parse_and_read_as_documented (
         BufReader::new (client);
       let first : String =
         read_first_then_assert_empty_stream (&mut reader)?;
-      assert! ( first . contains ("Switch the source-set to all \
+      assert! ( first . contains ("Switch the repo-set to all \
                                    first") , "{}", first );
       assert! ( read_lp_message (&mut reader) . is_err (),
                 "nothing follows the empty stream" );

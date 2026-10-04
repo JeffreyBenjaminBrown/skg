@@ -1,7 +1,7 @@
 -- PURPOSE: A workflow to search for text and insert a link to one of
 -- the results: run from any buffer, it records the buffer and cursor,
 -- searches, and in the results buffer a pick (<CR> or
--- <localleader>cc) kills the search, returns to the source position,
+-- <localleader>cc) kills the search, returns to the repo position,
 -- and inserts [[id:X][LABEL]] there. The Lua port of
 -- elisp/skg-search-make-link.el.
 --
@@ -54,7 +54,7 @@ function M.maybe_activate_link_from_search_mode ()
 end
 
 ---Pick the result at point: kill the search buffer, return to the
----source position, and insert the link, its label normalized so it
+---repo position, and insert the link, its label normalized so it
 ---never contains nested links.
 function M.finish ()
   local search_buf = vim.api.nvim_get_current_buf()

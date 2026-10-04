@@ -1,5 +1,5 @@
 ;;; -*- lexical-binding: t; -*-
-;;; Display-only status and optional home-source suffixes for Skg links.
+;;; Display-only status and optional home-repo suffixes for Skg links.
 
 (require 'cl-lib)
 (require 'subr-x)
@@ -11,25 +11,25 @@
   "Capture a literal Skg link's target ID and label in a view buffer.")
 
 (defvar skg-link-annotations--cache (make-hash-table :test 'equal)
-  "Status by literal ID for the current graph and source-set lifetime.")
+  "Status by literal ID for the current graph and repo-set lifetime.")
 (defvar skg-link-annotations--requests (make-hash-table :test 'equal)
   "Outstanding request ID to (buffer generation tick epoch ids).")
 (defvar skg-link-annotations--next-request 0)
 (defvar skg-link-annotations--epoch 0)
 
-(defvar-local skg-link-annotations--source-suffix-enabled nil
-  "Whether this buffer displays source suffixes on Skg links.")
-(put 'skg-link-annotations--source-suffix-enabled 'permanent-local t)
+(defvar-local skg-link-annotations--repo-suffix-enabled nil
+  "Whether this buffer displays repo suffixes on Skg links.")
+(put 'skg-link-annotations--repo-suffix-enabled 'permanent-local t)
 (defvar-local skg-link-annotations--generation 0)
 (defvar-local skg-link-annotations--timer nil)
 
-(defun skg-toggle-source-overlay-on-links ()
-  "Toggle display-only source suffixes for Skg links in this view."
+(defun skg-toggle-repo-overlay-on-links ()
+  "Toggle display-only repo suffixes for Skg links in this view."
   (interactive)
   (unless (derived-mode-p 'skg-content-view-mode)
     (user-error "This command needs an Skg view buffer"))
-  (setq skg-link-annotations--source-suffix-enabled
-        (not skg-link-annotations--source-suffix-enabled))
+  (setq skg-link-annotations--repo-suffix-enabled
+        (not skg-link-annotations--repo-suffix-enabled))
   (skg-link-annotations-mode 1)
   (skg-link-annotations-refresh))
 
@@ -158,7 +158,7 @@ character."
           (overlay-put overlay 'skg-link-annotation t)
           (overlay-put overlay 'face
                        '(:inherit heralds-confusable-face :underline t))))
-      (when skg-link-annotations--source-suffix-enabled
+      (when skg-link-annotations--repo-suffix-enabled
         (let* ((label (pcase kind
                         ('resolved (format "⌂:%s" (nth 2 status)))
                         ('missing "⌂:missing")
@@ -249,7 +249,7 @@ character."
                (skg-link-annotations--scan)))))))))
 
 (defun skg-link-annotations-invalidate-all ()
-  "Expire lookup results after a graph or source-set change."
+  "Expire lookup results after a graph or repo-set change."
   (cl-incf skg-link-annotations--epoch)
   (clrhash skg-link-annotations--cache)
   (dolist (buffer (buffer-list))
@@ -280,7 +280,7 @@ character."
 
 ;;;###autoload
 (define-minor-mode skg-link-annotations-mode
-  "Style confirmed broken Skg links and optionally show source suffixes."
+  "Style confirmed broken Skg links and optionally show repo suffixes."
   :lighter ""
   (if skg-link-annotations-mode
       (progn

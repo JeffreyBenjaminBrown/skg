@@ -135,7 +135,7 @@ Returns the parsed s-expression or nil if not found."
    (equal
     (skg-strip-metadata-from-org-text
      (concat
-      "* (skg (node (id 1) (source public))) root\n"
+      "* (skg (node (id 1) (repo public))) root\n"
       "body line\n"
       "** (skg alias (staged newM)) alias title\n"
       "** plain child\n"))
@@ -156,7 +156,7 @@ Returns the parsed s-expression or nil if not found."
 
 (ert-deftest test-skg-view-without-metadata-opens-stripped-region ()
   "Test skg-view-without-metadata opens a new buffer with stripped text."
-  (let ((source-buffer (generate-new-buffer " *skg-test-source*"))
+  (let ((source-buffer (generate-new-buffer " *skg-test-repo*"))
         (projection-buffer nil))
     (unwind-protect
         (with-current-buffer source-buffer
@@ -199,39 +199,39 @@ C-c p o must bind to distinct commands."
     (should (eq (lookup-key skg-content-view-mode-map (kbd (car pair)))
                 (cdr pair)))))
 
-(ert-deftest test-skg-set-source ()
-  "Test skg-set-source replaces the node source field."
+(ert-deftest test-skg-set-repo ()
+  "Test skg-set-repo replaces the node repo field."
   (with-temp-buffer
     (org-mode)
-    (insert "* (skg (node (id 1) (source public))) title")
+    (insert "* (skg (node (id 1) (repo public))) title")
     (goto-char (point-min))
-    (cl-letf (((symbol-function 'skg--prompt-for-source-change)
-               (lambda (current-source)
-                 (should (equal current-source "public"))
+    (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
+               (lambda (current-repo)
+                 (should (equal current-repo "public"))
                  "private")))
-      (skg-set-source))
+      (skg-set-repo))
     (let ((result (test-skg--extract-metadata-sexp)))
       (should (skg-sexp-subtree-p
                result
-               '(skg (node (id 1) (source private)))))
+               '(skg (node (id 1) (repo private)))))
       (should (skg-sexp-subtree-p
                result
-               '(skg (node (viewStats (sourceHerald ⌂:private))))))
+               '(skg (node (viewStats (homeRepoHerald ⌂:private))))))
       (should-not (skg-sexp-subtree-p
                    result
-                   '(skg (node (source public))))))))
+                   '(skg (node (repo public))))))))
 
-(ert-deftest test-skg-set-source-updates-displayed-source-herald ()
-  "Test skg-set-source changes the source herald for the current node."
+(ert-deftest test-skg-set-repo-updates-displayed-repo-herald ()
+  "Test skg-set-repo changes the repo herald for the current node."
   (with-temp-buffer
     (org-mode)
-    (insert "* (skg (node (id 1) (source public) (viewStats (sourceHerald ⌂:public)))) title")
+    (insert "* (skg (node (id 1) (repo public) (viewStats (homeRepoHerald ⌂:public)))) title")
     (goto-char (point-min))
     (heralds-minor-mode 1)
-    (cl-letf (((symbol-function 'skg--prompt-for-source-change)
-               (lambda (_current-source)
+    (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
+               (lambda (_current-repo)
                  "private")))
-      (skg-set-source))
+      (skg-set-repo))
     (let* ((metadata-start (save-excursion
                              (goto-char (point-min))
                              (search-forward "(skg")
@@ -248,20 +248,20 @@ C-c p o must bind to distinct commands."
   "Test skg-set-merge-request adds a merge editRequest."
   (with-temp-buffer
     (org-mode)
-    (insert "* (skg (node (id acquirer) (source public))) title")
+    (insert "* (skg (node (id acquirer) (repo public))) title")
     (goto-char (point-min))
     (skg-set-merge-request "acquiree")
     (let ((result (test-skg--extract-metadata-sexp)))
       (should (skg-sexp-subtree-p
                result
-               '(skg (node (id acquirer) (source public)
+               '(skg (node (id acquirer) (repo public)
                            (editRequest (merge acquiree)))))))))
 
 (ert-deftest test-skg-set-merge-request-with-link-replaces-editrequest ()
   "Test skg-set-merge-request accepts org links and replaces old editRequests."
   (with-temp-buffer
     (org-mode)
-    (insert "* (skg (node (id acquirer) (source public) (editRequest delete))) title")
+    (insert "* (skg (node (id acquirer) (repo public) (editRequest delete))) title")
     (goto-char (point-min))
     (skg-set-merge-request "[[id:acquiree][Acquiree title]]")
     (let ((result (test-skg--extract-metadata-sexp)))
@@ -296,52 +296,52 @@ C-c p o must bind to distinct commands."
                      "[[id:acquiree][Acquiree title]]"))
       (should (null skg-id-stack)))))
 
-(ert-deftest test-skg-set-source-recursive-prunes-non-content-affectsParent ()
-  "Test recursive source change follows only container org relationships."
+(ert-deftest test-skg-set-repo-recursive-prunes-non-content-affectsParent ()
+  "Test recursive repo change follows only container org relationships."
   (with-temp-buffer
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id root) (source public) (affectsParent na))) root\n"
-      "** (skg (node (id content-child) (source public))) content child\n"
-      "*** (skg (node (id content-grandchild) (source public))) content grandchild\n"
-      "** (skg (node (id mismatched-content) (source foreign))) mismatched content\n"
-      "*** (skg (node (id public-under-mismatch) (source public))) public under mismatch\n"
-      "** (skg (node (id link-child) (source public) (affectsParent false) (birth backpath mentioner))) link child\n"
-      "*** (skg (node (id under-link) (source public))) under link\n"
+      "* (skg (node (id root) (repo public) (affectsParent na))) root\n"
+      "** (skg (node (id content-child) (repo public))) content child\n"
+      "*** (skg (node (id content-grandchild) (repo public))) content grandchild\n"
+      "** (skg (node (id mismatched-content) (repo foreign))) mismatched content\n"
+      "*** (skg (node (id public-under-mismatch) (repo public))) public under mismatch\n"
+      "** (skg (node (id link-child) (repo public) (affectsParent false) (birth backpath mentioner))) link child\n"
+      "*** (skg (node (id under-link) (repo public))) under link\n"
       "** (skg aliasFolder) aliases\n"
-      "*** (skg (node (id under-scaffold) (source public))) under scaffold\n"))
+      "*** (skg (node (id under-scaffold) (repo public))) under scaffold\n"))
     (goto-char (point-min))
-    (cl-letf (((symbol-function 'skg--prompt-for-source-change)
-               (lambda (current-source)
-                 (should (equal current-source "public"))
+    (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
+               (lambda (current-repo)
+                 (should (equal current-repo "public"))
                  "private")))
-      (skg-set-source-recursive))
+      (skg-set-repo-recursive))
     (dolist (id '("root"
                   "content-child"
                   "content-grandchild"
                   "public-under-mismatch"))
       (should (skg-sexp-subtree-p
                (test-skg--metadata-sexp-by-id id)
-               '(skg (node (source private)))))
+               '(skg (node (repo private)))))
       (should (skg-sexp-subtree-p
                (test-skg--metadata-sexp-by-id id)
-               '(skg (node (viewStats (sourceHerald ⌂:private)))))))
+               '(skg (node (viewStats (homeRepoHerald ⌂:private)))))))
     (should (skg-sexp-subtree-p
              (test-skg--metadata-sexp-by-id "mismatched-content")
-             '(skg (node (source foreign)))))
+             '(skg (node (repo foreign)))))
     (should-not (skg-sexp-subtree-p
                  (test-skg--metadata-sexp-by-id "mismatched-content")
-                 '(skg (node (source private)))))
+                 '(skg (node (repo private)))))
     (dolist (id '("link-child"
                   "under-link"
                   "under-scaffold"))
       (should (skg-sexp-subtree-p
                (test-skg--metadata-sexp-by-id id)
-               '(skg (node (source public)))))
+               '(skg (node (repo public)))))
       (should-not (skg-sexp-subtree-p
                    (test-skg--metadata-sexp-by-id id)
-                   '(skg (node (source private))))))))
+                   '(skg (node (repo private))))))))
 
 (ert-deftest test-skg-replace-content-with-link-from-body ()
   "Test replacing the current branch from point in the node body."
@@ -349,16 +349,16 @@ C-c p o must bind to distinct commands."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (source public))) R\n"
-      "** (skg (node (id p) (source public))) P\n"
+      "* (skg (node (id r) (repo public))) R\n"
+      "** (skg (node (id p) (repo public))) P\n"
       "body point starts here\n"
       "*** (skg aliasFolder) aliases\n"
-      "*** (skg (node (id c) (source public) writeProtected)) child\n"
-      "** (skg (node (id p) (source public) writeProtected)) P elsewhere\n"))
+      "*** (skg (node (id c) (repo public) writeProtected)) child\n"
+      "** (skg (node (id p) (repo public) writeProtected)) P elsewhere\n"))
     (goto-char (point-min))
     (search-forward "body point")
     (let ((save-count 0))
-      (cl-letf (((symbol-function 'skg--owned-sources)
+      (cl-letf (((symbol-function 'skg--owned-repos)
                  (lambda () '("public")))
                 ((symbol-function 'skg-request-save-buffer)
                  (lambda () (setq save-count (1+ save-count)))))
@@ -368,9 +368,9 @@ C-c p o must bind to distinct commands."
        (equal
         (buffer-string)
         (concat
-         "* (skg (node (id r) (source public))) R\n"
+         "* (skg (node (id r) (repo public))) R\n"
          "** [[id:p][P]]\n"
-         "** (skg (node (id p) (source public) writeProtected)) P elsewhere\n"))))))
+         "** (skg (node (id p) (repo public) writeProtected)) P elsewhere\n"))))))
 
 (ert-deftest test-skg-replace-content-with-link-confirms-linked-headline ()
   "Test link-bearing headlines ask for confirmation and simplify labels."
@@ -378,12 +378,12 @@ C-c p o must bind to distinct commands."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (source public))) R\n"
-      "** (skg (node (id p) (source public))) P has [[https://x][X]] and [[id:y]]\n"))
+      "* (skg (node (id r) (repo public))) R\n"
+      "** (skg (node (id p) (repo public))) P has [[https://x][X]] and [[id:y]]\n"))
     (goto-char (point-min))
     (forward-line 1)
     (let ((save-count 0))
-      (cl-letf (((symbol-function 'skg--owned-sources)
+      (cl-letf (((symbol-function 'skg--owned-repos)
                  (lambda () '("public")))
                 ((symbol-function 'skg-request-save-buffer)
                  (lambda () (setq save-count (1+ save-count))))
@@ -397,7 +397,7 @@ C-c p o must bind to distinct commands."
        (equal
         (buffer-string)
         (concat
-         "* (skg (node (id r) (source public))) R\n"
+         "* (skg (node (id r) (repo public))) R\n"
          "** [[id:p][P has X and id:y]]\n"))))))
 
 (ert-deftest test-skg-replace-content-with-link-cancel-linked-headline ()
@@ -406,13 +406,13 @@ C-c p o must bind to distinct commands."
     (org-mode)
     (let ((original
            (concat
-            "* (skg (node (id r) (source public))) R\n"
-            "** (skg (node (id p) (source public))) P has [[id:x][X]]\n")))
+            "* (skg (node (id r) (repo public))) R\n"
+            "** (skg (node (id p) (repo public))) P has [[id:x][X]]\n")))
       (insert original)
       (goto-char (point-min))
       (forward-line 1)
       (let ((save-count 0))
-        (cl-letf (((symbol-function 'skg--owned-sources)
+        (cl-letf (((symbol-function 'skg--owned-repos)
                    (lambda () '("public")))
                   ((symbol-function 'skg-request-save-buffer)
                    (lambda () (setq save-count (1+ save-count))))
@@ -429,12 +429,12 @@ C-c p o must bind to distinct commands."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (source public))) R\n"
-      "** (skg (node (source public))) P\n"))
+      "* (skg (node (id r) (repo public))) R\n"
+      "** (skg (node (repo public))) P\n"))
     (goto-char (point-min))
     (forward-line 1)
     (let ((save-count 0))
-      (cl-letf (((symbol-function 'skg--owned-sources)
+      (cl-letf (((symbol-function 'skg--owned-repos)
                  (lambda () '("public")))
                 ((symbol-function 'skg-request-save-buffer)
                  (lambda () (setq save-count (1+ save-count)))))
@@ -443,17 +443,17 @@ C-c p o must bind to distinct commands."
       (should (= save-count 0)))))
 
 (ert-deftest test-skg-replace-content-with-link-rejects-foreign-container ()
-  "Test replacement fails under a container source not owned by the user."
+  "Test replacement fails under a container repo not owned by the user."
   (with-temp-buffer
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (source foreign))) R\n"
-      "** (skg (node (id p) (source public))) P\n"))
+      "* (skg (node (id r) (repo foreign))) R\n"
+      "** (skg (node (id p) (repo public))) P\n"))
     (goto-char (point-min))
     (forward-line 1)
     (let ((save-count 0))
-      (cl-letf (((symbol-function 'skg--owned-sources)
+      (cl-letf (((symbol-function 'skg--owned-repos)
                  (lambda () '("public")))
                 ((symbol-function 'skg-request-save-buffer)
                  (lambda () (setq save-count (1+ save-count)))))
@@ -467,12 +467,12 @@ C-c p o must bind to distinct commands."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (source public) writeProtected)) R\n"
-      "** (skg (node (id p) (source public))) P\n"))
+      "* (skg (node (id r) (repo public) writeProtected)) R\n"
+      "** (skg (node (id p) (repo public))) P\n"))
     (goto-char (point-min))
     (forward-line 1)
     (let ((save-count 0))
-      (cl-letf (((symbol-function 'skg--owned-sources)
+      (cl-letf (((symbol-function 'skg--owned-repos)
                  (lambda () '("public")))
                 ((symbol-function 'skg-request-save-buffer)
                  (lambda () (setq save-count (1+ save-count)))))
@@ -486,14 +486,14 @@ C-c p o must bind to distinct commands."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (source public))) R\n"
+      "* (skg (node (id r) (repo public))) R\n"
       "** note\n"
       "see [[id:p][P]]\n"
-      "** (skg (node (id s) (source public))) sibling\n"))
+      "** (skg (node (id s) (repo public))) sibling\n"))
     (goto-char (point-min))
     (search-forward "[[id:p][P]]")
     (let ((save-count 0))
-      (cl-letf (((symbol-function 'skg--owned-sources)
+      (cl-letf (((symbol-function 'skg--owned-repos)
                  (lambda () '("public")))
                 ((symbol-function 'skg-request-save-buffer)
                  (lambda () (setq save-count (1+ save-count)))))
@@ -503,9 +503,9 @@ C-c p o must bind to distinct commands."
        (equal
         (buffer-string)
         (concat
-         "* (skg (node (id r) (source public))) R\n"
+         "* (skg (node (id r) (repo public))) R\n"
          "** (skg (node (id p) writeProtected (viewRequests definitiveView))) P\n"
-         "** (skg (node (id s) (source public))) sibling\n"))))))
+         "** (skg (node (id s) (repo public))) sibling\n"))))))
 
 (ert-deftest test-skg-replace-link-with-content-warns-for-existing-node ()
   "Test replacing an existing node warns because it might orphan it."
@@ -513,13 +513,13 @@ C-c p o must bind to distinct commands."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (source public))) R\n"
-      "** (skg (node (id old) (source public))) see [[id:p][P]]\n"))
+      "* (skg (node (id r) (repo public))) R\n"
+      "** (skg (node (id old) (repo public))) see [[id:p][P]]\n"))
     (goto-char (point-min))
     (forward-line 1)
     (let ((save-count 0)
           (messages nil))
-      (cl-letf (((symbol-function 'skg--owned-sources)
+      (cl-letf (((symbol-function 'skg--owned-repos)
                  (lambda () '("public")))
                 ((symbol-function 'skg-request-save-buffer)
                  (lambda () (setq save-count (1+ save-count))))
@@ -539,13 +539,13 @@ C-c p o must bind to distinct commands."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (source public))) R\n"
+      "* (skg (node (id r) (repo public))) R\n"
       "** [[id:a][A]]\n"
       "[[id:b][B]]\n"))
     (goto-char (point-min))
     (forward-line 1)
     (let ((save-count 0))
-      (cl-letf (((symbol-function 'skg--owned-sources)
+      (cl-letf (((symbol-function 'skg--owned-repos)
                  (lambda () '("public")))
                 ((symbol-function 'skg-request-save-buffer)
                  (lambda () (setq save-count (1+ save-count)))))
@@ -559,12 +559,12 @@ C-c p o must bind to distinct commands."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (source public))) R\n"
+      "* (skg (node (id r) (repo public))) R\n"
       "** [[https://example.com][web]]\n"))
     (goto-char (point-min))
     (forward-line 1)
     (let ((save-count 0))
-      (cl-letf (((symbol-function 'skg--owned-sources)
+      (cl-letf (((symbol-function 'skg--owned-repos)
                  (lambda () '("public")))
                 ((symbol-function 'skg-request-save-buffer)
                  (lambda () (setq save-count (1+ save-count)))))
@@ -578,13 +578,13 @@ C-c p o must bind to distinct commands."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (source public))) R\n"
+      "* (skg (node (id r) (repo public))) R\n"
       "** [[id:p][P]]\n"
       "*** child\n"))
     (goto-char (point-min))
     (forward-line 1)
     (let ((save-count 0))
-      (cl-letf (((symbol-function 'skg--owned-sources)
+      (cl-letf (((symbol-function 'skg--owned-repos)
                  (lambda () '("public")))
                 ((symbol-function 'skg-request-save-buffer)
                  (lambda () (setq save-count (1+ save-count)))))
@@ -598,12 +598,12 @@ C-c p o must bind to distinct commands."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (source public) writeProtected)) R\n"
+      "* (skg (node (id r) (repo public) writeProtected)) R\n"
       "** [[id:p][P]]\n"))
     (goto-char (point-min))
     (forward-line 1)
     (let ((save-count 0))
-      (cl-letf (((symbol-function 'skg--owned-sources)
+      (cl-letf (((symbol-function 'skg--owned-repos)
                  (lambda () '("public")))
                 ((symbol-function 'skg-request-save-buffer)
                  (lambda () (setq save-count (1+ save-count)))))

@@ -185,36 +185,36 @@ mod tests {
   #[test]
   fn buffer_reorders_only_skg_metadata_and_preserves_the_rest () {
     let a : &str =
-      "* (skg (node (id x) (source main))) A title\nbody line\n";
+      "* (skg (node (id x) (repo main))) A title\nbody line\n";
     let b : &str =
-      "* (skg (node (source main) (id x))) A title\nbody line\n";
+      "* (skg (node (repo main) (id x))) A title\nbody line\n";
     assert_eq! ( canonicalize_metadata_ordering (a),
                  canonicalize_metadata_ordering (b) );
     // a differing title (non-metadata text) is still caught
     let c : &str =
-      "* (skg (node (source main) (id x))) DIFFERENT\nbody line\n";
+      "* (skg (node (repo main) (id x))) DIFFERENT\nbody line\n";
     assert_ne! ( canonicalize_metadata_ordering (a),
                  canonicalize_metadata_ordering (c) );
     // a differing id (metadata content) is still caught
     let d : &str =
-      "* (skg (node (source main) (id y))) A title\nbody line\n";
+      "* (skg (node (repo main) (id y))) A title\nbody line\n";
     assert_ne! ( canonicalize_metadata_ordering (a),
                  canonicalize_metadata_ordering (d) ); }
 
   #[test]
   fn multiline_buffer_with_several_headlines () {
     let a : &str = concat! (
-      "* (skg (node (id 1) (source main) (affectsParent na))) one\n",
-      "** (skg (node (id 2) (source main) writeProtected)) two\n" );
+      "* (skg (node (id 1) (repo main) (affectsParent na))) one\n",
+      "** (skg (node (id 2) (repo main) writeProtected)) two\n" );
     let b : &str = concat! (
-      "* (skg (node (affectsParent na) (source main) (id 1))) one\n",
-      "** (skg (node (source main) writeProtected (id 2))) two\n" );
+      "* (skg (node (affectsParent na) (repo main) (id 1))) one\n",
+      "** (skg (node (repo main) writeProtected (id 2))) two\n" );
     assert_eq! ( canonicalize_metadata_ordering (a),
                  canonicalize_metadata_ordering (b) );
     // bullets / depth are non-metadata and stay significant
     let c : &str = concat! (
-      "* (skg (node (affectsParent na) (source main) (id 1))) one\n",
-      "*** (skg (node (source main) writeProtected (id 2))) two\n" );
+      "* (skg (node (affectsParent na) (repo main) (id 1))) one\n",
+      "*** (skg (node (repo main) writeProtected (id 2))) two\n" );
     assert_ne! ( canonicalize_metadata_ordering (a),
                  canonicalize_metadata_ordering (c) ); }
 
@@ -223,7 +223,7 @@ mod tests {
     // The ⌂:LABEL homeRepoHerald and the ☮/⟳ glyphs must survive parse +
     // canon (bytes preserved, just possibly reordered).
     let s : &str =
-      "* (skg (node (id 1) (source main) (viewStats cycle (sourceHerald ⌂:main)))) t\n";
+      "* (skg (node (id 1) (repo main) (viewStats cycle (homeRepoHerald ⌂:main)))) t\n";
     let c : String = canonicalize_metadata_ordering (s);
     assert! ( c . contains ("⌂:main"), "got: {}", c );
     assert! ( c . contains ("cycle") ); }

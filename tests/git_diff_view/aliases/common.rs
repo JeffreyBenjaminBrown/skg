@@ -6,12 +6,12 @@ pub use super::super::common::*;
 /// Mirrors the IDFolder diff (ids/common.rs): an AliasFolder scaffold appears, with
 /// each alias as a child carrying a per-stage diff marker for added/removed.
 pub const GIT_DIFF_VIEW: &str = "\
-* (skg (node (id 1) (source main))) 1
+* (skg (node (id 1) (repo main))) 1
 ** (skg aliasFolder)
 *** (skg alias (unstaged removedM)) old-alias
 *** (skg alias (unstaged newM)) new-alias
 *** (skg alias) keep
-** (skg (node (id child) (source main))) child
+** (skg (node (id child) (repo main))) child
 ";
 
 /// Create a git repo with head->worktree transition from aliases fixtures.

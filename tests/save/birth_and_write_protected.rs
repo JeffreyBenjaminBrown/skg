@@ -40,9 +40,9 @@ fn test_birth_and_write_protected(
         // Node 2 contains node 3 (already) and should contain node 4 (new)
         // Node 2 should NOT affect node 1 because affectsParent=false
         let org_text = indoc! {"
-          * (skg (node (id 1) (source main))) 1
-          ** (skg (node (id 2) (source main) (affectsParent false) writeProtected)) 2
-          *** (skg (node (id 4) (source main))) 4
+          * (skg (node (id 1) (repo main))) 1
+          ** (skg (node (id 2) (repo main) (affectsParent false) writeProtected)) 2
+          *** (skg (node (id 4) (repo main))) 4
         "};
         let ( _viewforest, save_plan, _warnings ) =
           buffer_to_validated_saveplan(

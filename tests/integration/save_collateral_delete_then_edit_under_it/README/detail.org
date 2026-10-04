@@ -176,8 +176,8 @@ Constructed in two steps:
    standalone subee root:
 
 #+begin_example
-  * (skg (node (id subee) (source main))) subee
-  ** (skg (node (id subee-1) (source main))) subee-1
+  * (skg (node (id subee) (repo main))) subee
+  ** (skg (node (id subee-1) (repo main))) subee-1
 #+end_example
 
    Then save to register the multi-root view with the server.
@@ -219,9 +219,9 @@ and call =skg-request-save-buffer= to register the view.
 Buffer content before save:
 
 #+begin_example
-  * (skg (node (id 11) (source main) writeProtected)) 11
-  * (skg (node (id subee) (source main))) subee
-  ** (skg (node (id subee-1) (source main))) subee-1
+  * (skg (node (id 11) (repo main) writeProtected)) 11
+  * (skg (node (id subee) (repo main))) subee
+  ** (skg (node (id subee-1) (repo main))) subee-1
 #+end_example
 
 After saving, the server completes the tree and sends back the
@@ -354,9 +354,9 @@ Expected headline-titles:
 * Phase 5: Add new-root under deletedScaff in buffer 1
 
 Insert =new-root= as a sibling of =subee= under the depth-3
-=DeletedScaff= (formerly =subscribeeFolder=) in buffer 1. Source
-metadata must be supplied explicitly (=(source main)=) because
-=DeletedScaff= has no source to inherit from.
+=DeletedScaff= (formerly =subscribeeFolder=) in buffer 1. Repo
+metadata must be supplied explicitly (=(repo main)=) because
+=DeletedScaff= has no repo to inherit from.
 
 This exercises:
 - =Deleted= / =DeletedScaff= round-tripping through the save
@@ -389,27 +389,27 @@ Expected headline-titles (approximately):
 function =build_child_creation_data= (around line 450).
 
 Currently, for a non-phantom child not already in the tree,
-the function errors: "no source for X (not in map, not a child)".
+the function errors: "no repo for X (not in map, not a child)".
 This prevents collateral updates from picking up new children
 created by another buffer's save.
 
-The fix: when =child_sources.get(id)= returns =None=, fall back
+The fix: when =child_repos.get(id)= returns =None=, fall back
 to =home_from_disk(id, config)= (defined in
 =server/types/phantom.rs=). This mirrors the fallback chain in
-=source_for_phantom= (same file).
+=repo_for_phantom= (same file).
 
 Current code (lines ~451-455):
 
 #+begin_example
 } else {
-  let child_source : &SourceName = child_sources.get( id )
+  let child_repo : &RepoName = child_repos.get( id )
     .ok_or( format!(
       "build_child_creation_data: \
-       no source for {} (not in map, not a child)",
+       no repo for {} (not in map, not a child)",
       id.0 )) ?;
 #+end_example
 
-Replacement — follow the same chain as =source_for_phantom=
+Replacement — follow the same chain as =repo_for_phantom=
 (=server/types/phantom.rs=), which already does
 =existing_children → deleted_since_head_pid_src_map → map → disk=.
 All four parameters are already available in
@@ -417,21 +417,21 @@ All four parameters are already available in
 
 #+begin_example
 } else {
-  let child_source : SourceName =
-    child_sources.get( id ).cloned()
+  let child_repo : RepoName =
+    child_repos.get( id ).cloned()
     .or_else( || deleted_since_head_pid_src_map.get( id ).cloned() )
-    .or_else( || map.get( id ).map( |n| n.source.clone() ) )
+    .or_else( || map.get( id ).map( |n| n.repo.clone() ) )
     .or_else( || home_from_disk( id, config ) )
     .ok_or( format!(
       "build_child_creation_data: \
-       no source for {}",
+       no repo for {}",
       id.0 )) ?;
 #+end_example
 
-Note: the variable changes from =&SourceName= to =SourceName=
-(owned). The subsequent line that uses =child_source= (passed to
-=nodecomplete_from_map_or_disk=) takes =&SourceName=, so use
-=&child_source= there.
+Note: the variable changes from =&RepoName= to =RepoName=
+(owned). The subsequent line that uses =child_repo= (passed to
+=nodecomplete_from_map_or_disk=) takes =&RepoName=, so use
+=&child_repo= there.
 
 Import =home_from_disk= at the top of the file from
 =crate::types::phantom::home_from_disk=.
@@ -472,7 +472,7 @@ For =DeletedScaff= lines, check that metadata contains
 
 * Reusable tools
 
-| Tool                                              | Source                                              |
+| Tool                                              | Repo                                              |
 |---------------------------------------------------+-----------------------------------------------------|
 | =test-lib.sh= helpers                             | =tests/integration/test-lib.sh=                     |
 | =skg-request-single-root-content-view-from-id=    | =elisp/skg-request-single-root-content-view.el=     |
@@ -533,9 +533,9 @@ The prompt uses shorthand throughout: =** (deleted)= means a
 are the literal org-mode rendering.
 
 The actual rendering would be:
-- =(deleted)= → =(skg (deleted (id 11) (source main))) 11=
+- =(deleted)= → =(skg (deleted (id 11) (repo main))) 11=
 - =(deletedscaff)= → =(skg deletedScaffold)= (no title)
-- =(writeProtected) 11= → =(skg (node (id 11) (source main) writeProtected)) 11=
+- =(writeProtected) 11= → =(skg (node (id 11) (repo main) writeProtected)) 11=
 
 ** Childless DeletedNode stays in tree (resolved)
 
@@ -559,7 +559,7 @@ Then the collateral update for buffer 2 re-completes its stored
 forest.
 
 Currently =build_child_creation_data= fails for =subee-2=
-because it's not in =child_sources= (existing tree children).
+because it's not in =child_repos= (existing tree children).
 This is the same limitation from the
 =save_collateral_add_content_and_modify_text= test.
 
@@ -567,7 +567,7 @@ Fix: add a =home_from_disk= fallback to
 =build_child_creation_data= (see "Rust code fix" section above).
 After the fix, the collateral update succeeds: =complete_viewtree=
 processes =subee=, reads the updated =subee.skg=, finds =subee-2=
-in =contains=, looks up its source from disk, and creates it as
+in =contains=, looks up its repo from disk, and creates it as
 a new TrueNode child. Buffer 2 gains =subee-2= under =subee=.
 
 This also fixes the known limitation in the

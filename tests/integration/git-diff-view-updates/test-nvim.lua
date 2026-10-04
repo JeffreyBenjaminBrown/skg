@@ -161,11 +161,11 @@ print('=== PHASE 3: Edit view-b and save ===')
 vim.api.nvim_set_current_buf(buf_b)
 print('Buffer-b before edit: ' .. T.buffer_text(buf_b))
 vim.api.nvim_buf_set_lines(buf_b, 0, -1, false, {
-  '* (skg (node (id b) (source main))) b',
-  '** (skg (node (id c) (source main) (editRequest delete))) c',
-  '** (skg (node (id e) (source main))) e, edited',
-  '** (skg (node (id f) (source main))) f',
-  '*** (skg (node (id d) (source main))) d',
+  '* (skg (node (id b) (repo main))) b',
+  '** (skg (node (id c) (repo main) (editRequest delete))) c',
+  '** (skg (node (id e) (repo main))) e, edited',
+  '** (skg (node (id f) (repo main))) f',
+  '*** (skg (node (id d) (repo main))) d',
 })
 vim.api.nvim_win_set_cursor(0, { 1, 0 })
 require('skg.save').request_save_buffer()

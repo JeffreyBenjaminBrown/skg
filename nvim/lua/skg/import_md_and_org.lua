@@ -20,7 +20,7 @@ local function cleanup ()
   end
 end
 
-local function send (fields, input_directory, destination_source)
+local function send (fields, input_directory, destination_repo)
   client.connect()
   cleanup()
   state.register_response_handler('import-md-and-org-host-mapping-needed',
@@ -32,11 +32,11 @@ local function send (fields, input_directory, destination_source)
         local ok, host_root = pcall(vim.fn.input,
           'Absolute host path corresponding to input directory (blank leaves links unresolved): ')
         if not ok then
-          M.cancel(input_directory, destination_source)
+          M.cancel(input_directory, destination_repo)
           return end
         send({ action = 'preview', ['input-directory'] = input_directory,
-          ['destination-source'] = destination_source,
-          ['host-root'] = host_root }, input_directory, destination_source)
+          ['destination-repo'] = destination_repo,
+          ['host-root'] = host_root }, input_directory, destination_repo)
       end)
     end, false)
   state.register_response_handler('import-md-and-org-preview',
@@ -51,8 +51,8 @@ local function send (fields, input_directory, destination_source)
           'Import exactly this preview?', '&Import\n&Decline', 2)
         if ok and answer == 1 then
           send({ action = 'apply', ['approval-token'] = token },
-            input_directory, destination_source)
-        else M.cancel(input_directory, destination_source) end
+            input_directory, destination_repo)
+        else M.cancel(input_directory, destination_repo) end
       end) end
     end, false)
   state.register_response_handler('import-md-and-org-result',
@@ -67,7 +67,7 @@ local function send (fields, input_directory, destination_source)
     end, false)
   state.lp_reset()
   local request = { sexpr.pair(sexpr.symbol('request'), 'import md and org') }
-  for _, name in ipairs({ 'action', 'input-directory', 'destination-source',
+  for _, name in ipairs({ 'action', 'input-directory', 'destination-repo',
                          'host-root', 'approval-token' }) do
     if fields[name] ~= nil then
       table.insert(request, sexpr.pair(sexpr.symbol(name), fields[name])) end
@@ -79,22 +79,22 @@ local function send (fields, input_directory, destination_source)
   end
 end
 
-function M.cancel (input_directory, destination_source)
-  send({ action = 'cancel' }, input_directory, destination_source)
+function M.cancel (input_directory, destination_repo)
+  send({ action = 'cancel' }, input_directory, destination_repo)
 end
 
-function M.import_md_and_org (input_directory, destination_source)
+function M.import_md_and_org (input_directory, destination_repo)
   if not input_directory then
     input_directory = vim.fn.input('Input directory on server (absolute path): ') end
   if input_directory == '' then return end
-  if not destination_source then
-    vim.notify('Choose an owned source; it determines privacy for every imported node.')
+  if not destination_repo then
+    vim.notify('Choose an owned repo; it determines privacy for every imported node.')
   end
-  destination_source = destination_source or picker.prompt_for_owned_source('Import into source: ')
-  if not destination_source then return end
+  destination_repo = destination_repo or picker.prompt_for_owned_repo('Import into repo: ')
+  if not destination_repo then return end
   send({ action = 'preview', ['input-directory'] = input_directory,
-    ['destination-source'] = destination_source },
-    input_directory, destination_source)
+    ['destination-repo'] = destination_repo },
+    input_directory, destination_repo)
 end
 
 return M

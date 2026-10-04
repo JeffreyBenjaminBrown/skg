@@ -278,7 +278,7 @@ pub fn format_override_invariant_violations (
     match violation {
       OverrideInvariantViolation::UnknownRepo { node, repo } => {
         lines . push (format!(
-          "* node {} has unknown source {}", node, repo ));
+          "* node {} has unknown repo {}", node, repo ));
       }
       OverrideInvariantViolation::MultipleUserOwnedOverriders {
         overridden,

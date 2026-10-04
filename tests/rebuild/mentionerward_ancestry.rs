@@ -84,7 +84,7 @@ async fn test_mentionerward_ancestry_impl (
 ) -> Result<(), Box<dyn Error>> {
   // Start with a minimal tree containing just node "a".
   let input : &str = indoc! {"
-    * (skg (node (id a) (source main))) a
+    * (skg (node (id a) (repo main))) a
   "};
   let unchecked_viewforest =
     org_to_uninterpreted_nodes (input) ? . 0;

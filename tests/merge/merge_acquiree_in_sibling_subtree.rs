@@ -62,10 +62,10 @@ async fn merge_acquiree_in_sibling_subtree_impl (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"
-    * (skg (node (id a) (source main))) a
-    ** (skg (node (id b) (source main))) b
-    * (skg (node (id c) (source main))) c
-    ** (skg (node (id d) (source main) (editRequest (merge b)))) d
+    * (skg (node (id a) (repo main))) a
+    ** (skg (node (id b) (repo main))) b
+    * (skg (node (id c) (repo main))) c
+    ** (skg (node (id d) (repo main) (editRequest (merge b)))) d
   "};
 
   let graph : InRustGraphHandle =

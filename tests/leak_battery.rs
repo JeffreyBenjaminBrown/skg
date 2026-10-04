@@ -146,7 +146,7 @@ fn inbound_containerward_data_hides_N_at_public (
       {
         let mut viewforest : Tree<ViewNode> =
           viewforest_from_org (
-            "* (skg (node (id C) (source public))) leak-battery-C\n" )?;
+            "* (skg (node (id C) (repo public))) leak-battery-C\n" )?;
         let c_id : NodeId = first_child_id (&viewforest);
         build_and_integrate_containerward_path_with_repo_set (
           &mut viewforest, c_id, &graph, config, Some (&public) ) ?;
@@ -164,7 +164,7 @@ fn inbound_containerward_data_hides_N_at_public (
       {
         let mut viewforest : Tree<ViewNode> =
           viewforest_from_org (
-            "* (skg (node (id C) (source public))) leak-battery-C\n" )?;
+            "* (skg (node (id C) (repo public))) leak-battery-C\n" )?;
         let c_id : NodeId = first_child_id (&viewforest);
         build_and_integrate_containerward_path_with_repo_set (
           &mut viewforest, c_id, &graph, config, Some (&all) ) ?;
@@ -277,8 +277,8 @@ fn ancestor_heralds_gate_privately_recorded_relations (
       -> Result<Option<String>, Box<dyn Error>> {
         let mut viewforest : Tree<ViewNode> =
           viewforest_from_org (
-            "* (skg (node (id C) (source public))) leak-battery-C\n\
-             ** (skg (node (id S) (source public))) leak-battery-S\n" )?;
+            "* (skg (node (id C) (repo public))) leak-battery-C\n\
+             ** (skg (node (id S) (repo public))) leak-battery-S\n" )?;
         for value in viewforest . values_mut () {
           // Give every node counts so the herald pass does not
           // early-return before the ancestor flags (its "no stats ->

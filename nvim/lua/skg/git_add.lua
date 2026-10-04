@@ -81,7 +81,7 @@ function M.git_add_new_files_recursive_plan ()
   local paths = {}
   local seen = {}
   for _, pair in ipairs(pairs_found) do
-    local path = config.abs_path_for_id_and_source(pair[1], pair[2])
+    local path = config.abs_path_for_id_and_repo(pair[1], pair[2])
     if path and not seen[path] then
       seen[path] = true
       table.insert(paths, path)
@@ -133,7 +133,7 @@ function M.group_paths_by_dir (paths)
   return groups
 end
 
----{id, source} pairs in this subtree whose metadata carries the
+---{id, repo} pairs in this subtree whose metadata carries the
 ---unstaged newX axis (file-existence changes, not membership-only
 ---newM).
 ---@return table[]
@@ -146,9 +146,9 @@ function M.subtree_unstaged_new_file_pairs ()
     local sexp = metadata.metadata_sexp_at_line_or_nil(line)
     if sexp and M.metadata_has_unstaged_new_file_p(sexp) then
       local id = id_search.extract_id_from_metadata_sexp(sexp)
-      local source = id_search.extract_source_from_metadata_sexp(sexp)
-      if id and source then
-        table.insert(pairs_found, { id, source }) end
+      local repo = id_search.extract_repo_from_metadata_sexp(sexp)
+      if id and repo then
+        table.insert(pairs_found, { id, repo }) end
     end
   end
   return pairs_found

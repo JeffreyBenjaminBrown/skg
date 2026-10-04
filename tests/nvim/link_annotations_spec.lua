@@ -41,7 +41,7 @@ describe('skg.link_annotations', function ()
     annotations.requests = {}
   end)
 
-  it('styles only missing Skg links and adds optional source suffixes',
+  it('styles only missing Skg links and adds optional repo suffixes',
      function ()
     local buf = vim.api.nvim_create_buf(true, false)
     local lines = {
@@ -69,14 +69,14 @@ describe('skg.link_annotations', function ()
     assert.are.equal(confusable.fg, broken_link.fg)
     assert.is_true(broken_link.underline)
     assert.are.equal(0, #suffixes(buf))
-    annotations.toggle_source_overlay(buf)
+    annotations.toggle_repo_overlay(buf)
     assert.same({ ' [⌂:pub]', ' [⌂:missing]', ' [⌂:inactive]' },
                 suffixes(buf))
     assert.same(lines, vim.api.nvim_buf_get_lines(buf, 0, -1, false))
     assert.is_false(vim.bo[buf].modified)
     annotations.refresh(buf)
     assert.are.equal(3, #suffixes(buf))
-    annotations.toggle_source_overlay(buf)
+    annotations.toggle_repo_overlay(buf)
     assert.are.equal(0, #suffixes(buf))
     annotations.disable(buf)
     vim.api.nvim_buf_delete(buf, { force = true })
@@ -114,14 +114,14 @@ describe('skg.link_annotations', function ()
     assert.same({ 'resolved', 'node', 'main' }, annotations.cache.node)
     assert.is_nil(annotations.requests.old)
     assert.is_nil(annotations.requests.right)
-    annotations.requests.old_source_set = {
+    annotations.requests.old_repo_set = {
       buf = second,
       generation = vim.b[second].skg_link_annotations_generation,
       tick = vim.api.nvim_buf_get_changedtick(second),
       epoch = 20, ids = { 'node' } }
     annotations.epoch = 21
     annotations.handle_response(sexpr.read(
-      '((request-id "old_source_set") (results (("node" missing))))'))
+      '((request-id "old_repo_set") (results (("node" missing))))'))
     assert.same({ 'resolved', 'node', 'main' }, annotations.cache.node)
     annotations.requests.dead_buffer = {
       buf = first, generation = 1, tick = 1, epoch = 21,

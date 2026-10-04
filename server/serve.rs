@@ -107,11 +107,11 @@ fn handle_emacs (
       . unwrap_or_else ( |e| {
         tracing::error! (
           error = %e,
-          "failed to initialize active source-set; falling back to all");
+          "failed to initialize active repo-set; falling back to all");
         ActiveRepoSet::named (
           &runtime . config,
           RepoSetName::from ("all"))
-        . expect ("reserved source-set all should always resolve") });
+        . expect ("reserved repo-set all should always resolve") });
 
   let enrichment_slot // To update search results once the 'enrichment' (containerward paths + graphnodestats) has been computed.
     : Arc<Mutex<Option<SearchEnrichmentPayload>>> =

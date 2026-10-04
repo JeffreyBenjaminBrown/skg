@@ -206,7 +206,7 @@ impl CollectedIntents {
             "Cannot have both Delete and Save for same ID: {}",
             target )); }
         fill_exclusive_slot (
-          &mut entry . home_repo, repo, "source", &target) ?;
+          &mut entry . home_repo, repo, "repo", &target) ?;
         if ! entry . delete {
           entry . delete = true;
           self . lowerable_order . push (target); }
@@ -219,7 +219,7 @@ impl CollectedIntents {
         match intent {
           NodeIntent_Local::SetTitleAndBody { repo, title, body } => {
             fill_exclusive_slot (
-              &mut entry . home_repo, repo, "source", &target) ?;
+              &mut entry . home_repo, repo, "repo", &target) ?;
             let was_empty : bool =
               entry . title_and_body . is_none();
             fill_exclusive_slot (

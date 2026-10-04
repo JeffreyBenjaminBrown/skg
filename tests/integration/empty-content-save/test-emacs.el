@@ -25,7 +25,7 @@
 
   (with-current-buffer "*skg-empty*"
     (erase-buffer)
-    (insert "* (skg (node (id 1) (source main))) 1\n")
+    (insert "* (skg (node (id 1) (repo main))) 1\n")
     (goto-char (point-min))
     (setq integration-test-phase "save-buffer")
     (skg-request-save-buffer))

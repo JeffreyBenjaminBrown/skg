@@ -53,11 +53,11 @@ fn test_load_from_single_repo() {
   let result : IoResult<Vec<NodeComplete>> =
     read_all_skg_files_from_repos (&config);
   assert!(result . is_ok(),
-          "Should successfully load from single source");
+          "Should successfully load from single repo");
 
   let nodes : Vec<NodeComplete> = result . unwrap();
   assert_eq!(nodes . len(), 1, "Should have loaded 1 node");
-  assert_eq!(&*nodes[0] . home_repo, "main", "Source should be 'main'");
+  assert_eq!(&*nodes[0] . home_repo, "main", "Repo should be 'main'");
   assert_eq!(nodes[0] . title, "Test Node 1");
 }
 
@@ -113,7 +113,7 @@ fn test_load_from_multiple_repos() {
 
   let result : IoResult<Vec<NodeComplete>> =
     read_all_skg_files_from_repos (&config);
-  assert!(result . is_ok(), "Should successfully load from multiple sources");
+  assert!(result . is_ok(), "Should successfully load from multiple repos");
 
   let nodes : Vec<NodeComplete> = result . unwrap();
   assert_eq!(nodes . len(), 3, "Should have loaded 3 nodes total");
@@ -179,7 +179,7 @@ fn test_telescope_is_not_a_conflict_but_two_pids_are() {
   let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_repos (&config) . unwrap();
   assert_eq!( nodes . len(), 1,
-    "same-pid files across sources fold into one telescope" );
+    "same-pid files across repos fold into one telescope" );
   assert_eq!( nodes[0] . title, "Node in Main",
     "the home (most public titled section) wins the title" );
   assert_eq!( nodes[0] . home_repo, RepoName::from ("main") );
@@ -270,7 +270,7 @@ fn test_one_id_claimed_by_a_pid_and_anothers_extra_id() {
 #[test]
 fn test_load_from_empty_repos() {
   let temp_dir : TempDir = tempdir() . unwrap();
-  let repo_path : PathBuf = temp_dir . path() . join ("empty_source");
+  let repo_path : PathBuf = temp_dir . path() . join ("empty_repo");
   fs::create_dir_all (&repo_path) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> = {
@@ -287,19 +287,19 @@ fn test_load_from_empty_repos() {
       &test_config (repos,
                     temp_dir . path () . to_path_buf () )) };
   assert!(result . is_ok(),
-          "Should successfully handle empty source");
+          "Should successfully handle empty repo");
 
   let nodes : Vec<NodeComplete> = result . unwrap();
   assert_eq!(nodes . len(), 0,
-             "Should have loaded 0 nodes from empty source");
+             "Should have loaded 0 nodes from empty repo");
 }
 
 #[test]
 fn test_repo_field_set_correctly() {
   let temp_dir : TempDir = tempdir() . unwrap();
 
-  let repo_a : PathBuf = temp_dir . path() . join ("source_a");
-  let repo_b : PathBuf = temp_dir . path() . join ("source_b");
+  let repo_a : PathBuf = temp_dir . path() . join ("repo_a");
+  let repo_b : PathBuf = temp_dir . path() . join ("repo_b");
   fs::create_dir_all (&repo_a) . unwrap();
   fs::create_dir_all (&repo_b) . unwrap();
 
@@ -307,16 +307,16 @@ fn test_repo_field_set_correctly() {
     let mut repos : HashMap<RepoName, SkgfileRepo> =
       HashMap::new();
     repos . insert(
-      RepoName::from ("source_a"),
+      RepoName::from ("repo_a"),
       SkgfileRepo {
-        name: RepoName::from ("source_a"),
+        name: RepoName::from ("repo_a"),
         abbreviation: None,
         path: repo_a,
         user_owns_it: true, } );
     repos . insert(
-      RepoName::from ("source_b"),
+      RepoName::from ("repo_b"),
       SkgfileRepo {
-        name: RepoName::from ("source_b"),
+        name: RepoName::from ("repo_b"),
         abbreviation: None,
         path: repo_b,
         user_owns_it: true, } );
@@ -326,13 +326,13 @@ fn test_repo_field_set_correctly() {
   let mut node_a : NodeComplete = empty_node_complete();
   node_a . pid = ID::new ("node_a");
   node_a . title = "Node A" . to_string();
-  set_repo_retagging_relRepos ( &mut node_a, &RepoName::from ("source_a") );
+  set_repo_retagging_relRepos ( &mut node_a, &RepoName::from ("repo_a") );
   write_nodecomplete_to_repo(&node_a, &config) . unwrap();
 
   let mut node_b : NodeComplete = empty_node_complete();
   node_b . pid = ID::new ("node_b");
   node_b . title = "Node B" . to_string();
-  set_repo_retagging_relRepos ( &mut node_b, &RepoName::from ("source_b") );
+  set_repo_retagging_relRepos ( &mut node_b, &RepoName::from ("repo_b") );
   write_nodecomplete_to_repo(&node_b, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
@@ -351,8 +351,8 @@ fn test_repo_field_set_correctly() {
   assert!(node_a_result . is_some());
   assert!(node_b_result . is_some());
 
-  assert_eq!(&*node_a_result . unwrap() . home_repo, "source_a");
-  assert_eq!(&*node_b_result . unwrap() . home_repo, "source_b");
+  assert_eq!(&*node_a_result . unwrap() . home_repo, "repo_a");
+  assert_eq!(&*node_b_result . unwrap() . home_repo, "repo_b");
 }
 
 #[test]
@@ -360,24 +360,24 @@ fn test_many_id_conflicts_create_org_file() {
   // Test that >10 duplicates triggers org file creation
   let temp_dir : TempDir = tempdir() . unwrap();
 
-  let repo_a : PathBuf = temp_dir . path() . join ("source_a");
-  let repo_b : PathBuf = temp_dir . path() . join ("source_b");
+  let repo_a : PathBuf = temp_dir . path() . join ("repo_a");
+  let repo_b : PathBuf = temp_dir . path() . join ("repo_b");
   fs::create_dir_all (&repo_a) . unwrap();
   fs::create_dir_all (&repo_b) . unwrap();
 
   let mut repos : HashMap<RepoName, SkgfileRepo> =
     HashMap::new();
   repos . insert(
-    RepoName::from ("source_a"),
+    RepoName::from ("repo_a"),
     SkgfileRepo {
-      name: RepoName::from ("source_a"),
+      name: RepoName::from ("repo_a"),
         abbreviation: None,
       path: repo_a,
       user_owns_it: true, } );
   repos . insert(
-    RepoName::from ("source_b"),
+    RepoName::from ("repo_b"),
     SkgfileRepo {
-      name: RepoName::from ("source_b"),
+      name: RepoName::from ("repo_b"),
         abbreviation: None,
       path: repo_b,
       user_owns_it: true,
@@ -400,8 +400,8 @@ fn test_many_id_conflicts_create_org_file() {
     node_b . extra_ids = vec![ID::new (&id)];
     node_a . title = format!("Node A {}", i);
     node_b . title = format!("Node B {}", i);
-    set_repo_retagging_relRepos ( &mut node_a, &RepoName::from ("source_a") );
-    set_repo_retagging_relRepos ( &mut node_b, &RepoName::from ("source_b") );
+    set_repo_retagging_relRepos ( &mut node_a, &RepoName::from ("repo_a") );
+    set_repo_retagging_relRepos ( &mut node_b, &RepoName::from ("repo_b") );
     nodes . push (node_a);
     nodes . push (node_b); }
 
@@ -428,7 +428,7 @@ fn test_many_id_conflicts_create_org_file() {
   let mut expected : String = String::new();
   expected . push_str ("#+title: IDs claimed by more than one node\n");
   expected . push_str ("#+date: <generated at initialization>\n\n");
-  expected . push_str ("15 id(s) claimed by more than one node. Same-id files ACROSS SOURCES are not this: those are the sections of one privacy telescope (docs/telescopes.org). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n");
+  expected . push_str ("15 id(s) claimed by more than one node. Same-id files ACROSS REPOS are not this: those are the sections of one privacy telescope (docs/telescopes.org). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n");
 
   // IDs are sorted alphabetically (lexicographic), not numerically
   // So: dup_id_1, dup_id_10, dup_id_11, ..., dup_id_2, ...
@@ -439,8 +439,8 @@ fn test_many_id_conflicts_create_org_file() {
   for id in ids {
     let n : &str = id . rsplit ('_') . next () . unwrap ();
     expected . push_str(&format!("* {}\n", id));
-    expected . push_str(&format!("** pid_a_{} (source_a)\n", n));
-    expected . push_str(&format!("** pid_b_{} (source_b)\n", n));
+    expected . push_str(&format!("** pid_a_{} (repo_a)\n", n));
+    expected . push_str(&format!("** pid_b_{} (repo_b)\n", n));
   }
 
   // Read and verify full org file content
@@ -455,8 +455,8 @@ fn test_unreadable_files_creates_org_file() {
   // Test that unreadable files trigger org file creation
   let temp_dir : TempDir = tempdir() . unwrap();
 
-  let repo_good : PathBuf = temp_dir . path() . join ("source_good");
-  let repo_bad : PathBuf = temp_dir . path() . join ("source_bad");
+  let repo_good : PathBuf = temp_dir . path() . join ("repo_good");
+  let repo_bad : PathBuf = temp_dir . path() . join ("repo_bad");
   fs::create_dir_all (&repo_good) . unwrap();
   // Don't create repo_bad directory - it should cause an error
 
@@ -464,9 +464,9 @@ fn test_unreadable_files_creates_org_file() {
   let mut write_repos : HashMap<RepoName, SkgfileRepo> =
     HashMap::new();
   write_repos . insert(
-    RepoName::from ("source_good"),
+    RepoName::from ("repo_good"),
     SkgfileRepo {
-      name: RepoName::from ("source_good"),
+      name: RepoName::from ("repo_good"),
         abbreviation: None,
       path: repo_good . clone(),
       user_owns_it: true, } );
@@ -478,23 +478,23 @@ fn test_unreadable_files_creates_org_file() {
   let mut node : NodeComplete = empty_node_complete();
   node . pid = ID::new ("test1");
   node . title = "Test Node" . to_string();
-  set_repo_retagging_relRepos ( &mut node, &RepoName::from ("source_good") );
+  set_repo_retagging_relRepos ( &mut node, &RepoName::from ("repo_good") );
   write_nodecomplete_to_repo(&node, &write_config) . unwrap();
 
   // Create config with both repos for reading (including the bad one)
   let mut repos : HashMap<RepoName, SkgfileRepo> =
     HashMap::new();
   repos . insert(
-    RepoName::from ("source_good"),
+    RepoName::from ("repo_good"),
     SkgfileRepo {
-      name: RepoName::from ("source_good"),
+      name: RepoName::from ("repo_good"),
         abbreviation: None,
       path: repo_good,
       user_owns_it: true, } );
   repos . insert(
-    RepoName::from ("source_bad"),
+    RepoName::from ("repo_bad"),
     SkgfileRepo {
-      name: RepoName::from ("source_bad"),
+      name: RepoName::from ("repo_bad"),
         abbreviation: None,
       path: repo_bad . clone(),
       user_owns_it: true, } );
@@ -503,7 +503,7 @@ fn test_unreadable_files_creates_org_file() {
     read_all_skg_files_from_repos(
       &test_config (repos,
                     temp_dir . path () . to_path_buf () ));
-  assert!(result . is_err(), "Should fail due to unreadable source");
+  assert!(result . is_err(), "Should fail due to unreadable repo");
 
   let err : IoError = result . unwrap_err();
   assert_eq!(err . kind(), IoErrorKind::InvalidData);
@@ -531,8 +531,8 @@ fn test_unreadable_files_creates_org_file() {
   let bad_path_str : String = repo_bad . display() . to_string();
   assert!(org_content . contains(&format!("* {}\n", bad_path_str)),
           "Should list the bad path at level 1");
-  assert!(org_content . contains ("** source_bad\n"),
-          "Should list source_bad at level 2");
+  assert!(org_content . contains ("** repo_bad\n"),
+          "Should list repo_bad at level 2");
   assert!(org_content . contains ("*** Error: "),
           "Should have error message at level 3");
 

@@ -126,21 +126,21 @@ Tests position 1, position 17 (end of line 1), and one random in [2,16]."
 
 (ert-deftest test-strip-heralds-removes-herald-subfields ()
   "Heralds (node-level semantic rels facts and
-sourceHerald inside viewStats) are removed; a viewStats emptied by the
+homeRepoHerald inside viewStats) are removed; a viewStats emptied by the
 removal is dropped, other data is kept."
   (should (equal
            (skg-strip-heralds-from-sexp
             '(skg (node (id x)
                         (rels (contains (in 1 (ancestors 1)) (out 3))
                               (birth contains))
-                        (viewStats (sourceHerald ⌂:priv) cycle))))
+                        (viewStats (homeRepoHerald ⌂:priv) cycle))))
            '(skg (node (id x) (viewStats cycle))))))
 
 (ert-deftest test-strip-heralds-drops-stats-form-with-only-heralds ()
   "A graphStats/viewStats holding only herald subfields is dropped."
   (should (equal
            (skg-strip-heralds-from-sexp
-            '(skg (node (id x) (viewStats (sourceHerald ⌂:priv)))))
+            '(skg (node (id x) (viewStats (homeRepoHerald ⌂:priv)))))
            '(skg (node (id x))))))
 
 (ert-deftest test-strip-heralds-does-not-fabricate-node ()
@@ -154,8 +154,8 @@ never gains a fabricated (node ...) and never matches (skg (node))."
   "A ActiveNode lacking stats keeps exactly its fields -- no fabricated
 graphStats/viewStats."
   (should (equal
-           (skg-strip-heralds-from-sexp '(skg (node (id x) (source y))))
-           '(skg (node (id x) (source y))))))
+           (skg-strip-heralds-from-sexp '(skg (node (id x) (repo y))))
+           '(skg (node (id x) (repo y))))))
 
 (ert-deftest test-strip-heralds-passes-through-non-skg ()
   "A sexp that does not start with skg is returned unchanged."

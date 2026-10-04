@@ -1,9 +1,9 @@
-;;; test-skg-insert-heading-source-prompt.el --- Test C-return source prompt
+;;; test-skg-insert-heading-repo-prompt.el --- Test C-return repo prompt
 ;;;
 ;;; When org-insert-heading-respect-content is called on a root headline
 ;;; in a content-view buffer, and the new headline has no metadata,
-;;; skg-edit-metadata should prompt for a source in the minibuffer
-;;; (not open the sexp-edit buffer) and insert the chosen source
+;;; skg-edit-metadata should prompt for a repo in the minibuffer
+;;; (not open the sexp-edit buffer) and insert the chosen repo
 ;;; as metadata on the new headline.
 
 (load-file (expand-file-name "../../elisp/skg-test-utils.el"
@@ -23,29 +23,29 @@
           "name = \"private\"\n"
           "path = \"owned/private\"\n"
           "")
-  "Config text with two owned sources: public and private.")
+  "Config text with two owned repos: public and private.")
 
-(defvar test--config-with-foreign-source
+(defvar test--config-with-foreign-repo
   (concat test--config-public-and-private
           "\n[[repos]]\n"
           "name = \"foreign\"\n"
           "path = \"" (expand-file-name
-                       "test-skg-insert-heading-source-prompt/foreign"
+                       "test-skg-insert-heading-repo-prompt/foreign"
                        (file-name-directory load-file-name)) "\"\n"
           "")
-  "Config text with two owned sources and one foreign source.")
+  "Config text with two owned repos and one foreign repo.")
 
-(defvar test--config-with-interleaved-source-sets
+(defvar test--config-with-interleaved-repo-sets
   (concat "[[repo_sets]]\n"
           "name = \"public-set\"\n"
-          "sources = [\"public\"]\n\n"
+          "repos = [\"public\"]\n\n"
           "[[repos]]\n"
           "name = \"public\"\n"
           "path = \"owned/public\"\n"
           "\n"
           "[[repo_sets]]\n"
           "name = \"private-set\"\n"
-          "sources = [\"private\"]\n\n"
+          "repos = [\"private\"]\n\n"
           "[[repos]]\n"
           "name = \"private\"\n"
           "path = \"owned/private\"\n"
@@ -55,7 +55,7 @@
 (defun test--with-skg-content-view (org-text config-text body-fn)
   "Run BODY-FN in a temp skg content-view buffer with ORG-TEXT.
 CONFIG-TEXT is written to a temporary skgconfig.toml so that
-skg-config-dir is set and skg--owned-sources works."
+skg-config-dir is set and skg--owned-repos works."
   (let* ((config-dir (make-temp-file "skg-test-config" t))
          (config-file (expand-file-name "skgconfig.toml" config-dir))
          (skg-config-dir (file-name-as-directory config-dir)))
@@ -70,14 +70,14 @@ skg-config-dir is set and skg--owned-sources works."
       (delete-file config-file)
       (delete-directory config-dir))))
 
-;; Test 1: C-return inserts metadata with chosen source via minibuffer,
+;; Test 1: C-return inserts metadata with chosen repo via minibuffer,
 ;;         does NOT open a sexp-edit buffer.
 
-(ert-deftest test-insert-heading-prompts-for-source ()
-  "C-return on a root headline should prompt for source in minibuffer,
-insert metadata with chosen source, and not open the sexp-edit buffer."
+(ert-deftest test-insert-heading-prompts-for-repo ()
+  "C-return on a root headline should prompt for repo in minibuffer,
+insert metadata with chosen repo, and not open the sexp-edit buffer."
   (test--with-skg-content-view
-   "* (skg (node (id x) (source public))) x\n"
+   "* (skg (node (id x) (repo public))) x\n"
    test--config-public-and-private
    (lambda ()
      (should (org-at-heading-p))
@@ -94,12 +94,12 @@ insert metadata with chosen source, and not open the sexp-edit buffer."
 
        ;; Original headline unchanged.
        (should (string-match-p
-                "^\\* (skg (node (id x) (source public))) x$"
+                "^\\* (skg (node (id x) (repo public))) x$"
                 content))
 
-       ;; New headline has metadata with chosen source "private".
+       ;; New headline has metadata with chosen repo "private".
        (should (string-match-p
-                "^\\* (skg (node (source private))) $"
+                "^\\* (skg (node (repo private))) $"
                 content))
 
        ;; Exactly two headlines.
@@ -112,19 +112,19 @@ insert metadata with chosen source, and not open the sexp-edit buffer."
          (buffer-local-value 'skg-sexp-edit--source-buffer b))
        (buffer-list))))))
 
-;; Test 2: Single owned source skips the prompt entirely.
+;; Test 2: Single owned repo skips the prompt entirely.
 
-(ert-deftest test-insert-heading-single-source-no-prompt ()
-  "When there is only one owned source, C-return should use it
+(ert-deftest test-insert-heading-single-repo-no-prompt ()
+  "When there is only one owned repo, C-return should use it
 without prompting."
-  (let ((one-source-config
+  (let ((one-repo-config
          (concat "[[repos]]\n"
                  "name = \"only\"\n"
                  "path = \"owned/only\"\n"
                  "")))
     (test--with-skg-content-view
-     "* (skg (node (id x) (source only))) x\n"
-     one-source-config
+     "* (skg (node (id x) (repo only))) x\n"
+     one-repo-config
      (lambda ()
        (should (org-at-heading-p))
 
@@ -140,23 +140,23 @@ without prompting."
        (let ((content (buffer-substring-no-properties
                        (point-min) (point-max))))
          (should (string-match-p
-                  "^\\* (skg (node (source only))) $"
+                  "^\\* (skg (node (repo only))) $"
                   content)))))))
 
 ;; Test 3: The cycling closure works correctly.
 
-(ert-deftest test-source-cycling-wraps-around ()
-  "skg--prompt-for-owned-source's cycling closure should wrap around."
+(ert-deftest test-repo-cycling-wraps-around ()
+  "skg--prompt-for-owned-repo's cycling closure should wrap around."
   (let* ((config-dir (make-temp-file "skg-test-config" t))
          (config-file (expand-file-name "skgconfig.toml" config-dir))
          (skg-config-dir (file-name-as-directory config-dir)))
     (with-temp-file config-file
       (insert test--config-public-and-private))
     (unwind-protect
-        (let ((sources (skg--owned-sources))
+        (let ((repos (skg--owned-repos))
               results)
-          ;; Verify we have two sources in expected order.
-          (should (equal sources '("public" "private")))
+          ;; Verify we have two repos in expected order.
+          (should (equal repos '("public" "private")))
 
           ;; Mock completing-read to simulate cycling:
           ;; Start at "public", cycle right once to reach "private".
@@ -166,24 +166,24 @@ without prompting."
                      (lambda (_prompt coll &rest _)
                        ;; Simulate: start empty, cycle right once.
                        ;; The cycle closure does:
-                       ;;   idx = (cl-position cur sources) or 0
-                       ;;   new = (nth (mod (+ idx dir) len) sources)
+                       ;;   idx = (cl-position cur repos) or 0
+                       ;;   new = (nth (mod (+ idx dir) len) repos)
                        ;; Starting from "" (not in list) -> idx=0 ("public"),
                        ;; cycling right: (mod (+ 0 1) 2) = 1 -> "private"
                        (let* ((idx 0)
-                              (new (nth (mod (+ idx 1) (length sources))
-                                        sources)))
+                              (new (nth (mod (+ idx 1) (length repos))
+                                        repos)))
                          new))))
-            (should (equal (skg--prompt-for-owned-source) "private")))
+            (should (equal (skg--prompt-for-owned-repo) "private")))
 
           ;; Test wrap-around: from "private" (idx=1), cycle right -> "public"
           (let* ((idx 1)
-                 (new (nth (mod (+ idx 1) (length sources)) sources)))
+                 (new (nth (mod (+ idx 1) (length repos)) repos)))
             (should (equal new "public")))
 
           ;; Test cycle left from "public" (idx=0) -> wraps to "private"
           (let* ((idx 0)
-                 (new (nth (mod (+ idx -1) (length sources)) sources)))
+                 (new (nth (mod (+ idx -1) (length repos)) repos)))
             (should (equal new "private"))))
       (delete-file config-file)
       (delete-directory config-dir))))
@@ -194,7 +194,7 @@ without prompting."
   "When a headline already has metadata, skg-edit-metadata should
 open the sexp-edit buffer (not prompt in minibuffer)."
   (test--with-skg-content-view
-   "* (skg (node (id x) (source public))) x\n"
+   "* (skg (node (id x) (repo public))) x\n"
    test--config-public-and-private
    (lambda ()
      (should (org-at-heading-p))
@@ -217,18 +217,18 @@ open the sexp-edit buffer (not prompt in minibuffer)."
          (should (get-text-property (point) 'read-only)))
        (kill-buffer edit-buf)))))
 
-(ert-deftest test-view-source-list-includes-all-sources ()
-  "skg-view-source-list should list every configured source and path."
+(ert-deftest test-view-repo-list-includes-all-repos ()
+  "skg-view-repo-list should list every configured repo and path."
   (test--with-skg-content-view
-   "* (skg (node (id x) (source public))) x\n"
-   test--config-with-foreign-source
+   "* (skg (node (id x) (repo public))) x\n"
+   test--config-with-foreign-repo
    (lambda ()
      (unwind-protect
          (progn
-           (skg-view-source-list)
-           (let ((source-buffer (get-buffer "*skg-sources*")))
-             (should source-buffer)
-             (with-current-buffer source-buffer
+           (skg-view-repo-list)
+           (let ((list-buffer (get-buffer "*skg-repos*")))
+             (should list-buffer)
+             (with-current-buffer list-buffer
                (should (derived-mode-p 'org-mode))
                (let ((content (buffer-substring-no-properties
                                (point-min) (point-max))))
@@ -238,13 +238,13 @@ open the sexp-edit buffer (not prompt in minibuffer)."
                  (should (string-match-p "/public" content))
                  (should (string-match-p "/private" content))
                  (should (string-match-p "/foreign" content))))))
-       (when (get-buffer "*skg-sources*")
-         (kill-buffer "*skg-sources*"))))))
+       (when (get-buffer "*skg-repos*")
+         (kill-buffer "*skg-repos*"))))))
 
-(ert-deftest test-source-change-prompt-starts-with-current-source ()
-  "skg--prompt-for-source-change should put current source in editable text."
+(ert-deftest test-repo-change-prompt-starts-with-current-repo ()
+  "skg--prompt-for-repo-change should put current repo in editable text."
   (test--with-skg-content-view
-   "* (skg (node (id x) (source public))) x\n"
+   "* (skg (node (id x) (repo public))) x\n"
    test--config-public-and-private
    (lambda ()
      (cl-letf (((symbol-function 'completing-read)
@@ -260,21 +260,21 @@ open the sexp-edit buffer (not prompt in minibuffer)."
                   (should (null def))
                   (should (null inherit-input-method))
                   "private")))
-       (should (equal (skg--prompt-for-source-change "public")
+       (should (equal (skg--prompt-for-repo-change "public")
                       "private"))))))
 
-(ert-deftest test-source-set-prompt-completes-configured-source-sets ()
-  "skg--prompt-for-source-set completes the prefix source-set choices:
-the sources in privacy order, then \"all\"."
+(ert-deftest test-repo-set-prompt-completes-configured-repo-sets ()
+  "skg--prompt-for-repo-set completes the prefix repo-set choices:
+the repos in privacy order, then \"all\"."
   (test--with-skg-content-view
-   "* (skg (node (id x) (source public))) x\n"
-   test--config-with-interleaved-source-sets
+   "* (skg (node (id x) (repo public))) x\n"
+   test--config-with-interleaved-repo-sets
    (lambda ()
      (cl-letf (((symbol-function 'completing-read)
                 (lambda (prompt collection predicate require-match
                          initial-input &optional hist def
                          inherit-input-method)
-                  (should (string-match-p "Most private source" prompt))
+                  (should (string-match-p "Most private repo" prompt))
                   (should (equal collection
                                  '("public" "private" "all")))
                   (should (null predicate))
@@ -284,29 +284,29 @@ the sources in privacy order, then \"all\"."
                   (should (equal def "all"))
                   (should (null inherit-input-method))
                   "private")))
-       (should (equal (skg--prompt-for-source-set)
+       (should (equal (skg--prompt-for-repo-set)
                       "private"))))))
 
-(ert-deftest test-config-readers-handle-interleaved-source-tables ()
+(ert-deftest test-config-readers-handle-interleaved-repo-tables ()
   "Elisp config readers should not confuse [[repos]] and [[repo_sets]]."
   (test--with-skg-content-view
-   "* (skg (node (id x) (source public))) x\n"
-   test--config-with-interleaved-source-sets
+   "* (skg (node (id x) (repo public))) x\n"
+   test--config-with-interleaved-repo-sets
    (lambda ()
-     (should (equal (skg--source-names) '("public" "private")))
-     (should (equal (skg--source-set-names)
+     (should (equal (skg--repo-names) '("public" "private")))
+     (should (equal (skg--repo-set-names)
                     '("public" "private" "all")))
-     (should (equal (mapcar #'car (skg--source-paths))
+     (should (equal (mapcar #'car (skg--repo-paths))
                     '("public" "private"))))))
 
 ;; --- Empty-node metadata view (C-c v m on a metadata-less headline) ---
 
-(defvar test--config-one-source
+(defvar test--config-one-repo
   (concat "[[repos]]\n"
           "name = \"only\"\n"
           "path = \"owned/only\"\n"
           "")
-  "Config text with a single owned source, so no source prompt fires.")
+  "Config text with a single owned repo, so no repo prompt fires.")
 
 (defun test--skg-edit-buffer ()
   "Return the open sexp-edit buffer, if any."
@@ -315,10 +315,10 @@ the sources in privacy order, then \"all\"."
      (buffer-local-value 'skg-sexp-edit--source-buffer b))
    (buffer-list)))
 
-;; Builder: source pre-filled, other editable fields childless, title group.
+;; Builder: repo pre-filled, other editable fields childless, title group.
 
 (ert-deftest test-empty-node-org-text-with-title ()
-  "The skeleton pre-fills source, leaves other fields childless,
+  "The skeleton pre-fills repo, leaves other fields childless,
 and shows the title under a `title' group."
   (let* ((org-text (skg-edit-metadata--empty-node-org-text
                     "only" "my title"))
@@ -329,7 +329,7 @@ and shows the title under a `title' group."
                      (2 . "my title")
                      (1 . "skg")
                      (2 . "node")
-                     (3 . "source")
+                     (3 . "repo")
                      (4 . "only")
                      (3 . "writeProtected")
                      (3 . "affectsParent")
@@ -346,21 +346,21 @@ and shows the title under a `title' group."
     (should (equal (cadr headlines) '(1 . "skg")))))
 
 ;; Opening: C-c v m on a metadata-less headline drops minimal metadata
-;; in place and opens the view with source pre-filled.
+;; in place and opens the view with repo pre-filled.
 
 (ert-deftest test-edit-metadata-empty-opens-view ()
-  "C-c v m on a metadata-less headline populates (skg (node (source only)))
-in place and opens the empty-node view: source pre-filled, others childless."
+  "C-c v m on a metadata-less headline populates (skg (node (repo only)))
+in place and opens the empty-node view: repo pre-filled, others childless."
   (test--with-skg-content-view
    "* a new node\n"
-   test--config-one-source
+   test--config-one-repo
    (lambda ()
      (let ((source-buffer (current-buffer)))
        (skg-edit-metadata)
-       ;; The source headline now carries minimal metadata.
+       ;; The repo headline now carries minimal metadata.
        (with-current-buffer source-buffer
          (should (string-match-p
-                  "^\\* (skg (node (source only))) a new node$"
+                  "^\\* (skg (node (repo only))) a new node$"
                   (buffer-substring-no-properties
                    (point-min) (point-max)))))
        ;; The edit buffer shows the skeleton.
@@ -370,7 +370,7 @@ in place and opens the empty-node view: source pre-filled, others childless."
              (with-current-buffer edit-buf
                (let ((content (buffer-substring-no-properties
                                (point-min) (point-max))))
-                 (should (string-match-p "^\\*\\*\\* source\n\\*\\*\\*\\* only$"
+                 (should (string-match-p "^\\*\\*\\* repo\n\\*\\*\\*\\* only$"
                                          content))
                  (should (string-match-p "^\\*\\*\\* writeProtected$" content))
                  (should (string-match-p "^\\*\\*\\* viewRequests$" content))
@@ -382,13 +382,13 @@ in place and opens the empty-node view: source pre-filled, others childless."
                  (should (string-match-p "^\\*\\* a new node$" content))))
            (kill-buffer edit-buf)))))))
 
-;; Round-trip: committing the untouched view yields just the source.
+;; Round-trip: committing the untouched view yields just the repo.
 
 (ert-deftest test-edit-metadata-empty-commit-untouched ()
-  "Committing the untouched empty-node view yields (skg (node (source only)))."
+  "Committing the untouched empty-node view yields (skg (node (repo only)))."
   (test--with-skg-content-view
    "* a new node\n"
-   test--config-one-source
+   test--config-one-repo
    (lambda ()
      (let ((source-buffer (current-buffer)))
        (skg-edit-metadata)
@@ -396,18 +396,18 @@ in place and opens the empty-node view: source pre-filled, others childless."
          (skg-sexp-edit--commit))
        (with-current-buffer source-buffer
          (should (string-match-p
-                  "^\\* (skg (node (source only))) a new node$"
+                  "^\\* (skg (node (repo only))) a new node$"
                   (buffer-substring-no-properties
                    (point-min) (point-max)))))))))
 
 ;; Round-trip: a field the user populates survives; the rest stay na.
 
 (ert-deftest test-edit-metadata-empty-commit-with-write-protected ()
-  "Populating writeProtected=true in the view yields (skg (node (source only) writeProtected)),
+  "Populating writeProtected=true in the view yields (skg (node (repo only) writeProtected)),
 while the untouched fields contribute no keys."
   (test--with-skg-content-view
    "* a new node\n"
-   test--config-one-source
+   test--config-one-repo
    (lambda ()
      (let ((source-buffer (current-buffer)))
        (skg-edit-metadata)
@@ -421,8 +421,8 @@ while the untouched fields contribute no keys."
          (skg-sexp-edit--commit))
        (with-current-buffer source-buffer
          (should (string-match-p
-                  "^\\* (skg (node (source only) writeProtected)) a new node$"
+                  "^\\* (skg (node (repo only) writeProtected)) a new node$"
                   (buffer-substring-no-properties
                    (point-min) (point-max)))))))))
 
-(provide 'test-skg-insert-heading-source-prompt)
+(provide 'test-skg-insert-heading-repo-prompt)

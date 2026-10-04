@@ -116,25 +116,25 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Node has multiple Content children with the same ID {:?}", id),
       BufferValidationError::InconsistentRepos(id, repos) => {
         let repo_list: Vec<&RepoName> = repos . iter() . collect();
-        write!(f, "Multiple viewnodes with ID {:?} have inconsistent sources: {:?}", id, repo_list) },
+        write!(f, "Multiple viewnodes with ID {:?} have inconsistent repos: {:?}", id, repo_list) },
       BufferValidationError::ModifiedForeignNode(id, repo) =>
-        write!(f, "Cannot modify node {:?} from foreign (read-only) source '{}'", id, repo),
+        write!(f, "Cannot modify node {:?} from foreign (read-only) repo '{}'", id, repo),
       BufferValidationError::CreatedForeignNode(id, repo) =>
-        write!(f, "Cannot create node {:?} in foreign (read-only) source '{}'", id, repo),
+        write!(f, "Cannot create node {:?} in foreign (read-only) repo '{}'", id, repo),
       BufferValidationError::CannotMoveToOrFromForeignRepo(id, disk_repo, buffer_repo) =>
-        write!(f, "Cannot move node {:?} between sources '{}' and '{}': one or both are foreign (read-only)", id, disk_repo, buffer_repo),
+        write!(f, "Cannot move node {:?} between repos '{}' and '{}': one or both are foreign (read-only)", id, disk_repo, buffer_repo),
       BufferValidationError::CannotMoveAndMergeSimultaneously(id) =>
         write!(f, "Cannot move and merge node {:?} in the same save", id),
       BufferValidationError::RepoNotInConfig(id, repo) =>
-        write!(f, "Node {:?} references source '{}' which does not exist in config", id, repo),
+        write!(f, "Node {:?} references repo '{}' which does not exist in config", id, repo),
       BufferValidationError::ForkRepoUnresolved(id) =>
-        write!(f, "Cannot fork node {:?}: no owned source to put the clone in. It has no owned ancestor in the view to inherit a source from; set the clone's source in the confirmation buffer (C-c s s).", id),
+        write!(f, "Cannot fork node {:?}: no owned repo to put the clone in. It has no owned ancestor in the view to inherit a repo from; set the clone's repo in the confirmation buffer (C-c s s).", id),
       BufferValidationError::ForkAlreadyExists(original, existing) =>
         write!(f, "Cannot fork node {:?}: you have already forked it. Your clone is {:?}. Edit that clone instead (a node may have at most one user-owned override).", original, existing),
       BufferValidationError::ForkRepoInactive(id, repo) =>
-        write!(f, "Cannot fork node {:?}: the clone's source '{}' is inactive under the current source-set. Activate it first; an invisible clone is never created silently.", id, repo),
+        write!(f, "Cannot fork node {:?}: the clone's repo '{}' is inactive under the current repo-set. Activate it first; an invisible clone is never created silently.", id, repo),
       BufferValidationError::ForkRepoNotOwned(id, repo) =>
-        write!(f, "Cannot fork node {:?}: the clone's source '{}' is not one you own. Choose an owned source for the clone (C-c s s in the confirmation buffer).", id, repo),
+        write!(f, "Cannot fork node {:?}: the clone's repo '{}' is not one you own. Choose an owned repo for the clone (C-c s s in the confirmation buffer).", id, repo),
       BufferValidationError::ForkRequestOnUnknownNode(id) =>
         write!(f, "Cannot fork node {:?}: it is not in the graph. Only a saved node can be forked; save it first, then fork.", id),
       BufferValidationError::ForkRequestMultiple(id) =>
@@ -164,7 +164,7 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "The properties surface under node {:?} ({:?}) was edited: {}. It is server-owned and no changes were saved. Use skg-set-property-search-matching for noSearchMatching; provenance properties have no setter.",
                owner_id, owner_title, changes . join ("; ")),
       BufferValidationError::BoolPropEditOnForeignNode (id, repo) =>
-        write! (f, "Cannot change properties of node {:?} from foreign source '{}'; this gesture never creates an implicit fork.", id, repo),
+        write! (f, "Cannot change properties of node {:?} from foreign repo '{}'; this gesture never creates an implicit fork.", id, repo),
       BufferValidationError::BoolPropEditOnUnknownNode (id) =>
         write! (f, "Cannot change properties of unsaved or unknown node {:?}; save the node first.", id),
       BufferValidationError::OverridesHere_Mismatch(carrier, original, effective) =>

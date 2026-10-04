@@ -45,7 +45,7 @@ fn manifests_list_prefixes_for_owned_repos_only (
         ("private", "owned/private", true) ] );
   let written : Vec<RepoName> =
     write_dependencies_manifests (&config) . unwrap ();
-  assert_eq! ( written . len (), 2, "owned sources only" );
+  assert_eq! ( written . len (), 2, "owned repos only" );
   let private_manifest : String =
     std::fs::read_to_string (
       tmp . path () . join ("owned/private/DEPENDENCIES.toml") )
@@ -55,13 +55,13 @@ fn manifests_list_prefixes_for_owned_repos_only (
   assert! ( private_manifest . contains ("\"owned/private\"") );
   assert! ( ! tmp . path ()
             . join ("eggman/eggs/DEPENDENCIES.toml") . exists (),
-            "foreign sources get no manifest" );
+            "foreign repos get no manifest" );
   let public_manifest : String =
     std::fs::read_to_string (
       tmp . path () . join ("owned/public/DEPENDENCIES.toml") )
     . unwrap ();
   assert! ( ! public_manifest . contains ("private"),
-            "a manifest lists only sources at least as public" );
+            "a manifest lists only repos at least as public" );
   { // byte-stability: rewriting changes nothing
     let mtime_before =
       std::fs::metadata (
@@ -145,7 +145,7 @@ fn dependency_pair_omits_git_remote_when_repo_is_not_a_gitrepo (
     . unwrap ();
   assert! (
     manifest . contains ("{ path = \"owned/public\" }"),
-    "a path-only pair when the source is not a git repo: {manifest}" );
+    "a path-only pair when the Skg repo is not a Git repo: {manifest}" );
   assert! (
     ! manifest . contains ("git-remote ="),
     "no git-remote field when there is no remote: {manifest}" );

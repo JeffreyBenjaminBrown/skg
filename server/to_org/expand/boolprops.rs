@@ -122,7 +122,7 @@ mod tests {
   fn boolprops_surface_render_parse_round_trip_uses_all_canonical_atoms (
   ) {
     let org = indoc! {"
-      * (skg (node (id owner) (source main))) Owner
+      * (skg (node (id owner) (repo main))) Owner
       ** (skg propertiesFolder)
       *** (skg (property hadId))
       *** (skg (property wasOverloaded))

@@ -250,7 +250,7 @@ fn test_stage_moves_title_presence_semantics() {
   let script : String =
     stage_moves_script (&config) . unwrap();
   assert! ( ! script . contains ("releveled"),
-            "titleless deletion is a relSource change, not a move:\n{}",
+            "titleless deletion is a relRepo change, not a move:\n{}",
             script );
   assert! ( script . contains ("#   mixed : alpha -> beta"),
             "mixed-destination move should be reported:\n{}", script );

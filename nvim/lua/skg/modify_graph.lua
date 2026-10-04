@@ -113,22 +113,22 @@ function M.container_data (line)
   return sexp
 end
 
----Error unless CONTAINER_SEXP is an editable container: sourced,
----owned, and definitive.
+---Error unless CONTAINER_SEXP is an editable container: it has a repo,
+---is owned, and is definitive.
 ---@param container_sexp any
 function M.check_container (container_sexp)
-  local source = metadata.node_source(container_sexp)
-  if not source then
+  local repo = metadata.node_repo(container_sexp)
+  if not repo then
     error('Cannot replace this branch with a link:'
-          .. ' container has no source') end
-  local owned = config.owned_sources() or {}
+          .. ' container has no repo') end
+  local owned = config.owned_repos() or {}
   local is_owned = false
   for _, name in ipairs(owned) do
-    if name == source then is_owned = true break end
+    if name == repo then is_owned = true break end
   end
   if not is_owned then
     error('Cannot replace this branch with a link:'
-          .. ' container source is not owned: ' .. source) end
+          .. ' container repo is not owned: ' .. repo) end
   if metadata.node_write_protected_p(container_sexp) then
     error('Cannot replace this branch with a link:'
           .. ' container is write-protected') end

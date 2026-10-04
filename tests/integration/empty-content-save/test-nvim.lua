@@ -1,6 +1,6 @@
 -- Integration test for skg empty-content save, nvim client.
 -- The Lua mirror of test-emacs.el in this directory:
--- open an empty skg buffer, enter '* (skg (node (id 1) (source
+-- open an empty skg buffer, enter '* (skg (node (id 1) (repo
 -- main))) 1', save, and verify the result lands in data/owned/skg/1.skg.
 
 local T = dofile('../test-nvim-lib.lua')
@@ -17,7 +17,7 @@ end
 
 vim.api.nvim_set_current_buf(content_buffer)
 vim.api.nvim_buf_set_lines(content_buffer, 0, -1, false,
-  { '* (skg (node (id 1) (source main))) 1' })
+  { '* (skg (node (id 1) (repo main))) 1' })
 vim.api.nvim_win_set_cursor(0, { 1, 0 })
 
 print('save-buffer')

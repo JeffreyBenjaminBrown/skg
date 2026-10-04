@@ -50,10 +50,10 @@ async fn write_protected_should_not_count_as_donotdelete_impl (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"
-    * (skg (node (id parent) (source main))) parent
-    ** (skg (node (id victim) (source main) (editRequest delete))) victim
-    ** (skg (node (id via) (source main))) via
-    *** (skg (node (id victim) (source main) writeProtected)) victim
+    * (skg (node (id parent) (repo main))) parent
+    ** (skg (node (id victim) (repo main) (editRequest delete))) victim
+    ** (skg (node (id via) (repo main))) via
+    *** (skg (node (id victim) (repo main) writeProtected)) victim
   "};
   let graph : InRustGraphHandle =
     new_handle (InRustGraph::new ());

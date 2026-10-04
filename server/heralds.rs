@@ -209,9 +209,9 @@ pub fn herald_rule_table () -> HeraldRule {
       // An alias's stored relRepo is a display fact.  A
       // requested replacement lives under editRequest below, so the
       // two values can be rendered side by side without conflation.
-      crule (Red, "relSource", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
+      crule (Red, "relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
       rule ("editRequest", vec! [
-        crule (Red, "relSource", vec! [
+        crule (Red, "relRepo", vec! [
           any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]),
       // The six READ-ONLY folder scaffolds carry ☮ ("cannot be changed
       // from here"); the writable folders (subscribeeFolder, overriddenFolder,
@@ -249,22 +249,22 @@ pub fn herald_rule_table () -> HeraldRule {
       crule (Red, "deleted", vec! [
         s ("DELETED"),
         vac ("id"),
-        vac ("source") ]),
+        vac ("repo") ]),
       crule (Orange, "unknown", vec! [
         s ("Reference to unknown node."),
         vac ("id"),
         crule (Blue, "viewStats", vec! [
-          crule (Red, "relSource", vec! [
+          crule (Red, "relRepo", vec! [
             any (vec! [ s ("~"), RuleChild::It ]) ]) ]),
         rule ("editRequest", vec! [
-          crule (Red, "relSource", vec! [
+          crule (Red, "relRepo", vec! [
             any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ]),
       // An inactive placeholder is anonymous and dataless: the bare
       // atom 'inactiveNode' (see InactiveNode), like the other dataless
       // scaffold markers. Its id/repo would leak hidden content, so
       // they are not emitted.
       crule (Blue, "inactiveNode", vec! [
-        s ("node from inactive source") ]),
+        s ("node from inactive repo") ]),
       interc (Some (Green), "", Some ("staged"), vec! [
         s ("staged:"),
         leaf (Green, "newM",     "M"),
@@ -275,7 +275,7 @@ pub fn herald_rule_table () -> HeraldRule {
         leaf (Red,   "removedM", "-M") ]),
       rule ("node", vec! [
         vac ("id"),
-        vac ("source"),
+        vac ("repo"),
         rule ("affectsParent", vec! [
           vac ("na"),
           vac ("true"),
@@ -305,13 +305,13 @@ pub fn herald_rule_table () -> HeraldRule {
           // homeRepoHerald below (table ORDER is presentation order,
           // per the module doc, so placing this rule first guarantees
           // that regardless of the atoms' order in the raw sexp).
-          crule (Red, "relSource", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
-          crule (Green, "sourceHerald", vec! [ any (vec! [RuleChild::It]) ]) ]),
+          crule (Red, "relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
+          crule (Green, "homeRepoHerald", vec! [ any (vec! [RuleChild::It]) ]) ]),
         rule ("editRequest", vec! [
           leaf (Red, "delete", "delete"),
           crule (Red, "merge", vec! [
             any ( vec! [ s ("merge:"), RuleChild::It ] ) ]),
-          crule (Red, "relSource", vec! [
+          crule (Red, "relRepo", vec! [
             any (vec! [ s ("request:~"), RuleChild::It ]) ]),
           crule (Red, "property", vec! [
             // A property request is flat metadata:
@@ -349,7 +349,7 @@ pub fn herald_rule_table () -> HeraldRule {
       // viewRequests.
       rule ("diffPhantom", vec! [
         vac ("id"),
-        vac ("source"),
+        vac ("repo"),
         leaf_abut (Green, "writeProtected", "☮"),
         rule ("rels", vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
         interc (Some (Green), "", Some ("staged"), vec! [
@@ -444,7 +444,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     "node", "diffPhantom", "deleted", "unknown", "inactiveNode",
     "deletedScaffold",
     // Keys inside node / diffPhantom / deleted / unknown forms:
-    "id", "source",
+    "id", "repo",
     "affectsParent", "writeProtected", "hiddenBody", "notInGit",
     // The assembled relationship-herald atom, a payload of styled spans
     // (server/herald_tokens.rs); its span sub-forms are value position,
@@ -499,7 +499,7 @@ fn viewstats_atoms () -> Vec<&'static str> {
       relRepo : _,       // -> the relRepo display-fact atom and herald
     } = v; }
   let _ = guard;
-  vec! [ "cycle", "sourceHerald", "overridesHere", "relSource" ] }
+  vec! [ "cycle", "homeRepoHerald", "overridesHere", "relRepo" ] }
 
 /// AffectsParent values the serializer can emit (True stays implicit).
 fn affectsParent_emitted_atoms () -> Vec<&'static str> {

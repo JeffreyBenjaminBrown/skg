@@ -1,10 +1,10 @@
 -- Integration test for the fork-confirmation buffer's EDITABLE clone
--- source, nvim client. The Lua mirror of test-emacs.el in this
+-- repo, nvim client. The Lua mirror of test-emacs.el in this
 -- directory: open owned P (whose content is foreign N); make N
 -- definitive and edit its title; save -> a fork-confirmation buffer.
--- The clone's source is inferred as "owned"; rotate it to "owned2" in
+-- The clone's repo is inferred as "owned"; rotate it to "owned2" in
 -- the confirmation buffer, then approve. The clone must land in
--- "owned2" (the rotated source), not in "owned".
+-- "owned2" (the rotated repo), not in "owned".
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(40)
@@ -63,7 +63,7 @@ local function skg_files_in (dir)
   return names
 end
 
-print('Starting fork source-rotation integration test...')
+print('Starting fork repo-rotation integration test...')
 
 -- 1. Open owned P; its content is the foreign node N.
 content_view.request_single_root_content_view_from_id('P')
@@ -72,7 +72,7 @@ T.check(p_buf, "P's view never appeared")
 vim.api.nvim_set_current_buf(p_buf)
 
 -- 2. Make N definitive and edit its title -- the fork gesture.
-local n_line = goto_line_containing('(id N) (source foreign)',
+local n_line = goto_line_containing('(id N) (repo foreign)',
   "could not find N's headline")
 local n_line_text =
   vim.api.nvim_buf_get_lines(p_buf, n_line - 1, n_line, false)[1]
@@ -84,33 +84,33 @@ vim.api.nvim_buf_set_lines(p_buf, n_line - 1, n_line, false,
 -- 3. Save -> fork-confirmation (nothing committed).
 save.request_save_buffer()
 
--- 4. The confirmation buffer appears. Rotate the clone-to-be's source
+-- 4. The confirmation buffer appears. Rotate the clone-to-be's repo
 --    from the inferred "owned" to "owned2", then approve.
 local confirm_buf = T.wait_for_buffer('skg://fork-confirmation', 10)
 T.check(confirm_buf, 'no fork-confirmation buffer appeared')
 vim.api.nvim_set_current_buf(confirm_buf)
--- The elisp original asserts '(source owned)' here, which is STALE:
--- the server always pre-fills the PICK-A-SOURCE placeholder and only
--- SUGGESTS the inferred source in a comment line (fork.rs; documented
+-- The elisp original asserts '(repo owned)' here, which is STALE:
+-- the server always pre-fills the PICK-A-REPO placeholder and only
+-- SUGGESTS the inferred repo in a comment line (fork.rs; documented
 -- in COMMANDS.org and glossary.org). The emacs test fails on this
 -- today -- see the problems.org entry filed with the vim-client port.
 -- This mirror asserts the documented behavior instead.
 local confirmation_text = T.buffer_text(confirm_buf)
-T.check(confirmation_text:find('(source PICK-A-SOURCE)', 1, true),
-        'clone-to-be carries the PICK-A-SOURCE placeholder')
-T.check(confirmation_text:find('Suggested source for the clone'
+T.check(confirmation_text:find('(repo PICK-A-REPO)', 1, true),
+        'clone-to-be carries the PICK-A-REPO placeholder')
+T.check(confirmation_text:find('Suggested repo for the clone'
                                .. ' below: owned', 1, true),
-        "the inferred source 'owned' is suggested in the comment")
+        "the inferred repo 'owned' is suggested in the comment")
 -- Move to the clone-to-be parent (the first, level-1 headline) and
--- rotate its source -- what <localleader>ss does interactively.
+-- rotate its repo -- what <localleader>ss does interactively.
 local clone_line = goto_line_starting_with('* (skg',
   'could not find the clone-to-be headline')
-metadata.change_source_at_line(clone_line, 'owned2')
-T.check(T.buffer_text(confirm_buf):find('(source owned2)', 1, true),
-        'rotation did not set source owned2')
-print("rotated the clone's source to owned2")
+metadata.change_repo_at_line(clone_line, 'owned2')
+T.check(T.buffer_text(confirm_buf):find('(repo owned2)', 1, true),
+        'rotation did not set repo owned2')
+print("rotated the clone's repo to owned2")
 
--- 5. Approve: re-save the origin with the chosen source.
+-- 5. Approve: re-save the origin with the chosen repo.
 save.approve_fork()
 
 -- 6. The clone must land in owned2 (rotated), NOT owned (inferred).
@@ -131,6 +131,6 @@ local clone_full_path = vim.fn.glob('data/owned/owned2/*.skg', false, true)[1]
 local clone_content = table.concat(vim.fn.readfile(clone_full_path), '\n')
 T.check(clone_content:find('overrides_view_of', 1, true),
         'the clone in owned2 should override N')
-print('the clone landed in the rotated source owned2 and overrides N')
+print('the clone landed in the rotated repo owned2 and overrides N')
 
-T.pass('PASS: Fork source-rotation integration test successful!')
+T.pass('PASS: Fork repo-rotation integration test successful!')

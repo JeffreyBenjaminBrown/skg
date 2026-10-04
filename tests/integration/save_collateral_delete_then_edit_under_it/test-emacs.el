@@ -76,8 +76,8 @@ contains to [], overwriting subee.skg on disk."
     ;; Append standalone subee root with child.
     (goto-char (point-max))
     (unless (bolp) (insert "\n"))
-    (insert "* (skg (node (id subee) (source main))) subee\n")
-    (insert "** (skg (node (id subee-1) (source main))) subee-1")
+    (insert "* (skg (node (id subee) (repo main))) subee\n")
+    (insert "** (skg (node (id subee-1) (repo main))) subee-1")
     (skg-request-save-buffer))
   (skg-test-wait-for-response)
   (let ((buf (get-buffer "*1*")))
@@ -110,9 +110,9 @@ which takes priority over subee.skg on disk."
       (erase-buffer)
       (org-mode)
       (setq skg-view-uri (org-id-uuid))
-      (insert "* (skg (node (id 11) (source main) writeProtected)) 11\n")
-      (insert "* (skg (node (id subee) (source main))) subee\n")
-      (insert "** (skg (node (id subee-1) (source main))) subee-1")
+      (insert "* (skg (node (id 11) (repo main) writeProtected)) 11\n")
+      (insert "* (skg (node (id subee) (repo main))) subee\n")
+      (insert "** (skg (node (id subee-1) (repo main))) subee-1")
       (skg-request-save-buffer))
     (skg-test-wait-for-response)
     (message "Buffer 2 after save:\n%s"
@@ -251,8 +251,8 @@ Originally this exercised inserting a node under a DeletedScaff;
 after the delete pipeline started cleaning up references to the
 deleted node, buffer 1 no longer contains a DeletedScaff, so the
 phase now exercises adding a top-level root via metadata-only
-insertion (the BufferRoot, like a DeletedScaff, supplies no source
-to inherit, so explicit (source main) is still required)."
+insertion (the BufferRoot, like a DeletedScaff, supplies no repo
+to inherit, so explicit (repo main) is still required)."
   (message "=== PHASE 8: Add new-root under deletedScaff in buffer 1 ===")
   (setq integration-test-phase "phase-8-add-new-root")
   (with-current-buffer "*1*"
@@ -274,7 +274,7 @@ to inherit, so explicit (source main) is still required)."
           (forward-line 1))
         ;; Insert new-root as a sibling of subee.
         (let ((stars (make-string subee-depth ?*)))
-          (insert (format "%s (skg (node (source main))) new-root\n"
+          (insert (format "%s (skg (node (repo main))) new-root\n"
                           stars)))))
     (message "Buffer 1 after inserting new-root:\n%s"
              (buffer-substring-no-properties (point-min) (point-max)))

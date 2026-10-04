@@ -33,7 +33,7 @@ re-installed after, since `unload-feature' on
 connect.
 
 PITFALL: the re-install is wrapped in `unwind-protect'. The herald
-table is session-only state with no on-disk source, so once
+table is session-only state with no on-disk repo, so once
 `unload-feature' wipes it the only way back is the captured copy.
 If a reloaded file signals (e.g. a stray edit-in-progress), an
 unprotected re-install would be skipped and the table lost for the
@@ -84,7 +84,7 @@ rather than via `unload-feature'."
             skg-request-herald-rules
             skg-request-diff-report
             skg-request-delete-references-to-absent-node
-            skg-request-edge-source-info
+            skg-request-edge-repo-info
             skg-request-boolprop-state
             skg-request-export-org
             skg-request-import-md-and-org
@@ -93,7 +93,7 @@ rather than via `unload-feature'."
             skg-request-rerender-all-views
             skg-request-save
             skg-request-single-root-content-view
-            skg-request-source-sets
+            skg-request-repo-sets
             skg-request-stage-moves
             skg-request-strip-body-whitespace
             skg-request-text-search

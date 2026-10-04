@@ -66,12 +66,12 @@ describe('skg.metadata parsing', function ()
 
   it('keeps graphStats/viewStats sub-sexps whole', function ()
     local parsed = metadata.parse_metadata_sexp(
-      '(skg (node x) (viewStats cycle (sourceHerald h)))')
+      '(skg (node x) (viewStats cycle (homeRepoHerald h)))')
     local found = nil
     for _, kv in ipairs(parsed.alist) do
       if kv.key == 'viewStats' then found = kv.value end
     end
-    assert.are.equal('(viewStats cycle (sourceHerald h))', found)
+    assert.are.equal('(viewStats cycle (homeRepoHerald h))', found)
   end)
 end)
 
@@ -125,7 +125,7 @@ describe('skg.metadata commands', function ()
     assert.are.equal(
       '* root\nbody line\n** alias title\n** plain child\n',
       metadata.strip_metadata_from_org_text(
-        '* (skg (node (id 1) (source public))) root\n'
+        '* (skg (node (id 1) (repo public))) root\n'
         .. 'body line\n'
         .. '** (skg alias (staged newM)) alias title\n'
         .. '** plain child\n'))
@@ -140,74 +140,74 @@ describe('skg.metadata commands', function ()
     assert.are.equal('org', vim.bo.filetype)
   end)
 
-  it('set_source replaces source and refreshes the herald', function ()
-    -- Mirrors test-skg-set-source.
-    buffer_with('* (skg (node (id 1) (source public))) title')
-    local original = picker.prompt_for_source_change
-    picker.prompt_for_source_change = function (current)
+  it('set_repo replaces repo and refreshes the herald', function ()
+    -- Mirrors test-skg-set-repo.
+    buffer_with('* (skg (node (id 1) (repo public))) title')
+    local original = picker.prompt_for_repo_change
+    picker.prompt_for_repo_change = function (current)
       assert.are.equal('public', current)
       return 'private'
     end
-    metadata.set_source()
-    picker.prompt_for_source_change = original
+    metadata.set_repo()
+    picker.prompt_for_repo_change = original
     local result = first_metadata_sexp()
     assert.is_true(subtree_p(result,
-      '(skg (node (id 1) (source private)))'))
+      '(skg (node (id 1) (repo private)))'))
     assert.is_true(subtree_p(result,
-      '(skg (node (viewStats (sourceHerald ⌂:private))))'))
-    assert.is_false(subtree_p(result, '(skg (node (source public)))'))
+      '(skg (node (viewStats (homeRepoHerald ⌂:private))))'))
+    assert.is_false(subtree_p(result, '(skg (node (repo public)))'))
   end)
 
-  it('set_source_recursive prunes non-content affectsParent', function ()
-    -- Mirrors test-skg-set-source-recursive-prunes-non-content-affectsParent.
+  it('set_repo_recursive prunes non-content affectsParent', function ()
+    -- Mirrors test-skg-set-repo-recursive-prunes-non-content-affectsParent.
     buffer_with(table.concat({
-      '* (skg (node (id root) (source public) (affectsParent na))) root',
-      '** (skg (node (id content-child) (source public))) content child',
-      '*** (skg (node (id content-grandchild) (source public))) content grandchild',
-      '** (skg (node (id mismatched-content) (source foreign))) mismatched content',
-      '*** (skg (node (id public-under-mismatch) (source public))) public under mismatch',
-      '** (skg (node (id link-child) (source public) (affectsParent false) (birth backpath mentioner))) link child',
-      '*** (skg (node (id under-link) (source public))) under link',
+      '* (skg (node (id root) (repo public) (affectsParent na))) root',
+      '** (skg (node (id content-child) (repo public))) content child',
+      '*** (skg (node (id content-grandchild) (repo public))) content grandchild',
+      '** (skg (node (id mismatched-content) (repo foreign))) mismatched content',
+      '*** (skg (node (id public-under-mismatch) (repo public))) public under mismatch',
+      '** (skg (node (id link-child) (repo public) (affectsParent false) (birth backpath mentioner))) link child',
+      '*** (skg (node (id under-link) (repo public))) under link',
       '** (skg aliasFolder) aliases',
-      '*** (skg (node (id under-scaffold) (source public))) under scaffold' },
+      '*** (skg (node (id under-scaffold) (repo public))) under scaffold' },
       '\n'))
-    local original = picker.prompt_for_source_change
-    picker.prompt_for_source_change = function (current)
+    local original = picker.prompt_for_repo_change
+    picker.prompt_for_repo_change = function (current)
       assert.are.equal('public', current)
       return 'private'
     end
-    metadata.set_source_recursive()
-    picker.prompt_for_source_change = original
+    metadata.set_repo_recursive()
+    picker.prompt_for_repo_change = original
     for _, id in ipairs({ 'root', 'content-child',
                           'content-grandchild',
                           'public-under-mismatch' }) do
       assert.is_true(subtree_p(metadata_sexp_by_id(id),
-        '(skg (node (source private)))'), id)
+        '(skg (node (repo private)))'), id)
       assert.is_true(subtree_p(metadata_sexp_by_id(id),
-        '(skg (node (viewStats (sourceHerald ⌂:private))))'), id)
+        '(skg (node (viewStats (homeRepoHerald ⌂:private))))'), id)
     end
     assert.is_true(subtree_p(metadata_sexp_by_id('mismatched-content'),
-      '(skg (node (source foreign)))'))
+      '(skg (node (repo foreign)))'))
     for _, id in ipairs({ 'link-child', 'under-link',
                           'under-scaffold' }) do
       assert.is_true(subtree_p(metadata_sexp_by_id(id),
-        '(skg (node (source public)))'), id)
+        '(skg (node (repo public)))'), id)
       assert.is_false(subtree_p(metadata_sexp_by_id(id),
-        '(skg (node (source private)))'), id)
+        '(skg (node (repo private)))'), id)
     end
   end)
 
   it('set_merge_request accepts a bare id', function ()
-    buffer_with('* (skg (node (id acquirer) (source public))) title')
+    buffer_with('* (skg (node (id acquirer) (repo public))) title')
     metadata.set_merge_request('acquiree')
     assert.is_true(subtree_p(first_metadata_sexp(),
-      '(skg (node (id acquirer) (source public)'
+      '(skg (node (id acquirer) (repo public)'
       .. ' (editRequest (merge acquiree))))'))
   end)
 
   it('set_merge_request accepts a link and replaces old requests',
      function ()
-    buffer_with('* (skg (node (id acquirer) (source public)'
+    buffer_with('* (skg (node (id acquirer) (repo public)'
                 .. ' (editRequest delete))) title')
     metadata.set_merge_request('[[id:acquiree][Acquiree title]]')
     local result = first_metadata_sexp()

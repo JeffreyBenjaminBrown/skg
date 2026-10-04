@@ -482,7 +482,7 @@ fn validate_activeNode (
     validate_gnode_identity_and_structure (
       tree, node_id, has_id (t), "ActiveNode" );
   if !has_valid_repo (t, config) {
-    errors . push("ActiveNode must have a source that exists in the config."
+    errors . push("ActiveNode must have a repo that exists in the config."
                   . to_string()); }
   if t . id . is_none () && matches! (
     t . edit_request (), Some (NodeEditRequest::SetBoolProp { .. }))

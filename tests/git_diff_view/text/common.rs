@@ -5,12 +5,12 @@ pub use super::super::common::*;
 /// The expected git diff view output for title/body changes.
 /// TextChanged scaffolds appear as children of nodes whose title or body changed.
 pub const GIT_DIFF_VIEW: &str = "\
-* (skg (node (id 1) (source main))) 1 has a new title.
+* (skg (node (id 1) (repo main))) 1 has a new title.
 ** (skg (textChanged unstaged))
-** (skg (node (id 11) (source main))) 11
+** (skg (node (id 11) (repo main))) 11
 11 has a new body.
 *** (skg (textChanged unstaged))
-** (skg (node (id 12) (source main))) 12
+** (skg (node (id 12) (repo main))) 12
 ";
 
 /// Create a git repo with head->worktree transition from text fixtures.
@@ -37,10 +37,10 @@ pub fn setup_gitrepo_with_fixtures_staged(
 
 /// Expected diff view when the text changes are staged.
 pub const GIT_DIFF_VIEW_STAGED: &str = "\
-* (skg (node (id 1) (source main))) 1 has a new title.
+* (skg (node (id 1) (repo main))) 1 has a new title.
 ** (skg (textChanged staged))
-** (skg (node (id 11) (source main))) 11
+** (skg (node (id 11) (repo main))) 11
 11 has a new body.
 *** (skg (textChanged staged))
-** (skg (node (id 12) (source main))) 12
+** (skg (node (id 12) (repo main))) 12
 ";

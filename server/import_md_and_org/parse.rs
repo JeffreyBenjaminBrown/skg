@@ -345,7 +345,7 @@ pub fn rendered_range (
   let mut cursor : usize = range . start;
   for edit in document . source_edits . iter () . filter (|edit|
     edit . range . start >= range . start && edit . range . end <= range . end) {
-    assert! (edit . range . start >= cursor, "overlapping source edits");
+    assert! (edit . range . start >= cursor, "overlapping repo edits");
     out . push_str (&document . text [cursor..edit . range . start]);
     out . push_str (&edit . replacement);
     cursor = edit . range . end; }

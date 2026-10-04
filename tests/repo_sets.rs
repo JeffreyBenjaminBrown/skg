@@ -59,9 +59,9 @@ fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str = "tests/repo_sets/fixtures";
   run_with_shared_test_stores (
-    "skg-test-source-sets",
+    "skg-test-repo-sets",
     |s| Box::pin ( async move {
-      s . reset ("source_set_switch_rerenders_views_and_cancels_stale_search_enrichment", fixtures) ?;
+      s . reset ("repo_set_switch_rerenders_views_and_cancels_stale_search_enrichment", fixtures) ?;
       repo_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("content_view_omits_inactive_contained_nodes", fixtures) ?;
@@ -74,7 +74,7 @@ fn all_tests
         |root| prepare_git_diff_fixture (root) ) ?;
       diff_view_omits_inactive_members_without_content_leak (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("search_filters_inactive_sources_before_ranking_and_truncation", fixtures) ?;
+      s . reset ("search_filters_inactive_repos_before_ranking_and_truncation", fixtures) ?;
       search_filters_inactive_repos_before_ranking_and_truncation (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("inactive_placeholder_in_buffer_does_not_drive_contains", fixtures) ?;
@@ -83,7 +83,7 @@ fn all_tests
       s . reset ("saving_edits_to_inactive_placeholder_content_are_rejected", fixtures) ?;
       saving_edits_to_inactive_placeholder_content_are_rejected (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("restricted_source_search_and_save_work_together_end_to_end", fixtures) ?;
+      s . reset ("restricted_repo_search_and_save_work_together_end_to_end", fixtures) ?;
       restricted_repo_search_and_save_work_together_end_to_end (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("containerward_expansion_truncates_before_inactive_container", fixtures) ?;
@@ -176,7 +176,7 @@ fn override_substitute_across_repo_switch_anonymizes_and_keeps_original (
         scope . spawn ( || {
           handle_repo_set_request (
             &mut server_stream,
-            "((request . \"set active source set\") (name . \"public\"))",
+            "((request . \"set active repo set\") (name . \"public\"))",
             &env, &mut views_state, &mut active,
             &enrichment_slot, &search_cancelled); } ); } );
 
@@ -318,7 +318,7 @@ fn config_rejects_reserved_all_repo_and_repo_set_names (
     load_config ("tests/repo_sets/fixtures-invalid/repo-all/skgconfig.toml");
   assert! (
     repo_all . is_err (),
-    "configured source named all must be rejected" );
+    "configured repo named all must be rejected" );
   let repo_set_all =
     load_config ("tests/repo_sets/fixtures-invalid/repo-set-all/skgconfig.toml");
   assert! (
@@ -371,7 +371,7 @@ async fn repo_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
         scope . spawn ( || {
           handle_repo_set_request (
             &mut server_stream,
-            "((request . \"set active source set\") (name . \"all\"))",
+            "((request . \"set active repo set\") (name . \"all\"))",
             &env,
             &mut views_state,
             &mut active,
@@ -380,17 +380,17 @@ async fn repo_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
       assert_eq! (
         active . name,
         RepoSetName::from ("all"),
-        "source-set switch should update the active set" );
+        "repo-set switch should update the active set" );
       assert! (
         views_state . open_views . views . contains_key (&uri),
-        "source-set switch should KEEP registered views (re-rendered \
+        "repo-set switch should KEEP registered views (re-rendered \
          in place), not close them" );
       assert! (
         enrichment_slot . lock () . unwrap () . is_none (),
-        "source-set switch should drop stale search enrichment payloads" );
+        "repo-set switch should drop stale search enrichment payloads" );
       assert! (
         search_cancelled . load (Ordering::SeqCst),
-        "source-set switch should cancel in-flight search enrichment" );
+        "repo-set switch should cancel in-flight search enrichment" );
       Ok (( )) }
 
 async fn content_view_omits_inactive_contained_nodes (
@@ -454,7 +454,7 @@ async fn diff_view_omits_inactive_members_without_content_leak (
         "private new title must not leak",
         "private removed title must not leak",
         "private body must not leak",
-        "source private) private",
+        "repo private) private",
       ] {
         assert! (
           ! actual . contains (forbidden),
@@ -506,10 +506,10 @@ async fn inactive_placeholder_in_buffer_does_not_drive_contains (
         // private-a at its DISK position (after active-a), not the
         // buffer position, and writes no SaveNode for it.
         let reordered = indoc! {"
-          * (skg (node (id root) (source public))) root
-          ** (skg (node (id active-a) (source public) writeProtected)) active-a
-          ** (skg (node (id active-b) (source public) writeProtected)) active-b
-          ** (skg (inactiveNode (id private-a) (source private)))
+          * (skg (node (id root) (repo public))) root
+          ** (skg (node (id active-a) (repo public) writeProtected)) active-a
+          ** (skg (node (id active-b) (repo public) writeProtected)) active-b
+          ** (skg (inactiveNode (id private-a) (repo private)))
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (
@@ -530,10 +530,10 @@ async fn inactive_placeholder_in_buffer_does_not_drive_contains (
         // (private-removed) must not be resurrected into contains; the
         // real invisible member (private-a) is still preserved.
         let stale = indoc! {"
-          * (skg (node (id root) (source public))) root
-          ** (skg (node (id active-a) (source public) writeProtected)) active-a
-          ** (skg (node (id active-b) (source public) writeProtected)) active-b
-          ** (skg (inactiveNode (id private-removed) (source private)))
+          * (skg (node (id root) (repo public))) root
+          ** (skg (node (id active-a) (repo public) writeProtected)) active-a
+          ** (skg (node (id active-b) (repo public) writeProtected)) active-b
+          ** (skg (inactiveNode (id private-removed) (repo private)))
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (
@@ -558,8 +558,8 @@ async fn saving_edits_to_inactive_placeholder_content_are_rejected (
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let buffer = indoc! {"
-        * (skg (node (id root) (source public))) root
-        ** (skg (inactiveNode (id private-a) (source private))) edited title
+        * (skg (node (id root) (repo public))) root
+        ** (skg (inactiveNode (id private-a) (repo private))) edited title
         This body edit should be rejected.
       "};
       let result =
@@ -589,7 +589,7 @@ async fn restricted_repo_search_and_save_work_together_end_to_end (
       assert_eq! (
         ids,
         vec![ID::from ("active-search-hit")],
-        "restricted search should only return active-source hits" );
+        "restricted search should only return active-repo hits" );
       let (rendered, _pids, _viewforest) : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view_with_repo_set (
           config, None,
@@ -601,9 +601,9 @@ async fn restricted_repo_search_and_save_work_together_end_to_end (
         "restricted content view must omit inactive members: {}",
         rendered );
       let edited_buffer = indoc! {"
-        * (skg (node (id root) (source public))) root
-        ** (skg (node (id active-a) (source public) writeProtected)) active-a
-        ** (skg (node (id active-b) (source public))) active-b edited through restricted view
+        * (skg (node (id root) (repo public))) root
+        ** (skg (node (id active-a) (repo public) writeProtected)) active-a
+        ** (skg (node (id active-b) (repo public))) active-b edited through restricted view
       "};
       let instructions : Vec<DefineNode> =
         buffer_to_validated_saveplan (
@@ -619,11 +619,11 @@ async fn restricted_repo_search_and_save_work_together_end_to_end (
          via the weave" );
       assert! (
         ! save_ids (&instructions) . contains (&ID::from ("private-a")),
-        "restricted save should not write inactive-source nodes" );
+        "restricted save should not write inactive-repo nodes" );
       assert_eq! (
         saved_node_by_id (&instructions, "active-b") . title,
         "active-b edited through restricted view",
-        "restricted save should still write active-source edits" );
+        "restricted save should still write active-repo edits" );
       Ok (( )) }
 
 #[test]
@@ -689,7 +689,7 @@ async fn containerward_expansion_truncates_before_inactive_container (
           RepoSetName::from ("public"))?;
       let mut viewforest : Tree<ViewNode> =
         viewforest_from_org (indoc! {"
-          * (skg (node (id child-for-backpath) (source public))) child-for-backpath
+          * (skg (node (id child-for-backpath) (repo public))) child-for-backpath
         "})?;
       let child_id : NodeId = first_child_id (&viewforest);
       build_and_integrate_containerward_path_with_repo_set (
@@ -729,7 +729,7 @@ async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks 
           RepoSetName::from ("public"))?;
       let mut viewforest : Tree<ViewNode> =
         viewforest_from_org (indoc! {"
-          * (skg (node (id child-with-fork) (source public))) child-with-fork
+          * (skg (node (id child-with-fork) (repo public))) child-with-fork
         "})?;
       let child_id : NodeId = first_child_id (&viewforest);
       integrate_path_that_might_fork_or_cycle_with_repo_set (
@@ -753,7 +753,7 @@ async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks 
 
       let mut empty_fork_viewforest : Tree<ViewNode> =
         viewforest_from_org (indoc! {"
-          * (skg (node (id child-with-fork) (source public))) child-with-fork
+          * (skg (node (id child-with-fork) (repo public))) child-with-fork
         "})?;
       let empty_fork_child_id : NodeId =
         first_child_id (&empty_fork_viewforest);
@@ -808,7 +808,7 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
     &[result_node . clone (), active_container . clone (),
       private_container . clone ()]);
   let index_dir : &str =
-    "/tmp/tantivy-test-source-sets-search-enrichment-truncation";
+    "/tmp/tantivy-test-repo-sets-search-enrichment-truncation";
   let (tantivy, _count) =
     wipe_then_init_tantivy_db (
       &[ result_node, active_container, private_container ],
@@ -844,9 +844,9 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
     "active ancestry should render: {}",
     rendered );
   assert! (
-    rendered . contains ("(sourceHerald ⌂:public)"),
-    "enriched search results should show the source herald at the \
-     source boundary (the active-source root): {}",
+    rendered . contains ("(homeRepoHerald ⌂:public)"),
+    "enriched search results should show the repo herald at the \
+     repo boundary (the active-repo root): {}",
     rendered );
   assert! (
     ! rendered . contains ("private-container"),
@@ -881,7 +881,7 @@ fn titles_by_ids_omits_inactive_repo_titles (
     Some (&"active-a" . to_string ()));
   assert! (
     ! titles . contains_key (&ID::from ("private-a")),
-    "inactive-source title lookup must omit private-a" );
+    "inactive-repo title lookup must omit private-a" );
   Ok (( )) }
 
 async fn stale_inactive_placeholders_under_folders_save_without_error (
@@ -892,10 +892,10 @@ async fn stale_inactive_placeholders_under_folders_save_without_error (
   // buffer. A buffer rendered before a repo-set switch can hold
   // InactiveNodes under folders; saving it must not error.
       let buffer = indoc! {"
-        * (skg (node (id root) (source public))) root
+        * (skg (node (id root) (repo public))) root
         ** (skg subscriberFolder)
-        *** (skg (inactiveNode (id private-a) (source private)))
-        ** (skg (node (id active-b) (source public) writeProtected)) active-b
+        *** (skg (inactiveNode (id private-a) (repo private)))
+        ** (skg (node (id active-b) (repo public) writeProtected)) active-b
       "};
       let active : ActiveRepoSet =
         ActiveRepoSet::named (
@@ -919,10 +919,10 @@ async fn inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to (
   // owner's subscribeeFolder. (root has no subscribes_to on disk, so the
   // active member is the only one written.)
       let buffer = indoc! {"
-        * (skg (node (id root) (source public))) root
+        * (skg (node (id root) (repo public))) root
         ** (skg subscribeeFolder)
-        *** (skg (inactiveNode (id private-a) (source private)))
-        *** (skg (node (id active-b) (source public) writeProtected)) active-b
+        *** (skg (inactiveNode (id private-a) (repo private)))
+        *** (skg (node (id active-b) (repo public) writeProtected)) active-b
       "};
       let active : ActiveRepoSet =
         ActiveRepoSet::named (
@@ -954,9 +954,9 @@ async fn weave_preserves_omitted_inactive_content_members (
         // The restricted buffer omits private-a; saving must keep it,
         // anchored after active-a.
         let buffer = indoc! {"
-          * (skg (node (id root) (source public))) root
-          ** (skg (node (id active-a) (source public) writeProtected)) active-a
-          ** (skg (node (id active-b) (source public) writeProtected)) active-b
+          * (skg (node (id root) (repo public))) root
+          ** (skg (node (id active-a) (repo public) writeProtected)) active-a
+          ** (skg (node (id active-b) (repo public) writeProtected)) active-b
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (
@@ -971,9 +971,9 @@ async fn weave_preserves_omitted_inactive_content_members (
       { // Reordering the visible members carries the anchored
         // invisible member with its anchor.
         let buffer = indoc! {"
-          * (skg (node (id root) (source public))) root
-          ** (skg (node (id active-b) (source public) writeProtected)) active-b
-          ** (skg (node (id active-a) (source public) writeProtected)) active-a
+          * (skg (node (id root) (repo public))) root
+          ** (skg (node (id active-b) (repo public) writeProtected)) active-b
+          ** (skg (node (id active-a) (repo public) writeProtected)) active-a
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (
@@ -988,8 +988,8 @@ async fn weave_preserves_omitted_inactive_content_members (
       { // Deleting a visible member lands; the invisible member
         // reattaches leftward (here, to START's successor region).
         let buffer = indoc! {"
-          * (skg (node (id root) (source public))) root
-          ** (skg (node (id active-b) (source public) writeProtected)) active-b
+          * (skg (node (id root) (repo public))) root
+          ** (skg (node (id active-b) (repo public) writeProtected)) active-b
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (
@@ -1025,9 +1025,9 @@ async fn restricted_save_preserves_invisible_override_targets (
         // (If the merge reproduces disk exactly the owner is a no-op and
         // emits no SaveNode -- which is itself preservation.)
         let unmodified = indoc! {"
-          * (skg (node (id ovr-owner) (source public))) ovr-owner
+          * (skg (node (id ovr-owner) (repo public))) ovr-owner
           ** (skg overriddenFolder)
-          *** (skg (node (id ovr-visible) (source public) writeProtected)) ovr-visible
+          *** (skg (node (id ovr-visible) (repo public) writeProtected)) ovr-visible
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (
@@ -1043,7 +1043,7 @@ async fn restricted_save_preserves_invisible_override_targets (
              target: {:?}", owner . overrides_view_of ); } }
       { // Delete the visible member: disk holds exactly [ovr-inactive].
         let deleted = indoc! {"
-          * (skg (node (id ovr-owner) (source public))) ovr-owner
+          * (skg (node (id ovr-owner) (repo public))) ovr-owner
           ** (skg overriddenFolder)
         "};
         let instructions : Vec<DefineNode> =

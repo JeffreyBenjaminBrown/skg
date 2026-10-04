@@ -1,4 +1,4 @@
--- Display-only source suffixes and confirmed broken-link styling in views.
+-- Display-only repo suffixes and confirmed broken-link styling in views.
 
 local client = require('skg.client')
 local heralds = require('skg.heralds')
@@ -140,7 +140,7 @@ end
 
 function M.paint (buf, positions)
   vim.api.nvim_buf_clear_namespace(buf, M.namespace, 0, -1)
-  local suffix_enabled = vim.b[buf].skg_link_source_suffix == true
+  local suffix_enabled = vim.b[buf].skg_link_repo_suffix == true
   for _, position in ipairs(positions) do
     local status = M.cache[position.id]
     local kind = status and status[1] or 'pending'
@@ -283,11 +283,11 @@ function M.disable (buf)
   vim.api.nvim_buf_clear_namespace(buf, M.namespace, 0, -1)
 end
 
-function M.toggle_source_overlay (buf)
+function M.toggle_repo_overlay (buf)
   buf = buf ~= 0 and buf or vim.api.nvim_get_current_buf()
   if not valid(buf) then error('This command needs an Skg view buffer') end
-  vim.b[buf].skg_link_source_suffix =
-    not (vim.b[buf].skg_link_source_suffix == true)
+  vim.b[buf].skg_link_repo_suffix =
+    not (vim.b[buf].skg_link_repo_suffix == true)
   M.refresh(buf)
 end
 

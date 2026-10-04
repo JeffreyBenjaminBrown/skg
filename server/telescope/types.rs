@@ -111,15 +111,15 @@ impl fmt::Display for TelescopeConstructionError {
       TelescopeConstructionError::MixedPid {
         expected, actual, repo } =>
         write! ( f,
-          "Telescope '{}' contains a section from source '{}' whose embedded pid is '{}'.",
+          "Telescope '{}' contains a section from repo '{}' whose embedded pid is '{}'.",
           expected, repo, actual ),
       TelescopeConstructionError::UnknownRepo { repo } =>
         write! ( f,
-          "Telescope contains a section from unconfigured source '{}'.",
+          "Telescope contains a section from unconfigured repo '{}'.",
           repo ),
       TelescopeConstructionError::DuplicateRepo { repo } =>
         write! ( f,
-          "Telescope contains more than one section from source '{}'.",
+          "Telescope contains more than one section from repo '{}'.",
           repo ),
       TelescopeConstructionError::OutOfOrder { previous, next } =>
         write! ( f,
@@ -355,7 +355,7 @@ impl std::fmt::Display for FoldWarning {
           anchor ),
       FoldWarning::DuplicateMember { member } =>
         write! ( f,
-          "member '{}' appeared in two sources; the more public occurrence won",
+          "member '{}' appeared in two repos; the more public occurrence won",
           member ),
       FoldWarning::TitleBelowHome { home, title_at } =>
         write! ( f,

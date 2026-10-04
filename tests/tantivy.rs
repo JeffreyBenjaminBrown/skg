@@ -802,14 +802,14 @@ fn test_title_by_id_returns_title_not_alias (
       &ID::new ("node-with-aliases") );
   assert_eq! (result . as_ref () . map ( |(t, _)| t . as_str () ),
     Some ("The Real Title"),
-    "title_and_source_by_id should return the title, not an alias");
+    "title_and_repo_by_id should return the title, not an alias");
   let missing : Option<(String, RepoName)> =
     title_and_repo_by_id (
       &tantivy_index,
       &ID::new ("nonexistent-id") );
   assert_eq! (missing, None,
-    "title_and_source_by_id should return None for missing IDs");
-  println! ("title_and_source_by_id test passed!");
+    "title_and_repo_by_id should return None for missing IDs");
+  println! ("title_and_repo_by_id test passed!");
   Ok (( )) }
 
 #[test]

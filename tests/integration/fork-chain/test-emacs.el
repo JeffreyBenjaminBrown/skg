@@ -1,7 +1,7 @@
 ;;; Integration test for the MOTIVATING override-chain case.
 ;;; Fork a foreign N into a public clone C (implicit fork), then run
 ;;; skg-fork-node on the DRAWN SUBSTITUTE C and rotate its clone to a
-;;; PRIVATE source, forming the chain D overrides C overrides N. Viewing
+;;; PRIVATE repo, forming the chain D overrides C overrides N. Viewing
 ;;; N's container then draws the chain end D, marked (overridesHere N),
 ;;; and the save accepts that chain-end carrier.
 
@@ -47,7 +47,7 @@
         (test-fail "P's view does not show foreign N:\n%s" (buffer-string)))
       ;; 2. Implicit fork: make N definitive and edit its title.
       (goto-char (point-min))
-      (unless (re-search-forward "^.*(id N) (source foreign).*$" nil t)
+      (unless (re-search-forward "^.*(id N) (repo foreign).*$" nil t)
         (test-fail "could not find N's headline:\n%s" (buffer-string)))
       (let* ((line (match-string 0))
              (edited (replace-regexp-in-string
@@ -61,11 +61,11 @@
                       (lambda () (get-buffer "*SKG Fork Confirmation*")) 10)))
     (unless confirm-buf (test-fail "no fork-confirmation for N appeared"))
     (with-current-buffer confirm-buf
-      ;; Pick the clone's source (required), then approve.
+      ;; Pick the clone's repo (required), then approve.
       (goto-char (point-min))
-      (re-search-forward "^\\* (skg (node (source ")
+      (re-search-forward "^\\* (skg (node (repo ")
       (beginning-of-line)
-      (skg--change-source-at-point "public")
+      (skg--change-repo-at-point "public")
       (skg-approve-fork)))
   (message "✓ foreign N forked into a public clone")
 
@@ -86,21 +86,21 @@
         (test-fail "could not find the drawn substitute:\n%s" (buffer-string)))
       (skg-fork-node)))
 
-  ;; 6. In the confirmation buffer, rotate the clone-to-be's source to
+  ;; 6. In the confirmation buffer, rotate the clone-to-be's repo to
   ;;    PRIVATE, then approve -> private D overrides C.
   (let ((confirm-buf (skg-test-wait-for
                       (lambda () (get-buffer "*SKG Fork Confirmation*")) 10)))
     (unless confirm-buf (test-fail "no fork-confirmation for the clone appeared"))
     (with-current-buffer confirm-buf
       (goto-char (point-min))
-      (unless (re-search-forward "^\\* (skg (node (source " nil t)
+      (unless (re-search-forward "^\\* (skg (node (repo " nil t)
         (test-fail "could not find the clone-to-be headline:\n%s" (buffer-string)))
       (beginning-of-line)
-      (skg--change-source-at-point "private")
+      (skg--change-repo-at-point "private")
       (skg-approve-fork)))
-  (message "✓ the public clone was forked into a private clone (source rotated)")
+  (message "✓ the public clone was forked into a private clone (repo rotated)")
 
-  ;; 7. Reopen P (all sources active): the chain end D -- a PRIVATE-source
+  ;; 7. Reopen P (all repos active): the chain end D -- a PRIVATE-repo
   ;;    node -- is now drawn in N's place, still marked (overridesHere N).
   (let ((p-buf (chain-test--reopen-P)))
     (let ((end-drawn
@@ -113,7 +113,7 @@
                     (while (re-search-forward "(overridesHere N)" nil t)
                       (let ((line (buffer-substring-no-properties
                                    (line-beginning-position) (line-end-position))))
-                        (when (string-match-p "(source private)" line)
+                        (when (string-match-p "(repo private)" line)
                           (throw 'found t))))
                     nil))))
             10)))

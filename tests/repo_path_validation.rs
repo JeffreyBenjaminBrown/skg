@@ -31,7 +31,7 @@ fn test_validate_existing_owned_repo() {
   let result : IoResult<()> =
     validate_repo_paths_creating_owned_ones_if_needed (&repos);
   assert!(result . is_ok(),
-          "Validation should pass for existing owned source");
+          "Validation should pass for existing owned repo");
 }
 
 #[test]
@@ -39,7 +39,7 @@ fn test_validate_nonexistent_owned_repo() {
   // Use a path that doesn't exist yet
   let temp_dir : TempDir = tempdir() . unwrap();
   let repo_path : PathBuf =
-    temp_dir . path() . join ("nonexistent_source");
+    temp_dir . path() . join ("nonexistent_repo");
 
   let mut repos : HashMap<RepoName, SkgfileRepo> =
     HashMap::new();
@@ -56,7 +56,7 @@ fn test_validate_nonexistent_owned_repo() {
   // Should succeed and create the directory
   let result : IoResult<()> =
     validate_repo_paths_creating_owned_ones_if_needed (&repos);
-  assert!(result . is_ok(), "Validation should pass and create directory for owned source");
+  assert!(result . is_ok(), "Validation should pass and create directory for owned repo");
   assert!(repo_path . exists(), "Directory should have been created");
 }
 
@@ -81,7 +81,7 @@ fn test_validate_existing_foreign_repo() {
   // Should succeed since directory exists
   let result : IoResult<()> =
     validate_repo_paths_creating_owned_ones_if_needed (&repos);
-  assert!(result . is_ok(), "Validation should pass for existing foreign source");
+  assert!(result . is_ok(), "Validation should pass for existing foreign repo");
 }
 
 #[test]
@@ -106,7 +106,7 @@ fn test_validate_nonexistent_foreign_repo() {
   // Should fail since foreign repo path doesn't exist
   let result : IoResult<()> =
     validate_repo_paths_creating_owned_ones_if_needed (&repos);
-  assert!(result . is_err(), "Validation should fail for nonexistent foreign source");
+  assert!(result . is_err(), "Validation should fail for nonexistent foreign repo");
 
   let err : IoError = result . unwrap_err();
   assert_eq!(err . kind(), IoErrorKind::NotFound);
@@ -149,7 +149,7 @@ fn test_validate_multiple_repos() {
   // Should succeed, creating the new directory
   let result : IoResult<()> =
     validate_repo_paths_creating_owned_ones_if_needed (&repos);
-  assert!(result . is_ok(), "Validation should pass for multiple sources");
+  assert!(result . is_ok(), "Validation should pass for multiple repos");
   assert!(existing_path . exists(), "Existing path should still exist");
   assert!(new_owned_path . exists(), "New owned path should have been created");
 }
@@ -191,7 +191,7 @@ fn test_validate_multiple_repos_with_foreign_failure() {
   let result : IoResult<()> =
     validate_repo_paths_creating_owned_ones_if_needed (&repos);
   assert!(result . is_err(),
-          "Validation should fail when foreign source doesn't exist");
+          "Validation should fail when foreign repo doesn't exist");
 
   let err : IoError = result . unwrap_err();
   assert_eq!(err . kind(), IoErrorKind::NotFound);

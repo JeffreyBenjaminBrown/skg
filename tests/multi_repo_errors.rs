@@ -23,17 +23,17 @@ fn test_multi_repo_errors() -> Result<(), Box<dyn Error>> {
     let mut config: SkgConfig =
       load_config(
         "tests/multi_repo_errors/fixtures/skgconfig.toml")?;
-    config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-source-errors-1");
+    config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-repo-errors-1");
 
 
     // Test buffer with multiple error conditions
     // Comments indicate the expected error for each line/group
     let buffer_with_errors: &str =
       indoc! {"
-        * (skg (node (id pub-1))) pub-1                                      # root with no source
-        * (skg (node (id dub-1) (source dub))) dub-1                         # source does not exist
-        * (skg (node (id priv-1) (source public))) priv-1 # This line includes an error, mismatch between buffer and disk sources, which is not caught yet, but it is caught by 'buffer_to_validated_saveplan', as verified by 'test_reconciliation_errors'.
-        * (skg (node (id priv-1) (source private))) priv-1                   # error: multiple defining viewnodes for this id
+        * (skg (node (id pub-1))) pub-1                                      # root with no repo
+        * (skg (node (id dub-1) (repo dub))) dub-1                         # repo does not exist
+        * (skg (node (id priv-1) (repo public))) priv-1 # This line includes an error, mismatch between buffer and disk repos, which is not caught yet, but it is caught by 'buffer_to_validated_saveplan', as verified by 'test_reconciliation_errors'.
+        * (skg (node (id priv-1) (repo private))) priv-1                   # error: multiple defining viewnodes for this id
       "};
     let buffer_text: String =
       strip_org_comments (buffer_with_errors);
@@ -47,7 +47,7 @@ fn test_multi_repo_errors() -> Result<(), Box<dyn Error>> {
 
     { // Repo validation errors: one for dub-1 (nonexistent repo "dub")
       // and one for pub-1 (no repo at all).
-      let repo_re = Regex::new(r"(?i)activenod.*must.*source") . unwrap();
+      let repo_re = Regex::new(r"(?i)activenod.*must.*repo") . unwrap();
       let repo_errors: Vec<&BufferValidationError>
       = ( errors . iter()
           . filter(
@@ -55,15 +55,15 @@ fn test_multi_repo_errors() -> Result<(), Box<dyn Error>> {
                          if repo_re . is_match (msg)))
           . collect() );
       assert_eq!(repo_errors . len(), 2,
-                 "Expected 2 source validation errors (pub-1 and dub-1)");
+                 "Expected 2 repo validation errors (pub-1 and dub-1)");
       let ids: Vec<&str> = repo_errors . iter()
         . filter_map(|e| {
           if let BufferValidationError::LocalStructureViolation(_, id) = e {
             Some(id . 0 . as_str())
           } else { None } })
         . collect();
-      assert!(ids . contains(&"dub-1"), "Source error should include dub-1");
-      assert!(ids . contains(&"pub-1"), "Source error should include pub-1"); }
+      assert!(ids . contains(&"dub-1"), "Repo error should include dub-1");
+      assert!(ids . contains(&"pub-1"), "Repo error should include pub-1"); }
 
     { let multiple_defining_errors: Vec<&BufferValidationError>
       = ( errors . iter()
@@ -81,13 +81,13 @@ fn test_multi_repo_errors() -> Result<(), Box<dyn Error>> {
             |e| matches!(e, BufferValidationError::InconsistentRepos(_, _)))
           . collect() );
       assert_eq!(inconsistent_repo_errors . len(), 1,
-                 "Expected exactly 1 InconsistentSources error for priv-1");
+                 "Expected exactly 1 InconsistentRepos error for priv-1");
       if let BufferValidationError::InconsistentRepos(id, repos) = inconsistent_repo_errors[0] {
-        assert_eq!(id . 0, "priv-1", "InconsistentSources should be for priv-1");
-        assert_eq!(repos . len(), 2, "Should have 2 different sources for priv-1"); }}
+        assert_eq!(id . 0, "priv-1", "InconsistentRepos should be for priv-1");
+        assert_eq!(repos . len(), 2, "Should have 2 different repos for priv-1"); }}
 
     assert_eq!(errors . len(), 4,
-               "Expected exactly 4 errors: 2 LocalStructureViolation (source errors), 1 Multiple_Defining_Viewnodes, 1 InconsistentSources");
+               "Expected exactly 4 errors: 2 LocalStructureViolation (repo errors), 1 Multiple_Defining_Viewnodes, 1 InconsistentRepos");
 
     cleanup_test_tantivy(
       Some(config . tantivy_folder . as_path())
@@ -101,23 +101,23 @@ fn test_foreign_node_modification_errors(
     let mut config: SkgConfig =
       load_config(
         "tests/multi_repo_errors/fixtures/skgconfig.toml")?;
-    config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-source-errors-2");
+    config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-repo-errors-2");
 
     // Test 1: Foreign node modifications
     // (all other errors removed so initial validation passes)
     // Each line tests a different type of modification to get separate error reports
     {
       let buffer_with_errors: &str = indoc! {"
-        * (skg (node (id ext-1) (source ext))) ext-1
+        * (skg (node (id ext-1) (repo ext))) ext-1
         ** (skg aliasFolder) aliases         # edit to aliases (set to empty)
-        * (skg (node (id ext-2) (source ext))) ext-2-edited           # edit to title
-        * (skg (node (id ext-3) (source ext))) ext-3
+        * (skg (node (id ext-2) (repo ext))) ext-2-edited           # edit to title
+        * (skg (node (id ext-3) (repo ext))) ext-3
         new body                                               # edit to body
-        * (skg (node (id ext-4) (source ext))) ext-4                  # edit to content
-        ** (skg (node (id ext-5) (source ext))) ext-5
-        * (skg (node (id ext-new) (source ext))) ext-new              # add new node to foreign source
-        * (skg (node (id ext-6) (source ext) (editRequest delete))) ext-6  # delete from foreign source
-        * (skg (node (id ext-7) (source ext) (editRequest delete))) ext-7  # delete with body modification
+        * (skg (node (id ext-4) (repo ext))) ext-4                  # edit to content
+        ** (skg (node (id ext-5) (repo ext))) ext-5
+        * (skg (node (id ext-new) (repo ext))) ext-new              # add new node to foreign repo
+        * (skg (node (id ext-6) (repo ext) (editRequest delete))) ext-6  # delete from foreign repo
+        * (skg (node (id ext-7) (repo ext) (editRequest delete))) ext-7  # delete with body modification
         Different body.
       "}; // note that nothing is wrong with ext-5
 
@@ -191,8 +191,8 @@ fn test_foreign_node_modification_errors(
     // Pipeline short-circuits on modification errors, so this tests merge errors separately
     {
       let buffer_with_merges: &str = indoc! {"
-        * (skg (node (id pub-1) (source public) (editRequest (merge ext-8)))) pub-1  # merge into foreign acquirer (ext-8)
-        * (skg (node (id ext-9) (source ext) (editRequest (merge pub-2)))) ext-9     # merge foreign acquiree (would delete ext-9)
+        * (skg (node (id pub-1) (repo public) (editRequest (merge ext-8)))) pub-1  # merge into foreign acquirer (ext-8)
+        * (skg (node (id ext-9) (repo ext) (editRequest (merge pub-2)))) ext-9     # merge foreign acquiree (would delete ext-9)
       "};
 
       let buffer_text: String = strip_org_comments(
@@ -253,7 +253,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     // Load the multi-repo fixture config.
     let mut config: SkgConfig = load_config(
       "tests/multi_repo_errors/fixtures/skgconfig.toml")?;
-    config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-source-errors-3");
+    config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-repo-errors-3");
 
 
     // Test 1: Repo move between owned repos is now allowed
@@ -261,7 +261,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     // Both repos are owned, so this should succeed (producing a RepoMove).
     {
       let buffer_with_move: &str = indoc! {"
-        * (skg (node (id priv-1) (source public))) priv-1  # disk has 'private', buffer says 'public'
+        * (skg (node (id priv-1) (repo public))) priv-1  # disk has 'private', buffer says 'public'
       "};
 
       let buffer_text: String =
@@ -273,12 +273,12 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         None ) ;
 
       assert!(result . is_ok(),
-              "Source move between owned sources should succeed, got: {:?}",
+              "Repo move between owned repos should succeed, got: {:?}",
               result . err());
 
       let ( _viewforest, save_plan, _warnings ) = result?;
       assert_eq!(save_plan . repo_moves . len(), 1,
-                 "Expected exactly 1 source move");
+                 "Expected exactly 1 repo move");
       assert_eq!(save_plan . repo_moves[0] . pid . 0, "priv-1");
       assert_eq!(save_plan . repo_moves[0] . old_repo . as_str(), "private");
       assert_eq!(save_plan . repo_moves[0] . new_repo . as_str(), "public");
@@ -288,8 +288,8 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     // Two instances of pub-1 with different repos (validation should catch this)
     {
       let buffer_with_inconsistent_repos: &str = indoc! {"
-        * (skg (node (id pub-1) (source public))) pub-1                # definitive instance with 'public'
-        * (skg (node (id pub-1) (source private) writeProtected)) pub-1  # write-protected instance with 'private'
+        * (skg (node (id pub-1) (repo public))) pub-1                # definitive instance with 'public'
+        * (skg (node (id pub-1) (repo private) writeProtected)) pub-1  # write-protected instance with 'private'
       "};
 
       let buffer_text: String =
@@ -301,9 +301,9 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         &config,
         None ) ;
 
-      println!("\n=== InconsistentSources test ===");
+      println!("\n=== InconsistentRepos test ===");
 
-      assert!(result . is_err(), "Expected InconsistentSources error");
+      assert!(result . is_err(), "Expected InconsistentRepos error");
 
       if let Err (e) = result {
         println!("Error: {:?}", e);
@@ -315,8 +315,8 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
               . filter(|e| matches!(e, BufferValidationError::InconsistentRepos(_, _)))
               . collect();
             assert!(!repo_errors . is_empty(),
-                    "Expected InconsistentSources error in validation");
-            println!("Successfully caught InconsistentSources error during validation");
+                    "Expected InconsistentRepos error in validation");
+            println!("Successfully caught InconsistentRepos error during validation");
           }
           _ => panic!("Expected BufferValidationErrors, got: {:?}", e),
         }

@@ -122,7 +122,7 @@ but skg-content-view-mode is lost."
       (kill-buffer buf))))
 
 (ert-deftest test-same-name-content-views-do-not-overwrite-each-other ()
-  "A same-name view gets a numeric suffix when sources cannot distinguish it."
+  "A same-name view gets a numeric suffix when repos cannot distinguish it."
   (let (first second)
     (unwind-protect
         (progn
@@ -142,20 +142,20 @@ but skg-content-view-mode is lost."
       (when (buffer-live-p first) (kill-buffer first))
       (when (buffer-live-p second) (kill-buffer second)))))
 
-(ert-deftest test-same-title-different-sources-qualify-both-buffer-names ()
-  "Different root sources are more informative than numeric suffixes."
+(ert-deftest test-same-title-different-repos-qualify-both-buffer-names ()
+  "Different root repos are more informative than numeric suffixes."
   (let (public cheese)
     (unwind-protect
         (progn
           (setq public
                 (test--make-skg-buffer
                  "*cooking*"
-                 "* (skg (node (id public-id) (source public))) cooking\n"
+                 "* (skg (node (id public-id) (repo public))) cooking\n"
                  "uri-public"))
           (setq cheese
                 (test--make-skg-buffer
                  "*cooking*"
-                 "* (skg (node (id cheese-id) (source Cheese))) cooking\n"
+                 "* (skg (node (id cheese-id) (repo Cheese))) cooking\n"
                  "uri-cheese"))
           (should (equal (buffer-name public) "*cooking* <public>"))
           (should (equal (buffer-name cheese) "*cooking* <Cheese>"))
@@ -175,7 +175,7 @@ but skg-content-view-mode is lost."
           (setq opened
                 (test--make-skg-buffer
                  "*occupied-title*"
-                 "* (skg (node (id x) (source public))) occupied title\n"
+                 "* (skg (node (id x) (repo public))) occupied title\n"
                  "uri-new"))
           (should-not (eq unrelated opened))
           (should (equal (buffer-name opened) "*occupied-title*<2>"))

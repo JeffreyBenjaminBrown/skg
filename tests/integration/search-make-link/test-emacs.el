@@ -99,7 +99,7 @@ park point on that blank line. Return the point position."
       (skg-search-make-link-finish))))
 
 (defun verify-link-on-its-own-line (source-buf)
-  "Verify that SOURCE-BUF has a [[id:target][...]] link followed by
+  "Verify that REPO-BUF has a [[id:target][...]] link followed by
 its own newline, with the child's `** child node' headline still
 intact on the next line — i.e. the link did NOT eat the blank
 line's trailing newline."

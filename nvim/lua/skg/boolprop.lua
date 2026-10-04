@@ -61,7 +61,7 @@ local function apply (root_line, desired, recursive)
     return
   end
   local owned = {}
-  for _, name in ipairs(config.owned_sources() or {}) do owned[name] = true end
+  for _, name in ipairs(config.owned_repos() or {}) do owned[name] = true end
   local seen, skipped, changed = {}, {}, 0
   for _, line in ipairs(recursive_targets(root_line)) do
     local meta = metadata.metadata_sexp_at_line_or_nil(line)
@@ -71,7 +71,7 @@ local function apply (root_line, desired, recursive)
     elseif seen[id] then reason = 'duplicate occurrence'
     elseif metadata.node_write_protected_p(meta) then reason = 'write-protected'
     elseif edit_request_p(meta) then reason = 'already has an editRequest'
-    elseif not owned[metadata.node_source(meta)] then reason = 'foreign source' end
+    elseif not owned[metadata.node_repo(meta)] then reason = 'foreign repo' end
     if reason == 'duplicate occurrence' then
       -- A PID already stamped is intentionally silent.
     elseif reason then

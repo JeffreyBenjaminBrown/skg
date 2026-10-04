@@ -31,15 +31,15 @@ fn collected_from_org (
 fn lowering_produces_ordered_definenodes_and_signals () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id root) (source main))) root
+      * (skg (node (id root) (repo main))) root
       Root body
       ** (skg aliasFolder) aliases
       *** (skg alias) nickname
-      ** (skg (node (id child) (source main))) child
+      ** (skg (node (id child) (repo main))) child
       ** (skg subscribeeFolder)
-      *** (skg (node (id e) (source main))) e
-      **** (skg (node (id visible) (source main))) visible
-      * (skg (node (id doomed) (source main) (editRequest delete))) doomed
+      *** (skg (node (id e) (repo main))) e
+      **** (skg (node (id visible) (repo main))) visible
+      * (skg (node (id doomed) (repo main) (editRequest delete))) doomed
       "} );
   let LoweringOutput { intents, visibility, .. } =
     lower_collected_intents (collected) . unwrap();
@@ -87,9 +87,9 @@ fn lowering_produces_ordered_definenodes_and_signals () {
 fn nodeMerge_pairs_come_from_the_map_in_order () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id a) (source main) (editRequest (merge x)))) a
-      * (skg (node (id b) (source main))) b
-      * (skg (node (id c) (source main) (editRequest (merge y)))) c
+      * (skg (node (id a) (repo main) (editRequest (merge x)))) a
+      * (skg (node (id b) (repo main))) b
+      * (skg (node (id c) (repo main) (editRequest (merge y)))) c
       "} );
   assert_eq!(
     nodeMerge_pairs (&collected),

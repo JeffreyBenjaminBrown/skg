@@ -45,7 +45,7 @@ pub fn initialize_dbs (
   config : &SkgConfig,
 ) -> (SkgEnv, InitContextHandoff, Vec<NodeComplete>) {
   retire_stale_tantivy_generation_directories (&config . tantivy_folder);
-  tracing::info! ("Reading authoritative .skg files from all sources...");
+  tracing::info! ("Reading authoritative .skg files from all repos...");
   let (nodes, load_violations)
     : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
     read_all_skg_files_from_repos_collecting_violations (config)

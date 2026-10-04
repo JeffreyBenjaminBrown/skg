@@ -46,11 +46,11 @@ async fn merge_container_into_content_impl (
   // The input buffer: a content view of 'a',
   // with aa requesting to merge a into itself.
   let input_org_text : &str = indoc! {"
-    * (skg (node (id a) (source main))) a
-    ** (skg (node (id aa) (source main) (editRequest (merge a)))) aa
-    *** (skg (node (id x) (source main))) x
-    ** (skg (node (id b) (source main))) b
-    ** (skg (node (id c) (source main))) c
+    * (skg (node (id a) (repo main))) a
+    ** (skg (node (id aa) (repo main) (editRequest (merge a)))) aa
+    *** (skg (node (id x) (repo main))) x
+    ** (skg (node (id b) (repo main))) b
+    ** (skg (node (id c) (repo main))) c
   "};
 
   let graph : InRustGraphHandle =
@@ -127,7 +127,7 @@ async fn merge_container_into_content_impl (
         preserver_nodecomplete . title )); }
     if preserver_nodecomplete . home_repo != RepoName::from ("main") {
       failures . push ( format!(
-        "Text preserver source should be 'main', got '{:?}'",
+        "Text preserver repo should be 'main', got '{:?}'",
         preserver_nodecomplete . home_repo )); }
     if !preserver_nodecomplete . contains . is_empty() {
       failures . push ( format!(

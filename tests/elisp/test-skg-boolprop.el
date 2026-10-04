@@ -22,7 +22,7 @@
 (ert-deftest test-skg-boolprop-stamps-exact-set-and-clear-requests ()
   (dolist (case '((t true) (nil false)))
     (with-temp-buffer
-      (insert "* (skg (node (id root) (source main))) root")
+      (insert "* (skg (node (id root) (repo main))) root")
       (org-mode)
       (goto-char (point-min))
       (skg--stamp-search-matching-request (car case))
@@ -31,20 +31,20 @@
 (ert-deftest test-skg-boolprop-recursion-prunes-and-skips ()
   (with-temp-buffer
     (insert
-     "* (skg (node (id root) (source main))) root\n"
-     "** (skg (node (id child) (source main))) child\n"
-     "** (skg (node (id child) (source main))) duplicate child\n"
-     "** (skg (node (id protected) (source main) writeProtected)) protected\n"
-     "** (skg (node (id foreign) (source elsewhere))) foreign\n"
-     "** (skg (node (id conflict) (source main) (editRequest delete))) conflict\n"
-     "** (skg (node (id link) (source main) (affectsParent false))) link\n"
-     "*** (skg (node (id under-link) (source main))) under link\n"
+     "* (skg (node (id root) (repo main))) root\n"
+     "** (skg (node (id child) (repo main))) child\n"
+     "** (skg (node (id child) (repo main))) duplicate child\n"
+     "** (skg (node (id protected) (repo main) writeProtected)) protected\n"
+     "** (skg (node (id foreign) (repo elsewhere))) foreign\n"
+     "** (skg (node (id conflict) (repo main) (editRequest delete))) conflict\n"
+     "** (skg (node (id link) (repo main) (affectsParent false))) link\n"
+     "*** (skg (node (id under-link) (repo main))) under link\n"
      "** (skg aliasFolder) aliases\n"
-     "*** (skg (node (id under-folder) (source main))) under folder\n"
-     "* (skg (node (id sibling) (source main))) sibling")
+     "*** (skg (node (id under-folder) (repo main))) under folder\n"
+     "* (skg (node (id sibling) (repo main))) sibling")
     (org-mode)
     (goto-char (point-min))
-    (cl-letf (((symbol-function 'skg--owned-sources)
+    (cl-letf (((symbol-function 'skg--owned-repos)
                (lambda () '("main"))))
       (skg--stage-boolprop-search-matching-recursive t))
     (should (test-skg-boolprop--has-request-p 1 'true))
@@ -57,7 +57,7 @@
   (dolist (case '(("false" "search matching" "no search matching" true)
                   ("true" "no search matching" "search matching" false)))
     (with-temp-buffer
-      (insert "* (skg (node (id root) (source main))) root")
+      (insert "* (skg (node (id root) (repo main))) root")
       (org-mode)
       (goto-char (point-min))
       (let ((buffer (current-buffer))
@@ -75,7 +75,7 @@
                    (lambda () (setq save-count (1+ save-count)))))
           (skg--set-boolprop-search-matching-from-state
            buffer marker "root" nil
-           (format "((response-type property-state) (id \"root\") (property \"noSearchMatching\") (value \"%s\") (source \"main\") (user-owned \"true\"))"
+           (format "((response-type property-state) (id \"root\") (property \"noSearchMatching\") (value \"%s\") (repo \"main\") (user-owned \"true\"))"
                    (car case))))
         (should (equal initial (cadr case)))
         (should (test-skg-boolprop--has-request-p 1 (nth 3 case)))
@@ -84,7 +84,7 @@
 (ert-deftest test-skg-boolprop-state-response-refuses-a-vanished-buffer ()
   (let ((buffer (generate-new-buffer " *skg-boolprop-stale*")) marker)
     (with-current-buffer buffer
-      (insert "* (skg (node (id root) (source main))) root")
+      (insert "* (skg (node (id root) (repo main))) root")
       (org-mode)
       (goto-char (point-min))
       (setq marker (point-marker)))
@@ -100,9 +100,9 @@
 
 (ert-deftest test-skg-boolprop-root-refusals-and-key-bindings ()
   (dolist (metadata
-           '((skg (node (source main)))
-             (skg (node (id root) (source main) writeProtected))
-             (skg (node (id root) (source main) (editRequest delete)))))
+           '((skg (node (repo main)))
+             (skg (node (id root) (repo main) writeProtected))
+             (skg (node (id root) (repo main) (editRequest delete)))))
     (should-error (skg--boolprop-eligible-root-id metadata)
                   :type 'user-error))
   (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c l p"))

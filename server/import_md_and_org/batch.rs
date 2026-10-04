@@ -68,7 +68,7 @@ pub fn prepare_import_batch_with (
       return Err ("Host root must be an absolute path" . to_string ()); } }
   let runtime = env . runtime_snapshot ();
   if ! runtime . config . user_owns_repo (destination_repo) {
-    return Err (format! ("Destination source {} is absent or not owned",
+    return Err (format! ("Destination repo {} is absent or not owned",
       destination_repo)); }
   let mut documents : Vec<ParsedDocument> = discover_documents (input_directory)?;
   refuse_documents_with_errors (&documents)?;
@@ -126,7 +126,7 @@ impl PreparedImportBatch {
     &self,
   ) -> String {
     let mut out : String = format! (
-      "* Import preview\nImport directory: {}\nDestination source: {} (determines privacy)\nHost root: {}\n",
+      "* Import preview\nImport directory: {}\nDestination repo: {} (determines privacy)\nHost root: {}\n",
       self . input_directory . display (), self . destination_repo,
       self . host_root . as_ref () . map (|path| path . display () . to_string ())
         . unwrap_or_else (|| "none" . to_string ()));
@@ -167,7 +167,7 @@ impl PreparedImportBatch {
     let runtime = env . runtime_snapshot ();
     if *runtime . config != *self . config ||
       ! runtime . config . user_owns_repo (&self . destination_repo) {
-      return Err ("Configuration or source ownership changed; preview again"
+      return Err ("Configuration or repo ownership changed; preview again"
         . to_string ()); }
     let current : Vec<ParsedDocument> = discover_documents (&self . input_directory)?;
     if current . len () != self . documents . len () ||
@@ -176,7 +176,7 @@ impl PreparedImportBatch {
           now . text != before . text) {
       return Err ("Input files changed; preview again" . to_string ()); }
     if repo_file_evidence (&runtime . config)? != self . destination_evidence {
-      return Err ("Configured source files changed; preview again" . to_string ()); }
+      return Err ("Configured repo files changed; preview again" . to_string ()); }
     let existing : Vec<NodeComplete> =
       existing_authoritative_nodes (&runtime . config)?;
     ensure_runtime_matches_disk (&existing, &runtime . graph)?;
@@ -225,7 +225,7 @@ fn configured_identity_map (
       ids . insert (extra . 0 . clone (), node . pid . clone ()); } }
   for repo in runtime . config . ordered_repos () {
     let sections = read_skg_sections_from_folder (&repo, &runtime . config)
-      .map_err (|error| format! ("Reading source {}: {}", repo, error))?;
+      .map_err (|error| format! ("Reading repo {}: {}", repo, error))?;
     for (_, section) in sections {
       ids . insert (section . pid . 0 . clone (), section . pid . clone ());
       for extra in &section . extra_ids {
@@ -237,7 +237,7 @@ fn existing_authoritative_nodes (
   config : &SkgConfig,
 ) -> Result<Vec<NodeComplete>, String> {
   read_all_skg_files_from_repos_read_only (config)
-    . map_err (|error| format! ("Reading configured sources: {}", error))
+    . map_err (|error| format! ("Reading configured repos: {}", error))
 }
 
 fn ensure_runtime_matches_disk (
@@ -252,7 +252,7 @@ fn ensure_runtime_matches_disk (
       normalized_for_runtime_comparison (complete_from_rust (node))))
     .collect ();
   if disk != runtime {
-    return Err ("Configured source files differ from the runtime graph; rebuild and preview again"
+    return Err ("Configured repo files differ from the runtime graph; rebuild and preview again"
       . to_string ()); }
   Ok (())
 }
@@ -273,9 +273,9 @@ fn repo_file_evidence (
   let mut files : BTreeMap<PathBuf, Vec<u8>> = BTreeMap::new ();
   for repo_name in config . ordered_repos () {
     let repo = config . repos . get (&repo_name)
-      . ok_or_else (|| format! ("Configured source {} disappeared", repo_name))?;
+      . ok_or_else (|| format! ("Configured repo {} disappeared", repo_name))?;
     let entries = fs::read_dir (&repo . path)
-      .map_err (|error| format! ("Reading source {}: {}", repo_name, error))?;
+      .map_err (|error| format! ("Reading repo {}: {}", repo_name, error))?;
     for entry in entries {
       let entry = entry . map_err (|error| error . to_string ())?;
       let path : PathBuf = entry . path ();
@@ -338,7 +338,7 @@ fn import_record_body (
   time : &str,
 ) -> String {
   let mut body : String = format! (
-    "Input directory: {}\nHost root: {}\nDestination source: {}\nUTC execution time: {}\n\nImported documents:",
+    "Input directory: {}\nHost root: {}\nDestination repo: {}\nUTC execution time: {}\n\nImported documents:",
     input_directory . display (),
     host_root . map (|path| path . display () . to_string ())
       .unwrap_or_else (|| "none" . to_string ()),
@@ -381,7 +381,7 @@ mod tests {
   fn imports_empty_and_nonempty_documents_as_one_additive_batch () {
     let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
     let input : PathBuf = temp . path () . join ("input");
-    let repo : PathBuf = temp . path () . join ("source");
+    let repo : PathBuf = temp . path () . join ("repo");
     fs::create_dir (&input) . unwrap ();
     fs::create_dir (&repo) . unwrap ();
     fs::write (input . join ("empty.md"), "") . unwrap ();
@@ -432,7 +432,7 @@ mod tests {
   fn heading_inside_a_block_refuses_the_preview () {
     let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
     let input : PathBuf = temp . path () . join ("input");
-    let repo : PathBuf = temp . path () . join ("source");
+    let repo : PathBuf = temp . path () . join ("repo");
     fs::create_dir (&input) . unwrap ();
     fs::create_dir (&repo) . unwrap ();
     fs::write (input . join ("bad.org"),
@@ -449,7 +449,7 @@ mod tests {
   fn changed_input_refuses_approval_without_writes () {
     let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
     let input : PathBuf = temp . path () . join ("input");
-    let repo : PathBuf = temp . path () . join ("source");
+    let repo : PathBuf = temp . path () . join ("repo");
     fs::create_dir (&input) . unwrap ();
     fs::create_dir (&repo) . unwrap ();
     fs::write (input . join ("a.md"), "original") . unwrap ();
@@ -472,7 +472,7 @@ mod tests {
   fn added_destination_file_makes_preview_stale () {
     let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
     let input : PathBuf = temp . path () . join ("input");
-    let repo : PathBuf = temp . path () . join ("source");
+    let repo : PathBuf = temp . path () . join ("repo");
     fs::create_dir (&input) . unwrap ();
     fs::create_dir (&repo) . unwrap ();
     fs::write (input . join ("a.md"), "original") . unwrap ();
@@ -487,7 +487,7 @@ mod tests {
     let gate = env . mutation_gate ();
     let _guard = futures::executor::block_on (gate . lock ());
     assert! (prepared . apply_under_mutation_gate (&env) . unwrap_err ()
-      . contains ("Configured source files changed"));
+      . contains ("Configured repo files changed"));
     assert_eq! (fs::read_to_string (&foreign) . unwrap (), "external change");
     assert_eq! (env . runtime_snapshot () . graph . len (), 0);
   }
@@ -496,7 +496,7 @@ mod tests {
   fn export_path_collision_and_foreign_destination_refuse_preflight () {
     let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
     let input : PathBuf = temp . path () . join ("input");
-    let repo : PathBuf = temp . path () . join ("source");
+    let repo : PathBuf = temp . path () . join ("repo");
     fs::create_dir (&input) . unwrap ();
     fs::create_dir (&repo) . unwrap ();
     fs::write (input . join ("guide.md"), "Markdown") . unwrap ();
@@ -516,7 +516,7 @@ mod tests {
   fn real_export_after_mixed_import_keeps_originals_and_emits_org_paths () {
     let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
     let input : PathBuf = temp . path () . join ("input");
-    let repo : PathBuf = temp . path () . join ("source");
+    let repo : PathBuf = temp . path () . join ("repo");
     let output : PathBuf = temp . path () . join ("output");
     fs::create_dir (&input) . unwrap ();
     fs::create_dir (&repo) . unwrap ();

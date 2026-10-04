@@ -18,7 +18,7 @@
 ;;
 
 (defconst skg-activeNode--canonical-field-order
-  '("id" "source"
+  '("id" "repo"
     "writeProtected" "affectsParent" "birth" "editRequest" "viewRequests")
   "Canonical order for node fields. Fields not in this list go last.")
 
@@ -56,20 +56,20 @@
 ;;
 
 (defun skg-activeNode-expand-defaults-in-org
-    (org-text &optional default-source display-title)
+    (org-text &optional default-repo display-title)
   "Expand default fields in ORG-TEXT for ActiveNode metadata editing.
 Parses org text to headlines, finds the ** node section,
 reorders fields to canonical order, inserts missing editable
 fields with defaults, and expands bare boolean atoms to have
 a value child.
-If DEFAULT-SOURCE is non-nil, insert it as the source default
-and mark existing source values that match it with '(default)'.
+If DEFAULT-REPO is non-nil, insert it as the repo default
+and mark existing repo values that match it with '(default)'.
 If DISPLAY-TITLE is non-nil and non-empty, prepend a read-only
 title display group."
   (let* ((lines (split-string org-text "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
          (expanded (skg-activeNode--expand-headlines
-                    headlines default-source))
+                    headlines default-repo))
          (with-title
           (skg-activeNode--maybe-prepend-title
            expanded display-title)))
@@ -84,9 +84,9 @@ title display group."
               headlines)
     headlines))
 
-(defun skg-activeNode--expand-headlines (headlines &optional default-source)
+(defun skg-activeNode--expand-headlines (headlines &optional default-repo)
   "Expand HEADLINES by reordering fields and inserting defaults.
-DEFAULT-SOURCE, if non-nil, is used for source field defaults.
+DEFAULT-REPO, if non-nil, is used for repo field defaults.
 Returns a new headline list."
   (let* ((node-idx (skg-activeNode--find-node-headline headlines))
          (node-level (car (nth node-idx headlines)))
@@ -98,7 +98,7 @@ Returns a new headline list."
          (remainder (cdr groups))
          (expanded-children
           (skg-activeNode--expand-and-reorder
-           children child-level default-source)))
+           children child-level default-repo)))
     (append before-node expanded-children remainder)))
 
 (defun skg-activeNode--find-node-headline (headlines)
@@ -144,11 +144,11 @@ headline groups, each being a list of headlines."
     (cons (nreverse children) rest)))
 
 (defun skg-activeNode--expand-and-reorder (children child-level
-                                        &optional default-source)
+                                        &optional default-repo)
   "Reorder CHILDREN to canonical order and insert missing defaults.
 CHILDREN is a list of headline groups. CHILD-LEVEL is the level
-for field headlines. DEFAULT-SOURCE, if non-nil, is used for
-source field defaults. Returns a flat list of headlines."
+for field headlines. DEFAULT-REPO, if non-nil, is used for
+repo field defaults. Returns a flat list of headlines."
   (let* ((field-map (skg-activeNode--children-to-field-map children))
          (canonical skg-activeNode--canonical-field-order)
          (known-fields (mapcar #'car skg-activeNode--editable-defaults))
@@ -165,7 +165,7 @@ source field defaults. Returns a flat list of headlines."
                       (append ordered
                               (skg-activeNode--maybe-expand-field
                                group child-level field-name
-                               default-source)))))
+                               default-repo)))))
           ;; Insert default if it's an editable field
           (cond
            ((member field-name known-fields)
@@ -178,14 +178,14 @@ source field defaults. Returns a flat list of headlines."
                             (list (cons child-level field-name)
                                   (cons (1+ child-level)
                                         default-val))))))
-           ;; Insert default source if missing and default-source given
-           ((and (string= field-name "source") default-source)
+           ;; Insert default repo if missing and default-repo given
+           ((and (string= field-name "repo") default-repo)
             (push field-name seen)
             (setq ordered
                   (append ordered
-                          (list (cons child-level "source")
+                          (list (cons child-level "repo")
                                 (cons (1+ child-level)
-                                      (concat default-source
+                                      (concat default-repo
                                               " (default)"))))))))))
     ;; Add remaining fields not in canonical order (readonly stats etc.)
     (dolist (entry field-map)
@@ -201,8 +201,8 @@ source field defaults. Returns a flat list of headlines."
    children))
 
 (defun skg-activeNode--maybe-expand-field (group child-level field-name
-                                        default-source)
-  "Expand GROUP for display. Handles booleans and source defaults.
+                                        default-repo)
+  "Expand GROUP for display. Handles booleans and repo defaults.
 Returns the group, possibly with a value child added or modified."
   (cond
    ;; Bare boolean atom: expand to have 'true' child
@@ -210,15 +210,15 @@ Returns the group, possibly with a value child added or modified."
          (string= field-name "writeProtected"))
     (list (car group)
           (cons (1+ child-level) "true")))
-   ;; Source field: mark with (default) if it matches
-   ((and (string= field-name "source")
-         default-source
+   ;; Repo field: mark with (default) if it matches
+   ((and (string= field-name "repo")
+         default-repo
          (= (length group) 2))
     (let ((value (string-trim (cdr (nth 1 group)))))
-      (if (string= value default-source)
+      (if (string= value default-repo)
           (list (car group)
                 (cons (1+ child-level)
-                      (concat default-source " (default)")))
+                      (concat default-repo " (default)")))
         group)))
    (t group)))
 
@@ -337,7 +337,7 @@ CHILD-LEVEL is the level of the field headline."
              (= (length group) 2))
         nil) ;; remove: at default
        (t group)))
-     ((string= field-name "source")
+     ((string= field-name "repo")
       (when value-text
         (let ((stripped-val ;; strip " (default)" suffix if present
                (skg-activeNode--strip-default-suffix value-text)))

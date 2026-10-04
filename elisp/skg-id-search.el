@@ -447,14 +447,14 @@ title comes from the stack entry."
                  (car (skg-sexp-cdr-at-path sexp '(skg deleted     id))))))
     (when val (format "%s" val))))
 
-(defun skg--extract-source-from-metadata-sexp (sexp)
-  "Extract the source value from SEXP. Accepts the ActiveNode shape
-(skg (node (source X) ...)), the diff-phantom shape
-(skg (diffPhantom (source X) ...)), or the Deleted-phantom shape
-(skg (deleted (source X) ...)). Returns the source as a string, or nil."
-  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node        source)))
-                 (car (skg-sexp-cdr-at-path sexp '(skg diffPhantom source)))
-                 (car (skg-sexp-cdr-at-path sexp '(skg deleted     source))))))
+(defun skg--extract-repo-from-metadata-sexp (sexp)
+  "Extract the repo value from SEXP. Accepts the ActiveNode shape
+(skg (node (repo X) ...)), the diff-phantom shape
+(skg (diffPhantom (repo X) ...)), or the Deleted-phantom shape
+(skg (deleted (repo X) ...)). Returns the repo as a string, or nil."
+  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node        repo)))
+                 (car (skg-sexp-cdr-at-path sexp '(skg diffPhantom repo)))
+                 (car (skg-sexp-cdr-at-path sexp '(skg deleted     repo))))))
     (when val (format "%s" val))))
 
 (defun skg--point-in-link-p ()

@@ -54,7 +54,7 @@ With OVERWRITE non-nil, replace an existing PATH without prompting."
      (format "- Git diff mode: %s\n"
              (if (plist-get skg-clean-baseline-context :git-diff-mode)
                  "enabled" "disabled or unavailable"))
-     "- Source-set: unavailable to this client\n"
+     "- Repo-set: unavailable to this client\n"
      (if skg--search-enrichment-includes-user-edits
          (concat "- Search enrichment: current text includes both unsaved "
                  "edits and enrichment presentation; the diff is not a "
@@ -65,7 +65,7 @@ With OVERWRITE non-nil, replace an existing PATH without prompting."
        (concat "- Baseline: unavailable (the current text is still preserved, "
                "but no verified edit diff can be produced)\n"))
      "\n* Exact snapshots\n"
-     "Each source block is one JSON string. JSON decoding reproduces every "
+     "Each repo block is one JSON string. JSON decoding reproduces every "
      "character, including tabs and trailing newlines.\n\n"
      "** Clean baseline\n"
      (if baseline-available

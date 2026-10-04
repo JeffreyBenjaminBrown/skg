@@ -47,7 +47,7 @@ pub fn handle_repo_set_request (
       // guard before any repo-set request, so even these paths
       // answer in the unwinding shape.
       refuse_unwinding (
-        stream, active_repo_set, "not a source-set request"),
+        stream, active_repo_set, "not a repo-set request"),
     Err (e) =>
       refuse_unwinding (stream, active_repo_set, &e), }}
 
@@ -90,9 +90,9 @@ fn set_active_repo_set (
       // precedes every side effect: search-enrichment
       // cancellation, the set assignment, and the rerenders.
       let msg : String = format! (
-        "Cannot switch to source-set {}: git diff mode is on, and it requires active source-set all. Disable diff mode first.",
+        "Cannot switch to repo-set {}: git diff mode is on, and it requires active repo-set all. Disable diff mode first.",
         active . name . 0 );
-      tracing::info! ( msg = %msg, "Source-set switch refused" );
+      tracing::info! ( msg = %msg, "Repo-set switch refused" );
       refuse_unwinding (stream, active_repo_set, &msg);
       return; }}
   let mut prepared =
@@ -106,7 +106,7 @@ fn set_active_repo_set (
       Some (&target), Some (&prepass), true ) };
   if ! authorize_prepared_rerenders (
     stream, &mut prepared, Some (&active),
-    "source-set-switch-rerender",
+    "repo-set-switch-rerender",
     &approved_pids_from_request (request) ) {
     return; }
   search_cancelled . store (true, Ordering::SeqCst);
@@ -151,7 +151,7 @@ fn send_active_repo_set_response (
     &active . name . 0;
   let response : String =
     format! (
-      "((response-type {}) (active \"{}\") (content \"Active source-set: {}\"))",
+      "((response-type {}) (active \"{}\") (content \"Active repo-set: {}\"))",
       TcpToClient::ActiveRepoSet . repr_in_client (),
       escape_string (name),
       escape_string (name));

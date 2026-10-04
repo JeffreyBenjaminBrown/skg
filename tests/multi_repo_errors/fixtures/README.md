@@ -1,8 +1,8 @@
-# Multi-Source Error Test Fixtures
+# Multi-Repo Error Test Fixtures
 
-This directory contains test fixtures for comprehensive multi-source error validation.
+This directory contains test fixtures for comprehensive multi-repo error validation.
 
-## Sources
+## Repos
 
 ### public (user_owns_it = true)
 - **pub-1**: title="pub-1", no body, no aliases, no content
@@ -25,9 +25,9 @@ This directory contains test fixtures for comprehensive multi-source error valid
 ## Purpose
 
 These fixtures are used to test various error conditions including:
-- Missing sources on root nodes
-- Nonexistent source references
+- Missing repos on root nodes
+- Nonexistent repo references
 - Modifications to foreign (read-only) nodes
-- Source conflicts between disk and buffer
-- Inconsistent sources for duplicate IDs
+- Repo conflicts between disk and buffer
+- Inconsistent repos for duplicate IDs
 - Merge operations involving foreign nodes

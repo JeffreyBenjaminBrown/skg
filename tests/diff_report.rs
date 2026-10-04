@@ -199,19 +199,19 @@ fn diff_report_shows_cross_repo_inbound_relationships (
         include_unstaged: true }) ?;
   assert! (
     report . contains ("**** contained"),
-    "left-source container should report outbound contained change:\n{}",
+    "left-repo container should report outbound contained change:\n{}",
     report );
   assert! (
     report . contains ("**** containers (with gains)"),
-    "right-source child should report inbound container gain:\n{}",
+    "right-repo child should report inbound container gain:\n{}",
     report );
   assert! (
     report . contains ("Alpha"),
-    "report should include left-source container title:\n{}",
+    "report should include left-repo container title:\n{}",
     report );
   assert! (
     report . contains ("Beta"),
-    "report should include right-source child title:\n{}",
+    "report should include right-repo child title:\n{}",
     report );
   Ok (( )) }
 
@@ -233,16 +233,16 @@ fn diff_report_shows_repo_move_across_repos (
         include_staged: true,
         include_unstaged: true }) ?;
   assert! (
-    report . contains ("**** source"),
-    "source move should include source section:\n{}",
+    report . contains ("**** repo"),
+    "repo move should include repo section:\n{}",
     report );
   assert! (
     report . contains ("***** was: left"),
-    "source move should show old source:\n{}",
+    "repo move should show old repo:\n{}",
     report );
   assert! (
     report . contains ("***** is: right"),
-    "source move should show new source:\n{}",
+    "repo move should show new repo:\n{}",
     report );
   Ok (( )) }
 
@@ -323,7 +323,7 @@ fn diff_report_refuses_non_git_repos (
     . unwrap_err ();
   assert! (
     error . contains ("not in a git repository"),
-    "non-git source should be refused: {}",
+    "non-git repo should be refused: {}",
     error );
   Ok (( )) }
 

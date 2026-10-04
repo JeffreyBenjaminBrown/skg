@@ -299,7 +299,7 @@ where
          repo . name . clone (),
          repo . clone () ) . is_some () {
       return Err (serde::de::Error::custom (
-        format! ("Duplicate source name '{}'", repo . name))); }}
+        format! ("Duplicate repo name '{}'", repo . name))); }}
   Ok (map)
 }
 
@@ -607,7 +607,7 @@ impl SkgConfig {
     let position : usize =
       ordered . iter () . position ( |s| s == repo )
       . ok_or_else ( || format! (
-        "Source '{}' not found in config", repo )) ?;
+        "Repo '{}' not found in config", repo )) ?;
     Ok ( ordered [..= position] . to_vec () ) }
 
   /// The repos a repo-set choice makes available: everything for
@@ -622,7 +622,7 @@ impl SkgConfig {
     Ok ( self
          . prefix_through ( &RepoName::from ( name . 0 . as_str () ))
          . map_err ( |_| format! (
-           "Source-set '{}' names no configured source. A source-set is 'all' or the name of the most private source to make available.",
+           "Repo-set '{}' names no configured repo. A repo-set is 'all' or the name of the most private repo to make available.",
            name )) ?
          . into_iter () . collect () ) }
 }

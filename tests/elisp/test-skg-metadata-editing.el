@@ -108,7 +108,7 @@ produces -- as an overlay (never buffer text), colored tokens inside
 plain parens (TODO/more.org). Fields producing no herald get none."
   (skg-test-install-herald-rules)
   (with-temp-buffer
-    (insert "* skg\n** node\n*** source\n**** main\n*** writeProtected\n"
+    (insert "* skg\n** node\n*** repo\n**** main\n*** writeProtected\n"
             "*** affectsParent\n**** false\n")
     (org-mode)
     (skg-sexp-edit--decorate-with-heralds)
@@ -130,7 +130,7 @@ plain parens (TODO/more.org). Fields producing no herald get none."
       (should (equal (funcall hint-on-line "*** writeProtected") " (\u262e)"))
       (should (equal (funcall hint-on-line "**** false") " (\u22a5)"))
       (should-not (funcall hint-on-line "**** main"))
-      (should-not (funcall hint-on-line "*** source"))
+      (should-not (funcall hint-on-line "*** repo"))
       ;; The buffer TEXT is untouched: committing must not see hints.
       (should-not (string-match-p "(\u262e)" (buffer-string))))))
 

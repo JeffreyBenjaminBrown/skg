@@ -48,8 +48,8 @@
       (erase-buffer)
       (org-mode)
       (setq skg-view-uri (org-id-uuid))
-      (insert (concat "* (skg (node (source main))) a\n"
-                      "* (skg (node (source main))) b\n"
+      (insert (concat "* (skg (node (repo main))) a\n"
+                      "* (skg (node (repo main))) b\n"
                       "** c\n"
                       "** d\n"
                       "*** d1\n"
