@@ -695,8 +695,9 @@ With the server running, choose an absolute input directory in the
 server/container filesystem and an existing owned destination source. The
 source determines the privacy of all new nodes. Skg scans exact =.md= and
 =.org= files recursively, leaves the originals untouched, and asks for a
-host-root mapping only when absolute filesystem links occur. Blank mapping
-leaves unresolved links with warnings. Review the file/node counts, generated
+host-root mapping only when absolute links to =.md= or =.org= files occur.
+Blank mapping leaves unresolved links with warnings. Links to other kinds of
+files are left pointing where they did, without warnings. Review the file/node counts, generated
 export paths, and diagnostics; then explicitly confirm or decline. A changed
 input or destination requires a fresh preview.
 

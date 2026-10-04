@@ -68,7 +68,7 @@ pub fn handle_import_md_and_org_request (
         host_root . as_deref (), host_answer . is_some (), env) {
         Ok (ImportPreparation::HostMappingNeeded) => send_import_response (
           stream, TcpToClient::ImportMdAndOrgHostMappingNeeded,
-          "Absolute filesystem links were found. Supply the absolute host path corresponding to the input directory, or leave it blank to preserve unresolved links.",
+          "Absolute links to .md or .org files were found. Supply the absolute host path corresponding to the input directory, or leave it blank to preserve unresolved links.",
           None, None, &[], &[]),
         Ok (ImportPreparation::Prepared (batch)) => {
           let report : String = batch . preview_report ();

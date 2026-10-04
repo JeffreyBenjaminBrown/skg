@@ -820,6 +820,10 @@ footnotes are interpreted. Other Markdown/Org markup remains readable text,
 not a full format conversion. Unresolved links and unsupported constructs
 are left in place with warnings.
 
+Only links to =.md= and =.org= files are resolved, or warned about.
+A link to any other file (source code, an image, a folder) keeps pointing
+where it did, written as an Org link, without a warning.
+
 **** Re-export is dangerous.
 Subsequent Org export is for reading, not
 a round-trip backup: it does not preserve Markdown syntax or all Skg graph
@@ -827,11 +831,12 @@ semantics. Exporting to the original input directory would overwrite matching
 =.org= files, while leaving =.md= files alone. There is no dedicated undo or
 crash-recovery transaction; keep the originals and back up the owned source.
 
-**** Skg asks for a host-root mapping if it finds absolute filesystem links.
+**** Skg asks for a host-root mapping if it finds absolute links to documents.
 Skg runs in a Docker container.
 The folder /home/ubuntu/host in that container
 corresponds to some folder on the host system.
-If the files to be imported contain absolute links,
+If the files to be imported contain absolute links
+to =.md= or =.org= files,
 skg needs to know how those host-system paths
 correspond to paths in the docker container.
 
