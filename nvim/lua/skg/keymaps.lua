@@ -281,7 +281,7 @@ M.file_bindings = {
   { 'Oi', 'PopId' }, { 'Ol', 'PopLink' }, { 'On', 'PopNode' },
 }
 
----The subset used by diff-report report buffers.
+---The subset used by diff report buffers.
 M.diff_report_bindings = {
   { 'ff', 'Search' }, { 'fi', 'SearchInteractive' },
   { 'gg', 'Goto' }, { 'GG', 'GotoAndCloseThis' },

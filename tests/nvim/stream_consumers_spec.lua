@@ -143,7 +143,7 @@ describe('skg stream consumers', function ()
       seen)
   end)
 
-  it('shows the diff-report report with the navigation keymap',
+  it('shows the diff report with the navigation keymap',
      function ()
     -- Mirrors test-skg-diff-report.el's wiring: stage flags on the
     -- wire, report buffer, keymap attached.
