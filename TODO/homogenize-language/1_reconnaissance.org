@@ -73,7 +73,11 @@ comments where "source" meant a *source buffer* ('nvim/lua/skg/metadata_edit.lua
 Those say "source buffer" / "source headline" again. I also checked
 every rewrite in the git code ('git_ops/', 'diff_report/') by hand,
 since there a bare "repo" sometimes meant the gitrepo.
-***** TODO Which of these should also change?
+***** DONE Which of these should also change?
+Claude says: identifiers are done (you answered under [[*Repos][Repos]]:
+"skgrepo and gitrepo everywhere in code"). The rest of this question,
+about commands, wire and config, now lives in one place: [[*Claude says: doing the code; three questions about the edges of "code"][the Repos question]].
+
 The word is everywhere below prose, in three tiers:
 - *Identifiers* (compiler-checked, no data change): 'RepoName' (830
   server lines), 'ActiveRepoSet', 'home_repo', 'relRepo', 'repo_sets',
@@ -176,7 +180,7 @@ now "branch point".
 *** 'protocol.rs': 'SearchEnrichment' "Includes containerward ancestries"
 *** 'api-and-formats.org': "ancestry insertions" (override section), "override folders and paths"
 *** 'ContainerwardPathStats' in 'viewnode.rs': defined and used nowhere (filed as dead code)
-*** TODO.org: "backpaths" in four headlines; "containment ancestries"
+*** In TODO.org: "backpaths" in four headlines; "containment ancestries"
 *** 'paths.rs' ('PathToFirstNonlinearity') is still live: role trees use it
 Its "path" sense is fine. Its "fork" sense is not (see [[*fork: a clone, or a branch point][fork]]).
 ** The AffectsParent values have had four names
@@ -256,13 +260,13 @@ There are two clients now.
 - 'vognode' (code, 521 server lines) has *no glossary entry*. Only
   "non-vognode" is defined. I assume it means "viewnode of a graphnode";
   please confirm (open question).
-**** ONGOING J : yes
+**** DONE J : yes
 Let's use graphnode and viewnode everywhere.
 vognode is a viewnode representing a graphnode.
 Per server/types/viewnode.rs, it can be active (visible), inactive (not),
 or a phantom (not even in the graph any more).
-***** TODO Claude says: doing it; one question about "treenode"
-Doing: "graph node", "graph-node", "view node", "view-node" and "point" become graphnode / viewnode in docs and comments; identifiers like 'validate_gnode_identity_and_structure' and 'view_node_line_cols' too; and the glossary gets your vognode definition.
+***** DONE Claude says: done; one question about "treenode"
+Done (commit 6f4223b6): "graph node", "graph-node", "view node", "view-node" and "point" become graphnode / viewnode in docs and comments; identifiers like 'validate_gnode_identity_and_structure' and 'view_node_line_cols' too; and the glossary gets your vognode definition.
 ****** TODO Should "treenode" go too?
 Functions like 'get_id_from_treenode (tree, treeid)' and 'pid_and_repo_from_treenode' say "treenode" for the viewnode stored at a treeid. "viewnode" would do, e.g. 'get_id_from_viewnode_at'. I've left these alone until you say.
 *** Recommendation
@@ -270,7 +274,7 @@ Keep graphnode / viewnode / vognode / non-vognode, closed up with no
 hyphen. Bare "node" is fine where only one kind is possible (a .skg file,
 a graph query). Retire "point", "graph-node", "view-node". Add a
 glossary entry for vognode.
-**** ONGOING J : Yes
+**** DONE J : Yes
 *** Against "graphnode -> atom" (your dubious TODO)
 "atom" already means a bare S-expression symbol: 230 server lines, the
 herald "match atoms", 'EMITTABLE_MATCH_ATOMS', "the bare atom
@@ -294,7 +298,7 @@ away: in code it is a few type and field names ('RelationshipAxes',
 meant. "membership" is fine as an informal synonym for an edge of a
 list-valued relation, but I would drop it from the docs too, since the
 docs already need "member" (below).
-*** ONGOING J : relation, relationship, member
+*** DONE J : relation, relationship, member
 Like in TypeDB I want relation to mean a kind of relationship
 and relationship to be an instance of a relation.
 Member is meaningful (discussed elsewhere in this document)
@@ -305,11 +309,12 @@ I think we need all three names.
 
 (I like how distinct 'edge' is from 'relation',
 but it is novice-hostile, an unfortunate legacy of planar graph theory.)
-**** TODO Claude says: doing it in prose; a question about code
-Doing: in docs and comments, "relation" means the kind (contains,
+**** DONE Claude says: done in prose; a question about code
+Done: in docs and comments, "relation" means the kind (contains,
 linksTo, ...), "relationship" means one instance, and "edge" becomes
 "relationship". "member" stays for a folder's children and for a list
-entry. The glossary will say all three.
+entry. The glossary entry "relation, relationship, recorder, member,
+partner" says all three.
 ***** TODO In code, should 'edge' identifiers become 'relationship' too?
 A few dozen ('edge_count', "stuck edges" in 'skg--set-repo-and-handle-stuck-edges',
 'leak-shaped edges'). Comments are easy; the names change call sites.
@@ -336,16 +341,17 @@ Keep "owned/owner" for the user's repos only, and say "extra-ID holder"
 or just "the node with that extra ID" for the other sense. Identifier
 cost: 'owner*' names in the graph and validation code, roughly 300 lines.
 See open questions.
-*** ONGOING J : recorder, member, partner
-**** TODO Claude says: doing it; one sense of "owner" is left
-Doing: the node whose file records a relationship is its *recorder*,
+*** DONE J : recorder, member, partner
+**** DONE Claude says: done; one sense of "owner" is left
+Done: the node whose file records a relationship is its *recorder*,
 in prose and in code ('owner_pid' -> 'recorder_pid', ...), and
 'relations.json''s 'stored_by' becomes 'recorded_by'.
 ***** TODO What should the node that holds an extra ID be called?
 'extra_owners' and a few comments say the node "owns" an extra ID. Not
 a relationship, so not a recorder. "claimant" fits the diff report's
 existing language ("IDs claimed by more than one node"). Until you
-decide, I'm leaving that sense as it is.
+decide, I'm leaving that sense as it is. (Your sidecar answer, "extra-id
+carrier", will settle this when I process the sidecar.)
 ** Relation names and role names (your CRITICAL TODO)
 *** What's in use
 | relation (stored)            | roles                   | other spellings in use                         |
@@ -396,7 +402,7 @@ hider hidesFromSubs hidden
 
 I need hidesFromSubs, not hides, to make room
 for the eventual hidesFromNetions.
-**** TODO Claude says: names settled; execution still waits on how far it reaches
+**** Claude says: names settled; execution still waits on how far it reaches
 This settles the names, including role 'content' replacing 'contained'.
 Whether it reaches the .skg YAML keys is the open question under
 [[*"Short relation names in the API doc (doc bug)"][the short-names item]] (options a, b, c). I'll do the rename once
@@ -411,7 +417,7 @@ e.g. "(ids "uuid1" ...)" in the api doc). "primary ID" and "extra ID" are
 consistent. Recommendation: "ID" in prose; 'pid' when the primary-ness
 matters; retire 'skgid' and "uuid", since an ID need not be a UUID
 (tests use readable ones).
-**** ONGOING J
+**** DONE J
 In code, skg IDs often appear alongside egotree node IDs or buffer IDs.
 Let's always use either skgid, pid or extra_id for a skg id, never just id.
 
@@ -423,15 +429,18 @@ There are generic tools for creating UUIDs, I believe,
 that could be destined for skg IDs or buffer IDs.
 Those should keep referring to UUIDs.
 Otherwise yes -- uuid in other contexts is probably a mistake.
-***** TODO Claude says: doing it, in a slice of its own
-In Rust, every variable, field and parameter that holds a skg ID and is
+***** DONE Claude says: done
+Commits 6f4223b6 (Rust), 0e3dfd79 (elisp and Lua locals) and f98e0bed
+(uuid). What it did: in Rust, every variable, field and parameter that holds a skg ID and is
 named 'id' (or 'ids', '*_id') becomes 'pid' when it is known to be
 primary, 'extra_id' when known extra, else 'skgid'. That includes
 struct fields such as 'ActiveVognode.id'. The wire atom '(id X)' and
 request keys stay (formats). UUID: 'uuid' stays only where something
 generates UUIDs ('Uuid::new_v4' and the clients' new-ID code); the
 api doc's '"uuid1"' examples become '"ID1"'. Lisp and Lua get the same
-treatment for their internal names.
+treatment for their internal names. Left alone: ego_tree's '.id()'
+method; non-skg IDs (request, search, timer, Org custom IDs); the
+import/export code, whose IDs come from other systems; client wire keys.
 *** ego_tree handles
 'NodeId' (371 server lines), 'node_id' (275), 'treeid' (106), 'nid',
 'nodeids', 'tree_node_id': six names for "a position in an ego_tree".
@@ -471,7 +480,7 @@ gitrepo", and I've already made prose say "skgrepo" every time. I read
 bare "repo"). If you meant first-mention-then-"repo", say so and I'll
 loosen it.
 ***** TODO Claude says: doing the code; three questions about the edges of "code"
-Doing: Rust and client-internal identifiers say skgrepo / gitrepo:
+Done (commits 6f4223b6, 4ee70f77): Rust and client-internal identifiers say skgrepo / gitrepo:
 'RepoName' -> 'SkgRepoName', 'repo' -> 'skgrepo', 'home_repo' ->
 'home_skgrepo', 'repo_sets' -> 'skgrepo_sets', and so on. Following your
 'SkgRepo', types write the R in capitals ('SkgRepoName'); values write
@@ -486,22 +495,22 @@ Does "everywhere in code" include any of these?
 "privacy level" (docs) vs "level" meaning outline depth (311 nvim
 lines, 158 elisp). The privacy sense is rare in code. Recommendation:
 "privacy level" always spelled out, bare "level" for outline depth only.
-**** ONGOING J : yes
+**** DONE J : yes
 ** repo-set
 "repo-set" (docs, dominant), "repo set" (request strings "list repo
 sets", 12 server lines), "Skg repo set" ('render/diff.rs'), "source set"
 (TODO, stale), "active repos". The wire strings are fine. Recommendation:
 "repo-set" in prose.
-*** ONGOING J
+*** DONE J
 Yes except let's specify "skgrepo", not just "repo" in all of those.
-**** TODO Claude says: doing prose and identifiers ("skgrepo-set"); wire strings are in the question above
+**** DONE Claude says: done in prose and identifiers ("skgrepo-set"); wire strings are in the question above
 ** Ownership
 "owned" vs "user-owned" (118 server lines, 'user_owns_repo'), and
 "write-protected" for foreign repos ("Foreign Skg repos are
 write-protected" in the api doc). Recommendation: owned / foreign. Drop
 "user-" ("owned" can only mean by the user), and do not call a repo
 write-protected (see [[*write-protected: three senses][write-protected]]).
-*** ONGOING J : yes
+*** DONE J : yes
 ** Editability
 'Editability::{Definitive, WriteProtected}' is settled in code, but
 prose also says "editable" (26 server lines), "writable" (13) /
@@ -511,11 +520,11 @@ definitive / write-protected for viewnodes; "writable" (one spelling)
 only for 'FolderPolicy::WritableSet'; "inert" for viewnodes that emit
 no save instructions, which is a distinct, useful concept that deserves
 a glossary entry.
-*** ONGOING J
+*** DONE J
 Let's use 'editable | write-protected',
 and for 'inert' say 'save-inert'.
-**** TODO Claude says: doing it in code and prose; two user-visible names to confirm
-Doing: 'Editability::Definitive' -> 'Editability::Editable';
+**** Claude says: done in code and prose; two user-visible names to confirm
+Done: 'Editability::Definitive' -> 'Editability::Editable';
 'FolderPolicy::WritableSet' -> 'EditableSet' (it already sits beside
 'EditableFilter'); "definitive" -> "editable" and "writable" ->
 "editable" in docs and comments; "inert" -> "save-inert".
@@ -530,7 +539,7 @@ phantoms, *and* for 'InactiveVognode', which is not a Phantom, *and*
 for 'PICK-A-REPO' in the fork confirmation. TODO.org adds "ghost nodes".
 Recommendation: "phantom" only for 'Phantom'; "inactive placeholder" or
 just "inactive vognode" for the other; no "ghost".
-**** ONGOING J : yes
+**** DONE J : yes
 *** A reference that resolves to nothing
 'Phantom::Unknown' (code), "absent node" (the delete-references command),
 "dangling" (37 server lines), "missing" (link-statuses), "dead link" and
@@ -539,7 +548,7 @@ different sides. Recommendation: "dangling" for the reference (an edge or
 link whose ID resolves to nothing), "absent" for the ID itself. Keep
 'Unknown' as the phantom variant's name, since it describes what the view
 knows.
-**** ONGOING J : yes
+**** DONE J : yes
 ** The buffer and its contents
 *** buffer, view, viewforest, forest, viewtree
 'ViewUri' is documented as "Identifies a buffer in the client";
@@ -549,15 +558,16 @@ Recommendation: *view* is the thing the server tracks (one URI), *buffer*
 is the editor's container for it, *viewforest* is its tree. Retire
 "viewtree" and "viewnodetree" (16 identifiers, e.g.
 'complete_relevant_children_in_viewnodetree').
-**** ONGOING J : yes, but also
+**** DONE J : yes, but also
 why ViewUri? Wouldn't ViewID be clearer?
 ***** TODO Claude says: yes, ViewId would be clearer
 A content view's "URI" is just its root's ID, and a search view's is
 "search:TERMS" ('ViewUri::repr_in_client'). Nothing about it is a URI.
 It's an identifier, so 'ViewId' says what it is. That's a Rust rename
 plus the wire key 'view-uri' (in several requests and responses, both
-clients). OK to do both? Meanwhile I'm doing the settled part: retiring
-"viewtree" / "viewnodetree" in favor of viewforest.
+clients). OK to do both? The settled part is done: "viewtree" /
+"viewnodetree" are retired in favor of viewforest, and the glossary
+entry "view, buffer, viewforest" defines all three.
 *** The kinds of view
 "single root content view" (request string), "content view"
 ('ViewUri::ContentView', response type), "single-root-view" (the
@@ -591,7 +601,7 @@ occur several times in a view, each with its own viewStats. "position"
 also means a cursor position (173 elisp lines). Recommendation: promote
 "occurrence" (glossary entry); leave "position" to cursors and list
 offsets.
-**** ONGOING J : yes
+**** DONE J : yes
 *** The parent in the view
 "org-parent", "visible parent", "viewparent" / "view-parent",
 "org-ancestry" ('skg-view-org-ancestry'), "org-child", "viewchild",
@@ -600,7 +610,7 @@ mean the view relation. Recommendation: bare "parent" / "child" /
 "ancestor" where unambiguous, "viewparent" etc. otherwise. Retire
 "org-" and "visible" as prefixes, since Neovim users don't think of
 these as Org relations.
-**** ONGOING J : child, parent, ancestor, descendent
+**** DONE J : child, parent, ancestor, descendent
 I *guess* we can omit 'view' from terms like 'viewparent'
 when it's *really* unambiguous but I'm a little skittish,
 because it's easy for a user to think content = child, which is false,
@@ -608,8 +618,8 @@ so if there's even the shadow of a doubt in the docs, let's disambiguate.
 The code will almost never need that disambiguation, though,
 because there is almost (maybe literally) always only one kind of tree
 being processed.
-***** TODO Claude says: doing it, conservatively
-Docs: "viewparent", "viewchild", "viewancestor" whenever a reader could
+***** TODO Claude says: done, conservatively; one question
+Done. Docs: "viewparent", "viewchild", "viewancestor" whenever a reader could
 mistake child for content, which in user docs is almost always. Code
 comments: bare parent/child. Retiring "org-parent", "org-child" and
 "visible parent" in prose. The command 'skg-view-org-ancestry' is
@@ -634,23 +644,29 @@ intent (one field, during collection) -> instruction (one node:
 rename of a central type, so only if you want the name to say what
 the docs say. Note "defmap" ('DefinitiveMap') is unrelated: it maps
 definitive occurrences, not definitions.
-**** ONGOING J
+**** DONE J
 Better to leave no room for doubt:
 fieldIntent, nodeInstruction, savePlan
-***** TODO Claude says: doing it
+***** TODO Claude says: done; a fourth name, and one question
 'DefineNode' -> 'NodeInstruction', "definition(s)" and "instruction(s)"
 (the 'DefineNode' sense) -> nodeInstruction(s), "intent(s)" (per
 field) -> fieldIntent(s), and "save plan" / 'SavePlan' as is. The
 module 'local_instruction_collection' keeps its name: it collects
 fieldIntents, but renaming a module directory is churn you may not
 want. Say if you want it renamed too.
+
+The code had a level your three names didn't cover: 'NodeIntent', all
+of one node's fieldIntents lowered into a save or delete, still partial
+before disk supplementation. "nodeIntent" fits the ladder, so I kept
+it: fieldIntent -> nodeIntent -> nodeInstruction -> savePlan. The
+glossary has an entry for the four.
 *** Restoring what the buffer can't show
 "disk merge" (api doc), "anchored weave" (api doc), 'weave' (22 server
 lines), "disk supplementation" (glossary), 'supplement_from_disk.rs'.
 Recommendation: "disk supplementation", matching the module. "Weave" is
 a good word for the order-preserving list merge specifically; keep it
 for that one algorithm.
-**** ONGOING J : yes, but
+**** DONE J : yes, but
 what do you mean 'what the buffer can't show'?
 Do you mean 'what it didn't show but it will after being restored'?
 ***** TODO Claude says: what the save must not lose, though the buffer didn't say
@@ -721,7 +737,7 @@ already says how they differ. Shall I?
 the syntax), "md" (glossary says md = metadata). Recommendation:
 metadata for the content, sexp for the syntax. Retire "md" for
 metadata, since 'import-md-and-org' uses md for Markdown.
-**** ONGOING J : yes
+**** DONE J : yes
 *** herald / token / glyph / marker / label / annotation
 - herald: the rendered display of metadata (settled).
 - token: a unit of herald text ('herald_tokens.rs').
@@ -735,24 +751,24 @@ These mostly divide the territory cleanly. The one real overlap is
 "annotation" vs "herald" for link decorations. I'd keep "annotation"
 for decorations on text that is not metadata (links, IDs in magit),
 which is how both clients use it, and add that sentence to heralds.org.
-**** ONGOING J : yes
+**** DONE J : yes
 *** heading vs headline
 Both clients use "heading" in some function names
 ('skg--back-to-current-heading', 'M.next_heading_line') and "headline"
 in others. The glossary defines headline. Recommendation: headline.
-**** ONGOING J : yes
+**** DONE J : yes
 ** Buffer state
 "dirty" (protocol, 25 server lines), "unsaved" (29 elisp, 18 nvim),
 "modified" (Emacs's 'buffer-modified-p'). Recommendation: "dirty" in
 protocol and docs; the clients can say "unsaved" to users.
-*** ONGOING J : yes
+*** DONE J : yes
 ** The ID stack is also the linkstack
 Emacs: 'skg-view-id-stack', 73 elisp "id stack" lines. Neovim: module
 'linkstack.lua', but command ':SkgViewIdStack'. Both COMMANDS files have
 headline "IDs, links and the linkstack" over a section "the stack of
 links/ids". Recommendation: pick one. "link stack" describes what you
 push (a link); "ID stack" what is stored.
-*** ONGOING J : linkstack
+*** DONE J : linkstack
 since it includes titles
 ** Command aliases with different verbs
 'skg-alias' maps user names to internal ones, which is fine, but three
@@ -761,7 +777,7 @@ pairs disagree in meaning:
 - 'skg-limit-repo-set' = 'skg-set-active-repo-set' (limit vs set; a
   wider set is not a limit)
 - 'skg-goto-in-magit' (Emacs) vs ':SkgGotoInGit' (Neovim)
-*** ONGOING J
+*** DONE J
 'skg-goto-in-magit' is appropriate for Emacs.
 Is ':SkgGotoInGit' appropriate for Neovim?
 I don't know what the equivalent to magit is for neovim.
@@ -785,6 +801,11 @@ is named 'noindex-and-boolprops', a third name for the same feature
 'misc' to 'flags' (formats tier: a YAML key). Accept the per-layer
 spellings; they are a deliberate mapping.
 *** ONGOING J : yes
+**** Claude says: half done
+'Graphnode.misc' (and the in-Rust and Tantivy node types) is now
+'flags'. The YAML key is still 'misc', because changing it means
+migrating foreign skgrepos; that part waits on [[*Claude says: your new names are a rename; how far should it reach?][the file-format question]]
+(option c bundles it with the relation-name keys).
 ** Approval on retry
 Five different shapes for "the user approved; re-issue":
 '(fork-approved . "true")' plus 'fork-repos'; '(hoist-approved-pids ...)';
@@ -794,14 +815,14 @@ the differences are real (an opaque token vs a PID list), but the verb
 need not differ. Recommendation: "approved-" as the prefix:
 'approved-forks', 'approved-hoist-pids',
 'approved-overPrivateText-pids'. Formats tier, both clients.
-*** ONGOING J : yes
+*** DONE J : yes
 ** Fork vocabulary
 The forked node is "N" / "original" ('ForkSpec.original_*', glossary)
 in some places and "origin F" ("rewritten from origin F to clone K",
 api doc) in others. "origin" also means a role tree's root, the
 search-ranking "context origin", and git's 'origin' remote.
 Recommendation: "original" for forks, "origin" only for role trees.
-*** ONGOING J : yes
+*** DONE J : yes
 * One name, several things
 For each of these, either qualify every use, as the "merge" rule does,
 or rename the minority sense.
@@ -815,6 +836,7 @@ Recommendation: rename the telescope sense. Candidates: *compose* /
 "visible fold" / "full fold" become "visible composition" / "full
 composition". Identifier tier ('telescope/fold.rs', 'FoldWarning') plus
 docs.
+*** TODO J : compose/decompose is perfect
 ** hide
 The 'hides_from_its_subscriptions' relation; 'hidden_body' (a body the
 rendering omits); "hidden in its parent" (the comment on
@@ -824,15 +846,29 @@ gets worse. Recommendation: reserve hide/hider/hidden for the relation.
 'hidden_body' -> 'omitted_body' (the herald B is display-only, so the
 wire atom 'hiddenBody' is cheap to change); "folded" for Org; "inactive"
 or "withheld" for repo-set restriction.
-** owner
+*** TODO J
+**** hidesFromSubs
+**** regarding body
+If the body is hidden via skg-org-body-toggle,
+'hiddenBody' is the right word.
+If the body is absent from the buffer, 'omittedBody' is right.
+**** org fold : yes, keep
+**** active/inactive
+Let's ought to call this 'unrestricted/restricted',
+and rename the command from 'limit' to 'restrict'.
+** DONE owner
 Edge holder vs extra-ID holder vs user ownership. See [[*The two ends of an edge: holder, member, partner][holder]].
-** write-protected: three senses
+*** TODO edge recorder, extra-id carrier, user owns
+*** DONE Claude says: settled there (recorder); only the extra-ID sense remains
+** DONE write-protected: three senses
 - a viewnode occurrence whose edits are not saved ('Editability::WriteProtected');
 - a generated folder whose membership is not editable here (☮ on folders);
 - a foreign repo.
 The first two share the glossary's sense "cannot be changed from here".
 The third is different: it is about ownership, not this view.
 Recommendation: say "foreign" for repos, never "write-protected".
+*** TODO J : yes
+*** DONE Claude says: done under [[*Ownership][Ownership]]
 ** generation
 The published runtime generation ('RuntimeGeneration'); an ancestor's
 distance in '(rels ...)' ("Generation 1 is the visible parent",
@@ -841,17 +877,34 @@ link-statuses replies carry. Recommendation: "generation" for the
 runtime one; "ancestor distance" in prose for the rels one (the wire
 already just says '(ancestors 1 2)'); qualify the client one as "buffer
 generation".
+*** TODO J
+Only 'ancestor distance' is user-facing, right?
+If so, we can fully qualify all the others:
+RuntimeGeneration
+DigraphGeneration
+BufferGeneration
+
+In proces, 'ancestor distance' seems confusing, but
+'its distance from the ancestor' and
+'the ancestor's distance from it' are clear.
 ** snapshot
 Graph snapshot ('GraphSnapshot', 'graph_snap'); git snapshots (HEAD,
 index, worktree in the diff report: "selected snapshots"); the buffer
 snapshot that search enrichment requests ('request-snapshot'); the
 baseline/current snapshots of dirty views in the save envelope.
 Recommendation: always qualify (graph / git / buffer snapshot).
+*** TODO J : yes
 ** index
 Tantivy's index, git's index (the staging area: "compare HEAD to
 index"), and the in-Rust graph's inverse indexes ('contained_by' etc.).
 The diff code is where they meet. Recommendation: always qualify ("search
 index", "git index", "inverse index").
+*** TODO J : yes but
+wouldn't the entities for the Rust graph be better named
+relationshipMaps and inverseRelationshipMap?
+Actually that's pretty wordy; better relMap and inverseRelMap.
+
+I'm literally asking. Don't proceed on this; just answer, please.
 ** context
 Search ranking ('ContextOriginType', "context-origin multiplier",
 "Rooty" nodes, 'tests/contexts/'); the downward-flowing state in local
@@ -861,6 +914,7 @@ sense and harmless. The first is a domain concept with a generic name.
 Recommendation: rename the search-ranking sense to something specific,
 e.g. *prominence* ('ProminenceSource': root, cycle member, mentioned,
 had-ID, multi-contained). "Rooty" then becomes "prominent".
+*** TODO J : yes
 ** fork: a clone, or a branch point
 Forking a node (the clone operation) vs a branch point in a
 containerward path ('PathToFirstNonlinearity' docs: "if it ends in a
@@ -869,8 +923,14 @@ any number > 1", which is about this sense, sits right above "clone, and
 the fork operation"). Recommendation: "branch point" for paths (the
 code's own word 'nonlinearity' is fine too); "fork" only for cloning.
 Delete the first glossary entry or reword it.
-** md
+*** TODO J : yes but use 'branching viewnode', not 'branch point'.
+And explain in the glossary: A branching viewnode is a viewnode
+with multiple children. Explain not to confuse that with a branch,
+which might be degenerate (with 1 or 0 children).
+** DONE md
 Metadata (glossary) vs Markdown ('import-md-and-org'). See [[*metadata / sexp / header / md][metadata]].
+*** TODO J : yes
+*** DONE Claude says: done there
 ** ephemeral
 "ephemeral data stores" (graph and Tantivy, rebuilt from disk at startup)
 vs the glossary's "ephem": data that lasts only as long as a view
@@ -878,12 +938,18 @@ vs the glossary's "ephem": data that lasts only as long as a view
 Recommendation: "derived stores" for the first (above); keep
 "ephemeral" for view-lifetime data, or call that "view-only", which
 matches "display fact".
+*** TODO J
+Are these user-facing? If not, session-lifetime and view-lifetime seem best.
 ** dependencies
 'DEPENDENCIES.toml' (which repos a repo may reference) vs
 'save_dependencies' / 'dependencies_from_registered' (the IDs a dirty
 view depends on, for the save conflict check). Recommendation: rename
 the save sense to "view footprint" or "view reach". The api doc already
 says the server "unions dependencies from" each dirty view.
+*** TODO J
+Rename the file OTHER_SKGREPO_DEPENDENCIES.toml.
+The other terms can stay, I think -- if they're just in code,
+the type signature should make clear what kind of thing is being depended on.
 ** commit
 A git commit; the commit step of a save ("the clones commit only on
 approval"; "commit consumes those prepared values"); a Tantivy commit;
@@ -891,30 +957,40 @@ and your "commitment status" / "commit-readiness" ideas in TODO.org.
 Recommendation: in save code and docs say "apply" for the save's
 mutation step. Leave "commit" for git and Tantivy, where it is the
 library's word.
+*** TODO J
+call them git-commit, skgsave-commit and tantivy-commit
 ** publish
 Publishing a graph generation (atomic swap); Hoist "publishes the
 selected title and body at home"; and sharing notes publicly
 (docs/sharing-model). Recommendation: keep "publish" for sharing, which
 is the user's sense. Say "install" or "swap in" for generations, and
 "Hoist moves the text to home" for Hoist.
+*** TODO J : agreeed, using 'swap in'
 ** content
 The contains list vs the wire field '(content "...")' (every response's
 payload) vs buffer contents. The wire field is everywhere and harmless
 in code, but it makes "content view" responses read oddly
 ('(response-type content-view) (content "...")'). Low priority; mention
 it in the api doc's preamble and move on.
+*** TODO J : agreed, not a big deal
 ** view
 A whole view (one URI) vs the "additional views" a 'ViewRequest' asks
 for (folders, role trees, flags) inside a view. Recommendation: keep
 "view request" for the request, and call what it adds a "projection"
 (the glossary already calls the flags folder an "optional projection").
+*** TODO better 'viewbranch'
+The view is the whole buffer (in the Emacs case, at least);
+a viewbranch is any subtree.
 ** member
 Membership in a list or folder vs 'Vognode::is_graph_member' /
 'id_if_graph_member' (the node currently exists in the graph).
 Recommendation: rename the latter "current" ('is_current_graphnode'),
 which is how its doc comment already explains it.
-** level
+*** TODO J : yes
+** DONE level
 Outline depth vs privacy level. See [[*Repos][Repos]].
+*** TODO J : already covered, right?
+*** DONE Claude says: done there ("privacy level" spelled out)
 ** marker
 The bare metadata atoms 'focused' / 'folded' ('skg-add-folded-markers');
 the 'overridesHere' "substitution marker"; the export marker node; the
@@ -924,20 +1000,29 @@ client's "save markers" ('snapshot_with_save_markers'); the
 oldest sense. 'overridesHere' is a viewStats fact, so call it that. The
 export one is an "export root" with an "export instruction child"; the
 api doc mostly says that already.
-** origin
+*** TODO J
+It sounds like we could say 'metadata' instead of 'marker'
+for a lot of those, no?
+** DONE origin
 See [[*Fork vocabulary][fork vocabulary]].
-** atom
+** DONE atom
 S-expression atom only. See [[*Against "graphnode -> atom" (your dubious TODO)][against atom]].
-
 * Opportunities to simplify or reorganize
 ** One verb per relation, with V-er / V-ed roles
+*** DONE Claude says: superseded by your relation table
+You chose contains, linksTo, subscribesTo, overrides, hidesFromSubs
+under [[*Relation names and role names (your CRITICAL TODO)][relation names]]; only how far the rename reaches is open.
+*** Original text
 Described [[*Recommendation: one verb per relation, roles V-er and V-ed][above]]. It's the biggest change here and the biggest payoff: a
 reader who knows the relation name knows its roles, its folder names,
 and its herald letter.
 ** The holder / member / partner triad
+*** DONE Claude says: done as recorder / member / partner
+*** Original text
 Also [[*The two ends of an edge: holder, member, partner][above]]. It removes the "owned owner" problem and gives
 the 'stored_by' of 'relations.json' a name people can say.
 ** Glossary repairs
+*** DONE Claude says: done, except the two items under [[*Glossary repairs that need no decision][the open questions]]
 *** Missing entries
 vognode, phantom, definitive, inert, occurrence, birth, MSV, collateral
 view, view request vs edit request, display fact vs save intent (the
@@ -952,6 +1037,7 @@ adopted.
 "buffer, or sometimes forest" is defined but says nothing about "view".
 Merge it with the view definitions above.
 ** Bury finished plans instead of rewriting them
+*** Claude says: the certain ones are done; the rest is [[*Shall I move finished plans out of TODO/ into TODO/DONE/ before any vocabulary sweep?][an open question]]
 Old plans are history; rewriting their vocabulary costs a lot and
 changes their meaning. But TODO/ outside DONE is supposed to be live, and
 most of the stale vocabulary is in finished plans. The densest:
@@ -965,10 +1051,12 @@ most of the stale vocabulary is in finished plans. The densest:
 'done/git-diff-staged-v-unstaged.org'. Moving finished plans to DONE
 shrinks the homogenization surface by roughly half and loses nothing.
 ** Retire abbreviations nobody needs
+*** DONE Claude says: done ("interp" and "md = Metadata" are gone)
 "kv-pair", "lp" (in code only as 'skg-lp-*' in elisp and 'lp' in the
 api doc's "LP" prefix: fine), "mk" (code idiom, fine), "interp" (gone),
 "ephem" (glossary only). Only "interp" and "md" need action.
 ** Make the qualify-always rule a written convention
+*** Claude says: waiting on [[*Claude says: a one-paragraph rule in names.org][its open question]] and your sidecar answers
 'names.org' could say: these words are never used bare — merge,
 snapshot, index, generation, commit — with the qualifiers listed. That
 covers most homonyms here without any renames.
@@ -976,15 +1064,19 @@ covers most homonyms here without any renames.
 * Terms that ought to exist
 ** vognode, defined
 In code everywhere, defined nowhere.
+*** DONE Claude says: the glossary now defines it, in your words
 ** holder
 The first-role node of an edge, which stores it. See above.
+*** DONE Claude says: exists now, as "recorder"
 ** binding edge
+*** Claude says: still a suggestion; it would now be "binding relationship"
 The edge a viewnode occurrence represents to its parent ('contains' for
 content; the folder's relation for a folder member). 'viewnode.rs' and
 the relRepo docs already lean on this ("the relRepo of the RELATIONSHIP
 this headline represents"). Naming it makes the relRepo rules much
 shorter to state.
 ** A word for an affectsParent-false child
+*** DONE Claude says: "non-member", which you chose
 Prose currently says Independent / non-member / "affects not its parent"
 (heralds.org, glyph ⊥). If you dislike "non-member", "bystander" is
 short and vivid.
@@ -995,17 +1087,20 @@ things that describe a neighbor rather than standing for a graphnode.
 "Scaffold" was the old word and is free again in code. I'd only bother
 if the glossary entry gets rewritten anyway.
 ** display fact vs request
+*** DONE Claude says: the glossary has "display fact vs save input" and "view request vs edit request"
 The metadata grammar has two kinds of things: facts the server computes
 and discards on read (viewStats, heralds, relRepo display), and requests
 the server consumes on save ('editRequest', 'viewRequests'). The docs
 explain this per field, over and over. One glossary entry, with those
 two words, would let each field's documentation just say which it is.
 ** git snapshot
+*** Claude says: still a suggestion; your sidecar answer on "snapshot" may settle it
 HEAD, index and worktree, collectively. The diff code needs a word for
 "one of the three", and today uses "stage", "endpoint" and "snapshot"
 interchangeably.
 
 * Suggested order of work
+** DONE Claude says: superseded; we followed your answers instead
 In order: the doc bugs (already in problems.org); bury finished plans;
 the stale-name sweep (prose only, mechanical); the glossary repairs; the
 identifier renames that don't touch formats (treeid, 'Src', 'SkgRepo',
@@ -1038,30 +1133,35 @@ lives mainly in tests, a narrower follow-up pass would be cheap.
 TODO headlines need your decision. EASY headlines are clear winners with
 obvious execution, ready for me to start. Each is self-contained. Terms: "prose" = docs and comments; "identifier"
 = code names; "format" = wire atoms, YAML keys, file names.
-** TODO Adopt one-verb relation names (contains, mentions, follows, hides, overrides) with -er/-ed roles?
+** DONE Adopt one-verb relation names (contains, mentions, follows, hides, overrides) with -er/-ed roles?
+*** Claude says: superseded by your relation table; how far it reaches is [[*Claude says: your new names are a rename; how far should it reach?][this question]]
 This is your CRITICAL TODO's direction, made uniform. Format tier:
 .skg migration, both clients, heralds (S becomes F). Discussed under
 [[*Relation names and role names (your CRITICAL TODO)][relation names]]. If yes, do you also want "contains -> presents"?
 *** Claude says: not EASY
 It migrates every .skg file, including foreign repos you can't rewrite,
 so it needs its own plan.
-** TODO Name the first-role node "holder" instead of "owner"?
+** DONE Name the first-role node "holder" instead of "owner"?
+*** Claude says: you chose "recorder"; done
 Frees "owner/owned" for the user's repos only. Identifier and prose
 tier, about 300 server lines. [[*The two ends of an edge: holder, member, partner][Discussion]].
 *** Claude says: not EASY
 The execution is mechanical, but the word is your call.
-** TODO "relation" for the type and "edge" for one instance, retiring "relationship"?
+** DONE "relation" for the type and "edge" for one instance, retiring "relationship"?
+*** Claude says: you chose relation (type) / relationship (instance); done in prose
 'RelationshipAxes' would become 'EdgeAxes' or similar. [[*Relations, relationships, edges, memberships][Discussion]].
 *** Claude says: not EASY
 I think it's a clear winner, but each of the ~800 prose uses needs a
 judgment about which sense is meant, and the user-facing docs use
 "relationship" heavily. Worth your yes first.
-** TODO Rename the telescope "fold" (combining sections) so "fold" means only Org folding?
+** ONGOING Rename the telescope "fold" (combining sections) so "fold" means only Org folding?
+*** Claude says: your sidecar says compose/decompose; I'll do it when I process the sidecar
 Candidates: compose/decompose, stack/unstack. Identifier and prose
 tier. [[*fold][Discussion]].
 *** Claude says: not EASY
 Easy to execute once you pick the word.
-** EASY Reserve "hide" for the relation, renaming 'hiddenBody' to 'omittedBody'?
+** ONGOING Reserve "hide" for the relation, renaming 'hiddenBody' to 'omittedBody'?
+*** Claude says: your sidecar answers both of my questions below; I'll act when I process it
 Small format change (a display-only atom). [[*hide][Discussion]].
 *** Claude says: EASY
 'hidden_body' / 'hiddenBody' is a display-only fact: the parser discards
@@ -1073,7 +1173,7 @@ restriction.
 Let's use hidesFromSubs and hidesBody.
 There will be yet more hides later (from a links mentioners);
 no single kind can claim the whole word.
-**** TODO Claude says: two questions before I start
+**** ONGOING Claude says: two questions before I start
 ***** Does "hidesFromSubs" rename the stored relation, or only how we talk about it?
 The stored name 'hides_from_its_subscriptions' is a YAML key and a wire
 name, so renaming it means migrating every .skg file, including foreign
@@ -1085,9 +1185,10 @@ It marks a write-protected occurrence whose graphnode has a body that
 this rendering leaves out. "hidesBody" reads as "this occurrence hides
 its body", which fits. It is a display fact, so renaming it changes no
 data.
-** TODO Is "vognode" short for "viewnode of a graphnode"?
+** DONE Is "vognode" short for "viewnode of a graphnode"?
 I will write its glossary entry once you say.
 *** Claude says: a question only you can answer
+*** Claude says: you answered under [[*The graph's nodes and the view's nodes][graph and view nodes]]; the glossary entry is written
 ** DONE "treeid" for every ego_tree handle (now NodeId, node_id, nid, treeid)?
 Identifier tier only. [[*ego_tree handles][Discussion]].
 *** Claude says: EASY
@@ -1115,22 +1216,26 @@ About 90 comment and doc lines. "Affected" became "member" or
 "affectsParent false". "Normal", an older name for an active vognode,
 became "Active". Herald-style "Normal" and Neovim's 'Normal' highlight
 group are a different thing and were left alone.
-** TODO Which survives: "ID stack" or "link stack"?
+** DONE Which survives: "ID stack" or "link stack"?
+*** Claude says: you chose linkstack; done (commands, functions, docs, both clients)
 Both clients and both COMMANDS files mix them. [[*The ID stack is also the linkstack][Discussion]].
 *** Claude says: not EASY
 Your pick; it renames user-facing commands in both clients.
-** TODO Rename the YAML field 'misc' to 'flags'?
+** ONGOING Rename the YAML field 'misc' to 'flags'?
+*** Claude says: the in-memory field is renamed; the YAML key waits on [[*Claude says: your new names are a rename; how far should it reach?][the file-format question]]
 Format tier; one-line migration per file. [[*Flags][Discussion]].
 *** Claude says: not EASY after all
 On reflection: foreign repos carry 'misc' too, and you can't migrate
 them. That means either a coordinated change for everyone who shares
 data, or accepting both keys on read, which is legacy support.
-** TODO Unify the retry-approval keys under an "approved-" prefix?
+** DONE Unify the retry-approval keys under an "approved-" prefix?
+*** Claude says: you said yes under [[*Approval on retry][Approval on retry]]; done
 Format tier, both clients. [[*Approval on retry][Discussion]].
 *** Claude says: not EASY
 Mechanical, but it touches five protocol exchanges in both clients for
 a modest gain. Your call whether it's worth it.
-** TODO Rename search ranking's "context" (ContextOriginType, "rooty") to something specific, e.g. "prominence"?
+** ONGOING Rename search ranking's "context" (ContextOriginType, "rooty") to something specific, e.g. "prominence"?
+*** Claude says: your sidecar says yes; I'll do it when I process the sidecar
 [[*context][Discussion]].
 *** Claude says: not EASY
 Easy to execute once you pick the word.
@@ -1233,7 +1338,7 @@ a user-facing message, and the tests that check it. Emacs and Neovim
 suites pass.
 *** DONE Fix the stale 'Viewnode' doc comment that predates Neovim.
 Jeff : yes.
-** EASY Glossary repairs that need no decision
+** ONGOING Glossary repairs that need no decision
 *** DONE Remove the dead entries: "interp", "md = Metadata".
 Jeff : yes.
 Claude says: "md = Metadata" had a useful description of metadata, so I
@@ -1242,6 +1347,8 @@ kept it as a plain "metadata" entry that notes md means Markdown.
 which is about path branching.
 **** J : yes.
 **** Claude says: it is now "branch point (in a containerward path)"
+Your sidecar asks for "branching viewnode" instead; I'll change it when
+I process the sidecar.
 *** Fix the PartnerFolder entry's "partnerCols" / "hiddenCol" and its 10-versus-8 contradiction.
 **** DONE Jeff : what now? Please elaborate.
 If understanding this just requires me to read an earlier section
@@ -1260,14 +1367,14 @@ with the 6 + 2 = 8 account above. OK to do that?
 *** DONE Fix the link to 'claude-to-claude.org'.
 Jeff : yes.
 Claude says: the glossary now lists the save pipeline's stages itself.
-*** Add entries for phantom, definitive, inert, occurrence, birth, MSV,
+*** DONE Add entries for phantom, definitive, inert, occurrence, birth, MSV,
   collateral view, view request vs edit request, display fact vs save
   intent, and owned / foreign.
 **** J : yes
 **** DONE Claude says: done
-Added: owned/foreign, MSV, display fact vs save intent, view request vs
-edit request, collateral view, occurrence, definitive/write-protected,
-birth, phantom, inert. I put each next to its nearest relative rather
+Added: owned/foreign, MSV, display fact vs save input, view request vs
+edit request, collateral view, occurrence, editable/write-protected,
+birth, phantom, save-inert. I put each next to its nearest relative rather
 than alphabetically, since the glossary isn't alphabetical.
 *** Add the qualify-always convention (merge, snapshot, index, generation,
 commit) to 'coding-advice/names.org'. vognode waits on its TODO above.
