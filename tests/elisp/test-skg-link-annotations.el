@@ -62,12 +62,12 @@
               (skg-content-view-mode)
               (skg-link-annotations-mode 1)))
           (with-current-buffer first
-            (puthash "old" (list first skg-link-annotations--generation
+            (puthash "old" (list first skg-link-annotations--buffer-generation
                                  (buffer-chars-modified-tick) 20 '("node"))
                      skg-link-annotations--requests)
             (insert "edited"))
           (with-current-buffer second
-            (puthash "right" (list second skg-link-annotations--generation
+            (puthash "right" (list second skg-link-annotations--buffer-generation
                                    (buffer-chars-modified-tick) 20 '("node"))
                      skg-link-annotations--requests))
           (clrhash skg-link-annotations--cache)
@@ -89,7 +89,7 @@
                        (overlays-in (point-min) (point-max))))))
           (with-current-buffer second
             (puthash "old-repo-set"
-                     (list second skg-link-annotations--generation
+                     (list second skg-link-annotations--buffer-generation
                            (buffer-chars-modified-tick) 20 '("node"))
                      skg-link-annotations--requests))
           (setq skg-link-annotations--epoch 21)

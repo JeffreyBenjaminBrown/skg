@@ -97,12 +97,12 @@ describe('skg.link_annotations', function ()
     annotations.epoch = 20
     annotations.requests.old = {
       buf = first,
-      generation = vim.b[first].skg_link_annotations_generation,
+      buffer_generation = vim.b[first].skg_link_annotations_buffer_generation,
       tick = vim.api.nvim_buf_get_changedtick(first),
       epoch = 20, ids = { 'node' } }
     annotations.requests.right = {
       buf = second,
-      generation = vim.b[second].skg_link_annotations_generation,
+      buffer_generation = vim.b[second].skg_link_annotations_buffer_generation,
       tick = vim.api.nvim_buf_get_changedtick(second),
       epoch = 20, ids = { 'node' } }
     vim.api.nvim_buf_set_lines(first, 0, -1, false,
@@ -118,7 +118,7 @@ describe('skg.link_annotations', function ()
     assert.is_nil(annotations.requests.right)
     annotations.requests.old_repo_set = {
       buf = second,
-      generation = vim.b[second].skg_link_annotations_generation,
+      buffer_generation = vim.b[second].skg_link_annotations_buffer_generation,
       tick = vim.api.nvim_buf_get_changedtick(second),
       epoch = 20, ids = { 'node' } }
     annotations.epoch = 21
@@ -126,14 +126,14 @@ describe('skg.link_annotations', function ()
       '((request-id "old_repo_set") (results (("node" missing))))'))
     assert.same({ 'resolved', 'node', 'main' }, annotations.cache.node)
     annotations.requests.dead_buffer = {
-      buf = first, generation = 1, tick = 1, epoch = 21,
+      buf = first, buffer_generation = 1, tick = 1, epoch = 21,
       ids = { 'node' } }
     vim.api.nvim_buf_delete(first, { force = true })
     annotations.handle_response(sexpr.read(
       '((request-id "dead_buffer") (results (("node" missing))))'))
     assert.same({ 'resolved', 'node', 'main' }, annotations.cache.node)
     annotations.requests.old_connection = {
-      buf = second, generation = 1, tick = 1, epoch = 21,
+      buf = second, buffer_generation = 1, tick = 1, epoch = 21,
       ids = { 'node' } }
     annotations.connection_reset()
     assert.is_nil(annotations.requests.old_connection)

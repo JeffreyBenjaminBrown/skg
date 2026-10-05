@@ -169,8 +169,8 @@ end
 function M.refresh (buf)
   buf = buf ~= 0 and buf or vim.api.nvim_get_current_buf()
   if not valid(buf) then return end
-  local generation = (vim.b[buf].skg_link_annotations_generation or 0) + 1
-  vim.b[buf].skg_link_annotations_generation = generation
+  local buffer_generation = (vim.b[buf].skg_link_annotations_buffer_generation or 0) + 1
+  vim.b[buf].skg_link_annotations_buffer_generation = buffer_generation
   local tick = vim.api.nvim_buf_get_changedtick(buf)
   local positions = M.collect(buf)
   M.paint(buf, positions)
@@ -180,10 +180,10 @@ function M.refresh (buf)
       seen[position.id] = true
       table.insert(skgids, position.id) end
   end
-  if #skgids > 0 then M.request(buf, generation, tick, skgids) end
+  if #skgids > 0 then M.request(buf, buffer_generation, tick, skgids) end
 end
 
-function M.request (buf, generation, tick, skgids)
+function M.request (buf, buffer_generation, tick, skgids)
   if not state.tcp or state.tcp:is_closing() then
     for _, skgid in ipairs(skgids) do M.cache[skgid] = { 'lookup_failed' } end
     M.paint(buf, M.collect(buf))
@@ -199,7 +199,7 @@ function M.request (buf, generation, tick, skgids)
   state.register_response_handler('link-statuses',
     function (_payload_text, response) M.handle_response(response) end,
     false)
-  M.requests[request_id] = { buf = buf, generation = generation,
+  M.requests[request_id] = { buf = buf, buffer_generation = buffer_generation,
     tick = tick, epoch = M.epoch, ids = skgids }
   state.lp_pending_count = state.lp_pending_count + 1
   local ok = pcall(client.send_string, request)
@@ -219,7 +219,7 @@ function M.handle_response (response)
   state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
   local buf = entry.buf
   if entry.epoch ~= M.epoch or not valid(buf)
-     or entry.generation ~= vim.b[buf].skg_link_annotations_generation
+     or entry.buffer_generation ~= vim.b[buf].skg_link_annotations_buffer_generation
      or entry.tick ~= vim.api.nvim_buf_get_changedtick(buf) then
     return end
   local requested = {}
@@ -280,8 +280,8 @@ function M.disable (buf)
   buf = buf ~= 0 and buf or vim.api.nvim_get_current_buf()
   if not vim.api.nvim_buf_is_valid(buf) then return end
   vim.b[buf].skg_link_annotations_enabled = false
-  vim.b[buf].skg_link_annotations_generation =
-    (vim.b[buf].skg_link_annotations_generation or 0) + 1
+  vim.b[buf].skg_link_annotations_buffer_generation =
+    (vim.b[buf].skg_link_annotations_buffer_generation or 0) + 1
   pcall(vim.api.nvim_del_augroup_by_name, 'skg-link-annotations-' .. buf)
   vim.api.nvim_buf_clear_namespace(buf, M.namespace, 0, -1)
 end

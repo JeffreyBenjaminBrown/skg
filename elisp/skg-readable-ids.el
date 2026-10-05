@@ -18,13 +18,13 @@
 (defvar-local skg-readable-ids--positions nil
   "List of (start end id-string) triples from the last scan.")
 
-(defvar-local skg-readable-ids--generation 0
+(defvar-local skg-readable-ids--buffer-generation 0
   "Counter incremented on each annotation request.
 The response handler drops stale responses.")
 
 (defvar skg-readable-ids--pending-title-requests nil
   "FIFO queue of pending titles-by-ids requests.
-Each entry is (GENERATION BUFFER REQUESTED-IDS). The server
+Each entry is (BUFFER-GENERATION BUFFER REQUESTED-IDS). The server
 responds on the same TCP connection in request order, so a
 response is matched to the oldest pending request.")
 
@@ -84,11 +84,11 @@ triggers), no request is sent."
               (delete-dups
                (mapcar (lambda (p) (nth 2 p)) positions)))))
         (when uncached-skgids
-          (let ((generation
-                 (setq skg-readable-ids--generation
-                       (1+ skg-readable-ids--generation))))
+          (let ((buffer-generation
+                 (setq skg-readable-ids--buffer-generation
+                       (1+ skg-readable-ids--buffer-generation))))
             (skg-readable-ids--request-titles
-             uncached-skgids generation (current-buffer))))))))
+             uncached-skgids buffer-generation (current-buffer))))))))
 
 (defun skg-readable-ids--place-title-annotations ()
   "(Re)place after-string title annotations over the scanned ID
@@ -132,12 +132,12 @@ the full id. POSITIONS is a list of (start end id-string) triples."
                        (propertize "…"
                                    'face 'skg-magit-title-face)))))))
 
-(defun skg-readable-ids--request-titles (skgids generation buf
+(defun skg-readable-ids--request-titles (skgids buffer-generation buf
                                              &optional approved-pids)
   "Send a titles-by-ids request for IDS.
-GENERATION and BUF are captured for the response handler."
+BUFFER-GENERATION and BUF are captured for the response handler."
   (condition-case err
-      (let ((entry (list generation buf skgids)))
+      (let ((entry (list buffer-generation buf skgids)))
         (skg-readable-ids--ensure-title-response-handler)
         (skg-lp-reset)
         (let* ((tcp-proc (skg-tcp-connect-to-rust))
@@ -201,14 +201,14 @@ GENERATION and BUF are captured for the response handler."
        (nth 1 entry)
        (nth 2 entry)))))
 
-(defun skg-readable-ids--handle-response (payload generation buf requested-skgids)
+(defun skg-readable-ids--handle-response (payload buffer-generation buf requested-skgids)
   "Handle the titles-by-ids response.
 PAYLOAD is the tagged LP response; its titles merge into
 `skg-readable-ids--title-cache' unconditionally (they are true
 regardless of buffer state), and each of REQUESTED-IDS the server
 did not answer for is cached as `:missing' so it is not
-re-requested. GENERATION is checked against the buffer's current
-generation before annotating, to drop stale responses. BUF is the
+re-requested. BUFFER-GENERATION is checked against the buffer's current
+buffer-generation before annotating, to drop stale responses. BUF is the
 magit buffer to annotate."
   (let* ((response (read payload))
          (content  (cadr (assoc 'content response)))
@@ -225,7 +225,7 @@ magit buffer to annotate."
         (puthash skgid :missing skg-readable-ids--title-cache))))
   (when (buffer-live-p buf)
     (with-current-buffer buf
-      (when (= generation skg-readable-ids--generation)
+      (when (= buffer-generation skg-readable-ids--buffer-generation)
         (skg-readable-ids--place-title-annotations)))))
 
 (defun skg-readable-ids--format-title (title)

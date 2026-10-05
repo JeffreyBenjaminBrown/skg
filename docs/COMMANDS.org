@@ -1092,7 +1092,7 @@ Closes the TCP connection to the Rust server.
 Re-reads the authoritative =.skg= files, validates and replaces the in-memory
 graph, and rebuilds the derived Tantivy search index. It does not rewrite the
 =.skg= files. Existing views are closed after successful publication because
-they belong to the previous runtime generation.
+they were rendered before the rebuild.
 *** skg-strip-trailing-whitespace-from-bodies
 Strips trailing whitespace from every line of every body,
 and trailing blank lines from each body's tail,

@@ -302,7 +302,7 @@ So far there are these endpoints:
     and missing rows return neither title nor skgrepo. The lookup reads the
     published in-Rust graph snapshot and active skgrepo-set, independently
     of Tantivy title-index commits. =request-id= associates asynchronous
-    responses with their requesting buffer and generation.
+    responses with their requesting buffer and its buffer generation.
 
 ** Diff report
   - Request: =((request . "diff report") (include-staged . "BOOL") (include-unstaged . "BOOL"))=

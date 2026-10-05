@@ -65,19 +65,19 @@
         (insert test-skg-readable-ids--id-a)
         (setq skg-readable-ids--positions
               (skg-readable-ids--collect-ids))
-        (setq skg-readable-ids--generation 1)
+        (setq skg-readable-ids--buffer-generation 1)
         (skg-readable-ids--request-titles
          (list test-skg-readable-ids--id-a)
-         skg-readable-ids--generation
+         skg-readable-ids--buffer-generation
          (current-buffer))
         (erase-buffer)
         (insert test-skg-readable-ids--id-b)
         (setq skg-readable-ids--positions
               (skg-readable-ids--collect-ids))
-        (setq skg-readable-ids--generation 2)
+        (setq skg-readable-ids--buffer-generation 2)
         (skg-readable-ids--request-titles
          (list test-skg-readable-ids--id-b)
-         skg-readable-ids--generation
+         skg-readable-ids--buffer-generation
          (current-buffer))
         (skg-lp--dispatch-by-type
          nil
@@ -107,7 +107,7 @@
           "* (skg (inactiveNode (id %s) (repo private)))\n* (skg (node (id %s) (repo public))) active\n"
           test-skg-readable-ids--id-inactive
           test-skg-readable-ids--id-active))
-        (setq skg-readable-ids--generation 0)
+        (setq skg-readable-ids--buffer-generation 0)
         (skg-readable-ids--annotate-buffer)
         (should (= 2 (test-skg-readable-ids--display-count)))
         (skg-lp--dispatch-by-type

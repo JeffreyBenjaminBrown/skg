@@ -13,14 +13,14 @@
 (defvar skg-link-annotations--cache (make-hash-table :test 'equal)
   "Status by literal ID for the current graph and repo-set lifetime.")
 (defvar skg-link-annotations--requests (make-hash-table :test 'equal)
-  "Outstanding request ID to (buffer generation tick epoch ids).")
+  "Outstanding request ID to (buffer buffer-generation tick epoch ids).")
 (defvar skg-link-annotations--next-request 0)
 (defvar skg-link-annotations--epoch 0)
 
 (defvar-local skg-link-annotations--repo-suffix-enabled nil
   "Whether this buffer displays repo suffixes on Skg links.")
 (put 'skg-link-annotations--repo-suffix-enabled 'permanent-local t)
-(defvar-local skg-link-annotations--generation 0)
+(defvar-local skg-link-annotations--buffer-generation 0)
 (defvar-local skg-link-annotations--timer nil)
 
 (defun skg-toggle-repo-overlay-on-links ()
@@ -180,8 +180,8 @@ character."
     (when (timerp skg-link-annotations--timer)
       (cancel-timer skg-link-annotations--timer))
     (setq skg-link-annotations--timer nil)
-    (cl-incf skg-link-annotations--generation)
-    (let* ((generation skg-link-annotations--generation)
+    (cl-incf skg-link-annotations--buffer-generation)
+    (let* ((buffer-generation skg-link-annotations--buffer-generation)
            (tick (buffer-chars-modified-tick))
            (positions (skg-link-annotations--scan))
            (unknown (delete-dups
@@ -191,10 +191,10 @@ character."
                               collect skgid))))
       (skg-link-annotations--paint positions)
       (when unknown
-        (skg-link-annotations--request unknown generation tick)))))
+        (skg-link-annotations--request unknown buffer-generation tick)))))
 
-(defun skg-link-annotations--request (skgids generation tick)
-  "Request the status of IDS for this buffer's GENERATION and TICK."
+(defun skg-link-annotations--request (skgids buffer-generation tick)
+  "Request the status of IDS for this buffer's BUFFER-GENERATION and TICK."
   (let ((process (and (boundp 'skg-rust-tcp-proc) skg-rust-tcp-proc)))
     (if (not (and process (process-live-p process)))
         (progn
@@ -202,7 +202,7 @@ character."
             (puthash skgid '(lookup-failed) skg-link-annotations--cache))
           (skg-link-annotations--paint (skg-link-annotations--scan)))
       (let* ((request-id (format "links-%s" (cl-incf skg-link-annotations--next-request)))
-             (entry (list (current-buffer) generation tick
+             (entry (list (current-buffer) buffer-generation tick
                           skg-link-annotations--epoch skgids))
              (request (concat (prin1-to-string
                                `((request . "link statuses")
@@ -229,12 +229,12 @@ character."
     (when entry
       (remhash request-id skg-link-annotations--requests)
       (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count)))
-      (pcase-let ((`(,buffer ,generation ,tick ,epoch ,ids) entry))
+      (pcase-let ((`(,buffer ,buffer-generation ,tick ,epoch ,ids) entry))
         (when (and (= epoch skg-link-annotations--epoch)
                    (buffer-live-p buffer))
           (with-current-buffer buffer
             (when (and skg-link-annotations-mode
-                       (= generation skg-link-annotations--generation)
+                       (= buffer-generation skg-link-annotations--buffer-generation)
                        (= tick (buffer-chars-modified-tick)))
               (dolist (row (cadr (assq 'results response)))
                 (let ((skgid (car row)))
