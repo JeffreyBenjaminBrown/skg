@@ -305,14 +305,18 @@ The adjectives containerward, mentionerward, overriderward,
 overriddenward, and so on name the role a role tree follows: a
 containerward role tree follows the container role.
 
-*** ephem = ephemeral
+*** view-lifetime
 
-Some data regarding a node is ephemeral --
+Some data regarding a node is view-lifetime data
+(viewStats, for instance):
 it lasts only as long as the view of it in some buffer.
 
-Non-ephemeral data, by contrast,
-remains on disk when the app terminates,
+Data on disk, by contrast,
+remains when the app terminates,
 and can be recovered by a later session.
+(The "ephemeral data stores", the in-Rust graph and the search index,
+are something else: rebuilt from disk each time the server starts,
+they outlive every view.)
 
 *** branching viewnode (vs a branch)
 
