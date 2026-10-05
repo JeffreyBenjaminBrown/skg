@@ -180,7 +180,7 @@ fn format_buffer_validation_error (
       let fmt_opt = |skgid : &Option<ID>| -> String {
         skgid . as_ref () . map ( |i| i . 0 . clone () )
           . unwrap_or_else ( || "<none>" . to_string () ) };
-      format!("Invalid (overridesHere ...) marker; saving it would rewrite a contains list, so the save was aborted:\n- the node carrying the marker: {}\n- the original the marker claims it stands for: {}\n- what the server would draw in place of that original: {}\n- The marker looks hand-edited or stale. Re-render the view (close and reopen, or C-c g RET) and retry.\n",
+      format!("Invalid (overridesHere ...) fact; saving it would rewrite a contains list, so the save was aborted:\n- the node carrying the fact: {}\n- the original the fact claims it stands for: {}\n- what the server would draw in place of that original: {}\n- The fact looks hand-edited or stale. Re-render the view (close and reopen, or C-c g RET) and retry.\n",
               fmt_opt (carrier), original . 0, fmt_opt (effective)) },
     BufferValidationError::Multiple_Defining_Viewnodes (skgid) => {
       format!("ID has multiple defining containers:\n- ID: {}\n",

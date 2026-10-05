@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Integration test for focus and folded markers functionality
+# Integration test for focus and folded atoms functionality
 # This script:
 # - Backs up and resets test data to clean state (6 .skg files)
 # - Starts an independent cargo run process with test config
-# - Uses Emacs to test focus and folded marker addition during save
+# - Uses Emacs to test focus and folded atom addition during save
 # - Cleans up any test artifacts and restores original state
 
 set -e  # Exit on any error
@@ -15,7 +15,7 @@ PROJECT_ROOT="$(cd "$TEST_DIR/../../.." && pwd)"
 # Repo common test library
 source "$TEST_DIR/../test-lib.sh"
 
-echo "=== SKG Focus and Folded Markers Integration Test ==="
+echo "=== SKG Focus and Folded Atoms Integration Test ==="
 echo "Test directory: $TEST_DIR"
 echo "Project root: $PROJECT_ROOT"
 

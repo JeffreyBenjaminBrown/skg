@@ -65,7 +65,7 @@ fn add_editable_view_request_to_subscribees (
     . lines()
     . map(|line| {
       if line . contains ("subscribee-") && line . contains ("writeProtected") {
-        // Insert viewRequests right after the `write-protected' marker. In the
+        // Insert viewRequests right after the `write-protected' atom. In the
         // semantic-herald format `writeProtected' may be followed by `)'
         // (no more atoms) or by `(rels ...)' or `(viewStats ...)'.
         if line . contains ("writeProtected)") {
@@ -171,7 +171,7 @@ fn assert_hides_e1_in_subscribee_folder (
 ) {
   assert! (
     // 'folded': a new hidden folder begins folded (TODO/fork-fixes.org),
-    // expressed as a fold marker on each member.
+    // expressed as a folded atom on each member.
     buffer . contains ("**** (skg hiddenInSubscribeeFolder)\n***** (skg folded (node (id e1) (repo foreign) writeProtected"),
     "Expected e1 to be rendered folded under HiddenInSubscribeeFolder:\n{}",
     buffer );
@@ -199,7 +199,7 @@ fn move_h_from_hiddenin_folder_to_visible_subscribee_content (
         None
       } else if line . contains ("(id H)") {
         Some (line . replacen ("***** ", "**** ", 1)
-              // A real client manages fold markers itself (they are
+              // A real client manages fold metadata itself (they are
               // re-derived from visibility at save), so the moved
               // line would not carry the folder's 'folded' mark.
               . replacen ("(skg folded ", "(skg ", 1))

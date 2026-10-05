@@ -76,7 +76,7 @@ pub struct ViewnodeMetadata {
   pub unknown_relRepo : Option<SkgRepoName>,
   pub unknown_relRepo_request : Option<SkgRepoName>,
   // When true, this is a restricted-skgrepo placeholder: an anonymous,
-  // dataless marker (see RestrictedVognode). It carries no id/repo/etc.
+  // dataless atom (see RestrictedVognode). It carries no id/repo/etc.
   pub is_restricted_node : bool,
   // When true, this is a PhantomDiff. It carries the same fields as a
   // node (id/repo/write-protected/graphStats/diff axes), parsed via
@@ -428,7 +428,7 @@ pub fn parse_metadata_to_viewnodemd (
           "focused"  => result . focused = true,
           "folded"   => result . folded = true,
           "bodyFolded" => result . body_folded = true,
-          // A restricted vognode is a dataless bare-atom marker
+          // A restricted vognode is a dataless bare atom
           // (see RestrictedVognode). The legacy field-bearing list form
           // '(restrictedNode ...)' is still tolerated by the List arm
           // above so a stale buffer round-trips.
@@ -545,7 +545,7 @@ fn parse_node_sexp (
         let bare_value : String =
           atom_to_string (element) ?;
         match bare_value . as_str () {
-          // A `writeProtected` marker makes this occurrence write-protected.
+          // A `writeProtected` atom makes this occurrence write-protected.
           // The server emits and accepts this exact atom (see org_to_text.rs).
           "writeProtected" =>
             metadata . writeProtected = true,
@@ -661,7 +661,7 @@ fn parse_unknownnode_sexp (
 /// older server's field-bearing list form is tolerated here -- its
 /// children (id/repo/membership/overridesHere) are discarded -- so a
 /// stale buffer still round-trips. A restricted vognode is an
-/// anonymous, dataless marker (see RestrictedVognode).
+/// anonymous, dataless atom (see RestrictedVognode).
 fn parse_restrictednode_sexp (
   _items   : &[Sexp],
   metadata : &mut ViewnodeMetadata,

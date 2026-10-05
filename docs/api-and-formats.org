@@ -885,7 +885,7 @@ under different parents):
   request as one red semantic state: =request:no search matching= for =true=,
   or =request:search matching= for =false=.
 - =(overridesHere N)= — crucial =ĥ= immediately after the =O= token; the load-bearing
-  substitution marker, documented in the next subsection.
+  substitution fact, documented in the next subsection.
 
 ** Node flags
 
@@ -898,7 +898,7 @@ therefore blocks direct title, alias, body, regexp, operator, and
 field-qualified matches, but is not an access-control boundary and does not
 remove graph context.
 
-** Override substitution and the overridesHere marker
+** Override substitution and the overridesHere fact
 
 When view completion would CREATE a viewnode for node N as
 recursive content, and an owned overrider R of N is visible
@@ -930,20 +930,20 @@ a node whose only overrider is invisible under the skgrepo restriction is
 
 A substituted viewnode carries the keyed viewStats form
 =(overridesHere N)= -- crucial =ĥ= immediately after =O= -- naming the original it
-stands for. The marker is LOAD-BEARING at save: wherever it
+stands for. The fact is LOAD-BEARING at save: wherever it
 appears, extraction collects N rather than the carrying node's own
 ID, so a container's contains list round-trips to the original
 instead of being rewritten to the overrider. Edits to the drawn
 node itself (title, body, folders) still save to the drawn node.
-A buffer whose marker the server would not have drawn (the carrier
+A buffer whose fact the server would not have drawn (the carrier
 is not on N's owned override chain -- the ownership-gated,
 visibility-UNGATED walk out of N) aborts the save with an
 explanation. With chains the honest carrier may be a MIDDLE link
 (drawn when a later link's mentioner is hidden), so the check accepts
-any node on the chain and rejects only off-chain markers. A
+any node on the chain and rejects only off-chain facts. A
 skgrepo-set switch that makes a
 drawn substitute's skgrepo restricted turns it into an anonymous
-=restrictedNode= (the marker does not survive -- a restricted node is
+=restrictedNode= (the fact does not survive -- a restricted node is
 dataless); the original it stood for is preserved in its container's
 contains by disk supplementation.
 

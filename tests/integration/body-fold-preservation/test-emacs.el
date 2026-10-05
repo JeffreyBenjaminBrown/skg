@@ -10,7 +10,7 @@
 ;;;    `org-cycle' twice → child *headline* visible, parent body
 ;;;    visible, but the *child's* body is hidden.
 ;;;    After save: the child's body should still be hidden. The
-;;;    current fold-marker mechanism only marks invisible *headlines*.
+;;;    current fold-atom mechanism only marks invisible *headlines*.
 ;;;    The child isn't hidden, and a body line isn't a headline, so
 ;;;    nothing gets marked — the child's body comes back visible.
 ;;;    That's the bug this scenario exposes.

@@ -91,7 +91,7 @@ overrides C overrides N).
 Refuses if the buffer has unsaved changes (\"Save the buffer before
 forking.\"), so the clone's saved state matches what you see. Otherwise
 stamps (viewRequests fork) into the headline's own (skg (node ...)) --
-targeting the headline's OWN id, never an (overridesHere N) marker it may
+targeting the headline's OWN id, never an (overridesHere N) fact it may
 carry -- and auto-saves (unlike `skg-request-editable-view'). The server
 returns the usual fork-confirmation buffer; Emacs prompts for the clone's
 repo (unless already specified), then approve with C-c C-c or decline

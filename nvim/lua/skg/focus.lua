@@ -11,7 +11,7 @@ local M = {}
 ---Add 'focused' to the metadata of the current headline (finding the
 ---owning headline when the cursor is in a body). No change if already
 ---focused.
-function M.add_focused_marker ()
+function M.add_focused_metadata ()
   local line_number = M.owning_headline_line()
   if not line_number then return end
   metadata.edit_metadata_at_line(line_number,
@@ -30,7 +30,7 @@ function M.owning_headline_line ()
 end
 
 ---@param line_number integer|nil
----@return boolean does that headline carry the focused marker?
+---@return boolean does that headline carry the focused atom?
 function M.headline_has_focused_p (line_number)
   local sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
   return sexp ~= nil
@@ -58,7 +58,7 @@ function M.goto_focused_headline ()
 end
 
 ---Remove 'focused' from the first focused headline, if any.
-function M.remove_focused_marker ()
+function M.remove_focused_metadata ()
   local line = M.focused_headline_line()
   if line then
     metadata.edit_metadata_at_line(line,

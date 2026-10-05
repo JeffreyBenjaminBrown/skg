@@ -584,7 +584,7 @@ In buffer 2, we need to:
 =skg-edit-metadata-at-point= merges sexp structures. It can ADD
 fields but it's unclear if it can REMOVE =writeProtected= (a bare
 atom, not a key-value pair). We may need to use =(DELETE writeProtected)=
-syntax (like =skg-remove-focused-marker= uses =(DELETE focused)=).
+syntax (like =skg-remove-focused-metadata= uses =(DELETE focused)=).
 
 So the two calls would be:
 1. =(skg-edit-metadata-at-point '(skg (DELETE writeProtected)))=

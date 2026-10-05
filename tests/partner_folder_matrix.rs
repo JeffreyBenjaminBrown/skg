@@ -369,7 +369,7 @@ fn relationship_matrix
 //////////////////////////////////////////////////////////////
 // The Path view-request, '(viewRequests (roleTree ROLENAME))': graft the
 // partners playing ROLENAME toward the node as inverted write-protected
-// children with a '(birth roleGraft ROLENAME)' marker. One generic
+// children with a '(birth roleGraft ROLENAME)' fact. One generic
 // role-tree engine serves all nine roles; these cover the seven new
 // ones (the container/mentioner roles keep their own golden tests).
 // An absent relation field stays MSV::Unspecified on save, so these
@@ -387,7 +387,7 @@ async fn path_request_scenarios (
       recorder, role, title ) };
   // Each row: (scenario, recorder, role, partner-id, birth-span-fragment).
   // Since uniform-heralds, the grafted partner no longer carries the
-  // old (birth roleGraft ROLE) marker nor a parent-relative viewStat;
+  // old (birth roleGraft ROLE) fact nor a parent-relative viewStat;
   // instead its relationship TO its viewparent (the origin) shows as the
   // birth (black-on-white) token inside its (rels ...) spans.
   // E.g. the 'overridden' partner is overridden BY the origin -> its

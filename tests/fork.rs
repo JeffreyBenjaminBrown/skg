@@ -742,7 +742,7 @@ async fn fork_fixture_files (
 /// listing N but no unrequested overriddenFolder. The load-bearing property:
 /// P's stored
 /// 'contains' is NOT rewritten to the clone -- it still lists N, so the
-/// marker round-trips and a save never silently re-points containers at
+/// fact round-trips and a save never silently re-points containers at
 /// the clone. (That the clone's subscribee-as-such view of N starts
 /// empty and fills as N gains children is the prerequisite rule,
 /// exercised in hidden_from_subscriptions; here C.contains ==
@@ -779,7 +779,7 @@ async fn fork_round_trip (
     p_view );
 
   // The load-bearing round-trip: P's stored contains was NOT rewritten
-  // to the clone; it still lists N (the marker collected N, not C).
+  // to the clone; it still lists N (the fact collected N, not C).
   let p_disk : Graphnode = node_from_disk (config, "P") ?;
   assert_eq! ( members_of (& p_disk . contains), vec! [ ID::from ("N") ],
     "P's contains must still point at N, not the clone {}", clone_skgid . 0 );

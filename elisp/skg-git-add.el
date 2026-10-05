@@ -30,7 +30,7 @@
 
 (defun skg--explain-if-blind-to-new-files (path-count)
   "When PATH-COUNT is 0 because git diff mode is off, say so.
-New files are recognized by the `(unstaged addedN)' markers that only a
+New files are recognized by the `(unstaged addedN)' atoms that only a
 diff-mode render carries, so with diff mode off this command is blind
 -- reporting \"0 files\" as if the user did it right would mislead.
 Returns non-nil when it explained (the caller then skips its own
@@ -38,7 +38,7 @@ report)."
   (when (and (zerop path-count)
              (not skg--git-diff-mode-enabled))
     (message
-     "Git diff mode is off, so new files cannot be recognized: this command looks for the addedN markers only a diff-mode view carries. Toggle diff mode (C-c v d), then retry.")
+     "Git diff mode is off, so new files cannot be recognized: this command looks for the addedN atoms only a diff-mode view carries. Toggle diff mode (C-c v d), then retry.")
     t))
 
 (defun skg-git-add-if-new-recursive ()

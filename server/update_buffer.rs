@@ -532,7 +532,7 @@ pub fn finish_viewforest (
   // (a phantom / Deleted / DeadViewnode) is a non-dead generalized orphan and
   // must become a non-member.
   mark_orphans_under_dead_parents_false ( viewforest );
-  // Correct any affectsParent markers whose claimed relation to the parent doesn't
+  // Correct any affectsParent atoms whose claimed relation to the parent doesn't
   // hold in the captured graph (e.g. user moved a birth=linksToParent node
   // under a new parent it doesn't link to).
   validate_affectsParent_relationships ( viewforest, graph );

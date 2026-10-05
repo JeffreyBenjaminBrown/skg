@@ -1,10 +1,10 @@
--- Integration test for focus and folded markers, nvim client. The Lua
+-- Integration test for focus and folded atoms, nvim client. The Lua
 -- mirror of test-emacs.el in this directory. It tests, in order:
 -- - Creating a buffer with 6 headlines;
 -- - Folding headline 3 (which contains headlines 4 and 5);
 -- - Positioning point on headline 2;
 -- - Saving with save.request_save_buffer;
--- - Verifying that after save, the markers are removed but the
+-- - Verifying that after save, the atoms are removed but the
 --   folding is preserved and point is on the focused headline.
 --
 -- NOTE: file system operations (backup/cleanup) are handled by
@@ -18,7 +18,7 @@ local folds = require('skg.folds')
 local metadata = require('skg.metadata')
 local save = require('skg.save')
 
-print('=== SKG Focus and Folded Markers Integration Test ===')
+print('=== SKG Focus and Folded Atoms Integration Test ===')
 
 -- PHASE 1: create the test buffer.
 print('=== PHASE 1: Creating test buffer ===')
@@ -31,7 +31,7 @@ local content = table.concat({
   '** (skg (node (id 6))) 6',
 }, '\n')
 local buf = buffer.open_org_buffer_from_text(
-  content, 'skg://focus-and-folded-markers-test')
+  content, 'skg://focus-and-folded-metadata-test')
 print('Created buffer with 6 headlines')
 
 T.write_file('initial.log', T.buffer_text(buf))
@@ -70,12 +70,12 @@ for line = 1, vim.api.nvim_buf_line_count(buf) do
   end
 end
 
--- Debug: manually test folds.add_folded_markers.
-print('=== Testing folds.add_folded_markers ===')
-folds.add_folded_markers()
-local after_folded_markers = T.buffer_text(buf)
-T.write_file('after-folded-markers.log', after_folded_markers)
-print('Buffer after folds.add_folded_markers:\n' .. after_folded_markers)
+-- Debug: manually test folds.add_folded_metadata.
+print('=== Testing folds.add_folded_metadata ===')
+folds.add_folded_metadata()
+local after_folded_metadata = T.buffer_text(buf)
+T.write_file('after-folded-metadata.log', after_folded_metadata)
+print('Buffer after folds.add_folded_metadata:\n' .. after_folded_metadata)
 
 -- PHASE 2: save the buffer.
 print('=== PHASE 2: Saving buffer ===')
@@ -88,16 +88,16 @@ T.write_file('result.log', result_content)
 print('Saved result buffer state to result.log')
 print('Result content:\n' .. result_content)
 
-local has_focused_marker =
+local has_focused_metadata =
   result_content:find('%f[%w]focused%f[%W]') ~= nil
-local has_folded_marker =
+local has_folded_metadata =
   result_content:find('%f[%w]folded%f[%W]') ~= nil
 local final_line = vim.api.nvim_get_current_line()
 local line_4_invisible = folds.line_invisible_p(4)
 local line_5_invisible = folds.line_invisible_p(5)
 
-T.check(not has_focused_marker, 'focused marker removed from buffer')
-T.check(not has_folded_marker, 'folded markers removed from buffer')
+T.check(not has_focused_metadata, 'focused atom removed from buffer')
+T.check(not has_folded_metadata, 'folded atoms removed from buffer')
 T.check(final_line:find('(id 2)', 1, true) ~= nil,
         'point is on headline 2 (focused headline)')
 T.check(line_4_invisible, 'headline 4 is invisible (folded)')

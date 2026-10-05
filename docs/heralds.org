@@ -51,7 +51,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | the birth letter     | high        | the letter of a relation that put this occurrence here                       |
 | relationship sides   | their tier  | counts and ancestor flags; see [[*Relationship heralds][Relationship heralds]]                     |
 | property counts      | low         | =A3= aliases, =I1= extra IDs, =F2= true flags                                 |
-| position markers     | crucial     | =☮= write-protected, =B= omitted body, =⊥= affects not its parent, =ĥ= overrides here |
+| position glyphs      | crucial     | =☮= write-protected, =B= omitted body, =⊥= affects not its parent, =ĥ= overrides here |
 |                      | medium      | =⟳= cycle                                                                     |
 | home-repo heralds    | normal      | =⌂:LABEL=                                                                     |
 |                      | yucky       | =~NAME=, a relRepo more private than the default                              |
@@ -146,10 +146,10 @@ grandparent) draws the 'b' medium, because of b's floor.
 
 Immediately after =O=, a crucial =ĥ= (precomposed h with circumflex)
 means this occurrence substitutes for a node it overrides. =2Oĥ3= is an
-example. It comes from the load-bearing 'overridesHere' marker; an
-override folder or path occurrence without that marker has no =ĥ=. The
-eighth ancestor is a plain =h=, so =Oĥh= shows the two markers together.
-The marker preserves the original membership ID when a substituted view
+example. It comes from the load-bearing 'overridesHere' fact; an
+override folder or path occurrence without that fact has no =ĥ=. The
+eighth ancestor is a plain =h=, so =Oĥh= shows the two glyphs together.
+The fact preserves the original membership ID when a substituted view
 is saved. See [[file:override.org][override behavior]].
 
 ** Other heralds
@@ -172,7 +172,7 @@ request a view. =delete=, =merge:...=, and =request:no search matching=
 or =request:search matching= are save requests.
 
 An unknown node is labeled =Reference to unknown node.=; a restricted
-skgrepo yields an anonymous =node from restricted skgrepo= marker, which
+skgrepo yields an anonymous =node from restricted skgrepo= placeholder, which
 reveals no node title or skgrepo. =DELETED= marks a deleted node, or a
 viewnode whose node was deleted.
 

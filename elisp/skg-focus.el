@@ -7,7 +7,7 @@
 (require 'skg-metadata)
 (require 'skg-sexpr-search)
 
-(defun skg-add-focused-marker ()
+(defun skg-add-focused-metadata ()
   "Add 'focused' to metadata of the current headline.
 If point is in a headline body, navigates to the owning headline.
 Merges '(skg focused)' into existing metadata.
@@ -20,7 +20,7 @@ If metadata already contains 'focused', no change."
   "Move point to the first headline with 'focused' in its (view ...) metadata.
 If no focused headline is found, move point to the beginning of buffer.
 TODO: This could be faster if we found 'focused' in the course of dealing
-with 'folded' markers, rather than searching for it separately afterward."
+with 'folded' atoms, rather than searching for it separately afterward."
   (goto-char (point-min))
   (let ((found-position nil))
     (save-excursion
@@ -35,7 +35,7 @@ with 'folded' markers, rather than searching for it separately afterward."
         (goto-char found-position)
       (goto-char (point-min)))))
 
-(defun skg-remove-focused-marker ()
+(defun skg-remove-focused-metadata ()
   "Remove 'focused' from metadata of the focused headline.
 Searches for the first headline with 'focused' in its metadata and removes it.
 If no focused headline is found, does nothing."

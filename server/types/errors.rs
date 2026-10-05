@@ -73,7 +73,7 @@ pub enum BufferValidationError {
                                   Vec<ID>,  // ids the buffer's IDFolder claims
                                   Vec<ID>), // the recorder's real ids (pid + extra_ids); empty if the recorder is not in the graph
   OverridesHere_Mismatch         (Option<ID>, // the carrier's own ID
-                                  ID,         // the original the marker claims
+                                  ID,         // the original the fact claims
                                   Option<ID>), // who the graph says substitutes for that original; None if the graph was unavailable
   Other                          (String),
 }
@@ -168,7 +168,7 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::FlagEditOnUnknownNode (skgid) =>
         write! (f, "Cannot change flags of unsaved or unknown node {:?}; save the node first.", skgid),
       BufferValidationError::OverridesHere_Mismatch(carrier, original, effective) =>
-        write!(f, "Node {:?} carries the marker (overridesHere {:?}), but it is not on the override chain of that original (which resolves to {:?}). The marker looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, original, effective),
+        write!(f, "Node {:?} carries the fact (overridesHere {:?}), but it is not on the override chain of that original (which resolves to {:?}). The fact looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, original, effective),
       BufferValidationError::Other (msg) =>
         write!(f, "{}", msg), }} }
 

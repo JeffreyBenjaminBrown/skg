@@ -10,9 +10,9 @@
 ;; client-side fold/unfold + focus processing it runs.
 ;;
 ;; ROOT CAUSE (exposed by the failing test below):
-;; After `skg-fold-marked-headlines' + `skg-remove-folded-markers'
+;; After `skg-fold-marked-headlines' + `skg-remove-folded-metadata'
 ;; run, the root headline is folded (its subtree hidden by an
-;; org-fold overlay). Then `skg-remove-focused-marker' finds the
+;; org-fold overlay). Then `skg-remove-focused-metadata' finds the
 ;; root, and `skg-edit-metadata-at-point' calls
 ;; `skg-replace-current-line', which issues a
 ;; `delete-region' on (line-beginning-position . line-end-position).
@@ -61,7 +61,7 @@ root with `focused' metadata and each child with `folded' metadata.
       (kill-buffer buf))))
 
 (ert-deftest test-save-response-no-focused-preserves-root ()
-  "Same as above but without a `focused' marker on the root, to
+  "Same as above but without a `focused' atom on the root, to
 isolate the fold-processing path from the focus-processing path."
   (let* ((from-rust
           (concat

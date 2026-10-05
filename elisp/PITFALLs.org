@@ -15,7 +15,7 @@ check (=org-fold-core--fix-folded-region= →
 
 Either way, the visible behavior is "the headline vanishes and the
 fold's text is destroyed." This is extra dangerous because the
-error can fire during the OUTBOUND save (=skg-add-focused-marker=
+error can fire during the OUTBOUND save (=skg-add-focused-metadata=
 editing the root before any TCP round-trip), leaving the buffer
 in a corrupted state that the user cannot recover from.
 

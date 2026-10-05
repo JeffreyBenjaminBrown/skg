@@ -153,7 +153,7 @@ rule table after repeated attempts.")
 
 ;;;###autoload
 (define-minor-mode heralds-minor-mode
-  "Display skg metadata as a short list of \"herald\" markers.
+  "Display skg metadata as a short list of \"heralds\".
 Each org headline the server sends starts with `(skg ...)` metadata.
 This mode lenses that tree via `skg-transform-sexp-flat`, producing
 coloured tokens that summarise view and code information. The served

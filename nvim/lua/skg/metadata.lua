@@ -302,7 +302,7 @@ function M.node_requests_editable_view_p (metadata_sexp)
 end
 
 ---@param metadata_sexp any
----@return boolean does it carry the bare write-protected marker?
+---@return boolean does it carry the bare write-protected atom?
 function M.node_write_protected_p (metadata_sexp)
   return compare.subtree_p(metadata_sexp,
     { SKG, { NODE, sexpr.symbol('writeProtected') } })

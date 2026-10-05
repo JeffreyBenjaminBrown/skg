@@ -52,13 +52,13 @@
                   (message "✗ FAIL: Error buffer does not contain expected content")
                   (kill-emacs 1)))))
 
-          ;; Check that buffer has no focused marker. Focus and fold information is sent to the server but not shown to the user.
+          ;; Check that buffer has no focused atom. Focus and fold information is sent to the server but not shown to the user.
           (if content-buffer
               (with-current-buffer content-buffer
                 (let ((content (buffer-substring-no-properties (point-min) (point-max))))
                   (if (string= content "* (skg (node (id 1) (repo main))) 1\n** (skg (node (id 1))) 1")
                       (progn
-                        (message "✓ PASS: Buffer content unchanged (no lingering markers)")
+                        (message "✓ PASS: Buffer content unchanged (no lingering atoms)")
                         (setq integration-test-phase "invalid-save-complete"))
                     (progn
                       (message "✗ FAIL: Buffer content does not match expected")
@@ -101,14 +101,14 @@
     (let ((updated-content (buffer-substring-no-properties (point-min) (point-max))))
       (message "Updated buffer content: %s" updated-content)
 
-      ;; Should contain cycle and write-protected markers
+      ;; Should contain cycle and write-protected atoms
       ;; Note: cycle and write-protected are inside (node ...)
       (if (and (string-match-p "cycle" updated-content)
                (string-match-p "\\bwriteProtected\\b" updated-content))
           (progn
             (message "✓ PASS: Valid save worked and showed cycle writeProtected"))
         (progn
-          (message "✗ FAIL: Expected cycle and writeProtected markers not found")
+          (message "✗ FAIL: Expected cycle and writeProtected atoms not found")
           (message "Expected to contain: 'cycle' and 'writeProtected'")
           (message "Got: %s" updated-content)
           (kill-emacs 1)))))

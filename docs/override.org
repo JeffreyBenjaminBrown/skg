@@ -184,17 +184,17 @@ their existing raw positions while ordinary reconciliation refreshes their
 content and stats.  A later independent direct visit to =F= still opens raw
 =F=, in accordance with the exact-visit rule.
 
-*** The =overridesHere= marker
+*** The =overridesHere= fact
 
 A substituted viewnode carries =(overridesHere N)=, where =N= is the
-original node for which the displayed carrier substitutes.  The marker
+original node for which the displayed carrier substitutes.  The fact
 is load-bearing during save: the viewnode contributes =N= to its parent's
 stored relationship list rather than the carrier's ID.  Editing the
 carrier's title, body, or folders still edits the carrier itself.
 
-The server rejects a forged or stale marker whose carrier is not on
+The server rejects a forged or stale fact whose carrier is not on
 =N='s owned override chain.  The validation walk is intentionally
-visibility-ungated so that a marker which was honest when rendered does
+visibility-ungated so that a fact which was honest when rendered does
 not become invalid merely because the skgrepo restriction changed.
 
 ** Heralds and reasons for placement

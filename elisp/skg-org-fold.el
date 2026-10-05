@@ -48,9 +48,9 @@ with a message, unless its children need to be revealed."
 
 (defun skg-fold-marked-headlines ()
   "PURPOSE:
-Restore the user's fold state from per-headline metadata markers.
+Restore the user's fold state from per-headline metadata atoms.
 .
-Two markers are recognised:
+Two atoms are recognised:
 - 'folded'      : THIS headline is hidden inside a folded ancestor.
                   We restore that by folding its parent's subtree.
 - 'bodyFolded'  : THIS headline is visible but its body is hidden
@@ -98,8 +98,8 @@ fold; we don't have to undo any prior fold."
         (org-fold-hide-entry))
       (forward-line 1))))
 
-(defun skg-remove-folded-markers ()
-  "Remove 'folded' and 'bodyFolded' markers from all (skg ...) metadata.
+(defun skg-remove-folded-metadata ()
+  "Remove 'folded' and 'bodyFolded' atoms from all (skg ...) metadata.
 Re-folds headlines that had folded children using org-mode functions,
 and re-hides entries that had `bodyFolded'."
   (save-excursion
@@ -148,7 +148,7 @@ Caller must `set-marker' each to nil when done."
         (forward-line 1)))
     markers))
 
-(defun skg-add-folded-markers ()
+(defun skg-add-folded-metadata ()
   "Annotate the headline at each fold-relevant position.
 - For each *invisible* headline (hidden inside a folded ancestor),
   merge `(skg folded)' into its metadata.
@@ -180,7 +180,7 @@ Operationally:
   or its next sibling) must be visible — or absent. If the next
   headline is also hidden, the body's hiddenness is a consequence of
   this headline's subtree being folded, which the existing `folded'
-  marker mechanism already restores via the children's markers; we
+  atom mechanism already restores via the children's atoms; we
   must not double-record it."
   (save-excursion
     (forward-line 1)
@@ -195,7 +195,7 @@ Operationally:
                (not (invisible-p next-headline)))))))
 
 (defun skg-collect-parent-markers-of-folded-headlines ()
-  "Collect markers for parent headlines of all headlines with folded markers.
+  "Collect markers for parent headlines of all headlines with folded atoms.
 Returns a list of markers pointing to parent headlines.
 Duplicates are removed - each parent appears only once in the list.
 Caller is responsible for freeing the markers with set-marker."
@@ -206,7 +206,7 @@ Caller is responsible for freeing the markers with set-marker."
         (beginning-of-line)
         (when (and (org-at-heading-p)
                    (skg-headline-has-folded-in-view-p))
-          ;; This headline has "folded" marker, so record its parent
+          ;; This headline has the "folded" atom, so record its parent
           (save-excursion
             (when (org-up-heading-safe)
               (let ((parent-pos (point)))
@@ -221,16 +221,16 @@ Caller is responsible for freeing the markers with set-marker."
   "Return t if the current headline has 'folded' in its metadata.
 Assumes point is at the beginning of a headline.
 Verifies the structure is (skg ... folded ...)."
-  (skg--headline-has-bare-marker-p 'folded))
+  (skg--headline-has-bare-atom-p 'folded))
 
 (defun skg-headline-has-bodyfolded-in-view-p ()
   "Return t if the current headline has 'bodyFolded' in its metadata.
 Assumes point is at the beginning of a headline.
 Verifies the structure is (skg ... bodyFolded ...)."
-  (skg--headline-has-bare-marker-p 'bodyFolded))
+  (skg--headline-has-bare-atom-p 'bodyFolded))
 
-(defun skg--headline-has-bare-marker-p (marker)
-  "Return t if the current headline's metadata contains the bare atom MARKER.
+(defun skg--headline-has-bare-atom-p (atom)
+  "Return t if the current headline's metadata contains the bare atom ATOM.
 Assumes point is at the beginning of a headline."
   (when (org-at-heading-p)
     (let* ((headline-text (skg-get-current-headline-text))
@@ -241,6 +241,6 @@ Assumes point is at the beginning of a headline."
           (when (and metadata-sexp
                      (not (string-empty-p metadata-sexp)))
             (skg-sexp-subtree-p (read metadata-sexp)
-                                (list 'skg marker))))))))
+                                (list 'skg atom))))))))
 
 (provide 'skg-org-fold)

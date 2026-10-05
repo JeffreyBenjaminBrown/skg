@@ -190,7 +190,7 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///     skipped, so "text changed ✓ ✗" shows only the marks that apply.
 ///
 ///   * 'leaf_abut' -- the emitted token glues onto the preceding
-///     token with no space (used so the write-protected marker "☮" sits
+///     token with no space (used so the write-protected glyph "☮" sits
 ///     directly on its affectsParent glyph).
 ///
 /// WHY SOME RULES LOOK EMPTY OR REDUNDANT:
@@ -208,7 +208,7 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///
 ///   * Two non-vognode-level staged/unstaged INTERC rules and two
 ///     node-level ones -- the non-vognode-level pair omits the N / -N
-///     axes because node-axis markers only apply to UnrestrictedVognodes,
+///     axes because node-axis atoms only apply to UnrestrictedVognodes,
 ///     not to non-vognodes.
 ///
 ///   * The 'affectsParent' sub-rule 'true' is vacuous: the server leaves
@@ -286,7 +286,7 @@ pub fn herald_rule_table () -> HeraldRule {
             any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ]),
       // A restricted vognode is anonymous and dataless: the bare
       // atom 'restrictedNode' (see RestrictedVognode), like the other dataless
-      // non-vognode markers. Its id/repo would leak hidden content, so
+      // non-vognode atoms. Its id/repo would leak hidden content, so
       // they are not emitted.
       crule (Message, "restrictedNode", vec! [
         s ("node from restricted skgrepo") ]),

@@ -12,13 +12,13 @@
 -- - a closed vim fold always displays a one-line placeholder, where
 --   org hid the text entirely -- cosmetic, recorded as a deviation;
 -- - vim cannot CLOSE a single-line fold, so a one-line body cannot be
---   body-folded here (a 'bodyFolded' marker on one degrades
---   gracefully: the body stays visible and the marker is not
+--   body-folded here (a 'bodyFolded' atom on one degrades
+--   gracefully: the body stays visible and the atom is not
 --   re-recorded at the next save) -- recorded as a deviation;
--- - fold state is per-WINDOW in vim, so the marker readers/writers
+-- - fold state is per-WINDOW in vim, so the atom readers/writers
 --   here operate on the current window, which is where saves happen.
 --
--- The marker PROTOCOL is unchanged from the Emacs client: 'folded' on
+-- The atom PROTOCOL is unchanged from the Emacs client: 'folded' on
 -- each headline hidden inside a folded ancestor, 'bodyFolded' on each
 -- visible headline whose body is hidden; both round-trip through the
 -- server, are acted on after each redraw, and are stripped from the
@@ -95,39 +95,39 @@ function M.headline_body_hidden_p (lnum)
          or not M.line_invisible_p(next_headline)
 end
 
--- ── marker predicates ──────────────────────────────────────────────
+-- ── atom predicates ──────────────────────────────────────────────
 
 ---@param line_number integer
----@param marker string 'folded' or 'bodyFolded'
+---@param atom string 'folded' or 'bodyFolded'
 ---@return boolean
-function M.headline_has_bare_marker_p (line_number, marker)
+function M.headline_has_bare_atom_p (line_number, atom)
   if not metadata.at_headline_p(line_number) then return false end
   local sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
   return sexp ~= nil
          and compare.subtree_p(sexp, { sexpr.symbol('skg'),
-                                       sexpr.symbol(marker) })
+                                       sexpr.symbol(atom) })
 end
 
 ---@param line_number integer
 ---@return boolean
 function M.headline_has_folded_p (line_number)
-  return M.headline_has_bare_marker_p(line_number, 'folded')
+  return M.headline_has_bare_atom_p(line_number, 'folded')
 end
 
 ---@param line_number integer
 ---@return boolean
 function M.headline_has_bodyfolded_p (line_number)
-  return M.headline_has_bare_marker_p(line_number, 'bodyFolded')
+  return M.headline_has_bare_atom_p(line_number, 'bodyFolded')
 end
 
--- ── serialize: fold state -> markers ───────────────────────────────
+-- ── serialize: fold state -> atoms ───────────────────────────────
 
 ---Annotate the headline at each fold-relevant position: each
 ---invisible headline gains '(skg folded)'; each visible headline
 ---whose body is hidden gains '(skg bodyFolded)'. Mutually exclusive:
 ---a hidden headline's body state is already covered by the ancestor's
 ---subtree fold.
-function M.add_folded_markers ()
+function M.add_folded_metadata ()
   local last = vim.api.nvim_buf_line_count(0)
   for line = 1, last do
     if metadata.at_headline_p(line) then
@@ -142,12 +142,12 @@ function M.add_folded_markers ()
   end
 end
 
--- ── restore: markers -> fold state ─────────────────────────────────
+-- ── restore: atoms -> fold state ─────────────────────────────────
 
----Restore the user's fold state from the markers: unfold everything,
+---Restore the user's fold state from the atoms: unfold everything,
 ---hide every bodyFolded entry, then iteratively fold the parent of
 ---each still-visible folded-marked headline (looping because folding
----one parent hides more markers).
+---one parent hides more atoms).
 function M.fold_marked_headlines ()
   M.show_all()
   M.fold_bodies_of_bodyfolded_headlines()
@@ -206,15 +206,15 @@ function M.close_fold_at (lnum)
   pcall(vim.cmd, string.format('%dfoldclose', lnum))
 end
 
--- ── strip markers, re-applying the folds they encode ───────────────
+-- ── strip atoms, re-applying the folds they encode ───────────────
 
----Remove all 'folded'/'bodyFolded' markers, re-folding what they
+---Remove all 'folded'/'bodyFolded' atoms, re-folding what they
 ---described: collect the fold positions, unfold all (so edits behave),
----delete the markers, then re-hide the bodyFolded entries and re-fold
+---delete the atoms, then re-hide the bodyFolded entries and re-fold
 ---the parents of folded headlines. (Positions are line numbers; the
 ---marker edits stay within their lines, so no marker objects are
 ---needed where elisp needed them.)
-function M.remove_folded_markers ()
+function M.remove_folded_metadata ()
   local parent_lines = {}
   local parent_seen = {}
   local bodyfolded_lines = {}

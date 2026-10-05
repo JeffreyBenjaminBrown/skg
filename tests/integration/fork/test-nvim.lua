@@ -61,7 +61,7 @@ vim.api.nvim_set_current_buf(p_buf)
 T.check(T.buffer_text(p_buf):find('(id N)', 1, true),
         "P's view does not show its foreign content N")
 
--- 2. Make N editable (drop its 'writeProtected' marker) and edit its title
+-- 2. Make N editable (drop its 'writeProtected' atom) and edit its title
 --    -- the fork gesture.
 local n_line = goto_line_containing('(id N) (repo foreign)',
   "could not find N's headline")

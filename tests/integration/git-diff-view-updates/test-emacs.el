@@ -103,17 +103,17 @@
   (skg-view-diff-mode)
   (skg-test-wait-for-response 20))
 
-;; ─── Phase 6: Verify diff markers in view-b ────────────────
+;; ─── Phase 6: Verify diff atoms in view-b ────────────────
 
 (defun phase-6-verify-diff-view-b ()
-  (message "=== PHASE 6: Verify diff markers in view-b ===")
+  (message "=== PHASE 6: Verify diff atoms in view-b ===")
   (setq integration-test-phase "phase-6")
   (let* ((buf (get-buffer "*b*"))
          (content (with-current-buffer buf
                     (buffer-substring-no-properties
                      (point-min) (point-max)))))
     (message "Buffer-b with diff: %S" content)
-    ;; Check that key diff markers appear somewhere in the buffer.
+    ;; Check that key diff atoms appear somewhere in the buffer.
     ;; We check for the presence of diff-related strings rather
     ;; than exact line-by-line match, because graphStats etc. may vary.
     (dolist (expected '(("removed" . "c")     ;; c was deleted
@@ -123,19 +123,19 @@
         (unless (string-match-p (regexp-quote marker) content)
           (message "✗ FAIL [phase 6]: expected %S in view-b" marker)
           (kill-emacs 1))))
-    (message "✓ PASS [phase 6]: diff markers present in view-b")))
+    (message "✓ PASS [phase 6]: diff atoms present in view-b")))
 
-;; ─── Phase 7: Verify diff markers in view-a ────────────────
+;; ─── Phase 7: Verify diff atoms in view-a ────────────────
 
 (defun phase-7-verify-diff-view-a ()
-  (message "=== PHASE 7: Verify diff markers in view-a ===")
+  (message "=== PHASE 7: Verify diff atoms in view-a ===")
   (setq integration-test-phase "phase-7")
   (let* ((buf (get-buffer "*a*"))
          (content (with-current-buffer buf
                     (buffer-substring-no-properties
                      (point-min) (point-max)))))
     (message "Buffer-a with diff: %S" content)
-    ;; a's view should show the same diff markers under b.
+    ;; a's view should show the same diff atoms under b.
     (dolist (expected '(("removed" . "c")
                         ("e, edited" . nil)
                         ("f" . nil)))
@@ -143,7 +143,7 @@
         (unless (string-match-p (regexp-quote marker) content)
           (message "✗ FAIL [phase 7]: expected %S in view-a" marker)
           (kill-emacs 1))))
-    (message "✓ PASS [phase 7]: diff markers present in view-a")))
+    (message "✓ PASS [phase 7]: diff atoms present in view-a")))
 
 ;; ─── Phase 8: Commit e's title change, re-save ─────────────
 
@@ -189,7 +189,7 @@
 ;; ─── Phase 11: Verify clean views ───────────────────────────
 
 (defun phase-11-verify-clean-views ()
-  (message "=== PHASE 11: Verify views are clean (no diff markers) ===")
+  (message "=== PHASE 11: Verify views are clean (no diff atoms) ===")
   (setq integration-test-phase "phase-11")
   ;; view-b should have no diff/phantom nodes
   (let ((buf-b (get-buffer "*b*")))
@@ -205,18 +205,18 @@
          (titles (headline-titles buf-a)))
     (message "Buffer-a titles after diff-off: %S" titles)
     ;; a should contain b, b should contain e,f; f contains d.
-    ;; The exact write-protected markers vary, so just check titles.
+    ;; The exact write-protected atoms vary, so just check titles.
     (dolist (expected-title '("a" "b" "e, edited" "f" "d"))
       (unless (cl-find expected-title titles
                        :key (lambda (triple) (nth 2 triple))
                        :test #'equal)
         (message "✗ FAIL [phase 11]: expected title %S in view-a" expected-title)
         (kill-emacs 1)))
-    ;; Should NOT have diff markers
+    ;; Should NOT have diff atoms
     (let ((content (with-current-buffer buf-a
                      (buffer-substring-no-properties (point-min) (point-max)))))
       (when (string-match-p "diff:" content)
-        (message "✗ FAIL [phase 11]: diff markers remain in view-a")
+        (message "✗ FAIL [phase 11]: diff atoms remain in view-a")
         (kill-emacs 1))
       (when (string-match-p "textChanged" content)
         (message "✗ FAIL [phase 11]: textChanged remains in view-a")

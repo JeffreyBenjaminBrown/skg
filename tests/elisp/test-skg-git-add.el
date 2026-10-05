@@ -227,7 +227,7 @@ ellipsis object to `call-process' instead of a string."
     (test-skg-git-add--teardown)))
 
 (ert-deftest test-skg-git-add-explains-when-diff-mode-off ()
-  "With git diff mode off and no addedN markers in the subtree, both
+  "With git diff mode off and no addedN atoms in the subtree, both
 commands must explain that diff mode is required to recognize new
 files, rather than reporting 0 files as if the user did it right
 (TODO/more.org)."

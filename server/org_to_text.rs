@@ -478,7 +478,7 @@ fn phantomUnknown_metadata_to_string (
   parts . join (" ") }
 
 /// Render a restricted vognode as the bare atom 'restrictedNode',
-/// like the other dataless non-vognode markers (aliasFolder, subscribeeFolder,
+/// like the other dataless non-vognode atoms (aliasFolder, subscribeeFolder,
 /// ...). It carries no id/repo/etc. -- those describe content the
 /// user hid by restricting the skgrepo-set, so emitting them would leak
 /// (see RestrictedVognode).

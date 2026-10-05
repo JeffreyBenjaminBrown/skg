@@ -27,7 +27,7 @@ local M = {}
 M.fork_repo_placeholder = 'PICK-A-REPO'
 
 ---Send the current buffer to the server. Before sending, 'folded'
----and 'focused' markers are added (for the wire) and then removed
+---and 'focused' atoms are added (for the wire) and then removed
 ---from what the user sees. If the save edited any FOREIGN node the
 ---server replies fork-confirmation instead of save-result, skgsave-committing
 ---nothing, unless FORK_APPROVED rides along; FORK_REPOS then pairs
@@ -64,7 +64,7 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
   local focused_had_metadata = focused_line ~= nil
     and metadata.line_text(focused_line):match('^%*+ %(skg') ~= nil
   local save_point_position = M.current_save_point_position()
-  local buffer_contents = M.buffer_snapshot_with_save_markers(
+  local buffer_contents = M.buffer_snapshot_with_save_metadata(
     save_buf, focused_had_metadata)
   local wire_content = sexpr.to_string({
     { sexpr.symbol('saved-buffer'), buffer_contents },
@@ -125,25 +125,25 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
   client.send_string(wire_content)
 end
 
----Return the current text with transient save markers, restoring the buffer.
+---Return the current text with transient save atoms, restoring the buffer.
 ---The save lock is synchronously suspended only for the client's internal
----marker edits and restored before any request is sent. A clean buffer
----stays clean, so the marker edits never look like a user's first edit.
+---atom edits and restored before any request is sent. A clean buffer
+---stays clean, so the atom edits never look like a user's first edit.
 ---@param save_buf integer
 ---@param focused_had_metadata boolean
 ---@return string
-function M.buffer_snapshot_with_save_markers (save_buf, focused_had_metadata)
+function M.buffer_snapshot_with_save_metadata (save_buf, focused_had_metadata)
   local was_save_locked = vim.b[save_buf].skg_save_locked == true
   local was_modified = vim.bo[save_buf].modified
   if was_save_locked then vim.bo[save_buf].modifiable = true end
   local ok, result = pcall(function ()
-    folds.add_folded_markers()
-    focus.add_focused_marker()
+    folds.add_folded_metadata()
+    focus.add_focused_metadata()
     return buffer.text(save_buf)
   end)
-  -- Cleanup is best-effort even when marker insertion or capture failed.
-  pcall(focus.remove_focused_marker)
-  pcall(folds.remove_folded_markers)
+  -- Cleanup is best-effort even when atom insertion or capture failed.
+  pcall(focus.remove_focused_metadata)
+  pcall(folds.remove_folded_metadata)
   if not focused_had_metadata then
     pcall(M.strip_bare_skg_at_headline, focus.owning_headline_line()) end
   if was_save_locked then vim.bo[save_buf].modifiable = false end
@@ -255,7 +255,7 @@ function M.current_save_point_position ()
   }
 end
 
----Remove a bare '(skg)' left on LINE_NUMBER by the marker add/remove
+---Remove a bare '(skg)' left on LINE_NUMBER by the atom add/remove
 ---cycle, when the headline had no metadata to begin with.
 ---@param line_number integer|nil
 function M.strip_bare_skg_at_headline (line_number)
@@ -387,11 +387,11 @@ function M.save_point_position_from_response (response)
 end
 
 ---Replace BUF's contents with NEW_CONTENT from the server, then act
----on the markers it carries: move to the focused headline and drop
----its marker, restore folds and drop their markers, restore
+---on the atoms it carries: move to the focused headline and drop
+---its atom, restore folds and drop their atoms, restore
 ---point/scroll, and clear the modified flag. Fold restoration is per-window (vim folds live on
 ---windows): it runs in the first window showing BUF; an undisplayed
----buffer still gets its markers stripped, it just has no fold state
+---buffer still gets its atoms stripped, it just has no fold state
 ---to restore into.
 ---@param buf integer
 ---@param new_content string
@@ -406,21 +406,21 @@ function M.replace_buffer_with_new_content (buf, new_content,
     if vim.api.nvim_win_get_buf(win) == buf then
       window = win break end
   end
-  local function act_on_markers ()
+  local function act_on_save_metadata ()
     folds.show_all()
     -- Focus first, while everything is visible.
     focus.goto_focused_headline()
-    focus.remove_focused_marker()
+    focus.remove_focused_metadata()
     local cursor = vim.api.nvim_win_get_cursor(0)
     folds.fold_marked_headlines()
-    folds.remove_folded_markers()
+    folds.remove_folded_metadata()
     vim.api.nvim_win_set_cursor(0, cursor)
     M.restore_save_point_position(save_point_position)
   end
   if window then
-    vim.api.nvim_win_call(window, act_on_markers)
+    vim.api.nvim_win_call(window, act_on_save_metadata)
   else
-    vim.api.nvim_buf_call(buf, act_on_markers)
+    vim.api.nvim_buf_call(buf, act_on_save_metadata)
   end
   vim.bo[buf].modified = false
   buffer.capture_clean_baseline(buf)

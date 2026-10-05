@@ -103,7 +103,7 @@ pub enum Phantom {
 /// a node already materialized in the view turns up in
 /// `deleted_by_this_save_pids`. An Unrestricted content child flips here via
 /// `mutate_unrestrictedVognode_to_deletednode`. (A Restricted node is NOT flipped: it is an
-/// anonymous restricted vognode, and turning it into a DELETED marker would leak that a
+/// anonymous restricted vognode, and turning it into a DELETED placeholder would leak that a
 /// hidden node vanished, so it just lingers until the next full rerender drops
 /// it.) So it marks a node that genuinely no longer exists in the graph, killed
 /// by a completed save (this buffer's or a shared one's) -- not a git artifact.
@@ -355,7 +355,7 @@ pub struct ViewnodeStats {
   /// which it (transitively) overrides. Herald pink "ĥ" after "O".
   /// LOAD-BEARING, unlike the other view stats: save extraction
   /// collects N (not this node's own ID) into the parent's lists
-  /// wherever this marker appears, so a substituted child
+  /// wherever this fact appears, so a substituted child
   /// round-trips to the original ID instead of rewriting the
   /// parent's contains. Serialized as the keyed form
   /// '(overridesHere N)'; tamper-checked at buffer validation

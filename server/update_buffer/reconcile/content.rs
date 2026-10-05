@@ -289,7 +289,7 @@ fn reconcile_content_children (
 /// the view were reopened.
 ///
 /// The replacement retains the tree position and wrapper state (focus and
-/// folds), while its `overridesHere` marker keeps the parent's membership
+/// folds), while its `overridesHere` fact keeps the parent's membership
 /// attached to the original ID on the next save.
 fn replace_raw_content_children_with_visible_overriders (
   tree                 : &mut Tree<Viewnode>,
@@ -397,7 +397,7 @@ pub(in crate::update_buffer) fn mutate_unrestrictedVognode_to_deletednode (
 /// - OVERRIDDEN: ownership-gated, visibility-UNGATED ('unrestricted' = None),
 ///   so even a node whose only overrider is invisible counts as
 ///   "overridden but drawn raw".
-/// - A node carrying an 'overridesHere' marker is a substitute, not a
+/// - A node carrying an 'overridesHere' fact is a substitute, not a
 ///   raw original, so it is excluded (its children substitute as
 ///   usual).
 fn is_overridden_drawn_raw (
@@ -424,7 +424,7 @@ fn is_overridden_drawn_raw (
       . unwrap_or (false);
     affects_parent_raw_drawing_folder || is_view_root };
   if ! in_raw_position { return Ok (false); }
-  let (skgid, has_marker) : (Option<ID>, bool) =
+  let (skgid, has_overridesHere) : (Option<ID>, bool) =
     read_at_node_in_tree( tree, node,
       |vn : &Viewnode| match &vn . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
@@ -432,7 +432,7 @@ fn is_overridden_drawn_raw (
                t . viewStats . overridesHere . is_some () ),
         _ => ( None, false ) } ) ?;
   let skgid : ID = match skgid { Some (skgid) => skgid, None => return Ok (false) };
-  if has_marker { return Ok (false); }
+  if has_overridesHere { return Ok (false); }
   let overridden : bool =
     resolve_override (config, graph_snap, None, &skgid) . effective != skgid;
   Ok (overridden) }

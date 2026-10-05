@@ -50,7 +50,7 @@ pub fn setup_gitrepo_with_subscribee_fixtures(
 /// HEAD and worktree (22's .skg file still present, so the removal is
 /// membership-only). The removed subscribee 22 must render as a phantom with
 /// (unstaged removedR) -- its relation is subscribesTo, not contains, so the
-/// marker comes from build_child_data's net-removal fallback, not phantom_axes.
+/// membership sign comes from build_child_data's net-removal fallback, not phantom_axes.
 pub fn setup_gitrepo_with_removed_subscribee_fixtures(
   gitrepo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {

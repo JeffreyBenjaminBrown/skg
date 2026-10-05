@@ -15,7 +15,7 @@
 #   - makes d a child of f
 #
 # After saving, git diff mode is toggled on.
-# We verify diff markers in both view-b and view-a.
+# We verify diff atoms in both view-b and view-a.
 # Then we commit e's title change, re-save, verify textChanged gone.
 # Then we toggle diff mode off and verify clean output.
 

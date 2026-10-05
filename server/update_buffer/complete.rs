@@ -205,7 +205,7 @@ fn dispatch_node_update (
         &context . runtime . config ) ?,
     _ => {
       // No-op for: Restricted (an anonymous restricted vognode -- it carries no
-      // identity, and flipping it to a "DELETED" marker would leak that
+      // identity, and flipping it to a "DELETED" placeholder would leak that
       // a hidden node vanished; it just lingers until the next full
       // rerender drops it), Unknown (unresolvable-id placeholder),
       // Deleted, DeadViewnode, Property leaves, BufferRoot, and Diff phantom

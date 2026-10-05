@@ -1,6 +1,6 @@
 /// Tests for git diff view - aliases-list changes.
 /// A node's `aliases` change between HEAD and worktree should surface an
-/// AliasFolder with per-alias diff markers -- emitted by the diff
+/// AliasFolder with per-alias diff atoms -- emitted by the diff
 /// overlay (render/diff.rs prepend_aliasfolder_with_children), the alias mirror
 /// of the IDFolder diff.
 

@@ -61,7 +61,7 @@
 (ert-deftest test-heralds-minor-mode-toggle ()
   "Test that heralds-minor-mode properly adds and removes overlays."
   (with-temp-buffer
-    (progn ;; Insert test text with herald markers
+    (progn ;; Insert test text with heralds
       (insert "Test line with (skg (node (id 123) (rels (contains (out 2))) (viewStats cycle))) herald\n")
       (insert "Another line (skg (node (id 456) (rels (linksTo (in 3 (substantive 3)))) (editRequest delete))) more text\n")
       (insert "Plain line without heralds\n"))
@@ -139,7 +139,7 @@ at its floor (low), and the birth letter \"C\" (high)."
 (ert-deftest test-heralds-restricted-node-display ()
   "An anonymous restricted vognode displays as a message herald.
 The server emits the bare atom `restrictedNode' (like the other
-dataless non-vognode markers) -- it carries no id/repo, because those
+dataless non-vognode atoms) -- it carries no id/repo, because those
 would leak content the user hid by restricting the repo-set."
   (with-temp-buffer
     (insert "(skg restrictedNode)")

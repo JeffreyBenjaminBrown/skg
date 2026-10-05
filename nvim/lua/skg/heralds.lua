@@ -1,4 +1,4 @@
--- PURPOSE: Display skg metadata as a short list of "herald" markers.
+-- PURPOSE: Display skg metadata as a short list of "heralds".
 -- Each org headline the server sends starts with '(skg ...)' metadata.
 -- This module lenses that tree via skg.sexpr.lens, producing colored
 -- tokens that summarize view and code information. The served rule

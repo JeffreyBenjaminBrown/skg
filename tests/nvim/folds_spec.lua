@@ -35,7 +35,7 @@ describe('skg.folds', function ()
           vim.api.nvim_get_current_buf(), { force = true })
   end)
 
-  it('round-trips fold state through the markers', function ()
+  it('round-trips fold state through the atoms', function ()
     -- Mirrors test-skg-fold-round-trip.
     buffer_with(table.concat({
       '* 1',
@@ -51,8 +51,8 @@ describe('skg.folds', function ()
       '** 13' }, '\n'))
     folds.fold_marked_headlines()
     assert.are.equal(5, count_visible_nonempty_lines())
-    folds.remove_folded_markers()
-    folds.add_folded_markers()
+    folds.remove_folded_metadata()
+    folds.add_folded_metadata()
     assert.are.equal(table.concat({
       '* 1',
       '1 body',
@@ -67,8 +67,8 @@ describe('skg.folds', function ()
       '** 13' }, '\n'), buffer_text())
   end)
 
-  it('removes folded markers of every metadata shape', function ()
-    -- Mirrors test-skg-remove-folded-markers.
+  it('removes folded atoms of every metadata shape', function ()
+    -- Mirrors test-skg-remove-folded-metadata.
     buffer_with(table.concat({
       '* (skg folded) only folded',
       '* (skg folded other) folded first',
@@ -76,7 +76,7 @@ describe('skg.folds', function ()
       '* (skg folded (key value)) folded last',
       '* (skg folded (k v) other) folded middle',
       '* (skg other) no folded' }, '\n'))
-    folds.remove_folded_markers()
+    folds.remove_folded_metadata()
     assert.are.equal(table.concat({
       '* (skg) only folded',
       '* (skg other) folded first',
@@ -98,10 +98,10 @@ describe('skg.folds', function ()
     folds.hide_entry(1)
     assert.is_true(folds.headline_body_hidden_p(1))
     assert.is_false(folds.line_invisible_p(4)) -- the child stays visible
-    folds.add_folded_markers()
+    folds.add_folded_metadata()
     assert.is_true(folds.headline_has_bodyfolded_p(1))
     assert.is_false(folds.headline_has_folded_p(4))
-    folds.remove_folded_markers()
+    folds.remove_folded_metadata()
     assert.is_falsy(buffer_text():find('bodyFolded'))
     assert.is_true(folds.headline_body_hidden_p(1))
   end)
@@ -110,12 +110,12 @@ describe('skg.folds', function ()
      function ()
     -- Pins the documented deviation: vim cannot close a single-line
     -- fold, so a one-line body stays visible and its bodyFolded
-    -- marker degrades gracefully rather than erroring.
+    -- atom degrades gracefully rather than erroring.
     buffer_with(table.concat({
       '* top', 'only body line', '** child' }, '\n'))
     folds.hide_entry(1)
     assert.is_false(folds.headline_body_hidden_p(1))
-    folds.add_folded_markers()
+    folds.add_folded_metadata()
     assert.is_false(folds.headline_has_bodyfolded_p(1))
   end)
 

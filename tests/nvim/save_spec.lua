@@ -88,7 +88,7 @@ describe('skg.save pipeline', function ()
     lock.end_stream()
   end)
 
-  it('round-trips a save: markers out, redraw in, point restored',
+  it('round-trips a save: atoms out, redraw in, point restored',
      function ()
     local seen_request = nil
     server = helpers.connect_to_fake_server(function (line, respond)
@@ -116,15 +116,15 @@ describe('skg.save pipeline', function ()
       return lock.stream_in_progress == nil and seen_request ~= nil
              and vim.bo[buf].modifiable
     end, 10)
-    -- The request went out with the markers embedded.
+    -- The request went out with the atoms embedded.
     assert.is_truthy(seen_request:find('view_id-save', 1, true))
-    -- The buffer holds the redraw, markers stripped.
+    -- The buffer holds the redraw, atoms stripped.
     local text = table.concat(
       vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
     assert.is_falsy(text:find('focused', 1, true))
     assert.is_falsy(text:find('folded', 1, true))
     assert.is_truthy(text:find('child', 1, true))
-    -- The folded marker was acted on: the child is hidden.
+    -- The folded atom was acted on: the child is hidden.
     assert.is_true(folds.line_invisible_p(3))
     -- Point: one line below the focused headline, byte column 3.
     local cursor = vim.api.nvim_win_get_cursor(0)
@@ -134,7 +134,7 @@ describe('skg.save pipeline', function ()
     assert.is_false(vim.bo[buf].modified)
   end)
 
-  it('save markers leave a clean buffer clean, so nothing asks to confirm',
+  it('save atoms leave a clean buffer clean, so nothing asks to confirm',
      function ()
     local asked = 0
     local real_confirm = vim.fn.confirm
@@ -145,7 +145,7 @@ describe('skg.save pipeline', function ()
       '* (skg (node (id b))) b\n** (skg (node (id c))) c',
       'skg://b', 'view_id-b')
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
-    save.buffer_snapshot_with_save_markers(clean, true)
+    save.buffer_snapshot_with_save_metadata(clean, true)
     vim.wait(100, function () return false end)
     vim.fn.confirm = real_confirm
     assert.are.equal(0, asked)

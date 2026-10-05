@@ -362,7 +362,7 @@ mod tests {
 /// See this module's header for definition of "goal child".
 ///
 /// This function repairs surviving or newly matched goal children whose
-/// membership marker is stale, so the folder continues to own them
+/// membership sign is stale, so the folder continues to own them
 /// as generated folder members.
 fn mark_goal_children_as_folder_members (
   tree          : &mut Tree<Viewnode>,

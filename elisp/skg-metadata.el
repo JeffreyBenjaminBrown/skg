@@ -959,7 +959,7 @@ their repo edits take effect even under a write-protected parent."
           (format "%s" (car id-values))))))
 
 (defun skg--node-write-protected-p (metadata-sexp)
-  "Return non-nil if METADATA-SEXP has the bare UnrestrictedVognode writeProtected marker."
+  "Return non-nil if METADATA-SEXP has the bare UnrestrictedVognode writeProtected atom."
   (skg-sexp-subtree-p metadata-sexp '(skg (node writeProtected))))
 
 (defun skg--change-repo-at-point (new-skgrepo)

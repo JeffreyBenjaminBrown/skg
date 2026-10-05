@@ -189,10 +189,10 @@ vim.api.nvim_set_current_buf(buf_b)
 require('skg.diff_mode').toggle()
 T.check(T.wait_for_response(20), 'phase 5: diff-mode-on response arrived')
 
--- PHASE 6: verify diff markers in view-b. Check for the presence of
+-- PHASE 6: verify diff atoms in view-b. Check for the presence of
 -- diff-related strings rather than an exact line-by-line match,
 -- because graphStats etc. may vary.
-print('=== PHASE 6: Verify diff markers in view-b ===')
+print('=== PHASE 6: Verify diff atoms in view-b ===')
 do
   local content = T.buffer_text(buf_b)
   print('Buffer-b with diff: ' .. content)
@@ -202,9 +202,9 @@ do
   end
 end
 
--- PHASE 7: verify diff markers in view-a; a's view should show the
--- same diff markers under b.
-print('=== PHASE 7: Verify diff markers in view-a ===')
+-- PHASE 7: verify diff atoms in view-a; a's view should show the
+-- same diff atoms under b.
+print('=== PHASE 7: Verify diff atoms in view-a ===')
 do
   local content = T.buffer_text(buf_a)
   print('Buffer-a with diff: ' .. content)
@@ -243,8 +243,8 @@ vim.api.nvim_set_current_buf(buf_b)
 require('skg.diff_mode').toggle()
 T.check(T.wait_for_response(20), 'phase 10: diff-mode-off response arrived')
 
--- PHASE 11: verify both views are clean (no diff/phantom markers).
-print('=== PHASE 11: Verify views are clean (no diff markers) ===')
+-- PHASE 11: verify both views are clean (no diff atoms or phantoms).
+print('=== PHASE 11: Verify views are clean (no diff atoms) ===')
 assert_headline_titles(buf_b,
   { { 1, 'na', 'b' },
     { 2, 'true', 'e, edited' },
@@ -255,7 +255,7 @@ do
   local titles_a = headline_titles(buf_a)
   print('Buffer-a titles after diff-off: ' .. format_triples(titles_a))
   -- a should contain b, b should contain e,f; f contains d. The exact
-  -- write-protected markers vary, so just check titles.
+  -- write-protected atoms vary, so just check titles.
   for _, expected_title in ipairs({ 'a', 'b', 'e, edited', 'f', 'd' }) do
     local found = false
     for _, triple in ipairs(titles_a) do
@@ -267,7 +267,7 @@ do
   end
   local content = T.buffer_text(buf_a)
   T.check(content:find('diff:', 1, true) == nil,
-          'phase 11: no diff markers remain in view-a')
+          'phase 11: no diff atoms remain in view-a')
   T.check(content:find('textChanged', 1, true) == nil,
           'phase 11: textChanged remains gone from view-a')
 end

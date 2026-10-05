@@ -13,7 +13,7 @@
                                           approved-hoist-pids
                                           text-approved-pids)
   "Send the current buffer contents to Rust for processing.
-Before sending, adds 'folded' markers to folded headlines and 'focused' marker to current headline.
+Before sending, adds 'folded' atoms to folded headlines and 'focused' atom to current headline.
 The server sends three LP messages around the save:
   1. save-lock: acknowledges the client's early broad lock.
   2. save-relax-lock: narrows the lock once the checked save inputs and
@@ -60,7 +60,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
            (save-buffer (current-buffer))
            (saved-view-id skg-view-id)
            (buffer-contents
-            (skg--buffer-snapshot-with-save-markers focused-had-metadata))
+            (skg--buffer-snapshot-with-save-metadata focused-had-metadata))
            (other-view-buffer-snapshots
             (skg--other-view-buffer-snapshots save-buffer))
            (wire-content
@@ -161,9 +161,9 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
        "()")
      "))")))
 
-(defun skg--buffer-snapshot-with-save-markers (focused-had-metadata)
-  "Return current text with transient save markers, restoring the buffer.
-FOCUSED-HAD-METADATA records whether marker removal can leave a bare skg
+(defun skg--buffer-snapshot-with-save-metadata (focused-had-metadata)
+  "Return current text with transient save atoms, restoring the buffer.
+FOCUSED-HAD-METADATA records whether atom removal can leave a bare skg
 form.  The saved buffer's lock is suspended only during this synchronous
 internal edit; it is restored before any request is sent."
   (let ((was-save-locked skg--save-lock-overlay)
@@ -173,16 +173,16 @@ internal edit; it is restored before any request is sent."
       (skg--unlock-after-save))
     (unwind-protect
         (progn
-          (skg-add-folded-markers)
-          (skg-add-focused-marker)
+          (skg-add-folded-metadata)
+          (skg-add-focused-metadata)
           ;; Text properties are an Emacs presentation concern.  If retained,
           ;; `prin1-to-string' emits #("..." ...) syntax, which is not part of
           ;; the shared S-expression protocol and is parsed as extra fields by
           ;; the Rust reader.
           (setq buffer-snapshot
                 (buffer-substring-no-properties (point-min) (point-max))))
-      (skg-remove-focused-marker)
-      (skg-remove-folded-markers)
+      (skg-remove-focused-metadata)
+      (skg-remove-folded-metadata)
       (unless focused-had-metadata
         (skg-strip-bare-skg-at-focused-headline))
       (when was-save-locked
@@ -283,7 +283,7 @@ WHY: A character offset from buffer start is not stable enough: saving can make 
 
 (defun skg-strip-bare-skg-at-focused-headline ()
   "Remove bare (skg) from the current headline if that is its only metadata.
-Used after marker removal to clean up headlines that had no metadata
+Used after atom removal to clean up headlines that had no metadata
 before the add/remove cycle."
   (save-excursion
     (org-back-to-heading t)
@@ -870,8 +870,8 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
                                                       &optional
                                                       save-point-position)
   "Replace the current buffer contents with NEW-CONTENT from Rust.
-After inserting content, folds marked headlines, removes fold markers,
-moves point to focused headline, and removes focus marker."
+After inserting content, folds marked headlines, removes fold atoms,
+moves point to focused headline, and removes focus atom."
   (let ((inhibit-read-only t)
         (skg--inhibit-dirty-view-confirmation t))
     (erase-buffer)
@@ -886,17 +886,17 @@ moves point to focused headline, and removes focus marker."
      ;; cover the hidden subtree — clobbering the root.
      org-fold-show-all)
     (progn
-      ;; Process focus marker BEFORE fold markers, while the buffer is
+      ;; Process focus atom BEFORE fold atoms, while the buffer is
       ;; guaranteed unfolded by the `org-fold-show-all' above.
       (skg-goto-focused-headline)
-      (skg-remove-focused-marker))
+      (skg-remove-focused-metadata))
     (save-excursion
-      ;; Process folding markers (now safe — all metadata edits done).
+      ;; Process folding atoms (now safe — all metadata edits done).
       ;; Wrap in `save-excursion' because `skg-fold-marked-headlines'
       ;; leaves point on the last parent it folded; we need point to
       ;; stay on the focused headline set just above.
       (skg-fold-marked-headlines)
-      (skg-remove-folded-markers))
+      (skg-remove-folded-metadata))
     (skg--restore-save-point-position save-point-position)
     (set-buffer-modified-p nil)
     (skg--capture-clean-baseline)

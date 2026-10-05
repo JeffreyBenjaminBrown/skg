@@ -132,7 +132,7 @@ viewing =N='s container draws the chain's end =D=; restrict the
 skgrepo-set to hide =D='s skgrepo and the same view draws the middle =C=
 instead — either way =N= stays in the container's contents. If you point
 =skg-fork-node= at a node that is /itself/ a drawn substitute (one
-carrying an =overridesHere= marker), it forks the node on screen — the
+carrying an =overridesHere= fact), it forks the node on screen — the
 overrider — deepening the chain, never re-forking the node it stands for.
 
 If the node already has a clone you own, =skg-fork-node= is rejected by

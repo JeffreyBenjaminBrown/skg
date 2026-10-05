@@ -79,7 +79,7 @@ pub fn find_buffer_errors_for_saving_in_graph (
     viewforest, graph, config, &mut errors);
   idFolder_membership_errors (
     viewforest, graph, config, &mut errors ) ?;
-  overridesHere_marker_errors (
+  overridesHere_fact_errors (
     viewforest, graph, config, &mut errors );
   validate_view_roots (
       viewforest, &mut errors);
@@ -170,23 +170,23 @@ fn idFolder_membership_errors (
             recorder, buffer_skgids, real )); }}, }}
   Ok (( )) }
 
-/// Tamper validation for the '(overridesHere N)' marker (plan 11).
-/// The marker is load-bearing text: wherever it appears, save
+/// Tamper validation for the '(overridesHere N)' fact (plan 11).
+/// The fact is load-bearing text: wherever it appears, save
 /// extraction collects N instead of the carrier's own ID. So a
-/// marker the server would not have drawn must abort the save --
+/// fact the server would not have drawn must abort the save --
 /// otherwise hand-edited (or yanked, or stale) metadata could
 /// rewrite arbitrary contains members. The check: the carrier's ID
 /// must be ON N's owned override chain
 /// ('carrier_on_owned_chain', VISIBILITY-UNGATED so ownership
-/// still gates but a marker honest when rendered does not start
+/// still gates but a fact honest when rendered does not start
 /// failing after a skgrepo-set switch). With chains the drawn node can
 /// be a MIDDLE link (when a later link's mentioner is hidden), so the
 /// check accepts any honest carrier and rejects only an off-chain
-/// marker. Markers on retained RestrictedVognodes are checked identically.
-/// The explicit graph is required, so every present marker is checked against
+/// fact. Facts on retained RestrictedVognodes are checked identically.
+/// The explicit graph is required, so every present fact is checked against
 /// the same graph snapshot used by the rest of save planning.
 #[allow(non_snake_case)]
-fn overridesHere_marker_errors (
+fn overridesHere_fact_errors (
   viewforest : &MpViewForest,
   graph      : &InRustGraph,
   config     : &SkgConfig,
@@ -202,7 +202,7 @@ fn overridesHere_marker_errors (
               ( t . skgid . clone (), original . clone () ),
             None => continue },
         // A restricted vognode is anonymous: it carries no override
-        // marker, so it can never mismatch.
+        // fact, so it can never mismatch.
         MpViewnodeKind::Vognode (MpVognode::Restricted (_)) => continue,
         _ => continue };
     let chain_ok : bool =

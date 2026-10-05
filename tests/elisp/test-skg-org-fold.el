@@ -7,7 +7,7 @@
 (require 'skg-org-fold)
 
 (ert-deftest test-skg-fold-round-trip ()
-  "Test folding and unfolding with metadata markers."
+  "Test folding and unfolding with metadata atoms."
   (let* ((imaginary-from-rust "* 1
 1 body
 ** 11
@@ -28,8 +28,8 @@
        (= (count-visible-nonempty-lines)
           5))
 
-      (skg-remove-folded-markers)
-      (skg-add-folded-markers)
+      (skg-remove-folded-metadata)
+      (skg-add-folded-metadata)
       (let*
           ((expected
             ;; Every sibling of a folded node should be folded.
@@ -51,8 +51,8 @@
                        expected))))
     (kill-buffer buf)))
 
-(ert-deftest test-skg-remove-folded-markers ()
-  "Test that skg-remove-folded-markers handles all cases correctly."
+(ert-deftest test-skg-remove-folded-metadata ()
+  "Test that skg-remove-folded-metadata handles all cases correctly."
   (let ((buf (generate-new-buffer "*test-remove-folded*")))
     (with-current-buffer buf
       (org-mode)
@@ -62,7 +62,7 @@ Body text.
 * (skg folded (key value)) folded last
 * (skg folded (k v) other) folded middle
 * (skg other) no folded")
-      (skg-remove-folded-markers)
+      (skg-remove-folded-metadata)
       (should (equal (buffer-substring-no-properties (point-min)
                                                      (point-max))
                      "* (skg) only folded

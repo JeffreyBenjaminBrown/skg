@@ -14,9 +14,9 @@
    - Appends =f= as a new child of =b=, with =d= as a child of =f=.
 3. Saves. Verifies =c= gone, structure correct.
 4. Toggles git diff mode ON.
-   Verifies diff markers (removed, removed-here, new-here, textChanged)
+   Verifies diff atoms (removed, removed-here, new-here, textChanged)
    appear in both views.
 5. Commits =e.skg= to git. Re-saves.
    Verifies textChanged gone (title change is now in HEAD).
 6. Toggles git diff mode OFF.
-   Verifies both views are clean (no diff markers or phantom nodes).
+   Verifies both views are clean (no diff atoms or phantom nodes).

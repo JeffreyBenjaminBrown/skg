@@ -555,10 +555,10 @@ chain's end. The resolver is 'resolve_override' in
 'server/dbs/in_rust_graph/override_resolution.rs'. Foreign override
 relationships are display-only facts and never substitute.
 
-The drawn substitute carries the MARKER '(overridesHere N)'
+The drawn substitute carries the FACT '(overridesHere N)'
 (the crucial herald =ĥ= after =O=), naming the original it stands for. A viewnode's
 COLLECTED ID is what it contributes to its parent's saved lists:
-the marker's original if present, else its own ID -- so saving a
+the fact's original if present, else its own ID -- so saving a
 view that draws R in place of N keeps N in the parent's contains.
 
 An OVERRIDDEN-AS-SUCH is a member child of an overriddenFolder --
@@ -632,7 +632,7 @@ A *vognode* is a viewnode representing a graphnode ('Vognode' in
 'server/types/viewnode.rs'). It is one of three kinds:
 - *unrestricted*: the graphnode is in an unrestricted skgrepo, so the view shows it;
 - *restricted*: it is in a restricted skgrepo, so the view shows only an
-  anonymous, dataless marker;
+  anonymous, dataless placeholder;
 - a *phantom*: the graphnode is no longer in the graph, or never was.
 
 The other viewnodes are *non-vognodes*: folders, properties, the buffer

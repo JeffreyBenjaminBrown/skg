@@ -51,8 +51,8 @@ fn all_tests
       s . reset ("save_roundtrips_to_original_and_is_idempotent", fixtures) ?;
       save_roundtrips_to_original_and_is_idempotent (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("extraction_honors_the_marker", fixtures) ?;
-      extraction_honors_the_marker (
+      s . reset ("extraction_honors_overridesHere", fixtures) ?;
+      extraction_honors_overridesHere (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("diff_mode_disables_substitution", fixtures) ?;
       diff_mode_disables_substitution (
@@ -74,10 +74,10 @@ fn marked_lines<'a> (
   buf      : &'a str,
   original : &str,
 ) -> Vec<&'a str> {
-  let marker : String =
+  let fact : String =
     format! ("(overridesHere {})", original);
   buf . lines ()
-    . filter ( |l| l . contains (&marker) )
+    . filter ( |l| l . contains (&fact) )
     . collect () }
 
 fn saved_node_by_skgid<'a> (
@@ -195,7 +195,7 @@ async fn save_roundtrips_to_original_and_is_idempotent (
          collected-ID orderkey)" );
       Ok (( )) }
 
-async fn extraction_honors_the_marker (
+async fn extraction_honors_overridesHere (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -282,7 +282,7 @@ async fn extraction_honors_the_marker (
           opt_saved_node_by_skgid (
             & node_instructions_from (buffer, config) . await ?,
             "P" ) . is_none () ); }
-      { // Tamper: a marker the server would not have drawn aborts.
+      { // Tamper: a fact the server would not have drawn aborts.
         let buffer = indoc! {"
           * (skg (node (id P) (repo main))) P
           ** (skg (node (id M) (repo main) (viewStats (overridesHere W)) writeProtected)) M
@@ -293,7 +293,7 @@ async fn extraction_honors_the_marker (
               e, BufferValidationError::OverridesHere_Mismatch (..) )),
               "expected OverridesHere_Mismatch, got: {:?}", errors ); },
           other => panic! (
-            "tampered marker must abort the save; got: {:?}",
+            "tampered fact must abort the save; got: {:?}",
             other . map ( |v| v . len () ) ), }}
       { // Subscribee-as-such: the visible-content signal speaks of
         // the original, so no phantom hide of N is inferred.
@@ -496,7 +496,7 @@ async fn ownership_and_visibility_gate_substitution (
           "the restricted original is omitted:\n{}", view );
         assert! ( ! view . contains ("(id R3)"),
           "its overrider must not be drawn in its place (the \
-           marker would name a restricted node):\n{}", view ); }
+           fact would name a restricted node):\n{}", view ); }
       Ok (( )) }
 
 /// Save 'buf' under a specific skgrepo restriction (the test shims save
@@ -534,7 +534,7 @@ async fn save_under_set (
 /// end D in skgrepo 'other'. Under 'all' the END D substitutes for N;
 /// under 'main' (hiding 'other') the MIDDLE C substitutes. Saving the
 /// half-visible view accepts the middle carrier (it is on N's chain)
-/// and keeps N in P's contains; an off-chain marker is rejected.
+/// and keeps N in P's contains; an off-chain fact is rejected.
 async fn chain_half_visible_keeps_the_original (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -586,7 +586,7 @@ async fn chain_half_visible_keeps_the_original (
         assert! ( ! p_file . contains ("- C"),
           "P must NOT be rewritten to contain the carrier C:\n{}",
           p_file ); }
-      { // A marker on a node NOT on N's chain is rejected.
+      { // A fact on a node NOT on N's chain is rejected.
         let buffer = indoc! {"
           * (skg (node (id P) (repo main))) P
           ** (skg (node (id D) (repo other) (viewStats (overridesHere P)) writeProtected)) D
@@ -595,8 +595,8 @@ async fn chain_half_visible_keeps_the_original (
           Err (SaveError::BufferValidationErrors { errors, .. }) =>
             assert! ( errors . iter () . any ( |e| matches! (
               e, BufferValidationError::OverridesHere_Mismatch (..) )),
-              "off-chain marker must abort; got: {:?}", errors ),
+              "off-chain fact must abort; got: {:?}", errors ),
           other => panic! (
-            "off-chain marker must abort the save; got: {:?}",
+            "off-chain fact must abort the save; got: {:?}",
             other . map ( |v| v . len () ) ), }}
       Ok (( )) }

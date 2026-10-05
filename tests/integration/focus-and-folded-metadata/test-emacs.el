@@ -1,10 +1,10 @@
-;;; Integration test for focus and folded markers functionality
+;;; Integration test for focus and folded atoms functionality
 ;;; This script tests, in order:
 ;;; - Creating a buffer with 6 headlines
 ;;; - Folding headline 3 (which contains headlines 4 and 5)
 ;;; - Positioning point on headline 2
 ;;; - Saving with skg-request-save-buffer
-;;; - Verifying that after save, the markers are removed but the folding is preserved
+;;; - Verifying that after save, the atoms are removed but the folding is preserved
 ;;;   and point is on the focused headline
 ;;;
 ;;; NOTE: File system operations (backup/cleanup) are handled by run-test.sh
@@ -19,7 +19,7 @@
 
 (defun run-all-tests ()
   "Main orchestrator function that runs all integration tests."
-  (message "=== SKG Focus and Folded Markers Integration Test ===")
+  (message "=== SKG Focus and Folded Atoms Integration Test ===")
 
   ;; Set the port from environment variable if available
   (let ((test-port (getenv "SKG_TEST_PORT")))
@@ -28,7 +28,7 @@
       (message "Using test port: %d" skg-port)))
 
   ;; Run the test
-  (test-focus-and-folded-markers)
+  (test-focus-and-folded-metadata)
 
   ;; Wait for completion with timeout
   (let ((timeout 0))
@@ -42,8 +42,8 @@
     (message "Last phase: %s" integration-test-phase)
     (kill-emacs 1)))
 
-(defun test-focus-and-folded-markers ()
-  "Test focus and folded markers during save."
+(defun test-focus-and-folded-metadata ()
+  "Test focus and folded atoms during save."
   (message "=== PHASE 1: Creating test buffer ===")
 
   ;; Create a new buffer with the test content
@@ -103,13 +103,13 @@
 
       (setq integration-test-phase "ready-to-save")
 
-      ;; Debug: Manually test skg-add-folded-markers
-      (message "=== Testing skg-add-folded-markers ===")
-      (skg-add-folded-markers)
-      (let ((after-folded-markers (buffer-substring-no-properties (point-min) (point-max))))
-        (with-temp-file "after-folded-markers.log"
-          (insert after-folded-markers))
-        (message "Buffer after skg-add-folded-markers:\n%s" after-folded-markers))
+      ;; Debug: Manually test skg-add-folded-metadata
+      (message "=== Testing skg-add-folded-metadata ===")
+      (skg-add-folded-metadata)
+      (let ((after-folded-metadata (buffer-substring-no-properties (point-min) (point-max))))
+        (with-temp-file "after-folded-metadata.log"
+          (insert after-folded-metadata))
+        (message "Buffer after skg-add-folded-metadata:\n%s" after-folded-metadata))
 
       ;; Save the buffer
       (message "=== PHASE 2: Saving buffer ===")
@@ -127,9 +127,9 @@
         (message "✓ Saved result buffer state to result.log")
         (message "Result content:\n%s" result-content)
 
-        ;; Verify the markers are REMOVED (not present in buffer)
-        (let ((has-focused-marker (string-match-p "\\<focused\\>" result-content))
-              (has-folded-marker (string-match-p "\\<folded\\>" result-content))
+        ;; Verify the atoms are REMOVED (not present in buffer)
+        (let ((has-focused-metadata (string-match-p "\\<focused\\>" result-content))
+              (has-folded-metadata (string-match-p "\\<folded\\>" result-content))
               (current-line (buffer-substring-no-properties (line-beginning-position) (line-end-position)))
               (line-4-invisible (save-excursion
                                   (goto-char (point-min))
@@ -140,14 +140,14 @@
                                   (forward-line 4)
                                   (invisible-p (point)))))
 
-          (if (and (not has-focused-marker)
-                   (not has-folded-marker)
+          (if (and (not has-focused-metadata)
+                   (not has-folded-metadata)
                    (string-match-p "(id 2)" current-line)
                    line-4-invisible
                    line-5-invisible)
               (progn
-                (message "✓ PASS: Focused marker removed from buffer")
-                (message "✓ PASS: Folded markers removed from buffer")
+                (message "✓ PASS: Focused atom removed from buffer")
+                (message "✓ PASS: Folded atoms removed from buffer")
                 (message "✓ PASS: Point is on headline 2 (focused headline)")
                 (message "✓ PASS: Headline 4 is invisible (folded)")
                 (message "✓ PASS: Headline 5 is invisible (folded)")
@@ -156,8 +156,8 @@
                 (kill-emacs 0))
             (progn
               (message "✗ FAIL: Expected behavior not found")
-              (message "  has-focused-marker (should be nil): %s" has-focused-marker)
-              (message "  has-folded-marker (should be nil): %s" has-folded-marker)
+              (message "  has-focused-metadata (should be nil): %s" has-focused-metadata)
+              (message "  has-folded-metadata (should be nil): %s" has-folded-metadata)
               (message "  current-line: %s" current-line)
               (message "  line-4-invisible (should be non-nil): %s" line-4-invisible)
               (message "  line-5-invisible (should be non-nil): %s" line-5-invisible)

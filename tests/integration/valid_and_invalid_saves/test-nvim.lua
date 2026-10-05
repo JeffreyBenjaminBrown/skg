@@ -48,14 +48,14 @@ local function test_invalid_save ()
   T.check(error_content:find('NOTHING WAS SAVED', 1, true) ~= nil,
           'Error buffer contains expected error message')
 
-  -- Buffer has no lingering focused/folded markers: focus and fold
+  -- Buffer has no lingering focused/folded atoms: focus and fold
   -- information is sent to the server but not shown to the user.
   if not vim.api.nvim_buf_is_valid(content_buf) then
     T.fail('Original ' .. content_buffer_name .. ' buffer was lost')
   end
   local content = T.buffer_text(content_buf)
   T.check(content == original_content,
-          'Buffer content unchanged (no lingering markers)')
+          'Buffer content unchanged (no lingering atoms)')
   if content ~= original_content then
     print('Expected: ' .. original_content)
     print('Got: ' .. content)
@@ -97,7 +97,7 @@ local function test_valid_save (content_buf)
   local updated_content = T.buffer_text(content_buf)
   print('Updated buffer content: ' .. updated_content)
 
-  -- Should contain cycle and write-protected markers (inside (node ...)).
+  -- Should contain cycle and write-protected atoms (inside (node ...)).
   local has_cycle = updated_content:find('cycle', 1, true) ~= nil
   local has_write_protected = updated_content:find('%f[%w]writeProtected%f[%W]') ~= nil
   if has_cycle and has_write_protected then
@@ -105,7 +105,7 @@ local function test_valid_save (content_buf)
   else
     print('Expected to contain: "cycle" and "writeProtected"')
     print('Got: ' .. updated_content)
-    T.fail('Expected cycle and writeProtected markers not found')
+    T.fail('Expected cycle and writeProtected atoms not found')
   end
 
   -- §20.2(c): an invalid save must NOT leak lock/stream state that

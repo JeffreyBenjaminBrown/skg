@@ -235,9 +235,9 @@ async fn test_diff_mode_as_subscribee_regenerates_phantom_children (
 
 /// #1 fix: a subscribee removed from the subscriber's subscribesTo list (but
 /// whose .skg still exists) renders as a phantom with (unstaged removedR). Its
-/// relation is subscribesTo, not contains, so the membership marker comes from
+/// relation is subscribesTo, not contains, so the membership sign comes from
 /// build_child_data's net-removal fallback rather than phantom_axes(contains).
-/// Without the fix the phantom would carry NO membership marker.
+/// Without the fix the phantom would carry NO membership sign.
 async fn test_diff_mode_removed_subscribee_shows_removedR (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>

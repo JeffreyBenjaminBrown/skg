@@ -162,7 +162,7 @@ impl OpenViews {
 /// The pids a view "contains" for collateral detection (views_containing): the
 /// primary ids of its Unrestricted vognodes -- the only kind backed by a
 /// real, current graphnode that this view renders meaningfully. Restricted
-/// placeholders are excluded: they are anonymous markers whose rerender shows
+/// placeholders are excluded: they are anonymous placeholders whose rerender shows
 /// nothing about the node, so a save touching that node need not re-render this
 /// view (its unrestricted descendants register themselves). Deleted / Unknown / Diff
 /// phantom are excluded too: they are not graph members. The single source of

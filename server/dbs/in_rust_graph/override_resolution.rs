@@ -13,7 +13,7 @@
 //!   followed only if both its relRepo and its overrider's home skgrepo
 //!   are unrestricted. A restricted relationship cannot affect visible topology,
 //!   and a restricted overrider cannot be drawn; either one stops the walk
-//!   at the last visible node. Callers that ask "what marker would the
+//!   at the last visible node. Callers that ask "what fact would the
 //!   server have written, ever?" (the tamper check) pass None, i.e.
 //!   visibility-ungated.
 //!
@@ -113,14 +113,14 @@ pub fn resolve_override (
 /// content. The tamper check at save uses this: with chains the drawn
 /// node can be any link of the chain (a MIDDLE carrier, when a later
 /// link's skgrepo is hidden), not only the end, so it must accept any
-/// honest carrier and reject only an off-chain (faked/stale) marker.
-/// VISIBILITY-UNGATED ('unrestricted' = None) so a marker that was honest
+/// honest carrier and reject only an off-chain (faked/stale) fact.
+/// VISIBILITY-UNGATED ('unrestricted' = None) so a fact that was honest
 /// when rendered does not start failing after a skgrepo-set switch;
 /// 'path' is the full owned chain (ownership still gates).
 pub fn carrier_on_owned_chain (
   config   : &SkgConfig,
   graph    : &InRustGraph,
-  original : &ID,   // the marker's N
+  original : &ID,   // the fact's N
   carrier  : &ID,   // the drawn node's own id
 ) -> bool {
   resolve_override (config, graph, None, original)
