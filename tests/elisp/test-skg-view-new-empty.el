@@ -17,7 +17,7 @@
           (setq opened (current-buffer))
           (should (equal (buffer-string) ""))
           (should (derived-mode-p 'skg-content-view-mode))
-          (should (stringp skg-view-uri)))
+          (should (stringp skg-view-id)))
       (when (buffer-live-p opened)
         (set-buffer-modified-p nil)
         (kill-buffer opened)))))

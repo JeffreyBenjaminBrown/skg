@@ -161,7 +161,7 @@ function M.cancel_locally_failed_search ()
 end
 
 ---Display the immediate results: a search view buffer registered
----under the uri 'search:TERMS'.
+---under the view_id 'search:TERMS'.
 ---@param response any
 ---@param search_terms string
 function M.display_search_phase1 (response, search_terms)
@@ -189,7 +189,7 @@ function M.display_search_enrichment (response)
     M.display_warnings(
       response, 'Search enrichment completed with warnings')
     return end
-  local buf = buffer.find_buffer_by_uri('search:' .. terms)
+  local buf = buffer.find_buffer_by_view_id('search:' .. terms)
   if not buf then return end
   vim.bo[buf].modifiable = true
   local buffer_snapshot_was_dirty =
@@ -235,7 +235,7 @@ end
 ---@param response any
 function M.handle_buffer_snapshot_request (response)
   local terms = payload.field_text(response, 'content')
-  local buf = terms and buffer.find_buffer_by_uri('search:' .. terms)
+  local buf = terms and buffer.find_buffer_by_view_id('search:' .. terms)
   if not buf then return end
   vim.b[buf].skg_search_buffer_snapshot_was_dirty = vim.bo[buf].modified
   vim.bo[buf].modifiable = false

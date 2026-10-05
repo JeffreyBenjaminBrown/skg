@@ -25,33 +25,33 @@ function M.request_rerender_all_views ()
 end
 
 function M.request_rerender_clean_views_after_import ()
-  local dirty_uris = {}
+  local dirty_view_ids = {}
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].modified then
-      local uri = vim.b[buf].skg_view_uri
-      if uri then table.insert(dirty_uris, uri) end
+      local view_id = vim.b[buf].skg_view_id
+      if view_id then table.insert(dirty_view_ids, view_id) end
     end
   end
-  return M.request_rerender_all_views_with_approval(nil, dirty_uris)
+  return M.request_rerender_all_views_with_approval(nil, dirty_view_ids)
 end
 
 function M.request_rerender_all_views_with_approval (approved_pids,
-                                                     excluded_view_uris)
+                                                     excluded_view_ids)
   lock.begin_stream('rerender')
   lock.lock_all_skg_buffers()
   M.register_rerender_stream_handlers()
   M.register_overPrivateText_confirmation(function (pids)
-    M.request_rerender_all_views_with_approval(pids, excluded_view_uris)
+    M.request_rerender_all_views_with_approval(pids, excluded_view_ids)
   end)
   state.lp_reset()
   local request = {
     sexpr.pair(
       sexpr.symbol('request'),
       'rerender all views') }
-  if excluded_view_uris then
-    local excluded = { sexpr.symbol('exclude-view-uris') }
-    for _, uri in ipairs(excluded_view_uris) do
-      table.insert(excluded, uri) end
+  if excluded_view_ids then
+    local excluded = { sexpr.symbol('exclude-view-ids') }
+    for _, view_id in ipairs(excluded_view_ids) do
+      table.insert(excluded, view_id) end
     table.insert(request, excluded)
   end
   if approved_pids and #approved_pids > 0 then
@@ -109,7 +109,7 @@ function M.register_rerender_stream_handlers ()
       local ok, err = pcall(function ()
         local lock_views = payload.field(response, 'lock-views')
         if lock_views ~= nil then
-          lock.unlock_buffers_not_in_uri_list(
+          lock.unlock_buffers_not_in_view_id_list(
             payload.string_list(lock_views)) end
       end)
       if not ok then

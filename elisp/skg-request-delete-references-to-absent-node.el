@@ -19,7 +19,7 @@
     (unless (skg--unknown-headline-p metadata)
       (user-error "Point must be on an Unknown headline"))
     (when (cl-some (lambda (buf)
-                     (and (buffer-local-value 'skg-view-uri buf)
+                     (and (buffer-local-value 'skg-view-id buf)
                           (buffer-modified-p buf)))
                    (buffer-list))
       (user-error "Save or revert every skg view before global reference cleanup"))

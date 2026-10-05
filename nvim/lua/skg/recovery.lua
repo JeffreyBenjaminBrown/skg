@@ -38,7 +38,7 @@ function M.document (buf)
     '',
     '* Context',
     '- Buffer name: ' .. vim.api.nvim_buf_get_name(buf),
-    '- View URI: ' .. tostring(vim.b[buf].skg_view_uri),
+    '- View ID: ' .. tostring(vim.b[buf].skg_view_id),
     '- Captured UTC: ' .. os.date('!%Y-%m-%dT%H:%M:%SZ'),
     '- Repo-set and git diff mode: unavailable to this client',
     '- Search enrichment: ' .. enrichment_note,
@@ -77,7 +77,7 @@ end
 function M.show_unsaved_changes (path, overwrite)
   local source_buf = vim.api.nvim_get_current_buf()
   if not buffer.buffer_p(source_buf)
-     or vim.b[source_buf].skg_view_uri == nil then
+     or vim.b[source_buf].skg_view_id == nil then
     error('This buffer is not a live skg view') end
   path = path or vim.fn.input(
     'Write unsaved-changes recovery document: ', '', 'file')

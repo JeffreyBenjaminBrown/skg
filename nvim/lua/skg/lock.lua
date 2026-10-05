@@ -58,7 +58,7 @@ end
 function M.lock_all_skg_buffers ()
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf)
-       and vim.b[buf].skg_view_uri ~= nil then
+       and vim.b[buf].skg_view_id ~= nil then
       M.lock_for_save(buf) end
   end
 end
@@ -69,30 +69,30 @@ function M.unlock_all_save_locked ()
   end
 end
 
----Unlock skg buffers whose uri is NOT in URI_LIST.
----@param uri_list string[]
-function M.unlock_buffers_not_in_uri_list (uri_list)
+---Unlock skg buffers whose view_id is NOT in VIEW_ID_LIST.
+---@param view_id_list string[]
+function M.unlock_buffers_not_in_view_id_list (view_id_list)
   local keep = {}
-  for _, uri in ipairs(uri_list) do keep[uri] = true end
+  for _, view_id in ipairs(view_id_list) do keep[view_id] = true end
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf)
        and vim.b[buf].skg_save_locked then
-      local uri = vim.b[buf].skg_view_uri
-      if uri and not keep[uri] then M.unlock_after_save(buf) end
+      local view_id = vim.b[buf].skg_view_id
+      if view_id and not keep[view_id] then M.unlock_after_save(buf) end
     end
   end
 end
 
----Unlock skg buffers outside SAVED_URI and the narrowed keep-set.
----COLLATERAL_URIS is historical naming: it can also contain dirty views whose
+---Unlock skg buffers outside SAVED_VIEW_ID and the narrowed keep-set.
+---COLLATERAL_VIEW_IDS is historical naming: it can also contain dirty views whose
 ---buffer snapshots were inputs to the conflict check.
----@param saved_uri string
----@param collateral_uris string[]|nil
-function M.unlock_non_collateral_buffers (saved_uri, collateral_uris)
-  local keep = { saved_uri }
-  for _, uri in ipairs(collateral_uris or {}) do
-    table.insert(keep, uri) end
-  M.unlock_buffers_not_in_uri_list(keep)
+---@param saved_view_id string
+---@param collateral_view_ids string[]|nil
+function M.unlock_non_collateral_buffers (saved_view_id, collateral_view_ids)
+  local keep = { saved_view_id }
+  for _, view_id in ipairs(collateral_view_ids or {}) do
+    table.insert(keep, view_id) end
+  M.unlock_buffers_not_in_view_id_list(keep)
 end
 
 -- A server crash or busy-initializing teardown mid-save must not

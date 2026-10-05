@@ -5,7 +5,7 @@ pub use super::super::common::*;
 pub use ego_tree::Tree;
 
 pub use skg::serve::handlers::save_buffer::SaveResponse;
-pub use skg::types::views_state::ViewUri;
+pub use skg::types::views_state::ViewId;
 pub use skg::types::viewnode::Viewnode;
 
 /// The expected initial diff view for a containing b (text changed).

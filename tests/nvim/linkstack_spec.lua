@@ -123,7 +123,7 @@ describe('skg.linkstack paste and pop', function ()
   local function paste_node_in_view (existing_line)
     state.linkstack = { { 'id-1', 'Title from stack' } }
     buffer_with(existing_line .. '\n')
-    vim.b.skg_view_uri = 'test-view'
+    vim.b.skg_view_id = 'test-view'
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     local notified = nil
     local real_notify = vim.notify

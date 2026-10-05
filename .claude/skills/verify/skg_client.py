@@ -44,13 +44,13 @@ def run ( request_line, body = None, expect_multi = False ):
 if __name__ == "__main__":
     mode = sys . argv [1]
     if mode == "view":
-        node_id, uri = sys . argv [2], sys . argv [3]
-        req = f'((request . "single root content view") (id . "{node_id}") (view-uri . "{uri}"))'
+        node_id, view_id = sys . argv [2], sys . argv [3]
+        req = f'((request . "single root content view") (id . "{node_id}") (view-id . "{view_id}"))'
         msgs = run ( req )
     elif mode == "save":
-        uri, body_file = sys . argv [2], sys . argv [3]
+        view_id, body_file = sys . argv [2], sys . argv [3]
         body = open ( body_file ) . read ()
-        req = ( f'((request . "save buffer") (view-uri . "{uri}")'
+        req = ( f'((request . "save buffer") (view-id . "{view_id}")'
                 ' (point-lines-below-focused-headline . "0")'
                 ' (point-column . "0")'
                 ' (point-screen-lines-below-window-start . "0"))' )

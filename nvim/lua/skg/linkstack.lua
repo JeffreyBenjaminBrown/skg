@@ -117,7 +117,7 @@ end
 ---@param entry table
 function M.insert_node_from_entry (entry)
   local request_editable_view = false
-  if vim.b.skg_view_uri ~= nil then
+  if vim.b.skg_view_id ~= nil then
     if M.buffer_has_editable_occurrence_p(entry[1]) then
       vim.notify('NOTE: Pasting node write-protected because a writable'
                  .. ' occurrence is already present in this same buffer.')

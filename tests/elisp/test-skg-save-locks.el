@@ -9,12 +9,12 @@
     (unwind-protect
         (progn
           (with-current-buffer saved
-            (setq-local skg-view-uri "uri-saved"))
+            (setq-local skg-view-id "view-id-saved"))
           (with-current-buffer other
-            (setq-local skg-view-uri "uri-client-only"))
+            (setq-local skg-view-id "view-id-client-only"))
           (skg--lock-all-skg-buffers)
           (skg--broad-save-lock-handler
-           "((response-type save-lock) (lock-views (\"uri-saved\")))")
+           "((response-type save-lock) (lock-views (\"view-id-saved\")))")
           (should (buffer-local-value 'skg--save-lock-overlay saved))
           (should (buffer-local-value 'skg--save-lock-overlay other)))
       (skg--unlock-all-save-locked)
@@ -28,15 +28,15 @@
     (unwind-protect
         (progn
           (with-current-buffer saved
-            (setq-local skg-view-uri "uri-saved"))
+            (setq-local skg-view-id "view-id-saved"))
           (with-current-buffer dirty
-            (setq-local skg-view-uri "uri-dirty"))
+            (setq-local skg-view-id "view-id-dirty"))
           (with-current-buffer clean
-            (setq-local skg-view-uri "uri-clean"))
+            (setq-local skg-view-id "view-id-clean"))
           (skg--lock-all-skg-buffers)
           (skg--save-relax-lock-handler
-           "uri-saved"
-           "((response-type save-relax-lock) (lock-views (uri-dirty)))")
+           "view-id-saved"
+           "((response-type save-relax-lock) (lock-views (view-id-dirty)))")
           (should (buffer-local-value 'skg--save-lock-overlay saved))
           (should (buffer-local-value 'skg--save-lock-overlay dirty))
           (should-not (buffer-local-value 'skg--save-lock-overlay clean)))
@@ -51,12 +51,12 @@
     (unwind-protect
         (progn
           (with-current-buffer saved
-            (setq-local skg-view-uri "uri-saved"))
+            (setq-local skg-view-id "view-id-saved"))
           (with-current-buffer other
-            (setq-local skg-view-uri "uri-other"))
+            (setq-local skg-view-id "view-id-other"))
           (skg--lock-all-skg-buffers)
           (skg--save-relax-lock-handler
-           "uri-saved"
+           "view-id-saved"
            "((response-type save-relax-lock) (lock-views malformed))")
           (should (buffer-local-value 'skg--save-lock-overlay saved))
           (should (buffer-local-value 'skg--save-lock-overlay other)))

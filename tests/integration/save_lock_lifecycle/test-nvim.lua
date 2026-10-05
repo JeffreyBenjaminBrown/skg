@@ -66,8 +66,8 @@ local function phase_2_edit_and_save_a ()
     saw_broad_lock = true
   end
   local original_relax = save.save_relax_lock_handler
-  save.save_relax_lock_handler = function (saved_uri, response)
-    original_relax(saved_uri, response)
+  save.save_relax_lock_handler = function (saved_view_id, response)
+    original_relax(saved_view_id, response)
     T.check(vim.b[view_bufs.a].skg_save_locked == true,
             'saved view remains locked after relaxation')
     T.check(vim.b[view_bufs.b].skg_save_locked == true,

@@ -76,7 +76,7 @@
 (ert-deftest test-skg-import-rerender-excludes-dirty-views ()
   (let ((sent nil))
     (with-temp-buffer
-      (setq-local skg-view-uri "dirty-uri")
+      (setq-local skg-view-id "dirty-view-id")
       (insert "unsaved text")
       (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
                  (lambda () 'fake-proc))
@@ -89,4 +89,4 @@
                  #'ignore))
         (skg--import-rerender-clean-views)
         (should (string-match-p
-                 (regexp-quote "(exclude-view-uris \"dirty-uri\")") sent))))))
+                 (regexp-quote "(exclude-view-ids \"dirty-view-id\")") sent))))))

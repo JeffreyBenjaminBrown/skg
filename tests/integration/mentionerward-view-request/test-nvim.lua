@@ -5,7 +5,7 @@
 -- (not fetched from the server) -- the elisp test does the same,
 -- building a scratch org buffer by hand before calling the view
 -- request. That exercises skg.view_requests / save purely, against a
--- buffer whose skg_view_uri the test itself assigns.
+-- buffer whose skg_view_id the test itself assigns.
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(30)
@@ -36,16 +36,16 @@ local function strip_metadata_and_bodies (text)
 end
 
 ---Reset the scratch view buffer to base_buffer_text under a fresh
----view uri, position the cursor at LINE_NUMBER (0-based, like the
+---view view_id, position the cursor at LINE_NUMBER (0-based, like the
 ---elisp), request the mentionerward view (auto-saves), and return the
 ---resulting full buffer text. Port of
 ---skg-mentionerward--request-on-line.
 ---@param line_number integer
 ---@return string
 local function request_on_line (line_number)
-  local uri = buffer.generate_uuid()
+  local view_id = buffer.generate_uuid()
   local buf = buffer.open_org_buffer_from_text(
-    base_buffer_text, 'skg://mentionerward-test-view', uri)
+    base_buffer_text, 'skg://mentionerward-test-view', view_id)
   vim.api.nvim_win_set_cursor(0, { line_number + 1, 0 })
   print(string.format(
     'requesting-mentionerward-view-line-%d', line_number))

@@ -11,20 +11,20 @@ local buffer = require('skg.buffer')
 local content_view = require('skg.content_view')
 
 describe('skg.content_view request strings', function ()
-  it('carries id and view-uri', function ()
+  it('carries id and view-id', function ()
     assert.are.equal(
       '((request . "single root content view") (id . "abc")'
-      .. ' (view-uri . "uri-1"))\n',
-      content_view.request_string('abc', 'uri-1'))
+      .. ' (view-id . "view_id-1"))\n',
+      content_view.request_string('abc', 'view_id-1'))
   end)
 
   it('carries only the overPrivateText telescope pids approved on retry', function ()
     assert.are.equal(
       '((request . "single root content view") (id . "abc")'
-      .. ' (view-uri . "uri-1")'
+      .. ' (view-id . "view_id-1")'
       .. ' (approved-overPrivateText-pids "pid-a" "pid-b"))\n',
       content_view.request_string(
-        'abc', 'uri-1', { 'pid-a', 'pid-b' }))
+        'abc', 'view_id-1', { 'pid-a', 'pid-b' }))
   end)
 end)
 
@@ -58,8 +58,8 @@ describe('skg.content_view responses', function ()
     content_view.request_single_root_content_view_from_id('abc')
     local opened = nil
     vim.wait(2000, function ()
-      opened = buffer.find_buffer_by_uri(
-        vim.b[vim.api.nvim_get_current_buf()].skg_view_uri or '')
+      opened = buffer.find_buffer_by_view_id(
+        vim.b[vim.api.nvim_get_current_buf()].skg_view_id or '')
       return vim.b[vim.api.nvim_get_current_buf()].skg_content_view
              == true
     end, 10)
@@ -68,18 +68,18 @@ describe('skg.content_view responses', function ()
                      vim.api.nvim_buf_get_name(buf))
     assert.are.equal('* (skg (node (id abc))) served title',
       vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1])
-    assert.is_truthy(vim.b[buf].skg_view_uri)
+    assert.is_truthy(vim.b[buf].skg_view_id)
   end)
 
   it('switches to an already-open view instead of duplicating',
      function ()
     local existing = buffer.open_org_buffer_from_text(
-      '* already open', 'skg://already open', 'uri-existing')
+      '* already open', 'skg://already open', 'view_id-existing')
     local scratch = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_set_current_buf(scratch)
     serve_content(
       '((response-type content-view)'
-      .. ' (switch-to-view "uri-existing"))')
+      .. ' (switch-to-view "view_id-existing"))')
     content_view.request_single_root_content_view_from_id('abc')
     vim.wait(2000, function ()
       return vim.api.nvim_get_current_buf() == existing

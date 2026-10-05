@@ -40,17 +40,17 @@ function M.request_save_buffer (approved_forks, fork_skgrepos,
                                 approved_hoist_pids,
                                 text_approved_pids)
   local save_buf = vim.api.nvim_get_current_buf()
-  local saved_uri = vim.b[save_buf].skg_view_uri
-  if not saved_uri then
-    -- A nil view-uri causes an unfiltered save AND the server won't
+  local saved_view_id = vim.b[save_buf].skg_view_id
+  if not saved_view_id then
+    -- A nil view-id causes an unfiltered save AND the server won't
     -- update its in-Rust graph: slow and wasted. Refuse.
     error(string.format(
-      "Cannot save: view uri is nil in buffer '%s'. Re-open the view.",
+      "Cannot save: view view_id is nil in buffer '%s'. Re-open the view.",
       vim.api.nvim_buf_get_name(save_buf))) end
   lock.begin_stream('save')
   lock.lock_all_skg_buffers()
   local ok, err = pcall(
-    M.send_save_buffer, save_buf, saved_uri, approved_forks, fork_skgrepos,
+    M.send_save_buffer, save_buf, saved_view_id, approved_forks, fork_skgrepos,
     approved_hoist_pids, text_approved_pids)
   if not ok then
     M.cancel_locally_failed_save()
@@ -58,7 +58,7 @@ function M.request_save_buffer (approved_forks, fork_skgrepos,
 end
 
 ---Serialize and send a save after the stream guard and locks are held.
-function M.send_save_buffer (save_buf, saved_uri, approved_forks, fork_skgrepos,
+function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgrepos,
                              approved_hoist_pids, text_approved_pids)
   local focused_line = focus.owning_headline_line()
   local focused_had_metadata = focused_line ~= nil
@@ -72,7 +72,7 @@ function M.send_save_buffer (save_buf, saved_uri, approved_forks, fork_skgrepos,
       M.other_view_buffer_snapshots(save_buf) },
   })
   local request_line =
-    M.save_request_string(saved_uri, save_point_position,
+    M.save_request_string(saved_view_id, save_point_position,
                           approved_forks, fork_skgrepos,
                           approved_hoist_pids,
                           text_approved_pids)
@@ -87,7 +87,7 @@ function M.send_save_buffer (save_buf, saved_uri, approved_forks, fork_skgrepos,
   -- save-result removes it.
   state.register_response_handler('save-relax-lock',
     function (_payload_text, response)
-      M.save_relax_lock_handler(saved_uri, response)
+      M.save_relax_lock_handler(saved_view_id, response)
     end, false)
   state.register_response_handler('collateral-view',
     function (payload_text, response)
@@ -157,11 +157,11 @@ end
 function M.other_view_buffer_snapshots (save_buf)
   local result = {}
   for _, other in ipairs(vim.api.nvim_list_bufs()) do
-    local uri = vim.api.nvim_buf_is_valid(other)
-                and vim.b[other].skg_view_uri or nil
-    if other ~= save_buf and uri then
+    local view_id = vim.api.nvim_buf_is_valid(other)
+                and vim.b[other].skg_view_id or nil
+    if other ~= save_buf and view_id then
       local entry = {
-        { sexpr.symbol('view-uri'), uri },
+        { sexpr.symbol('view-id'), view_id },
         { sexpr.symbol('dirty'),
           sexpr.symbol(vim.bo[other].modified and 'true' or 'false') },
       }
@@ -199,19 +199,19 @@ function M.cancel_locally_failed_save ()
 end
 
 ---The save-buffer request line.
----@param view_uri string
+---@param view_id string
 ---@param position table
 ---@param approved_forks boolean|nil
 ---@param fork_repos table[]|nil
 ---@param approved_hoist_pids string[]|nil
 ---@param text_approved_pids string[]|nil
 ---@return string
-function M.save_request_string (view_uri, position, approved_forks,
+function M.save_request_string (view_id, position, approved_forks,
                                 fork_skgrepos, approved_hoist_pids,
                                 text_approved_pids)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'save buffer'),
-    sexpr.pair(sexpr.symbol('view-uri'), view_uri),
+    sexpr.pair(sexpr.symbol('view-id'), view_id),
     sexpr.pair(sexpr.symbol('point-lines-below-focused-headline'),
                tostring(position.lines_below_focused_headline)),
     sexpr.pair(sexpr.symbol('point-column'),
@@ -284,17 +284,17 @@ function M.broad_save_lock_handler (response)
   end
 end
 
----Narrow broad locks to SAVED_URI and the URIs in RESPONSE.
----@param saved_uri string
+---Narrow broad locks to SAVED_VIEW_ID and the view IDs in RESPONSE.
+---@param saved_view_id string
 ---@param response any
-function M.save_relax_lock_handler (saved_uri, response)
+function M.save_relax_lock_handler (saved_view_id, response)
   local ok, err = pcall(function ()
     local lock_views = payload.field(response, 'lock-views')
     if lock_views == nil then error('missing lock-views') end
     if not sexpr.is_list(lock_views) then
       error('lock-views is not a list') end
     lock.unlock_non_collateral_buffers(
-      saved_uri, payload.string_list(lock_views))
+      saved_view_id, payload.string_list(lock_views))
   end)
   if not ok then
     -- Retain every lock when the keep-set cannot be trusted.
@@ -304,7 +304,7 @@ function M.save_relax_lock_handler (saved_uri, response)
 end
 
 ---Apply one streamed view update: unlock and replace the buffer for
----its view uri. Shared by the save (collateral-view) and rerender
+---its view view_id. Shared by the save (collateral-view) and rerender
 ---(rerender-view) streams.
 ---@param _payload_text string
 ---@param response any
@@ -313,9 +313,9 @@ end
 function M.apply_streamed_view_update (_payload_text, response,
                                        log_category, handler_name)
   local ok, err = pcall(function ()
-    local uri = payload.field_text(response, 'view-uri')
+    local view_id = payload.field_text(response, 'view-id')
     local content = payload.field(response, 'content')
-    local buf = uri and buffer.find_buffer_by_uri(uri) or nil
+    local buf = view_id and buffer.find_buffer_by_view_id(view_id) or nil
     if buf and content ~= nil and not sexpr.is_list(content) then
       lock.unlock_after_save(buf)
       M.replace_buffer_with_new_content(
@@ -694,7 +694,7 @@ end
 ---Show CONTENT in the fork-confirmation buffer, recording SAVE_BUF as
 ---its source; returns the buffer. It is a navigable, editable content
 ---view (so the user can rotate each clone's skgrepo), but NOT an
----ordinary save target: it has no view uri (tripping the nil-uri save
+---ordinary save target: it has no view view_id (tripping the nil-view_id save
 ---guard) and its ':w' refuses. Only approve (<localleader>cc) and
 ---decline (<localleader>ck) act on it. Dismissing it without
 ---approving strips the source's lingering fork atom, so the next save
@@ -720,7 +720,7 @@ function M.show_fork_confirmation (content, save_buf)
   vim.bo[buf].buftype = 'acwrite'
   vim.bo[buf].swapfile = false
   vim.bo[buf].filetype = 'org'
-  vim.b[buf].skg_view_uri = nil -- not a registered view
+  vim.b[buf].skg_view_id = nil -- not a registered view
   vim.b[buf].skg_fork_source = save_buf
   vim.b[buf].skg_fork_suppress_strip = false
   require('skg.heralds').enable(buf)

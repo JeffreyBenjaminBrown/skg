@@ -9,7 +9,7 @@
 
 (require 'skg-length-prefix)
 (require 'skg-request-save) ; for skg-replace-buffer-with-new-content, skg-big-nonfatal-message
-(require 'skg-buffer)       ; for skg-find-buffer-by-uri
+(require 'skg-buffer)       ; for skg-find-buffer-by-view-id
 (require 'skg-lock-buffers)
 
 (defvar skg--rerender-overPrivateText-retry nil
@@ -72,7 +72,7 @@ request replaced; remove it and balance its pending count."
   "Register the three handlers for streamed rerender responses.
 Shared by 'skg-request-rerender-all-views' and 'skg-view-diff-mode'."
   (skg-register-response-handler
-   ;; 1. Lock message: unlock buffers not in the URI list.
+   ;; 1. Lock message: unlock buffers not in the view ID list.
    'rerender-lock
    (lambda (_tcp-proc payload)
      (unless skg--rerender-overPrivateText-challenged
@@ -83,7 +83,7 @@ Shared by 'skg-request-rerender-all-views' and 'skg-view-diff-mode'."
          (let* ((response (read payload))
                 (lock-entry (assoc 'lock-views response)))
            (when lock-entry
-             (skg--unlock-buffers-not-in-uri-list
+             (skg--unlock-buffers-not-in-view-id-list
               (cadr lock-entry))))
        (error
         (skg--unlock-all-save-locked)

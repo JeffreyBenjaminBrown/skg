@@ -39,9 +39,9 @@ local buffer = require('skg.buffer')
 local metadata = require('skg.metadata')
 local folds = require('skg.folds')
 
-local view_uri = buffer.generate_uuid()
+local view_id = buffer.generate_uuid()
 local view = buffer.open_org_buffer_from_text(
-  org_text, 'skg://skg-root-folded-save', view_uri)
+  org_text, 'skg://skg-root-folded-save', view_id)
 vim.api.nvim_win_set_cursor(0, { 1, 0 })
 
 -- Close every fold: the nvim analog of org-startup-folded=t/overview.

@@ -16,7 +16,7 @@ use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::ID;
 use skg::types::errors::SaveError;
 use skg::types::save::format_save_error_as_org;
-use skg::types::views_state::{OpenViews, ViewUri};
+use skg::types::views_state::{OpenViews, ViewId};
 
 fn mk_pair () -> (TcpStream, TcpStream) {
   let listener : TcpListener = TcpListener::bind ("127.0.0.1:0") . unwrap ();
@@ -27,12 +27,12 @@ fn mk_pair () -> (TcpStream, TcpStream) {
 }
 
 fn dirty_buffer_snapshot (
-  uri      : &str,
+  view_id  : &str,
   baseline : Option<&str>,
   current  : &str,
 ) -> ClientViewSnapshot {
   ClientViewSnapshot {
-    uri      : ViewUri::ContentView (uri . into ()),
+    view_id  : ViewId::ContentView (view_id . into ()),
     dirty    : true,
     baseline : baseline . map (str::to_string),
     current  : Some (current . to_string ()),
@@ -58,7 +58,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
         diff_mode_enabled : false,
         open_views        : OpenViews::new (),
       };
-      let saved_uri : ViewUri = ViewUri::ContentView ("saved-a" . into ());
+      let saved_view_id : ViewId = ViewId::ContentView ("saved-a" . into ());
       let (a_view, _, _) = single_root_view (
         config, Some (tantivy), &ID::from ("A"), false) ?;
       let edited_a : String = a_view . replace (
@@ -73,7 +73,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
       let (mut stream, read_end) = mk_pair ();
       let result = update_from_and_rerender_buffer_with_snapshots_test (
         &mut stream, &edited_a, config, tantivy, &graph, false,
-        &Ok (saved_uri . clone ()), &mut views_state,
+        &Ok (saved_view_id . clone ()), &mut views_state,
         &[dirty_buffer_snapshot ("client-only-b", Some (&b_view), &dirty_b)])
         . await;
       drop (stream);
@@ -102,15 +102,15 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
       // The collateral fixture contains only endpoint X as an active node.
       // Reaching it therefore proves the A -> X ordinary graph hop, rather
       // than shared ancestry supplied by a larger rendered view.
-      let x_uri : ViewUri = ViewUri::ContentView ("endpoint-x" . into ());
+      let x_view_id : ViewId = ViewId::ContentView ("endpoint-x" . into ());
       let (_, x_pids, x_forest) = single_root_view (
         config, Some (tantivy), &ID::from ("X"), false) ?;
       views_state . open_views . register_view (
-        &graph . load_full (), x_uri, x_forest, &x_pids);
+        &graph . load_full (), x_view_id, x_forest, &x_pids);
       let (mut stream, read_end) = mk_pair ();
       let response = update_from_and_rerender_buffer_with_snapshots_test (
         &mut stream, &edited_a, config, tantivy, &graph, false,
-        &Ok (saved_uri), &mut views_state,
+        &Ok (saved_view_id), &mut views_state,
         &[dirty_buffer_snapshot ("client-only-c", Some (&c_view), &dirty_c)])
         . await ?;
       drop (stream);
@@ -159,7 +159,7 @@ fn missing_or_unparseable_dirty_baseline_refuses () -> Result<(), Box<dyn Error>
         let (mut stream, _) = mk_pair ();
         let result = update_from_and_rerender_buffer_with_snapshots_test (
           &mut stream, &a_view, config, tantivy, &graph, false,
-          &Ok (ViewUri::ContentView ("saved-a" . into ())),
+          &Ok (ViewId::ContentView ("saved-a" . into ())),
           &mut views_state, &[buffer_snapshot]) . await;
         let error = match result {
           Ok (_) => panic! ("invalid dirty snapshot should refuse the save"),

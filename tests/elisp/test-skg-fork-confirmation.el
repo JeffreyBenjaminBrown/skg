@@ -9,7 +9,7 @@
 (ert-deftest test-save-request-sexp-omits-approved-forks-by-default ()
   "Without approval, the save request carries no approved-forks field."
   (let ((sexp (skg--save-request-sexp
-               "uri-1"
+               "view-id-1"
                '(:point-lines-below-focused-headline 0
                  :point-column 0
                  :point-screen-lines-below-window-start 0))))
@@ -19,7 +19,7 @@
 (ert-deftest test-save-request-sexp-includes-approved-forks-when-set ()
   "With approval, the save request carries (approved-forks . \"true\")."
   (let ((sexp (skg--save-request-sexp
-               "uri-1"
+               "view-id-1"
                '(:point-lines-below-focused-headline 0
                  :point-column 0
                  :point-screen-lines-below-window-start 0)
@@ -29,7 +29,7 @@
 (ert-deftest test-save-request-sexp-omits-fork-repos-by-default ()
   "Without chosen repos, the save request carries no fork-repos field."
   (let ((sexp (skg--save-request-sexp
-               "uri-1"
+               "view-id-1"
                '(:point-lines-below-focused-headline 0
                  :point-column 0
                  :point-screen-lines-below-window-start 0)
@@ -39,7 +39,7 @@
 (ert-deftest test-save-request-sexp-includes-fork-repos-when-set ()
   "With chosen repos, the request carries (fork-repos ((N . X) ...))."
   (let* ((sexp (skg--save-request-sexp
-                "uri-1"
+                "view-id-1"
                 '(:point-lines-below-focused-headline 0
                   :point-column 0
                   :point-screen-lines-below-window-start 0)
@@ -55,7 +55,7 @@
 (ert-deftest test-save-request-sexp-carries-exact-hoist-pids ()
   "Hoist authority is a proper PID list, never a broad boolean."
   (let* ((sexp (skg--save-request-sexp
-                "uri-1"
+                "view-id-1"
                 '(:point-lines-below-focused-headline 0
                   :point-column 0
                   :point-screen-lines-below-window-start 0)
@@ -94,7 +94,7 @@
 (ert-deftest test-save-request-sexp-carries-text-release-pids ()
   "Saved/collateral rerender authority uses the shared release field."
   (let* ((sexp (skg--save-request-sexp
-                "uri-1"
+                "view-id-1"
                 '(:point-lines-below-focused-headline 0
                   :point-column 0
                   :point-screen-lines-below-window-start 0)
@@ -157,7 +157,7 @@ repo to a later fork's child (parent-repo resets on every level 1)."
 (ert-deftest test-show-fork-confirmation-builds-editable-navigable-buffer ()
   "skg--show-fork-confirmation inserts the content into an EDITABLE
 content-view buffer (so the user can rotate each clone's repo), records
-the source buffer, leaves skg-view-uri nil, and binds approve/decline plus an
+the source buffer, leaves skg-view-id nil, and binds approve/decline plus an
 ordinary-save refusal on C-x C-s."
   (let ((source (generate-new-buffer "*fork-origin*")))
     (unwind-protect
@@ -167,7 +167,7 @@ ordinary-save refusal on C-x C-s."
           (unwind-protect
               (with-current-buffer buf
                 (should-not buffer-read-only)
-                (should (null skg-view-uri))
+                (should (null skg-view-id))
                 (should (eq skg--fork-source-buffer source))
                 (should (derived-mode-p 'skg-content-view-mode))
                 (should (string-match-p "(id N)" (buffer-string)))

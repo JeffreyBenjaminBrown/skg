@@ -61,7 +61,7 @@ describe('skg.search', function ()
     server = helpers.connect_to_fake_server(function () end)
     search.request_text_search('still enriching', false, false, false)
     local buf = buffer.open_org_buffer_from_text(
-      '* (skg (node (id a))) a', 'skg://a', 'uri-a')
+      '* (skg (node (id a))) a', 'skg://a', 'view_id-a')
     local ok, err = pcall(save.request_save_buffer)
     assert.is_false(ok)
     assert.is_truthy(tostring(err):find(
@@ -111,7 +111,7 @@ describe('skg.search', function ()
     search.search('dog')
     local buf = nil
     vim.wait(3000, function ()
-      buf = buffer.find_buffer_by_uri('search:dog')
+      buf = buffer.find_buffer_by_view_id('search:dog')
       if not buf then return false end
       local first =
         vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] or ''
@@ -163,13 +163,13 @@ describe('skg.search', function ()
     end)
     local skgrepo = buffer.open_org_buffer_from_text(
       '* (skg (node (id src))) repo\nbody line ',
-      'skg://repo', 'uri-repo')
+      'skg://repo', 'view_id-repo')
     vim.api.nvim_win_set_cursor(0, { 2, 9 })
     search_make_link.search_make_link('chosen')
     vim.wait(3000, function ()
-      return buffer.find_buffer_by_uri('search:chosen') ~= nil
+      return buffer.find_buffer_by_view_id('search:chosen') ~= nil
     end, 10)
-    local search_buf = buffer.find_buffer_by_uri('search:chosen')
+    local search_buf = buffer.find_buffer_by_view_id('search:chosen')
     vim.api.nvim_set_current_buf(search_buf)
     vim.api.nvim_win_set_cursor(0, { 1, 4 })
     search_make_link.finish()
@@ -203,9 +203,9 @@ describe('skg.search', function ()
     end)
     search.search('plain')
     vim.wait(3000, function ()
-      return buffer.find_buffer_by_uri('search:plain') ~= nil
+      return buffer.find_buffer_by_view_id('search:plain') ~= nil
     end, 10)
-    local buf = buffer.find_buffer_by_uri('search:plain')
+    local buf = buffer.find_buffer_by_view_id('search:plain')
     assert.is_nil(vim.b[buf].skg_link_target_buf)
   end)
 end)

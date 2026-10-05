@@ -4,13 +4,13 @@
 ;;; `skg-close-all-skg-buffers' failed to close any buffers.
 ;;;
 ;;; The previous root cause was that `unload-feature' cleared each
-;;; buffer's `skg-view-uri' (the var was declared in the unloaded
+;;; buffer's `skg-view-id' (the var was declared in the unloaded
 ;;; file) and unbound the major-mode function (so the buffer's
 ;;; major-mode degraded to `org-mode'). `skg-reload' now omits
 ;;; `skg-buffer' from the unload list and re-loads it plainly
-;;; instead, preserving each buffer's mode and view-uri. Those two
+;;; instead, preserving each buffer's mode and view-id. Those two
 ;;; signals are all `skg-buffer-p' relies on, so a user's own
-;;; .skg.org file (org-mode, no view-uri) is never reaped, even
+;;; .skg.org file (org-mode, no view-id) is never reaped, even
 ;;; when its first headline begins with `(skg'.
 
 (defconst test-skg-close-all--this-dir
@@ -31,21 +31,21 @@
       (erase-buffer)
       (insert "* (skg (node (id fake-id) (repo main))) fake title\n")
       (skg-content-view-mode)
-      (setq skg-view-uri (concat "test-uri-" name))
+      (setq skg-view-id (concat "test-view-id-" name))
       (set-buffer-modified-p nil))
     buf))
 
 (ert-deftest test-skg-close-all-baseline ()
-  "Close-all closes buffers with skg-view-uri and skg mode."
+  "Close-all closes buffers with skg-view-id and skg mode."
   (let ((buf (test-skg-close-all--make-fake-skg-buffer
               "*fake-skg-baseline*")))
     (should (buffer-live-p buf))
     (skg-close-all-skg-buffers)
     (should-not (buffer-live-p buf))))
 
-(ert-deftest test-skg-reload-preserves-mode-and-view-uri ()
+(ert-deftest test-skg-reload-preserves-mode-and-view-id ()
   "`skg-reload' must not downgrade open skg buffers to org-mode
-nor clear their `skg-view-uri'. Before the fix,
+nor clear their `skg-view-id'. Before the fix,
 `unload-feature' on `skg-buffer' did exactly that."
   (load-file (expand-file-name
               "../../elisp/skg-reload.el"
@@ -58,8 +58,8 @@ nor clear their `skg-view-uri'. Before the fix,
           (should (buffer-live-p buf))
           (should (with-current-buffer buf
                     (derived-mode-p 'skg-content-view-mode)))
-          (should (string= (buffer-local-value 'skg-view-uri buf)
-                           "test-uri-*fake-skg-preserved*")))
+          (should (string= (buffer-local-value 'skg-view-id buf)
+                           "test-view-id-*fake-skg-preserved*")))
       (when (buffer-live-p buf) (kill-buffer buf)))))
 
 (ert-deftest test-skg-reload-refreshes-keymap-bindings ()
@@ -109,7 +109,7 @@ module was not unloaded and therefore `require' declined to load it again."
 (ert-deftest test-skg-close-all-spares-org-buffer-with-skg-heading ()
   "A real file the user is editing must survive `skg-close-all-skg-buffers',
 even when it is an org file whose first headline begins with `(skg'
-\(e.g. a .skg.org export). Such a buffer has no skg-view-uri and is
+\(e.g. a .skg.org export). Such a buffer has no skg-view-id and is
 in plain `org-mode', so `skg-buffer-p' must not claim it."
   (let* ((tmp (make-temp-file "skg-spare-" nil ".skg.org"))
          (buf (find-file-noselect tmp)))

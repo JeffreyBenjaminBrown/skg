@@ -33,9 +33,9 @@
   (setq integration-test-saw-broad-lock t)
   (message "✓ broad save-lock retained every local view"))
 
-(defun integration-test-observe-relaxed-lock (original saved-uri payload)
+(defun integration-test-observe-relaxed-lock (original saved-view-id payload)
   "Assert the narrowed intermediate lock set before collateral streaming."
-  (funcall original saved-uri payload)
+  (funcall original saved-view-id payload)
   (unless (and (buffer-local-value 'skg--save-lock-overlay
                                     (get-buffer "*a*"))
                (buffer-local-value 'skg--save-lock-overlay

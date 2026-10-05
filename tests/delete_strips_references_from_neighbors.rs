@@ -42,7 +42,7 @@ use skg::serve::handlers::delete_references_to_absent_node::
 use skg::skgrepo_sets::ActiveSkgRepoSet;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::env::SkgEnv;
-use skg::types::views_state::{OpenViews, ViewUri};
+use skg::types::views_state::{OpenViews, ViewId};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex, SkgRepoName, members_of, members_msv};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode, DeleteNode};
@@ -103,14 +103,14 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
   let active          : ActiveSkgRepoSet = ActiveSkgRepoSet::default_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false, open_views : OpenViews::new (), };
-  for (uri, root) in [("affected", "owner"),
+  for (view_id, root) in [("affected", "owner"),
                       ("clean-unrelated", "unrelated"),
                       ("dirty-unrelated", "unrelated-dirty")] {
     let (_text, pids, tree) = single_root_view (
       config, Some (tantivy), &ID::from (root), false ) ?;
     views_state . open_views . register_view (
       &graph . load_full (),
-      ViewUri::ContentView (uri . to_string ()), tree, &pids ); }
+      ViewId::ContentView (view_id . to_string ()), tree, &pids ); }
 
   let request = |approval : Option<&str>| {
     let mut request = "((request . \"delete references to absent node\") (id . \"gone\"))" . to_string ();

@@ -109,7 +109,7 @@ which takes priority over subee.skg on disk."
     (with-current-buffer buf
       (erase-buffer)
       (org-mode)
-      (setq skg-view-uri (org-id-uuid))
+      (setq skg-view-id (org-id-uuid))
       (insert "* (skg (node (id 11) (repo main) writeProtected)) 11\n")
       (insert "* (skg (node (id subee) (repo main))) subee\n")
       (insert "** (skg (node (id subee-1) (repo main))) subee-1")

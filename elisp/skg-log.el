@@ -13,7 +13,7 @@
 ;;; USAGE:
 ;;;   (skg-log 'info 'save "sending %d bytes" content-length)
 ;;;   (skg-log 'debug 'tcp "received %s" payload)
-;;;   (skg-log 'warn 'uri "nil skg-view-uri in %s" (buffer-name))
+;;;   (skg-log 'warn 'view-id "nil skg-view-id in %s" (buffer-name))
 ;;;   (skg-log 'error 'parse "failed: %S" err)
 
 (defvar skg-log-file nil
@@ -55,7 +55,7 @@ Walks the backtrace to find the first non-skg-log frame."
 (defun skg-log (level category fmt &rest args)
   "Log a structured JSON entry if LEVEL and CATEGORY pass filters.
 LEVEL is a symbol: debug, info, warn, error.
-CATEGORY is a symbol: save, tcp, search, uri, etc.
+CATEGORY is a symbol: save, tcp, search, view-id, etc.
 FMT and ARGS are passed to `format'."
   (when (and skg-log-file
              (>= (skg-log--level-num level)

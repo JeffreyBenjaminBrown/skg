@@ -27,7 +27,7 @@
              (seq-find
               (lambda (buf)
                 (with-current-buffer buf
-                  (and (boundp 'skg-view-uri) skg-view-uri
+                  (and (boundp 'skg-view-id) skg-view-id
                        (equal skg-contentView-initialRoot-repo
                               "public"))))
               (buffer-list)))
@@ -53,7 +53,7 @@
              (seq-find
               (lambda (buf)
                 (with-current-buffer buf
-                  (and (boundp 'skg-view-uri) skg-view-uri
+                  (and (boundp 'skg-view-id) skg-view-id
                        (equal skg-contentView-initialRoot-repo
                               "Cheese"))))
               (buffer-list)))
@@ -83,7 +83,7 @@
              (seq-find
               (lambda (buf)
                 (with-current-buffer buf
-                  (and (boundp 'skg-view-uri) skg-view-uri
+                  (and (boundp 'skg-view-id) skg-view-id
                        (equal skg-contentView-initialRoot-repo
                               "public"))))
               (buffer-list)))

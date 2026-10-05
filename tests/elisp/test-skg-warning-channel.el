@@ -10,8 +10,8 @@
   (let ((opened nil)
         (shown nil))
     (cl-letf (((symbol-function 'skg-open-org-buffer-from-text)
-               (lambda (_tcp-proc content buffer-name view-uri)
-                 (setq opened (list content buffer-name view-uri))))
+               (lambda (_tcp-proc content buffer-name view-id)
+                 (setq opened (list content buffer-name view-id))))
               ((symbol-function 'skg-big-nonfatal-message)
                (lambda (buffer-name message-text content)
                  (setq shown (list buffer-name message-text content)))))
@@ -55,7 +55,7 @@
     (unwind-protect
         (progn
           (with-current-buffer target
-            (setq skg-view-uri "existing-uri"))
+            (setq skg-view-id "existing-view-id"))
           (cl-letf (((symbol-function 'run-at-time)
                      (lambda (_secs _repeat function &rest args)
                        (setq timer-called t)
@@ -64,32 +64,32 @@
                      (lambda (buffer &rest _args)
                        (setq displayed buffer))))
             (skg-handle-content-view-sexp
-             nil "((switch-to-view existing-uri))" "unused-uri" "node-x")
+             nil "((switch-to-view existing-view-id))" "unused-view-id" "node-x")
             (should timer-called)
             (should (eq displayed target))))
       (when (buffer-live-p target) (kill-buffer target)))))
 
-(ert-deftest test-missing-switch-uri-closes-and-retries-only-once ()
+(ert-deftest test-missing-switch-view-id-closes-and-retries-only-once ()
   (let (closed retried visible)
     (cl-letf (((symbol-function 'run-at-time)
                (lambda (_secs _repeat function &rest args)
                  (apply function args)))
-              ((symbol-function 'skg-send-close-view-uri)
-               (lambda (tcp uri) (setq closed (list tcp uri))))
+              ((symbol-function 'skg-send-close-view-id)
+               (lambda (tcp view-id) (setq closed (list tcp view-id))))
               ((symbol-function 'skg-request-single-root-content-view-from-id)
                (lambda (&rest args) (setq retried args)))
               ((symbol-function 'message)
                (lambda (format-string &rest args)
                  (setq visible (apply #'format format-string args)))))
       (skg-handle-content-view-sexp
-       'test-tcp "((switch-to-view stale-uri))" "unused-uri"
+       'test-tcp "((switch-to-view stale-view-id))" "unused-view-id"
        "node-x" '("approved-pid") nil)
-      (should (equal closed '(test-tcp "stale-uri")))
+      (should (equal closed '(test-tcp "stale-view-id")))
       (should (equal retried
                      '("node-x" test-tcp ("approved-pid") nil t)))
       (setq closed nil retried nil)
       (skg-handle-content-view-sexp
-       'test-tcp "((switch-to-view still-stale))" "unused-uri"
+       'test-tcp "((switch-to-view still-stale))" "unused-view-id"
        "node-x" nil t)
       (should-not closed)
       (should-not retried)

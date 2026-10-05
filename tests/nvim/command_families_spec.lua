@@ -316,7 +316,7 @@ describe('skg.org_ancestry and view_new_empty', function ()
     require('skg.view_new_empty').view_new_empty()
     assert.are.equal('', buffer_text())
     assert.is_truthy(vim.b[vim.api.nvim_get_current_buf()]
-                     .skg_view_uri)
+                     .skg_view_id)
     assert.is_true(vim.b[vim.api.nvim_get_current_buf()]
                    .skg_content_view)
   end)

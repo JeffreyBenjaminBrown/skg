@@ -13,7 +13,7 @@ use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::{members_of, ID, SkgConfig, TantivyIndex};
 use skg::types::nodes::complete::{
   Graphnode, Flag, flag_is_true};
-use skg::types::views_state::{OpenViews, ViewUri};
+use skg::types::views_state::{OpenViews, ViewId};
 
 use std::error::Error;
 use std::net::TcpStream;
@@ -34,8 +34,8 @@ fn deleting_the_flags_folder_is_accepted_and_inert (
         std::net::TcpListener::bind ("127.0.0.1:0")?;
       let mut stream : TcpStream =
         TcpStream::connect (listener . local_addr ()?)?;
-      let uri : Result<ViewUri, String> = Ok (
-        ViewUri::ContentView ("flags-folder-deletion-test" . to_string ()));
+      let view_id : Result<ViewId, String> = Ok (
+        ViewId::ContentView ("flags-folder-deletion-test" . to_string ()));
       let with_flags = indoc! {"
         * (skg (node (id brie) (repo main))) brie
         ** (skg flagsFolder)
@@ -43,7 +43,7 @@ fn deleting_the_flags_folder_is_accepted_and_inert (
       "};
       let first = update_from_and_rerender_buffer (
         &mut stream, with_flags, config, tantivy, &graph, false,
-        &uri, &mut views_state ) . await ?;
+        &view_id, &mut views_state ) . await ?;
       assert! (first . errors . is_empty ());
       assert! (first . saved_view . contains ("flagsFolder"));
 
@@ -51,7 +51,7 @@ fn deleting_the_flags_folder_is_accepted_and_inert (
         "* (skg (node (id brie) (repo main))) brie\n";
       let second = update_from_and_rerender_buffer (
         &mut stream, without_flags, config, tantivy, &graph, false,
-        &uri, &mut views_state ) . await ?;
+        &view_id, &mut views_state ) . await ?;
       assert! (second . errors . is_empty ());
       assert! (! second . saved_view . contains ("flagsFolder"));
       let saved : Graphnode =
@@ -97,15 +97,15 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
     std::net::TcpListener::bind ("127.0.0.1:0")?;
   let mut stream : TcpStream =
     TcpStream::connect (listener . local_addr ()?)?;
-  let uri : Result<ViewUri, String> = Ok (
-    ViewUri::ContentView ("write-protected-edits-test" . to_string ()));
+  let view_id : Result<ViewId, String> = Ok (
+    ViewId::ContentView ("write-protected-edits-test" . to_string ()));
   let rendered = indoc! {"
     * (skg (node (id 1) (repo main))) 1
     ** (skg (node (id 2) (repo main) writeProtected)) 2
   "};
   let first = update_from_and_rerender_buffer (
     &mut stream, rendered, config, tantivy, &graph, false,
-    &uri, &mut views_state ) . await ?;
+    &view_id, &mut views_state ) . await ?;
 
   // A second, newly inserted occurrence of node 1 is not an edit to a
   // previously rendered write-protected occurrence. It may therefore express
@@ -116,7 +116,7 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
     1);
   let second = update_from_and_rerender_buffer (
     &mut stream, &with_new_self_occurrence, config, tantivy, &graph, false,
-    &uri, &mut views_state ) . await ?;
+    &view_id, &mut views_state ) . await ?;
   assert! (second . errors . is_empty (),
     "the new self occurrence should be accepted: {:?}", second . errors);
   let saved_root : Graphnode =
@@ -134,7 +134,7 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
   let edited : String = second . saved_view . replace (old_line, &new_line);
   let result = update_from_and_rerender_buffer (
     &mut stream, &edited, config, tantivy, &graph, false,
-    &uri, &mut views_state ) . await;
+    &view_id, &mut views_state ) . await;
   let error = match result {
     Err (error) => error,
     Ok (_) => panic! (

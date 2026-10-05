@@ -176,7 +176,7 @@ exceptions to the usual preservation of existing raw viewnodes:
 Both replacements carry =(overridesHere F)=.  The root case is not ordinary
 recursive-content substitution; it is the one-time identity transition of the
 view which performed the fork.  After completing that forest, the server
-stores it under the same view URI and recomputes the open-view root index, so
+stores it under the same view ID and recomputes the open-view root index, so
 the buffer is thereafter registered as rooted at =K= rather than =F=.
 
 Collateral rerenders do not apply either saved-view exception.  They retain

@@ -10,7 +10,7 @@
 With OVERWRITE non-nil, replace an existing PATH without prompting."
   (interactive
    (list (read-file-name "Write unsaved-changes recovery document: ") nil))
-  (unless (and skg-view-uri (skg-buffer-p (current-buffer)))
+  (unless (and skg-view-id (skg-buffer-p (current-buffer)))
     (user-error "This buffer is not a live skg view"))
   (let* ((source-buffer (current-buffer))
          (destination (expand-file-name path))
@@ -28,7 +28,7 @@ With OVERWRITE non-nil, replace an existing PATH without prompting."
       (insert document)
       (write-region (point-min) (point-max) destination nil 'silent))
     (find-file destination)
-    (setq-local skg-view-uri nil)
+    (setq-local skg-view-id nil)
     (setq-local skg-clean-baseline nil)
     (set-buffer-modified-p nil)
     (message "Created detached unsaved-changes recovery document: %s"
@@ -48,7 +48,7 @@ With OVERWRITE non-nil, replace an existing PATH without prompting."
      "newer graph data.\n\n"
      "* Context\n"
      (format "- Buffer name: %s\n" (buffer-name))
-     (format "- View URI: %s\n" skg-view-uri)
+     (format "- View ID: %s\n" skg-view-id)
      (format "- Captured UTC: %s\n"
              (format-time-string "%Y-%m-%dT%H:%M:%SZ" nil t))
      (format "- Git diff mode: %s\n"

@@ -305,7 +305,7 @@ headline."
   (let* (( skgid (car entry) )
          ( title (cadr entry) )
          ( request-editable-view
-           (and (bound-and-true-p skg-view-uri)
+           (and (bound-and-true-p skg-view-id)
                 (if (skg--buffer-has-editable-occurrence-p skgid)
                     (progn (message "NOTE: Pasting node write-protected because a writable occurrence is already present in this same buffer.")
                            nil)

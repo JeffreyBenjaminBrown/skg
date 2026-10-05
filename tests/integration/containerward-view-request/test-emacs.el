@@ -43,7 +43,7 @@
     (with-current-buffer buffer
       (erase-buffer)
       (org-mode)
-      (setq skg-view-uri (org-id-uuid))
+      (setq skg-view-id (org-id-uuid))
       (insert "* (skg (node (id 0) (repo main))) 0\n")
       (insert "** (skg (node (id 1))) 1\n")
       (insert "*** (skg (node (id 11))) 11\n")

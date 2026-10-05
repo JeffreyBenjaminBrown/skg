@@ -71,9 +71,9 @@ next to this file. Set `SKG_PORT` (default 1750), then:
   require; a blank host root is sent if one is requested)
 
 The essentials:
-- View: `((request . "single root content view") (id . "1") (view-uri . "content-view:1"))`
+- View: `((request . "single root content view") (id . "1") (view-id . "content-view:1"))`
   → `((response-type content-view) (content "...") (errors ()) (warnings ()))`
-- Save: `((request . "save buffer") (view-uri . "content-view:1")
+- Save: `((request . "save buffer") (view-id . "content-view:1")
   (point-lines-below-focused-headline . "0") (point-column . "0")
   (point-screen-lines-below-window-start . "0"))` + newline, then the
   buffer as an LP body. A new child is just a bare headline

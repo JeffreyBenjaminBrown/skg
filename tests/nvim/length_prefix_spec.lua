@@ -62,7 +62,7 @@ describe('skg.length_prefix dispatch', function ()
     state.register_response_handler('collateral-view',
       function () count = count + 1 end, false)
     local message =
-      framed('((response-type collateral-view) (view-uri "u"))')
+      framed('((response-type collateral-view) (view-id "u"))')
     length_prefix.handle_generic_chunk(message .. message)
     assert.are.equal(2, count)
     assert.is_not_nil(state.response_handler_map['collateral-view'])

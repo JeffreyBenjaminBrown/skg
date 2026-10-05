@@ -73,7 +73,7 @@ binding PORT-VAR to that server's port."
   "Views from the old server must not be saved into the new one."
   (test-skg-client--with-live-connection port
     (let (( view (generate-new-buffer "*test-port-switch*") ))
-      (with-current-buffer view (setq skg-view-uri "test-view"))
+      (with-current-buffer view (setq skg-view-id "test-view"))
       (unwind-protect
           (progn
             (should-error (skg--end-connection-to-another-port (1+ port))

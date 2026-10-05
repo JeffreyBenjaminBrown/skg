@@ -272,7 +272,7 @@ Return (BUFFER-TEXT . LAST-MESSAGE)."
         ( last-message nil ))
     (with-temp-buffer
       (org-mode)
-      (setq-local skg-view-uri "test-view")
+      (setq-local skg-view-id "test-view")
       (insert existing-text)
       (cl-letf (( (symbol-function 'message)
                   (lambda (fmt &rest args)

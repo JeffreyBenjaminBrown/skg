@@ -376,7 +376,7 @@ async fn marked_view_is_shape_stable_across_diff_toggle (
             &[ ID::from ("P") ], false ) ?;
         views_state . open_views . register_view (
           &graph . load_full (),
-          skg::types::views_state::ViewUri::ContentView (
+          skg::types::views_state::ViewId::ContentView (
             "toggle-subst-uuid" . to_string ()),
           tree, &pids );
         view };

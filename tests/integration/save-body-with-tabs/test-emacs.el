@@ -46,7 +46,7 @@
       (let ((inhibit-read-only t)) (erase-buffer))
       (insert org-text)
       (skg-content-view-mode)
-      (setq skg-view-uri (org-id-uuid))
+      (setq skg-view-id (org-id-uuid))
       (goto-char (point-min))
 
       (message "=== PHASE 2: save buffer ===")

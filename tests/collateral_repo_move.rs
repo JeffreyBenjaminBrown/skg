@@ -18,7 +18,7 @@ use skg::test_utils::{
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::nodes::complete::Graphnode;
-use skg::types::views_state::{OpenViews, ViewUri};
+use skg::types::views_state::{OpenViews, ViewId};
 use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
@@ -68,14 +68,14 @@ fn test_skgrepo_move_updates_collateral_view_metadata (
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views        : OpenViews::new (), };
-      let uri_1 : ViewUri =
-        ViewUri::ContentView ( "repo-move-buffer-1" . to_string() );
-      let uri_2 : ViewUri =
-        ViewUri::ContentView ( "repo-move-buffer-2" . to_string() );
+      let view_id_1 : ViewId =
+        ViewId::ContentView ( "repo-move-buffer-1" . to_string() );
+      let view_id_2 : ViewId =
+        ViewId::ContentView ( "repo-move-buffer-2" . to_string() );
       views_state . open_views . register_view (
-        &graph . load_full (), uri_1 . clone(), viewforest . clone(), &pids );
+        &graph . load_full (), view_id_1 . clone(), viewforest . clone(), &pids );
       views_state . open_views . register_view (
-        &graph . load_full (), uri_2 . clone(), viewforest, &pids );
+        &graph . load_full (), view_id_2 . clone(), viewforest, &pids );
 
       let save_input : String =
         initial_buffer . replace (
@@ -91,7 +91,7 @@ fn test_skgrepo_move_updates_collateral_view_metadata (
           &tantivy,
           &graph,
           false,
-          &Ok ( uri_1 . clone() ),
+          &Ok ( view_id_1 . clone() ),
           &mut views_state ) . await?;
       drop (stream);
 
@@ -110,7 +110,7 @@ fn test_skgrepo_move_updates_collateral_view_metadata (
         "expected one collateral message, got {:?}",
         collateral_msgs );
       assert! (
-        collateral_msgs[0] . contains (&uri_2 . repr_in_client()),
+        collateral_msgs[0] . contains (&view_id_2 . repr_in_client()),
         "collateral message should target buffer 2:\n{}",
         collateral_msgs[0] );
       let collateral_buffer : String =

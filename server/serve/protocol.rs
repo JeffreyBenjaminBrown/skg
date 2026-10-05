@@ -73,7 +73,7 @@ impl RequestType {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TcpToClient {
   ContentView,
-  SaveLock, // Sent before the expensive save pipeline. Acknowledges the clients' broad lock of all local views; its server-known URI list does not authorize narrowing.
+  SaveLock, // Sent before the expensive save pipeline. Acknowledges the clients' broad lock of all local views; its server-known view ID list does not authorize narrowing.
   SaveRelaxLock, // Sent after preparation and the dirty-view conflict check, before mutation. Lists collateral targets plus every dirty conflict-check input. The client also retains the saved view, and may unlock unrelated clean views.
   SaveResult,
   ForkConfirmation, // Terminal message of a save that found fork candidates and was not pre-approved: a write-protected buffer listing the foreign nodes about to be forked, for the user to approve (re-issue the save with (approved-forks . "true")) or decline. Sent after SaveLock, in place of SaveResult; nothing is committed.

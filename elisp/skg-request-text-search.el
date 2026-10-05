@@ -168,12 +168,12 @@ buffer to link-creation mode.")
 
 (defun skg--display-search-phase1 (payload search-terms)
   "Display phase 1 search results (without paths).
-Sets skg-view-uri to \"search:TERMS\" and registers a
+Sets skg-view-id to \"search:TERMS\" and registers a
 kill-buffer-hook to send close-view to the server."
   (let* ((response (read payload))
          (content (skg--as-string (cadr (assoc 'content response))))
          (warnings (cadr (assoc 'warnings response)))
-         (view-uri (concat "search:" search-terms)))
+         (view-id (concat "search:" search-terms)))
     (when content
       (with-current-buffer
           (get-buffer-create (skg-search-buffer-name search-terms))
@@ -182,7 +182,7 @@ kill-buffer-hook to send close-view to the server."
           (skg-content-view-mode)
           (heralds-minor-mode)
           (goto-char (point-min)))
-        (setq skg-view-uri view-uri)
+        (setq skg-view-id view-id)
         (skg--capture-clean-baseline)
         (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
         (run-hooks 'skg--search-buffer-setup-hook)

@@ -22,7 +22,7 @@
     (erase-buffer)
     (insert "* (skg (node (id 1) (repo main))) 1\n** (skg (node (id 1))) 1")
     (org-mode)
-    (setq skg-view-uri (org-id-uuid))
+    (setq skg-view-id (org-id-uuid))
     (goto-char (point-min))
     (message "✓ Created *skg-content-view* buffer with invalid content"))
 

@@ -13,8 +13,8 @@ local function raw_view_buffer_showing (skgid)
   local needle = '(id ' .. skgid .. ')'
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) then
-      local uri = vim.b[buf].skg_view_uri
-      if uri and T.buffer_text(buf):find(needle, 1, true) then
+      local view_id = vim.b[buf].skg_view_id
+      if view_id and T.buffer_text(buf):find(needle, 1, true) then
         return buf
       end
     end

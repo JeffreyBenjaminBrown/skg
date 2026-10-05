@@ -33,7 +33,7 @@ use crate::serve::handlers::text_release::{
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::git::RelationshipAxes;
-use crate::types::views_state::ViewUri;
+use crate::types::views_state::ViewId;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgRepoName};
 use crate::skgrepo_sets::{ActiveSkgRepoSet, search_skgids_for_skgrepo_set_for_test as search_ids_for_skgrepo_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
@@ -250,13 +250,13 @@ pub fn handle_text_search_request (
             // Render first, before register_view moves the viewforest
             viewforest_to_string ( &viewforest, &runtime . config )
             . expect ("search viewforest rendering never fails");
-          let uri : ViewUri =
-            ViewUri::SearchView ( search_terms . clone () );
-          if views_state . open_views . views . contains_key (&uri) {
+          let view_id : ViewId =
+            ViewId::SearchView ( search_terms . clone () );
+          if views_state . open_views . views . contains_key (&view_id) {
             // Replace prior search with the same terms.
-            views_state . open_views . unregister_view (&uri); }
+            views_state . open_views . unregister_view (&view_id); }
           views_state . open_views . register_view (
-            &runtime . graph, uri, viewforest, &search_results );
+            &runtime . graph, view_id, viewforest, &search_results );
           send_response_with_length_prefix (
             // phase 1 (unenriched) tagged LP response
             stream,

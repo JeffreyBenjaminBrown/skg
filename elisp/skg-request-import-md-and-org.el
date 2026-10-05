@@ -106,12 +106,12 @@ privacy for every imported node.  No input file is changed."
 
 (defun skg--import-rerender-clean-views (&optional approved-pids)
   "Refresh clean views after import without replacing dirty client text."
-  (let* ((dirty-uris
+  (let* ((dirty-view-ids
           (cl-loop for buf in (buffer-list)
-                   for uri = (with-current-buffer buf
-                               (and (boundp 'skg-view-uri) skg-view-uri))
-                   when (and uri (buffer-modified-p buf))
-                   collect uri))
+                   for view-id = (with-current-buffer buf
+                               (and (boundp 'skg-view-id) skg-view-id))
+                   when (and view-id (buffer-modified-p buf))
+                   collect view-id))
          (tcp-proc (skg-tcp-connect-to-rust)))
     (skg--begin-stream "import rerender")
     (skg--lock-all-skg-buffers)
@@ -126,7 +126,7 @@ privacy for every imported node.  No input file is changed."
           (prin1-to-string
            (append
             `((request . "rerender all views")
-              (exclude-view-uris ,@dirty-uris))
+              (exclude-view-ids ,@dirty-view-ids))
             (when approved-pids
               `((approved-overPrivateText-pids ,@approved-pids)))))
           "\n"))

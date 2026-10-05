@@ -27,7 +27,7 @@ use crate::skgrepo_sets::{ActiveSkgRepoSet, apply_skgrepo_set_to_viewforest};
 use crate::to_org::expand::role_tree::attach_full_containerward_role_trees_at_treeids_with_skgrepo_set;
 use crate::to_org::util::EditableMap;
 use crate::types::git::{NodeAxes, RelationshipAxes, SkgRepoDiff};
-use crate::types::views_state::ViewUri;
+use crate::types::views_state::ViewId;
 use crate::types::misc::{ID, SkgRepoName, SkgConfig};
 use crate::types::save::{NodeInstruction, ForkSpec};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
@@ -133,7 +133,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
 }
 
 struct RenderedCollateralView {
-  uri        : ViewUri,
+  view_id    : ViewId,
   text       : String,
   viewforest : ViewForest,
 }
@@ -150,11 +150,11 @@ pub fn update_views_after_save (
   stream                      : &mut std::net::TcpStream,
   saved_view                  : ViewForest,
   node_instructions           : Vec<NodeInstruction>,
-  collateral_uris             : Vec<ViewUri>,
+  collateral_view_ids         : Vec<ViewId>,
   diff_mode_enabled           : bool,
   env                         : &SkgEnv,
   runtime                     : Arc<RuntimeGeneration>,
-  viewuri_from_request_result : &Result<ViewUri, String>,
+  viewid_from_request_result  : &Result<ViewId, String>,
   views_state                 : &mut ViewsState,
   active_skgrepo_set          : Option<&ActiveSkgRepoSet>,
   deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
@@ -189,9 +189,9 @@ pub fn update_views_after_save (
   if let Some (active) = active_skgrepo_set {
     let mut input_candidates : Vec<ID> =
       active_skgids_in_viewforest (&saved_view_mut);
-    for uri in &collateral_uris {
+    for view_id in &collateral_view_ids {
       if let Some (viewforest) = views_state . open_views
-          . viewuri_to_view (uri) {
+          . viewid_to_view (view_id) {
         input_candidates . extend (
           active_skgids_in_viewforest (viewforest) ); }}
     let release : TextReleaseDecision = decide (
@@ -222,7 +222,7 @@ pub fn update_views_after_save (
     // the saved view, batched per (folder, recorder).
     render_completion_warnings (&repair_warnings) );
   let mut collateral_views : Vec<RenderedCollateralView> = Vec::new ();
-  for curi in &collateral_uris {
+  for curi in &collateral_view_ids {
     match rerender_collateral_view (
       curi . clone (), views_state, &mut context )
     { Ok (rendered) => collateral_views . push (rendered),
@@ -253,19 +253,19 @@ pub fn update_views_after_save (
         context . warnings . push (warning),
       TextReleaseDecision::Allow => {}, }}
 
-  if let Ok (uri) = viewuri_from_request_result {
+  if let Ok (view_id) = viewid_from_request_result {
     views_state . open_views . update_view (
-      &context . graph_snap, uri, saved_view_mut);
+      &context . graph_snap, view_id, saved_view_mut);
     for rendered in collateral_views {
       views_state . open_views . update_view (
         &context . graph_snap,
-        &rendered . uri, rendered . viewforest);
+        &rendered . view_id, rendered . viewforest);
       send_response_with_length_prefix (
         stream,
         & tag_sexp_response (
           TcpToClient::CollateralView,
           & format_single_view_sexp (
-            &rendered . uri, &rendered . text) )); }}
+            &rendered . view_id, &rendered . text) )); }}
   Ok ( SaveResponse {
     saved_view          : saved_text,
     errors              : context . errors,
@@ -325,22 +325,22 @@ fn replace_saved_view_fork_roots (
 }
 
 fn rerender_collateral_view (
-  uri         : ViewUri,
+  view_id     : ViewId,
   views_state : &ViewsState,
   context     : &mut RerenderAfterSaveContext<'_>,
 ) -> Result<RenderedCollateralView, String> {
   let mut viewforest : ViewForest = match
-    views_state . open_views . viewuri_to_view (&uri) {
+    views_state . open_views . viewid_to_view (&view_id) {
       Some (f) => f . clone (),
       None => {
         return Err ( format! (
           "Collateral view {}: no viewforest found",
-          uri . repr_in_client () )); } };
+          view_id . repr_in_client () )); } };
   if let Err (e) = rewriteInPlace_viewnodes_whose_skgid_is_newly_extra (
     &mut viewforest, &context . graph_snap )
   { return Err ( format! (
       "Collateral view {}: preprocessing failed: {}",
-      uri . repr_in_client (), e )); }
+      view_id . repr_in_client (), e )); }
   let text : String =
     { let _span : tracing::span::EnteredSpan =
         tracing::info_span!( "rerender_view (collateral)" ). entered();
@@ -352,9 +352,9 @@ fn rerender_collateral_view (
         false
       ) . map_err (
         |e| format!( "Collateral view {}: {}",
-                      uri . repr_in_client (), e)) ? };
+                      view_id . repr_in_client (), e)) ? };
   Ok (RenderedCollateralView {
-    uri,
+    view_id,
     text,
     viewforest,
   }) }

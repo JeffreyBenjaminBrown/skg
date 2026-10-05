@@ -129,11 +129,11 @@ the approved view stays visible."
       (skg--forget-dirtying-view-approval)
       (delete-other-windows))))
 
-(ert-deftest test-skg-dirty-view-confirmation-ignores-uri-less-buffers ()
-  "A content-view-mode buffer with no view URI (like the fork
+(ert-deftest test-skg-dirty-view-confirmation-ignores-view-id-less-buffers ()
+  "A content-view-mode buffer with no view ID (like the fork
 confirmation buffer) neither asks nor counts as dirty."
   (skg-test--with-views (a b)
-    (with-current-buffer b (setq skg-view-uri nil))
+    (with-current-buffer b (setq skg-view-id nil))
     (skg-test--edit-answering a nil)
     (should (= 0 (skg-test--edit-answering b nil)))
     (with-current-buffer a (set-buffer-modified-p nil))

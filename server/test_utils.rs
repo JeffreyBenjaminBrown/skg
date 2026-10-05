@@ -15,7 +15,7 @@ use crate::serve::handlers::save_buffer::{
   update_from_and_rerender_buffer_with_approvals,
 };
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
-use crate::types::views_state::ViewUri;
+use crate::types::views_state::ViewId;
 use crate::types::misc::{MSV, SkgConfig, SkgRepo, ID, TantivyIndex, SkgRepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::nodes::complete::Graphnode;
@@ -398,7 +398,7 @@ pub async fn update_from_and_rerender_buffer_test (
   tantivy_index               : &TantivyIndex,
   graph                       : &InRustGraphHandle,
   diff_mode_enabled           : bool,
-  viewuri_from_request_result : &Result<ViewUri, String>,
+  viewid_from_request_result  : &Result<ViewId, String>,
   views_state                 : &mut ViewsState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   // Auto-approve forks: a test driving the save directly is exercising
@@ -406,7 +406,7 @@ pub async fn update_from_and_rerender_buffer_test (
   // own shim below.
   update_from_and_rerender_buffer_with_fork_approval_test (
     stream, org_buffer_text, config, tantivy_index, graph,
-    diff_mode_enabled, viewuri_from_request_result, views_state,
+    diff_mode_enabled, viewid_from_request_result, views_state,
     /* approved_forks = */ true ) . await }
 
 /// Drive the full prepared-save conflict path with explicit buffer snapshots.
@@ -417,7 +417,7 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
   tantivy_index               : &TantivyIndex,
   graph                       : &InRustGraphHandle,
   diff_mode_enabled           : bool,
-  viewuri_from_request_result : &Result<ViewUri, String>,
+  viewid_from_request_result  : &Result<ViewId, String>,
   views_state                 : &mut ViewsState,
   other_views                 : &[ClientViewSnapshot],
 ) -> Result<SaveResponse, Box<dyn Error>> {
@@ -425,7 +425,7 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
     skg_env_from_parts (config, tantivy_index, graph);
   update_from_and_rerender_buffer_with_approvals (
     stream, org_buffer_text, &mut env, diff_mode_enabled,
-    viewuri_from_request_result, views_state, None,
+    viewid_from_request_result, views_state, None,
     true, &HashMap::new (), &std::collections::HashSet::new (),
     &std::collections::HashSet::new (), other_views ) . await
 }
@@ -440,7 +440,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_approval_test (
   tantivy_index               : &TantivyIndex,
   graph                       : &InRustGraphHandle,
   diff_mode_enabled           : bool,
-  viewuri_from_request_result : &Result<ViewUri, String>,
+  viewid_from_request_result  : &Result<ViewId, String>,
   views_state                 : &mut ViewsState,
   approved_forks              : bool,
 ) -> Result<SaveResponse, Box<dyn Error>> {
@@ -448,7 +448,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_approval_test (
   // inference-else-default.
   update_from_and_rerender_buffer_with_fork_skgrepos_test (
     stream, org_buffer_text, config, tantivy_index, graph,
-    diff_mode_enabled, viewuri_from_request_result, views_state,
+    diff_mode_enabled, viewid_from_request_result, views_state,
     approved_forks, &HashMap::new () ) . await }
 
 /// As 'update_from_and_rerender_buffer_with_fork_approval_test', but also
@@ -462,7 +462,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_skgrepos_test (
   tantivy_index               : &TantivyIndex,
   graph                       : &InRustGraphHandle,
   diff_mode_enabled           : bool,
-  viewuri_from_request_result : &Result<ViewUri, String>,
+  viewid_from_request_result  : &Result<ViewId, String>,
   views_state                 : &mut ViewsState,
   approved_forks              : bool,
   fork_skgrepos               : &HashMap<ID, SkgRepoName>,
@@ -474,7 +474,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_skgrepos_test (
     org_buffer_text,
     &mut env,
     diff_mode_enabled,
-    viewuri_from_request_result,
+    viewid_from_request_result,
     views_state,
     None,
     approved_forks,
@@ -822,7 +822,7 @@ pub fn read_all_lp_messages (
   messages }
 
 /// Extract a string field from a tagged sexp like
-/// ((response-type X) (view-uri "URI") (content "...")).
+/// ((response-type X) (view-id "VIEW_ID") (content "...")).
 /// Returns None if the key is not found.
 pub fn extract_string_field_from_sexp (
   sexp_str : &str,

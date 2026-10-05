@@ -1,14 +1,14 @@
 -- PURPOSE: skg view buffers: creation from server text, naming, the
--- view-uri registry, close-view notification, and the
+-- view-id registry, close-view notification, and the
 -- clean-baseline bookkeeping. The Lua port of elisp/skg-buffer.el.
 --
 -- Where Emacs used a derived major mode plus a permanent-local
--- 'skg-view-uri', an skg view buffer here is: filetype org (so the
+-- 'skg-view-id', an skg view buffer here is: filetype org (so the
 -- baked-in orgmode plugin provides highlighting/folding/cycling),
 -- buftype acwrite (so ':w' fires our BufWriteCmd instead of writing a
--- file -- there is no file), 'vim.b.skg_view_uri' as the registry
+-- file -- there is no file), 'vim.b.skg_view_id' as the registry
 -- key, and 'vim.b.skg_content_view' marking the buffer as ours. The
--- permanent-local hazard (mode switches wiping the uri) does not
+-- permanent-local hazard (mode switches wiping the view_id) does not
 -- exist: vim.b survives filetype changes.
 
 local heralds = require('skg.heralds')
@@ -84,19 +84,19 @@ end
 
 -- ── the registry ───────────────────────────────────────────────────
 
----The buffer whose skg_view_uri is URI, or nil.
----@param uri string
+---The buffer whose skg_view_id is VIEW_ID, or nil.
+---@param view_id string
 ---@return integer|nil bufnr
-function M.find_buffer_by_uri (uri)
+function M.find_buffer_by_view_id (view_id)
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf)
-       and vim.b[buf].skg_view_uri == uri then
+       and vim.b[buf].skg_view_id == view_id then
       return buf end
   end
   return nil
 end
 
----Is BUF an skg view buffer? It qualifies if it carries a view uri or
+---Is BUF an skg view buffer? It qualifies if it carries a view view_id or
 ---the content-view marker, both set solely by skg's own view code --
 ---so a real .skg file the user merely opened never matches (and is
 ---never reaped by close_all_skg_buffers).
@@ -104,7 +104,7 @@ end
 ---@return boolean
 function M.buffer_p (buf)
   return vim.api.nvim_buf_is_valid(buf)
-         and (vim.b[buf].skg_view_uri ~= nil
+         and (vim.b[buf].skg_view_id ~= nil
               or vim.b[buf].skg_content_view == true)
 end
 
@@ -117,14 +117,14 @@ function M.all_skg_buffers ()
   return result
 end
 
----A view is a buffer with a view uri: a content view or search
+---A view is a buffer with a view view_id: a content view or search
 ---results, but not the fork-confirmation buffer.
 ---@return integer[] views other than BUF with unsaved edits
 function M.other_unsaved_skg_buffers (buf)
   local result = {}
   for _, other in ipairs(vim.api.nvim_list_bufs()) do
     if other ~= buf and vim.api.nvim_buf_is_valid(other)
-       and vim.b[other].skg_view_uri ~= nil
+       and vim.b[other].skg_view_id ~= nil
        and vim.bo[other].modified then
       table.insert(result, other) end
   end
@@ -150,15 +150,15 @@ end
 -- ── lifecycle ──────────────────────────────────────────────────────
 
 ---Find-or-create the buffer named BUFFER_NAME, fill it with ORG_TEXT,
----mark it as an skg view (uri = VIEW_URI or a fresh UUID), enable
+---mark it as an skg view (view_id = VIEW_ID or a fresh UUID), enable
 ---heralds, arm the lifecycle autocmds, clear the modified flag, and
 ---switch to it. The port of 'skg-open-org-buffer-from-text'.
 ---@param org_text string
 ---@param buffer_name string
----@param view_uri string|nil
+---@param view_id string|nil
 ---@return integer bufnr
-function M.open_org_buffer_from_text (org_text, buffer_name, view_uri)
-  local uri = view_uri or M.generate_uuid()
+function M.open_org_buffer_from_text (org_text, buffer_name, view_id)
+  local view_id = view_id or M.generate_uuid()
   local buf = nil
   for _, existing in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(existing)
@@ -172,7 +172,7 @@ function M.open_org_buffer_from_text (org_text, buffer_name, view_uri)
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                              vim.split(org_text, '\n'))
-  M.configure_view_buffer(buf, uri)
+  M.configure_view_buffer(buf, view_id)
   vim.bo[buf].modified = false
   M.capture_clean_baseline(buf)
   vim.api.nvim_set_current_buf(buf)
@@ -182,9 +182,9 @@ end
 
 ---Buffer-local setup shared by every server-fed view.
 ---@param buf integer
----@param uri string
-function M.configure_view_buffer (buf, uri)
-  vim.b[buf].skg_view_uri = uri
+---@param view_id string
+function M.configure_view_buffer (buf, view_id)
+  vim.b[buf].skg_view_id = view_id
   vim.b[buf].skg_content_view = true
   vim.bo[buf].buftype = 'acwrite'
   vim.bo[buf].swapfile = false
@@ -251,7 +251,7 @@ function M.confirm_before_dirtying_another_view (buf)
     vim.b[buf].skg_dirtiness_vetted = false
     return end
   if vim.b[buf].skg_dirtiness_vetted
-     or vim.b[buf].skg_view_uri == nil then
+     or vim.b[buf].skg_view_id == nil then
     return end
   vim.b[buf].skg_dirtiness_vetted = true -- ask at most once per dirty spell
   if #M.other_unsaved_skg_buffers(buf) == 0 then return end
@@ -293,12 +293,12 @@ end
 ---connection makes it a no-op.
 ---@param buf integer
 function M.send_close_view (buf)
-  local uri = vim.api.nvim_buf_is_valid(buf)
-              and vim.b[buf].skg_view_uri or nil
-  if uri and state.tcp and not state.tcp:is_closing() then
+  local view_id = vim.api.nvim_buf_is_valid(buf)
+              and vim.b[buf].skg_view_id or nil
+  if view_id and state.tcp and not state.tcp:is_closing() then
     local request = sexpr.to_string({
       sexpr.pair(sexpr.symbol('request'), 'close view'),
-      sexpr.pair(sexpr.symbol('view-uri'), uri) }) .. '\n'
+      sexpr.pair(sexpr.symbol('view-id'), view_id) }) .. '\n'
     pcall(function () state.tcp:write(request) end)
   end
 end
@@ -317,7 +317,7 @@ end
 
 ---A v4-format UUID, the analog of org-id-uuid. Built from OS-level
 ---randomness (an unseeded math.random would repeat across editor
----processes, and view uris must not collide between clients).
+---processes, and view view_ids must not collide between clients).
 ---@return string
 function M.generate_uuid ()
   local bytes = { vim.uv.random(16):byte(1, 16) }

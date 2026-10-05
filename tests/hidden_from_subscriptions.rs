@@ -19,7 +19,7 @@ use skg::types::misc::{SkgConfig, ID, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 
 use skg::serve::ViewsState;
-use skg::types::views_state::{OpenViews, ViewUri};
+use skg::types::views_state::{OpenViews, ViewId};
 use skg::dbs::in_rust_graph::{
   InRustGraphHandle,
   };
@@ -100,7 +100,7 @@ async fn save_buffer_for_hidden_subscriptions_test (
 
 async fn save_buffer_and_read_collateral_views (
   buffer      : &str,
-  uri         : &ViewUri,
+  view_id     : &ViewId,
 
   config      : &SkgConfig,
   tantivy     : &mut TantivyIndex,
@@ -113,7 +113,7 @@ async fn save_buffer_and_read_collateral_views (
     update_from_and_rerender_buffer (
       &mut stream,
       buffer, config, tantivy, graph, false,
-      &Ok (uri . clone ()), views_state
+      &Ok (view_id . clone ()), views_state
     ) . await ?;
   drop (stream);
   let mut reader : BufReader<TcpStream> =
@@ -515,11 +515,11 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (),};
-    let saved_uri : ViewUri =
-      ViewUri::ContentView (
+    let saved_view_id : ViewId =
+      ViewId::ContentView (
         "collateral-hide-saved" . to_string());
-    let collateral_uri : ViewUri =
-      ViewUri::ContentView (
+    let collateral_view_id : ViewId =
+      ViewId::ContentView (
         "collateral-hide-other" . to_string());
 
     let (initial_view, pids, viewforest) =
@@ -528,12 +528,12 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
         &ID ("r" . to_string()),
         false )?;
     views_state . open_views . register_view (
-      &graph . load_full (), saved_uri . clone(), viewforest, &pids);
+      &graph . load_full (), saved_view_id . clone(), viewforest, &pids);
 
     let (expanded, collateral_views) =
       save_buffer_and_read_collateral_views (
         &add_editable_view_request_to_subscribees (&initial_view),
-        &saved_uri, &config, tantivy, &graph,
+        &saved_view_id, &config, tantivy, &graph,
         &mut views_state ) . await?;
     assert!(
       collateral_views . is_empty(),
@@ -541,19 +541,19 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       collateral_views);
 
     let expanded_viewforest =
-      views_state . open_views . viewuri_to_view (&saved_uri)
+      views_state . open_views . viewid_to_view (&saved_view_id)
       . expect ("saved view should be registered")
       . clone();
     let expanded_pids : Vec<ID> =
-      views_state . open_views . viewuri_to_pids (&saved_uri);
+      views_state . open_views . viewid_to_pids (&saved_view_id);
     views_state . open_views . register_view (
-      &graph . load_full (), collateral_uri, expanded_viewforest, &expanded_pids);
+      &graph . load_full (), collateral_view_id, expanded_viewforest, &expanded_pids);
 
     let edited : String =
       expanded_subscribee_edit_view (&expanded, "delete");
     let (_saved_view, collateral_views) =
       save_buffer_and_read_collateral_views (
-        &edited, &saved_uri, &config, tantivy, &graph,
+        &edited, &saved_view_id, &config, tantivy, &graph,
         &mut views_state ) . await?;
 
     assert_eq!(
@@ -961,11 +961,11 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (),};
-    let saved_uri : ViewUri =
-      ViewUri::ContentView (
+    let saved_view_id : ViewId =
+      ViewId::ContentView (
         "collateral-unhide-saved" . to_string());
-    let collateral_uri : ViewUri =
-      ViewUri::ContentView (
+    let collateral_view_id : ViewId =
+      ViewId::ContentView (
         "collateral-unhide-other" . to_string());
 
     let (initial_view, pids, viewforest) =
@@ -974,12 +974,12 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
         &ID ("R" . to_string()),
         false )?;
     views_state . open_views . register_view (
-      &graph . load_full (), saved_uri . clone(), viewforest, &pids);
+      &graph . load_full (), saved_view_id . clone(), viewforest, &pids);
 
     let (expanded, collateral_views) =
       save_buffer_and_read_collateral_views (
         &add_editable_view_request_to_subscribees (&initial_view),
-        &saved_uri, &config, tantivy, &graph,
+        &saved_view_id, &config, tantivy, &graph,
         &mut views_state ) . await?;
     assert!(
       collateral_views . is_empty(),
@@ -987,20 +987,20 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
       collateral_views);
 
     let expanded_viewforest =
-      views_state . open_views . viewuri_to_view (&saved_uri)
+      views_state . open_views . viewid_to_view (&saved_view_id)
       . expect ("saved view should be registered")
       . clone();
     let expanded_pids : Vec<ID> =
-      views_state . open_views . viewuri_to_pids (&saved_uri);
+      views_state . open_views . viewid_to_pids (&saved_view_id);
     views_state . open_views . register_view (
-      &graph . load_full (), collateral_uri, expanded_viewforest, &expanded_pids);
+      &graph . load_full (), collateral_view_id, expanded_viewforest, &expanded_pids);
 
     let edited : String =
       move_h_from_hiddenin_folder_to_visible_subscribee_content (
         &expanded );
     let (_saved_view, collateral_views) =
       save_buffer_and_read_collateral_views (
-        &edited, &saved_uri, &config, tantivy, &graph,
+        &edited, &saved_view_id, &config, tantivy, &graph,
         &mut views_state ) . await?;
 
     assert_eq!(

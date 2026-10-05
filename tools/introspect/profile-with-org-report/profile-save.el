@@ -24,8 +24,8 @@
   (seq-find
    (lambda (buffer)
      (with-current-buffer buffer
-       (and (boundp 'skg-view-uri)
-            skg-view-uri
+       (and (boundp 'skg-view-id)
+            skg-view-id
             (save-excursion
               (goto-char (point-min))
               (search-forward root-pid nil t)))))

@@ -24,9 +24,9 @@ local function test_invalid_save ()
   print('=== PHASE 1: Testing invalid save (duplicate ID without'
        .. ' writeProtected) ===')
 
-  local view_uri = buffer.generate_uuid()
+  local view_id = buffer.generate_uuid()
   local content_buf = buffer.open_org_buffer_from_text(
-    original_content, content_buffer_name, view_uri)
+    original_content, content_buffer_name, view_id)
   print('created ' .. content_buffer_name .. ' buffer with invalid'
        .. ' content')
 

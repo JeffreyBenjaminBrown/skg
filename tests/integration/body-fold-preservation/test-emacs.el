@@ -71,7 +71,7 @@ metadata stripped from headlines so headlines read like `* title'."
         "** (skg (node (repo main))) child\n"
         "child body line\n"))
       (skg-content-view-mode)
-      (setq skg-view-uri (org-id-uuid))
+      (setq skg-view-id (org-id-uuid))
       (goto-char (point-min)))
     buf))
 

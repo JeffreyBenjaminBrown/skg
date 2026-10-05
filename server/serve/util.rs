@@ -1,6 +1,6 @@
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
-use crate::types::views_state::ViewUri;
+use crate::types::views_state::ViewId;
 
 use sexp::{Sexp, Atom};
 use std::error::Error;
@@ -74,11 +74,11 @@ pub fn request_type_from_request (
     extract_v_from_kv_pair_in_sexp ( &sexp, "request" ) ?;
   RequestType::from_client_string (&request_value) }
 
-pub fn view_uri_from_request (
+pub fn view_id_from_request (
   request : &str,
-) -> Result<ViewUri, String> {
-  value_from_request_sexp ( "view-uri", request )
-    . map (ViewUri::from_client_string) }
+) -> Result<ViewId, String> {
+  value_from_request_sexp ( "view-id", request )
+    . map (ViewId::from_client_string) }
 
 /// Extract a value from a request like
 /// ((request . "type") (key . 'xyz))
@@ -111,8 +111,8 @@ pub(crate) fn format_buffer_response_sexp (
 
 /// Format the fork-confirmation response: a write-protected buffer listing
 /// the foreign nodes about to be forked, plus the one-line minibuffer
-/// prompt. It has no view-uri: the client adopts the buffer under its
-/// own generated URI because the confirmation is transient, not a
+/// prompt. It has no view-id: the client adopts the buffer under its
+/// own generated view ID because the confirmation is transient, not a
 /// registered server view.
 /// Format: ((content "...") (to-minibuffer "...") (errors ()) (warnings ()))
 pub(crate) fn format_fork_confirmation_response_sexp (
@@ -131,35 +131,35 @@ pub(crate) fn format_fork_confirmation_response_sexp (
     . to_string () }
 
 /// Format a single view update as an s-expression.
-/// Format: ((view-uri "URI") (content "CONTENT"))
+/// Format: ((view-id "VIEW_ID") (content "CONTENT"))
 /// Used for any streamed per-view message (collateral-view,
 /// rerender-view, etc.). The caller tags it with the appropriate
 /// TcpToClient variant.
 pub(crate) fn format_single_view_sexp (
-  uri     : &ViewUri,
+  view_id : &ViewId,
   content : &str,
 ) -> String {
   Sexp::List ( vec! [
     Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "view-uri" . to_string () )),
-      Sexp::Atom ( Atom::S ( uri . repr_in_client () )) ] ),
+      Sexp::Atom ( Atom::S ( "view-id" . to_string () )),
+      Sexp::Atom ( Atom::S ( view_id . repr_in_client () )) ] ),
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "content" . to_string () )),
       Sexp::Atom ( Atom::S ( content . to_string () )) ] ) ] )
     . to_string () }
 
-/// Format: ((lock-views ("URI1" "URI2" ...)))
+/// Format: ((lock-views ("VIEW_ID1" "VIEW_ID2" ...)))
 pub(crate) fn format_lock_views_sexp (
-  uris : &[ViewUri],
+  view_ids : &[ViewId],
 ) -> String {
-  let uri_sexps : Vec<Sexp> =
-    uris . iter ()
+  let view_id_sexps : Vec<Sexp> =
+    view_ids . iter ()
     . map ( |u| Sexp::Atom ( Atom::S ( u . repr_in_client () )) )
     . collect ();
   Sexp::List ( vec! [
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "lock-views" . to_string () )),
-      Sexp::List ( uri_sexps ) ] ) ] )
+      Sexp::List ( view_id_sexps ) ] ) ] )
     . to_string () }
 
 /// Format: ((errors ("e1" ...)) (warnings ("w1" ...)))

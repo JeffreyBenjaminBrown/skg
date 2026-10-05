@@ -12,7 +12,7 @@
 -- USAGE:
 --   log.log('info', 'save', 'sending %d bytes', content_length)
 --   log.log('debug', 'tcp', 'received %s', payload)
---   log.log('warn', 'uri', 'nil view uri in %s', buffer_name)
+--   log.log('warn', 'view_id', 'nil view view_id in %s', buffer_name)
 --   log.log('error', 'parse', 'failed: %s', vim.inspect(err))
 
 local M = {}
@@ -33,7 +33,7 @@ local level_order = { debug = 0, info = 1, warn = 2, error = 3 }
 
 ---Log a structured JSON entry if LEVEL and CATEGORY pass the filters.
 ---@param level string 'debug'|'info'|'warn'|'error'
----@param category string e.g. 'save', 'tcp', 'search', 'uri'
+---@param category string e.g. 'save', 'tcp', 'search', 'view_id'
 ---@param format_string string passed to string.format
 ---@param ... any format arguments
 function M.log (level, category, format_string, ...)

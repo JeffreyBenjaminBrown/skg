@@ -1,7 +1,7 @@
 /// Generic many-to-many map.
 ///
 /// The bimap crate (BiHashMap) enforces strict 1:1 — inserting
-/// (id2, same_uri) would evict (id1, same_uri). We need multiple
+/// (id2, same_view_id) would evict (id1, same_view_id). We need multiple
 /// left values mapping to the same right value (e.g. a view has
 /// multiple root IDs) and potentially multiple right values for
 /// a single left value (e.g. an ID roots multiple views). No

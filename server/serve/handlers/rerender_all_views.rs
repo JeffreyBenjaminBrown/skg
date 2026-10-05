@@ -11,7 +11,7 @@ use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
-use crate::types::views_state::ViewUri;
+use crate::types::views_state::ViewId;
 use crate::types::views_state::pids_from_viewforest;
 use crate::update_buffer::{rerender_view, RerenderAfterSaveContext};
 
@@ -20,14 +20,14 @@ use std::net::TcpStream;
 use std::collections::HashSet;
 
 struct PreparedView {
-  uri        : ViewUri,
+  view_id    : ViewId,
   text       : String,
   viewforest : ViewForest,
 }
 
 pub(crate) struct PreparedRerenders {
   runtime  : std::sync::Arc<RuntimeGeneration>,
-  uris     : Vec<ViewUri>,
+  view_ids : Vec<ViewId>,
   views    : Vec<PreparedView>,
   errors   : Vec<String>,
   warnings : Vec<String>,
@@ -40,8 +40,8 @@ pub fn handle_rerender_all_views_request (
   views_state : &mut ViewsState,
   active_skgrepo_set : &ActiveSkgRepoSet,
 ) {
-  let excluded : HashSet<ViewUri> =
-    match excluded_view_uris_from_request (request) {
+  let excluded : HashSet<ViewId> =
+    match excluded_view_ids_from_request (request) {
       Ok (excluded) => excluded,
       Err (error) => {
         send_response_with_length_prefix (
@@ -55,21 +55,21 @@ pub fn handle_rerender_all_views_request (
     stream, env, views_state, active_skgrepo_set,
     &approved_pids_from_request (request), &excluded); }
 
-fn excluded_view_uris_from_request (
+fn excluded_view_ids_from_request (
   request : &str,
-) -> Result<HashSet<ViewUri>, String> {
+) -> Result<HashSet<ViewId>, String> {
   let parsed = sexp::parse (request) . map_err (|error| error . to_string ())?;
   let present : bool = match &parsed {
     sexp::Sexp::List (items) => items . iter () . any (|item|
       matches! (item, sexp::Sexp::List (fields)
         if matches! (fields . first (), Some (sexp::Sexp::Atom (
-          sexp::Atom::S (name))) if name == "exclude-view-uris"))),
+          sexp::Atom::S (name))) if name == "exclude-view-ids"))),
     _ => false, };
   if ! present { return Ok (HashSet::new ()); }
   crate::types::sexp::extract_string_list_from_sexp (
-    &parsed, "exclude-view-uris")
-    .map (|uris| uris . into_iter ()
-      .map (ViewUri::from_client_string) . collect ())
+    &parsed, "exclude-view-ids")
+    .map (|view_ids| view_ids . into_iter ()
+      .map (ViewId::from_client_string) . collect ())
 }
 
 #[cfg(test)]
@@ -78,13 +78,13 @@ mod import_exclusion_tests {
 
   #[test]
   fn dirty_view_exclusions_are_parsed_and_malformed_lists_fail_closed () {
-    let request : &str = "((request . \"rerender all views\") (exclude-view-uris \"dirty-uri\"))";
-    let excluded : HashSet<ViewUri> =
-      excluded_view_uris_from_request (request) . unwrap ();
-    assert! (excluded . contains (&ViewUri::from_client_string (
-      "dirty-uri" . to_string ())));
-    assert! (excluded_view_uris_from_request (
-      "((request . \"rerender all views\") (exclude-view-uris (bad)))")
+    let request : &str = "((request . \"rerender all views\") (exclude-view-ids \"dirty-view_id\"))";
+    let excluded : HashSet<ViewId> =
+      excluded_view_ids_from_request (request) . unwrap ();
+    assert! (excluded . contains (&ViewId::from_client_string (
+      "dirty-view_id" . to_string ())));
+    assert! (excluded_view_ids_from_request (
+      "((request . \"rerender all views\") (exclude-view-ids (bad)))")
       . is_err ());
   }
 }
@@ -95,13 +95,13 @@ fn stream_rerender_views_excluding (
   views_state : &mut ViewsState,
   active_skgrepo_set : &ActiveSkgRepoSet,
   approved_pids : &HashSet<crate::types::misc::ID>,
-  excluded : &HashSet<ViewUri>,
+  excluded : &HashSet<ViewId>,
 ) {
   let mut prepared : PreparedRerenders = prepare_rerender_views (
     env, views_state, views_state . diff_mode_enabled,
     Some (active_skgrepo_set), None, false);
-  prepared . uris . retain (|uri| ! excluded . contains (uri));
-  prepared . views . retain (|view| ! excluded . contains (&view . uri));
+  prepared . view_ids . retain (|view_id| ! excluded . contains (view_id));
+  prepared . views . retain (|view| ! excluded . contains (&view . view_id));
   if ! authorize_prepared_rerenders (
     stream, &mut prepared, Some (active_skgrepo_set),
     "rerender-all-views", approved_pids) {
@@ -199,27 +199,27 @@ fn prepare_rerender_views_where (
   create_partnerFolders  : bool,
   include             : impl Fn (&ViewForest) -> bool,
 ) -> PreparedRerenders {
-  let uris : Vec<ViewUri> = views_state . open_views . views . iter ()
+  let view_ids : Vec<ViewId> = views_state . open_views . views . iter ()
     .filter (|(_, state)| include (&state . viewforest))
-    .map (|(uri, _)| uri . clone ()) . collect ();
+    .map (|(view_id, _)| view_id . clone ()) . collect ();
   let mut context : RerenderAfterSaveContext =
     RerenderAfterSaveContext::without_save_with_runtime (
       env, runtime, diff_mode_enabled, active_skgrepo_set );
   let mut rendered_views : Vec<PreparedView> = Vec::new ();
-  for uri in &uris {
+  for view_id in &view_ids {
     let mut viewforest : ViewForest = match
-      views_state . open_views . viewuri_to_view (uri) {
+      views_state . open_views . viewid_to_view (view_id) {
         Some (f) => f . clone (),
         None => {
           context . errors . push ( format! (
             "View {}: no viewforest found",
-            uri . repr_in_client () ));
+            view_id . repr_in_client () ));
           continue; } };
     if let Some (prepass) = prepass {
       if let Err (e) = prepass (&mut viewforest) {
         context . errors . push ( format! (
           "View {}: {}",
-          uri . repr_in_client (), e ));
+          view_id . repr_in_client (), e ));
         continue; }}
     match block_on ( async {
       let _span : tracing::span::EnteredSpan =
@@ -235,14 +235,14 @@ fn prepare_rerender_views_where (
       ) } )
     { Ok (text) => {
         rendered_views . push ( PreparedView {
-          uri : uri . clone (), text, viewforest } ); },
+          view_id : view_id . clone (), text, viewforest } ); },
       Err (e) => {
         context . errors . push ( format! (
           "View {}: {}",
-          uri . repr_in_client (), e )); }} }
+          view_id . repr_in_client (), e )); }} }
   PreparedRerenders {
     runtime : context . runtime . clone (),
-    uris,
+    view_ids,
     views    : rendered_views,
     errors   : context . errors,
     warnings : context . warnings,
@@ -305,16 +305,16 @@ pub(crate) fn stream_prepared_rerenders (
     stream,
     & tag_sexp_response (
       TcpToClient::RerenderLock,
-      & format_lock_views_sexp (&prepared . uris) ));
+      & format_lock_views_sexp (&prepared . view_ids) ));
   for view in prepared . views {
     views_state . open_views . update_view (
       &prepared . runtime . graph,
-      &view . uri, view . viewforest);
+      &view . view_id, view . viewforest);
     send_response_with_length_prefix (
       stream,
       & tag_sexp_response (
         TcpToClient::RerenderView,
-        & format_single_view_sexp (&view . uri, &view . text) )); }
+        & format_single_view_sexp (&view . view_id, &view . text) )); }
 
   send_response_with_length_prefix (
     stream,

@@ -51,7 +51,7 @@ root with `focused' metadata and each child with `folded' metadata.
     (unwind-protect
         (with-current-buffer buf
           (org-mode)
-          (setq-local skg-view-uri "test-uri")
+          (setq-local skg-view-id "test-view-id")
           (skg-replace-buffer-with-new-content nil from-rust)
           (let ((actual (skg-test--buffer-text)))
             (should (string-match-p "(id root)" actual))
@@ -75,7 +75,7 @@ isolate the fold-processing path from the focus-processing path."
     (unwind-protect
         (with-current-buffer buf
           (org-mode)
-          (setq-local skg-view-uri "test-uri")
+          (setq-local skg-view-id "test-view-id")
           (skg-replace-buffer-with-new-content nil from-rust)
           (let ((actual (skg-test--buffer-text)))
             (should (string-match-p "(id root)" actual))
@@ -94,7 +94,7 @@ isolate the fold-processing path from the focus-processing path."
     (unwind-protect
         (with-current-buffer buf
           (org-mode)
-          (setq-local skg-view-uri "test-uri")
+          (setq-local skg-view-id "test-view-id")
           (skg-replace-buffer-with-new-content
            nil
            from-rust
@@ -116,7 +116,7 @@ isolate the fold-processing path from the focus-processing path."
     (unwind-protect
         (with-current-buffer buf
           (org-mode)
-          (setq-local skg-view-uri "test-uri")
+          (setq-local skg-view-id "test-view-id")
           (skg-replace-buffer-with-new-content
            nil
            from-rust
@@ -141,7 +141,7 @@ isolate the fold-processing path from the focus-processing path."
     (unwind-protect
         (with-current-buffer buf
           (org-mode)
-          (setq-local skg-view-uri "test-uri")
+          (setq-local skg-view-id "test-view-id")
           (skg-replace-buffer-with-new-content
            nil
            from-rust
@@ -167,7 +167,7 @@ line's end and does not spill onto the next line."
     (unwind-protect
         (with-current-buffer buf
           (org-mode)
-          (setq-local skg-view-uri "test-uri")
+          (setq-local skg-view-id "test-view-id")
           (skg-replace-buffer-with-new-content
            nil
            from-rust
@@ -194,7 +194,7 @@ headline and not back on the focused headline."
     (unwind-protect
         (with-current-buffer buf
           (org-mode)
-          (setq-local skg-view-uri "test-uri")
+          (setq-local skg-view-id "test-view-id")
           (skg-replace-buffer-with-new-content
            nil
            from-rust

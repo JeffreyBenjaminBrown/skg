@@ -37,10 +37,10 @@ end
 print('=== SKG Containerward View Request Integration Test ===')
 
 -- PHASE 1: establish relationships on disk. Both phases below reuse
--- the SAME buffer and view uri, mirroring the elisp test's single
--- *skg-content-view* buffer whose skg-view-uri never changes.
+-- the SAME buffer and view view_id, mirroring the elisp test's single
+-- *skg-content-view* buffer whose skg-view-id never changes.
 print('=== PHASE 1: Establishing relationships on disk ===')
-local view_uri = buffer.generate_uuid()
+local view_id = buffer.generate_uuid()
 local buffer_name = 'skg://containerward-view-request-test'
 local initial_content = table.concat({
   '* (skg (node (id 0) (repo main))) 0',
@@ -51,7 +51,7 @@ local initial_content = table.concat({
   '*** (skg (node (id 13))) 13',
 }, '\n')
 local buf = buffer.open_org_buffer_from_text(
-  initial_content, buffer_name, view_uri)
+  initial_content, buffer_name, view_id)
 print('Created initial buffer with full structure')
 
 print('Saving initial buffer to establish relationships...')
@@ -68,7 +68,7 @@ local new_content = table.concat({
   '*** (skg (node (id 121))) 121',
   '** (skg (node (id 13))) 13',
 }, '\n')
-buf = buffer.open_org_buffer_from_text(new_content, buffer_name, view_uri)
+buf = buffer.open_org_buffer_from_text(new_content, buffer_name, view_id)
 print('Created new buffer without node 0')
 
 -- Position on line 3 ('** (skg (node (id 12))) 12').

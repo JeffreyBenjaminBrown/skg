@@ -17,7 +17,7 @@ rerender-done."
   (let ((unsaved-buffers
          (cl-remove-if-not
           (lambda (buf)
-            (and (buffer-local-value 'skg-view-uri buf)
+            (and (buffer-local-value 'skg-view-id buf)
                  (buffer-modified-p buf)))
           (buffer-list))))
     (when unsaved-buffers

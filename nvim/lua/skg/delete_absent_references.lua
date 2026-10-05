@@ -33,7 +33,7 @@ end
 local function any_dirty_view ()
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].modified
-       and vim.b[buf].skg_view_uri then return true end
+       and vim.b[buf].skg_view_id then return true end
   end
   return false
 end

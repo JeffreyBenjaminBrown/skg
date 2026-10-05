@@ -93,7 +93,7 @@ So far there are these endpoints:
 
 ** Single root content tree view from ID
   - Request: =((request . "single root content view")
-    (id . "NODE_ID") (view-uri . "URI")
+    (id . "NODE_ID") (view-id . "VIEW_ID")
     (approved-overPrivateText-pids "PID" ...))=
   - Response: LP =((response-type content-view) (content "...")
     (errors ("..." ...)) (warnings ("..." ...)))=. The document
@@ -115,15 +115,15 @@ So far there are these endpoints:
     override folders and role trees.
 
 ** Save buffer
-  - Request: First =((request . "save buffer") (view-uri . "URI") (point-lines-below-focused-headline . "N") (point-column . "C") (point-screen-lines-below-window-start . "M"))\n=, then one UTF-8 length-prefixed S-expression envelope:
+  - Request: First =((request . "save buffer") (view-id . "VIEW_ID") (point-lines-below-focused-headline . "N") (point-column . "C") (point-screen-lines-below-window-start . "M"))\n=, then one UTF-8 length-prefixed S-expression envelope:
     #+begin_src lisp
     ((saved-buffer "...Org text...")
      (other-views
-       (((view-uri "...") (dirty false))
-        ((view-uri "...") (dirty true)
+       (((view-id "...") (dirty false))
+        ((view-id "...") (dirty true)
          (baseline (present "...last clean text..."))
          (current "...edited text..."))
-        ((view-uri "...") (dirty true)
+        ((view-id "...") (dirty true)
          (baseline unavailable)
          (current "...edited text...")))))
     #+end_src
@@ -131,7 +131,7 @@ So far there are these endpoints:
     is mandatory even when empty and covers every other live client view,
     including views the server has not registered. Clean entries carry no
     buffer snapshots. Dirty entries carry exact current text and either the exact
-    clean baseline or explicit =unavailable=. Duplicate URIs, the saved URI,
+    clean baseline or explicit =unavailable=. Duplicate view IDs, the saved view ID,
     missing fields, and inconsistent clean/dirty fields are rejected. Raw Org
     in place of the envelope is not a supported legacy form.
     - Two optional fields drive the fork-confirmation round-trip
@@ -156,19 +156,19 @@ So far there are these endpoints:
     - =point-screen-lines-below-window-start= is global to the buffer save: the number of screen lines from the window's top line to point before save. The server echoes all three point fields in the final save response so Emacs can restore point and scroll position after replacing the buffer text.
   - Response: Multiple length-prefixed messages, sent sequentially:
     1. Early lock acknowledgement (sent immediately, before reading the envelope):
-       =Content-Length: N\r\n\r\n((response-type save-lock) (lock-views ("URI1" "URI2" ...)))=
+       =Content-Length: N\r\n\r\n((response-type save-lock) (lock-views ("view ID1" "view ID2" ...)))=
        Both clients lock every local Skg view before taking the request's
        buffer snapshots. This message acknowledges that broad lock; its server-known
-       URI list does not authorize unlocking client-only views.
+       view ID list does not authorize unlocking client-only views.
     2. Save-relax-lock message (sent after preparation and conflict checking, before mutation):
-       =Content-Length: N\r\n\r\n((response-type save-relax-lock) (lock-views ("URI1" "URI2" ...)))=
+       =Content-Length: N\r\n\r\n((response-type save-relax-lock) (lock-views ("view ID1" "view ID2" ...)))=
        The keep-set contains selected collateral targets and every dirty view
        whose baseline/current buffer snapshots were checked, including unregistered
        views. The saved view is retained implicitly. Only unrelated clean
        views may unlock at this point. A malformed narrowing message leaves
        all locks held until terminal cleanup.
     3. Zero or more collateral-view messages (one per affected view, streamed as each finishes):
-       =Content-Length: N\r\n\r\n((response-type collateral-view) (view-uri "URI") (content "..."))=
+       =Content-Length: N\r\n\r\n((response-type collateral-view) (view-id "VIEW_ID") (content "..."))=
        Emacs unlocks and updates each buffer as it arrives.
     4. Final save response:
        =Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))=
@@ -180,7 +180,7 @@ So far there are these endpoints:
     dependencies from its clean baseline, current text, and registered forest
     when present. Any intersection refuses the save conservatively; malformed
     or missing dirty dependency data also refuses. A refusal returns
-    =save-result= with nil content and actionable errors naming view URIs and
+    =save-result= with nil content and actionable errors naming view IDs and
     IDs, and performs no filesystem, graph, search index, registry, or collateral
     update. There is no save-anyway path.
   - The first ALTERNATIVE terminal message: after validation, a save
@@ -495,7 +495,7 @@ TCP connection:
   =response-type= =import-md-and-org-result= and =content=, =errors=, and
   =warnings= fields. A successful apply additionally has
   =(record-id "ID")=; clients then use the normal rerender protocol with an
-  optional =(exclude-view-uris "URI" ...)= list naming dirty editor views.
+  optional =(exclude-view-ids "VIEW_ID" ...)= list naming dirty editor views.
   Those views are not replaced or updated in the server's open-view state;
   clean views refresh normally. An absent list means rerender all views.
 
@@ -581,10 +581,10 @@ one automatically.
     (approved-overPrivateText-pids "PID" ...))=.
   - Response: Multiple length-prefixed messages, sent sequentially:
     1. Lock message:
-       =Content-Length: N\r\n\r\n((response-type rerender-lock) (lock-views ("URI1" "URI2" ...)))=
-       Lists all view URIs that will be re-rendered. Emacs locks those buffers.
+       =Content-Length: N\r\n\r\n((response-type rerender-lock) (lock-views ("view ID1" "view ID2" ...)))=
+       Lists all view IDs that will be re-rendered. Emacs locks those buffers.
     2. Zero or more per-view messages (one per view, streamed as each finishes):
-       =Content-Length: N\r\n\r\n((response-type rerender-view) (view-uri "URI") (content "..."))=
+       =Content-Length: N\r\n\r\n((response-type rerender-view) (view-id "VIEW_ID") (content "..."))=
        Emacs unlocks and updates each buffer as it arrives.
     3. Done message:
        =Content-Length: N\r\n\r\n((response-type rerender-done) (errors ("..." ...)) (warnings ("..." ...)))=
@@ -598,7 +598,7 @@ one automatically.
     LP =overPrivateText-telescope-confirmation= with
     =(operation rerender-all-views)= and
     the exact PIDs, followed by an EMPTY rerender stream
-    (=rerender-lock= with no URIs, then clean =rerender-done=). No view
+    (=rerender-lock= with no view IDs, then clean =rerender-done=). No view
     text is sent and no open-view registry entry changes. A retry adds
     =approved-overPrivateText-pids=; =all= instead adds the shared warning to
     =rerender-done=.
@@ -914,7 +914,7 @@ The buffer whose approved save creates a fork is the post-save exception. A
 root named by one of that save's exact =ForkSpec=s is rewritten from original F
 to clone K, and an existing recursive-content occurrence in the saved forest
 may likewise be replaced by its newly visible substitute. Both carry
-=(overridesHere F)=. The completed forest remains under the same view URI, and
+=(overridesHere F)=. The completed forest remains under the same view ID, and
 the open-view root index is recomputed from it, so that buffer is thereafter
 registered as rooted at K. Collateral rerenders do not perform these
 replacements; they retain their existing raw positions. A later independent

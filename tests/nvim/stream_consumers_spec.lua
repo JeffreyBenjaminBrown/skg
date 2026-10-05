@@ -48,9 +48,9 @@ describe('skg stream consumers', function ()
       if line:find('rerender all views', 1, true) then
         respond(helpers.framed(
           '((response-type rerender-lock)'
-          .. ' (lock-views (uri-a)))'))
+          .. ' (lock-views (view_id-a)))'))
         respond(helpers.framed(
-          '((response-type rerender-view) (view-uri uri-a)'
+          '((response-type rerender-view) (view-id view_id-a)'
           .. ' (content "* (skg (node (id a))) a rerendered"))'))
         respond(helpers.framed(
           '((response-type rerender-done) (errors ())'
@@ -58,9 +58,9 @@ describe('skg stream consumers', function ()
       end
     end)
     local a = buffer.open_org_buffer_from_text(
-      '* (skg (node (id a))) a', 'skg://a', 'uri-a')
+      '* (skg (node (id a))) a', 'skg://a', 'view_id-a')
     local b = buffer.open_org_buffer_from_text(
-      '* (skg (node (id b))) b', 'skg://b', 'uri-b')
+      '* (skg (node (id b))) b', 'skg://b', 'view_id-b')
     rerender.request_rerender_all_views()
     -- Locked immediately; b unlocks on rerender-lock (not listed).
     assert.is_false(vim.bo[a].modifiable)
@@ -97,7 +97,7 @@ describe('skg stream consumers', function ()
       end
     end)
     local a = buffer.open_org_buffer_from_text(
-      '* (skg (node (id a))) a', 'skg://a', 'uri-a')
+      '* (skg (node (id a))) a', 'skg://a', 'view_id-a')
     vim.bo[a].modified = true
     local ok, err = pcall(diff_mode.toggle)
     assert.is_false(ok)

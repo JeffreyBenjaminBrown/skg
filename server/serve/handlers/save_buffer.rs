@@ -27,7 +27,7 @@ use crate::serve::handlers::save_dependencies::{
   SaveAffectedIds, dirty_view_conflicts, format_conflict_error,
 };
 use crate::serve::util::{
-  view_uri_from_request,
+  view_id_from_request,
   format_buffer_response_sexp,
   format_fork_confirmation_response_sexp,
   format_lock_views_sexp,
@@ -43,7 +43,7 @@ use crate::types::misc::{ID, SkgRepoName, SkgConfig};
 use crate::types::save::{
   NodeInstruction, PostSkgsaveCommitNoticeCandidate, SavePlan, format_save_error_as_org };
 use crate::types::tree::forest::ViewForest;
-use crate::types::views_state::ViewUri;
+use crate::types::views_state::ViewId;
 use crate::update_buffer::update_views_after_save;
 
 use futures::executor::block_on;
@@ -81,7 +81,7 @@ pub struct SaveResponse {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ClientViewSnapshot {
-  pub uri      : ViewUri,
+  pub view_id  : ViewId,
   pub dirty    : bool,
   pub baseline : Option<String>,
   pub current  : Option<String>,
@@ -119,7 +119,7 @@ impl SaveResponse {
 
 /// Handles save buffer requests from Emacs.
 /// - Reads the buffer content (with length prefix).
-/// - Sends the early broad lock (uris_of_views_to_lock) before the slow pipeline.
+/// - Sends the early broad lock (view_ids_of_views_to_lock) before the slow pipeline.
 /// - Runs 'update_from_and_rerender_buffer' (parse + validate -> SavePlan, update
 ///   the graph, then rerender + stream the saved and collateral views).
 /// - Responds to Emacs (with length prefix).
@@ -131,8 +131,8 @@ pub fn handle_save_buffer_request (
   views_state : &mut ViewsState,
   active_skgrepo_set : &ActiveSkgRepoSet,
 ) {
-  let viewuri_from_request_result : Result<ViewUri, String> =
-    view_uri_from_request (request);
+  let viewid_from_request_result : Result<ViewId, String> =
+    view_id_from_request (request);
   let save_point_position : Option<SavePointPosition> =
     save_point_position_from_request (request);
   let approved_forks : bool =
@@ -155,17 +155,17 @@ pub fn handle_save_buffer_request (
     // save-result would arrive, leaving the count unbalanced and wedging the
     // next save's wait). save-result unlocks regardless. Conservative/broad
     // here: the SavePlan is not yet computed.
-    let uris_to_lock : Vec<ViewUri> =
-      uris_of_views_to_lock (
-        &viewuri_from_request_result, views_state );
+    let view_ids_to_lock : Vec<ViewId> =
+      view_ids_of_views_to_lock (
+        &viewid_from_request_result, views_state );
     let lock_sexp : String =
-      format_lock_views_sexp ( &uris_to_lock );
+      format_lock_views_sexp ( &view_ids_to_lock );
     send_response_with_length_prefix (
       stream,
       & tag_sexp_response ( TcpToClient::SaveLock, &lock_sexp )); }
   match read_length_prefixed_content (reader)
     .and_then (|content| parse_save_request_envelope (
-      &content, viewuri_from_request_result . as_ref () . ok ()))
+      &content, viewid_from_request_result . as_ref () . ok ()))
   {
     Ok (envelope) => {
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -176,7 +176,7 @@ pub fn handle_save_buffer_request (
             & envelope . saved_buffer,
             env,
             views_state . diff_mode_enabled,
-            &viewuri_from_request_result,
+            &viewid_from_request_result,
             views_state,
             Some (active_skgrepo_set),
             approved_forks,
@@ -264,7 +264,7 @@ pub fn handle_save_buffer_request (
 
 pub fn parse_save_request_envelope (
   content   : &str,
-  saved_uri : Option<&ViewUri>,
+  saved_view_id : Option<&ViewId>,
 ) -> Result<SaveRequestEnvelope, Box<dyn Error>> {
   let parsed : Sexp = sexp::parse (content)
     .map_err (|error| format! ("Malformed save envelope: {}", error)) ?;
@@ -278,20 +278,20 @@ pub fn parse_save_request_envelope (
   let other_view_entries : &[Sexp] = sexp_list (
     other_views_value, "other-views") ?;
   let mut other_views : Vec<ClientViewSnapshot> = Vec::new ();
-  let mut seen_uris : HashSet<ViewUri> = HashSet::new ();
+  let mut seen_view_ids : HashSet<ViewId> = HashSet::new ();
   for entry in other_view_entries {
     let entry_fields : &[Sexp] = sexp_list (entry, "other view") ?;
-    let uri : ViewUri = ViewUri::from_client_string (sexp_atom_string (
-      unique_field (entry_fields, "view-uri", "other view") ?,
-      "other view-uri") ?);
-    if saved_uri == Some (&uri) {
+    let view_id : ViewId = ViewId::from_client_string (sexp_atom_string (
+      unique_field (entry_fields, "view-id", "other view") ?,
+      "other view-id") ?);
+    if saved_view_id == Some (&view_id) {
       return Err (format! (
-        "Malformed save envelope: saved URI {} appears in other-views",
-        uri . repr_in_client ()) . into ()); }
-    if ! seen_uris . insert (uri . clone ()) {
+        "Malformed save envelope: saved view ID {} appears in other-views",
+        view_id . repr_in_client ()) . into ()); }
+    if ! seen_view_ids . insert (view_id . clone ()) {
       return Err (format! (
-        "Malformed save envelope: duplicate other view URI {}",
-        uri . repr_in_client ()) . into ()); }
+        "Malformed save envelope: duplicate other view ID {}",
+        view_id . repr_in_client ()) . into ()); }
     let dirty_text : String = sexp_atom_string (
       unique_field (entry_fields, "dirty", "other view") ?, "dirty") ?;
     let dirty : bool = match dirty_text . as_str () {
@@ -299,7 +299,7 @@ pub fn parse_save_request_envelope (
       "false" => false,
       _ => return Err (format! (
         "Malformed save envelope: dirty must be true or false for {}",
-        uri . repr_in_client ()) . into ()), };
+        view_id . repr_in_client ()) . into ()), };
     let baseline_field : Option<&Sexp> = optional_unique_field (
       entry_fields, "baseline", "other view") ?;
     let current_field : Option<&Sexp> = optional_unique_field (
@@ -308,27 +308,27 @@ pub fn parse_save_request_envelope (
       let baseline : Option<String> = parse_baseline (
         baseline_field . ok_or_else (|| format! (
           "Malformed save envelope: dirty view {} has no baseline field",
-          uri . repr_in_client ())) ?) ?;
+          view_id . repr_in_client ())) ?) ?;
       let current : String = sexp_atom_string (
         current_field . ok_or_else (|| format! (
           "Malformed save envelope: dirty view {} has no current text",
-          uri . repr_in_client ())) ?, "current") ?;
+          view_id . repr_in_client ())) ?, "current") ?;
       (baseline, Some (current))
     } else {
       if baseline_field . is_some () || current_field . is_some () {
         return Err (format! (
           "Malformed save envelope: clean view {} carries dirty snapshots",
-          uri . repr_in_client ()) . into ()); }
+          view_id . repr_in_client ()) . into ()); }
       (None, None)
     };
     for field in entry_fields {
       let (key, _) : (&str, &Sexp) = field_pair (field, "other view") ?;
-      if ! ["view-uri", "dirty", "baseline", "current"] . contains (&key) {
+      if ! ["view-id", "dirty", "baseline", "current"] . contains (&key) {
         return Err (format! (
           "Malformed save envelope: unknown other-view field {}", key)
           . into ()); }}
     other_views . push (ClientViewSnapshot {
-      uri, dirty, baseline, current, }); }
+      view_id, dirty, baseline, current, }); }
   for field in fields {
     let (key, _) : (&str, &Sexp) = field_pair (field, "save envelope") ?;
     if ! ["saved-buffer", "other-views"] . contains (&key) {
@@ -562,7 +562,7 @@ pub async fn update_from_and_rerender_buffer (
   org_buffer_text             : &str,
   env                         : &mut SkgEnv,
   diff_mode_enabled           : bool,
-  viewuri_from_request_result : &Result<ViewUri, String>,
+  viewid_from_request_result  : &Result<ViewId, String>,
   views_state                  : &mut ViewsState,
   active_skgrepo_set          : Option<&ActiveSkgRepoSet>,
   approved_forks              : bool, // true once the user has approved the forks (a re-issued save); false on the first save, which returns a fork-confirmation instead of committing.
@@ -571,7 +571,7 @@ pub async fn update_from_and_rerender_buffer (
   let no_hoist_approvals : HashSet<ID> = HashSet::new ();
   update_from_and_rerender_buffer_with_hoist_approval (
     stream, org_buffer_text, env, diff_mode_enabled,
-    viewuri_from_request_result, views_state, active_skgrepo_set,
+    viewid_from_request_result, views_state, active_skgrepo_set,
     approved_forks, fork_skgrepos, &no_hoist_approvals ) . await
 }
 
@@ -580,7 +580,7 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
   org_buffer_text             : &str,
   env                         : &mut SkgEnv,
   diff_mode_enabled           : bool,
-  viewuri_from_request_result : &Result<ViewUri, String>,
+  viewid_from_request_result  : &Result<ViewId, String>,
   views_state                  : &mut ViewsState,
   active_skgrepo_set          : Option<&ActiveSkgRepoSet>,
   approved_forks              : bool,
@@ -589,7 +589,7 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
 ) -> Result<SaveResponse, Box<dyn Error>> {
   update_from_and_rerender_buffer_with_approvals (
     stream, org_buffer_text, env, diff_mode_enabled,
-    viewuri_from_request_result, views_state, active_skgrepo_set,
+    viewid_from_request_result, views_state, active_skgrepo_set,
     approved_forks, fork_skgrepos, approved_hoist_pids,
     &HashSet::new (), &[] ) . await
 }
@@ -599,7 +599,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   org_buffer_text             : &str,
   env                         : &mut SkgEnv,
   diff_mode_enabled           : bool,
-  viewuri_from_request_result : &Result<ViewUri, String>,
+  viewid_from_request_result  : &Result<ViewId, String>,
   views_state                  : &mut ViewsState,
   active_skgrepo_set          : Option<&ActiveSkgRepoSet>,
   approved_forks              : bool,
@@ -630,9 +630,9 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_graph (
           org_buffer_text, &runtime . graph, &runtime . config,
           active_skgrepo_set, fork_skgrepos,
-          viewuri_from_request_result . as_ref () . ok ()
-            . and_then ( |uri| views_state . open_views
-              . viewuri_to_view (uri) ) )
+          viewid_from_request_result . as_ref () . ok ()
+            . and_then ( |view_id| views_state . open_views
+              . viewid_to_view (view_id) ) )
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
   if viewforest . is_empty ()
@@ -736,34 +736,34 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       errors : vec![crate::types::errors::BufferValidationError::Other (
         format_conflict_error (&dirty_conflicts))],
       warnings : parse_warnings, })); }
-  let collateral_uris : Vec<ViewUri> = viewuri_from_request_result . as_ref ()
-    .map (|saved_uri| affected_skgids . collateral_view_uris (
-      saved_uri, views_state,
+  let collateral_view_ids : Vec<ViewId> = viewid_from_request_result . as_ref ()
+    .map (|saved_view_id| affected_skgids . collateral_view_ids (
+      saved_view_id, views_state,
       prepared_save . graph_before_save (),
       prepared_save . final_candidate ()))
     .unwrap_or_default ();
-  let mut narrowed_lock_uris : Vec<ViewUri> = collateral_uris . clone ();
-  narrowed_lock_uris . extend (
+  let mut narrowed_lock_view_ids : Vec<ViewId> = collateral_view_ids . clone ();
+  narrowed_lock_view_ids . extend (
     other_views . iter () . filter (|view| view . dirty)
-      . map (|view| view . uri . clone ()));
-  narrowed_lock_uris . sort_by_key (ViewUri::repr_in_client);
-  narrowed_lock_uris . dedup ();
-  // The client keeps the saved URI implicitly. Every dirty view stays locked
+      . map (|view| view . view_id . clone ()));
+  narrowed_lock_view_ids . sort_by_key (ViewId::repr_in_client);
+  narrowed_lock_view_ids . dedup ();
+  // The client keeps the saved view ID implicitly. Every dirty view stays locked
   // because its exact buffer snapshot was an input to the conflict decision, even
   // when that view is client-only and not a collateral target.
   send_response_with_length_prefix (
     stream,
     & tag_sexp_response (
       TcpToClient::SaveRelaxLock,
-      & format_lock_views_sexp (&narrowed_lock_uris) ));
-  if collateral_uris . is_empty () {
+      & format_lock_views_sexp (&narrowed_lock_view_ids) ));
+  if collateral_view_ids . is_empty () {
     tracing::debug!("save preparation selected no collateral views");
   } else {
     tracing::info!(
       "save preparation selected {} collateral view(s): {:?}",
-      collateral_uris . len (),
-      collateral_uris . iter ()
-        . map (ViewUri::repr_in_client)
+      collateral_view_ids . len (),
+      collateral_view_ids . iter ()
+        . map (ViewId::repr_in_client)
         . collect::<Vec<_>> ()); }
   let deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>> =
   { // Apply the already-checked preparation. Prominence sources are
@@ -796,11 +796,11 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         stream,
         viewforest,
         node_instructions,
-        collateral_uris,
+        collateral_view_ids,
         diff_mode_enabled,
         env,
         swapped_in . clone (),
-        viewuri_from_request_result,
+        viewid_from_request_result,
         views_state,
         active_skgrepo_set,
         deleted_by_this_save_extra_ids,
@@ -927,18 +927,18 @@ pub fn deleted_skgids_to_skgrepo (
 /// Over-approximates true collateral (which requires parsing the buffer
 /// to know which PIDs actually changed). This is intentional: locking
 /// too many buffers briefly is harmless; missing one could lose edits.
-fn uris_of_views_to_lock (
-  viewuri_from_request_result : &Result<ViewUri, String>,
+fn view_ids_of_views_to_lock (
+  viewid_from_request_result : &Result<ViewId, String>,
   views_state                  : &ViewsState,
-) -> Vec<ViewUri> {
-  let saved_uri : &ViewUri = match viewuri_from_request_result {
-    Ok (uri) => uri,
+) -> Vec<ViewId> {
+  let saved_view_id : &ViewId = match viewid_from_request_result {
+    Ok (view_id) => view_id,
     Err (_)  => return Vec::new () };
   let pids : Vec<ID> =
-    views_state . open_views . viewuri_to_pids (saved_uri);
-  let mut collateral_views : HashSet<ViewUri> = HashSet::new ();
+    views_state . open_views . viewid_to_pids (saved_view_id);
+  let mut collateral_views : HashSet<ViewId> = HashSet::new ();
   for pid in &pids {
-    for uri in views_state . open_views . views_containing (pid) {
-      if &uri != saved_uri
-      { collateral_views . insert (uri); } } }
+    for view_id in views_state . open_views . views_containing (pid) {
+      if &view_id != saved_view_id
+      { collateral_views . insert (view_id); } } }
   collateral_views . into_iter () . collect () }

@@ -20,9 +20,9 @@ local org_text = table.concat({
 }, '\n')
 
 local buffer = require('skg.buffer')
-local view_uri = buffer.generate_uuid()
+local view_id = buffer.generate_uuid()
 buffer.open_org_buffer_from_text(
-  org_text, 'skg://skg-body-with-tabs', view_uri)
+  org_text, 'skg://skg-body-with-tabs', view_id)
 vim.api.nvim_win_set_cursor(0, { 1, 0 })
 
 print('=== PHASE 2: save buffer ===')

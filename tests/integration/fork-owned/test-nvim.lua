@@ -20,7 +20,7 @@ local view_requests = require('skg.view_requests')
 local function buffer_showing (skgid)
   local needle = '(id ' .. skgid .. ')'
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_view_uri ~= nil
+    if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_view_id ~= nil
        and T.buffer_text(buf):find(needle, 1, true) then
       return buf
     end

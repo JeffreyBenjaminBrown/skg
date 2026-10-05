@@ -55,12 +55,12 @@ async fn test_collateral_view_preserves_diff_annotations (
 
   // 3. Register buffer 1 and buffer 2,
   //    both viewing the same viewforest rooted at "a".
-  let uri_1 : ViewUri = ViewUri::ContentView ( "buffer-1" . to_string() );
-  let uri_2 : ViewUri = ViewUri::ContentView ( "buffer-2" . to_string() );
+  let view_id_1 : ViewId = ViewId::ContentView ( "buffer-1" . to_string() );
+  let view_id_2 : ViewId = ViewId::ContentView ( "buffer-2" . to_string() );
   views_state . open_views . register_view (
-    &graph . load_full (), uri_1 . clone (), viewforest . clone (), &pids );
+    &graph . load_full (), view_id_1 . clone (), viewforest . clone (), &pids );
   views_state . open_views . register_view (
-    &graph . load_full (), uri_2 . clone (), viewforest . clone (), &pids );
+    &graph . load_full (), view_id_2 . clone (), viewforest . clone (), &pids );
 
   // 4. Save buffer 1 with a new child "c" of "a".
   //    This also updates the in-Rust graph and re-renders collateral views.
@@ -72,7 +72,7 @@ async fn test_collateral_view_preserves_diff_annotations (
     update_from_and_rerender_buffer (
       &mut stream,
       &save_input, &config, tantivy, &graph, true,
-      &Ok ( uri_1 . clone () ),
+      &Ok ( view_id_1 . clone () ),
       &mut views_state ) . await ?;
   // Close the write end so read_all_lp_messages (which reads to
   // EOF) terminates. (Before the shared-db conversion the stream
@@ -95,7 +95,7 @@ async fn test_collateral_view_preserves_diff_annotations (
   let body : &str = &collateral_msgs[0];
   assert! ( body . contains ("collateral-view"),
     "Expected collateral-view response, got: {}", body );
-  assert! ( body . contains (&uri_2 . repr_in_client ()),
+  assert! ( body . contains (&view_id_2 . repr_in_client ()),
     "Collateral update should be for buffer 2, got: {}", body );
   let collateral_buffer : String =
     skg::test_utils::extract_string_field_from_sexp (body, "content")
@@ -160,12 +160,12 @@ async fn test_collateral_view_staged_text_and_unstaged_add (
     diff_mode_enabled : true,
     open_views            : OpenViews::new (),};
 
-  let uri_1 : ViewUri = ViewUri::ContentView ( "buffer-1" . to_string() );
-  let uri_2 : ViewUri = ViewUri::ContentView ( "buffer-2" . to_string() );
+  let view_id_1 : ViewId = ViewId::ContentView ( "buffer-1" . to_string() );
+  let view_id_2 : ViewId = ViewId::ContentView ( "buffer-2" . to_string() );
   views_state . open_views . register_view (
-    &graph . load_full (), uri_1 . clone (), viewforest . clone (), &pids );
+    &graph . load_full (), view_id_1 . clone (), viewforest . clone (), &pids );
   views_state . open_views . register_view (
-    &graph . load_full (), uri_2 . clone (), viewforest . clone (), &pids );
+    &graph . load_full (), view_id_2 . clone (), viewforest . clone (), &pids );
 
   let save_input : String = insert_after (
     &initial_buffer, "(id a)",
@@ -175,7 +175,7 @@ async fn test_collateral_view_staged_text_and_unstaged_add (
     update_from_and_rerender_buffer (
       &mut stream,
       &save_input, &config, tantivy, &graph, true,
-      &Ok ( uri_1 . clone () ),
+      &Ok ( view_id_1 . clone () ),
       &mut views_state ) . await ?;
   // Close the write end so read_all_lp_messages (which reads to
   // EOF) terminates. (Before the shared-db conversion the stream
@@ -196,7 +196,7 @@ async fn test_collateral_view_staged_text_and_unstaged_add (
   let body : &str = &collateral_msgs[0];
   assert! ( body . contains ("collateral-view"),
     "Expected collateral-view response, got: {}", body );
-  assert! ( body . contains (&uri_2 . repr_in_client ()),
+  assert! ( body . contains (&view_id_2 . repr_in_client ()),
     "Collateral update should be for buffer 2, got: {}", body );
   let collateral_buffer : String =
     skg::test_utils::extract_string_field_from_sexp (body, "content")

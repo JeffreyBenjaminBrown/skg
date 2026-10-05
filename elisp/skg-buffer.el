@@ -57,12 +57,12 @@ buffer snapshots), so `skg--confirm-before-dirtying-another-view' stays quiet.")
 
 (defun skg--unsaved-view-buffers (&optional except)
   "Return every live view with unsaved edits, other than EXCEPT.
-A view is a buffer with a non-nil `skg-view-uri': a content view or
+A view is a buffer with a non-nil `skg-view-id': a content view or
 search results, but not the fork-confirmation buffer."
   (cl-remove-if-not
    (lambda (buf)
      (and (not (eq buf except))
-          (buffer-local-value 'skg-view-uri buf)
+          (buffer-local-value 'skg-view-id buf)
           (buffer-modified-p buf)))
    (buffer-list)))
 
@@ -82,7 +82,7 @@ to the start of the line, so an answer typed there came out reversed.)"
   (cond
    ((eq skg--dirtying-view-approved (current-buffer))
     (skg--forget-dirtying-view-approval))
-   ((and skg-view-uri
+   ((and skg-view-id
          (not skg--inhibit-dirty-view-confirmation)
          (skg--unsaved-view-buffers (current-buffer)))
     (run-at-time 0 nil #'skg--ask-to-dirty-another-view
@@ -124,9 +124,9 @@ an edit command typed via M-x keeps the approval."
   (remove-hook 'post-command-hook
                #'skg--revoke-dirtying-view-approval-if-point-left))
 
-(defvar-local skg-view-uri nil
-  "Unique view URI for this skg buffer.")
-(put 'skg-view-uri
+(defvar-local skg-view-id nil
+  "Unique view ID for this skg buffer.")
+(put 'skg-view-id
      'permanent-local ; to survive major-mode changes
      t)
 
@@ -272,13 +272,13 @@ and truncates to a reasonable length."
   (skg-open-org-buffer-from-text
    nil "" "*skg-empty*"))
 
-(defun skg-open-org-buffer-from-text (_tcp-proc org-text buffer-name &optional view-uri)
+(defun skg-open-org-buffer-from-text (_tcp-proc org-text buffer-name &optional view-id)
   "Open a new buffer and insert ORG-TEXT, enabling org-mode.
-If VIEW-URI is provided, set it as the buffer's skg-view-uri;
+If VIEW-ID is provided, set it as the buffer's skg-view-id;
 otherwise generate a new UUID."
   (let* ((skgrepo (skg-content-view-repo-name org-text))
          (buffer (skg--generate-contentView-buffer buffer-name skgrepo))
-        (uri (or view-uri (org-id-uuid))))
+        (view-id (or view-id (org-id-uuid))))
     (with-current-buffer buffer
       (let ((inhibit-read-only t)
             (skg--inhibit-dirty-view-confirmation t))
@@ -287,7 +287,7 @@ otherwise generate a new UUID."
         (skg-content-view-mode)
         (heralds-minor-mode)
         (skg-link-annotations-mode 1))
-      (setq skg-view-uri uri)
+      (setq skg-view-id view-id)
       (setq skg-contentView-initialRoot-repo skgrepo)
       (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
       (set-buffer-modified-p nil)
@@ -295,19 +295,19 @@ otherwise generate a new UUID."
       (goto-char (point-min)))
     (switch-to-buffer buffer)))
 
-(defun skg-send-close-view-uri (tcp-proc view-uri)
-  "Send a close-view message for VIEW-URI over TCP-PROC."
-  (when (and view-uri tcp-proc (process-live-p tcp-proc))
+(defun skg-send-close-view-id (tcp-proc view-id)
+  "Send a close-view message for VIEW-ID over TCP-PROC."
+  (when (and view-id tcp-proc (process-live-p tcp-proc))
     (let ((request (concat (prin1-to-string
                             `((request . "close view")
-                              (view-uri . ,view-uri)))
+                              (view-id . ,view-id)))
                            "\n")))
       (process-send-string tcp-proc request))))
 
 (defun skg-send-close-view ()
-  "Send a close-view message to the server for this buffer's view URI."
+  "Send a close-view message to the server for this buffer's view ID."
   (when (boundp 'skg-rust-tcp-proc)
-    (skg-send-close-view-uri skg-rust-tcp-proc skg-view-uri)))
+    (skg-send-close-view-id skg-rust-tcp-proc skg-view-id)))
 
 (defun skg--other-unsaved-skg-buffers ()
   "Return modified skg view buffers other than the current buffer."
@@ -315,20 +315,20 @@ otherwise generate a new UUID."
         (result nil))
     (dolist (buf (buffer-list))
       (when (and (not (eq buf self))
-                 (buffer-local-value 'skg-view-uri buf)
+                 (buffer-local-value 'skg-view-id buf)
                  (buffer-modified-p buf))
         (push buf result)))
     result))
 
-(defun skg-find-buffer-by-uri (uri)
-  "Find the buffer whose skg-view-uri matches URI."
+(defun skg-find-buffer-by-view-id (view-id)
+  "Find the buffer whose skg-view-id matches VIEW-ID."
   (cl-find-if (lambda (buf)
-                (string= uri (buffer-local-value 'skg-view-uri buf)))
+                (string= view-id (buffer-local-value 'skg-view-id buf)))
               (buffer-list)))
 
 (defun skg-buffer-p (buf)
   "Return non-nil if BUF is a skg view buffer.
-A buffer qualifies if it carries the buffer-local `skg-view-uri'
+A buffer qualifies if it carries the buffer-local `skg-view-id'
 or derives from `skg-content-view-mode'. Both are set solely by
 skg's own view code (`skg-open-org-buffer-from-text') and both
 survive `skg-reload' (which deliberately leaves `skg-buffer'
@@ -338,7 +338,7 @@ e.g. a real .skg.org file whose first headline begins with
 `skg-close-all-skg-buffers'."
   (and (buffer-live-p buf)
        (with-current-buffer buf
-         (or (and (boundp 'skg-view-uri) skg-view-uri)
+         (or (and (boundp 'skg-view-id) skg-view-id)
              (derived-mode-p 'skg-content-view-mode)))))
 
 (defun skg-close-all-skg-buffers ()

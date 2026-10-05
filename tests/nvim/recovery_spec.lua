@@ -26,7 +26,7 @@ describe('skg.recovery', function ()
     local baseline = '* old\n#+end_src\n\tλ\n'
     local current = '* new\n#+begin_src json\n\t雪'
     local buf = buffer.open_org_buffer_from_text(
-      baseline, 'skg://recovery-repo', 'recovery-uri')
+      baseline, 'skg://recovery-repo', 'recovery-view_id')
     vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                                vim.split(current, '\n'))
     local document = recovery.document(buf)
@@ -42,14 +42,14 @@ describe('skg.recovery', function ()
     local path = vim.fn.tempname() .. '-skg-recovery-test.org'
     table.insert(paths, path)
     local skgrepo = buffer.open_org_buffer_from_text(
-      '* baseline\n', 'skg://recovery-live', 'live-uri')
+      '* baseline\n', 'skg://recovery-live', 'live-view_id')
     vim.api.nvim_buf_set_lines(skgrepo, 1, 1, false, { 'unsaved' })
     recovery.show_unsaved_changes(path, true)
     local archive = vim.api.nvim_get_current_buf()
     assert.are.equal(path, vim.api.nvim_buf_get_name(archive))
-    assert.is_nil(vim.b[archive].skg_view_uri)
+    assert.is_nil(vim.b[archive].skg_view_id)
     assert.is_true(vim.bo[skgrepo].modified)
-    assert.are.equal('live-uri', vim.b[skgrepo].skg_view_uri)
+    assert.are.equal('live-view_id', vim.b[skgrepo].skg_view_id)
     vim.api.nvim_buf_delete(skgrepo, { force = true })
     assert.is_true(vim.api.nvim_buf_is_valid(archive))
   end)
@@ -57,7 +57,7 @@ describe('skg.recovery', function ()
   it('cancellation, refused overwrite and write error preserve edits',
      function ()
     local skgrepo = buffer.open_org_buffer_from_text(
-      '* baseline\n', 'skg://recovery-errors', 'error-uri')
+      '* baseline\n', 'skg://recovery-errors', 'error-view_id')
     vim.api.nvim_buf_set_lines(skgrepo, 1, 1, false, { 'unsaved' })
     assert.is_nil(recovery.show_unsaved_changes('', false))
 
@@ -78,6 +78,6 @@ describe('skg.recovery', function ()
     local write_ok = pcall(recovery.show_unsaved_changes, directory, true)
     assert.is_false(write_ok)
     assert.is_true(vim.bo[skgrepo].modified)
-    assert.are.equal('error-uri', vim.b[skgrepo].skg_view_uri)
+    assert.are.equal('error-view_id', vim.b[skgrepo].skg_view_id)
   end)
 end)

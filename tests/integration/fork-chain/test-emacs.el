@@ -19,7 +19,7 @@
    (lambda (b)
      (and (buffer-live-p b)
           (with-current-buffer b
-            (and (boundp 'skg-view-uri) skg-view-uri
+            (and (boundp 'skg-view-id) skg-view-id
                  (string-match-p (regexp-quote (format "(id %s)" skgid))
                                  (buffer-substring-no-properties
                                   (point-min) (point-max)))))))

@@ -46,7 +46,7 @@ describe('skg mixed Markdown/Org import', function ()
     helpers.install_fixture_herald_rules()
     local dirty = buffer.open_org_buffer_from_text(
       '* (skg (node (id dirty))) Unsaved\nlocal edit',
-      'skg://dirty', 'dirty-uri')
+      'skg://dirty', 'dirty-view_id')
     vim.bo[dirty].modified = true
     importer.import_md_and_org('/container/notes', 'private')
     local complete = vim.wait(3000, function () return #requests >= 4 end, 10)
@@ -55,7 +55,7 @@ describe('skg mixed Markdown/Org import', function ()
     assert.is_truthy(requests[1]:find('input-directory', 1, true))
     assert.is_truthy(requests[2]:find('/host/notes', 1, true))
     assert.is_truthy(requests[3]:find('opaque', 1, true))
-    assert.is_truthy(requests[4]:find('dirty-uri', 1, true))
+    assert.is_truthy(requests[4]:find('dirty-view_id', 1, true))
     assert.is_true(vim.bo[dirty].modified)
     assert.is_nil(state.response_handler_map['import-md-and-org-preview'])
     -- The result buffer can follow its record link.

@@ -9,7 +9,7 @@
 Two files are deliberately absent from the unload list:
 
 - `skg-buffer' defines `skg-content-view-mode' and the
-  permanent-local `skg-view-uri'. `unload-feature' would
+  permanent-local `skg-view-id'. `unload-feature' would
   destroy both for every already-open skg buffer: the mode
   degrades to org-mode and the buffer-local var is cleared.
 

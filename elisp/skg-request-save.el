@@ -29,8 +29,8 @@ nothing. `skg--fork-confirmation-handler' then shows the confirmation
 buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
 `skg-decline-fork'."
   (interactive)
-  (unless skg-view-uri
-    (error "Cannot save: skg-view-uri is nil in buffer '%s' (content-view-mode=%s). Re-open the view."
+  (unless skg-view-id
+    (error "Cannot save: skg-view-id is nil in buffer '%s' (content-view-mode=%s). Re-open the view."
            (buffer-name)
            (if (derived-mode-p 'skg-content-view-mode) "on" "off")))
   (skg--begin-stream "save")
@@ -58,7 +58,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
          (skg--current-save-point-position)))
     (let* ((tcp-proc (skg-tcp-connect-to-rust))
            (save-buffer (current-buffer))
-           (saved-uri skg-view-uri)
+           (saved-view-id skg-view-id)
            (buffer-contents
             (skg--buffer-snapshot-with-save-markers focused-had-metadata))
            (other-view-buffer-snapshots
@@ -68,7 +68,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
              buffer-contents other-view-buffer-snapshots))
            (request-s-exp (concat (prin1-to-string
                                    (skg--save-request-sexp
-                                    skg-view-uri
+                                    skg-view-id
                                     save-point-position
                                     approved-forks
                                     fork-skgrepos
@@ -87,7 +87,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
       ;; save-relax-lock carries the post-preparation keep-set: collateral
       ;; targets plus dirty conflict-check inputs. Buffers locked early that
       ;; are absent can unlock. The saved buffer stays
-      ;; locked (skg--unlock-non-collateral-buffers keeps saved-uri) until
+      ;; locked (skg--unlock-non-collateral-buffers keeps saved-view-id) until
       ;; save-result. Registered NON-one-shot (like collateral-view) so it does
       ;; NOT add to skg-lp--pending-count: an *invalid* save errors before the
       ;; server reaches the point that emits save-relax-lock, so a one-shot
@@ -96,7 +96,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
       (skg-register-response-handler
        'save-relax-lock
        (lambda (_tcp-proc payload)
-         (skg--save-relax-lock-handler saved-uri payload))
+         (skg--save-relax-lock-handler saved-view-id payload))
        nil)
       (skg-register-response-handler
        'collateral-view
@@ -194,11 +194,11 @@ internal edit; it is restored before any request is sent."
   (let (result)
     (dolist (buffer (buffer-list) (nreverse result))
       (when (and (not (eq buffer saved-buffer))
-                 (buffer-local-value 'skg-view-uri buffer))
+                 (buffer-local-value 'skg-view-id buffer))
         (with-current-buffer buffer
           (push
            (if (buffer-modified-p)
-               `((view-uri ,skg-view-uri)
+               `((view-id ,skg-view-id)
                  (dirty true)
                  (baseline ,(if (stringp skg-clean-baseline)
                                 `(present ,(substring-no-properties
@@ -206,7 +206,7 @@ internal edit; it is restored before any request is sent."
                               'unavailable))
                  (current ,(buffer-substring-no-properties
                             (point-min) (point-max))))
-             `((view-uri ,skg-view-uri) (dirty false)))
+             `((view-id ,skg-view-id) (dirty false)))
            result))))))
 
 (defun skg--cancel-locally-failed-save ()
@@ -223,7 +223,7 @@ internal edit; it is restored before any request is sent."
   (skg--end-stream)
   (skg--unlock-all-save-locked))
 
-(defun skg--save-request-sexp (view-uri save-point-position
+(defun skg--save-request-sexp (view-id save-point-position
                                         &optional approved-forks fork-skgrepos
                                         approved-hoist-pids
                                         text-approved-pids)
@@ -235,7 +235,7 @@ with the owned repo the user chose for its clone; it rides out as the
 field (fork-repos ((N . REPO) ...))."
   (append
    `((request . "save buffer")
-     (view-uri . ,view-uri)
+     (view-id . ,view-id)
      (point-lines-below-focused-headline
       . ,(number-to-string
           (plist-get save-point-position
@@ -301,19 +301,19 @@ before the add/remove cycle."
      ;; A malformed acknowledgement cannot safely authorize any unlock.
      (skg-log 'error 'save "broad save-lock handler error: %S" err)) ))
 
-(defun skg--save-relax-lock-handler (saved-uri payload)
-  "Narrow broad save locks to SAVED-URI and the URIs in PAYLOAD."
+(defun skg--save-relax-lock-handler (saved-view-id payload)
+  "Narrow broad save locks to SAVED-VIEW-ID and the view IDs in PAYLOAD."
   (condition-case err
       (let* ((response (read payload))
              (lock-entry (assoc 'lock-views response)))
         (unless (and lock-entry (listp (cadr lock-entry)))
           (error "Malformed save-relax-lock payload"))
         (skg--unlock-non-collateral-buffers
-         saved-uri
-         (mapcar (lambda (uri)
-                   (cond ((stringp uri) uri)
-                         ((symbolp uri) (symbol-name uri))
-                         (t (error "Malformed lock view URI: %S" uri))))
+         saved-view-id
+         (mapcar (lambda (view-id)
+                   (cond ((stringp view-id) view-id)
+                         ((symbolp view-id) (symbol-name view-id))
+                         (t (error "Malformed lock view ID: %S" view-id))))
                  (cadr lock-entry))))
     (error
      ;; Retain every lock: an incomplete or malformed keep-set cannot safely
@@ -322,13 +322,13 @@ before the add/remove cycle."
 
 (defun skg--apply-streamed-view-update (payload log-category handler-name)
   "Apply one streamed view update from PAYLOAD: unlock and replace the buffer for
-its view URI.  Shared by the save (collateral-view) and rerender (rerender-view)
+its view ID.  Shared by the save (collateral-view) and rerender (rerender-view)
 streams; LOG-CATEGORY and HANDLER-NAME label any error."
   (condition-case err
       (let* ((response (read payload))
-             (uri (cadr (assoc 'view-uri response)))
+             (view-id (cadr (assoc 'view-id response)))
              (content (cadr (assoc 'content response)))
-             (buf (skg-find-buffer-by-uri uri)))
+             (buf (skg-find-buffer-by-view-id view-id)))
         (when buf
           (with-current-buffer buf
             (skg--unlock-after-save)
@@ -338,7 +338,7 @@ streams; LOG-CATEGORY and HANDLER-NAME label any error."
 
 (defun skg--collateral-view-handler (payload)
   "Handle one streamed collateral-view update.
-Unlocks and updates the buffer for the given view URI."
+Unlocks and updates the buffer for the given view ID."
   (skg--apply-streamed-view-update payload 'save "collateral-view"))
 
 (defun skg--save-result-handler (save-buffer payload)
@@ -672,7 +672,7 @@ SAVE-BUFFER as its source, and return the buffer. The buffer is a
 navigable content view (so id-push / search work). It is editable so
 each clone's repo can be set (the handler's minibuffer prompts write
 into it; C-c s s on a clone-to-be works too), but it is NOT an ordinary
-save target: skg-view-uri is left nil (tripping the nil-view-uri save
+save target: skg-view-id is left nil (tripping the nil-view-id save
 guard) and C-x C-s is rebound to refuse, because a stray normal save of
 its id-less clone-to-be parents would create bare nodes. Only C-c C-c
 \(approve) and C-c C-k (decline) act on it."
@@ -686,9 +686,9 @@ its id-less clone-to-be parents would create bare nodes. Only C-c C-c
               "skg-fork-ask")
         (when (fboundp 'heralds-minor-mode) (heralds-minor-mode))
         (goto-char (point-min)))
-      ;; nil view-uri: not a registered view, and the ordinary-save guard
+      ;; nil view-id: not a registered view, and the ordinary-save guard
       ;; rejects M-x skg-request-save-buffer on it.
-      (setq skg-view-uri nil)
+      (setq skg-view-id nil)
       (setq skg--fork-source-buffer save-buffer)
       (setq skg--fork-suppress-strip-on-kill nil)
       ;; Dismissing this buffer without approving (killing it directly,

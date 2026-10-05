@@ -44,7 +44,7 @@ use skg::types::viewnode::{
   ViewnodeKind,
   viewforest_root_viewnode};
 use skg::types::viewnode::{Vognode, Phantom};
-use skg::types::views_state::{OpenViews, ViewState, ViewUri};
+use skg::types::views_state::{OpenViews, ViewState, ViewId};
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
@@ -159,10 +159,10 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
       let mut views_state : ViewsState =
         ViewsState { diff_mode_enabled : false,
                      open_views        : OpenViews::new () };
-      let uri : ViewUri =
-        ViewUri::SearchView ("ovr-sub" . to_string ());
+      let view_id : ViewId =
+        ViewId::SearchView ("ovr-sub" . to_string ());
       views_state . open_views . views . insert (
-        uri . clone (),
+        view_id . clone (),
         ViewState { viewforest : tree_all . into (),
                     pids       : HashSet::new () });
       let enrichment_slot
@@ -183,7 +183,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
       // 3. The re-rendered view: N drawn directly, R anonymized.
       let view_public : String = {
         let forest = views_state . open_views
-          . viewuri_to_view (&uri)
+          . viewid_to_view (&view_id)
           . expect ("the switched view should still be registered");
         viewforest_to_string (forest, config) ? };
       assert! ( view_public . contains ("inactiveNode"),
@@ -345,10 +345,10 @@ async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment 
         ViewsState {
           diff_mode_enabled : false,
           open_views        : OpenViews::new (), };
-      let uri : ViewUri =
-        ViewUri::SearchView ("shared ranking term" . to_string ());
+      let view_id : ViewId =
+        ViewId::SearchView ("shared ranking term" . to_string ());
       views_state . open_views . views . insert (
-        uri . clone (),
+        view_id . clone (),
         ViewState {
           viewforest : Tree::new (viewforest_root_viewnode ()) . into (),
           pids       : HashSet::from ([ID::from ("active-search-hit")]), });
@@ -382,7 +382,7 @@ async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment 
         SkgRepoSetName::from ("all"),
         "repo-set switch should update the active set" );
       assert! (
-        views_state . open_views . views . contains_key (&uri),
+        views_state . open_views . views . contains_key (&view_id),
         "repo-set switch should KEEP registered views (re-rendered \
          in place), not close them" );
       assert! (

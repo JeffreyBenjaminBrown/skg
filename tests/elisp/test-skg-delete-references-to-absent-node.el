@@ -14,7 +14,7 @@
     (insert "* (skg (node (id recorder) (repo main))) recorder\n"
             "** (skg (unknown (id gone)))\n")
     (skg-content-view-mode)
-    (setq-local skg-view-uri "test-unknown-view")
+    (setq-local skg-view-id "test-unknown-view")
     (set-buffer-modified-p nil)
     (goto-char (point-min))
     (forward-line 1)

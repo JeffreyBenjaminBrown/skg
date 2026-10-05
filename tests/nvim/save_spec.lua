@@ -17,20 +17,20 @@ local search = require('skg.search')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
-local function open_view (text, name, uri)
-  local buf = buffer.open_org_buffer_from_text(text, name, uri)
+local function open_view (text, name, view_id)
+  local buf = buffer.open_org_buffer_from_text(text, name, view_id)
   require('skg.folds').set_up_window()
   return buf
 end
 
 describe('skg.save request strings', function ()
-  it('carries the uri and the three point fields', function ()
-    local line = save.save_request_string('uri-1', {
+  it('carries the view_id and the three point fields', function ()
+    local line = save.save_request_string('view_id-1', {
       lines_below_focused_headline = 2,
       column = 5,
       screen_lines_below_window_start = 3 }, nil, nil)
     assert.are.equal(
-      '((request . "save buffer") (view-uri . "uri-1")'
+      '((request . "save buffer") (view-id . "view_id-1")'
       .. ' (point-lines-below-focused-headline . "2")'
       .. ' (point-column . "5")'
       .. ' (point-screen-lines-below-window-start . "3"))\n',
@@ -39,7 +39,7 @@ describe('skg.save request strings', function ()
 
   it('adds approved-forks and fork-repos when given', function ()
     -- Mirrors test-skg-fork-confirmation's request-field cases.
-    local line = save.save_request_string('uri-1', {
+    local line = save.save_request_string('view_id-1', {
       lines_below_focused_headline = 0,
       column = 0,
       screen_lines_below_window_start = 0 },
@@ -51,7 +51,7 @@ describe('skg.save request strings', function ()
   end)
 
   it('adds exact approved-hoist pids when given', function ()
-    local line = save.save_request_string('uri-1', {
+    local line = save.save_request_string('view_id-1', {
       lines_below_focused_headline = 0,
       column = 0,
       screen_lines_below_window_start = 0 },
@@ -62,7 +62,7 @@ describe('skg.save request strings', function ()
   end)
 
   it('adds exact text-release pids when given', function ()
-    local line = save.save_request_string('uri-1', {
+    local line = save.save_request_string('view_id-1', {
       lines_below_focused_headline = 0,
       column = 0,
       screen_lines_below_window_start = 0 },
@@ -109,7 +109,7 @@ describe('skg.save pipeline', function ()
     end)
     local buf = open_view(
       '* (skg (node (id root))) root\nroot body\nedited line',
-      'skg://save-me', 'uri-save')
+      'skg://save-me', 'view_id-save')
     vim.api.nvim_win_set_cursor(0, { 2, 4 })
     save.request_save_buffer()
     vim.wait(3000, function ()
@@ -117,7 +117,7 @@ describe('skg.save pipeline', function ()
              and vim.bo[buf].modifiable
     end, 10)
     -- The request went out with the markers embedded.
-    assert.is_truthy(seen_request:find('uri-save', 1, true))
+    assert.is_truthy(seen_request:find('view_id-save', 1, true))
     -- The buffer holds the redraw, markers stripped.
     local text = table.concat(
       vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
@@ -139,11 +139,11 @@ describe('skg.save pipeline', function ()
     local asked = 0
     local real_confirm = vim.fn.confirm
     vim.fn.confirm = function () asked = asked + 1 return 2 end
-    local dirty = open_view('* (skg (node (id a))) a', 'skg://a', 'uri-a')
+    local dirty = open_view('* (skg (node (id a))) a', 'skg://a', 'view_id-a')
     vim.api.nvim_buf_set_lines(dirty, 1, 1, false, { 'edit' })
     local clean = open_view(
       '* (skg (node (id b))) b\n** (skg (node (id c))) c',
-      'skg://b', 'uri-b')
+      'skg://b', 'view_id-b')
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     save.buffer_snapshot_with_save_markers(clean, true)
     vim.wait(100, function () return false end)
@@ -160,15 +160,15 @@ describe('skg.save pipeline', function ()
         respond_fn = respond
         respond(helpers.framed(
           '((response-type save-lock)'
-          .. ' (lock-views (uri-collateral)))'))
+          .. ' (lock-views (view_id-collateral)))'))
       end
     end)
     local saved = open_view('* (skg (node (id a))) a',
-                            'skg://a', 'uri-saved')
+                            'skg://a', 'view_id-saved')
     local collateral = open_view('* (skg (node (id b))) b',
-                                 'skg://b', 'uri-collateral')
+                                 'skg://b', 'view_id-collateral')
     local bystander = open_view('* (skg (node (id c))) c',
-                                'skg://c', 'uri-bystander')
+                                'skg://c', 'view_id-bystander')
     vim.api.nvim_set_current_buf(saved)
     save.request_save_buffer()
     -- Immediately after sending, everything is locked.
@@ -184,12 +184,12 @@ describe('skg.save pipeline', function ()
     assert.is_false(vim.bo[collateral].modifiable)
     respond_fn(helpers.framed(
       '((response-type save-relax-lock)'
-      .. ' (lock-views (uri-collateral)))'))
+      .. ' (lock-views (view_id-collateral)))'))
     vim.wait(3000, function () return vim.bo[bystander].modifiable end, 10)
     assert.is_true(vim.bo[bystander].modifiable)
     -- Stream the collateral update, then the terminal result.
     respond_fn(helpers.framed(
-      '((response-type collateral-view) (view-uri uri-collateral)'
+      '((response-type collateral-view) (view-id view_id-collateral)'
       .. ' (content "* (skg (node (id b))) b updated"))'))
     vim.wait(3000, function ()
       return vim.bo[collateral].modifiable end, 10)
@@ -217,17 +217,17 @@ describe('skg.save pipeline', function ()
       end
     end)
     local saved = open_view('* (skg (node (id a))) a',
-                            'skg://a', 'uri-saved')
+                            'skg://a', 'view_id-saved')
     local dirty = open_view('* (skg (node (id b))) b\nlocal edit',
-                            'skg://b', 'uri-dirty')
+                            'skg://b', 'view_id-dirty')
     vim.bo[dirty].modified = true
     local clean = open_view('* (skg (node (id c))) c',
-                            'skg://c', 'uri-clean')
+                            'skg://c', 'view_id-clean')
     vim.api.nvim_set_current_buf(saved)
     save.request_save_buffer()
     vim.wait(3000, function () return respond_fn ~= nil end, 10)
     respond_fn(helpers.framed(
-      '((response-type save-relax-lock) (lock-views (uri-dirty)))'))
+      '((response-type save-relax-lock) (lock-views (view_id-dirty)))'))
     vim.wait(3000, function () return vim.bo[clean].modifiable end, 10)
     assert.is_false(vim.bo[saved].modifiable)
     assert.is_false(vim.bo[dirty].modifiable)
@@ -243,12 +243,12 @@ describe('skg.save pipeline', function ()
 
   it('retains every lock after a malformed relaxation', function ()
     local saved = open_view('* (skg (node (id a))) a',
-                            'skg://a', 'uri-saved')
+                            'skg://a', 'view_id-saved')
     local other = open_view('* (skg (node (id b))) b',
-                            'skg://b', 'uri-other')
+                            'skg://b', 'view_id-other')
     lock.lock_all_skg_buffers()
     save.save_relax_lock_handler(
-      'uri-saved', sexpr.read('((lock-views not-a-list))'))
+      'view_id-saved', sexpr.read('((lock-views not-a-list))'))
     assert.is_false(vim.bo[saved].modifiable)
     assert.is_false(vim.bo[other].modifiable)
   end)
@@ -265,7 +265,7 @@ describe('skg.save pipeline', function ()
           .. ' (errors ()) (warnings ("careful there")))'))
       end
     end)
-    open_view('* (skg (node (id a))) a', 'skg://warn', 'uri-warn')
+    open_view('* (skg (node (id a))) a', 'skg://warn', 'view_id-warn')
     save.request_save_buffer()
     vim.wait(3000, function ()
       return lock.stream_in_progress == nil end, 10)
@@ -283,7 +283,7 @@ describe('skg.save pipeline', function ()
 
   it('refuses a second save while one streams', function ()
     server = helpers.connect_to_fake_server(function () end)
-    open_view('* (skg (node (id a))) a', 'skg://guard', 'uri-guard')
+    open_view('* (skg (node (id a))) a', 'skg://guard', 'view_id-guard')
     save.request_save_buffer()
     local ok, err = pcall(save.request_save_buffer)
     assert.is_false(ok)
@@ -299,7 +299,7 @@ describe('skg.save pipeline', function ()
   it('a pending save blocks search until terminal cleanup', function ()
     server = helpers.connect_to_fake_server(function () end)
     open_view('* (skg (node (id a))) a', 'skg://guard-search',
-              'uri-guard-search')
+              'view_id-guard-search')
     save.request_save_buffer()
     local ok, err = pcall(
       search.request_text_search, 'blocked', false, false, false)
@@ -308,13 +308,13 @@ describe('skg.save pipeline', function ()
       'save already in progress', 1, true))
   end)
 
-  it('refuses to save a buffer with no view uri', function ()
+  it('refuses to save a buffer with no view view_id', function ()
     local buf = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_set_current_buf(buf)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, { '* headline' })
     local ok, err = pcall(save.request_save_buffer)
     assert.is_false(ok)
-    assert.is_truthy(tostring(err):find('view uri is nil'))
+    assert.is_truthy(tostring(err):find('view view_id is nil'))
   end)
 end)
 
@@ -365,7 +365,7 @@ describe('skg.save fork confirmation', function ()
     local source = open_view(
       '* (skg (node (id foreign-1)'
       .. ' (viewRequests fork))) the original edited',
-      'skg://source', 'uri-origin')
+      'skg://source', 'view_id-origin')
     save.request_save_buffer()
     vim.wait(3000, function ()
       return vim.api.nvim_buf_get_name(
@@ -399,7 +399,7 @@ describe('skg.save fork confirmation', function ()
                      vim.api.nvim_buf_get_name(confirm))
     assert.is_true(vim.bo[confirm].modifiable)
     assert.is_true(vim.bo[source].modifiable) -- everything unlocked
-    assert.is_nil(vim.b[confirm].skg_view_uri)
+    assert.is_nil(vim.b[confirm].skg_view_id)
     assert.are.equal(0, state.lp_pending_count) -- balanced
   end)
 

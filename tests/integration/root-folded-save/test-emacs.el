@@ -54,7 +54,7 @@
         "** (skg (node (id rfs-c3) (repo main))) rfs-c3\n"
         "rfs-c3 body\n"))
       (skg-content-view-mode)
-      (setq skg-view-uri (org-id-uuid))
+      (setq skg-view-id (org-id-uuid))
       (goto-char (point-min))
 
       (message "=== visibility after mode activation (org-startup-folded=t) ===")

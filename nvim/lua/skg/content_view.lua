@@ -15,14 +15,14 @@ local M = {}
 
 ---The request sexp string for a single-root content view of NODE_ID.
 ---@param node_skgid string
----@param view_uri string
+---@param view_id string
 ---@param approved_pids string[]|nil
 ---@return string
-function M.request_string (node_skgid, view_uri, approved_pids)
+function M.request_string (node_skgid, view_id, approved_pids)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'single root content view'),
     sexpr.pair(sexpr.symbol('id'), node_skgid),
-    sexpr.pair(sexpr.symbol('view-uri'), view_uri) }
+    sexpr.pair(sexpr.symbol('view-id'), view_id) }
   if approved_pids and #approved_pids > 0 then
     local approval = { sexpr.symbol('approved-overPrivateText-pids') }
     for _, pid in ipairs(approved_pids) do
@@ -36,12 +36,12 @@ end
 ---@param node_id string
 function M.request_single_root_content_view_from_id (node_skgid,
                                                      approved_pids,
-                                                     existing_view_uri)
-  local view_uri = existing_view_uri or buffer.generate_uuid()
+                                                     existing_view_id)
+  local view_id = existing_view_id or buffer.generate_uuid()
   state.register_response_handler('content-view',
     function (payload_text, response)
       state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
-      M.handle_content_view(payload_text, response, view_uri)
+      M.handle_content_view(payload_text, response, view_id)
     end, true)
   -- Alternative to content-view. It is non-one-shot so the pending
   -- response count represents only the one terminal reply.
@@ -58,30 +58,30 @@ function M.request_single_root_content_view_from_id (node_skgid,
         payload.string_list(payload.field(response, 'pids'))
       if vim.fn.confirm(prompt, '&Include\n&Decline', 2) == 1 then
         M.request_single_root_content_view_from_id(
-          node_skgid, pids, view_uri) end
+          node_skgid, pids, view_id) end
     end, false)
   state.lp_reset()
   client.send_string(
     M.request_string(
-      node_skgid, view_uri, approved_pids))
+      node_skgid, view_id, approved_pids))
 end
 
----Handle a content-view response: either a (switch-to-view URI)
+---Handle a content-view response: either a (switch-to-view ID)
 ---redirect to an already-open buffer, or content plus errors and
----warnings. VIEW_URI is the client-generated uuid.
+---warnings. VIEW_ID is the client-generated uuid.
 ---@param payload_text string
 ---@param response any
----@param view_uri string
-function M.handle_content_view (payload_text, response, view_uri)
+---@param view_id string
+function M.handle_content_view (payload_text, response, view_id)
   local ok, err = pcall(function ()
-    local switch_uri = payload.field_text(response, 'switch-to-view')
-    if switch_uri then
+    local switch_view_id = payload.field_text(response, 'switch-to-view')
+    if switch_view_id then
       -- The requested id is already a root of an open view.
-      local buf = buffer.find_buffer_by_uri(switch_uri)
+      local buf = buffer.find_buffer_by_view_id(switch_view_id)
       if not buf then
         log.log('warn', 'view',
                 'server said switch to view %s, but no buffer found',
-                switch_uri)
+                switch_view_id)
       elseif buf == vim.api.nvim_get_current_buf() then
         vim.notify(
           'Already viewing this node (it is a root of this view)')
@@ -99,7 +99,7 @@ function M.handle_content_view (payload_text, response, view_uri)
       buffer.open_org_buffer_from_text(
         content_text,
         buffer.content_view_buffer_name(content_text),
-        view_uri) end
+        view_id) end
     local has_errors = #errors > 0
     local has_warnings = #warnings > 0
     if has_errors or has_warnings then

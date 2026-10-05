@@ -53,26 +53,26 @@ the TCP sentinel, and the busy-initializing handler.")
   "Lock every skg content-view buffer against edits."
   (dolist (buf (buffer-list))
     (when (and (buffer-live-p buf)
-               (buffer-local-value 'skg-view-uri buf))
+               (buffer-local-value 'skg-view-id buf))
       (with-current-buffer buf
         (skg--lock-for-save)) )) )
 
-(defun skg--unlock-buffers-not-in-uri-list (uri-list)
-  "Unlock skg buffers whose URI is NOT in URI-LIST."
+(defun skg--unlock-buffers-not-in-view-id-list (view-id-list)
+  "Unlock skg buffers whose view ID is NOT in VIEW-ID-LIST."
   (dolist (buf (buffer-list))
     (when (and (buffer-live-p buf)
-               (buffer-local-value 'skg-view-uri buf)
+               (buffer-local-value 'skg-view-id buf)
                (buffer-local-value 'skg--save-lock-overlay buf))
-      (let ((uri (buffer-local-value 'skg-view-uri buf)))
-        (unless (member uri uri-list)
+      (let ((view-id (buffer-local-value 'skg-view-id buf)))
+        (unless (member view-id view-id-list)
           (with-current-buffer buf
             (skg--unlock-after-save)) )) )) )
 
-(defun skg--unlock-non-collateral-buffers (saved-uri collateral-uris)
-  "Unlock buffers outside SAVED-URI and the server's narrowed keep-set.
-COLLATERAL-URIS is historical naming: it can also contain dirty views whose
+(defun skg--unlock-non-collateral-buffers (saved-view-id collateral-view-ids)
+  "Unlock buffers outside SAVED-VIEW-ID and the server's narrowed keep-set.
+COLLATERAL-VIEW-IDS is historical naming: it can also contain dirty views whose
 buffer snapshots were inputs to the conflict check."
-  (skg--unlock-buffers-not-in-uri-list (cons saved-uri collateral-uris)))
+  (skg--unlock-buffers-not-in-view-id-list (cons saved-view-id collateral-view-ids)))
 
 (defun skg--begin-stream (label)
   "Mark a streaming operation as in progress.

@@ -154,7 +154,7 @@ describe('skg.client', function ()
     client.port = server.port
     local tcp = client.connect()
     local view = vim.api.nvim_create_buf(true, false)
-    vim.b[view].skg_view_uri = 'test-view'
+    vim.b[view].skg_view_id = 'test-view'
     local ok, message = pcall(client.end_connection_to_another_port,
                               server.port + 1)
     vim.api.nvim_buf_delete(view, { force = true })

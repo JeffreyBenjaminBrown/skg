@@ -22,7 +22,7 @@
         (with-current-buffer buffer
           (insert baseline)
           (skg-content-view-mode)
-          (setq skg-view-uri "recovery-uri")
+          (setq skg-view-id "recovery-view-id")
           (set-buffer-modified-p nil)
           (skg--capture-clean-baseline)
           (erase-buffer)
@@ -50,17 +50,17 @@
           (with-current-buffer skgrepo
             (insert "* baseline\n")
             (skg-content-view-mode)
-            (setq skg-view-uri "live-uri")
+            (setq skg-view-id "live-view-id")
             (set-buffer-modified-p nil)
             (skg--capture-clean-baseline)
             (goto-char (point-max))
             (insert "unsaved\n")
             (skg-show-unsaved-changes path t))
           (setq archive (current-buffer))
-          (should-not (buffer-local-value 'skg-view-uri archive))
+          (should-not (buffer-local-value 'skg-view-id archive))
           (should (with-current-buffer skgrepo (buffer-modified-p)))
-          (should (equal "live-uri"
-                         (buffer-local-value 'skg-view-uri skgrepo)))
+          (should (equal "live-view-id"
+                         (buffer-local-value 'skg-view-id skgrepo)))
           (kill-buffer skgrepo)
           (should (buffer-live-p archive))
           (should (file-exists-p path)))
@@ -78,7 +78,7 @@
         (with-current-buffer skgrepo
           (insert "* baseline\n")
           (skg-content-view-mode)
-          (setq skg-view-uri "error-uri")
+          (setq skg-view-id "error-view-id")
           (set-buffer-modified-p nil)
           (skg--capture-clean-baseline)
           (goto-char (point-max))
@@ -93,7 +93,7 @@
                            (buffer-string))))
           (should-error (skg-show-unsaved-changes directory t) :type 'error)
           (should (buffer-modified-p))
-          (should (equal "error-uri" skg-view-uri)))
+          (should (equal "error-view-id" skg-view-id)))
       (when (buffer-live-p skgrepo)
         (with-current-buffer skgrepo (set-buffer-modified-p nil))
         (kill-buffer skgrepo))

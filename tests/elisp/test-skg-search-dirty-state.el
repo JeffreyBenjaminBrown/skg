@@ -32,7 +32,7 @@
         (buffer (generate-new-buffer " *skg blocked save*")))
     (unwind-protect
         (with-current-buffer buffer
-          (setq-local skg-view-uri "blocked-uri")
+          (setq-local skg-view-id "blocked-view-id")
           (should-error (skg-request-save-buffer) :type 'error)
           (should-not skg--save-lock-overlay))
       (kill-buffer buffer))))
@@ -43,7 +43,7 @@
     (unwind-protect
         (with-current-buffer buffer
           (skg-content-view-mode)
-          (setq skg-view-uri "search:dirty-test")
+          (setq skg-view-id "search:dirty-test")
           (skg--replace-search-content "* clean")
           (let ((baseline skg-clean-baseline))
             (goto-char (point-max))
@@ -64,7 +64,7 @@
     (unwind-protect
         (with-current-buffer buffer
           (skg-content-view-mode)
-          (setq skg-view-uri "search:clean-test")
+          (setq skg-view-id "search:clean-test")
           (skg--replace-search-content "* clean")
           (setq skg--search-buffer-snapshot-was-dirty nil)
           (skg--display-search-enrichment

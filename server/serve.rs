@@ -48,7 +48,7 @@ use crate::skgrepo_sets::apply_skgrepo_set_to_viewforest;
 use crate::types::maybe_placed_viewnode::{MpViewnode,maybePlaced_to_placed_tree};
 use crate::types::misc::SkgRepoSetName;
 use crate::types::viewnode::Viewnode;
-use crate::types::views_state::{OpenViews, ViewUri};
+use crate::types::views_state::{OpenViews, ViewId};
 use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
 use crate::update_buffer::set_viewnodestats_in_viewforest;
 
@@ -160,14 +160,14 @@ fn handle_emacs (
               &mut views_state,
               &active_skgrepo_set ),
           Ok (RequestType::CloseView) => {
-            let closed_uri : Option<ViewUri> =
+            let closed_view_id : Option<ViewId> =
               handle_close_view_request (
                 &mut stream,
                 &request_header,
                 &mut views_state );
-            if closed_uri . is_some ()
-               && closed_uri == ( search_enrichment_owed_for_terms . clone ()
-                                  . map (ViewUri::SearchView) ) {
+            if closed_view_id . is_some ()
+               && closed_view_id == ( search_enrichment_owed_for_terms . clone ()
+                                  . map (ViewId::SearchView) ) {
               // The client closed the search buffer before its
               // enrichment arrived, so it cannot answer a buffer snapshot
               // request.
@@ -452,10 +452,10 @@ fn enrich_search_buffer_snapshot (
   let enriched_sexp : String =
     mk_search_enrichment_sexp (
       terms, Some (&enriched), &release_warnings );
-  { let uri : ViewUri = // update ViewsState with enriched viewforest
-      ViewUri::SearchView ( terms . to_string () );
+  { let view_id : ViewId = // update ViewsState with enriched viewforest
+      ViewId::SearchView ( terms . to_string () );
     views_state . open_views . update_view (
-      &runtime . graph, &uri, viewforest ); }
+      &runtime . graph, &view_id, viewforest ); }
   Ok (enriched_sexp) }
 
 fn handle_verify_connection_request (

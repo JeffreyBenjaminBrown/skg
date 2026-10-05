@@ -51,7 +51,7 @@
     (with-current-buffer test-buffer
       (erase-buffer)
       (org-mode)
-      (setq skg-view-uri (org-id-uuid))
+      (setq skg-view-id (org-id-uuid))
 
       ;; Insert the 6 headlines
       (insert "* (skg (node (id 1) (repo main))) 1\n")
