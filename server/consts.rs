@@ -12,7 +12,7 @@ pub const SEARCH_DISPLAY_LIMIT : usize = 1000;
 pub const TANTIVY_WRITER_BUFFER_BYTES : usize = 50_000_000;
 
 /// Max documents to retrieve when looking up a single ID
-/// in Tantivy (e.g. during context type updates).
+/// in Tantivy (e.g. during prominence source updates).
 pub const TANTIVY_PER_ID_LOOKUP_LIMIT : usize = 100;
 
 /// Default TCP port for Rust-Emacs communication.

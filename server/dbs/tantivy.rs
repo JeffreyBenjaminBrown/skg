@@ -4,14 +4,14 @@
 //   - escape:         query preprocessing (pure strings).
 //   - search:         the text-search API (QueryParser / RegexQuery).
 //   - write:          update/delete/add documents + commit helper.
-//   - context_update: refresh `context_origin_type` via
+//   - prominence_update: refresh `prominence_source` via
 //                     delete-and-readd.
 
 // GLOSSARY:
 // See the Tantivy section in docs/glossary.org.
 
 pub mod background_writer;
-pub mod context_update;
+pub mod prominence_update;
 pub mod escape;
 pub mod search;
 pub mod write;
@@ -51,8 +51,8 @@ pub(crate) fn tantivy_index_from_index (
     schema . get_field ("no_search_matching") ?;
   let skgrepo_field : schema::Field =
     schema . get_field ("repo") ?;
-  let context_origin_type_field : schema::Field =
-    schema . get_field ("context_origin_type") ?;
+  let prominence_source_field : schema::Field =
+    schema . get_field ("prominence_source") ?;
   let is_title_field : schema::Field =
     schema . get_field ("is_title") ?;
   let had_id_field : schema::Field =
@@ -68,7 +68,7 @@ pub(crate) fn tantivy_index_from_index (
     overPrivateText_telescope_field,
     no_search_matching_field,
     skgrepo_field,
-    context_origin_type_field,
+    prominence_source_field,
     is_title_field,
     had_id_field,
     body_field, } ) }
@@ -86,13 +86,13 @@ pub(crate) fn tantivy_index_from_index (
 /// - "no_search_matching":  STRING | STORED — "true" when this
 ///                          document must not directly match text search.
 /// - "repo":              STRING | STORED — the skgrepo name.
-/// - "context_origin_type": STRING | STORED — Root/CycleMember/Target/…
+/// - "prominence_source": STRING | STORED — Root/CycleMember/Target/…
 /// - "is_title":            STRING | STORED — "true" for the primary title,
 ///                          "false" for alias docs.
 /// - "had_id":              STRING | STORED — "true" if the node had an
 ///                          org-roam ID before import.
 /// - "body":                TEXT   | STORED — searchable body text. STORED
-///                          so that `update_context_origin_types` can
+///                          so that `update_prominence_sources` can
 ///                          preserve the body when it does a
 ///                          delete-and-readd to refresh origin types.
 ///                          (The body is also on disk in the .skg file,
@@ -114,7 +114,7 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
   schema_builder . add_text_field(
     "repo", schema::STRING | schema::STORED);
   schema_builder . add_text_field(
-    "context_origin_type", schema::STRING | schema::STORED);
+    "prominence_source", schema::STRING | schema::STORED);
   schema_builder . add_text_field(
     "is_title", schema::STRING | schema::STORED);
   schema_builder . add_text_field(

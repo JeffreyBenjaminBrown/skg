@@ -272,7 +272,7 @@ pub struct TantivyIndex {
   pub overPrivateText_telescope_field      : Field,
   pub no_search_matching_field  : Field,
   pub skgrepo_field             : Field,
-  pub context_origin_type_field : Field,
+  pub prominence_source_field : Field,
   pub is_title_field            : Field,
   pub had_id_field              : Field,
   pub body_field                : Field,

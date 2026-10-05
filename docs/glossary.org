@@ -622,6 +622,14 @@ body from producing a direct text-search hit. The node remains indexed for
 exact-ID lookup and may appear as context around another hit. It is search
 decluttering, not privacy.
 
+*** prominent, prominence source, prominence multiplier
+
+Search ranks *prominent* nodes higher. A node's *prominence source*
+('ProminenceSource') says why it is prominent: it is a root, a cycle
+member, mentioned (linked to), had an ID before import, or is
+multiply contained. Each source has a *prominence multiplier* applied
+to the text-match score. Most nodes have no prominence source.
+
 *** flags folder and Flag
 
 =flagsFolder= is a generated, write-protected non-vognode under a graphnode. Its

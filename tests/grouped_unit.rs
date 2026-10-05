@@ -7,9 +7,6 @@
 #[path = "body_yaml_format.rs"]
 mod body_yaml_format;
 
-#[path = "contexts.rs"]
-mod contexts;
-
 #[path = "dbs.rs"]
 mod dbs;
 
@@ -36,6 +33,9 @@ mod multi_skgrepo_errors;
 
 #[path = "multi_repo_loading.rs"]
 mod multi_skgrepo_loading;
+
+#[path = "prominence.rs"]
+mod prominence;
 
 #[path = "render_util.rs"]
 mod render_util;

@@ -65,9 +65,9 @@ views which show a changed recorder or the exact absent raw ID.
 The 'f' is for 'find'.
 *** how search works
 **** the search ranking rules
-"Rooty" nodes (roots, cycle members,
+Prominent nodes (roots, cycle members,
 mentioned nodes, and nodes that had an org-roam ID before import)
-are bumped in the ranking via their context-origin multiplier.
+are bumped in the ranking via their prominence multiplier.
 **** how search treats skgrepo restrictions
 If the skgrepo-set is restricted, if the search index contains any overPrivateText
 telescope (one whose selected title or body lies below home), Skg asks
@@ -201,7 +201,7 @@ Examples:
 - Each alias is indexed as its own document, so a query can
   match on an alias even when the title doesn't mention the
   searched word. The returned node is still the aliased one.
-- Results are ranked by BM25 times a context-origin factor
+- Results are ranked by BM25 times a prominence multiplier
   (Root 100×, CycleMember ~32×, Mentioned 10×, HadID 10×,
   MultiContained ~3.2×, everything else 1×). A weaker text
   match on a root can outrank a stronger match on a leaf,

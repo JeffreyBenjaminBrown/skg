@@ -1,5 +1,5 @@
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
-use crate::context::context_origin_types_for_saved_from_in_rust_graph;
+use crate::prominence::prominence_sources_for_saved_from_in_rust_graph;
 use crate::dbs::filesystem::one_node::{
   PreparedTelescopeWrite, prepare_graphnode_telescope,
 };
@@ -142,14 +142,14 @@ pub(crate) fn enqueue_tantivy_delta (
   tantivy_index : &TantivyIndex,
   node_defs     : Vec<NodeInstruction>,
 ) {
-  // Context origin types, read from the post-apply in-Rust graph, so
+  // Prominence sources, read from the post-apply in-Rust graph, so
   // the Tantivy pass below indexes each saved doc once with its final
   // type — no separate context writer/commit. Computed here (not on the
   // Tantivy thread) so the read happens before any further mutation.
-  let context_types : HashMap<ID, String> =
+  let prominence_sources : HashMap<ID, String> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "context_origin_types_for_saved" ). entered();
-      context_origin_types_for_saved_from_in_rust_graph (
+      "prominence_sources_for_saved" ). entered();
+      prominence_sources_for_saved_from_in_rust_graph (
         candidate, &node_defs ) };
 
   // Tantivy (background): the search index is a derived cache that the
@@ -161,7 +161,7 @@ pub(crate) fn enqueue_tantivy_delta (
   enqueue_tantivy_write ( TantivyWriteTask {
     tantivy_index : tantivy_index . clone (),
     instructions  : node_defs,
-    context_types, } );
+    prominence_sources, } );
 }
 
 /// Runs 'update_graph_minus_nodeMerges' and then 'merge_nodes' in that
@@ -621,7 +621,7 @@ pub(crate) fn prepare_fs_update (
 pub(crate) fn update_tantivy_from_nodeInstructions (
   instructions  : &[NodeInstruction],
   tantivy_index : &TantivyIndex,
-  context_types : &HashMap<ID, String>, // pid -> context_origin_type label, so each doc is indexed once with its final type (no second context pass needed). Empty for the nodeMerge path.
+  prominence_sources : &HashMap<ID, String>, // pid -> prominence_source label, so each doc is indexed once with its final type (no second context pass needed). Empty for the nodeMerge path.
 ) -> Result<usize, Box<dyn Error>> {
 
   let _wlock = // one IndexWriter per directory; serialize all Tantivy writers
@@ -655,7 +655,7 @@ pub(crate) fn update_tantivy_from_nodeInstructions (
         "tantivy_add" ). entered();
       add_documents_to_tantivy_writer(
         & nodes_to_add, &mut writer, tantivy_index,
-        context_types )? };
+        prominence_sources )? };
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "tantivy_commit" ). entered();
     commit_with_status(

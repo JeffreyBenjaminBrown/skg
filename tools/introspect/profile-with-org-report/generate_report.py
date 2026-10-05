@@ -338,7 +338,7 @@ def derived_unspanned_remainders(spans: dict[str, list[float]]) -> list[tuple[st
         median_span(spans, "apply_ordinary_defineNodes")
         - median_span(spans, "update_fs_from_savenode_defs")
         - median_span(spans, "publish_prepared_graph_update")
-        - median_span(spans, "context_origin_types_for_saved"),
+        - median_span(spans, "prominence_sources_for_saved"),
     )
     return [
         ("unspanned transaction orchestration",
@@ -528,7 +528,7 @@ def main() -> None:
     graphnodeInRust_conversions = callgrind_call_count(
         "GraphnodeInRust as core::convert::From<&skg::types::nodes::complete::Graphnode")
     context_derivations = callgrind_call_count(
-        "context_origin_types_for_saved_from_in_rust_graph")
+        "prominence_sources_for_saved_from_in_rust_graph")
     tantivy_enqueues = callgrind_call_count("skg::save::enqueue_tantivy_delta")
     first_normalized_count = (graph_work[0].get("normalized_definitions", 0)
                               if graph_work else 0)
@@ -597,7 +597,7 @@ def main() -> None:
         f"{'PASS' if graphnodeInRust_conversions == first_normalized_count * 2 else 'FAIL'} | "
         f"GraphnodeInRust conversions {graphnodeInRust_conversions} (candidate plus independent local check); "
         f"saved definitions {first_normalized_count} |",
-        f"| ordinary context types derive once and definitions enqueue once | "
+        f"| ordinary prominence sources derive once and definitions enqueue once | "
         f"{'PASS' if context_derivations == 1 and tantivy_enqueues == 1 else 'FAIL'} | "
         f"context derivations {context_derivations}; queue calls {tantivy_enqueues} |",
         "| validation/index work follows the affected neighborhood | PASS | "

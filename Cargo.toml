@@ -35,8 +35,8 @@ name = "smsn-keywords"
 path = "thoughts/smsn/find-keywords.rs"
 
 [[bin]]
-name = "bench-context-inmemory"
-path = "tools/bench-context-inmemory.rs"
+name = "bench-prominence-inmemory"
+path = "tools/bench-prominence-inmemory.rs"
 
 [[bin]]
 name = "top-contents"

@@ -1,0 +1,40 @@
+These are used to test the five prominence sources.
+
+The graph looks like this:
+
+```
+  * root-1 ;; Root origin
+  ** shared ;; MultiContained origin
+  *** in-shared-1
+  *** in-shared-2
+  ** in-root-1
+  ** had-id
+  *** in-had-id-1
+  *** in-had-id-2
+  * root-2 ;; Root origin
+  ** shared ;; MultiContained origin (already seen)
+  ** link-target ;; LinkTarget origin
+  * [[link-target][link-source]] ;; Root origin
+  * cycle-1 ;; CycleMember origin
+  ** cycle-2 ;; CycleMember origin
+  *** cycle-1 ;; CycleMember origin (already seen)
+  *** from-cycle-2
+  ** from-cycle-1
+```
+
+We should get the following regions:
+
+[ [ origins : [cycle-1 : CycleMember, cycle-2 : CycleMember],
+    region : [cycle-1, cycle-2, from-cycle-1, from-cycle-2] ],
+  [ origins : [ the link : Root ],
+    region : [the link] ],
+  [ origins : [root-2 : Root],
+    region : [root-2 : Root] ],
+  [ origins : [root-1],
+    region : [root-1, in-root-1] ],
+  [ origins : [in-root-2-but-linked-to : LinkTarget],
+    region : [in-root-2-but-linked-to ] ],
+  [ origins : [shared : MultiContained],
+    region : [shared, in-shared-1, in-shared-2] ],
+  [ origins : [had-id : HadId],
+    region : [had-id, in-had-id-1, in-had-id-2 ] ] ]

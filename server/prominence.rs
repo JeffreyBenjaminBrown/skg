@@ -1,10 +1,12 @@
-/// PURPOSE: Compute "context origin types" for nodes in the graph.
-/// A context is a region of the containment graph,
-/// consisting of 'origins' (usually a single rootlike node,
-/// but maybe a cycle) and potentially a lot of other nodes
-/// in the recursive content of the origin(s).
-/// Origins (roots, mentioned nodes, multiply-contained nodes, cycle members,
-/// nodes with Had_ID_Before_Import) get score multipliers at search time.
+/// PURPOSE: Compute each prominent node's "prominence source", which
+/// search uses to rank results.
+/// Prominent nodes (roots, mentioned nodes, multiply-contained nodes,
+/// cycle members, nodes with Had_ID_Before_Import) get score multipliers
+/// at search time. Each is the 'origin' of a region of the containment
+/// graph: the origin (usually a single rootlike node, but maybe a cycle)
+/// and potentially a lot of other nodes in its recursive content.
+/// Regions serve only to find the nodes no treelike region covers,
+/// which lie in or under containment cycles.
 
 use crate::consts::{
   MULTIPLIER_CYCLE_MEMBER,
@@ -14,7 +16,7 @@ use crate::consts::{
   MULTIPLIER_MENTIONED,
 };
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::tantivy::context_update::update_context_origin_types;
+use crate::dbs::tantivy::prominence_update::update_prominence_sources;
 use crate::types::misc::{ID, TantivyIndex};
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::nodes::complete::{Flag, Graphnode};
@@ -29,7 +31,7 @@ use std::error::Error;
 
 // This enum's constructors are listed in priority order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ContextOriginType {
+pub enum ProminenceSource {
   Root,
   CycleMember, // A treelike set might have no single root, but rather a rootlike cycle. In that case every member of the cycle should be almost as prominent in search results as a true root. The multipliers reflect that.
   Mentioned,
@@ -37,30 +39,30 @@ pub enum ContextOriginType {
   MultiContained,
 }
 
-impl ContextOriginType {
+impl ProminenceSource {
   pub fn label ( &self, ) -> &'static str {
     match self {
-      ContextOriginType::Root           => "Root",
-      ContextOriginType::CycleMember    => "CycleMember",
-      ContextOriginType::Mentioned      => "Mentioned",
-      ContextOriginType::HadID          => "HadID",
-      ContextOriginType::MultiContained => "MultiContained", } }
+      ProminenceSource::Root           => "Root",
+      ProminenceSource::CycleMember    => "CycleMember",
+      ProminenceSource::Mentioned      => "Mentioned",
+      ProminenceSource::HadID          => "HadID",
+      ProminenceSource::MultiContained => "MultiContained", } }
   pub fn from_label ( label : &str, )
-                      -> Option<ContextOriginType> {
+                      -> Option<ProminenceSource> {
     match label {
-      "Root"           => Some (ContextOriginType::Root),
-      "CycleMember"    => Some (ContextOriginType::CycleMember),
-      "Mentioned"      => Some (ContextOriginType::Mentioned),
-      "HadID"          => Some (ContextOriginType::HadID),
-      "MultiContained" => Some (ContextOriginType::MultiContained),
+      "Root"           => Some (ProminenceSource::Root),
+      "CycleMember"    => Some (ProminenceSource::CycleMember),
+      "Mentioned"      => Some (ProminenceSource::Mentioned),
+      "HadID"          => Some (ProminenceSource::HadID),
+      "MultiContained" => Some (ProminenceSource::MultiContained),
       _                => None, } }
   pub fn multiplier ( &self, ) -> f32 {
     match self {
-      ContextOriginType::Root           => MULTIPLIER_ROOT,
-      ContextOriginType::CycleMember    => MULTIPLIER_CYCLE_MEMBER,
-      ContextOriginType::Mentioned      => MULTIPLIER_MENTIONED,
-      ContextOriginType::HadID          => MULTIPLIER_HAD_ID,
-      ContextOriginType::MultiContained => MULTIPLIER_MULTI_CONTAINED, }} }
+      ProminenceSource::Root           => MULTIPLIER_ROOT,
+      ProminenceSource::CycleMember    => MULTIPLIER_CYCLE_MEMBER,
+      ProminenceSource::Mentioned      => MULTIPLIER_MENTIONED,
+      ProminenceSource::HadID          => MULTIPLIER_HAD_ID,
+      ProminenceSource::MultiContained => MULTIPLIER_MULTI_CONTAINED, }} }
 
 /// Maps each node to the nodes it contains.
 pub type MapToContent = HashMap<ID, Vec<ID>>;
@@ -68,15 +70,15 @@ pub type MapToContent = HashMap<ID, Vec<ID>>;
 pub type MapToContainers = HashMap<ID, Vec<ID>>;
 
 //
-// Top-level: compute all context origin types and store in Tantivy
+// Top-level: compute all prominence sources and store in Tantivy
 //
 
-/// Compute context origin types for all nodes and update Tantivy.
-/// Returns the map from node ID to context origin type label.
+/// Compute prominence sources for all nodes and update Tantivy.
+/// Returns the map from node ID to prominence source label.
 ///
 /// All data is precomputed from Graphnodes at init. This is synchronous and
 /// near-instantaneous (sub-second on a 28k-node dataset).
-pub fn compute_and_store_context_types (
+pub fn compute_and_store_prominence_sources (
   tantivy_index : &TantivyIndex,
   had_id_set    : &HashSet<ID>,
   all_node_skgids  : &HashSet<ID>,
@@ -84,50 +86,50 @@ pub fn compute_and_store_context_types (
   map_to_content  : &MapToContent,
   map_to_containers   : &MapToContainers,
 ) -> Result<HashMap<ID, String>, Box<dyn Error>> {
-  tracing::info! ("Computing context origin types...");
+  tracing::info! ("Computing prominence sources...");
   let edge_count : usize =
     map_to_content . values () . map ( |v| v . len () ) . sum ();
   tracing::info! ("  {} nodes, {} edges, {} mentioned nodes.",
             all_node_skgids . len (), edge_count, mentioned_skgids . len ());
-  let mut origin_types : HashMap<ID, ContextOriginType> =
+  let mut prominence_sources : HashMap<ID, ProminenceSource> =
     identify_origins (
       all_node_skgids, map_to_containers, mentioned_skgids, had_id_set );
-  tracing::info! ("  {} origins identified.", origin_types . len ());
-  let mut all_contexts : Vec<HashSet<ID>> =
-    grow_all_contexts (&origin_types, map_to_content);
-  tracing::info! ("  {} treelike contexts grown.", all_contexts . len ());
-  extend_contexts_for_cycles (
+  tracing::info! ("  {} origins identified.", prominence_sources . len ());
+  let mut all_regions : Vec<HashSet<ID>> =
+    grow_all_regions (&prominence_sources, map_to_content);
+  tracing::info! ("  {} treelike regions grown.", all_regions . len ());
+  extend_regions_for_cycles (
     all_node_skgids,
     map_to_content,
     map_to_containers,
-    &mut origin_types,
-    &mut all_contexts );
-  tracing::info! ("  {} total contexts after cycle detection.",
-            all_contexts . len ());
-  let context_types_by_skgid : HashMap<ID, String> =
-    // Converts ContextOriginType too String for Tantivy.
-    origin_types . iter ()
+    &mut prominence_sources,
+    &mut all_regions );
+  tracing::info! ("  {} total regions after cycle detection.",
+            all_regions . len ());
+  let prominence_sources_by_skgid : HashMap<ID, String> =
+    // Converts ProminenceSource too String for Tantivy.
+    prominence_sources . iter ()
     . map ( |(skgid, ct)| (skgid . clone (),
                         ct . label () . to_string ()) )
     . collect ();
   let updated : usize = // update Tantivy
-    update_context_origin_types (
-      tantivy_index, &context_types_by_skgid ) ?;
-  tracing::info! ("  {} Tantivy documents updated with context types.",
+    update_prominence_sources (
+      tantivy_index, &prominence_sources_by_skgid ) ?;
+  tracing::info! ("  {} Tantivy documents updated with prominence sources.",
             updated);
-  Ok (context_types_by_skgid) }
+  Ok (prominence_sources_by_skgid) }
 
-/// Context origin types (used to rank search results) for the nodes a save
+/// Prominence sources (used to rank search results) for the nodes a save
 /// touched, read straight from the post-save graph. Returns a pid ->
-/// origin-type-label map that the
+/// prominence-source-label map that the
 /// save's single Tantivy index pass writes directly into each document,
 /// so no second writer/commit is needed.
 ///
 /// Like the previous save-time version this is best-effort for cycles:
 /// it does a containerward walk from each still-untyped saved node
 /// rather than the whole-graph cycle expansion, which stays at
-/// init/rebuild ('compute_and_store_context_types').
-pub fn context_origin_types_for_saved_from_in_rust_graph (
+/// init/rebuild ('compute_and_store_prominence_sources').
+pub fn prominence_sources_for_saved_from_in_rust_graph (
   graph     : &InRustGraph,
   node_defs : &[NodeInstruction],
 ) -> HashMap<ID, String> {
@@ -157,16 +159,16 @@ pub fn context_origin_types_for_saved_from_in_rust_graph (
         &Flag::Had_ID_Before_Import ) )
     . map ( |n| n . pid . clone () )
     . collect ();
-  let mut origin_types : HashMap<ID, ContextOriginType> =
+  let mut prominence_sources : HashMap<ID, ProminenceSource> =
     identify_origins (
       &saved_skgids, &map_to_containers, &mentioned_skgids, &had_id_set );
   for skgid in &saved_skgids {
     // CycleMember, only for nodes not already a higher-priority origin.
-    if ! origin_types . contains_key (skgid)
+    if ! prominence_sources . contains_key (skgid)
        && node_is_in_containerward_cycle (graph, skgid) {
-      origin_types . insert (
-        skgid . clone (), ContextOriginType::CycleMember ); } }
-  origin_types . iter ()
+      prominence_sources . insert (
+        skgid . clone (), ProminenceSource::CycleMember ); } }
+  prominence_sources . iter ()
     . map ( |(skgid, ct)| (skgid . clone (),
                         ct . label () . to_string ()) )
     . collect () }
@@ -194,10 +196,10 @@ fn node_is_in_containerward_cycle (
 // Step 1: identify origins (using the in-Rust graph)
 //
 
-/// Build the origin-types map from graph data and imported flags.
+/// Build the prominence-sources map from graph data and imported flags.
 /// We impose priority order: If something is a Root,
 /// it doesn't matter that it's Mentioned, etc.
-/// Therefore higher-priority origin types are processed later.
+/// Therefore higher-priority prominence sources are processed later.
 /// CycleMember is assigned later (step 3).
 /// (That's safe because the only higher-priority thing is a Root,
 /// and a Root cannot be a CycleMember.)
@@ -206,25 +208,25 @@ fn identify_origins (
   map_to_containers  : &MapToContainers,
   mentioned_skgids : &HashSet<ID>,
   had_id_set   : &HashSet<ID>,
-) -> HashMap<ID, ContextOriginType> {
+) -> HashMap<ID, ProminenceSource> {
   let ( roots, multicontained ) : ( HashSet<ID>, HashSet<ID> ) =
     find_roots_and_multiply_contained (all_node_skgids, map_to_containers);
-  let mut origin_types : HashMap<ID, ContextOriginType> =
+  let mut prominence_sources : HashMap<ID, ProminenceSource> =
     HashMap::new ();
   { // Important: Start at least priority, work up to highest.
     for skgid in &multicontained {
-      origin_types . insert (
-        skgid . clone (), ContextOriginType::MultiContained ); }
+      prominence_sources . insert (
+        skgid . clone (), ProminenceSource::MultiContained ); }
     for skgid in had_id_set {
-      origin_types . insert (
-        skgid . clone (), ContextOriginType::HadID ); }
+      prominence_sources . insert (
+        skgid . clone (), ProminenceSource::HadID ); }
     for skgid in mentioned_skgids {
-      origin_types . insert (
-        skgid . clone (), ContextOriginType::Mentioned ); }
+      prominence_sources . insert (
+        skgid . clone (), ProminenceSource::Mentioned ); }
     for skgid in &roots {
-      origin_types . insert (
-        skgid . clone (), ContextOriginType::Root ); }}
-  origin_types }
+      prominence_sources . insert (
+        skgid . clone (), ProminenceSource::Root ); }}
+  prominence_sources }
 
 /// Partition nodes into roots and multiply-contained
 /// based on how many distinct containers each has:
@@ -246,41 +248,41 @@ pub fn find_roots_and_multiply_contained (
   ( roots, multi ) }
 
 //
-// Step 2: grow treelike contexts (using the in-Rust graph)
+// Step 2: grow treelike regions (using the in-Rust graph)
 //
 
-/// Grow contexts from all origins using the in-Rust-graph map.
-fn grow_all_contexts (
-  origin_types : &HashMap<ID, ContextOriginType>,
+/// Grow regions from all origins using the in-Rust-graph map.
+fn grow_all_regions (
+  prominence_sources : &HashMap<ID, ProminenceSource>,
   map_to_content : &MapToContent,
 ) -> Vec<HashSet<ID>> {
-  origin_types . keys ()
+  prominence_sources . keys ()
     . map ( |origin|
-      { let mut ctx : HashSet<ID> = HashSet::new ();
-        extend_context (
-          &mut ctx, origin, origin_types, map_to_content );
-        ctx } )
+      { let mut region : HashSet<ID> = HashSet::new ();
+        extend_region (
+          &mut region, origin, prominence_sources, map_to_content );
+        region } )
     . collect () }
 
 //
 // Step 3: handle cycles (using the in-Rust graph)
 //
 
-/// The treelike contexts, grown first, might not cover all nodes.
+/// The treelike regions, grown first, might not cover all nodes.
 /// Stragglers are in, or recursively contained in, containment cycles.
 /// For each connected component of uncovered nodes,
 /// this will climb containerward to find a cycle,
 /// mark cycle members as origins, and grow their tails.
-pub fn extend_contexts_for_cycles (
+pub fn extend_regions_for_cycles (
   all_node_skgids   : &HashSet<ID>,
   map_to_content    : &MapToContent,
   map_to_containers : &MapToContainers,
-  origins  : &mut HashMap<ID, ContextOriginType>, // we grow this
-  contexts : &mut Vec<HashSet<ID>>,               // we grow this
+  origins  : &mut HashMap<ID, ProminenceSource>, // we grow this
+  regions : &mut Vec<HashSet<ID>>,               // we grow this
 ) {
-  let covered : HashSet<ID> = // nodes already assigned a context
-    contexts . iter ()
-    . flat_map ( |ctx| ctx . iter () . cloned () )
+  let covered : HashSet<ID> = // nodes already assigned a region
+    regions . iter ()
+    . flat_map ( |region| region . iter () . cloned () )
     . collect ();
   let mut uncovered : HashSet<ID> =
     all_node_skgids . difference (&covered) . cloned () . collect ();
@@ -290,47 +292,47 @@ pub fn extend_contexts_for_cycles (
     let ( _path, cycle_members ) : ( Vec<ID>, HashSet<ID> ) =
       climb_containerward_to_cycle (&start, map_to_containers);
     for cm in &cycle_members {
-      if origins . get (cm) != Some (&ContextOriginType::Root) {
+      if origins . get (cm) != Some (&ProminenceSource::Root) {
         // This should never execute: We already handled Roots and MultiContained, so each cycle member should be contained exactly once.
         // But to be safe, we explicitly avoid clobbering Root with CycleMember. (Recall that in priority, Root > Cycle > others.)
         origins . insert ( cm . clone (),
-                           ContextOriginType::CycleMember ); }}
-    let mut ctx : HashSet<ID> = HashSet::new ();
+                           ProminenceSource::CycleMember ); }}
+    let mut region : HashSet<ID> = HashSet::new ();
     for cm in &cycle_members {
-      extend_context (
-        &mut ctx, cm, origins, map_to_content ); }
-    for member in &ctx { // 'path' is a subset of 'ctx'
+      extend_region (
+        &mut region, cm, origins, map_to_content ); }
+    for member in &region { // 'path' is a subset of 'region'
       uncovered . remove (member); }
-    contexts . push (ctx); }}
+    regions . push (region); }}
 
 //
 // Shared callee of steps 2 and 3
 //
 
-/// Grow a context contentward from `grow_from`, merging results
-/// into `context`. Used for both single-origin contexts (where
-/// `context` starts empty) and cycle contexts (where multiple
-/// cycle members each extend the same context).
+/// Grow a region contentward from `grow_from`, merging results
+/// into `region`. Used for both single-origin regions (where
+/// `region` starts empty) and cycle regions (where multiple
+/// cycle members each extend the same region).
 /// Growth is truncated without inclusion
-/// wherever it encounters another context origin.
-pub fn extend_context (
-  context      : &mut HashSet<ID>,
+/// wherever it encounters another region's origin.
+pub fn extend_region (
+  region      : &mut HashSet<ID>,
   grow_from    : &ID,
-  origins      : &HashMap<ID, ContextOriginType>,
+  origins      : &HashMap<ID, ProminenceSource>,
   map_to_content : &MapToContent,
 ) {
-  context . insert (grow_from . clone ());
+  region . insert (grow_from . clone ());
   let mut frontier : Vec<ID> = vec![grow_from . clone ()];
   while ! frontier . is_empty () {
     let mut next_frontier : Vec<ID> = Vec::new ();
     for pid in &frontier {
       if let Some (children) = map_to_content . get (pid) {
         for child in children {
-          if origins . contains_key (child) && child != grow_from { // The origin of a different context. Don't include it, and don't recurse into it.
+          if origins . contains_key (child) && child != grow_from { // The origin of a different region. Don't include it, and don't recurse into it.
             continue; }
-          if context . contains (child) { // Already visited. Do not recurse into it.
+          if region . contains (child) { // Already visited. Do not recurse into it.
             continue; }
-          context . insert (child . clone ());
+          region . insert (child . clone ());
           next_frontier . push (child . clone ()); }} }
     frontier = next_frontier; } }
 

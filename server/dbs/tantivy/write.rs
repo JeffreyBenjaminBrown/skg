@@ -1,7 +1,7 @@
 // PURPOSE: The search-index write path: update/delete/add document
 // helpers, plus `create_documents_from_node` (one title doc + one
 // doc per alias), and the shared `commit_with_status` used by both
-// this module and `context_update`.
+// this module and `prominence_update`.
 
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::dbs::tantivy::background_writer::lock_tantivy_writes;
@@ -67,7 +67,7 @@ pub fn add_documents_to_tantivy_writer<'a, I> (
   nodes         : I,
   writer        : &mut IndexWriter,
   tantivy_index : &TantivyIndex,
-  context_types : &HashMap<ID, String>, // pid -> context_origin_type label; pids absent here index with "" (filled at init/rebuild).
+  prominence_sources : &HashMap<ID, String>, // pid -> prominence_source label; pids absent here index with "" (filled at init/rebuild).
 ) -> Result<usize, Box<dyn Error>>
 where I: IntoIterator<Item = &'a GraphnodeInTantivy>, {
 
@@ -75,7 +75,7 @@ where I: IntoIterator<Item = &'a GraphnodeInTantivy>, {
   for node in nodes {
     let documents: Vec<TantivyDocument> =
       create_documents_from_node(
-        node, tantivy_index, context_types )?;
+        node, tantivy_index, prominence_sources )?;
     for document in documents {
       writer . add_document (document)?;
       indexed_count += 1; }}
@@ -84,12 +84,12 @@ where I: IntoIterator<Item = &'a GraphnodeInTantivy>, {
 fn create_documents_from_node (
   node: &GraphnodeInTantivy,
   tantivy_index: &TantivyIndex,
-  context_types : &HashMap<ID, String>,
+  prominence_sources : &HashMap<ID, String>,
 ) -> Result < Vec < TantivyDocument >,
               Box < dyn Error >> {
   let primary_skgid : &ID = &node . pid;
-  let context_origin_type : &str =
-    context_types . get (primary_skgid)
+  let prominence_source : &str =
+    prominence_sources . get (primary_skgid)
     . map ( |s| s . as_str () ) . unwrap_or ("");
   let had_id : &str =
     if node . flags . contains (
@@ -143,8 +143,8 @@ fn create_documents_from_node (
           { "true" } else { "false" },
         tantivy_index . skgrepo_field =>
           doc_skgrepo . as_str(),
-        tantivy_index . context_origin_type_field =>
-          context_origin_type,
+        tantivy_index . prominence_source_field =>
+          prominence_source,
         tantivy_index . is_title_field =>
           is_title_str,
         tantivy_index . had_id_field =>

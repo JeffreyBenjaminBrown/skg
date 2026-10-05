@@ -766,7 +766,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         . map (ViewUri::repr_in_client)
         . collect::<Vec<_>> ()); }
   let deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>> =
-  { // Apply the already-checked preparation. Context origin types are
+  { // Apply the already-checked preparation. Prominence sources are
     // computed from the post-save graph in the ordinary apply path.
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "apply_prepared_save" ). entered();

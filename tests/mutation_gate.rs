@@ -285,7 +285,7 @@ fn tantivy_worker_applies_same_pid_tasks_in_publication_order () {
       tantivy_index : index . clone (),
       instructions  : vec! [NodeInstruction::Save (SaveNode (
         node ("same-pid", title, "main")))],
-      context_types : HashMap::new (),
+      prominence_sources : HashMap::new (),
     }); }
   drop (writer_lock);
   wait_for_tantivy_writes_idle ();

@@ -1,14 +1,14 @@
-/* bench-context-inmemory
+/* bench-prominence-inmemory
  * Benchmark the fully in-memory context computation pipeline.
- * Usage: cargo run --bin bench-context-inmemory <config-path>
+ * Usage: cargo run --bin bench-prominence-inmemory <config-path>
  *   default config: data/real/skgconfig.toml
  *
  * Reads .skg files from disk and computes
- * context types entirely in memory.
+ * prominence sources entirely in memory.
  */
 
-use skg::context::{
-  compute_and_store_context_types,
+use skg::prominence::{
+  compute_and_store_prominence_sources,
   content_maps_from_nodes,
   had_id_set_from_nodes,
   mentioned_skgids_from_nodes,
@@ -90,7 +90,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
     tempfile::TempDir::new () ?;
   let tantivy_index : TantivyIndex =
     create_empty_tantivy_index (tantivy_dir . path ()) ?;
-  // Populate Tantivy with node titles so context types can be stored
+  // Populate Tantivy with node titles so prominence sources can be stored
   let t5 : Instant = Instant::now ();
   let tantivy_nodes : Vec<GraphnodeInTantivy> =
     nodes . iter () . map (GraphnodeInTantivy::from) . collect ();
@@ -103,8 +103,8 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
 
   // Step 4: Run context computation
   let t6 : Instant = Instant::now ();
-  let context_types =
-    compute_and_store_context_types (
+  let prominence_sources =
+    compute_and_store_prominence_sources (
       &tantivy_index,
       &had_id_set,
       &all_node_ids,
@@ -113,8 +113,8 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
       &reverse_map ) ?;
   let context_time : f64 = t6 . elapsed () . as_secs_f64 ();
   println! ("4. Context computation: {:.3}s", context_time);
-  println! ("   {} nodes received context types",
-            context_types . len ());
+  println! ("   {} nodes received prominence sources",
+            prominence_sources . len ());
 
   // Summary
   let total : f64 = read_time + extract_total
@@ -139,7 +139,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
     skg::dbs::tantivy::write::update_index_with_nodes (
       &tantivy_nodes, &tantivy_index2 ) ?;
     let t : Instant = Instant::now ();
-    let _ = compute_and_store_context_types (
+    let _ = compute_and_store_prominence_sources (
       &tantivy_index2,
       &had_id_set,
       &all_node_ids,

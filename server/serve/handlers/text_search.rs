@@ -10,7 +10,7 @@ use coverage::{CoverageMatcher, build_coverage_matcher, coverage_factor};
 /// which are truncated for display.
 
 use crate::consts::SEARCH_DISPLAY_LIMIT;
-use crate::context::ContextOriginType;
+use crate::prominence::ProminenceSource;
 use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
 use crate::dbs::tantivy::search::{
   SearchOptions, has_overPrivateText_telescope, search_index};
@@ -54,7 +54,7 @@ use tantivy::schema::document::Value;
 /// so one ID might get multiple matches).
 /// The score incorporates a context-based multiplier:
 /// Each result's BM25 score from Tantivy is multiplied by
-/// the multiplier corresponding to its context_origin_type.
+/// the multiplier corresponding to its prominence_source.
 /// Non-origins keep their raw score (multiplier = 1).
 pub type MatchGroups =
   HashMap < ID, ( SkgRepoName,
@@ -569,11 +569,11 @@ pub fn group_matches_by_skgid (
           if ! a . is_all ()
           && ! a . contains_skgrepo (&skgrepo) {
             continue; }}
-        let origin_type : Option < ContextOriginType > =
+        let origin_type : Option < ProminenceSource > =
           retrieved_doc
-            . get_first ( tantivy_index . context_origin_type_field )
+            . get_first ( tantivy_index . prominence_source_field )
             . and_then ( |v| v . as_str () )
-            . and_then ( ContextOriginType::from_label );
+            . and_then ( ProminenceSource::from_label );
         let multiplier : f32 =
           origin_type . map_or ( 1.0, |t| t . multiplier() );
         let coverage : f32 =

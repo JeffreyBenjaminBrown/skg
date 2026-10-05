@@ -1,5 +1,5 @@
-use crate::context::{
-  compute_and_store_context_types,
+use crate::prominence::{
+  compute_and_store_prominence_sources,
   content_maps_from_nodes,
   had_id_set_from_nodes,
   mentioned_skgids_from_nodes};
@@ -87,7 +87,7 @@ pub fn rebuild_ephemeral_data_stores_in_place (
     let mentioned_skgids = mentioned_skgids_from_nodes (&nodes);
     let (map_to_content, map_to_containers) =
       content_maps_from_nodes (&nodes);
-    compute_and_store_context_types (
+    compute_and_store_prominence_sources (
       &new_tantivy, &had_id_set, &all_node_skgids,
       &mentioned_skgids, &map_to_content, &map_to_containers )
       . map_err ( |e| format! ("Context computation failed: {}", e) ) ?;

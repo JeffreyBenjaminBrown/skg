@@ -1,8 +1,8 @@
 // PURPOSE: Build the reconstructible in-memory graph and Tantivy index.
 
-use crate::context::{MapToContent, MapToContainers};
-use crate::context::{content_maps_from_nodes, had_id_set_from_nodes};
-use crate::context::mentioned_skgids_from_nodes;
+use crate::prominence::{MapToContent, MapToContainers};
+use crate::prominence::{content_maps_from_nodes, had_id_set_from_nodes};
+use crate::prominence::mentioned_skgids_from_nodes;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos_collecting_violations;
 use crate::dbs::tantivy::{mk_tantivy_schema, tantivy_index_from_index};
 use crate::dbs::tantivy::write::update_index_with_nodes;
@@ -25,7 +25,7 @@ use std::sync::Arc;
 use tantivy::Index;
 
 /// One-shot init handoff. Holds derived data needed exactly once
-/// after startup: it is fed to 'compute_context_origin_types' and
+/// after startup: it is fed to 'compute_prominence_sources' and
 /// then dropped. Keeping these out of 'SkgEnv' makes it impossible
 /// to keep the init-derived sets around past their freshness
 /// window.

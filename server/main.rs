@@ -7,7 +7,7 @@
 /// Converts org-roam .org files to .skg files.
 
 use skg::consts::{BUSYSIGNAL_POLL_INTERVAL_MS, BUSYSIGNAL_READ_TIMEOUT_MS};
-use skg::context::{compute_and_store_context_types, MapToContent, MapToContainers};
+use skg::prominence::{compute_and_store_prominence_sources, MapToContent, MapToContainers};
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::export_org::{
@@ -258,7 +258,7 @@ fn install_shutdown_signal_handler (
     std::process::exit (0);
   } ) . expect ("Error setting Ctrl+C handler"); }
 
-/// Compute context origin types for search ranking.
+/// Compute prominence sources for search ranking.
 /// Fully in-Rust-graph: all data is pre-computed from Graphnodes at init.
 /// Consumes (and frees) the large lookup maps after use.
 fn compute_context_rankings (
@@ -271,7 +271,7 @@ fn compute_context_rankings (
 ) {
   let _span : tracing::span::EnteredSpan = tracing::info_span! (
     "context_computation") . entered ();
-  match compute_and_store_context_types (
+  match compute_and_store_prominence_sources (
     tantivy_index,
     &had_id_set,
     &all_node_skgids,

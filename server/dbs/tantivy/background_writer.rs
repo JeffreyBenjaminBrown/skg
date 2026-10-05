@@ -45,7 +45,7 @@ pub fn lock_tantivy_writes () -> MutexGuard<'static, ()> {
 pub struct TantivyWriteTask {
   pub tantivy_index : TantivyIndex,
   pub instructions  : Vec<NodeInstruction>,
-  pub context_types : HashMap<ID, String>, }
+  pub prominence_sources : HashMap<ID, String>, }
 
 /// Shared between the worker thread and the enqueue/wait API: the count
 /// of writes not yet committed, and a condvar signalled when it reaches
@@ -71,7 +71,7 @@ fn worker () -> &'static Worker {
       while let Ok (task) = receiver . recv () {
         // update_tantivy_from_nodeInstructions takes the write lock itself.
         if let Err (e) = update_tantivy_from_nodeInstructions (
-          &task . instructions, &task . tantivy_index, &task . context_types )
+          &task . instructions, &task . tantivy_index, &task . prominence_sources )
         { tracing::error! (
             "Background Tantivy write failed: {}. The filesystem is correct; \
              run 'rebuild ephemeral data stores' to resync the search index.", e ); }

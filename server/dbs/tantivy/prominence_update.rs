@@ -1,4 +1,4 @@
-// PURPOSE: Refresh the `context_origin_type` field on every
+// PURPOSE: Refresh the `prominence_source` field on every
 // document matching a given ID. Because Tantivy has no in-place
 // field mutation, this is a read-all-stored-fields / delete /
 // add-back dance. The all-fields copying is the ugliest part of
@@ -19,11 +19,11 @@ use tantivy::schema::document::Value;
 use std::collections::HashMap;
 use std::error::Error;
 
-/// Updates context_origin_type for all documents matching each ID.
-/// Deletes and re-adds each document with the new context_origin_type.
-pub fn update_context_origin_types (
+/// Updates prominence_source for all documents matching each ID.
+/// Deletes and re-adds each document with the new prominence_source.
+pub fn update_prominence_sources (
   tantivy_index          : &TantivyIndex,
-  context_types_by_skgid : &HashMap<ID, String>,
+  prominence_sources_by_skgid : &HashMap<ID, String>,
 ) -> Result<usize, Box<dyn Error>> {
   let searcher : Searcher =
     tantivy_index . reader . searcher ();
@@ -33,7 +33,7 @@ pub fn update_context_origin_types (
     tantivy_index . index . writer (
       TANTIVY_WRITER_BUFFER_BYTES) ?;
   let mut updated_count : usize = 0;
-  for (pid, context_type) in context_types_by_skgid {
+  for (pid, prominence_source) in prominence_sources_by_skgid {
     let query : Box < dyn Query > =
       // Find all documents with this ID.
       Box::new ( tantivy::query::TermQuery::new (
@@ -50,7 +50,7 @@ pub fn update_context_origin_types (
       Term::from_field_text (
         tantivy_index . id_field, pid . as_str () ));
     for (_score, doc_address) in &results {
-      // Re-add with the new context_origin_type.
+      // Re-add with the new prominence_source.
       let retrieved_doc : TantivyDocument =
         searcher . doc (*doc_address) ?;
       let title_or_alias : String =
@@ -106,8 +106,8 @@ pub fn update_context_origin_types (
           no_search_matching . as_str (),
         tantivy_index . skgrepo_field =>
           skgrepo . as_str (),
-        tantivy_index . context_origin_type_field =>
-          context_type . as_str (),
+        tantivy_index . prominence_source_field =>
+          prominence_source . as_str (),
         tantivy_index . is_title_field =>
           is_title . as_str (),
         tantivy_index . had_id_field =>

@@ -77,9 +77,9 @@ run it again to rescan.
 The 'f' is for 'find'.
 *** <localleader>ff : :SkgSearch
 Text search across titles and aliases, returning every
-matching node. "Rooty" nodes (roots, cycle members,
+matching node. Prominent nodes (roots, cycle members,
 mentioned nodes, and nodes that had an org-roam ID before import)
-are bumped in the ranking via their context-origin multiplier.
+are bumped in the ranking via their prominence multiplier.
 
 A node with =NoSearchMatching= cannot be a direct title, alias, or body hit
 in any search mode. It may still appear as context for another hit and remains
@@ -186,7 +186,7 @@ to MUST.
 - Each alias is indexed as its own document, so a query can
   match on an alias even when the title doesn't mention the
   searched word. The returned node is still the aliased one.
-- Results are ranked by BM25 times a context-origin factor
+- Results are ranked by BM25 times a prominence multiplier
   (Root 100×, CycleMember ~32×, Mentioned 10×, HadID 10×,
   MultiContained ~3.2×, everything else 1×). A weaker text
   match on a root can outrank a stronger match on a leaf,

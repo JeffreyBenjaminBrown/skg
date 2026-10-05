@@ -1,17 +1,17 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
-use skg::context::{
-  ContextOriginType,
+use skg::prominence::{
+  ProminenceSource,
   MapToContent,
   MapToContainers,
   content_maps_from_nodes,
-  context_origin_types_for_saved_from_in_rust_graph,
+  prominence_sources_for_saved_from_in_rust_graph,
   had_id_set_from_nodes,
   mentioned_skgids_from_nodes,
   find_roots_and_multiply_contained,
-  extend_context,
-  extend_contexts_for_cycles,
+  extend_region,
+  extend_regions_for_cycles,
 };
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::InRustGraph;
@@ -21,20 +21,20 @@ use skg::types::save::{NodeInstruction, SaveNode};
 
 #[test]
 fn test_from_label_unknown () {
-  assert! (ContextOriginType::from_label ("") . is_none());
-  assert! (ContextOriginType::from_label ("Bogus") . is_none()); }
+  assert! (ProminenceSource::from_label ("") . is_none());
+  assert! (ProminenceSource::from_label ("Bogus") . is_none()); }
 
 #[test]
 fn test_label_roundtrip () {
-  let types : Vec<ContextOriginType> = vec![
-    ContextOriginType::Root,
-    ContextOriginType::CycleMember,
-    ContextOriginType::Mentioned,
-    ContextOriginType::HadID,
-    ContextOriginType::MultiContained ];
+  let types : Vec<ProminenceSource> = vec![
+    ProminenceSource::Root,
+    ProminenceSource::CycleMember,
+    ProminenceSource::Mentioned,
+    ProminenceSource::HadID,
+    ProminenceSource::MultiContained ];
   for ct in types {
     assert_eq! (
-      ContextOriginType::from_label (ct . label()),
+      ProminenceSource::from_label (ct . label()),
       Some (ct) ); } }
 
 #[test]
@@ -74,27 +74,27 @@ fn test_mentioned_skgids_from_nodes () {
   assert! (mentioned_skgids . contains (&ID::new ("tgt2"))); }
 
 #[test]
-fn test_origin_type_priority () {
+fn test_prominence_source_priority () {
   // When a node qualifies as multiple types,
   // the highest-priority (largest multiplier) wins.
   // Root (100) > Target (10) > MultiContained (3).
-  let mut origin_types : HashMap<ID, ContextOriginType> =
+  let mut prominence_sources : HashMap<ID, ProminenceSource> =
     HashMap::new ();
   // Simulate: start from lowest priority.
-  origin_types . insert (
-    ID::new ("a"), ContextOriginType::MultiContained);
-  origin_types . insert (
-    ID::new ("a"), ContextOriginType::Mentioned);
-  origin_types . insert (
-    ID::new ("a"), ContextOriginType::Root);
+  prominence_sources . insert (
+    ID::new ("a"), ProminenceSource::MultiContained);
+  prominence_sources . insert (
+    ID::new ("a"), ProminenceSource::Mentioned);
+  prominence_sources . insert (
+    ID::new ("a"), ProminenceSource::Root);
   // Last insert wins (Root).
   assert_eq! (
-    origin_types . get (&ID::new ("a")),
-    Some (&ContextOriginType::Root) ); }
+    prominence_sources . get (&ID::new ("a")),
+    Some (&ProminenceSource::Root) ); }
 
 #[test]
-fn in_rust_context_types_for_saved_nodes () {
-  // The save-time, in-Rust-graph origin-type computation. One node of
+fn in_rust_prominence_sources_for_saved_nodes () {
+  // The save-time, in-Rust-graph prominence-source computation. One node of
   // each kind, plus an ordinary (untyped) node and a 2-node cycle.
   let mk = | pid : &str, title : &str,
             contains : &[&str], had_id : bool | -> Graphnode {
@@ -123,7 +123,7 @@ fn in_rust_context_types_for_saved_nodes () {
     nodes . iter () . cloned ()
     . map ( |n| NodeInstruction::Save ( SaveNode (n) )) . collect ();
   let types : HashMap<ID, String> =
-    context_origin_types_for_saved_from_in_rust_graph (&graph, &defs);
+    prominence_sources_for_saved_from_in_rust_graph (&graph, &defs);
   let got = |skgid : &str| types . get (&ID::new (skgid)) . map ( |s| s . as_str () );
   assert_eq! (got ("root"),   Some ("Root"));
   assert_eq! (got ("other"),  Some ("Root"));
@@ -160,7 +160,7 @@ fn test_find_roots_and_multiply_contained () {
   assert! (multi . contains (&ID::new ("b"))); }
 
 #[test]
-fn test_grow_context_simple_tree () {
+fn test_grow_region_simple_tree () {
   // a (root/origin) → b → c
   // d (root/origin) → e
   // Growing from a should give {a, b, c}, truncated at d.
@@ -171,20 +171,20 @@ fn test_grow_context_simple_tree () {
     ID::new ("b"), vec![ID::new ("c")] );
   contains_map . insert (
     ID::new ("d"), vec![ID::new ("e")] );
-  let origins : HashMap<ID, ContextOriginType> =
+  let origins : HashMap<ID, ProminenceSource> =
     HashMap::from ([
-      (ID::new ("a"), ContextOriginType::Root),
-      (ID::new ("d"), ContextOriginType::Root) ]);
-  let mut ctx : HashSet<ID> = HashSet::new ();
-  extend_context (
-    &mut ctx, &ID::new ("a"), &origins, &contains_map );
-  assert_eq! (ctx . len (), 3);
-  assert! (ctx . contains (&ID::new ("a")));
-  assert! (ctx . contains (&ID::new ("b")));
-  assert! (ctx . contains (&ID::new ("c"))); }
+      (ID::new ("a"), ProminenceSource::Root),
+      (ID::new ("d"), ProminenceSource::Root) ]);
+  let mut region : HashSet<ID> = HashSet::new ();
+  extend_region (
+    &mut region, &ID::new ("a"), &origins, &contains_map );
+  assert_eq! (region . len (), 3);
+  assert! (region . contains (&ID::new ("a")));
+  assert! (region . contains (&ID::new ("b")));
+  assert! (region . contains (&ID::new ("c"))); }
 
 #[test]
-fn test_grow_context_truncates_at_other_origin () {
+fn test_grow_region_truncates_at_other_origin () {
   // a (origin) → b → c (origin) → d
   // Growing from a should give {a, b}, stopping before c.
   let mut contains_map : MapToContent = HashMap::new ();
@@ -194,25 +194,25 @@ fn test_grow_context_truncates_at_other_origin () {
     ID::new ("b"), vec![ID::new ("c")] );
   contains_map . insert (
     ID::new ("c"), vec![ID::new ("d")] );
-  let origins : HashMap<ID, ContextOriginType> =
+  let origins : HashMap<ID, ProminenceSource> =
     HashMap::from ([
-      (ID::new ("a"), ContextOriginType::Root),
-      (ID::new ("c"), ContextOriginType::Mentioned) ]);
-  let mut ctx_a : HashSet<ID> = HashSet::new ();
-  extend_context (
-    &mut ctx_a, &ID::new ("a"), &origins, &contains_map );
-  assert_eq! (ctx_a . len (), 2);
-  assert! (ctx_a . contains (&ID::new ("a")));
-  assert! (ctx_a . contains (&ID::new ("b")));
-  let mut ctx_c : HashSet<ID> = HashSet::new ();
-  extend_context (
-    &mut ctx_c, &ID::new ("c"), &origins, &contains_map );
-  assert_eq! (ctx_c . len (), 2);
-  assert! (ctx_c . contains (&ID::new ("c")));
-  assert! (ctx_c . contains (&ID::new ("d"))); }
+      (ID::new ("a"), ProminenceSource::Root),
+      (ID::new ("c"), ProminenceSource::Mentioned) ]);
+  let mut region_a : HashSet<ID> = HashSet::new ();
+  extend_region (
+    &mut region_a, &ID::new ("a"), &origins, &contains_map );
+  assert_eq! (region_a . len (), 2);
+  assert! (region_a . contains (&ID::new ("a")));
+  assert! (region_a . contains (&ID::new ("b")));
+  let mut region_c : HashSet<ID> = HashSet::new ();
+  extend_region (
+    &mut region_c, &ID::new ("c"), &origins, &contains_map );
+  assert_eq! (region_c . len (), 2);
+  assert! (region_c . contains (&ID::new ("c")));
+  assert! (region_c . contains (&ID::new ("d"))); }
 
 #[test]
-fn test_extend_contexts_for_cycles_detects_cycle () {
+fn test_extend_regions_for_cycles_detects_cycle () {
   // a → b → c → a (cycle: a, b, c)
   // d is a root (origin), not in the cycle.
   let mut contains_map : MapToContent = HashMap::new ();
@@ -235,41 +235,41 @@ fn test_extend_contexts_for_cycles_detects_cycle () {
     HashSet::from ([
       ID::new ("a"), ID::new ("b"),
       ID::new ("c"), ID::new ("d") ]);
-  let mut origin_types : HashMap<ID, ContextOriginType> =
+  let mut prominence_sources : HashMap<ID, ProminenceSource> =
     HashMap::new ();
-  origin_types . insert (
-    ID::new ("d"), ContextOriginType::Root );
-  let mut all_contexts : Vec<HashSet<ID>> =
+  prominence_sources . insert (
+    ID::new ("d"), ProminenceSource::Root );
+  let mut all_regions : Vec<HashSet<ID>> =
     vec![HashSet::from ([ID::new ("d")])];
-  extend_contexts_for_cycles (
+  extend_regions_for_cycles (
     &all_node_skgids,
     &contains_map,
     &reverse_map,
-    &mut origin_types,
-    &mut all_contexts );
+    &mut prominence_sources,
+    &mut all_regions );
   // All cycle members should now be CycleMember origins.
   assert_eq! (
-    origin_types . get (&ID::new ("a")),
-    Some (&ContextOriginType::CycleMember) );
+    prominence_sources . get (&ID::new ("a")),
+    Some (&ProminenceSource::CycleMember) );
   assert_eq! (
-    origin_types . get (&ID::new ("b")),
-    Some (&ContextOriginType::CycleMember) );
+    prominence_sources . get (&ID::new ("b")),
+    Some (&ProminenceSource::CycleMember) );
   assert_eq! (
-    origin_types . get (&ID::new ("c")),
-    Some (&ContextOriginType::CycleMember) );
+    prominence_sources . get (&ID::new ("c")),
+    Some (&ProminenceSource::CycleMember) );
   // All nodes should be covered.
   let covered : HashSet<ID> =
-    all_contexts . iter ()
-    . flat_map ( |ctx| ctx . iter () . cloned () )
+    all_regions . iter ()
+    . flat_map ( |region| region . iter () . cloned () )
     . collect ();
   assert! (covered . contains (&ID::new ("a")));
   assert! (covered . contains (&ID::new ("b")));
   assert! (covered . contains (&ID::new ("c")));
   assert! (covered . contains (&ID::new ("d"))); }
 
-/// See tests/contexts/fixtures/README.org
+/// See tests/prominence/fixtures/README.org
 #[test]
-fn test_full_context_pipeline () {
+fn test_full_prominence_pipeline () {
   // Load Graphnodes from fixture files.
   let config : SkgConfig =
     SkgConfig::dummyFromSkgRepos (
@@ -278,7 +278,7 @@ fn test_full_context_pipeline () {
         SkgRepo {
           name         : SkgRepoName::from ("test"),
           abbreviation : None,
-          path         : PathBuf::from ("tests/contexts/fixtures"),
+          path         : PathBuf::from ("tests/prominence/fixtures"),
           owned        : true } )]) );
   let nodes : Vec<Graphnode> =
     read_all_skg_files_from_skgrepos (&config)
@@ -311,90 +311,90 @@ fn test_full_context_pipeline () {
   assert! (roots . contains (&ID::new ("link-source")));
   assert_eq! (multicontained . len (), 1);
   assert! (multicontained . contains (&ID::new ("shared")));
-  let mut origin_types : HashMap<ID, ContextOriginType> =
+  let mut prominence_sources : HashMap<ID, ProminenceSource> =
     HashMap::new ();
   // Priority order: MC, HadID, Target, Root (lowest first).
   for skgid in &multicontained {
-    origin_types . insert (
-      skgid . clone (), ContextOriginType::MultiContained ); }
+    prominence_sources . insert (
+      skgid . clone (), ProminenceSource::MultiContained ); }
   for skgid in &had_id_set {
-    origin_types . insert (
-      skgid . clone (), ContextOriginType::HadID ); }
+    prominence_sources . insert (
+      skgid . clone (), ProminenceSource::HadID ); }
   for skgid in &mentioned_skgids {
-    origin_types . insert (
-      skgid . clone (), ContextOriginType::Mentioned ); }
+    prominence_sources . insert (
+      skgid . clone (), ProminenceSource::Mentioned ); }
   for skgid in &roots {
-    origin_types . insert (
-      skgid . clone (), ContextOriginType::Root ); }
-  assert_eq! (origin_types . len (), 6);
-  assert_eq! (origin_types [&ID::new ("root-1")],
-              ContextOriginType::Root);
-  assert_eq! (origin_types [&ID::new ("root-2")],
-              ContextOriginType::Root);
-  assert_eq! (origin_types [&ID::new ("link-source")],
-              ContextOriginType::Root);
-  assert_eq! (origin_types [&ID::new ("shared")],
-              ContextOriginType::MultiContained);
-  assert_eq! (origin_types [&ID::new ("link-target")],
-              ContextOriginType::Mentioned);
-  assert_eq! (origin_types [&ID::new ("had-id")],
-              ContextOriginType::HadID);
-  // Step 2: grow treelike contexts.
-  // (grow_all_contexts is private, so we replicate it.)
-  let mut all_contexts : Vec<HashSet<ID>> =
-    origin_types . keys ()
+    prominence_sources . insert (
+      skgid . clone (), ProminenceSource::Root ); }
+  assert_eq! (prominence_sources . len (), 6);
+  assert_eq! (prominence_sources [&ID::new ("root-1")],
+              ProminenceSource::Root);
+  assert_eq! (prominence_sources [&ID::new ("root-2")],
+              ProminenceSource::Root);
+  assert_eq! (prominence_sources [&ID::new ("link-source")],
+              ProminenceSource::Root);
+  assert_eq! (prominence_sources [&ID::new ("shared")],
+              ProminenceSource::MultiContained);
+  assert_eq! (prominence_sources [&ID::new ("link-target")],
+              ProminenceSource::Mentioned);
+  assert_eq! (prominence_sources [&ID::new ("had-id")],
+              ProminenceSource::HadID);
+  // Step 2: grow treelike regions.
+  // (grow_all_regions is private, so we replicate it.)
+  let mut all_regions : Vec<HashSet<ID>> =
+    prominence_sources . keys ()
     . map ( |origin|
-      { let mut ctx : HashSet<ID> = HashSet::new ();
-        extend_context (
-          &mut ctx, origin, &origin_types, &map_to_content );
-        ctx } )
+      { let mut region : HashSet<ID> = HashSet::new ();
+        extend_region (
+          &mut region, origin, &prominence_sources, &map_to_content );
+        region } )
     . collect ();
-  // Verify that each treelike context has the right members.
-  assert_eq! (ctx_containing ("root-1", &all_contexts),
+  // Verify that each treelike region has the right members.
+  assert_eq! (ctx_containing ("root-1", &all_regions),
               HashSet::from ([
                 ID::new ("root-1"),
                 ID::new ("in-root-1") ]));
-  assert_eq! (ctx_containing ("root-2", &all_contexts),
+  assert_eq! (ctx_containing ("root-2", &all_regions),
               HashSet::from ([
                 ID::new ("root-2") ]));
-  assert_eq! (ctx_containing ("link-source", &all_contexts),
+  assert_eq! (ctx_containing ("link-source", &all_regions),
               HashSet::from ([
                 ID::new ("link-source") ]));
-  assert_eq! (ctx_containing ("shared", &all_contexts),
+  assert_eq! (ctx_containing ("shared", &all_regions),
               HashSet::from ([
                 ID::new ("shared"),
                 ID::new ("in-shared-1"),
                 ID::new ("in-shared-2") ]));
-  assert_eq! (ctx_containing ("link-target", &all_contexts),
+  assert_eq! (ctx_containing ("link-target", &all_regions),
               HashSet::from ([
                 ID::new ("link-target") ]));
-  assert_eq! (ctx_containing ("had-id", &all_contexts),
+  assert_eq! (ctx_containing ("had-id", &all_regions),
               HashSet::from ([
                 ID::new ("had-id"),
                 ID::new ("in-had-id-1"),
                 ID::new ("in-had-id-2") ]));
   // Cycle nodes should not be covered yet.
   let covered_before_cycles : HashSet<ID> =
-    all_contexts . iter ()
-    . flat_map ( |ctx| ctx . iter () . cloned () )
+    all_regions . iter ()
+    . flat_map ( |region| region . iter () . cloned () )
     . collect ();
   assert_eq! (covered_before_cycles . len (), 11);
   assert! (! covered_before_cycles . contains (
     &ID::new ("cycle-1") ));
   // Step 3: handle cycles.
-  extend_contexts_for_cycles (
+  extend_regions_for_cycles (
     &all_node_skgids,
     &map_to_content,
     &map_to_containers,
-    &mut origin_types,
-    &mut all_contexts );
+    &mut prominence_sources,
+    &mut all_regions );
   // Verify cycle members are now CycleMember origins.
-  assert_eq! (origin_types [&ID::new ("cycle-1")],
-              ContextOriginType::CycleMember);
-  assert_eq! (origin_types [&ID::new ("cycle-2")],
-              ContextOriginType::CycleMember);
-  // Verify the cycle context.
-  assert_eq! (ctx_containing ("cycle-1", &all_contexts),
+  assert_eq! (prominence_sources [&ID::new ("cycle-1")],
+              ProminenceSource::CycleMember);
+  assert_eq! (prominence_sources [&ID::new ("cycle-2")],
+              ProminenceSource::CycleMember);
+  // Verify the cycle region.
+  assert_eq! (ctx_containing ("cycle-1", &all_regions),
               HashSet::from ([
                 ID::new ("cycle-1"),
                 ID::new ("cycle-2"),
@@ -402,19 +402,19 @@ fn test_full_context_pipeline () {
                 ID::new ("from-cycle-2") ]));
   // Verify all 12 nodes are covered.
   let covered_after : HashSet<ID> =
-    all_contexts . iter ()
-    . flat_map ( |ctx| ctx . iter () . cloned () )
+    all_regions . iter ()
+    . flat_map ( |region| region . iter () . cloned () )
     . collect ();
   assert_eq! (covered_after . len (), 15); }
 
-/// Find the context containing the given node ID.
+/// Find the region containing the given node ID.
 fn ctx_containing (
   skgid       : &str,
-  contexts : &[HashSet<ID>],
+  regions : &[HashSet<ID>],
 ) -> HashSet<ID> {
   let target : ID = ID::new (skgid);
-  contexts . iter ()
-  . find ( |ctx| ctx . contains (&target) )
+  regions . iter ()
+  . find ( |region| region . contains (&target) )
   . unwrap_or_else ( || panic! (
-    "{} not in any context", skgid ) )
+    "{} not in any region", skgid ) )
   . clone () }

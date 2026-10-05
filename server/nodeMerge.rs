@@ -129,7 +129,7 @@ pub(crate) fn apply_prepared_nodeMerges (
   { // Tantivy.
     match update_tantivy_from_nodeInstructions (
       &primary_nodeInstructions, tantivy_index,
-      &std::collections::HashMap::new () ) // merged nodes index with "" context type; refreshed at next rebuild
+      &std::collections::HashMap::new () ) // merged nodes index with "" prominence source; refreshed at next rebuild
     { Ok (_count) => {
         tracing::info!("   Tantivy merge complete.");
         Ok (None) }
