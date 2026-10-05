@@ -509,8 +509,12 @@ dirty view in the save envelope. The wire atoms 'request-snapshot' and
 The /search index/ is Tantivy's. The /git index/ is git's staging
 area; next to HEAD and worktree it needs no qualifier ("HEAD vs
 index"). A /graph index/ is a derived map inside the in-Rust graph:
-the /inverse indexes/ ('contained_by', 'subscribers_of', ...), each
-the inverse of one relation, plus 'extra_id_to_pid'.
+the /recorderward relmaps/ ('contained_by', 'subscribers_of', ...), plus
+'extra_id_to_pid'. A recorderward relmap maps each member of one
+relation to the recorders that list it. (Not "inverse": today every
+relationship is recorded by its first member, but the data model may
+someday let the second member record one; 'RecorderwardRelmap' in
+'server/dbs/in_rust_graph.rs' says more.)
 
 *** "commit" is qualified when ambiguous: git-, skgsave- or tantivy-commit
 

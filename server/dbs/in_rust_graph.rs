@@ -1,7 +1,7 @@
 //! The in-Rust partial projection of the graph.
 //!
 //! A single 'InRustGraph' value holds every node (as a 'GraphnodeInRust') the
-//! render / save pipeline can read from, plus inverse indexes for
+//! render / save pipeline can read from, plus recorderward relmaps for
 //! every outbound relation and for extra_ids. It lives behind an
 //! 'ArcSwap' so readers never block writers and writers never block
 //! readers — writers clone via 'im''s structural sharing (O(log n)
@@ -28,27 +28,37 @@ use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
 
+/// A *recorderward relmap*: for one relation, each member's ID maps to
+/// the pids of the recorders that list it, so a reader can ask "who
+/// records X?" in one lookup rather than walking every node.
+///
+/// Why "recorderward" rather than "inverse": so far every relationship
+/// is recorded by its first member, so the recorderward direction is
+/// also the relation's inverse. Expansions of the data model could let
+/// the second member record a relationship; "recorderward" would still
+/// say which way the map points, and "inverse" would not.
+pub type RecorderwardRelmap = im::HashMap<ID, im::HashSet<ID>>;
+
 /// The in-Rust-graph projection of the graph.
 ///
 /// Values are 'GraphnodeInRust' — everything a 'Graphnode' has except
 /// 'flags', plus 'linksTo' parsed from body text.
 ///
-/// The six inverse indexes mirror the five outbound relations and
-/// the extra_ids list, so a reader can ask "who points at X?" in
-/// O(1) / O(log n) lookups rather than walking every node.
+/// One recorderward relmap per relation, plus 'extra_id_to_pid'. Together
+/// they are the graph indexes.
 #[derive(Clone, Debug)]
 pub struct InRustGraph {
   pub nodes            : im::HashMap<ID, GraphnodeInRust>,
   /// 'X → {pids of nodes whose contains includes X}'
-  pub contained_by     : im::HashMap<ID, im::HashSet<ID>>,
+  pub contained_by     : RecorderwardRelmap,
   /// 'X → {pids of nodes whose subscribesTo includes X}'
-  pub subscribers_of   : im::HashMap<ID, im::HashSet<ID>>,
+  pub subscribers_of   : RecorderwardRelmap,
   /// 'X → {pids of nodes whose hidesFromSubs includes X}'
-  pub hiders_of        : im::HashMap<ID, im::HashSet<ID>>,
+  pub hiders_of        : RecorderwardRelmap,
   /// 'X → {pids of nodes whose overrides includes X}'
-  pub overriders_of    : im::HashMap<ID, im::HashSet<ID>>,
+  pub overriders_of    : RecorderwardRelmap,
   /// 'X → {pids of nodes whose linksTo includes X}'
-  pub mentioners_of     : im::HashMap<ID, im::HashSet<ID>>,
+  pub mentioners_of    : RecorderwardRelmap,
   /// Maps any of a node's extra_ids to that node's pid. Invariant:
   /// an extra_id is on at most one node at any visible graph snapshot.
   pub extra_id_to_pid  : im::HashMap<ID, ID>,
@@ -68,10 +78,10 @@ impl InRustGraph {
   /// Build from a slice of Graphnodes. Typically called at
   /// startup after reading all .skg files from disk.
   ///
-  /// Two-pass, because canonical-keyed inverse indexes need to
+  /// Two-pass, because canonical-keyed recorderward relmaps need to
   /// map each outbound relation's second member (see
   /// [[docs/data-model_technical.org]]) to its corresponding pid (which might
-  /// be the id itself) via 'extra_id_to_pid' while building the inverse indexes. A
+  /// be the id itself) via 'extra_id_to_pid' while building the recorderward relmaps. A
   /// single-pass load couldn't do this for a reference to an
   /// extra_id of a not-yet-loaded node. First pass populates
   /// 'extra_id_to_pid' only; second pass inserts nodes and builds
@@ -112,7 +122,7 @@ impl InRustGraph {
     Some ( ( pid, node . home_skgrepo . clone () ) ) }
 }
 
-/// Resolve a raw relationship ID to its inverse-index key under an explicit
+/// Resolve a raw relationship ID to its recorderward-relmap key under an explicit
 /// identity graph snapshot. Unknown IDs remain their own keys.
 fn canonical_key (
   identity : &InRustGraph,
@@ -159,7 +169,7 @@ pub(crate) fn add_to_inverse_indexes (
   add_relationship_contributions (graph, node, &identity);
 }
 
-/// Remove a node's contributions from every inverse index. Used
+/// Remove a node's contributions from every recorderward relmap. Used
 /// during update (before inserting the new GraphnodeInRust) and during
 /// delete.
 ///
@@ -267,7 +277,7 @@ pub fn apply_nodeInstructions_to_inRustGraph (
   let mut affected_skgids : HashSet<ID> = touched_pids . clone ();
 
   // Install the complete final identity state before rebuilding any forward
-  // contribution. The inherited inverse maps are deliberately left in place
+  // contribution. The inherited recorderward relmaps are deliberately left in place
   // until affected recorders have been discovered from the base graph snapshot.
   for pid in &touched_pids {
     if let Some (old) = base . nodes . get (pid) {

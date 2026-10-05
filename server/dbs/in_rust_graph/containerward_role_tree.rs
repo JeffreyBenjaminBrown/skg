@@ -63,7 +63,7 @@ fn assemble(
       ContainerwardRoleTree::Inner ( skgid, children ) }, } }
 
 /// In-Rust-graph containerward role tree, walking the 'contained_by'
-/// inverse index. Uses breadth-first traversal with no
+/// recorderward relmap. Uses breadth-first traversal with no
 /// async / no parallel queries / no frontier-batching.
 pub fn full_containerward_role_tree_from_in_rust_graph (
   graph     : &InRustGraph,

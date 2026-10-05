@@ -37,14 +37,14 @@ fn mk_node (
 /// Insert nodes into a fresh InRustGraph.
 fn graph_with (nodes: Vec<GraphnodeInRust>) -> InRustGraph {
   let mut g : InRustGraph = InRustGraph::new ();
-  // Populate extra_id_to_pid first so inverse indexes resolve right.
+  // Populate extra_id_to_pid first so recorderward relmaps resolve right.
   for n in &nodes {
     for eid in &n . extra_ids {
       g . extra_id_to_pid . insert (eid . clone (), n . pid . clone ()); } }
   for n in nodes {
-    // Build the inverse indexes too (contained_by, mentioners_of, ...),
+    // Build the recorderward relmaps too (contained_by, mentioners_of, ...),
     // so the graph is complete: 'relation_membership_is_real' (used by
-    // the birth-claim validation) reads those inverse maps.
+    // the birth-claim validation) reads those recorderward relmaps.
     add_to_inverse_indexes (&mut g, &n);
     g . nodes . insert (n . pid . clone (), n); }
   g }

@@ -440,7 +440,7 @@ pub(crate) fn apply_delete_propagation_cleanup (
         NodeInstruction::Delete (_)          => None } )
       . collect ();
     let mut referencer_pids : HashSet<ID> = HashSet::new ();
-    for deleted in &deleted_primary_pids { // Inverse indexes are keyed by primary pid (id_to_pid_if_found resolves extra_ids during index construction), so iterating the primary pids of deletes is sufficient to find every referencer.
+    for deleted in &deleted_primary_pids { // Recorderward relmaps are keyed by primary pid (id_to_pid_if_found resolves extra_ids during index construction), so iterating the primary pids of deletes is sufficient to find every referencer.
       for inverse in [
         &graph_snap . contained_by,
         &graph_snap . subscribers_of,

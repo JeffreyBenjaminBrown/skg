@@ -222,7 +222,7 @@ pub fn existing_owned_overrider_of (
   owned_overriders_of (config, graph, &pid) . into_iter () . next () }
 
 /// The owned nodes (by pid) that override 'overridden' (a pid), via
-/// the in-Rust graph's 'overriders_of' inverse index. Overriders whose
+/// the in-Rust graph's 'overriders_of' recorderward relmap. Overriders whose
 /// skgrepo is unknown are treated as not-owned here: a touched
 /// node's own unknown repo is still reported by 'node_is_owned' at
 /// the call site, and untouched neighbors are validated at init.

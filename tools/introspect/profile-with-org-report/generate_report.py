@@ -512,7 +512,7 @@ def main() -> None:
     else:
         principal_finding = (
             "The production save stack contains no complete-graph candidate validation. "
-            "Graph validity, inverse-index auditing, override checks, and telescope warnings "
+            "Graph validity, recorderward-relmap auditing, override checks, and telescope warnings "
             "are bounded by the recorded save delta and affected neighborhood."
         )
     median_wall = statistics.median(walls)

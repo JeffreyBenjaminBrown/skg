@@ -43,7 +43,7 @@ pub fn find_related_nodes (
         if let Some (n) = graph . nodes . get (&pid) {
           out . extend ( n . linksTo
                          . iter () . map (&pid_or_self) ); },
-      // Inverse lookups: consult the inverse index.
+      // Inverse lookups: consult the recorderward relmap.
       ("contains",                     "content",   "container")   =>
         if let Some (s) = graph . contained_by . get (&pid) {
           out . extend ( s . iter () . cloned () ); },

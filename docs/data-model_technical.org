@@ -63,7 +63,7 @@ relationship entities.  Relationship relRepo remains part of every stored
 preserve the same constraints incrementally: while holding the mutation gate,
 they derive an exact persistent candidate from the current valid graph snapshot,
 validate the identities and relationships whose truth can change, and check
-the affected inverse-index entries before any file mutation.  A candidate is
+the affected recorderward-relmap entries before any file mutation.  A candidate is
 rejected when any of these conditions holds:
 
 1. A primary ID identifies more than one composed node.
@@ -112,11 +112,11 @@ derived indexes are:
 | =extra_id_to_pid= | extra ID -> primary ID | Canonical identity resolution. |
 
 Construction is two-pass: first collect every extra-ID mapping, then insert
-nodes and build inverse indexes.  This makes results independent of file read
+nodes and build recorderward relmaps.  This makes results independent of file read
 order.  Incremental mutation instead installs the batch's complete final
 identity state first, then reindexes each touched node and every untouched
 recorder whose raw relationship can resolve differently under the final identity
-map.  All five inverse indexes use that same final resolver.  Deletion is
+map.  All five recorderward relmaps use that same final resolver.  Deletion is
 supported: references to a deleted PID remain raw and surviving recorders are
 rekeyed where canonical resolution changed.  Writers clone the persistent
 graph and swap in one new =Arc= atomically; readers retain the immutable

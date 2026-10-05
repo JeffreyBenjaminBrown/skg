@@ -84,12 +84,12 @@ pub fn fetch_all_graphnodestats_with_skgrepo_set (
     graph, pids, &pid_set, restriction ) ) }
 
 /// In-Rust-graph implementation. Every field is computed from GraphnodeInRust
-/// and the inverse indexes, without I/O.
+/// and the recorderward relmaps, without I/O.
 ///
 /// relRepo gating (render-and-gating, 5_plan.org): counts and the
 /// container/content maps use the gated accessors
 /// ('outbound_pids_for_relation_gated' / 'inbound_pids_for_relation_gated'),
-/// not the raw GraphnodeInRust lists / inverse indexes -- a membership
+/// not the raw GraphnodeInRust lists / recorderward relmaps -- a membership
 /// recorded at a skgrepo outside 'unrestricted' must not inflate a count or
 /// appear in these maps, in either direction, even when the member
 /// NODE itself is unrestricted (still checked separately via
