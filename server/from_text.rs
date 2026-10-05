@@ -8,7 +8,7 @@
 pub mod buffer_to_viewnodes;
 pub mod fork;
 pub mod write_protected_edits;
-pub mod local_instruction_collection;
+pub mod local_fieldintent_collection;
 pub mod supplement_from_disk;
 pub mod weave;
 pub mod validate;
@@ -33,7 +33,7 @@ use fork::{
   new_foreign_nodes_adopting_clone_skgrepos,
   owned_ancestor_skgrepos_for_foreign_vognodes,
   validate_fork_specs_in_graph};
-use local_instruction_collection::NonmergeSavePlan;
+use local_fieldintent_collection::NonmergeSavePlan;
 use validate::{validate_and_filter_foreign_instructions, validate_no_simultaneous_move_and_nodeMerge};
 
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
@@ -155,7 +155,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
         warnings : parsing_warnings, } ); }}
   let ( nonmerge_plan, nodeMerge_acquisitions )
     : ( NonmergeSavePlan, Vec<(ID, ID)> )
-    = crate::from_text::local_instruction_collection
+    = crate::from_text::local_fieldintent_collection
       ::extract_nonmergeSavePlan_locally_in_graph (
         &viewforest, graph, config, restricted_skgrepo_set )
  . map_err (SaveError::DatabaseError) ?;

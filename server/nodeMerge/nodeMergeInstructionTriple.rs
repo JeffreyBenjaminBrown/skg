@@ -1,8 +1,8 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::{graphnode_by_skgid, opt_graphnode_by_skgid};
-use crate::from_text::local_instruction_collection::lower::nodeMerge_pairs;
-use crate::from_text::local_instruction_collection::traverse::collect_instructions_locally;
-use crate::from_text::local_instruction_collection::types::CollectedFieldIntents;
+use crate::from_text::local_fieldintent_collection::lower::nodeMerge_pairs;
+use crate::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
+use crate::from_text::local_fieldintent_collection::types::CollectedFieldIntents;
 use crate::types::save::{NodeMerge, SaveNode, DeleteNode};
 use crate::types::misc::{MSV, RelPartner, SkgConfig, SkgRepoName, ID, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
@@ -18,7 +18,7 @@ use std::error::Error;
 /// - acquiree_text_preserver: new node containing the acquiree's title and body
 /// - updated_acquirer: acquirer node with modified contents and extra IDs
 /// - acquiree_to_delete: acquiree marked for deletion
-/// It is a convenience wrapper over local instruction collection
+/// It is a convenience wrapper over local fieldIntent collection
 /// plus 'nodeMerge_instructions_from_pairs'; the production save
 /// pipeline collects once and calls the pair form directly.
 #[allow(non_snake_case)]

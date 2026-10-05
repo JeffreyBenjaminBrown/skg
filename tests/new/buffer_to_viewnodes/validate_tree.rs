@@ -754,7 +754,7 @@ fn inactive_placeholder_does_not_collide_with_content () {
 fn duplicate_members_of_defining_folders_pass_validation () {
   // Defining folders (SubscribeeFolder, OverriddenFolder; aliases were always
   // exempt) silently deduplicate at emission instead of bouncing the
-  // save (TODO/DONE/local-instruction-collection/3_plan.org).
+  // save (TODO/DONE/local-fieldintent-collection/3_plan.org).
   let input : &str =
     indoc! {"
       * (skg (node (id recorder) (repo main))) recorder

@@ -1,5 +1,5 @@
 /// This file defines the pure traversal at the heart of local
-/// instruction collection (TODO/DONE/local-instruction-collection/3_plan.org).
+/// instruction collection (TODO/DONE/local-fieldintent-collection/3_plan.org).
 /// .
 /// The traversal is one recursive DFS preorder over the placed
 /// viewforest. Recursion is UNCONDITIONAL: every node's children are
@@ -40,11 +40,11 @@
 /// folder, hence not shown *as* a subscribee: it is an ordinary
 /// self-writer parked there.
 
-use crate::from_text::local_instruction_collection::predicates::{
+use crate::from_text::local_fieldintent_collection::predicates::{
   active_child_counts_as_content,
   active_child_counts_as_visible_content,
   member_counts_for_partnerFolder };
-use crate::from_text::local_instruction_collection::types::{
+use crate::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, DefiningFolderRecorder, LocalContext, FieldIntent,
   HiddenOutsideEdit, SubscribeeTextClaim, SubscribeeVisibility };
 use crate::types::misc::{ID, SkgRepoName};

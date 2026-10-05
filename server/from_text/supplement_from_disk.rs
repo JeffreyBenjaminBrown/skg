@@ -8,7 +8,7 @@
 /// which means it must be read from disk
 /// and inserted into the Graphnode.
 
-use crate::from_text::local_instruction_collection::lower::{
+use crate::from_text::local_fieldintent_collection::lower::{
   RequestedRelRepos, NodeIntent, NodeSaveIntent };
 use crate::from_text::weave::{relationship_member_is_visible, set_difference_merge, weave};
 use crate::skgrepo_sets::ActiveSkgRepoSet;

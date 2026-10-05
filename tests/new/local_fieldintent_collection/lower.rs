@@ -1,15 +1,15 @@
 /// These are unit tests for lowering
-/// (server/from_text/local_instruction_collection/lower.rs), which
+/// (server/from_text/local_fieldintent_collection/lower.rs), which
 /// turns CollectedFieldIntents into ordered NodeIntents plus extracted
 /// signals.
 
 use ego_tree::Tree;
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::from_text::local_instruction_collection::lower::{
+use skg::from_text::local_fieldintent_collection::lower::{
   lower_collected_fieldIntents, nodeMerge_pairs, LoweringOutput };
-use skg::from_text::local_instruction_collection::traverse::collect_instructions_locally;
-use skg::from_text::local_instruction_collection::types::CollectedFieldIntents;
+use skg::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
+use skg::from_text::local_fieldintent_collection::types::CollectedFieldIntents;
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, maybePlaced_to_placed_tree };
 use skg::types::misc::{ID, MSV, members_of, members_msv};

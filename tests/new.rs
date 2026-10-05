@@ -12,20 +12,20 @@ mod validate_tree;
 #[path = "new/buffer_to_viewnodes/add_missing_info.rs"]
 mod add_missing_info;
 
-#[path = "new/local_instruction_collection/predicates.rs"]
-mod local_instruction_collection_predicates;
+#[path = "new/local_fieldintent_collection/predicates.rs"]
+mod local_fieldintent_collection_predicates;
 
-#[path = "new/local_instruction_collection/types.rs"]
-mod local_instruction_collection_types;
+#[path = "new/local_fieldintent_collection/types.rs"]
+mod local_fieldintent_collection_types;
 
-#[path = "new/local_instruction_collection/traverse.rs"]
-mod local_instruction_collection_traverse;
+#[path = "new/local_fieldintent_collection/traverse.rs"]
+mod local_fieldintent_collection_traverse;
 
-#[path = "new/local_instruction_collection/lower.rs"]
-mod local_instruction_collection_lower;
+#[path = "new/local_fieldintent_collection/lower.rs"]
+mod local_fieldintent_collection_lower;
 
-#[path = "new/local_instruction_collection/pipeline.rs"]
-mod local_instruction_collection_pipeline;
+#[path = "new/local_fieldintent_collection/pipeline.rs"]
+mod local_fieldintent_collection_pipeline;
 
-#[path = "new/local_instruction_collection/extraction.rs"]
-mod local_instruction_collection_extraction;
+#[path = "new/local_fieldintent_collection/extraction.rs"]
+mod local_fieldintent_collection_extraction;

@@ -9,11 +9,11 @@ use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_v
 use skg::from_text::buffer_to_viewnodes::uninterpreted::{
   org_to_uninterpreted_nodes,
   org_to_uninterpreted_viewforest};
-use skg::from_text::local_instruction_collection::extract_nonmergeSavePlan_locally;
-use skg::from_text::local_instruction_collection::lower::{
+use skg::from_text::local_fieldintent_collection::extract_nonmergeSavePlan_locally;
+use skg::from_text::local_fieldintent_collection::lower::{
   lower_collected_fieldIntents, LoweringOutput, NodeIntent };
-use skg::from_text::local_instruction_collection::traverse::collect_instructions_locally;
-use skg::from_text::local_instruction_collection::types::SubscribeeVisibility;
+use skg::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
+use skg::from_text::local_fieldintent_collection::types::SubscribeeVisibility;
 use skg::from_text::validate::validate_and_filter_foreign_instructions;
 use skg::test_utils::extract_graphnode_if_save_else_error;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
@@ -94,7 +94,7 @@ fn visibility_pairs_from_org (
 
 fn hiddenoutside_edits_from_tree (
   viewforest : Tree<Viewnode>,
-) -> Vec<(ID, skg::from_text::local_instruction_collection::types::HiddenOutsideEdit)> {
+) -> Vec<(ID, skg::from_text::local_fieldintent_collection::types::HiddenOutsideEdit)> {
   let forest : ViewForest = ViewForest::from_internal_tree (viewforest);
   lower_collected_fieldIntents (
     collect_instructions_locally (&forest) . unwrap () ) . unwrap ()
@@ -125,7 +125,7 @@ fn unknown_members_write_their_editable_relationship_recorders_only () {
               MSV::Specified (vec! [ID::from ("overridden-unknown")]));
   assert_eq! (hiddenoutside_edits_from_tree (checked_viewforest_from_org (input)),
               vec! [(ID::from ("recorder"),
-                    skg::from_text::local_instruction_collection::types::HiddenOutsideEdit {
+                    skg::from_text::local_fieldintent_collection::types::HiddenOutsideEdit {
                       members: vec! [ID::from ("hiddenoutside-unknown")] })],
               "HiddenOutside passes the raw Unknown ID to its hide resolver");
 }
@@ -1416,7 +1416,7 @@ fn test_extract_nonmergeSavePlan_complex_scenario() {
 
 // The next several tests pin the membership-predicate wiring of
 // extraction, with one test per condition not already covered above
-// (TODO/DONE/local-instruction-collection/3_plan.org, predicate test
+// (TODO/DONE/local-fieldintent-collection/3_plan.org, predicate test
 // audit).
 
 #[test]
@@ -1543,7 +1543,7 @@ fn duplicate_members_of_defining_folders_are_silently_deduplicated (
 ) {
   // Defining folders never squawk about repeats: emission
   // deduplicates, preserving first-occurrence order
-  // (TODO/DONE/local-instruction-collection/3_plan.org).
+  // (TODO/DONE/local-fieldintent-collection/3_plan.org).
   let input : &str =
     indoc! {"
             * (skg (node (id recorder) (repo main))) recorder

@@ -28,7 +28,7 @@ use crate::consts::{DEFAULT_INITIAL_NODE_LIMIT, DEFAULT_PORT};
 /// where the user wants it empty.
 ///
 /// THE FOLDER RULE these values encode at save extraction
-/// ('server/from_text/local_instruction_collection/traverse.rs'
+/// ('server/from_text/local_fieldintent_collection/traverse.rs'
 /// enforces it; 'supplement_unspecified_fields_from_disk' consumes
 /// it): a buffer with NO folder for a field (no AliasFolder, SubscribeeFolder
 /// or OverriddenFolder under the defining node) emits no intent for that

@@ -4,7 +4,7 @@
 /// .
 /// The expectations were originally verified differentially against
 /// the old extraction path before its deletion
-/// (TODO/DONE/local-instruction-collection/3_plan.org). The cases marked
+/// (TODO/DONE/local-fieldintent-collection/3_plan.org). The cases marked
 /// "new recursion surface" are the deliberate behavior changes.
 
 use ego_tree::Tree;
@@ -13,7 +13,7 @@ use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_v
 use skg::from_text::buffer_to_viewnodes::uninterpreted::{
   org_to_uninterpreted_nodes,
   org_to_uninterpreted_viewforest };
-use skg::from_text::local_instruction_collection::{
+use skg::from_text::local_fieldintent_collection::{
   extract_nonmergeSavePlan_locally, NonmergeSavePlan };
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};

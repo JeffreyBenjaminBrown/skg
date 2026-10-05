@@ -402,7 +402,7 @@ relationship.
 What a save turns the buffer into, in order:
 - a *fieldIntent* ('FieldIntent') says what one position in the buffer
   wants for one field of one node (its title and body, its contains,
-  a hide, ...). Local instruction collection emits these into a map
+  a hide, ...). Local fieldIntent collection emits these into a map
   keyed by ID ('CollectedFieldIntents').
 - a *nodeIntent* ('NodeIntent') is all of one node's fieldIntents,
   lowered into a save or a delete. It may still be partial: fields
@@ -412,7 +412,7 @@ What a save turns the buffer into, in order:
 - the *savePlan* ('SavePlan') is everything one save applies: its
   nodeInstructions, plus forks and nodeMerges.
 
-*** local instruction collection
+*** local fieldIntent collection
 
 The save path's fieldIntent extraction: one pure DFS preorder over
 the buffer's viewforest, in which each position reads only itself and
@@ -420,7 +420,7 @@ its direct children, plus a context that flows down from its
 ancestors. Each visit emits fieldIntents into a map keyed by
 node ID; downstream stages (validation, lowering, visibility
 resolution, disk supplementation, the noop filter) consume the map.
-Lives in =server/from_text/local_instruction_collection/=, entered
+Lives in =server/from_text/local_fieldintent_collection/=, entered
 via =extract_nonmergeSavePlan_locally=.
 
 This entry is the canonical sketch of the save pipeline. Its
@@ -486,7 +486,7 @@ rerender.
 A /nodeMerge/ is the acquirer/acquiree operation on graphnodes (the
 =NodeMerge= type, requested via =(editRequest (merge ID))=). An
 /instructionMerge/ is the combining of emitted save intents into the
-map during local instruction collection. In prose, say "merge nodes"
+map during local fieldIntent collection. In prose, say "merge nodes"
 or "merge instructions"; bare "merge" appears only in client-facing
 wire strings, where only nodes can merge.
 

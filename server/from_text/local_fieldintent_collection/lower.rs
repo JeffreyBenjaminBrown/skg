@@ -17,7 +17,7 @@
 ///   here: nodeMerge extraction reads them via 'nodeMerge_pairs'
 ///   before lowering consumes the map.)
 
-use crate::from_text::local_instruction_collection::types::{
+use crate::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, HiddenOutsideEdit, FieldIntentsForOneId, SubscribeeVisibility };
 use crate::types::misc::{
   ID, MSV, RelPartner, SkgRepoName, members_msv, members_of,

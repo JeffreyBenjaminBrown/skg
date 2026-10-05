@@ -7,7 +7,7 @@
 
 use crate::dbs::node_lookup::opt_graphnode_by_skgid;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::from_text::local_instruction_collection::types::CollectedFieldIntents;
+use crate::from_text::local_fieldintent_collection::types::CollectedFieldIntents;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::SkgConfig;
 

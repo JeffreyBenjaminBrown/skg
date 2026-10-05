@@ -1,9 +1,9 @@
 /// These tests pin the membership predicates of
-/// server/from_text/local_instruction_collection/predicates.rs.
+/// server/from_text/local_fieldintent_collection/predicates.rs.
 /// There is one test per condition each predicate encodes
-/// (TODO/DONE/local-instruction-collection/3_plan.org, "testing").
+/// (TODO/DONE/local-fieldintent-collection/3_plan.org, "testing").
 
-use skg::from_text::local_instruction_collection::predicates::{
+use skg::from_text::local_fieldintent_collection::predicates::{
   active_child_counts_as_content,
   active_child_counts_as_visible_content,
   member_counts_for_partnerFolder };

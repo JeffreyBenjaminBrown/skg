@@ -72,9 +72,9 @@ There are three ways to test the code:
      - New nodes get UUIDs; repoless nodes inherit parent's Skg repo
   3. Validates tree structure ('find_buffer_errors_for_saving')
   4. Converts to placed types ('maybePlaced_to_placed_tree')
-  5. Extracts save intents via local instruction collection
+  5. Extracts save intents via local fieldIntent collection
      ('extract_nonmergeSavePlan_locally' in
-     'server/from_text/local_instruction_collection/'): one pure DFS
+     'server/from_text/local_fieldintent_collection/'): one pure DFS
      preorder in which each buffer position reads only itself and its
      direct children plus a downward-flowing 'LocalContext', emitting
      per-field intents into a map keyed by PID. Downstream stages

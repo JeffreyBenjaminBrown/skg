@@ -1,9 +1,9 @@
-/// This module implements 'local instruction collection', which is
+/// This module implements 'local fieldIntent collection', which is
 /// how the save path extracts instructions from a buffer. The name
 /// refers to its central property: extraction is one pure traversal
 /// in which each buffer position reads only itself and its direct
 /// children, plus a context that flows down from its ancestors. The
-/// spec is TODO/DONE/local-instruction-collection/3_plan.org.
+/// spec is TODO/DONE/local-fieldintent-collection/3_plan.org.
 /// .
 /// Beyond listing the submodules, this mod file defines the composed
 /// pipeline, 'extract_nonmergeSavePlan_locally'. That function runs
@@ -50,7 +50,7 @@ pub struct NonmergeSavePlan {
 }
 
 /// This is the whole non-nodeMerge half of save extraction, done via
-/// local instruction collection. It returns the plan, plus the
+/// local fieldIntent collection. It returns the plan, plus the
 /// (acquirer, acquiree) pairs that nodeMerge expansion consumes.
 #[allow(non_snake_case)]
 pub fn extract_nonmergeSavePlan_locally_in_graph (

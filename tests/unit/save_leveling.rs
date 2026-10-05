@@ -6,7 +6,7 @@
 use super::{apply_sticky_relRepos_in_graph, build_diskSupplemented_nodeInstructions,
             refuse_delete_with_inactive_sections};
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::from_text::local_instruction_collection::lower::{
+use crate::from_text::local_fieldintent_collection::lower::{
   NodeIntent, RequestedRelRepos};
 use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::misc::{

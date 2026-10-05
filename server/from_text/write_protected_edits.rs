@@ -4,7 +4,7 @@
 //! rather than guessing from the graph (which cannot represent view-local
 //! folder occurrences).
 
-use crate::from_text::local_instruction_collection::predicates::{
+use crate::from_text::local_fieldintent_collection::predicates::{
   active_child_counts_as_content, member_counts_for_partnerFolder};
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, SkgRepoName};

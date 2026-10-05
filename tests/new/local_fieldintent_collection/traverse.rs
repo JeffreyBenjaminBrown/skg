@@ -1,15 +1,15 @@
-/// These are unit tests for the local-instruction-collection
+/// These are unit tests for the local-fieldintent-collection
 /// traversal
-/// (server/from_text/local_instruction_collection/traverse.rs).
+/// (server/from_text/local_fieldintent_collection/traverse.rs).
 /// They cover the explicit case list in
-/// TODO/DONE/local-instruction-collection/3_plan.org, "testing".
+/// TODO/DONE/local-fieldintent-collection/3_plan.org, "testing".
 /// The traversal is pure and synchronous, so these tests need no db.
 
 use ego_tree::Tree;
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::from_text::local_instruction_collection::traverse::collect_instructions_locally;
-use skg::from_text::local_instruction_collection::types::{
+use skg::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
+use skg::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, FieldIntentsForOneId, SubscribeeTextClaim,
   SubscribeeVisibility };
 use skg::types::git::Sign;

@@ -23,8 +23,8 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::opt_graphnode_by_skgid;
-use crate::from_text::local_instruction_collection::lower::LoweredNodeIntents;
-use crate::from_text::local_instruction_collection::types::{
+use crate::from_text::local_fieldintent_collection::lower::LoweredNodeIntents;
+use crate::from_text::local_fieldintent_collection::types::{
   HiddenOutsideEdit, SubscribeeVisibility };
 use crate::from_text::weave::member_is_visible;
 use crate::skgrepo_sets::ActiveSkgRepoSet;
