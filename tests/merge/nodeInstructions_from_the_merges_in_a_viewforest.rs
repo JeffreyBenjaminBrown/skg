@@ -56,15 +56,15 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
        assert_eq!(acquiree_text_preserver . contains . len(),
              0, "acquiree_text_preserver should have no contents");
         assert_eq!(
-          acquiree_text_preserver . subscribes_to,
+          acquiree_text_preserver . subscribesTo,
           MSV::Specified(vec![]),
           "acquiree_text_preserver should have empty subscriptions" );
         assert_eq!(
-          acquiree_text_preserver . hides_from_its_subscriptions,
+          acquiree_text_preserver . hidesFromSubs,
           MSV::Specified(vec![]),
           "acquiree_text_preserver should have empty hides" );
         assert_eq!(
-          acquiree_text_preserver . overrides_view_of,
+          acquiree_text_preserver . overrides,
           MSV::Specified(vec![]),
           "acquiree_text_preserver should have empty overrides" );
 

@@ -115,11 +115,11 @@ fn unconfigured_skgrepo_and_msv_relations_are_covered (
   let config : SkgConfig = two_skgrepo_config ();
   let mut node : Graphnode = node_at ("n", "public");
   let target : Graphnode = node_at ("t", "private");
-  node . subscribes_to = MSV::Specified ( vec! [
+  node . subscribesTo = MSV::Specified ( vec! [
     // leak via a non-contains relation
     RelPartner::at_relRepo ( SkgRepoName::from ("public"),
                           ID::new ("t") ) ] );
-  node . hides_from_its_subscriptions = MSV::Specified (
+  node . hidesFromSubs = MSV::Specified (
     rel_partners_at_relRepo ( & SkgRepoName::from ("nonexistent-repo"),
                     vec! [ ID::new ("t") ] ));
   let graph : InRustGraph =
@@ -130,7 +130,7 @@ fn unconfigured_skgrepo_and_msv_relations_are_covered (
   assert_eq! ( violations . len (), 2, "{:?}", violations );
   assert! ( violations . iter () . any ( |v| matches! (
     v, TelescopeViolation::LeakShapedMember {
-      relation : "subscribes_to", .. } )));
+      relation : "subscribesTo", .. } )));
   assert! ( violations . iter () . any ( |v| matches! (
     v, TelescopeViolation::UnconfiguredRelRepo { .. } )));
 }
@@ -142,17 +142,17 @@ fn absent_targets_use_recorder_home_for_all_four_relationships () {
     SkgRepoName::from ("public"), ID::from ("absent"));
   let mut recorder : Graphnode = node_at ("recorder", "private");
   recorder . contains = vec![member . clone ()];
-  recorder . subscribes_to = MSV::Specified (vec![member . clone ()]);
-  recorder . hides_from_its_subscriptions =
+  recorder . subscribesTo = MSV::Specified (vec![member . clone ()]);
+  recorder . hidesFromSubs =
     MSV::Specified (vec![member . clone ()]);
-  recorder . overrides_view_of = MSV::Specified (vec![member]);
+  recorder . overrides = MSV::Specified (vec![member]);
   let graph      : InRustGraph = InRustGraph::from_graphnodes (&[recorder]);
   let violations : Vec<TelescopeViolation> = telescope_violations_of (
     &config, &graph, &ID::from ("recorder"));
   assert_eq! (violations . len (), 4, "{violations:?}");
   for relation in [
-    "contains", "subscribes_to", "hides_from_its_subscriptions",
-    "overrides_view_of",
+    "contains", "subscribesTo", "hidesFromSubs",
+    "overrides",
   ] {
     assert! (violations . iter () . any (|violation| matches! (
       violation,
@@ -189,9 +189,9 @@ fn recorder_with_relation (
     SkgRepoName::from (relRepo), ID::from (target))];
   match relation {
     0 => recorder . contains = members,
-    1 => recorder . subscribes_to = MSV::Specified (members),
-    2 => recorder . hides_from_its_subscriptions = MSV::Specified (members),
-    3 => recorder . overrides_view_of = MSV::Specified (members),
+    1 => recorder . subscribesTo = MSV::Specified (members),
+    2 => recorder . hidesFromSubs = MSV::Specified (members),
+    3 => recorder . overrides = MSV::Specified (members),
     _ => unreachable! (),
   }
   recorder

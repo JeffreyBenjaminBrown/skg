@@ -20,10 +20,10 @@ fn node_with_body (
     extra_ids                    : vec! [],
     body                         : Some (body . to_string ()),
     contains                     : vec! [],
-    subscribes_to                : vec! [],
-    hides_from_its_subscriptions : vec! [],
-    overrides_view_of            : vec! [],
-    misc                         : vec! [],
+    subscribesTo                 : vec! [],
+    hidesFromSubs                : vec! [],
+    overrides                    : vec! [],
+    flags                        : vec! [],
   } }
 
 fn assert_roundtrip (
@@ -95,10 +95,10 @@ fn field_order_places_body_between_extra_ids_and_contains () {
       "multi\nline\n\tbody" . to_string ()),
     contains                     : vec! [
       ListItem::Member ( ID::new ("c1") ) ],
-    subscribes_to                : vec! [],
-    hides_from_its_subscriptions : vec! [],
-    overrides_view_of            : vec! [],
-    misc                         : vec! [],
+    subscribesTo                 : vec! [],
+    hidesFromSubs                : vec! [],
+    overrides                    : vec! [],
+    flags                        : vec! [],
   };
   let yaml : String = node . to_yaml () . unwrap ();
   let extra_ids_pos : usize =

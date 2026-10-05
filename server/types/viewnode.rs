@@ -473,16 +473,16 @@ pub enum NodeEditRequest {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FolderRelation {
   Aliases,
-  OverridesViewOf,
-  HidesFromItsSubscriptions,
+  Overrides,
+  HidesFromSubs,
   SubscribesTo,
 }
 
 impl FolderRelation {
   pub const ALL : [FolderRelation; 4] = [
     FolderRelation::Aliases,
-    FolderRelation::OverridesViewOf,
-    FolderRelation::HidesFromItsSubscriptions,
+    FolderRelation::Overrides,
+    FolderRelation::HidesFromSubs,
     FolderRelation::SubscribesTo ];
 
   pub fn relname (
@@ -490,9 +490,9 @@ impl FolderRelation {
   ) -> &'static str {
     match self {
       FolderRelation::Aliases                   => "aliases",
-      FolderRelation::OverridesViewOf           => "overrides_view_of",
-      FolderRelation::HidesFromItsSubscriptions => "hides_from_its_subscriptions",
-      FolderRelation::SubscribesTo              => "subscribes_to", } }
+      FolderRelation::Overrides                 => "overrides",
+      FolderRelation::HidesFromSubs             => "hidesFromSubs",
+      FolderRelation::SubscribesTo              => "subscribesTo", } }
 
   pub fn from_relname (
     s : &str,

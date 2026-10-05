@@ -150,11 +150,11 @@ fn relation_list_of_graphnode (
     NodeRelation::Contains =>
       members_of ( & nc . contains ),
     NodeRelation::SubscribesTo =>
-      members_of ( nc . subscribes_to . or_default () ),
-    NodeRelation::HidesFromItsSubscriptions =>
-      members_of ( nc . hides_from_its_subscriptions . or_default () ),
-    NodeRelation::OverridesViewOf =>
-      members_of ( nc . overrides_view_of . or_default () ),
+      members_of ( nc . subscribesTo . or_default () ),
+    NodeRelation::HidesFromSubs =>
+      members_of ( nc . hidesFromSubs . or_default () ),
+    NodeRelation::Overrides =>
+      members_of ( nc . overrides . or_default () ),
     NodeRelation::LinksTo =>
       Vec::new (), } }
 
@@ -220,7 +220,7 @@ pub fn goal_list_for_hiddenInSubscribee_folder (
   let hides3 : [Vec<ID>; 3] =
     three_git_snapshots_of_relation_list (
       subscriber_pid, subscriber_skgrepo,
-      NodeRelation::HidesFromItsSubscriptions,
+      NodeRelation::HidesFromSubs,
       subscriber_hides, skgrepo_diffs );
   let contains3 : [Vec<ID>; 3] =
     three_git_snapshots_of_relation_list (
@@ -283,7 +283,7 @@ pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
   let hides3 : [Vec<ID>; 3] =
     three_git_snapshots_of_relation_list (
       subscriber_pid, subscriber_skgrepo,
-      NodeRelation::HidesFromItsSubscriptions,
+      NodeRelation::HidesFromSubs,
       wt_subscriber_hides, skgrepo_diffs );
   let subscribees3 : [Vec<ID>; 3] =
     three_git_snapshots_of_relation_list (

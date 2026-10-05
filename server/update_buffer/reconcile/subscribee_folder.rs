@@ -69,7 +69,7 @@ pub fn reconcile_subscribeeFolder_children (
   // TODO/DONE/local-view-update/plan_v2.org §3.4/§6.7 exception: an *empty* SubscribeeFolder is PRESERVED, not
   // self-deleted. It is the editable interface onto the origin's outgoing
   // subscriptions; if it vanished when emptied, the user would lose the place
-  // to add one back. (A SubscribeeFolder is only *created* when subscribes_to is
+  // to add one back. (A SubscribeeFolder is only *created* when subscribesTo is
   // non-empty -- to_org/complete/sharing/mod.rs gates on that -- so an empty one
   // here means the subscriber lost all its subscriptions, and we keep the
   // headline so the user can re-add.) Its children still reconcile to empty
@@ -150,7 +150,7 @@ fn read_subscribeeFolder_context (
     graphnode_graphFirst_by_pid_and_skgrepo (
       &runtime . graph, &runtime . config, &parent_pid, &parent_skgrepo )
       . ok ()
-      . map ( |skg| skg . subscribes_to . or_default () . iter ()
+      . map ( |skg| skg . subscribesTo . or_default () . iter ()
               . filter ( |m| match active_skgrepo_set {
                   None      => true,
                   Some (a)  => a . is_all ()

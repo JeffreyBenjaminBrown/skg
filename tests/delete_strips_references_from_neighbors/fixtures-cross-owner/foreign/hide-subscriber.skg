@@ -1,6 +1,6 @@
 pid: hide-subscriber
 title: foreign hide subscriber
-subscribes_to:
+subscribesTo:
 - hide-subscribee
-hides_from_its_subscriptions:
+hidesFromSubs:
 - victim-alt

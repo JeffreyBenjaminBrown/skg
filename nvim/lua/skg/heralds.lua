@@ -404,7 +404,7 @@ local function rel_side_chunks (rel, side, form, birth, write_protected)
   local subset_key, subset_tier = nil, nil
   if rel == 'contains' and side == 'out' then
     subset_key, subset_tier = 'unintegrated', tiers.out_unintegrated
-  elseif rel == 'links_to' and side == 'in' then
+  elseif rel == 'linksTo' and side == 'in' then
     subset_key, subset_tier = 'substantive', tiers.in_substantive end
   local subset = subset_key and assq(s, subset_key) or nil
   if subset then
@@ -417,7 +417,7 @@ end
 local function rel_chunks (rel, form, birth, write_protected, overrides_here)
   local in_c = rel_side_chunks(rel, 'in', form, birth, write_protected)
   local out_c = rel_side_chunks(rel, 'out', form, birth, write_protected)
-  local here = rel == 'overrides_view_of' and overrides_here
+  local here = rel == 'overrides' and overrides_here
   if #in_c == 0 and #out_c == 0 and not here then return nil end
   local born = false
   for _, fact in ipairs(birth) do
@@ -464,7 +464,7 @@ function M.render_rel_facts (sexp)
   end
   for _, rel in ipairs(REL_ORDER) do
     local form = assq(rels, rel)
-    if form or (rel == 'overrides_view_of' and overrides_here) then
+    if form or (rel == 'overrides' and overrides_here) then
       add_token(rel_chunks(rel, form, birth, write_protected, overrides_here))
     end
   end

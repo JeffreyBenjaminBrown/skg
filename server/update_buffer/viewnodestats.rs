@@ -16,9 +16,9 @@ use std::collections::{HashMap, HashSet};
 /// the in-Rust graph (contains is checked via the containment maps).
 const GRAPH_RELATIONS : [NodeRelation; 4] = [
   NodeRelation::LinksTo,
-  NodeRelation::HidesFromItsSubscriptions,
+  NodeRelation::HidesFromSubs,
   NodeRelation::SubscribesTo,
-  NodeRelation::OverridesViewOf, ];
+  NodeRelation::Overrides, ];
 
 pub fn set_viewnodestats_in_viewforest (
   viewforest            : &mut Tree<Viewnode>,
@@ -147,7 +147,7 @@ fn set_herald_strings_in_viewnode (
           node_pid, NodeRelation::Contains, active )
           . into_iter () . filter (|skgid| visible (skgid)) . collect ();
         let hidden : Vec<ID> = g . outbound_pids_for_relation_gated (
-          subscriber_pid, NodeRelation::HidesFromItsSubscriptions, active );
+          subscriber_pid, NodeRelation::HidesFromSubs, active );
         let contained : Vec<ID> = g . outbound_pids_for_relation_gated (
           subscriber_pid, NodeRelation::Contains, active );
         let members : HashSet<ID> = unintegrated_content_skgids (
@@ -294,12 +294,12 @@ fn birth_facts (
         ParentKind::Other => Vec::new (), }}};
   if overridesHere
     && ! facts . iter () . any ( |fact|
-           fact . relation == NodeRelation::OverridesViewOf ) {
+           fact . relation == NodeRelation::Overrides ) {
     // A drawn overrider (drawn in place of a node it overrides) is
     // born of that override: it leads with the O herald, like every
     // other birth relation. The overridden node is not an ancestor.
     facts . insert ( 0, BirthFact::new (
-      NodeRelation::OverridesViewOf, Side::Out, None ) ); }
+      NodeRelation::Overrides, Side::Out, None ) ); }
   facts }
 
 /// The side of a node playing ROLE: the first role states the relationship
@@ -334,11 +334,11 @@ fn birth_facts_for_folder (
     // the subscriber (generation 3) hides it.
     PartnerFolder::HiddenInSubscribee =>
       vec![ BirthFact::new (
-              NodeRelation::HidesFromItsSubscriptions, Side::In, Some (4) ),
+              NodeRelation::HidesFromSubs, Side::In, Some (4) ),
             BirthFact::new ( NodeRelation::Contains, Side::In, Some (2) ) ],
     PartnerFolder::HiddenOutsideOfSubscribee =>
       vec![ BirthFact::new (
-              NodeRelation::HidesFromItsSubscriptions, Side::In, Some (3) ) ], } }
+              NodeRelation::HidesFromSubs, Side::In, Some (3) ) ], } }
 
 /// Sets omitted_body on the active vognode at treeid: true iff the node
 /// is drawn WRITE_PROTECTED here while its graphnode has a body -- one

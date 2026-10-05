@@ -1,6 +1,6 @@
 pid: Subscribee
 title: Subscribee
-subscribes_to:
+subscribesTo:
 - SubscribeeLeaf
 contains:
 - SubscribeeHidden

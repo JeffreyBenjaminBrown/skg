@@ -1,4 +1,4 @@
 pid: U
 title: cooking the owned way
-overrides_view_of:
+overrides:
   - F

@@ -689,7 +689,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       text_release_confirmation : None, } ); }
   // Forks detected this save (approved, or none): editing a foreign node
   // N is a request to clone it. The clone C is skgsave-committed with the rest of the
-  // save -- its 'overrides_view_of = [N]' relationship rides in the same
+  // save -- its 'overrides = [N]' relationship rides in the same
   // NodeInstructions, so the touched-override-invariant check (which reads the
   // simulated post-save graph) sees C before validating.
   let nonmerge_nodeInstructions : Vec<NodeInstruction> = {
@@ -839,7 +839,7 @@ fn post_skgsave_commit_hiddenoutside_warnings (
       graphnode_from_graph (graph, subscriber)
     else { continue; };
     let mut containing_subscribees : Vec<String> = Vec::new ();
-    for subscribee in subscriber_node . subscribes_to . or_default () {
+    for subscribee in subscriber_node . subscribesTo . or_default () {
       let Some (subscribee_node) =
         graphnode_from_graph (graph, &subscribee . member)
       else { continue; };

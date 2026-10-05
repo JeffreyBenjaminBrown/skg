@@ -48,8 +48,8 @@ converts a runtime panic into a compile-time guarantee.
 * DONE Option<Vec<T>>: conflating "unknown" and "empty"
 
 ~SkgNode~ uses ~Option<Vec<ID>>~ for ~contains~,
-~subscribes_to~, ~hides_from_its_subscriptions~, and
-~overrides_view_of~. The semantics:
+~subscribesTo~, ~hidesFromSubs~, and
+~overrides~. The semantics:
 
 - ~None~ = "ViewNode said nothing; clobber with disk data later"
 - ~Some(vec![])~ = "user explicitly set this to empty"

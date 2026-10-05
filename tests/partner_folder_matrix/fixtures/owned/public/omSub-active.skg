@@ -1,4 +1,4 @@
 pid: omSub-active
 title: omSub-active
-subscribes_to:
+subscribesTo:
 - omSub-owner

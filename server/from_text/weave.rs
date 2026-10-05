@@ -63,7 +63,7 @@ pub fn relationship_member_is_visible (
 }
 
 /// The anchored weave, for order-meaningful lists ('contains',
-/// 'subscribes_to').  Invisible disk members cling to the visible
+/// 'subscribesTo').  Invisible disk members cling to the visible
 /// sibling they followed: each maximal run of invisible,
 /// non-positioned disk members attaches to the nearest PRECEDING
 /// positioned disk member (or to START), and is emitted right after
@@ -109,7 +109,7 @@ where T : Eq + Hash + Clone,
   result }
 
 /// The set-difference merge, for order-meaningless lists
-/// ('overrides_view_of').  The disk list keeps its order; visible
+/// ('overrides').  The disk list keeps its order; visible
 /// members the user deleted are subtracted; new buffer members are
 /// appended; nothing else changes -- so reordering is a no-op, the
 /// diff stays quiet, and invisible members survive.

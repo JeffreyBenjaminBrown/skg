@@ -1,7 +1,7 @@
 //! GraphnodeInRust: the projection held in the in-Rust graph.
 //!
 //! Wide enough to match everything Graphnode carries (except
-//! derived fields), plus links_to — derived from body parsing at
+//! derived fields), plus linksTo — derived from body parsing at
 //! GraphnodeInRust construction time.
 
 use crate::types::misc::{ID, MSV, RelPartner, SkgRepoName};
@@ -18,20 +18,20 @@ pub struct GraphnodeInRust {
   pub aliases                      : MSV<RelPartner<String>>,
   pub body                         : Option<String>,
   pub contains                     : Vec<RelPartner<ID>>,
-  pub subscribes_to                : MSV<RelPartner<ID>>,
-  pub hides_from_its_subscriptions : MSV<RelPartner<ID>>,
-  pub overrides_view_of            : MSV<RelPartner<ID>>,
+  pub subscribesTo                 : MSV<RelPartner<ID>>,
+  pub hidesFromSubs                : MSV<RelPartner<ID>>,
+  pub overrides                    : MSV<RelPartner<ID>>,
   pub flags                        : Vec<Flag>,
   // PITFALL: derived from the text.
   // Parsed from title+body via 'links_from_node' during
   // construction; never read from disk.
-  pub links_to                 : Vec<ID>,
+  pub linksTo                  : Vec<ID>,
 }
 
 impl From<&Graphnode> for GraphnodeInRust {
-  /// Derive 'links_to' by parsing title+body; copy everything else.
+  /// Derive 'linksTo' by parsing title+body; copy everything else.
   fn from (c: &Graphnode) -> Self {
-    let links_to : Vec<ID> =
+    let linksTo : Vec<ID> =
       links_from_node (c)
       . into_iter ()
       . map ( |tl| tl . skgid )
@@ -45,11 +45,11 @@ impl From<&Graphnode> for GraphnodeInRust {
       aliases                      : c . aliases . clone (),
       body                         : c . body . clone (),
       contains                     : c . contains . clone (),
-      subscribes_to                : c . subscribes_to . clone (),
-      hides_from_its_subscriptions : c . hides_from_its_subscriptions . clone (),
-      overrides_view_of            : c . overrides_view_of . clone (),
+      subscribesTo                 : c . subscribesTo . clone (),
+      hidesFromSubs                : c . hidesFromSubs . clone (),
+      overrides                    : c . overrides . clone (),
       flags                        : c . flags . clone (),
-      links_to,
+      linksTo,
     }
   }
 }

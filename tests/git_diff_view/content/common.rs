@@ -46,10 +46,10 @@ pub fn setup_gitrepo_with_subscribee_fixtures(
   )
 }
 
-/// #1 fix coverage: a subscriber whose subscribes_to dropped node 22 between
+/// #1 fix coverage: a subscriber whose subscribesTo dropped node 22 between
 /// HEAD and worktree (22's .skg file still present, so the removal is
 /// membership-only). The removed subscribee 22 must render as a phantom with
-/// (unstaged removedR) -- its relation is subscribes_to, not contains, so the
+/// (unstaged removedR) -- its relation is subscribesTo, not contains, so the
 /// marker comes from build_child_data's net-removal fallback, not phantom_axes.
 pub fn setup_gitrepo_with_removed_subscribee_fixtures(
   gitrepo_path: &Path,
@@ -63,7 +63,7 @@ pub fn setup_gitrepo_with_removed_subscribee_fixtures(
 
 /// §C: the same removed-subscribee transition, but STAGED -- so the phantom's
 /// relationship axis must report (staged removedR), proving per-stage works for a
-/// sharing relation (subscribes_to), not just the net unstaged fallback.
+/// sharing relation (subscribesTo), not just the net unstaged fallback.
 pub fn setup_gitrepo_with_removed_subscribee_fixtures_staged(
   gitrepo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {
@@ -74,7 +74,7 @@ pub fn setup_gitrepo_with_removed_subscribee_fixtures_staged(
   )
 }
 
-/// The added direction: a subscriber whose subscribes_to GAINED node 22
+/// The added direction: a subscriber whose subscribesTo GAINED node 22
 /// between HEAD and worktree, so the present member 22 must carry
 /// (unstaged addedR) (TODO/DONE/full-schema/DONE/12-2_diff-mode-policy_discussion.org,
 /// outbound folder completeness).

@@ -2,6 +2,6 @@ pid: r
 title: r
 contains:
   - c1
-subscribes_to:
+subscribesTo:
   - s1
   - s2

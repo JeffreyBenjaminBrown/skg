@@ -1,5 +1,5 @@
 pid: omWsub-owner
 title: omWsub-owner
-subscribes_to:
+subscribesTo:
 - omWsub-active
 - omWsub-inactive

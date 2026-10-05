@@ -40,7 +40,7 @@
         (when (string-match-p "(affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))" root-line)
           (fail "contained view-root should be content, not content; line: %S"
                 root-line))
-        (when (string-match-p "(affectsParent false) writeProtected (rels (links_to (out (ancestors 1))) (birth (links_to out 1)))" root-line)
+        (when (string-match-p "(affectsParent false) writeProtected (rels (linksTo (out (ancestors 1))) (birth (linksTo out 1)))" root-line)
           (fail "contained view-root should be content, not line: %S"
                 root-line)))
       (let ((line (and (string-match

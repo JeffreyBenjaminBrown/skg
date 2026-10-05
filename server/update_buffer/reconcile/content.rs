@@ -506,7 +506,7 @@ fn content_goal_list (
       None      => true,
       Some (a)  => a . is_all () || a . contains_skgrepo (skgrepo) };
     let worktree_hidden : Vec<ID> =
-        grandparent_graphnode . hides_from_its_subscriptions
+        grandparent_graphnode . hidesFromSubs
         . or_default () . iter ()
         . filter ( |m| skgrepo_active (& m . relRepo) )
         . map ( |m| m . member . clone () )

@@ -1,7 +1,7 @@
 //! TODO/more.org, "The skg diff report should report what vanished
 //! nodes used to be": a node id that the worktree still REFERENCES
-//! (in some contains / subscribes_to / hides_from_its_subscriptions /
-//! overrides_view_of list) but that exists in NO skgrepo -- the kind
+//! (in some contains / subscribesTo / hidesFromSubs /
+//! overrides list) but that exists in NO skgrepo -- the kind
 //! that renders as "Parent references unknown node." -- is
 //! investigated in the git history of every skgrepo. If it was never
 //! there, the report says that; otherwise it names the commit at
@@ -22,8 +22,8 @@ use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 
 /// Every id some node of 'git_snapshot' lists as a relationship member
-/// (contains, subscribes_to, hides_from_its_subscriptions,
-/// overrides_view_of) that no node of 'git_snapshot' answers to (as
+/// (contains, subscribesTo, hidesFromSubs,
+/// overrides) that no node of 'git_snapshot' answers to (as
 /// primary or extra id). Link targets are NOT collected here:
 /// a dangling link degrades to text, not to an unknown-node phantom.
 pub fn dangling_skgids_in_git_snapshot (
@@ -38,10 +38,10 @@ pub fn dangling_skgids_in_git_snapshot (
   let mut dangling : BTreeSet<ID> = BTreeSet::new ();
   for node in git_snapshot . nodes . values () {
     let contains_skgids   : Vec<ID> = members_of (& node . contains);
-    let subscribes_skgids : MSV<ID> = members_msv (& node . subscribes_to);
+    let subscribes_skgids : MSV<ID> = members_msv (& node . subscribesTo);
     let hides_skgids       : MSV<ID> = members_msv (
-      & node . hides_from_its_subscriptions);
-    let overrides_skgids   : MSV<ID> = members_msv (& node . overrides_view_of);
+      & node . hidesFromSubs);
+    let overrides_skgids   : MSV<ID> = members_msv (& node . overrides);
     let referenced =
       contains_skgids . iter ()
       . chain ( subscribes_skgids . or_default () . iter () )
@@ -152,14 +152,14 @@ fn sighting_at_commit (
       if ! members . is_empty () {
         outbound . push ( (name, members . to_vec ()) ); }};
     let contains_skgids   : Vec<ID> = members_of (& own . contains);
-    let subscribes_skgids : MSV<ID> = members_msv (& own . subscribes_to);
+    let subscribes_skgids : MSV<ID> = members_msv (& own . subscribesTo);
     let hides_skgids       : MSV<ID> = members_msv (
-      & own . hides_from_its_subscriptions);
-    let overrides_skgids   : MSV<ID> = members_msv (& own . overrides_view_of);
+      & own . hidesFromSubs);
+    let overrides_skgids   : MSV<ID> = members_msv (& own . overrides);
     keep ("contains",                     & contains_skgids);
-    keep ("subscribes_to",                subscribes_skgids . or_default ());
-    keep ("hides_from_its_subscriptions", hides_skgids . or_default ());
-    keep ("overrides_view_of",            overrides_skgids . or_default ());
+    keep ("subscribesTo",                subscribes_skgids . or_default ());
+    keep ("hidesFromSubs", hides_skgids . or_default ());
+    keep ("overrides",            overrides_skgids . or_default ());
     outbound };
   let inbound : Vec<(ID, &'static str)> =
     inbound_references_in_tree (gitrepo, prefix, skgrepo_name, skgid, &tree);
@@ -201,14 +201,14 @@ fn inbound_references_in_tree (
       if hit { inbound . push ( (node . pid . clone (), name) ); }};
     note ("contains",
           node . contains . iter () . any ( |m| &m . member == skgid ));
-    note ("subscribes_to",
-          node . subscribes_to . or_default () . iter ()
+    note ("subscribesTo",
+          node . subscribesTo . or_default () . iter ()
             . any ( |m| &m . member == skgid ));
-    note ("hides_from_its_subscriptions",
-          node . hides_from_its_subscriptions . or_default () . iter ()
+    note ("hidesFromSubs",
+          node . hidesFromSubs . or_default () . iter ()
             . any ( |m| &m . member == skgid ));
-    note ("overrides_view_of",
-          node . overrides_view_of . or_default () . iter ()
+    note ("overrides",
+          node . overrides . or_default () . iter ()
             . any ( |m| &m . member == skgid ));
     note ("link",
           links_from_node (&node) . iter ()

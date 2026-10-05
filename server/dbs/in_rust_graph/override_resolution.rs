@@ -1,5 +1,5 @@
 //! The override resolver: given an ID, which node should be DRAWN
-//! in its place? Follows owned 'overrides_view_of' relationships from
+//! in its place? Follows owned 'overrides' relationships from
 //! overridden to overrider, transitively, with a seen-set cycle
 //! guard. Foreign override relationships never participate in substitution;
 //! they are display-only facts (search enrichment, folders, heralds,

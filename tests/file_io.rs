@@ -155,7 +155,7 @@ fn verify_body_not_needed() {
 
 pub fn reverse_some_of_node(node: &Graphnode) -> Graphnode {
   // Create a new Graphnode reversing two of its lists,
-  // `contains` and `subscribes_to`.
+  // `contains` and `subscribesTo`.
   // This is only for testing purposes,
   // to show reading from and writing to disk work;
   // there's no other reason anyone would want to do this.
@@ -163,14 +163,14 @@ pub fn reverse_some_of_node(node: &Graphnode) -> Graphnode {
     let mut v : Vec<RelPartner<ID>> = node . contains . clone();
     v . reverse();
     v };
-  let reversed_subscribes_to = match node . subscribes_to . clone() {
+  let reversed_subscribesTo = match node . subscribesTo . clone() {
     MSV::Unspecified => MSV::Unspecified,
     MSV::Specified (mut v) => {
       v . reverse();
       MSV::Specified (v) } };
   Graphnode {
     contains          : reversed_contains,
-    subscribes_to     : reversed_subscribes_to,
+    subscribesTo      : reversed_subscribesTo,
 
     title             : node . title             . clone(),
     overPrivateText_telescope    : node . overPrivateText_telescope,
@@ -179,9 +179,9 @@ pub fn reverse_some_of_node(node: &Graphnode) -> Graphnode {
     pid               : node . pid               . clone(),
     extra_ids         : node . extra_ids         . clone(),
     body              : node . body              . clone(),
-    hides_from_its_subscriptions :
-      node . hides_from_its_subscriptions        . clone(),
-    overrides_view_of : node . overrides_view_of . clone(),
+    hidesFromSubs     :
+      node . hidesFromSubs        . clone(),
+    overrides         : node . overrides . clone(),
     flags             : node . flags              . clone(),
   }}
 

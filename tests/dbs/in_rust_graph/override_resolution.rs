@@ -47,7 +47,7 @@ fn node (
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
   node . home_skgrepo = SkgRepoName::from (skgrepo);
-  node . overrides_view_of =
+  node . overrides =
     if overrides . is_empty () {
       MSV::Unspecified
     } else {
@@ -162,7 +162,7 @@ fn an_inactive_override_edge_between_active_nodes_does_not_substitute () {
     restricted_to ( &["owned", "foreign"] );
   let mut overrider : Graphnode =
     node ("overrider", "owned", &[]);
-  overrider . overrides_view_of = MSV::Specified (vec![
+  overrider . overrides = MSV::Specified (vec![
     RelPartner::at_relRepo (
       SkgRepoName::from ("owned2"), ID::from ("target")) ]);
   assert_eq! (

@@ -14,17 +14,17 @@ use crate::types::links::links_with_ranges_from_text;
 pub enum StructuredField {
   Contains,
   SubscribesTo,
-  HidesFromItsSubscriptions,
-  OverridesViewOf,
+  HidesFromSubs,
+  Overrides,
 }
 
 impl StructuredField {
   pub fn label (self) -> &'static str {
     match self {
       Self::Contains => "contains",
-      Self::SubscribesTo => "subscribes_to",
-      Self::HidesFromItsSubscriptions => "hides_from_its_subscriptions",
-      Self::OverridesViewOf => "overrides_view_of", } }
+      Self::SubscribesTo => "subscribesTo",
+      Self::HidesFromSubs => "hidesFromSubs",
+      Self::Overrides => "overrides", } }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -140,11 +140,11 @@ pub fn preview (
           raw_skgid          : raw_skgid . clone (),
           relRepo : member . relRepo . clone (), }); }};
     record (StructuredField::Contains, &node . contains);
-    record (StructuredField::SubscribesTo, node . subscribes_to . or_default ());
-    record (StructuredField::HidesFromItsSubscriptions,
-            node . hides_from_its_subscriptions . or_default ());
-    record (StructuredField::OverridesViewOf,
-            node . overrides_view_of . or_default ());
+    record (StructuredField::SubscribesTo, node . subscribesTo . or_default ());
+    record (StructuredField::HidesFromSubs,
+            node . hidesFromSubs . or_default ());
+    record (StructuredField::Overrides,
+            node . overrides . or_default ());
     record_links (&mut result . links, node, raw_skgid, TextField::Title,
                        &node . title);
     if let Some (body) = &node . body {
@@ -196,12 +196,12 @@ pub fn rewrite (
       .ok_or_else (|| format! ("Cleanup recorder disappeared: {}", pid))?;
     let mut rewritten = graphnode_from_graphnodeInRust (node);
     rewritten . contains . retain (|m| m . member != fresh . raw_skgid);
-    rewritten . subscribes_to = remove_exact (
-      &rewritten . subscribes_to, &fresh . raw_skgid);
-    rewritten . hides_from_its_subscriptions = remove_exact (
-      &rewritten . hides_from_its_subscriptions, &fresh . raw_skgid);
-    rewritten . overrides_view_of = remove_exact (
-      &rewritten . overrides_view_of, &fresh . raw_skgid);
+    rewritten . subscribesTo = remove_exact (
+      &rewritten . subscribesTo, &fresh . raw_skgid);
+    rewritten . hidesFromSubs = remove_exact (
+      &rewritten . hidesFromSubs, &fresh . raw_skgid);
+    rewritten . overrides = remove_exact (
+      &rewritten . overrides, &fresh . raw_skgid);
     writes . push (NodeInstruction::Save (SaveNode (rewritten))); }
   Ok (writes)
 }
@@ -255,10 +255,10 @@ mod tests {
   fn scans_owned_exact_members_and_leaves_everything_else_verbatim () {
     let mut owned = node ("owned", "main");
     owned . contains = vec! [member ("main", "gone"), member ("main", "keep")];
-    owned . subscribes_to = MSV::Specified (vec! [member ("main", "gone")]);
-    owned . hides_from_its_subscriptions =
+    owned . subscribesTo = MSV::Specified (vec! [member ("main", "gone")]);
+    owned . hidesFromSubs =
       MSV::Specified (vec! [member ("private", "gone")]);
-    owned . overrides_view_of = MSV::Specified (vec! [member ("main", "gone")]);
+    owned . overrides = MSV::Specified (vec! [member ("main", "gone")]);
     let mut foreign = node ("foreign", "foreign");
     foreign . contains = vec! [member ("foreign", "gone")];
     let graph = InRustGraph::from_graphnodes (&[owned, foreign]);
@@ -278,10 +278,10 @@ mod tests {
     let NodeInstruction::Save (SaveNode (rewritten)) = &rewrites [0] else {
       panic! ("cleanup must produce a SaveNode"); };
     assert_eq! (rewritten . contains, vec! [member ("main", "keep")]);
-    assert_eq! (rewritten . subscribes_to, MSV::Specified (Vec::new ()));
-    assert_eq! (rewritten . hides_from_its_subscriptions,
+    assert_eq! (rewritten . subscribesTo, MSV::Specified (Vec::new ()));
+    assert_eq! (rewritten . hidesFromSubs,
                 MSV::Specified (Vec::new ()));
-    assert_eq! (rewritten . overrides_view_of, MSV::Specified (Vec::new ()));
+    assert_eq! (rewritten . overrides, MSV::Specified (Vec::new ()));
     assert_eq! (graph . get (&skgid ("foreign")) . unwrap () . contains,
                 vec! [member ("foreign", "gone")]);
   }

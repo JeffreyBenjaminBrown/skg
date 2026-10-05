@@ -154,18 +154,18 @@ async fn pipeline_basic_mixed_tree (
                     MSV::Specified (vec![
                       "first alias" . to_string(),
                       "second alias" . to_string()]) );
-        assert_eq!( members_msv (&root . subscribes_to),
+        assert_eq!( members_msv (&root . subscribesTo),
                     MSV::Specified (vec![ID::from ("s1")]) );
-        assert_eq!( members_msv (&root . overrides_view_of),
+        assert_eq!( members_msv (&root . overrides),
                     MSV::Specified (vec![ID::from ("o1")]) ); }
       { let explicit : &Graphnode =
           saved_node_by_skgid (&plan . node_instructions, "explicit");
         // Present-but-empty folders are explicit emptiness.
         assert_eq!( explicit . aliases,
                     MSV::Specified (vec![]) );
-        assert_eq!( explicit . subscribes_to,
+        assert_eq!( explicit . subscribesTo,
                     MSV::Specified (vec![]) );
-        assert_eq!( explicit . overrides_view_of,
+        assert_eq!( explicit . overrides,
                     MSV::Specified (vec![]) ); }
       assert!( plan . skgrepo_moves . is_empty() );
       assert!( nodeMerge_acquisitions . is_empty() );
@@ -189,7 +189,7 @@ async fn pipeline_subscribee_hiderels (
           &forest, config, None)?;
       assert_eq!(
         members_msv (&saved_node_by_skgid (&plan . node_instructions, "r")
-          . hides_from_its_subscriptions),
+          . hidesFromSubs),
         MSV::Specified (vec![ID::from ("e1")]));
       assert!(
         ! save_skgids (&plan . node_instructions)

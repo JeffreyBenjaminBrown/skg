@@ -35,7 +35,7 @@ fn snapshots_degenerate_when_the_file_is_unchanged () {
   let [head, index, wt] =
     three_git_snapshots_of_relation_list (
       &skgid ("S"), &src ("main"),
-      NodeRelation::HidesFromItsSubscriptions,
+      NodeRelation::HidesFromSubs,
       &worktree,
       & diffs_with_one_entry (&src ("main"), None, None) );
   assert_eq! (head,  worktree);
@@ -59,7 +59,7 @@ fn unstaged_change_reconstructs_the_index_as_the_before_list () {
   let [head, index, _wt] =
     three_git_snapshots_of_relation_list (
       &skgid ("S"), &src ("main"),
-      NodeRelation::HidesFromItsSubscriptions,
+      NodeRelation::HidesFromSubs,
       & skgids (&["a", "c"]), &diffs );
   assert_eq! (index, skgids (&["a", "b"]));
   assert_eq! (head,  skgids (&["a", "b"]));
@@ -79,7 +79,7 @@ fn staged_change_separates_head_from_index () {
   let [head, index, wt] =
     three_git_snapshots_of_relation_list (
       &skgid ("S"), &src ("main"),
-      NodeRelation::HidesFromItsSubscriptions,
+      NodeRelation::HidesFromSubs,
       & skgids (&["a"]), &diffs );
   assert_eq! (head,  skgids (&["a", "b"]));
   assert_eq! (index, skgids (&["a"]));

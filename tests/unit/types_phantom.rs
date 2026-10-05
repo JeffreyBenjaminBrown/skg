@@ -127,7 +127,7 @@ fn each_relation_reads_its_own_diff_when_one_recorder_bears_both () {
       status: GitDiffStatus::Modified,
       node_changes: Some ( NodeChanges {
         contains_diff          : contains_ops,
-        overrides_view_of_diff : overrides_ops,
+        overrides_diff         : overrides_ops,
         .. NodeChanges::default () } ),
       before_node: None,
       after_node: None, } };
@@ -152,11 +152,11 @@ fn each_relation_reads_its_own_diff_when_one_recorder_bears_both () {
     "the content phantom is labeled from contains_diff only" );
   let (_, overrides_mem) = phantom_axes (
     &child, &src, &parent, &src,
-    NodeRelation::OverridesViewOf, Some (&diffs) );
+    NodeRelation::Overrides, Some (&diffs) );
   assert_eq! ( overrides_mem, RelationshipAxes {
     staged: None, unstaged: Some (Sign::Minus) },
     "the overriddenFolder phantom is labeled from \
-     overrides_view_of_diff only" );
+     overrides_diff only" );
 }
 
 /// A node with sections in several skgrepos has exactly one home: the

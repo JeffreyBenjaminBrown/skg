@@ -2,8 +2,8 @@
 """Audit data/public/ for dangling references.
 
 A "dangling reference" here means: a current .skg file mentions an ID
-(via 'contains', 'subscribes_to', 'hides_from_its_subscriptions',
-'overrides_view_of', or a body/title '[[id:X]]' link) that was at
+(via 'contains', 'subscribesTo', 'hidesFromSubs',
+'overrides', or a body/title '[[id:X]]' link) that was at
 some point checked into git as a 'pid' or 'extra_ids' entry, but is
 no longer owned by any current file (neither as 'pid' nor 'extra_ids').
 
@@ -32,11 +32,11 @@ LINK_RE = re . compile (r'\[\[id:([^\]]+)\]')
 OWNERSHIP_FIELDS = ('extra_ids',)
 REFERENCE_FIELDS = (
     'contains',
-    'subscribes_to',
-    'hides_from_its_subscriptions',
-    'overrides_view_of',
+    'subscribesTo',
+    'hidesFromSubs',
+    'overrides',
 )
-LIST_FIELDS = OWNERSHIP_FIELDS + REFERENCE_FIELDS + ('aliases', 'misc')
+LIST_FIELDS = OWNERSHIP_FIELDS + REFERENCE_FIELDS + ('aliases', 'flags')
 
 
 # ============================================================
@@ -70,11 +70,11 @@ def parse_skg (text):
           'body'   : '',
           'extra_ids'                    : [],
           'contains'                     : [],
-          'subscribes_to'                : [],
-          'hides_from_its_subscriptions' : [],
-          'overrides_view_of'            : [],
+          'subscribesTo'                 : [],
+          'hidesFromSubs'                : [],
+          'overrides'                    : [],
           'aliases'                      : [],
-          'misc'                         : [], }
+          'flags'                        : [], }
   lines = text . split ('\n')
   i = 0
   n = len (lines)
@@ -303,9 +303,9 @@ def per_file_sentence (field, lost_phrase):
   multiple of these sentences under one file heading."""
   return {
       'contains'                     : f"Its ~contains~ field still lists {lost_phrase}.",
-      'subscribes_to'                : f"Its ~subscribes_to~ field still lists {lost_phrase}.",
-      'hides_from_its_subscriptions' : f"Its ~hides_from_its_subscriptions~ field still lists {lost_phrase}.",
-      'overrides_view_of'            : f"Its ~overrides_view_of~ field still lists {lost_phrase}.",
+      'subscribesTo'                 : f"Its ~subscribesTo~ field still lists {lost_phrase}.",
+      'hidesFromSubs'                : f"Its ~hidesFromSubs~ field still lists {lost_phrase}.",
+      'overrides'                    : f"Its ~overrides~ field still lists {lost_phrase}.",
       'title-link'               : f"Its title embeds a link to {lost_phrase}.",
       'body-link'                : f"Its body embeds a link to {lost_phrase}.",
   } . get (field, f"It references {lost_phrase} via {field}.")
@@ -318,9 +318,9 @@ def per_lost_id_sentence (field, fname, ref_title):
   who = f'~{fname}~ (titled "{ref_title}")'
   return {
       'contains'                     : f"{who} lists it in its ~contains~ field.",
-      'subscribes_to'                : f"{who} lists it in its ~subscribes_to~ field.",
-      'hides_from_its_subscriptions' : f"{who} lists it in its ~hides_from_its_subscriptions~ field.",
-      'overrides_view_of'            : f"{who} lists it in its ~overrides_view_of~ field.",
+      'subscribesTo'                 : f"{who} lists it in its ~subscribesTo~ field.",
+      'hidesFromSubs'                : f"{who} lists it in its ~hidesFromSubs~ field.",
+      'overrides'                    : f"{who} lists it in its ~overrides~ field.",
       'title-link'               : f"{who} embeds a link to it in its title.",
       'body-link'                : f"{who} embeds a link to it in its body.",
   } . get (field, f"{who} references it via {field}.")

@@ -1,4 +1,4 @@
 pid: X
 title: X
-overrides_view_of:
+overrides:
   - G

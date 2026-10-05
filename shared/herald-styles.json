@@ -47,11 +47,11 @@
       "contains":                     { "in": "medium", "out": "normal",
                                         "out_write_protected": "low",
                                         "out_unintegrated": "medium" },
-      "links_to":                     { "in": "medium", "out": "normal",
+      "linksTo":                     { "in": "medium", "out": "normal",
                                         "in_substantive": "high" },
-      "subscribes_to":                { "in": "high",   "out": "medium" },
-      "overrides_view_of":            { "in": "low",    "out": "medium" },
-      "hides_from_its_subscriptions": { "in": "medium", "out": "normal" }
+      "subscribesTo":                { "in": "high",   "out": "medium" },
+      "overrides":                   { "in": "low",    "out": "medium" },
+      "hidesFromSubs":               { "in": "medium", "out": "normal" }
     },
     "floors": {
       "comment": "The least tier a glyph shows. Ancestor flag a is the parent; b is the grandparent, and so on.",

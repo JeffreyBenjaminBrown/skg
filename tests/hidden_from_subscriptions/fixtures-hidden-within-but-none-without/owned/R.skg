@@ -2,7 +2,7 @@ title: R
 pid: R
 contains:
 - R1
-subscribes_to:
+subscribesTo:
 - E1
-hides_from_its_subscriptions:
+hidesFromSubs:
 - H

@@ -92,7 +92,7 @@ async fn exercise_rejected_merge_override (
     graphnode_from_skgid (config, &ID::from ("N2")) ?;
   preserver . pid = ID::from ("preserver");
   preserver . extra_ids . clear ();
-  preserver . overrides_view_of = skg::types::misc::MSV::Unspecified;
+  preserver . overrides = skg::types::misc::MSV::Unspecified;
   let merge : NodeMerge = NodeMerge {
     acquiree_text_preserver : SaveNode (preserver),
     updated_acquirer        : SaveNode (n1),

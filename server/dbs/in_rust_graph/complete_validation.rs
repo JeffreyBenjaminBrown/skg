@@ -197,9 +197,9 @@ pub(crate) fn complete_from_rust (node : &GraphnodeInRust) -> Graphnode {
     extra_ids : node . extra_ids . clone (),
     body : node . body . clone (),
     contains : node . contains . clone (),
-    subscribes_to : node . subscribes_to . clone (),
-    hides_from_its_subscriptions : node . hides_from_its_subscriptions . clone (),
-    overrides_view_of : node . overrides_view_of . clone (),
+    subscribesTo : node . subscribesTo . clone (),
+    hidesFromSubs : node . hidesFromSubs . clone (),
+    overrides : node . overrides . clone (),
     flags : node . flags . clone (),
   }
 }

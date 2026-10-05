@@ -498,9 +498,9 @@ pub fn set_skgrepo_retagging_relRepos (
     if let MSV::Specified (v) = msv {
       for m in v . iter_mut () {
         m . relRepo = skgrepo . clone (); }} };
-  retag_msv ( &mut node . subscribes_to );
-  retag_msv ( &mut node . hides_from_its_subscriptions );
-  retag_msv ( &mut node . overrides_view_of );
+  retag_msv ( &mut node . subscribesTo );
+  retag_msv ( &mut node . hidesFromSubs );
+  retag_msv ( &mut node . overrides );
   if let MSV::Specified (v) = &mut node . aliases {
     for m in v . iter_mut () {
       m . relRepo = skgrepo . clone (); }} }
@@ -759,12 +759,12 @@ It better be okay with newlines."# . to_string() ),
                     vec![ ID::new ("1"),
                           ID::new ("2"),
                           ID::new ("3")] ),
-    subscribes_to: rel_partners_at_relRepo_msv ( &skgrepo,
+    subscribesTo: rel_partners_at_relRepo_msv ( &skgrepo,
                     MSV::Specified(vec![ID::new ("11"),
                              ID::new ("12"),
                              ID::new ("13")])),
-    hides_from_its_subscriptions: MSV::Unspecified,
-    overrides_view_of: MSV::Unspecified,
+    hidesFromSubs: MSV::Unspecified,
+    overrides: MSV::Unspecified,
     flags: Vec::new (), }}
 
 /// Extract Graphnode from Save variant; panics on Delete.

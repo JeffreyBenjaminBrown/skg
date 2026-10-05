@@ -54,7 +54,7 @@ pub fn validate_override_invariants (
       config, pid, &node . home_skgrepo, &mut violations )
     else { continue; };
     if ! node_is_owned { continue; }
-    for target in members_of ( node . overrides_view_of . or_default () ) {
+    for target in members_of ( node . overrides . or_default () ) {
       // Override targets can be primary or extra IDs. Validate against the
       // effective primary PID, matching graph relationship resolution.
       let overridden : ID =
@@ -143,11 +143,11 @@ pub fn derive_affected_override_scope (
   for skgrepo in &skgrepos {
     if let Some (node) = base . nodes . get (skgrepo) {
       targets . extend (
-        members_of (node . overrides_view_of . or_default ()) . into_iter ()
+        members_of (node . overrides . or_default ()) . into_iter ()
           . map (|raw| base . pid_of (&raw) . unwrap_or (raw))); }
     if let Some (node) = candidate . nodes . get (skgrepo) {
       targets . extend (
-        members_of (node . overrides_view_of . or_default ()) . into_iter ()
+        members_of (node . overrides . or_default ()) . into_iter ()
           . map (|raw| candidate . pid_of (&raw) . unwrap_or (raw))); }}
   OverrideCheckScope { skgrepos, targets }
 }

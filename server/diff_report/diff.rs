@@ -200,8 +200,8 @@ fn node_reports (
       value_set_diffs (before_node, after_node);
     let relationship_diffs : Vec<RelationshipDiff> =
       relationship_diffs_for_pid (&pid, before_facts, after_facts);
-    let contained_list_diff : Option<Vec<ListDiffItem>> =
-      contained_list_diff_for_pid (&pid, before_facts, after_facts);
+    let content_list_diff : Option<Vec<ListDiffItem>> =
+      content_list_diff_for_pid (&pid, before_facts, after_facts);
     let changed : bool =
       before_node . is_none () || after_node . is_none () ||
       title_diff . is_some () ||
@@ -211,7 +211,7 @@ fn node_reports (
         ! d . lost . is_empty () || ! d . gained . is_empty () ) ||
       relationship_diffs . iter () . any ( |d|
         ! d . lost . is_empty () || ! d . gained . is_empty () ) ||
-      contained_list_diff . is_some ();
+      content_list_diff . is_some ();
     if ! changed {
       continue; }
     let skgrepo : RepoForReport =
@@ -232,7 +232,7 @@ fn node_reports (
       skgrepo_change,
       value_set_diffs,
       relationship_diffs,
-      contained_list_diff }); }
+      content_list_diff }); }
   reports
 }
 
@@ -325,7 +325,7 @@ fn is_backward_relationship_role (
     "container" | "subscribee" | "hidden" | "overridden" | "mentioned" )
 }
 
-fn contained_list_diff_for_pid (
+fn content_list_diff_for_pid (
   pid          : &ID,
   before_facts : &GraphFacts,
   after_facts  : &GraphFacts,
@@ -494,19 +494,19 @@ impl GraphFacts {
       for contained in &contains_skgids {
         if ambiguous_pids . contains (contained) {
           continue; }
-        facts . add_edge ("contained", &node . pid, contained);
+        facts . add_edge ("content", &node . pid, contained);
         facts . add_edge ("container", contained, &node . pid); }
-      for subscribee in members_msv (&node . subscribes_to) . or_default () {
+      for subscribee in members_msv (&node . subscribesTo) . or_default () {
         if ambiguous_pids . contains (subscribee) {
           continue; }
         facts . add_edge ("subscriber", &node . pid, subscribee);
         facts . add_edge ("subscribee", subscribee, &node . pid); }
-      for hidden in members_msv (&node . hides_from_its_subscriptions) . or_default () {
+      for hidden in members_msv (&node . hidesFromSubs) . or_default () {
         if ambiguous_pids . contains (hidden) {
           continue; }
         facts . add_edge ("hider", &node . pid, hidden);
         facts . add_edge ("hidden", hidden, &node . pid); }
-      for overridden in members_msv (&node . overrides_view_of) . or_default () {
+      for overridden in members_msv (&node . overrides) . or_default () {
         if ambiguous_pids . contains (overridden) {
           continue; }
         facts . add_edge ("overrider", &node . pid, overridden);
@@ -561,24 +561,24 @@ impl GraphFacts {
         if ambiguous_pids . contains (contained) {
           continue; }
         if track_outbound {
-          facts . add_edge ("contained", &node . pid, contained); }
+          facts . add_edge ("content", &node . pid, contained); }
         if tracked_pids . contains (contained) {
           facts . add_edge ("container", contained, &node . pid); }}
-      for subscribee in members_msv (&node . subscribes_to) . or_default () {
+      for subscribee in members_msv (&node . subscribesTo) . or_default () {
         if ambiguous_pids . contains (subscribee) {
           continue; }
         if track_outbound {
           facts . add_edge ("subscriber", &node . pid, subscribee); }
         if tracked_pids . contains (subscribee) {
           facts . add_edge ("subscribee", subscribee, &node . pid); }}
-      for hidden in members_msv (&node . hides_from_its_subscriptions) . or_default () {
+      for hidden in members_msv (&node . hidesFromSubs) . or_default () {
         if ambiguous_pids . contains (hidden) {
           continue; }
         if track_outbound {
           facts . add_edge ("hider", &node . pid, hidden); }
         if tracked_pids . contains (hidden) {
           facts . add_edge ("hidden", hidden, &node . pid); }}
-      for overridden in members_msv (&node . overrides_view_of) . or_default () {
+      for overridden in members_msv (&node . overrides) . or_default () {
         if ambiguous_pids . contains (overridden) {
           continue; }
         if track_outbound {
@@ -609,7 +609,7 @@ impl GraphFacts {
 }
 
 const ROLE_NAMES : &[&str] = &[
-  "contained",
+  "content",
   "container",
   "subscriber",
   "subscribee",

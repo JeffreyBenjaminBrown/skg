@@ -38,9 +38,9 @@ pub struct ComposedNode {
   // Graphnode's.
   pub aliases                      : Option<Vec<RelPartner<String>>>,
   pub contains                     : Vec<RelPartner<ID>>,
-  pub subscribes_to                : Option<Vec<RelPartner<ID>>>,
-  pub hides_from_its_subscriptions : Option<Vec<RelPartner<ID>>>,
-  pub overrides_view_of            : Option<Vec<RelPartner<ID>>>,
+  pub subscribesTo                 : Option<Vec<RelPartner<ID>>>,
+  pub hidesFromSubs                : Option<Vec<RelPartner<ID>>>,
+  pub overrides                    : Option<Vec<RelPartner<ID>>>,
 }
 
 /// THE compose entry point: one telescope on disk -> the effective
@@ -117,10 +117,10 @@ pub fn graphnode_from_composition (
     extra_ids,
     body                         : composed . body,
     contains                     : composed . contains,
-    subscribes_to                : msv ( composed . subscribes_to ),
-    hides_from_its_subscriptions :
-      msv ( composed . hides_from_its_subscriptions ),
-    overrides_view_of            : msv ( composed . overrides_view_of ),
+    subscribesTo                 : msv ( composed . subscribesTo ),
+    hidesFromSubs                :
+      msv ( composed . hidesFromSubs ),
+    overrides                    : msv ( composed . overrides ),
     flags, } ) }
 
 /// Compose SECTIONS (already sorted most public first -- the caller
@@ -174,22 +174,22 @@ pub fn compose_sections (
     resolve, &mut warnings );
   let mentioned = |proj : &dyn Fn (&SectionSlices) -> bool| -> bool {
     sections . iter () . any ( |(_, s)| proj (s) ) };
-  composed . subscribes_to =
-    if mentioned ( &|s| s . subscribes_to . is_some () ) {
+  composed . subscribesTo =
+    if mentioned ( &|s| s . subscribesTo . is_some () ) {
       Some ( compose_ordered (
-        sections, |s| s . subscribes_to . as_deref (),
+        sections, |s| s . subscribesTo . as_deref (),
         resolve, &mut warnings ) ) }
     else { None };
-  composed . hides_from_its_subscriptions =
-    if mentioned ( &|s| s . hides_from_its_subscriptions . is_some () ) {
+  composed . hidesFromSubs =
+    if mentioned ( &|s| s . hidesFromSubs . is_some () ) {
       Some ( compose_unordered (
-        sections, |s| s . hides_from_its_subscriptions . as_deref (),
+        sections, |s| s . hidesFromSubs . as_deref (),
         resolve, &mut warnings ) ) }
     else { None };
-  composed . overrides_view_of =
-    if mentioned ( &|s| s . overrides_view_of . is_some () ) {
+  composed . overrides =
+    if mentioned ( &|s| s . overrides . is_some () ) {
       Some ( compose_unordered (
-        sections, |s| s . overrides_view_of . as_deref (),
+        sections, |s| s . overrides . as_deref (),
         resolve, &mut warnings ) ) }
     else { None };
   composed . aliases = {

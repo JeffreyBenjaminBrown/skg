@@ -104,14 +104,14 @@ Every glyph has a floor, the least tier it shows: =a= is at least low,
 A side's tier is shown by one part of the side, its carrier: its
 numeral, if it shows one, and otherwise all its ancestor flags. The
 carrier shows the greater of its floor and the side's tier; every other
-glyph shows just its floor. On the subscribes-to in-side, whose tier is
+glyph shows just its floor. On the subscribesTo in-side, whose tier is
 high, =2aS= draws the 2 high and the 'a' low, while =aS= has no
 numeral, so its 'a' carries the tier and is drawn high.
 
 *** Fractions
 Two sides can show a subset with a tier of its own, as a fraction.
 
-On the links-to in-side, the numerator counts substantive mentioners. A
+On the linksTo in-side, the numerator counts substantive mentioners. A
 mentioner is substantive if it has nonempty body text, visible direct
 content, or links to more than one distinct visible target. In =2/5L3=,
 five visible nodes link here, two are substantive, and this node links

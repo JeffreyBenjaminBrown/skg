@@ -101,18 +101,18 @@ There are three ways to test the code:
   - Used by 'path_from_pid_and_repo' to compute file paths: repo.path / pid.skg
   - Governed by user_owns_it flag: foreign Skg repos are write-protected
 
-  All graph relationships (contains, subscribes_to, etc.) reference nodes by ID, not by Skg repo. Skg repo is purely about where the .skg file lives on disk.
+  All graph relationships (contains, subscribesTo, etc.) reference nodes by ID, not by Skg repo. Skg repo is purely about where the .skg file lives on disk.
 
 * Relationships and the view system
 
   Graph relationships (all ID-based, repo-independent):
   - contains: parent -> child ordering (Vec<ID>, order matters)
   - subscribes: subscriber -> subscribee (forking foreign data)
-  - hides_from_its_subscriptions: filtering within subscriptions
-  - overrides_view_of: an overrider node is drawn in place of the
+  - hidesFromSubs: filtering within subscriptions
+  - overrides: an overrider node is drawn in place of the
     overridden node wherever it would appear as recursive content
     (override substitution; see docs/glossary.org and docs/sharing-model.org)
-  - links_to: org-roam style [[id:...]] hyperlinks
+  - linksTo: org-roam style [[id:...]] hyperlinks
 
   The view system is ephemeral non-vognode viewnodes rebuilt every save:
   - ActiveVognode: corresponds to an Graphnode, can be Definitive (editable) or Write-protected

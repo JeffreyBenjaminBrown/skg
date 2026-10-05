@@ -1,0 +1,15 @@
+* One-off: rename .skg keys (October 2026)
+The relation names became 'subscribesTo', 'hidesFromSubs' and
+'overrides', and the on-disk 'misc' became 'flags'. This script
+rewrites the old top-level keys in every .skg file under the given
+directories:
+
+#+begin_src sh
+python3 tools/migrate-skg-keys-2026-10/migrate.py --dry-run data/owned
+python3 tools/migrate-skg-keys-2026-10/migrate.py data/owned
+#+end_src
+
+It touches only keys at the start of a line, so titles and bodies are
+never changed, and it is idempotent. The server reads the old keys too
+(serde aliases on 'GraphnodeOnDisk'), so unmigrated files and old git
+history still load; any save rewrites the file with the new keys.

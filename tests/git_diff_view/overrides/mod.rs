@@ -100,8 +100,8 @@ async fn run_overrides_view_test (
        view:\n{}", initial );
     let request : String = initial . replace (
       "(affectsParent na)",
-      "(affectsParent na) (viewRequests (folder overrides_view_of) \
-       (folder hides_from_its_subscriptions))" );
+      "(affectsParent na) (viewRequests (folder overrides) \
+       (folder hidesFromSubs))" );
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : true,
       open_views        : OpenViews::new (), };
@@ -158,11 +158,11 @@ async fn emptied_requested_folders_still_render_in_diff_mode (
         . replace (
           "(id E) (repo main) (affectsParent na)",
           "(id E) (repo main) (affectsParent na) \
-           (viewRequests (folder overrides_view_of) (folder hides_from_its_subscriptions))" )
+           (viewRequests (folder overrides) (folder hidesFromSubs))" )
         . replace (
           "(id EN) (repo main) (affectsParent na)",
           "(id EN) (repo main) (affectsParent na) \
-           (viewRequests (folder overrides_view_of))" );
+           (viewRequests (folder overrides))" );
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views        : OpenViews::new (), };
@@ -207,7 +207,7 @@ async fn requested_outbound_folders_show_phantoms_and_addedR_staged (
 /// no-op for the relations, regenerates the phantoms (idempotence:
 /// saving the rendered result changes nothing further), and never
 /// collects a phantom as an editable-folder member (saving the phantom
-/// line must not re-add W to R's overrides_view_of).
+/// line must not re-add W to R's overrides).
 async fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
@@ -253,12 +253,12 @@ async fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
         &second . saved_view, EXPECTED_UNSTAGED );
       let r : Graphnode = read_graphnode (gitrepo_path, "R")?;
       assert_eq! (
-        members_msv (&r . overrides_view_of) . or_default () . to_vec (),
+        members_msv (&r . overrides) . or_default () . to_vec (),
         vec! [ ID::from ("Z"), ID::from ("O") ],
         "a phantom under a writable folder is never collected: W must \
-         not return to R's overrides_view_of" );
+         not return to R's overrides" );
       assert_eq! (
-        members_msv (&r . hides_from_its_subscriptions) . or_default () . to_vec (),
+        members_msv (&r . hidesFromSubs) . or_default () . to_vec (),
         vec! [ ID::from ("ha"), ID::from ("hc") ],
         "hb must not return to R's hides list" ); }
     Ok (( )) }

@@ -6,7 +6,7 @@ Enumerates the post-BASE_COMMIT edits in MANGLED_DIR and determines
 exactly which mangled UUIDs need translation via uuid_map. Uses
 `git diff --name-status BASE HEAD` to partition changed files into
 Added vs Modified, then for each Modified file computes the semantic
-delta (title/body/misc + per-field inserts/deletes on list fields).
+delta (title/body/flags + per-field inserts/deletes on list fields).
 
 Outputs (under WORK):
   targets.json — full summary. Shape:
@@ -21,7 +21,7 @@ Outputs (under WORK):
       "contains_deletes": {file_uuid: {field: [uuid, ...]}},
       "title_changes":    {file_uuid: {from: .., to: ..}},
       "body_changes":     {file_uuid: {from: .., to: ..}},
-      "misc_changes":     {file_uuid: {from: .., to: ..}},
+      "flags_changes":     {file_uuid: {from: .., to: ..}},
       "needed_map_keys":  [uuid, ...]  # UUIDs step 05 will dereference
                                        # through uuid_map.
     }
@@ -94,11 +94,11 @@ def all_refs(node: dict) -> list[str]:
     out = []
     for k in (
         "contains",
-        "subscribes_to",
-        "hides_from_its_subscriptions",
-        "overrides_view_of",
+        "subscribesTo",
+        "hidesFromSubs",
+        "overrides",
         "extra_ids",
-        "links_to",
+        "linksTo",
     ):
         v = node.get(k)
         if not v:
@@ -153,9 +153,9 @@ def main():
     # --- contains inserts / deletes per modified file ---
     list_fields = [
         "contains",
-        "subscribes_to",
-        "hides_from_its_subscriptions",
-        "overrides_view_of",
+        "subscribesTo",
+        "hidesFromSubs",
+        "overrides",
         "extra_ids",
     ]
 
@@ -172,7 +172,7 @@ def main():
     deletes: dict = {}
     title_changes: dict = {}
     body_changes: dict = {}
-    misc_changes: dict = {}
+    flags_changes: dict = {}
 
     for uu in modified:
         base = base_nodes[uu] or {}
@@ -181,8 +181,8 @@ def main():
             title_changes[uu] = {"from": base.get("title"), "to": head.get("title")}
         if base.get("body") != head.get("body"):
             body_changes[uu] = {"from": base.get("body"), "to": head.get("body")}
-        if base.get("misc") != head.get("misc"):
-            misc_changes[uu] = {"from": base.get("misc"), "to": head.get("misc")}
+        if base.get("flags") != head.get("flags"):
+            flags_changes[uu] = {"from": base.get("flags"), "to": head.get("flags")}
         for k in list_fields:
             b = normalize_list(base.get(k))
             h = normalize_list(head.get(k))
@@ -229,7 +229,7 @@ def main():
         "contains_deletes": deletes,
         "title_changes": title_changes,
         "body_changes": body_changes,
-        "misc_changes": misc_changes,
+        "flags_changes": flags_changes,
         "needed_map_keys": sorted(needed),
     }
 
@@ -241,7 +241,7 @@ def main():
     print(f"  -> {sorted(needed)}")
     print(f"title_changes: {len(title_changes)}")
     print(f"body_changes: {len(body_changes)}")
-    print(f"misc_changes: {len(misc_changes)}")
+    print(f"flags_changes: {len(flags_changes)}")
     print(f"contains_inserts: {sum(len(d) for d in inserts.values())} keys across {len(inserts)} files")
     print(f"contains_deletes: {sum(len(d) for d in deletes.values())} keys across {len(deletes)} files")
 

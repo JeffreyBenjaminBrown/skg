@@ -396,8 +396,8 @@ pub(crate) fn emit_telescope_warnings (
 /// Phase 2 (strip pass): for every Save in NODE_DEFS regardless of
 /// origin (which could be Phase 1 or the save itself),
 /// remove every id in 'deleted_id_set' from the four
-/// outbound list fields (contains, subscribes_to,
-/// hides_from_its_subscriptions, overrides_view_of).
+/// outbound list fields (contains, subscribesTo,
+/// hidesFromSubs, overrides).
 ///
 /// 'deleted_id_set' includes both the primary pid of each delete
 /// AND the extra_ids of that node from the in-Rust graph.
@@ -410,7 +410,7 @@ pub(crate) fn emit_telescope_warnings (
 /// - extra_ids of referencers: per the data model, an id can only
 ///   be an extra_id of ONE node, so a referencer cannot legitimately
 ///   carry a deleted node's id in its extra_ids.
-/// - links_to: lives in body text; stripping requires body
+/// - linksTo: lives in body text; stripping requires body
 ///   rewriting. Dangling link targets render as PhantomUnknown
 ///   placeholders when followed, so this is non-fatal.
 pub(crate) fn apply_delete_propagation_cleanup (
@@ -472,12 +472,12 @@ pub(crate) fn apply_delete_propagation_cleanup (
         if ! config . skgrepo_is_owned (&nc . home_skgrepo) { continue; }
         nc . contains . retain ( |skgid|
           ! deleted_id_set . contains (& skgid . member) );
-        nc . subscribes_to = remove_from_msv (
-          &nc . subscribes_to, &deleted_id_set );
-        nc . hides_from_its_subscriptions = remove_from_msv (
-          &nc . hides_from_its_subscriptions, &deleted_id_set );
-        nc . overrides_view_of = remove_from_msv (
-          &nc . overrides_view_of, &deleted_id_set ); }} } }
+        nc . subscribesTo = remove_from_msv (
+          &nc . subscribesTo, &deleted_id_set );
+        nc . hidesFromSubs = remove_from_msv (
+          &nc . hidesFromSubs, &deleted_id_set );
+        nc . overrides = remove_from_msv (
+          &nc . overrides, &deleted_id_set ); }} } }
 
 /// Project a GraphnodeInRust back into a Graphnode verbatim. Stripping
 /// of deleted ids happens later, in 'apply_delete_propagation_cleanup'
@@ -494,9 +494,9 @@ pub(crate) fn graphnode_from_graphnodeInRust (
     aliases                      : rust . aliases . clone (),
     body                         : rust . body . clone (),
     contains                     : rust . contains . clone (),
-    subscribes_to                : rust . subscribes_to . clone (),
-    hides_from_its_subscriptions : rust . hides_from_its_subscriptions . clone (),
-    overrides_view_of            : rust . overrides_view_of . clone (),
+    subscribesTo                 : rust . subscribesTo . clone (),
+    hidesFromSubs                : rust . hidesFromSubs . clone (),
+    overrides                    : rust . overrides . clone (),
     flags                        : rust . flags . clone (),
   }}
 

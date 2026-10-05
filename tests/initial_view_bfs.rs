@@ -220,10 +220,10 @@ async fn test_budget_content_beats_subscribers (
 
       println!("content-vs-subscribers (budget 3):\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id r) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribes_to (out 2))))) r
+      let expected = indoc! {"* (skg (node (id r) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 2))))) r
                               ** (skg subscribeeFolder)
-                              *** (skg (node (id s1) (repo main) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribes_to (in 1 (ancestors 2))) (birth (subscribes_to in 2))))) s1
-                              *** (skg (node (id s2) (repo main) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribes_to (in 1 (ancestors 2))) (birth (subscribes_to in 2))))) s2
+                              *** (skg (node (id s1) (repo main) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) s1
+                              *** (skg (node (id s2) (repo main) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) s2
                               ** (skg (node (id c1) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) c1
                               *** (skg (node (id c2) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) c2
                               "};

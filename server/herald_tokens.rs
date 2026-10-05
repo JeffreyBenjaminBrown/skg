@@ -10,10 +10,10 @@
 //!   (rels
 //!     (contains          (in  COUNT (ancestors GEN...))
 //!                        (out COUNT (ancestors GEN...)))
-//!     (subscribes_to     (in ...) (out ...))
-//!     (overrides_view_of (in ...) (out ...))
-//!     (hides_from_its_subscriptions (in ...) (out ...))
-//!     (links_to          (in COUNT (ancestors GEN...)
+//!     (subscribesTo     (in ...) (out ...))
+//!     (overrides (in ...) (out ...))
+//!     (hidesFromSubs (in ...) (out ...))
+//!     (linksTo          (in COUNT (ancestors GEN...)
 //!                            (substantive COUNT (ancestors GEN...)))
 //!                        (out COUNT (ancestors GEN...)))
 //!     (aliases  K)
@@ -97,12 +97,12 @@ impl AncestorFlags {
       (NodeRelation::Contains,                  false) => Some (&mut self . contains_out),
       (NodeRelation::LinksTo,               true ) => Some (&mut self . links_in),
       (NodeRelation::LinksTo,               false) => Some (&mut self . links_out),
-      (NodeRelation::HidesFromItsSubscriptions, true ) => Some (&mut self . hides_in),
-      (NodeRelation::HidesFromItsSubscriptions, false) => Some (&mut self . hides_out),
+      (NodeRelation::HidesFromSubs, true )             => Some (&mut self . hides_in),
+      (NodeRelation::HidesFromSubs, false)             => Some (&mut self . hides_out),
       (NodeRelation::SubscribesTo,                true ) => Some (&mut self . subscribes_in),
       (NodeRelation::SubscribesTo,                false) => Some (&mut self . subscribes_out),
-      (NodeRelation::OverridesViewOf,           true ) => Some (&mut self . overrides_in),
-      (NodeRelation::OverridesViewOf,           false) => Some (&mut self . overrides_out), };
+      (NodeRelation::Overrides,           true )       => Some (&mut self . overrides_in),
+      (NodeRelation::Overrides,           false)       => Some (&mut self . overrides_out), };
     if let Some (v) = slot {
       if ! v . contains (&generation) { v . push (generation); } } }
 }
@@ -175,7 +175,7 @@ fn contains_sexp (
   if let Some (s) = out { sides . push (s); }
   Some (format! ("(contains {})", sides . join (" "))) }
 
-/// The links_to relation reports the substantive inbound subset and
+/// The linksTo relation reports the substantive inbound subset and
 /// distinct resolved outbound targets. All counts are complete facts.
 fn links_sexp (
   total             : usize,
@@ -201,7 +201,7 @@ fn links_sexp (
   let mut inner : Vec<String> = Vec::new ();
   if let Some (s) = inb { inner . push (s); }
   if let Some (s) = out { inner . push (s); }
-  Some ( format! ("(links_to {})", inner . join (" ")) ) }
+  Some ( format! ("(linksTo {})", inner . join (" ")) ) }
 
 /// Emit the semantic `(rels ...)` form for a node from its member
 /// counts, alias/extra-id/flag counts, ancestor flags, and birth relations.
@@ -228,10 +228,10 @@ pub fn relationship_heralds_sexp (
     NodeRelation::SubscribesTo . relation_name (), counts . subscribers, &flags . subscribes_in,
     counts . subscribees, &flags . subscribes_out) { parts . push (s); }
   if let Some (s) = relation_sexp (
-    NodeRelation::OverridesViewOf . relation_name (), counts . overriders, &flags . overrides_in,
+    NodeRelation::Overrides . relation_name (), counts . overriders, &flags . overrides_in,
     counts . overrides_out, &flags . overrides_out) { parts . push (s); }
   if let Some (s) = relation_sexp (
-    NodeRelation::HidesFromItsSubscriptions . relation_name (), counts . hiders, &flags . hides_in,
+    NodeRelation::HidesFromSubs . relation_name (), counts . hiders, &flags . hides_in,
     counts . hides, &flags . hides_out) { parts . push (s); }
   if aliases   > 0 { parts . push ( format! ("(aliases {})",  aliases) ); }
   if extra_ids > 0 { parts . push ( format! ("(extraIds {})", extra_ids) ); }

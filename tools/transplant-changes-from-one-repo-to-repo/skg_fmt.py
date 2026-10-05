@@ -49,10 +49,10 @@ FIELD_ORDER = [
     "extra_ids",
     "body",
     "contains",
-    "subscribes_to",
-    "hides_from_its_subscriptions",
-    "overrides_view_of",
-    "misc",
+    "subscribesTo",
+    "hidesFromSubs",
+    "overrides",
+    "flags",
 ]
 
 

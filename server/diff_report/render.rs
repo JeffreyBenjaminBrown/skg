@@ -140,8 +140,8 @@ fn render_node_report (
   for relationship_diff in &node . relationship_diffs {
     render_relationship_diff (
       out, relationship_diff, report, abbreviations ); }
-  if let Some (diff) = &node . contained_list_diff {
-    render_contained_list_diff (out, diff, abbreviations); }
+  if let Some (diff) = &node . content_list_diff {
+    render_content_list_diff (out, diff, abbreviations); }
 }
 
 fn skgrepo_text (
@@ -251,7 +251,7 @@ fn is_backward_relationship_role (
     "container" | "subscribee" | "hidden" | "overridden" | "mentioned" )
 }
 
-fn render_contained_list_diff (
+fn render_content_list_diff (
   out           : &mut String,
   diff          : &[ListDiffItem],
   abbreviations : &HashMap<ID, String>,
@@ -325,7 +325,7 @@ fn abbreviations_for_report (
             . or_insert_with ( || report . titles . get (skgid)
               . cloned () . unwrap_or_else (
                 || "[unknown title]" . to_string () ) ); }}
-      if let Some (diff) = &node . contained_list_diff {
+      if let Some (diff) = &node . content_list_diff {
         for item in diff {
           let skgid : &ID = match item {
             ListDiffItem::Unchanged (skgid)

@@ -187,19 +187,19 @@ struct FolderSpec {
 
 const WRITE_PROTECTED_FOLDERS : [FolderSpec; 4] = [
   FolderSpec { atom : "subscriberFolder", recorder : "roSub-owner",
-            relation : "subscribes_to",
+            relation : "subscribesTo",
             member_a : "roSub-a", member_b : "roSub-b",
             intruder : "roSub-x" },
   FolderSpec { atom : "overriderFolder", recorder : "roOvr-owner",
-            relation : "overrides_view_of",
+            relation : "overrides",
             member_a : "roOvr-a", member_b : "roOvr-b",
             intruder : "roOvr-x" },
   FolderSpec { atom : "hiderFolder", recorder : "roHider-owner",
-            relation : "hides_from_its_subscriptions",
+            relation : "hidesFromSubs",
             member_a : "roHider-a", member_b : "roHider-b",
             intruder : "roHider-x" },
   FolderSpec { atom : "hiddenFolder", recorder : "roHidden-owner",
-            relation : "hides_from_its_subscriptions",
+            relation : "hidesFromSubs",
             member_a : "roHidden-a", member_b : "roHidden-b",
             intruder : "roHidden-x" },
 ];
@@ -401,12 +401,12 @@ async fn path_request_scenarios (
   // overridden (the origin overrides it) from overrider (it overrides
   // the origin, among others).
   let sharing : [(&str, &str, &str, &str, &str); 6] = [
-    ("path/overridden", "wOvr-owner",     "overridden", "wOvr-a",         "(overrides_view_of (in 1 (ancestors 1)))"),
-    ("path/overrider",  "wOvr-a",         "overrider",  "wOvr-owner",     "(overrides_view_of (out 2 (ancestors 1)))"),
-    ("path/subscribee", "wSub-owner",     "subscribee", "wSub-a",         "(subscribes_to (in 1 (ancestors 1)))"),
-    ("path/subscriber", "wSub-a",         "subscriber", "wSub-owner",     "(subscribes_to (out 3 (ancestors 1)))"),
-    ("path/hidden",     "roHidden-owner", "hidden",     "roHidden-a",     "(hides_from_its_subscriptions (in 1 (ancestors 1)))"),
-    ("path/hider",      "roHidden-a",     "hider",      "roHidden-owner", "(hides_from_its_subscriptions (out 2 (ancestors 1)))"),
+    ("path/overridden", "wOvr-owner",     "overridden", "wOvr-a",         "(overrides (in 1 (ancestors 1)))"),
+    ("path/overrider",  "wOvr-a",         "overrider",  "wOvr-owner",     "(overrides (out 2 (ancestors 1)))"),
+    ("path/subscribee", "wSub-owner",     "subscribee", "wSub-a",         "(subscribesTo (in 1 (ancestors 1)))"),
+    ("path/subscriber", "wSub-a",         "subscriber", "wSub-owner",     "(subscribesTo (out 3 (ancestors 1)))"),
+    ("path/hidden",     "roHidden-owner", "hidden",     "roHidden-a",     "(hidesFromSubs (in 1 (ancestors 1)))"),
+    ("path/hider",      "roHidden-a",     "hider",      "roHidden-owner", "(hidesFromSubs (out 2 (ancestors 1)))"),
   ];
   for (s, recorder, role, partner, birth_rel) in sharing {
     let _ = role;
@@ -439,7 +439,7 @@ async fn path_request_scenarios (
     // The grafted dest is born of a single inbound link (from the
     // origin), no outbound.
     fails . want_contains (
-      s, &resp . saved_view, "(links_to (in 1 (ancestors 1) (substantive 0)))" ); }
+      s, &resp . saved_view, "(linksTo (in 1 (ancestors 1) (substantive 0)))" ); }
   { // Self-referential fixture: a node that links to ITSELF. A
     // non-container path role is cycle-guarded and needs NO view-root
     // special-case (unlike containerward) -- the build must not panic,
@@ -471,43 +471,43 @@ async fn folder_request_scenarios (
     format! (
       "* (skg (node (id {}) (repo public) (viewRequests (folder {})))) {}\n",
       recorder, rel, recorder ) };
-  { // (folder overrides_view_of) on wSub-owner, which overrides nothing and is
+  { // (folder overrides) on wSub-owner, which overrides nothing and is
     // overridden by nothing: the EDITABLE overriddenFolder appears EMPTY
     // (the "add an override here" surface); the write-protected overriderFolder
     // does not appear (empty write-protected folders are pruned).
     let s : &str = "folder-request/overrides-empty";
     let resp : SaveResponse = save (
-      &request_buf ("wSub-owner", "overrides_view_of"),
+      &request_buf ("wSub-owner", "overrides"),
       config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(skg overriddenFolder)");
     fails . want_absent  (s, &resp . saved_view, "overriderFolder"); }
-  { // (folder overrides_view_of) on wOvr-owner, which overrides wOvr-a and wOvr-b:
+  { // (folder overrides) on wOvr-owner, which overrides wOvr-a and wOvr-b:
     // the overriddenFolder appears POPULATED with both.
     let s : &str = "folder-request/overrides-populated";
     let resp : SaveResponse = save (
-      &request_buf ("wOvr-owner", "overrides_view_of"),
+      &request_buf ("wOvr-owner", "overrides"),
       config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(skg overriddenFolder)");
     fails . want_contains (s, &resp . saved_view, "(id wOvr-a)");
     fails . want_contains (s, &resp . saved_view, "(id wOvr-b)"); }
-  { // (folder subscribes_to) on wSub-owner: subscribeeFolder POPULATED (a,b,c).
+  { // (folder subscribesTo) on wSub-owner: subscribeeFolder POPULATED (a,b,c).
     let s : &str = "folder-request/subscribes-populated";
     let resp : SaveResponse = save (
-      &request_buf ("wSub-owner", "subscribes_to"),
+      &request_buf ("wSub-owner", "subscribesTo"),
       config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(skg subscribeeFolder)");
     fails . want_contains (s, &resp . saved_view, "(id wSub-a)"); }
-  { // (folder hides_from_its_subscriptions) on wSub-owner, which neither hides nor is hidden:
+  { // (folder hidesFromSubs) on wSub-owner, which neither hides nor is hidden:
     // both sides write-protected and empty, so NOTHING appears.
     let s : &str = "folder-request/hides-empty";
     let resp : SaveResponse = save (
-      &request_buf ("wSub-owner", "hides_from_its_subscriptions"),
+      &request_buf ("wSub-owner", "hidesFromSubs"),
       config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
@@ -553,10 +553,10 @@ async fn editable_subscribeeFolder (
     let nodes : Vec<NodeInstruction> =
       saveplan_nodes (&reordered, config, None) . await ?;
     match saved_node_by_skgid (&nodes, "wSub-owner") {
-      Some (n) => if members_msv (&n . subscribes_to) != MSV::Specified (vec![
+      Some (n) => if members_msv (&n . subscribesTo) != MSV::Specified (vec![
           ID::from ("wSub-c"), ID::from ("wSub-b"), ID::from ("wSub-a")]) {
         fails . record (s, format! (
-          "reordered subscribes_to wrong: {:?}", n . subscribes_to)); },
+          "reordered subscribesTo wrong: {:?}", n . subscribesTo)); },
       None => fails . record (s, "no SaveNode for wSub-owner" . into ()), } }
   { // delete one: remove b -> [a,c]
     let s : &str = "subscribeeFolder/delete";
@@ -566,10 +566,10 @@ async fn editable_subscribeeFolder (
     let nodes  : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, None) . await ?;
     match saved_node_by_skgid (&nodes, "wSub-owner") {
-      Some (n) => if members_msv (&n . subscribes_to) != MSV::Specified (vec![
+      Some (n) => if members_msv (&n . subscribesTo) != MSV::Specified (vec![
           ID::from ("wSub-a"), ID::from ("wSub-c")]) {
         fails . record (s, format! (
-          "after delete, subscribes_to wrong: {:?}", n . subscribes_to)); },
+          "after delete, subscribesTo wrong: {:?}", n . subscribesTo)); },
       None => fails . record (s, "no SaveNode for wSub-owner" . into ()), } }
   { // insert a member: add d -> [a,b,c,d]
     let s : &str = "subscribeeFolder/insert";
@@ -580,16 +580,16 @@ async fn editable_subscribeeFolder (
     let nodes : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, None) . await ?;
     match saved_node_by_skgid (&nodes, "wSub-owner") {
-      Some (n) => if members_msv (&n . subscribes_to) != MSV::Specified (vec![
+      Some (n) => if members_msv (&n . subscribesTo) != MSV::Specified (vec![
           ID::from ("wSub-a"), ID::from ("wSub-b"),
           ID::from ("wSub-c"), ID::from ("wSub-d")]) {
         fails . record (s, format! (
-          "after insert, subscribes_to wrong: {:?}", n . subscribes_to)); },
+          "after insert, subscribesTo wrong: {:?}", n . subscribesTo)); },
       None => fails . record (s, "no SaveNode for wSub-owner" . into ()), } }
   Ok (( )) }
 
 fn override_set ( n : &Graphnode ) -> Vec<ID> {
-  match &n . overrides_view_of {
+  match &n . overrides {
     MSV::Specified (skgids) => { let mut v = members_of (skgids); v . sort (); v }
     MSV::Unspecified => Vec::new (), } }
 
@@ -600,7 +600,7 @@ async fn editable_overriddenFolder (
   graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   let buf : String = render_with_requested_relation_folders (
-    "wOvr-owner", "overrides_view_of", config, tantivy, graph ) . await ?;
+    "wOvr-owner", "overrides", config, tantivy, graph ) . await ?;
   let stars : usize = folder_member_stars (&buf, "(id wOvr-a)");
   { // reorder is harmless: order-free set unchanged
     let s : &str = "overriddenFolder/reorder";
@@ -612,7 +612,7 @@ async fn editable_overriddenFolder (
       Some (n) => if override_set (n) != vec![
           ID::from ("wOvr-a"), ID::from ("wOvr-b")] {
         fails . record (s, format! (
-          "reorder changed the override set: {:?}", n . overrides_view_of)); },
+          "reorder changed the override set: {:?}", n . overrides)); },
       None => fails . record (s, "no SaveNode for wOvr-owner" . into ()), } }
   { // delete one: remove a -> [b]
     let s : &str = "overriddenFolder/delete";
@@ -624,7 +624,7 @@ async fn editable_overriddenFolder (
     match saved_node_by_skgid (&nodes, "wOvr-owner") {
       Some (n) => if override_set (n) != vec![ID::from ("wOvr-b")] {
         fails . record (s, format! (
-          "after delete, override set wrong: {:?}", n . overrides_view_of)); },
+          "after delete, override set wrong: {:?}", n . overrides)); },
       None => fails . record (s, "no SaveNode for wOvr-owner" . into ()), } }
   { // insert a member: add c -> {a,b,c}
     let s : &str = "overriddenFolder/insert";
@@ -638,12 +638,12 @@ async fn editable_overriddenFolder (
       Some (n) => if override_set (n) != vec![
           ID::from ("wOvr-a"), ID::from ("wOvr-b"), ID::from ("wOvr-c")] {
         fails . record (s, format! (
-          "after insert, override set wrong: {:?}", n . overrides_view_of)); },
+          "after insert, override set wrong: {:?}", n . overrides)); },
       None => fails . record (s, "no SaveNode for wOvr-owner" . into ()), } }
   Ok (( )) }
 
 /// Deleting a member from the write-protected hiddenFolder must not unhide it
-/// on disk: the recorder's hides_from_its_subscriptions is never read
+/// on disk: the recorder's hidesFromSubs is never read
 /// from the folder, so the deleted member stays hidden. (The view-level
 /// twin -- respawn in the saved view -- is the hiddenFolder case of
 /// write_protected_delete; the extraction-seam twin is in commit 1.)
@@ -655,7 +655,7 @@ async fn hiddenFolder_delete_does_not_unhide (
 ) -> Result<(), Box<dyn Error>> {
   let s : &str = "hiddenFolder/no-unhide-on-disk";
   let buf : String = render_with_requested_relation_folders (
-    "roHidden-owner", "hides_from_its_subscriptions", config, tantivy, graph ) . await ?;
+    "roHidden-owner", "hidesFromSubs", config, tantivy, graph ) . await ?;
   let a_line : String =
     line_containing (&buf, "(id roHidden-a)") . to_string ();
   let edited : String = buf . replace (&format! ("{}\n", a_line), "");
@@ -664,7 +664,7 @@ async fn hiddenFolder_delete_does_not_unhide (
   // Either the recorder is a no-op (absent from the plan), or its SaveNode
   // still hides roHidden-a; in no case is roHidden-a unhidden.
   if let Some (n) = saved_node_by_skgid (&nodes, "roHidden-owner") {
-    let hides : Vec<ID> = match &n . hides_from_its_subscriptions {
+    let hides : Vec<ID> = match &n . hidesFromSubs {
       MSV::Specified (skgids) => members_of (skgids),
       MSV::Unspecified => Vec::new (), };
     if ! hides . is_empty () && ! hides . contains (&ID::from ("roHidden-a")) {
@@ -694,7 +694,7 @@ async fn omission_scenarios (
     fails . want_absent (s, &buf, "omSub-active");
     fails . want_absent (s, &buf, "omSub-inactive"); }
   { // editable subscribeeFolder: inactive omitted from render, but the
-    // restricted save weaves it back into subscribes_to.
+    // restricted save weaves it back into subscribesTo.
     let s : &str = "subscribeeFolder/omission";
     let (buf, _p, _t) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view_with_skgrepo_set (
@@ -705,7 +705,7 @@ async fn omission_scenarios (
     // Delete the only VISIBLE subscribee and save under the restricted
     // set: the weave must still preserve the invisible omWsub-inactive
     // (a restricted save cannot delete what it cannot see), while the
-    // deleted active member is removed. So subscribes_to = [inactive].
+    // deleted active member is removed. So subscribesTo = [inactive].
     let active_line : String =
       line_containing (&buf, "(id omWsub-active)") . to_string ();
     let edited : String =
@@ -713,7 +713,7 @@ async fn omission_scenarios (
     let nodes : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, Some (&active)) . await ?;
     match saved_node_by_skgid (&nodes, "omWsub-owner") {
-      Some (n) => { let subs : Vec<ID> = match &n . subscribes_to {
+      Some (n) => { let subs : Vec<ID> = match &n . subscribesTo {
           MSV::Specified (skgids) => members_of (skgids),
           MSV::Unspecified => Vec::new (), };
         if ! subs . contains (&ID::from ("omWsub-inactive")) {
@@ -778,10 +778,10 @@ fn buffer_save_rejects_second_owned_overrider
         graphnode_by_skgid (
           &skg::test_utils::graph_handle_from_config (config)? . load_full (),
           config, &ID::from ("mono-r2") ) ?;
-      let overrides_empty : bool = match &r2 . overrides_view_of {
+      let overrides_empty : bool = match &r2 . overrides {
         MSV::Unspecified       => true,
         MSV::Specified (skgids)   => skgids . is_empty (), };
       assert! ( overrides_empty,
         "a rejected save must not write mono-r2's override edge: {:?}",
-        r2 . overrides_view_of );
+        r2 . overrides );
       Ok (( )) } )) }

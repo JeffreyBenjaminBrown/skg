@@ -1,7 +1,7 @@
 pid: 'S2'
 title: "S2"
-subscribes_to:
+subscribesTo:
   - "B2"
-hides_from_its_subscriptions:
+hidesFromSubs:
   - "x2"
   - "y2"

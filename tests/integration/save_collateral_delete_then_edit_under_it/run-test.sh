@@ -62,9 +62,9 @@ title: "11"
 pid: "11"
 aliases:
   - eleven
-subscribes_to:
+subscribesTo:
   - subee
-hides_from_its_subscriptions:
+hidesFromSubs:
   - subee-1
   - also-hidden
 EOF

@@ -6,8 +6,8 @@ The clone keeps a live link to the original, so the original's later
 additions still reach you, but your edits never touch the original.
 
 See also [[file:./sharing-model.org][the sharing model]] for the underlying
-relations (=subscribes=, =overrides_view_of=,
-=hides_from_its_subscriptions=) and =glossary.org= ("fork", "clone",
+relations (=subscribes=, =overrides=,
+=hidesFromSubs=) and =glossary.org= ("fork", "clone",
 "subscribee as such", "override substitution").
 
 ** The implicit gesture: editing a foreign node
@@ -211,7 +211,7 @@ Suppose the clone =C= and the original =N= both contain a child =X=,
 and you delete =X= from =C= (or move it elsewhere). Without more, =X=
 would immediately resurface under =C= as unintegrated subscribed
 content — you removed it, =N= still contains it. So the save records a
-hide: =C= now =hides_from_its_subscriptions= =X=, and the subscription
+hide: =C= now =hidesFromSubs= =X=, and the subscription
 stays quiet about it. Putting =X= back among =C='s contents removes
 the hide again. (This is the same rule the forking edit itself
 follows: children of =N= you deleted /while/ forking are born hidden.

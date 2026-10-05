@@ -18,7 +18,7 @@ Modified files (status 'M'):
   - Read public/'s current text.
   - Apply the semantic delta (mangled BASE → mangled HEAD) as
     minimal text-level edits:
-      title / body / misc / extra_ids: replace that field's span.
+      title / body / flags / extra_ids: replace that field's span.
       list fields (contains etc): replace the whole list with
         map(mangled HEAD list). This exploits the step-04
         invariant — positions carry through faithfully.
@@ -136,10 +136,10 @@ def render_added_file(mangled_text: str, mangled_node: dict,
     for field in (
         "contains",
         "extra_ids",
-        "subscribes_to",
-        "hides_from_its_subscriptions",
-        "overrides_view_of",
-        "links_to",
+        "subscribesTo",
+        "hidesFromSubs",
+        "overrides",
+        "linksTo",
     ):
         v = node.get(field)
         if isinstance(v, list):
@@ -166,23 +166,23 @@ def render_node(node: dict) -> str:
         out += S.emit_body(node["body"])
     if node.get("contains"):
         out += render_list_field("contains", node["contains"])
-    if node.get("subscribes_to"):
-        v = node["subscribes_to"]
+    if node.get("subscribesTo"):
+        v = node["subscribesTo"]
         if isinstance(v, str):
             v = [v]
-        out += render_list_field("subscribes_to", v)
-    if node.get("hides_from_its_subscriptions"):
-        v = node["hides_from_its_subscriptions"]
+        out += render_list_field("subscribesTo", v)
+    if node.get("hidesFromSubs"):
+        v = node["hidesFromSubs"]
         if isinstance(v, str):
             v = [v]
-        out += render_list_field("hides_from_its_subscriptions", v)
-    if node.get("overrides_view_of"):
-        v = node["overrides_view_of"]
+        out += render_list_field("hidesFromSubs", v)
+    if node.get("overrides"):
+        v = node["overrides"]
         if isinstance(v, str):
             v = [v]
-        out += render_list_field("overrides_view_of", v)
-    if node.get("misc"):
-        out += render_list_field("misc", node["misc"])
+        out += render_list_field("overrides", v)
+    if node.get("flags"):
+        out += render_list_field("flags", node["flags"])
     return out
 
 
@@ -234,10 +234,10 @@ def apply_modifications(public_text: str, mangled_base: dict,
                 spans = S.parse_fields(public_text)
 
     # Misc change.
-    if mangled_base.get("misc") != mangled_head.get("misc"):
-        head_misc = mangled_head.get("misc") or []
-        span = S.find_span(spans, "misc")
-        new_text = render_list_field("misc", head_misc) if head_misc else ""
+    if mangled_base.get("flags") != mangled_head.get("flags"):
+        head_flags = mangled_head.get("flags") or []
+        span = S.find_span(spans, "flags")
+        new_text = render_list_field("flags", head_flags) if head_flags else ""
         if span is None:
             if new_text:
                 public_text = public_text if public_text.endswith("\n") else public_text + "\n"
@@ -247,7 +247,7 @@ def apply_modifications(public_text: str, mangled_base: dict,
             public_text = S.replace_span(public_text, span, new_text)
             spans = S.parse_fields(public_text)
 
-    # List-field changes (contains, subscribes_to, etc.).
+    # List-field changes (contains, subscribesTo, etc.).
     #
     # Relies on step 04's invariant: mapping the mangled BASE list
     # through uuid_map yields the public/ list element-for-element. So
@@ -256,8 +256,8 @@ def apply_modifications(public_text: str, mangled_base: dict,
     # shot. If the invariant is violated for a file, the result is
     # "mangled HEAD's order and content, translated to public UUIDs" —
     # which may reorder public/'s list, but the content is correct.
-    for field in ("contains", "subscribes_to",
-                  "hides_from_its_subscriptions", "overrides_view_of",
+    for field in ("contains", "subscribesTo",
+                  "hidesFromSubs", "overrides",
                   "extra_ids"):
         base_list = normalize_list(mangled_base.get(field))
         head_list = normalize_list(mangled_head.get(field))

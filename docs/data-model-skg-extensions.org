@@ -10,19 +10,19 @@ This is [[file:./data-model-trees-with-links.org][the data model that almost all
 Each document is a curated view of data defined by the =contains= relation. Any document that includes the node N also includes every node that descends from N via =contains=.
 
 As described in the [[file:./data-model_technical.org][technical data model]], nodes can
-be connected by =contains=, =links_to=, and several other relationships.
+be connected by =contains=, =linksTo=, and several other relationships.
 Containment and links differ in two ways:
 
 - Links are defined by the text in a node, whereas containment is defined by nodes' spatial relationships to each other in a tree (the document containing them).
 - Following a link requires the user to jump to a different context, whereas following a containment relationship need only require moving your eyes. If A contains B, looking at A means looking at a document that already contains B underneath A.
 ** Each node of a document is a separate file.
 This is unusual -- in most applications, the entire tree of text would be a single document. The one-file model has the advantage that a document can be easily read without special software. But the Skg model makes it possible to share granularly (see [[file:./sharing-model.org][the sharing model]], and [[file:./diffs-are-clearer-in-skg.org][easy to understand changes]].
-** The overrides_view_of relationship
+** The overrides relationship
 A file F can override the view of file O. Visiting O directly still opens O itself as the raw root. Override facts can be inspected in enriched search results and through requested override folders or paths. Separately, wherever O would appear as recursive /content/ of a node already in view, F is drawn in its place automatically; this is /override substitution/ (see [[file:./sharing-model.org][the sharing model]]).
 
 Overriding is useful for both sharing and privacy, as is explained below.
 
-Overriding is represented in the graph with the =overrides_view_of=
+Overriding is represented in the graph with the =overrides=
 relationship.
 ** Sharing
 When you "edit" a note N that you don't own, what actually happens is you gain a new note N', which begins with all of the content from N plus a (deletable) subscription to N and a (deletable) overrides relationship to N.
@@ -33,7 +33,7 @@ The overrides relationship is what makes Skg draw N' wherever N would appear as 
 
 When new content appears in N, it will appear in your N' as "unintegrated subscribed content" (which you can proceed to integrate if you like). If you delete the subscription, this stops being true. You can also subscribe N' to other nodes apart from N.
 
-If the original N contains C, and you delete C from your N', then N' gains a "hides_from_its_subscriptions" relationship to C, which prevents C from being shown as "unintegrated subscribed content" in N'.
+If the original N contains C, and you delete C from your N', then N' gains a "hidesFromSubs" relationship to C, which prevents C from being shown as "unintegrated subscribed content" in N'.
 ** Privacy relies on overriding.
 The previous section describes how overriding is used to integrate foreign content into one's data. Overriding is also the mechanism by which private data is added to public data.
 

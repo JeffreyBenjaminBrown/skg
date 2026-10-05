@@ -1,4 +1,4 @@
 pid: M1
 title: mutual one
-overrides_view_of:
+overrides:
   - M2

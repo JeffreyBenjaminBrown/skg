@@ -1,6 +1,6 @@
 pid: had-id
 title: had-id
-misc:
+flags:
 - Had_ID_Before_Import
 contains:
 - in-had-id-1

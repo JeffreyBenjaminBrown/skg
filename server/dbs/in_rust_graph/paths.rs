@@ -47,7 +47,7 @@ pub fn path_containerward_to_first_nonlinearity_in_graph (
   node  : &ID,
 ) -> Result<PathToFirstNonlinearity, Box<dyn Error>> {
   path_to_first_nonlinearity_in_graph (
-    graph, None, node, "contains", "contained", "container") }
+    graph, None, node, "contains", "content", "container") }
 
 fn path_to_first_nonlinearity_in_graph (
   graph       : &InRustGraph,
@@ -124,8 +124,8 @@ fn related_nodes_from_graph_gated (
 
 fn node_relation_from_name (name : &str) -> Option<NodeRelation> {
   [ NodeRelation::Contains, NodeRelation::LinksTo,
-    NodeRelation::SubscribesTo, NodeRelation::HidesFromItsSubscriptions,
-    NodeRelation::OverridesViewOf ]
+    NodeRelation::SubscribesTo, NodeRelation::HidesFromSubs,
+    NodeRelation::Overrides ]
     . into_iter () . find (|relation| relation . relation_name () == name)
 }
 
@@ -135,4 +135,4 @@ pub fn path_containerward_to_first_nonlinearity (
   node  : &ID,
 ) -> Result<PathToFirstNonlinearity, Box<dyn Error>> {
   path_to_first_nonlinearity_in_graph (
-    graph, None, node, "contains", "contained", "container") }
+    graph, None, node, "contains", "content", "container") }

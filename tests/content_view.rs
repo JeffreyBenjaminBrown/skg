@@ -188,18 +188,18 @@ async fn test_multi_root_view_with_shared_nodes (
       // write-protected Content) as the first child of the level-1 view of
       // node 2.
       let expected = indoc! {
-        "* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 2)) (hides_from_its_subscriptions (out 2))))) title 1
+        "* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 2)) (hidesFromSubs (out 2))))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
-         ** (skg (node (id 2) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (links_to (in 1 (substantive 1))) (subscribes_to (out 2)) (extraIds 1) (birth (contains in 1))))) title 2
-         ** (skg (node (id 5) (repo main) (rels (links_to (in 1 (substantive 1)) (out 3)) (subscribes_to (in 2)) (overrides_view_of (out 2)) (hides_from_its_subscriptions (in 1 (ancestors 1))) (extraIds 1) (birth (overrides_view_of out))) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
+         ** (skg (node (id 2) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1) (birth (contains in 1))))) title 2
+         ** (skg (node (id 5) (repo main) (rels (linksTo (in 1 (substantive 1)) (out 3)) (subscribesTo (in 2)) (overrides (out 2)) (hidesFromSubs (in 1 (ancestors 1))) (extraIds 1) (birth (overrides out))) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
-         * (skg (node (id 2) (repo main) (affectsParent na) (rels (contains (in 1)) (links_to (in 1 (substantive 1))) (subscribes_to (out 2)) (extraIds 1)))) title 2
+         * (skg (node (id 2) (repo main) (affectsParent na) (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1)))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (repo main) (affectsParent false) writeProtected omittedBody (rels (contains (out 2 (ancestors 1))) (hides_from_its_subscriptions (out 2)) (birth (contains out 1))))) title 1
+         ** (skg (node (id 1) (repo main) (affectsParent false) writeProtected omittedBody (rels (contains (out 2 (ancestors 1))) (hidesFromSubs (out 2)) (birth (contains out 1))))) title 1
          ** (skg subscribeeFolder)
-         *** (skg (node (id 4) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (subscribes_to (in 2 (ancestors 2))) (overrides_view_of (in 1)) (hides_from_its_subscriptions (in 1)) (extraIds 1) (birth (subscribes_to in 2))))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (links_to (in 1 (substantive 1)) (out 3 (ancestors 2))) (subscribes_to (in 2 (ancestors 2))) (overrides_view_of (out 2)) (hides_from_its_subscriptions (in 1)) (extraIds 1) (birth (subscribes_to in 2))))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 2 (ancestors 2))) (overrides (in 1)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2))))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (subscribesTo (in 2 (ancestors 2))) (overrides (out 2)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2))))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_metadata_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");
@@ -234,18 +234,18 @@ async fn test_multi_root_view_with_node_limit (
       // their bodies + default folders (folders are not budget-bound);
       // subscribee members are write-protected.
       let expected = indoc! {
-        "* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 2)) (hides_from_its_subscriptions (out 2))))) title 1
+        "* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 2)) (hidesFromSubs (out 2))))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
-         ** (skg (node (id 2) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (links_to (in 1 (substantive 1))) (subscribes_to (out 2)) (extraIds 1) (birth (contains in 1))))) title 2
-         ** (skg (node (id 5) (repo main) (rels (links_to (in 1 (substantive 1)) (out 3)) (subscribes_to (in 2)) (overrides_view_of (out 2)) (hides_from_its_subscriptions (in 1 (ancestors 1))) (extraIds 1) (birth (overrides_view_of out))) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
+         ** (skg (node (id 2) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1) (birth (contains in 1))))) title 2
+         ** (skg (node (id 5) (repo main) (rels (linksTo (in 1 (substantive 1)) (out 3)) (subscribesTo (in 2)) (overrides (out 2)) (hidesFromSubs (in 1 (ancestors 1))) (extraIds 1) (birth (overrides out))) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
-         * (skg (node (id 2) (repo main) (affectsParent na) (rels (contains (in 1)) (links_to (in 1 (substantive 1))) (subscribes_to (out 2)) (extraIds 1)))) title 2
+         * (skg (node (id 2) (repo main) (affectsParent na) (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1)))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (repo main) (affectsParent false) writeProtected omittedBody (rels (contains (out 2 (ancestors 1))) (hides_from_its_subscriptions (out 2)) (birth (contains out 1))))) title 1
+         ** (skg (node (id 1) (repo main) (affectsParent false) writeProtected omittedBody (rels (contains (out 2 (ancestors 1))) (hidesFromSubs (out 2)) (birth (contains out 1))))) title 1
          ** (skg subscribeeFolder)
-         *** (skg (node (id 4) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (subscribes_to (in 2 (ancestors 2))) (overrides_view_of (in 1)) (hides_from_its_subscriptions (in 1)) (extraIds 1) (birth (subscribes_to in 2))))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (links_to (in 1 (substantive 1)) (out 3 (ancestors 2))) (subscribes_to (in 2 (ancestors 2))) (overrides_view_of (out 2)) (hides_from_its_subscriptions (in 1)) (extraIds 1) (birth (subscribes_to in 2))))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 2 (ancestors 2))) (overrides (in 1)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2))))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (subscribesTo (in 2 (ancestors 2))) (overrides (out 2)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2))))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_metadata_eq!(result, expected,
                  "Multi root view limit=3 truncates by the §5.5 budget");

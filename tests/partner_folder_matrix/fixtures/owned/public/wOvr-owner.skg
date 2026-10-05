@@ -1,5 +1,5 @@
 pid: wOvr-owner
 title: wOvr-owner
-overrides_view_of:
+overrides:
 - wOvr-a
 - wOvr-b

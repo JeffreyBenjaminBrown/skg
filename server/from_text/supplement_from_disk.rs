@@ -188,9 +188,9 @@ fn supplement_nodeSaveIntent_from_disk (
 /// node's relationship-list members, so its lists describe only the
 /// visible subset.  This merges each list with its disk counterpart
 /// (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org): the anchored
-/// 'weave' for the order-meaningful 'contains' and 'subscribes_to',
+/// 'weave' for the order-meaningful 'contains' and 'subscribesTo',
 /// the 'set_difference_merge' for the order-meaningless
-/// 'overrides_view_of'.  A field is replaced only when the merge
+/// 'overrides'.  A field is replaced only when the merge
 /// changed it, so an untouched field keeps its MSV shape (and the
 /// noop filter can still recognize an unchanged node).
 fn preserve_invisible_members (
@@ -208,12 +208,12 @@ fn preserve_invisible_members (
       . is_some_and (|member| relationship_member_is_visible (
         graph, member, config, active)) };
   let subscribes_visible = |skgid : &ID| -> bool {
-    disk_node . subscribes_to . or_default () . iter ()
+    disk_node . subscribesTo . or_default () . iter ()
       .find (|member| &member . member == skgid)
       .is_some_and (|member| relationship_member_is_visible (
         graph, member, config, active)) };
   let overrides_visible = |skgid : &ID| -> bool {
-    disk_node . overrides_view_of . or_default () . iter ()
+    disk_node . overrides . or_default () . iter ()
       .find (|member| &member . member == skgid)
       .is_some_and (|member| relationship_member_is_visible (
         graph, member, config, active)) };
@@ -239,30 +239,30 @@ fn preserve_invisible_members (
     supplemented . contains =
       rel_partners_at_relRepo (&recorder_skgrepo, merged); }
   { let disk_subscribes : Vec<ID> =
-      members_of (disk_node . subscribes_to . or_default ());
+      members_of (disk_node . subscribesTo . or_default ());
     let submitted_subscribes : Vec<ID> =
-      members_of (supplemented . subscribes_to . or_default ());
+      members_of (supplemented . subscribesTo . or_default ());
     let buffer_subscribes : Vec<ID> = normalize_to_disk_raw (
       &submitted_subscribes,
-      disk_node . subscribes_to . or_default ());
+      disk_node . subscribesTo . or_default ());
     let merged : Vec<ID> = weave (
       &disk_subscribes, &subscribes_visible,
       &buffer_subscribes );
     if merged != submitted_subscribes {
-      supplemented . subscribes_to =
+      supplemented . subscribesTo =
         MSV::Specified (rel_partners_at_relRepo (&recorder_skgrepo, merged)); }}
   { let disk_overrides : Vec<ID> =
-      members_of (disk_node . overrides_view_of . or_default ());
+      members_of (disk_node . overrides . or_default ());
     let submitted_overrides : Vec<ID> =
-      members_of (supplemented . overrides_view_of . or_default ());
+      members_of (supplemented . overrides . or_default ());
     let buffer_overrides : Vec<ID> = normalize_to_disk_raw (
       &submitted_overrides,
-      disk_node . overrides_view_of . or_default ());
+      disk_node . overrides . or_default ());
     let merged : Vec<ID> = set_difference_merge (
       &disk_overrides, &overrides_visible,
       &buffer_overrides );
     if merged != submitted_overrides {
-      supplemented . overrides_view_of =
+      supplemented . overrides =
         MSV::Specified (rel_partners_at_relRepo (&recorder_skgrepo, merged)); }}
   supplemented }
 
@@ -441,29 +441,29 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
         disk, &submitted, &explicit . contains, "contains") ?;
       m . member = raw_disk_member (disk, &submitted); }}
   { let disk : &[RelPartner<ID>] =
-      disk_node . subscribes_to . or_default ();
-    if let MSV::Specified (v) = &mut supplemented . subscribes_to {
+      disk_node . subscribesTo . or_default ();
+    if let MSV::Specified (v) = &mut supplemented . subscribesTo {
       for m in v . iter_mut () {
         let submitted : ID = m . member . clone ();
         m . relRepo = resolve_skgrepo (
-          disk, &submitted, &explicit . subscribes_to,
-          "subscribes_to") ?;
+          disk, &submitted, &explicit . subscribesTo,
+          "subscribesTo") ?;
         m . member = raw_disk_member (disk, &submitted); }} }
   { let disk : &[RelPartner<ID>] =
-      disk_node . overrides_view_of . or_default ();
-    if let MSV::Specified (v) = &mut supplemented . overrides_view_of {
+      disk_node . overrides . or_default ();
+    if let MSV::Specified (v) = &mut supplemented . overrides {
       for m in v . iter_mut () {
         let submitted : ID = m . member . clone ();
         m . relRepo = resolve_skgrepo (
-          disk, &submitted, &explicit . overrides_view_of,
-          "overrides_view_of") ?;
+          disk, &submitted, &explicit . overrides,
+          "overrides") ?;
         m . member = raw_disk_member (disk, &submitted); }} }
   { let disk : &[RelPartner<ID>] =
-      disk_node . hides_from_its_subscriptions . or_default ();
+      disk_node . hidesFromSubs . or_default ();
     let subscribes : Vec<RelPartner<ID>> =
-      supplemented . subscribes_to . or_default () . to_vec ();
+      supplemented . subscribesTo . or_default () . to_vec ();
     if let MSV::Specified (v) =
-      &mut supplemented . hides_from_its_subscriptions {
+      &mut supplemented . hidesFromSubs {
       for m in v . iter_mut () {
         let submitted : ID = m . member . clone ();
         let key : RelationshipMemberKey = member_key ( &submitted );
@@ -600,15 +600,15 @@ pub fn supplement_unspecified_fields_from_disk (
 ) -> Graphnode {
   if from_buffer . aliases . is_unspecified() {
     from_buffer . aliases = disk_node . aliases . clone(); }
-  if from_buffer . subscribes_to . is_unspecified() {
-    from_buffer . subscribes_to =
-      disk_node . subscribes_to . clone(); }
-  if from_buffer . hides_from_its_subscriptions . is_unspecified() {
-    from_buffer . hides_from_its_subscriptions =
-      disk_node . hides_from_its_subscriptions . clone(); }
-  if from_buffer . overrides_view_of . is_unspecified() {
-    from_buffer . overrides_view_of =
-      disk_node . overrides_view_of . clone(); }
+  if from_buffer . subscribesTo . is_unspecified() {
+    from_buffer . subscribesTo =
+      disk_node . subscribesTo . clone(); }
+  if from_buffer . hidesFromSubs . is_unspecified() {
+    from_buffer . hidesFromSubs =
+      disk_node . hidesFromSubs . clone(); }
+  if from_buffer . overrides . is_unspecified() {
+    from_buffer . overrides =
+      disk_node . overrides . clone(); }
   if from_buffer . flags . is_empty() {
     from_buffer . flags = disk_node . flags . clone(); }
   from_buffer }

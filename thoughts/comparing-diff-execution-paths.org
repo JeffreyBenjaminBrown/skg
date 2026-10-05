@@ -103,7 +103,7 @@ When =source_diffs= is =Some=:
   The goal list interleaves worktree IDs with removed IDs so that
   removed children appear in their original position.
 - For subscribee nodes (children of a SubscribeeFolder):
-  additionally filters by grandparent's =hides_from_its_subscriptions=,
+  additionally filters by grandparent's =hidesFromSubs=,
   comparing HEAD hidden list vs worktree hidden list, then computes
   an interleaved diff of the visible content.
 
@@ -158,9 +158,9 @@ Called for every =Scaffold::SubscribeeFolder=.
 
 =diff_aware_goal_list= works similarly to the content goal list:
 - Looks up parent's SourceDiff by source name.
-- If in a git repo: reads HEAD's =subscribes_to= via
+- If in a git repo: reads HEAD's =subscribesTo= via
   =skgnode_from_git_head=, computes an interleaved diff against
-  worktree =subscribes_to=.
+  worktree =subscribesTo=.
 - Returns =(goal_list, removed_ids)=.
 
 *** Reconcile subscribee children (INSERTS nodes)

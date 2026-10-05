@@ -5,9 +5,9 @@ Two repos: 'home' (owned) and 'away' (foreign).
 Structure:
   home/
     1         contains 11, 12, 13, 14
-    11        contains 111, subscribes_to 11-sees
+    11        contains 111, subscribesTo 11-sees
     111       (leaf)
-    12        subscribes_to 12-sees
+    12        subscribesTo 12-sees
     13        (leaf, no subscriptions)
     14        contains 141
     141       (leaf)

@@ -1,4 +1,4 @@
 pid: Overridden
 title: Overridden
-subscribes_to:
+subscribesTo:
 - OverriddenLeaf

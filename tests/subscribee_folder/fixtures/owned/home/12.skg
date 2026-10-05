@@ -1,4 +1,4 @@
 pid: 12
 title: 12
-subscribes_to:
+subscribesTo:
   - 12-sees

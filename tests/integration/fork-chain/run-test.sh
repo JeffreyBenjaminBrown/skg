@@ -76,7 +76,7 @@ if grep -q "$PRIV_ID" "$PUB_CLONE"; then
   cat "$PUB_CLONE"
   exit 1
 fi
-if ! grep -q "overrides_view_of" "$PUB_CLONE" || ! grep -q "N" "$PUB_CLONE"; then
+if ! grep -q "overrides" "$PUB_CLONE" || ! grep -q "N" "$PUB_CLONE"; then
   echo "✗ FAIL: the public clone should override the foreign N:"
   cat "$PUB_CLONE"
   exit 1

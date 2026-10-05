@@ -233,9 +233,9 @@ async fn test_diff_mode_as_subscribee_regenerates_phantom_children (
       Ok (( )) }) }) . await
 }
 
-/// #1 fix: a subscribee removed from the subscriber's subscribes_to list (but
+/// #1 fix: a subscribee removed from the subscriber's subscribesTo list (but
 /// whose .skg still exists) renders as a phantom with (unstaged removedR). Its
-/// relation is subscribes_to, not contains, so the membership marker comes from
+/// relation is subscribesTo, not contains, so the membership marker comes from
 /// build_child_data's net-removal fallback rather than phantom_axes(contains).
 /// Without the fix the phantom would carry NO membership marker.
 async fn test_diff_mode_removed_subscribee_shows_removedR (
@@ -272,7 +272,7 @@ async fn test_diff_mode_removed_subscribee_shows_removedR (
 }
 
 /// §C: the SAME removed subscribee, but staged -- the phantom must now report
-/// (staged removedR), proving phantom_axes reads subscribes_to PER STAGE (not
+/// (staged removedR), proving phantom_axes reads subscribesTo PER STAGE (not
 /// just the net unstaged fallback). Guards the per-stage sharing-relation diff.
 async fn test_diff_mode_removed_subscribee_staged_shows_stagedM (
   s : &mut SharedStoreSession,
@@ -308,7 +308,7 @@ async fn test_diff_mode_removed_subscribee_staged_shows_stagedM (
 }
 
 /// The added direction for an outbound folder: a subscribee newly added
-/// to the subscriber's subscribes_to renders PRESENT with
+/// to the subscriber's subscribesTo renders PRESENT with
 /// (unstaged addedR), mirroring content's mark_membership rule.
 async fn test_diff_mode_added_subscribee_shows_addedR (
   s : &mut SharedStoreSession,

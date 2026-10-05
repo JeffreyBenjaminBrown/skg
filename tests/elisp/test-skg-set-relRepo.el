@@ -96,7 +96,7 @@ viewparent), relation = the folder's relation."
      (beginning-of-line)
      (should (equal (skg--rel-at-point)
                     '(:recorder "anchor" :member "seen"
-                      :relation "subscribes_to"))))))
+                      :relation "subscribesTo"))))))
 
 (ert-deftest test-rel-refuses-on-write-protected-folder-member ()
   "Refuses (user-error) on a member of a write-protected folder."
@@ -271,7 +271,7 @@ the displayed relRepo fact; its message says the SAVED skgrepo survives
    (lambda ()
      (goto-char (point-min))
      (should-error
-      (skg--set-relRepo-recursive-walk 'contained "trusted"))
+      (skg--set-relRepo-recursive-walk 'content "trusted"))
      (should-not (string-match-p "relRepo" (test--buffer-line 2))))))
 
 (ert-deftest test-alias-command-derives-default-locally ()
@@ -420,8 +420,8 @@ aliasFolder.")
     (buffer-substring-no-properties
      (line-beginning-position) (line-end-position))))
 
-(ert-deftest test-recursive-walk-contained ()
-  "Kind `contained' hits true content children of definitive
+(ert-deftest test-recursive-walk-content ()
+  "Kind `content' hits true content children of definitive
 activeNode parents only: the root's own (na) edge is skipped, the
 false branch and everything below the write-protected node and the
 subscribee-as-such member are pruned, and folder members are untouched."
@@ -431,7 +431,7 @@ subscribee-as-such member are pruned, and folder members are untouched."
    (lambda ()
      (goto-char (point-min))
      (let ((count (skg--set-relRepo-recursive-walk
-                   'contained "trusted")))
+                   'content "trusted")))
        (should (= count 3)) ;; a, b, e
        (dolist (skgid '("a" "b" "e"))
          (should (string-match-p "(relRepo trusted)"
@@ -468,7 +468,7 @@ own edge to its view-parent."
      (search-forward "(id a)")
      (beginning-of-line)
      (let ((count (skg--set-relRepo-recursive-walk
-                   'contained "trusted")))
+                   'content "trusted")))
        (should (= count 2)) ;; a and b
        (should (string-match-p "(relRepo trusted)"
                                (test--line-of-id "a")))
@@ -478,7 +478,7 @@ own edge to its view-parent."
 (ert-deftest test-recursive-walk-overridden-and-member-content ()
   "An overriddenFolder member matches kind `overridden'; the member's
 own content children (the member being definitive) match kind
-`contained' through the folder."
+`content' through the folder."
   (let ((tree (concat
                "* (skg (node (id anchor) (repo public))) anchor\n"
                "** (skg overriddenFolder)\n"
@@ -499,7 +499,7 @@ own content children (the member being definitive) match kind
      (lambda ()
        (goto-char (point-min))
        (should (= 1 (skg--set-relRepo-recursive-walk
-                     'contained "private")))
+                     'content "private")))
        (should (string-match-p "(relRepo private)"
                                (test--line-of-id "oc")))
        (should-not (string-match-p "relRepo"
@@ -518,7 +518,7 @@ member's content children are not reached."
    (lambda ()
      (goto-char (point-min))
      (should (= 0 (skg--set-relRepo-recursive-walk
-                   'contained "trusted")))
+                   'content "trusted")))
      (dolist (skgid '("s" "sc"))
        (should-not (string-match-p "relRepo"
                                    (test--line-of-id skgid)))))))
@@ -563,7 +563,7 @@ the subtree, while preserving display facts."
    (lambda ()
      (goto-char (point-min))
      (should (= 2 (skg--set-relRepo-recursive-walk
-                   'contained skg--relRepo-no-override)))
+                   'content skg--relRepo-no-override)))
      (dolist (skgid '("a" "b"))
        (should-not (string-match-p "editRequest"
                                    (test--line-of-id skgid)))))))
@@ -574,14 +574,14 @@ the subtree, while preserving display facts."
   "The menu tree offers exactly the three writable kinds, one per
 writable position, and covers all five schema relations."
   (should (equal (mapcar #'car (skg--relationship-kind-menu-tree))
-                 '("contains" "links_to" "subscribes_to"
-                   "hides_from_its_subscriptions" "overrides_view_of")))
+                 '("contains" "linksTo" "subscribesTo"
+                   "hidesFromSubs" "overrides")))
   (should (equal (delq nil
                        (mapcar (lambda (role) (nth 1 role))
                                (apply #'append
                                       (mapcar #'cdr
                                               (skg--relationship-kind-menu-tree)))))
-                 '(contained subscribee overridden))))
+                 '(content subscribee overridden))))
 
 (defun test--choose-menu-role (role-line)
   "In the relationship-kind menu buffer, move to ROLE-LINE and choose it."
@@ -610,8 +610,8 @@ does neither."
             (should-not chosen)
             (should-error (test--choose-menu-role "** subscriber")
                           :type 'user-error))
-          (test--choose-menu-role "** contained")
-          (should (eq chosen 'contained))
+          (test--choose-menu-role "** content")
+          (should (eq chosen 'content))
           ;; Choosing killed the menu buffer.
           (should-not (get-buffer "*skg-relationship-kinds*"))))
     (when (get-buffer "*skg-relationship-kinds*")
@@ -633,7 +633,7 @@ window plumbing are stubbed as in the other handler tests."
                        ((symbol-function 'completing-read)
                         (lambda (&rest _) "trusted")))
                (skg-set-relRepo-recursive)
-               (test--choose-menu-role "** contained"))
+               (test--choose-menu-role "** content"))
              (with-current-buffer view-buffer
                (dolist (skgid '("a" "b" "e"))
                  (should (string-match-p "(relRepo trusted)"

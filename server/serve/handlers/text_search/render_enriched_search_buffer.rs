@@ -87,7 +87,7 @@ fn insert_full_containerward_role_tree(
 /// role-graft birth it stamps on each grafted relative.
 #[derive(Clone, Copy)]
 enum OverrideDir {
-  /// The nodes this node OVERRIDES (outbound `overrides_view_of`).
+  /// The nodes this node OVERRIDES (outbound `overrides`).
   /// Birth OVERRIDDEN; renders herald "aO" (parent overrides child).
   Overriddenward,
   /// The nodes that OVERRIDE this node (inbound). Birth OVERRIDER;
@@ -152,10 +152,10 @@ pub fn collect_overrideward_view_subtree_skgids (
         let relatives : Vec<ID> = match dir {
           OverrideDir::Overriddenward =>
             graph . outbound_pids_for_relation_gated (
-              &cur, NodeRelation::OverridesViewOf, Some (active) ),
+              &cur, NodeRelation::Overrides, Some (active) ),
           OverrideDir::Overriderward =>
             graph . inbound_pids_for_relation_gated (
-              &cur, NodeRelation::OverridesViewOf, Some (active) ), };
+              &cur, NodeRelation::Overrides, Some (active) ), };
         for rel in relatives {
           let visible : bool = graph . nodes . get (&rel)
             . map_or ( false,
@@ -183,10 +183,10 @@ fn graft_override_chain (
   let relatives : Vec<ID> = match dir {
     OverrideDir::Overriddenward =>
       graph . outbound_pids_for_relation_gated (
-        pid, NodeRelation::OverridesViewOf, Some (active) ),
+        pid, NodeRelation::Overrides, Some (active) ),
     OverrideDir::Overriderward =>
       graph . inbound_pids_for_relation_gated (
-        pid, NodeRelation::OverridesViewOf, Some (active) ), };
+        pid, NodeRelation::Overrides, Some (active) ), };
   let birth_role : RelationRole = match dir {
     OverrideDir::Overriddenward => RelationRole::OVERRIDDEN,
     OverrideDir::Overriderward  => RelationRole::OVERRIDER, };

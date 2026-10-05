@@ -1,4 +1,4 @@
 pid: dn-ovr-a
 title: dn-ovr-a
-overrides_view_of:
+overrides:
 - dn-owner

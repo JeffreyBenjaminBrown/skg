@@ -362,8 +362,8 @@ fn test_music_and_consciousness () {
 
 #[test]
 fn test_had_id_before_import () {
-  // Nodes with :ID: get Had_ID_Before_Import in misc.
-  // Nodes without :ID: (assigned UUIDs) get empty misc.
+  // Nodes with :ID: get Had_ID_Before_Import in flags.
+  // Nodes without :ID: (assigned UUIDs) get empty flags.
   let content : &str = "\
 :PROPERTIES:
 :ID:       file-id
@@ -388,7 +388,7 @@ fn test_had_id_before_import () {
   // Child with :ID: → Had_ID_Before_Import.
   assert_eq! (nodes[1] . flags,
               vec![Flag::Had_ID_Before_Import]);
-  // Child without :ID: → empty misc.
+  // Child without :ID: → empty flags.
   assert! (nodes[2] . flags . is_empty()); }
 
 #[test]

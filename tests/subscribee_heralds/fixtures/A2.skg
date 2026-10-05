@@ -1,6 +1,6 @@
 pid: A2
 title: Second subscriber
-subscribes_to:
+subscribesTo:
 - B
-hides_from_its_subscriptions:
+hidesFromSubs:
 - z

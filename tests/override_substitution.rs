@@ -307,7 +307,7 @@ async fn extraction_honors_the_marker (
           node_instructions_from (buffer, config) . await ?;
         if let Some (s_node) = opt_saved_node_by_skgid (&instructions, "S") {
           assert! (
-            ! s_node . hides_from_its_subscriptions . or_default ()
+            ! s_node . hidesFromSubs . or_default ()
               . iter () . any ( |m| &m . member == &ID::from ("N") ),
             "S must not hide N: the drawn R stands for N" ); }}
       Ok (( )) }

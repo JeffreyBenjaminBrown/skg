@@ -145,7 +145,7 @@ async fn run_inbound_save_test (
       let edge_r : Graphnode =
         read_graphnode (gitrepo_path, "edge-r")?;
       assert! (
-        edge_r . overrides_view_of . or_default () . is_empty (),
+        edge_r . overrides . or_default () . is_empty (),
         "a removed inbound edge must not return: the relation \
          lives in edge-r's file, which the folder cannot edit" ); }
     Ok (( )) }

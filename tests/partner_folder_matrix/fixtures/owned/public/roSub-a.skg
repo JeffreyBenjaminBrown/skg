@@ -1,4 +1,4 @@
 pid: roSub-a
 title: roSub-a
-subscribes_to:
+subscribesTo:
 - roSub-owner

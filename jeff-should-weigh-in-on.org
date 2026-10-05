@@ -147,7 +147,7 @@ content of some node F subscribes to becomes a hide by F. Rationale:
 subscribe + override -- and docs/sharing-model.org already promised
 this behavior for clones ("Branches you then delete from the clone,
 or move elsewhere, become branches the clone
-hides_from_its_subscriptions"). Consequences you might weigh in on:
+hidesFromSubs"). Consequences you might weigh in on:
 
 - MOVING C elsewhere in the same buffer also records the hide (the
   doc says it should; the rule sees only "C left F.contains").

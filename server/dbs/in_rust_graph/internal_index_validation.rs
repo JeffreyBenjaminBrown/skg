@@ -160,13 +160,13 @@ fn relationship_keys (
   BTreeMap::from ([
     ("contained_by", members_of (&node . contains) . into_iter ()
       . map (|raw| canonical (&raw)) . collect ()),
-    ("subscribers_of", members_of (node . subscribes_to . or_default ())
+    ("subscribers_of", members_of (node . subscribesTo . or_default ())
       . into_iter () . map (|raw| canonical (&raw)) . collect ()),
-    ("hiders_of", members_of (node . hides_from_its_subscriptions . or_default ())
+    ("hiders_of", members_of (node . hidesFromSubs . or_default ())
       . into_iter () . map (|raw| canonical (&raw)) . collect ()),
-    ("overriders_of", members_of (node . overrides_view_of . or_default ())
+    ("overriders_of", members_of (node . overrides . or_default ())
       . into_iter () . map (|raw| canonical (&raw)) . collect ()),
-    ("mentioners_of", node . links_to . iter ()
+    ("mentioners_of", node . linksTo . iter ()
       . map (canonical) . collect ()),
   ])
 }
@@ -227,13 +227,13 @@ pub fn validate_internal_indexes (
   for node in graph . nodes . values () {
     for member in members_of (&node . contains) {
       record (&mut contained_by, &member, &node . pid); }
-    for member in members_of (node . subscribes_to . or_default ()) {
+    for member in members_of (node . subscribesTo . or_default ()) {
       record (&mut subscribers_of, &member, &node . pid); }
-    for member in members_of (node . hides_from_its_subscriptions . or_default ()) {
+    for member in members_of (node . hidesFromSubs . or_default ()) {
       record (&mut hiders_of, &member, &node . pid); }
-    for member in members_of (node . overrides_view_of . or_default ()) {
+    for member in members_of (node . overrides . or_default ()) {
       record (&mut overriders_of, &member, &node . pid); }
-    for member in &node . links_to {
+    for member in &node . linksTo {
       record (&mut mentioners_of, member, &node . pid); }}
 
   let mut result : Vec<InternalIndexMismatch> = Vec::new ();

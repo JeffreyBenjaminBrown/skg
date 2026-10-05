@@ -341,7 +341,7 @@ pub fn validate_fork_specs (
 /// resolved owned skgrepo. C copies N's title/body/contains (the
 /// edited buffer values -- N is already disk-supplemented, so no disk
 /// fetch is needed, unlike nodeMerge whose acquiree is only an ID
-/// reference), subscribes_to = [N] and overrides_view_of = [N], a
+/// reference), subscribesTo = [N] and overrides = [N], a
 /// fresh pid, and the owned skgrepo. C's hides are the children the
 /// forking edit DELETED (disk_contains minus the edited contains):
 /// the user dismissed them, so they must not reappear as
@@ -368,15 +368,15 @@ pub fn build_fork_clone (
     body          : buffer_node . body . clone (),
     contains      : rel_partners_at_relRepo (
       &clone_skgrepo, buffer_contains_skgids . clone () ),
-    subscribes_to : MSV::Specified ( rel_partners_at_relRepo (
+    subscribesTo  : MSV::Specified ( rel_partners_at_relRepo (
       &clone_skgrepo, vec! [ buffer_node . pid . clone () ] )),
-    hides_from_its_subscriptions : MSV::Specified ( rel_partners_at_relRepo (
+    hidesFromSubs : MSV::Specified ( rel_partners_at_relRepo (
       &clone_skgrepo,
       // The children the forking edit deleted.
       disk_contains . iter ()
         . filter ( |skgid| ! buffer_contains_skgids . contains (skgid) )
         . cloned () . collect () )),
-    overrides_view_of : MSV::Specified ( rel_partners_at_relRepo (
+    overrides : MSV::Specified ( rel_partners_at_relRepo (
       &clone_skgrepo, vec! [ buffer_node . pid . clone () ] )),
     // The clone preserves the original node's search-matching choice, but
     // importer provenance flags do not describe the newly-created clone.

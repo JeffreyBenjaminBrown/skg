@@ -7,8 +7,8 @@ Tests that `HiddenOutsideOfSubscribeeFolder` appears when a hidden node is NOT i
 ```
 R (subscriber)
 ├── contains: [R1]
-├── subscribes_to: [E1, E2]
-└── hides_from_its_subscriptions: [H]
+├── subscribesTo: [E1, E2]
+└── hidesFromSubs: [H]
 
 E1 # no relationships but 'contains'
 └── E11

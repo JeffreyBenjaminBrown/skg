@@ -1,8 +1,8 @@
 pid: 'R'
 title: "R"
-overrides_view_of:
+overrides:
   - "Z"
   - "W"
-hides_from_its_subscriptions:
+hidesFromSubs:
   - "ha"
   - "hb"

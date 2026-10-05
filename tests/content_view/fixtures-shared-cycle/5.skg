@@ -4,6 +4,6 @@ extra_ids:
 title: this title includes a [[id:22][textlink to another file]]
 body: |-
   this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
-overrides_view_of:
+overrides:
 - 3
 - 4

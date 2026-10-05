@@ -201,7 +201,7 @@ impl Telescope {
   ) -> Vec<Flag> {
     let mut flags : Vec<Flag> = Vec::new ();
     for (_, node_fs) in &self . sections {
-      for m in &node_fs . misc {
+      for m in &node_fs . flags {
         if ! flags . contains (m) {
           flags . push ( m . clone () ); }} }
     flags }
@@ -289,9 +289,9 @@ pub struct SectionSlices {
   pub body                         : Option<String>,
   pub aliases                      : Option<Vec<String>>,
   pub contains                     : Option<Vec<ListItem>>,
-  pub subscribes_to                : Option<Vec<ListItem>>,
-  pub hides_from_its_subscriptions : Option<Vec<ID>>,
-  pub overrides_view_of            : Option<Vec<ID>>,
+  pub subscribesTo                 : Option<Vec<ListItem>>,
+  pub hidesFromSubs                : Option<Vec<ID>>,
+  pub overrides                    : Option<Vec<ID>>,
 }
 
 /// Nonfatal compose trouble. The compose is TOTAL: junk degrades to one of
@@ -401,10 +401,10 @@ mod telescope_construction_tests {
       extra_ids                    : Vec::new (),
       body                         : None,
       contains                     : Vec::new (),
-      subscribes_to                : Vec::new (),
-      hides_from_its_subscriptions : Vec::new (),
-      overrides_view_of            : Vec::new (),
-      misc                         : Vec::new (), } }
+      subscribesTo                 : Vec::new (),
+      hidesFromSubs                : Vec::new (),
+      overrides                    : Vec::new (),
+      flags                        : Vec::new (), } }
 
   fn config () -> SkgConfig {
     let ordered : Vec<SkgRepoName> =

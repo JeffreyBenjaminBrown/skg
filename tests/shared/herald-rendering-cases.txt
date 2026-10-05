@@ -15,55 +15,55 @@
 # before the first case are comments.
 
 ==== links: substantive fraction, both sides
-(skg (node (id x) (rels (links_to (in 5 (substantive 2)) (out 3)))))
+(skg (node (id x) (rels (linksTo (in 5 (substantive 2)) (out 3)))))
 ---- text: 2/5L3
 ---- styles: high*1 medium*2 normal*2
 ==== links: no substantive mentioner
-(skg (node (id x) (rels (links_to (in 5 (substantive 0)) (out 3)))))
+(skg (node (id x) (rels (linksTo (in 5 (substantive 0)) (out 3)))))
 ---- text: 5L3
 ---- styles: medium*1 normal*2
 ==== links: in-side only
-(skg (node (id x) (rels (links_to (in 5 (substantive 2))))))
+(skg (node (id x) (rels (linksTo (in 5 (substantive 2))))))
 ---- text: 2/5L
 ---- styles: high*1 medium*2 normal*1
 ==== links: out-side only
-(skg (node (id x) (rels (links_to (out 3)))))
+(skg (node (id x) (rels (linksTo (out 3)))))
 ---- text: L3
 ---- styles: normal*2
 ==== links: every mentioner substantive
-(skg (node (id x) (rels (links_to (in 5 (substantive 5))))))
+(skg (node (id x) (rels (linksTo (in 5 (substantive 5))))))
 ---- text: 5/L
 ---- styles: high*1 medium*1 normal*1
 ==== links: the parent is the only, substantive mentioner
-(skg (node (id x) (rels (links_to (in 1 (ancestors 1) (substantive 1 (ancestors 1)))))))
+(skg (node (id x) (rels (linksTo (in 1 (ancestors 1) (substantive 1 (ancestors 1)))))))
 ---- text: a/L
 ---- styles: high*1 medium*1 normal*1
 ==== links: the substantive parent and a grandparent
-(skg (node (id x) (rels (links_to (in 2 (ancestors 1 2) (substantive 1 (ancestors 1)))))))
+(skg (node (id x) (rels (linksTo (in 2 (ancestors 1 2) (substantive 1 (ancestors 1)))))))
 ---- text: a/bL
 ---- styles: high*1 medium*2 normal*1
 ==== links: the substantive parent among five
-(skg (node (id x) (rels (links_to (in 5 (ancestors 1) (substantive 1 (ancestors 1)))))))
+(skg (node (id x) (rels (linksTo (in 5 (ancestors 1) (substantive 1 (ancestors 1)))))))
 ---- text: a/5L
 ---- styles: high*1 medium*2 normal*1
 ==== links: one substantive mentioner, the parent among five
-(skg (node (id x) (rels (links_to (in 5 (ancestors 1) (substantive 1))))))
+(skg (node (id x) (rels (linksTo (in 5 (ancestors 1) (substantive 1))))))
 ---- text: 1/5aL
 ---- styles: high*1 medium*2 low*1 normal*1
 ==== links: the parent, not substantive
-(skg (node (id x) (rels (links_to (in 1 (ancestors 1) (substantive 0))))))
+(skg (node (id x) (rels (linksTo (in 1 (ancestors 1) (substantive 0))))))
 ---- text: aL
 ---- styles: medium*1 normal*1
 ==== links: links to the parent
-(skg (node (id x) (rels (links_to (out 1 (ancestors 1))))))
+(skg (node (id x) (rels (linksTo (out 1 (ancestors 1))))))
 ---- text: La
 ---- styles: normal*1 low*1
 ==== links: links to the parent and two more
-(skg (node (id x) (rels (links_to (out 3 (ancestors 1))))))
+(skg (node (id x) (rels (linksTo (out 3 (ancestors 1))))))
 ---- text: L3a
 ---- styles: normal*2 low*1
 ==== links: a generation beyond z
-(skg (node (id x) (rels (links_to (in 1 (ancestors 27) (substantive 1 (ancestors 27)))))))
+(skg (node (id x) (rels (linksTo (in 1 (ancestors 27) (substantive 1 (ancestors 27)))))))
 ---- text: {27}/L
 ---- styles: high*4 medium*1 normal*1
 ==== contains: unintegrated fraction
@@ -83,35 +83,35 @@
 ---- text: 2C
 ---- styles: medium*1 normal*1
 ==== overrides: overrides-here beside an ancestor h
-(skg (node (id x) (rels (overrides_view_of (out 1 (ancestors 8)))) (viewStats (overridesHere y))))
+(skg (node (id x) (rels (overrides (out 1 (ancestors 8)))) (viewStats (overridesHere y))))
 ---- text: Oĥh
 ---- styles: normal*1 crucial*1 medium*1
 ==== birth: links and overrides
-(skg (node (id x) (rels (links_to (in 5 (substantive 2)) (out 3)) (overrides_view_of (out 1)) (birth (overrides_view_of out 1)))))
+(skg (node (id x) (rels (linksTo (in 5 (substantive 2)) (out 3)) (overrides (out 1)) (birth (overrides out 1)))))
 ---- text: 2/5L3 O1
 ---- styles: high*1 medium*2 normal*2 -*1 high*1 medium*1
 ==== birth: contains
 (skg (node (id x) (rels (contains (in 1) (out 2)) (birth (contains in 1)))))
 ---- text: 1C2
 ---- styles: medium*1 high*1 normal*1
-==== birth: links_to
-(skg (node (id x) (rels (links_to (in 5 (substantive 2)) (out 3)) (birth (links_to out 1)))))
+==== birth: linksTo
+(skg (node (id x) (rels (linksTo (in 5 (substantive 2)) (out 3)) (birth (linksTo out 1)))))
 ---- text: 2/5L3
 ---- styles: high*1 medium*2 high*1 normal*1
 ==== birth: contains, unintegrated
 (skg (node (id x) (rels (contains (out 8 (unintegrated 2))) (birth (contains in 1)))))
 ---- text: C2/8
 ---- styles: high*1 medium*1 normal*2
-==== birth: subscribes_to
-(skg (node (id x) (rels (subscribes_to (in 1) (out 2)) (birth (subscribes_to in 2)))))
+==== birth: subscribesTo
+(skg (node (id x) (rels (subscribesTo (in 1) (out 2)) (birth (subscribesTo in 2)))))
 ---- text: 1S2
 ---- styles: high*2 medium*1
-==== birth: overrides_view_of
-(skg (node (id x) (rels (overrides_view_of (in 1) (out 2)) (birth (overrides_view_of in 2)))))
+==== birth: overrides
+(skg (node (id x) (rels (overrides (in 1) (out 2)) (birth (overrides in 2)))))
 ---- text: 1O2
 ---- styles: low*1 high*1 medium*1
-==== birth: hides_from_its_subscriptions
-(skg (node (id x) (rels (hides_from_its_subscriptions (in 1) (out 2)) (birth (hides_from_its_subscriptions in 2)))))
+==== birth: hidesFromSubs
+(skg (node (id x) (rels (hidesFromSubs (in 1) (out 2)) (birth (hidesFromSubs in 2)))))
 ---- text: 1H2
 ---- styles: medium*1 high*1 normal*1
 ==== node: independent, a cycle, a delete request, contained by the parent and another
@@ -191,11 +191,11 @@
 ---- text: node from inactive repo
 ---- styles: message*23
 ==== carriers: two subscribers, one the parent
-(skg (node (id x) (rels (subscribes_to (in 2 (ancestors 1))))))
+(skg (node (id x) (rels (subscribesTo (in 2 (ancestors 1))))))
 ---- text: 2aS
 ---- styles: high*1 low*1 normal*1
 ==== carriers: the parent is the only subscriber
-(skg (node (id x) (rels (subscribes_to (in 1 (ancestors 1))))))
+(skg (node (id x) (rels (subscribesTo (in 1 (ancestors 1))))))
 ---- text: aS
 ---- styles: high*1 normal*1
 ==== birth-explained: the parent is the sole container
@@ -203,7 +203,7 @@
 ---- text: aC
 ---- styles: low*1 high*1
 ==== birth-explained: a subscribee whose subscriber is the grandparent
-(skg (node (id x) (rels (subscribes_to (in 1 (ancestors 2))) (birth (subscribes_to in 2)))))
+(skg (node (id x) (rels (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2)))))
 ---- text: bS
 ---- styles: medium*1 high*1
 ==== birth-explained: not when another node also contains it

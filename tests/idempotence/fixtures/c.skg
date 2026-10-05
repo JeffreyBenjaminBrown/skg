@@ -1,4 +1,4 @@
 pid: c
 title: c
-subscribes_to:
+subscribesTo:
   - d

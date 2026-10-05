@@ -1,6 +1,6 @@
 pid: Overrider
 title: Overrider
-subscribes_to:
+subscribesTo:
 - OverriderLeaf
-overrides_view_of:
+overrides:
 - N

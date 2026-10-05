@@ -53,7 +53,7 @@ T.check(not root_line:find(
     'contained view-root should be content, not content; line: %s',
     root_line))
 T.check(not root_line:find(
-    '(affectsParent false) writeProtected (rels (links_to (out (ancestors 1))) (birth (links_to out 1)))', 1, true),
+    '(affectsParent false) writeProtected (rels (linksTo (out (ancestors 1))) (birth (linksTo out 1)))', 1, true),
   string.format(
     'contained view-root should be content, not line: %s', root_line))
 

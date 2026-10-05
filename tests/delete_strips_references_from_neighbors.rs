@@ -9,7 +9,7 @@
 //
 // Fixture:
 //   container.skg     contains: [victim, sibling]
-//   subscriber.skg    subscribes_to: [victim, sibling]
+//   subscriber.skg    subscribesTo: [victim, sibling]
 //   victim.skg        (the one being deleted)
 //   sibling.skg       (left alone)
 //
@@ -17,7 +17,7 @@
 // pipeline should:
 //   - delete victim.skg
 //   - rewrite container.skg to contains: [sibling]
-//   - rewrite subscriber.skg to subscribes_to: [sibling]
+//   - rewrite subscriber.skg to subscribesTo: [sibling]
 //   - leave sibling.skg unchanged.
 
 use indoc::indoc;
@@ -203,9 +203,9 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
   let recorder : Graphnode = graphnode_from_pid_and_skgrepo (
     config, ID::from ("owner"), &SkgRepoName::from ("main")) ?;
   assert_eq! (members_of (&recorder . contains), vec! [ID::from ("kept")]);
-  assert! (recorder . subscribes_to . or_default () . is_empty ());
-  assert! (recorder . hides_from_its_subscriptions . or_default () . is_empty ());
-  assert! (recorder . overrides_view_of . or_default () . is_empty ());
+  assert! (recorder . subscribesTo . or_default () . is_empty ());
+  assert! (recorder . hidesFromSubs . or_default () . is_empty ());
+  assert! (recorder . overrides . or_default () . is_empty ());
   assert! (recorder . title . contains ("[[id:gone][text link left alone]]"),
             "cleanup reports text links but does not rewrite them" );
   Ok (( ))
@@ -311,7 +311,7 @@ async fn delete_in_foreign_overridden_rerenders_as_unknown (
     response . saved_view);
   let original : Graphnode = graphnode_from_pid_and_skgrepo (
     config, ID::from ("overrider"), &SkgRepoName::from ("foreign")) ?;
-  assert! (members_msv (&original . overrides_view_of)
+  assert! (members_msv (&original . overrides)
            . into_vec ()
            . contains (&ID::from ("victim-alt")),
     "the foreign original's raw override relationship must survive deletion");
@@ -402,19 +402,19 @@ async fn delete_strips_references_impl (
       "container.contains lost sibling: {:?}",
       container . contains )); }
 
-  // 3. subscriber.skg's subscribes_to has only sibling.
+  // 3. subscriber.skg's subscribesTo has only sibling.
   let subscriber : Graphnode =
     graphnode_from_pid_and_skgrepo (
       config, ID::from ("subscriber"), &main ) ?;
   let sub_vec : Vec<ID> =
-    members_msv ( &subscriber . subscribes_to ) . into_vec ();
+    members_msv ( &subscriber . subscribesTo ) . into_vec ();
   if sub_vec . contains (&ID::from ("victim")) {
     failures . push ( format! (
-      "subscriber.subscribes_to still has victim: {:?}",
+      "subscriber.subscribesTo still has victim: {:?}",
       sub_vec )); }
   if ! sub_vec . contains (&ID::from ("sibling")) {
     failures . push ( format! (
-      "subscriber.subscribes_to lost sibling: {:?}",
+      "subscriber.subscribesTo lost sibling: {:?}",
       sub_vec )); }
 
   // 4. sibling.skg unchanged.

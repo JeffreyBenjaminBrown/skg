@@ -3,5 +3,5 @@ pid: r
 contains:
 - r1
 - r2
-subscribes_to:
+subscribesTo:
 - e

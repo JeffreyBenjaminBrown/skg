@@ -2,5 +2,5 @@ pid: R
 title: R
 contains:
   - W
-overrides_view_of:
+overrides:
   - N

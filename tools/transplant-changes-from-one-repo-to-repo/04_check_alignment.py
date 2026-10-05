@@ -5,7 +5,7 @@ Step 4 of 5 in the mangled→public port pipeline. See README.org.
 Sanity check on the load-bearing invariant step 05 relies on:
 
     for every modified mangled file F with counterpart F' in public/,
-    and for every list-valued field (contains, subscribes_to, ...):
+    and for every list-valued field (contains, subscribesTo, ...):
       map_uuid(mangled_base[F][field])  ==  public[F'][field]
 
 If this holds, step 05 can translate mangled's list-edit semantics
@@ -73,8 +73,8 @@ def main():
         if public_node is None:
             print(f"{u} -> {pub_uuid}: public/ FILE MISSING (target)")
             continue
-        for field in ("contains", "subscribes_to",
-                      "hides_from_its_subscriptions", "overrides_view_of"):
+        for field in ("contains", "subscribesTo",
+                      "hidesFromSubs", "overrides"):
             base_list = normalize_list(base_node.get(field))
             public_list = normalize_list(public_node.get(field))
             if not base_list and not public_list:

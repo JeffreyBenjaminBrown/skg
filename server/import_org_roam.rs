@@ -212,12 +212,12 @@ fn write_graphnode_to_dir (
           home     : & node . home_skgrepo,
           aliases  : node . aliases . or_default (),
           contains : & node . contains,
-          subscribes_to :
-            node . subscribes_to . or_default (),
-          hides_from_its_subscriptions :
-            node . hides_from_its_subscriptions . or_default (),
-          overrides_view_of :
-            node . overrides_view_of . or_default (), },
+          subscribesTo :
+            node . subscribesTo . or_default (),
+          hidesFromSubs :
+            node . hidesFromSubs . or_default (),
+          overrides :
+            node . overrides . or_default (), },
         &config ) ?;
     let (_, node_fs) : (SkgRepoName, GraphnodeOnDisk) =
       decomposed . into_sections () . into_iter () . next ()

@@ -104,9 +104,9 @@ pub struct NodeChanges {
   /// ('NodeRelation::diff_in_nodechanges'): one recorder can bear the
   /// same ID in two relations, changed in different stages, and a
   /// phantom's stage label must come from its own folder's relation.
-  pub subscribes_to_diff      : Vec<Diff_Item<ID>>,
+  pub subscribesTo_diff       : Vec<Diff_Item<ID>>,
   pub hides_diff              : Vec<Diff_Item<ID>>,
-  pub overrides_view_of_diff  : Vec<Diff_Item<ID>>,
+  pub overrides_diff          : Vec<Diff_Item<ID>>,
 }
 
 //

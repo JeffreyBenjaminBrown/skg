@@ -1,4 +1,4 @@
 pid: subscriber
 title: foreign subscriber
-subscribes_to:
+subscribesTo:
 - victim-alt

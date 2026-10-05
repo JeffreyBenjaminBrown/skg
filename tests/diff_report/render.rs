@@ -25,7 +25,7 @@ fn node_report (
     skgrepo_change: None,
     value_set_diffs: Vec::new (),
     relationship_diffs: Vec::new (),
-    contained_list_diff: None }
+    content_list_diff: None }
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn abbreviations_use_enough_skgid_prefix_to_disambiguate () {
 fn unchanged_contained_diff_lines_align_with_changed_lines () {
   let mut node : NodeDiffReport =
     node_report ("parent", "Parent");
-  node . contained_list_diff =
+  node . content_list_diff =
     Some (vec! [
       ListDiffItem::Unchanged (skgid ("keep")),
       ListDiffItem::Removed (skgid ("gone")),

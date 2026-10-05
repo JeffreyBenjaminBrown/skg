@@ -59,9 +59,9 @@ M.commands = {
                                   desc = 'Goto in git parent, closing this buffer' },
   ShowFolderOfAliases = { module = 'skg.view_requests', fn = 'show_folderOf_aliases',
                             desc = 'Request the alias folder (auto-saves)' },
-  ShowFolderOfOverridesViewOf = { module = 'skg.view_requests', fn = 'show_folderOf_overridesViewOf',
+  ShowFolderOfOverrides = { module = 'skg.view_requests', fn = 'show_folderOf_overrides',
                               desc = 'Request the override folders (auto-saves)' },
-  ShowFolderOfHidesFromItsSubscriptions = { module = 'skg.view_requests', fn = 'show_folderOf_hidesFromItsSubscriptions',
+  ShowFolderOfHidesFromSubs = { module = 'skg.view_requests', fn = 'show_folderOf_hidesFromSubs',
                           desc = 'Request the hide folders (auto-saves)' },
   ShowFolderOfSubscribesTo = { module = 'skg.view_requests', fn = 'show_folderOf_subscribesTo',
                                desc = 'Request the subscribe folders (auto-saves)' },
@@ -225,8 +225,8 @@ M.content_view_bindings = {
   { 'gM', 'GotoInGitParent' },           -- C-c g M
   { 'GM', 'GotoInGitParentAndCloseThis' }, -- C-c G M
   { 'ca', 'ShowFolderOfAliases' },
-  { 'co', 'ShowFolderOfOverridesViewOf' },
-  { 'ch', 'ShowFolderOfHidesFromItsSubscriptions' },
+  { 'co', 'ShowFolderOfOverrides' },
+  { 'ch', 'ShowFolderOfHidesFromSubs' },
   { 'cs', 'ShowFolderOfSubscribesTo' },
   { 'cp', 'ShowFolderOfFlags' },
   { 'pC', 'ShowContainerwardTree' }, -- C-c p C

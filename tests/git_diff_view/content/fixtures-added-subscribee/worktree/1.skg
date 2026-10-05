@@ -1,5 +1,5 @@
 pid: '1'
 title: "1"
-subscribes_to:
+subscribesTo:
   - "11"
   - "22"

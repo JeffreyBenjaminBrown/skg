@@ -75,7 +75,7 @@ fn diff_report_shows_override_changes_on_raw_nodes (
   // No substitution in diff surfaces
   // (TODO/DONE/full-schema/DONE/12-2_diff-mode-policy_discussion.org): the diff
   // report renders raw nodes -- each under its own title -- and
-  // reports an overrides_view_of change in both roles.
+  // reports an overrides change in both roles.
   let fixture : DiffFixture =
     DiffFixture::new () ?;
   fixture . write_node ("n", "Original", "", &[]) ?;
@@ -83,7 +83,7 @@ fn diff_report_shows_override_changes_on_raw_nodes (
   fixture . commit_all ("initial") ?;
   fs::write (
     fixture . skgrepo . join ("r.skg"),
-    "title: Overrider\npid: r\noverrides_view_of:\n- n\n" ) ?;
+    "title: Overrider\npid: r\noverrides:\n- n\n" ) ?;
   let report : String =
     diff_report_as_org (
       &fixture . config,

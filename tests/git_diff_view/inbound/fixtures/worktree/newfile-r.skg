@@ -1,4 +1,4 @@
 pid: 'newfile-r'
 title: "newfile-r"
-overrides_view_of:
+overrides:
   - "N4"

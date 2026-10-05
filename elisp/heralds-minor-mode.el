@@ -446,7 +446,7 @@ of birth facts (RELATION SIDE [GEN]), already accounts for."
                           (heralds--side-tier rel 'out_write_protected))
                          (t (heralds--side-tier rel side))))
              (subset-key (cond ((and (eq rel 'contains) (eq side 'out)) 'unintegrated)
-                               ((and (eq rel 'links_to) (eq side 'in)) 'substantive)))
+                               ((and (eq rel 'linksTo) (eq side 'in)) 'substantive)))
              (subset (and subset-key (heralds--subset-facts facts subset-key))))
         (if subset
             (heralds--fraction-text
@@ -459,7 +459,7 @@ of birth facts (RELATION SIDE [GEN]), already accounts for."
   "Render relation REL's token from FORM, or nil if it has nothing to show."
   (let ((in-s (heralds--rel-side-text rel 'in form birth write-protected))
         (out-s (heralds--rel-side-text rel 'out form birth write-protected))
-        (here (and (eq rel 'overrides_view_of) overrides-here)))
+        (here (and (eq rel 'overrides) overrides-here)))
     (unless (and (string-empty-p in-s) (string-empty-p out-s) (not here))
       (concat in-s
               (heralds--styled (heralds--rel-letter rel)
@@ -487,7 +487,7 @@ space-separated."
              (tokens '()))
         (dolist (rel heralds--rel-order)
           (let ((form (assq rel (cdr rels))))
-            (when (or form (and (eq rel 'overrides_view_of) overrides-here))
+            (when (or form (and (eq rel 'overrides) overrides-here))
               (let ((tok (heralds--rel-token rel form birth write-protected
                                              overrides-here)))
                 (when tok (push tok tokens))))))

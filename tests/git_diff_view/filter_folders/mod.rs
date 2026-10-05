@@ -124,7 +124,7 @@ async fn run_filter_folder_test (
       assert_buffer_contains (&second . saved_view, expected);
       let s : Graphnode = read_graphnode (gitrepo_path, "S")?;
       assert_eq! (
-        members_msv (&s . hides_from_its_subscriptions) . or_default () . to_vec (),
+        members_msv (&s . hidesFromSubs) . or_default () . to_vec (),
         vec! [ ID::from ("h1"), ID::from ("h2"),
                ID::from ("h3"), ID::from ("h5") ],
         "filter-folder phantoms must not edit the hides list" ); }

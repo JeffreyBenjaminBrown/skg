@@ -139,8 +139,8 @@ fn initial_and_as_such_editable_nodes_get_only_the_default_folders
 
       let requested_folders : String = n_view . replace (
         "(affectsParent na)",
-        "(affectsParent na) (viewRequests (folder subscribes_to) \
-         (folder overrides_view_of) (folder hides_from_its_subscriptions))" );
+        "(affectsParent na) (viewRequests (folder subscribesTo) \
+         (folder overrides) (folder hidesFromSubs))" );
       let with_folders : String =
         save (&requested_folders, config, tantivy, &graph)
         . await ? . saved_view;

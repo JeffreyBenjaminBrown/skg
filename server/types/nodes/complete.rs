@@ -100,9 +100,9 @@ pub struct Graphnode {
   // Each relationship member carries the privacy LEVEL of the relationship
   // (see 'RelPartner'). List order is composition order.
   pub contains                     : Vec<RelPartner<ID>>, // See docs/data-model_technical.org.
-  pub subscribes_to                : MSV<RelPartner<ID>>, // See docs/data-model_technical.org.
-  pub hides_from_its_subscriptions : MSV<RelPartner<ID>>, // See docs/data-model_technical.org.
-  pub overrides_view_of            : MSV<RelPartner<ID>>, // See docs/data-model_technical.org.
+  pub subscribesTo                 : MSV<RelPartner<ID>>, // See docs/data-model_technical.org.
+  pub hidesFromSubs                : MSV<RelPartner<ID>>, // See docs/data-model_technical.org.
+  pub overrides                    : MSV<RelPartner<ID>>, // See docs/data-model_technical.org.
 
   pub flags: Vec<Flag>,
 }
@@ -168,9 +168,9 @@ pub fn empty_graphnode () -> Graphnode {
     extra_ids                    : Vec::new (),
     body                         : None,
     contains                     : Vec::new(),
-    subscribes_to                : MSV::Unspecified,
-    hides_from_its_subscriptions : MSV::Unspecified,
-    overrides_view_of            : MSV::Unspecified,
+    subscribesTo                 : MSV::Unspecified,
+    hidesFromSubs                : MSV::Unspecified,
+    overrides                    : MSV::Unspecified,
     flags                        : Vec::new (),
   }}
 

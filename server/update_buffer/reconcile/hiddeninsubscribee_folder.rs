@@ -132,7 +132,7 @@ fn read_hiddenin_context (
       tree, node, 2, kind . caller_label () ) ?;
   // relRepo gating (render-and-gating, 5_plan.org): these are the
   // subscribee's and subscriber's own outbound lists (contains,
-  // hides_from_its_subscriptions), read here to compute a DERIVED
+  // hidesFromSubs), read here to compute a DERIVED
   // membership for a third node (the HiddenInSubscribeeFolder) -- like
   // 'content_goal_list's grandparent subtrahends. A membership
   // recorded in an inactive skgrepo must not participate, in either
@@ -155,7 +155,7 @@ fn read_hiddenin_context (
       graphnode_graphFirst_by_pid_and_skgrepo (
         &runtime . graph, &runtime . config,
         &subscriber_pid, &subscriber_skgrepo ) ?;
-    let members = subscriber_graphnode . hides_from_its_subscriptions
+    let members = subscriber_graphnode . hidesFromSubs
       . or_default () . iter ()
       . filter ( |m| skgrepo_active (& m . relRepo) )
       . collect::<Vec<_>> ();

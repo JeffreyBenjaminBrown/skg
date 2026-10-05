@@ -131,16 +131,16 @@ fn lost_container_reports_current_existing_containers () {
 fn backward_subscribee_reports_current_existing_related_nodes () {
   let mut old : Graphnode =
     node ("old", "Old", &[]);
-  old . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&old . home_skgrepo, vec! [skgid ("target")]));
+  old . subscribesTo = MSV::Specified (rel_partners_at_relRepo (&old . home_skgrepo, vec! [skgid ("target")]));
   let mut stay : Graphnode =
     node ("stay", "Stay", &[]);
-  stay . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&stay . home_skgrepo, vec! [skgid ("target")]));
+  stay . subscribesTo = MSV::Specified (rel_partners_at_relRepo (&stay . home_skgrepo, vec! [skgid ("target")]));
   let mut stay_after : Graphnode =
     node ("stay", "Stay", &[]);
-  stay_after . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&stay_after . home_skgrepo, vec! [skgid ("target")]));
+  stay_after . subscribesTo = MSV::Specified (rel_partners_at_relRepo (&stay_after . home_skgrepo, vec! [skgid ("target")]));
   let mut new : Graphnode =
     node ("new", "New", &[]);
-  new . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&new . home_skgrepo, vec! [skgid ("target")]));
+  new . subscribesTo = MSV::Specified (rel_partners_at_relRepo (&new . home_skgrepo, vec! [skgid ("target")]));
   let report : DiffReport =
     report_for (
       vec! [ old, stay, node ("target", "Target", &[]) ],
@@ -174,7 +174,7 @@ fn contained_order_change_gets_list_diff () {
     reports_by_pid (&report);
   assert! (
     reports . get (&skgid ("a")) . unwrap ()
-      . contained_list_diff . is_some () );
+      . content_list_diff . is_some () );
 }
 
 #[test]
@@ -393,9 +393,9 @@ fn pure_contained_reorder_has_list_diff_without_set_diff () {
     reports_by_pid (&report);
   let a_report : &NodeDiffReport =
     reports . get (&skgid ("a")) . unwrap ();
-  let contained_set_diff : Option<&RelationshipDiff> =
+  let content_set_diff : Option<&RelationshipDiff> =
     a_report . relationship_diffs . iter ()
-      . find ( |diff| diff . role == "contained" );
-  assert! (contained_set_diff . is_none ());
-  assert! (a_report . contained_list_diff . is_some ());
+      . find ( |diff| diff . role == "content" );
+  assert! (content_set_diff . is_none ());
+  assert! (a_report . content_list_diff . is_some ());
 }

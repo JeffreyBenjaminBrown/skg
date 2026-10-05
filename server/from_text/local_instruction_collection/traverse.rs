@@ -415,7 +415,7 @@ fn partnerFolder_members (
 /// that pass the PartnerFolder membership predicate, deduplicated (by
 /// ID; see 'dedup_members_by_id'). Like 'content_members' (and for
 /// the same reason), inactive children contribute nothing:
-/// 'subscribes_to' is order-meaningful, but disk supplementation (its weave)
+/// 'subscribesTo' is order-meaningful, but disk supplementation (its weave)
 /// already restores invisible subscribees at their disk position, so
 /// a buffer-present inactive vognode must not feed this list.
 /// Each member is paired with its headline's explicit

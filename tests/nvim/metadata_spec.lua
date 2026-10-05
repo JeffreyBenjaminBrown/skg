@@ -238,7 +238,7 @@ describe('skg.metadata keybinding surface', function ()
       by_lhs[binding[1]] = binding[2]
     end
     assert.are.equal('ShowFolderOfAliases', by_lhs['ca'])
-    assert.are.equal('ShowFolderOfOverridesViewOf', by_lhs['co'])
+    assert.are.equal('ShowFolderOfOverrides', by_lhs['co'])
     assert.are.equal('ShowFolderOfSubscribesTo', by_lhs['cs'])
     assert.are.equal('ShowFolderOfFlags', by_lhs['cp'])
     assert.is_nil(by_lhs['cb'])

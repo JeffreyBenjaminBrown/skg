@@ -123,14 +123,14 @@ fn fetch_all_graphnodestats_in_rust (
     let containers : usize = inbound_count (NodeRelation::Contains);
     let contents : usize = outbound_count (NodeRelation::Contains);
     let hiders : usize =
-      inbound_count (NodeRelation::HidesFromItsSubscriptions);
+      inbound_count (NodeRelation::HidesFromSubs);
     let hides : usize =
-      outbound_count (NodeRelation::HidesFromItsSubscriptions);
+      outbound_count (NodeRelation::HidesFromSubs);
     let subscribers : usize = inbound_count (NodeRelation::SubscribesTo);
     let subscribees : usize = outbound_count (NodeRelation::SubscribesTo);
-    let overriders : usize = inbound_count (NodeRelation::OverridesViewOf);
+    let overriders : usize = inbound_count (NodeRelation::Overrides);
     let overrides_out : usize =
-      outbound_count (NodeRelation::OverridesViewOf);
+      outbound_count (NodeRelation::Overrides);
     let mentioners : HashSet<ID> =
       graph . inbound_pids_for_relation_gated (
         pid, NodeRelation::LinksTo, active )
@@ -182,7 +182,7 @@ fn fetch_all_graphnodestats_in_rust (
   } }
 
 /// Distinct visible resolved link targets, and whether the mentioner is substantive.
-/// The graph already parsed title and body into links_to.
+/// The graph already parsed title and body into linksTo.
 fn link_facts_for_mentioner (
   graph  : &InRustGraph,
   active : Option<&ActiveSkgRepoSet>,

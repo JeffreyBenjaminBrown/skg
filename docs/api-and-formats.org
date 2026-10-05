@@ -414,7 +414,7 @@ So far there are these endpoints:
 ** relRepo info
   - Request: ((request . "relRepo info") (owner . "ID")
     (member . "ID") (relation . "contains")) — relation is one of
-    =contains=, =subscribes_to=, =overrides_view_of=: the three
+    =contains=, =subscribesTo=, =overrides=: the three
     relations an explicit =(editRequest (relRepo ...))= request can name.
   - Response: LP response-type "relRepo-info" with
     =((default "NAME") (current "NAME"))=. =(current ...)= is absent
@@ -572,8 +572,8 @@ one automatically.
     =changed-nodes=, and =changed-memberships=, followed by rerender-lock,
     rerender-view*, and rerender-done for every open view.
   - The mutation removes only exact raw-ID matches in owned =contains=,
-    =subscribes_to=, =hides_from_its_subscriptions=, and
-    =overrides_view_of= lists.  It leaves text links and foreign telescopes
+    =subscribesTo=, =hidesFromSubs=, and
+    =overrides= lists.  It leaves text links and foreign telescopes
     untouched.
 
 ** Rerender all views
@@ -760,8 +760,8 @@ other relation folders; their potential contents remain advertised by the
 node's heralds.
 
 - =(folder RELNAME)= — build BOTH folders of the relation, populated from the
-  graph. RELNAME is =aliases=, =overrides_view_of=,
-  =hides_from_its_subscriptions=, or =subscribes_to=.
+  graph. RELNAME is =aliases=, =overrides=,
+  =hidesFromSubs=, or =subscribesTo=.
   The editable folder (=overriddenFolder= / =subscribeeFolder= / =aliasFolder=)
   appears even when empty (its editable "add here" surface); an empty
   write-protected folder is pruned. In diff mode, removed members count as content,
@@ -793,12 +793,12 @@ assembled glyphs, omitted numerals or colors. For example:
 (rels
   (contains (in 2 (ancestors 1))
             (out 8 (ancestors 2) (unintegrated 3 (ancestors 2))))
-  (links_to (in 5 (ancestors 1 2)
+  (linksTo (in 5 (ancestors 1 2)
                    (substantive 2 (ancestors 1)))
                (out 3 (ancestors 2)))
-  (overrides_view_of (out 1 (ancestors 1)))
+  (overrides (out 1 (ancestors 1)))
   (aliases 2) (extraIds 1) (flags 3)
-  (birth (overrides_view_of out 1)))
+  (birth (overrides out 1)))
 #+end_example
 
 Each relation side is =(in COUNT (ancestors GEN...))= or
@@ -806,8 +806,8 @@ Each relation side is =(in COUNT (ancestors GEN...))= or
 =COUNT= is the complete distinct visible node count even when ancestor
 flags let the client omit its numeral. Generation 1 is the viewparent,
 2 the grandparent, counting non-vognode levels. Relation keys are =contains=,
-=links_to=, =subscribes_to=, =overrides_view_of=, and
-=hides_from_its_subscriptions=. The =links_to=
+=linksTo=, =subscribesTo=, =overrides=, and
+=hidesFromSubs=. The =linksTo=
 incoming side adds =(substantive COUNT (ancestors GEN...))= for the subset
 whose skgrepo has a nonempty body, visible direct content, or more than one
 distinct visible resolved target. Its outgoing side counts distinct visible
@@ -820,20 +820,20 @@ occurrence's subscriber. Subset counts cannot exceed their side's total.
 occurrence: for each, the side of this node it is on (=in= or =out=) and
 the generation of the ancestor it accounts for. =GEN= is omitted when no
 ancestor accounts for it, as for a node drawn in place of a node it
-overrides, which carries =(overrides_view_of out)=.
+overrides, which carries =(overrides out)=.
 
 | Birth                            | Facts                                                        |
 |----------------------------------+--------------------------------------------------------------|
 | ordinary content                 | =(contains in 1)=                                            |
-| subscribee-folder member         | =(subscribes_to in 2)=                                       |
-| subscriber-folder member         | =(subscribes_to out 2)=                                      |
-| overridden-folder member         | =(overrides_view_of in 2)=                                   |
-| overrider-folder member          | =(overrides_view_of out 2)=                                  |
-| hidden-folder member             | =(hides_from_its_subscriptions in 2)=                        |
-| hider-folder member              | =(hides_from_its_subscriptions out 2)=                       |
-| hidden-in-subscribee member      | =(hides_from_its_subscriptions in 4) (contains in 2)=        |
-| hidden-outside-subscribee member | =(hides_from_its_subscriptions in 3)=                        |
-| drawn overrider (overrides-here) | =(overrides_view_of out)=                                    |
+| subscribee-folder member         | =(subscribesTo in 2)=                                       |
+| subscriber-folder member         | =(subscribesTo out 2)=                                      |
+| overridden-folder member         | =(overrides in 2)=                                   |
+| overrider-folder member          | =(overrides out 2)=                                  |
+| hidden-folder member             | =(hidesFromSubs in 2)=                        |
+| hider-folder member              | =(hidesFromSubs out 2)=                       |
+| hidden-in-subscribee member      | =(hidesFromSubs in 4) (contains in 2)=        |
+| hidden-outside-subscribee member | =(hidesFromSubs in 3)=                        |
+| drawn overrider (overrides-here) | =(overrides out)=                                    |
 | role graft                   | its role's relation, =out= for a first role and =in= for a second, =1= |
 Nonzero =(aliases K)=, =(extraIds K)= and =(flags K)= are property counts.
 See [[file:./heralds.org][heralds.org]] for the rendered notation and styles.
@@ -889,7 +889,7 @@ under different parents):
 
 ** Node flags
 
-The YAML =misc= list stores =Had_ID_Before_Import=, =Was_Overloaded=, and
+The YAML =flags= list stores =Had_ID_Before_Import=, =Was_Overloaded=, and
 =NoSearchMatching= using those exact spellings. Absence means false.
 =NoSearchMatching= keeps the node's Tantivy documents for ID/title/repo
 lookup but marks every title/alias document with indexed, stored
@@ -1088,7 +1088,7 @@ Fields:
 - =body=: An optional string, perhaps with newlines. Home only.
 - =aliases=: Optional list of strings. Each section may contribute
   aliases; an alias's relRepo is its section's skgrepo.
-- =contains=, =subscribes_to=: Ordered relations. ONE flat YAML
+- =contains=, =subscribesTo=: Ordered relations. ONE flat YAML
   sequence per relation, one entry per line:
   - =- ID= — a member recorded at this section's skgrepo. Identical
     syntax in every section, so a membership moving between skgrepos
@@ -1100,7 +1100,7 @@ Fields:
     on save from the in-memory order; hand-written anchors are
     honored on load (a dangling anchor's run falls back with a
     warning, and duplicate anchors concatenate in file order).
-- =hides_from_its_subscriptions=, =overrides_view_of=: Unordered
+- =hidesFromSubs=, =overrides=: Unordered
   relations; plain lists of IDs. The effective list is the union
   across sections; each entry's relRepo is its section's
   skgrepo.
@@ -1199,8 +1199,8 @@ included (they stay reachable by search or direct visit).
 Saving preserves what rendering omitted: an omitted relationship
 member cannot be deleted (or even seen), so the save merges the
 buffer's visible lists with the disk lists -- order-preserving (the
-anchored weave) for =contains= and =subscribes_to=, set-difference
-for =overrides_view_of=. Edits to visible members, including
+anchored weave) for =contains= and =subscribesTo=, set-difference
+for =overrides=. Edits to visible members, including
 deletions, are honored.
 
 The one place an inactive node still appears is retention: when a

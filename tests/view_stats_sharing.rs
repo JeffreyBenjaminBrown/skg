@@ -82,16 +82,16 @@ fn assert_sharing_stats_in_view_of_R (
   for (folder, line) in &e_lines {
     match *folder {
       "subscribeeFolder" => {
-        assert! ( line . contains ("(birth (subscribes_to in 2))"),
+        assert! ( line . contains ("(birth (subscribesTo in 2))"),
           "{}: E-as-subscribee is born of the subscribe:\n{}", label, buf );
-        assert! ( line . contains ("(overrides_view_of")
+        assert! ( line . contains ("(overrides")
                   && line . contains ("(ancestors 2)"),
           "{}: E-as-subscribee also shows gO (R overrides E, gen 2):\n{}",
           label, buf ); },
       "overriddenFolder" => {
-        assert! ( line . contains ("(birth (overrides_view_of in 2))"),
+        assert! ( line . contains ("(birth (overrides in 2))"),
           "{}: E-as-overridden is born of the override:\n{}", label, buf );
-        assert! ( line . contains ("(subscribes_to")
+        assert! ( line . contains ("(subscribesTo")
                   && line . contains ("(ancestors 2)"),
           "{}: E-as-overridden also shows gS (R subscribes E, gen 2):\n{}",
           label, buf ); },
@@ -101,7 +101,7 @@ fn assert_sharing_stats_in_view_of_R (
   for f_line in lines_containing (buf, "(id F)") {
     // F is a subscribee R does NOT override, so it has no overrides
     // relation at all -- only its folder subscribe (its birth).
-    assert! ( ! f_line . contains ("(overrides_view_of"),
+    assert! ( ! f_line . contains ("(overrides"),
       "{}: F, a subscribee R does not override, shows no override \
        relation:\n{}", label, buf ); }
   { // Since override substitution (plan 11), a fresh view of R draws
@@ -121,7 +121,7 @@ fn assert_op_in_view_of_P (
   // Op ("overridesParent"): C overrides its viewparent (a = P), so
   // it is born of an overrides-OUT relation to generation 1.
   assert! ( c_lines . iter ()
-            . any ( |l| l . contains ("(overrides_view_of (out")
+            . any ( |l| l . contains ("(overrides (out")
                         && l . contains ("(ancestors 1)") ),
     "{}: C drawn as content of P (which it overrides) is born of an \
      overrides-out to P (gen 1):\n{}", label, buf ); }
@@ -162,7 +162,7 @@ async fn sharing_view_stats_appear_and_roundtrip (
           &[ ID ("R" . to_string ()) ], false ) ?;
       let folder_request : String = initial . replace (
         "(affectsParent na)",
-        "(affectsParent na) (viewRequests (folder overrides_view_of))" );
+        "(affectsParent na) (viewRequests (folder overrides))" );
       let de_novo : String =
         save_and_rerender (&folder_request, config, tantivy) . await ?;
       assert_sharing_stats_in_view_of_R (&de_novo, "de novo");

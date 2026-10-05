@@ -63,7 +63,7 @@
   (with-temp-buffer
     (progn ;; Insert test text with herald markers
       (insert "Test line with (skg (node (id 123) (rels (contains (out 2))) (viewStats cycle))) herald\n")
-      (insert "Another line (skg (node (id 456) (rels (links_to (in 3 (substantive 3)))) (editRequest delete))) more text\n")
+      (insert "Another line (skg (node (id 456) (rels (linksTo (in 3 (substantive 3)))) (editRequest delete))) more text\n")
       (insert "Plain line without heralds\n"))
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)

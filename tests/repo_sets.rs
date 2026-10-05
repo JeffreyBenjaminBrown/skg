@@ -95,8 +95,8 @@ fn all_tests
       s . reset ("stale_inactive_placeholders_under_folders_save_without_error", fixtures) ?;
       stale_inactive_placeholders_under_folders_save_without_error (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to", fixtures) ?;
-      inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to (
+      s . reset ("inactive_subscribee_placeholder_does_not_contribute_to_subscribesTo", fixtures) ?;
+      inactive_subscribee_placeholder_does_not_contribute_to_subscribesTo (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("weave_preserves_omitted_inactive_content_members", fixtures) ?;
       weave_preserves_omitted_inactive_content_members (
@@ -908,15 +908,15 @@ async fn stale_inactive_placeholders_under_folders_save_without_error (
         result . err () . map ( |e| format! ("{:?}", e)) );
       Ok (( )) }
 
-async fn inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to (
+async fn inactive_subscribee_placeholder_does_not_contribute_to_subscribesTo (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // An inactive vognode emits no subscribes_to membership, just as
-  // it emits no contains relationship_axes: 'subscribes_to' is
+  // An inactive vognode emits no subscribesTo membership, just as
+  // it emits no contains relationship_axes: 'subscribesTo' is
   // order-meaningful, but the disk merge (weave) owns invisible
   // subscribees, so a buffer-present placeholder must not feed the
-  // recorder's subscribeeFolder. (root has no subscribes_to on disk, so the
+  // recorder's subscribeeFolder. (root has no subscribesTo on disk, so the
   // active member is the only one written.)
       let buffer = indoc! {"
         * (skg (node (id root) (repo public))) root
@@ -934,7 +934,7 @@ async fn inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to (
       assert_eq! (
         members_of (
           saved_node_by_skgid (&instructions, "root")
-            . subscribes_to . or_default () ),
+            . subscribesTo . or_default () ),
         vec! [ ID::from ("active-b") ],
         "the inactive vognode must not be a subscribee member" );
       Ok (( )) }
@@ -1017,7 +1017,7 @@ async fn restricted_save_preserves_invisible_override_targets (
         ActiveSkgRepoSet::named (
           &config, SkgRepoSetName::from ("public") )?;
       let override_set = |node : &Graphnode| -> Vec<ID> {
-        match &node . overrides_view_of {
+        match &node . overrides {
           MSV::Specified (skgids) => {
             let mut v : Vec<ID> = members_of (skgids); v . sort (); v }
           MSV::Unspecified => Vec::new (), } };
@@ -1040,7 +1040,7 @@ async fn restricted_save_preserves_invisible_override_targets (
           assert! (
             override_set (recorder) . contains (&ID::from ("ovr-inactive")),
             "unmodified restricted save dropped the invisible override \
-             target: {:?}", recorder . overrides_view_of ); } }
+             target: {:?}", recorder . overrides ); } }
       { // Delete the visible member: disk holds exactly [ovr-inactive].
         let deleted = indoc! {"
           * (skg (node (id ovr-owner) (repo public))) ovr-owner

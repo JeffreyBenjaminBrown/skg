@@ -31,6 +31,9 @@ use crate::types::nodes::complete::Flag;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct GraphnodeOnDisk {
+  // The aliases read the keys used before October 2026, so old files
+  // and old git blobs still load; writes use the new keys.
+  // tools/migrate-skg-keys-2026-10/ rewrites old files.
   // Field order fixes YAML output order. When anything here changes,
   // update 'Graphnode' (see [[./complete.rs][server/types/nodes/complete.rs]]) and vice versa.
 
@@ -51,17 +54,17 @@ pub struct GraphnodeOnDisk {
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub contains: Vec<ListItem>,
 
-  #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub subscribes_to: Vec<ListItem>,
+  #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "subscribes_to")]
+  pub subscribesTo: Vec<ListItem>,
 
-  #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub hides_from_its_subscriptions: Vec<ID>,
+  #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "hides_from_its_subscriptions")]
+  pub hidesFromSubs: Vec<ID>,
 
-  #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub overrides_view_of: Vec<ID>,
+  #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "overrides_view_of")]
+  pub overrides: Vec<ID>,
 
-  #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub misc: Vec<Flag>,
+  #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "misc")]
+  pub flags: Vec<Flag>,
 }
 
 impl GraphnodeOnDisk {
@@ -81,12 +84,12 @@ impl GraphnodeOnDisk {
         else { Some ( self . aliases ) },
       contains                     :
         nonempty_items ( self . contains ),
-      subscribes_to                :
-        nonempty_items ( self . subscribes_to ),
-      hides_from_its_subscriptions :
-        nonempty_skgids ( self . hides_from_its_subscriptions ),
-      overrides_view_of            :
-        nonempty_skgids ( self . overrides_view_of ), }}
+      subscribesTo                 :
+        nonempty_items ( self . subscribesTo ),
+      hidesFromSubs                :
+        nonempty_skgids ( self . hidesFromSubs ),
+      overrides                    :
+        nonempty_skgids ( self . overrides ), }}
 
   /// Treat ONE section as a whole node: exact for single-section
   /// telescopes; the per-file git/diff paths use it as interim
@@ -120,14 +123,14 @@ impl GraphnodeOnDisk {
       body                         : self . body,
       contains                     : rel_partners_at_relRepo (
         &skgrepo, members_only ( self . contains ) ),
-      subscribes_to                : rel_partners_at_relRepo_msv (
-        &skgrepo, msv_skgids ( members_only ( self . subscribes_to ) ) ),
-      hides_from_its_subscriptions : rel_partners_at_relRepo_msv (
+      subscribesTo                 : rel_partners_at_relRepo_msv (
+        &skgrepo, msv_skgids ( members_only ( self . subscribesTo ) ) ),
+      hidesFromSubs                : rel_partners_at_relRepo_msv (
         &skgrepo,
-        msv_skgids ( self . hides_from_its_subscriptions ) ),
-      overrides_view_of            : rel_partners_at_relRepo_msv (
-        &skgrepo, msv_skgids ( self . overrides_view_of ) ),
-      flags                         : self . misc,
+        msv_skgids ( self . hidesFromSubs ) ),
+      overrides                    : rel_partners_at_relRepo_msv (
+        &skgrepo, msv_skgids ( self . overrides ) ),
+      flags                         : self . flags,
       home_skgrepo: skgrepo,
     }}
 
@@ -180,7 +183,7 @@ impl GraphnodeOnDisk {
 pub fn graphnode_on_disk_from_section (
   pid       : &ID,
   extra_ids : &[ID],
-  misc      : &[Flag],
+  flags     : &[Flag],
   is_home   : bool,
   slices    : SectionSlices,
 ) -> GraphnodeOnDisk {
@@ -196,14 +199,14 @@ pub fn graphnode_on_disk_from_section (
         slices . body ),
     contains                     :
       slices . contains . unwrap_or_default (),
-    subscribes_to                :
-      slices . subscribes_to . unwrap_or_default (),
-    hides_from_its_subscriptions :
-      slices . hides_from_its_subscriptions . unwrap_or_default (),
-    overrides_view_of            :
-      slices . overrides_view_of . unwrap_or_default (),
-    misc                         :
-      if is_home { misc . to_vec () } else { Vec::new () }, }}
+    subscribesTo                 :
+      slices . subscribesTo . unwrap_or_default (),
+    hidesFromSubs                :
+      slices . hidesFromSubs . unwrap_or_default (),
+    overrides                    :
+      slices . overrides . unwrap_or_default (),
+    flags                        :
+      if is_home { flags . to_vec () } else { Vec::new () }, }}
 
 /// Render BODY as a YAML block-literal key-value of the form
 /// `body: |2…\n  line\n  line\n`. Returns Some only when the result

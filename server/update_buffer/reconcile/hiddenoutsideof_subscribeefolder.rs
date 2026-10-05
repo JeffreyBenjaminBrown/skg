@@ -130,14 +130,14 @@ fn read_hiddenoutside_context (
       &runtime . graph, &runtime . config,
       &subscriber_pid, &subscriber_skgrepo ) ?;
   // relRepo gating (render-and-gating, 5_plan.org): both are the
-  // subscriber's own outbound lists (hides_from_its_subscriptions,
-  // subscribes_to); a membership recorded in an inactive skgrepo must
+  // subscriber's own outbound lists (hidesFromSubs,
+  // subscribesTo); a membership recorded in an inactive skgrepo must
   // not feed this derived folder.
   let skgrepo_active = |skgrepo : &SkgRepoName| match active_skgrepo_set {
     None      => true,
     Some (a)  => a . is_all () || a . contains_skgrepo (skgrepo) };
   let wt_subscriber_hide_members =
-    wt_subscriber_graphnode . hides_from_its_subscriptions
+    wt_subscriber_graphnode . hidesFromSubs
     . or_default () . iter ()
     . filter ( |m| skgrepo_active (& m . relRepo) )
     . collect::<Vec<_>> ();
@@ -149,7 +149,7 @@ fn read_hiddenoutside_context (
     . map ( |m| (m . member . clone (), m . relRepo . clone ()) )
     . collect ();
   let wt_subscribees : Vec<ID> =
-    wt_subscriber_graphnode . subscribes_to
+    wt_subscriber_graphnode . subscribesTo
     . or_default () . iter ()
     . filter ( |m| skgrepo_active (& m . relRepo) )
     . map ( |m| m . member . clone () )

@@ -119,9 +119,9 @@ fn unknown_members_write_their_editable_relationship_recorders_only () {
               "an Unknown must not create a node save, delete, merge, or fork instruction");
   let recorder = saved_node_by_skgid (&instructions, "recorder");
   assert_eq! (members_of (&recorder . contains), vec! [ID::from ("content-unknown")]);
-  assert_eq! (members_msv (&recorder . subscribes_to),
+  assert_eq! (members_msv (&recorder . subscribesTo),
               MSV::Specified (vec! [ID::from ("subscribee-unknown")]));
-  assert_eq! (members_msv (&recorder . overrides_view_of),
+  assert_eq! (members_msv (&recorder . overrides),
               MSV::Specified (vec! [ID::from ("overridden-unknown")]));
   assert_eq! (hiddenoutside_edits_from_tree (checked_viewforest_from_org (input)),
               vec! [(ID::from ("recorder"),
@@ -487,7 +487,7 @@ fn extraction_collects_subscribees_without_hidden_branches (
       ID::from ("subscribee-content"),
       ID::from ("hidden-outside")]);
   assert_eq!(
-    members_msv (&saved_node_by_skgid (&instructions, "subscriber") . subscribes_to),
+    members_msv (&saved_node_by_skgid (&instructions, "subscriber") . subscribesTo),
     MSV::Specified (vec![ID::from ("subscribee")]));
   assert_eq!(
     saved_node_by_skgid (&instructions, "subscriber") . contains,
@@ -516,13 +516,13 @@ fn extraction_collects_overridden_folder (
   assert_eq!(
     save_skgids (&instructions),
     // OverriddenFolder members are self-writers: their membership is
-    // read for the parent's overrides_view_of, and they also save
+    // read for the parent's overrides, and they also save
     // their own vognodes. This is part of the new recursion surface.
     vec![ID::from ("overrider"),
          ID::from ("overridden-a"),
          ID::from ("overridden-b")]);
   assert_eq!(
-    members_msv (&saved_node_by_skgid (&instructions, "overrider") . overrides_view_of),
+    members_msv (&saved_node_by_skgid (&instructions, "overrider") . overrides),
     MSV::Specified (vec![
       ID::from ("overridden-a"),
       ID::from ("overridden-b")])); }
@@ -544,7 +544,7 @@ fn empty_overridden_folder_means_empty_override_set (
     nodeInstructions_from_tree (viewforest) . unwrap();
 
   assert_eq!(
-    saved_node_by_skgid (&instructions, "overrider") . overrides_view_of,
+    saved_node_by_skgid (&instructions, "overrider") . overrides,
     MSV::Specified (vec![])); }
 
 #[test]
@@ -771,7 +771,7 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
   assert_eq!(members_msv (&root . aliases), MSV::Specified (vec![
     "root alias" . to_string()]));
   assert_eq!(members_of (&root . contains), vec![ID::from ("child")]);
-  assert_eq!(members_msv (&root . subscribes_to), MSV::Specified (vec![
+  assert_eq!(members_msv (&root . subscribesTo), MSV::Specified (vec![
     ID::from ("subscribee")]));
   assert!(matches!(
     instructions . last(),
@@ -816,7 +816,7 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
   assert_eq!(members_of (&root . contains), vec![ID::from ("content")]);
   assert_eq!(members_msv (&root . aliases), MSV::Specified (vec![
     "root alias" . to_string()]));
-  assert_eq!(members_msv (&root . subscribes_to), MSV::Specified (vec![
+  assert_eq!(members_msv (&root . subscribesTo), MSV::Specified (vec![
     ID::from ("subscribee")]));
   assert_eq!(
     saved_node_by_skgid (&instructions, "independent") . contains,
@@ -976,7 +976,7 @@ async fn subscribee_as_such_child_list_removal_infers_subscriber_hide (
           input, config) . await?;
       assert_eq!(
         members_msv (&saved_node_by_skgid (&instructions, "r")
-          . hides_from_its_subscriptions),
+          . hidesFromSubs),
         MSV::Specified (vec![ID::from ("e1")]));
       assert!(
         ! save_skgids (&instructions) . contains (&ID::from ("e")),
@@ -1000,7 +1000,7 @@ async fn moving_subscribee_as_such_child_to_subscriber_does_not_hide (
           input, config) . await?;
       assert_eq!(
         saved_node_by_skgid (&instructions, "r")
-          . hides_from_its_subscriptions,
+          . hidesFromSubs,
         MSV::Unspecified);
       assert_eq!(
         members_of (&saved_node_by_skgid (&instructions, "r") . contains),
@@ -1024,7 +1024,7 @@ async fn subscribee_as_such_visible_child_removes_subscriber_hide (
           input, config) . await?;
       assert_eq!(
         saved_node_by_skgid (&instructions, "R")
-          . hides_from_its_subscriptions,
+          . hidesFromSubs,
         MSV::Specified (vec![]));
       assert!(
         ! save_skgids (&instructions) . contains (&ID::from ("E1")),
@@ -1050,7 +1050,7 @@ async fn subscribee_as_such_unhide_preserves_unrelated_hides (
           input, config) . await?;
       assert_eq!(
         members_msv (&saved_node_by_skgid (&instructions, "R")
-          . hides_from_its_subscriptions),
+          . hidesFromSubs),
         MSV::Specified (
           vec![ID::from ("hidden-in-E2"),
                ID::from ("hidden-for-no-reason")]));
@@ -1120,7 +1120,7 @@ async fn ordinary_same_skgid_occurrence_keeps_contains_edit_when_also_as_subscri
         vec![ID::from ("e1")]);
       assert_eq!(
         members_msv (&saved_node_by_skgid (&instructions, "r")
-          . hides_from_its_subscriptions),
+          . hidesFromSubs),
         MSV::Specified (vec![ID::from ("e1")]));
       Ok (()) }
 
@@ -1452,7 +1452,7 @@ fn toDelete_member_is_excluded_from_subscribees (
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
-    members_msv (&saved_node_by_skgid (&instructions, "subscriber") . subscribes_to),
+    members_msv (&saved_node_by_skgid (&instructions, "subscriber") . subscribesTo),
     MSV::Specified (vec![ID::from ("keep")])); }
 
 #[test]
@@ -1471,7 +1471,7 @@ fn would_be_diff_phantom_member_is_excluded_from_subscribees (
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
-    members_msv (&saved_node_by_skgid (&instructions, "subscriber") . subscribes_to),
+    members_msv (&saved_node_by_skgid (&instructions, "subscriber") . subscribesTo),
     MSV::Specified (vec![ID::from ("keep")])); }
 
 #[test]
@@ -1489,7 +1489,7 @@ fn toDelete_member_is_excluded_from_overriddens (
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
-    members_msv (&saved_node_by_skgid (&instructions, "overrider") . overrides_view_of),
+    members_msv (&saved_node_by_skgid (&instructions, "overrider") . overrides),
     MSV::Specified (vec![ID::from ("keep")])); }
 
 #[test]
@@ -1507,7 +1507,7 @@ fn independent_member_is_excluded_from_overriddens (
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
-    members_msv (&saved_node_by_skgid (&instructions, "overrider") . overrides_view_of),
+    members_msv (&saved_node_by_skgid (&instructions, "overrider") . overrides),
     MSV::Specified (vec![ID::from ("keep")])); }
 
 #[test]
@@ -1571,25 +1571,25 @@ fn duplicate_members_of_defining_folders_are_silently_deduplicated (
     MSV::Specified (vec![
       "echo" . to_string(), "other" . to_string()]));
   assert_eq!(
-    members_msv (&recorder . subscribes_to),
+    members_msv (&recorder . subscribesTo),
     MSV::Specified (vec![ID::from ("s1"), ID::from ("s2")]));
   assert_eq!(
-    members_msv (&recorder . overrides_view_of),
+    members_msv (&recorder . overrides),
     MSV::Specified (vec![ID::from ("o1"), ID::from ("o2")])); }
 
 // The next four tests pin the editable-folder membership semantics that
 // the relationship matrix (stage 13) asks for at the cheapest seam:
 // subscribeeFolder order and one-member removal persist to
-// subscribes_to; overriddenFolder order does not matter (the
+// subscribesTo; overriddenFolder order does not matter (the
 // set-difference merge depends on this); and the write-protected hiddenFolder
 // never writes the recorder's hides.
 
 #[test]
-fn reordering_subscribees_reorders_subscribes_to (
+fn reordering_subscribees_reorders_subscribesTo (
 ) {
   // A subscribeeFolder is writable: its member order is the recorder's
-  // subscribes_to order. Members [c, a, b] (a reorder of [a, b, c])
-  // emit subscribes_to = [c, a, b].
+  // subscribesTo order. Members [c, a, b] (a reorder of [a, b, c])
+  // emit subscribesTo = [c, a, b].
   let input : &str =
     indoc! {"
             * (skg (node (id recorder) (repo main))) recorder
@@ -1603,7 +1603,7 @@ fn reordering_subscribees_reorders_subscribes_to (
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
-    members_msv (&saved_node_by_skgid (&instructions, "recorder") . subscribes_to),
+    members_msv (&saved_node_by_skgid (&instructions, "recorder") . subscribesTo),
     MSV::Specified (vec![
       ID::from ("c"), ID::from ("a"), ID::from ("b")])); }
 
@@ -1611,7 +1611,7 @@ fn reordering_subscribees_reorders_subscribes_to (
 fn removing_one_subscribee_keeps_the_rest (
 ) {
   // Deleting one member of an editable folder (b, from [a, b, c]) leaves
-  // the rest: subscribes_to = [a, c], neither empty nor unspecified.
+  // the rest: subscribesTo = [a, c], neither empty nor unspecified.
   let input : &str =
     indoc! {"
             * (skg (node (id recorder) (repo main))) recorder
@@ -1624,13 +1624,13 @@ fn removing_one_subscribee_keeps_the_rest (
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
-    members_msv (&saved_node_by_skgid (&instructions, "recorder") . subscribes_to),
+    members_msv (&saved_node_by_skgid (&instructions, "recorder") . subscribesTo),
     MSV::Specified (vec![ID::from ("a"), ID::from ("c")])); }
 
 #[test]
 fn reordering_overridden_folder_is_harmless (
 ) {
-  // overrides_view_of is order-free (the set-difference merge relies
+  // overrides is order-free (the set-difference merge relies
   // on this). overriddenFolder members [b, a] (a reorder of [a, b]) emit
   // the same set, and nothing else about the recorder changes.
   let input : &str =
@@ -1646,7 +1646,7 @@ fn reordering_overridden_folder_is_harmless (
     nodeInstructions_from_tree (viewforest) . unwrap ();
   let recorder : &Graphnode =
     saved_node_by_skgid (&instructions, "recorder");
-  let overridden : Vec<ID> = match &recorder . overrides_view_of {
+  let overridden : Vec<ID> = match &recorder . overrides {
     MSV::Specified (skgids) => members_of (skgids),
     other => panic! (
       "expected Specified override set, got {:?}", other), };
@@ -1654,14 +1654,14 @@ fn reordering_overridden_folder_is_harmless (
   assert!(overridden . contains (&ID::from ("a")));
   assert!(overridden . contains (&ID::from ("b")));
   assert_eq!(members_of (&recorder . contains), Vec::<ID>::new());
-  assert_eq!(recorder . subscribes_to, MSV::Unspecified);
-  assert_eq!(recorder . hides_from_its_subscriptions, MSV::Unspecified); }
+  assert_eq!(recorder . subscribesTo, MSV::Unspecified);
+  assert_eq!(recorder . hidesFromSubs, MSV::Unspecified); }
 
 #[test]
 fn deleting_from_hiddenFolder_emits_no_hide_change (
 ) {
   // hiddenFolder is write-protected: its membership is never collected into
-  // the recorder's hides_from_its_subscriptions. A member shown there
+  // the recorder's hidesFromSubs. A member shown there
   // (and, equally, a member deleted from there) emits no hide intent;
   // the recorder's hides stay Unspecified (no opinion), preserving
   // whatever disk holds. The filter folders have this guarantee tested;
@@ -1678,5 +1678,5 @@ fn deleting_from_hiddenFolder_emits_no_hide_change (
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
     saved_node_by_skgid (&instructions, "recorder")
-      . hides_from_its_subscriptions,
+      . hidesFromSubs,
     MSV::Unspecified); }

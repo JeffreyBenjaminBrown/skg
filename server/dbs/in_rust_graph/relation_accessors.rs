@@ -9,11 +9,11 @@ use crate::types::nodes::rust::GraphnodeInRust;
 /// The five stored outbound relationship types and their endpoint roles.
 /// This is domain vocabulary; storage adapters consume it rather than own it.
 pub const OUTBOUND_RELATIONSHIP_TYPES : &[(&str, &str, &str)] = &[
-  ("contains",                      "container",  "contained"),
-  ("links_to",                      "mentioner",  "mentioned"),
-  ("subscribes_to",                 "subscriber", "subscribee"),
-  ("hides_from_its_subscriptions",  "hider",      "hidden"),
-  ("overrides_view_of",             "overrider",  "overridden"),
+  ("contains",                      "container",  "content"),
+  ("linksTo",                       "mentioner",  "mentioned"),
+  ("subscribesTo",                  "subscriber", "subscribee"),
+  ("hidesFromSubs",                 "hider",      "hidden"),
+  ("overrides",                     "overrider",  "overridden"),
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -21,8 +21,8 @@ pub enum NodeRelation {
   Contains,
   LinksTo,
   SubscribesTo,
-  HidesFromItsSubscriptions,
-  OverridesViewOf,
+  HidesFromSubs, // "hides from its subscriptions": the hider keeps the hidden node out of what it shows from its subscribees.
+  Overrides,
 }
 
 impl NodeRelation {
@@ -31,13 +31,13 @@ impl NodeRelation {
       Self::Contains =>
         "contains",
       Self::LinksTo =>
-        "links_to",
+        "linksTo",
       Self::SubscribesTo =>
-        "subscribes_to",
-      Self::HidesFromItsSubscriptions =>
-        "hides_from_its_subscriptions",
-      Self::OverridesViewOf =>
-        "overrides_view_of",
+        "subscribesTo",
+      Self::HidesFromSubs =>
+        "hidesFromSubs",
+      Self::Overrides =>
+        "overrides",
     } }
 
 
@@ -55,11 +55,11 @@ impl NodeRelation {
       Self::Contains =>
         Some ( & nc . contains_diff ),
       Self::SubscribesTo =>
-        Some ( & nc . subscribes_to_diff ),
-      Self::HidesFromItsSubscriptions =>
+        Some ( & nc . subscribesTo_diff ),
+      Self::HidesFromSubs =>
         Some ( & nc . hides_diff ),
-      Self::OverridesViewOf =>
-        Some ( & nc . overrides_view_of_diff ),
+      Self::Overrides =>
+        Some ( & nc . overrides_diff ),
       Self::LinksTo =>
         None, } }
 
@@ -127,16 +127,16 @@ impl RelationRole {
     RelationRole { relation : NodeRelation::LinksTo,
                    position : BinaryRolePosition::Second };
   pub const OVERRIDER : RelationRole =
-    RelationRole { relation : NodeRelation::OverridesViewOf,
+    RelationRole { relation : NodeRelation::Overrides,
                    position : BinaryRolePosition::First };
   pub const OVERRIDDEN : RelationRole =
-    RelationRole { relation : NodeRelation::OverridesViewOf,
+    RelationRole { relation : NodeRelation::Overrides,
                    position : BinaryRolePosition::Second };
   pub const HIDER : RelationRole =
-    RelationRole { relation : NodeRelation::HidesFromItsSubscriptions,
+    RelationRole { relation : NodeRelation::HidesFromSubs,
                    position : BinaryRolePosition::First };
   pub const HIDDEN : RelationRole =
-    RelationRole { relation : NodeRelation::HidesFromItsSubscriptions,
+    RelationRole { relation : NodeRelation::HidesFromSubs,
                    position : BinaryRolePosition::Second };
   pub const SUBSCRIBER : RelationRole =
     RelationRole { relation : NodeRelation::SubscribesTo,
@@ -224,7 +224,7 @@ impl InRustGraph {
         NodeRelation::Contains,
         NodeRelation::LinksTo,
         NodeRelation::SubscribesTo,
-        NodeRelation::HidesFromItsSubscriptions,
+        NodeRelation::HidesFromSubs,
       ] {
         result . extend (
           self . outbound_skgids_for_relation (seed, relation)
@@ -250,10 +250,10 @@ impl InRustGraph {
       let next : Vec<ID> = match seed_position {
         BinaryRolePosition::First =>
           self . outbound_skgids_for_relation (
-            &node, NodeRelation::OverridesViewOf),
+            &node, NodeRelation::Overrides),
         BinaryRolePosition::Second =>
           self . inbound_pids_for_relation (
-            &node, NodeRelation::OverridesViewOf), };
+            &node, NodeRelation::Overrides), };
       for raw_skgid in next {
         let skgid : ID = self . pid_of (&raw_skgid) . unwrap_or (raw_skgid);
         if visited . insert (skgid . clone ()) {
@@ -287,11 +287,11 @@ impl InRustGraph {
       NodeRelation::Contains =>
         node . contains . clone (),
       NodeRelation::SubscribesTo =>
-        node . subscribes_to . or_default () . to_vec (),
-      NodeRelation::HidesFromItsSubscriptions =>
-        node . hides_from_its_subscriptions . or_default () . to_vec (),
-      NodeRelation::OverridesViewOf =>
-        node . overrides_view_of . or_default () . to_vec (),
+        node . subscribesTo . or_default () . to_vec (),
+      NodeRelation::HidesFromSubs =>
+        node . hidesFromSubs . or_default () . to_vec (),
+      NodeRelation::Overrides =>
+        node . overrides . or_default () . to_vec (),
       NodeRelation::LinksTo =>
         return Vec::new (),
     };
@@ -338,11 +338,11 @@ impl InRustGraph {
       NodeRelation::Contains =>
         node . contains . clone (),
       NodeRelation::SubscribesTo =>
-        node . subscribes_to . or_default () . to_vec (),
-      NodeRelation::HidesFromItsSubscriptions =>
-        node . hides_from_its_subscriptions . or_default () . to_vec (),
-      NodeRelation::OverridesViewOf =>
-        node . overrides_view_of . or_default () . to_vec (),
+        node . subscribesTo . or_default () . to_vec (),
+      NodeRelation::HidesFromSubs =>
+        node . hidesFromSubs . or_default () . to_vec (),
+      NodeRelation::Overrides =>
+        node . overrides . or_default () . to_vec (),
       NodeRelation::LinksTo =>
         // links derive from the body, which is home-only, so
         // their skgrepo is the recorder's home by construction.
@@ -493,13 +493,13 @@ fn outbound_skgids_from_node (
     NodeRelation::Contains =>
       members_of ( &node . contains ),
     NodeRelation::LinksTo =>
-      node . links_to . clone (),
+      node . linksTo . clone (),
     NodeRelation::SubscribesTo =>
-      members_of ( node . subscribes_to . or_default () ),
-    NodeRelation::HidesFromItsSubscriptions =>
-      members_of ( node . hides_from_its_subscriptions . or_default () ),
-    NodeRelation::OverridesViewOf =>
-      members_of ( node . overrides_view_of . or_default () ),
+      members_of ( node . subscribesTo . or_default () ),
+    NodeRelation::HidesFromSubs =>
+      members_of ( node . hidesFromSubs . or_default () ),
+    NodeRelation::Overrides =>
+      members_of ( node . overrides . or_default () ),
   } }
 
 fn inbound_pid_set (
@@ -520,11 +520,11 @@ fn inbound_pid_set (
       graph . subscribers_of . get (pid)
       . map ( |s| s . iter () . cloned () . collect () )
       . unwrap_or_default (),
-    NodeRelation::HidesFromItsSubscriptions =>
+    NodeRelation::HidesFromSubs =>
       graph . hiders_of . get (pid)
       . map ( |s| s . iter () . cloned () . collect () )
       . unwrap_or_default (),
-    NodeRelation::OverridesViewOf =>
+    NodeRelation::Overrides =>
       graph . overriders_of . get (pid)
       . map ( |s| s . iter () . cloned () . collect () )
       . unwrap_or_default (),
@@ -541,14 +541,14 @@ mod tests {
   fn every_node_relation () -> Vec<NodeRelation> {
     let every : Vec<NodeRelation> = vec! [
       NodeRelation::Contains, NodeRelation::LinksTo,
-      NodeRelation::SubscribesTo, NodeRelation::HidesFromItsSubscriptions,
-      NodeRelation::OverridesViewOf ];
+      NodeRelation::SubscribesTo, NodeRelation::HidesFromSubs,
+      NodeRelation::Overrides ];
     for relation in &every {
       match relation {
         NodeRelation::Contains | NodeRelation::LinksTo
           | NodeRelation::SubscribesTo
-          | NodeRelation::HidesFromItsSubscriptions
-          | NodeRelation::OverridesViewOf => (), } }
+          | NodeRelation::HidesFromSubs
+          | NodeRelation::Overrides => (), } }
     every }
 
   /// shared/relations.json, which both clients read, names the same
@@ -594,23 +594,23 @@ mod tests {
     let expected : [(&str, RelationRole, &str,
                      (&str, &str, &str)); 9] = [
       ("container",  RelationRole::CONTAINER,   "}",
-       ("contains", "contained", "container")),
+       ("contains", "content", "container")),
       ("mentioner", RelationRole::MENTIONER, "←",
-       ("links_to", "mentioned", "mentioner")),
+       ("linksTo",  "mentioned", "mentioner")),
       ("mentioned",   RelationRole::MENTIONED,   "→",
-       ("links_to", "mentioner", "mentioned")),
+       ("linksTo",  "mentioner", "mentioned")),
       ("overrider",  RelationRole::OVERRIDER,   "Op",
-       ("overrides_view_of", "overridden", "overrider")),
+       ("overrides",         "overridden", "overrider")),
       ("overridden", RelationRole::OVERRIDDEN,  "pO",
-       ("overrides_view_of", "overrider", "overridden")),
+       ("overrides",         "overrider", "overridden")),
       ("hider",      RelationRole::HIDER,       "Hp",
-       ("hides_from_its_subscriptions", "hidden", "hider")),
+       ("hidesFromSubs",                "hidden", "hider")),
       ("hidden",     RelationRole::HIDDEN,      "pH",
-       ("hides_from_its_subscriptions", "hider", "hidden")),
+       ("hidesFromSubs",                "hider", "hidden")),
       ("subscriber", RelationRole::SUBSCRIBER,  "Sp",
-       ("subscribes_to", "subscribee", "subscriber")),
+       ("subscribesTo",  "subscribee", "subscriber")),
       ("subscribee", RelationRole::SUBSCRIBEE,  "pS",
-       ("subscribes_to", "subscriber", "subscribee")),
+       ("subscribesTo",  "subscriber", "subscribee")),
     ];
     for (name, role, glyph, triple) in expected {
       assert_eq! ( role . rolename (), name );
@@ -622,6 +622,6 @@ mod tests {
   #[test]
   fn from_rolename_rejects_unknown_and_the_absent_content_role () {
     assert_eq! ( RelationRole::from_rolename (""), None );
-    assert_eq! ( RelationRole::from_rolename ("contained"), None );
+    assert_eq! ( RelationRole::from_rolename ("content"), None );
     assert_eq! ( RelationRole::from_rolename ("bogus"), None ); }
 }

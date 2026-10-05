@@ -98,8 +98,8 @@ fn nodeMerge_from_acquirer_and_acquiree (
 /// - Combined IDs from both nodes
 /// - contains: [acquiree_text_preserver] + acquirer's + acquiree's novel contents
 ///   - 'Novel' = not among the acquirer's contents
-/// - Combined relationship fields (subscribes_to, overrides_view_of)
-/// - Filtered hides_from_its_subscriptions: can't hide your own
+/// - Combined relationship fields (subscribesTo, overrides)
+/// - Filtered hidesFromSubs: can't hide your own
 ///   content, and can't hide what either member SHOWED pre-merge
 ///   ('shown_pre_merge')
 fn three_nodeMerged_graphnodes(
@@ -191,12 +191,12 @@ fn three_nodeMerged_graphnodes(
             skgrepo, m . member . clone () )), }} }
     updated_acquirer . aliases =
       MSV::Specified (combined); }
-  { // Combine subscribes_to
-    updated_acquirer . subscribes_to =
+  { // Combine subscribesTo
+    updated_acquirer . subscribesTo =
       MSV::Specified ( combine_rel_partners (
-        & [ acquirer_from_disk . subscribes_to . or_default (),
-            acquiree_from_disk . subscribes_to . or_default () ] )); }
-  { // Combine hides_from_its_subscriptions, filtering to hide
+        & [ acquirer_from_disk . subscribesTo . or_default (),
+            acquiree_from_disk . subscribesTo . or_default () ] )); }
+  { // Combine hidesFromSubs, filtering to hide
     // nothing that the acquirer contains, and nothing either member
     // SHOWED through its subscriptions pre-merge: if it was
     // contained in one member's subscribee and unhidden by (and not
@@ -205,21 +205,21 @@ fn three_nodeMerged_graphnodes(
     // like the intersection": exactly the intersection when both
     // members could see the id through some subscribee.)
     let mut combined : Vec<RelPartner<ID>> = combine_rel_partners (
-      & [ acquirer_from_disk . hides_from_its_subscriptions
+      & [ acquirer_from_disk . hidesFromSubs
             . or_default (),
-          acquiree_from_disk . hides_from_its_subscriptions
+          acquiree_from_disk . hidesFromSubs
             . or_default () ] );
     combined . retain ( // if it's in 'new_contains', then it's not here
       |m| ! new_contains . contains ( &m . member ));
     combined . retain (
       |m| ! shown_pre_merge . contains ( &m . member ));
-    updated_acquirer . hides_from_its_subscriptions =
+    updated_acquirer . hidesFromSubs =
       MSV::Specified (combined); }
-  { // Combine overrides_view_of
-    updated_acquirer . overrides_view_of =
+  { // Combine overrides
+    updated_acquirer . overrides =
       MSV::Specified ( combine_rel_partners (
-        & [ acquirer_from_disk . overrides_view_of . or_default (),
-            acquiree_from_disk . overrides_view_of . or_default () ] )); }
+        & [ acquirer_from_disk . overrides . or_default (),
+            acquiree_from_disk . overrides . or_default () ] )); }
   Ok (updated_acquirer) }
 
 /// The ids 'node' shows as unintegrated subscribed content: contained
@@ -234,10 +234,10 @@ fn skgids_shown_through_subscriptions (
 ) -> Result<HashSet<ID>, Box<dyn Error>> {
   let mut shown : HashSet<ID> = HashSet::new ();
   let hides : Vec<ID> =
-    members_of ( node . hides_from_its_subscriptions . or_default () );
+    members_of ( node . hidesFromSubs . or_default () );
   let contains : Vec<ID> =
     members_of ( & node . contains );
-  for subscribee_skgid in members_of ( node . subscribes_to . or_default () ) {
+  for subscribee_skgid in members_of ( node . subscribesTo . or_default () ) {
     let Some (subscribee) = opt_graphnode_by_skgid (
       graph, config, &subscribee_skgid ) ?
     else { continue; };
@@ -258,9 +258,9 @@ fn create_acquiree_text_preserver(acquiree: &Graphnode) -> Graphnode {
     extra_ids: vec![],
     body: acquiree . body . clone(),
     contains                     : vec![],
-    subscribes_to                : MSV::Specified(vec![]),
-    hides_from_its_subscriptions : MSV::Specified(vec![]),
-    overrides_view_of            : MSV::Specified(vec![]),
+    subscribesTo                 : MSV::Specified(vec![]),
+    hidesFromSubs                : MSV::Specified(vec![]),
+    overrides                    : MSV::Specified(vec![]),
     flags                        : if flag_is_true (
       &acquiree . flags, Flag::NoSearchMatching)
       { vec![Flag::NoSearchMatching] }

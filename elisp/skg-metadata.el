@@ -235,7 +235,7 @@ children's edges are examined."
            (start-level (org-outline-level))
            (consider ;; point on a candidate child C, whose inbound relationship is examined; the arguments say whether each endpoint's skgrepo is about to be retargeted
             (lambda (parent-retargets-p child-retargets-p)
-              (when (skg--relationship-kind-matches-p 'contained)
+              (when (skg--relationship-kind-matches-p 'content)
                 (let* ((child-meta (skg--metadata-sexp-at-point-or-nil))
                        (child-skgrepo (skg--node-repo child-meta))
                        (child-moves ;; a write-protected occurrence is skipped by the retargeting walk, so its skgrepo does not actually change
@@ -352,8 +352,8 @@ the edge belongs to the other end, so setting its repo here would
 be meaningless.")
 
 (defconst skg--writable-folder-relations
-  '((subscribeeFolder . "subscribes_to")
-    (overriddenFolder . "overrides_view_of"))
+  '((subscribeeFolder . "subscribesTo")
+    (overriddenFolder . "overrides"))
   "The PartnerFolder atoms whose members' edges are WRITABLE
 from this side, each mapped to its relation's wire name
 (NodeRelation::relation_name, server/dbs/in_rust_graph/
@@ -523,29 +523,29 @@ next save will do with the edge."
 (defconst skg--relationship-role-menu-prose
   '(("container" nil
      "The node would CONTAIN its view-parent -- the shape of a containerward role graft. The edge belongs to the role role graft's own contains list, wherever that list is drawn definitively; it cannot be set from the role role graft's position.")
-    ("contained" contained
+    ("content" content
      "The view-parent contains the node: ordinary content. Sets the repo of each parent-contains-child edge.")
     ("mentioner" nil
      "Links are inferred from body text; they carry no false relRepo, so there is nothing to set.")
     ("mentioned" nil
      "Links are inferred from body text; they carry no false relRepo, so there is nothing to set.")
     ("subscriber" nil
-     "A subscriberFolder member: the subscribes-to edge belongs to the member (the subscriber), not to the view-parent. Write-protected from here.")
+     "A subscriberFolder member: the subscribesTo relationship belongs to the member (the subscriber), not to the view-parent. Write-protected from here.")
     ("subscribee" subscribee
-     "A member of the view-parent's subscribeeFolder. Sets the repo of each anchor-subscribes-to-member edge.")
+     "A member of the view-parent's subscribeeFolder. Sets the repo of each subscribesTo relationship from the view-parent.")
     ("hider" nil
      "Hide repos are derived at save, floored at the most public explaining subscription; the hiderFolder is write-protected.")
     ("hidden" nil
      "Hide repos are derived at save, floored at the most public explaining subscription; the hiddenFolder is write-protected.")
     ("overrider" nil
-     "An overriderFolder member: the overrides-view-of edge belongs to the member (the overrider), not to the view-parent. Write-protected from here.")
+     "An overriderFolder member: the overrides relationship belongs to the member (the overrider), not to the view-parent. Write-protected from here.")
     ("overridden" overridden
-     "A member of the view-parent's overriddenFolder. Sets the repo of each anchor-overrides-view-of-member edge."))
+     "A member of the view-parent's overriddenFolder. Sets the repo of each overrides relationship from the view-parent."))
   "For each relation role in 'shared/relations.json',
 (ROLE-NAME KIND-OR-NIL DESCRIPTION), as the relationship-kind menu of
 `skg-set-relRepo-recursive' shows it. ROLE-NAME is the role the
 VIEW-CHILD would play toward its view-parent. KIND-OR-NIL is the
-symbol the walk dispatches on (`contained', `subscribee' or
+symbol the walk dispatches on (`content', `subscribee' or
 `overridden') for the three roles whose edge is writable from the
 child's buffer position, and nil for the rest; DESCRIPTION then
 explains why the edge cannot be set from that position.")
@@ -575,7 +575,7 @@ First presents an org-menu of the schema's five node-node relations
 (level-1 headlines) and their roles (level-2 headlines); pick, with
 RET, the role the view-CHILDREN should play toward their
 view-parents. Only three roles are settable from the child's
-position: `contained' (ordinary content), `subscribee' (a
+position: `content' (ordinary content), `subscribee' (a
 subscribeeFolder member) and `overridden' (an overriddenFolder member);
 RET on any other role explains why it cannot be set from there.
 
@@ -688,7 +688,7 @@ explains the refusal; q aborts."
   "Apply CHOICE (a repo name, or
 `skg--relRepo-no-override') to every headline in the
 subtree at point, the headline at point included, whose relationship
-to its view-parent is of KIND (`contained', `subscribee' or
+to its view-parent is of KIND (`content', `subscribee' or
 `overridden'; see `skg--relationship-kind-matches-p'). Recurses only
 where edits still affect the graph: it prunes below write-protected
 nodes and subscribee-as-such members, prunes non-true
@@ -749,7 +749,7 @@ command, but does not edit anything."
 (defun skg--relationship-kind-matches-p (kind)
   "Non-nil iff the headline at point is a true activeNode or Unknown whose
 relationship to its view-parent is of KIND, writable-and-collected
-from this position: for `contained', the view-parent must be a
+from this position: for `content', the view-parent must be a
 definitive activeNode not in subscribee-as-such position (an
 write-protected or subscribee-as-such parent's contains is not
 collected at save, so a relRepo request under one would be
@@ -764,7 +764,7 @@ the matching writable folder with a definitive anchor."
                 (let ((parent-sexp (skg--metadata-sexp-at-point-or-nil)))
                   (cond
                    ((skg--activeNode-sexp-p parent-sexp)
-                    (and (eq kind 'contained)
+                    (and (eq kind 'content)
                          (not (skg--node-write-protected-p parent-sexp))
                          (not (skg--subscribee-as-such-at-point-p))))
                    ((skg--non-vognode-atom-present-p parent-sexp

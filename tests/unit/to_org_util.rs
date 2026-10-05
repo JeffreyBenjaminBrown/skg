@@ -14,7 +14,7 @@ fn mk_node (
   pid          : &str,
   extra_ids    : &[&str],
   contains     : &[&str],
-  links_to : &[&str],
+  linksTo      : &[&str],
 ) -> GraphnodeInRust {
   GraphnodeInRust {
     pid:          skgid (pid),
@@ -27,11 +27,11 @@ fn mk_node (
     contains:     rel_partners_at_relRepo (
       & src (),
       contains . iter () . map ( |s| skgid (s) ) . collect () ),
-    subscribes_to:                MSV::Unspecified,
-    hides_from_its_subscriptions: MSV::Unspecified,
-    overrides_view_of:            MSV::Unspecified,
+    subscribesTo:                MSV::Unspecified,
+    hidesFromSubs: MSV::Unspecified,
+    overrides:            MSV::Unspecified,
     flags:         Vec::new (),
-    links_to: links_to . iter () . map ( |s| skgid (s) ) . collect (),
+    linksTo: linksTo . iter () . map ( |s| skgid (s) ) . collect (),
   } }
 
 /// Insert nodes into a fresh InRustGraph.
@@ -67,11 +67,11 @@ fn birth_if_normal (
 
 #[test]
 fn linksto_false_claim_flipped_to_independent () {
-  // Parent P, child C with birth=LinksToParent, but C's links_to
+  // Parent P, child C with birth=LinksToParent, but C's linksTo
   // does NOT include P. The claim is false → flip.
   let graph : InRustGraph = graph_with (vec! [
     mk_node ("P", &[], &[], &[]),
-    mk_node ("C", &[], &[], &[]),   // links_to: empty
+    mk_node ("C", &[], &[], &[]),   // linksTo: empty
   ]);
   let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
@@ -91,7 +91,7 @@ fn linksto_false_claim_flipped_to_independent () {
 
 #[test]
 fn linksto_true_claim_preserved () {
-  // Parent P, child C with birth=LinksToParent and C's links_to
+  // Parent P, child C with birth=LinksToParent and C's linksTo
   // DOES include P. The claim is true → preserve.
   let graph : InRustGraph = graph_with (vec! [
     mk_node ("P", &[], &[], &[]),

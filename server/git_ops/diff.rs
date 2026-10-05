@@ -202,31 +202,31 @@ fn compare_graphnodes (
       &new_contains );
   // §C: per-stage diffs of the sharing relations, so a removed
   // subscribee / hidden-outside member gets a per-stage relationship axis.
-  let old_subscribes_to : MSV<ID> = members_msv (& old . subscribes_to);
-  let new_subscribes_to : MSV<ID> = members_msv (& new . subscribes_to);
-  let subscribes_to_diff : Vec<Diff_Item<ID>> =
+  let old_subscribesTo  : MSV<ID> = members_msv (& old . subscribesTo);
+  let new_subscribesTo  : MSV<ID> = members_msv (& new . subscribesTo);
+  let subscribesTo_diff : Vec<Diff_Item<ID>> =
     compute_interleaved_diff (
-      old_subscribes_to . or_default (),
-      new_subscribes_to . or_default () );
+      old_subscribesTo . or_default (),
+      new_subscribesTo . or_default () );
   let old_hides : MSV<ID> = members_msv (
-    & old . hides_from_its_subscriptions);
+    & old . hidesFromSubs);
   let new_hides : MSV<ID> = members_msv (
-    & new . hides_from_its_subscriptions);
+    & new . hidesFromSubs);
   let hides_diff : Vec<Diff_Item<ID>> =
     compute_interleaved_diff (
       old_hides . or_default (),
       new_hides . or_default () );
-  let old_overrides_view_of : MSV<ID> = members_msv (& old . overrides_view_of);
-  let new_overrides_view_of : MSV<ID> = members_msv (& new . overrides_view_of);
-  let overrides_view_of_diff : Vec<Diff_Item<ID>> =
+  let old_overrides         : MSV<ID> = members_msv (& old . overrides);
+  let new_overrides         : MSV<ID> = members_msv (& new . overrides);
+  let overrides_diff : Vec<Diff_Item<ID>> =
     compute_interleaved_diff (
-      old_overrides_view_of . or_default (),
-      new_overrides_view_of . or_default () );
+      old_overrides . or_default (),
+      new_overrides . or_default () );
   NodeChanges {
     text_changed,
     aliases_diff,
     ids_diff,
     contains_diff,
-    subscribes_to_diff,
+    subscribesTo_diff,
     hides_diff,
-    overrides_view_of_diff }}
+    overrides_diff }}

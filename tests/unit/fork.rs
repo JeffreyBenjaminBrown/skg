@@ -126,7 +126,7 @@ fn fork_clone_hides_children_the_edit_deleted () {
     SkgRepoName::from ("owned2"), false );
   assert_eq! (
     members_of (
-      spec . clone . 0 . hides_from_its_subscriptions . or_default () ),
+      spec . clone . 0 . hidesFromSubs . or_default () ),
     vec! [ ID::from ("N2") ],
     "the clone must hide exactly the children the edit deleted" ); }
 

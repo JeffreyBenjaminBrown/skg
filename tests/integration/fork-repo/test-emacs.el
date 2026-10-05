@@ -107,7 +107,7 @@ the clone landed in the rotated repo."
            (content (with-temp-buffer
                       (insert-file-contents clone-file)
                       (buffer-string))))
-      (unless (string-match-p "overrides_view_of" content)
+      (unless (string-match-p "overrides" content)
         (test-fail "the clone in owned2 should override N:\n%s" content)))
     (message "✓ the clone landed in the rotated repo owned2 and overrides N"))
 

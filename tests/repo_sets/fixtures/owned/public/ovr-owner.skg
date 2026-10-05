@@ -1,5 +1,5 @@
 pid: ovr-owner
 title: ovr-owner
-overrides_view_of:
+overrides:
 - ovr-visible
 - ovr-inactive

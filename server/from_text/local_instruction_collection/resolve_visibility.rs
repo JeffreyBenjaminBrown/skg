@@ -73,7 +73,7 @@ pub fn resolve_visibility (
       members_of (&subscribee_from_disk . contains);
     let subscriber_hides : Vec<ID> =
       members_of (
-        subscriber_from_disk . hides_from_its_subscriptions
+        subscriber_from_disk . hidesFromSubs
         . or_default() );
     let inferred_hides : Vec<ID> =
       subscribee_contains . iter()
@@ -138,7 +138,7 @@ fn apply_hiddenoutside_edits (
     // from newly inferred hides: preceding user actions in this save retain
     // their ordinary inference semantics.
     let replaceable_outside : HashSet<ID> =
-      subscriber_from_disk . hides_from_its_subscriptions . or_default ()
+      subscriber_from_disk . hidesFromSubs . or_default ()
       . iter ()
       . filter (|member| restricted_skgrepo_set . map_or (
         true, |active| active . contains_skgrepo (&member . relRepo)))
@@ -148,7 +148,7 @@ fn apply_hiddenoutside_edits (
     let submitted : HashSet<ID> =
       edit . members . iter () . map (|skgid| key (skgid)) . collect ();
     let disk_hide_keys : HashSet<ID> =
-      subscriber_from_disk . hides_from_its_subscriptions . or_default ()
+      subscriber_from_disk . hidesFromSubs . or_default ()
       . iter () . map (|member| key (&member . member)) . collect ();
     for member in &edit . members {
       if ! disk_hide_keys . contains (&key (member)) {
@@ -223,7 +223,7 @@ fn infer_hides_from_contains_removals (
         subscriber_contains . iter () . collect ();
       let disk_hides : Vec<ID> =
         members_of (
-          subscriber_from_disk . hides_from_its_subscriptions
+          subscriber_from_disk . hidesFromSubs
           . or_default () );
       new_contains . iter ()
         . filter ( |skgid| ! disk_contains . contains (skgid) )
@@ -239,7 +239,7 @@ fn infer_hides_from_contains_removals (
             MSV::Specified (subs) => subs . clone (),
             MSV::Unspecified =>
               members_of (
-                subscriber_from_disk . subscribes_to . or_default () ), };
+                subscriber_from_disk . subscribesTo . or_default () ), };
           let mut content : HashSet<ID> = HashSet::new ();
           for subscribee in &subscribes {
             if let Some (subscribee_from_disk) =

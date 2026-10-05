@@ -383,11 +383,11 @@ fn merge_override_collision_names_participants_and_both_repairs () {
   n2 . title = "Acquiree title" . to_string ();
   let mut r1 : Graphnode = node ("R1");
   r1 . title = "Existing overrider title" . to_string ();
-  r1 . overrides_view_of = MSV::Specified (rel_partners_at_relRepo (
+  r1 . overrides = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("N1")]));
   let mut r2 : Graphnode = node ("R2");
   r2 . title = "Redirected overrider title" . to_string ();
-  r2 . overrides_view_of = MSV::Specified (rel_partners_at_relRepo (
+  r2 . overrides = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("N2")]));
   let base : Arc<InRustGraph> = Arc::new (
     InRustGraph::from_graphnodes (&[n1 . clone (), n2, r1, r2]));

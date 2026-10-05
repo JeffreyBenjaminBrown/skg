@@ -41,7 +41,7 @@ fn node (
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
   node . home_skgrepo = SkgRepoName::from (skgrepo);
-  node . overrides_view_of =
+  node . overrides =
     if overrides . is_empty () {
       MSV::Unspecified
     } else {

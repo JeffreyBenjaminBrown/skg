@@ -1,4 +1,4 @@
 pid: 'edge-r'
 title: "edge-r"
-overrides_view_of:
+overrides:
   - "N2"

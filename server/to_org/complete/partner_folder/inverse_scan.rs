@@ -136,11 +136,11 @@ fn outbound_member_relRepo_of_graphnode (
     NodeRelation::Contains =>
       & nc . contains,
     NodeRelation::SubscribesTo =>
-      nc . subscribes_to . or_default (),
-    NodeRelation::HidesFromItsSubscriptions =>
-      nc . hides_from_its_subscriptions . or_default (),
-    NodeRelation::OverridesViewOf =>
-      nc . overrides_view_of . or_default (),
+      nc . subscribesTo . or_default (),
+    NodeRelation::HidesFromSubs =>
+      nc . hidesFromSubs . or_default (),
+    NodeRelation::Overrides =>
+      nc . overrides . or_default (),
     NodeRelation::LinksTo =>
       // Links are inferred from body text, not stored as a list
       // (see 'outbound_ids_of_graphnode'); this scan never fires

@@ -277,7 +277,7 @@ fn validate_subscribeefolder (
     tree, treeid, 1, true,
     |node| node . is_active_or_diff_phantom ()
            || matches!(&node . kind,
-                    MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive subscribee may sit here as an save-inert display placeholder; it emits no subscribes_to membership (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org)
+                    MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive subscribee may sit here as an save-inert display placeholder; it emits no subscribesTo membership (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org)
                       | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
                       | MpViewnodeKind::PartnerFolder (
                           PartnerFolder::HiddenOutsideOfSubscribee) ))

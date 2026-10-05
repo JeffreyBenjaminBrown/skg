@@ -429,12 +429,12 @@ fn affected_pids_for_changed_node (
     pids . insert (node . pid . clone ());
     pids . extend (members_of (&node . contains));
     pids . extend (
-      members_msv (&node . subscribes_to) . or_default () . iter () . cloned ());
+      members_msv (&node . subscribesTo) . or_default () . iter () . cloned ());
     pids . extend (
-      members_msv (&node . hides_from_its_subscriptions)
+      members_msv (&node . hidesFromSubs)
         . or_default () . iter () . cloned ());
     pids . extend (
-      members_msv (&node . overrides_view_of) . or_default () . iter () . cloned ());
+      members_msv (&node . overrides) . or_default () . iter () . cloned ());
     pids . extend (
       links_from_node (node)
         . into_iter ()

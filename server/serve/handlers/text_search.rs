@@ -627,7 +627,7 @@ pub fn suppressed_result_skgids (
     let mut seen  : HashSet<ID> = HashSet::from ([ owned . clone () ]);
     while let Some (cur) = stack . pop () {
       for target in graph . outbound_pids_for_relation_gated (
-        &cur, NodeRelation::OverridesViewOf, Some (active) ) {
+        &cur, NodeRelation::Overrides, Some (active) ) {
         if ! seen . insert (target . clone ()) { continue; }
         if candidates . contains (&target) {
           suppressed . insert (target . clone ()); }

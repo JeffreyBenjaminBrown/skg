@@ -3,9 +3,9 @@ title: owner [[id:gone][text link left alone]]
 contains:
 - gone
 - kept
-subscribes_to:
+subscribesTo:
 - gone
-hides_from_its_subscriptions:
+hidesFromSubs:
 - gone
-overrides_view_of:
+overrides:
 - gone

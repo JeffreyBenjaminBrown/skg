@@ -1,5 +1,5 @@
 pid: subscriber
 title: subscriber
-subscribes_to:
+subscribesTo:
 - victim
 - sibling

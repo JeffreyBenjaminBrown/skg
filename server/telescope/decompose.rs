@@ -32,9 +32,9 @@ pub struct DecompositionInput<'a> {
   pub home                         : &'a SkgRepoName,
   pub aliases                      : &'a [RelPartner<String>],
   pub contains                     : &'a [RelPartner<ID>],
-  pub subscribes_to                : &'a [RelPartner<ID>],
-  pub hides_from_its_subscriptions : &'a [RelPartner<ID>],
-  pub overrides_view_of            : &'a [RelPartner<ID>],
+  pub subscribesTo                 : &'a [RelPartner<ID>],
+  pub hidesFromSubs                : &'a [RelPartner<ID>],
+  pub overrides                    : &'a [RelPartner<ID>],
 }
 
 /// A complete on-disk telescope prepared by the decomposition boundary.
@@ -118,10 +118,10 @@ pub fn decompose_node (
           skgrepo . clone (), SectionSlices::default () ); }};
     note ( input . home );
     for m in input . contains          { note ( &m . relRepo ); }
-    for m in input . subscribes_to     { note ( &m . relRepo ); }
-    for m in input . hides_from_its_subscriptions
+    for m in input . subscribesTo     { note ( &m . relRepo ); }
+    for m in input . hidesFromSubs
                                        { note ( &m . relRepo ); }
-    for m in input . overrides_view_of { note ( &m . relRepo ); }
+    for m in input . overrides { note ( &m . relRepo ); }
     for m in input . aliases           { note ( &m . relRepo ); }}
   { // title/body text live in the home section
     let home : &mut SectionSlices =
@@ -136,12 +136,12 @@ pub fn decompose_node (
       rank (a) < rank (b) };
     section . contains = decompose_ordered (
       input . contains, skgrepo, &is_more_public );
-    section . subscribes_to = decompose_ordered (
-      input . subscribes_to, skgrepo, &is_more_public );
-    section . hides_from_its_subscriptions = decompose_unordered (
-      input . hides_from_its_subscriptions, skgrepo );
-    section . overrides_view_of = decompose_unordered (
-      input . overrides_view_of, skgrepo );
+    section . subscribesTo = decompose_ordered (
+      input . subscribesTo, skgrepo, &is_more_public );
+    section . hidesFromSubs = decompose_unordered (
+      input . hidesFromSubs, skgrepo );
+    section . overrides = decompose_unordered (
+      input . overrides, skgrepo );
     section . aliases = {
       let mine : Vec<String> =
         input . aliases . iter ()
@@ -158,9 +158,9 @@ pub fn decompose_node (
                  || s . body . is_some ()
                  || s . aliases . is_some ()
                  || s . contains . is_some ()
-                 || s . subscribes_to . is_some ()
-                 || s . hides_from_its_subscriptions . is_some ()
-                 || s . overrides_view_of . is_some () )
+                 || s . subscribesTo . is_some ()
+                 || s . hidesFromSubs . is_some ()
+                 || s . overrides . is_some () )
          . unwrap_or (false) } ); }
   skgrepo_names . sort_by_key ( |skgrepo| rank (skgrepo) );
   let complete_sections : Vec<(SkgRepoName, GraphnodeOnDisk)> =

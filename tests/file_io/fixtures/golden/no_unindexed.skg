@@ -4,7 +4,7 @@ contains:
 - '1'
 - '2'
 - '3'
-subscribes_to:
+subscribesTo:
 - '11'
 - '12'
 - '13'

@@ -176,7 +176,7 @@ pub fn maybe_add_subscribeeFolder_branch (
     let r_hides : HashSet < ID > =
           graph . outbound_pids_for_relation_gated (
             & subscriber_pid,
-            NodeRelation::HidesFromItsSubscriptions,
+            NodeRelation::HidesFromSubs,
             active_skgrepo_set )
           . into_iter () . collect ();
     let all_subscribee_content : HashSet < ID > =
@@ -208,7 +208,7 @@ pub fn maybe_add_subscribeeFolder_branch (
              graph, config, &subscriber_pid, &subscriber_skgrepo )
            . ok ()
            . map ( |skg| members_of (
-                       skg . hides_from_its_subscriptions . or_default () ) )
+                       skg . hidesFromSubs . or_default () ) )
            . unwrap_or_default ();
          ! goal_list_for_hiddenOutsideOfSubscribee_folder (
              graph,
@@ -382,7 +382,7 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
         let subscriber_hides : HashSet<ID> =
           graph . outbound_pids_for_relation_gated (
             & subscriber_pid,
-            NodeRelation::HidesFromItsSubscriptions,
+            NodeRelation::HidesFromSubs,
             active_skgrepo_set )
           . into_iter () . collect ();
         let subscribee_content : HashSet<ID> =
@@ -422,7 +422,7 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
                graph, config, &subscriber_pid, &subscriber_skgrepo )
              . ok ()
              . map ( |skg| members_of (
-                         skg . hides_from_its_subscriptions . or_default () ) )
+                         skg . hidesFromSubs . or_default () ) )
              . unwrap_or_default ();
            ! goal_list_for_hiddenInSubscribee_folder (
                graph,

@@ -1,4 +1,4 @@
 pid: subscribes-to-1
 title: "subscribes-to-1"
-subscribes_to:
+subscribesTo:
 - "1"

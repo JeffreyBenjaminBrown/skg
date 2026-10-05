@@ -125,7 +125,7 @@ pub struct FieldIntentsForOneId {
   pub title_and_body : Option<(String, Option<String>)>,
   pub contains       : Option<Vec<(ID, Option<SkgRepoName>)>>,
   pub aliases        : Option<Vec<(String, Option<SkgRepoName>)>>,
-  pub subscribes_to  : Option<Vec<(ID, Option<SkgRepoName>)>>,
+  pub subscribesTo   : Option<Vec<(ID, Option<SkgRepoName>)>>,
   pub overrides      : Option<Vec<(ID, Option<SkgRepoName>)>>,
   pub delete         : bool,
   pub node_merge     : Option<ID>, // This holds the acquiree.
@@ -152,7 +152,7 @@ impl FieldIntentsForOneId {
     self . title_and_body . is_some()
       || self . contains      . is_some()
       || self . aliases       . is_some()
-      || self . subscribes_to . is_some()
+      || self . subscribesTo . is_some()
       || self . overrides     . is_some()
       || self . node_merge    . is_some()
       || self . flag      . is_some() }}
@@ -236,12 +236,12 @@ impl CollectedFieldIntents {
               &mut entry . aliases, texts, "aliases", &target),
           FieldIntent::SetSubscribesTo (members) =>
             fill_exclusive_slot (
-              &mut entry . subscribes_to, members,
-              "subscribes_to", &target),
+              &mut entry . subscribesTo, members,
+              "subscribesTo", &target),
           FieldIntent::SetOverrides (members) =>
             fill_exclusive_slot (
               &mut entry . overrides, members,
-              "overrides_view_of", &target),
+              "overrides", &target),
           FieldIntent::NodeMerge { acquiree } => {
             if entry . flag . is_some() {
               return Err ( format!(

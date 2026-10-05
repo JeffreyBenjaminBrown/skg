@@ -157,23 +157,23 @@ fn verify_filesystem_after_merge_2_into_1(
 
   // Verify that node 1 keeps its original relationships
   // (node 2 had no relationships to transfer)
-  assert_eq!(node_1 . subscribes_to . or_default() . len(), 1,
-             "Node 1 should keep its subscribes_to");
-  assert_eq!(&node_1 . subscribes_to . or_default()[0] . member,
+  assert_eq!(node_1 . subscribesTo . or_default() . len(), 1,
+             "Node 1 should keep its subscribesTo");
+  assert_eq!(&node_1 . subscribesTo . or_default()[0] . member,
              &ID::from ("1-subscribes-to"));
 
   // Note: node 1 originally hid both "hidden-from-1s-subscriptions"
   // and "hidden-from-subscriptions-of-1-but-in-content-of-2".
   // The latter is now in node 1's contents, so it should be removed from hides.
-  assert_eq!(node_1 . hides_from_its_subscriptions . or_default() . len(),
+  assert_eq!(node_1 . hidesFromSubs . or_default() . len(),
              1,
              "Node 1 should have 1 hides relationship");
-  assert_eq!(&node_1 . hides_from_its_subscriptions . or_default()[0] . member,
+  assert_eq!(&node_1 . hidesFromSubs . or_default()[0] . member,
              &ID::from ("hidden-from-1s-subscriptions"));
 
-  assert_eq!(node_1 . overrides_view_of . or_default() . len(), 1,
-             "Node 1 should keep its overrides_view_of");
-  assert_eq!(&node_1 . overrides_view_of . or_default()[0] . member,
+  assert_eq!(node_1 . overrides . or_default() . len(), 1,
+             "Node 1 should keep its overrides");
+  assert_eq!(&node_1 . overrides . or_default()[0] . member,
              &ID::from ("overridden-by-1"));
 
   let acquiree_text_preserver_path: String =
@@ -195,12 +195,12 @@ fn verify_filesystem_after_merge_2_into_1(
 
   // acquiree_text_preserver should have Unspecified for relationship fields
   // (when read from disk, missing fields are Unspecified)
-  assert_eq!(acquiree_text_preserver . subscribes_to, MSV::Unspecified,
-             "acquiree_text_preserver should have Unspecified for subscribes_to");
-  assert_eq!(acquiree_text_preserver . hides_from_its_subscriptions, MSV::Unspecified,
-             "acquiree_text_preserver should have Unspecified for hides_from_its_subscriptions");
-  assert_eq!(acquiree_text_preserver . overrides_view_of, MSV::Unspecified,
-             "acquiree_text_preserver should have Unspecified for overrides_view_of");
+  assert_eq!(acquiree_text_preserver . subscribesTo, MSV::Unspecified,
+             "acquiree_text_preserver should have Unspecified for subscribesTo");
+  assert_eq!(acquiree_text_preserver . hidesFromSubs, MSV::Unspecified,
+             "acquiree_text_preserver should have Unspecified for hidesFromSubs");
+  assert_eq!(acquiree_text_preserver . overrides, MSV::Unspecified,
+             "acquiree_text_preserver should have Unspecified for overrides");
 
   Ok(( )) }
 
@@ -329,27 +329,27 @@ fn verify_filesystem_after_merge_1_into_2(
   assert_eq!(overlap_count, 1,
              "overlap should appear exactly once (deduplicated), not twice");
 
-  // Verify subscribes_to: should have node 1's subscribes_to transferred
-  assert_eq!(node_2 . subscribes_to . or_default() . len(), 1,
-             "Node 2 should have 1 subscribes_to relationship");
-  assert_eq!(&node_2 . subscribes_to . or_default()[0] . member,
+  // Verify subscribesTo: should have node 1's subscribesTo transferred
+  assert_eq!(node_2 . subscribesTo . or_default() . len(), 1,
+             "Node 2 should have 1 subscribesTo relationship");
+  assert_eq!(&node_2 . subscribesTo . or_default()[0] . member,
              &ID::from ("1-subscribes-to"),
              "Node 2 should subscribe to 1-subscribes-to");
 
-  // Verify hides_from_its_subscriptions: should have node 1's hides,
+  // Verify hidesFromSubs: should have node 1's hides,
   // but NOT "hidden-from-subscriptions-of-1-but-in-content-of-2"
   // (because it's in node 2's contents)
-  assert_eq!(node_2 . hides_from_its_subscriptions . or_default() . len(),
+  assert_eq!(node_2 . hidesFromSubs . or_default() . len(),
              1,
-             "Node 2 should have 1 hides_from_its_subscriptions relationship");
-  assert_eq!(&node_2 . hides_from_its_subscriptions . or_default()[0] . member,
+             "Node 2 should have 1 hidesFromSubs relationship");
+  assert_eq!(&node_2 . hidesFromSubs . or_default()[0] . member,
              &ID::from ("hidden-from-1s-subscriptions"),
              "Node 2 should hide hidden-from-1s-subscriptions");
 
-  // Verify overrides_view_of: should have node 1's overrides_view_of transferred
-  assert_eq!(node_2 . overrides_view_of . or_default() . len(), 1,
-             "Node 2 should have 1 overrides_view_of relationship");
-  assert_eq!(&node_2 . overrides_view_of . or_default()[0] . member,
+  // Verify overrides: should have node 1's overrides transferred
+  assert_eq!(node_2 . overrides . or_default() . len(), 1,
+             "Node 2 should have 1 overrides relationship");
+  assert_eq!(&node_2 . overrides . or_default()[0] . member,
              &ID::from ("overridden-by-1"),
              "Node 2 should override view of overridden-by-1");
 
@@ -375,12 +375,12 @@ fn verify_filesystem_after_merge_1_into_2(
   // acquiree_text_preserver should have Unspecified for relationship fields
   // (when read from disk, missing fields are Unspecified)
   // (these relationships stay with the acquirer, not the acquiree_text_preserver)
-  assert_eq!(acquiree_text_preserver . subscribes_to, MSV::Unspecified,
-             "acquiree_text_preserver should have Unspecified for subscribes_to");
-  assert_eq!(acquiree_text_preserver . hides_from_its_subscriptions, MSV::Unspecified,
-             "acquiree_text_preserver should have Unspecified for hides_from_its_subscriptions");
-  assert_eq!(acquiree_text_preserver . overrides_view_of, MSV::Unspecified,
-             "acquiree_text_preserver should have Unspecified for overrides_view_of");
+  assert_eq!(acquiree_text_preserver . subscribesTo, MSV::Unspecified,
+             "acquiree_text_preserver should have Unspecified for subscribesTo");
+  assert_eq!(acquiree_text_preserver . hidesFromSubs, MSV::Unspecified,
+             "acquiree_text_preserver should have Unspecified for hidesFromSubs");
+  assert_eq!(acquiree_text_preserver . overrides, MSV::Unspecified,
+             "acquiree_text_preserver should have Unspecified for overrides");
 
   Ok(( )) }
 
@@ -474,21 +474,21 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   let subscribers : HashSet<ID> =
     find_related_nodes (
       &graph_snap, &input_acquirer,
-      "subscribes_to", "subscribee", "subscriber" );
+      "subscribesTo", "subscribee", "subscriber" );
   assert!( subscribers . contains (&ID::from ("subscribes-to-1")),
            "inverse subscribes under pid 2 should include \
-            subscribes-to-1 (its subscribes_to = [1], which aliases 2)" );
+            subscribes-to-1 (its subscribesTo = [1], which aliases 2)" );
 
   let containers : HashSet<ID> =
     find_related_nodes (
       &graph_snap, &input_acquirer,
-      "contains", "contained", "container" );
+      "contains", "content", "container" );
   assert! (containers . contains (&ID::from ("contains-1")));
 
   let hiders : HashSet<ID> =
     find_related_nodes (
       &graph_snap, &input_acquirer,
-      "hides_from_its_subscriptions", "hidden", "hider" );
+      "hidesFromSubs", "hidden", "hider" );
   assert!( hiders . contains (&ID::from ("hides-1-from-subscriptions")),
            "inverse hides under pid 2 should include \
             hides-1-from-subscriptions" );
@@ -496,17 +496,17 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   let overriders : HashSet<ID> =
     find_related_nodes (
       &graph_snap, &input_acquirer,
-      "overrides_view_of", "overridden", "overrider" );
+      "overrides", "overridden", "overrider" );
   assert!( overriders . contains (&ID::from ("overrider-of-1")),
-           "inverse overrides_view_of under pid 2 should include \
+           "inverse overrides under pid 2 should include \
             overrider-of-1" );
 
   let link_skgrepos : HashSet<ID> =
     find_related_nodes (
       &graph_snap, &input_acquirer,
-      "links_to", "mentioned", "mentioner" );
+      "linksTo", "mentioned", "mentioner" );
   assert!( link_skgrepos . contains (&ID::from ("links-to-1")),
-           "inverse links_to under pid 2 should include \
+           "inverse linksTo under pid 2 should include \
             links-to-1 (its body has a link to id 1, which aliases 2)" );
 
   // === Forward queries: neighbors' outbound should resolve 1 → 2 ===
@@ -514,7 +514,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   let subscribee_of_s2_1 : HashSet<ID> =
     find_related_nodes (
       &graph_snap, &vec![ID::from ("subscribes-to-1")],
-      "subscribes_to", "subscriber", "subscribee" );
+      "subscribesTo", "subscriber", "subscribee" );
   assert!( subscribee_of_s2_1 . contains (&ID::from ("2")),
            "subscribes-to-1's forward subscribes should resolve to \
             canonical pid 2 (was raw 1 on disk)" );
@@ -524,7 +524,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   let hidden_by_h1 : HashSet<ID> =
     find_related_nodes (
       &graph_snap, &vec![ID::from ("hides-1-from-subscriptions")],
-      "hides_from_its_subscriptions", "hider", "hidden" );
+      "hidesFromSubs", "hider", "hidden" );
   assert!( hidden_by_h1 . contains (&ID::from ("2")),
            "hides-1-from-subscriptions's forward hides should include \
             canonical pid 2" );
@@ -534,7 +534,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   let overridden_by_ov1 : HashSet<ID> =
     find_related_nodes (
       &graph_snap, &vec![ID::from ("overrider-of-1")],
-      "overrides_view_of", "overrider", "overridden" );
+      "overrides", "overrider", "overridden" );
   assert!( overridden_by_ov1 . contains (&ID::from ("2")),
            "overrider-of-1's forward overrides should resolve \
             to canonical pid 2" );
@@ -542,7 +542,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   let destinations_of_l1 : HashSet<ID> =
     find_related_nodes (
       &graph_snap, &vec![ID::from ("links-to-1")],
-      "links_to", "mentioner", "mentioned" );
+      "linksTo", "mentioner", "mentioned" );
   assert!( destinations_of_l1 . contains (&ID::from ("2")),
            "links-to-1's forward links should resolve to \
             canonical pid 2" );

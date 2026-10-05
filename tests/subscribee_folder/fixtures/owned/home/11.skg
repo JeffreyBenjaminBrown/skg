@@ -2,5 +2,5 @@ pid: 11
 title: 11
 contains:
   - 111
-subscribes_to:
+subscribesTo:
   - 11-sees

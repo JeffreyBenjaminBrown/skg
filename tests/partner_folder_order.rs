@@ -91,7 +91,7 @@ async fn write_protected_folder_order_is_preserved_impl (
       &[ ID ("n" . to_string ()) ], false ) ?;
   let folder_request : String = initial_buffer . replace (
     "(affectsParent na)",
-    "(affectsParent na) (viewRequests (folder subscribes_to))" );
+    "(affectsParent na) (viewRequests (folder subscribesTo))" );
   let complete_buffer : String =
     save_and_rerender (&folder_request, config, tantivy) . await ?;
   assert_member_order (

@@ -110,7 +110,7 @@ fn collateral_definitive_subscriber_subscribeeFolder_refreshes
       views_state . open_views . register_view (
         &graph . load_full (), b_uri . clone (), b_vf, &b_pids );
 
-      // In view A, drop N from S's subscribeeFolder (subscribes_to -> [M])
+      // In view A, drop N from S's subscribeeFolder (subscribesTo -> [M])
       // and save A.
       let edited_a : String = drop_member_line (&a_view, "(id N)");
       let (_response, collateral_views) =

@@ -52,16 +52,16 @@ impl PartnerFolder {
           NodeRelation::SubscribesTo, BinaryRolePosition::First)),
       PartnerFolder::Overridden =>
         Some (RelationRole::new (
-          NodeRelation::OverridesViewOf, BinaryRolePosition::Second)),
+          NodeRelation::Overrides, BinaryRolePosition::Second)),
       PartnerFolder::Overrider =>
         Some (RelationRole::new (
-          NodeRelation::OverridesViewOf, BinaryRolePosition::First)),
+          NodeRelation::Overrides, BinaryRolePosition::First)),
       PartnerFolder::Hider =>
         Some (RelationRole::new (
-          NodeRelation::HidesFromItsSubscriptions, BinaryRolePosition::First)),
+          NodeRelation::HidesFromSubs, BinaryRolePosition::First)),
       PartnerFolder::Hidden =>
         Some (RelationRole::new (
-          NodeRelation::HidesFromItsSubscriptions, BinaryRolePosition::Second)),
+          NodeRelation::HidesFromSubs, BinaryRolePosition::Second)),
       PartnerFolder::HiddenInSubscribee |
       PartnerFolder::HiddenOutsideOfSubscribee =>
         None,

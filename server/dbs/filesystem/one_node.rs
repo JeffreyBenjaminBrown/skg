@@ -234,12 +234,12 @@ pub(crate) fn prepare_graphnode_telescope (
         home     : & graphnode . home_skgrepo,
         aliases  : graphnode . aliases . or_default (),
         contains : & graphnode . contains,
-        subscribes_to :
-          graphnode . subscribes_to . or_default (),
-        hides_from_its_subscriptions :
-          graphnode . hides_from_its_subscriptions . or_default (),
-        overrides_view_of :
-          graphnode . overrides_view_of . or_default (), },
+        subscribesTo :
+          graphnode . subscribesTo . or_default (),
+        hidesFromSubs :
+          graphnode . hidesFromSubs . or_default (),
+        overrides :
+          graphnode . overrides . or_default (), },
       config )
     . map_err ( |e| io::Error::new (
       io::ErrorKind::InvalidData, e ) ) ?;

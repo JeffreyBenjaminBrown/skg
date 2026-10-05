@@ -65,7 +65,7 @@ fn ordinary_editable_emissions () {
     assert_eq!( root . contains, Some (vec![(ID::from ("child"), None)]) );
     assert_eq!( root . aliases,
                 Some (vec![("nickname" . to_string(), None)]) );
-    assert_eq!( root . subscribes_to, Some (vec![(ID::from ("s"), None)]) );
+    assert_eq!( root . subscribesTo, Some (vec![(ID::from ("s"), None)]) );
     assert_eq!( root . overrides, Some (vec![(ID::from ("o"), None)]) );
     assert_eq!( root . flag,
                 Some ((Flag::NoSearchMatching, true)) );
@@ -114,7 +114,7 @@ fn subscribee_as_such_emits_claim_and_visibility () {
       vec![ SubscribeeVisibility {
         subscribee : ID::from ("e"),
         visible    : vec![ID::from ("visible")] } ]);
-    assert_eq!( subscriber . subscribes_to,
+    assert_eq!( subscriber . subscribesTo,
                 Some (vec![(ID::from ("e"), None)]) ); }
   { // Ordinary editable children of a subscribee-as-such still
     // emit their own instructions, but form no one's contains.
@@ -153,7 +153,7 @@ fn folders_under_toDelete_or_writeProtected_recorders_emit_nothing () {
   { let doomed : &FieldIntentsForOneId = entry (&collected, "doomed");
     assert!( doomed . delete );
     assert_eq!( doomed . aliases, None );
-    assert_eq!( doomed . subscribes_to, None ); }
+    assert_eq!( doomed . subscribesTo, None ); }
   assert!( collected . by_pid . get (&ID::from ("ghost")) . is_none(),
            "a write-protected vognode and its folders emit nothing" ); }
 
@@ -176,7 +176,7 @@ fn definitive_member_of_write_protected_folder_emits_for_itself_only () {
   { // The folder's recorder is unaffected by the folder's membership.
     let recorder : &FieldIntentsForOneId = entry (&collected, "recorder");
     assert_eq!( recorder . contains, Some (vec![]) );
-    assert_eq!( recorder . subscribes_to, None ); }}
+    assert_eq!( recorder . subscribesTo, None ); }}
 
 #[test]
 fn definitive_child_of_inactive_vognode_emits () {
@@ -273,12 +273,12 @@ fn present_but_empty_folders_differ_from_absent_folders () {
   { let explicit : &FieldIntentsForOneId = entry (&collected, "explicit");
     // A present-but-empty folder is an explicitly empty field.
     assert_eq!( explicit . aliases, Some (vec![]) );
-    assert_eq!( explicit . subscribes_to, Some (vec![]) );
+    assert_eq!( explicit . subscribesTo, Some (vec![]) );
     assert_eq!( explicit . overrides, Some (vec![]) ); }
   { let silent : &FieldIntentsForOneId = entry (&collected, "silent");
     // An absent folder expresses no opinion.
     assert_eq!( silent . aliases, None );
-    assert_eq!( silent . subscribes_to, None );
+    assert_eq!( silent . subscribesTo, None );
     assert_eq!( silent . overrides, None ); }}
 
 #[test]
@@ -303,7 +303,7 @@ fn duplicate_defining_folder_members_dedup_preserving_order () {
   assert_eq!( recorder . aliases,
               Some (vec![("echo" . to_string(), None),
                           ("other" . to_string(), None)]) );
-  assert_eq!( recorder . subscribes_to,
+  assert_eq!( recorder . subscribesTo,
               Some (vec![(ID::from ("s1"), None), (ID::from ("s2"), None)]) );
   assert_eq!( recorder . overrides,
               Some (vec![(ID::from ("o1"), None), (ID::from ("o2"), None)]) ); }

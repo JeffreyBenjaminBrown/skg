@@ -21,17 +21,17 @@ fn node (
   node . home_skgrepo = SkgRepoName::from ("main");
   node . extra_ids =
     extra_ids . iter () . map ( |skgid| ID::from (*skgid) ) . collect ();
-  node . subscribes_to =
+  node . subscribesTo =
     if subscribes . is_empty () { MSV::Unspecified }
     else { MSV::Specified ( rel_partners_at_relRepo (
       &node . home_skgrepo,
       subscribes . iter () . map ( |skgid| ID::from (*skgid) ) . collect ())) };
-  node . hides_from_its_subscriptions =
+  node . hidesFromSubs =
     if hides . is_empty () { MSV::Unspecified }
     else { MSV::Specified ( rel_partners_at_relRepo (
       &node . home_skgrepo,
       hides . iter () . map ( |skgid| ID::from (*skgid) ) . collect ())) };
-  node . overrides_view_of =
+  node . overrides =
     if overrides . is_empty () { MSV::Unspecified }
     else { MSV::Specified ( rel_partners_at_relRepo (
       &node . home_skgrepo,
@@ -91,23 +91,23 @@ fn relation_accessors_return_both_membership_directions () {
     graph . other_member_pids (
       &ID::from ("recorder"),
       RelationRole::new (
-        NodeRelation::HidesFromItsSubscriptions, BinaryRolePosition::First)),
+        NodeRelation::HidesFromSubs, BinaryRolePosition::First)),
     vec![ID::from ("hidden")] );
   assert_eq!(
     graph . other_member_pids (
       &ID::from ("recorder"),
       RelationRole::new (
-        NodeRelation::HidesFromItsSubscriptions, BinaryRolePosition::Second)),
+        NodeRelation::HidesFromSubs, BinaryRolePosition::Second)),
     vec![ID::from ("hider")] );
   assert_eq!(
     graph . other_member_pids (
       &ID::from ("recorder"),
-      RelationRole::new (NodeRelation::OverridesViewOf, BinaryRolePosition::First)),
+      RelationRole::new (NodeRelation::Overrides, BinaryRolePosition::First)),
     vec![ID::from ("overridden")] );
   assert_eq!(
     graph . other_member_pids (
       &ID::from ("recorder"),
-      RelationRole::new (NodeRelation::OverridesViewOf, BinaryRolePosition::Second)),
+      RelationRole::new (NodeRelation::Overrides, BinaryRolePosition::Second)),
     vec![ID::from ("overrider")] ); }
 
 #[test]

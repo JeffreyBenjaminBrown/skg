@@ -19,7 +19,7 @@ fn graphnode (
       pid, pid,
       if overrides . is_empty () { String::new () }
       else { format! (
-        "overrides_view_of:\n{}",
+        "overrides:\n{}",
         overrides . iter ()
           . map ( |o| format! ("  - \"{}\"\n", o) )
           . collect::<String> () ) } )) . unwrap ();
@@ -31,7 +31,7 @@ fn modified_entry (
   GraphnodeDiff {
     status : GitDiffStatus::Modified,
     node_changes : Some ( NodeChanges {
-      overrides_view_of_diff : overrides_diff,
+      overrides_diff : overrides_diff,
       .. NodeChanges::default () } ),
     before_node : None,
     after_node : None } }
@@ -87,7 +87,7 @@ fn signs_come_from_modified_deleted_and_added_files_per_stage () {
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
   let scan : HashMap<ID, RelationshipAxes> =
     inverse_scan_for_inbound_folder (
-      &recorder, NodeRelation::OverridesViewOf, &diffs, None );
+      &recorder, NodeRelation::Overrides, &diffs, None );
   assert_eq! ( scan . len (), 3, "{:?}", scan );
   assert_eq! ( scan [ &skgid ("edge-r") ],
     RelationshipAxes { staged : Some (Sign::Minus), unstaged : None } );
@@ -110,7 +110,7 @@ fn recorder_absent_from_every_diff_yields_nothing () {
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
   let scan : HashMap<ID, RelationshipAxes> =
     inverse_scan_for_inbound_folder (
-      &skgid ("N"), NodeRelation::OverridesViewOf, &diffs, None );
+      &skgid ("N"), NodeRelation::Overrides, &diffs, None );
   assert! ( scan . is_empty (), "{:?}", scan );
 }
 
@@ -126,7 +126,7 @@ fn each_relation_is_read_separately () {
     GraphnodeDiff {
       status : GitDiffStatus::Modified,
       node_changes : Some ( NodeChanges {
-        subscribes_to_diff : vec! [
+        subscribesTo_diff : vec! [
           Diff_Item::Removed ( recorder . clone () ) ],
         .. NodeChanges::default () } ),
       before_node : None,
@@ -134,7 +134,7 @@ fn each_relation_is_read_separately () {
   let diffs : Option<HashMap<SkgRepoName, SkgRepoDiff>> =
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
   assert! ( inverse_scan_for_inbound_folder (
-      &recorder, NodeRelation::OverridesViewOf, &diffs, None )
+      &recorder, NodeRelation::Overrides, &diffs, None )
     . is_empty () );
   assert_eq! ( inverse_scan_for_inbound_folder (
       &recorder, NodeRelation::SubscribesTo, &diffs, None ) [ &skgid ("m") ],
@@ -161,7 +161,7 @@ fn cross_skgrepo_move_yields_no_membership_change () {
       ( src ("b"), sd_b ) ]) );
   let scan : HashMap<ID, RelationshipAxes> =
     inverse_scan_for_inbound_folder (
-      &recorder, NodeRelation::OverridesViewOf, &diffs, None );
+      &recorder, NodeRelation::Overrides, &diffs, None );
   assert! ( scan . is_empty (),
     "a move must not fabricate a membership change: {:?}", scan );
 }
@@ -178,7 +178,7 @@ fn relRepo_gates_deleted_stage_signs () {
   before . pid = skgid ("del-r");
   before . title = "del-r" . to_string ();
   before . home_skgrepo = src ("public");
-  before . overrides_view_of = MSV::Specified ( vec! [
+  before . overrides = MSV::Specified ( vec! [
     RelPartner::at_relRepo ( src ("private"), recorder . clone () ) ] );
   let mut sd : SkgRepoDiff = empty_skgrepo_diff ();
   sd . unstaged . insert (
@@ -191,14 +191,14 @@ fn relRepo_gates_deleted_stage_signs () {
     skgrepos : BTreeSet::from ([ src ("public") ]) };
   let gated : HashMap<ID, RelationshipAxes> =
     inverse_scan_for_inbound_folder (
-      &recorder, NodeRelation::OverridesViewOf, &diffs,
+      &recorder, NodeRelation::Overrides, &diffs,
       Some (&public_only) );
   assert! ( gated . is_empty (),
     "a Deleted-stage sign recorded at an inactive repo must not \
      surface: {:?}", gated );
   let ungated : HashMap<ID, RelationshipAxes> =
     inverse_scan_for_inbound_folder (
-      &recorder, NodeRelation::OverridesViewOf, &diffs, None );
+      &recorder, NodeRelation::Overrides, &diffs, None );
   assert! ( ! ungated . is_empty (),
     "ungated (None) scan should still see the Deleted-stage sign: {:?}",
     ungated );

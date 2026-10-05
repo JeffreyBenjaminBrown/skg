@@ -55,7 +55,7 @@ fn contains_multi_not_birth () {
 
 #[test]
 fn subscribee_as_such () {
-  // bS: grandparent (gen 2) subscribes to it, born of subscribes_to.
+  // bS: grandparent (gen 2) subscribes to it, born of subscribesTo.
   let c = RelationCounts { subscribers : 1, .. counts () };
   let mut f = AncestorFlags::default ();
   f . record (NodeRelation::SubscribesTo, true, 2);
@@ -63,7 +63,7 @@ fn subscribee_as_such () {
     emit (&c, 0, 0, &f,
           &[BirthFact::new (NodeRelation::SubscribesTo, Side::In, Some (2))])
       . as_deref (),
-    Some ("(rels (subscribes_to (in 1 (ancestors 2))) (birth (subscribes_to in 2)))") );
+    Some ("(rels (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2)))") );
 }
 
 #[test]
@@ -88,12 +88,12 @@ fn overrider_as_such_out_side () {
   // Ob: it overrides its grandparent (out, gen 2), born of overrides.
   let c = RelationCounts { overrides_out : 1, .. counts () };
   let mut f = AncestorFlags::default ();
-  f . record (NodeRelation::OverridesViewOf, false, 2);
+  f . record (NodeRelation::Overrides, false, 2);
   assert_eq! (
     emit (&c, 0, 0, &f,
-          &[BirthFact::new (NodeRelation::OverridesViewOf, Side::Out, Some (2))])
+          &[BirthFact::new (NodeRelation::Overrides, Side::Out, Some (2))])
       . as_deref (),
-    Some ("(rels (overrides_view_of (out 1 (ancestors 2))) (birth (overrides_view_of out 2)))") );
+    Some ("(rels (overrides (out 1 (ancestors 2))) (birth (overrides out 2)))") );
 }
 
 #[test]
@@ -102,17 +102,17 @@ fn filter_folder_two_births_in_fixed_order () {
   // Relations emitted contains-first; birth lists in the given order.
   let c = RelationCounts { hiders : 1, containers : 1, .. counts () };
   let mut f = AncestorFlags::default ();
-  f . record (NodeRelation::HidesFromItsSubscriptions, true, 4);
+  f . record (NodeRelation::HidesFromSubs, true, 4);
   f . record (NodeRelation::Contains, true, 2);
   assert_eq! (
     emit (&c, 0, 0, &f,
           &[BirthFact::new (
-              NodeRelation::HidesFromItsSubscriptions, Side::In, Some (4)),
+              NodeRelation::HidesFromSubs, Side::In, Some (4)),
             BirthFact::new (NodeRelation::Contains, Side::In, Some (2))])
       . as_deref (),
     Some ("(rels (contains (in 1 (ancestors 2))) \
-           (hides_from_its_subscriptions (in 1 (ancestors 4))) \
-           (birth (hides_from_its_subscriptions in 4) (contains in 2)))") );
+           (hidesFromSubs (in 1 (ancestors 4))) \
+           (birth (hidesFromSubs in 4) (contains in 2)))") );
 }
 
 #[test]
@@ -124,11 +124,11 @@ fn link_counts_and_interesting_subset () {
       .. counts () };
     emit (&cc, 0, 0, &AncestorFlags::default (), &[]) };
   assert_eq! ( mk (3, 1, 2) . as_deref (),
-    Some ("(rels (links_to (in 3 (substantive 1)) (out 2)))") );
+    Some ("(rels (linksTo (in 3 (substantive 1)) (out 2)))") );
   assert_eq! ( mk (3, 0, 0) . as_deref (),
-    Some ("(rels (links_to (in 3 (substantive 0))))") );
+    Some ("(rels (linksTo (in 3 (substantive 0))))") );
   assert_eq! ( mk (0, 0, 2) . as_deref (),
-    Some ("(rels (links_to (out 2)))") );
+    Some ("(rels (linksTo (out 2)))") );
   assert_eq! ( mk (0, 0, 0), None );
 }
 
@@ -142,7 +142,7 @@ fn mentioner_birth_out_only () {
     emit (&c, 0, 0, &f,
           &[BirthFact::new (NodeRelation::LinksTo, Side::Out, Some (1))])
       . as_deref (),
-    Some ("(rels (links_to (out 1 (ancestors 1))) (birth (links_to out 1)))") );
+    Some ("(rels (linksTo (out 1 (ancestors 1))) (birth (linksTo out 1)))") );
 }
 
 #[test]
@@ -156,7 +156,7 @@ fn link_ancestor_membership_includes_interesting_subset () {
   f . record (NodeRelation::LinksTo, false, 2);
   assert_eq! (
     emit (&c, 0, 0, &f, &[]) . as_deref (),
-    Some ("(rels (links_to (in 2 (ancestors 1) (substantive 1 (ancestors 1))) (out 3 (ancestors 2))))") );
+    Some ("(rels (linksTo (in 2 (ancestors 1) (substantive 1 (ancestors 1))) (out 3 (ancestors 2))))") );
 }
 
 #[test]

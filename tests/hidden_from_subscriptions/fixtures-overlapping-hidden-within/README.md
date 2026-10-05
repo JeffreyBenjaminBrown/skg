@@ -7,8 +7,8 @@ Tests behavior when a hidden node is in multiple subscribees' content.
 ```
 R (subscriber)
 ├── contains: [R1]
-├── subscribes_to: [E1, E2]
-└── hides_from_its_subscriptions: [H]
+├── subscribesTo: [E1, E2]
+└── hidesFromSubs: [H]
 
 E1 (subscribee)
 └── contains: [H]

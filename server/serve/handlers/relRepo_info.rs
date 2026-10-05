@@ -95,11 +95,11 @@ fn relation_from_client_string (
 ) -> Result<NodeRelation, String> {
   match s {
     "contains"          => Ok (NodeRelation::Contains),
-    "subscribes_to"     => Ok (NodeRelation::SubscribesTo),
-    "overrides_view_of" => Ok (NodeRelation::OverridesViewOf),
+    "subscribesTo"      => Ok (NodeRelation::SubscribesTo),
+    "overrides"         => Ok (NodeRelation::Overrides),
     other => Err ( format! (
       "unsupported relation '{}': the explicit-relRepo path covers \
-       contains, subscribes_to and overrides_view_of", other )), }}
+       contains, subscribesTo and overrides", other )), }}
 
 fn quoted (
   s : &str,

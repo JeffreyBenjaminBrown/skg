@@ -25,7 +25,7 @@ pub struct GraphnodeInTantivy {
 }
 
 impl From<&Graphnode> for GraphnodeInTantivy {
-  /// Keep title, aliases (with relRepos), body, misc (Tantivy indexes
+  /// Keep title, aliases (with relRepos), body, flags (Tantivy indexes
   /// these). Drop relations.
   fn from (c: &Graphnode) -> Self {
     GraphnodeInTantivy {

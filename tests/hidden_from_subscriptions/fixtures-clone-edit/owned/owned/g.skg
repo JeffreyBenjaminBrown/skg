@@ -1,6 +1,6 @@
 pid: g
 title: g
-subscribes_to:
+subscribesTo:
 - o
-hides_from_its_subscriptions:
+hidesFromSubs:
 - c

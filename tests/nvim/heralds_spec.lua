@@ -88,7 +88,7 @@ describe('skg.heralds', function ()
     local buf = scratch_buffer_with({
       'Test line with (skg (node (id 123) (rels (contains (out 2)))'
       .. ' (viewStats cycle))) herald',
-      'Another line (skg (node (id 456) (rels (links_to (in 3 (substantive 3))))'
+      'Another line (skg (node (id 456) (rels (linksTo (in 3 (substantive 3))))'
       .. ' (editRequest delete))) more text',
       'Plain line without heralds' })
     assert.is_true(heralds.enable(buf))

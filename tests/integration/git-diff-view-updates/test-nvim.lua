@@ -26,16 +26,16 @@ end
 ---nil. RELS_BODY is the cdr of the (rels ...) form. A role graft relates
 ---OUTBOUND to a tracked ancestor: a relation with an (out ...
 ---(ancestors ...)) side, mapped to its role (contains -> container,
----links_to -> mentioner, subscribes -> subscribee, overrides ->
+---linksTo -> mentioner, subscribes -> subscribee, overrides ->
 ---overrider, hides -> hider). Only meaningful for a node already known
 ---to be a role graft (affectsParent false).
 ---@param rels_body any|nil
 ---@return string|nil
 local function role_of_role_graft_from_rels (rels_body)
   if not rels_body then return nil end
-  local roles = { { 'contains', 'container' }, { 'links_to', 'mentioner' },
-                  { 'subscribes_to', 'subscribee' }, { 'overrides_view_of', 'overrider' },
-                  { 'hides_from_its_subscriptions', 'hider' } }
+  local roles = { { 'contains', 'container' }, { 'linksTo', 'mentioner' },
+                  { 'subscribesTo', 'subscribee' }, { 'overrides', 'overrider' },
+                  { 'hidesFromSubs', 'hider' } }
   for _, pair in ipairs(roles) do
     local form = child_named(rels_body, pair[1])
     if form then

@@ -7,17 +7,17 @@ RELS-BODY is the cdr of the (rels ...) form -- a list of relation
 sub-forms like (contains (in ...) (out ...)) and (birth ...). A role
 graft relates OUTBOUND to a tracked ancestor: it has a relation with an
 (out ... (ancestors ...)) side. That relation names the role: contains
--> container, links_to -> mentioner, subscribes_to -> subscribee,
-overrides_view_of -> overrider, hides_from_its_subscriptions -> hider. Only
+-> container, linksTo -> mentioner, subscribesTo -> subscribee,
+overrides -> overrider, hidesFromSubs -> hider. Only
 meaningful for a node
 already known to be a role graft (affectsParent false); an ordinary content
 child can carry the same outbound ancestor (e.g. a cycle) yet is NOT a
 role graft."
   (cl-loop for (rel . role) in '((contains    . container)
-                                 (links_to . mentioner)
-                                 (subscribes_to . subscribee)
-                                 (overrides_view_of . overrider)
-                                 (hides_from_its_subscriptions . hider))
+                                 (linksTo . mentioner)
+                                 (subscribesTo . subscribee)
+                                 (overrides . overrider)
+                                 (hidesFromSubs . hider))
            for form = (assq rel rels-body)
            when (and form
                      (let ((out (assq 'out (cdr form))))

@@ -109,7 +109,7 @@ pub struct NodeDiffReport {
   pub skgrepo_change      : Option<(SkgRepoName, SkgRepoName)>,
   pub value_set_diffs     : Vec<ValueSetDiff>,
   pub relationship_diffs  : Vec<RelationshipDiff>,
-  pub contained_list_diff : Option<Vec<ListDiffItem>>,
+  pub content_list_diff : Option<Vec<ListDiffItem>>,
 }
 
 #[derive(Clone, Debug)]

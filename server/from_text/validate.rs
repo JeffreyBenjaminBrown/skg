@@ -247,10 +247,10 @@ fn rehome_inherited_new_node (
   node . home_skgrepo = new_skgrepo . clone ();
   retag (&mut node . contains, &old_skgrepo, new_skgrepo);
   retag_msv (&mut node . aliases, &old_skgrepo, new_skgrepo);
-  retag_msv (&mut node . subscribes_to, &old_skgrepo, new_skgrepo);
+  retag_msv (&mut node . subscribesTo, &old_skgrepo, new_skgrepo);
   retag_msv (
-    &mut node . hides_from_its_subscriptions, &old_skgrepo, new_skgrepo);
-  retag_msv (&mut node . overrides_view_of, &old_skgrepo, new_skgrepo);
+    &mut node . hidesFromSubs, &old_skgrepo, new_skgrepo);
+  retag_msv (&mut node . overrides, &old_skgrepo, new_skgrepo);
 }
 
 fn skgrepo_is_foreign(
@@ -268,8 +268,8 @@ fn skgrepo_is_foreign(
 /// For *editable* fields (title, body, contains):
 /// Some([]) and None are equivalent, so we normalize them for comparison.
 ///
-/// For *non-definitive* fields (aliases, overrides_view_of,
-/// subscribes_to, hides_from_its_subscriptions): Unspecified means "no opinion"
+/// For *non-definitive* fields (aliases, overrides,
+/// subscribesTo, hidesFromSubs): Unspecified means "no opinion"
 /// (because the user did not mention it in the buffer),
 /// and therefore does not represent an edit.
 pub(crate) fn buffernode_differs_from_disknode(
@@ -296,12 +296,12 @@ pub(crate) fn buffernode_differs_from_disknode(
      && flags_match
      && fields_match( &buffer_node . aliases,
                       &disk_node . aliases)
-     && fields_match( &buffer_node . subscribes_to,
-                      &disk_node . subscribes_to)
-     && fields_match( &buffer_node . hides_from_its_subscriptions,
-                      &disk_node . hides_from_its_subscriptions)
-     && fields_match( &buffer_node . overrides_view_of,
-                      &disk_node . overrides_view_of)) }
+     && fields_match( &buffer_node . subscribesTo,
+                      &disk_node . subscribesTo)
+     && fields_match( &buffer_node . hidesFromSubs,
+                      &disk_node . hidesFromSubs)
+     && fields_match( &buffer_node . overrides,
+                      &disk_node . overrides)) }
 
 /// Lets us treat Specified([]) and Unspecified as equivalent.
 pub(crate) fn flatten_ms<T: Clone>(

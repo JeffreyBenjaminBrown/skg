@@ -5,10 +5,10 @@ contains:
 - "11"
 - "12"
 - "overlap"
-subscribes_to:
+subscribesTo:
 - 1-subscribes-to
-hides_from_its_subscriptions:
+hidesFromSubs:
 - hidden-from-1s-subscriptions
 - hidden-from-subscriptions-of-1-but-in-content-of-2
-overrides_view_of:
+overrides:
 - overridden-by-1

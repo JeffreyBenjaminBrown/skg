@@ -41,7 +41,7 @@ pub struct NodeSaveIntent {
   pub home_skgrepo      : SkgRepoName,
   pub title             : String,
   pub body              : Option<String>,
-  // contains / subscribes_to / overrides_view_of pair each member
+  // contains / subscribesTo / overrides pair each member
   // with an Option<RepoName>: Some when the buffer's headline
   // carried an '(editRequest (relRepo NAME))' request (see
   // 'ActiveVognode_Generic::relRepo_request', 'FieldIntent'); None means
@@ -52,9 +52,9 @@ pub struct NodeSaveIntent {
   pub contains          : MSV<(ID, Option<SkgRepoName>)>,
   pub extra_ids         : Vec<ID>,
   pub aliases           : MSV<(String, Option<SkgRepoName>)>,
-  pub subscribes_to     : MSV<(ID, Option<SkgRepoName>)>,
-  pub hides_from_its_subscriptions : MSV<ID>,
-  pub overrides_view_of : MSV<(ID, Option<SkgRepoName>)>,
+  pub subscribesTo      : MSV<(ID, Option<SkgRepoName>)>,
+  pub hidesFromSubs     : MSV<ID>,
+  pub overrides         : MSV<(ID, Option<SkgRepoName>)>,
   pub flags              : Vec<Flag>,
   pub flag_request  : Option<(Flag, bool)>,
 }
@@ -76,8 +76,8 @@ pub struct NodeSaveIntent {
 pub struct RequestedRelRepos {
   pub contains          : HashMap<ID, SkgRepoName>,
   pub aliases           : HashMap<String, SkgRepoName>,
-  pub subscribes_to     : HashMap<ID, SkgRepoName>,
-  pub overrides_view_of : HashMap<ID, SkgRepoName>,
+  pub subscribesTo      : HashMap<ID, SkgRepoName>,
+  pub overrides         : HashMap<ID, SkgRepoName>,
 }
 
 /// Strip the per-member explicit-repo payload down to plain IDs, by
@@ -156,10 +156,10 @@ impl NodeIntent {
           aliases . into_iter ()
           . map ( |alias| (alias . member, None) )
           . collect () ), },
-      subscribes_to                : no_explicit_msv (&node . subscribes_to),
-      hides_from_its_subscriptions :
-        members_msv (&node . hides_from_its_subscriptions),
-      overrides_view_of            : no_explicit_msv (&node . overrides_view_of),
+      subscribesTo                 : no_explicit_msv (&node . subscribesTo),
+      hidesFromSubs                :
+        members_msv (&node . hidesFromSubs),
+      overrides                    : no_explicit_msv (&node . overrides),
       flags                         : node . flags,
       flag_request             : None,
     }) }
@@ -216,8 +216,8 @@ impl NodeSaveIntent {
         . filter_map ( |(text, skgrepo)| skgrepo . clone ()
           . map ( |skgrepo| (text . clone (), skgrepo) ) )
         . collect (),
-      subscribes_to     : collect (self . subscribes_to . or_default ()),
-      overrides_view_of : collect (self . overrides_view_of . or_default ()),
+      subscribesTo      : collect (self . subscribesTo . or_default ()),
+      overrides         : collect (self . overrides . or_default ()),
     }}
 
   pub fn into_graphnode (
@@ -243,12 +243,12 @@ impl NodeSaveIntent {
       contains                     :
         rel_partners_at_relRepo (
           &skgrepo, skgids_only (self . contains . or_default ()) ),
-      subscribes_to                :
-        rel_partners_at_relRepo_msv (&skgrepo, skgids_only_msv (self . subscribes_to)),
-      hides_from_its_subscriptions :
-        rel_partners_at_relRepo_msv (&skgrepo, self . hides_from_its_subscriptions),
-      overrides_view_of            :
-        rel_partners_at_relRepo_msv (&skgrepo, skgids_only_msv (self . overrides_view_of)),
+      subscribesTo                 :
+        rel_partners_at_relRepo_msv (&skgrepo, skgids_only_msv (self . subscribesTo)),
+      hidesFromSubs                :
+        rel_partners_at_relRepo_msv (&skgrepo, self . hidesFromSubs),
+      overrides                    :
+        rel_partners_at_relRepo_msv (&skgrepo, skgids_only_msv (self . overrides)),
       flags                         : self . flags,
     };
     node . normalize_skgids ();
@@ -261,16 +261,16 @@ impl NodeSaveIntent {
     inferred_unhides : &[ID],
   ) {
     let mut hides : Vec<ID> =
-      if self . hides_from_its_subscriptions . is_unspecified() {
+      if self . hidesFromSubs . is_unspecified() {
         base_hides . or_default() . to_vec()
       } else {
-        self . hides_from_its_subscriptions . or_default() . to_vec()
+        self . hidesFromSubs . or_default() . to_vec()
       };
     hides . retain ( |skgid| ! inferred_unhides . contains (skgid) );
     for skgid in inferred_hides {
       if ! hides . contains (skgid) {
         hides . push (skgid . clone()); }}
-    self . hides_from_its_subscriptions =
+    self . hidesFromSubs =
       MSV::Specified (hides); }}
 
 /// This is an ordered map of one NodeIntent per PID; lowering
@@ -347,7 +347,7 @@ pub fn lower_collected_fieldIntents (
     // 'lowerable_order'; so anything else here is a collection bug.
     if leftover . contains . is_some()
       || leftover . aliases       . is_some()
-      || leftover . subscribes_to . is_some()
+      || leftover . subscribesTo . is_some()
       || leftover . overrides     . is_some()
       || leftover . node_merge    . is_some()
       || leftover . flag      . is_some()
@@ -386,10 +386,10 @@ fn lower_one_entry (
         extra_ids                    : vec![],
         aliases                      :
           msv_from_slot (entry . aliases),
-        subscribes_to                :
-          msv_from_slot (entry . subscribes_to),
-        hides_from_its_subscriptions : MSV::Unspecified,
-        overrides_view_of            :
+        subscribesTo                 :
+          msv_from_slot (entry . subscribesTo),
+        hidesFromSubs                : MSV::Unspecified,
+        overrides                    :
           msv_from_slot (entry . overrides),
         flags                    : Vec::new(),
         flag_request             : entry . flag,
@@ -411,7 +411,7 @@ impl LoweredNodeIntents {
       . filter_map ( |pid| by_pid . remove (&pid) )
       . collect() }
 
-  /// One (pid, skgrepo, contains, subscribes_to) tuple per Save
+  /// One (pid, skgrepo, contains, subscribesTo) tuple per Save
   /// nodeIntent whose contains is Specified -- the candidates for
   /// inferring hides from contains removals (see
   /// 'infer_hides_from_contains_removals'). Cloned out so the caller
@@ -428,7 +428,7 @@ impl LoweredNodeIntents {
                 pid . clone (),
                 intent . home_skgrepo . clone (),
                 skgids_only (contains),
-                skgids_only_msv_ref (&intent . subscribes_to) )),
+                skgids_only_msv_ref (&intent . subscribesTo) )),
               _ => None },
           _ => None })
       . collect () }
@@ -458,11 +458,11 @@ impl LoweredNodeIntents {
   ) -> Vec<ID> {
     match self . by_pid . get (&subscriber_from_disk . pid) {
       Some (NodeIntent::Save (intent))
-        if ! intent . subscribes_to . is_unspecified () =>
-          skgids_only (intent . subscribes_to . or_default ()),
+        if ! intent . subscribesTo . is_unspecified () =>
+          skgids_only (intent . subscribesTo . or_default ()),
       _ =>
         members_of (
-          subscriber_from_disk . subscribes_to . or_default () ),
+          subscriber_from_disk . subscribesTo . or_default () ),
     }}
 
   /// The hide IDs after the preceding inference stages.  Filter edits run
@@ -473,11 +473,11 @@ impl LoweredNodeIntents {
   ) -> Vec<ID> {
     match self . by_pid . get (&subscriber_from_disk . pid) {
       Some (NodeIntent::Save (intent))
-        if ! intent . hides_from_its_subscriptions . is_unspecified () =>
-          intent . hides_from_its_subscriptions . or_default () . to_vec (),
+        if ! intent . hidesFromSubs . is_unspecified () =>
+          intent . hidesFromSubs . or_default () . to_vec (),
       _ =>
         members_of (
-          subscriber_from_disk . hides_from_its_subscriptions . or_default () ),
+          subscriber_from_disk . hidesFromSubs . or_default () ),
     }}
 
   /// This applies inferred hides/unhides to the subscriber's
@@ -490,7 +490,7 @@ impl LoweredNodeIntents {
     inferred_unhides : &[ID],
   ) {
     let base_hides : MSV<ID> =
-      members_msv (&subscriber . hides_from_its_subscriptions);
+      members_msv (&subscriber . hidesFromSubs);
     if let Some (intent) =
       self . by_pid . get_mut (&subscriber . pid)
     { intent . apply_hiderel_delta (

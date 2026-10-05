@@ -105,7 +105,7 @@ Special glyphs on a node indicate when
 its relationship to its parent is not the default.
 **** Nodes link to each other.
 ***** language
-a 'mentioner' node 'links_to' a 'mentioned' node.
+a 'mentioner' node 'linksTo' a 'mentioned' node.
 ***** link representation
 These are encoded 'inline' in the text,
 just as in org-roam.
@@ -134,7 +134,7 @@ That is not necessarily the node's only purpose:
 it can also have content unrelated to its subscriptions.
 **** Node N can filter node F from N's subscriptions.
 ***** language and definition
-A 'hider' node 'hides_from_its_subscriptions' a 'hidden' node.
+A 'hider' node 'hidesFromSubs' a 'hidden' node.
 If S subscribes to T, this relation allows S to hide
   any of T's contents from S's "subscription view" of T.
 ***** Filtering subscriptions facilitate integration.
@@ -148,7 +148,7 @@ that new (to the subscriber) content
 will appear in the subscriber's view of the subscribee.
 **** One node's view can override another's.
 ***** language and definition
-A 'replacement' node 'overrides_view_of' a 'replaced' node.
+A 'replacement' node 'overrides' a 'replaced' node.
 ***** creating an overrider by editing someone else's node
 serial
 ****** User U is reading note N by user W.

@@ -1,6 +1,6 @@
 pid: wSub-owner
 title: wSub-owner
-subscribes_to:
+subscribesTo:
 - wSub-a
 - wSub-b
 - wSub-c

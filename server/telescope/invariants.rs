@@ -145,12 +145,12 @@ pub fn telescope_violations_of (
   check ("contains", &node . contains);
   let msv = |m : &MSV<RelPartner<ID>>| -> Vec<RelPartner<ID>> {
     m . or_default () . to_vec () };
-  check ("subscribes_to",
-         & msv ( &node . subscribes_to ));
-  check ("hides_from_its_subscriptions",
-         & msv ( &node . hides_from_its_subscriptions ));
-  check ("overrides_view_of",
-         & msv ( &node . overrides_view_of ));
+  check ("subscribesTo",
+         & msv ( &node . subscribesTo ));
+  check ("hidesFromSubs",
+         & msv ( &node . hidesFromSubs ));
+  check ("overrides",
+         & msv ( &node . overrides ));
   violations }
 
 /// Recorders whose telescope-warning truth may differ between two valid

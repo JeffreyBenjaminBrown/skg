@@ -25,11 +25,11 @@ derived text links.
 | =overPrivateText_telescope= | =bool= | True when the selected title or body came from a section below the home skgrepo.  Release decisions use this conservative folded fact. |
 | =aliases= | =MSV<RelPartner<String>>= | Search aliases and the skgrepo at which each is recorded. |
 | =contains= | =Vec<RelPartner<ID>>= | Ordered content children and each relationship's relRepo. |
-| =subscribes_to= | =MSV<RelPartner<ID>>= | Nodes whose content this node follows, with relRepos. |
-| =hides_from_its_subscriptions= | =MSV<RelPartner<ID>>= | Nodes suppressed when reached through this node's subscriptions, with relRepos. |
-| =overrides_view_of= | =MSV<RelPartner<ID>>= | Nodes for which this node may substitute during recursive rendering, with relRepos. |
-| =flags= | =Vec<Flag>= | Node flags: import provenance (=Had_ID_Before_Import=, =Was_Overloaded=) and behavior settings such as =NoSearchMatching=.  Stored in YAML under the key =misc=. |
-| =links_to= | =Vec<ID>= on =GraphnodeInRust= | Outbound Org =id:= links parsed from title/body text.  Derived rather than serialized as a graph field. |
+| =subscribesTo= | =MSV<RelPartner<ID>>= | Nodes whose content this node follows, with relRepos. |
+| =hidesFromSubs= | =MSV<RelPartner<ID>>= | Nodes suppressed when reached through this node's subscriptions, with relRepos. |
+| =overrides= | =MSV<RelPartner<ID>>= | Nodes for which this node may substitute during recursive rendering, with relRepos. |
+| =flags= | =Vec<Flag>= | Node flags: import provenance (=Had_ID_Before_Import=, =Was_Overloaded=) and behavior settings such as =NoSearchMatching=. |
+| =linksTo= | =Vec<ID>= on =GraphnodeInRust= | Outbound Org =id:= links parsed from title/body text.  Derived rather than serialized as a graph field. |
 
 =MSV<T>= means “maybe specified vector.”  =Unspecified= says a file or edit
 has no opinion about the field; =Specified([])= explicitly supplies an empty
@@ -48,10 +48,10 @@ that hand-authored or temporarily incomplete graphs remain representable.
 | Relationship | First role | Second role | Semantics |
 |--------------+------------+-------------+-----------|
 | =contains= | container | contained | Ordered document/content nesting. |
-| =subscribes_to= | subscriber | subscribee | The subscriber incorporates later content from the subscribee.  A fork initially creates both a subscription and an override relationship to the original. |
-| =hides_from_its_subscriptions= | hider | hidden | Suppresses the hidden node only when it would be reached through the hider's subscriptions. |
-| =overrides_view_of= | overrider | overridden | Replaces the overridden node in recursive content rendering when the eligible owned override chain resolves to it. |
-| =links_to= | mentioner | mentioned | Plain Org ID links derived from text. |
+| =subscribesTo= | subscriber | subscribee | The subscriber incorporates later content from the subscribee.  A fork initially creates both a subscription and an override relationship to the original. |
+| =hidesFromSubs= | hider | hidden | Suppresses the hidden node only when it would be reached through the hider's subscriptions. |
+| =overrides= | overrider | overridden | Replaces the overridden node in recursive content rendering when the eligible owned override chain resolves to it. |
+| =linksTo= | mentioner | mentioned | Plain Org ID links derived from text. |
 
 Home skgrepo and which node carries each extra ID are node properties, not separate runtime
 relationship entities.  Relationship relRepo remains part of every stored

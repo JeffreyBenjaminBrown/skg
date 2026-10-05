@@ -7,8 +7,8 @@ Some terms and abbreviations used in this code.
 
 For a set of IDs in one graph snapshot, the *update-relevant
 neighborhood* contains the IDs themselves, their immediate neighbors in
-both directions along =contains=, =links_to=, =subscribes_to=, and
-=hides_from_its_subscriptions=, and every node reachable by each of the
+both directions along =contains=, =linksTo=, =subscribesTo=, and
+=hidesFromSubs=, and every node reachable by each of the
 two monotonic override walks. The overriderward and overriddenward walks
 start independently at the original IDs, never reverse direction, and
 never continue from an ordinary neighbor. Thus it includes no mixed
@@ -84,8 +84,12 @@ repair that moves the selected title and body to home.
 *** relation, relationship, recorder, member, partner
 
 As in TypeDB, a *relation* is a kind of relationship: =contains=,
-=links_to=, =subscribes_to=, =hides_from_its_subscriptions=,
-=overrides_view_of=. A *relationship* is one instance of a relation: this
+=linksTo=, =subscribesTo=, =hidesFromSubs=, =overrides=. Each names
+its two roles: container contains content, mentioner linksTo
+mentioned, subscriber subscribesTo subscribee, overrider overrides
+overridden, hider hidesFromSubs hidden. =hidesFromSubs= is short for
+"hides from its subscriptions": the hider hides the hidden node from
+what the hider sees through its subscriptions. A *relationship* is one instance of a relation: this
 node contains that one. (Graph theory would call it an edge; we don't,
 because the word is opaque to newcomers.)
 
@@ -182,7 +186,7 @@ or the relationship between their parent and their children,
 or maybe something else.
 
 The Skg graph contains a few (currently five) formal relationships -- =contains=,
-=links_to=, etc. In the graph, there is no concept of parent or child;
+=linksTo=, etc. In the graph, there is no concept of parent or child;
 those are only meaningful in a view.
 Where the code says "child" or "parent", it means the relationship between viewnodes
 -- e.g., in Emacs, the relationship between headlines in an Org buffer
@@ -362,11 +366,11 @@ related to forking a node, below.
 
 To *fork* a node N is to turn it into an editable *clone* C in a
 skgrepo you own. C copies N's title, body, and child-list (the child IDs
-only — shallow), =subscribes_to= N (so N's later additions surface to C
-as unintegrated subscribed content) and =overrides_view_of= N (so
+only — shallow), =subscribesTo= N (so N's later additions surface to C
+as unintegrated subscribed content) and =overrides= N (so
 override substitution draws C wherever N would appear). Children of N
 that the forking edit deleted become C's
-=hides_from_its_subscriptions=, and thereafter any child removed from
+=hidesFromSubs=, and thereafter any child removed from
 an owned subscriber's contains that some subscribee still contains is
 hidden likewise on save (re-adding it unhides). A node may have at
 most one clone you own (override monogamy).
@@ -528,7 +532,7 @@ but might not, is maybe-placed.
 When view completion would CREATE a viewnode for node N as
 recursive content, it draws the EFFECTIVE OVERRIDER of N instead:
 the end of the chain of owned, currently-VISIBLE
-'overrides_view_of' relationships leading out of N. The chain is often one
+'overrides' relationships leading out of N. The chain is often one
 relationship, but may be longer (an owned chain D overrides C overrides
 N is legal; only a cycle is forbidden), and visibility gating can
 stop it at a MIDDLE node when a later link's mentioner is inactive --

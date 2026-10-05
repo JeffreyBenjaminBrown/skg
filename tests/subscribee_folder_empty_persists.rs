@@ -50,7 +50,7 @@ async fn empty_subscribee_folder_persists_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // s subscribes to nothing (fixture has no subscribes_to), but the buffer
+  // s subscribes to nothing (fixture has no subscribesTo), but the buffer
   // still shows a subscribeeFolder -- the editable interface the user just emptied.
   let input_org_text : &str = indoc! {"
     * (skg (node (id s) (repo main))) s

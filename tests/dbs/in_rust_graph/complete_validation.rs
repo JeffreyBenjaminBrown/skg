@@ -108,7 +108,7 @@ fn unknown_home_is_hard_but_edge_provenance_is_a_warning () {
 #[test]
 fn configured_dangling_members_are_tolerated_without_warning () {
   let mut recorder = node ("recorder", "public");
-  recorder . subscribes_to = MSV::Specified (vec![RelPartner::at_relRepo (
+  recorder . subscribesTo = MSV::Specified (vec![RelPartner::at_relRepo (
     SkgRepoName::from ("public"), ID::from ("absent"))]);
   let report = validate_complete_graph (&config (), &[recorder]);
   assert! (report . is_valid ());
@@ -122,7 +122,7 @@ fn canonical_entry_includes_override_monogamy_and_telescope_orientation () {
   let mut a = node ("a", "public");
   let mut b = node ("b", "public");
   for overrider in [&mut a, &mut b] {
-    overrider . overrides_view_of = MSV::Specified (vec![
+    overrider . overrides = MSV::Specified (vec![
       RelPartner::at_relRepo (
         SkgRepoName::from ("public"), ID::from ("target")),
     ]); }
@@ -134,7 +134,7 @@ fn canonical_entry_includes_override_monogamy_and_telescope_orientation () {
       if overridden == &ID::from ("target"))));
   assert_eq! (report . warnings . iter () . filter (|(_, warning)| matches! (
     warning, TelescopeViolation::LeakShapedMember {
-      relation : "overrides_view_of", .. })) . count (), 2);
+      relation : "overrides", .. })) . count (), 2);
 }
 
 #[test]

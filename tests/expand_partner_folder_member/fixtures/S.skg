@@ -1,6 +1,6 @@
 pid: S
 title: S
-subscribes_to:
+subscribesTo:
 - N
 - SubscriberLeaf
 contains:

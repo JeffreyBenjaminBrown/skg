@@ -24,39 +24,39 @@ pub fn find_related_nodes (
       graph . pid_of (skgid) . unwrap_or_else ( || skgid . clone () ) };
     match (relation, input_role, output_role) {
       // Forward lookups: read the field on the node.
-      ("contains",                     "container",   "contained")  =>
+      ("contains",                     "container",   "content")  =>
         if let Some (n) = graph . nodes . get (&pid) {
           out . extend ( members_of (& n . contains) . iter () . map (&pid_or_self) ); },
-      ("subscribes_to",                "subscriber",  "subscribee") =>
+      ("subscribesTo",                 "subscriber",  "subscribee") =>
         if let Some (n) = graph . nodes . get (&pid) {
-          out . extend ( members_of ( n . subscribes_to . or_default () )
+          out . extend ( members_of ( n . subscribesTo . or_default () )
                          . iter () . map (&pid_or_self) ); },
-      ("hides_from_its_subscriptions", "hider",       "hidden")     =>
+      ("hidesFromSubs", "hider",                      "hidden")     =>
         if let Some (n) = graph . nodes . get (&pid) {
-          out . extend ( members_of ( n . hides_from_its_subscriptions . or_default () )
+          out . extend ( members_of ( n . hidesFromSubs . or_default () )
                          . iter () . map (&pid_or_self) ); },
-      ("overrides_view_of",            "overrider",   "overridden") =>
+      ("overrides",                    "overrider",   "overridden") =>
         if let Some (n) = graph . nodes . get (&pid) {
-          out . extend ( members_of ( n . overrides_view_of . or_default () )
+          out . extend ( members_of ( n . overrides . or_default () )
                          . iter () . map (&pid_or_self) ); },
-      ("links_to",                     "mentioner",   "mentioned")  =>
+      ("linksTo",                      "mentioner",   "mentioned")  =>
         if let Some (n) = graph . nodes . get (&pid) {
-          out . extend ( n . links_to
+          out . extend ( n . linksTo
                          . iter () . map (&pid_or_self) ); },
       // Inverse lookups: consult the inverse index.
-      ("contains",                     "contained",   "container")   =>
+      ("contains",                     "content",   "container")   =>
         if let Some (s) = graph . contained_by . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
-      ("subscribes_to",                "subscribee",  "subscriber")  =>
+      ("subscribesTo",                 "subscribee",  "subscriber")  =>
         if let Some (s) = graph . subscribers_of . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
-      ("hides_from_its_subscriptions", "hidden",      "hider")       =>
+      ("hidesFromSubs",                "hidden",      "hider")       =>
         if let Some (s) = graph . hiders_of . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
-      ("overrides_view_of",            "overridden",  "overrider")   =>
+      ("overrides",                    "overridden",  "overrider")   =>
         if let Some (s) = graph . overriders_of . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
-      ("links_to",                     "mentioned",   "mentioner")  =>
+      ("linksTo",                      "mentioned",   "mentioner")  =>
         if let Some (s) = graph . mentioners_of . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
       // Unknown (relation, input, output) combination: shouldn't

@@ -1,5 +1,5 @@
 title: R
 pid: R
-subscribes_to:
+subscribesTo:
 - E1
 - E2

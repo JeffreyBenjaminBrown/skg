@@ -99,7 +99,7 @@ Writes =uuid_map.json= plus =unmapped.json= with reasons.
 *** 02_collect_targets.py
 Uses =git diff --name-status BASE HEAD= in the mangled repo to
 enumerate Added and Modified files, then extracts per-file semantic
-edits (title / body / misc / list-field inserts+deletes).
+edits (title / body / flags / list-field inserts+deletes).
 
 Writes =targets.json=. Key field =needed_map_keys= lists the UUIDs
 that the diff-builder will actually dereference through the map.
@@ -136,10 +136,10 @@ The main diff generator. For each target file:
   public/.
 - *Modified* (14 in our run): look up the public/ counterpart via
   =uuid_map=. Apply semantic edits at text level (minimal diff):
-  - title / body / misc / extra_ids changes: replace that field's
+  - title / body / flags / extra_ids changes: replace that field's
     span with the new value. Body uses skg's =body: |2-= block
     scalar form.
-  - list-field changes (contains, subscribes_to, etc.): replace
+  - list-field changes (contains, subscribesTo, etc.): replace
     the entire list with =map(mangled_head_list)=. Per step 04's
     invariant this preserves positions from public/.
 
@@ -191,7 +191,7 @@ against a fresh snapshot of the pre-patch public/ state.
   clobbers public/'s contains list with =map(mangled_head)=. Step
   04's output is your warning signal.
 - Does not handle MSV (maybe-scalar-or-vec) idiosyncrasies in
-  =subscribes_to=, =hides_from_its_subscriptions=, =overrides_view_of=
+  =subscribesTo=, =hidesFromSubs=, =overrides=
   beyond str-or-list normalization. If a mangled edit changes an MSV
   from unspecified to a single scalar, the diff uses a list.
 - Subscription-list changes get the same position-based treatment as

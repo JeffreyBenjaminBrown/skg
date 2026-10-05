@@ -62,7 +62,7 @@ fn build_and_integrate_folder (
       return Err (
         "build_and_integrate_folder: aliases is built by the AliasFolder \
          builder, not here" . into () ),
-    FolderRelation::OverridesViewOf => {
+    FolderRelation::Overrides => {
       // overriddenFolder (writable) -- forced empty; overriderFolder (write-protected).
       maybe_add_one_partnerFolder (
         tree, treeid, PartnerFolder::Overridden, config, graph,
@@ -70,7 +70,7 @@ fn build_and_integrate_folder (
       maybe_add_one_partnerFolder (
         tree, treeid, PartnerFolder::Overrider, config, graph,
         active_skgrepo_set, skgrepo_diffs, false ) ?; },
-    FolderRelation::HidesFromItsSubscriptions => {
+    FolderRelation::HidesFromSubs => {
       // Both sides write-protected: hiding is editable only from a
       // subscribee-as-such, never from a hider/hidden folder.
       maybe_add_one_partnerFolder (

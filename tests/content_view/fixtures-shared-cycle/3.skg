@@ -4,6 +4,6 @@ extra_ids:
 title: title 3
 body: |-
   this one string could span pages
-subscribes_to:
+subscribesTo:
 - '44'
 - '55'

@@ -1,4 +1,4 @@
 pid: C1
 title: C1
-overrides_view_of:
+overrides:
   - C2

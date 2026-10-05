@@ -27,9 +27,9 @@ end
 ---The two command families, generated like the elisp macro did.
 local command_rows = {
   { 'show_folderOf_aliases', '(folder aliases)' },
-  { 'show_folderOf_overridesViewOf', '(folder overrides_view_of)' },
-  { 'show_folderOf_hidesFromItsSubscriptions', '(folder hides_from_its_subscriptions)' },
-  { 'show_folderOf_subscribesTo', '(folder subscribes_to)' },
+  { 'show_folderOf_overrides', '(folder overrides)' },
+  { 'show_folderOf_hidesFromSubs', '(folder hidesFromSubs)' },
+  { 'show_folderOf_subscribesTo', '(folder subscribesTo)' },
   { 'show_folderOf_flags', 'flags' },
   { 'show_containerward_tree', '(roleTree container)' },
   { 'show_mentionerward_tree', '(roleTree mentioner)' },

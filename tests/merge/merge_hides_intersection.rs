@@ -35,7 +35,7 @@ fn all_tests
       assert_eq! ( merges . len (), 1 );
       let hides : &[RelPartner<ID>] =
         merges[0] . updated_acquirer . 0
-        . hides_from_its_subscriptions . or_default ();
+        . hidesFromSubs . or_default ();
       assert! ( ! hides . iter () . any (|m| m . member == ID::from ("x")),
         "b showed x through e pre-merge, so the merge must not hide it: {:?}",
         hides );

@@ -87,11 +87,11 @@ fn composed_from_lists (
     home                         : Some ( home . clone () ),
     aliases                      : None,
     contains,
-    subscribes_to                :
+    subscribesTo                 :
       if subs . is_empty () { None } else { Some (subs) },
-    hides_from_its_subscriptions :
+    hidesFromSubs                :
       if hides . is_empty () { None } else { Some (hides) },
-    overrides_view_of            : None, }}
+    overrides                    : None, }}
 
 fn decompose_then_compose (
   composed : &ComposedNode,
@@ -110,13 +110,13 @@ fn decompose_then_compose (
         aliases  : composed . aliases . as_deref ()
                    . unwrap_or (&[]),
         contains : &composed . contains,
-        subscribes_to :
-          composed . subscribes_to . as_deref () . unwrap_or (&[]),
-        hides_from_its_subscriptions :
-          composed . hides_from_its_subscriptions . as_deref ()
+        subscribesTo :
+          composed . subscribesTo . as_deref () . unwrap_or (&[]),
+        hidesFromSubs :
+          composed . hidesFromSubs . as_deref ()
           . unwrap_or (&[]),
-        overrides_view_of :
-          composed . overrides_view_of . as_deref ()
+        overrides :
+          composed . overrides . as_deref ()
           . unwrap_or (&[]), } );
   compose_sections ( &sections, &identity_resolve ) }
 
@@ -132,16 +132,16 @@ fn flags_write_at_home_and_compose_defensively_from_all_sections () {
   let mut sections = decompose_node (&DecompositionInput {
     pid: &ID::from ("p"), extra_ids: &[], flags: &misc,
     title: Some ("title"), body: None, home: &home,
-    aliases: &[], contains: &contains, subscribes_to: &[],
-    hides_from_its_subscriptions: &[], overrides_view_of: &[],
+    aliases: &[], contains: &contains, subscribesTo: &[],
+    hidesFromSubs: &[], overrides: &[],
   }, &telescope_config ()) . unwrap () . into_sections ();
-  assert_eq! (sections . first () . unwrap () . 1 . misc, misc);
+  assert_eq! (sections . first () . unwrap () . 1 . flags, misc);
   assert! (sections . iter () . skip (1)
-    . all (|(_, section)| section . misc . is_empty ()));
+    . all (|(_, section)| section . flags . is_empty ()));
 
   let private_section = sections . iter_mut ()
     . find (|(skgrepo, _)| skgrepo == &private) . unwrap ();
-  private_section . 1 . misc = vec![
+  private_section . 1 . flags = vec![
     Flag::NoSearchMatching,
     Flag::Was_Overloaded];
   let telescope = Telescope::try_new (
@@ -179,8 +179,8 @@ proptest! {
     // The one asymmetry: compose cannot learn a home the decomposition did not
     // write title/body text into; everything else must round-trip exactly.
     prop_assert_eq! ( &recomposed . contains, &composed . contains );
-    prop_assert_eq! ( &recomposed . subscribes_to,
-                      &composed . subscribes_to );
+    prop_assert_eq! ( &recomposed . subscribesTo,
+                      &composed . subscribesTo );
     { // Unordered relations have no order to preserve: sections
       // cannot express cross-repo interleavings without anchors,
       // which unordered relations deliberately lack, so the composition's
@@ -193,8 +193,8 @@ proptest! {
         v . sort_by ( |a, b| a . member . cmp ( &b . member ));
         v };
       prop_assert_eq! (
-        sort ( recomposed . hides_from_its_subscriptions . as_ref () ),
-        sort ( composed . hides_from_its_subscriptions . as_ref () )); }
+        sort ( recomposed . hidesFromSubs . as_ref () ),
+        sort ( composed . hidesFromSubs . as_ref () )); }
     prop_assert_eq! ( recomposed . title . as_deref (), Some ("t") );
     prop_assert_eq! ( recomposed . home, Some (home) );
     prop_assert! ( warnings . is_empty (),
@@ -217,9 +217,9 @@ proptest! {
           title : composed . title . as_deref (),
           body : None, home : &home,
           aliases : &[], contains : &composed . contains,
-          subscribes_to : &[],
-          hides_from_its_subscriptions : &[],
-          overrides_view_of : &[], } );
+          subscribesTo : &[],
+          hidesFromSubs : &[],
+          overrides : &[], } );
     let sections_twice : Vec<(SkgRepoName, SectionSlices)> =
       decompose_sections (
         & DecompositionInput {
@@ -227,9 +227,9 @@ proptest! {
           title : recomposed . title . as_deref (),
           body : None, home : &home,
           aliases : &[], contains : &recomposed . contains,
-          subscribes_to : &[],
-          hides_from_its_subscriptions : &[],
-          overrides_view_of : &[], } );
+          subscribesTo : &[],
+          hidesFromSubs : &[],
+          overrides : &[], } );
     prop_assert_eq! (sections_once, sections_twice);
   }
 
@@ -509,3 +509,19 @@ fn later_text_reports_the_repo_that_actually_won (
   assert! (warnings . contains (&CompositionWarning::NonHomeBody {
     skgrepo : private, selected_at : public }));
 }
+
+#[test]
+fn pre_october_2026_keys_still_load () {
+  use crate::types::nodes::fs::GraphnodeOnDisk;
+  let old : GraphnodeOnDisk = serde_yaml::from_str (
+    "pid: p\ntitle: t\nsubscribes_to:\n- s\nhides_from_its_subscriptions:\n- h\noverrides_view_of:\n- o\nmisc:\n- NoSearchMatching\n"
+  ) . unwrap ();
+  assert_eq! (old . hidesFromSubs, vec! [ID::from ("h")]);
+  assert_eq! (old . overrides,     vec! [ID::from ("o")]);
+  assert_eq! (old . flags,         vec! [Flag::NoSearchMatching]);
+  assert_eq! (old . subscribesTo . len (), 1);
+  let yaml : String = old . to_yaml () . unwrap ();
+  for new_key in ["subscribesTo:", "hidesFromSubs:", "overrides:", "flags:"] {
+    assert! (yaml . contains (new_key), "missing {}:\n{}", new_key, yaml); }
+  for old_key in ["subscribes_to", "hides_from_its", "overrides_view_of", "misc"] {
+    assert! (! yaml . contains (old_key), "still writes {}:\n{}", old_key, yaml); } }

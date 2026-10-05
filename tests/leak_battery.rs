@@ -4,7 +4,7 @@
 // item render-and-gating): a membership's relRepo, not just the
 // member node's own skgrepo, gates whether it renders. Fixtures pin
 // the shape the sweep exists to close: a PUBLIC node (N) whose
-// PRIVATE section privately contains/subscribes-to another PUBLIC
+// PRIVATE section privately contains/subscribesTo another PUBLIC
 // node (C) -- a private reading-list entry between two nodes that
 // are each individually visible at every skgrepo. Without relRepo
 // gating this leaks by omission (a public session would still show
@@ -16,7 +16,7 @@
 // - N: public home ("leak-battery-N"), no contains there; a private
 //   section (owned/private/N.skg, no title) holds `contains: - C`.
 // - S: public home ("leak-battery-S"); a private section
-//   (owned/private/S.skg, no title) holds `subscribes_to: - C`.
+//   (owned/private/S.skg, no title) holds `subscribesTo: - C`.
 
 use ego_tree::{NodeId, Tree};
 use std::collections::BTreeSet;
@@ -308,12 +308,12 @@ fn ancestor_heralds_gate_privately_recorded_relations (
       let at_public : Option<String> = herald_of_S (&public) ?;
       assert! (
         ! at_public . as_deref () . unwrap_or ("")
-          . contains ("subscribes_to"),
+          . contains ("subscribesTo"),
         "S's privately-recorded subscription to its buffer-parent C \
          must not tint an ancestor herald at public: {:?}", at_public );
       let at_all : Option<String> = herald_of_S (&all) ?;
       assert! (
-        at_all . as_deref () . unwrap_or ("") . contains ("subscribes_to"),
+        at_all . as_deref () . unwrap_or ("") . contains ("subscribesTo"),
         "under 'all' the subscription flags S's herald: {:?}", at_all );
       Ok (( )) } )) }
 

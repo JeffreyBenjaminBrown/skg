@@ -31,7 +31,7 @@ use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
 /// The in-Rust-graph projection of the graph.
 ///
 /// Values are 'GraphnodeInRust' — everything a 'Graphnode' has except
-/// 'flags', plus 'links_to' parsed from body text.
+/// 'flags', plus 'linksTo' parsed from body text.
 ///
 /// The six inverse indexes mirror the five outbound relations and
 /// the extra_ids list, so a reader can ask "who points at X?" in
@@ -41,13 +41,13 @@ pub struct InRustGraph {
   pub nodes            : im::HashMap<ID, GraphnodeInRust>,
   /// 'X → {pids of nodes whose contains includes X}'
   pub contained_by     : im::HashMap<ID, im::HashSet<ID>>,
-  /// 'X → {pids of nodes whose subscribes_to includes X}'
+  /// 'X → {pids of nodes whose subscribesTo includes X}'
   pub subscribers_of   : im::HashMap<ID, im::HashSet<ID>>,
-  /// 'X → {pids of nodes whose hides_from_its_subscriptions includes X}'
+  /// 'X → {pids of nodes whose hidesFromSubs includes X}'
   pub hiders_of        : im::HashMap<ID, im::HashSet<ID>>,
-  /// 'X → {pids of nodes whose overrides_view_of includes X}'
+  /// 'X → {pids of nodes whose overrides includes X}'
   pub overriders_of    : im::HashMap<ID, im::HashSet<ID>>,
-  /// 'X → {pids of nodes whose links_to includes X}'
+  /// 'X → {pids of nodes whose linksTo includes X}'
   pub mentioners_of     : im::HashMap<ID, im::HashSet<ID>>,
   /// Maps any of a node's extra_ids to that node's pid. Invariant:
   /// an extra_id is on at most one node at any visible graph snapshot.
@@ -132,16 +132,16 @@ fn add_relationship_contributions (
   for second_member in members_of ( &node . contains ) {
     let key : ID = canonical_key (identity, &second_member);
     add_to_inverse_map (&mut graph . contained_by, &key, pid); }
-  for second_member in members_of ( node . subscribes_to . or_default () ) {
+  for second_member in members_of ( node . subscribesTo . or_default () ) {
     let key : ID = canonical_key (identity, &second_member);
     add_to_inverse_map (&mut graph . subscribers_of, &key, pid); }
-  for second_member in members_of ( node . hides_from_its_subscriptions . or_default () ) {
+  for second_member in members_of ( node . hidesFromSubs . or_default () ) {
     let key : ID = canonical_key (identity, &second_member);
     add_to_inverse_map (&mut graph . hiders_of, &key, pid); }
-  for second_member in members_of ( node . overrides_view_of . or_default () ) {
+  for second_member in members_of ( node . overrides . or_default () ) {
     let key : ID = canonical_key (identity, &second_member);
     add_to_inverse_map (&mut graph . overriders_of, &key, pid); }
-  for second_member in &node . links_to {
+  for second_member in &node . linksTo {
     let key : ID = canonical_key (identity, second_member);
     add_to_inverse_map (&mut graph . mentioners_of, &key, pid); } }
 
@@ -174,16 +174,16 @@ fn remove_relationship_contributions (
   for second_member in members_of ( &node . contains ) {
     let key : ID = canonical_key (identity, &second_member);
     remove_from_inverse_map (&mut graph . contained_by, &key, pid); }
-  for second_member in members_of ( node . subscribes_to . or_default () ) {
+  for second_member in members_of ( node . subscribesTo . or_default () ) {
     let key : ID = canonical_key (identity, &second_member);
     remove_from_inverse_map (&mut graph . subscribers_of, &key, pid); }
-  for second_member in members_of ( node . hides_from_its_subscriptions . or_default () ) {
+  for second_member in members_of ( node . hidesFromSubs . or_default () ) {
     let key : ID = canonical_key (identity, &second_member);
     remove_from_inverse_map (&mut graph . hiders_of, &key, pid); }
-  for second_member in members_of ( node . overrides_view_of . or_default () ) {
+  for second_member in members_of ( node . overrides . or_default () ) {
     let key : ID = canonical_key (identity, &second_member);
     remove_from_inverse_map (&mut graph . overriders_of, &key, pid); }
-  for second_member in &node . links_to {
+  for second_member in &node . linksTo {
     let key : ID = canonical_key (identity, second_member);
     remove_from_inverse_map (&mut graph . mentioners_of, &key, pid); } }
 
