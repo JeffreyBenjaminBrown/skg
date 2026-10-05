@@ -91,13 +91,13 @@ So far there are these endpoints:
       recursively overridden by an owned result is suppressed at the
       top level because it reappears in that result's subtree.
 
-** Single root content tree view from ID
+** Single-root content view from ID
   - Request: =((request . "single root content view")
     (id . "NODE_ID") (view-id . "VIEW_ID")
     (approved-overPrivateText-pids "PID" ...))=
   - Response: LP =((response-type content-view) (content "...")
     (errors ("..." ...)) (warnings ("..." ...)))=. The document
-    structure is detailed below, under =Single root content tree view=.
+    structure is detailed below, under =Content view=.
     Under a restricted skgrepo-set, a response involving an overPrivateText
     telescope instead returns LP =overPrivateText-telescope-confirmation= with
     =(operation single-root-view)=, the exact PIDs, and a text-free
@@ -692,7 +692,7 @@ Once initialization is complete, endpoint errors use that endpoint's
 normal tagged, length-prefixed response shape (or the shared
 =response-type error= dispatcher fallback); they are not bare text.
 
-* Single root content tree view
+* Content view
 
 Rust sends the entire text document to Emacs, org-bullets and all.
 Each org-bullet is followed by a space, some metadata, a space,

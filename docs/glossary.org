@@ -162,6 +162,8 @@ public. See =server/from_text/supplement_from_disk.rs=.
 
 A *view* is what the server tracks for one open window onto the graph:
 a content view or a search view, identified by its 'ViewId'. A
+content view may have several roots; the request that opens one today
+asks for a single root, so only the request is "single-root". A
 *buffer* is the editor's container for one view (an Emacs or Neovim
 buffer). A view's *viewforest* is its tree of viewnodes, under a
 buffer root; say "viewforest" rather than "viewtree" or "forest".

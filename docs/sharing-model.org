@@ -45,7 +45,7 @@ Two invariants keep owned overrides coherent, checked both when you save and whe
 
 Because a chain can be longer than one link, the node Skg draws for an overridden =N= is the end of the chain of /visible/ owned overriders out of =N=. Under a restricted skgrepo-set that hides the chain's end, the drawn node is a /middle/ of the chain; its =overridesHere N= marker is still honest, and the save still round-trips =N= into the container's contains.
 
-When you ask for a brand-new single-root view, Skg opens the requested node itself, drawn raw. It does not insert overriders as non-member children. Override facts remain visible in enriched search results and through explicitly requested override folders and role trees; automatic substitution applies only when the overridden node occurs as recursive content.
+When you ask for a brand-new content view of a node, Skg opens the requested node itself, drawn raw. It does not insert overriders as non-member children. Override facts remain visible in enriched search results and through explicitly requested override folders and role trees; automatic substitution applies only when the overridden node occurs as recursive content.
 
 ** The write-protected folders: who subscribes to, overrides, or hides this node
 
