@@ -17,7 +17,7 @@ use crate::types::viewnode::{
 use crate::types::viewnode::{Vognode, Phantom, PartnerFolder};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_skgrepo_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_graphnode::{
-    pid_and_skgrepo_from_treenode,
+    pid_and_skgrepo_from_viewnode_at,
     write_at_activeVognode_in_tree};
 use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::update_buffer::util::{
@@ -97,7 +97,7 @@ pub fn expand_true_content_at_activeVognode (
     make_writeProtected_if_repeat_then_extend_editable_map(
       tree, node, editable_map ) ?; }
   let (pid, initial_skgrepo) : (ID, SkgRepoName) =
-    pid_and_skgrepo_from_treenode( tree, node,
+    pid_and_skgrepo_from_viewnode_at( tree, node,
                                   "expand_true_content_at_activeVognode" ) ?;
   // This content path produces the pure worktree view; the node's git diff
   // (axes, phantom flip, diff-only properties) is applied by process_activeVognode_diff at

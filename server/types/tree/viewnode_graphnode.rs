@@ -1,6 +1,6 @@
 /// Node access utilities for ego_tree::Tree<Viewnode> and Tree<MpViewnode>
 
-use crate::to_org::util::get_skgid_from_treenode;
+use crate::to_org::util::get_skgid_from_viewnode_at;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, MSV, SkgConfig, SkgRepoName};
@@ -39,7 +39,7 @@ where F: FnOnce (&mut ActiveVognode) -> R {
 
 /// Extract (ID, skgrepo) from a non-phantom vognode that carries both.
 /// Returns an error if the node is not found or cannot provide both fields.
-pub fn pid_and_skgrepo_from_treenode (
+pub fn pid_and_skgrepo_from_viewnode_at (
   tree        : &Tree<Viewnode>,
   treeid      : NodeId,
   caller_name : &str,
@@ -102,7 +102,7 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
   graph   : &InRustGraph,
   config  : &SkgConfig,
 ) -> Result < ( ID, ID ), Box<dyn Error> > {
-  let subscribee_pid : ID = get_skgid_from_treenode ( tree, treeid ) ?;
+  let subscribee_pid : ID = get_skgid_from_viewnode_at ( tree, treeid ) ?;
   let node_ref : NodeRef < Viewnode > =
     tree . get (treeid) . ok_or (
       "pid_for_subscribee_and_its_subscriber_grandparent: node not found" ) ?;
@@ -117,7 +117,7 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
     parent_ref . parent ()
     . ok_or ("SubscribeeFolder has no parent (subscriber)") ?;
   let (subscriber_skgid, subscriber_skgrepo) : (ID, SkgRepoName) =
-    pid_and_skgrepo_from_treenode (
+    pid_and_skgrepo_from_viewnode_at (
       tree, grandparent_ref . id (),
       "pid_for_subscribee_and_its_subscriber_grandparent" ) ?;
   let graphnode : Graphnode =

@@ -19,7 +19,7 @@ use crate::types::misc::{ID, SkgConfig, SkgRepoName, TantivyIndex};
 use crate::types::phantom::title_for_phantom;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, mk_phantom_viewnode };
 use crate::types::viewnode::{Vognode, Phantom, PropertyFolder, Property};
-use crate::types::tree::viewnode_graphnode::pid_and_skgrepo_from_treenode;
+use crate::types::tree::viewnode_graphnode::pid_and_skgrepo_from_viewnode_at;
 use crate::dbs::in_rust_graph::InRustGraph;
 
 use ego_tree::{NodeMut, NodeRef, NodeId};
@@ -42,7 +42,7 @@ pub(crate) fn process_activeVognode_diff (
   let treeid : NodeId =
     node_mut . id();
   let (pid, skgrepo) : (ID, SkgRepoName) =
-    pid_and_skgrepo_from_treenode (
+    pid_and_skgrepo_from_viewnode_at (
       node_mut . tree(), treeid, "process_activeVognode_diff"
     ) . map_err ( |e| e . to_string() ) ?;
   let skgrepo_diff : &SkgRepoDiff =

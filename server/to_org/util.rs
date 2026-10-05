@@ -171,7 +171,7 @@ pub fn make_writeProtected_if_repeat_then_extend_editable_map (
   editableMap  : &mut EditableMap,
 ) -> Result<(), Box<dyn Error>> {
   let pid : ID = // Will error if node is a Non-vognode.
-    get_skgid_from_treenode ( tree, treeid ) ?;
+    get_skgid_from_viewnode_at ( tree, treeid ) ?;
   let is_writeProtected : bool =
     write_at_activeVognode_in_tree (
       tree, treeid,
@@ -192,7 +192,7 @@ pub fn detect_and_mark_cycle_v1 (
   treeid : NodeId,
 ) -> Result<(), Box<dyn Error>> {
   let is_cycle : bool = {
-    let pid : ID = get_skgid_from_treenode ( tree, treeid ) ?;
+    let pid : ID = get_skgid_from_viewnode_at ( tree, treeid ) ?;
     is_ancestor_skgid ( tree, treeid, &pid ) ? };
   write_at_activeVognode_in_tree
     ( tree, treeid,
@@ -435,7 +435,7 @@ fn is_ancestor_skgid (
   unreachable!() }
 
 /// Errors if the node is a phantom, a non-vognode, or not found.
-pub fn get_skgid_from_treenode (
+pub fn get_skgid_from_viewnode_at (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Result < ID, Box<dyn Error> > {
@@ -445,9 +445,9 @@ pub fn get_skgid_from_treenode (
   match node_kind {
     ViewnodeKind::Vognode (v) if v . is_current_graphnode ()
       => v . skgid () . cloned () . ok_or_else (
-           || "get_id_from_treenode: inactive vognode has no id"
+           || "get_skgid_from_viewnode_at: inactive vognode has no id"
               . into () ),
-    _ => Err ( "get_id_from_treenode: caller must pass a non-phantom vognode" . into() ),
+    _ => Err ( "get_skgid_from_viewnode_at: caller must pass a non-phantom vognode" . into() ),
   }}
 
 

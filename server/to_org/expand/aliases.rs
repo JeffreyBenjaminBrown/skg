@@ -1,6 +1,6 @@
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::to_org::util::{get_skgid_from_treenode, remove_completed_view_request};
+use crate::to_org::util::{get_skgid_from_viewnode_at, remove_completed_view_request};
 use crate::types::git::RelationshipAxes;
 use crate::types::misc::{ID, RelPartner, SkgConfig, SkgRepoName};
 use crate::types::nodes::complete::Graphnode;
@@ -47,7 +47,7 @@ pub fn build_and_integrate_aliases (
   _config    : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   let node_id_val : ID =
-    get_skgid_from_treenode ( tree, treeid ) ?;
+    get_skgid_from_viewnode_at ( tree, treeid ) ?;
   if unique_non_vognode_child_of_viewnode (
     tree, treeid,
     &ViewnodeKind::PropertyFolder (PropertyFolder::Alias) )? . is_some ()

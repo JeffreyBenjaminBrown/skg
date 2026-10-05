@@ -3,7 +3,7 @@ use crate::types::nodes::complete::Graphnode;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::viewnode::Viewnode;
-use crate::types::tree::viewnode_graphnode::{ pid_and_skgrepo_from_treenode, write_at_activeVognode_in_tree };
+use crate::types::tree::viewnode_graphnode::{ pid_and_skgrepo_from_viewnode_at, write_at_activeVognode_in_tree };
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
@@ -22,7 +22,7 @@ pub fn clobberWriteProtectedViewnode (
 ) -> Result < (), Box<dyn Error> > {
 
   let (node_id, skgrepo) : (ID, SkgRepoName) =
-    pid_and_skgrepo_from_treenode (
+    pid_and_skgrepo_from_viewnode_at (
       tree, treeid, "clobberWriteProtectedViewnode" ) ?;
   let graphnode : Graphnode =
     graphnode_graphFirst_by_pid_and_skgrepo (

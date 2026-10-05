@@ -15,7 +15,7 @@ use crate::dbs::in_rust_graph::paths::{
   paths_to_first_nonlinearities_in_graph, PathToFirstNonlinearity};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::skgrepo_sets::ActiveSkgRepoSet;
-use crate::to_org::util::{ get_skgid_from_treenode, graphnode_and_viewnode_from_skgid, remove_completed_view_request};
+use crate::to_org::util::{ get_skgid_from_viewnode_at, graphnode_and_viewnode_from_skgid, remove_completed_view_request};
 
 use crate::types::misc::{ID, SkgConfig, SkgRepoName};
 use crate::types::tree::viewnode_graphnode::{ find_child_by_skgid, find_children_by_skgids};
@@ -134,7 +134,7 @@ fn build_and_integrate_role_trees (
   active      : Option<&ActiveSkgRepoSet>,
 ) -> Result < Vec<ID>, Box<dyn Error> > {
   let terminus_pid : ID =
-    get_skgid_from_treenode ( tree, treeid ) ?;
+    get_skgid_from_viewnode_at ( tree, treeid ) ?;
   let paths : Vec<PathToFirstNonlinearity> =
     paths_to_first_nonlinearities_in_graph (
       graph, active, &terminus_pid, relation, input_role, output_role )?;
@@ -481,7 +481,7 @@ pub fn prepend_writeProtected_indep_child_with_skgrepo_set (
     // role-tree step), so the relationship and its recorder are derivable.
     // The captured graph is the authoritative home of relationship relRepos.
     if let Birth::RoleGraft (role) = birth {
-      if let Ok (parent_pid) = get_skgid_from_treenode (tree, parent_treeid) {
+      if let Ok (parent_pid) = get_skgid_from_viewnode_at (tree, parent_treeid) {
           let skgrepo_active : bool =
             role_graft_relRepo (graph, &parent_pid, child_skgid, role)
             . map ( |skgrepo| active . contains_skgrepo (&skgrepo) )

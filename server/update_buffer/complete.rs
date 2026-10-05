@@ -18,7 +18,7 @@ use crate::update_buffer::util::detach_viewnode_transferring_focus;
 use crate::update_buffer::warnings::CompletionWarning;
 use crate::to_org::render::diff::process_activeVognode_diff;
 use crate::types::tree::viewnode_graphnode::{
-  pid_and_skgrepo_from_treenode, write_at_activeVognode_in_tree};
+  pid_and_skgrepo_from_viewnode_at, write_at_activeVognode_in_tree};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder, ViewRequest, Editability};
 use crate::types::viewnode::{Vognode, Phantom, PropertyFolder};
 use super::reconcile::hiddeninsubscribee_folder::reconcile_hiddenInSubscribeeFolder_children;
@@ -230,7 +230,7 @@ fn visit_normal_node (
   // graph, where the node is necessarily absent. This also ensures every
   // write-protected image becomes Deleted rather than Unknown.
   let (pid, skgrepo) : (ID, SkgRepoName) =
-    pid_and_skgrepo_from_treenode (
+    pid_and_skgrepo_from_viewnode_at (
       tree, treeid, "visit_normal_node deletion preflight" ) ?;
   if context . deleted_by_this_save_pids . contains (&pid) {
     mutate_activeVognode_to_deletednode (

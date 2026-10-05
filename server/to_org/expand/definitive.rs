@@ -3,7 +3,7 @@ use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_r
 use crate::to_org::expand::role_tree::build_and_integrate_role_tree_then_drop_request;
 use crate::to_org::expand::folder_request::build_and_integrate_folder_then_drop_request;
 use crate::to_org::expand::flags::build_and_integrate_flags_then_drop_request;
-use crate::to_org::util::{ EditableMap, Finalizable, get_skgid_from_treenode, makeWriteProtectedAndClobber, activeVognode_in_tree_is_writeProtected };
+use crate::to_org::util::{ EditableMap, Finalizable, get_skgid_from_viewnode_at, makeWriteProtectedAndClobber, activeVognode_in_tree_is_writeProtected };
 use crate::types::misc::{ID, SkgConfig, SkgRepoName};
 use crate::types::git::SkgRepoDiff;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, ViewRequest, FolderRelation, Editability, AffectsParent };
@@ -11,7 +11,7 @@ use crate::types::viewnode::Vognode;
 use crate::types::nodes::complete::Graphnode;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::tree::viewnode_graphnode::{write_at_activeVognode_in_tree, pid_and_skgrepo_from_treenode};
+use crate::types::tree::viewnode_graphnode::{write_at_activeVognode_in_tree, pid_and_skgrepo_from_viewnode_at};
 
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::HashMap;
@@ -93,7 +93,7 @@ pub fn apply_editable_draw_rule (
   config     : &SkgConfig,
   visited    : &mut EditableMap,
 ) -> Result < DrawOutcome, Box<dyn Error> > {
-  let node_pid : ID = get_skgid_from_treenode (
+  let node_pid : ID = get_skgid_from_viewnode_at (
     viewforest, treeid ) ?;
   if let Some (&prior) = visited . get (& node_pid) {
     if prior . is_final () && prior . treeid () != treeid {
@@ -146,7 +146,7 @@ fn writeProtect_content_subtree (
         tree . get (treeid) . ok_or (
           "writeProtect_content_subtree: NodeId not in tree" ) ?;
       let node_pid : ID =
-        get_skgid_from_treenode ( tree, treeid ) ?;
+        get_skgid_from_viewnode_at ( tree, treeid ) ?;
       let content_child_treeids : Vec < NodeId > =
         node_ref . children ()
         . filter ( |c| matches! ( &c . value() . kind,
@@ -173,7 +173,7 @@ fn from_disk_replace_title_body_and_graphnode (
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   let (pid, src) : (ID, SkgRepoName) =
-    pid_and_skgrepo_from_treenode ( tree, treeid,
+    pid_and_skgrepo_from_viewnode_at ( tree, treeid,
       "from_disk_replace_title_body_and_graphnode" ) ?;
   let graphnode : Graphnode = graphnode_graphFirst_by_pid_and_skgrepo (
     graph, config, &pid, &src ) ?;

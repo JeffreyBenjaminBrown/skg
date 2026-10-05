@@ -1,6 +1,6 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
-use crate::to_org::util::{get_skgid_from_treenode, remove_completed_view_request};
+use crate::to_org::util::{get_skgid_from_viewnode_at, remove_completed_view_request};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::nodes::complete::{
   Flag, Graphnode, flag_is_true};
@@ -38,7 +38,7 @@ pub fn build_and_integrate_flags (
     tree, treeid,
     &ViewnodeKind::PropertyFolder (PropertyFolder::flags ())) ? . is_some ()
   { return Ok (()); }
-  let pid  : ID = get_skgid_from_treenode (tree, treeid) ?;
+  let pid  : ID = get_skgid_from_viewnode_at (tree, treeid) ?;
   let node : Option<Graphnode> = graphnode_from_graph (graph, &pid);
   let folder : ego_tree::NodeId = insert_non_vognode_as_child (
     tree, treeid,
