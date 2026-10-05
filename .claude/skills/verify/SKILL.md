@@ -46,9 +46,13 @@ on scratch data instead. Instances share nothing but the binary.
 3. Build and start it, recording its PID:
    ```bash
    cargo build --bin skg
-   cd <scratch> && ./path/to/target/debug/skg skgconfig.toml > server.log 2>&1 &
+   cd <scratch>
+   /abs/path/to/target/debug/skg skgconfig.toml > server.log 2>&1 &
    SKG_PID=$!
    ```
+   Keep the 'cd' a separate command. In 'cd <scratch> && skg ... &'
+   the whole list is backgrounded as a subshell, so '$!' is that
+   subshell's PID: killing it leaves the server running on its port.
    Then wait for "Server ready." in `server.log` (a few seconds on a
    tiny dataset). If cargo-watch is running, it keeps `target/debug/skg`
    current, so `cargo build` is then instant.
@@ -88,7 +92,8 @@ persisted.
 
 ## Cleanup
 
-`kill $SKG_PID`, then delete the scratch dir.
+`kill $SKG_PID`, confirm it is gone (`ps -p $SKG_PID`, and nothing
+listening on the scratch port), then delete the scratch dir.
 
 Do not stop a scratch server with `pkill -f` or `kill $(pgrep -f ...)`:
 a pattern naming the binary or config also matches the command line of

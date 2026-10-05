@@ -2,6 +2,7 @@
 
 use pulldown_cmark::{Event, LinkType, Options, Parser, Tag, TagEnd};
 use serde_yaml::Value;
+use crate::export_org::export_header_length;
 use crate::types::links::org_literal_ranges::{
   HeadlineInsideBlock, headlines_inside_blocks,
   org_literal_ranges_and_unclosed_block};
@@ -138,6 +139,10 @@ pub fn parse_document (
   }
   if format == DocumentFormat::Org { parse_org_links (&mut document); }
   set_body_ranges (&mut document);
+  if format == DocumentFormat::Org { // Skg's own export header is not content.
+    let header : usize = export_header_length (&document . text);
+    let root_body : &mut Range<usize> = &mut document . sections [0] . body;
+    root_body . start = root_body . start . max (header . min (root_body . end)); }
   promote_sole_top_heading_to_root (&mut document);
   document
 }
@@ -627,6 +632,21 @@ mod tests {
     assert_eq! (document . sections [1] . aliases,
       vec!["first one", "first"]);
     assert_eq! (document . sections [2] . title, "Two");
+  }
+
+  #[test]
+  fn skg_export_header_is_not_content () {
+    let header : String =
+      crate::export_org::export_header (&crate::types::misc::ID::from ("abc"));
+    let exported : ParsedDocument = parse_document (Path::new ("doc.org"),
+      format! ("{}* Only\nbody\n", header));
+    assert_eq! (exported . sections . len (), 1);
+    assert_eq! (exported . sections [0] . title, "Only");
+    let edited : ParsedDocument = parse_document (Path::new ("doc.org"),
+      format! ("{}* Only\n", header . replacen ("generated", "made", 1)));
+    assert_eq! (edited . sections [0] . title, "doc");
+    assert! (rendered_range (&edited, edited . sections [0] . body . clone ())
+      . starts_with ("# This file was made"));
   }
 
   #[test]

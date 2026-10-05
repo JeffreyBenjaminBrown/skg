@@ -34,6 +34,7 @@ THe OVERVIEW-old.org file is getting treated strangely -- I see only one copy in
   I didn't change any data. This workspace's copy is stale anyway, and the fix belongs in the data you actually use.
 ** data/skg-system/ should not need mention in the config
 * next
+** TODO/skg-for-ai/1_discussion.org
 ** for docs : the org exporter
 *** ONGOING bug : flattening example links
   - Example links inside verbatim text got flattened. The exporter treats a link

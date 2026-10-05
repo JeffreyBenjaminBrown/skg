@@ -11,6 +11,8 @@ mod leak_battery;
 #[path = "move_repo.rs"]
 mod move_repo;
 
+#[path = "search_enrichment_terminal.rs"]
+mod search_enrichment_terminal;
 
 #[path = "repo_sets.rs"]
 mod repo_sets;

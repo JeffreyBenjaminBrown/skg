@@ -142,7 +142,14 @@ fn export_writes_expected_files_and_links () {
 
   let n : String =
     fs::read_to_string (dir . path () . join ("sub/n.org")) . unwrap ();
-  assert_eq! (n, "* Enn\n");
+  assert_eq! (n, "\
+# This file was generated from the skg node with this ID:
+# n
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
+* Enn
+");
+  assert_eq! (export_header_length (&n), n . len () - "* Enn\n" . len ());
 
   let broken : String =
     fs::read_to_string (dir . path () . join ("broken.org")) . unwrap ();
@@ -201,7 +208,7 @@ fn headline_links_survive_and_linked_ones_get_custom_ids () {
   export_to_org (&active_all (), &nodes2, dir2 . path ()) . unwrap ();
   let r : String =
     fs::read_to_string (dir2 . path () . join ("r.org")) . unwrap ();
-  assert! (r . starts_with (
+  assert! (r [export_header_length (&r) ..] . starts_with (
     "* Root [[*Ex][X]] tail\n:PROPERTIES:\n:CUSTOM_ID: r\n:END:\n"),
     "r.org:\n{}", r);
   assert! (r . contains ("[[#r][back to root]]"), "r.org:\n{}", r);
@@ -388,7 +395,7 @@ fn headline_like_body_lines_are_defused () {
     export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
   let a : String =
     fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
-  assert_eq! (a, "\
+  assert_eq! (&a [export_header_length (&a) ..], "\
 * Root A
   * bullet
 #+begin_src org

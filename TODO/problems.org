@@ -17,6 +17,15 @@
   'save::none_node_fields_are_noops' and
   'dangling_reference_renders_unknown_node'); each passes alone.
   Probably a cleanup race with a background writer.
+** Parallel Neovim test runs share one ShaDa file
+  'bash/nvim-tests.sh' and the Neovim integration runs start Neovims
+  that all write '~/.local/state/nvim/shada/main.shada'. Interrupted
+  writes left 'main.shada.tmp.a' through '.z' and a truncated
+  'main.shada', after which every Neovim failed with E576 ("Reading
+  ShaDa file ... file ended earlier"), surfacing as a recovery-spec
+  failure. On 2026-10-05 they were moved to
+  '~/.local/state/nvim/shada-moved-aside-2026-10-05/'. Starting test
+  Neovims with 'shada=NONE' (or '-i NONE') would prevent it.
 ** String-typed relation lookups fail silently
   'find_related_nodes' in 'server/dbs/in_rust_graph/query.rs' takes
   the relation and roles as strings, and an unknown combination

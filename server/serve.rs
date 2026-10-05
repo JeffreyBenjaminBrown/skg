@@ -35,7 +35,7 @@ use crate::serve::handlers::repo_sets::handle_repo_set_request;
 use crate::serve::handlers::stage_moves::handle_stage_moves_request;
 use crate::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
 use crate::serve::handlers::text_search::render_enriched_search_buffer::{insert_full_containerward_role_trees_into_search_view, insert_overrideward_view_subtrees};
-use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
+use crate::serve::handlers::text_search::{ abandon_search_enrichment, handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
 use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request_with_repo_set;
 use crate::serve::handlers::link_statuses::handle_link_statuses_request;
 use crate::serve::protocol::{RequestType, TcpToClient};
@@ -119,6 +119,8 @@ fn handle_emacs (
   let search_cancelled : Arc<AtomicBool> =
     Arc::new ( AtomicBool::new (false) );
   let mut snapshot_requested : bool = false;
+  let mut search_enrichment_owed_for_terms // Some while a search awaits its terminal 'search-enrichment'. See 'handle_text_search_request'.
+    : Option<String> = None;
   let mut pending_import : Option<PendingImport> = None;
 
   let peer : SocketAddr =
@@ -157,17 +159,30 @@ fn handle_emacs (
               &mut env,
               &mut views_state,
               &active_repo_set ),
-          Ok (RequestType::CloseView) =>
-            handle_close_view_request (
-              &mut stream,
-              &request_header,
-              &mut views_state ),
+          Ok (RequestType::CloseView) => {
+            let closed_uri : Option<ViewUri> =
+              handle_close_view_request (
+                &mut stream,
+                &request_header,
+                &mut views_state );
+            if closed_uri . is_some ()
+               && closed_uri == ( search_enrichment_owed_for_terms . clone ()
+                                  . map (ViewUri::SearchView) ) {
+              // The client closed the search buffer before its
+              // enrichment arrived, so it cannot answer a snapshot
+              // request.
+              snapshot_requested = false;
+              if let Some (terms) = search_enrichment_owed_for_terms . take () {
+                abandon_search_enrichment (
+                  &mut stream, &terms,
+                  &enrichment_slot, &search_cancelled ); }} }
           Ok (RequestType::DeleteReferencesToAbsentNode) =>
             handle_delete_references_to_absent_node_request (
               &mut stream, &request_header, &mut env, &mut views_state,
               &active_repo_set ),
           Ok (RequestType::SnapshotResponse) => {
             snapshot_requested = false;
+            search_enrichment_owed_for_terms = None;
             handle_snapshot_response (
               &mut reader,
               &mut stream,
@@ -180,14 +195,15 @@ fn handle_emacs (
             // Cancel any in-flight background search
             search_cancelled . store (true, Ordering::SeqCst);
             snapshot_requested = false;
-            handle_text_search_request (
-              &mut stream,
-              &request_header,
-              &env,
-              &enrichment_slot,
-              &search_cancelled,
-              &mut views_state,
-              &active_repo_set ); }
+            search_enrichment_owed_for_terms =
+              handle_text_search_request (
+                &mut stream,
+                &request_header,
+                &env,
+                &enrichment_slot,
+                &search_cancelled,
+                &mut views_state,
+                &active_repo_set ); }
           Ok (RequestType::VerifyConnection) =>
             handle_verify_connection_request (
               &mut stream ),
@@ -302,6 +318,9 @@ fn handle_emacs (
 /// Handle the snapshot that Emacs sent back.
 /// Parses the buffer text, inserts ancestry, sets graphnodestats,
 /// and sends the enriched result to Emacs.
+/// Always sends exactly one 'search-enrichment', because that is what
+/// releases the client's stream guard. If enrichment fails, it has no
+/// content, and carries the failure as a warning.
 /// Emacs to Rust message format:
 ///   ((request . "snapshot response") (terms . "TERMS"))
 ///   Content-Length: N\r\n\r\n<buffer text>
@@ -314,42 +333,66 @@ fn handle_snapshot_response (
   views_state      : &mut ViewsState,
   active_repo_set : &ActiveRepoSet,
 ) {
-  let terms : String
-    = match value_from_request_sexp ("terms", request)
-    { Ok (t) => t,
-      Err (e) => { tracing::error! ( "snapshot response: bad terms: {}", e);
-                   return; }};
-  let buffer_text : String
-    = match read_length_prefixed_content (reader)
-    { Ok (text) => text,
-      Err (e) => { tracing::error! ( "snapshot response: failed to read content: {}", e);
-                   return; }};
+  let terms_result : Result<String, String> =
+    value_from_request_sexp ("terms", request);
+  let buffer_text_result : Result<String, String> =
+    // Read even if the terms are bad, to stay in step with the stream.
+    read_length_prefixed_content (reader)
+    . map_err ( |e| format! ("failed to read content: {}", e) );
+  let terms : String =
+    terms_result . clone () . unwrap_or_default ();
+  let enrichment_result : Result<String, String> =
+    terms_result
+    . map_err ( |e| format! ("bad terms: {}", e) )
+    . and_then ( |terms| {
+      let buffer_text : String = buffer_text_result ?;
+      enrich_search_snapshot (
+        &terms, &buffer_text, enrichment_slot,
+        views_state, active_repo_set ) } );
+  let response : String = match enrichment_result {
+    Ok (enriched_sexp) => {
+      tracing::debug! (bytes = enriched_sexp . len (),
+                       "snapshot response: sending enrichment");
+      enriched_sexp },
+    Err (reason) => {
+      tracing::error! ("snapshot response: {}", reason);
+      mk_search_enrichment_sexp (
+        &terms, None,
+        &[ format! ("Search results could not be enriched: {}",
+                    reason ) ] ) }};
+  send_response_with_length_prefix (
+    stream, &response ); }
+
+/// Returns the 'search-enrichment' s-exp for the snapshot,
+/// or why it could not be made.
+fn enrich_search_snapshot (
+  terms             : &str,
+  buffer_text       : &str,
+  enrichment_slot   : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
+  views_state       : &mut ViewsState,
+  active_repo_set : &ActiveRepoSet,
+) -> Result<String, String> {
   let payload : SearchEnrichmentPayload = {
     let mut guard : MutexGuard<Option<SearchEnrichmentPayload>> =
       enrichment_slot . lock () . unwrap ();
     match guard . take () {
       Some (p) => p,
-      None => { tracing::warn! (
-                  "snapshot response: no enrichment payload");
-                return; }} };
+      None => return Err ( "no enrichment payload" . to_string () ), }};
   let runtime = payload . runtime . clone ();
   if payload . terms != terms {
-    tracing::warn! ("snapshot response: terms mismatch ('{}' vs '{}')",
-                    payload . terms, terms);
-    return; }
+    return Err ( format! ("terms mismatch ('{}' vs '{}')",
+                          payload . terms, terms )); }
   let parse_result : Result<(Tree<MpViewnode>,
                              Vec<BufferValidationError>), String>
-    = org_to_uninterpreted_nodes (&buffer_text);
+    = org_to_uninterpreted_nodes (buffer_text);
   let mut viewforest : Tree<Viewnode> = match parse_result {
     Ok (( maybePlaced_viewforest, _errors )) =>
       match maybePlaced_to_placed_tree (maybePlaced_viewforest) {
         Ok (f) => f,
         Err (e) => {
-          tracing::error! ("snapshot response: check failed: {}", e);
-          return; }},
+          return Err ( format! ("check failed: {}", e )); }},
     Err (e) => {
-      tracing::error! ("snapshot response: parse failed: {}", e);
-      return; }};
+      return Err ( format! ("parse failed: {}", e )); }};
   insert_full_containerward_role_trees_into_search_view (
     &mut viewforest, &runtime . graph, &payload . search_results,
     &payload . containerward_role_trees_by_id, &runtime . tantivy_index,
@@ -397,9 +440,9 @@ fn handle_snapshot_response (
   if matches! (release, TextReleaseDecision::Challenge { .. }) {
     // Preflight and the load-bearing payload should make this unreachable.
     // Fail closed rather than serialize if a future change violates either.
-    tracing::error! (
-      "search enrichment reached the release boundary without approval" );
-    return; }
+    return Err (
+      "search enrichment reached the release boundary without approval"
+      . to_string () ); }
   let release_warnings : Vec<String> = match release {
     TextReleaseDecision::AllowWithWarning { warning } => vec! [warning],
     _ => Vec::new (), };
@@ -408,15 +451,12 @@ fn handle_snapshot_response (
     . expect ("search viewforest rendering never fails");
   let enriched_sexp : String =
     mk_search_enrichment_sexp (
-      &terms, &enriched, &release_warnings );
+      terms, Some (&enriched), &release_warnings );
   { let uri : ViewUri = // update ViewsState with enriched viewforest
-      ViewUri::SearchView ( terms . clone () );
+      ViewUri::SearchView ( terms . to_string () );
     views_state . open_views . update_view (
       &runtime . graph, &uri, viewforest ); }
-  tracing::debug! (bytes = enriched_sexp . len (),
-                   "snapshot response: sending enrichment");
-  send_response_with_length_prefix (
-    stream, &enriched_sexp ); }
+  Ok (enriched_sexp) }
 
 fn handle_verify_connection_request (
   stream: &mut std::net::TcpStream) {

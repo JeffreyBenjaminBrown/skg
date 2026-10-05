@@ -5,7 +5,8 @@ use crate::serve::handlers::rerender_all_views::{
   stream_empty_rerender,
   stream_prepared_rerenders};
 use crate::serve::handlers::text_release::approved_pids_from_request;
-use crate::serve::handlers::text_search::SearchEnrichmentPayload;
+use crate::serve::handlers::text_search::{
+  SearchEnrichmentPayload, cancel_search_enrichment};
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{
   request_type_from_request,
@@ -19,7 +20,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::update_buffer::repo_switch::convert_and_prune_for_repo_switch;
 
 use std::net::TcpStream;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
 pub fn handle_repo_set_request (
@@ -109,9 +110,7 @@ fn set_active_repo_set (
     "repo-set-switch-rerender",
     &approved_pids_from_request (request) ) {
     return; }
-  search_cancelled . store (true, Ordering::SeqCst);
-  if let Ok (mut slot) = enrichment_slot . lock () {
-    *slot = None; }
+  cancel_search_enrichment (enrichment_slot, search_cancelled);
   *active_repo_set = active;
   send_active_repo_set_response (stream, active_repo_set);
   stream_prepared_rerenders (stream, views_state, prepared); }

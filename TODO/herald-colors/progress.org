@@ -1,0 +1,203 @@
+* Executing [[file:2_1_plan.org][the plan]]: deviations and choices
+Every phase is done and committed, one or more commits per step. What
+follows is what the plan did not dictate, or where execution departed
+from it. The plan itself is unchanged.
+* Renames (phase 1)
+** DONE Folder requests and their commands use the relation names
+'(folder subscribes)', '(folder overrides)' and '(folder hides)' became
+'(folder subscribes_to)', '(folder overrides_view_of)' and
+'(folder hides_from_its_subscriptions)', since a folder request names a
+relation. The commands followed the code names, e.g.
+'skg-show-folderOf-subscribes_to' and nvim's 'show_folderOf_subscribes_to'.
+*** DONE [jeff]
+Commands like 'skg-show-folderOf-subscribes_to' and nvim's 'show_folderOf_subscribes_to' read badly. Let's camel-case subscribesTo in them.
+**** Claude says: done in 'a40a177d'
+'skg-show-folderOf-subscribesTo', '-overridesViewOf' and
+'-hidesFromItsSubscriptions', and the same in nvim
+('show_folderOf_subscribesTo', ...). The wire keeps the code names, e.g.
+'(folder subscribes_to)'.
+** DONE Other names the link roles reached
+"Sourceward" (paths through a node's link sources) became
+"mentionerward", including a test directory and fixture directory. The
+search context-origin type 'Dest' became 'Mentioned'. The diff
+report's link role sets "source"/"dest" became "mentioner"/"mentioned".
+** DONE "Hyperlink" became "link" in the friendly data model
+'docs/data-model_friendly.org' said "I try to say hyperlink and not
+link"; that sentence went, since the plan settles on "link". Prose says
+"target" for the far end of a link and "mentioned" for the role.
+** The dead viewnode herald changed in step 1f, not phase 5
+'(deletedScaffold deadScaffold)' became the bare atom 'deadViewnode',
+and its herald plain "DELETED", in the same commit.
+** DONE The phantom move preserves phase-1 behavior explicitly
+The audited sites that assumed a current graph member now exclude
+phantoms through 'Vognode::is_graph_member'
+('pid_and_repo_from_treenode', 'pid_and_repo_from_required_ancestor',
+'get_id_from_treenode', and 'id_if_vognode', renamed
+'id_if_graph_member'). Whether any of them should now accept phantoms
+is a later question.
+** DONE Client helpers named for the wire's node form keep "activeNode"
+'skg-activeNode-defaults' and nvim's 'activenode_defaults' describe the
+'(node ...)' metadata form, which keeps its name, so step 1g left them.
+** DONE Step 1b, delegated, edited the live config
+The agent that renamed source -> Skg repo also edited the untracked
+'data/skgconfig.toml' to the new keys ('[[repos]]', 'default_repo_set'),
+so the server will start there. Its backup is in my scratchpad, which
+is temporary, so check the edited file now if you want the old one. The
+first server start there will also rewrite each Skg repo's
+'DEPENDENCIES.toml' header ("source" -> "Skg repo"), leaving a diff in
+those Git repos for you to commit.
+* Styles (phases 2 to 6)
+** DONE Style directives on the wire are capitalized
+The served rule table writes a style as its name in capitals (CRUCIAL,
+GO, ...), like its other directives (ANY, IT, INTERC); the style file,
+faces and highlight groups use the same word in their own case.
+** DONE The lens engines skip empty INTERC slots
+An INTERC used to emit its separator beside an empty slot, so a
+one-slot match read '3{' -- a rule kept for a contains herald that no
+longer exists. Without the change, =text changed ✓ ✗= with one mark
+would read "text changed  ✗" (two spaces). Both lens engines now skip
+an empty slot and its separator; their tests say so.
+*** DONE [jeff]
+Sounds good. Did the old behavior have no justification?
+I haven't invented a purpose for it upon thinking about it today.
+**** Claude says: it had one, which is gone
+It came with commit 'e5c0505b' ("overhaul herald rules"), for the old
+contains herald 'N{M'. There the separator '{' was itself the glyph
+meaning "contains", so '3{' (three containers, no contents) needed it
+even with the right slot empty. Relation letters are now drawn by the
+clients' relationship renderers, and no INTERC in the served table has
+a separator that means anything.
+** DONE Diff marks are written compactly
+=✓NR= and =✗-N-R=, with no space between the mark and the axes, as
+"staged:NR" had none.
+** DONE Backpath grafts' birth generation is 1
+A graft's birth fact is its role's relation, 'out' for a first role and
+'in' for a second, at generation 1: each graft relates to its org-parent.
+*** DONE [jeff]
+What's a graft? Is this another opportunity to unify divergent language?
+**** Claude says: yes; which name should the chain get?
+***** What a graft is
+A path request '(path ROLE)' (e.g. 'skg-show-paths-through-mentioners')
+draws, under the origin, the node playing ROLE toward it, then that
+node's partner in the same role, and so on. Each node it adds is a
+graft: it sits where it does because of the path, not because its
+parent contains it, so it carries 'affectsParent false' and the birth
+'(birth backpath ROLE)'. The glossary does not define it.
+***** The divergent names
+The chain is a "path" in the commands, the wire's '(path ROLE)' and
+'RelationRole' docs; a "backpath" in the engine
+('server/to_org/expand/backpath.rs'), 'Birth::Backpath' and the birth
+atom; and a "...ward ancestry" ('containerward', 'mentionerward') in
+module names, tests and some docs. ("Org ancestry", the outline above a
+headline, is a different thing and keeps its name.) "Graft" names one
+node of the chain, and is the only word for that.
+***** My recommendation
+Call the chain a "path" everywhere: 'Birth::Path', '(birth path ROLE)',
+"the path engine" in 'to_org/expand/path.rs', and "a containerward
+path" rather than "containerward ancestry". Keep "graft" for one node
+of a path, and define both in the glossary. It is a rename like phase 1:
+code, wire, both clients, tests and docs. Shall I do it?
+****** DONE [jeff]
+It's not always a path. Often it's a tree or a forest.
+I think the general terms should be 'single-relation tree'
+and 'single-relation forest'. Except that doesn't imply directedness --
+we're only traversing the relation in one direction.
+Is there a good word for that? "Flow", maybe?
+******* DONE Claude says: "role tree" carries the direction
+******** You're right that it branches
+The header of 'server/to_org/expand/backpath.rs' already says so: the
+"path" follows a node's single partner in the role until a node has
+several, then includes that first layer of branches. So it is a tree,
+rooted at the origin.
+******** A role, unlike a relation, is directed
+Following the container role from a node only ever goes one way, so
+"single-role tree" says what "single-relation tree" can't. Shorter:
+"role tree". The existing '-ward' adjectives name particular ones:
+"a containerward tree", "a mentionerward tree". It is always one tree,
+rooted at the origin; it would be a forest only without its root.
+******** Against "flow"
+In graph theory a flow is a quantity assigned to edges (network flow),
+and in prose it suggests movement. Other candidates I considered:
+"reach" (direction, but names a set, not a shape), "lineage" (directed
+and branching, but implies ancestry, which fits only containerward),
+and "arborescence" (exactly a directed rooted tree, but obscure).
+******** The proposal
+"Role tree" for the chain, "graft" for one of its nodes, '-ward'
+adjectives for particular role trees. In code and on the wire:
+'Birth::RoleTree', '(birth roleTree ROLE)', the request
+'(roleTree ROLE)' replacing '(path ROLE)', 'to_org/expand/role_tree.rs',
+and commands like 'skg-show-mentionerward-tree' replacing
+'skg-show-paths-through-mentioners'. Shall I do it, or would you name
+it differently?
+********* DONE [jeff]
+That sounds almost ideal, but is 'role graft' better than 'role branch'?
+********** DONE Claude says: "graft" is better, and "role" can go
+*********** "Branch" already means a node with all its descendants
+'docs/vocabulary.org' defines it so ("A branch is just a node together
+with all its descendents"), on containment: "When a node contains other
+nodes, we can say it branches". In a role tree, a node's descendants are
+the rest of the tree beyond it, so "a role branch" would name a node
+together with everything grafted below it, not the one node. And it
+would echo containment, which is just what a graft is not: a graft is in
+the view because of the role, not because its parent contains it.
+*********** "Graft" alone is enough
+Only role trees make grafts, so "role graft" repeats itself. "A graft"
+is one node of a role tree; "the grafts" are all of them but the root.
+*********** So the proposal stands
+"Role tree", "graft", and '-ward' adjectives for particular role
+trees, carried through code, wire, commands and the glossary as
+described above. Say go and I'll do it.
+************ DONE [jeff]
+Sounds good but let's clarify that it's a 'role graft'.
+Four extra characters to avoid a potential future collision --
+we might graft other things onto views later.
+************* Claude says: done in '01ed2dbb'
+"Role tree" for the structure, "role graft" for one of its nodes, and
+'-ward' adjectives for particular role trees, now defined together in
+'docs/glossary.org'. On the wire, '(path ROLE)' became
+'(roleTree ROLE)'. In code, 'Birth::Backpath' became 'Birth::RoleGraft'
+(the birth is about the node, so it names a role graft), the backpath
+engine 'server/to_org/expand/role_tree.rs', and the full containerward
+'AncestryTree' 'ContainerwardRoleTree'. The commands are
+'skg-show-ROLEward-tree', e.g. 'skg-show-mentionerward-tree'. Kept:
+'server/dbs/in_rust_graph/paths.rs', whose paths really are linear (it
+draws a role tree as paths to their first fork), "org ancestry" (the
+outline above a headline), and a folder's "required ancestry" (its
+view ancestors). The docs' '(birth backpath ROLE)' node form turned out
+to be stale -- the server no longer emits or parses it -- so the docs
+now say how a role graft is marked.
+** The broken-link suffix is gone, and suffix spaces are unstyled
+Per the plan's table a missing target gets no suffix; the "⌂:missing"
+suffix went with it. The space before a suffix is no longer styled.
+** DONE The view-face palette is my choice
+The plan fixed the default (white on black) but not the Org faces'
+colors. 'shared/herald-styles.json' gives bold headlines in four
+alternating colors, cyan underlined links, and muted grays for blocks,
+drawers, tags and the ellipsis. These want Jeff's eye.
+*** DONE [jeff]
+Oh wow these colors are a trip. I like your choices but they're too unfamiliar. I've put my .emacs, my .emacs.d, and my 'git-play' repo which they refer to in other-projects/. I use a something -- rainbow mode? -- to define the org colors, I think. Can you have this do that?
+**** Claude says: done in 'd25a321e'
+Your .emacs and .emacs.d turned out to be at the repo root, not in
+other-projects/, and I found no git-play repo in the container; the
+.emacs was enough. Your rainbow headlines are not a mode but your own
+custom faces: level 1 #ff8888, then orange, yellow, green, cyan, blue,
+purple and red. Everything else Org shows comes from the manoj-dark
+theme: cyan underlined links, grey70 code and verbatim, LightSkyBlue
+drawers, LightSalmon property names, Pink TODO and PaleGreen DONE in
+bold, LightGoldenrod ellipsis. 'shared/herald-styles.json' now copies
+those, in hex so Neovim reads them identically.
+**** Claude says: imposing manoj-dark itself would not simplify things
+A theme is global in Emacs, so confining it to views would mean copying
+its face specs into buffer-local remaps anyway, plus its non-Org faces.
+Neovim has no manoj-dark, so the shared file would stay, and your
+rainbow headlines are not in the theme. The shared file is effectively
+manoj-dark's Org faces plus your headlines.
+* DONE Verification
+Every commit passed the Rust, Emacs and Neovim suites, and the wire and
+rename commits passed the Emacs integration suite. The Neovim
+integration variants (run only by 'bash/all-tests.sh') were checked
+after the link-annotation step and at the end. Two failures are
+pre-existing and logged in TODO/problems.org: 'import-md-and-org', and
+an occasional 'DirectoryNotEmpty' during test cleanup. Tests check
+style names, not colors, so the work ends with Jeff looking at a view
+in each client.

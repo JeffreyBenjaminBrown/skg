@@ -1,3 +1,47 @@
+* A search that never gets enriched wedges every later search (fixed 2026-10-05)
+  Symptom: "skg: search enrichment blocked -- search enrichment already in
+  progress", even with no skg buffers open. It persists until the TCP
+  connection drops.
+** The mechanism
+   'skg--request-text-search' sets 'skg--stream-in-progress'. Only the
+   'search-enrichment' handler (or the overPrivateText challenge handler,
+   or a connection reset) clears it. Any search for which the server never
+   sends 'search-enrichment' therefore leaves the guard set forever.
+   Killing the search buffer does not clear it.
+** Paths on which the server never sends 'search-enrichment'
+*** Phase 1 returns early
+    'handle_text_search_request' in 'server/serve/handlers/text_search.rs'
+    sends only 'search-results' when there are no matches (two sites), and
+    on every error path (bad sexp, bad terms, privacy-check error, index
+    error). This is the observed case: on 2026-10-05 the search for
+    'm-audio' logged "Finding matches." and then no "search enrichment
+    thread started"; the next search, 'doremidi', was blocked client-side
+    and never reached the server.
+*** The client never answers the snapshot request
+    'skg--handle-snapshot-request' does nothing when the search buffer is
+    gone. Killing a search buffer before a slow enrichment arrives (e.g.
+    1000 hits, ~4 s) leaves the server waiting and the client wedged.
+*** 'handle_snapshot_response' returns early
+    In 'server/serve.rs': bad terms, unreadable content, no payload, terms
+    mismatch, parse or placement failure, and the fail-closed release
+    challenge all return without a reply.
+** Workaround
+   Reconnecting clears it ('skg--tcp-sentinel'). So does
+   'M-: (skg--cancel-locally-failed-search)', which also removes the stale
+   one-shot handlers and their pending-count increments.
+** Fixed on the server
+   Every 'search-results' (except the overPrivateText challenge, which
+   the clients already handle) is now followed by exactly one
+   'search-enrichment'. When no enrichment is coming, that message omits
+   'content', so clients release the guard and leave the buffer alone.
+   Phase-1 early returns send it at once
+   ('send_search_results_without_enrichment'). 'handle_emacs' tracks
+   the owed enrichment; a 'close view' of that search cancels it and
+   sends it ('abandon_search_enrichment'). 'handle_snapshot_response'
+   always replies, with the failure as a warning, and reads the buffer
+   body even when 'terms' is bad.
+   Tests: 'tests/search_enrichment_terminal.rs'. The protocol is
+   documented in 'docs/api-and-formats.org'.
 * Herald color names and docs have drifted (2026-10-04; fixed 2026-10-04)
   'HeraldColor::Orange' in 'server/heralds.rs' renders yellow and the
   unused 'Yellow' would render orange: both clients map the keyword

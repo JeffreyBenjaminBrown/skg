@@ -127,6 +127,15 @@ pub struct SearchEnrichmentPayload {
 /// The slower one is 'enriched'
 /// with containerward paths and graphnodestats at each search hit,
 /// and is processed in the background -- the user need not await it.
+///
+/// Every 'search-results' is eventually followed by exactly one
+/// 'search-enrichment', because that is what releases the client's
+/// stream guard. When there is nothing to enrich (no matches, or an
+/// error), that message follows at once, without content. Otherwise it
+/// is owed: this returns the search terms, and the caller must see that
+/// the enrichment, or a contentless stand-in, is eventually sent.
+/// The overPrivateText challenge is the exception: it sends neither
+/// message, and the client releases its guard on receiving it.
 pub fn handle_text_search_request (
   stream           : &mut TcpStream,
   request          : &str,
@@ -135,7 +144,7 @@ pub fn handle_text_search_request (
   search_cancelled : &Arc<AtomicBool>,
   views_state       : &mut ViewsState,
   active            : &ActiveRepoSet,
-) {
+) -> Option<String> {
   let parsed_sexp : Result < Sexp, String > =
     sexp::parse (request)
     . map_err ( |e| format! (
@@ -144,21 +153,19 @@ pub fn handle_text_search_request (
     Ok (s) => s,
     Err (err) => {
       tracing::error! ( "{}", err );
-      send_response_with_length_prefix (
-        stream,
-        & tag_text_response (
-          TcpToClient::SearchResults, &err ));
-      return; } };
+      send_search_results_without_enrichment (stream, "", &err);
+      return None; } };
   let search_terms : Result < String, String > =
     extract_v_from_kv_pair_in_sexp ( &sexp, "terms" );
   let search_choice : Option<SearchOverPrivateTextChoice> =
     match search_choice_from_request (&sexp) {
       Ok (choice) => choice,
       Err (error) => {
-        send_response_with_length_prefix (
+        send_search_results_without_enrichment (
           stream,
-          & tag_text_response (TcpToClient::SearchResults, &error) );
-        return; }};
+          search_terms . as_deref () . unwrap_or (""),
+          &error );
+        return None; }};
   match search_terms {
     Ok (search_terms) => {
       // Wait for any in-flight background save-index writes to commit, so
@@ -169,18 +176,17 @@ pub fn handle_text_search_request (
         match has_overPrivateText_telescope (&runtime . tantivy_index) {
           Ok (has_overPrivateText) => has_overPrivateText,
           Err (error) => {
-            send_response_with_length_prefix (
+            send_search_results_without_enrichment (
               stream,
-              & tag_text_response (
-                TcpToClient::SearchResults,
-                &format! ("Error checking search privacy: {}", error) ) );
-            return; }};
+              &search_terms,
+              &format! ("Error checking search privacy: {}", error) );
+            return None; }};
       if ! active . is_all ()
          && index_has_overPrivateText
          && search_choice . is_none () {
         send_response_with_length_prefix (
           stream, &search_challenge_response () );
-        return; }
+        return None; }
       let include_overPrivateText_telescopes : bool =
         active . is_all ()
         || search_choice == Some (SearchOverPrivateTextChoice::Include);
@@ -196,12 +202,9 @@ pub fn handle_text_search_request (
                            &search_opts ) {
         Ok (( best_matches, searcher )) => {
           if best_matches . is_empty () {
-            send_response_with_length_prefix (
-              stream,
-              & tag_text_response (
-                TcpToClient::SearchResults,
-                "No matches found." ));
-            return; }
+            send_search_results_without_enrichment (
+              stream, &search_terms, "No matches found." );
+            return None; }
           let matches_by_id : MatchGroups =
             filter_match_groups_to_active_repos (
               group_matches_by_id (
@@ -213,12 +216,9 @@ pub fn handle_text_search_request (
               Some (active) ),
               active );
           if matches_by_id . is_empty () {
-            send_response_with_length_prefix (
-              stream,
-              & tag_text_response (
-                TcpToClient::SearchResults,
-                "No matches found." ));
-            return; }
+            send_search_results_without_enrichment (
+              stream, &search_terms, "No matches found." );
+            return None; }
           let suppressed : HashSet<ID> =
             suppressed_result_ids (
               &matches_by_id,
@@ -241,7 +241,7 @@ pub fn handle_text_search_request (
             release, TextReleaseDecision::Challenge { .. } ) {
             send_response_with_length_prefix (
               stream, &search_challenge_response () );
-            return; }
+            return None; }
           let warnings : Vec<String> = match release {
             TextReleaseDecision::AllowWithWarning { warning } =>
               vec! [warning],
@@ -266,22 +266,63 @@ pub fn handle_text_search_request (
             enrichment_slot, search_cancelled,
             runtime . clone (),
             &search_terms, &search_results, active,
-            include_overPrivateText_telescopes ); },
+            include_overPrivateText_telescopes );
+          Some (search_terms) },
         Err (e) => {
-          send_response_with_length_prefix (
+          send_search_results_without_enrichment (
             stream,
-            & tag_text_response (
-              TcpToClient::SearchResults,
-              & format! ("Error searching index: {}", e) )); }} },
+            &search_terms,
+            & format! ("Error searching index: {}", e) );
+          None }} },
     Err (err) => {
       let error_msg : String =
         format! (
           "Error extracting search terms: {}", err );
       tracing::error! ( "{}", error_msg ) ;
-      send_response_with_length_prefix (
-        stream,
-        & tag_text_response (
-          TcpToClient::SearchResults, &error_msg )); }} }
+      send_search_results_without_enrichment (
+        stream, "", &error_msg );
+      None }} }
+
+/// Sends TEXT as the phase-1 'search-results', then at once the
+/// contentless 'search-enrichment' that tells the client no
+/// enrichment is coming.
+fn send_search_results_without_enrichment (
+  stream       : &mut TcpStream,
+  search_terms : &str,
+  text         : &str,
+) {
+  send_response_with_length_prefix (
+    stream,
+    & tag_text_response (TcpToClient::SearchResults, text) );
+  send_response_with_length_prefix (
+    stream,
+    & mk_search_enrichment_sexp (search_terms, None, &[]) ); }
+
+/// For when the client closes a search buffer whose enrichment is
+/// still owed. The client can then no longer answer the snapshot
+/// request, so without this the enrichment would never be sent and
+/// the client's stream guard would never be released.
+pub fn abandon_search_enrichment (
+  stream           : &mut TcpStream,
+  search_terms     : &str,
+  enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
+  search_cancelled : &Arc<AtomicBool>,
+) {
+  cancel_search_enrichment (enrichment_slot, search_cancelled);
+  send_response_with_length_prefix (
+    stream,
+    & mk_search_enrichment_sexp (search_terms, None, &[]) ); }
+
+/// Stops any running enrichment thread and discards any payload it
+/// already wrote. The thread checks the flag while holding the slot's
+/// lock, so once this returns the slot stays empty.
+pub fn cancel_search_enrichment (
+  enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
+  search_cancelled : &Arc<AtomicBool>,
+) {
+  search_cancelled . store (true, Ordering::SeqCst);
+  if let Ok (mut slot) = enrichment_slot . lock () {
+    *slot = None; }}
 
 /// Read a boolean axis flag from the request sexp. Absent, empty, or
 /// any non-"true" string is treated as false.
@@ -366,12 +407,14 @@ fn spawn_enrichment_thread (
         AllGraphnodeStats::empty () } );
     tracing::info! ("search enrichment: graphnodestats fetched for {} IDs",
               all_enriched_ids . len ());
+    let mut guard : MutexGuard<Option<SearchEnrichmentPayload>> =
+      slot_clone . lock () . unwrap ();
     if cancel_clone . load (Ordering::SeqCst) {
+      // Checked under the lock, so that 'cancel_search_enrichment'
+      // cannot clear the slot between this check and the write.
       tracing::info! ("search enrichment: cancelled after graphnodestats");
       return; }
     tracing::info! ("search enrichment: writing payload to slot");
-    let mut guard : MutexGuard<Option<SearchEnrichmentPayload>> =
-      slot_clone . lock () . unwrap ();
     *guard = Some ( SearchEnrichmentPayload {
       runtime,
       terms          : terms_clone,
@@ -392,30 +435,36 @@ fn collect_ids_from_role_tree_node(
 /// Build the tagged s-exp for a search enrichment payload.
 /// Format: (("response-type" "search-enrichment")
 ///          ("terms" "TERMS") ("content" "ORG") ("warnings" ()))
+/// Without CONTENT the "content" pair is omitted. That tells the
+/// client no enrichment is coming: it releases its stream guard,
+/// shows any warnings, and leaves the search buffer alone.
 pub fn mk_search_enrichment_sexp (
   terms    : &str,
-  content  : &str,
+  content  : Option<&str>,
   warnings : &[String],
 ) -> String {
-  Sexp::List ( vec! [
+  let mut fields : Vec<Sexp> = vec! [
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "response-type" . to_string () )),
       Sexp::Atom ( Atom::S ( TcpToClient::SearchEnrichment
                              . repr_in_client () . to_string () )), ] ),
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "terms"   . to_string () )),
-      Sexp::Atom ( Atom::S ( terms     . to_string () )), ] ),
-    Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "content" . to_string () )),
-      Sexp::Atom ( Atom::S ( content   . to_string () )), ] ),
+      Sexp::Atom ( Atom::S ( terms     . to_string () )), ] ), ];
+  if let Some (content) = content {
+    fields . push (
+      Sexp::List ( vec! [
+        Sexp::Atom ( Atom::S ( "content" . to_string () )),
+        Sexp::Atom ( Atom::S ( content   . to_string () )), ] )); }
+  fields . push (
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "warnings" . to_string () )),
       Sexp::List (
         warnings . iter ()
         . map ( |warning|
           Sexp::Atom ( Atom::S (warning . clone ()) ) )
-        . collect () ), ] ),
-  ] ) . to_string () }
+        . collect () ), ] ));
+  Sexp::List (fields) . to_string () }
 
 fn mk_search_results_sexp (
   content  : &str,
