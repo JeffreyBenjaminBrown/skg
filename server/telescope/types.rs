@@ -11,7 +11,7 @@
 //! shape: the most public section mentioning a relation holds its
 //! anchor-free base; a more private section's items before the first
 //! anchor are its prepend, and each anchor starts a run inserted
-//! after that member of the strictly-more-public fold. See
+//! after that member of the strictly-more-public compose. See
 //! TODO/DONE/privacy-telescope/5_plan.org, work item
 //! section-format-and-fold.
 
@@ -206,7 +206,7 @@ impl Telescope {
           flags . push ( m . clone () ); }} }
     flags }
 
-  /// The sections in the form the fold consumes, order preserved.
+  /// The sections in the form the composition consumes, order preserved.
   pub fn into_slices (
     self,
   ) -> Vec<(SkgRepoName, SectionSlices)> {
@@ -230,7 +230,7 @@ impl Telescope {
 #[serde(untagged)]
 pub enum ListItem {
   Member (ID),
-  /// Names a member of the strictly-more-public fold; the items
+  /// Names a member of the strictly-more-public compose; the items
   /// after it (until the next anchor) insert immediately after that
   /// member. Illegal in an unordered relation and in the most public
   /// section mentioning the relation (where it degrades per the
@@ -294,17 +294,17 @@ pub struct SectionSlices {
   pub overrides_view_of            : Option<Vec<ID>>,
 }
 
-/// Nonfatal fold trouble. The fold is TOTAL: junk degrades to one of
+/// Nonfatal compose trouble. The compose is TOTAL: junk degrades to one of
 /// these, never to an error or a panic, because a dangling anchor
 /// can arise from two perfectly correct saves on different machines
 /// (see the plan's "Dangling anchors" section).
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum FoldWarning {
-  /// An anchor named no member of the strictly-more-public fold.
+pub enum CompositionWarning {
+  /// An anchor named no member of the strictly-more-public compose.
   /// Its run attached after the preceding run (or the prepend).
   DanglingAnchor { anchor : ID },
   /// An anchor appeared in the most public section that mentions
-  /// the relation -- there is no more-public fold to anchor into.
+  /// the relation -- there is no more-public compose to anchor into.
   /// Handled exactly like a dangling anchor.
   AnchorInBase { anchor : ID },
   /// The same member appeared in two skgrepos; the more public
@@ -339,41 +339,41 @@ pub enum FoldWarning {
   MissingTitle,
 }
 
-impl std::fmt::Display for FoldWarning {
+impl std::fmt::Display for CompositionWarning {
   fn fmt (
     &self,
     f : &mut std::fmt::Formatter<'_>,
   ) -> std::fmt::Result {
     match self {
-      FoldWarning::DanglingAnchor { anchor } =>
+      CompositionWarning::DanglingAnchor { anchor } =>
         write! ( f,
           "dangling anchor '{}': it named no member of any more public section, so its run attached after the preceding run (or the prepend)",
           anchor ),
-      FoldWarning::AnchorInBase { anchor } =>
+      CompositionWarning::AnchorInBase { anchor } =>
         write! ( f,
           "anchor '{}' appeared in the most public section mentioning its relation, where there is no more public fold to anchor into; handled like a dangling anchor",
           anchor ),
-      FoldWarning::DuplicateMember { member } =>
+      CompositionWarning::DuplicateMember { member } =>
         write! ( f,
           "member '{}' appeared in two repos; the more public occurrence won",
           member ),
-      FoldWarning::TitleBelowHome { home, title_at } =>
+      CompositionWarning::TitleBelowHome { home, title_at } =>
         write! ( f,
           "title below the home: the home '{}' carries no title, so this node's text sits at '{}', invisible to anyone reading at '{}'. A node's text belongs in its most public section. A save of this node is refused until the files are repaired by hand: either move the title up to '{}', or delete the '{}' section if it holds nothing else.",
           home, title_at, home, home, home ),
-      FoldWarning::BodyBelowHome { home, body_at } =>
+      CompositionWarning::BodyBelowHome { home, body_at } =>
         write! ( f,
           "body below the home: the home is '{}', but the selected body sits at '{}'; restricted readers at '{}' cannot see it",
           home, body_at, home ),
-      FoldWarning::NonHomeTitle { skgrepo, selected_at } =>
+      CompositionWarning::NonHomeTitle { skgrepo, selected_at } =>
         write! ( f,
           "section '{}' carried a later title; the more public title selected from '{}' won",
           skgrepo, selected_at ),
-      FoldWarning::NonHomeBody { skgrepo, selected_at } =>
+      CompositionWarning::NonHomeBody { skgrepo, selected_at } =>
         write! ( f,
           "section '{}' carried a later body; the more public body selected from '{}' won",
           skgrepo, selected_at ),
-      FoldWarning::MissingTitle =>
+      CompositionWarning::MissingTitle =>
         write! ( f, "no section carried a title" ), }}}
 
 #[cfg(test)]

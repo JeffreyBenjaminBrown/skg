@@ -1,8 +1,8 @@
 pub mod dependencies_manifest;
-pub mod fold;
+pub mod compose;
 pub mod invariants;
 pub mod types;
-pub mod unfold;
+pub mod decompose;
 
 #[cfg(test)]
 #[path = "../../tests/unit/telescope.rs"]

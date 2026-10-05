@@ -163,7 +163,7 @@ fn test_telescope_is_not_a_conflict_but_two_pids_are() {
   // SECTIONS of one privacy telescope, folded into one node whose
   // home is the more public section (alphabetical fallback order for
   // this dummy config: "main" precedes "shared"). The stray second
-  // title is a fold warning, not an error. The section files are
+  // title is a composition warning, not an error. The section files are
   // written RAW: a whole-node write would (correctly) sweep the
   // pid's sections at other skgrepos, so two sequential
   // write_graphnode_to_repo calls cannot build a telescope.

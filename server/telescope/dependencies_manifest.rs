@@ -1,6 +1,6 @@
 //! DEPENDENCIES.toml: the publisher-side fix for the one structural
 //! regression the telescope carries relative to the retired chain
-//! design -- a foreign telescope's fold ORDER lives in the
+//! design -- a foreign telescope's composition ORDER lives in the
 //! receiver's config, not in the data (5_plan.org, work item
 //! dependencies-manifest; decided in 4_discussion, "lets Skg
 //! automatically generate a DEPENDENCIES.toml").

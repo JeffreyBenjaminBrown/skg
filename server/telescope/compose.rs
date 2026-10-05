@@ -1,13 +1,13 @@
-//! The FOLD: sections (per-repo slices, most public first) -> the
+//! The COMPOSITION: sections (per-repo slices, most public first) -> the
 //! node's effective lists of relation partners. Total and deterministic: junk
-//! degrades to 'FoldWarning's, never errors (see types.rs).
+//! degrades to 'CompositionWarning's, never errors (see types.rs).
 //!
-//! Semantics, per ordered relation: the fold THROUGH skgrepo k is
+//! Semantics, per ordered relation: the composition THROUGH skgrepo k is
 //! exactly what a repo-k viewer sees. The most public section
 //! mentioning the relation contributes the base list; each more
 //! private section's prepend lands at the front, and each of its
 //! runs lands immediately after its anchor -- an anchor being any
-//! member of the strictly-more-public fold, matched through the
+//! member of the strictly-more-public compose, matched through the
 //! caller's 'resolve' (extra-ids: 'pid_of'; identity in tests).
 //! Runs sharing an anchor concatenate in file order. A dangling run
 //! attaches after the run that precedes it in the file, or joins the
@@ -17,17 +17,17 @@
 //! Skgrepo order; a member repeated across skgrepos keeps its most
 //! public occurrence, with a warning.
 
-use crate::telescope::types::{FoldWarning, ListItem, SectionSlices, Telescope};
+use crate::telescope::types::{CompositionWarning, ListItem, SectionSlices, Telescope};
 use crate::types::misc::{ID, MSV, RelPartner, SkgRepoName};
 use crate::types::nodes::complete::{Flag, Graphnode};
 
 use std::collections::HashMap;
 use std::io;
 
-/// The fold of one node's sections, as effective lists of relation partners plus
+/// The compose of one node's sections, as effective lists of relation partners plus
 /// title/body text. Field names mirror 'Graphnode'.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct FoldedNode {
+pub struct ComposedNode {
   pub title                        : Option<String>,
   pub title_skgrepo                : Option<SkgRepoName>,
   pub body                         : Option<String>,
@@ -43,26 +43,26 @@ pub struct FoldedNode {
   pub overrides_view_of            : Option<Vec<RelPartner<ID>>>,
 }
 
-/// THE fold entry point: one telescope on disk -> the effective
-/// node, plus whatever the fold complained about. 'resolve' maps
+/// THE compose entry point: one telescope on disk -> the effective
+/// node, plus whatever the composition complained about. 'resolve' maps
 /// extra ids to pids for anchor resolution and must be built from
 /// the whole corpus, not just this telescope (else a nodeMerge can
 /// dangle an anchor).
 ///
 /// Errors only when no section anywhere carries a title. A title
-/// present but BELOW the home folds fine, carrying a
+/// present but BELOW the home composes fine, carrying a
 /// 'TitleBelowHome' warning.
-pub fn fold_telescope_collecting_warnings (
+pub fn compose_telescope_collecting_warnings (
   telescope : Telescope,
   resolve   : &dyn Fn (&ID) -> ID,
-) -> io::Result<(Graphnode, Vec<FoldWarning>)> {
+) -> io::Result<(Graphnode, Vec<CompositionWarning>)> {
   let pid       : ID                = telescope . pid () . clone ();
   let extra_ids : Vec<ID>           = telescope . extra_ids ();
   let flags     : Vec<Flag> = telescope . flags ();
-  let (folded, warnings) : (FoldedNode, Vec<FoldWarning>) =
-    fold_sections ( & telescope . into_slices (), resolve );
-  let mut node : Graphnode = graphnode_from_fold (
-    pid . clone (), extra_ids, flags, folded )
+  let (composed, warnings) : (ComposedNode, Vec<CompositionWarning>) =
+    compose_sections ( & telescope . into_slices (), resolve );
+  let mut node : Graphnode = graphnode_from_composition (
+    pid . clone (), extra_ids, flags, composed )
     . ok_or_else ( || io::Error::new (
       io::ErrorKind::InvalidData,
       format! ("Telescope '{}' has no title in any section.",
@@ -72,33 +72,33 @@ pub fn fold_telescope_collecting_warnings (
 
 /// 'fold_telescope_collecting_warnings', with the warnings logged
 /// rather than returned -- for callers with no way to report them.
-pub fn fold_telescope (
+pub fn compose_telescope (
   telescope : Telescope,
   resolve   : &dyn Fn (&ID) -> ID,
 ) -> io::Result<Graphnode> {
   let pid : ID = telescope . pid () . clone ();
-  let (node, warnings) : (Graphnode, Vec<FoldWarning>) =
-    fold_telescope_collecting_warnings ( telescope, resolve ) ?;
+  let (node, warnings) : (Graphnode, Vec<CompositionWarning>) =
+    compose_telescope_collecting_warnings ( telescope, resolve ) ?;
   for w in &warnings {
     tracing::warn! ( pid = %pid, warning = %w,
                      "telescope fold warning" ); }
   Ok (node) }
 
-/// The fold as a Graphnode. None iff the telescope has no
+/// The compose as a Graphnode. None iff the telescope has no
 /// sections at all, or no section carried a title anywhere -- the
 /// caller decides whether that is a hard load error (it is, at
 /// init) or a warning. A title present but BELOW the home is not
-/// such a case: it folds, carrying a 'TitleBelowHome' warning.
-pub fn graphnode_from_fold (
+/// such a case: it composes, carrying a 'TitleBelowHome' warning.
+pub fn graphnode_from_composition (
   pid       : ID,
   extra_ids : Vec<ID>,
   flags     : Vec<Flag>,
-  folded    : FoldedNode,
+  composed    : ComposedNode,
 ) -> Option<Graphnode> {
-  let home                      : SkgRepoName = folded . home ?;
+  let home                      : SkgRepoName = composed . home ?;
   let overPrivateText_telescope : bool =
-    folded . title_skgrepo . as_ref () != Some (&home)
-    || folded . body_skgrepo . as_ref ()
+    composed . title_skgrepo . as_ref () != Some (&home)
+    || composed . body_skgrepo . as_ref ()
        .map ( |skgrepo| skgrepo != &home )
        .unwrap_or (false);
   let msv = |o : Option<Vec<RelPartner<ID>>>|
@@ -107,92 +107,92 @@ pub fn graphnode_from_fold (
       None     => MSV::Unspecified,
       Some (v) => MSV::Specified (v), }};
   Some ( Graphnode {
-    title                        : folded . title ?,
+    title                        : composed . title ?,
     overPrivateText_telescope,
-    aliases                      : match folded . aliases {
+    aliases                      : match composed . aliases {
       None     => MSV::Unspecified,
       Some (v) => MSV::Specified (v), },
     home_skgrepo                       : home,
     pid,
     extra_ids,
-    body                         : folded . body,
-    contains                     : folded . contains,
-    subscribes_to                : msv ( folded . subscribes_to ),
+    body                         : composed . body,
+    contains                     : composed . contains,
+    subscribes_to                : msv ( composed . subscribes_to ),
     hides_from_its_subscriptions :
-      msv ( folded . hides_from_its_subscriptions ),
-    overrides_view_of            : msv ( folded . overrides_view_of ),
+      msv ( composed . hides_from_its_subscriptions ),
+    overrides_view_of            : msv ( composed . overrides_view_of ),
     flags, } ) }
 
-/// Fold SECTIONS (already sorted most public first -- the caller
+/// Compose SECTIONS (already sorted most public first -- the caller
 /// orders them via 'SkgConfig::ordered_repos') into effective
 /// lists. 'resolve' maps any ID to its primary ID ('pid_of');
 /// anchors and members are compared through it.
-pub fn fold_sections (
+pub fn compose_sections (
   sections : &[(SkgRepoName, SectionSlices)],
   resolve  : &dyn Fn (&ID) -> ID,
-) -> (FoldedNode, Vec<FoldWarning>) {
-  let mut warnings : Vec<FoldWarning> = Vec::new ();
-  let mut folded : FoldedNode = FoldedNode::default ();
+) -> (ComposedNode, Vec<CompositionWarning>) {
+  let mut warnings : Vec<CompositionWarning> = Vec::new ();
+  let mut composed : ComposedNode = ComposedNode::default ();
   { // Title/body text select independently: the first title and first body
     // in privacy order win. The home remains the first section,
     // whether or not it carries either scalar.
-    folded . home = sections . first ()
+    composed . home = sections . first ()
       . map ( |(skgrepo, _)| skgrepo . clone () );
     for (skgrepo, section) in sections {
       if let Some (title) = &section . title {
-        match &folded . title_skgrepo {
+        match &composed . title_skgrepo {
           None => {
-            folded . title = Some (title . clone ());
-            folded . title_skgrepo = Some (skgrepo . clone ());
-            if folded . home . as_ref () != Some (skgrepo) {
-              warnings . push ( FoldWarning::TitleBelowHome {
-                home : folded . home . clone ()
+            composed . title = Some (title . clone ());
+            composed . title_skgrepo = Some (skgrepo . clone ());
+            if composed . home . as_ref () != Some (skgrepo) {
+              warnings . push ( CompositionWarning::TitleBelowHome {
+                home : composed . home . clone ()
                   . expect ("a section establishes the home"),
                 title_at : skgrepo . clone (), } ); }}
           Some (selected_at) =>
-            warnings . push ( FoldWarning::NonHomeTitle {
+            warnings . push ( CompositionWarning::NonHomeTitle {
               skgrepo     : skgrepo . clone (),
               selected_at : selected_at . clone (), } ), }}
       if let Some (body) = &section . body {
-        match &folded . body_skgrepo {
+        match &composed . body_skgrepo {
           None => {
-            folded . body = Some (body . clone ());
-            folded . body_skgrepo = Some (skgrepo . clone ());
-            if folded . home . as_ref () != Some (skgrepo) {
-              warnings . push ( FoldWarning::BodyBelowHome {
-                home : folded . home . clone ()
+            composed . body = Some (body . clone ());
+            composed . body_skgrepo = Some (skgrepo . clone ());
+            if composed . home . as_ref () != Some (skgrepo) {
+              warnings . push ( CompositionWarning::BodyBelowHome {
+                home : composed . home . clone ()
                   . expect ("a section establishes the home"),
                 body_at : skgrepo . clone (), } ); }}
           Some (selected_at) =>
-            warnings . push ( FoldWarning::NonHomeBody {
+            warnings . push ( CompositionWarning::NonHomeBody {
               skgrepo     : skgrepo . clone (),
               selected_at : selected_at . clone (), } ), }} }
-    if folded . title . is_none () {
-      warnings . push ( FoldWarning::MissingTitle ); }}
-  folded . contains = fold_ordered (
+    if composed . title . is_none () {
+      warnings . push ( CompositionWarning::MissingTitle ); }}
+  composed . contains = compose_ordered (
     sections, |s| s . contains . as_deref (),
     resolve, &mut warnings );
   let mentioned = |proj : &dyn Fn (&SectionSlices) -> bool| -> bool {
     sections . iter () . any ( |(_, s)| proj (s) ) };
-  folded . subscribes_to =
+  composed . subscribes_to =
     if mentioned ( &|s| s . subscribes_to . is_some () ) {
-      Some ( fold_ordered (
+      Some ( compose_ordered (
         sections, |s| s . subscribes_to . as_deref (),
         resolve, &mut warnings ) ) }
     else { None };
-  folded . hides_from_its_subscriptions =
+  composed . hides_from_its_subscriptions =
     if mentioned ( &|s| s . hides_from_its_subscriptions . is_some () ) {
-      Some ( fold_unordered (
+      Some ( compose_unordered (
         sections, |s| s . hides_from_its_subscriptions . as_deref (),
         resolve, &mut warnings ) ) }
     else { None };
-  folded . overrides_view_of =
+  composed . overrides_view_of =
     if mentioned ( &|s| s . overrides_view_of . is_some () ) {
-      Some ( fold_unordered (
+      Some ( compose_unordered (
         sections, |s| s . overrides_view_of . as_deref (),
         resolve, &mut warnings ) ) }
     else { None };
-  folded . aliases = {
+  composed . aliases = {
     if ! sections . iter () . any ( |(_, s)| s . aliases . is_some () ) {
       None }
     else { // aliases: union like the unordered relations,
@@ -209,18 +209,18 @@ pub fn fold_sections (
             else {
               // No per-alias id to report; reuse DuplicateMember with
               // a synthetic ID carrying the alias text.
-              warnings . push ( FoldWarning::DuplicateMember {
+              warnings . push ( CompositionWarning::DuplicateMember {
                 member : ID ( a . clone () ) } ); }}}}
       Some (out) }};
-  (folded, warnings) }
+  (composed, warnings) }
 
-/// One ordered relation's fold. 'slice_of' projects a section's
+/// One ordered relation's compose. 'slice_of' projects a section's
 /// stored item sequence for this relation (None = no opinion).
-fn fold_ordered (
+fn compose_ordered (
   sections : &[(SkgRepoName, SectionSlices)],
   slice_of : impl Fn (&SectionSlices) -> Option<&[ListItem]>,
   resolve  : &dyn Fn (&ID) -> ID,
-  warnings : &mut Vec<FoldWarning>,
+  warnings : &mut Vec<CompositionWarning>,
 ) -> Vec<RelPartner<ID>> {
   let mut effective : Vec<RelPartner<ID>> = Vec::new ();
   let mut any_section_yet : bool = false;
@@ -245,7 +245,7 @@ fn fold_ordered (
           ListItem::Anchor { anchor : a } => {
             let key : ID = resolve (a);
             if is_base {
-              warnings . push ( FoldWarning::AnchorInBase {
+              warnings . push ( CompositionWarning::AnchorInBase {
                 anchor : a . clone () } );
               // fall through to the dangling handling below
             }
@@ -256,7 +256,7 @@ fn fold_ordered (
               dest = Dest::Queue (key);
             } else {
               if ! is_base { // base already warned above
-                warnings . push ( FoldWarning::DanglingAnchor {
+                warnings . push ( CompositionWarning::DanglingAnchor {
                   anchor : a . clone () } ); }
               // Fallback: keep writing into whatever preceded this
               // run -- the previous run's queue, or the prepend.
@@ -267,16 +267,16 @@ fn fold_ordered (
               Dest::Queue (k)  =>
                 queues . get_mut (k) . expect ("queue exists")
                 . push ( skgid . clone () ), }} }} }
-    // Dedup against the fold so far and within this section.
+    // Dedup against the composition so far and within this section.
     let mut seen : std::collections::HashSet<ID> =
       effective . iter ()
       . map ( |m| resolve ( &m . member ) )
       . collect ();
-    let mut keep = |skgid : &ID, warnings : &mut Vec<FoldWarning>|
+    let mut keep = |skgid : &ID, warnings : &mut Vec<CompositionWarning>|
     -> bool {
       if seen . insert ( resolve (skgid) ) { true }
       else {
-        warnings . push ( FoldWarning::DuplicateMember {
+        warnings . push ( CompositionWarning::DuplicateMember {
           member : skgid . clone () } );
         false }};
     let mut next : Vec<RelPartner<ID>> =
@@ -297,13 +297,13 @@ fn fold_ordered (
     effective = next; }
   effective }
 
-/// One unordered relation's fold: union in skgrepo order, most public
+/// One unordered relation's compose: union in skgrepo order, most public
 /// occurrence winning.
-fn fold_unordered (
+fn compose_unordered (
   sections : &[(SkgRepoName, SectionSlices)],
   slice_of : impl Fn (&SectionSlices) -> Option<&[ID]>,
   resolve  : &dyn Fn (&ID) -> ID,
-  warnings : &mut Vec<FoldWarning>,
+  warnings : &mut Vec<CompositionWarning>,
 ) -> Vec<RelPartner<ID>> {
   let mut seen : std::collections::HashSet<ID> =
     std::collections::HashSet::new ();
@@ -315,6 +315,6 @@ fn fold_unordered (
         out . push ( RelPartner::at_relRepo (
           skgrepo . clone (), skgid . clone () ));
       } else {
-        warnings . push ( FoldWarning::DuplicateMember {
+        warnings . push ( CompositionWarning::DuplicateMember {
           member : skgid . clone () } ); }}}
   out }

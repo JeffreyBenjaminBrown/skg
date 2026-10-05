@@ -3,8 +3,8 @@ pub mod parse;
 use crate::types::misc::{
   ID, MSV, RelPartner, SkgConfig, SkgRepo, SkgRepoName,
   members_msv, rel_partners_at_relRepo_msv};
-use crate::telescope::unfold::{
-  UnfoldInput, UnfoldedTelescope, unfold_node,
+use crate::telescope::decompose::{
+  DecompositionInput, DecomposedTelescope, decompose_node,
 };
 use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::nodes::complete::{Flag, Graphnode};
@@ -189,7 +189,7 @@ fn write_graphnode_to_dir (
     output_dir . join (&filename);
   let node_fs : GraphnodeOnDisk = {
     // An imported node is single-section by construction (every
-    // member relRepo == its home), so the unfold yields exactly one
+    // member relRepo == its home), so the decomposition yields exactly one
     // section. A one-repo config lets the importer use the same
     // checked boundary as the ordinary filesystem writer.
     let skgrepo_name : SkgRepoName = node . home_skgrepo . clone ();
@@ -201,9 +201,9 @@ fn write_graphnode_to_dir (
             owned        : true, } ) ]
       . into_iter () . collect () );
     config . skgrepo_order = vec! [skgrepo_name];
-    let unfolded : UnfoldedTelescope =
-      unfold_node (
-        & UnfoldInput {
+    let decomposed : DecomposedTelescope =
+      decompose_node (
+        & DecompositionInput {
           pid      : & node . pid,
           extra_ids : & node . extra_ids,
           flags    : & node . flags,
@@ -220,7 +220,7 @@ fn write_graphnode_to_dir (
             node . overrides_view_of . or_default (), },
         &config ) ?;
     let (_, node_fs) : (SkgRepoName, GraphnodeOnDisk) =
-      unfolded . into_sections () . into_iter () . next ()
+      decomposed . into_sections () . into_iter () . next ()
       . expect ("an imported node has a home section");
     node_fs };
   let yaml    : String = node_fs . to_yaml ()?;

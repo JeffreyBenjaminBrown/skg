@@ -369,7 +369,7 @@ impl InRustGraph {
       . map ( |member| member . relRepo ) }
 
   /// Outbound members whose relRepo is in the active set: the
-  /// visible fold of one relation. Pass None for the full fold.
+  /// visible composition of one relation. Pass None for the full composition.
   pub fn outbound_pids_for_relation_gated (
     &self,
     pid      : &ID,
@@ -471,7 +471,7 @@ impl InRustGraph {
   /// 'relation_membership_is_real' with relRepo gating: a relationship
   /// whose relRepo is outside the active prefix does not count
   /// as a membership (see 'relRepo'). Pass None to ask about the
-  /// full fold.
+  /// full composition.
   pub fn relation_membership_is_visible (
     &self,
     recorder_pid : &ID,

@@ -27,7 +27,7 @@ body, and extra IDs. That the home is the section with the title is
 an invariant rather than a definition: it would be silly to share a
 node without sharing its text, so a node's text always lives in its
 most public section. Data that breaks the rule — a title or body
-selected below the home section — still loads, but the fold reports
+selected below the home section — still loads, but the composition reports
 it. An interactive save offers Abort or Hoist before changing
 anything. Hoist explicitly publishes the selected title and body at
 home, removes lower title/body copies, preserves lower relationships and
@@ -40,13 +40,13 @@ relationship (a =contains=
 membership, a subscription, a hide, an override) carries its own
 relRepo: the skgrepo of the section that records it.
 
-Reading the node *folds* the sections, most public first, into one
+Reading the node *composes* the sections, most public first, into one
 effective node. Under a restricted skgrepo-set you see the *visible
-fold* — only the active sections' contributions — while =all= shows
-the *full fold*. A more private section can both /add/ members and
+composition* — only the active sections' contributions — while =all= shows
+the *full composition*. A more private section can both /add/ members and
 /place/ them: its members interleave into the more public list via
 placement anchors, so your private ordering of a public list
-survives without the public file recording anything. Saving unfolds
+survives without the public file recording anything. Saving decomposes
 the node back into sections, byte-stably: sections you did not
 affect do not change on disk, and foreign sections are never
 written.
@@ -54,12 +54,12 @@ written.
 One normalization rule determines what "retained" means when raw
 repositories collide. If any owned section uses a PID, Skg keeps the
 complete owned telescope for that PID and ignores every same-PID foreign
-section before folding, ID-conflict checks, indexing, or any other semantic
+section before composing, ID-conflict checks, indexing, or any other semantic
 read. It emits a deterministic warning naming the ignored skgrepos and never
 edits those files; their contents are visible only by inspecting the raw
 foreign repository. A wholly foreign telescope is retained normally.
 
-If folding has to select a title or body below home, Skg marks the
+If composing has to select a title or body below home, Skg marks the
 whole telescope *overPrivateText*. Skgrepo-set =all= displays that text with a
 warning. A restricted skgrepo-set asks before releasing it, using an
 approval scoped to the exact PIDs and the single request; search asks

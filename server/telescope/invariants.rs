@@ -14,7 +14,7 @@
 //! hard-error, and those live in the parser, not here.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::telescope::types::FoldWarning;
+use crate::telescope::types::CompositionWarning;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgRepoName};
 use crate::types::nodes::rust::GraphnodeInRust;
 
@@ -58,15 +58,15 @@ pub enum TelescopeViolation {
   },
   /// Non-owned sections used the same pid as at least one owned
   /// section. The owned telescope won and these skgrepos were
-  /// ignored before folding or id-claim collection.
+  /// ignored before composition or id-claim collection.
   IgnoredForeignPidFolderlision {
     ignored_skgrepos : Vec<SkgRepoName>,
   },
-  /// Anything the FOLD noticed while combining a node's sections
+  /// Anything the COMPOSITION noticed while combining a node's sections
   /// (a dangling anchor, a title below the home, a stray second
   /// title, ...). These were logged and dropped before; they
   /// belong in the report with the rest.
-  Fold ( FoldWarning ),
+  Composition ( CompositionWarning ),
 }
 
 impl fmt::Display for TelescopeViolation {
@@ -97,7 +97,7 @@ impl fmt::Display for TelescopeViolation {
           ignored_skgrepos . iter ()
             . map ( |skgrepo| format! ("'{}'", skgrepo) )
             . collect::<Vec<String>> () . join (", ") ),
-      TelescopeViolation::Fold (w) =>
+      TelescopeViolation::Composition (w) =>
         write! ( f, "{}", w ), }}}
 
 /// THE PRIMITIVE both gates call: one node's telescope violations,
@@ -231,9 +231,9 @@ pub fn validate_all_telescopes (
 
 /// The whole init/rebuild report: what the graph shows
 /// ('validate_all_telescopes') plus what the LOAD saw that the
-/// graph cannot show -- fold complaints and ignored foreign pid
+/// graph cannot show -- compose complaints and ignored foreign pid
 /// collisions, which
-/// need a node's section list rather than its fold. Reporting
+/// need a node's section list rather than its composition. Reporting
 /// failures are logged, not propagated: a report we could not write
 /// is no reason to refuse to start.
 pub fn report_all_telescope_violations (

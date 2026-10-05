@@ -1,6 +1,6 @@
 use crate::dbs::filesystem::multiple_nodes::{
   read_skg_sections_from_folder};
-use crate::telescope::fold::fold_telescope;
+use crate::telescope::compose::compose_telescope;
 use crate::telescope::types::{
   Telescope, retain_owned_sections_when_pid_folderlides,
 };
@@ -128,7 +128,7 @@ fn read_graph_snapshot (
   kind   : SnapshotKind,
 ) -> Result<GraphSnapshot, String> {
   // Sections arrive in privacy order (ordered_repos) so each
-  // telescope folds with its most public section first.
+  // telescope composes with its most public section first.
   let mut sections : Vec<(SkgRepoName, GraphnodeOnDisk)> = Vec::new ();
   for skgrepo_name in config . ordered_skgrepos () {
     let label : String =
@@ -328,7 +328,7 @@ fn overlay_changed_after_snapshot (
       read_telescope_sections_at_endpoint (
         config, after_kind, pid ) ? ); }
   // Anchor resolution needs the whole corpus's extra-id map:
-  // unchanged telescopes contribute via their folded nodes, changed
+  // unchanged telescopes contribute via their composed nodes, changed
   // ones via their fresh sections.
   let pid_of : HashMap<ID, ID> = {
     let mut m : HashMap<ID, ID> = HashMap::new ();
@@ -404,7 +404,7 @@ fn read_telescope_sections_at_endpoint (
 }
 
 /// Drop the claims a pid's sections contributed at the before
-/// endpoint (its claimed ids are exactly the folded node's
+/// endpoint (its claimed ids are exactly the composed node's
 /// all_ids). Claims by OTHER pids on the same ids survive.
 fn remove_telescope_claims (
   snapshot    : &mut GraphSnapshot,
@@ -568,7 +568,7 @@ fn profile_log (
     duration . subsec_millis ()); }
 
 /// Group sections by pid (sections must arrive in privacy order),
-/// normalize owned/non-owned pid collisions, fold each telescope,
+/// normalize owned/non-owned pid collisions, compose each telescope,
 /// and record the retained sections' id claims.
 fn snapshot_from_sections (
   config   : &SkgConfig,
@@ -618,7 +618,7 @@ fn snapshot_from_sections (
   Ok ( GraphSnapshot { nodes: by_pid, id_claims } )
 }
 
-/// Fold one telescope, but where init would hard-error on a
+/// Compose one telescope, but where init would hard-error on a
 /// titleless telescope (no home), a snapshot must not: diff
 /// endpoints legitimately pass through ill-formed states (e.g. a
 /// home-section deletion staged before its recreation). Retry with
@@ -635,7 +635,7 @@ fn fold_telescope_tolerating_homelessness (
   let telescope : Telescope =
     Telescope::try_new ( pid . clone (), sections, config )
     . map_err ( |e| e . to_string () ) ?;
-  match fold_telescope ( telescope, resolve )
+  match compose_telescope ( telescope, resolve )
   { Ok (node) => Ok (node),
     Err (_) => {
       let mut retry : Vec<(SkgRepoName, GraphnodeOnDisk)> = retry;
@@ -648,7 +648,7 @@ fn fold_telescope_tolerating_homelessness (
       let retry_telescope : Telescope =
         Telescope::try_new ( pid . clone (), retry, config )
         . map_err ( |e| e . to_string () ) ?;
-      fold_telescope ( retry_telescope, resolve )
+      compose_telescope ( retry_telescope, resolve )
         . map_err ( |e| e . to_string () ) }}
 }
 
@@ -773,7 +773,7 @@ pub(super) fn path_is_skgrepo_skg (
 }
 
 /// One FILE's contents as a section (pid-checked against the file
-/// stem). The snapshot folds same-pid sections into one telescope.
+/// stem). The snapshot composes same-pid sections into one telescope.
 pub(super) fn parse_blob_section (
   bytes    : &[u8],
   rel_path : &Path,
@@ -797,7 +797,7 @@ pub(super) fn parse_blob_section (
 
 /// One FILE as a whole node -- the per-blob view the vanished-node
 /// history search uses (it inspects one historical blob at a time,
-/// so there is no telescope to fold).
+/// so there is no telescope to compose).
 pub(super) fn parse_blob_node (
   bytes        : &[u8],
   skgrepo_name : &SkgRepoName,

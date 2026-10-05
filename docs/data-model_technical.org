@@ -2,16 +2,16 @@
 
 This document describes the complete runtime graph model.  The =.skg= files
 and =skgconfig.toml= are authoritative.  At startup and explicit rebuild, the
-server folds all file sections into =Graphnode= values, validates the whole
+server composes all file sections into =Graphnode= values, validates the whole
 set, builds an immutable =InRustGraph= snapshot, and builds Tantivy from the
 same values.  Tantivy is a derived text index; it is not graph authority.
 
 For a gentler introduction, see [[./data-model_friendly.org][the friendly data-model guide]].  For
-privacy-section folding and unfolding, see [[./telescopes.org][telescopes]].
+privacy-section composing and decomposing, see [[./telescopes.org][telescopes]].
 
 ** Node fields
 
-The full folded representation is =Graphnode= in
+The full composed representation is =Graphnode= in
 =server/types/nodes/complete.rs=.  =GraphnodeInRust= is its graph projection and adds
 derived text links.
 
@@ -20,8 +20,8 @@ derived text links.
 | =pid= | =ID= | Immutable primary identity.  It determines the home filename and is the key in =InRustGraph.nodes= and Tantivy. |
 | =extra_ids= | =Vec<ID>= | Former identities acquired by node merge.  They are normalized in stable first-occurrence order, excluding the node's own PID.  Any primary or extra ID resolves to the node's =pid=. |
 | =home_repo= | =RepoName= | The node's home: the most public skgrepo with a retained telescope section.  It is inferred from file location and never serialized inside YAML. |
-| =title= | =String= | Folded node title. |
-| =body= | =Option<String>= | Folded body text.  Leading and trailing whitespace-only lines are normalized away; a body with no remaining content is =None=. |
+| =title= | =String= | Composed node title. |
+| =body= | =Option<String>= | Composed body text.  Leading and trailing whitespace-only lines are normalized away; a body with no remaining content is =None=. |
 | =overPrivateText_telescope= | =bool= | True when the selected title or body came from a section below the home skgrepo.  Release decisions use this conservative folded fact. |
 | =aliases= | =MSV<RelPartner<String>>= | Search aliases and the skgrepo at which each is recorded. |
 | =contains= | =Vec<RelPartner<ID>>= | Ordered content children and each relationship's relRepo. |
@@ -66,7 +66,7 @@ validate the identities and relationships whose truth can change, and check
 the affected inverse-index entries before any file mutation.  A candidate is
 rejected when any of these conditions holds:
 
-1. A primary ID identifies more than one folded node.
+1. A primary ID identifies more than one composed node.
 2. An extra ID belongs to more than one node.
 3. An ID is both a primary ID and an extra ID.
 4. A node's home skgrepo is absent from the current configuration.
@@ -78,7 +78,7 @@ rejected when any of these conditions holds:
    index.
 
 Relationship roles are enforced by distinct Rust fields.  A node has exactly
-one =home_repo= in its folded representation.  Telescope validation also
+one =home_repo= in its composed representation.  Telescope validation also
 checks privacy/provenance rules.  Telescope violations are deterministic
 warnings rather than hard graph-construction errors; callers surface them for
 repair while retaining readable data.

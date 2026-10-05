@@ -84,11 +84,11 @@ pub struct Graphnode {
   // There is a 1-to-1 correspondence between Graphnodes and privacy TELESCOPES (families of same-pid .skg files, one section per skgrepo; see docs/telescopes.org). Reading FOLDS the sections into a Graphnode; writing UNFOLDS it back into sections, byte-stably. The files are the only permanent data. Graphnode initializes the in-memory graph and Tantivy index.
   // The graph indexes this complete record for structural queries. Tantivy
   // receives the searchable subset. The filesystem remains authoritative.
-  // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/flags.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when reconciling multiple Graphnodes (e.g. 'reconcile_same_id_instructions' and supplement_unspecified_fields_from_disk). PITFALL: since telescopes, the distinction is meaningful ON DISK too: a section that omits a field has no opinion about it (Unspecified), while under unfold each section records exactly the relationships recorded there -- so what a given section file shows is not the node's whole list, and an absent field in one section says nothing about the fold.
+  // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/flags.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when reconciling multiple Graphnodes (e.g. 'reconcile_same_id_instructions' and supplement_unspecified_fields_from_disk). PITFALL: since telescopes, the distinction is meaningful ON DISK too: a section that omits a field has no opinion about it (Unspecified), while under decompose each section records exactly the relationships recorded there -- so what a given section file shows is not the node's whole list, and an absent field in one section says nothing about the composition.
 
   pub title: String,
   /// True when the selected title or body came from below the home.
-  /// Precise title/body-text skgrepos remain a fold/save-time fact; runtime
+  /// Precise title/body-text skgrepos remain a composition/save-time fact; runtime
   /// release decisions intentionally use this coarse flag.
   pub overPrivateText_telescope: bool,
   pub aliases: MSV<RelPartner<String>>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.) Each alias carries its relRepo.
@@ -98,7 +98,7 @@ pub struct Graphnode {
   pub body: Option<String>, // Not indexed by the structural graph. The body is all text (if any) between the preceding org headline, to which it belongs, and the next (if there is a next).
 
   // Each relationship member carries the privacy LEVEL of the relationship
-  // (see 'RelPartner'). List order is fold order.
+  // (see 'RelPartner'). List order is composition order.
   pub contains                     : Vec<RelPartner<ID>>, // See docs/data-model_technical.org.
   pub subscribes_to                : MSV<RelPartner<ID>>, // See docs/data-model_technical.org.
   pub hides_from_its_subscriptions : MSV<RelPartner<ID>>, // See docs/data-model_technical.org.

@@ -308,14 +308,14 @@ fn marker_child_is_excluded_from_content () {
 }
 
 //
-// relRepo gating (visible fold)
+// relRepo gating (visible composition)
 //
 
 #[test]
 fn private_skgrepo_edge_is_omitted_from_restricted_export () {
   // Root and both children live in "main", but the relationship to "priv"
   // is RECORDED in skgrepo "private". A main-only export renders the
-  // visible fold: "pub" appears, "priv" does not -- even though
+  // visible composition: "pub" appears, "priv" does not -- even though
   // priv's home is active.
   let mut root : Graphnode =
     node ("r", "Root", None, &["ma"]);

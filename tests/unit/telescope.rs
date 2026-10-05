@@ -1,16 +1,16 @@
-//! Flag suite for the telescope fold/unfold pair. The
+//! Flag suite for the telescope composition/decompose pair. The
 //! load-bearing laws (5_plan.org, section-format-and-fold):
-//! - fold(unfold(x)) == x for every list of relation partners ("round-trip");
-//! - unfold(fold(sections)) is idempotent from the first application
-//!   (unfold output is canonical);
+//! - compose(decompose(x)) == x for every list of relation partners ("round-trip");
+//! - decompose(compose(sections)) is idempotent from the first application
+//!   (decompose output is canonical);
 //! - every member's skgrepo survives both directions;
-//! - dangling/duplicate-anchor junk folds totally and
+//! - dangling/duplicate-anchor junk composes totally and
 //!   deterministically;
 //! - the silent-leak guard: no member ever changes skgrepo.
 
-use super::fold::{FoldedNode, fold_sections, graphnode_from_fold};
-use super::types::{FoldWarning, ListItem, SectionSlices, Telescope};
-use super::unfold::{UnfoldInput, unfold_node};
+use super::compose::{ComposedNode, compose_sections, graphnode_from_composition};
+use super::types::{CompositionWarning, ListItem, SectionSlices, Telescope};
+use super::decompose::{DecompositionInput, decompose_node};
 use crate::types::misc::{
   ID, RelPartner, SkgConfig, SkgRepo, SkgRepoName,
 };
@@ -41,10 +41,10 @@ fn telescope_config () -> SkgConfig {
   config . skgrepo_order = skgrepo_universe ();
   config }
 
-fn unfold_sections (
-  input : &UnfoldInput,
+fn decompose_sections (
+  input : &DecompositionInput,
 ) -> Vec<(SkgRepoName, SectionSlices)> {
-  unfold_node (input, &telescope_config ()) . unwrap ()
+  decompose_node (input, &telescope_config ()) . unwrap ()
     . into_sections () . into_iter ()
     . map ( |(skgrepo, node_fs)|
       (skgrepo, node_fs . into_section_slices ()) )
@@ -57,7 +57,7 @@ fn identity_resolve (
 
 /// An arbitrary list of relation partners with UNIQUE members: up to N
 /// members, each at a random skgrepo in the universe. Uniqueness matters
-/// because the fold dedups (with warnings), which round-trip inputs
+/// because the composition dedups (with warnings), which round-trip inputs
 /// must not trigger.
 fn arb_rel_partners (
   max_len : usize,
@@ -72,14 +72,14 @@ fn arb_rel_partners (
         . collect () } ) }
 
 /// Wrap ordered lists of relation partners (and nothing else) into an
-/// UnfoldInput-shaped FoldedNode for the round-trip tests.
-fn folded_from_lists (
+/// DecompositionInput-shaped ComposedNode for the round-trip tests.
+fn composed_from_lists (
   home     : &SkgRepoName,
   contains : Vec<RelPartner<ID>>,
   subs     : Vec<RelPartner<ID>>,
   hides    : Vec<RelPartner<ID>>,
-) -> FoldedNode {
-  FoldedNode {
+) -> ComposedNode {
+  ComposedNode {
     title                        : Some ("t" . to_string ()),
     title_skgrepo                : Some (home . clone ()),
     body                         : None,
@@ -93,35 +93,35 @@ fn folded_from_lists (
       if hides . is_empty () { None } else { Some (hides) },
     overrides_view_of            : None, }}
 
-fn unfold_then_fold (
-  folded : &FoldedNode,
-) -> (FoldedNode, Vec<FoldWarning>) {
+fn decompose_then_compose (
+  composed : &ComposedNode,
+) -> (ComposedNode, Vec<CompositionWarning>) {
   let home : SkgRepoName =
-    folded . home . clone () . expect ("home set");
+    composed . home . clone () . expect ("home set");
   let sections : Vec<(SkgRepoName, SectionSlices)> =
-    unfold_sections (
-      & UnfoldInput {
+    decompose_sections (
+      & DecompositionInput {
         pid      : &ID::new ("p"),
         extra_ids : &[],
         flags    : &[],
-        title    : folded . title . as_deref (),
-        body     : folded . body . as_deref (),
+        title    : composed . title . as_deref (),
+        body     : composed . body . as_deref (),
         home     : &home,
-        aliases  : folded . aliases . as_deref ()
+        aliases  : composed . aliases . as_deref ()
                    . unwrap_or (&[]),
-        contains : &folded . contains,
+        contains : &composed . contains,
         subscribes_to :
-          folded . subscribes_to . as_deref () . unwrap_or (&[]),
+          composed . subscribes_to . as_deref () . unwrap_or (&[]),
         hides_from_its_subscriptions :
-          folded . hides_from_its_subscriptions . as_deref ()
+          composed . hides_from_its_subscriptions . as_deref ()
           . unwrap_or (&[]),
         overrides_view_of :
-          folded . overrides_view_of . as_deref ()
+          composed . overrides_view_of . as_deref ()
           . unwrap_or (&[]), } );
-  fold_sections ( &sections, &identity_resolve ) }
+  compose_sections ( &sections, &identity_resolve ) }
 
 #[test]
-fn flags_write_at_home_and_fold_defensively_from_all_sections () {
+fn flags_write_at_home_and_compose_defensively_from_all_sections () {
   let home = SkgRepoName::from ("S0");
   let private = SkgRepoName::from ("S2");
   let misc = vec![
@@ -129,7 +129,7 @@ fn flags_write_at_home_and_fold_defensively_from_all_sections () {
     Flag::NoSearchMatching];
   let contains = vec![RelPartner::at_relRepo (
     private . clone (), ID::from ("child"))];
-  let mut sections = unfold_node (&UnfoldInput {
+  let mut sections = decompose_node (&DecompositionInput {
     pid: &ID::from ("p"), extra_ids: &[], flags: &misc,
     title: Some ("title"), body: None, home: &home,
     aliases: &[], contains: &contains, subscribes_to: &[],
@@ -172,18 +172,18 @@ proptest! {
       . map ( |m| RelPartner::at_relRepo (
         m . relRepo, ID ( format! ("h-{}", m . member . 0 ))))
       . collect ();
-    let home   : SkgRepoName = SkgRepoName::from ("S0");
-    let folded : FoldedNode =
-      folded_from_lists (&home, contains, subs, hides);
-    let (refolded, warnings) = unfold_then_fold (&folded);
-    // The one asymmetry: fold cannot learn a home the unfold did not
+    let home     : SkgRepoName = SkgRepoName::from ("S0");
+    let composed : ComposedNode =
+      composed_from_lists (&home, contains, subs, hides);
+    let (recomposed, warnings) = decompose_then_compose (&composed);
+    // The one asymmetry: compose cannot learn a home the decomposition did not
     // write title/body text into; everything else must round-trip exactly.
-    prop_assert_eq! ( &refolded . contains, &folded . contains );
-    prop_assert_eq! ( &refolded . subscribes_to,
-                      &folded . subscribes_to );
+    prop_assert_eq! ( &recomposed . contains, &composed . contains );
+    prop_assert_eq! ( &recomposed . subscribes_to,
+                      &composed . subscribes_to );
     { // Unordered relations have no order to preserve: sections
       // cannot express cross-repo interleavings without anchors,
-      // which unordered relations deliberately lack, so the fold's
+      // which unordered relations deliberately lack, so the composition's
       // output order is CANONICAL (repo-major). The law is
       // set-equality with skgrepos intact.
       let sort = |v : Option<&Vec<RelPartner<ID>>>|
@@ -193,40 +193,40 @@ proptest! {
         v . sort_by ( |a, b| a . member . cmp ( &b . member ));
         v };
       prop_assert_eq! (
-        sort ( refolded . hides_from_its_subscriptions . as_ref () ),
-        sort ( folded . hides_from_its_subscriptions . as_ref () )); }
-    prop_assert_eq! ( refolded . title . as_deref (), Some ("t") );
-    prop_assert_eq! ( refolded . home, Some (home) );
+        sort ( recomposed . hides_from_its_subscriptions . as_ref () ),
+        sort ( composed . hides_from_its_subscriptions . as_ref () )); }
+    prop_assert_eq! ( recomposed . title . as_deref (), Some ("t") );
+    prop_assert_eq! ( recomposed . home, Some (home) );
     prop_assert! ( warnings . is_empty (),
                    "round-trip inputs must not warn: {:?}", warnings );
   }
 
   #[test]
-  fn unfold_is_canonical (
+  fn decompose_is_canonical (
     contains in arb_rel_partners (12),
   ) {
-    // unfold . fold . unfold == unfold  (sections are a normal form)
-    let home   : SkgRepoName = SkgRepoName::from ("S0");
-    let folded : FoldedNode = folded_from_lists (
+    // decompose . compose . decompose == decompose  (sections are a normal form)
+    let home     : SkgRepoName = SkgRepoName::from ("S0");
+    let composed : ComposedNode = composed_from_lists (
       &home, contains, Vec::new (), Vec::new ());
-    let (refolded, _) = unfold_then_fold (&folded);
+    let (recomposed, _) = decompose_then_compose (&composed);
     let sections_once : Vec<(SkgRepoName, SectionSlices)> =
-      unfold_sections (
-        & UnfoldInput {
+      decompose_sections (
+        & DecompositionInput {
           pid : &ID::new ("p"), extra_ids : &[], flags : &[],
-          title : folded . title . as_deref (),
+          title : composed . title . as_deref (),
           body : None, home : &home,
-          aliases : &[], contains : &folded . contains,
+          aliases : &[], contains : &composed . contains,
           subscribes_to : &[],
           hides_from_its_subscriptions : &[],
           overrides_view_of : &[], } );
     let sections_twice : Vec<(SkgRepoName, SectionSlices)> =
-      unfold_sections (
-        & UnfoldInput {
+      decompose_sections (
+        & DecompositionInput {
           pid : &ID::new ("p"), extra_ids : &[], flags : &[],
-          title : refolded . title . as_deref (),
+          title : recomposed . title . as_deref (),
           body : None, home : &home,
-          aliases : &[], contains : &refolded . contains,
+          aliases : &[], contains : &recomposed . contains,
           subscribes_to : &[],
           hides_from_its_subscriptions : &[],
           overrides_view_of : &[], } );
@@ -237,13 +237,13 @@ proptest! {
   fn no_member_ever_changes_skgrepo ( // the silent-leak guard
     contains in arb_rel_partners (12),
   ) {
-    let home   : SkgRepoName = SkgRepoName::from ("S0");
-    let folded : FoldedNode = folded_from_lists (
+    let home     : SkgRepoName = SkgRepoName::from ("S0");
+    let composed : ComposedNode = composed_from_lists (
       &home, contains . clone (), Vec::new (), Vec::new ());
-    let (refolded, _) = unfold_then_fold (&folded);
+    let (recomposed, _) = decompose_then_compose (&composed);
     for m in &contains {
       let found : Option<&RelPartner<ID>> =
-        refolded . contains . iter ()
+        recomposed . contains . iter ()
         . find ( |n| n . member == m . member );
       prop_assert_eq! (
         found . map ( |n| &n . relRepo ), Some ( &m . relRepo ),
@@ -274,16 +274,16 @@ fn dangling_anchor_attaches_after_preceding_run_with_warning (
           ListItem::Anchor { anchor : ID::new ("GONE") },
           ListItem::Member ( ID::new ("y") ) ] ),
         .. SectionSlices::default () } ) ];
-  let (folded, warnings) =
-    fold_sections ( &sections, &identity_resolve );
+  let (composed, warnings) =
+    compose_sections ( &sections, &identity_resolve );
   let got : Vec<&str> =
-    folded . contains . iter ()
+    composed . contains . iter ()
     . map ( |m| m . member . 0 . as_str () )
     . collect ();
   assert_eq! ( got, vec! ["p", "a", "x", "y", "b"],
                "y follows its preceding run (a,[x])" );
   assert! ( warnings . iter () . any ( |w| matches! (
-    w, FoldWarning::DanglingAnchor { anchor } if anchor . 0 == "GONE" )),
+    w, CompositionWarning::DanglingAnchor { anchor } if anchor . 0 == "GONE" )),
     "dangling anchor warned: {:?}", warnings );
 }
 
@@ -303,10 +303,10 @@ fn dangling_first_run_joins_the_prepend (
           ListItem::Anchor { anchor : ID::new ("GONE") },
           ListItem::Member ( ID::new ("y") ) ] ),
         .. SectionSlices::default () } ) ];
-  let (folded, warnings) =
-    fold_sections ( &sections, &identity_resolve );
+  let (composed, warnings) =
+    compose_sections ( &sections, &identity_resolve );
   let got : Vec<&str> =
-    folded . contains . iter ()
+    composed . contains . iter ()
     . map ( |m| m . member . 0 . as_str () )
     . collect ();
   assert_eq! ( got, vec! ["y", "a"],
@@ -332,10 +332,10 @@ fn duplicate_anchors_concatenate_in_file_order (
           ListItem::Anchor { anchor : ID::new ("a") },
           ListItem::Member ( ID::new ("z") ) ] ),
         .. SectionSlices::default () } ) ];
-  let (folded, _) =
-    fold_sections ( &sections, &identity_resolve );
+  let (composed, _) =
+    compose_sections ( &sections, &identity_resolve );
   let got : Vec<&str> =
-    folded . contains . iter ()
+    composed . contains . iter ()
     . map ( |m| m . member . 0 . as_str () )
     . collect ();
   assert_eq! ( got, vec! ["a", "x", "z"] );
@@ -360,10 +360,10 @@ fn anchors_resolve_through_the_resolver ( // extra-id safety
           ListItem::Anchor { anchor : ID::new ("a-alias") },
           ListItem::Member ( ID::new ("y") ) ] ),
         .. SectionSlices::default () } ) ];
-  let (folded, warnings) =
-    fold_sections ( &sections, &resolve );
+  let (composed, warnings) =
+    compose_sections ( &sections, &resolve );
   let got : Vec<&str> =
-    folded . contains . iter ()
+    composed . contains . iter ()
     . map ( |m| m . member . 0 . as_str () )
     . collect ();
   assert_eq! ( got, vec! ["a", "y"] );
@@ -386,16 +386,16 @@ fn the_home_is_the_most_public_section_titled_or_not (
       SectionSlices { title : Some ( "N" . to_string () ),
                       body  : Some ( "secret" . to_string () ),
                       .. SectionSlices::default () } );
-  let (folded, warnings) : (FoldedNode, Vec<FoldWarning>) =
-    fold_sections (
+  let (composed, warnings) : (ComposedNode, Vec<CompositionWarning>) =
+    compose_sections (
       & [ titleless_public, titled_private ],
       & identity_resolve );
-  assert_eq! ( folded . home,
+  assert_eq! ( composed . home,
                Some ( SkgRepoName::from ("public") ),
                "the home is the most public section" );
-  assert_eq! ( folded . title, Some ( "N" . to_string () ),
+  assert_eq! ( composed . title, Some ( "N" . to_string () ),
                "the title still folds in, from wherever it sits" );
-  assert! ( warnings . contains ( & FoldWarning::TitleBelowHome {
+  assert! ( warnings . contains ( & CompositionWarning::TitleBelowHome {
               home     : SkgRepoName::from ("public"),
               title_at : SkgRepoName::from ("private"), } ),
             "the shape is reported: {:?}", warnings );
@@ -413,26 +413,26 @@ fn a_titled_most_public_section_raises_no_title_warning (
       SectionSlices { contains : Some ( vec! [
         ListItem::Member ( ID::new ("C") ) ] ),
         .. SectionSlices::default () } );
-  let (folded, warnings) : (FoldedNode, Vec<FoldWarning>) =
-    fold_sections (
+  let (composed, warnings) : (ComposedNode, Vec<CompositionWarning>) =
+    compose_sections (
       & [ titled_public, titleless_private ],
       & identity_resolve );
-  assert_eq! ( folded . home,
+  assert_eq! ( composed . home,
                Some ( SkgRepoName::from ("public") ) );
   assert! ( ! warnings . iter () . any ( |w| matches! (
-              w, FoldWarning::TitleBelowHome { .. }
-                 | FoldWarning::NonHomeTitle { .. }
-                 | FoldWarning::MissingTitle )),
+              w, CompositionWarning::TitleBelowHome { .. }
+                 | CompositionWarning::NonHomeTitle { .. }
+                 | CompositionWarning::MissingTitle )),
             "the ordinary telescope shape warns about nothing: {:?}",
             warnings );
 }
 
 fn text_node (
   sections : Vec<(SkgRepoName, SectionSlices)>,
-) -> (crate::types::nodes::complete::Graphnode, Vec<FoldWarning>) {
-  let (folded, warnings) = fold_sections (&sections, &identity_resolve);
-  let node = graphnode_from_fold (
-    ID::new ("text-node"), Vec::new (), Vec::new (), folded )
+) -> (crate::types::nodes::complete::Graphnode, Vec<CompositionWarning>) {
+  let (composed, warnings) = compose_sections (&sections, &identity_resolve);
+  let node = graphnode_from_composition (
+    ID::new ("text-node"), Vec::new (), Vec::new (), composed )
     .expect ("test cases carry a title");
   (node, warnings) }
 
@@ -462,7 +462,7 @@ fn title_and_body_select_independently_and_mark_overPrivateTextness (
   assert_eq! (lower_title . body . as_deref (), Some ("home body"));
   assert! (lower_title . overPrivateText_telescope);
   assert! (warnings . iter () . any ( |warning| matches! (
-    warning, FoldWarning::TitleBelowHome { title_at, .. }
+    warning, CompositionWarning::TitleBelowHome { title_at, .. }
       if title_at == &private )));
 
   let (lower_body, warnings) = text_node (vec! [
@@ -476,7 +476,7 @@ fn title_and_body_select_independently_and_mark_overPrivateTextness (
   assert_eq! (lower_body . body . as_deref (), Some ("lower body"));
   assert! (lower_body . overPrivateText_telescope);
   assert! (warnings . iter () . any ( |warning| matches! (
-    warning, FoldWarning::BodyBelowHome { body_at, .. }
+    warning, CompositionWarning::BodyBelowHome { body_at, .. }
       if body_at == &private )));
 
   let (both_lower, _) = text_node (vec! [
@@ -504,8 +504,8 @@ fn later_text_reports_the_repo_that_actually_won (
         title : Some ("later" . to_string ()),
         body  : Some ("later body" . to_string ()),
         .. SectionSlices::default () } ) ]);
-  assert! (warnings . contains (&FoldWarning::NonHomeTitle {
+  assert! (warnings . contains (&CompositionWarning::NonHomeTitle {
     skgrepo : private . clone (), selected_at : public . clone () }));
-  assert! (warnings . contains (&FoldWarning::NonHomeBody {
+  assert! (warnings . contains (&CompositionWarning::NonHomeBody {
     skgrepo : private, selected_at : public }));
 }

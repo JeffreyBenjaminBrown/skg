@@ -57,19 +57,19 @@ the MOST PUBLIC RETAINED section; it alone holds title, body, and extra
 ids. That the home carries the title is an INVARIANT, not a
 search rule: a node's text always lives in its most public
 section, so a titleless section above the title is a violation
-the fold reports (=FoldWarning::TitleBelowHome=), not a shape to
+the composition reports (=CompositionWarning::TitleBelowHome=), not a shape to
 look past. There is no linking relationship between sections —
 sharing an ID is being the same node. See =docs/telescopes.org=
 and =server/types/nodes/fs.rs=.
 
-Before folding, an owned-PID collision is normalized: if any owned
+Before composing, an owned-PID collision is normalized: if any owned
 section exists for a PID, the entire owned telescope is retained and all
 same-PID foreign sections are ignored (with a deterministic warning and no
 filesystem edit). A telescope with no owned section remains wholly foreign.
 
 *** overPrivateText
 
-A privacy telescope is *overPrivateText* when its folded title or body is
+A privacy telescope is *overPrivateText* when its composed title or body is
 selected from a section more private than its home (most public retained)
 section. The flag applies to the whole telescope, even if only one text
 field is below home. This violates the rule that the node's text lives at
@@ -114,13 +114,13 @@ file section or an edit has nothing to say about the field;
 =Specified(vec![])= says the field is explicitly empty. Telescope
 folding and partial nodeIntents both depend on the difference.
 
-*** fold (visible vs full), unfold
+*** composition (visible vs full), decomposition
 
-The *fold* of a telescope combines its sections, most public
-first, into one effective node (=server/telescope/fold.rs=). The
-*full fold* uses every section; a *visible fold* uses only the
+The *composition* of a telescope combines its sections, most public
+first, into one effective node (=server/telescope/compose.rs=). The
+*full composition* uses every section; a *visible composition* uses only the
 sections active under the current skgrepo-set, and is what a
-restricted view renders. *Unfold* is the save-side inverse:
+restricted view renders. *Decomposition* is the save-side inverse:
 splitting the effective node back into sections, byte-stably.
 
 *** placement, anchor

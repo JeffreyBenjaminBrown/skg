@@ -7,7 +7,7 @@
 //! not change, so an unchanged section serializes byte-identically
 //! (the no-cosmetic-rewrites rule).
 //!
-//! fold(unfold(x)) == x for every list of relation partners (pinned by the
+//! compose(decompose(x)) == x for every list of relation partners (pinned by the
 //! property suite in tests/unit/telescope.rs).
 
 use crate::telescope::types::{
@@ -22,8 +22,8 @@ use crate::types::nodes::fs::{GraphnodeOnDisk, graphnode_on_disk_from_section};
 use std::collections::HashMap;
 use std::fmt;
 
-/// Everything required to unfold one complete in-memory node.
-pub struct UnfoldInput<'a> {
+/// Everything required to decompose one complete in-memory node.
+pub struct DecompositionInput<'a> {
   pub pid                          : &'a ID,
   pub extra_ids                    : &'a [ID],
   pub flags                        : &'a [Flag],
@@ -37,20 +37,20 @@ pub struct UnfoldInput<'a> {
   pub overrides_view_of            : &'a [RelPartner<ID>],
 }
 
-/// A complete on-disk telescope prepared by the unfold boundary.
+/// A complete on-disk telescope prepared by the decomposition boundary.
 /// Construction proves that it is nonempty, starts at HOME, and
 /// contains same-pid sections at configured unique skgrepos in
 /// privacy order. Ownership is deliberately not part of this type;
 /// the filesystem writer checks it before mutation.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct UnfoldedTelescope {
+pub struct DecomposedTelescope {
   pid      : ID,
   home     : SkgRepoName,
   sections : Vec<(SkgRepoName, GraphnodeOnDisk)>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum UnfoldedTelescopeConstructionError {
+pub enum DecomposedTelescopeConstructionError {
   InvalidTelescope (TelescopeConstructionError),
   HomeMismatch {
     expected : SkgRepoName,
@@ -58,40 +58,40 @@ pub enum UnfoldedTelescopeConstructionError {
   },
 }
 
-impl fmt::Display for UnfoldedTelescopeConstructionError {
+impl fmt::Display for DecomposedTelescopeConstructionError {
   fn fmt (
     &self,
     f : &mut fmt::Formatter<'_>,
   ) -> fmt::Result {
     match self {
-      UnfoldedTelescopeConstructionError::InvalidTelescope (error) =>
+      DecomposedTelescopeConstructionError::InvalidTelescope (error) =>
         write! (f, "{}", error),
-      UnfoldedTelescopeConstructionError::HomeMismatch {
+      DecomposedTelescopeConstructionError::HomeMismatch {
         expected, actual } =>
         write! ( f,
           "Unfolded telescope expected home '{}', but its first section is '{}'.",
           expected, actual ), }} }
 
-impl std::error::Error for UnfoldedTelescopeConstructionError {
+impl std::error::Error for DecomposedTelescopeConstructionError {
 }
 
-impl UnfoldedTelescope {
+impl DecomposedTelescope {
   pub fn try_new (
     pid      : ID,
     home     : SkgRepoName,
     sections : Vec<(SkgRepoName, GraphnodeOnDisk)>,
     config   : &SkgConfig,
-  ) -> Result<UnfoldedTelescope, UnfoldedTelescopeConstructionError> {
+  ) -> Result<DecomposedTelescope, DecomposedTelescopeConstructionError> {
     let telescope : Telescope = Telescope::try_new (
       pid . clone (), sections . clone (), config )
       . map_err (
-        UnfoldedTelescopeConstructionError::InvalidTelescope ) ?;
+        DecomposedTelescopeConstructionError::InvalidTelescope ) ?;
     if telescope . home () != &home {
       return Err (
-        UnfoldedTelescopeConstructionError::HomeMismatch {
+        DecomposedTelescopeConstructionError::HomeMismatch {
           expected : home,
           actual   : telescope . home () . clone (), } ); }
-    Ok ( UnfoldedTelescope { pid, home, sections } ) }
+    Ok ( DecomposedTelescope { pid, home, sections } ) }
 
   pub fn pid (&self) -> &ID { &self . pid }
 
@@ -104,10 +104,10 @@ impl UnfoldedTelescope {
     self . sections }
 }
 
-pub fn unfold_node (
-  input  : &UnfoldInput,
+pub fn decompose_node (
+  input  : &DecompositionInput,
   config : &SkgConfig,
-) -> Result<UnfoldedTelescope, UnfoldedTelescopeConstructionError> {
+) -> Result<DecomposedTelescope, DecomposedTelescopeConstructionError> {
   let mut sections : HashMap<SkgRepoName, SectionSlices> =
     HashMap::new ();
   let mut skgrepo_names : Vec<SkgRepoName> = Vec::new ();
@@ -134,13 +134,13 @@ pub fn unfold_node (
   for (skgrepo, section) in sections . iter_mut () {
     let is_more_public = |a : &SkgRepoName, b : &SkgRepoName| -> bool {
       rank (a) < rank (b) };
-    section . contains = unfold_ordered (
+    section . contains = decompose_ordered (
       input . contains, skgrepo, &is_more_public );
-    section . subscribes_to = unfold_ordered (
+    section . subscribes_to = decompose_ordered (
       input . subscribes_to, skgrepo, &is_more_public );
-    section . hides_from_its_subscriptions = unfold_unordered (
+    section . hides_from_its_subscriptions = decompose_unordered (
       input . hides_from_its_subscriptions, skgrepo );
-    section . overrides_view_of = unfold_unordered (
+    section . overrides_view_of = decompose_unordered (
       input . overrides_view_of, skgrepo );
     section . aliases = {
       let mine : Vec<String> =
@@ -174,7 +174,7 @@ pub fn unfold_node (
         is_home, slices );
       (skgrepo, node_fs) } )
     . collect ();
-  UnfoldedTelescope::try_new (
+  DecomposedTelescope::try_new (
     input . pid . clone (), input . home . clone (),
     complete_sections, config ) }
 
@@ -185,7 +185,7 @@ pub fn unfold_node (
 /// construction (nothing precedes its members more publicly ONLY
 /// when it is first -- middle skgrepos can and do anchor). Returns
 /// None when the skgrepo has no members of this relation.
-fn unfold_ordered (
+fn decompose_ordered (
   effective      : &[RelPartner<ID>],
   skgrepo        : &SkgRepoName,
   is_more_public : &dyn Fn (&SkgRepoName, &SkgRepoName) -> bool,
@@ -220,7 +220,7 @@ fn unfold_ordered (
 
 /// One unordered relation's slice for REPO: just its members, in
 /// effective order. None when empty.
-fn unfold_unordered (
+fn decompose_unordered (
   effective : &[RelPartner<ID>],
   skgrepo   : &SkgRepoName,
 ) -> Option<Vec<ID>> {

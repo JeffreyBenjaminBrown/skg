@@ -476,7 +476,7 @@ fn collect_events (
     let mut kids : Vec<ID> = Vec::new ();
     for member in node . contains . iter () {
       if ! relRepo_is_active (member, active) { continue; } // the EDGE's
-        // skgrepo is inactive: the visible fold omits it, even when
+        // skgrepo is inactive: the visible composition omits it, even when
         // the child's home is active.
       let cpid : ID = resolve_pid (&member . member, alias_to_pid);
       if marker_pids . contains (&cpid) { continue; } // markers never render
@@ -747,7 +747,7 @@ fn node_active (
   active . is_all () || active . contains_skgrepo (&node . home_skgrepo) }
 
 /// Whether an EDGE is visible under the active set: its recorded
-/// relRepo must be active. (The visible fold = active
+/// relRepo must be active. (The visible composition = active
 /// sections' lists only.)
 fn relRepo_is_active (
   member : &RelPartner<ID>,

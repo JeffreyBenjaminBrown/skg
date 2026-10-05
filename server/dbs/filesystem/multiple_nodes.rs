@@ -1,6 +1,6 @@
-use crate::telescope::fold::fold_telescope_collecting_warnings;
+use crate::telescope::compose::compose_telescope_collecting_warnings;
 use crate::telescope::types::{
-  FoldWarning, Telescope, retain_owned_sections_when_pid_folderlides,
+  CompositionWarning, Telescope, retain_owned_sections_when_pid_folderlides,
 };
 use crate::telescope::invariants::TelescopeViolation;
 use crate::dbs::filesystem::one_node::{
@@ -55,9 +55,9 @@ pub(crate) fn read_all_skg_files_from_skgrepos_read_only (
 ///
 /// Two kinds arise here and nowhere else, because only here are a
 /// node's SECTION LIST and the config both in hand:
-/// - every 'FoldWarning' (wrapped as 'TelescopeViolation::Fold'),
+/// - every 'CompositionWarning' (wrapped as 'TelescopeViolation::Composition'),
 /// - 'IgnoredForeignPidFolderlision', where owned and non-owned files
-///   use the same pid. The owned telescope wins before folding.
+///   use the same pid. The owned telescope wins before composition.
 pub fn read_all_skg_files_from_skgrepos_collecting_violations (
   config: &SkgConfig
 ) -> io::Result<(Vec<Graphnode>, Vec<(ID, TelescopeViolation)>)> {
@@ -103,18 +103,18 @@ fn read_all_skg_files_from_skgrepos_impl (
   let collision_violations : Vec<(ID, TelescopeViolation)> =
     retain_owned_telescopes (
       &mut sections_by_pid, &pid_order, config );
-  let (nodes, fold_violations)
+  let (nodes, composition_violations)
     : (Vec<Graphnode>, Vec<(ID, TelescopeViolation)>) =
-    fold_grouped_sections (sections_by_pid, pid_order, config) ?;
+    compose_grouped_sections (sections_by_pid, pid_order, config) ?;
   Ok (( nodes,
         { let mut all : Vec<(ID, TelescopeViolation)> =
             collision_violations;
-          all . extend (fold_violations);
+          all . extend (composition_violations);
           all . sort_by ( |a, b| a . 0 . cmp ( &b . 0 ));
           all } )) }
 
 /// When owned and non-owned files use one pid, retain only the
-/// owned files before folding or building the extra-id map. A pid
+/// owned files before composition or building the extra-id map. A pid
 /// represented entirely by non-owned files remains readable.
 fn retain_owned_telescopes (
   sections_by_pid : &mut HashMap<ID, Vec<(SkgRepoName, GraphnodeOnDisk)>>,
@@ -137,7 +137,7 @@ fn retain_owned_telescopes (
   violations }
 
 /// One telescope, read fresh from disk by pid (all its sections,
-/// folded). Errors if no section exists or no section has a title.
+/// composed). Errors if no section exists or no section has a title.
 pub fn graphnode_from_telescope_on_disk (
   config : &SkgConfig,
   pid    : &ID,
@@ -146,14 +146,14 @@ pub fn graphnode_from_telescope_on_disk (
     config, pid . clone (),
     & SkgRepoName::from ("(any)") ) }
 
-/// Fold each telescope (already grouped by pid; sections arrive in
+/// Compose each telescope (already grouped by pid; sections arrive in
 /// privacy order because the caller iterated 'ordered_repos').
 /// Anchors resolve through the extra-id map built from every
 /// section, so a nodeMerge cannot dangle an anchor. A telescope
 /// with no title in any section is a hard load error; every other
-/// fold complaint comes back as a violation for the caller to
+/// compose complaint comes back as a violation for the caller to
 /// report.
-fn fold_grouped_sections (
+fn compose_grouped_sections (
   mut sections_by_pid : HashMap<ID, Vec<(SkgRepoName, GraphnodeOnDisk)>>,
   pid_order           : Vec<ID>,
   config              : &SkgConfig,
@@ -178,16 +178,16 @@ fn fold_grouped_sections (
       config )
       . map_err ( |e| io::Error::new (
         io::ErrorKind::InvalidData, e ) ) ?;
-    let (node, warnings) : (Graphnode, Vec<FoldWarning>) =
-      fold_telescope_collecting_warnings ( telescope, &resolve ) ?;
+    let (node, warnings) : (Graphnode, Vec<CompositionWarning>) =
+      compose_telescope_collecting_warnings ( telescope, &resolve ) ?;
     all_nodes . push (node);
     for w in warnings {
       all_violations . push (
-        ( pid . clone (), TelescopeViolation::Fold (w) )); }}
+        ( pid . clone (), TelescopeViolation::Composition (w) )); }}
   Ok (( all_nodes, all_violations )) }
 
 /// NOT AN ERROR: same-id files across skgrepos. Those are the
-/// SECTIONS of one privacy telescope, grouped and folded at load,
+/// SECTIONS of one privacy telescope, grouped and composed at load,
 /// and they are the feature -- see docs/telescopes.org. Sections of
 /// one telescope share a pid, so they can never trip this check.
 ///
@@ -263,7 +263,7 @@ pub fn read_skg_sections_from_folder (
 /// Like `read_all_skg_files_from_repos` but only for telescopes
 /// with at least one section file whose mtime is more recent than
 /// `since`. A touched SECTION reloads its WHOLE telescope (all its
-/// sections, however old), since the fold needs every skgrepo.
+/// sections, however old), since the composition needs every skgrepo.
 pub fn read_recently_modified_skgfiles_from_skgrepos (
   config : &SkgConfig,
   since  : std::time::SystemTime,

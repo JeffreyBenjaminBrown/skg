@@ -13,14 +13,14 @@
 //! parse unchanged (title present, no anchors).
 //!
 //! Conversions:
-//! - 'GraphnodeOnDisk::into_section_slices' feeds the fold
-//!   ('server/telescope/fold.rs'), which is how Graphnode values
-//!   are born; 'graphnode_on_disk_from_section' is the unfold-side inverse.
+//! - 'GraphnodeOnDisk::into_section_slices' feeds the composition
+//!   ('server/telescope/compose.rs'), which is how Graphnode values
+//!   are born; 'graphnode_on_disk_from_section' is the decomposition-side inverse.
 //! - 'GraphnodeOnDisk::into_complete_as_single_section (repo)' treats ONE
 //!   section as a whole node. Used only where a single FILE is the
 //!   honest unit: historical blobs (the vanished-node search) and
 //!   diff MODE's per-file reads (safe because diff mode requires
-//!   the active skgrepo-set "all", so no fold is hidden).
+//!   the active skgrepo-set "all", so no composition is hidden).
 
 use serde::{Serialize, Deserialize};
 
@@ -65,7 +65,7 @@ pub struct GraphnodeOnDisk {
 }
 
 impl GraphnodeOnDisk {
-  /// This section's contribution to the fold.
+  /// This section's contribution to the composition.
   pub fn into_section_slices (
     self,
   ) -> SectionSlices {

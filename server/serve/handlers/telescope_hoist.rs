@@ -2,12 +2,12 @@
 //!
 //! A buffer-authored Graphnode has already lost the provenance of its
 //! title and body. Before writing it, reread the current disk telescope and
-//! fold the title/body text with the load path. If either selected title/body text lives below
+//! compose the title/body text with the load path. If either selected title/body text lives below
 //! home, the save must carry an exact PID approval obtained from the typed
 //! confirmation response.
 
 use crate::dbs::filesystem::one_node::telescope_from_disk;
-use crate::telescope::fold::fold_telescope_collecting_warnings;
+use crate::telescope::compose::compose_telescope_collecting_warnings;
 use crate::types::misc::{ID, SkgConfig, SkgRepoName};
 use crate::types::save::{NodeInstruction, NodeMerge, SaveNode};
 use crate::types::sexp::extract_string_list_from_sexp;
@@ -79,7 +79,7 @@ pub fn candidates_from_disk (
         format! (
           "Refusing to offer Hoist for '{}': its selected home '{}' is not owned.",
           pid, home ))); }
-    let (node, _warnings) = fold_telescope_collecting_warnings (
+    let (node, _warnings) = compose_telescope_collecting_warnings (
       telescope, & |skgid : &ID| skgid . clone () ) ?;
     if node . overPrivateText_telescope {
       candidates . push ( HoistCandidate { pid, home } ); }}
@@ -108,7 +108,7 @@ pub fn repair_saves_for_unwritten_candidates (
     if already_written . contains (&candidate . pid) { continue; }
     let Some (telescope) = telescope_from_disk (
         config, &candidate . pid) ? else { continue; };
-    let (mut node, _warnings) = fold_telescope_collecting_warnings (
+    let (mut node, _warnings) = compose_telescope_collecting_warnings (
       telescope, & |skgid : &ID| skgid . clone () ) ?;
     node . overPrivateText_telescope = false;
     repairs . push ( NodeInstruction::Save (SaveNode (node)) ); }

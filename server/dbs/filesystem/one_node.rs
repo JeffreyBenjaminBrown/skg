@@ -1,9 +1,9 @@
-use crate::telescope::fold::fold_telescope;
+use crate::telescope::compose::compose_telescope;
 use crate::telescope::types::{
   Telescope, retain_owned_sections_when_pid_folderlides,
 };
-use crate::telescope::unfold::{
-  UnfoldInput, UnfoldedTelescope, unfold_node,
+use crate::telescope::decompose::{
+  DecompositionInput, DecomposedTelescope, decompose_node,
 };
 use crate::types::misc::{ID, SkgConfig, SkgRepoName, members_msv};
 use crate::types::nodes::fs::GraphnodeOnDisk;
@@ -33,8 +33,8 @@ pub fn graphnode_from_skgid (
 
 /// Reads a Graphnode from disk given its PID: the whole
 /// TELESCOPE -- every same-pid section file across the configured
-/// skgrepos, folded. The 'repo' parameter survives only as the
-/// caller's belief about the home; the fold derives the true home
+/// skgrepos, composed. The 'repo' parameter survives only as the
+/// caller's belief about the home; the composition derives the true home
 /// (the most public section), so a stale belief cannot corrupt the
 /// read. Extra-id anchor resolution here is
 /// identity-only (this telescope's own extra_ids are unknown until
@@ -51,7 +51,7 @@ pub fn graphnode_from_pid_and_skgrepo (
       io::ErrorKind::NotFound,
       format! ("No .skg file for '{}' in any repo (caller expected one in '{}')",
                pid, skgrepo ))); };
-  fold_telescope ( telescope, & |skgid : &ID| skgid . clone () ) }
+  compose_telescope ( telescope, & |skgid : &ID| skgid . clone () ) }
 
 /// PID's telescope as it sits on disk, in privacy order: for each
 /// configured skgrepo (most public first), pid.skg if present. The
@@ -118,7 +118,7 @@ pub fn fetch_aliases_from_file (
       members_msv ( & graphnode . aliases ) . into_vec(),
     _ => Vec::new(), }}
 
-/// Write a node as its telescope: unfold into per-repo sections,
+/// Write a node as its telescope: decompose into per-repo sections,
 /// write each section file only when its bytes changed
 /// (no-cosmetic-rewrites), and delete OWNED section files whose
 /// skgrepo lost its last member. Foreign skgrepos are never written or
@@ -189,7 +189,7 @@ impl PreparedTelescopeWrite {
     Ok (( ))
   }
 
-  /// Hoist is not complete until a fresh disk fold proves that title and
+  /// Hoist is not complete until a fresh disk compose proves that title and
   /// body now select from home. This runs after filesystem writes and before
   /// callers update the in-memory graph or either derived database.
   pub(crate) fn verify_hoist (
@@ -223,9 +223,9 @@ pub(crate) fn prepare_graphnode_telescope (
   let verify_as_hoist : bool =
     error_unless_home_is_writable (
       graphnode, config, allow_hoist ) ?;
-  let unfolded : UnfoldedTelescope =
-    unfold_node (
-      & UnfoldInput {
+  let decomposed : DecomposedTelescope =
+    decompose_node (
+      & DecompositionInput {
         pid      : pid,
         extra_ids : & graphnode . extra_ids,
         flags    : & graphnode . flags,
@@ -244,7 +244,7 @@ pub(crate) fn prepare_graphnode_telescope (
     . map_err ( |e| io::Error::new (
       io::ErrorKind::InvalidData, e ) ) ?;
 
-  let mut offending_skgrepos : Vec<SkgRepoName> = unfolded . sections ()
+  let mut offending_skgrepos : Vec<SkgRepoName> = decomposed . sections ()
     . iter ()
     .map ( |(skgrepo, _)| skgrepo )
     . filter ( |skgrepo| ! config . skgrepo_is_owned (skgrepo) )
@@ -264,7 +264,7 @@ pub(crate) fn prepare_graphnode_telescope (
 
   let mut prepared_writes : Vec<(SkgRepoName, String, String)> =
     Vec::new ();
-  for (skgrepo, node_fs) in unfolded . sections () {
+  for (skgrepo, node_fs) in decomposed . sections () {
     let path : String =
       path_from_pid_and_skgrepo ( config, skgrepo, pid . clone () )
       . map_err ( |e| io::Error::new (
@@ -303,7 +303,7 @@ pub(crate) fn prepare_graphnode_telescope (
 /// creates a section more public than the home -- and arrive only
 /// from hand-edited files, a pull, or a foreign overlay.
 ///
-/// The nodes this blocks are already broken; the fold reports both
+/// The nodes this blocks are already broken; the composition reports both
 /// shapes in telescope-warnings.org with their repairs.
 fn error_unless_home_is_writable (
   graphnode : &Graphnode,
@@ -322,14 +322,14 @@ fn error_unless_home_is_writable (
       format! (
         "Refusing to write '{}': its home is '{}', which you do not own. Foreign sections are never written, so this node cannot be saved from here. See the foreign-overlay entry in telescope-warnings.org.",
         graphnode . pid, home ))); }
-  // TEXT HOIST. Fold the current disk telescope with the same title/body
+  // TEXT HOIST. Compose the current disk telescope with the same title/body
   // selection used by load. Looking only for a titleless home misses the
   // equally sensitive shape "title at home, body below home".
   let disk_is_overPrivateText : bool =
     match telescope_from_disk (config, &graphnode . pid) ? {
       None => false,
       Some (telescope) => match
-        fold_telescope ( telescope, & |skgid : &ID| skgid . clone () ) {
+        compose_telescope ( telescope, & |skgid : &ID| skgid . clone () ) {
           Ok (disk_node) => disk_node . overPrivateText_telescope,
           Err (error) => return Err ( io::Error::new (
             io::ErrorKind::InvalidData,

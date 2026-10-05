@@ -316,8 +316,8 @@ So far there are these endpoints:
     in both role directions, text diffs for title/body, and
     root/new/deleted/modified buckets. Nodes are compared as whole
     telescopes: each endpoint's section files are grouped by pid and
-    folded, so a change to one section reports against the node's
-    full fold. A separate bucket ("IDs claimed by more than one
+    composed, so a change to one section reports against the node's
+    full composition. A separate bucket ("IDs claimed by more than one
     node") reports duplicate-ID VIOLATIONS — an id claimed by two
     distinct pids at either endpoint. An id merely present in
     several skgrepos is the normal telescope shape and is not
@@ -1068,7 +1068,7 @@ skgrepo; the filename is the node's primary ID followed by =.skg= in
 every skgrepo. The node's *home* is its MOST PUBLIC section, and
 that section carries the =title= — an invariant, not a search rule.
 A titleless section more public than the title still loads (the
-fold reports it) but cannot be rewritten by a save. A field a
+composition reports it) but cannot be rewritten by a save. A field a
 section omits is a field that section has no opinion about.
 Pre-telescope single-file nodes parse unchanged (one section, title
 present, no anchors).
@@ -1100,8 +1100,8 @@ Fields:
   across sections; each entry's relRepo is its section's
   skgrepo.
 
-The FOLD of all same-pid sections (most public first) yields the
-node; saving UNFOLDS the node back into sections, byte-stably, so
+The COMPOSITION of all same-pid sections (most public first) yields the
+node; saving DECOMPOSES the node back into sections, byte-stably, so
 untouched sections do not change on disk. An owned section emptied
 by a save is deleted; foreign sections are never touched.
 

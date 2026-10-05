@@ -197,7 +197,7 @@ pub struct SkgConfig {
   // which loses it). Filled at parse time by the config loaders; empty
   // for dummy/test configs, where the config-order helpers fall back to
   // alphabetical. LOAD-BEARING: declaration order is the privacy order
-  // (most public first); the fold, the relRepo defaults, the
+  // (most public first); the composition, the relRepo defaults, the
   // validators, and prefix skgrepo-sets all read it, through the
   // comparison chokepoint methods below ('ordered_repos',
   // 'repo_position', 'is_strictly_more_public', 'more_private_of',
