@@ -24,7 +24,7 @@ impl Forest<Viewnode> {
       viewforest_root_viewnode () ) }}
 
   /// Drop save-only edit requests from every occurrence in a successfully
-  /// committed saved view. View requests have a different lifecycle and are
+  /// skgsave-committed saved view. View requests have a different lifecycle and are
   /// intentionally preserved for completion to execute.
   pub fn consume_edit_requests_after_save (
     &mut self,

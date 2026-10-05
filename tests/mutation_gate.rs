@@ -277,7 +277,7 @@ fn rebuild_started_after_a_mutation_publishes_a_snapshot_containing_it () {
 #[test]
 fn tantivy_worker_applies_same_pid_tasks_in_publication_order () {
   let index = empty_in_ram_tantivy_index () . unwrap ();
-  // Holding the writer lock makes both tasks queue before either can commit,
+  // Holding the writer lock makes both tasks queue before either can tantivy-commit,
   // so the assertion depends on channel order rather than scheduler timing.
   let writer_lock = lock_tantivy_writes ();
   for title in ["firstversiontoken", "secondversiontoken"] {

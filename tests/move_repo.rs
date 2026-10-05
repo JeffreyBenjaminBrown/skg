@@ -25,7 +25,7 @@ fn tantivy_skgrepo_for_skgid (
   query          : &str,
   expected_skgid : &str,
 ) -> Result<Option<String>, Box<dyn Error>> {
-  // A save commits its Tantivy index update in the background, so wait
+  // A save tantivy-commits its search-index update in the background, so wait
   // for it to land before reading — mirroring the production search
   // handler. (See server/dbs/tantivy/background_writer.rs.)
   skg::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();

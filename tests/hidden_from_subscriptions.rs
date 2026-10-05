@@ -1175,7 +1175,7 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
       response . warnings . iter () . any ( |warning|
         warning . contains ("Saved hide for")
         && warning . contains ("HiddenInSubscribeeFolder") ),
-      "Expected the post-commit moved-inside warning: {:?}",
+      "Expected the post-skgsave-commit moved-inside warning: {:?}",
       response . warnings );
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (

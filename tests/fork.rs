@@ -173,8 +173,8 @@ fn all_tests
       s . reset ("fork_repo_inactive", fixtures) ?;
       fork_skgrepo_inactive (
         &s . config ) . await ?;
-      s . reset ("fork_confirmation_gates_commit", fixtures) ?;
-      fork_confirmation_gates_commit (
+      s . reset ("fork_confirmation_gates_skgsave_commit", fixtures) ?;
+      fork_confirmation_gates_skgsave_commit (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("fork_from_bare_new_child_plan", fixtures) ?;
       fork_from_bare_new_child_plan (
@@ -182,8 +182,8 @@ fn all_tests
       s . reset ("fork_new_parent_adopts_relationship_repos", fixtures) ?;
       fork_new_parent_adopts_relationship_skgrepos (
         &s . config ) . await ?;
-      s . reset ("fork_from_bare_new_child_commits", fixtures) ?;
-      fork_from_bare_new_child_commits (
+      s . reset ("fork_from_bare_new_child_skgsave_commits", fixtures) ?;
+      fork_from_bare_new_child_skgsave_commits (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("explicitly_foreign_new_child_still_rejected", fixtures) ?;
       explicitly_foreign_new_child_still_rejected (
@@ -265,7 +265,7 @@ async fn explicit_fork_on_unknown_node_errors (
       "expected ForkRequestOnUnknownNode, got {:?}", other ), }
   Ok (( )) }
 
-/// The explicit fork commits a clone overriding the owned P (override
+/// The explicit fork skgsave-commits a clone overriding the owned P (override
 /// substitution then draws it in P's place), and a SECOND explicit fork
 /// of the now-overridden P is rejected with 'ForkAlreadyExists'.
 async fn explicit_fork_round_trip_and_monogamy (
@@ -282,7 +282,7 @@ async fn explicit_fork_round_trip_and_monogamy (
     false, &Err ( String::new () ), &mut views_state,
     /* approved_forks = */ true ) . await ?;
   assert! ( response . errors . is_empty (),
-    "the approved explicit fork must commit: {:?}", response . errors );
+    "the approved explicit fork must skgsave-commit: {:?}", response . errors );
   let clone : Graphnode = clone_overriding_on_disk (config, "P") ?;
   assert_eq! ( members_of ( clone . subscribes_to . or_default () ), vec! [ ID::from ("P") ],
     "the clone subscribes to P" );
@@ -404,7 +404,7 @@ async fn fork_user_set_skgrepo_overrides (
     &Err ( String::new () ), &mut views_state,
     /* approved_forks = */ true, &fork_skgrepos ) . await ?;
   assert! ( response . errors . is_empty (),
-    "the user-set fork must commit: {:?}", response . errors );
+    "the user-set fork must skgsave-commit: {:?}", response . errors );
   let c : Graphnode = clone_on_disk (config) ?;
   assert_eq! ( c . home_skgrepo, SkgRepoName::from ("owned2"),
     "the user-set repo 'owned2' must override the inferred 'owned'; \
@@ -464,9 +464,9 @@ async fn disagreeing_new_child_skgrepos_leave_clone_skgrepo_unconfirmed (
   Ok (( )) }
 
 /// The confirmation stage: a save that finds forks but is NOT approved
-/// returns a fork-confirmation buffer and commits NOTHING; re-issuing
-/// the save approved then commits.
-async fn fork_confirmation_gates_commit (
+/// returns a fork-confirmation buffer and skgsave-commits NOTHING; re-issuing
+/// the save approved then skgsave-commits.
+async fn fork_confirmation_gates_skgsave_commit (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -475,7 +475,7 @@ async fn fork_confirmation_gates_commit (
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false, open_views : OpenViews::new () };
 
-  // Unapproved save -> fork-confirmation, nothing committed.
+  // Unapproved save -> fork-confirmation, nothing skgsave-committed.
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer_with_fork_approval_test (
     &mut stream, FORK_BUFFER, config, tantivy, &graph, false,
@@ -487,20 +487,20 @@ async fn fork_confirmation_gates_commit (
             && response . saved_view . contains ("(id N)"),
     "the confirmation buffer must list N:\n{}", response . saved_view );
   assert! ( clone_on_disk (config) . is_err (),
-    "no clone may be committed before approval" );
+    "no clone may be skgsave-committed before approval" );
   assert_eq! ( node_from_disk (config, "N") ? . title, "N-original",
     "N must be untouched before approval" );
 
-  // Approved re-issue -> commits the clone.
+  // Approved re-issue -> skgsave-commits the clone.
   let mut stream2 : std::net::TcpStream = mk_test_tcp_stream ();
   let response2 = update_from_and_rerender_buffer_with_fork_approval_test (
     &mut stream2, FORK_BUFFER, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state,
     /* approved_forks = */ true ) . await ?;
   assert! ( response2 . fork_confirmation . is_none (),
-    "an approved save commits and returns a normal save-result" );
+    "an approved save skgsave-commits and returns a normal save-result" );
   assert! ( clone_on_disk (config) . is_ok (),
-    "the clone must be committed after approval" );
+    "the clone must be skgsave-committed after approval" );
   Ok (( )) }
 
 /// TODO/fork-fixes.org Case 1, at the plan level: appending a bare
@@ -564,7 +564,7 @@ async fn fork_new_parent_adopts_relationship_skgrepos (
 /// TODO/fork-fixes.org Case 1, committed: the approved save creates
 /// the clone AND the new node, both in the owned skgrepo; N's foreign
 /// .skg is untouched.
-async fn fork_from_bare_new_child_commits (
+async fn fork_from_bare_new_child_skgsave_commits (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -578,7 +578,7 @@ async fn fork_from_bare_new_child_commits (
     &graph, false, &Err ( String::new () ), &mut views_state,
     /* approved_forks = */ true ) . await ?;
   assert! ( response . errors . is_empty (),
-    "the approved bare-new-child fork must commit: {:?}",
+    "the approved bare-new-child fork must skgsave-commit: {:?}",
     response . errors );
   let clone : Graphnode = clone_on_disk (config) ?;
   let new_node : Graphnode =

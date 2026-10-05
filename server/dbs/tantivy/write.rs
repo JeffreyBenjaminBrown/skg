@@ -1,6 +1,6 @@
 // PURPOSE: The search-index write path: update/delete/add document
 // helpers, plus `create_documents_from_node` (one title doc + one
-// doc per alias), and the shared `commit_with_status` used by both
+// doc per alias), and the shared `tantivy_commit_with_status` used by both
 // this module and `prominence_update`.
 
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
@@ -34,7 +34,7 @@ pub fn update_index_with_nodes (
   let processed_count: usize = // Add new associations.
     add_documents_to_tantivy_writer (
       nodes, &mut writer, tantivy_index, &HashMap::new ())?;
-  commit_with_status(
+  tantivy_commit_with_status(
     &mut writer, tantivy_index, processed_count, "Updated")?;
   Ok (processed_count) }
 
@@ -153,7 +153,7 @@ fn create_documents_from_node (
           body_for_this_doc ) ); }
   Ok (documents) }
 
-pub fn commit_with_status (
+pub fn tantivy_commit_with_status (
   writer        : &mut IndexWriter,
   tantivy_index : &TantivyIndex,
   indexed_count : usize,
@@ -165,11 +165,11 @@ pub fn commit_with_status (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "tantivy_writer_commit" ). entered();
       writer . commit () ? ; }
-    // Force the shared reader to see the new commit. With the
+    // Force the shared reader to see the new tantivy-commit. With the
     // default 'ReloadPolicy::OnCommitWithDelay', the reader
     // refreshes asynchronously after a small delay, which races
     // with code (notably tests) that searches immediately after a
-    // commit. Manual reload makes the post-commit state visible
+    // tantivy-commit. Manual reload makes the post-tantivy-commit state visible
     // synchronously.
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "tantivy_reader_reload" ). entered();

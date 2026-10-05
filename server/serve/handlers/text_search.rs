@@ -168,7 +168,7 @@ pub fn handle_text_search_request (
         return None; }};
   match search_terms {
     Ok (search_terms) => {
-      // Wait for any in-flight background search-index writes to commit, so
+      // Wait for any in-flight background search-index writes to tantivy-commit, so
       // the search reflects every save issued so far (read-your-writes).
       wait_for_tantivy_writes_idle ();
       let runtime = env . runtime_snapshot ();

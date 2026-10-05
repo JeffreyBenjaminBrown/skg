@@ -41,7 +41,7 @@ use crate::types::errors::SaveError;
 use crate::types::git::{SkgRepoDiff, GitDiffStatus};
 use crate::types::misc::{ID, SkgRepoName, SkgConfig};
 use crate::types::save::{
-  NodeInstruction, PostCommitNoticeCandidate, SavePlan, format_save_error_as_org };
+  NodeInstruction, PostSkgsaveCommitNoticeCandidate, SavePlan, format_save_error_as_org };
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::ViewUri;
 use crate::update_buffer::update_views_after_save;
@@ -65,14 +65,14 @@ pub struct SaveResponse {
   pub warnings            : Vec<String>,
   pub save_point_position : Option<SavePointPosition>,
   /// Some when this save found fork candidates and was NOT pre-approved:
-  /// nothing was committed, 'saved_view' instead holds the write-protected
+  /// nothing was skgsave-committed, 'saved_view' instead holds the write-protected
   /// fork-confirmation buffer, and this holds the one-line minibuffer
   /// prompt. The handler then sends a 'fork-confirmation' message rather
   /// than 'save-result'. None for an ordinary save.
   pub fork_confirmation   : Option<String>,
   /// Some when this save found an overPrivateText current disk telescope without an
   /// exact publication approval. This is checked before fork confirmation;
-  /// nothing was committed and the response contains no title/body text.
+  /// nothing was skgsave-committed and the response contains no title/body text.
   pub hoist_confirmation  : Option<Vec<HoistCandidate>>,
   /// Fully tagged overPrivateText-telescope-confirmation response produced after the
   /// save's rerenders have been staged but before text or view-state release.
@@ -198,7 +198,7 @@ pub fn handle_save_buffer_request (
                     &hoist_confirmation_response (candidates) )),
               (None, Some (to_minibuffer), _) =>
                 // A save that found forks and was not approved: nothing
-                // committed; send the confirmation buffer instead of a
+                // skgsave-committed; send the confirmation buffer instead of a
                 // save-result.
                 send_response_with_length_prefix (
                   stream,
@@ -643,7 +643,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     nodeMerge_instructions : nodeMerges,
     skgrepo_moves,
     fork_specs,
-    post_commit_notice_candidates }
+    post_skgsave_commit_notice_candidates }
     = save_plan;
   { // Delete propagation adds collateral writes. Derive them before the
     // disk Hoist classification so "touched pids" means every telescope
@@ -671,7 +671,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     repair_saves_for_unwritten_candidates (
       &hoist_candidates, &nonmerge_nodeInstructions, &runtime . config ) ? );
   if ! fork_specs . is_empty () && ! approved_forks {
-    // A save that found forks but was not pre-approved commits NOTHING.
+    // A save that found forks but was not pre-approved skgsave-commits NOTHING.
     // Return a write-protected fork-confirmation buffer; the client shows it,
     // and on approval re-issues the save with (approved-forks . "true").
     // (Monogamy and skgrepo validation already ran in
@@ -688,7 +688,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       hoist_confirmation  : None,
       text_release_confirmation : None, } ); }
   // Forks detected this save (approved, or none): editing a foreign node
-  // N is a request to clone it. The clone C commits with the rest of the
+  // N is a request to clone it. The clone C is skgsave-committed with the rest of the
   // save -- its 'overrides_view_of = [N]' relationship rides in the same
   // NodeInstructions, so the touched-override-invariant check (which reads the
   // simulated post-save graph) sees C before validating.
@@ -811,18 +811,18 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       let mut warnings : Vec<String> = parse_warnings;
       warnings . extend ( response . warnings );
       warnings . extend (
-        post_commit_hiddenoutside_warnings (
-          &published . graph, &post_commit_notice_candidates ) );
+        post_skgsave_commit_hiddenoutside_warnings (
+          &published . graph, &post_skgsave_commit_notice_candidates ) );
       response . warnings = warnings; }
     Ok (response) } }
 
-/// Turn a successfully committed HiddenOutside addition into a message only
+/// Turn a successfully skgsave-committed HiddenOutside addition into a message only
 /// when the final graph classifies it as hidden *inside* a subscribee.  This is
 /// intentionally downstream of graph/filesystem mutation: failure and every
 /// confirmation return leave the candidate silent.
-fn post_commit_hiddenoutside_warnings (
+fn post_skgsave_commit_hiddenoutside_warnings (
   graph      : &crate::dbs::in_rust_graph::InRustGraph,
-  candidates : &[PostCommitNoticeCandidate],
+  candidates : &[PostSkgsaveCommitNoticeCandidate],
 ) -> Vec<String> {
   let key = |skgid : &ID| -> ID {
     graph . pid_of (skgid)
@@ -833,7 +833,7 @@ fn post_commit_hiddenoutside_warnings (
       None => skgid . to_string (), } };
   let mut warnings : Vec<String> = Vec::new ();
   for candidate in candidates {
-    let PostCommitNoticeCandidate::HiddenOutsideAdded {
+    let PostSkgsaveCommitNoticeCandidate::HiddenOutsideAdded {
       subscriber, member } = candidate;
     let Some (subscriber_node) =
       graphnode_from_graph (graph, subscriber)

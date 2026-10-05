@@ -18,7 +18,7 @@ use std::collections::{HashMap, HashSet};
 /// it: N's own foreign SaveNode is DROPPED (N stays untouched on disk)
 /// and a ForkSpec for the clone C is collected instead. The clone is
 /// NOT folded into the returned NodeInstructions here -- a save carrying
-/// forks is gated on the user's confirmation, so the handler commits
+/// forks is gated on the user's confirmation, so the handler skgsave-commits
 /// the clones only on approval.
 ///
 /// ERRORS: if an nodeInstruction
@@ -171,7 +171,7 @@ fn collect_foreign_policy_outcomes(
 
 /// Drop any NodeInstruction that defines a foreign node to be unchanged,
 /// and any that is a fork candidate (N's own save is never written --
-/// N stays untouched on disk; the clone C is committed separately,
+/// N stays untouched on disk; the clone C is skgsave-committed separately,
 /// gated on confirmation). A new node adopting a clone's skgrepo is
 /// KEPT, rewritten into that skgrepo -- its fork must exist among the
 /// specs, else it degrades to the foreign-creation rejection it would

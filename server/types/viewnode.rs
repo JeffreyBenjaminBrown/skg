@@ -749,7 +749,7 @@ impl AsMut<Viewnode> for Viewnode {
 
 impl Viewnode {
   /// Consume every save-only `(editRequest ...)` carried by this occurrence.
-  /// Call only after the save has committed: failed saves and confirmation
+  /// Call only after the save's skgsave-commit: failed saves and confirmation
   /// round-trips must leave requests in the user's buffer. `view_requests` are
   /// deliberately separate -- completion fulfills those while rendering.
   pub fn consume_edit_request_after_save (

@@ -211,7 +211,7 @@ pub(crate) fn validate_affected_override_invariants_with_counts (
 /// graph and override relationships resolve. Read against the LIVE graph before
 /// the save, so a fork of an already-forked node is rejected with a
 /// helpful "you already forked this; your clone is X" rather than the
-/// raw MultipleOwnedOverriders crash at commit.
+/// raw MultipleOwnedOverriders crash at skgsave-commit.
 pub fn existing_owned_overrider_of (
   config     : &SkgConfig,
   graph      : &InRustGraph,

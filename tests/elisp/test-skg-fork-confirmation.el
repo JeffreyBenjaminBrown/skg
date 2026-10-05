@@ -103,7 +103,7 @@
     (should (equal entry '(approved-overPrivateText-pids "U1" "U2")))))
 
 (ert-deftest test-save-text-release-balances-and-retries-exact-pids ()
-  "The save is committed, but no staged text is adopted before approval."
+  "The save is skgsave-committed, but no staged text is adopted before approval."
   (let ((source (generate-new-buffer "*save-release-origin*"))
         (skg-response-handler-map
          '((save-result ignore . t)

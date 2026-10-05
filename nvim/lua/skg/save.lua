@@ -29,7 +29,7 @@ M.fork_repo_placeholder = 'PICK-A-REPO'
 ---Send the current buffer to the server. Before sending, 'folded'
 ---and 'focused' markers are added (for the wire) and then removed
 ---from what the user sees. If the save edited any FOREIGN node the
----server replies fork-confirmation instead of save-result, committing
+---server replies fork-confirmation instead of save-result, skgsave-committing
 ---nothing, unless FORK_APPROVED rides along; FORK_REPOS then pairs
 ---each forked node's id with the owned skgrepo chosen for its clone.
 ---@param approved_forks boolean|nil
@@ -502,7 +502,7 @@ end
 -- ── the fork-confirmation flow ─────────────────────────────────────
 
 ---Handle a fork-confirmation message: the save edited foreign
----node(s) and was not pre-approved, so NOTHING was committed. Show
+---node(s) and was not pre-approved, so NOTHING was skgsave-committed. Show
 ---the confirmation buffer; interactively, ask whether to approve.
 ---Terminal like save_result_handler: removes the streaming handlers
 ---AND the unfired save-result one-shot (decrementing its pending
@@ -553,7 +553,7 @@ function M.fork_confirmation_handler (save_buf, response)
   end
 end
 
----Handle the text-free terminal Hoist challenge. Nothing was committed.
+---Handle the text-free terminal Hoist challenge. Nothing was skgsave-committed.
 ---An interactive approval reissues the same save with the exact PIDs; Abort
 ---and headless operation leave the buffer and disk untouched.
 ---@param save_buf integer
@@ -607,7 +607,7 @@ function M.telescope_hoist_confirmation_handler (
   end
 end
 
----Handle a save-rerender release challenge. The save itself has committed,
+---Handle a save-rerender release challenge. The save itself has been skgsave-committed,
 ---but staged text and the open-view registry remain untouched. Approval
 ---reissues with exact PIDs; Abort keeps current buffers as they are.
 ---@param save_buf integer
@@ -800,7 +800,7 @@ function M.approve_fork ()
       error('Pick a repo for each clone first: point on a'
             .. ' clone-to-be headline, then <localleader>ss') end
   end
-  -- The fork atom must survive to the re-save (which commits the
+  -- The fork atom must survive to the re-save (which skgsave-commits the
   -- fork; the server drops it on re-render): suppress the kill-hook
   -- strip.
   vim.b[buf].skg_fork_suppress_strip = true

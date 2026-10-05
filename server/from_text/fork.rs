@@ -7,7 +7,7 @@
 //! SaveNode whose buffer content differs from disk is a fork candidate
 //! rather than a 'ModifiedForeignNode' error. This module resolves the
 //! clone's owned repo (from N's nearest owned ancestor in the view)
-//! and builds C's SaveNode. The confirmation-gating and the commit live
+//! and builds C's SaveNode. The confirmation-gating and the skgsave-commit live
 //! in the save handler.
 
 use crate::dbs::in_rust_graph::override_invariants::existing_owned_overrider_of;
@@ -244,7 +244,7 @@ pub fn build_fork_confirmation_buffer (
      top-level headline below is a clone-to-be; its child is the\n\
      original it forks (real id, marked \"pO\": its viewparent\n\
      overrides it).\n\
-     APPROVE with C-c C-c: the source buffer is re-saved, committing\n\
+     APPROVE with C-c C-c: the source buffer is re-saved, skgsave-committing\n\
      each fork into the repo its clone-to-be shows. A clone still\n\
      showing PICK-A-REPO needs a real repo first: Emacs prompts\n\
      for each, or set one yourself with C-c s s on the clone-to-be's\n\
@@ -275,12 +275,12 @@ pub fn build_fork_confirmation_buffer (
 
 /// Reject any fork that monogamy or the skgrepo-set forbids. Run after
 /// the clones are built (their skgrepos resolved) but before the save
-/// commits anything:
+/// skgsave-commits anything:
 /// - *monogamy*: a node may have at most one owned overrider, so
 ///   forking an N the user has already forked would violate it. Detect
 ///   the existing clone against the LIVE graph and reject with
 ///   'ForkAlreadyExists' (naming it) rather than letting the raw
-///   MultipleOwnedOverriders fire at commit. A monogamy-blocked fork
+///   MultipleOwnedOverriders fire at skgsave-commit. A monogamy-blocked fork
 ///   is not also reported for its skgrepo.
 /// - *owned*: the clone's resolved skgrepo must be one the user owns.
 ///   Inference and the default only ever yield owned skgrepos, but a
@@ -293,7 +293,7 @@ pub fn build_fork_confirmation_buffer (
 ///
 /// 'restricted_repo_set' is None when nothing is restricted (the set
 /// 'all'). The monogamy check uses the explicit save-planning graph; the
-/// commit-time invariant check remains a defense in depth.
+/// skgsave-commit-time invariant check remains a defense in depth.
 pub fn validate_fork_specs_in_graph (
   fork_specs             : &[ForkSpec],
   graph                  : &crate::dbs::in_rust_graph::InRustGraph,

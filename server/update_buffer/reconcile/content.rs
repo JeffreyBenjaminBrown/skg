@@ -282,7 +282,7 @@ fn reconcile_content_children (
     tree, node, &apparent_content_skgids ) ?;
   Ok (( )) }
 
-/// Replace already-rendered raw content children whose newly committed
+/// Replace already-rendered raw content children whose newly skgsave-committed
 /// overrides now make another node their visible substitute.  Reconciliation
 /// otherwise recognizes the raw child by its membership ID and retains it,
 /// which would leave an implicit fork editable as its foreign original until

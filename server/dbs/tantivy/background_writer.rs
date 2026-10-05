@@ -4,15 +4,15 @@
 //! 'writer.commit()' (see profiling-save.org) — used to block the
 //! response, even though the save's re-rendered result is built from
 //! the in-Rust graph and never reads the search index. The save now
-//! ENQUEUES its search-index update here and returns; the commit happens off
+//! ENQUEUES its search-index update here and returns; the tantivy-commit happens off
 //! the critical path.
 //!
 //! A single worker thread applies the queued updates in FIFO order, so
-//! two rapid saves of the same node can never commit out of order. A
+//! two rapid saves of the same node can never tantivy-commit out of order. A
 //! search blocks on 'wait_for_tantivy_writes_idle' until the queue has
 //! drained, so it always sees a search index reflecting every save issued so
 //! far (read-your-writes), at the cost of waiting through any in-flight
-//! commit.
+//! tantivy-commit.
 //!
 //! 'lock_tantivy_writes' serializes EVERY Tantivy writer (this worker,
 //! search-make-link's 'update_index_with_nodes', the init/rebuild
@@ -48,7 +48,7 @@ pub struct TantivyWriteTask {
   pub prominence_sources : HashMap<ID, String>, }
 
 /// Shared between the worker thread and the enqueue/wait API: the count
-/// of writes not yet committed, and a condvar signalled when it reaches
+/// of writes not yet tantivy-committed, and a condvar signalled when it reaches
 /// zero.
 struct Inflight {
   count  : Mutex<usize>,
@@ -84,8 +84,8 @@ fn decrement_and_maybe_notify (inflight : &Inflight) {
   *count = count . saturating_sub (1);
   if *count == 0 { inflight . idle . notify_all (); } }
 
-/// Enqueue a Tantivy index update to commit in the background, in FIFO
-/// order. Returns immediately — the save does not wait for the commit.
+/// Enqueue a Tantivy index update to tantivy-commit in the background, in FIFO
+/// order. Returns immediately — the save does not wait for the tantivy-commit.
 pub fn enqueue_tantivy_write (
   task : TantivyWriteTask,
 ) {
@@ -99,7 +99,7 @@ pub fn enqueue_tantivy_write (
     tracing::error! ("Tantivy background worker unavailable: {}", e);
     decrement_and_maybe_notify (&worker . inflight); } }
 
-/// Block until every enqueued Tantivy write has committed, so the
+/// Block until every enqueued Tantivy write has been tantivy-committed, so the
 /// caller (a search) sees a search index reflecting all saves issued so far.
 pub fn wait_for_tantivy_writes_idle () {
   let worker : &Worker = worker ();

@@ -178,7 +178,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
         errors, warnings : parsing_warnings . clone (), }); }}
   let nodeMerge_instructions : Vec<NodeMerge> =
     // NodeMerge extraction only plans mutations; it does not mutate the saved
-    // viewforest. After a successful commit, the common edit-request
+    // viewforest. After a successful skgsave-commit, the common edit-request
     // consumption boundary in update_views_after_save clears this request
     // together with every other `(editRequest ...)` carrier.
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -258,7 +258,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
     // (it is owned); we only ADD the clone C overriding N. C copies N's
     // saved state on disk -- the client refuses to fork a dirty buffer,
     // so disk == what the user sees. These specs join the implicit ones
-    // for the shared confirmation / commit pipeline below.
+    // for the shared confirmation / skgsave-commit pipeline below.
     let mut specs : Vec<ForkSpec> = fork_specs;
     specs . extend (
       explicit_fork_specs_from_viewforest (
@@ -267,7 +267,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
           errors, warnings : parsing_warnings . clone () } ) ? );
     specs };
   { // Reject forks monogamy or the skgrepo-set forbids (before any
-    // commit). Monogamy reads the live graph; the skgrepo-set check uses
+    // skgsave-commit). Monogamy reads the live graph; the skgrepo-set check uses
     // the active set.
     let fork_errors : Vec<BufferValidationError> =
       validate_fork_specs_in_graph (
@@ -288,8 +288,8 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
           nodeMerge_instructions,
           skgrepo_moves : nonmerge_plan . skgrepo_moves,
           fork_specs,
-          post_commit_notice_candidates :
-            nonmerge_plan . post_commit_notice_candidates },
+          post_skgsave_commit_notice_candidates :
+            nonmerge_plan . post_skgsave_commit_notice_candidates },
         warnings )) }
 
 /// Transitional compatibility for callers not yet carrying a generation.

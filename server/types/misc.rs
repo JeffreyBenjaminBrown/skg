@@ -260,7 +260,7 @@ pub struct TantivyIndex {
   pub index                     : Arc<Index>,
   /// Long-lived 'IndexReader' shared across all callers. Default
   /// 'ReloadPolicy::OnCommitWithDelay' refreshes automatically after
-  /// writes commit, so this stays current without manual
+  /// each tantivy-commit, so this stays current without manual
   /// invalidation. Re-creating an 'IndexReader' on every lookup
   /// (which 'index.reader()' does) is the dominant cost of
   /// per-query Tantivy ID lookups, so callers should prefer this

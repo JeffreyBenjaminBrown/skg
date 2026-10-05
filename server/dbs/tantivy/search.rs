@@ -46,13 +46,13 @@ pub fn search_index (
     body = opts . body,
     operators = opts . operators,
     "Finding matches." );
-  // Tantivy index writes commit on a background worker (see
+  // Tantivy index writes are tantivy-committed on a background worker (see
   // server/dbs/tantivy/background_writer.rs). The worker reloads the
-  // shared reader after each commit, but reloading again here, on the
+  // shared reader after each tantivy-commit, but reloading again here, on the
   // reading thread immediately before we take a searcher, is what makes
   // read-your-writes deterministic: a caller that has
   // 'wait_for_tantivy_writes_idle'd first is then guaranteed to see every
-  // committed write. Without this, a search right after a save could
+  // tantivy-committed write. Without this, a search right after a save could
   // occasionally observe a stale reader.
   tantivy_index . reader . reload () ?;
   let searcher : Searcher =

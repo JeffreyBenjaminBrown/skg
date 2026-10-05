@@ -30,7 +30,7 @@ use crate::from_text::weave::member_is_visible;
 use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{
-  NodeInstruction, PostCommitNoticeCandidate, SaveNode, SkgRepoMove };
+  NodeInstruction, PostSkgsaveCommitNoticeCandidate, SaveNode, SkgRepoMove };
 use crate::types::tree::forest::ViewForest;
 use lower::{lower_collected_fieldIntents, nodeMerge_pairs, LoweringOutput};
 use resolve_visibility::resolve_visibility;
@@ -46,7 +46,7 @@ pub struct NonmergeSavePlan {
   pub skgrepo_moves : Vec<SkgRepoMove>,
   pub flag_targets : HashSet<ID>,
   pub warnings     : Vec<String>, // nonfatal, destined for SaveResponse.warnings (e.g. inactive-node rewrite suppression)
-  pub post_commit_notice_candidates : Vec<PostCommitNoticeCandidate>,
+  pub post_skgsave_commit_notice_candidates : Vec<PostSkgsaveCommitNoticeCandidate>,
 }
 
 /// This is the whole non-nodeMerge half of save extraction, done via
@@ -71,8 +71,8 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
     . collect ();
   let nodeMerge_acquisitions : Vec<(ID, ID)> =
     nodeMerge_pairs (&collected);
-  let (resolved, post_commit_notice_candidates)
-    : (lower::LoweredNodeIntents, Vec<PostCommitNoticeCandidate>) = {
+  let (resolved, post_skgsave_commit_notice_candidates)
+    : (lower::LoweredNodeIntents, Vec<PostSkgsaveCommitNoticeCandidate>) = {
     let LoweringOutput { intents, visibility, hidden_outside } =
       lower_collected_fieldIntents (collected)
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -117,7 +117,7 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
           skgrepo_moves,
           flag_targets,
           warnings,
-          post_commit_notice_candidates },
+          post_skgsave_commit_notice_candidates },
         nodeMerge_acquisitions )) }
 
 /// Transitional compatibility for direct extraction tests.

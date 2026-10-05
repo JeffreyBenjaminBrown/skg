@@ -31,7 +31,7 @@ use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, members_of};
 use crate::types::nodes::complete::Graphnode;
-use crate::types::save::PostCommitNoticeCandidate;
+use crate::types::save::PostSkgsaveCommitNoticeCandidate;
 
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -45,7 +45,7 @@ pub fn resolve_visibility (
   graph       : &InRustGraph,
   config      : &SkgConfig,
   restricted_skgrepo_set : Option<&ActiveSkgRepoSet>, // None means no restriction; callers normalize 'all' to None.
-) -> Result<(LoweredNodeIntents, Vec<PostCommitNoticeCandidate>), Box<dyn Error>> {
+) -> Result<(LoweredNodeIntents, Vec<PostSkgsaveCommitNoticeCandidate>), Box<dyn Error>> {
   validate_no_overlapping_subscribee_hiderel_conflicts (
     visibility, graph, config ) ?;
   infer_hides_from_contains_removals (
@@ -92,10 +92,10 @@ pub fn resolve_visibility (
       subscriber_from_disk,
       &inferred_hides,
       &inferred_unhides ); }
-  let post_commit_notice_candidates = apply_hiddenoutside_edits (
+  let post_skgsave_commit_notice_candidates = apply_hiddenoutside_edits (
     &mut lowered, hidden_outside, graph, config,
     restricted_skgrepo_set ) ?;
-  Ok ((lowered, post_commit_notice_candidates)) }
+  Ok ((lowered, post_skgsave_commit_notice_candidates)) }
 
 /// Applies the submitted visible-outside subset after all ordinary hide
 /// inference.  Only the old *visible outside* viewnodes are replaceable: inactive
@@ -107,9 +107,9 @@ fn apply_hiddenoutside_edits (
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
   restricted_skgrepo_set : Option<&ActiveSkgRepoSet>,
-) -> Result<Vec<PostCommitNoticeCandidate>, Box<dyn Error>> {
+) -> Result<Vec<PostSkgsaveCommitNoticeCandidate>, Box<dyn Error>> {
   let mut seen : HashSet<ID> = HashSet::new ();
-  let mut candidates : Vec<PostCommitNoticeCandidate> = Vec::new ();
+  let mut candidates : Vec<PostSkgsaveCommitNoticeCandidate> = Vec::new ();
   for (subscriber, edit) in edits {
     if ! seen . insert (subscriber . clone ()) {
       return Err (Box::new (BufferValidationError::Other (
@@ -153,7 +153,7 @@ fn apply_hiddenoutside_edits (
     for member in &edit . members {
       if ! disk_hide_keys . contains (&key (member)) {
         candidates . push (
-          PostCommitNoticeCandidate::HiddenOutsideAdded {
+          PostSkgsaveCommitNoticeCandidate::HiddenOutsideAdded {
             subscriber : subscriber . clone (), member : member . clone () }); }}
     let current_hides : Vec<ID> =
       lowered . subscriber_hides_after_resolution (&subscriber_from_disk);

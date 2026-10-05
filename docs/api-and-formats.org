@@ -181,7 +181,7 @@ So far there are these endpoints:
   - The first ALTERNATIVE terminal message: after validation, a save
     rereads every telescope it will write. If any currently selects a
     title or body below home and lacks exact approval, nothing is
-    committed and the server replies, in place of save-result,
+    skgsave-committed and the server replies, in place of save-result,
     =((response-type telescope-hoist-confirmation) (telescopes
     (((pid "P") (home "REPO")) ...)) (prompt "..."))=.
     This response contains no title or body. The prompt explains that
@@ -196,7 +196,7 @@ So far there are these endpoints:
     =save-result= follows it.
   - The second ALTERNATIVE terminal message: a save that detects forks
     (edited foreign nodes, or explicit fork requests) and does NOT
-    carry =(approved-forks . "true")= commits nothing and replies, in
+    carry =(approved-forks . "true")= skgsave-commits nothing and replies, in
     place of save-result,
     =((response-type fork-confirmation) (content "...") (to-minibuffer "..."))=,
     where =content= is the fork-confirmation buffer (an instructions

@@ -8,7 +8,7 @@
 
 use crate::consts::{TANTIVY_PER_ID_LOOKUP_LIMIT, TANTIVY_WRITER_BUFFER_BYTES};
 use crate::dbs::tantivy::background_writer::lock_tantivy_writes;
-use crate::dbs::tantivy::write::commit_with_status;
+use crate::dbs::tantivy::write::tantivy_commit_with_status;
 use crate::types::misc::{ID, SkgRepoName, TantivyIndex};
 
 use tantivy::{IndexWriter, Searcher, Term, TantivyDocument, doc};
@@ -115,6 +115,6 @@ pub fn update_prominence_sources (
         tantivy_index . body_field =>
           body . as_str () )) ?;
       updated_count += 1; } }
-  commit_with_status (
+  tantivy_commit_with_status (
     &mut writer, tantivy_index, updated_count, "Context-updated") ?;
   Ok (updated_count) }

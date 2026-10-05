@@ -75,7 +75,7 @@ async fn test_modified_foreign_node_forks_with_default_skgrepo (
       // Editing a foreign node FORKS it. The foreign node is a ROOT with
       // no owned ancestor to infer a clone skgrepo from, so the clone's
       // skgrepo DEFAULTS to the user's first owned skgrepo ("main"). The
-      // fork rides in the plan's fork_specs (committed only on
+      // fork rides in the plan's fork_specs (skgsave-committed only on
       // confirmation); the foreign node itself is not written.
       let org_text: &str = indoc! {"
         * (skg (node (id foreign2) (repo foreign))) MODIFIED TITLE

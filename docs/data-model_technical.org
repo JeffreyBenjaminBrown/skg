@@ -94,7 +94,7 @@ startup/rebuild gate and test oracle.
 The shared mutation gate serializes candidate construction, filesystem
 mutation, graph publication, and Tantivy enqueue so two writers cannot validate
 against the same stale graph snapshot.  Filesystem preflight and graph validation
-produce tokens tied to that exact graph snapshot; commit consumes those prepared
+produce tokens tied to that exact graph snapshot; skgsave-commit consumes those prepared
 values rather than recomputing them after writes begin.
 
 ** Graph indexes

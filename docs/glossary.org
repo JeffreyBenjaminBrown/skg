@@ -475,6 +475,15 @@ index"). A /graph index/ is a derived map inside the in-Rust graph:
 the /inverse indexes/ ('contained_by', 'subscribers_of', ...), each
 the inverse of one relation, plus 'extra_id_to_pid'.
 
+*** "commit" is qualified when ambiguous: git-, skgsave- or tantivy-commit
+
+A /git-commit/ is git's. A /skgsave-commit/ is the step of a save that
+writes the .skg files and swaps in the new graph; a save that stops to
+ask for confirmation (forks, Hoist) skgsave-commits nothing. A
+/tantivy-commit/ makes search-index writes visible; a save's happens
+later, on a background worker. Where context leaves no doubt (HEAD, a
+merge commit, a 'git2' call) bare "commit" means a git-commit.
+
 *** mp = maybe-placed
 
 A viewnode that might have an ID and skgrepo,

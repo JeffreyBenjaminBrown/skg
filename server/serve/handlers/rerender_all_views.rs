@@ -138,7 +138,7 @@ pub fn stream_rerender_views (
 
 /// The absent-reference command only removes relationships to an ID freshly proven to
 /// have no node.  It cannot introduce title/body text into any view, so this
-/// narrowly scoped post-commit rerender bypasses the text-release challenge.
+/// narrowly scoped post-skgsave-commit rerender bypasses the text-release challenge.
 pub fn stream_rerender_views_after_absent_reference_cleanup (
   stream     : &mut TcpStream,
   env        : &SkgEnv,

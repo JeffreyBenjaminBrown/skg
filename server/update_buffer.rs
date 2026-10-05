@@ -174,7 +174,7 @@ pub fn update_views_after_save (
         deleted_by_this_save_extra_ids, active_skgrepo_set ) };
   let mut saved_view_mut : ViewForest = saved_view;
   replace_saved_view_fork_roots (&mut saved_view_mut, fork_specs) ?;
-  // The graph mutation has committed, so every `(editRequest ...)` in the
+  // The skgsave-commit has happened, so every `(editRequest ...)` in the
   // submitted view is now consumed input. Clear all request carriers at this
   // one boundary before completion can echo any of them into the response.
   // `viewRequests` remain: those are fulfilled by completion below.
@@ -289,7 +289,7 @@ fn active_skgids_in_viewforest (
 
 /// A root is intentionally rendered raw when the user ordinarily opens an
 /// overridden node.  The buffer which *created* a fork is the exception: once
-/// the save commits, continuing to show its foreign root would make the next
+/// the save's skgsave-commit happens, continuing to show its foreign root would make the next
 /// edit attempt another fork.  Replace only roots named by this save's exact
 /// ForkSpecs; content occurrences are handled by content reconciliation.
 fn replace_saved_view_fork_roots (

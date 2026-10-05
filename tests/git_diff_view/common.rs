@@ -91,9 +91,9 @@ pub async fn cleanup_test_stores(
   tantivy_folder: Option<&Path>,
 ) -> Result<(), Box<dyn Error>> {
   if let Some (path) = tantivy_folder {
-    // A save's Tantivy update commits on a background worker
+    // A save's Tantivy update is tantivy-committed on a background worker
     // (coding-advice/common-gotchas.md); removing the folder while a
-    // commit is in flight flakes with DirectoryNotEmpty.
+    // tantivy-commit is in flight flakes with DirectoryNotEmpty.
     skg::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
     if path . exists() { fs::remove_dir_all (path)?; }
   }

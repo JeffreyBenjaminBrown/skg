@@ -331,7 +331,7 @@ async fn guarded_test_then_cleanup(
   let test_result: Result<Result<(), Box<dyn Error>>, _> =
     AssertUnwindSafe(test_future)
     . catch_unwind() . await;
-  // A save's Tantivy write now commits in the background and outlives
+  // A save's tantivy-commit now happens in the background and outlives
   // update_from_and_rerender_buffer; drain it before deleting the test
   // search index out from under the worker.
   crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
@@ -402,7 +402,7 @@ pub async fn update_from_and_rerender_buffer_test (
   views_state                 : &mut ViewsState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   // Auto-approve forks: a test driving the save directly is exercising
-  // the COMMIT path. The fork-confirmation (commit-nothing) path has its
+  // the skgsave-commit path. The fork-confirmation (nothing-committed) path has its
   // own shim below.
   update_from_and_rerender_buffer_with_fork_approval_test (
     stream, org_buffer_text, config, tantivy_index, graph,
@@ -432,7 +432,7 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
 
 /// As 'update_from_and_rerender_buffer_test', but lets the test choose
 /// whether forks are approved -- pass false to exercise the
-/// fork-confirmation (commit-nothing) path.
+/// fork-confirmation (nothing-skgsave-committed) path.
 pub async fn update_from_and_rerender_buffer_with_fork_approval_test (
   stream                      : &mut std::net::TcpStream,
   org_buffer_text             : &str,

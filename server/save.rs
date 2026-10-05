@@ -14,7 +14,7 @@ use crate::dbs::in_rust_graph::{
   },
 };
 use crate::dbs::tantivy::background_writer::{enqueue_tantivy_write, lock_tantivy_writes, TantivyWriteTask};
-use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_skgid_from_index};
+use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, tantivy_commit_with_status, delete_nodes_by_skgid_from_index};
 use crate::types::env::MutationGate;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, TantivyIndex};
 use crate::types::errors::{BufferValidationError, SaveError};
@@ -144,7 +144,7 @@ pub(crate) fn enqueue_tantivy_delta (
 ) {
   // Prominence sources, read from the post-apply in-Rust graph, so
   // the Tantivy pass below indexes each saved doc once with its final
-  // type — no separate context writer/commit. Computed here (not on the
+  // type — no separate prominence writer or tantivy-commit. Computed here (not on the
   // Tantivy thread) so the read happens before any further mutation.
   let prominence_sources : HashMap<ID, String> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -153,7 +153,7 @@ pub(crate) fn enqueue_tantivy_delta (
         candidate, &node_defs ) };
 
   // Tantivy (background): the search index is a derived cache that the
-  // save's response never reads, so enqueue the search-index update to commit
+  // save's response never reads, so enqueue the search-index update to tantivy-commit
   // off the critical path, in FIFO order (a single worker). Searches
   // block on 'wait_for_tantivy_writes_idle' until it lands. A
   // background failure is logged, not propagated — the filesystem is
@@ -658,7 +658,7 @@ pub(crate) fn update_tantivy_from_nodeInstructions (
         prominence_sources )? };
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "tantivy_commit" ). entered();
-    commit_with_status(
+    tantivy_commit_with_status(
       &mut writer, tantivy_index, processed_count, "Updated")? ; }
   // Wait out the writer's background merge threads before returning, so
   // the search index is fully quiescent: 'commit()' alone can leave merge

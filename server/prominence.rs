@@ -123,7 +123,7 @@ pub fn compute_and_store_prominence_sources (
 /// touched, read straight from the post-save graph. Returns a pid ->
 /// prominence-source-label map that the
 /// save's single Tantivy index pass writes directly into each document,
-/// so no second writer/commit is needed.
+/// so no second writer or tantivy-commit is needed.
 ///
 /// Like the previous save-time version this is best-effort for cycles:
 /// it does a containerward walk from each still-untyped saved node

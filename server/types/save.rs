@@ -60,17 +60,17 @@ pub struct SavePlan {
   /// Forks detected this save: editing a foreign node N is read as a
   /// request to clone it. Held SEPARATE from 'node_instructions' because a
   /// save carrying forks is gated on the user's confirmation -- the
-  /// clones commit only on approval (see ForkSpec, the save handler's
+  /// clones are skgsave-committed only on approval (see ForkSpec, the save handler's
   /// fork-confirmation stage). Empty for an ordinary save.
   pub fork_specs         : Vec<ForkSpec>,
   /// Facts collected while interpreting a derived editable filter.  They are
   /// deliberately not warnings yet: the save handler turns them into user
   /// messages only after filesystem and graph mutation succeeds.
-  pub post_commit_notice_candidates : Vec<PostCommitNoticeCandidate>,
+  pub post_skgsave_commit_notice_candidates : Vec<PostSkgsaveCommitNoticeCandidate>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PostCommitNoticeCandidate {
+pub enum PostSkgsaveCommitNoticeCandidate {
   HiddenOutsideAdded { subscriber : ID, member : ID },
 }
 

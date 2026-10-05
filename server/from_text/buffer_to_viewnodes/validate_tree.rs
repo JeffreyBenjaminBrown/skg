@@ -227,8 +227,8 @@ fn overridesHere_marker_errors (
 ///   pid from enrichment, which is not in the graph;
 /// - if the node already has an owned overrider, fail early with
 ///   'ForkAlreadyExists' (the helpful message) rather than a later
-///   monogamy abort at commit.
-/// These checks use the explicit save-planning graph; the commit-time
+///   monogamy abort at skgsave-commit.
+/// These checks use the explicit save-planning graph; the skgsave-commit-time
 /// invariant check remains a defense in depth.
 #[allow(non_snake_case)]
 fn validate_fork_view_requests (

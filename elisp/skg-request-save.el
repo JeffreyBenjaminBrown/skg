@@ -24,7 +24,7 @@ unlock client-only views; save-relax-lock is the first narrowing point.
 
 If the save edited any FOREIGN node, the server reads that as a request
 to fork (clone) it and -- unless FORK-APPROVED is non-nil -- replies with
-a `fork-confirmation' message instead of `save-result', committing
+a `fork-confirmation' message instead of `save-result', skgsave-committing
 nothing. `skg--fork-confirmation-handler' then shows the confirmation
 buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
 `skg-decline-fork'."
@@ -228,7 +228,7 @@ internal edit; it is restored before any request is sent."
                                         approved-hoist-pids
                                         text-approved-pids)
   "Build the save-buffer request sexp. When FORK-APPROVED is non-nil,
-include (approved-forks . \"true\") so the server commits any forks it
+include (approved-forks . \"true\") so the server skgsave-commits any forks it
 finds instead of returning a fork-confirmation. FORK-REPOS, when
 non-nil, is an alist ((N . REPO) ...) pairing each forked node's id
 with the owned repo the user chose for its clone; it rides out as the
@@ -387,7 +387,7 @@ leaves things untouched.")
 (defvar-local skg--fork-suppress-strip-on-kill nil
   "When non-nil, `skg--fork-confirmation-on-kill' does NOT strip the
 source's fork atom. `skg-approve-fork' sets it before killing this
-buffer, because its re-save still needs the atom to commit the fork.")
+buffer, because its re-save still needs the atom to skgsave-commit the fork.")
 
 (defvar-local skg--pending-fork-result nil
   "On a fork's source buffer, (RESULT-BUFFER . FORK-COUNT) while the
@@ -481,7 +481,7 @@ Record that buffer and FORK-COUNT on ORIGIN, then kill CONFIRMATION."
 
 (defun skg--fork-confirmation-handler (save-buffer payload)
   "Handle a `fork-confirmation' LP message: the save edited foreign
-node(s) and was not pre-approved, so NOTHING was committed. Show the
+node(s) and was not pre-approved, so NOTHING was skgsave-committed. Show the
 confirmation buffer (which lists the nodes that would be forked) and,
 interactively, prompt for any clone repo not yet specified, then ask
 whether to approve.
@@ -542,7 +542,7 @@ it), end the stream, and unlock."
     (save-buffer payload approved-forks fork-skgrepos
                  &optional text-approved-pids)
   "Handle the text-free terminal Hoist challenge for SAVE-BUFFER.
-The server has committed nothing.  On approval, reissue the same save with
+The server has skgsave-committed nothing.  On approval, reissue the same save with
 the exact candidate PIDs; on Abort, leave the buffer and every .skg file
 untouched.  FORK-APPROVED and FORK-REPOS survive if this challenge arose
 on a retry that had already received fork authority."
@@ -699,7 +699,7 @@ its id-less clone-to-be parents would create bare nodes. Only C-c C-c
       ;; shared skg-content-view-mode-map; rebinding C-x C-s on the shared
       ;; map would break saving in every content view.
       (use-local-map (copy-keymap (current-local-map)))
-      ;; C-c C-c commits the forks; C-c C-k declines; C-x C-s refuses
+      ;; C-c C-c skgsave-commits the forks; C-c C-k declines; C-x C-s refuses
       ;; (this buffer must not be saved as ordinary content).
       (local-set-key (kbd "C-c C-c") #'skg-approve-fork)
       (local-set-key (kbd "C-c C-k") #'skg-decline-fork)
@@ -711,7 +711,7 @@ its id-less clone-to-be parents would create bare nodes. Only C-c C-c
 (defun skg--fork-confirmation-refuse-save ()
   "Refuse an ordinary save of the fork-confirmation buffer.
 Its clone-to-be parents are id-less owned-repo nodes; saving them as
-ordinary content would create bare nodes. Approve with C-c C-c (commits
+ordinary content would create bare nodes. Approve with C-c C-c (skgsave-commits
 the forks) or decline with C-c C-k."
   (interactive)
   (user-error
@@ -769,7 +769,7 @@ hand (C-c s s)."
                     fork-skgrepos)
       (user-error
        "Pick a repo for each clone first: point on a clone-to-be headline, then C-c s s"))
-    ;; The atom must survive to the re-save (which commits the fork; the
+    ;; The atom must survive to the re-save (which skgsave-commits the fork; the
     ;; server then drops it on re-render), so suppress the kill-hook strip.
     (setq skg--fork-suppress-strip-on-kill t)
     (skg--replace-fork-confirmation-with-result
