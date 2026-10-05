@@ -519,6 +519,14 @@ relationship is recorded by its first member, but the data model may
 someday let the second member record one; 'RecorderwardRelmap' in
 'server/dbs/in_rust_graph.rs' says more.)
 
+*** ancestor generation
+
+How far up the view an ancestor is: 1 is the viewparent, 2 the
+grandparent, counting folders. The '(rels ...)' form's '(ancestors GEN
+...)' and a birth fact's GEN are ancestor generations, and heralds
+draw them as a, b, ... z, then {27}. A tree's plain "generation",
+counting down from its root, is the opposite direction.
+
 *** "commit" is qualified when ambiguous: git-, skgsave- or tantivy-commit
 
 A /git-commit/ is git's. A /skgsave-commit/ is the step of a save that

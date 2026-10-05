@@ -107,12 +107,12 @@ pub fn is_folder_kind (
     ViewnodeKind::PropertyFolder (_) | ViewnodeKind::PartnerFolder (_) ) }
 
 fn ancestor_treeid (
-  tree       : &Tree<Viewnode>,
-  node       : NodeId,
-  generation : usize,
+  tree                : &Tree<Viewnode>,
+  node                : NodeId,
+  ancestor_generation : usize,
 ) -> Option<NodeId> {
   let mut node_ref : NodeRef<Viewnode> = tree . get (node) ?;
-  for _ in 0 .. generation {
+  for _ in 0 .. ancestor_generation {
     node_ref = node_ref . parent () ?; }
   Some ( node_ref . id () ) }
 

@@ -20,11 +20,11 @@
 //!     (extraIds K)
 //!     (flags K)
 //!     (birth (RELNAME SIDE [GEN])...))
-//! GEN is a generation distance: 1 = viewparent, 2 = grandparent,
+//! GEN is an ancestor ancestor_generation: 1 = viewparent, 2 = grandparent,
 //! ... `in` = "N nodes RELATION it"; `out` = "it RELATIONs N nodes".
 //! Each birth fact names a relation explaining why this occurrence is
-//! here, the side of this node it is on, and the generation of the
-//! ancestor it accounts for -- omitted when no ancestor does, as for a
+//! here, the side of this node it is on, and the ancestor ancestor_generation
+//! it accounts for -- omitted when no ancestor does, as for a
 //! node drawn in place of a node it overrides.
 //! See TODO/DONE/semantic-heralds-wire/plan.org.
 
@@ -40,34 +40,34 @@ impl Side {
     match self { Side::In => "in", Side::Out => "out" } } }
 
 /// One reason an occurrence is drawn where it is: a relation, the side
-/// of this node it is on, and the generation of the ancestor it
+/// of this node it is on, and the ancestor ancestor_generation it
 /// accounts for (None when it accounts for no ancestor).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BirthFact {
-  pub relation   : NodeRelation,
-  pub side       : Side,
-  pub generation : Option<usize>,
+  pub relation            : NodeRelation,
+  pub side                : Side,
+  pub ancestor_generation : Option<usize>,
 }
 
 impl BirthFact {
   pub fn new (
-    relation   : NodeRelation,
-    side       : Side,
-    generation : Option<usize>,
+    relation            : NodeRelation,
+    side                : Side,
+    ancestor_generation : Option<usize>,
   ) -> BirthFact {
-    BirthFact { relation, side, generation } }
+    BirthFact { relation, side, ancestor_generation } }
 
   /// '(RELNAME SIDE [GEN])'
   fn sexp (self) -> String {
-    match self . generation {
-      Some (generation) => format! ( "({} {} {})",
+    match self . ancestor_generation {
+      Some (ancestor_generation) => format! ( "({} {} {})",
         self . relation . relation_name (), self . side . wire_name (),
-        generation ),
+        ancestor_generation ),
       None => format! ( "({} {})",
         self . relation . relation_name (), self . side . wire_name () ), } } }
 use crate::types::viewnode::RelationCounts;
 
-/// Per-relation, per-side ancestor-flag generation distances (1 = the
+/// Per-relation, per-side ancestor generations of the flags (1 = the
 /// viewparent, 2 = grandparent, ...). Transient: computed in the
 /// viewnodestats pass and consumed immediately when emitting the
 /// relationship heralds.
@@ -83,14 +83,14 @@ pub struct AncestorFlags {
 }
 
 impl AncestorFlags {
-  /// Record a flag at generation 'generation' for relation 'rel' on the
+  /// Record a flag at 'ancestor_generation' for relation 'rel' on the
   /// given side (inbound = "ancestor R's the node", outbound = "the node
   /// R's the ancestor").
   pub fn record (
     &mut self,
-    rel        : NodeRelation,
-    inbound    : bool,
-    generation : usize,
+    rel                 : NodeRelation,
+    inbound             : bool,
+    ancestor_generation : usize,
   ) {
     let slot : Option<&mut Vec<usize>> = match (rel, inbound) {
       (NodeRelation::Contains,                  true ) => Some (&mut self . contains_in),
@@ -104,10 +104,10 @@ impl AncestorFlags {
       (NodeRelation::Overrides,           true )       => Some (&mut self . overrides_in),
       (NodeRelation::Overrides,           false)       => Some (&mut self . overrides_out), };
     if let Some (v) = slot {
-      if ! v . contains (&generation) { v . push (generation); } } }
+      if ! v . contains (&ancestor_generation) { v . push (ancestor_generation); } } }
 }
 
-/// `(ancestors GEN...)`, or None if empty. Generations are sorted and
+/// `(ancestors GEN...)`, or None if empty. Ancestor generations are sorted and
 /// de-duped for a stable wire.
 fn ancestors_sexp (
   flags : &[usize],

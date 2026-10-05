@@ -348,24 +348,24 @@ na anyway) any stray sentinel token is dropped."
   (propertize text 'face (intern (format "heralds-%s-face" style))))
 
 (defun heralds--gen-list (gens)
-  "Return sorted distinct generation integers from GENS."
+  "Return sorted distinct ancestor generations from GENS."
   (sort (delete-dups (copy-sequence gens)) #'<))
 
-(defun heralds--ancestor-glyph (generation)
-  "The ancestor flag for GENERATION: a for the parent, b for the
+(defun heralds--ancestor-glyph (ancestor-generation)
+  "The ancestor flag for ANCESTOR-GENERATION: a for the parent, b for the
 grandparent, ..., then {N}."
-  (if (and (>= generation 1) (<= generation 26))
-      (char-to-string (+ ?a (1- generation)))
-    (format "{%s}" generation)))
+  (if (and (>= ancestor-generation 1) (<= ancestor-generation 26))
+      (char-to-string (+ ?a (1- ancestor-generation)))
+    (format "{%s}" ancestor-generation)))
 
 (defun heralds--ancestor-text (gens carrier-tier)
   "Render the ancestor flags GENS. Each shows its floor, or the greater
 of its floor and CARRIER-TIER when the flags carry a tier."
   (mapconcat
-   (lambda (generation)
-     (let ((floor (heralds--floor (if (= generation 1) 'ancestor_a
+   (lambda (ancestor-generation)
+     (let ((floor (heralds--floor (if (= ancestor-generation 1) 'ancestor_a
                                     'ancestor_b_and_higher))))
-       (heralds--styled (heralds--ancestor-glyph generation)
+       (heralds--styled (heralds--ancestor-glyph ancestor-generation)
                         (if carrier-tier (heralds--max-tier floor carrier-tier)
                           floor))))
    (heralds--gen-list gens) ""))
@@ -426,11 +426,11 @@ return (COUNT GENS SUBFORMS) for SIDE (`in' or `out'), or nil if absent."
 of birth facts (RELATION SIDE [GEN]), already accounts for."
   (and gens
        (= count (length (heralds--gen-list gens)))
-       (cl-every (lambda (generation)
+       (cl-every (lambda (ancestor-generation)
                    (cl-some (lambda (fact)
                               (and (eq (nth 0 fact) rel)
                                    (eq (nth 1 fact) side)
-                                   (eql (nth 2 fact) generation)))
+                                   (eql (nth 2 fact) ancestor-generation)))
                             birth))
                  gens)))
 

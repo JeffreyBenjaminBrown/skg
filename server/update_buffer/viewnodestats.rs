@@ -91,7 +91,7 @@ fn set_viewnodestats_recursive (
     { ancestor_skgids . remove (pid); } } }
 
 /// What the unrestricted vognode at treeid is born of, and which ancestors to
-/// flag. The viewparent is a generation-1 ancestor (a non-vognode folder
+/// flag. The viewparent is at ancestor generation 1 (a non-vognode folder
 /// carries no flag); a folder member additionally flags the folder's
 /// required-ancestry vognodes (recorder = the last entry) at their tree-gen
 /// distances.

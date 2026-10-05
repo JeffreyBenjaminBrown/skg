@@ -293,7 +293,7 @@ local function first_number (sexp)
   return nil
 end
 
----Generation integers of an (ancestors ...) sub-form inside SIDE, else {}.
+---Ancestor generations of an (ancestors ...) sub-form inside SIDE, else {}.
 local function ancestors_of (side)
   local anc = assq(side, 'ancestors')
   if not anc then return {} end
@@ -374,7 +374,7 @@ local function fraction_chunks (total, total_gens, numerator,
 end
 
 ---Whether the side's only members are ancestors that BIRTH, a list of
----{relation, side, generation} facts, already accounts for.
+---{relation, side, ancestor_generation} facts, already accounts for.
 local function birth_explained (rel, side, count, gens, birth)
   gens = distinct_gens(gens)
   if #gens == 0 or count ~= #gens then return false end
@@ -382,7 +382,7 @@ local function birth_explained (rel, side, count, gens, birth)
     local accounted = false
     for _, fact in ipairs(birth) do
       if fact.relation == rel and fact.side == side
-         and fact.generation == g then accounted = true end
+         and fact.ancestor_generation == g then accounted = true end
     end
     if not accounted then return false end
   end
@@ -453,7 +453,7 @@ function M.render_rel_facts (sexp)
       local fact = birth_form[i]
       table.insert(birth, { relation = sexpr.atom_text(fact[1]),
                             side = sexpr.atom_text(fact[2]),
-                            generation = fact[3] }) end
+                            ancestor_generation = fact[3] }) end
   end
   local chunks = {}
   local function add_token (tok)

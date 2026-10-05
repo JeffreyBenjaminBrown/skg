@@ -25,5 +25,7 @@ The glossary ('docs/glossary.org') defines each kind.
 - commit: git-commit, skgsave-commit or tantivy-commit. Where git is
   plain from context (HEAD, a merge commit, a git2 call), bare
   "commit" means a git-commit.
-- generation: runtime generation ('RuntimeGeneration') or buffer
-  generation (the clients' per-buffer request counter).
+- generation: runtime generation ('RuntimeGeneration'), buffer
+  generation (the clients' per-buffer request counter), or ancestor
+  generation (how far up the view an ancestor is: 1 = viewparent). A
+  bare "generation" of a tree, counting down from its root, is fine.

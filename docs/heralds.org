@@ -92,8 +92,8 @@ hidden-outside-subscribee folders.
 
 *** Ancestor flags and floors
 Lowercase flags name tracked ancestors: =a= is the viewparent, =b=
-the grandparent, and so on, counting folders as generations. After =z=,
-a generation appears as ={27}=, ={28}=, etc. =aC= says the parent
+the grandparent, and so on: the ancestor generation, counting folders.
+After =z=, an ancestor generation appears as ={27}=, ={28}=, etc. =aC= says the parent
 contains this node; =Ca= says this node contains its parent. A flag
 replaces a numeral when ancestors account for the whole side.
 
