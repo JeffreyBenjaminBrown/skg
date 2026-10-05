@@ -2,7 +2,7 @@
 //!
 //! This is the canonical home for whole-graph constraints. It separates hard
 //! errors (the candidate must
-//! not be published) from telescope warnings (the data remains loadable but
+//! not be swapped in) from telescope warnings (the data remains loadable but
 //! deserves repair), and returns both in deterministic order.
 
 use crate::dbs::in_rust_graph::InRustGraph;

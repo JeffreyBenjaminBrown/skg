@@ -263,7 +263,7 @@ pub fn mark_view_roots_parent_na (
 ///
 /// Forest roots have no ActiveVognode parent and therefore
 /// do not fall through this check. Also relies on the save pipeline's
-/// invariant that prepared graph publication has updated the in-Rust-graph
+/// invariant that the prepared graph swap-in has updated the in-Rust-graph
 /// graph before the rerender pass runs (see
 /// 'update_views_after_save').
 pub fn validate_affectsParent_relationships (

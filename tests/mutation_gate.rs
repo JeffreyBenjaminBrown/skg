@@ -1,9 +1,9 @@
 //! Deterministic regression for the graph half of a concurrent save.
 //!
 //! Two writers that both clone the same ArcSwap snapshot and independently
-//! publish a replacement lose whichever write stores first.  The real save
+//! swap in a replacement lose whichever write stores first.  The real save
 //! pipeline also writes disk, graph indexes and the search index, so its shared MutationGate
-//! must cover snapshot capture through publication.  These tests force that
+//! must cover snapshot capture through swap-in.  These tests force that
 //! old interleaving without involving filesystem timing or external services.
 
 use futures::executor::block_on;
@@ -54,7 +54,7 @@ fn complete_from_rust (node : &GraphnodeInRust) -> Graphnode {
     flags : node . flags . clone (),
   } }
 
-fn publish_from_snapshot (
+fn swap_in_from_snapshot (
   handle : &InRustGraphHandle,
   graph_snapshot : &Arc<InRustGraph>,
   instruction : &NodeInstruction,
@@ -69,7 +69,7 @@ fn two_simultaneous_snapshot_writers_lose_an_update_without_a_gate () {
   let handle : InRustGraphHandle = new_handle ( InRustGraph::new () );
   let a = save ("a");
   let b = save ("b");
-  // Capture both old snapshots before either candidate is published.  The
+  // Capture both old snapshots before either candidate is swapped in.  The
   // barrier makes this the exact lost-update schedule rather than a race that
   // happens only occasionally under load.
   let a_graph_snapshot = handle . load_full ();
@@ -80,10 +80,10 @@ fn two_simultaneous_snapshot_writers_lose_an_update_without_a_gate () {
     let b_barrier = barrier . clone ();
     let write_a = async {
       a_barrier . wait () . await;
-      publish_from_snapshot (&handle, &a_graph_snapshot, &a); };
+      swap_in_from_snapshot (&handle, &a_graph_snapshot, &a); };
     let write_b = async {
       b_barrier . wait () . await;
-      publish_from_snapshot (&handle, &b_graph_snapshot, &b); };
+      swap_in_from_snapshot (&handle, &b_graph_snapshot, &b); };
     join! (write_a, write_b); } );
   let final_graph = handle . load_full ();
   assert_eq! (final_graph . len (), 1,
@@ -110,7 +110,7 @@ fn shared_mutation_gate_serializes_snapshot_capture_and_preserves_both_writes ()
       let graph_snapshot = handle . load_full ();
       first_captured_a . notify_one ();
       release_first_a . notified () . await;
-      publish_from_snapshot (&handle, &graph_snapshot, &a); };
+      swap_in_from_snapshot (&handle, &graph_snapshot, &a); };
 
     let gate_b = gate . clone ();
     let second_entered_b = second_entered . clone ();
@@ -118,7 +118,7 @@ fn shared_mutation_gate_serializes_snapshot_capture_and_preserves_both_writes ()
       let _guard = gate_b . lock () . await;
       second_entered_b . store (true, Ordering::Release);
       let graph_snapshot = handle . load_full ();
-      publish_from_snapshot (&handle, &graph_snapshot, &b); };
+      swap_in_from_snapshot (&handle, &graph_snapshot, &b); };
 
     let control = async {
       first_captured . notified () . await;
@@ -183,7 +183,7 @@ fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
       // post-merge snapshot must canonicalize its inverse entry.
       observer . contains = vec! [ RelPartner::at_relRepo (
         SkgRepoName::from ("main"), ID::from ("acquiree")) ];
-      publish_from_snapshot (
+      swap_in_from_snapshot (
         &handle, &graph_snapshot, &NodeInstruction::Save (SaveNode (observer))); };
     join! (merge_delete, save_after); });
 
@@ -213,7 +213,7 @@ fn save_plan_captured_after_skgrepo_move_preserves_the_new_skgrepo () {
       release_a . notified () . await;
       let mut moved = node ("moved", "old title", "private");
       moved . extra_ids = vec! [ID::from ("former-id")];
-      publish_from_snapshot (
+      swap_in_from_snapshot (
         &handle, &graph_snapshot, &NodeInstruction::Save (SaveNode (moved))); };
 
     let gate_b = gate . clone ();
@@ -228,7 +228,7 @@ fn save_plan_captured_after_skgrepo_move_preserves_the_new_skgrepo () {
       let mut edited : Graphnode =
         complete_from_rust (graph_snapshot . get (&ID::from ("moved")) . unwrap ());
       edited . title = "edited after move" . to_string ();
-      publish_from_snapshot (
+      swap_in_from_snapshot (
         &handle, &graph_snapshot, &NodeInstruction::Save (SaveNode (edited))); };
     join! (skgrepo_move, edit_after_move); });
 
@@ -239,7 +239,7 @@ fn save_plan_captured_after_skgrepo_move_preserves_the_new_skgrepo () {
   assert_eq! (graph . pid_of (&ID::from ("former-id")), Some (ID::from ("moved"))); }
 
 #[test]
-fn rebuild_started_after_a_mutation_publishes_a_snapshot_containing_it () {
+fn rebuild_started_after_a_mutation_swaps_in_a_graph_snapshot_containing_it () {
   let handle = new_handle (InRustGraph::from_graphnodes (&[
     node ("seed", "seed", "main") ]));
   let gate = new_mutation_gate ();
@@ -255,7 +255,7 @@ fn rebuild_started_after_a_mutation_publishes_a_snapshot_containing_it () {
       let graph_snapshot = handle . load_full ();
       entered_a . notify_one ();
       release_a . notified () . await;
-      publish_from_snapshot (&handle, &graph_snapshot, &save ("saved")); };
+      swap_in_from_snapshot (&handle, &graph_snapshot, &save ("saved")); };
 
     let gate_b = gate . clone ();
     let entered_b = mutation_entered . clone ();
@@ -264,7 +264,7 @@ fn rebuild_started_after_a_mutation_publishes_a_snapshot_containing_it () {
       release_mutation . notify_one ();
       let _guard = gate_b . lock () . await;
       // A real rebuild reads disk here.  Its candidate must therefore be
-      // based on the state published by every earlier gated mutation.
+      // based on the state swapped in by every earlier gated mutation.
       let disk_nodes : Vec<Graphnode> = handle . load_full () . nodes
         . values () . map (complete_from_rust) . collect ();
       handle . store (Arc::new (InRustGraph::from_graphnodes (&disk_nodes))); };
@@ -293,5 +293,5 @@ fn tantivy_worker_applies_same_pid_tasks_in_publication_order () {
   let opts = SearchOptions::default ();
   let (old_hits, _) = search_index (&index, "firstversiontoken", &opts) . unwrap ();
   let (new_hits, _) = search_index (&index, "secondversiontoken", &opts) . unwrap ();
-  assert! (old_hits . is_empty (), "the first publication must be superseded");
-  assert_eq! (new_hits . len (), 1, "the final queued publication must be searchable"); }
+  assert! (old_hits . is_empty (), "the first swap-in must be superseded");
+  assert_eq! (new_hits . len (), 1, "the final queued swap-in must be searchable"); }

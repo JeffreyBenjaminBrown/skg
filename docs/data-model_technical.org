@@ -59,7 +59,7 @@ relationship entities.  Relationship relRepo remains part of every stored
 
 ** Hard validation constraints
 
-=validate_complete_graph= runs before startup/rebuild publication.  Saves
+=validate_complete_graph= runs before the startup/rebuild swap-in.  Saves
 preserve the same constraints incrementally: while holding the mutation gate,
 they derive an exact persistent candidate from the current valid graph snapshot,
 validate the identities and relationships whose truth can change, and check
@@ -92,7 +92,7 @@ only keys that could change.  The complete validator remains an independent
 startup/rebuild gate and test oracle.
 
 The shared mutation gate serializes candidate construction, filesystem
-mutation, graph publication, and Tantivy enqueue so two writers cannot validate
+mutation, graph swap-in, and Tantivy enqueue so two writers cannot validate
 against the same stale graph snapshot.  Filesystem preflight and graph validation
 produce tokens tied to that exact graph snapshot; skgsave-commit consumes those prepared
 values rather than recomputing them after writes begin.
@@ -119,7 +119,7 @@ recorder whose raw relationship can resolve differently under the final identity
 map.  All five inverse indexes use that same final resolver.  Deletion is
 supported: references to a deleted PID remain raw and surviving recorders are
 rekeyed where canonical resolution changed.  Writers clone the persistent
-graph and publish one new =Arc= atomically; readers retain the immutable
+graph and swap in one new =Arc= atomically; readers retain the immutable
 generation they captured at operation start.
 
 Managed saves support monotonic acquisition of extra IDs during node merge,
@@ -137,7 +137,7 @@ home changes; startup and rebuild still audit every recorder.
 
 ** Runtime generations and rebuilding
 
-An =SkgEnv= family shares one atomic =RuntimeGeneration= publication point and
+An =SkgEnv= family shares one atomic =RuntimeGeneration= swap-in point and
 one mutation gate.  A generation contains an =Arc<SkgConfig>=, an
 =Arc<InRustGraph>=, the matching =TantivyIndex=, and a monotonically increasing
 generation number.  Each request captures exactly one generation and threads
@@ -146,6 +146,6 @@ fallback.
 
 Startup and “rebuild ephemeral data stores” both read the filesystem once,
 validate the candidate graph, and build graph plus Tantivy from that same node
-vector.  A live rebuild publishes only after the complete candidate succeeds;
+vector.  A live rebuild swaps in only after the complete candidate succeeds;
 failure leaves the prior generation visible.  The operation never rewrites
 authoritative =.skg= files.

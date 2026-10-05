@@ -122,7 +122,7 @@ pub(crate) fn apply_prepared_nodeMerges (
 
   let (_candidate, primary_nodeInstructions)
     : (Arc<InRustGraph>, Vec<NodeInstruction>) =
-    prepared . publish (graph)
+    prepared . swap_in (graph)
     . map_err ( |message| -> Box<dyn Error> { message . into () } ) ?;
   tracing::info!("   In-Rust graph merge complete.");
 

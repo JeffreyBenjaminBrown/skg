@@ -2,7 +2,7 @@
 //!
 //! Recomputes every index from node forward data without calling the graph's
 //! incremental index-maintenance helpers.  This makes it useful both as a
-//! regression oracle and as a precise diagnostic when a published graph is
+//! regression oracle and as a precise diagnostic when a swapped-in graph is
 //! suspected of internal corruption.
 
 use crate::dbs::in_rust_graph::InRustGraph;

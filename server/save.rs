@@ -50,7 +50,7 @@ fn graph_preparation_save_error (
 
 /// Updates the authoritative and derived stores from prepared `NodeInstruction`s:
 ///   1) Filesystem (source of truth)
-///   2) immutable in-Rust graph publication
+///   2) immutable in-Rust graph swap-in
 ///   3) Tantivy background update
 /// Returns `None` for the ordinary queued search-index path.
 /// Returns `Some(new_index)` when Tantivy had to be rebuilt.
@@ -129,8 +129,8 @@ fn apply_nodeInstructions (
     // view that's consistent with what just landed on disk, and
     // never a mid-save half-applied state.
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "publish_prepared_graph_update") . entered ();
-    prepared . publish (graph)
+      "swap_in_prepared_graph_update") . entered ();
+    prepared . swap_in (graph)
       . map_err ( |message| -> Box<dyn Error> { message . into () } ) ? };
 
   enqueue_tantivy_delta (
@@ -187,7 +187,7 @@ pub async fn update_graph_including_nodeMerges (
 
 /// The combined save operation for a caller that already holds the shared
 /// mutation gate.  The TCP save handler takes the gate before parsing so its
-/// disk-derived SavePlan cannot become stale before this function publishes.
+/// disk-derived SavePlan cannot become stale before this function swaps in the new graph.
 pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
   nodeInstructions  : Vec<NodeInstruction>,
   nodeMerge_instructions : &[NodeMerge],

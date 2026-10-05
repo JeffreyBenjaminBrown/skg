@@ -28,7 +28,7 @@ Ex command.
 
 If the current files for anything being saved select a title or body
 from below that node's home, Skg stops before every write and offers
-*Hoist* or *Abort*. Hoist publishes the selected text at home, removes
+*Hoist* or *Abort*. Hoist moves the selected text to home, removes
 lower title/body copies, and preserves lower relationships and aliases;
 the exact approved PIDs are reread and rechecked as one batch before the
 save proceeds. Abort leaves every file byte-for-byte unchanged. Scripts

@@ -29,7 +29,7 @@ pub fn handle_delete_references_to_absent_node_request (
     Err (e) => return refuse (stream, &e), };
   // Preview validation and the resulting rewrite are one mutation.  Taking
   // the gate before the preview prevents an approved token from becoming
-  // stale again between its check and the filesystem/graph publication.
+  // stale again between its check and the filesystem write and graph swap-in.
   let mutation_gate = env . mutation_gate ();
   let _mutation_guard = block_on (mutation_gate . lock ());
   let runtime = env . runtime_snapshot ();
@@ -60,7 +60,7 @@ pub fn handle_delete_references_to_absent_node_request (
       writes, &[], (*runtime . config) . clone (), &runtime . tantivy_index,
       &working_graph, &HashSet::new () )
     { return refuse (stream, &e . to_string ()); }
-    env . runtime . publish (
+    env . runtime . swap_in (
       runtime . config . clone (), working_graph . load_full (),
       runtime . tantivy_index . clone ()); }
   drop (_mutation_guard);

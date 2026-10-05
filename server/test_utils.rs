@@ -505,7 +505,7 @@ pub fn set_skgrepo_retagging_relRepos (
     for m in v . iter_mut () {
       m . relRepo = skgrepo . clone (); }} }
 
-/// Verify the published graph's inverse indexes after a mutation.
+/// Verify the current graph's inverse indexes after a mutation.
 pub fn audit_inrustgraph_or_panic (
   handle  : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {

@@ -170,7 +170,7 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
     vec![NodeInstruction::Save (SaveNode (changed_recorder))], &[], config . clone (),
     &runtime . tantivy_index, &working_graph,
     &env . mutation_gate () ) . await ?;
-  env . runtime . publish (
+  env . runtime . swap_in (
     runtime . config . clone (), working_graph . load_full (),
     runtime . tantivy_index . clone ());
   let stale : Vec<String> = invoke (

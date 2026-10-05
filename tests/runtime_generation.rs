@@ -34,11 +34,11 @@ fn cloned_runtime_observes_atomic_generations_while_old_snapshot_stays_stable ()
   let mut new_config = (*captured_old . config) . clone ();
   new_config . owned_folder = "new-config" . to_string ();
   let new_index = empty_in_ram_tantivy_index () . unwrap ();
-  let published = runtime . publish (
+  let swapped_in = runtime . swap_in (
     Arc::new (new_config), Arc::new (graph_with ("new-node")),
     new_index . clone ());
 
-  assert_eq! (published . generation, 1);
+  assert_eq! (swapped_in . generation, 1);
   let observed = other_connection . graph_snapshot ();
   assert_eq! (observed . generation, 1);
   assert_eq! (observed . config . owned_folder, "new-config");
@@ -53,16 +53,16 @@ fn cloned_runtime_observes_atomic_generations_while_old_snapshot_stays_stable ()
 }
 
 #[test]
-fn unpublished_candidate_cannot_change_the_visible_generation () {
+fn a_candidate_not_swapped_in_cannot_change_the_visible_generation () {
   let runtime = SharedRuntime::new (
-    config (), Arc::new (graph_with ("published")),
+    config (), Arc::new (graph_with ("swapped-in")),
     empty_in_ram_tantivy_index () . unwrap ());
   let before = runtime . graph_snapshot ();
-  let _failed_candidate = graph_with ("never-published");
+  let _failed_candidate = graph_with ("never-swapped-in");
   let after = runtime . graph_snapshot ();
   assert! (Arc::ptr_eq (&before, &after));
   assert_eq! (after . generation, 0);
-  assert! (! after . graph . nodes . contains_key (&ID::from ("never-published")));
+  assert! (! after . graph . nodes . contains_key (&ID::from ("never-swapped-in")));
 }
 
 #[test]
@@ -75,7 +75,7 @@ fn rebuild_candidate_uses_a_sibling_directory_without_wiping_live_index () {
   let (generation_config, generation_index) = rebuild_tantivy_as_generation (
     &candidate_config, &[node_for_generation ("candidate")], 7) . unwrap ();
   assert_ne! (generation_config . tantivy_folder, live_path);
-  assert! (live_path . is_dir (), "the published search-index directory survives");
+  assert! (live_path . is_dir (), "the swapped-in search-index directory survives");
   assert! (generation_config . tantivy_folder . is_dir ());
   assert! (! Arc::ptr_eq (&live_index . index, &generation_index . index));
 }

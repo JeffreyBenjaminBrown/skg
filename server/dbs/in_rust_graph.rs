@@ -5,7 +5,7 @@
 //! every outbound relation and for extra_ids. It lives behind an
 //! 'ArcSwap' so readers never block writers and writers never block
 //! readers — writers clone via 'im''s structural sharing (O(log n)
-//! per mutation) and atomically publish a new graph snapshot.
+//! per mutation) and atomically swap in a new graph snapshot.
 
 pub mod complete_validation;
 pub mod containerward_role_tree;
@@ -305,7 +305,7 @@ pub fn apply_nodeInstructions_to_inRustGraph (
 /// in_rust_graph, and every Delete's id is absent. Used as a 'debug_assert!'
 /// invariant guard at the top of 'update_views_after_save' to catch
 /// pipeline-ordering regressions (someone reshuffles the pipeline so
-/// rerender runs before prepared graph publication). Returns Ok (()) on
+/// rerender runs before the prepared graph swap-in). Returns Ok (()) on
 /// coherence, Err with the offending pid's detail otherwise. Never
 /// panics — the caller wraps in 'debug_assert!' so release builds pay
 /// no cost.

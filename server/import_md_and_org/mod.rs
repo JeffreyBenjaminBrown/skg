@@ -1,7 +1,7 @@
 pub mod parse;
 pub mod build;
 pub mod resolve;
-pub mod publish;
+pub mod swap_in;
 pub mod batch;
 
 use parse::{ParsedDocument, parse_document};

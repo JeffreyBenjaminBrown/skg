@@ -1,4 +1,4 @@
--- Live graph lookup, extmarks, and graph publication in Neovim.
+-- Live graph lookup, extmarks, and graph swap-in in Neovim.
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(45)
@@ -84,7 +84,7 @@ new_file:write('pid: new\ntitle: New target\n')
 new_file:close()
 misc.rebuild_ephemeral_data_stores()
 T.check(T.wait_for(function () return status('new', 'resolved') end, 10),
-        'newly published target stops being missing')
+        'newly swapped-in target stops being missing')
 T.check(buffer.text(buf) == unsaved_text and vim.bo[buf].modified,
         'lookup and rebuild leave unsaved text alone')
 

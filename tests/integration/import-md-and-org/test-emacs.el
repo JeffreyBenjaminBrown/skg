@@ -37,7 +37,7 @@
   (unless (= host-prompts 1) (error "Expected one host-root prompt"))
   (unless (= approvals 1) (error "Expected one explicit approval"))
   (unless (file-exists-p (expand-file-name "import-root.skg" repo-dir))
-    (error "Explicit Org root ID was not published"))
+    (error "Explicit Org root ID was not imported"))
   ;; The import result schedules an asynchronous refresh. Let that finish
   ;; before issuing the next request on the same length-prefixed connection.
   (accept-process-output nil 0.1)

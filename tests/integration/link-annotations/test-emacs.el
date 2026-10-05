@@ -1,5 +1,5 @@
 ;;; -*- lexical-binding: t; -*-
-;;; Live graph lookup, display overlays, and graph publication in Emacs.
+;;; Live graph lookup, display overlays, and graph swap-in in Emacs.
 
 (load-file "../../../elisp/skg-init.el")
 

@@ -45,7 +45,7 @@ pub fn rebuild_ephemeral_data_stores_in_place (
   views_state : &mut ViewsState,
 ) -> Result<(), String> {
   tracing::info!("Rebuilding ephemeral data stores from .skg files...");
-  // Rebuild is an authoritative publication just like a save.  Clone the Arc
+  // Rebuild is an authoritative swap-in just like a save.  Clone the Arc
   // before locking so the guard does not borrow `env` while this function
   // replaces its config/search-index fields below.
   let mutation_gate = env . mutation_gate ();
@@ -92,8 +92,8 @@ pub fn rebuild_ephemeral_data_stores_in_place (
       &mentioned_skgids, &map_to_content, &map_to_containers )
       . map_err ( |e| format! ("Context computation failed: {}", e) ) ?;
     tracing::info!("Context rankings recomputed.");
-    { // Publish config, graph, and replacement search index as one generation.
-      env . runtime . publish (
+    { // Swap in config, graph, and replacement search index as one generation.
+      env . runtime . swap_in (
         Arc::new (fresh_config), Arc::new (fresh_graph), new_tantivy);
       tracing::info!("In-Rust graph rebuilt."); }
     Ok (())

@@ -1,4 +1,5 @@
-//! Checked, creation-only publication for one approved import batch.
+//! Checked, creation-only file writes and graph swap-in for one approved
+//! import batch.
 
 use crate::dbs::filesystem::multiple_nodes::read_skg_sections_from_folder;
 use crate::dbs::filesystem::one_node::prepare_graphnode_telescope;
@@ -15,7 +16,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Component, Path, PathBuf};
 
-pub(crate) struct PreparedImportPublication {
+pub(crate) struct PreparedImportSwapIn {
   graph : PreparedGraphUpdate,
   files : Vec<(PathBuf, String)>,
 }
@@ -25,10 +26,10 @@ struct CreatedFile {
   handle : File,
 }
 
-pub(crate) fn prepare_import_publication (
+pub(crate) fn prepare_import_swap_in (
   nodes : &[Graphnode],
   env : &SkgEnv,
-) -> Result<PreparedImportPublication, String> {
+) -> Result<PreparedImportSwapIn, String> {
   let runtime = env . runtime_snapshot ();
   let config : &SkgConfig = &runtime . config;
   let mut claims : HashMap<ID, ID> = HashMap::new ();
@@ -60,10 +61,10 @@ pub(crate) fn prepare_import_publication (
     if ! paths . insert (path . clone ()) {
       return Err (format! ("Two imported sections would write {}",
         path . display ())); } }
-  Ok (PreparedImportPublication { graph, files })
+  Ok (PreparedImportSwapIn { graph, files })
 }
 
-impl PreparedImportPublication {
+impl PreparedImportSwapIn {
   pub(crate) fn apply_under_mutation_gate (
     self,
     env : &SkgEnv,
@@ -76,7 +77,7 @@ impl PreparedImportPublication {
       handle . write_all (yaml . as_bytes ()))?;
     let nodeInstructions : Vec<NodeInstruction> = self . graph . nodeInstructions () . to_vec ();
     let candidate = self . graph . candidate () . clone ();
-    env . runtime . publish (
+    env . runtime . swap_in (
       runtime . config . clone (), candidate . clone (),
       runtime . tantivy_index . clone ());
     enqueue_tantivy_delta (&candidate, &runtime . tantivy_index, nodeInstructions);

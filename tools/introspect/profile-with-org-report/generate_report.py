@@ -337,7 +337,7 @@ def derived_unspanned_remainders(spans: dict[str, list[float]]) -> list[tuple[st
         0.0,
         median_span(spans, "apply_ordinary_defineNodes")
         - median_span(spans, "update_fs_from_savenode_defs")
-        - median_span(spans, "publish_prepared_graph_update")
+        - median_span(spans, "swap_in_prepared_graph_update")
         - median_span(spans, "prominence_sources_for_saved"),
     )
     return [

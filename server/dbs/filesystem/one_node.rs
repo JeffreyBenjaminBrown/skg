@@ -155,7 +155,7 @@ pub(crate) struct PreparedTelescopeWrite {
 
 impl PreparedTelescopeWrite {
   /// Serialized sections for a new telescope. Import checks all configured
-  /// paths for absence and publishes these with create_new rather than using
+  /// paths for absence and writes these with create_new rather than using
   /// the ordinary overwrite/delete mutation path.
   pub(crate) fn creation_files (
     &self,

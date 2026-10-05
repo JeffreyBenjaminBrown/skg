@@ -2,7 +2,7 @@
 //!
 //! The constructor is the only way to obtain this token.  Store orchestration
 //! can inspect its nodeInstructions and candidate while preflighting later work,
-//! but publication consumes it and never reapplies nodeInstructions to a newer
+//! but the swap-in consumes it and never reapplies nodeInstructions to a newer
 //! graph.
 
 use crate::dbs::in_rust_graph::{
@@ -186,7 +186,7 @@ impl PreparedGraphUpdate {
       Err ("Refusing to apply a prepared graph update to a different base snapshot. This is an internal mutation-boundary error." . to_string ()) }
   }
 
-  pub(crate) fn publish (
+  pub(crate) fn swap_in (
     self,
     graph : &InRustGraphHandle,
   ) -> Result<(Arc<InRustGraph>, Vec<NodeInstruction>), String> {

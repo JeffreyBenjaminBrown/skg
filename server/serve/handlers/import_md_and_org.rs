@@ -50,7 +50,7 @@ pub fn handle_import_md_and_org_request (
           &format! ("Imported {} nodes. Record: [[id:{}][Import record]]",
             count, record_id), None, Some (&record_id . 0), &[], &warnings),
         Err (error) => refuse (stream, &format! (
-          "Import was not published: {} Preview again.", error)), } }
+          "Import was not written: {} Preview again.", error)), } }
     "preview" => {
       *pending = None;
       let input : String = match value_from_request_sexp ("input-directory", request) {

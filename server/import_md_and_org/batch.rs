@@ -1,7 +1,7 @@
 //! Read-only preparation and under-gate revalidation of one import.
 
 use super::{discover_documents, build::{BuiltDocument, build_document},
-  parse::{ParsedDocument, line_at}, publish::prepare_import_publication,
+  parse::{ParsedDocument, line_at}, swap_in::prepare_import_swap_in,
   resolve::{contains_absolute_file_link, resolve_document_links}};
 use crate::dbs::filesystem::multiple_nodes::{
   read_all_skg_files_from_skgrepos_read_only, read_skg_sections_from_folder};
@@ -106,7 +106,7 @@ pub fn prepare_import_batch_with (
       host_root, destination_skgrepo, "on confirmation"));
     Some (record_id) };
   if ! nodes . is_empty () {
-    let _ = prepare_import_publication (&nodes, env)?; }
+    let _ = prepare_import_swap_in (&nodes, env)?; }
   Ok (ImportPreparation::Prepared (PreparedImportBatch {
     input_directory : input_directory . to_path_buf (),
     host_root : host_root . map (Path::to_path_buf),
@@ -193,7 +193,7 @@ impl PreparedImportBatch {
       &self . record_documents, &self . input_directory,
       self . host_root . as_deref (), &self . destination_skgrepo,
       &execution_time));
-    let prepared = prepare_import_publication (&nodes, env)?;
+    let prepared = prepare_import_swap_in (&nodes, env)?;
     let created : usize = prepared . apply_under_mutation_gate (env)?;
     Ok ((created, record_id))
   }

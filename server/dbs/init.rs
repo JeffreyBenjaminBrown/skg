@@ -137,8 +137,8 @@ pub fn rebuild_tantivy_from_nodes (
   Ok (tantivy_index) }
 
 /// Build a live-reload candidate in a sibling directory, leaving the search index in
-/// the currently published generation untouched.  The returned config points
-/// at the candidate directory and is published atomically with the search index.
+/// the current generation untouched.  The returned config points
+/// at the candidate directory and is swapped in atomically with the search index.
 pub fn rebuild_tantivy_as_generation (
   config : &SkgConfig,
   nodes : &[Graphnode],

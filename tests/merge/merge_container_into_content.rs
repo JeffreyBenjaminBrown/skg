@@ -144,7 +144,7 @@ async fn merge_container_into_content_impl (
       "aa contains itself on filesystem (self-containment after merge)"
       . to_string() ); }
 
-  // aa must not contain itself in the published graph.
+  // aa must not contain itself in the swapped-in graph.
   { if let Some (aa) = graph . load_full () . get (&ID::from ("aa")) {
       if aa . contains . iter () . any (|m| m . member == ID::from ("aa")) {
         failures . push (

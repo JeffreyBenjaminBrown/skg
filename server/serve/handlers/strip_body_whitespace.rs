@@ -64,7 +64,7 @@ fn strip_body_whitespace_and_refresh_caches (
       changed . iter () . map (GraphnodeInTantivy::from) . collect ();
     update_index_with_nodes (&tantivy_nodes, &runtime . tantivy_index)
       . map_err ( |e| format! ("Tantivy update failed: {}", e) ) ?; }
-  env . runtime . publish (
+  env . runtime . swap_in (
     runtime . config . clone (), new_graph, runtime . tantivy_index . clone ());
   let breakdown : String = {
     // BTreeMap so the report lists skgrepos in a stable order.

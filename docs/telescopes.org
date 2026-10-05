@@ -29,7 +29,7 @@ node without sharing its text, so a node's text always lives in its
 most public section. Data that breaks the rule — a title or body
 selected below the home section — still loads, but the composition reports
 it. An interactive save offers Abort or Hoist before changing
-anything. Hoist explicitly publishes the selected title and body at
+anything. Hoist explicitly moves the selected title and body to
 home, removes lower title/body copies, preserves lower relationships and
 aliases, then rereads the files and requires the telescope to be
 clean before updating the in-memory graph or derived databases.

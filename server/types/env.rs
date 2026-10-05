@@ -17,7 +17,7 @@ use tokio::sync::Mutex;
 ///
 /// Readers continue to use immutable graph snapshots without this lock.  A
 /// writer holds it across validation against its captured graph, authoritative
-/// filesystem writes, graph publication, and the Tantivy enqueue. The Arc means every cloned
+/// filesystem writes, graph swap-in, and the Tantivy enqueue. The Arc means every cloned
 /// `SkgEnv` for different connections shares the same gate.
 pub type MutationGate = Arc<Mutex<()>>;
 
@@ -35,7 +35,7 @@ pub struct RuntimeGeneration {
 pub struct SharedRuntime {
   current : ArcSwap<RuntimeGeneration>,
   pub mutation_gate : MutationGate,
-  // Shared atomic publication state for coherent runtime generations.
+  // Shared atomic swap-in state for coherent runtime generations.
   legacy_graph : InRustGraphHandle,
 }
 
@@ -68,23 +68,23 @@ impl SharedRuntime {
     self . current . load_full ()
   }
 
-  pub fn publish (
+  pub fn swap_in (
     &self,
     config : Arc<SkgConfig>,
     graph : Arc<InRustGraph>,
     tantivy_index : TantivyIndex,
   ) -> Arc<RuntimeGeneration> {
     let generation = self . graph_snapshot () . generation + 1;
-    let published = Arc::new (RuntimeGeneration {
+    let swapped_in = Arc::new (RuntimeGeneration {
       config, graph : graph . clone (), tantivy_index, generation,
     });
     self . legacy_graph . store (graph);
-    self . current . store (published . clone ());
+    self . current . store (swapped_in . clone ());
     tracing::info! (
       generation,
-      node_count = published . graph . nodes . len (),
-      "published coherent runtime generation");
-    published
+      node_count = swapped_in . graph . nodes . len (),
+      "swapped in coherent runtime generation");
+    swapped_in
   }
 
   pub fn legacy_graph_handle (&self) -> InRustGraphHandle {

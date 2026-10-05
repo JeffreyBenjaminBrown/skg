@@ -89,7 +89,7 @@ fn publication_uses_the_exact_prepared_candidate () {
     . unwrap ();
   let expected : Arc<InRustGraph> = prepared . candidate () . clone ();
   let (_published, _nodeInstructions) : (Arc<InRustGraph>, Vec<NodeInstruction>) =
-    prepared . publish (&graph) . unwrap ();
+    prepared . swap_in (&graph) . unwrap ();
   let visible : Arc<InRustGraph> = graph . load_full ();
   assert! (Arc::ptr_eq (&visible, &expected));
 }
@@ -105,7 +105,7 @@ fn a_prepared_update_refuses_a_different_base () {
   let replacement : Arc<InRustGraph> = Arc::new (
     InRustGraph::from_graphnodes (&[node ("replacement")]));
   graph . store (replacement . clone ());
-  assert! (prepared . publish (&graph) . is_err ());
+  assert! (prepared . swap_in (&graph) . is_err ());
   assert! (Arc::ptr_eq (&graph . load_full (), &replacement));
 }
 

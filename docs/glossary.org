@@ -484,6 +484,14 @@ ask for confirmation (forks, Hoist) skgsave-commits nothing. A
 later, on a background worker. Where context leaves no doubt (HEAD, a
 merge commit, a 'git2' call) bare "commit" means a git-commit.
 
+*** swap in (a runtime generation), vs publish
+
+A save, rebuild or import ends by atomically *swapping in* a new
+runtime generation (config, graph and search index): readers holding
+the old one keep it, and the next reader gets the new one. "Publish"
+means only making text more public: sharing a skgrepo, or writing text
+into a more public telescope section. Hoist /moves/ text to home.
+
 *** mp = maybe-placed
 
 A viewnode that might have an ID and skgrepo,

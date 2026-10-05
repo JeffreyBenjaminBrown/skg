@@ -609,7 +609,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   other_views               : &[ClientViewSnapshot],
 ) -> Result<SaveResponse, Box<dyn Error>> {
   // Save-plan construction reads the current files and graph.  Hold the sole
-  // writer gate from before those reads through publication, or two requests
+  // writer gate from before those reads through the graph swap-in, or two requests
   // can serialize their writes yet still act on the same stale disk state.
   let mutation_gate = env . mutation_gate ();
   let mutation_guard = mutation_gate . lock () . await;
@@ -773,9 +773,9 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     prepared_save . apply (
       (*runtime . config) . clone (), &mut working_tantivy, &working_graph )
     .map_err ( |e| backfill_parse_warnings (e, &parse_warnings) ) ? };
-  let published = env . runtime . publish (
+  let swapped_in = env . runtime . swap_in (
     runtime . config . clone (), working_graph . load_full (), working_tantivy);
-  // Rerender reads the newly published graph but performs no authoritative
+  // Rerender reads the newly swapped-in graph but performs no authoritative
   // mutation, so it must not lengthen the writer critical section.
   drop (mutation_guard);
 
@@ -783,9 +783,9 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       "coherence_debug_assert" ). entered();
     debug_assert! (
       // TODO | PITFALL: This is quite a weak assertion.
-      // PURPOSE: The in-Rust graph must already reflect every Save and Delete in 'node_instructions' by the time this function runs. Violating this invariant (e.g. by reordering the save pipeline so that 'update_views_after_save' runs before prepared graph publication) would let the rerender read stale Graphnodes from the in-Rust graph.
+      // PURPOSE: The in-Rust graph must already reflect every Save and Delete in 'node_instructions' by the time this function runs. Violating this invariant (e.g. by reordering the save pipeline so that 'update_views_after_save' runs before the prepared graph swap-in) would let the rerender read stale Graphnodes from the in-Rust graph.
       in_rust_graph_coherent_with_nodeInstructions_in (
-          &published . graph, &node_instructions
+          &swapped_in . graph, &node_instructions
         ) . is_ok (),
       "update_views_after_save: in-Rust graph not coherent with node_instructions" ); }
 
@@ -799,7 +799,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         collateral_uris,
         diff_mode_enabled,
         env,
-        published . clone (),
+        swapped_in . clone (),
         viewuri_from_request_result,
         views_state,
         active_skgrepo_set,
@@ -812,7 +812,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       warnings . extend ( response . warnings );
       warnings . extend (
         post_skgsave_commit_hiddenoutside_warnings (
-          &published . graph, &post_skgsave_commit_notice_candidates ) );
+          &swapped_in . graph, &post_skgsave_commit_notice_candidates ) );
       response . warnings = warnings; }
     Ok (response) } }
 

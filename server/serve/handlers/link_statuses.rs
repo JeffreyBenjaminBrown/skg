@@ -1,4 +1,4 @@
-//! Batch existence and home-repo lookup from the published graph snapshot.
+//! Batch existence and home-repo lookup from the current graph snapshot.
 //! It exposes no title or inactive node skgrepo information.
 
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -101,7 +101,7 @@ mod tests {
   use std::sync::Arc;
 
   #[test]
-  fn statuses_use_the_published_graph_and_hide_inactive_skgrepos () {
+  fn statuses_use_the_current_graph_and_hide_inactive_skgrepos () {
     let mut config : SkgConfig = load_config (
       "tests/repo_sets/fixtures/skgconfig.toml") . unwrap ();
     config . skgrepos . get_mut (&SkgRepoName::from ("public"))
@@ -139,7 +139,7 @@ mod tests {
   }
 
   #[test]
-  fn a_newly_published_graph_answers_before_any_title_index_update () {
+  fn a_newly_swapped_in_graph_answers_before_any_title_index_update () {
     let config : SkgConfig = load_config (
       "tests/repo_sets/fixtures/skgconfig.toml") . unwrap ();
     let active : ActiveSkgRepoSet = ActiveSkgRepoSet::named (
@@ -151,13 +151,13 @@ mod tests {
       &handle . load_full (), &config, &active, &requested),
       vec![(ID::from ("old-new"), LinkStatus::Missing)]);
 
-    let published : InRustGraph = InRustGraph::from_graphnodes (&[
+    let current : InRustGraph = InRustGraph::from_graphnodes (&[
       Graphnode {
         pid : ID::from ("new"),
         extra_ids : requested . clone (),
         home_skgrepo : SkgRepoName::from ("public"),
         .. empty_graphnode () } ]);
-    handle . store (Arc::new (published));
+    handle . store (Arc::new (current));
     let result = classify_link_skgids (
       &handle . load_full (), &config, &active, &requested);
     assert_eq! (result, vec![(ID::from ("old-new"),

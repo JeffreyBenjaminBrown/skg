@@ -17,7 +17,7 @@ vim.fn.input, vim.fn.confirm = original_input, original_confirm
 T.check(host_prompts == 1, 'absolute filesystem link prompted once')
 T.check(approvals == 1, 'valid preview required explicit approval')
 T.check(vim.fn.filereadable(repo_dir .. '/import-root.skg') == 1,
-  'explicit Org root ID was published')
+  'explicit Org root ID was imported')
 -- The import result schedules a clean-view refresh on the same connection.
 vim.wait(100, function () return false end, 100)
 T.check(T.wait_for_response(15), 'import refresh settled')

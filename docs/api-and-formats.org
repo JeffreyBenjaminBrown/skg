@@ -185,7 +185,7 @@ So far there are these endpoints:
     =((response-type telescope-hoist-confirmation) (telescopes
     (((pid "P") (home "REPO")) ...)) (prompt "..."))=.
     This response contains no title or body. The prompt explains that
-    Hoist publishes the selected title/body text at home and removes lower
+    Hoist moves the selected title/body text to home and removes lower
     title/body copies while retaining lower relationships and aliases;
     Abort writes nothing and requires manual =.skg= repair. Hoist
     re-issues the SAME save with =(approved-hoist-pids "P" ...)=.
@@ -300,7 +300,7 @@ So far there are these endpoints:
     including resolution from an extra ID. =REPO-LABEL= is the visible
     target's home-repo herald label, not the link's relRepo. Inactive
     and missing rows return neither title nor skgrepo. The lookup reads the
-    published in-Rust graph snapshot and active skgrepo-set, independently
+    current in-Rust graph snapshot and active skgrepo-set, independently
     of Tantivy title-index commits. =request-id= associates asynchronous
     responses with their requesting buffer and its buffer generation.
 
@@ -402,7 +402,7 @@ So far there are these endpoints:
     or "Rebuild failed: ..." on error.
   - Behavior: Reads the authoritative =.skg= files once, validates a complete
     candidate graph, builds that graph and a fresh Tantivy index from the same
-    node vector, then atomically publishes the new runtime generation. It does
+    node vector, then atomically swaps in the new runtime generation. It does
     not rewrite =.skg= files. Failure leaves the old generation live. Success
     closes existing views and recomputes context rankings for search.
 
@@ -494,7 +494,7 @@ TCP connection:
   Those views are not replaced or updated in the server's open-view state;
   clean views refresh normally. An absent list means rerender all views.
 
-The importer only creates new authoritative =.skg= files and then publishes
+The importer only creates new authoritative =.skg= files and then swaps in
 the graph and search delta. An ordinary write failure removes files created
 by that attempt where possible and reports residual paths; a process crash
 is not guaranteed atomic. Source files are never changed. An export marker
