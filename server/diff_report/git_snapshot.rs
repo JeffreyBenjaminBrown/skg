@@ -5,7 +5,7 @@ use crate::telescope::types::{
   Telescope, retain_owned_sections_when_pid_folderlides,
 };
 use crate::diff_report::types::{
-  ChangedSnapshotPair, DiffSelection, GraphSnapshot, SnapshotKind, SnapshotPair};
+  ChangedGitSnapshotPair, DiffSelection, GraphSnapshot, GitSnapshotKind, GitSnapshotPair};
 use crate::git_ops::misc::path_relative_to_gitrepo;
 use crate::git_ops::read_gitrepo::{
   get_staged_changed_skg_files, get_unstaged_changed_skg_files,
@@ -30,11 +30,11 @@ use std::time::{Duration, Instant};
 static SNAPSHOT_CACHE : OnceLock<Mutex<HashMap<String, GraphSnapshot>>> =
   OnceLock::new ();
 
-pub fn read_snapshot_pair (
+pub fn read_git_snapshot_pair (
   config    : &SkgConfig,
   selection : DiffSelection,
-) -> Result<SnapshotPair, String> {
-  let (before_kind, after_kind) : (SnapshotKind, SnapshotKind) =
+) -> Result<GitSnapshotPair, String> {
+  let (before_kind, after_kind) : (GitSnapshotKind, GitSnapshotKind) =
     endpoint_kinds (selection) ?;
   validate_skgrepos_for_selection (config, before_kind, after_kind) ?;
   let (before_result, after_result) :
@@ -56,21 +56,21 @@ pub fn read_snapshot_pair (
     before_result ?;
   let after : GraphSnapshot =
     after_result ?;
-  Ok ( SnapshotPair { before, after } )
+  Ok ( GitSnapshotPair { before, after } )
 }
 
-pub fn read_changed_snapshot_pair (
+pub fn read_changed_git_snapshot_pair (
   config    : &SkgConfig,
   selection : DiffSelection,
-) -> Result<Option<ChangedSnapshotPair>, String> {
-  let (before_kind, after_kind) : (SnapshotKind, SnapshotKind) =
+) -> Result<Option<ChangedGitSnapshotPair>, String> {
+  let (before_kind, after_kind) : (GitSnapshotKind, GitSnapshotKind) =
     endpoint_kinds (selection) ?;
   validate_skgrepos_for_selection (config, before_kind, after_kind) ?;
   let changed_paths : HashMap<SkgRepoName, BTreeSet<PathBuf>> =
     changed_paths_by_skgrepo (config, before_kind, after_kind) ?;
   if changed_paths . values () . all ( |paths| paths . is_empty () ) {
-    return Ok (Some ( ChangedSnapshotPair {
-      pair: SnapshotPair {
+    return Ok (Some ( ChangedGitSnapshotPair {
+      pair: GitSnapshotPair {
         before: GraphSnapshot::default (),
         after: GraphSnapshot::default () },
       affected_pids: BTreeSet::new () } )); }
@@ -79,32 +79,32 @@ pub fn read_changed_snapshot_pair (
       read_graph_snapshot_maybe_cached (config, before_kind) }) ?;
   let (after, affected_pids) : (GraphSnapshot, BTreeSet<ID>) =
     profile_step_result ("overlay changed after graph snapshot", || {
-      overlay_changed_after_snapshot (
+      overlay_changed_after_git_snapshot (
         config, after_kind, &before, &changed_paths) }) ?;
-  Ok (Some ( ChangedSnapshotPair {
-    pair: SnapshotPair { before, after },
+  Ok (Some ( ChangedGitSnapshotPair {
+    pair: GitSnapshotPair { before, after },
     affected_pids } ))
 }
 
 fn endpoint_kinds (
   selection : DiffSelection,
-) -> Result<(SnapshotKind, SnapshotKind), String> {
+) -> Result<(GitSnapshotKind, GitSnapshotKind), String> {
   match (selection . include_staged, selection . include_unstaged) {
-    (true,  true)  => Ok ((SnapshotKind::Head,  SnapshotKind::Worktree)),
-    (true,  false) => Ok ((SnapshotKind::Head,  SnapshotKind::Index)),
-    (false, true)  => Ok ((SnapshotKind::Index, SnapshotKind::Worktree)),
+    (true,  true)  => Ok ((GitSnapshotKind::Head,  GitSnapshotKind::Worktree)),
+    (true,  false) => Ok ((GitSnapshotKind::Head,  GitSnapshotKind::Index)),
+    (false, true)  => Ok ((GitSnapshotKind::Index, GitSnapshotKind::Worktree)),
     (false, false) => Err (
       "Diff report must include staged changes, unstaged changes, or both."
         . to_string () ), } }
 
 fn validate_skgrepos_for_selection (
   config      : &SkgConfig,
-  before_kind : SnapshotKind,
-  after_kind  : SnapshotKind,
+  before_kind : GitSnapshotKind,
+  after_kind  : GitSnapshotKind,
 ) -> Result<(), String> {
   let needs_head : bool =
-    before_kind == SnapshotKind::Head ||
-    after_kind  == SnapshotKind::Head;
+    before_kind == GitSnapshotKind::Head ||
+    after_kind  == GitSnapshotKind::Head;
   for (skgrepo_name, skgrepo) in &config . skgrepos {
     let skgrepo_path : &Path =
       Path::new ( &skgrepo . path );
@@ -125,7 +125,7 @@ fn validate_skgrepos_for_selection (
 
 fn read_graph_snapshot (
   config : &SkgConfig,
-  kind   : SnapshotKind,
+  kind   : GitSnapshotKind,
 ) -> Result<GraphSnapshot, String> {
   // Sections arrive in privacy order (ordered_repos) so each
   // telescope composes with its most public section first.
@@ -135,57 +135,57 @@ fn read_graph_snapshot (
       format! ("read repo '{}' from {:?}", skgrepo_name, kind);
     let mut skgrepo_sections : Vec<(SkgRepoName, GraphnodeOnDisk)> =
       profile_step_result (&label, || match kind {
-        SnapshotKind::Head =>
+        GitSnapshotKind::Head =>
           read_skgrepo_from_head (config, &skgrepo_name),
-        SnapshotKind::Index =>
+        GitSnapshotKind::Index =>
           read_skgrepo_from_index (config, &skgrepo_name),
-        SnapshotKind::Worktree =>
+        GitSnapshotKind::Worktree =>
           read_skg_sections_from_folder (&skgrepo_name, config)
             . map_err ( |e| format! (
               "Reading worktree repo '{}': {}", skgrepo_name, e )), }) ?;
     sections . append (&mut skgrepo_sections); }
   profile_step ("snapshot_from_sections", || {
-    snapshot_from_sections (config, sections) })
+    git_snapshot_from_sections (config, sections) })
 }
 
 fn read_graph_snapshot_maybe_cached (
   config : &SkgConfig,
-  kind   : SnapshotKind,
+  kind   : GitSnapshotKind,
 ) -> Result<GraphSnapshot, String> {
   let key : Option<String> =
-    snapshot_cache_key (config, kind) ?;
+    git_snapshot_cache_key (config, kind) ?;
   let Some (key) = key else {
     return read_graph_snapshot (config, kind); };
-  if let Some (snapshot) =
-    snapshot_cache ()
+  if let Some (git_snapshot) =
+    git_snapshot_cache ()
       . lock ()
       . map_err ( |e| format! (
         "Diff report snapshot cache lock failed: {}", e )) ?
       . get (&key)
       . cloned () {
     profile_log ("snapshot cache hit", Duration::from_millis (0));
-    return Ok (snapshot); }
+    return Ok (git_snapshot); }
   profile_log ("snapshot cache miss", Duration::from_millis (0));
-  let snapshot : GraphSnapshot =
+  let git_snapshot : GraphSnapshot =
     read_graph_snapshot (config, kind) ?;
-  snapshot_cache ()
+  git_snapshot_cache ()
     . lock ()
     . map_err ( |e| format! (
       "Diff report snapshot cache lock failed: {}", e )) ?
-    . insert (key, snapshot . clone ());
-  Ok (snapshot)
+    . insert (key, git_snapshot . clone ());
+  Ok (git_snapshot)
 }
 
-fn snapshot_cache (
+fn git_snapshot_cache (
 ) -> &'static Mutex<HashMap<String, GraphSnapshot>> {
   SNAPSHOT_CACHE . get_or_init ( || Mutex::new (HashMap::new ()) )
 }
 
-fn snapshot_cache_key (
+fn git_snapshot_cache_key (
   config : &SkgConfig,
-  kind   : SnapshotKind,
+  kind   : GitSnapshotKind,
 ) -> Result<Option<String>, String> {
-  if kind == SnapshotKind::Worktree {
+  if kind == GitSnapshotKind::Worktree {
     return Ok (None); }
   let mut parts : Vec<String> =
     Vec::new ();
@@ -203,11 +203,11 @@ fn snapshot_cache_key (
         "Could not open Git repo for Skg repo '{}'", skgrepo_name )) ?;
     let identity : String =
       match kind {
-        SnapshotKind::Head =>
+        GitSnapshotKind::Head =>
           head_cache_identity (&gitrepo, &skgrepo_name) ?,
-        SnapshotKind::Index =>
+        GitSnapshotKind::Index =>
           index_cache_identity (&gitrepo, &skgrepo_name) ?,
-        SnapshotKind::Worktree =>
+        GitSnapshotKind::Worktree =>
           unreachable! (), };
     parts . push (format! (
       "{}:{}:{}",
@@ -246,8 +246,8 @@ fn index_cache_identity (
 
 fn changed_paths_by_skgrepo (
   config      : &SkgConfig,
-  before_kind : SnapshotKind,
-  after_kind  : SnapshotKind,
+  before_kind : GitSnapshotKind,
+  after_kind  : GitSnapshotKind,
 ) -> Result<HashMap<SkgRepoName, BTreeSet<PathBuf>>, String> {
   let mut result : HashMap<SkgRepoName, BTreeSet<PathBuf>> =
     HashMap::new ();
@@ -268,25 +268,25 @@ fn changed_paths_by_skgrepo (
 fn changed_paths_for_skgrepo (
   gitrepo        : &Repository,
   prefix      : &Path,
-  before_kind : SnapshotKind,
-  after_kind  : SnapshotKind,
+  before_kind : GitSnapshotKind,
+  after_kind  : GitSnapshotKind,
 ) -> Result<BTreeSet<PathBuf>, String> {
   let mut paths : BTreeSet<PathBuf> =
     BTreeSet::new ();
   match (before_kind, after_kind) {
-    (SnapshotKind::Head, SnapshotKind::Index) => {
+    (GitSnapshotKind::Head, GitSnapshotKind::Index) => {
       for entry in get_staged_changed_skg_files (gitrepo)
         . map_err ( |e| format! (
           "Reading staged changed .skg files: {}", e )) ? {
         if path_is_skgrepo_skg (&entry . path, prefix) {
           paths . insert (entry . path); }}}
-    (SnapshotKind::Index, SnapshotKind::Worktree) => {
+    (GitSnapshotKind::Index, GitSnapshotKind::Worktree) => {
       for entry in get_unstaged_changed_skg_files (gitrepo)
         . map_err ( |e| format! (
           "Reading unstaged changed .skg files: {}", e )) ? {
         if path_is_skgrepo_skg (&entry . path, prefix) {
           paths . insert (entry . path); }}}
-    (SnapshotKind::Head, SnapshotKind::Worktree) => {
+    (GitSnapshotKind::Head, GitSnapshotKind::Worktree) => {
       for entry in get_staged_changed_skg_files (gitrepo)
         . map_err ( |e| format! (
           "Reading staged changed .skg files: {}", e )) ?
@@ -303,9 +303,9 @@ fn changed_paths_for_skgrepo (
   Ok (paths)
 }
 
-fn overlay_changed_after_snapshot (
+fn overlay_changed_after_git_snapshot (
   config        : &SkgConfig,
-  after_kind    : SnapshotKind,
+  after_kind    : GitSnapshotKind,
   before        : &GraphSnapshot,
   changed_paths : &HashMap<SkgRepoName, BTreeSet<PathBuf>>,
 ) -> Result<(GraphSnapshot, BTreeSet<ID>), String> {
@@ -372,7 +372,7 @@ fn overlay_changed_after_snapshot (
 /// in privacy order. Missing files simply contribute no section.
 fn read_telescope_sections_at_endpoint (
   config : &SkgConfig,
-  kind   : SnapshotKind,
+  kind   : GitSnapshotKind,
   pid    : &ID,
 ) -> Result<Vec<(SkgRepoName, GraphnodeOnDisk)>, String> {
   let mut sections : Vec<(SkgRepoName, GraphnodeOnDisk)> = Vec::new ();
@@ -407,16 +407,16 @@ fn read_telescope_sections_at_endpoint (
 /// endpoint (its claimed ids are exactly the composed node's
 /// all_ids). Claims by OTHER pids on the same ids survive.
 fn remove_telescope_claims (
-  snapshot    : &mut GraphSnapshot,
+  git_snapshot    : &mut GraphSnapshot,
   pid         : &ID,
   before_node : Option<&Graphnode>,
 ) {
   let Some (node) = before_node else { return; };
   for skgid in node . all_skgids () {
-    if let Some (by_pid) = snapshot . id_claims . get_mut (skgid) {
+    if let Some (by_pid) = git_snapshot . id_claims . get_mut (skgid) {
       by_pid . remove (pid);
       if by_pid . is_empty () {
-        snapshot . id_claims . remove (skgid); }} }
+        git_snapshot . id_claims . remove (skgid); }} }
 }
 
 fn affected_pids_for_changed_node (
@@ -443,17 +443,17 @@ fn affected_pids_for_changed_node (
 }
 
 fn read_section_at_endpoint (
-  kind        : SnapshotKind,
+  kind        : GitSnapshotKind,
   gitrepo        : &Repository,
   skgrepo_name : &SkgRepoName,
   rel_path    : &Path,
 ) -> Result<Option<GraphnodeOnDisk>, String> {
   match kind {
-    SnapshotKind::Head =>
+    GitSnapshotKind::Head =>
       read_section_from_head (gitrepo, skgrepo_name, rel_path),
-    SnapshotKind::Index =>
+    GitSnapshotKind::Index =>
       read_section_from_index (gitrepo, skgrepo_name, rel_path),
-    SnapshotKind::Worktree =>
+    GitSnapshotKind::Worktree =>
       read_section_from_worktree (gitrepo, skgrepo_name, rel_path), }
 }
 
@@ -570,7 +570,7 @@ fn profile_log (
 /// Group sections by pid (sections must arrive in privacy order),
 /// normalize owned/non-owned pid collisions, compose each telescope,
 /// and record the retained sections' id claims.
-fn snapshot_from_sections (
+fn git_snapshot_from_sections (
   config   : &SkgConfig,
   sections : Vec<(SkgRepoName, GraphnodeOnDisk)>,
 ) -> Result<GraphSnapshot, String> {

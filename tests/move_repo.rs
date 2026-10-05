@@ -221,13 +221,13 @@ async fn test_move_node_referenced_by_extra_id (
                "b.skg should exist in private/"); }
 
     { // Graph: skgrepo updated, extra_ids preserved
-      let snapshot = graph . load_full ();
+      let graph_snapshot = graph . load_full ();
       let (pid, skgrepo) : (ID, SkgRepoName) =
-        snapshot . pid_and_skgrepo (&ID::new ("b"))
+        graph_snapshot . pid_and_skgrepo (&ID::new ("b"))
         . expect ("b should exist in graph");
       assert_eq!(pid . 0, "b");
       assert_eq!(skgrepo . as_str(), "private");
-      assert_eq!(snapshot . pid_of (&ID::new ("b-alias")), Some (pid),
+      assert_eq!(graph_snapshot . pid_of (&ID::new ("b-alias")), Some (pid),
               "extra_id b-alias should be preserved after move"); }
 
     { // Tantivy: skgrepo updated
@@ -283,10 +283,10 @@ async fn test_move_multiple_nodes (
       assert!( temp_fixtures . join ("owned/public/a.skg") . exists() ); }
 
     { // Graph
-      let snapshot = graph . load_full ();
-      let (_, skgrepo_b) = snapshot . pid_and_skgrepo (&ID::new ("b"))
+      let graph_snapshot = graph . load_full ();
+      let (_, skgrepo_b) = graph_snapshot . pid_and_skgrepo (&ID::new ("b"))
         . expect ("b should exist");
-      let (_, skgrepo_c) = snapshot . pid_and_skgrepo (&ID::new ("c"))
+      let (_, skgrepo_c) = graph_snapshot . pid_and_skgrepo (&ID::new ("c"))
         . expect ("c should exist");
       assert_eq!(skgrepo_b . as_str(), "private");
       assert_eq!(skgrepo_c . as_str(), "private"); }

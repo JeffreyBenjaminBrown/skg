@@ -3,7 +3,7 @@
 This document describes the complete runtime graph model.  The =.skg= files
 and =skgconfig.toml= are authoritative.  At startup and explicit rebuild, the
 server composes all file sections into =Graphnode= values, validates the whole
-set, builds an immutable =InRustGraph= snapshot, and builds Tantivy from the
+set, builds an immutable =InRustGraph= graph snapshot, and builds Tantivy from the
 same values.  Tantivy is a derived text index; it is not graph authority.
 
 For a gentler introduction, see [[./data-model_friendly.org][the friendly data-model guide]].  For
@@ -61,7 +61,7 @@ relationship entities.  Relationship relRepo remains part of every stored
 
 =validate_complete_graph= runs before startup/rebuild publication.  Saves
 preserve the same constraints incrementally: while holding the mutation gate,
-they derive an exact persistent candidate from the current valid snapshot,
+they derive an exact persistent candidate from the current valid graph snapshot,
 validate the identities and relationships whose truth can change, and check
 the affected inverse-index entries before any file mutation.  A candidate is
 rejected when any of these conditions holds:
@@ -93,8 +93,8 @@ startup/rebuild gate and test oracle.
 
 The shared mutation gate serializes candidate construction, filesystem
 mutation, graph publication, and Tantivy enqueue so two writers cannot validate
-against the same stale snapshot.  Filesystem preflight and graph validation
-produce tokens tied to that exact snapshot; commit consumes those prepared
+against the same stale graph snapshot.  Filesystem preflight and graph validation
+produce tokens tied to that exact graph snapshot; commit consumes those prepared
 values rather than recomputing them after writes begin.
 
 ** Graph indexes

@@ -145,7 +145,7 @@ describe('skg.save pipeline', function ()
       '* (skg (node (id b))) b\n** (skg (node (id c))) c',
       'skg://b', 'uri-b')
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
-    save.snapshot_with_save_markers(clean, true)
+    save.buffer_snapshot_with_save_markers(clean, true)
     vim.wait(100, function () return false end)
     vim.fn.confirm = real_confirm
     assert.are.equal(0, asked)

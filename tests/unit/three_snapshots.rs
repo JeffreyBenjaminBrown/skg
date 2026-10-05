@@ -33,7 +33,7 @@ fn diffs_with_one_entry (
 fn snapshots_degenerate_when_the_file_is_unchanged () {
   let worktree : Vec<ID> = skgids (&["a", "b"]);
   let [head, index, wt] =
-    three_snapshots_of_relation_list (
+    three_git_snapshots_of_relation_list (
       &skgid ("S"), &src ("main"),
       NodeRelation::HidesFromItsSubscriptions,
       &worktree,
@@ -57,7 +57,7 @@ fn unstaged_change_reconstructs_the_index_as_the_before_list () {
       Diff_Item::Removed   (skgid ("b")),
       Diff_Item::New       (skgid ("c")) ] )) ));
   let [head, index, _wt] =
-    three_snapshots_of_relation_list (
+    three_git_snapshots_of_relation_list (
       &skgid ("S"), &src ("main"),
       NodeRelation::HidesFromItsSubscriptions,
       & skgids (&["a", "c"]), &diffs );
@@ -77,7 +77,7 @@ fn staged_change_separates_head_from_index () {
       Diff_Item::Removed   (skgid ("b")) ] )) ),
     None );
   let [head, index, wt] =
-    three_snapshots_of_relation_list (
+    three_git_snapshots_of_relation_list (
       &skgid ("S"), &src ("main"),
       NodeRelation::HidesFromItsSubscriptions,
       & skgids (&["a"]), &diffs );

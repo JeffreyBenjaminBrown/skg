@@ -56,10 +56,10 @@ fn complete_from_rust (node : &GraphnodeInRust) -> Graphnode {
 
 fn publish_from_snapshot (
   handle : &InRustGraphHandle,
-  snapshot : &Arc<InRustGraph>,
+  graph_snapshot : &Arc<InRustGraph>,
   instruction : &NodeInstruction,
 ) {
-  let mut candidate : InRustGraph = (**snapshot) . clone ();
+  let mut candidate : InRustGraph = (**graph_snapshot) . clone ();
   apply_nodeInstructions_to_inRustGraph (
     &mut candidate, std::slice::from_ref (instruction) );
   handle . store ( Arc::new (candidate) ); }
@@ -72,18 +72,18 @@ fn two_simultaneous_snapshot_writers_lose_an_update_without_a_gate () {
   // Capture both old snapshots before either candidate is published.  The
   // barrier makes this the exact lost-update schedule rather than a race that
   // happens only occasionally under load.
-  let a_snapshot = handle . load_full ();
-  let b_snapshot = handle . load_full ();
+  let a_graph_snapshot = handle . load_full ();
+  let b_graph_snapshot = handle . load_full ();
   let barrier = Arc::new ( Barrier::new (2) );
   block_on ( async {
     let a_barrier = barrier . clone ();
     let b_barrier = barrier . clone ();
     let write_a = async {
       a_barrier . wait () . await;
-      publish_from_snapshot (&handle, &a_snapshot, &a); };
+      publish_from_snapshot (&handle, &a_graph_snapshot, &a); };
     let write_b = async {
       b_barrier . wait () . await;
-      publish_from_snapshot (&handle, &b_snapshot, &b); };
+      publish_from_snapshot (&handle, &b_graph_snapshot, &b); };
     join! (write_a, write_b); } );
   let final_graph = handle . load_full ();
   assert_eq! (final_graph . len (), 1,
@@ -107,18 +107,18 @@ fn shared_mutation_gate_serializes_snapshot_capture_and_preserves_both_writes ()
     let gate_a = gate . clone ();
     let write_a = async {
       let _guard = gate_a . lock () . await;
-      let snapshot = handle . load_full ();
+      let graph_snapshot = handle . load_full ();
       first_captured_a . notify_one ();
       release_first_a . notified () . await;
-      publish_from_snapshot (&handle, &snapshot, &a); };
+      publish_from_snapshot (&handle, &graph_snapshot, &a); };
 
     let gate_b = gate . clone ();
     let second_entered_b = second_entered . clone ();
     let write_b = async {
       let _guard = gate_b . lock () . await;
       second_entered_b . store (true, Ordering::Release);
-      let snapshot = handle . load_full ();
-      publish_from_snapshot (&handle, &snapshot, &b); };
+      let graph_snapshot = handle . load_full ();
+      publish_from_snapshot (&handle, &graph_snapshot, &b); };
 
     let control = async {
       first_captured . notified () . await;
@@ -154,7 +154,7 @@ fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
     let release_a = release_merge . clone ();
     let merge_delete = async {
       let _guard = gate_a . lock () . await;
-      let snapshot = handle . load_full ();
+      let graph_snapshot = handle . load_full ();
       entered_a . notify_one ();
       release_a . notified () . await;
       let mut merged = node ("acquirer", "merged", "main");
@@ -167,7 +167,7 @@ fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
         NodeInstruction::Delete (DeleteNode {
           skgid : ID::from ("acquiree"), home_skgrepo : SkgRepoName::from ("main") }),
       ];
-      let mut candidate = (*snapshot) . clone ();
+      let mut candidate = (*graph_snapshot) . clone ();
       apply_nodeInstructions_to_inRustGraph (&mut candidate, &instructions);
       handle . store (Arc::new (candidate)); };
 
@@ -177,14 +177,14 @@ fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
       entered_b . notified () . await;
       release_merge . notify_one ();
       let _guard = gate_b . lock () . await;
-      let snapshot = handle . load_full ();
+      let graph_snapshot = handle . load_full ();
       let mut observer = node ("observer", "observer", "main");
       // The request still names the acquiree.  Applying against the
       // post-merge snapshot must canonicalize its inverse entry.
       observer . contains = vec! [ RelPartner::at_relRepo (
         SkgRepoName::from ("main"), ID::from ("acquiree")) ];
       publish_from_snapshot (
-        &handle, &snapshot, &NodeInstruction::Save (SaveNode (observer))); };
+        &handle, &graph_snapshot, &NodeInstruction::Save (SaveNode (observer))); };
     join! (merge_delete, save_after); });
 
   let graph = handle . load_full ();
@@ -208,13 +208,13 @@ fn save_plan_captured_after_skgrepo_move_preserves_the_new_skgrepo () {
     let release_a = release_move . clone ();
     let skgrepo_move = async {
       let _guard = gate_a . lock () . await;
-      let snapshot = handle . load_full ();
+      let graph_snapshot = handle . load_full ();
       entered_a . notify_one ();
       release_a . notified () . await;
       let mut moved = node ("moved", "old title", "private");
       moved . extra_ids = vec! [ID::from ("former-id")];
       publish_from_snapshot (
-        &handle, &snapshot, &NodeInstruction::Save (SaveNode (moved))); };
+        &handle, &graph_snapshot, &NodeInstruction::Save (SaveNode (moved))); };
 
     let gate_b = gate . clone ();
     let entered_b = move_entered . clone ();
@@ -224,12 +224,12 @@ fn save_plan_captured_after_skgrepo_move_preserves_the_new_skgrepo () {
       let _guard = gate_b . lock () . await;
       // This represents save-plan construction: copy the node only after the
       // gate is acquired, then alter the field supplied by the edited buffer.
-      let snapshot = handle . load_full ();
+      let graph_snapshot = handle . load_full ();
       let mut edited : Graphnode =
-        complete_from_rust (snapshot . get (&ID::from ("moved")) . unwrap ());
+        complete_from_rust (graph_snapshot . get (&ID::from ("moved")) . unwrap ());
       edited . title = "edited after move" . to_string ();
       publish_from_snapshot (
-        &handle, &snapshot, &NodeInstruction::Save (SaveNode (edited))); };
+        &handle, &graph_snapshot, &NodeInstruction::Save (SaveNode (edited))); };
     join! (skgrepo_move, edit_after_move); });
 
   let graph = handle . load_full ();
@@ -252,10 +252,10 @@ fn rebuild_started_after_a_mutation_publishes_a_snapshot_containing_it () {
     let release_a = release_mutation . clone ();
     let mutation = async {
       let _guard = gate_a . lock () . await;
-      let snapshot = handle . load_full ();
+      let graph_snapshot = handle . load_full ();
       entered_a . notify_one ();
       release_a . notified () . await;
-      publish_from_snapshot (&handle, &snapshot, &save ("saved")); };
+      publish_from_snapshot (&handle, &graph_snapshot, &save ("saved")); };
 
     let gate_b = gate . clone ();
     let entered_b = mutation_entered . clone ();

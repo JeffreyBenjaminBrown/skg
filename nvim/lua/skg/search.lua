@@ -119,9 +119,9 @@ function M.send_text_search_request (search_terms, regex, body, operators,
     end, true)
   state.register_response_handler('request-snapshot',
     function (_payload_text, response)
-      -- The server asks for a snapshot of the search buffer so it
+      -- The server asks for a buffer snapshot of the search buffer so it
       -- can integrate role trees without losing user edits.
-      M.handle_snapshot_request(response)
+      M.handle_buffer_snapshot_request(response)
     end, false) -- persistent, not one-shot
   state.register_response_handler('overPrivateText-telescope-confirmation',
     function (_payload_text, response)
@@ -192,8 +192,8 @@ function M.display_search_enrichment (response)
   local buf = buffer.find_buffer_by_uri('search:' .. terms)
   if not buf then return end
   vim.bo[buf].modifiable = true
-  local snapshot_was_dirty =
-    vim.b[buf].skg_search_snapshot_was_dirty == true
+  local buffer_snapshot_was_dirty =
+    vim.b[buf].skg_search_buffer_snapshot_was_dirty == true
   local cursor_saved = nil
   for _, win in ipairs(vim.api.nvim_list_wins()) do
     if vim.api.nvim_win_get_buf(win) == buf then
@@ -208,7 +208,7 @@ function M.display_search_enrichment (response)
     pcall(vim.api.nvim_win_set_cursor, cursor_saved[1],
           { math.min(cursor[1], line_count), cursor[2] })
   end
-  if snapshot_was_dirty then
+  if buffer_snapshot_was_dirty then
     vim.b[buf].skg_search_enrichment_includes_user_edits = true
     vim.bo[buf].modified = true
   else
@@ -233,11 +233,11 @@ end
 ---Freeze the search buffer read-only and send its text back for
 ---enrichment.
 ---@param response any
-function M.handle_snapshot_request (response)
+function M.handle_buffer_snapshot_request (response)
   local terms = payload.field_text(response, 'content')
   local buf = terms and buffer.find_buffer_by_uri('search:' .. terms)
   if not buf then return end
-  vim.b[buf].skg_search_snapshot_was_dirty = vim.bo[buf].modified
+  vim.b[buf].skg_search_buffer_snapshot_was_dirty = vim.bo[buf].modified
   vim.bo[buf].modifiable = false
   vim.notify('Enriching search results...')
   local contents = table.concat(

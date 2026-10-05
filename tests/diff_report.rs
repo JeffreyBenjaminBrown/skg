@@ -18,7 +18,7 @@ mod diff;
 #[path = "diff_report/render.rs"]
 mod render;
 #[path = "diff_report/snapshot.rs"]
-mod snapshot;
+mod git_snapshot;
 
 #[test]
 fn diff_report_includes_inbound_and_link_changes (

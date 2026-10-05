@@ -76,27 +76,27 @@ pub(crate) struct DirtyViewConflict {
 }
 
 pub(crate) fn dirty_view_conflicts (
-  snapshots   : &[ClientViewSnapshot],
+  buffer_snapshots   : &[ClientViewSnapshot],
   views_state : &ViewsState,
   affected    : &SaveAffectedIds,
   before      : &InRustGraph,
   after       : &InRustGraph,
 ) -> Result<Vec<DirtyViewConflict>, String> {
   let mut conflicts : Vec<DirtyViewConflict> = Vec::new ();
-  for snapshot in snapshots . iter () . filter (|snapshot| snapshot . dirty) {
-    let baseline : &str = snapshot . baseline . as_deref () . ok_or_else (||
+  for buffer_snapshot in buffer_snapshots . iter () . filter (|buffer_snapshot| buffer_snapshot . dirty) {
+    let baseline : &str = buffer_snapshot . baseline . as_deref () . ok_or_else (||
       format! (
         "Dirty view {} has no verified clean baseline. Run skg-show-unsaved-changes (Emacs) or :SkgShowUnsavedChanges (Neovim), then close or refresh that view before saving.",
-        snapshot . uri . repr_in_client ())) ?;
-    let current : &str = snapshot . current . as_deref () . ok_or_else (||
+        buffer_snapshot . uri . repr_in_client ())) ?;
+    let current : &str = buffer_snapshot . current . as_deref () . ok_or_else (||
       format! ("Dirty view {} has no current text",
-               snapshot . uri . repr_in_client ())) ?;
+               buffer_snapshot . uri . repr_in_client ())) ?;
     let mut dependencies : HashSet<ID> = dependencies_from_text (
-      baseline, &snapshot . uri) ?;
+      baseline, &buffer_snapshot . uri) ?;
     dependencies . extend (dependencies_from_text (
-      current, &snapshot . uri) ?);
+      current, &buffer_snapshot . uri) ?);
     if let Some (registered) = views_state . open_views
-        . viewuri_to_view (&snapshot . uri)
+        . viewuri_to_view (&buffer_snapshot . uri)
     { dependencies . extend (dependencies_from_registered (registered)); }
     // todo | PITFALL : Matching every reference is more conservative than
     // necessary, but much more convenient than classifying dependencies.
@@ -109,7 +109,7 @@ pub(crate) fn dirty_view_conflicts (
     matching . dedup ();
     if ! matching . is_empty () {
       conflicts . push (DirtyViewConflict {
-        uri : snapshot . uri . clone (), skgids : matching, }); }}
+        uri : buffer_snapshot . uri . clone (), skgids : matching, }); }}
   Ok (conflicts)
 }
 

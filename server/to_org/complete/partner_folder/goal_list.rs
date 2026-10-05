@@ -79,7 +79,7 @@ pub fn outbound_member_axes (
     unstaged_nc . and_then ( |c| relation . diff_in_nodechanges (c) ))
     . into_iter () . collect () }
 
-/// The three snapshots -- HEAD, index, worktree -- of one node's
+/// The three git snapshots -- HEAD, index, worktree -- of one node's
 /// outbound relation list, reconstructed from the per-stage diffs
 /// already in hand; no git reads:
 /// - a file Modified in a stage: that stage's interleaved diff gives
@@ -91,7 +91,7 @@ pub fn outbound_member_axes (
 /// - absent from a stage map: that stage changed nothing.
 /// Used by the filter folders' three-snapshot derived-membership
 /// comparison.
-pub fn three_snapshots_of_relation_list (
+pub fn three_git_snapshots_of_relation_list (
   pid           : &ID,
   skgrepo       : &SkgRepoName,
   relation      : NodeRelation,
@@ -162,7 +162,7 @@ fn relation_list_of_graphnode (
 /// snapshots: the staged signs are the HEAD-to-index changes and the
 /// unstaged signs the index-to-worktree ones.  Members present (or
 /// absent) in all three snapshots contribute nothing.
-fn axes_from_three_snapshots (
+fn axes_from_three_git_snapshots (
   head     : &[ID],
   index    : &[ID],
   worktree : &[ID],
@@ -218,12 +218,12 @@ pub fn goal_list_for_hiddenInSubscribee_folder (
     return ( derived (subscriber_hides, subscribee_contains),
              HashSet::new (), HashMap::new () ); }
   let hides3 : [Vec<ID>; 3] =
-    three_snapshots_of_relation_list (
+    three_git_snapshots_of_relation_list (
       subscriber_pid, subscriber_skgrepo,
       NodeRelation::HidesFromItsSubscriptions,
       subscriber_hides, skgrepo_diffs );
   let contains3 : [Vec<ID>; 3] =
-    three_snapshots_of_relation_list (
+    three_git_snapshots_of_relation_list (
       subscribee_pid, subscribee_skgrepo,
       NodeRelation::Contains,
       subscribee_contains, skgrepo_diffs );
@@ -232,7 +232,7 @@ pub fn goal_list_for_hiddenInSubscribee_folder (
       derived (&hides3 [1], &contains3 [1]),
       derived (&hides3 [2], &contains3 [2]) ];
   let axes : HashMap<ID, RelationshipAxes> =
-    axes_from_three_snapshots (
+    axes_from_three_git_snapshots (
       &derived3 [0], &derived3 [1], &derived3 [2] );
   let diff : Vec<Diff_Item<ID>> =
     compute_interleaved_diff ( &derived3 [0], &derived3 [2] );
@@ -281,12 +281,12 @@ pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
     return ( derived (wt_subscriber_hides, &wt_all_subscribee_content),
              HashSet::new (), HashMap::new () ); }
   let hides3 : [Vec<ID>; 3] =
-    three_snapshots_of_relation_list (
+    three_git_snapshots_of_relation_list (
       subscriber_pid, subscriber_skgrepo,
       NodeRelation::HidesFromItsSubscriptions,
       wt_subscriber_hides, skgrepo_diffs );
   let subscribees3 : [Vec<ID>; 3] =
-    three_snapshots_of_relation_list (
+    three_git_snapshots_of_relation_list (
       subscriber_pid, subscriber_skgrepo,
       NodeRelation::SubscribesTo,
       wt_subscribees, skgrepo_diffs );
@@ -304,14 +304,14 @@ pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
             graph_skgrepo (graph, &pid, config)
             . or_else ( || skgrepo_in_diffs_for_file (
                 &pid, skgrepo_diffs ));
-          let snapshots : [Vec<ID>; 3] = match skgrepo {
+          let git_snapshots : [Vec<ID>; 3] = match skgrepo {
             Some (src) =>
-              three_snapshots_of_relation_list (
+              three_git_snapshots_of_relation_list (
                 &pid, &src, NodeRelation::Contains,
                 &wt_contains, skgrepo_diffs ),
             None => // no skgrepo anywhere: treat as empty throughout
               [ Vec::new (), Vec::new (), Vec::new () ] };
-          (pid, snapshots) } )
+          (pid, git_snapshots) } )
       . collect () };
   let derived3 : [Vec<ID>; 3] =
     [0, 1, 2] . map ( |k| {
@@ -319,13 +319,13 @@ pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
         subscribees3 [k] . iter ()
           . flat_map ( |pid|
               content3_by_subscribee . get (pid)
-                . map ( |snaps| snaps [k] . clone () )
+                . map ( |git_snaps| git_snaps [k] . clone () )
                 . unwrap_or_default () )
           . map (|skgid| relationship_member_key (graph, &skgid))
           . collect ();
       derived ( &hides3 [k], &all_subscribee_content ) } );
   let axes : HashMap<ID, RelationshipAxes> =
-    axes_from_three_snapshots (
+    axes_from_three_git_snapshots (
       &derived3 [0], &derived3 [1], &derived3 [2] );
   let diff : Vec<Diff_Item<ID>> =
     compute_interleaved_diff ( &derived3 [0], &derived3 [2] );

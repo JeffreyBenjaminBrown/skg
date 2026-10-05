@@ -65,13 +65,13 @@ So far there are these endpoints:
     warnings. This happens immediately after a no-match or error
     response; when the client closes the search view (=close view= of
     =search:TERMS=) before enrichment arrives, after the close-view
-    response; and when the server cannot enrich a snapshot, with the
+    response; and when the server cannot enrich a buffer snapshot, with the
     reason as a warning.
 
   - Phase 2, enrichment: A three-message sequence:
     1. Rust sends LP response-type "request-snapshot" with =(("content" "TERMS"))= — asking Emacs for a snapshot of the search buffer matching those terms.
     2. Emacs replies with =((request . "snapshot response") (terms . "TERMS"))\n= followed by =Content-Length: N\r\n\r\n<buffer text>= — the current buffer contents, dirty or not. Emacs sets the buffer to readonly before sending.
-    3. Rust parses the snapshot, inserts containerward role tree,
+    3. Rust parses the buffer snapshot, inserts containerward role tree,
        overrideward view-subtrees, and graphnodestats, and sends LP
        response-type "search-enrichment" with =(("terms" "TERMS")
        ("content" "ORG") ("warnings" (...)))=. Emacs replaces the
@@ -125,7 +125,7 @@ So far there are these endpoints:
     =Content-Length= is the envelope's UTF-8 byte length. =other-views=
     is mandatory even when empty and covers every other live client view,
     including views the server has not registered. Clean entries carry no
-    snapshots. Dirty entries carry exact current text and either the exact
+    buffer snapshots. Dirty entries carry exact current text and either the exact
     clean baseline or explicit =unavailable=. Duplicate URIs, the saved URI,
     missing fields, and inconsistent clean/dirty fields are rejected. Raw Org
     in place of the envelope is not a supported legacy form.
@@ -152,13 +152,13 @@ So far there are these endpoints:
   - Response: Multiple length-prefixed messages, sent sequentially:
     1. Early lock acknowledgement (sent immediately, before reading the envelope):
        =Content-Length: N\r\n\r\n((response-type save-lock) (lock-views ("URI1" "URI2" ...)))=
-       Both clients lock every local Skg view before taking the request
-       snapshot. This message acknowledges that broad lock; its server-known
+       Both clients lock every local Skg view before taking the request's
+       buffer snapshots. This message acknowledges that broad lock; its server-known
        URI list does not authorize unlocking client-only views.
     2. Save-relax-lock message (sent after preparation and conflict checking, before mutation):
        =Content-Length: N\r\n\r\n((response-type save-relax-lock) (lock-views ("URI1" "URI2" ...)))=
        The keep-set contains selected collateral targets and every dirty view
-       whose baseline/current snapshots were checked, including unregistered
+       whose baseline/current buffer snapshots were checked, including unregistered
        views. The saved view is retained implicitly. Only unrelated clean
        views may unlock at this point. A malformed narrowing message leaves
        all locks held until terminal cleanup.
@@ -324,7 +324,7 @@ So far there are these endpoints:
     reported.
   - Refuses to produce an ordinary report if any configured skgrepo is not a
     gitrepo, has no HEAD commit, has a selected merge-commit HEAD baseline,
-    or contains an unreadable =.skg= blob in the selected snapshots.
+    or contains an unreadable =.skg= blob in the selected git snapshots.
   - Refuses to run unless the active skgrepo-set is =all=; restricted
     skgrepo-set diff reports are not defined yet.
   - Because it runs only under =all=, a report involving an overPrivateText

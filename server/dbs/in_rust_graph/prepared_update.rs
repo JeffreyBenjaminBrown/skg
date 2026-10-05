@@ -1,4 +1,4 @@
-//! A checked graph candidate tied to the exact snapshot it was derived from.
+//! A checked graph candidate tied to the exact graph snapshot it was derived from.
 //!
 //! The constructor is the only way to obtain this token.  Store orchestration
 //! can inspect its nodeInstructions and candidate while preflighting later work,

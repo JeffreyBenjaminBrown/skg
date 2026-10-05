@@ -113,11 +113,11 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
          (skg--end-stream)))
      t)
     (skg-register-response-handler
-     ;; Rust asks for a snapshot of the search buffer so it can
+     ;; Rust asks for a buffer snapshot of the search buffer so it can
      ;; integrate role trees without losing user edits.
      'request-snapshot
      (lambda (tcp-proc payload)
-       (skg--handle-snapshot-request tcp-proc payload))
+       (skg--handle-buffer-snapshot-request tcp-proc payload))
      nil) ;; persistent, not one-shot
     (skg-register-response-handler
      'overPrivateText-telescope-confirmation
@@ -214,9 +214,9 @@ Exits readonly after replacing content."
         (when (buffer-live-p buf)
           (with-current-buffer buf
             (let ((old-point (point))
-                  (snapshot-was-dirty
-                   skg--search-snapshot-was-dirty))
-              (skg--replace-search-content content snapshot-was-dirty)
+                  (buffer-snapshot-was-dirty
+                   skg--search-buffer-snapshot-was-dirty))
+              (skg--replace-search-content content buffer-snapshot-was-dirty)
               (goto-char (min old-point (point-max))))
             (setq buffer-read-only nil)
             (message "Search results enriched.") )) ))
@@ -226,8 +226,8 @@ Exits readonly after replacing content."
        "Search enrichment completed with warnings"
        (skg-errors-and-warnings-to-org-string nil warnings)))))
 
-(defun skg--handle-snapshot-request (tcp-proc payload)
-  "Handle a request from the server for a snapshot of a search buffer.
+(defun skg--handle-buffer-snapshot-request (tcp-proc payload)
+  "Handle a request from the server for a buffer snapshot of a search buffer.
 - Server sends the search terms.
 - Client looks up the corresponding search buffer by name.
 - Client makes that buffer readonly.
@@ -238,7 +238,7 @@ Exits readonly after replacing content."
                 (get-buffer (skg-search-buffer-name terms)))))
     (when (and buf (buffer-live-p buf))
       (with-current-buffer buf
-        (setq skg--search-snapshot-was-dirty (buffer-modified-p))
+        (setq skg--search-buffer-snapshot-was-dirty (buffer-modified-p))
         (setq buffer-read-only t)
         (message "Enriching search results...")
         (let* ((buffer-contents (buffer-string))
@@ -259,7 +259,7 @@ Exits readonly after replacing content."
 (defun skg--replace-search-content (content &optional preserve-modified)
   "Replace current buffer text with CONTENT, trimmed, with trailing newline.
 PRESERVE-MODIFIED keeps the prior clean baseline and marks the enriched
-snapshot dirty because it contains unsaved user edits.
+buffer snapshot dirty because it contains unsaved user edits.
 Callers that do additional buffer work (e.g. org-mode setup)
 should bind inhibit-read-only themselves, since the buffer
 may already be read-only from a previous search."

@@ -118,7 +118,7 @@ pub struct SearchEnrichmentPayload {
   pub search_results                    : Vec<ID>,
   pub containerward_role_trees_by_skgid : HashMap<ID, ContainerwardRoleTree>,
   pub graphnodestats                    : AllGraphnodeStats,
-  /// Load-bearing across the asynchronous snapshot exchange: enrichment
+  /// Load-bearing across the asynchronous buffer-snapshot exchange: enrichment
   /// must not broaden a preflight decision to exclude overPrivateText telescopes.
   pub include_overPrivateText_telescopes : bool,
 }
@@ -299,7 +299,7 @@ fn send_search_results_without_enrichment (
     & mk_search_enrichment_sexp (search_terms, None, &[]) ); }
 
 /// For when the client closes a search buffer whose enrichment is
-/// still owed. The client can then no longer answer the snapshot
+/// still owed. The client can then no longer answer the buffer-snapshot
 /// request, so without this the enrichment would never be sent and
 /// the client's stream guard would never be released.
 pub fn abandon_search_enrichment (

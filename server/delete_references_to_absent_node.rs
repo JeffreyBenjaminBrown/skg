@@ -2,7 +2,7 @@
 //!
 //! Transport deliberately does not live here: an approval is always compared
 //! with a freshly scanned `Preview`, and rewrite instructions are rebuilt from
-//! that same snapshot rather than from client-supplied text.
+//! that same graph snapshot rather than from client-supplied text.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::save::graphnode_from_graphnodeInRust;
@@ -179,7 +179,7 @@ fn record_links (
 
 /// Build one verbatim SaveNode per owned affected telescope.  It removes only
 /// exact raw-ID matches and preserves all list order, relRepos, and
-/// MSV shapes.  The caller must use the same fresh snapshot it previewed.
+/// MSV shapes.  The caller must use the same fresh graph snapshot it previewed.
 pub fn rewrite (
   graph  : &InRustGraph,
   config : &SkgConfig,

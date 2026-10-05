@@ -343,7 +343,7 @@ Forking spans two gestures, foreign and owned:
 - /explicit/ (owned N): =skg-fork-node= (=C-c m f=), for a node you
   already own — used to deepen an override chain (D overrides C overrides
   N, all owned). N keeps its own content; only the clone is added. The
-  clone is built from N's saved snapshot, so the command refuses a dirty
+  clone is built from N's saved state, so the command refuses a dirty
   buffer.
 
 See =docs/forks.org= and =docs/sharing-model.org=.

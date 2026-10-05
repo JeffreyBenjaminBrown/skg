@@ -133,7 +133,7 @@ describe('skg.search', function ()
       '* clean\n', buffer.search_buffer_name('dirty'), 'search:dirty')
     local baseline = vim.b[buf].skg_clean_baseline
     vim.api.nvim_buf_set_lines(buf, 1, 1, false, { 'user edit' })
-    vim.b[buf].skg_search_snapshot_was_dirty = true
+    vim.b[buf].skg_search_buffer_snapshot_was_dirty = true
     search.display_search_enrichment(sexpr.read(
       '((terms "dirty") (content "* enriched\\nuser edit") (warnings ()))'))
     assert.is_true(vim.bo[buf].modified)
@@ -144,7 +144,7 @@ describe('skg.search', function ()
   it('clean enrichment establishes a new clean baseline', function ()
     local buf = buffer.open_org_buffer_from_text(
       '* clean\n', buffer.search_buffer_name('clean'), 'search:clean')
-    vim.b[buf].skg_search_snapshot_was_dirty = false
+    vim.b[buf].skg_search_buffer_snapshot_was_dirty = false
     search.display_search_enrichment(sexpr.read(
       '((terms "clean") (content "* enriched") (warnings ()))'))
     assert.is_false(vim.bo[buf].modified)

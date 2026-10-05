@@ -1,16 +1,16 @@
 pub mod diff;
 pub mod render;
-pub mod snapshot;
+pub mod git_snapshot;
 pub mod types;
 pub mod vanished;
 
-use crate::diff_report::diff::{diff_snapshots, diff_snapshots_for_pids};
+use crate::diff_report::diff::{diff_git_snapshots, diff_git_snapshots_for_pids};
 use crate::diff_report::render::render_report;
-use crate::diff_report::snapshot::{read_changed_snapshot_pair, read_snapshot_pair};
+use crate::diff_report::git_snapshot::{read_changed_git_snapshot_pair, read_git_snapshot_pair};
 use crate::diff_report::types::{
-  ChangedSnapshotPair, DiffReport, DiffSelection, GraphSnapshot, SnapshotPair};
+  ChangedGitSnapshotPair, DiffReport, DiffSelection, GraphSnapshot, GitSnapshotPair};
 use crate::diff_report::vanished::{
-  dangling_skgids_in_snapshot, investigate_vanished_skgids};
+  dangling_skgids_in_git_snapshot, investigate_vanished_skgids};
 use crate::types::misc::SkgConfig;
 
 pub fn diff_report_as_org (
@@ -22,35 +22,35 @@ pub fn diff_report_as_org (
 }
 
 /// Build the report and retain the telescope-coarse overPrivateText PIDs from both
-/// compared snapshots so the transport can attach a release warning.
+/// compared git snapshots so the transport can attach a release warning.
 pub fn diff_report_as_org_with_overPrivateText_pids (
   config    : &SkgConfig,
   selection : DiffSelection,
 ) -> Result<(String, Vec<crate::types::misc::ID>), String> {
   let (mut report, after, mut overPrivateText_pids)
     : (DiffReport, GraphSnapshot, Vec<crate::types::misc::ID>) =
-    match read_changed_snapshot_pair (config, selection) ? {
+    match read_changed_git_snapshot_pair (config, selection) ? {
       Some (changed) => {
         let overPrivateText = overPrivateText_pids_in_pair (&changed . pair);
-        ( report_from_changed_snapshot_pair (&changed),
+        ( report_from_changed_git_snapshot_pair (&changed),
           changed . pair . after,
           overPrivateText ) },
       None => {
-        let pair : SnapshotPair =
-          read_snapshot_pair (config, selection) ?;
-        let report : DiffReport = diff_snapshots (&pair);
+        let pair : GitSnapshotPair =
+          read_git_snapshot_pair (config, selection) ?;
+        let report : DiffReport = diff_git_snapshots (&pair);
         let overPrivateText = overPrivateText_pids_in_pair (&pair);
         (report, pair . after, overPrivateText) }, };
   overPrivateText_pids . sort ();
   overPrivateText_pids . dedup ();
   report . vanished =
     investigate_vanished_skgids (
-      config, & dangling_skgids_in_snapshot (&after) );
+      config, & dangling_skgids_in_git_snapshot (&after) );
   Ok (( render_report (&report), overPrivateText_pids ))
 }
 
 fn overPrivateText_pids_in_pair (
-  pair : &SnapshotPair,
+  pair : &GitSnapshotPair,
 ) -> Vec<crate::types::misc::ID> {
   pair . before . nodes . values ()
     . chain (pair . after . nodes . values ())
@@ -59,11 +59,11 @@ fn overPrivateText_pids_in_pair (
     . collect ()
 }
 
-fn report_from_changed_snapshot_pair (
-  changed : &ChangedSnapshotPair,
+fn report_from_changed_git_snapshot_pair (
+  changed : &ChangedGitSnapshotPair,
 ) -> DiffReport {
   if changed . affected_pids . is_empty () {
     DiffReport::default ()
   } else {
-    diff_snapshots_for_pids (&changed . pair, &changed . affected_pids) }
+    diff_git_snapshots_for_pids (&changed . pair, &changed . affected_pids) }
 }

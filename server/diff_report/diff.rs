@@ -1,6 +1,6 @@
 use crate::diff_report::types::{
   DiffReport, DuplicateIDReport, GraphSnapshot, ListDiffItem, NodeBucket,
-  NodeDiffReport, RelationshipDiff, SnapshotPair, RepoForReport,
+  NodeDiffReport, RelationshipDiff, GitSnapshotPair, RepoForReport,
   TextDiffLine, ValueSetDiff};
 use crate::types::list::{Diff_Item, compute_interleaved_diff};
 use crate::types::misc::{
@@ -13,21 +13,21 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::thread;
 use std::time::{Duration, Instant};
 
-pub fn diff_snapshots (
-  pair : &SnapshotPair,
+pub fn diff_git_snapshots (
+  pair : &GitSnapshotPair,
 ) -> DiffReport {
-  diff_snapshots_with_pid_filter (pair, None)
+  diff_git_snapshots_with_pid_filter (pair, None)
 }
 
-pub fn diff_snapshots_for_pids (
-  pair : &SnapshotPair,
+pub fn diff_git_snapshots_for_pids (
+  pair : &GitSnapshotPair,
   pids : &BTreeSet<ID>,
 ) -> DiffReport {
-  diff_snapshots_with_pid_filter (pair, Some (pids))
+  diff_git_snapshots_with_pid_filter (pair, Some (pids))
 }
 
-fn diff_snapshots_with_pid_filter (
-  pair      : &SnapshotPair,
+fn diff_git_snapshots_with_pid_filter (
+  pair      : &GitSnapshotPair,
   only_pids : Option<&BTreeSet<ID>>,
 ) -> DiffReport {
   let total_start : Instant =
@@ -63,7 +63,7 @@ fn diff_snapshots_with_pid_filter (
 }
 
 fn graph_facts_for_diff (
-  pair           : &SnapshotPair,
+  pair           : &GitSnapshotPair,
   ambiguous_pids : &BTreeSet<ID>,
   only_pids      : Option<&BTreeSet<ID>>,
 ) -> (GraphFacts, GraphFacts) {
@@ -71,12 +71,12 @@ fn graph_facts_for_diff (
     let before_handle : thread::ScopedJoinHandle<'_, GraphFacts> =
       scope . spawn ( || profile_step (
         "before GraphFacts", || {
-          GraphFacts::from_snapshot_maybe_limited (
+          GraphFacts::from_git_snapshot_maybe_limited (
             &pair . before, ambiguous_pids, only_pids) }) );
     let after_handle : thread::ScopedJoinHandle<'_, GraphFacts> =
       scope . spawn ( || profile_step (
         "after GraphFacts", || {
-          GraphFacts::from_snapshot_maybe_limited (
+          GraphFacts::from_git_snapshot_maybe_limited (
             &pair . after, ambiguous_pids, only_pids) }) );
     ( before_handle . join ()
         . expect ("before GraphFacts panicked"),
@@ -126,8 +126,8 @@ fn duplicate_skgid_reports (
   let mut reports : Vec<DuplicateIDReport> =
     Vec::new ();
   for skgid in skgids {
-    let claiming_pids = |snapshot : &GraphSnapshot| -> usize {
-      snapshot . id_claims . get (&skgid)
+    let claiming_pids = |git_snapshot : &GraphSnapshot| -> usize {
+      git_snapshot . id_claims . get (&skgid)
         . map ( |by_pid| by_pid . len () )
         . unwrap_or (0) };
     if claiming_pids (before) <= 1 && claiming_pids (after) <= 1 {
@@ -159,7 +159,7 @@ fn ambiguous_pids (
 }
 
 fn node_reports (
-  pair          : &SnapshotPair,
+  pair          : &GitSnapshotPair,
   before_facts  : &GraphFacts,
   after_facts   : &GraphFacts,
   ambiguous_pids : &BTreeSet<ID>,
@@ -451,25 +451,25 @@ struct GraphFacts {
 }
 
 impl GraphFacts {
-  fn from_snapshot_maybe_limited (
-    snapshot       : &GraphSnapshot,
+  fn from_git_snapshot_maybe_limited (
+    git_snapshot       : &GraphSnapshot,
     ambiguous_pids : &BTreeSet<ID>,
     only_pids      : Option<&BTreeSet<ID>>,
   ) -> Self {
     match only_pids {
       Some (pids) =>
-        Self::from_snapshot_for_pids (snapshot, ambiguous_pids, pids),
+        Self::from_git_snapshot_for_pids (git_snapshot, ambiguous_pids, pids),
       None =>
-        Self::from_snapshot (snapshot, ambiguous_pids), }
+        Self::from_git_snapshot (git_snapshot, ambiguous_pids), }
   }
 
-  fn from_snapshot (
-    snapshot       : &GraphSnapshot,
+  fn from_git_snapshot (
+    git_snapshot       : &GraphSnapshot,
     ambiguous_pids : &BTreeSet<ID>,
   ) -> Self {
     let mut facts : GraphFacts =
       GraphFacts {
-        existing_pids: snapshot . nodes . keys ()
+        existing_pids: git_snapshot . nodes . keys ()
           . filter ( |pid| ! ambiguous_pids . contains (*pid) )
           . cloned () . collect (),
         extra_ids: BTreeSet::new (),
@@ -477,7 +477,7 @@ impl GraphFacts {
           . map ( |role| (*role, HashMap::new ()) )
           . collect (),
         contained_order: HashMap::new () };
-    for node in snapshot . nodes . values () {
+    for node in git_snapshot . nodes . values () {
       if ambiguous_pids . contains (&node . pid) {
         continue; }
       facts . extra_ids . extend (
@@ -519,8 +519,8 @@ impl GraphFacts {
     facts
   }
 
-  fn from_snapshot_for_pids (
-    snapshot       : &GraphSnapshot,
+  fn from_git_snapshot_for_pids (
+    git_snapshot       : &GraphSnapshot,
     ambiguous_pids : &BTreeSet<ID>,
     pids           : &BTreeSet<ID>,
   ) -> Self {
@@ -529,14 +529,14 @@ impl GraphFacts {
     let mut facts : GraphFacts =
       GraphFacts {
         existing_pids: tracked_pids . iter ()
-          . filter ( |pid| snapshot . nodes . contains_key (*pid) )
+          . filter ( |pid| git_snapshot . nodes . contains_key (*pid) )
           . cloned () . collect (),
         extra_ids: BTreeSet::new (),
         role_sets: ROLE_NAMES . iter ()
           . map ( |role| (*role, HashMap::new ()) )
           . collect (),
         contained_order: HashMap::new () };
-    for node in snapshot . nodes . values () {
+    for node in git_snapshot . nodes . values () {
       if ambiguous_pids . contains (&node . pid) {
         continue; }
       let track_outbound : bool =

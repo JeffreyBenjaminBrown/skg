@@ -85,7 +85,7 @@ end
 
 ---Unlock skg buffers outside SAVED_URI and the narrowed keep-set.
 ---COLLATERAL_URIS is historical naming: it can also contain dirty views whose
----snapshots were inputs to the conflict check.
+---buffer snapshots were inputs to the conflict check.
 ---@param saved_uri string
 ---@param collateral_uris string[]|nil
 function M.unlock_non_collateral_buffers (saved_uri, collateral_uris)

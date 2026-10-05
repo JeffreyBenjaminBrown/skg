@@ -154,7 +154,7 @@ pub fn telescope_violations_of (
   violations }
 
 /// Recorders whose telescope-warning truth may differ between two valid
-/// snapshots. Saved recorders are always included; untouched inbound recorders are
+/// graph snapshots. Saved recorders are always included; untouched inbound recorders are
 /// included when a target's existence, canonical PID, or home changed.
 pub fn derive_affected_telescope_recorders (
   base            : &InRustGraph,

@@ -125,7 +125,7 @@ fn apply_nodeInstructions (
               deleted_count, written_count ); }
 
   let (candidate, node_defs) : (Arc<InRustGraph>, Vec<NodeInstruction>) =
-  { // In-Rust graph — atomic snapshot swap so readers see a
+  { // In-Rust graph — atomic graph snapshot swap so readers see a
     // view that's consistent with what just landed on disk, and
     // never a mid-save half-applied state.
     let _span : tracing::span::EnteredSpan = tracing::info_span!(

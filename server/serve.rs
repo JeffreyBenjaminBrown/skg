@@ -118,7 +118,7 @@ fn handle_emacs (
     Arc::new ( Mutex::new (None) );
   let search_cancelled : Arc<AtomicBool> =
     Arc::new ( AtomicBool::new (false) );
-  let mut snapshot_requested : bool = false;
+  let mut buffer_snapshot_requested : bool = false;
   let mut search_enrichment_owed_for_terms // Some while a search awaits its terminal 'search-enrichment'. See 'handle_text_search_request'.
     : Option<String> = None;
   let mut pending_import : Option<PendingImport> = None;
@@ -169,9 +169,9 @@ fn handle_emacs (
                && closed_uri == ( search_enrichment_owed_for_terms . clone ()
                                   . map (ViewUri::SearchView) ) {
               // The client closed the search buffer before its
-              // enrichment arrived, so it cannot answer a snapshot
+              // enrichment arrived, so it cannot answer a buffer snapshot
               // request.
-              snapshot_requested = false;
+              buffer_snapshot_requested = false;
               if let Some (terms) = search_enrichment_owed_for_terms . take () {
                 abandon_search_enrichment (
                   &mut stream, &terms,
@@ -181,7 +181,7 @@ fn handle_emacs (
               &mut stream, &request_header, &mut env, &mut views_state,
               &active_skgrepo_set ),
           Ok (RequestType::SnapshotResponse) => {
-            snapshot_requested = false;
+            buffer_snapshot_requested = false;
             search_enrichment_owed_for_terms = None;
             handle_snapshot_response (
               &mut reader,
@@ -194,7 +194,7 @@ fn handle_emacs (
           Ok (RequestType::TextSearch) => {
             // Cancel any in-flight background search
             search_cancelled . store (true, Ordering::SeqCst);
-            snapshot_requested = false;
+            buffer_snapshot_requested = false;
             search_enrichment_owed_for_terms =
               handle_text_search_request (
                 &mut stream,
@@ -294,13 +294,13 @@ fn handle_emacs (
         if e . kind () == std::io::ErrorKind::WouldBlock
         || e . kind () == std::io::ErrorKind::TimedOut =>
       { // Idle timeout — if enrichment is ready, ask Emacs
-        // for a snapshot of the search buffer so we can integrate
+        // for a buffer snapshot of the search buffer so we can integrate
         // role trees without losing user edits.
-        if ! snapshot_requested {
+        if ! buffer_snapshot_requested {
           if let Ok (guard) = enrichment_slot . try_lock () {
             if guard . is_some () {
               // Peek at the terms without taking the payload yet.
-              // The payload stays in the slot until the snapshot arrives.
+              // The payload stays in the slot until the buffer snapshot arrives.
               let terms : String =
                 guard . as_ref () . unwrap () . terms . clone ();
               drop (guard); // release the lock
@@ -310,19 +310,19 @@ fn handle_emacs (
                 & tag_text_response (
                   TcpToClient::RequestSnapshot,
                   &terms ));
-              snapshot_requested = true; }} }}
+              buffer_snapshot_requested = true; }} }}
       Err (_) => break, // real error
     }}
   tracing::info!(peer = %peer, "Emacs disconnected"); }
 
-/// Handle the snapshot that Emacs sent back.
+/// Handle the buffer snapshot that Emacs sent back.
 /// Parses the buffer text, inserts role trees, sets graphnodestats,
 /// and sends the enriched result to Emacs.
 /// Always sends exactly one 'search-enrichment', because that is what
 /// releases the client's stream guard. If enrichment fails, it has no
 /// content, and carries the failure as a warning.
 /// Emacs to Rust message format:
-///   ((request . "snapshot response") (terms . "TERMS"))
+///   ((request . "buffer snapshot response") (terms . "TERMS"))
 ///   Content-Length: N\r\n\r\n<buffer text>
 fn handle_snapshot_response (
   reader          : &mut BufReader<TcpStream>,
@@ -346,7 +346,7 @@ fn handle_snapshot_response (
     . map_err ( |e| format! ("bad terms: {}", e) )
     . and_then ( |terms| {
       let buffer_text : String = buffer_text_result ?;
-      enrich_search_snapshot (
+      enrich_search_buffer_snapshot (
         &terms, &buffer_text, enrichment_slot,
         views_state, active_skgrepo_set ) } );
   let response : String = match enrichment_result {
@@ -363,9 +363,9 @@ fn handle_snapshot_response (
   send_response_with_length_prefix (
     stream, &response ); }
 
-/// Returns the 'search-enrichment' s-exp for the snapshot,
+/// Returns the 'search-enrichment' s-exp for the buffer snapshot,
 /// or why it could not be made.
-fn enrich_search_snapshot (
+fn enrich_search_buffer_snapshot (
   terms              : &str,
   buffer_text        : &str,
   enrichment_slot    : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,

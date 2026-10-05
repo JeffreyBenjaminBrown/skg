@@ -57,7 +57,7 @@ end
 
 ---Fork the (owned) node at point: create a private clone that
 ---overrides it. Refuses on a modified buffer, so the clone's saved
----snapshot matches what is on screen; otherwise stamps (viewRequests
+---saved state matches what is on screen; otherwise stamps (viewRequests
 ---fork) and auto-saves. The server answers with the usual
 ---fork-confirmation buffer.
 function M.fork_node ()

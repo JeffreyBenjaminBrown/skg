@@ -460,7 +460,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
     tantivy, &graph,
     &skg::types::env::new_mutation_gate () ) . await?;
 
-  let snap = graph . load_full ();
+  let graph_snap = graph . load_full ();
   let input_acquirer : Vec<ID> = vec![ID::from ("2")];
 
   for (path, (expected_bytes, expected_mtime)) in
@@ -473,7 +473,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
 
   let subscribers : HashSet<ID> =
     find_related_nodes (
-      &snap, &input_acquirer,
+      &graph_snap, &input_acquirer,
       "subscribes_to", "subscribee", "subscriber" );
   assert!( subscribers . contains (&ID::from ("subscribes-to-1")),
            "inverse subscribes under pid 2 should include \
@@ -481,13 +481,13 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
 
   let containers : HashSet<ID> =
     find_related_nodes (
-      &snap, &input_acquirer,
+      &graph_snap, &input_acquirer,
       "contains", "contained", "container" );
   assert! (containers . contains (&ID::from ("contains-1")));
 
   let hiders : HashSet<ID> =
     find_related_nodes (
-      &snap, &input_acquirer,
+      &graph_snap, &input_acquirer,
       "hides_from_its_subscriptions", "hidden", "hider" );
   assert!( hiders . contains (&ID::from ("hides-1-from-subscriptions")),
            "inverse hides under pid 2 should include \
@@ -495,7 +495,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
 
   let overriders : HashSet<ID> =
     find_related_nodes (
-      &snap, &input_acquirer,
+      &graph_snap, &input_acquirer,
       "overrides_view_of", "overridden", "overrider" );
   assert!( overriders . contains (&ID::from ("overrider-of-1")),
            "inverse overrides_view_of under pid 2 should include \
@@ -503,7 +503,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
 
   let link_skgrepos : HashSet<ID> =
     find_related_nodes (
-      &snap, &input_acquirer,
+      &graph_snap, &input_acquirer,
       "links_to", "mentioned", "mentioner" );
   assert!( link_skgrepos . contains (&ID::from ("links-to-1")),
            "inverse links_to under pid 2 should include \
@@ -513,7 +513,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
 
   let subscribee_of_s2_1 : HashSet<ID> =
     find_related_nodes (
-      &snap, &vec![ID::from ("subscribes-to-1")],
+      &graph_snap, &vec![ID::from ("subscribes-to-1")],
       "subscribes_to", "subscriber", "subscribee" );
   assert!( subscribee_of_s2_1 . contains (&ID::from ("2")),
            "subscribes-to-1's forward subscribes should resolve to \
@@ -523,7 +523,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
 
   let hidden_by_h1 : HashSet<ID> =
     find_related_nodes (
-      &snap, &vec![ID::from ("hides-1-from-subscriptions")],
+      &graph_snap, &vec![ID::from ("hides-1-from-subscriptions")],
       "hides_from_its_subscriptions", "hider", "hidden" );
   assert!( hidden_by_h1 . contains (&ID::from ("2")),
            "hides-1-from-subscriptions's forward hides should include \
@@ -533,7 +533,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
 
   let overridden_by_ov1 : HashSet<ID> =
     find_related_nodes (
-      &snap, &vec![ID::from ("overrider-of-1")],
+      &graph_snap, &vec![ID::from ("overrider-of-1")],
       "overrides_view_of", "overrider", "overridden" );
   assert!( overridden_by_ov1 . contains (&ID::from ("2")),
            "overrider-of-1's forward overrides should resolve \
@@ -541,7 +541,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
 
   let destinations_of_l1 : HashSet<ID> =
     find_related_nodes (
-      &snap, &vec![ID::from ("links-to-1")],
+      &graph_snap, &vec![ID::from ("links-to-1")],
       "links_to", "mentioner", "mentioned" );
   assert!( destinations_of_l1 . contains (&ID::from ("2")),
            "links-to-1's forward links should resolve to \
@@ -550,11 +550,11 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   let disk_nodes : Vec<Graphnode> =
     read_all_skg_files_from_skgrepos (config) ?;
   let rebuilt : InRustGraph = InRustGraph::from_graphnodes (&disk_nodes);
-  assert_eq! (snap . contained_by, rebuilt . contained_by);
-  assert_eq! (snap . subscribers_of, rebuilt . subscribers_of);
-  assert_eq! (snap . hiders_of, rebuilt . hiders_of);
-  assert_eq! (snap . overriders_of, rebuilt . overriders_of);
-  assert_eq! (snap . mentioners_of, rebuilt . mentioners_of);
-  assert_eq! (snap . extra_id_to_pid, rebuilt . extra_id_to_pid);
+  assert_eq! (graph_snap . contained_by, rebuilt . contained_by);
+  assert_eq! (graph_snap . subscribers_of, rebuilt . subscribers_of);
+  assert_eq! (graph_snap . hiders_of, rebuilt . hiders_of);
+  assert_eq! (graph_snap . overriders_of, rebuilt . overriders_of);
+  assert_eq! (graph_snap . mentioners_of, rebuilt . mentioners_of);
+  assert_eq! (graph_snap . extra_id_to_pid, rebuilt . extra_id_to_pid);
 
   Ok (( )) }

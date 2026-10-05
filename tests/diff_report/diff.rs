@@ -1,7 +1,7 @@
-use skg::diff_report::diff::diff_snapshots;
+use skg::diff_report::diff::diff_git_snapshots;
 use skg::diff_report::types::{
   DiffReport, GraphSnapshot, NodeBucket, NodeDiffReport, RelationshipDiff,
-  SnapshotPair, ValueSetDiff};
+  GitSnapshotPair, ValueSetDiff};
 use skg::types::misc::{ID, MSV, SkgRepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 
@@ -36,29 +36,29 @@ fn node (
   node
 }
 
-fn snapshot (
+fn git_snapshot (
   nodes : Vec<Graphnode>,
 ) -> GraphSnapshot {
-  let mut snapshot : GraphSnapshot =
+  let mut git_snapshot : GraphSnapshot =
     GraphSnapshot::default ();
   for node in nodes {
     for skgid in node . all_skgids () {
-      snapshot . id_claims . entry (skgid . clone ())
+      git_snapshot . id_claims . entry (skgid . clone ())
         . or_insert_with (std::collections::BTreeMap::new)
         . entry (node . pid . clone ())
         . or_insert_with (BTreeSet::new)
         . insert (node . home_skgrepo . clone ()); }
-    snapshot . nodes . insert (node . pid . clone (), node); }
-  snapshot
+    git_snapshot . nodes . insert (node . pid . clone (), node); }
+  git_snapshot
 }
 
 fn report_for (
   before : Vec<Graphnode>,
   after  : Vec<Graphnode>,
 ) -> DiffReport {
-  diff_snapshots (&SnapshotPair {
-    before: snapshot (before),
-    after: snapshot (after) })
+  diff_git_snapshots (&GitSnapshotPair {
+    before: git_snapshot (before),
+    after: git_snapshot (after) })
 }
 
 fn reports_by_pid (
@@ -231,15 +231,15 @@ fn telescope_shape_is_not_a_duplicate () {
   let mut telescope : Graphnode =
     node ("a", "A", &[]);
   telescope . home_skgrepo = skgrepo ("public");
-  let mut snap_after : GraphSnapshot =
-    snapshot (vec! [telescope]);
-  snap_after . id_claims . get_mut (&skgid ("a")) . unwrap ()
+  let mut git_snapshot_after : GraphSnapshot =
+    git_snapshot (vec! [telescope]);
+  git_snapshot_after . id_claims . get_mut (&skgid ("a")) . unwrap ()
     . get_mut (&skgid ("a")) . unwrap ()
     . insert (skgrepo ("private"));
   let report : DiffReport =
-    diff_snapshots (&SnapshotPair {
-      before: snapshot (vec! []),
-      after: snap_after });
+    diff_git_snapshots (&GitSnapshotPair {
+      before: git_snapshot (vec! []),
+      after: git_snapshot_after });
   assert! (report . duplicate_ids . is_empty (),
            "multi-repo single-pid claims flagged as duplicates");
   assert! (

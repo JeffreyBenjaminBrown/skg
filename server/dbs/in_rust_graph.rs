@@ -5,7 +5,7 @@
 //! every outbound relation and for extra_ids. It lives behind an
 //! 'ArcSwap' so readers never block writers and writers never block
 //! readers — writers clone via 'im''s structural sharing (O(log n)
-//! per mutation) and atomically publish a new snapshot.
+//! per mutation) and atomically publish a new graph snapshot.
 
 pub mod complete_validation;
 pub mod containerward_role_tree;
@@ -50,7 +50,7 @@ pub struct InRustGraph {
   /// 'X → {pids of nodes whose links_to includes X}'
   pub mentioners_of     : im::HashMap<ID, im::HashSet<ID>>,
   /// Maps any of a node's extra_ids to that node's pid. Invariant:
-  /// an extra_id is on at most one node at any visible snapshot.
+  /// an extra_id is on at most one node at any visible graph snapshot.
   pub extra_id_to_pid  : im::HashMap<ID, ID>,
 }
 
@@ -113,7 +113,7 @@ impl InRustGraph {
 }
 
 /// Resolve a raw relationship ID to its inverse-index key under an explicit
-/// identity snapshot. Unknown IDs remain their own keys.
+/// identity graph snapshot. Unknown IDs remain their own keys.
 fn canonical_key (
   identity : &InRustGraph,
   raw      : &ID,
@@ -268,7 +268,7 @@ pub fn apply_nodeInstructions_to_inRustGraph (
 
   // Install the complete final identity state before rebuilding any forward
   // contribution. The inherited inverse maps are deliberately left in place
-  // until affected recorders have been discovered from the base snapshot.
+  // until affected recorders have been discovered from the base graph snapshot.
   for pid in &touched_pids {
     if let Some (old) = base . nodes . get (pid) {
       affected_skgids . extend (old . extra_ids . iter () . cloned ());

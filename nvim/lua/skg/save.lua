@@ -64,12 +64,12 @@ function M.send_save_buffer (save_buf, saved_uri, approved_forks, fork_skgrepos,
   local focused_had_metadata = focused_line ~= nil
     and metadata.line_text(focused_line):match('^%*+ %(skg') ~= nil
   local save_point_position = M.current_save_point_position()
-  local buffer_contents = M.snapshot_with_save_markers(
+  local buffer_contents = M.buffer_snapshot_with_save_markers(
     save_buf, focused_had_metadata)
   local wire_content = sexpr.to_string({
     { sexpr.symbol('saved-buffer'), buffer_contents },
     { sexpr.symbol('other-views'),
-      M.other_view_save_snapshots(save_buf) },
+      M.other_view_buffer_snapshots(save_buf) },
   })
   local request_line =
     M.save_request_string(saved_uri, save_point_position,
@@ -132,7 +132,7 @@ end
 ---@param save_buf integer
 ---@param focused_had_metadata boolean
 ---@return string
-function M.snapshot_with_save_markers (save_buf, focused_had_metadata)
+function M.buffer_snapshot_with_save_markers (save_buf, focused_had_metadata)
   local was_save_locked = vim.b[save_buf].skg_save_locked == true
   local was_modified = vim.bo[save_buf].modified
   if was_save_locked then vim.bo[save_buf].modifiable = true end
@@ -154,7 +154,7 @@ end
 
 ---@param save_buf integer
 ---@return table[]
-function M.other_view_save_snapshots (save_buf)
+function M.other_view_buffer_snapshots (save_buf)
   local result = {}
   for _, other in ipairs(vim.api.nvim_list_bufs()) do
     local uri = vim.api.nvim_buf_is_valid(other)

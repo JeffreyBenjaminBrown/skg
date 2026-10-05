@@ -4,7 +4,7 @@ use crate::types::nodes::complete::Graphnode;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SnapshotKind {
+pub enum GitSnapshotKind {
   Head,
   Index,
   Worktree,
@@ -17,14 +17,14 @@ pub struct DiffSelection {
 }
 
 #[derive(Clone, Debug)]
-pub struct SnapshotPair {
+pub struct GitSnapshotPair {
   pub before : GraphSnapshot,
   pub after  : GraphSnapshot,
 }
 
 #[derive(Clone, Debug)]
-pub struct ChangedSnapshotPair {
-  pub pair          : SnapshotPair,
+pub struct ChangedGitSnapshotPair {
+  pub pair          : GitSnapshotPair,
   pub affected_pids : BTreeSet<ID>,
 }
 

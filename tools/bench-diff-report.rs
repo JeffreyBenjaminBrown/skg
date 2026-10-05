@@ -1,9 +1,9 @@
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::diff_report::diff_report_as_org;
-use skg::diff_report::diff::diff_snapshots;
+use skg::diff_report::diff::diff_git_snapshots;
 use skg::diff_report::render::render_report;
-use skg::diff_report::snapshot::read_snapshot_pair;
-use skg::diff_report::types::{DiffReport, DiffSelection, SnapshotPair};
+use skg::diff_report::git_snapshot::read_git_snapshot_pair;
+use skg::diff_report::types::{DiffReport, DiffSelection, GitSnapshotPair};
 use skg::types::misc::SkgConfig;
 
 use std::env;
@@ -36,8 +36,8 @@ fn main (
     return Ok (( )); }
   let total_start : Instant =
     Instant::now ();
-  let pair : SnapshotPair =
-    timed ("read snapshots", || read_snapshot_pair (&config, selection)) ?;
+  let pair : GitSnapshotPair =
+    timed ("read snapshots", || read_git_snapshot_pair (&config, selection)) ?;
   println! (
     "before nodes: {}, before ids: {}",
     pair . before . nodes . len (),
@@ -48,7 +48,7 @@ fn main (
     pair . after . id_claims . len ());
   let report : DiffReport =
     timed ("diff snapshots", || Ok::<DiffReport, String> (
-      diff_snapshots (&pair))) ?;
+      diff_git_snapshots (&pair))) ?;
   println! (
     "duplicate ids: {}, buckets: {}, affected nodes: {}",
     report . duplicate_ids . len (),

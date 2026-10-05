@@ -256,7 +256,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
     // is an OWNED node the user asked to fork. Unlike the implicit
     // foreign fork (where N's own save is dropped), N keeps its own save
     // (it is owned); we only ADD the clone C overriding N. C copies N's
-    // saved disk snapshot -- the client refuses to fork a dirty buffer,
+    // saved state on disk -- the client refuses to fork a dirty buffer,
     // so disk == what the user sees. These specs join the implicit ones
     // for the shared confirmation / commit pipeline below.
     let mut specs : Vec<ForkSpec> = fork_specs;
@@ -326,7 +326,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos (
 /// writes are scanned -- the noop filter has already dropped
 /// unchanged ones -- so an old dangling link warns again only when its
 /// carrier is edited. The explicit save-planning graph makes this check use
-/// the same snapshot as every other validation stage.
+/// the same graph snapshot as every other validation stage.
 fn dead_link_warnings (
   graph             : &crate::dbs::in_rust_graph::InRustGraph,
   node_instructions : &[NodeInstruction],
@@ -385,7 +385,7 @@ fn explicit_fork_specs_from_viewforest (
     // detached copies left by placement; dedup so one forked node yields
     // one spec. (D2 already rejected a genuine second fork request.)
     if ! seen . insert (pid . clone ()) { continue; }
-    let snapshot : Graphnode =
+    let graph_snapshot : Graphnode =
       match graphnode_graphFirst_by_pid_and_skgrepo (
         graph, config, pid, & t . home_skgrepo ) {
         Ok (nc) => nc,
@@ -394,11 +394,11 @@ fn explicit_fork_specs_from_viewforest (
             "Cannot fork node {}: {}", pid . 0, e )));
           continue; }};
     match fork_spec_from_buffer_node (
-      // The snapshot serves as both the clone template and the disk
+      // The graph snapshot serves as both the clone template and the disk
       // state, so the disk-contains diff is empty: an explicit fork
       // deletes nothing, hence hides nothing.
-      & snapshot, & snapshot . title,
-      & members_of ( & snapshot . contains ),
+      & graph_snapshot, & graph_snapshot . title,
+      & members_of ( & graph_snapshot . contains ),
       clone_skgrepo_inputs )
     { Ok (spec) => specs . push (spec),
       Err (e)   => errors . push (e), }}

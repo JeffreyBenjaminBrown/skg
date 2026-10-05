@@ -8,7 +8,7 @@
 //! which it vanished and what it was connected to (in every possible
 //! way, links included) when last present.
 
-use crate::diff_report::snapshot::{
+use crate::diff_report::git_snapshot::{
   parse_blob_node, path_is_skgrepo_skg, repo_prefix_in_gitrepo};
 use crate::diff_report::types::{
   CommitStamp, GraphSnapshot, VanishedNodeReport, VanishedNodeSighting};
@@ -21,22 +21,22 @@ use git2::{Commit, ObjectType, Repository, TreeWalkMode, TreeWalkResult};
 use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 
-/// Every id some node of 'snapshot' lists as a relationship member
+/// Every id some node of 'git_snapshot' lists as a relationship member
 /// (contains, subscribes_to, hides_from_its_subscriptions,
-/// overrides_view_of) that no node of 'snapshot' answers to (as
+/// overrides_view_of) that no node of 'git_snapshot' answers to (as
 /// primary or extra id). Link targets are NOT collected here:
 /// a dangling link degrades to text, not to an unknown-node phantom.
-pub fn dangling_skgids_in_snapshot (
-  snapshot : &GraphSnapshot,
+pub fn dangling_skgids_in_git_snapshot (
+  git_snapshot : &GraphSnapshot,
 ) -> BTreeSet<ID> {
   let resolvable : HashSet<&ID> = {
     let mut skgids : HashSet<&ID> = HashSet::new ();
-    for node in snapshot . nodes . values () {
+    for node in git_snapshot . nodes . values () {
       skgids . insert (& node . pid);
       skgids . extend ( node . extra_ids . iter () ); }
     skgids };
   let mut dangling : BTreeSet<ID> = BTreeSet::new ();
-  for node in snapshot . nodes . values () {
+  for node in git_snapshot . nodes . values () {
     let contains_skgids   : Vec<ID> = members_of (& node . contains);
     let subscribes_skgids : MSV<ID> = members_msv (& node . subscribes_to);
     let hides_skgids       : MSV<ID> = members_msv (

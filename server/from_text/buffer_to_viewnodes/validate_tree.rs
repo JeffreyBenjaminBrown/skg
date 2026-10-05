@@ -184,7 +184,7 @@ fn idFolder_membership_errors (
 /// check accepts any honest carrier and rejects only an off-chain
 /// marker. Markers on retained InactiveVognodes are checked identically.
 /// The explicit graph is required, so every present marker is checked against
-/// the same snapshot used by the rest of save planning.
+/// the same graph snapshot used by the rest of save planning.
 #[allow(non_snake_case)]
 fn overridesHere_marker_errors (
   viewforest : &MpViewForest,

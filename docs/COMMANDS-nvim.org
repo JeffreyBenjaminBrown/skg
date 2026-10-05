@@ -48,7 +48,7 @@ or register the archive as a live view.
 
 When a save is refused, archive the relevant dirty views, close those live
 views, save the remaining view, reopen fresh views, and manually reapply
-the intended edits. Do not save an entire stale archived snapshot over the
+the intended edits. Do not save an entire stale archived copy over the
 newer graph. If dirty search results were enriched, the archive labels that
 the diff also includes enrichment presentation and is not a semantic patch
 of user intent alone.
@@ -479,7 +479,7 @@ use it to deepen an override chain, e.g. to layer a private =D=
 over a public clone =C= that already overrides a foreign =N=.
 
 Refuses if the buffer has unsaved changes ("Save the buffer
-before forking."), so the clone's snapshot matches what you see.
+before forking."), so the clone's saved state matches what you see.
 Otherwise it stamps the node and auto-saves; the server returns
 the usual fork-confirmation buffer (=skg://fork-confirmation=).
 There you MUST set the clone's repo with 'SetRepo'

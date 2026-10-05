@@ -89,7 +89,7 @@ node you ALREADY own, deepening an override chain (e.g. E overrides D
 overrides C overrides N).
 
 Refuses if the buffer has unsaved changes (\"Save the buffer before
-forking.\"), so the clone's saved snapshot matches what you see. Otherwise
+forking.\"), so the clone's saved state matches what you see. Otherwise
 stamps (viewRequests fork) into the headline's own (skg (node ...)) --
 targeting the headline's OWN id, never an (overridesHere N) marker it may
 carry -- and auto-saves (unlike `skg-request-definitive-view'). The server

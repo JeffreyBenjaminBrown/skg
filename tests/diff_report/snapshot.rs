@@ -1,5 +1,5 @@
-use skg::diff_report::snapshot::read_snapshot_pair;
-use skg::diff_report::types::{DiffSelection, SnapshotPair};
+use skg::diff_report::git_snapshot::read_git_snapshot_pair;
+use skg::diff_report::types::{DiffSelection, GitSnapshotPair};
 use skg::types::misc::{ID, SkgConfig, SkgRepo, SkgRepoName};
 
 use git2::Repository;
@@ -94,8 +94,8 @@ fn selected_snapshots_distinguish_head_index_and_worktree () {
   write_node (&skgrepo_dir, "a", "worktree");
   let config : SkgConfig =
     config_for (tmp . path (), &skgrepo_dir);
-  let staged_only : SnapshotPair =
-    read_snapshot_pair (
+  let staged_only : GitSnapshotPair =
+    read_git_snapshot_pair (
       &config,
       DiffSelection {
         include_staged: true,
@@ -106,8 +106,8 @@ fn selected_snapshots_distinguish_head_index_and_worktree () {
   assert_eq! (
     staged_only . after . nodes [&ID::from ("a")] . title,
     "index" );
-  let unstaged_only : SnapshotPair =
-    read_snapshot_pair (
+  let unstaged_only : GitSnapshotPair =
+    read_git_snapshot_pair (
       &config,
       DiffSelection {
         include_staged: false,

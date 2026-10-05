@@ -29,7 +29,7 @@ fn cloned_runtime_observes_atomic_generations_while_old_snapshot_stays_stable ()
   let runtime = Arc::new (SharedRuntime::new (
     old_config, Arc::new (graph_with ("old-node")), old_index . clone ()));
   let other_connection = runtime . clone ();
-  let captured_old = runtime . snapshot ();
+  let captured_old = runtime . graph_snapshot ();
 
   let mut new_config = (*captured_old . config) . clone ();
   new_config . owned_folder = "new-config" . to_string ();
@@ -39,7 +39,7 @@ fn cloned_runtime_observes_atomic_generations_while_old_snapshot_stays_stable ()
     new_index . clone ());
 
   assert_eq! (published . generation, 1);
-  let observed = other_connection . snapshot ();
+  let observed = other_connection . graph_snapshot ();
   assert_eq! (observed . generation, 1);
   assert_eq! (observed . config . owned_folder, "new-config");
   assert! (observed . graph . nodes . contains_key (&ID::from ("new-node")));
@@ -57,9 +57,9 @@ fn unpublished_candidate_cannot_change_the_visible_generation () {
   let runtime = SharedRuntime::new (
     config (), Arc::new (graph_with ("published")),
     empty_in_ram_tantivy_index () . unwrap ());
-  let before = runtime . snapshot ();
+  let before = runtime . graph_snapshot ();
   let _failed_candidate = graph_with ("never-published");
-  let after = runtime . snapshot ();
+  let after = runtime . graph_snapshot ();
   assert! (Arc::ptr_eq (&before, &after));
   assert_eq! (after . generation, 0);
   assert! (! after . graph . nodes . contains_key (&ID::from ("never-published")));

@@ -53,7 +53,7 @@ typeface stays the user's."
 
 (defvar skg--inhibit-dirty-view-confirmation nil
   "Non-nil while skg itself edits view text (re-rendering, save
-snapshots), so `skg--confirm-before-dirtying-another-view' stays quiet.")
+buffer snapshots), so `skg--confirm-before-dirtying-another-view' stays quiet.")
 
 (defun skg--unsaved-view-buffers (&optional except)
   "Return every live view with unsaved edits, other than EXCEPT.
@@ -139,12 +139,12 @@ an edit command typed via M-x keeps the approval."
 (put 'skg-clean-baseline-context 'permanent-local t)
 
 (defvar-local skg--search-enrichment-includes-user-edits nil
-  "Non-nil when enrichment replaced a dirty search snapshot.")
+  "Non-nil when enrichment replaced a dirty search-buffer snapshot.")
 (put 'skg--search-enrichment-includes-user-edits 'permanent-local t)
 
-(defvar-local skg--search-snapshot-was-dirty nil
-  "Whether the snapshot currently being enriched contained unsaved edits.")
-(put 'skg--search-snapshot-was-dirty 'permanent-local t)
+(defvar-local skg--search-buffer-snapshot-was-dirty nil
+  "Whether the buffer snapshot currently being enriched contained unsaved edits.")
+(put 'skg--search-buffer-snapshot-was-dirty 'permanent-local t)
 
 (defvar-local skg-contentView-initialRoot-repo nil
   "Repo of the initial first root in this skg content view.

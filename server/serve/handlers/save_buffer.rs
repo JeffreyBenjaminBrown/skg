@@ -610,7 +610,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
 ) -> Result<SaveResponse, Box<dyn Error>> {
   // Save-plan construction reads the current files and graph.  Hold the sole
   // writer gate from before those reads through publication, or two requests
-  // can serialize their writes yet still act on the same stale disk snapshot.
+  // can serialize their writes yet still act on the same stale disk state.
   let mutation_gate = env . mutation_gate ();
   let mutation_guard = mutation_gate . lock () . await;
   let runtime = env . runtime_snapshot ();
@@ -749,7 +749,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   narrowed_lock_uris . sort_by_key (ViewUri::repr_in_client);
   narrowed_lock_uris . dedup ();
   // The client keeps the saved URI implicitly. Every dirty view stays locked
-  // because its exact snapshot was an input to the conflict decision, even
+  // because its exact buffer snapshot was an input to the conflict decision, even
   // when that view is client-only and not a collateral target.
   send_response_with_length_prefix (
     stream,

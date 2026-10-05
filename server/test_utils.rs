@@ -176,7 +176,7 @@ impl SharedStoreSession {
 
   /// Like 'reset', but runs `prep` on the temp fixture copy BEFORE
   /// the config is loaded and the graph snapshot populated -- for
-  /// sub-tests whose fixtures need mutation that the snapshot must
+  /// sub-tests whose fixtures need mutation that the graph snapshot must
   /// reflect (e.g. git-initializing a skgrepo and leaving a
   /// worktree-vs-HEAD diff).
   pub fn reset_with_fixture_prep<P> (
@@ -409,7 +409,7 @@ pub async fn update_from_and_rerender_buffer_test (
     diff_mode_enabled, viewuri_from_request_result, views_state,
     /* approved_forks = */ true ) . await }
 
-/// Drive the full prepared-save conflict path with explicit client snapshots.
+/// Drive the full prepared-save conflict path with explicit buffer snapshots.
 pub async fn update_from_and_rerender_buffer_with_snapshots_test (
   stream                      : &mut std::net::TcpStream,
   org_buffer_text             : &str,
@@ -509,9 +509,9 @@ pub fn set_skgrepo_retagging_relRepos (
 pub fn audit_inrustgraph_or_panic (
   handle  : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
-  let snap : Arc<InRustGraph> = handle . load_full ();
+  let graph_snap : Arc<InRustGraph> = handle . load_full ();
   let errors = crate::dbs::in_rust_graph::internal_index_validation
-    ::validate_internal_indexes (&snap);
+    ::validate_internal_indexes (&graph_snap);
   if ! errors . is_empty () {
     panic! ("graph index audit failed:\n{:#?}", errors); }
   Ok (( )) }

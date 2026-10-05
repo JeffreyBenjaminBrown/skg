@@ -33,7 +33,7 @@ function M.document (buf)
     '* Recovery instructions',
     'This is a detached local archive, not a live Skg view. Close archived'
       .. ' views, save the remaining live view, reopen fresh views, and manually'
-      .. ' reapply the intended edits. Do not save this entire stale snapshot'
+      .. ' reapply the intended edits. Do not save this entire stale buffer snapshot'
       .. ' over newer graph data.',
     '',
     '* Context',
@@ -47,7 +47,7 @@ function M.document (buf)
       or ('- Baseline: unavailable (the current text is still preserved,'
           .. ' but no verified edit diff can be produced)'),
     '',
-    '* Exact snapshots',
+    '* Exact buffer snapshots',
     'Each repo block is one JSON string. JSON decoding reproduces every'
       .. ' character, including tabs and trailing newlines.',
     '',

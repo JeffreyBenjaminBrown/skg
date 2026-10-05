@@ -60,12 +60,12 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
            (save-buffer (current-buffer))
            (saved-uri skg-view-uri)
            (buffer-contents
-            (skg--snapshot-with-save-markers focused-had-metadata))
-           (other-view-snapshots
-            (skg--other-view-save-snapshots save-buffer))
+            (skg--buffer-snapshot-with-save-markers focused-had-metadata))
+           (other-view-buffer-snapshots
+            (skg--other-view-buffer-snapshots save-buffer))
            (wire-content
             (skg--serialize-save-envelope
-             buffer-contents other-view-snapshots))
+             buffer-contents other-view-buffer-snapshots))
            (request-s-exp (concat (prin1-to-string
                                    (skg--save-request-sexp
                                     skg-view-uri
@@ -145,7 +145,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
       (process-send-string tcp-proc header)
       (process-send-string tcp-proc wire-content))))
 
-(defun skg--serialize-save-envelope (saved-buffer other-view-snapshots)
+(defun skg--serialize-save-envelope (saved-buffer other-view-buffer-snapshots)
   "Serialize SAVED-BUFFER and OTHER-VIEW-SNAPSHOTS for the Rust server."
   ;; Emacs prints its empty list as the atom `nil', while the Rust protocol
   ;; requires an explicit list for other-views.  Serialize that one empty
@@ -156,19 +156,19 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
     (concat
      "((saved-buffer " (prin1-to-string saved-buffer) ") "
      "(other-views "
-     (if other-view-snapshots
-         (prin1-to-string other-view-snapshots)
+     (if other-view-buffer-snapshots
+         (prin1-to-string other-view-buffer-snapshots)
        "()")
      "))")))
 
-(defun skg--snapshot-with-save-markers (focused-had-metadata)
+(defun skg--buffer-snapshot-with-save-markers (focused-had-metadata)
   "Return current text with transient save markers, restoring the buffer.
 FOCUSED-HAD-METADATA records whether marker removal can leave a bare skg
 form.  The saved buffer's lock is suspended only during this synchronous
 internal edit; it is restored before any request is sent."
   (let ((was-save-locked skg--save-lock-overlay)
         (skg--inhibit-dirty-view-confirmation t)
-        snapshot)
+        buffer-snapshot)
     (when was-save-locked
       (skg--unlock-after-save))
     (unwind-protect
@@ -179,7 +179,7 @@ internal edit; it is restored before any request is sent."
           ;; `prin1-to-string' emits #("..." ...) syntax, which is not part of
           ;; the shared S-expression protocol and is parsed as extra fields by
           ;; the Rust reader.
-          (setq snapshot
+          (setq buffer-snapshot
                 (buffer-substring-no-properties (point-min) (point-max))))
       (skg-remove-focused-marker)
       (skg-remove-folded-markers)
@@ -187,9 +187,9 @@ internal edit; it is restored before any request is sent."
         (skg-strip-bare-skg-at-focused-headline))
       (when was-save-locked
         (skg--lock-for-save)))
-    snapshot))
+    buffer-snapshot))
 
-(defun skg--other-view-save-snapshots (saved-buffer)
+(defun skg--other-view-buffer-snapshots (saved-buffer)
   "Return the structured states of every live view except SAVED-BUFFER."
   (let (result)
     (dolist (buffer (buffer-list) (nreverse result))

@@ -64,7 +64,7 @@ impl SharedRuntime {
     }
   }
 
-  pub fn snapshot (&self) -> Arc<RuntimeGeneration> {
+  pub fn graph_snapshot (&self) -> Arc<RuntimeGeneration> {
     self . current . load_full ()
   }
 
@@ -74,7 +74,7 @@ impl SharedRuntime {
     graph : Arc<InRustGraph>,
     tantivy_index : TantivyIndex,
   ) -> Arc<RuntimeGeneration> {
-    let generation = self . snapshot () . generation + 1;
+    let generation = self . graph_snapshot () . generation + 1;
     let published = Arc::new (RuntimeGeneration {
       config, graph : graph . clone (), tantivy_index, generation,
     });
@@ -120,7 +120,7 @@ impl SkgEnv {
   }
 
   pub fn runtime_snapshot (&self) -> Arc<RuntimeGeneration> {
-    let runtime = self . runtime . snapshot ();
+    let runtime = self . runtime . graph_snapshot ();
     tracing::trace! (
       generation = runtime . generation,
       "captured runtime generation");

@@ -48,7 +48,7 @@
           (let ((baseline skg-clean-baseline))
             (goto-char (point-max))
             (insert "user edit\n")
-            (setq skg--search-snapshot-was-dirty t)
+            (setq skg--search-buffer-snapshot-was-dirty t)
             (skg--display-search-enrichment
              "((terms \"dirty-test\") (content \"* enriched\\nuser edit\") (warnings ()))")
             (should (buffer-modified-p))
@@ -66,7 +66,7 @@
           (skg-content-view-mode)
           (setq skg-view-uri "search:clean-test")
           (skg--replace-search-content "* clean")
-          (setq skg--search-snapshot-was-dirty nil)
+          (setq skg--search-buffer-snapshot-was-dirty nil)
           (skg--display-search-enrichment
            "((terms \"clean-test\") (content \"* enriched\") (warnings ()))")
           (should-not (buffer-modified-p))

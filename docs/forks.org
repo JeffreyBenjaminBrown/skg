@@ -109,7 +109,7 @@ command, *=skg-fork-node=* (=C-c m f=, alias =skg-fork=).
 
 Put point on the node's headline and run it. It refuses if the buffer has
 unsaved changes ("Save the buffer before forking.") — so the clone is
-built from the node's saved snapshot, exactly what you see. Otherwise it
+built from the node's saved state, exactly what you see. Otherwise it
 marks the node and auto-saves, and you get the *same fork-confirmation
 buffer* as the implicit fork: pick the clone's skgrepo at the prompt —
 e.g. your /private/ skgrepo — (or set it with =C-c s s=), then approve

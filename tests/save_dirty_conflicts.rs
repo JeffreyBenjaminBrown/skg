@@ -26,7 +26,7 @@ fn mk_pair () -> (TcpStream, TcpStream) {
   (write_end, read_end)
 }
 
-fn dirty_snapshot (
+fn dirty_buffer_snapshot (
   uri      : &str,
   baseline : Option<&str>,
   current  : &str,
@@ -74,7 +74,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
       let result = update_from_and_rerender_buffer_with_snapshots_test (
         &mut stream, &edited_a, config, tantivy, &graph, false,
         &Ok (saved_uri . clone ()), &mut views_state,
-        &[dirty_snapshot ("client-only-b", Some (&b_view), &dirty_b)])
+        &[dirty_buffer_snapshot ("client-only-b", Some (&b_view), &dirty_b)])
         . await;
       drop (stream);
       let messages = read_all_lp_messages (&mut BufReader::new (read_end));
@@ -111,7 +111,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
       let response = update_from_and_rerender_buffer_with_snapshots_test (
         &mut stream, &edited_a, config, tantivy, &graph, false,
         &Ok (saved_uri), &mut views_state,
-        &[dirty_snapshot ("client-only-c", Some (&c_view), &dirty_c)])
+        &[dirty_buffer_snapshot ("client-only-c", Some (&c_view), &dirty_c)])
         . await ?;
       drop (stream);
       assert! (response . errors . is_empty ());
@@ -147,9 +147,9 @@ fn missing_or_unparseable_dirty_baseline_refuses () -> Result<(), Box<dyn Error>
       let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
       let (a_view, _, _) = single_root_view (
         config, Some (tantivy), &ID::from ("A"), false) ?;
-      for snapshot in [
-        dirty_snapshot ("missing-baseline", None, "* new node"),
-        dirty_snapshot (
+      for buffer_snapshot in [
+        dirty_buffer_snapshot ("missing-baseline", None, "* new node"),
+        dirty_buffer_snapshot (
           "malformed-baseline", Some ("** starts too deep"), "* new node"),
       ] {
         let mut views_state : ViewsState = ViewsState {
@@ -160,7 +160,7 @@ fn missing_or_unparseable_dirty_baseline_refuses () -> Result<(), Box<dyn Error>
         let result = update_from_and_rerender_buffer_with_snapshots_test (
           &mut stream, &a_view, config, tantivy, &graph, false,
           &Ok (ViewUri::ContentView ("saved-a" . into ())),
-          &mut views_state, &[snapshot]) . await;
+          &mut views_state, &[buffer_snapshot]) . await;
         let error = match result {
           Ok (_) => panic! ("invalid dirty snapshot should refuse the save"),
           Err (error) => error,
