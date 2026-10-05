@@ -167,7 +167,7 @@ So far there are these endpoints:
        views. The saved view is retained implicitly. Only unrelated clean
        views may unlock at this point. A malformed narrowing message leaves
        all locks held until terminal cleanup.
-    3. Zero or more collateral-view messages (one per affected view, streamed as each finishes):
+    3. Zero or more collateral-view messages (one per collateral view, streamed as each finishes):
        =Content-Length: N\r\n\r\n((response-type collateral-view) (view-id "VIEW_ID") (content "..."))=
        Emacs unlocks and updates each buffer as it arrives.
     4. Final save response:
@@ -215,7 +215,7 @@ So far there are these endpoints:
     confirmation, and neither attempt writes.
   - The third ALTERNATIVE terminal message protects the saved and
     collateral rerenders. After a valid save has updated disk and the
-    derived stores, the server renders every affected view in memory.
+    derived stores, the server renders the saved view and every collateral view in memory.
     Under a restricted skgrepo-set, if the staged forests contain overPrivateText
     telescopes without exact text-release approval, it changes no
     open-view registry entry, streams no content, and sends

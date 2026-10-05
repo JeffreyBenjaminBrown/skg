@@ -961,7 +961,7 @@ and configure that skgrepo with the intended name and privacy order. See
 before loading: the importer itself does not check them.
 
 For a first setup, configure the skgrepo before starting Skg. When replacing
-existing data, save and close affected views and stop the server before
+existing data, save and close the open views and stop the server before
 changing the files in its skgrepos, then restart it. If files in an already configured
 skgrepo changed while the server remained running,
 'M-x skg-rebuild-ephemeral-data-stores' reloads them; close stale views and
