@@ -222,11 +222,21 @@ Recall that there are five relations in the graph:
 containment, link, subscription, hiding, and overriding.
 Because a node can be on either side of each relationship --
 it can be the container or the content, the hider or the hidden, etc. --
-there are 5x2 = 10 kinds of PartnerFolders.
-A hiddenFolder lists (as its children)
-every node that plays hidden to its parent's 'hider';
-a subscribeeFolder lists every node that plays subscribee to its parent's subscriber;
-etc.
+there are many kinds of PartnerFolder. Each lists, as its children,
+the nodes that play one role toward its parent:
+- a *subscribeeFolder*: the nodes its parent subscribes to;
+- a *subscriberFolder*: the nodes that subscribe to its parent;
+- an *overriddenFolder*: the nodes whose view its parent overrides;
+- an *overriderFolder*: the nodes that override its parent's view;
+- a *hiddenFolder*: the nodes its parent hides;
+- a *hiderFolder*: the nodes that hide its parent;
+- a *hiddenInSubscribeeFolder*, under a subscribee as such: that
+  subscribee's contents which the subscriber hides;
+- a *hiddenOutsideOfSubscribeeFolder*, under a subscribeeFolder: the
+  nodes its parent hides that no subscribee contains.
+Containment and links get no PartnerFolder: a node's contents are its
+ordinary viewchildren, and its containers and mentioners appear as
+role trees.
 
 **** Some extremely technical details
 
