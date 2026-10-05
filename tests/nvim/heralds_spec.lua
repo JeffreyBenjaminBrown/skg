@@ -149,7 +149,7 @@ describe('skg.heralds', function ()
     assert.are.equal(0xffffff, default.fg)
     assert.are.equal(0x000000, default.bg)
     local level1 = vim.api.nvim_get_hl(0, { name = 'SkgViewHeadlineLevel1' })
-    assert.is_true(level1.bold)
+    assert.are.equal(0xff8888, level1.fg)
     assert.are.equal(0x000000, level1.bg) -- the default's background
     heralds.disable(buf)
   end)

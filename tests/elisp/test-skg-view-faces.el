@@ -15,7 +15,8 @@ buffers alone."
           (headline-remap (cadr (assq 'org-level-1 face-remapping-alist))))
       (should (equal (plist-get default-remap :foreground) "white"))
       (should (equal (plist-get default-remap :background) "black"))
-      (should (eq (plist-get headline-remap :weight) 'bold))
+      (should (equal (plist-get headline-remap :foreground) "#ff8888"))
+      (should (eq (plist-get headline-remap :weight) 'normal))
       ;; a face with no background of its own gets the default's
       (should (equal (plist-get headline-remap :background) "black"))
       (should (assq 'org-link face-remapping-alist))))
