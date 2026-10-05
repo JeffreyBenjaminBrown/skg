@@ -12,5 +12,8 @@ mod leak_battery;
 mod move_source;
 
 
+#[path = "search_enrichment_terminal.rs"]
+mod search_enrichment_terminal;
+
 #[path = "source_sets.rs"]
 mod source_sets;

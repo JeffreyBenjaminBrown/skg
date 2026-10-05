@@ -2,10 +2,58 @@
 ** not to dirty the production skg's code.
 ** to set the model
 * ONGOING TODO/import-md-and-org/
+** TODO duplicate file problem
+*** I asked
+THe OVERVIEW-old.org file is getting treated strangely -- I see only one copy in docs/, but when I export to export/ I see a second near-copy, under a docs/ subfolder. What's up with that?
+*** Claude explains
+  Found it, at least in this workspace's copy of your data. Your public source still has export markers left over from before the import:
+
+  target_filepath = docs/OVERVIEW-old
+  target_filepath = docs/setup
+  target_filepath = org_export_is_partial
+
+  Why there are two files: these are two different nodes, each with its own export marker.
+
+  1. The old one, in public: this is the OVERVIEW document you imported from Org-roam long ago. When you made commit c098c537 ("export docs/OVERVIEW-old.org from the skg data"), it got a marker with
+     target_filepath = docs/OVERVIEW-old. Exporting into export/ therefore writes it to export/docs/OVERVIEW-old.org.
+  2. The new one, in skg: the root that the Markdown/Org import created from docs/OVERVIEW-old.org. Its marker says target_filepath = OVERVIEW-old, so it's written to export/OVERVIEW-old.org.
+
+  Why they're almost the same: the second was imported from the file the first was exported to, and that file was edited in between (your reshuffle, and my link fixes).
+
+  Why the importer didn't object: it checks that no two documents claim the same output path, and these two paths differ (docs/OVERVIEW-old vs OVERVIEW-old).
+
+  How to fix it, in your main workspace's data: the cleanest fix is to delete the export marker child under the old OVERVIEW node in public. If that old copy is obsolete now that skg holds the document, delete the
+  old node itself.
+
+  Do the same for the other leftovers:
+  - docs/setup would likewise produce a stray export/docs/setup.org.
+  - org_export_is_partial is the old broken-link note. It's harmless, but no longer needed for docs/.
+
+  A workaround in the meantime: export with the source-set skg alone. You list skg as your most public source, so that set excludes public entirely.
+
+  I didn't change any data. This workspace's copy is stale anyway, and the fix belongs in the data you actually use.
 ** data/skg-system/ should not need mention in the config
 * next
 ** TODO/skg-for-ai/1_discussion.org
+** for docs : the org exporter
+*** ONGOING bug : flattening example links
+  - Example links inside verbatim text got flattened. The exporter treats a link
+    written as a literal example, like =[[id:X][LABEL]]= in COMMANDS.org, as a
+    real link to a node that wasn't exported, and replaces it with its label. So
+    "=[[id:X][LABEL]]= link is inserted at point" became "=LABEL= link is
+    inserted at point". The same happened to the example link in the
+    export-marker section I just wrote. That one points at the documentation
+    node in public, which wasn't exported, so it came out as : Export to Org.
+*** ONGOING List items that look like headings are lost.
+A Markdown list item at column 0 (* [Does it use plaintext?…] in FAQ.md)
+is now a line starting with * , which Org reads as a top-level heading.
+This breaks FAQ.org's outline.
+The exporter warned about this and similar lines (#+begin_src, #+title)
+but wrote them anyway.
 ** for video
+*** TODO divide subscriptions in 3 : unprocessed, integrated and hidden
+and rename the hide relationship processed-from-subscriptions
+*** TODO What if a subscription shows new foreign content that was already integrated into the user's data?
 *** AWAITS navigate point through herald (overlay)
 walk point through the herald string normally
 treat it as one character

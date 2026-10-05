@@ -184,7 +184,11 @@ end
 function M.display_search_enrichment (response)
   local terms = payload.field_text(response, 'terms')
   local content = payload.field_text(response, 'content')
-  if not terms or not content then return end
+  if not terms or not content then
+    -- No enrichment is coming; the server may say why.
+    M.display_warnings(
+      response, 'Search enrichment completed with warnings')
+    return end
   local buf = buffer.find_buffer_by_uri('search:' .. terms)
   if not buf then return end
   vim.bo[buf].modifiable = true
