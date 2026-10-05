@@ -15,3 +15,15 @@ because that can make names much clearer. For instance
 those three words look like an adjective phrase, when in fact they form a noun.
 Sometimes it is similarly clarifying to camel-case
 adjective or verb phrases into a single underscore-bracketed token.
+* Some words are never used bare
+Each of these names several things, so code and prose always say which.
+The glossary ('docs/glossary.org') defines each kind.
+- merge: nodeMerge or instructionMerge.
+- snapshot: graph snapshot, git snapshot or buffer snapshot.
+- index: search index, git index or graph index. Beside HEAD and
+  worktree, git's index needs no qualifier.
+- commit: git-commit, skgsave-commit or tantivy-commit. Where git is
+  plain from context (HEAD, a merge commit, a git2 call), bare
+  "commit" means a git-commit.
+- generation: runtime generation ('RuntimeGeneration') or buffer
+  generation (the clients' per-buffer request counter).
