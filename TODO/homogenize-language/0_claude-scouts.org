@@ -160,3 +160,5 @@ Slices, in order; mark each when done:
 - [X] PartnerFolder glossary: many kinds, list them: 0747487b + 38f05640 (table)
 - [X] names.org never-bare rule: 13d33d3b. Doc statuses: 81fee9b9.
 - NEXT (Jeff answered elsewhere in the doc): relation names "all of them" + one-off migration script (don't run on his data without asking); move finished plans to TODO/DONE (he said yes).
+- [X] Relation rename, all four layers + misc->flags on disk + contained->content: 6e442288. Serde aliases read old keys. Migration NOT run on data/ (dry run: 6433 keys / 6429 files). Integration: only import-md-and-org fails, same as baseline.
+- PENDING: apply TODO/homogenize-language/claude-pending.diff to 1_reconnaissance.org once Jeff releases it (he is editing it).
