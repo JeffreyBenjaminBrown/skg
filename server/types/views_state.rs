@@ -14,7 +14,7 @@ use std::collections::{HashMap, HashSet};
 /// Identifies a buffer in the client.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ViewUri {
-  ContentView  (String), // UUID
+  ContentView  (String), // the root skgid
   SearchView   (String), // query
 }
 

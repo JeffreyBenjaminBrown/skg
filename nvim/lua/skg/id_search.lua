@@ -71,8 +71,8 @@ function M.point_on_uuid_p ()
   local start, finish =
     M.match_containing(line, M.uuid_v4_pattern, pos, true)
   if start then
-    local uuid = line:sub(start, finish)
-    return { id = uuid, label = uuid } end
+    local skgid = line:sub(start, finish)
+    return { id = skgid, label = skgid } end
   return nil
 end
 

@@ -359,7 +359,7 @@ So far there are these endpoints:
     script is a bash move-list plus one loop over it:
     #+begin_example
     moves=(
-      "<uuid> <old-repo-dir> <new-repo-dir>"
+      "<ID> <old-repo-dir> <new-repo-dir>"
       ...
     )
 
@@ -648,10 +648,10 @@ one automatically.
     leaves the active set and open-view registry unchanged.
 
 ** Titles by ids
-  - Request: =((request . "titles by ids") (ids "uuid1" "uuid2" ...)
+  - Request: =((request . "titles by ids") (ids "ID1" "ID2" ...)
     (approved-overPrivateText-pids "PID" ...))=.
   - Response: LP =((response-type titles-by-ids)
-    (content (("uuid1" . "title1") ("uuid2" . "title2") ...))
+    (content (("ID1" . "title1") ("ID2" . "title2") ...))
     (warnings ("..." ...)))=.
   - IDs not found in Tantivy are simply absent from the response, except
     that deleted =.skg= files visible in the current git diff can also
