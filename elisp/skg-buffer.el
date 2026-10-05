@@ -191,15 +191,15 @@ prevent a view from opening."
                (kind (or (assoc 'node (cdr sexp))
                          (assoc 'diffPhantom (cdr sexp))
                          (assoc 'deleted (cdr sexp))))
-               (repo (and kind (cadr (assoc 'repo (cdr kind))))))
-          (when repo (format "%s" repo))))
+               (skgrepo (and kind (cadr (assoc 'repo (cdr kind))))))
+          (when skgrepo (format "%s" skgrepo))))
     (error nil)))
 
-(defun skg--repo-qualified-buffer-name (buffer-name repo)
+(defun skg--repo-qualified-buffer-name (buffer-name skgrepo)
   "Append REPO in angle brackets to BUFFER-NAME."
-  (format "%s <%s>" buffer-name (skg-sanitize-buffer-name repo)))
+  (format "%s <%s>" buffer-name (skg-sanitize-buffer-name skgrepo)))
 
-(defun skg--generate-contentView-buffer (buffer-name repo)
+(defun skg--generate-contentView-buffer (buffer-name skgrepo)
   "Generate a new content-view buffer named from BUFFER-NAME and REPO.
 When BUFFER-NAME is occupied by an skg view from another known repo,
 rename that view and the new one with repo qualifiers.  Otherwise use
@@ -208,19 +208,19 @@ buffer."
   (let ((existing (get-buffer buffer-name)))
     (if (not existing)
         (generate-new-buffer buffer-name)
-      (let* ((existing-repo
+      (let* ((existing-skgrepo
               (and (skg-buffer-p existing)
                    (buffer-local-value
                     'skg-contentView-initialRoot-repo existing)))
              (existing-name
-              (and existing-repo
+              (and existing-skgrepo
                    (skg--repo-qualified-buffer-name
-                    buffer-name existing-repo)))
+                    buffer-name existing-skgrepo)))
              (new-name
-              (and repo
-                   (skg--repo-qualified-buffer-name buffer-name repo))))
-        (if (and existing-repo repo
-                 (not (string= existing-repo repo))
+              (and skgrepo
+                   (skg--repo-qualified-buffer-name buffer-name skgrepo))))
+        (if (and existing-skgrepo skgrepo
+                 (not (string= existing-skgrepo skgrepo))
                  (not (get-buffer existing-name))
                  (not (get-buffer new-name)))
             (progn
@@ -276,8 +276,8 @@ and truncates to a reasonable length."
   "Open a new buffer and insert ORG-TEXT, enabling org-mode.
 If VIEW-URI is provided, set it as the buffer's skg-view-uri;
 otherwise generate a new UUID."
-  (let* ((repo (skg-content-view-repo-name org-text))
-         (buffer (skg--generate-contentView-buffer buffer-name repo))
+  (let* ((skgrepo (skg-content-view-repo-name org-text))
+         (buffer (skg--generate-contentView-buffer buffer-name skgrepo))
         (uri (or view-uri (org-id-uuid))))
     (with-current-buffer buffer
       (let ((inhibit-read-only t)
@@ -288,7 +288,7 @@ otherwise generate a new UUID."
         (heralds-minor-mode)
         (skg-link-annotations-mode 1))
       (setq skg-view-uri uri)
-      (setq skg-contentView-initialRoot-repo repo)
+      (setq skg-contentView-initialRoot-repo skgrepo)
       (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
       (set-buffer-modified-p nil)
       (skg--capture-clean-baseline)

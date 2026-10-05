@@ -43,11 +43,11 @@
 (ert-deftest test-skg-show-unsaved-changes-is-detached-and-preserves-repo ()
   "Writing and opening recovery neither cleans nor converts the repo view."
   (let ((path (make-temp-file "skg-recovery-" nil ".org"))
-        (repo (generate-new-buffer "*skg recovery live*"))
+        (skgrepo (generate-new-buffer "*skg recovery live*"))
         archive)
     (unwind-protect
         (progn
-          (with-current-buffer repo
+          (with-current-buffer skgrepo
             (insert "* baseline\n")
             (skg-content-view-mode)
             (setq skg-view-uri "live-uri")
@@ -58,24 +58,24 @@
             (skg-show-unsaved-changes path t))
           (setq archive (current-buffer))
           (should-not (buffer-local-value 'skg-view-uri archive))
-          (should (with-current-buffer repo (buffer-modified-p)))
+          (should (with-current-buffer skgrepo (buffer-modified-p)))
           (should (equal "live-uri"
-                         (buffer-local-value 'skg-view-uri repo)))
-          (kill-buffer repo)
+                         (buffer-local-value 'skg-view-uri skgrepo)))
+          (kill-buffer skgrepo)
           (should (buffer-live-p archive))
           (should (file-exists-p path)))
-      (when (buffer-live-p repo)
-        (with-current-buffer repo (set-buffer-modified-p nil))
-        (kill-buffer repo))
+      (when (buffer-live-p skgrepo)
+        (with-current-buffer skgrepo (set-buffer-modified-p nil))
+        (kill-buffer skgrepo))
       (when (buffer-live-p archive) (kill-buffer archive))
       (when (file-exists-p path) (delete-file path)))))
 
 (ert-deftest test-skg-recovery-refused-overwrite-and-write-error-preserve-edits ()
   (let ((existing (make-temp-file "skg-recovery-existing-"))
         (directory (make-temp-file "skg-recovery-directory-" t))
-        (repo (generate-new-buffer "*skg recovery errors*")))
+        (skgrepo (generate-new-buffer "*skg recovery errors*")))
     (unwind-protect
-        (with-current-buffer repo
+        (with-current-buffer skgrepo
           (insert "* baseline\n")
           (skg-content-view-mode)
           (setq skg-view-uri "error-uri")
@@ -94,9 +94,9 @@
           (should-error (skg-show-unsaved-changes directory t) :type 'error)
           (should (buffer-modified-p))
           (should (equal "error-uri" skg-view-uri)))
-      (when (buffer-live-p repo)
-        (with-current-buffer repo (set-buffer-modified-p nil))
-        (kill-buffer repo))
+      (when (buffer-live-p skgrepo)
+        (with-current-buffer skgrepo (set-buffer-modified-p nil))
+        (kill-buffer skgrepo))
       (when (file-exists-p existing) (delete-file existing))
       (when (file-directory-p directory) (delete-directory directory)))))
 

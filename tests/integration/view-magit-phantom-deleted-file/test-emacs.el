@@ -104,7 +104,7 @@
           (cl-find-if
            (lambda (b) (string-match-p "magit:" (buffer-name b)))
            (buffer-list)))
-         (expected-repo
+         (expected-skgrepo
           (file-truename
            (directory-file-name
             (expand-file-name
@@ -113,14 +113,14 @@
     ;; In batch mode, magit-status-setup-buffer creates the buffer
     ;; but doesn't make it current; switch explicitly.
     (switch-to-buffer magit-buf)
-    (let ((actual-repo
+    (let ((actual-skgrepo
            (file-truename
             (directory-file-name (magit-toplevel)))))
-      (unless (string-equal expected-repo actual-repo)
+      (unless (string-equal expected-skgrepo actual-skgrepo)
         (test-fail
          "magit opened on wrong repo.\n  Expected: %s\n  Got:      %s"
-         expected-repo actual-repo))
-      (test-pass "magit rooted at the skg-data repo (%s)" actual-repo))
+         expected-skgrepo actual-skgrepo))
+      (test-pass "magit rooted at the skg-data repo (%s)" actual-skgrepo))
     ;; Point should have been moved to the b.skg section. Magit's
     ;; rendering of a deleted file section includes "b.skg" as the
     ;; filename; we match that substring on the current line.

@@ -193,17 +193,17 @@ field childless, so an untouched save yields just (skg (node (repo X)))."
          ( headline (skg-get-current-headline-text) )
          ( split (skg-split-as-stars-metadata-title headline) )
          ( metadata-str (cadr split) )
-         ( repo (skg--node-repo (read metadata-str)) )
+         ( skgrepo (skg--node-repo (read metadata-str)) )
          ( sexp-start (+ (line-beginning-position)
                          (length (car split))) )
          ( sexp-end (+ sexp-start (length metadata-str)) )
          ( org-text (skg-view-metadata--empty-node-org-text
-                     repo title) ))
+                     skgrepo title) ))
     (skg-sexp-edit--open-edit-buffer
      org-text source-buffer sexp-start sexp-end t)
     (skg-sexp-edit--goto-field-value "repo")))
 
-(defun skg-view-metadata--empty-node-org-text (repo title)
+(defun skg-view-metadata--empty-node-org-text (skgrepo title)
   "Build org text for the empty-node metadata view.
 REPO is pre-filled under the `repo' field.  TITLE, if non-blank,
 appears under a display-only `title' group; otherwise `title' is shown
@@ -219,7 +219,7 @@ ones the user never populates -- key and all."
            (append (list (cons 1 "skg")
                          (cons 2 "node")
                          (cons 3 "repo")
-                         (cons 4 repo))
+                         (cons 4 skgrepo))
                    (mapcar (lambda (field)
                              (cons 3 field))
                            (mapcar #'car

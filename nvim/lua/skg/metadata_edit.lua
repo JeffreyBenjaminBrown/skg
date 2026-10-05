@@ -60,12 +60,12 @@ end
 ---@param line_number integer
 ---@param split table
 function M.open_empty_node_view (source_buf, line_number, split)
-  local repo = metadata.populate_minimal_node_metadata()
-  if not repo then return end
+  local skgrepo = metadata.populate_minimal_node_metadata()
+  if not skgrepo then return end
   local new_split = metadata.split_as_stars_metadata_title(
     metadata.line_text(line_number))
   M.open_edit_buffer(
-    M.empty_node_org_text(repo, split.title),
+    M.empty_node_org_text(skgrepo, split.title),
     source_buf, line_number,
     #new_split.stars, #new_split.metadata, true)
   M.goto_field_value('repo')
@@ -75,10 +75,10 @@ end
 ---TITLE, if non-blank, under a display-only title group; every other
 ---editable field childless, so the strip step drops the ones the user
 ---never populates.
----@param repo string
+---@param skgrepo string
 ---@param title string
 ---@return string
-function M.empty_node_org_text (repo, title)
+function M.empty_node_org_text (skgrepo, title)
   local headlines = {}
   table.insert(headlines, { level = 1, text = 'title' })
   if title and not title:match('^%s*$') then
@@ -86,7 +86,7 @@ function M.empty_node_org_text (repo, title)
   table.insert(headlines, { level = 1, text = 'skg' })
   table.insert(headlines, { level = 2, text = 'node' })
   table.insert(headlines, { level = 3, text = 'repo' })
-  table.insert(headlines, { level = 4, text = repo })
+  table.insert(headlines, { level = 4, text = skgrepo })
   for _, entry in ipairs(defaults.editable_defaults) do
     table.insert(headlines, { level = 3, text = entry.name })
   end
@@ -200,17 +200,17 @@ end
 ---@param field_value string
 ---@return string[]|nil
 function M.repo_cycle_values (field_value)
-  local repos = config.owned_repos()
-  if not repos or #repos == 0 then return nil end
+  local skgrepos = config.owned_repos()
+  if not skgrepos or #skgrepos == 0 then return nil end
   if field_value:match(' %(default%)$') then
     local bare = field_value:gsub(' %(default%)$', '')
     local values = { field_value }
-    for _, name in ipairs(repos) do
+    for _, name in ipairs(skgrepos) do
       if name ~= bare then table.insert(values, name) end
     end
     return values
   end
-  return repos
+  return skgrepos
 end
 
 ---Cycle the headline value at point by DIRECTION (1 or -1); dispatch

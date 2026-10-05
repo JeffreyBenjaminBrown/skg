@@ -72,10 +72,10 @@ end
 ---@param default_repo string|nil
 ---@param display_title string|nil
 ---@return string
-function M.expand_defaults_in_org (org_text, default_repo,
+function M.expand_defaults_in_org (org_text, default_skgrepo,
                                    display_title)
   local headlines = bijection.extract_headlines(org_text)
-  local expanded = M.expand_headlines(headlines, default_repo)
+  local expanded = M.expand_headlines(headlines, default_skgrepo)
   local with_title = M.maybe_prepend_title(expanded, display_title)
   return M.headlines_to_org(with_title)
 end
@@ -95,9 +95,9 @@ function M.maybe_prepend_title (headlines, display_title)
 end
 
 ---@param headlines table[]
----@param default_repo string|nil
+---@param default_skgrepo string|nil
 ---@return table[]
-function M.expand_headlines (headlines, default_repo)
+function M.expand_headlines (headlines, default_skgrepo)
   local node_index = M.find_node_headline(headlines)
   local child_level = headlines[node_index].level + 1
   local before_node = vim.list_slice(headlines, 1, node_index)
@@ -105,7 +105,7 @@ function M.expand_headlines (headlines, default_repo)
   local children, remainder =
     M.group_children(after_node, child_level)
   local expanded_children =
-    M.expand_and_reorder(children, child_level, default_repo)
+    M.expand_and_reorder(children, child_level, default_skgrepo)
   return M.concatenated(before_node, expanded_children, remainder)
 end
 
@@ -152,9 +152,9 @@ end
 ---missing defaults. Returns a flat headline list.
 ---@param children table[][]
 ---@param child_level integer
----@param default_repo string|nil
+---@param default_skgrepo string|nil
 ---@return table[]
-function M.expand_and_reorder (children, child_level, default_repo)
+function M.expand_and_reorder (children, child_level, default_skgrepo)
   local field_map = {}
   for _, group in ipairs(children) do
     table.insert(field_map, { name = group[1].text, group = group })
@@ -173,18 +173,18 @@ function M.expand_and_reorder (children, child_level, default_repo)
       seen[field_name] = true
       for _, headline in ipairs(
           M.maybe_expand_field(existing.group, child_level,
-                               field_name, default_repo)) do
+                               field_name, default_skgrepo)) do
         table.insert(ordered, headline) end
     elseif M.editable_default_for(field_name) then
       seen[field_name] = true
       table.insert(ordered, { level = child_level, text = field_name })
       table.insert(ordered, { level = child_level + 1,
                               text = M.editable_default_for(field_name) })
-    elseif field_name == 'repo' and default_repo then
+    elseif field_name == 'repo' and default_skgrepo then
       seen[field_name] = true
       table.insert(ordered, { level = child_level, text = 'repo' })
       table.insert(ordered, { level = child_level + 1,
-                              text = default_repo .. ' (default)' })
+                              text = default_skgrepo .. ' (default)' })
     end
   end
   for _, entry in ipairs(field_map) do
@@ -205,15 +205,15 @@ end
 ---@param default_repo string|nil
 ---@return table[]
 function M.maybe_expand_field (group, child_level, field_name,
-                               default_repo)
+                               default_skgrepo)
   if #group == 1 and field_name == 'writeProtected' then
     return { group[1], { level = child_level + 1, text = 'true' } } end
-  if field_name == 'repo' and default_repo and #group == 2 then
+  if field_name == 'repo' and default_skgrepo and #group == 2 then
     local value = vim.trim(group[2].text)
-    if value == default_repo then
+    if value == default_skgrepo then
       return { group[1],
                { level = child_level + 1,
-                 text = default_repo .. ' (default)' } } end
+                 text = default_skgrepo .. ' (default)' } } end
   end
   return group
 end

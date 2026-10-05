@@ -117,18 +117,18 @@ end
 ---is owned, and is editable.
 ---@param container_sexp any
 function M.check_container (container_sexp)
-  local repo = metadata.node_repo(container_sexp)
-  if not repo then
+  local skgrepo = metadata.node_repo(container_sexp)
+  if not skgrepo then
     error('Cannot replace this branch with a link:'
           .. ' container has no repo') end
   local owned = config.owned_repos() or {}
   local is_owned = false
   for _, name in ipairs(owned) do
-    if name == repo then is_owned = true break end
+    if name == skgrepo then is_owned = true break end
   end
   if not is_owned then
     error('Cannot replace this branch with a link:'
-          .. ' container repo is not owned: ' .. repo) end
+          .. ' container repo is not owned: ' .. skgrepo) end
   if metadata.node_write_protected_p(container_sexp) then
     error('Cannot replace this branch with a link:'
           .. ' container is write-protected') end

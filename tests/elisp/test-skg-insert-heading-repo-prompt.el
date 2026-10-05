@@ -153,10 +153,10 @@ without prompting."
     (with-temp-file config-file
       (insert test--config-public-and-private))
     (unwind-protect
-        (let ((repos (skg--owned-repos))
+        (let ((skgrepos (skg--owned-repos))
               results)
           ;; Verify we have two skgrepos in expected order.
-          (should (equal repos '("public" "private")))
+          (should (equal skgrepos '("public" "private")))
 
           ;; Mock completing-read to simulate cycling:
           ;; Start at "public", cycle right once to reach "private".
@@ -171,19 +171,19 @@ without prompting."
                        ;; Starting from "" (not in list) -> idx=0 ("public"),
                        ;; cycling right: (mod (+ 0 1) 2) = 1 -> "private"
                        (let* ((idx 0)
-                              (new (nth (mod (+ idx 1) (length repos))
-                                        repos)))
+                              (new (nth (mod (+ idx 1) (length skgrepos))
+                                        skgrepos)))
                          new))))
             (should (equal (skg--prompt-for-owned-repo) "private")))
 
           ;; Test wrap-around: from "private" (idx=1), cycle right -> "public"
           (let* ((idx 1)
-                 (new (nth (mod (+ idx 1) (length repos)) repos)))
+                 (new (nth (mod (+ idx 1) (length skgrepos)) skgrepos)))
             (should (equal new "public")))
 
           ;; Test cycle left from "public" (idx=0) -> wraps to "private"
           (let* ((idx 0)
-                 (new (nth (mod (+ idx -1) (length repos)) repos)))
+                 (new (nth (mod (+ idx -1) (length skgrepos)) skgrepos)))
             (should (equal new "private"))))
       (delete-file config-file)
       (delete-directory config-dir))))

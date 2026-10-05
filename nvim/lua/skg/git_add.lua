@@ -146,9 +146,9 @@ function M.subtree_unstaged_new_file_pairs ()
     local sexp = metadata.metadata_sexp_at_line_or_nil(line)
     if sexp and M.metadata_has_unstaged_new_file_p(sexp) then
       local id = id_search.extract_id_from_metadata_sexp(sexp)
-      local repo = id_search.extract_repo_from_metadata_sexp(sexp)
-      if id and repo then
-        table.insert(pairs_found, { id, repo }) end
+      local skgrepo = id_search.extract_repo_from_metadata_sexp(sexp)
+      if id and skgrepo then
+        table.insert(pairs_found, { id, skgrepo }) end
     end
   end
   return pairs_found

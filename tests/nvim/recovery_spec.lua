@@ -41,24 +41,24 @@ describe('skg.recovery', function ()
   it('writes an ordinary file without cleaning the repo', function ()
     local path = vim.fn.tempname() .. '-skg-recovery-test.org'
     table.insert(paths, path)
-    local repo = buffer.open_org_buffer_from_text(
+    local skgrepo = buffer.open_org_buffer_from_text(
       '* baseline\n', 'skg://recovery-live', 'live-uri')
-    vim.api.nvim_buf_set_lines(repo, 1, 1, false, { 'unsaved' })
+    vim.api.nvim_buf_set_lines(skgrepo, 1, 1, false, { 'unsaved' })
     recovery.show_unsaved_changes(path, true)
     local archive = vim.api.nvim_get_current_buf()
     assert.are.equal(path, vim.api.nvim_buf_get_name(archive))
     assert.is_nil(vim.b[archive].skg_view_uri)
-    assert.is_true(vim.bo[repo].modified)
-    assert.are.equal('live-uri', vim.b[repo].skg_view_uri)
-    vim.api.nvim_buf_delete(repo, { force = true })
+    assert.is_true(vim.bo[skgrepo].modified)
+    assert.are.equal('live-uri', vim.b[skgrepo].skg_view_uri)
+    vim.api.nvim_buf_delete(skgrepo, { force = true })
     assert.is_true(vim.api.nvim_buf_is_valid(archive))
   end)
 
   it('cancellation, refused overwrite and write error preserve edits',
      function ()
-    local repo = buffer.open_org_buffer_from_text(
+    local skgrepo = buffer.open_org_buffer_from_text(
       '* baseline\n', 'skg://recovery-errors', 'error-uri')
-    vim.api.nvim_buf_set_lines(repo, 1, 1, false, { 'unsaved' })
+    vim.api.nvim_buf_set_lines(skgrepo, 1, 1, false, { 'unsaved' })
     assert.is_nil(recovery.show_unsaved_changes('', false))
 
     local existing = vim.fn.tempname() .. '-skg-recovery-test.org'
@@ -77,7 +77,7 @@ describe('skg.recovery', function ()
     table.insert(paths, directory)
     local write_ok = pcall(recovery.show_unsaved_changes, directory, true)
     assert.is_false(write_ok)
-    assert.is_true(vim.bo[repo].modified)
-    assert.are.equal('error-uri', vim.b[repo].skg_view_uri)
+    assert.is_true(vim.bo[skgrepo].modified)
+    assert.are.equal('error-uri', vim.b[skgrepo].skg_view_uri)
   end)
 end)

@@ -61,22 +61,22 @@ hook after the cycle bindings are installed."
   "Prompt the user to choose an owned repo, with S-left/S-right cycling.
 PROMPT defaults to \"Repo: \".
 If there is only one owned repo, return it without prompting."
-  (let ((owned-repos (skg--owned-repos)))
-    (if (= (length owned-repos) 1)
-        (car owned-repos)
+  (let ((owned-skgrepos (skg--owned-repos)))
+    (if (= (length owned-skgrepos) 1)
+        (car owned-skgrepos)
       (skg--completing-read-with-cycle
-       (or prompt "Repo: ") owned-repos nil t nil nil nil nil owned-repos))))
+       (or prompt "Repo: ") owned-skgrepos nil t nil nil nil nil owned-skgrepos))))
 
-(defun skg--prompt-for-repo-change (current-repo)
+(defun skg--prompt-for-repo-change (current-skgrepo)
   "Prompt for a repo to replace CURRENT-REPO.
 S-left/S-right cycle through owned repos, and C-? displays every
 configured repo with its path.  The user may also type a repo
 name directly."
-  (let ((owned-repos (skg--owned-repos))
+  (let ((owned-skgrepos (skg--owned-repos))
         (repo-names (skg--repo-names)))
     (skg--completing-read-with-cycle
      "Repo (S-left/right cycle; press C-? for a list of repos): "
-     repo-names nil nil current-repo nil nil nil owned-repos
+     repo-names nil nil current-skgrepo nil nil nil owned-skgrepos
      (lambda ()
        (local-set-key (kbd "C-?") #'skg-view-repo-list)))))
 
@@ -176,19 +176,19 @@ its name to its path, also mirroring the server."
     (with-temp-buffer
       (insert-file-contents file)
       (goto-char (point-min))
-      (let ((repos '())
-            (in-repos nil)
+      (let ((skgrepos '())
+            (in-skgrepos nil)
             (current-name nil)
             (current-path nil)
             (flush nil))
         (setq flush
               (lambda ()
-                (when (and in-repos current-path)
+                (when (and in-skgrepos current-path)
                   (let ((abs (file-name-as-directory
                               (expand-file-name current-path data-root))))
                     (when (or (equal abs owned-root)
                               (string-prefix-p owned-root abs))
-                      (push (or current-name current-path) repos))))
+                      (push (or current-name current-path) skgrepos))))
                 (setq current-name nil current-path nil)))
         (while (not (eobp))
           (let ((line (string-trim
@@ -198,21 +198,21 @@ its name to its path, also mirroring the server."
             (cond
              ((string-match "^\\[\\[repos\\]\\]" line)
               (funcall flush)
-              (setq in-repos t))
+              (setq in-skgrepos t))
              ((string-match "^\\[\\[" line) ;; a different array table
               (funcall flush)
-              (setq in-repos nil))
-             ((and in-repos
+              (setq in-skgrepos nil))
+             ((and in-skgrepos
                    (string-match
                     "^name[ \t]*=[ \t]*\"\\([^\"]+\\)\"" line))
               (setq current-name (match-string 1 line)))
-             ((and in-repos
+             ((and in-skgrepos
                    (string-match
                     "^path[ \t]*=[ \t]*\"\\([^\"]+\\)\"" line))
               (setq current-path (match-string 1 line)))))
           (forward-line 1))
         (funcall flush)
-        (nreverse repos)))))
+        (nreverse skgrepos)))))
 
 (defun skg--toml-array-table-line-name (line)
   "Return the array-table name from LINE, or nil if LINE is not one."
@@ -289,10 +289,10 @@ config-load time."
   "Return absolute directory for REPO-NAME per skgconfig.toml, or nil."
   (cdr (assoc repo-name (skg--repo-paths))))
 
-(defun skg--abs-path-for-id-and-repo (id repo)
+(defun skg--abs-path-for-id-and-repo (id skgrepo)
   "Return the absolute path of ID.skg within REPO's directory,
 or nil if REPO is not declared in the config."
-  (let ((dir (skg--repo-dir repo)))
+  (let ((dir (skg--repo-dir skgrepo)))
     (when dir
       (expand-file-name (concat id ".skg") dir))))
 

@@ -172,12 +172,12 @@ target, then the buffer is saved."
 
 (defun skg--check-content-link-replacement-container (metadata-sexp)
   "Signal a user error if METADATA-SEXP is not an editable container."
-  (let ((repo (skg--node-repo metadata-sexp)))
-    (unless repo
+  (let ((skgrepo (skg--node-repo metadata-sexp)))
+    (unless skgrepo
       (user-error "Cannot replace this branch with a link: container has no repo"))
-    (unless (member repo (skg--owned-repos))
+    (unless (member skgrepo (skg--owned-repos))
       (user-error "Cannot replace this branch with a link: container repo is not owned: %s"
-                  repo))
+                  skgrepo))
     (when (skg--node-write-protected-p metadata-sexp)
       (user-error "Cannot replace this branch with a link: container is write-protected"))))
 

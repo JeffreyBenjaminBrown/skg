@@ -66,9 +66,9 @@ vim.api.nvim_win_set_cursor(0, { 1, 0 })
 if not metadata.at_headline_p() then fail('Not on a headline') end
 metadata_edit.edit_metadata() -- switches to the edit buffer, cursor
                                -- lands on the skgrepo value already
-local initial_repo = repo_value_in_edit_buffer()
-print(string.format('  Initial repo: %s', tostring(initial_repo)))
-T.check(initial_repo == 'public',
+local initial_skgrepo = repo_value_in_edit_buffer()
+print(string.format('  Initial repo: %s', tostring(initial_skgrepo)))
+T.check(initial_skgrepo == 'public',
         "metadata edit buffer opened, repo is 'public'")
 
 -- PHASE 3: S-right should change skgrepo to the next owned skgrepo.

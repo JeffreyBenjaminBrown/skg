@@ -56,7 +56,7 @@
 ;;
 
 (defun skg-activeNode-expand-defaults-in-org
-    (org-text &optional default-repo display-title)
+    (org-text &optional default-skgrepo display-title)
   "Expand default fields in ORG-TEXT for ActiveVognode metadata editing.
 Parses org text to headlines, finds the ** node section,
 reorders fields to canonical order, inserts missing editable
@@ -69,7 +69,7 @@ title display group."
   (let* ((lines (split-string org-text "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
          (expanded (skg-activeNode--expand-headlines
-                    headlines default-repo))
+                    headlines default-skgrepo))
          (with-title
           (skg-activeNode--maybe-prepend-title
            expanded display-title)))
@@ -84,7 +84,7 @@ title display group."
               headlines)
     headlines))
 
-(defun skg-activeNode--expand-headlines (headlines &optional default-repo)
+(defun skg-activeNode--expand-headlines (headlines &optional default-skgrepo)
   "Expand HEADLINES by reordering fields and inserting defaults.
 DEFAULT-REPO, if non-nil, is used for repo field defaults.
 Returns a new headline list."
@@ -98,7 +98,7 @@ Returns a new headline list."
          (remainder (cdr groups))
          (expanded-children
           (skg-activeNode--expand-and-reorder
-           children child-level default-repo)))
+           children child-level default-skgrepo)))
     (append before-node expanded-children remainder)))
 
 (defun skg-activeNode--find-node-headline (headlines)
@@ -144,7 +144,7 @@ headline groups, each being a list of headlines."
     (cons (nreverse children) rest)))
 
 (defun skg-activeNode--expand-and-reorder (children child-level
-                                        &optional default-repo)
+                                        &optional default-skgrepo)
   "Reorder CHILDREN to canonical order and insert missing defaults.
 CHILDREN is a list of headline groups. CHILD-LEVEL is the level
 for field headlines. DEFAULT-REPO, if non-nil, is used for
@@ -165,7 +165,7 @@ repo field defaults. Returns a flat list of headlines."
                       (append ordered
                               (skg-activeNode--maybe-expand-field
                                group child-level field-name
-                               default-repo)))))
+                               default-skgrepo)))))
           ;; Insert default if it's an editable field
           (cond
            ((member field-name known-fields)
@@ -179,13 +179,13 @@ repo field defaults. Returns a flat list of headlines."
                                   (cons (1+ child-level)
                                         default-val))))))
            ;; Insert default skgrepo if missing and default-repo given
-           ((and (string= field-name "repo") default-repo)
+           ((and (string= field-name "repo") default-skgrepo)
             (push field-name seen)
             (setq ordered
                   (append ordered
                           (list (cons child-level "repo")
                                 (cons (1+ child-level)
-                                      (concat default-repo
+                                      (concat default-skgrepo
                                               " (default)"))))))))))
     ;; Add remaining fields not in canonical order (write-protected stats etc.)
     (dolist (entry field-map)
@@ -201,7 +201,7 @@ repo field defaults. Returns a flat list of headlines."
    children))
 
 (defun skg-activeNode--maybe-expand-field (group child-level field-name
-                                        default-repo)
+                                        default-skgrepo)
   "Expand GROUP for display. Handles booleans and repo defaults.
 Returns the group, possibly with a value child added or modified."
   (cond
@@ -212,13 +212,13 @@ Returns the group, possibly with a value child added or modified."
           (cons (1+ child-level) "true")))
    ;; Repo field: mark with (default) if it matches
    ((and (string= field-name "repo")
-         default-repo
+         default-skgrepo
          (= (length group) 2))
     (let ((value (string-trim (cdr (nth 1 group)))))
-      (if (string= value default-repo)
+      (if (string= value default-skgrepo)
           (list (car group)
                 (cons (1+ child-level)
-                      (concat default-repo " (default)")))
+                      (concat default-skgrepo " (default)")))
         group)))
    (t group)))
 

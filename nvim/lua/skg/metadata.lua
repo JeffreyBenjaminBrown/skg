@@ -427,11 +427,11 @@ end
 ---at point, prompting for an owned skgrepo (no prompt when only one).
 ---@return string|nil the chosen skgrepo
 function M.populate_minimal_node_metadata ()
-  local repo = picker.prompt_for_owned_repo()
-  if not repo then return nil end
+  local skgrepo = picker.prompt_for_owned_repo()
+  if not skgrepo then return nil end
   M.edit_metadata_at_point(
-    sexpr.read(string.format('(skg (node (repo %s)))', repo)))
-  return repo
+    sexpr.read(string.format('(skg (node (repo %s)))', skgrepo)))
+  return skgrepo
 end
 
 ---Prompt for and change the skgrepo of the node at point (S-arrows
@@ -445,28 +445,28 @@ function M.set_repo (recursive)
     M.populate_minimal_node_metadata()
     return end
   local metadata = M.current_headline_metadata_sexp()
-  local current_repo = M.node_repo(metadata)
-  if not current_repo then error('Node has no repo') end
-  local new_repo =
-    picker.prompt_for_repo_change(current_repo)
-  if not new_repo then return end
-  new_repo = vim.trim(new_repo)
-  if new_repo == '' then return end
-  if new_repo:match('%s') then
+  local current_skgrepo = M.node_repo(metadata)
+  if not current_skgrepo then error('Node has no repo') end
+  local new_skgrepo =
+    picker.prompt_for_repo_change(current_skgrepo)
+  if not new_skgrepo then return end
+  new_skgrepo = vim.trim(new_skgrepo)
+  if new_skgrepo == '' then return end
+  if new_skgrepo:match('%s') then
     error('Repo names cannot contain whitespace') end
-  if new_repo == current_repo then
-    vim.notify('Repo unchanged: ' .. current_repo)
+  if new_skgrepo == current_skgrepo then
+    vim.notify('Repo unchanged: ' .. current_skgrepo)
     return end
   local changed_count
   if recursive then
     changed_count =
-      M.change_repo_recursive(current_repo, new_repo)
+      M.change_repo_recursive(current_skgrepo, new_skgrepo)
   else
     changed_count = M.change_repo_at_line(
-      M.current_line_number(), new_repo) end
+      M.current_line_number(), new_skgrepo) end
   vim.notify(string.format(
     'Repo changed from %s to %s on %d node%s. Save to apply.',
-    current_repo, new_repo, changed_count,
+    current_skgrepo, new_skgrepo, changed_count,
     changed_count == 1 and '' or 's'))
 end
 
@@ -476,14 +476,14 @@ end
 
 ---Change OLD_REPO to NEW_REPO in this content subtree (root
 ---inclusive; only affectsParent=true descendants are traversed).
----@param old_repo string
----@param new_repo string
+---@param old_skgrepo string
+---@param new_skgrepo string
 ---@return integer changed node count
-function M.change_repo_recursive (old_repo, new_repo)
+function M.change_repo_recursive (old_skgrepo, new_skgrepo)
   local start_line = M.current_line_number()
   local start_level = M.outline_level(start_line)
   local changed_count =
-    M.change_repo_at_line(start_line, new_repo)
+    M.change_repo_at_line(start_line, new_skgrepo)
   local line = M.next_headline_line(start_line)
   while line and (M.outline_level(line) or 0) > start_level do
     local metadata = M.metadata_sexp_at_line_or_nil(line)
@@ -491,9 +491,9 @@ function M.change_repo_recursive (old_repo, new_repo)
             and M.node_affectsParent_content_of_p(metadata)) then
       line = M.next_headline_after_subtree(line)
     else
-      if M.node_repo(metadata) == old_repo then
+      if M.node_repo(metadata) == old_skgrepo then
         changed_count = changed_count
-          + M.change_repo_at_line(line, new_repo) end
+          + M.change_repo_at_line(line, new_skgrepo) end
       line = M.next_headline_line(line) end
   end
   return changed_count
@@ -502,14 +502,14 @@ end
 ---Set the skgrepo at LINE_NUMBER to NEW_REPO (and refresh the
 ---homeRepoHerald so the display keeps pace).
 ---@param line_number integer
----@param new_repo string
+---@param new_skgrepo string
 ---@return integer 1
-function M.change_repo_at_line (line_number, new_repo)
+function M.change_repo_at_line (line_number, new_skgrepo)
   M.edit_metadata_at_line(line_number, sexpr.read(string.format(
-    '(skg (node (ENSURE (repo %s)) (viewStats)))', new_repo)))
+    '(skg (node (ENSURE (repo %s)) (viewStats)))', new_skgrepo)))
   M.edit_metadata_at_line(line_number, sexpr.read(string.format(
     '(skg (node (viewStats (ENSURE (homeRepoHerald ⌂:%s)))))',
-    new_repo)))
+    new_skgrepo)))
   return 1
 end
 

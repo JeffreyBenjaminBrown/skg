@@ -12,7 +12,7 @@
   '(import-md-and-org-host-mapping-needed
     import-md-and-org-preview import-md-and-org-result))
 
-(defun skg-import-md-and-org (input-directory destination-repo)
+(defun skg-import-md-and-org (input-directory destination-skgrepo)
   "Preview importing INPUT-DIRECTORY into an owned DESTINATION-REPO.
 Paths refer to the server filesystem.  The chosen repo determines
 privacy for every imported node.  No input file is changed."
@@ -21,19 +21,19 @@ privacy for every imported node.  No input file is changed."
          (progn
            (message "Choose an owned repo; it determines privacy for every imported node.")
            (skg--prompt-for-owned-repo "Import into repo: "))))
-  (unless destination-repo (user-error "No owned repo selected"))
+  (unless destination-skgrepo (user-error "No owned repo selected"))
   (skg--import-md-and-org-send
    `((action . "preview")
      (input-directory . ,input-directory)
-     (destination-repo . ,destination-repo))
-   input-directory destination-repo))
+     (destination-repo . ,destination-skgrepo))
+   input-directory destination-skgrepo))
 
 (defun skg--import-md-and-org-cleanup ()
   (dolist (type skg--import-md-and-org-response-types)
     (setq skg-response-handler-map
           (assoc-delete-all type skg-response-handler-map))))
 
-(defun skg--import-md-and-org-send (fields input-directory destination-repo)
+(defun skg--import-md-and-org-send (fields input-directory destination-skgrepo)
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
     (skg--import-md-and-org-cleanup)
     (skg-register-response-handler
@@ -51,10 +51,10 @@ privacy for every imported node.  No input file is changed."
               0 nil #'skg--import-md-and-org-send
               `((action . "preview")
                 (input-directory . ,input-directory)
-                (destination-repo . ,destination-repo)
+                (destination-repo . ,destination-skgrepo)
                 (host-root . ,host-root))
-              input-directory destination-repo))
-         (quit (skg--import-md-and-org-cancel input-directory destination-repo))))
+              input-directory destination-skgrepo))
+         (quit (skg--import-md-and-org-cancel input-directory destination-skgrepo))))
      nil)
     (skg-register-response-handler
      'import-md-and-org-preview
@@ -71,11 +71,11 @@ privacy for every imported node.  No input file is changed."
                    (run-at-time
                     0 nil #'skg--import-md-and-org-send
                     `((action . "apply") (approval-token . ,(format "%s" token)))
-                    input-directory destination-repo)
+                    input-directory destination-skgrepo)
                  (skg--import-md-and-org-cancel
-                  input-directory destination-repo))
+                  input-directory destination-skgrepo))
              (quit (skg--import-md-and-org-cancel
-                    input-directory destination-repo))))))
+                    input-directory destination-skgrepo))))))
      nil)
     (skg-register-response-handler
      'import-md-and-org-result
@@ -100,9 +100,9 @@ privacy for every imported node.  No input file is changed."
       (error (skg--import-md-and-org-cleanup)
              (signal (car err) (cdr err))))))
 
-(defun skg--import-md-and-org-cancel (input-directory destination-repo)
+(defun skg--import-md-and-org-cancel (input-directory destination-skgrepo)
   (skg--import-md-and-org-send
-   '((action . "cancel")) input-directory destination-repo))
+   '((action . "cancel")) input-directory destination-skgrepo))
 
 (defun skg--import-rerender-clean-views (&optional approved-pids)
   "Refresh clean views after import without replacing dirty client text."

@@ -70,9 +70,9 @@ or nil (with a user message) if no valid node metadata is found."
         nil)
        (t
         (let (( id     (skg--extract-id-from-metadata-sexp sexp) )
-              ( repo (skg--extract-repo-from-metadata-sexp sexp) ))
-          (if (and id repo)
-              (cons id repo)
+              ( skgrepo (skg--extract-repo-from-metadata-sexp sexp) ))
+          (if (and id skgrepo)
+              (cons id skgrepo)
             (message "Could not extract id or repo from metadata.")
             nil)))))))
 
@@ -95,13 +95,13 @@ or nil (with a user message) if no valid parent metadata is found."
       nil)
      (t
       (let (( parent-id     (skg--extract-id-from-metadata-sexp parent-sexp) )
-            ( parent-repo (skg--extract-repo-from-metadata-sexp parent-sexp) ))
-        (if (and parent-id parent-repo)
-            (cons parent-id parent-repo)
+            ( parent-skgrepo (skg--extract-repo-from-metadata-sexp parent-sexp) ))
+        (if (and parent-id parent-skgrepo)
+            (cons parent-id parent-skgrepo)
           (message "Could not extract id or repo from parent.")
           nil))))))
 
-(defun skg--request-file-path-with-handler (id repo handler)
+(defun skg--request-file-path-with-handler (id skgrepo handler)
   "Send a get-file-path request for ID and REPO, using HANDLER for the response."
   (skg-register-response-handler
    'get-file-path handler t)
@@ -111,7 +111,7 @@ or nil (with a user message) if no valid parent metadata is found."
            (concat (prin1-to-string
                     `((request . "get file path")
                       (id . ,id)
-                      (repo . ,repo)))
+                      (repo . ,skgrepo)))
                    "\n") ))
     (process-send-string tcp-proc request-sexp)))
 

@@ -12,19 +12,19 @@ local function find_text (headlines, text)
   return nil
 end
 
-local function expanded_headlines (sexp_text, default_repo,
+local function expanded_headlines (sexp_text, default_skgrepo,
                                    display_title)
   local org_text = bijection.sexp_to_org(sexpr.read(sexp_text))
   local expanded = defaults.expand_defaults_in_org(
-    org_text, default_repo, display_title)
+    org_text, default_skgrepo, display_title)
   return bijection.extract_headlines(expanded)
 end
 
 ---Expand then strip then re-read, as the edit-buffer commit path does.
-local function round_trip (sexp_text, default_repo)
+local function round_trip (sexp_text, default_skgrepo)
   local org_text = bijection.sexp_to_org(sexpr.read(sexp_text))
   local expanded = defaults.expand_defaults_in_org(
-    org_text, default_repo)
+    org_text, default_skgrepo)
   local stripped = defaults.strip_defaults_from_org(expanded)
   return bijection.org_to_sexp(stripped)
 end

@@ -74,27 +74,27 @@ function M.owned_repos_from_toml (file)
   local owned_folder = M.owned_folder_from_toml(file)
   local data_root = file:match('^(.*/)') or './'
   local owned_root = data_root .. owned_folder .. '/'
-  local repos = {}
-  local in_repos = false
+  local skgrepos = {}
+  local in_skgrepos = false
   local current_name, current_path = nil, nil
   local function flush ()
-    if in_repos and current_path then
+    if in_skgrepos and current_path then
       local abs = current_path
       if not abs:match('^/') then abs = data_root .. abs end
       if not abs:match('/$') then abs = abs .. '/' end
       if abs == owned_root
          or abs:sub(1, #owned_root) == owned_root
       then
-        table.insert(repos, current_name or current_path) end
+        table.insert(skgrepos, current_name or current_path) end
     end
     current_name, current_path = nil, nil
   end
   for _, line in ipairs(trimmed_lines(file)) do
     if line:match('^%[%[repos%]%]') then
-      flush(); in_repos = true
+      flush(); in_skgrepos = true
     elseif line:match('^%[%[') then
-      flush(); in_repos = false
-    elseif in_repos then
+      flush(); in_skgrepos = false
+    elseif in_skgrepos then
       local name = line:match('^name[ \t]*=[ \t]*"([^"]+)"')
       local path = line:match('^path[ \t]*=[ \t]*"([^"]+)"')
       if name then current_name = name end
@@ -102,7 +102,7 @@ function M.owned_repos_from_toml (file)
     end
   end
   flush()
-  return repos
+  return skgrepos
 end
 
 ---Name strings from each [[TABLE_NAME]] entry in FILE.
@@ -217,10 +217,10 @@ end
 ---The absolute path of ID.skg within REPO's directory, or nil if
 ---REPO is not declared in the config.
 ---@param id string
----@param repo string
+---@param skgrepo string
 ---@return string|nil
-function M.abs_path_for_id_and_repo (id, repo)
-  local dir = M.repo_dir(repo)
+function M.abs_path_for_id_and_repo (id, skgrepo)
+  local dir = M.repo_dir(skgrepo)
   if dir then return dir .. '/' .. id .. '.skg' end
   return nil
 end

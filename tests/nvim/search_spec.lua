@@ -161,7 +161,7 @@ describe('skg.search', function ()
           .. ' chosen [[id:inner][with link]] title"))'))
       end
     end)
-    local repo = buffer.open_org_buffer_from_text(
+    local skgrepo = buffer.open_org_buffer_from_text(
       '* (skg (node (id src))) repo\nbody line ',
       'skg://repo', 'uri-repo')
     vim.api.nvim_win_set_cursor(0, { 2, 9 })
@@ -176,9 +176,9 @@ describe('skg.search', function ()
     -- The search buffer died; we are back in the skgrepo; the link's
     -- label had its inner link reduced.
     assert.is_false(vim.api.nvim_buf_is_valid(search_buf))
-    assert.are.equal(repo, vim.api.nvim_get_current_buf())
+    assert.are.equal(skgrepo, vim.api.nvim_get_current_buf())
     local text = table.concat(
-      vim.api.nvim_buf_get_lines(repo, 0, -1, false), '\n')
+      vim.api.nvim_buf_get_lines(skgrepo, 0, -1, false), '\n')
     assert.is_truthy(text:find(
       '[[id:pick-me][chosen with link title]]', 1, true))
   end)

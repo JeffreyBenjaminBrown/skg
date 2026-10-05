@@ -55,10 +55,10 @@
     (test-fail "Not on a headline"))
   (skg-view-metadata)
   ;; The edit buffer should now be current.
-  (let ((repo (repo-value-in-edit-buffer)))
-    (message "  Initial repo: %S" repo)
-    (unless (equal repo "public")
-      (test-fail "Expected initial repo 'public', got %S" repo))
+  (let ((skgrepo (repo-value-in-edit-buffer)))
+    (message "  Initial repo: %S" skgrepo)
+    (unless (equal skgrepo "public")
+      (test-fail "Expected initial repo 'public', got %S" skgrepo))
     (test-pass "Metadata edit buffer opened, repo is 'public'")))
 
 (defun phase-3-cycle-right ()
@@ -71,10 +71,10 @@
   (outline-next-heading)
   ;; Cycle right
   (skg-sexp-edit-cycle-right)
-  (let ((repo (repo-value-in-edit-buffer)))
-    (message "  After S-right: %S" repo)
-    (unless (equal repo "personal")
-      (test-fail "Expected 'personal' after first S-right, got %S" repo))
+  (let ((skgrepo (repo-value-in-edit-buffer)))
+    (message "  After S-right: %S" skgrepo)
+    (unless (equal skgrepo "personal")
+      (test-fail "Expected 'personal' after first S-right, got %S" skgrepo))
     (test-pass "S-right changed repo to 'personal'")))
 
 (defun phase-4-cycle-left ()
@@ -83,10 +83,10 @@
   (setq integration-test-phase "phase-4")
   ;; Point should still be on the skgrepo value
   (skg-sexp-edit-cycle-left)
-  (let ((repo (repo-value-in-edit-buffer)))
-    (message "  After S-left: %S" repo)
-    (unless (equal repo "public")
-      (test-fail "Expected 'public' after S-left, got %S" repo))
+  (let ((skgrepo (repo-value-in-edit-buffer)))
+    (message "  After S-left: %S" skgrepo)
+    (unless (equal skgrepo "public")
+      (test-fail "Expected 'public' after S-left, got %S" skgrepo))
     (test-pass "S-left changed repo back to 'public'")))
 
 (defun phase-5-cycle-wraps ()
@@ -97,10 +97,10 @@
   (skg-sexp-edit-cycle-right) ; -> personal
   (skg-sexp-edit-cycle-right) ; -> private
   (skg-sexp-edit-cycle-right) ; -> public (wrap)
-  (let ((repo (repo-value-in-edit-buffer)))
-    (message "  After 3x S-right: %S" repo)
-    (unless (equal repo "public")
-      (test-fail "Expected 'public' after 3x S-right, got %S" repo))
+  (let ((skgrepo (repo-value-in-edit-buffer)))
+    (message "  After 3x S-right: %S" skgrepo)
+    (unless (equal skgrepo "public")
+      (test-fail "Expected 'public' after 3x S-right, got %S" skgrepo))
     ;; Also verify 'foreign' never appeared
     (test-pass "Three S-rights wraps back to 'public', 'foreign' never offered")))
 

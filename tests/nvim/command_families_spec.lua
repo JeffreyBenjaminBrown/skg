@@ -36,9 +36,9 @@ end
 
 ---Stub the config's owned skgrepos.
 local config = require('skg.config')
-local real_owned_repos = config.owned_repos
-local function stub_owned_repos (repos)
-  config.owned_repos = function () return repos end
+local real_owned_skgrepos = config.owned_repos
+local function stub_owned_repos (skgrepos)
+  config.owned_repos = function () return skgrepos end
 end
 
 describe('skg.modify_graph.goto_biggest_branch', function ()
@@ -82,7 +82,7 @@ describe('skg.modify_graph replacements', function ()
   end)
   after_each(function ()
     unstub_save()
-    config.owned_repos = real_owned_repos
+    config.owned_repos = real_owned_skgrepos
     pcall(vim.api.nvim_buf_delete,
           vim.api.nvim_get_current_buf(), { force = true })
   end)
@@ -231,7 +231,7 @@ end)
 describe('skg.metadata_edit', function ()
   before_each(function () stub_owned_repos({ 'public' }) end)
   after_each(function ()
-    config.owned_repos = real_owned_repos
+    config.owned_repos = real_owned_skgrepos
     for _, buf in ipairs(vim.api.nvim_list_bufs()) do
       local name = vim.api.nvim_buf_get_name(buf)
       if name:find('skg://metadata%-edit') then

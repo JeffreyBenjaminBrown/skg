@@ -20,7 +20,7 @@ local function cleanup ()
   end
 end
 
-local function send (fields, input_directory, destination_repo)
+local function send (fields, input_directory, destination_skgrepo)
   client.connect()
   cleanup()
   state.register_response_handler('import-md-and-org-host-mapping-needed',
@@ -32,11 +32,11 @@ local function send (fields, input_directory, destination_repo)
         local ok, host_root = pcall(vim.fn.input,
           'Absolute host path corresponding to input directory (blank leaves links unresolved): ')
         if not ok then
-          M.cancel(input_directory, destination_repo)
+          M.cancel(input_directory, destination_skgrepo)
           return end
         send({ action = 'preview', ['input-directory'] = input_directory,
-          ['destination-repo'] = destination_repo,
-          ['host-root'] = host_root }, input_directory, destination_repo)
+          ['destination-repo'] = destination_skgrepo,
+          ['host-root'] = host_root }, input_directory, destination_skgrepo)
       end)
     end, false)
   state.register_response_handler('import-md-and-org-preview',
@@ -51,8 +51,8 @@ local function send (fields, input_directory, destination_repo)
           'Import exactly this preview?', '&Import\n&Decline', 2)
         if ok and answer == 1 then
           send({ action = 'apply', ['approval-token'] = token },
-            input_directory, destination_repo)
-        else M.cancel(input_directory, destination_repo) end
+            input_directory, destination_skgrepo)
+        else M.cancel(input_directory, destination_skgrepo) end
       end) end
     end, false)
   state.register_response_handler('import-md-and-org-result',
@@ -79,22 +79,22 @@ local function send (fields, input_directory, destination_repo)
   end
 end
 
-function M.cancel (input_directory, destination_repo)
-  send({ action = 'cancel' }, input_directory, destination_repo)
+function M.cancel (input_directory, destination_skgrepo)
+  send({ action = 'cancel' }, input_directory, destination_skgrepo)
 end
 
-function M.import_md_and_org (input_directory, destination_repo)
+function M.import_md_and_org (input_directory, destination_skgrepo)
   if not input_directory then
     input_directory = vim.fn.input('Input directory on server (absolute path): ') end
   if input_directory == '' then return end
-  if not destination_repo then
+  if not destination_skgrepo then
     vim.notify('Choose an owned repo; it determines privacy for every imported node.')
   end
-  destination_repo = destination_repo or picker.prompt_for_owned_repo('Import into repo: ')
-  if not destination_repo then return end
+  destination_skgrepo = destination_skgrepo or picker.prompt_for_owned_repo('Import into repo: ')
+  if not destination_skgrepo then return end
   send({ action = 'preview', ['input-directory'] = input_directory,
-    ['destination-repo'] = destination_repo },
-    input_directory, destination_repo)
+    ['destination-repo'] = destination_skgrepo },
+    input_directory, destination_skgrepo)
 end
 
 return M

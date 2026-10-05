@@ -9,7 +9,7 @@
 (require 'skg-buffer)
 (require 'skg-lock-buffers)
 
-(defun skg-request-save-buffer (&optional approved-forks fork-repos
+(defun skg-request-save-buffer (&optional approved-forks fork-skgrepos
                                           approved-hoist-pids
                                           text-approved-pids)
   "Send the current buffer contents to Rust for processing.
@@ -37,12 +37,12 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
   (skg--lock-all-skg-buffers)
   (condition-case err
       (skg--send-save-buffer
-       approved-forks fork-repos approved-hoist-pids text-approved-pids)
+       approved-forks fork-skgrepos approved-hoist-pids text-approved-pids)
     (error
      (skg--cancel-locally-failed-save)
      (signal (car err) (cdr err)))))
 
-(defun skg--send-save-buffer (approved-forks fork-repos
+(defun skg--send-save-buffer (approved-forks fork-skgrepos
                                             approved-hoist-pids
                                             text-approved-pids)
   "Serialize and send a save after the stream guard and locks are held."
@@ -71,7 +71,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
                                     skg-view-uri
                                     save-point-position
                                     approved-forks
-                                    fork-repos
+                                    fork-skgrepos
                                     approved-hoist-pids
                                     text-approved-pids))
                                   "\n"))
@@ -125,14 +125,14 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
        'telescope-hoist-confirmation
        (lambda (_tcp-proc payload)
          (skg--telescope-hoist-confirmation-handler
-          save-buffer payload approved-forks fork-repos
+          save-buffer payload approved-forks fork-skgrepos
           text-approved-pids))
        nil)
       (skg-register-response-handler
        'overPrivateText-telescope-confirmation
        (lambda (_tcp-proc payload)
          (skg--save-text-release-confirmation-handler
-          save-buffer payload approved-forks fork-repos
+          save-buffer payload approved-forks fork-skgrepos
           approved-hoist-pids))
        nil)
 
@@ -224,7 +224,7 @@ internal edit; it is restored before any request is sent."
   (skg--unlock-all-save-locked))
 
 (defun skg--save-request-sexp (view-uri save-point-position
-                                        &optional approved-forks fork-repos
+                                        &optional approved-forks fork-skgrepos
                                         approved-hoist-pids
                                         text-approved-pids)
   "Build the save-buffer request sexp. When FORK-APPROVED is non-nil,
@@ -250,8 +250,8 @@ field (fork-repos ((N . REPO) ...))."
                      :point-screen-lines-below-window-start))))
    (when approved-forks
      '((approved-forks . "true")))
-   (when fork-repos
-     (list (list 'fork-repos fork-repos)))
+   (when fork-skgrepos
+     (list (list 'fork-repos fork-skgrepos)))
    (when approved-hoist-pids
      `((approved-hoist-pids ,@approved-hoist-pids)))
    (when text-approved-pids
@@ -539,7 +539,7 @@ it), end the stream, and unlock."
           (skg-decline-fork))))))
 
 (defun skg--telescope-hoist-confirmation-handler
-    (save-buffer payload approved-forks fork-repos
+    (save-buffer payload approved-forks fork-skgrepos
                  &optional text-approved-pids)
   "Handle the text-free terminal Hoist challenge for SAVE-BUFFER.
 The server has committed nothing.  On approval, reissue the same save with
@@ -579,7 +579,7 @@ on a retry that had already received fork authority."
           (if (yes-or-no-p prompt)
               (with-current-buffer save-buffer
                 (skg-request-save-buffer
-                 approved-forks fork-repos approved-pids
+                 approved-forks fork-skgrepos approved-pids
                  text-approved-pids))
             (message
              "Hoist aborted; nothing was saved. Repair the .skg sections manually."))))
@@ -588,7 +588,7 @@ on a retry that had already received fork authority."
               "telescope-hoist-confirmation handler error: %S" err))))
 
 (defun skg--save-text-release-confirmation-handler
-    (save-buffer payload approved-forks fork-repos approved-hoist-pids)
+    (save-buffer payload approved-forks fork-skgrepos approved-hoist-pids)
   "Handle a save-rerender text release challenge.
 The filesystem save has succeeded, but the server has not released the
 staged saved/collateral text or changed its open-view registry.  Approval
@@ -618,7 +618,7 @@ unchanged."
           (if (yes-or-no-p prompt)
               (with-current-buffer save-buffer
                 (skg-request-save-buffer
-                 approved-forks fork-repos approved-hoist-pids
+                 approved-forks fork-skgrepos approved-hoist-pids
                  approved-pids))
             (message
              "Save succeeded; protected rerender text remains withheld and buffers are unchanged."))))
@@ -724,7 +724,7 @@ id; each of its level-2 children is an original carrying (id N). The
 clone's REPO (rotated by the user, or the default) is paired with each
 child's id N -- the key by which the server applies the chosen repo."
   (let ((pairs nil)
-        (parent-repo nil))
+        (parent-skgrepo nil))
     (save-excursion
       (goto-char (point-min))
       (while (re-search-forward org-heading-regexp nil t)
@@ -736,11 +736,11 @@ child's id N -- the key by which the server applies the chosen repo."
             ;; Always rebind on a level-1 headline -- even a
             ;; metadata-less or garbled one -- so it cannot leak a prior
             ;; clone-to-be's repo to a later fork's child.
-            (setq parent-repo (and sexp (skg--node-repo sexp))))
-           ((and (= level 2) sexp parent-repo)
+            (setq parent-skgrepo (and sexp (skg--node-repo sexp))))
+           ((and (= level 2) sexp parent-skgrepo)
             (let ((id (skg--node-id sexp)))
               (when id
-                (push (cons id parent-repo) pairs))))))
+                (push (cons id parent-skgrepo) pairs))))))
         (forward-line 1)))
     (nreverse pairs)))
 
@@ -761,21 +761,21 @@ hand (C-c s s)."
   (unless noninteractive
     (skg--fork-choose-placeholder-repos))
   (let ((source skg--fork-source-buffer)
-        (fork-repos (skg--fork-repos-from-confirmation-buffer)))
+        (fork-skgrepos (skg--fork-repos-from-confirmation-buffer)))
     (unless (buffer-live-p source)
       (error "The buffer that requested these forks is no longer open"))
     (when (seq-some (lambda (pair)
                       (string= (cdr pair) skg-fork-repo-placeholder))
-                    fork-repos)
+                    fork-skgrepos)
       (user-error
        "Pick a repo for each clone first: point on a clone-to-be headline, then C-c s s"))
     ;; The atom must survive to the re-save (which commits the fork; the
     ;; server then drops it on re-render), so suppress the kill-hook strip.
     (setq skg--fork-suppress-strip-on-kill t)
     (skg--replace-fork-confirmation-with-result
-     (current-buffer) source (length fork-repos))
+     (current-buffer) source (length fork-skgrepos))
     (with-current-buffer source
-      (skg-request-save-buffer t fork-repos))))
+      (skg-request-save-buffer t fork-skgrepos))))
 
 (defun skg-decline-fork ()
   "Decline the forks; nothing was written. Strip any lingering explicit

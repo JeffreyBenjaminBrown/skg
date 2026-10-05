@@ -169,10 +169,10 @@ interactively-folded content view."
             (let ((sexp (skg-first-sexpr-on-line)))
               (when sexp
                 (let ((id     (skg--extract-id-from-metadata-sexp sexp))
-                      (repo (skg--extract-repo-from-metadata-sexp sexp)))
-                  (when (and id repo
+                      (skgrepo (skg--extract-repo-from-metadata-sexp sexp)))
+                  (when (and id skgrepo
                              (funcall predicate sexp))
-                    (push (cons id repo) pairs)))))
+                    (push (cons id skgrepo) pairs)))))
             (unless (outline-next-heading)
               (cl-return-from done)))))
       (nreverse pairs))))

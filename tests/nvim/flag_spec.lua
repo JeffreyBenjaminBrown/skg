@@ -22,7 +22,7 @@ local function has_request (line, value)
 end
 
 describe('skg.flag staging', function ()
-  local real_owned_repos = config.owned_repos
+  local real_owned_skgrepos = config.owned_repos
   local real_notify = vim.notify
   local real_send_string = client.send_string
   local real_picker = picker.completing_read_with_cycle
@@ -33,7 +33,7 @@ describe('skg.flag staging', function ()
   end)
 
   after_each(function ()
-    config.owned_repos = real_owned_repos
+    config.owned_repos = real_owned_skgrepos
     vim.notify = real_notify
     client.send_string = real_send_string
     picker.completing_read_with_cycle = real_picker

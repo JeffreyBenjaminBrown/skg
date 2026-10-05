@@ -60,15 +60,15 @@ Returns nil if the field is not cycleable."
   "Return repo names from config as a cycle list.
 If FIELD-VALUE has a ' (default)' suffix, prepend it so cycling
 starts there rather than jumping to a bare repo name."
-  (let ((repos (skg--owned-repos)))
-    (when repos
+  (let ((skgrepos (skg--owned-repos)))
+    (when skgrepos
       (if (string-suffix-p " (default)" field-value)
           (cons field-value
                 (remove (substring field-value 0
                                    (- (length field-value)
                                       (length " (default)")))
-                        repos))
-        repos))))
+                        skgrepos))
+        skgrepos))))
 
 ;;
 ;; Dispatch

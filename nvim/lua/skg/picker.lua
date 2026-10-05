@@ -101,14 +101,14 @@ end
 
 ---Choose a skgrepo to replace CURRENT_REPO: free-typed names are
 ---accepted, S-arrows cycle owned skgrepos, TAB completes all names.
----@param current_repo string
+---@param current_skgrepo string
 ---@return string|nil
-function M.prompt_for_repo_change (current_repo)
+function M.prompt_for_repo_change (current_skgrepo)
   local owned = config.owned_repos() or {}
   local names = config.repo_names() or {}
   return M.completing_read_with_cycle(
     'Repo (S-left/right cycle, TAB completes): ', names, {
-      initial_input = current_repo, cycle_values = owned })
+      initial_input = current_skgrepo, cycle_values = owned })
 end
 
 ---Choose a skgrepo-set name, with completion and cycling.

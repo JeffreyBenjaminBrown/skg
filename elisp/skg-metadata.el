@@ -124,10 +124,10 @@ Prompts for an owned repo (no prompt when only one repo is owned)
 and inserts (skg (node (repo REPO))).  Returns the chosen repo.
 Reuses `skg-edit-metadata-at-point', which formats and spaces the sexp
 correctly relative to the existing title."
-  (let (( repo (skg--prompt-for-owned-repo) ))
+  (let (( skgrepo (skg--prompt-for-owned-repo) ))
     (skg-edit-metadata-at-point
-     `(skg (node (repo ,(intern repo)))))
-    repo))
+     `(skg (node (repo ,(intern skgrepo)))))
+    skgrepo))
 
 (defun skg-set-repo (&optional recursive)
   "Prompt for and change the repo of the node at point.
@@ -157,15 +157,15 @@ Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive "P")
   (if (skg--headline-metadata-empty-p)
       (skg--populate-minimal-node-metadata)
-    (let* ((current-repo (skg--current-node-repo))
-           (new-repo (string-trim
-                        (skg--prompt-for-repo-change current-repo))))
-      (unless (string-empty-p new-repo)
-        (skg--validate-repo-name new-repo)
-        (if (string= current-repo new-repo)
-            (message "Repo unchanged: %s" current-repo)
+    (let* ((current-skgrepo (skg--current-node-repo))
+           (new-skgrepo (string-trim
+                        (skg--prompt-for-repo-change current-skgrepo))))
+      (unless (string-empty-p new-skgrepo)
+        (skg--validate-repo-name new-skgrepo)
+        (if (string= current-skgrepo new-skgrepo)
+            (message "Repo unchanged: %s" current-skgrepo)
           (skg--set-repo-and-handle-stuck-edges
-           current-repo new-repo recursive))))))
+           current-skgrepo new-skgrepo recursive))))))
 
 (defun skg-set-repo-recursive ()
   "Prompt for and recursively change the repo of the node at point.
@@ -176,19 +176,19 @@ Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive)
   (skg-set-repo t))
 
-(defun skg--set-repo-and-handle-stuck-edges (old-repo new-repo recursive)
+(defun skg--set-repo-and-handle-stuck-edges (old-skgrepo new-skgrepo recursive)
   "The body of `skg-set-repo' once a real move is requested:
 analyze which content edges the move would leave stuck at more
 private repos, retarget the repos (skipping write-protected
 occurrences), offer to publicize the stuck edges in the same go, and
 report -- loudly, when write-protected occurrences were skipped."
   (let* ((stuck ;; analyzed BEFORE any rewrite: it needs the old skgrepos
-          (skg--analyze-move-stuck-edges old-repo new-repo recursive))
+          (skg--analyze-move-stuck-edges old-skgrepo new-skgrepo recursive))
          (change-result (if recursive
-                            (skg--change-repo-recursive old-repo
-                                                          new-repo)
+                            (skg--change-repo-recursive old-skgrepo
+                                                          new-skgrepo)
                           (skg--change-repo-at-point-unless-write-protected
-                           new-repo)))
+                           new-skgrepo)))
          (changed-count (car change-result))
          (write-protected-ids (cdr change-result))
          (fixed-count
@@ -205,7 +205,7 @@ report -- loudly, when write-protected occurrences were skipped."
     (message "%s"
              (concat
               (format "Repo changed from %s to %s on %d node%s. Save to apply."
-                      old-repo new-repo changed-count
+                      old-skgrepo new-skgrepo changed-count
                       (if (= changed-count 1) "" "s"))
               (cond
                (fixed-count
@@ -218,7 +218,7 @@ report -- loudly, when write-protected occurrences were skipped."
                         (length write-protected-ids)
                         (if (= (length write-protected-ids) 1) "" "s")))))))
 
-(defun skg--analyze-move-stuck-edges (old-repo new-repo recursive)
+(defun skg--analyze-move-stuck-edges (old-skgrepo new-skgrepo recursive)
   "With point on the node a `skg-set-repo' move starts from, and
 BEFORE any repo is rewritten: return the true content edges
 the move would leave stuck in a more private repo than their new
@@ -237,29 +237,29 @@ children's edges are examined."
             (lambda (parent-retargets-p child-retargets-p)
               (when (skg--relationship-kind-matches-p 'contained)
                 (let* ((child-meta (skg--metadata-sexp-at-point-or-nil))
-                       (child-repo (skg--node-repo child-meta))
+                       (child-skgrepo (skg--node-repo child-meta))
                        (child-moves ;; a write-protected occurrence is skipped by the retargeting walk, so its skgrepo does not actually change
                         (and child-retargets-p
                              (not (skg--node-write-protected-p child-meta))))
-                       (parent-repo
+                       (parent-skgrepo
                         (save-excursion
                           (org-up-heading-safe)
                           (skg--node-repo
                            (skg--metadata-sexp-at-point-or-nil))))
-                       (eff (lambda (repo retargets-p)
+                       (eff (lambda (skgrepo retargets-p)
                               (if (and retargets-p
-                                       (equal repo old-repo))
-                                  new-repo
-                                repo)))
-                       (repo (skg--content-edge-stuck-repo
-                               parent-repo
-                               (funcall eff parent-repo
+                                       (equal skgrepo old-skgrepo))
+                                  new-skgrepo
+                                skgrepo)))
+                       (skgrepo (skg--content-edge-stuck-repo
+                               parent-skgrepo
+                               (funcall eff parent-skgrepo
                                         parent-retargets-p)
-                               child-repo
-                               (funcall eff child-repo child-moves))))
-                  (when repo
+                               child-skgrepo
+                               (funcall eff child-skgrepo child-moves))))
+                  (when skgrepo
                     (push (cons (copy-marker (line-beginning-position))
-                                repo)
+                                skgrepo)
                           stuck)))))))
       (funcall consider nil t) ;; the root's own inbound relationship
       (outline-next-heading)
@@ -309,14 +309,14 @@ STUCK, then free the markers. Returns the number of requests written."
       (set-marker (car entry) nil))
     (length stuck)))
 
-(defun skg--change-repo-at-point-unless-write-protected (new-repo)
+(defun skg--change-repo-at-point-unless-write-protected (new-skgrepo)
   "Set the repo at point to NEW-REPO, unless the occurrence is
 write-protected -- the save would silently ignore that edit. Returns
 (CHANGED-COUNT . WRITE-PROTECTED-IDS), matching `skg--change-repo-recursive'."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (if (skg--node-write-protected-p meta)
         (cons 0 (list (or (skg--node-id meta) "(no id)")))
-      (cons (skg--change-repo-at-point new-repo) nil))))
+      (cons (skg--change-repo-at-point new-skgrepo) nil))))
 
 (defun skg--more-private-of-repos (a b)
   "The more private of repos A and B per the config's privacy
@@ -334,11 +334,11 @@ the config's privacy order. Nil when either is unknown."
         (pb (skg--repo-privacy-position b)))
     (and pa pb (< pa pb))))
 
-(defun skg--repo-privacy-position (repo)
+(defun skg--repo-privacy-position (skgrepo)
   "REPO's index in the config's privacy order (0 = most public),
 or nil when REPO is nil or names no configured repo."
-  (and repo
-       (seq-position (skg--repo-names) repo #'string=)))
+  (and skgrepo
+       (seq-position (skg--repo-names) skgrepo #'string=)))
 
 (defconst skg--relRepo-unsupported-folder-atoms
   '(subscriberFolder overriderFolder hiderFolder hiddenFolder
@@ -860,12 +860,12 @@ Does NOT save; call `skg-request-save-buffer' afterward."
         (match-string 1 trimmed)
       trimmed)))
 
-(defun skg--validate-repo-name (repo)
+(defun skg--validate-repo-name (skgrepo)
   "Signal an error if REPO cannot be represented in skg metadata."
-  (when (string-match-p "[[:space:]]" repo)
+  (when (string-match-p "[[:space:]]" skgrepo)
     (user-error "Repo names cannot contain whitespace")))
 
-(defun skg--change-repo-recursive (old-repo new-repo)
+(defun skg--change-repo-recursive (old-skgrepo new-skgrepo)
   "Change OLD-REPO to NEW-REPO in this content subtree.
 Returns (CHANGED-COUNT . WRITE-PROTECTED-IDS).  The root node is inclusive;
 only descendents for which affectsParent=true are traversed.
@@ -887,7 +887,7 @@ their repo edits take effect even under a write-protected parent."
                           write-protected-ids)
                   (setq changed-count
                         (+ changed-count
-                           (skg--change-repo-at-point new-repo))))))))
+                           (skg--change-repo-at-point new-skgrepo))))))))
       (funcall change-or-collect) ;; the root
       (outline-next-heading)
       (while (and (not (eobp))
@@ -896,7 +896,7 @@ their repo edits take effect even under a write-protected parent."
           (if (not (and (skg--activeNode-sexp-p metadata-sexp)
                         (skg--node-affectsParent-content-of-p metadata-sexp)))
               (skg--goto-next-headline-after-subtree)
-            (when (equal (skg--node-repo metadata-sexp) old-repo)
+            (when (equal (skg--node-repo metadata-sexp) old-skgrepo)
               (funcall change-or-collect))
             (outline-next-heading))))
       (cons changed-count (nreverse write-protected-ids)))))
@@ -962,17 +962,17 @@ their repo edits take effect even under a write-protected parent."
   "Return non-nil if METADATA-SEXP has the bare ActiveVognode writeProtected marker."
   (skg-sexp-subtree-p metadata-sexp '(skg (node writeProtected))))
 
-(defun skg--change-repo-at-point (new-repo)
+(defun skg--change-repo-at-point (new-skgrepo)
   "Set the repo at point to NEW-REPO.
 Returns 1 if the current line was edited."
   (skg-edit-metadata-at-point
-   `(skg (node (ENSURE (repo ,(intern new-repo)))
+   `(skg (node (ENSURE (repo ,(intern new-skgrepo)))
                (viewStats))))
   (skg-edit-metadata-at-point
    `(skg (node (viewStats
                 (ENSURE
                  (homeRepoHerald ,(intern
-                                  (format "⌂:%s" new-repo))))))))
+                                  (format "⌂:%s" new-skgrepo))))))))
   1)
 
 (defun skg-parse-headline-metadata (headline-text)

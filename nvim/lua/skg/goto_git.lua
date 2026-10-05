@@ -31,11 +31,11 @@ function M.node_info_at_point ()
   if not id then
     vim.notify("No id in this line's metadata.")
     return nil end
-  local repo = id_search.extract_repo_from_metadata_sexp(sexp)
-  if not repo then
+  local skgrepo = id_search.extract_repo_from_metadata_sexp(sexp)
+  if not skgrepo then
     vim.notify('Could not extract id or repo from metadata.')
     return nil end
-  return { id = id, repo = repo }
+  return { id = id, repo = skgrepo }
 end
 
 ---{id, repo} for the parent headline's node, or nil with a message.
@@ -53,19 +53,19 @@ function M.parent_info_at_point ()
     vim.notify('Parent headline has no node metadata.')
     return nil end
   local id = id_search.extract_id_from_metadata_sexp(sexp)
-  local repo = id_search.extract_repo_from_metadata_sexp(sexp)
-  if not (id and repo) then
+  local skgrepo = id_search.extract_repo_from_metadata_sexp(sexp)
+  if not (id and skgrepo) then
     vim.notify('Could not extract id or repo from parent.')
     return nil end
-  return { id = id, repo = repo }
+  return { id = id, repo = skgrepo }
 end
 
 ---Request the on-disk path for ID within REPO; HANDLER receives the
 ---resolved absolute path (or is not called, with a message shown).
 ---@param id string
----@param repo string
+---@param skgrepo string
 ---@param handler fun(resolved_path: string)
-function M.request_file_path (id, repo, handler)
+function M.request_file_path (id, skgrepo, handler)
   state.register_response_handler('get-file-path',
     function (_payload_text, response)
       local content = payload.field_text(response, 'content')
@@ -87,7 +87,7 @@ function M.request_file_path (id, repo, handler)
   client.send_string(sexpr.to_string({
     sexpr.pair(sexpr.symbol('request'), 'get file path'),
     sexpr.pair(sexpr.symbol('id'), id),
-    sexpr.pair(sexpr.symbol('repo'), repo) }) .. '\n')
+    sexpr.pair(sexpr.symbol('repo'), skgrepo) }) .. '\n')
 end
 
 ---Open a git status view (neogit) for the skgrepo holding RESOLVED_PATH
