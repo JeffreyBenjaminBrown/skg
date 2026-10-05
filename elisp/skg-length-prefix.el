@@ -69,7 +69,7 @@ because the sexp crate emits simple strings unquoted."
                 (when (and (memq response-type
                                  '(save-result rerender-done skgrepo-restriction
                                    delete-references-result
-                                   rebuild-ephemeral-data-stores))
+                                   rebuild-session-lifetime-stores))
                            (fboundp 'skg-link-annotations-invalidate-all))
                   (skg-link-annotations-invalidate-all))
                 (when one-shot ;; It shot, so remove it. If instead the funcall errors, this 'when' statement will not fire, so the (stale? recoverable?) handler will not have been removed.

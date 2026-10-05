@@ -67,7 +67,7 @@ function M.dispatch_by_type (payload)
        or response_type == 'rerender-done'
        or response_type == 'skgrepo-restriction'
        or response_type == 'delete-references-result'
-       or response_type == 'rebuild-ephemeral-data-stores' then
+       or response_type == 'rebuild-session-lifetime-stores' then
       local annotations = package.loaded['skg.link_annotations']
       if annotations then annotations.invalidate_all() end
     end

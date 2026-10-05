@@ -158,7 +158,7 @@ M.commands = {
                   desc = 'Export a repo-set to plain .org files' },
   ImportMdAndOrg = { module = 'skg.import_md_and_org', fn = 'import_md_and_org',
                      desc = 'Preview and import Markdown/Org into an owned repo' },
-  RebuildEphemeralDataStores = { module = 'skg.misc_requests', fn = 'rebuild_ephemeral_data_stores',
+  RebuildSessionLifetimeStores = { module = 'skg.misc_requests', fn = 'rebuild_session_lifetime_stores',
                  desc = 'Rebuild the graph and Tantivy from the .skg files' },
   StripBodyWhitespace = { module = 'skg.misc_requests',
                           fn = 'strip_body_whitespace',

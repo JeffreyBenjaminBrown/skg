@@ -964,7 +964,7 @@ For a first setup, configure the skgrepo before starting Skg. When replacing
 existing data, save and close the open views and stop the server before
 changing the files in its skgrepos, then restart it. If files in an already configured
 skgrepo changed while the server remained running,
-'M-x skg-rebuild-ephemeral-data-stores' reloads them; close stale views and
+'M-x skg-rebuild-session-lifetime-stores' reloads them; close stale views and
 open fresh ones before editing. Configuration changes require a restart.
 
 The Cargo command prints a reminder to commit the imported files so Git
@@ -1079,7 +1079,7 @@ it with a warning. The noninteractive form "fails closed" (fails before writing 
 =--include-overPrivateText-telescopes=:
 
 : cargo run --bin skg -- export-org [config-path] [skgrepo-set] [output-dir] [--include-overPrivateText-telescopes]
-** connection, reload, rebuild ephemeral data stores
+** connection, reload, rebuild session-lifetime stores
 Unless you're coding or troubleshooting,
 you probably won't need these.
 *** skg-connection-verify
@@ -1088,7 +1088,7 @@ to check if the connection is working.
 Displays the result in the minibuffer.
 *** skg-connection-end
 Closes the TCP connection to the Rust server.
-*** skg-rebuild-ephemeral-data-stores
+*** skg-rebuild-session-lifetime-stores
 Re-reads the authoritative =.skg= files, validates and replaces the in-memory
 graph, and rebuilds the derived Tantivy search index. It does not rewrite the
 =.skg= files. Existing views are closed after a successful rebuild, because
@@ -1103,7 +1103,7 @@ the derived caches are refreshed to match.
 Review the result with 'git diff --ignore-all-space',
 which should show nothing.
 *** skg-close-all-skg-buffers
-This may be warranted after an ephemeral-data-store rebuild.
+This may be warranted after an session-lifetime-store rebuild.
 *** skg-reload
 Unloads all skg elisp modules and reloads them from disk.
 Useful when you've changed elisp code

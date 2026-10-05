@@ -48,7 +48,7 @@ fn graph_preparation_save_error (
   })
 }
 
-/// Updates the authoritative and derived stores from prepared `NodeInstruction`s:
+/// Updates the authoritative and session-lifetime stores from prepared `NodeInstruction`s:
 ///   1) Filesystem (source of truth)
 ///   2) immutable in-Rust graph swap-in
 ///   3) Tantivy background update
@@ -157,7 +157,7 @@ pub(crate) fn enqueue_tantivy_delta (
   // off the critical path, in FIFO order (a single worker). Searches
   // block on 'wait_for_tantivy_writes_idle' until it lands. A
   // background failure is logged, not propagated — the filesystem is
-  // the source of truth, so 'rebuild ephemeral data stores' resyncs the search index.
+  // the source of truth, so 'rebuild session-lifetime stores' resyncs the search index.
   enqueue_tantivy_write ( TantivyWriteTask {
     tantivy_index : tantivy_index . clone (),
     instructions  : node_defs,

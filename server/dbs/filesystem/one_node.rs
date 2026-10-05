@@ -191,7 +191,7 @@ impl PreparedTelescopeWrite {
 
   /// Hoist is not complete until a fresh disk compose proves that title and
   /// body now select from home. This runs after filesystem writes and before
-  /// callers update the in-memory graph or either derived database.
+  /// callers update the in-memory graph or either session-lifetime store.
   pub(crate) fn verify_hoist (
     &self,
     config : &SkgConfig,
@@ -204,7 +204,7 @@ impl PreparedTelescopeWrite {
       return Err ( io::Error::new (
         io::ErrorKind::InvalidData,
         format! (
-          "Hoist verification failed for '{}': its freshly reread telescope still selects title or body below home '{}'. The filesystem may have changed, but the in-memory graph and derived databases were not updated.",
+          "Hoist verification failed for '{}': its freshly reread telescope still selects title or body below home '{}'. The filesystem may have changed, but the in-memory graph and session-lifetime stores were not updated.",
           self . pid, self . home ))); }
     Ok (( ))
   }

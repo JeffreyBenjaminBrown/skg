@@ -82,7 +82,7 @@ local data = assert(os.getenv('SKG_TEST_DATA_DIR'))
 local new_file = assert(io.open(data .. '/public/new.skg', 'w'))
 new_file:write('pid: new\ntitle: New target\n')
 new_file:close()
-misc.rebuild_ephemeral_data_stores()
+misc.rebuild_session_lifetime_stores()
 T.check(T.wait_for(function () return status('new', 'resolved') end, 10),
         'newly swapped-in target stops being missing')
 T.check(buffer.text(buf) == unsaved_text and vim.bo[buf].modified,
@@ -90,13 +90,13 @@ T.check(buffer.text(buf) == unsaved_text and vim.bo[buf].modified,
 
 assert(os.rename(data .. '/private/private-node.skg',
                  data .. '/public/private-node.skg'))
-misc.rebuild_ephemeral_data_stores()
+misc.rebuild_session_lifetime_stores()
 T.check(T.wait_for(function ()
   return status('private-node', 'resolved') end, 10),
   'repo move refreshes restricted target')
 local broken_before = broken_count()
 assert(os.remove(data .. '/public/dest.skg'))
-misc.rebuild_ephemeral_data_stores()
+misc.rebuild_session_lifetime_stores()
 T.check(T.wait_for(function () return status('old-dest', 'missing') end, 10),
         'deleted target becomes missing')
 T.check(T.wait_for(function () return broken_count() > broken_before end, 10),

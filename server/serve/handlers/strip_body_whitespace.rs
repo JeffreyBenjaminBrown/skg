@@ -3,7 +3,7 @@
 //! blank lines from the body's tail), in every OWNED skgrepo in the
 //! config -- foreign skgrepos are never written, and stripping them would
 //! make them diverge from their upstreams (Jeff settled on owned
-//! only) -- rewriting only the .skg files whose bodies changed. Bodies also live in two derived stores, the in-Rust graph
+//! only) -- rewriting only the .skg files whose bodies changed. Bodies also live in two session-lifetime stores, the in-Rust graph
 //! and the Tantivy index; both are refreshed here. The graph is
 //! untouched: it stores no body text, and the links it derives
 //! from bodies cannot be changed by stripping trailing whitespace.

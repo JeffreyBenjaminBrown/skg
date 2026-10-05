@@ -1,5 +1,5 @@
 [process]
-server = "The Rust server receives the complete Org buffer, derives save instructions, updates authoritative and derived stores, rerenders affected views, and returns the new buffer."
+server = "The Rust server receives the complete Org buffer, derives save instructions, updates authoritative and session-lifetime stores, rerenders affected views, and returns the new buffer."
 emacs = "Emacs prepares transient focus/fold metadata, sends the request and full buffer, waits for the length-prefixed response stream, replaces the buffer, and restores presentation state."
 background = "The single Tantivy writer consumes the delta queued by the synchronous save. Search waits for this worker when it needs a fully current index; the save response does not."
 other = "Samples not attributable to the synchronous save handler or Tantivy worker."

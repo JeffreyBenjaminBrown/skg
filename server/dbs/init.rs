@@ -39,7 +39,7 @@ pub struct InitContextHandoff {
 
 /// Read the authoritative files once, validate and build the graph, and build
 /// Tantivy from that exact node vector. There is intentionally no marker or
-/// incremental branch: both derived stores are reconstructed at startup, so
+/// incremental branch: both session-lifetime stores are reconstructed at startup, so
 /// files deleted while the server was stopped cannot leave orphaned records.
 pub fn initialize_dbs (
   config : &SkgConfig,

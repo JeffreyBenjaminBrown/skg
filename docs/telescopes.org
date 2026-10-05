@@ -32,7 +32,7 @@ it. An interactive save offers Abort or Hoist before changing
 anything. Hoist explicitly moves the selected title and body to
 home, removes lower title/body copies, preserves lower relationships and
 aliases, then rereads the files and requires the telescope to be
-clean before updating the in-memory graph or derived databases.
+clean before updating the in-memory graph or session-lifetime stores.
 Abort leaves every file alone; manual repair requires making the same
 title/body-only edits in the =.skg= sections. Noninteractive and
 maintenance writers have no implicit Hoist answer and refuse. Every

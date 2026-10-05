@@ -19,16 +19,16 @@ use futures::executor::block_on;
 use std::net::TcpStream;
 use std::sync::Arc;
 
-pub fn handle_rebuild_ephemeral_data_stores_request (
+pub fn handle_rebuild_session_lifetime_stores_request (
   stream     : &mut TcpStream,
   env        : &mut SkgEnv,
   views_state : &mut ViewsState,
 ) {
   let result : Result<(), String> =
-    rebuild_ephemeral_data_stores_in_place (env, views_state);
+    rebuild_session_lifetime_stores_in_place (env, views_state);
   let msg : String = match result {
     Ok (()) => concat! (
-      "Ephemeral graph and Tantivy index rebuilt successfully; ",
+      "Session-lifetime graph and Tantivy index rebuilt successfully; ",
       ".skg files remain authoritative.") . to_string (),
     Err (e) => {
       tracing::error!("Rebuild failed: {}", e);
@@ -36,15 +36,15 @@ pub fn handle_rebuild_ephemeral_data_stores_request (
   send_response_with_length_prefix (
     stream,
     & tag_text_response (
-      TcpToClient::RebuildEphemeralDataStores, &msg )); }
+      TcpToClient::RebuildSessionLifetimeStores, &msg )); }
 
 /// The rebuild itself, streamless, so other handlers (the
 /// telescope migration) can rebuild after rewriting files.
-pub fn rebuild_ephemeral_data_stores_in_place (
+pub fn rebuild_session_lifetime_stores_in_place (
   env         : &mut SkgEnv,
   views_state : &mut ViewsState,
 ) -> Result<(), String> {
-  tracing::info!("Rebuilding ephemeral data stores from .skg files...");
+  tracing::info!("Rebuilding session-lifetime stores from .skg files...");
   // Rebuild is an authoritative swap-in just like a save.  Clone the Arc
   // before locking so the guard does not borrow `env` while this function
   // replaces its config/search-index fields below.
@@ -79,7 +79,7 @@ pub fn rebuild_ephemeral_data_stores_in_place (
       rebuild_tantivy_as_generation (
         &fresh_config, &nodes, runtime . generation + 1)
       . map_err ( |e| format! ("Tantivy rebuild failed: {}", e) ) ?;
-    tracing::info!("Ephemeral graph candidate and Tantivy rebuilt.");
+    tracing::info!("Session-lifetime graph candidate and Tantivy rebuilt.");
     let had_id_set = had_id_set_from_nodes (&nodes);
     let all_node_skgids = nodes . iter ()
       . map ( |n| n . pid . clone () )

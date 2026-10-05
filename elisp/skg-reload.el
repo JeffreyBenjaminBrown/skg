@@ -89,7 +89,7 @@ rather than via `unload-feature'."
             skg-request-export-org
             skg-request-import-md-and-org
             skg-request-git-diff-mode
-            skg-request-rebuild-ephemeral-data-stores
+            skg-request-rebuild-session-lifetime-stores
             skg-request-rerender-all-views
             skg-request-save
             skg-request-single-root-content-view

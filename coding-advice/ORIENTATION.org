@@ -30,7 +30,7 @@ Call out requests that are vague, contradictory, inefficient, unnecessary, or
 overly complex rather than silently guessing at a bad interpretation.
 * Project essentials
 Skg is a local knowledge-graph editor. Its canonical data is in plaintext
-'.skg' files; the 'in-Rust graph' and Tantivy are derived stores.
+'.skg' files; the 'in-Rust graph' and Tantivy are session-lifetime stores.
 The Rust server is in
 'server/', with Emacs Lisp and Neovim clients in 'elisp/' and 'nvim/'. A
 server retains one interactive user and admits one interactive client at a

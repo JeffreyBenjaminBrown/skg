@@ -144,7 +144,7 @@ generation number.  Each request captures exactly one generation and threads
 its graph through graph-dependent helpers.  There is no process-global graph
 fallback.
 
-Startup and “rebuild ephemeral data stores” both read the filesystem once,
+Startup and “rebuild session-lifetime stores” both read the filesystem once,
 validate the candidate graph, and build graph plus Tantivy from that same node
 vector.  A live rebuild swaps in only after the complete candidate succeeds;
 failure leaves the prior generation visible.  The operation never rewrites

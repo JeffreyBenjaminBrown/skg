@@ -2,16 +2,16 @@
 
 (require 'skg-length-prefix)
 
-(defun skg-rebuild-ephemeral-data-stores ()
+(defun skg-rebuild-session-lifetime-stores ()
   "Rebuild the in-memory graph and Tantivy from authoritative .skg files.
 The .skg files are not changed. Useful after importing data or if a
-derived store is stale."
+session-lifetime store is stale."
   (interactive)
-  (message "Rebuilding ephemeral data stores (this may take a while) ...")
+  (message "Rebuilding session-lifetime stores (this may take a while) ...")
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
-         (request-sexp "((request . \"rebuild ephemeral data stores\"))\n"))
+         (request-sexp "((request . \"rebuild session-lifetime stores\"))\n"))
     (skg-register-response-handler
-     'rebuild-ephemeral-data-stores
+     'rebuild-session-lifetime-stores
      (lambda (_tcp-proc payload)
        (let* ((response (read payload))
               (content (cadr (assoc 'content response)))
@@ -24,4 +24,4 @@ derived store is stale."
     (skg-lp-reset)
     (process-send-string tcp-proc request-sexp)))
 
-(provide 'skg-request-rebuild-ephemeral-data-stores)
+(provide 'skg-request-rebuild-session-lifetime-stores)

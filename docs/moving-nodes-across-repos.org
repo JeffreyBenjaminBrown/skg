@@ -102,7 +102,7 @@ extra — and the move still works correctly. The repo-move's =pid=
 is always resolved to the primary ID before the move is applied
 (=tests/move_repo.rs::test_move_node_referenced_by_extra_id=).
 
-*** how derived stores are updated
+*** how session-lifetime stores are updated
 The save pipeline collects =RepoMove= records alongside the
 ordinary =NodeInstruction= saves and deletes. The applied
 order is:

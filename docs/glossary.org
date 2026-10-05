@@ -351,9 +351,11 @@ it lasts only as long as the view of it in some buffer.
 Data on disk, by contrast,
 remains when the app terminates,
 and can be recovered by a later session.
-(The "ephemeral data stores", the in-Rust graph and the search index,
-are something else: rebuilt from disk each time the server starts,
-they outlive every view.)
+*Session-lifetime* data lasts as long as one server session: the
+in-Rust graph and the search index, together the *session-lifetime
+stores*. The server rebuilds them from the .skg files when it starts,
+or when asked ('skg-rebuild-session-lifetime-stores'); they outlive
+every view. Say which lifetime is meant, never "ephemeral".
 
 *** branching viewnode (vs a branch)
 

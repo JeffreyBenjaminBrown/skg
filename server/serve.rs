@@ -23,7 +23,7 @@ use crate::serve::handlers::import_md_and_org::{
   PendingImport, handle_import_md_and_org_request};
 use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_skgrepo_set;
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
-use crate::serve::handlers::rebuild_ephemeral_data_stores::handle_rebuild_ephemeral_data_stores_request;
+use crate::serve::handlers::rebuild_session_lifetime_stores::handle_rebuild_session_lifetime_stores_request;
 use crate::serve::handlers::rerender_all_views::{ handle_git_diff_toggle_and_rerender, handle_rerender_all_views_request};
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::text_release::{
@@ -266,8 +266,8 @@ fn handle_emacs (
           Ok (RequestType::ImportMdAndOrg) =>
             handle_import_md_and_org_request (
               &mut stream, &request_header, &env, &mut pending_import ),
-          Ok (RequestType::RebuildEphemeralDataStores) =>
-            handle_rebuild_ephemeral_data_stores_request ( &mut stream,
+          Ok (RequestType::RebuildSessionLifetimeStores) =>
+            handle_rebuild_session_lifetime_stores_request ( &mut stream,
                                          &mut env,
                                          &mut views_state ),
           Ok (RequestType::StripBodyWhitespace) =>

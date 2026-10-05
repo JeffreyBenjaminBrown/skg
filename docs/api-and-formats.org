@@ -215,7 +215,7 @@ So far there are these endpoints:
     confirmation, and neither attempt writes.
   - The third ALTERNATIVE terminal message protects the saved and
     collateral rerenders. After a valid save has updated disk and the
-    derived stores, the server renders the saved view and every collateral view in memory.
+    session-lifetime stores, the server renders the saved view and every collateral view in memory.
     Under a restricted skgrepo-set, if the staged forests contain overPrivateText
     telescopes without exact text-release approval, it changes no
     open-view registry entry, streams no content, and sends
@@ -400,9 +400,9 @@ So far there are these endpoints:
     contribute nothing. When no moves are found, the script body is a
     single =# No moves detected.= comment.
 
-** Rebuild ephemeral data stores
-  - Request: ((request . "rebuild ephemeral data stores"))
-  - Response: LP response-type "rebuild-ephemeral-data-stores" with =((content "..."))=.
+** Rebuild session-lifetime stores
+  - Request: ((request . "rebuild session-lifetime stores"))
+  - Response: LP response-type "rebuild-session-lifetime-stores" with =((content "..."))=.
     Content reports that the graph and Tantivy were rebuilt on success,
     or "Rebuild failed: ..." on error.
   - Behavior: Reads the authoritative =.skg= files once, validates a complete
