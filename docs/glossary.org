@@ -223,20 +223,31 @@ containment, link, subscription, hiding, and overriding.
 Because a node can be on either side of each relationship --
 it can be the container or the content, the hider or the hidden, etc. --
 there are many kinds of PartnerFolder. Each lists, as its children,
-the nodes that play one role toward its parent:
-- a *subscribeeFolder*: the nodes its parent subscribes to;
-- a *subscriberFolder*: the nodes that subscribe to its parent;
-- an *overriddenFolder*: the nodes whose view its parent overrides;
-- an *overriderFolder*: the nodes that override its parent's view;
-- a *hiddenFolder*: the nodes its parent hides;
-- a *hiderFolder*: the nodes that hide its parent;
-- a *hiddenInSubscribeeFolder*, under a subscribee as such: that
+the nodes that play one role toward its parent. For each relation,
+one folder could list the members its parent records, and another the
+recorders that record its parent:
+
+| relation      | members its parent records | recorders of its parent |
+|---------------+----------------------------+-------------------------|
+| containment   | not implemented[1]         | not implemented[3]      |
+| link          | not implemented[2]         | not implemented[3]      |
+| subscription  | subscribeeFolder           | subscriberFolder        |
+| hiding        | hiddenFolder               | hiderFolder             |
+| overriding    | overriddenFolder           | overriderFolder         |
+
+1. A contentFolder would be silly: a node's contents are already its
+   ordinary viewchildren.
+2. A mentionedFolder would be silly: the links are already visible in
+   the node's own text.
+3. A containerFolder or mentionerFolder might be a good idea, but
+   neither is implemented; containerward and mentionerward role trees
+   do the same job.
+
+Two more PartnerFolders filter the hiding relation by subscription:
+- a *hiddenInSubscribeeFolder*, under a subscribee as such, lists that
   subscribee's contents which the subscriber hides;
-- a *hiddenOutsideOfSubscribeeFolder*, under a subscribeeFolder: the
-  nodes its parent hides that no subscribee contains.
-Containment and links get no PartnerFolder: a node's contents are its
-ordinary viewchildren, and its containers and mentioners appear as
-role trees.
+- a *hiddenOutsideOfSubscribeeFolder*, under a subscribeeFolder, lists
+  the nodes its parent hides that no subscribee contains.
 
 **** Some extremely technical details
 
