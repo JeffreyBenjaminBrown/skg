@@ -296,19 +296,19 @@ describe('skg.metadata_edit', function ()
   end)
 end)
 
-describe('skg.org_ancestry and view_new_empty', function ()
+describe('skg.ancestry and view_new_empty', function ()
   after_each(function ()
     pcall(vim.api.nvim_buf_delete,
           vim.api.nvim_get_current_buf(), { force = true })
   end)
 
   it('shows only the ancestry of point', function ()
-    -- The docstring example of skg-view-org-ancestry.
+    -- The docstring example of skg-view-ancestry.
     local buf = buffer_with(table.concat({
       '* a', '** b', '** c', '*** d', '*** e', '*** f' }, '\n'))
     vim.bo[buf].filetype = 'org'
     vim.api.nvim_win_set_cursor(0, { 5, 0 }) -- on 'e'
-    require('skg.org_ancestry').view_org_ancestry()
+    require('skg.ancestry').view_ancestry()
     assert.are.equal('* a\n** c\n*** e', buffer_text())
   end)
 

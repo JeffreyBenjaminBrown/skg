@@ -156,7 +156,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c v l") #'skg-restrict-repo-set)
     (define-key map (kbd "C-c v L") #'skg-toggle-repo-overlay-on-links)
     (define-key map (kbd "C-c v m") #'skg-view-metadata)
-    (define-key map (kbd "C-c v o") #'skg-view-org-ancestry)
+    (define-key map (kbd "C-c v o") #'skg-view-ancestry)
     (define-key map (kbd "C-c v r") #'skg-readable-ids-mode)
     (define-key map (kbd "C-c v R") #'skg-readable-ids-refresh)
     (define-key map (kbd "C-c v s") #'skg-view-linkstack)

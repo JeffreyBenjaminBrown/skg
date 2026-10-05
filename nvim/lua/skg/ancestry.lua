@@ -1,14 +1,14 @@
 -- PURPOSE: Show, in a new buffer, only the outline ancestry of the
 -- headline at point (parent, grandparent, ... to the root, plus the
 -- headline itself). Not skg-specific; works in any org buffer. The
--- Lua port of elisp/skg-view-org-ancestry.el.
+-- Lua port of elisp/skg-view-ancestry.el.
 
 local focus = require('skg.focus')
 local metadata = require('skg.metadata')
 
 local M = {}
 
-function M.view_org_ancestry ()
+function M.view_ancestry ()
   if vim.bo.filetype ~= 'org' then
     error('Not in an org-mode buffer') end
   local line = focus.owning_headline_line()

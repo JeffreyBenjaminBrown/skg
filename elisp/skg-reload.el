@@ -113,7 +113,7 @@ rather than via `unload-feature'."
             skg-link-annotations
             skg-file-minor-mode
             skg-git-add
-            skg-view-org-ancestry
+            skg-view-ancestry
             heralds-minor-mode )))
     (dolist (feat skg-features)
       (when (featurep feat)

@@ -119,8 +119,8 @@ M.commands = {
                      desc = 'Restrict display and search to one skgrepo-set' },
   ViewMetadata = { module = 'skg.metadata_edit', fn = 'edit_metadata',
                    desc = "Edit the node's metadata as an org tree" },
-  ViewOrgAncestry = { module = 'skg.org_ancestry', fn = 'view_org_ancestry',
-                      desc = 'Show only the outline ancestry of point' },
+  ViewAncestry = { module = 'skg.ancestry', fn = 'view_ancestry',
+                   desc = 'Show only the outline ancestry of point' },
   ReadableIdsToggle = { module = 'skg.readable_ids', fn = 'toggle',
                         desc = 'Toggle shortened, title-annotated UUIDs' },
   ViewLinkstack = { module = 'skg.linkstack', fn = 'view_linkstack',
@@ -254,7 +254,7 @@ M.content_view_bindings = {
   { 'vl', 'RestrictRepoSet' },            -- C-c v l
   { 'vL', 'ToggleRepoOverlayOnLinks' }, -- C-c v L
   { 'vm', 'ViewMetadata' },              -- C-c v m
-  { 'vo', 'ViewOrgAncestry' },           -- C-c v o
+  { 'vo', 'ViewAncestry' },           -- C-c v o
   { 'vr', 'ReadableIdsToggle' },         -- C-c v r
   { 'vs', 'ViewLinkstack' },               -- C-c v s
   { 'vw', 'ViewWithoutMetadata' },       -- C-c v w

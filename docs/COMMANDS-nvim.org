@@ -566,7 +566,7 @@ Note that some properties don't make sense to edit,
 like the count of how many contents it has.
 (If you want to change how much content a node has,
 don't change the node's metadata; change its children in the view.)
-*** <localleader>vo : :SkgViewOrgAncestry
+*** <localleader>vo : :SkgViewAncestry
 If you're at a headline so deep in the tree
 that you can't remember where it came from,
 this brings you to a new view showing only that ancestry.
