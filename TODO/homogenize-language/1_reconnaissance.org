@@ -267,7 +267,7 @@ There are two clients now.
   repurposed for the skills task, so these links were dead before today.
 *** DONE J : yes
 **** Claude says: done earlier today, plus 87 citations of moved plans
-* Things with several names (synonyms)
+* DONE Things with several names (synonyms)
 ** DONE The graph's nodes and the view's nodes
 *** DONE What's in use
 - graph side: 'graphnode' (code, dominant), "graph-node" (friendly data
@@ -695,7 +695,7 @@ user-facing, so I'm leaving it. Rename it to 'skg-view-ancestry'?
 adjective.)
 ****** DONE J : yes
 ******* DONE Claude says: done ('9aba068c'): 'skg-view-ancestry', ':SkgViewAncestry'
-** ONGOING The save pipeline
+** DONE The save pipeline
 *** intent, instruction, definition, plan
 - *intent*: per-field, emitted during local instruction collection
   ('instructionMerge_intent', 'lower_collected_intents'). The api doc
@@ -775,7 +775,7 @@ supplementation" as the term, "weave" only for the list-merge algorithm.
 ******* DONE Claude says: nothing; it was done in the earlier round
 "disk supplementation" is the term, "weave" only names the list-merge
 algorithm. The heading's "can't show" meant "didn't show".
-** ONGOING The derived stores
+** DONE The derived stores
 "ephemeral data stores" (the request string), "derived stores"
 (ORIENTATION), "derived databases" (telescopes.org),
 "dbs" (module 'server/dbs/', 240 server lines), "databases",
@@ -811,7 +811,7 @@ do you want?
 I believe the inrustgraph and search index are session-lifetime, right?
 Anyplace we've been saying 'ephemeral'
 we should explicitly state the lifetime instead.
-****** TODO Claude says: right; done ('021c5396'), except 'server/dbs/'
+****** DONE Claude says: right; done ('021c5396'), except 'server/dbs/'
 Both are rebuilt at each server start (and on request), so both are
 session-lifetime. Together they're now the *session-lifetime stores*:
 the command is 'skg-rebuild-session-lifetime-stores'
@@ -821,6 +821,7 @@ from code and docs. If your Emacs config binds the old command, it
 needs the new name. The module 'server/dbs/' keeps its name; rename it
 'server/session_lifetime_stores/'? (It's long; 'server/stores/' would
 do.)
+******* DONE J : nah, let that stand
 ** Collateral views
 "collateral view" (response type, code), "other views" (the save
 envelope key 'other-views'), "affected view". These are not quite
@@ -1010,7 +1011,9 @@ and note that I lowercased the R in two of those words above,
 so that Skgrepo reads as one token.
 ******* TODO Claude says: done ('4f87c287'); should the older names follow your casing?
 As mapped: 'SkgrepoRestriction', 'UnrestrictedVognode' /
-'RestrictedVognode', wire 'restrictedNode' / 'unrestrictedNode', link
+'RestrictedVognode', the metadata atom 'restrictedNode' (rare: only a
+restricted node kept for its unrestricted viewchildren), the clients'
+internal 'unrestrictedNode' (never on the wire), link
 status 'restricted', requests "skgrepo restriction" / "set skgrepo
 restriction", response 'skgrepo-restriction' with field 'restriction'.
 Also 'skg-active-repo-set' -> 'skg-show-skgrepo-restriction'. Untouched:
