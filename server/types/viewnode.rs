@@ -71,7 +71,7 @@ pub enum ViewnodeKind {
 }
 
 /// A viewnode that represents a graphnode, which need not exist: Active
-/// and Inactive vognodes represent current graph members; a Phantom
+/// and Inactive vognodes represent current graphnodes; a Phantom
 /// represents a missing or historical one.
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
@@ -80,8 +80,8 @@ pub enum Vognode {
   Phantom  (Phantom),
 }
 
-/// The three display-only phantom kinds. None of them is a current graph
-/// member: all are save-inert on save and excluded from the view's collateral pids
+/// The three display-only phantom kinds. None of them is a current
+/// graphnode: all are save-inert on save and excluded from the view's collateral pids
 /// (`pids_from_viewforest`). They differ in *why* the node is absent and thus
 /// in how much they can still say about it.
 #[derive( Debug, Clone, PartialEq )]
@@ -94,8 +94,8 @@ pub enum Phantom {
 
 /// A phantom for a node whose .skg file a save just
 /// removed -- one of the three phantom kinds, alongside PhantomDiff and
-/// PhantomUnknown. All three stand in for something that is NOT a current graph
-/// member (so all three are save-inert on save and excluded from the view's
+/// PhantomUnknown. All three stand in for something that is NOT a current
+/// graphnode (so all three are save-inert on save and excluded from the view's
 /// collateral pids, `pids_from_viewforest`); they differ in *why* the node is
 /// absent and thus in how much they can still say about it.
 ///
@@ -704,9 +704,9 @@ impl Vognode {
       Vognode::Phantom  (p) => p . pid_and_skgrepo (),
     } }
 
-  /// Whether this vognode represents a current graph member
+  /// Whether this vognode represents a current graphnode
   /// (Active or Inactive), as opposed to a phantom.
-  pub fn is_graph_member (&self) -> bool {
+  pub fn is_current_graphnode (&self) -> bool {
     ! matches! (self, Vognode::Phantom (_)) }
 }
 
@@ -826,11 +826,11 @@ impl Viewnode {
       _ => false,
     }}
 
-  /// The id of a vognode that represents a current graph member: None
+  /// The id of a vognode that represents a current graphnode: None
   /// for phantoms, inactive vognodes and non-vognodes.
-  pub fn skgid_if_graph_member (&self) -> Option<&ID> {
+  pub fn skgid_if_current_graphnode (&self) -> Option<&ID> {
     match &self . kind {
-      ViewnodeKind::Vognode (v) if v . is_graph_member () => v . skgid (),
+      ViewnodeKind::Vognode (v) if v . is_current_graphnode () => v . skgid (),
       _ => None,
     }}
 

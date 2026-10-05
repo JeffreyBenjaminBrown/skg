@@ -427,7 +427,7 @@ fn is_ancestor_skgid (
   for generation in 1.. {
     match read_at_ancestor_in_tree(
       tree, origin_treeid, generation,
-      |viewnode| viewnode . skgid_if_graph_member () . cloned () )
+      |viewnode| viewnode . skgid_if_current_graphnode () . cloned () )
     { Ok(Some (skgid)) if &skgid == target_skgid
         => return Ok (true),
       Ok (_) => continue,
@@ -443,7 +443,7 @@ pub fn get_skgid_from_treenode (
     read_at_node_in_tree (
       tree, treeid, |viewnode| viewnode . kind . clone() )?;
   match node_kind {
-    ViewnodeKind::Vognode (v) if v . is_graph_member ()
+    ViewnodeKind::Vognode (v) if v . is_current_graphnode ()
       => v . skgid () . cloned () . ok_or_else (
            || "get_id_from_treenode: inactive vognode has no id"
               . into () ),

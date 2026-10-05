@@ -181,7 +181,7 @@ pub fn pid_and_skgrepo_from_required_ancestor (
   read_at_node_in_tree (
     tree, anc,
     |vn : &Viewnode| match &vn . kind {
-      ViewnodeKind::Vognode (v) if v . is_graph_member () =>
+      ViewnodeKind::Vognode (v) if v . is_current_graphnode () =>
         v . pid_and_skgrepo ()
         . map ( |(pid, skgrepo)| (pid . clone (), skgrepo . clone ()) ),
       _ => None } )

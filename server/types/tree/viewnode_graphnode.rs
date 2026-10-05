@@ -48,7 +48,7 @@ pub fn pid_and_skgrepo_from_treenode (
     tree . get (treeid) . ok_or_else ( ||
       format! ( "{}: node not found", caller_name ) ) ?;
   match &node_ref . value() . kind {
-    ViewnodeKind::Vognode (v) if v . is_graph_member () =>
+    ViewnodeKind::Vognode (v) if v . is_current_graphnode () =>
       v . pid_and_skgrepo ()
       . map ( |(pid, skgrepo)| (pid . clone (), skgrepo . clone ()) )
       . ok_or_else (|| format!(
