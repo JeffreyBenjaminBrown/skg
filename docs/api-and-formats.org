@@ -7,6 +7,11 @@ After initialization, every server response is length-prefixed as
 UTF-8 bytes in =PAYLOAD=. The exceptional busy-initializing signal is
 described below.
 
+Many responses carry their main payload in a =(content "...")= field.
+That field is just "the payload": it has nothing to do with a node's
+=contains= list or the "content view" (though a content-view response
+has one too).
+
 The shared overPrivateText-telescope release warning is
 =OPERATION includes title or body text selected below its node's home
 skgrepo for PID P.= (or =PIDs P1, P2, ...=). A restricted request that
