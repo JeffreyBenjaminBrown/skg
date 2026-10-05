@@ -147,14 +147,16 @@ Slices, in order; mark each when done:
 - [X] S5 Rust identifiers (310 names; serde renames keep TOML keys repos/default_repo_set; module files repo_sets.rs, repo_switch.rs moved; generic param Repo kept); prose repo-set -> skgrepo-set; privacy level. Clients' bare 'repo' NOT renamed (wire-key collision risk) -> question for Jeff. Reverted sweep edits in non-skg tools/ (call-graph "edges").
 * Homonyms ("One name, several things"), one commit each
 - [X] snapshot: cc12a25a. Wire atoms request-snapshot / snapshot response kept. Flake: grouped_views subscribee_folder_empty_persists (DirectoryNotEmpty; passes alone).
-- [ ] index (prose only; relMap is Jeff's question, don't implement)
-- [ ] context -> prominence
-- [ ] branching viewnode (glossary + role_tree.rs; paths.rs waits)
-- [ ] ephemeral glossary -> view-lifetime
-- [ ] OTHER_SKGREPO_DEPENDENCIES.toml
-- [ ] commit -> git-commit / skgsave-commit / tantivy-commit
-- [ ] publish -> swap in (generations); Hoist moves the text to home
-- [ ] content (api preamble sentence)
-- [ ] viewbranch (glossary + prose)
-- [ ] is_graph_member -> is_current_graphnode
-- [ ] PartnerFolder glossary: many kinds, list them
+- [X] index (prose only; relMap is Jeff's question, don't implement): cc6b0b50
+- [X] context -> prominence: eec7da34
+- [X] branching viewnode (glossary + role_tree.rs; paths.rs waits): 62e82771
+- [X] ephemeral glossary -> view-lifetime: 72aae25e
+- [X] OTHER_SKGREPO_DEPENDENCIES.toml: a0ddb164
+- [X] commit -> git-commit / skgsave-commit / tantivy-commit: 2629930a
+- [X] publish -> swap in (generations); Hoist moves the text to home: 0a840144
+- [X] content (api preamble sentence): 4f9b43f7
+- [X] viewbranch (glossary + prose): c372d96a
+- [X] is_graph_member -> is_current_graphnode: 17fcc1d7
+- [X] PartnerFolder glossary: many kinds, list them: 0747487b + 38f05640 (table)
+- [X] names.org never-bare rule: 13d33d3b. Doc statuses: 81fee9b9.
+- NEXT (Jeff answered elsewhere in the doc): relation names "all of them" + one-off migration script (don't run on his data without asking); move finished plans to TODO/DONE (he said yes).
