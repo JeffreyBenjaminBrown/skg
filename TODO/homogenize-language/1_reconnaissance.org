@@ -1009,7 +1009,7 @@ the mapping I'd use. Correct it before I start:
 ****** DONE J : rename them all
 and note that I lowercased the R in two of those words above,
 so that Skgrepo reads as one token.
-******* TODO Claude says: done ('4f87c287'); should the older names follow your casing?
+******* DONE Claude says: done ('4f87c287'); should the older names follow your casing?
 As mapped: 'SkgrepoRestriction', 'UnrestrictedVognode' /
 'RestrictedVognode', the metadata atom 'restrictedNode' (rare: only a
 restricted node kept for its unrestricted viewchildren), the clients'
@@ -1023,6 +1023,8 @@ config, and fixture node IDs like 'active-a'.
 Your casing: the new names use 'Skgrepo'. The existing types still say
 'SkgRepo' ('SkgRepo', 'SkgRepoName', 'SkgRepoSetName',
 'ForkSkgRepoNotOwned', ...). Shall I make them 'Skgrepo...' too?
+******** DONE J : yes, let's make those all Skgrepo not SkgRepo
+********* DONE Claude says: done ('b98172d4')
 ** DONE owner
 Edge holder vs extra-ID holder vs user ownership. See [[*The two ends of an edge: holder, member, partner][holder]].
 *** DONE edge recorder, extra-id carrier, user owns
@@ -1040,7 +1042,7 @@ The third is different: it is about ownership, not this view.
 Recommendation: say "foreign" for repos, never "write-protected".
 *** DONE J : yes
 *** DONE Claude says: done under [[*Ownership][Ownership]]
-** ONGOING generation
+** DONE generation
 The published runtime generation ('RuntimeGeneration'); an ancestor's
 distance in '(rels ...)' ("Generation 1 is the visible parent",
 'generations_climbed'); and the client-side buffer generation that
@@ -1080,7 +1082,7 @@ I said digraph because I wanted to be agnostic.
 Looking at it again I realize it counts in reverse!
 So scratch DigraphGeneration. Let's call it PredecessorGeneration.
 That's precise and clear, right?
-****** TODO Claude says: precise, with one risk; I'd say AncestorGeneration
+****** DONE Claude says: precise, with one risk; I'd say AncestorGeneration
 The number counts up the view tree: 1 is the viewparent, 2 the
 grandparent, so it is a distance to a viewancestor. "Predecessor" is
 right in the transitive sense. But in graph theory a predecessor is
@@ -1089,6 +1091,11 @@ relation partners (often containers, i.e. graph predecessors), so a
 reader could take it to count graph steps. 'AncestorGeneration' (prose:
 "the ancestor's generation") says it's the view tree. Your pick; I'll
 rename when you choose.
+******* DONE J : agreed, ancestor generation
+******** DONE Claude says: done ('1cc9b460')
+The herald code, both clients' herald renderers, the docs, names.org
+and a glossary entry. The tree utilities' "generation" (counting down
+from a root) keeps its name.
 ***** DONE Claude says: the runtime and buffer parts are done ('d1a8c812')
 Only the ancestor sense waits on the question above.
 ** DONE snapshot
