@@ -131,7 +131,7 @@ plain parens (TODO/more.org). Fields producing no herald get none."
       (should (equal (funcall hint-on-line "**** false") " (\u22a5)"))
       (should-not (funcall hint-on-line "**** main"))
       (should-not (funcall hint-on-line "*** repo"))
-      ;; The buffer TEXT is untouched: committing must not see hints.
+      ;; The buffer TEXT is untouched: applying must not see hints.
       (should-not (string-match-p "(\u262e)" (buffer-string))))))
 
 (provide 'test-skg-metadata-editing)

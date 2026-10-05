@@ -224,7 +224,7 @@ and hide INTERNAL from M-x completion."
 
 (let ((map skg-sexp-edit-mode-map))
   (setcdr map nil)
-  (define-key map (kbd "C-c C-c")   #'skg-sexp-edit--commit)
+  (define-key map (kbd "C-c C-c")   #'skg-sexp-edit--apply)
   (define-key map (kbd "S-<left>")  #'skg-sexp-edit-cycle-left)
   (define-key map (kbd "S-<right>") #'skg-sexp-edit-cycle-right))
 

@@ -20,7 +20,7 @@ local function expanded_headlines (sexp_text, default_skgrepo,
   return bijection.extract_headlines(expanded)
 end
 
----Expand then strip then re-read, as the edit-buffer commit path does.
+---Expand then strip then re-read, as the edit-buffer apply path does.
 local function round_trip (sexp_text, default_skgrepo)
   local org_text = bijection.sexp_to_org(sexpr.read(sexp_text))
   local expanded = defaults.expand_defaults_in_org(

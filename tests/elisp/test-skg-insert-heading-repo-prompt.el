@@ -382,10 +382,10 @@ in place and opens the empty-node view: repo pre-filled, others childless."
                  (should (string-match-p "^\\*\\* a new node$" content))))
            (kill-buffer edit-buf)))))))
 
-;; Round-trip: committing the untouched view yields just the skgrepo.
+;; Round-trip: applying the untouched view yields just the skgrepo.
 
-(ert-deftest test-edit-metadata-empty-commit-untouched ()
-  "Committing the untouched empty-node view yields (skg (node (repo only)))."
+(ert-deftest test-edit-metadata-empty-apply-untouched ()
+  "Applying the untouched empty-node view yields (skg (node (repo only)))."
   (test--with-skg-content-view
    "* a new node\n"
    test--config-one-repo
@@ -393,7 +393,7 @@ in place and opens the empty-node view: repo pre-filled, others childless."
      (let ((source-buffer (current-buffer)))
        (skg-view-metadata)
        (with-current-buffer (test--skg-edit-buffer)
-         (skg-sexp-edit--commit))
+         (skg-sexp-edit--apply))
        (with-current-buffer source-buffer
          (should (string-match-p
                   "^\\* (skg (node (repo only))) a new node$"
@@ -402,7 +402,7 @@ in place and opens the empty-node view: repo pre-filled, others childless."
 
 ;; Round-trip: a field the user populates survives; the rest stay na.
 
-(ert-deftest test-edit-metadata-empty-commit-with-write-protected ()
+(ert-deftest test-edit-metadata-empty-apply-with-write-protected ()
   "Populating writeProtected=true in the view yields (skg (node (repo only) writeProtected)),
 while the untouched fields contribute no keys."
   (test--with-skg-content-view
@@ -418,7 +418,7 @@ while the untouched fields contribute no keys."
          (re-search-forward "^\\*\\*\\* writeProtected$" nil t)
          (end-of-line)
          (insert "\n**** true")
-         (skg-sexp-edit--commit))
+         (skg-sexp-edit--apply))
        (with-current-buffer source-buffer
          (should (string-match-p
                   "^\\* (skg (node (repo only) writeProtected)) a new node$"

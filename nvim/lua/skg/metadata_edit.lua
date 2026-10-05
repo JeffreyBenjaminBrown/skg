@@ -1,12 +1,12 @@
 -- PURPOSE: Edit a headline's metadata sexp as an org tree in a
--- temporary buffer: ':w' (or <localleader>cc) commits the edited tree
+-- temporary buffer: ':w' (or <localleader>cc) applies the edited tree
 -- back into the source headline; killing the buffer cancels;
 -- S-left/S-right cycle field values. The Lua port of
 -- elisp/skg-sexpr-edit.el and skg-sexpr-edit/skg-sexpr-cycling.el.
 --
 -- DEVIATION: the elisp made the display-only title group read-only
 -- with text properties; nvim has no per-range read-only text, so
--- title edits are simply DISCARDED at commit (the strip step drops
+-- title edits are simply DISCARDED at apply (the strip step drops
 -- the title group whatever it holds).
 --
 -- DEVIATION: the elisp advised org-insert-heading-respect-content so
@@ -31,7 +31,7 @@ M.help_text =
 ---Edit the metadata sexp on the current headline. With no metadata,
 ---populates a minimal (skg (node (repo X))) in place and opens the
 ---empty-node view over it: skgrepo pre-filled, the other editable
----fields childless, so an untouched commit yields just the skgrepo.
+---fields childless, so an untouched apply yields just the skgrepo.
 function M.edit_metadata ()
   if not metadata.at_headline_p() then error('Not on a headline') end
   local source_buf = vim.api.nvim_get_current_buf()
@@ -94,7 +94,7 @@ function M.empty_node_org_text (skgrepo, title)
 end
 
 ---Open the edit buffer over ORG_TEXT, remembering where the metadata
----lives in the source buffer (line + byte range) so commit can splice it.
+---lives in the source buffer (line + byte range) so apply can splice it.
 ---@param org_text string
 ---@param source_buf integer
 ---@param line_number integer
@@ -122,11 +122,11 @@ function M.open_edit_buffer (org_text, source_buf, line_number,
   vim.b[buf].skg_edit_is_unrestrictedNode = is_unrestrictedNode
   vim.api.nvim_create_autocmd('BufWriteCmd', {
     buffer = buf,
-    callback = function () M.commit(buf) end })
+    callback = function () M.apply(buf) end })
   vim.keymap.set('n', '<localleader>cc',
-                 function () M.commit(buf) end,
+                 function () M.apply(buf) end,
                  { buffer = buf,
-                   desc = 'Commit the edited metadata' })
+                   desc = 'Apply the edited metadata' })
   vim.keymap.set('n', '<S-Left>', function () M.cycle(-1) end,
                  { buffer = buf, desc = 'Cycle this value left' })
   vim.keymap.set('n', '<S-Right>', function () M.cycle(1) end,
@@ -147,10 +147,10 @@ function M.goto_field_value (field_name)
   end
 end
 
----Commit the edit buffer back into the source headline's metadata,
+---Apply the edit buffer back into the source headline's metadata,
 ---then kill the edit buffer and return to the source buffer.
 ---@param buf integer
-function M.commit (buf)
+function M.apply (buf)
   local source_buf = vim.b[buf].skg_edit_source_buf
   local line_number = vim.b[buf].skg_edit_line
   local start_col = vim.b[buf].skg_edit_start

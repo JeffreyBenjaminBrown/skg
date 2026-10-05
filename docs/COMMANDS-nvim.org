@@ -557,7 +557,7 @@ an empty rerender stream releases the client's preemptive locks.
 *** <localleader>vm : :SkgViewMetadata
 When called from a node in a view of the graph,
 this switches to a view of the metadata of that node,
-with one field per org branch. ':w' (or <localleader>cc) commits
+with one field per org branch. ':w' (or <localleader>cc) applies
 the edited tree back into the source headline; ':bd!' cancels;
 S-Left / S-Right cycle a field's value (writeProtected, affectsParent,
 editRequest, skgrepo, ...).

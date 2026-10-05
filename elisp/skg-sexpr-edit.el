@@ -41,7 +41,7 @@
 (define-minor-mode skg-sexp-edit-mode
   "Minor mode for editing sexps as org text.
 \\<skg-sexp-edit-mode-map>
-\\[skg-sexp-edit--commit] to save changes back to the source buffer.
+\\[skg-sexp-edit--apply] to save changes back to the source buffer.
 Kill the buffer to cancel without saving."
   :lighter " SExp-Edit"
   :keymap skg-sexp-edit-mode-map)
@@ -50,7 +50,7 @@ Kill the buffer to cancel without saving."
 ;; Core implementation
 ;;
 
-(defun skg-sexp-edit--commit ()
+(defun skg-sexp-edit--apply ()
   "Save changes from sexp-edit buffer back to the repo sexp."
   (interactive)
   (let* ((org-text (buffer-substring-no-properties
@@ -105,7 +105,7 @@ SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER."
   "Append, per headline, the herald its metadata path produces:
 colored per herald rules, inside (uncolored) parentheses, after the
 rest of the title (TODO/more.org). Implemented as overlays, so the
-hints never become buffer text -- committing reads titles, and a
+hints never become buffer text -- applying reads titles, and a
 herald baked into a title would corrupt the sexp. A no-op without a
 rule table (e.g. no server connection). Hints reflect the values at
 open time; cycling a value does not refresh them."

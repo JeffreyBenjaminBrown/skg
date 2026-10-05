@@ -1,7 +1,7 @@
 -- Mirrors tests/elisp/test-skg-biggest-branch.el, the
 -- replace-content<->link cases of test-skg-metadata.el, the
 -- view-request command shapes, and the metadata edit buffer's
--- commit/cycle round trips (test-skg-insert-heading.el's empty-node
+-- apply/cycle round trips (test-skg-insert-heading.el's empty-node
 -- view cases and test-skg-metadata-editing.el's spirit).
 
 local defaults = require('skg.sexpr.unrestrictednode_defaults')
@@ -242,14 +242,14 @@ describe('skg.metadata_edit', function ()
           vim.api.nvim_get_current_buf(), { force = true })
   end)
 
-  it('opens the expanded view and commits an edit back', function ()
+  it('opens the expanded view and applies an edit back', function ()
     local source_buf = buffer_with(
       '* (skg (node (id abc) (repo public))) my title')
     metadata_edit.edit_metadata()
     local edit_buf = vim.api.nvim_get_current_buf()
     assert.is_truthy(vim.api.nvim_buf_get_name(edit_buf)
                      :find('metadata%-edit'))
-    -- Flip write-protected's value to true, then commit.
+    -- Flip write-protected's value to true, then apply.
     for line = 1, vim.api.nvim_buf_line_count(edit_buf) do
       if metadata.line_text(line):match('^%*+ writeProtected$') then
         vim.api.nvim_buf_set_lines(edit_buf, line, line + 1, false,
@@ -257,14 +257,14 @@ describe('skg.metadata_edit', function ()
         break
       end
     end
-    metadata_edit.commit(edit_buf)
+    metadata_edit.apply(edit_buf)
     assert.are.equal(source_buf, vim.api.nvim_get_current_buf())
     assert.are.equal(
       '* (skg (node (id abc) (repo public) writeProtected)) my title',
       buffer_text())
   end)
 
-  it('builds the empty-node view and commits just the repo',
+  it('builds the empty-node view and applies just the repo',
      function ()
     -- Mirrors the empty-node skeleton cases of
     -- test-skg-insert-heading-repo-prompt.el.
@@ -276,7 +276,7 @@ describe('skg.metadata_edit', function ()
     assert.is_truthy(text:find('%* title'))
     assert.is_truthy(text:find('just a plain headline', 1, true))
     assert.is_truthy(text:find('%*%*%*%* public'))
-    metadata_edit.commit(edit_buf)
+    metadata_edit.apply(edit_buf)
     assert.are.equal(source_buf, vim.api.nvim_get_current_buf())
     assert.are.equal(
       '* (skg (node (repo public))) just a plain headline',
