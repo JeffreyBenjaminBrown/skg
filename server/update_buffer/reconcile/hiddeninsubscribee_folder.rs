@@ -2,8 +2,8 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::to_org::complete::partner_folder::child_data::{ChildData, apply_relationship_axes_to_folder_members, build_child_data, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
 use crate::to_org::complete::partner_folder::goal_list::goal_list_for_hiddenInSubscribee_folder;
-use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgRepoDiff, file_node_axes_from_skgrepo_diff};
-use crate::types::misc::{ID, SkgRepoName};
+use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgrepoDiff, file_node_axes_from_skgrepo_diff};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::nodes::complete::Graphnode;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
@@ -19,12 +19,12 @@ use std::error::Error;
 
 struct HiddenInContext {
   subscriber_pid      : ID,
-  subscriber_skgrepo  : SkgRepoName,
+  subscriber_skgrepo  : SkgrepoName,
   subscribee_pid      : ID,
-  subscribee_skgrepo  : SkgRepoName,
+  subscribee_skgrepo  : SkgrepoName,
   subscribee_contains : Vec<ID>,
   subscriber_hides    : Vec<ID>,
-  relRepos            : HashMap<ID, SkgRepoName>,
+  relRepos            : HashMap<ID, SkgrepoName>,
 }
 
 /// HiddenInSubscribeeFolder completion (called at this folder's own BFS visit).
@@ -42,9 +42,9 @@ struct HiddenInContext {
 pub fn reconcile_hiddenInSubscribeeFolder_children (
   node                           : NodeId,
   tree                           : &mut Tree<Viewnode>,
-  skgrepo_diffs                  : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs                  : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   runtime                        : &RuntimeGeneration,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
   warning_sink                   : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
@@ -78,7 +78,7 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
     // contains), so no single relation diff is authoritative: the
     // relationship signs come from the three-snapshot comparison;
     // node signs from the member's own file statuses.
-    |child : &ID, child_src : &SkgRepoName|
+    |child : &ID, child_src : &SkgrepoName|
     -> (NodeAxes, RelationshipAxes) {
     ( file_node_axes_from_skgrepo_diff (
         skgrepo_diffs, child, child_src ),
@@ -124,10 +124,10 @@ fn read_hiddenin_context (
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: ancestry table indices -- subscribee = index 0 (parent), subscriber =
   // index 2 (the full [Unrestricted, SubscribeeFolder, Unrestricted] chain), read through the
   // helper so this multi-level read shares the death-check's spec.
-  let (subscribee_pid, subscribee_skgrepo) : (ID, SkgRepoName) =
+  let (subscribee_pid, subscribee_skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_required_ancestor(
       tree, node, 0, kind . caller_label () ) ?;
-  let (subscriber_pid, subscriber_skgrepo) : (ID, SkgRepoName) =
+  let (subscriber_pid, subscriber_skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_required_ancestor(
       tree, node, 2, kind . caller_label () ) ?;
   // relRepo gating (render-and-gating, 5_plan.org): these are the
@@ -138,7 +138,7 @@ fn read_hiddenin_context (
   // recorded in a restricted skgrepo must not participate, in either
   // direction, or a private containment/hide would leak by omission
   // or by appearance.
-  let skgrepo_unrestricted = |skgrepo : &SkgRepoName| match skgrepo_restriction {
+  let skgrepo_unrestricted = |skgrepo : &SkgrepoName| match skgrepo_restriction {
     None      => true,
     Some (a)  => a . is_all () || a . contains_skgrepo (skgrepo) };
   let subscribee_contains : Vec<ID> = {
@@ -150,7 +150,7 @@ fn read_hiddenin_context (
       . filter ( |m| skgrepo_unrestricted (& m . relRepo) )
       . map ( |m| m . member . clone () )
       . collect () };
-  let (subscriber_hides, relRepos) : (Vec<ID>, HashMap<ID, SkgRepoName>) = {
+  let (subscriber_hides, relRepos) : (Vec<ID>, HashMap<ID, SkgrepoName>) = {
     let subscriber_graphnode : Graphnode =
       graphnode_graphFirst_by_pid_and_skgrepo (
         &runtime . graph, &runtime . config,

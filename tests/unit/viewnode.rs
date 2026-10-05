@@ -24,14 +24,14 @@ fn partnerFolder_policy_mapping () {
 #[test]
 fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   let mut restriction : Viewnode = mk_viewnode (
-    ID::from ("unrestricted"), SkgRepoName::from ("public"), "unrestricted" . into (),
+    ID::from ("unrestricted"), SkgrepoName::from ("public"), "unrestricted" . into (),
     AffectsParent::True, Birth::Unremarkable,
     Editability::Editable {
       body : None,
       edit_request : Some (NodeEditRequest::Delete) },
     [ViewRequest::Editable] . into_iter () . collect () );
   if let ViewnodeKind::Vognode (Vognode::Unrestricted (node)) = &mut restriction . kind {
-    node . relRepo_request = Some (SkgRepoName::from ("private")); }
+    node . relRepo_request = Some (SkgrepoName::from ("private")); }
   restriction . consume_edit_request_after_save ();
   let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) = &restriction . kind
   else { panic! ("expected unrestricted node"); };
@@ -44,7 +44,7 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
     kind : ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (PhantomUnknown {
       skgid : ID::from ("unknown"),
       relRepo : None,
-      relRepo_request : Some (SkgRepoName::from ("private")), }))) };
+      relRepo_request : Some (SkgrepoName::from ("private")), }))) };
   unknown . consume_edit_request_after_save ();
   let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) = &unknown . kind
   else { panic! ("expected unknown node"); };
@@ -55,7 +55,7 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
     kind : ViewnodeKind::Property (Property::Alias {
       text : "alias" . into (),
       relRepo : None,
-      relRepo_request : Some (SkgRepoName::from ("private")),
+      relRepo_request : Some (SkgrepoName::from ("private")),
       relationship_axes : RelationshipAxes::default (), }) };
   alias . consume_edit_request_after_save ();
   let ViewnodeKind::Property (Property::Alias { relRepo_request, .. }) =

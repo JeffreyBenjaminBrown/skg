@@ -3,7 +3,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::in_rust_graph::containerward_role_tree::ContainerwardRoleTree;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, SkgConfig, SkgRepoName, TantivyIndex};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::viewnode::{Birth, Viewnode, ViewnodeKind, AffectsParent, mk_writeProtected_viewnode_with_birth};
 use crate::types::viewnode::Vognode;
@@ -228,7 +228,7 @@ fn prepend_containing_child_from_tantivy (
             AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER) ) }},
       None =>
         mk_writeProtected_viewnode_with_birth (
-          node_id . clone (), SkgRepoName::from ("search"),
+          node_id . clone (), SkgrepoName::from ("search"),
           node_id . as_str () . to_string (),
           AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER) ) };
   let mut parent_mut : NodeMut<Viewnode> =

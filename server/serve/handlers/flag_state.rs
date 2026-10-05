@@ -6,7 +6,7 @@ use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, value_from_request_sexp};
 use crate::types::env::SkgEnv;
-use crate::types::misc::{ID, SkgConfig, SkgRepoName};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::{
   Flag, flag_is_true};
 
@@ -48,8 +48,8 @@ pub fn flag_state (
   config   : &SkgConfig,
   skgid    : &ID,
   flag : Flag,
-) -> Result<(ID, SkgRepoName, bool, bool), String> {
-  let (pid, skgrepo) : (ID, SkgRepoName) = graph . pid_and_skgrepo (skgid)
+) -> Result<(ID, SkgrepoName, bool, bool), String> {
+  let (pid, skgrepo) : (ID, SkgrepoName) = graph . pid_and_skgrepo (skgid)
     . ok_or_else (|| format! ("id '{}' is not in the graph", skgid)) ?;
   let node = graphnode_from_graph (graph, &pid)
     . ok_or_else (|| format! ("canonical id '{}' is not in the graph", pid)) ?;

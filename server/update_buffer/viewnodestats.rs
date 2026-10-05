@@ -4,7 +4,7 @@ use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole };
 use crate::herald_tokens::{AncestorFlags, BirthFact, Side, relationship_heralds_sexp};
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, SkgConfig, SkgRepoName};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
   Birth, GraphnodeStats, AffectsParent, PartnerFolder, Viewnode, ViewnodeKind, Vognode };
 use crate::update_buffer::ancestry::required_ancestor;
@@ -384,7 +384,7 @@ fn set_relRepo (
   graph  : Option<&InRustGraph>,
   config : &SkgConfig,
 ) {
-  let relRepo : Option<SkgRepoName> = 'compute : {
+  let relRepo : Option<SkgrepoName> = 'compute : {
     let graph : &InRustGraph = match graph {
       Some (g) => g, None => break 'compute None, };
     let (node_pid, affectsParent, birth) : (ID, AffectsParent, Birth) = {
@@ -420,13 +420,13 @@ fn set_relRepo (
             (anchor_pid, role . relation, node_pid . clone ())
           }},
         ParentKind::Other => break 'compute None, };
-    let skgrepo : SkgRepoName =
+    let skgrepo : SkgrepoName =
       match graph . relRepo (&recorder_pid, relation, &target_pid) {
         Some (l) => l, None => break 'compute None, };
-    let default : SkgRepoName = {
-      let recorder_home : Option<SkgRepoName> =
+    let default : SkgrepoName = {
+      let recorder_home : Option<SkgrepoName> =
         graph . pid_and_skgrepo (&recorder_pid) . map ( |(_, s)| s );
-      let target_home : Option<SkgRepoName> =
+      let target_home : Option<SkgrepoName> =
         graph . pid_and_skgrepo (&target_pid) . map ( |(_, s)| s );
       match (recorder_home, target_home) {
         (Some (a), Some (b)) =>
@@ -440,7 +440,7 @@ fn set_relRepo (
 #[cfg(test)]
 mod relationship_default_tests {
   use super::*;
-  use crate::types::misc::{RelPartner, SkgRepo};
+  use crate::types::misc::{RelPartner, Skgrepo};
   use crate::types::nodes::complete::{empty_graphnode, Graphnode};
   use crate::types::viewnode::{
     mk_editable_viewnode, viewforest_root_viewnode};
@@ -449,31 +449,31 @@ mod relationship_default_tests {
   #[test]
   fn owned_to_foreign_recorder_home_relationship_has_no_override_herald () {
     let mut config : SkgConfig = {
-      let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+      let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
         HashMap::new ();
       for (name, owned) in
           [("public", true), ("foreign", false), ("private", true)] {
         skgrepos . insert (
-          SkgRepoName::from (name),
-          SkgRepo {
-            name         : SkgRepoName::from (name),
+          SkgrepoName::from (name),
+          Skgrepo {
+            name         : SkgrepoName::from (name),
             abbreviation : None,
             path         : PathBuf::from (name),
             owned        : owned, } ); }
-      SkgConfig::dummyFromSkgRepos (skgrepos) };
+      SkgConfig::dummyFromSkgrepos (skgrepos) };
     config . skgrepo_order = ["public", "foreign", "private"]
-      . into_iter () . map (SkgRepoName::from) . collect ();
+      . into_iter () . map (SkgrepoName::from) . collect ();
 
     let mut recorder : Graphnode = empty_graphnode ();
     recorder . pid = ID::new ("recorder");
     recorder . title = "recorder" . to_string ();
-    recorder . home_skgrepo = SkgRepoName::from ("public");
+    recorder . home_skgrepo = SkgrepoName::from ("public");
     recorder . contains = vec! [ RelPartner::at_relRepo (
-      SkgRepoName::from ("public"), ID::new ("member") ) ];
+      SkgrepoName::from ("public"), ID::new ("member") ) ];
     let mut member : Graphnode = empty_graphnode ();
     member . pid = ID::new ("member");
     member . title = "member" . to_string ();
-    member . home_skgrepo = SkgRepoName::from ("foreign");
+    member . home_skgrepo = SkgrepoName::from ("foreign");
     let graph : InRustGraph =
       InRustGraph::from_graphnodes (&[recorder, member]);
 
@@ -481,11 +481,11 @@ mod relationship_default_tests {
       Tree::new (viewforest_root_viewnode ());
     let recorder_treeid : NodeId = tree . root_mut () . append (
       mk_editable_viewnode (
-        ID::new ("recorder"), SkgRepoName::from ("public"),
+        ID::new ("recorder"), SkgrepoName::from ("public"),
         "recorder" . to_string (), None ) ) . id ();
     let member_treeid : NodeId = tree . get_mut (recorder_treeid)
       . unwrap () . append ( mk_editable_viewnode (
-        ID::new ("member"), SkgRepoName::from ("foreign"),
+        ID::new ("member"), SkgrepoName::from ("foreign"),
         "member" . to_string (), None ) ) . id ();
 
     set_relRepo (
@@ -505,12 +505,12 @@ fn set_skgrepo_at_boundary (
   tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
 ) {
-  let node_skgrepo : SkgRepoName = {
+  let node_skgrepo : SkgrepoName = {
     let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
     t . home_skgrepo . clone () };
-  let ancestor_skgrepo : Option<SkgRepoName> =
+  let ancestor_skgrepo : Option<SkgrepoName> =
     nearest_unrestrictedVognode_ancestor_skgrepo (tree, treeid);
   let at_boundary : bool =
     match ancestor_skgrepo {
@@ -518,14 +518,14 @@ fn set_skgrepo_at_boundary (
       Some (s) => s != node_skgrepo };
   if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
-  { t . viewStats . homeSkgRepoAtBoundary = at_boundary; }}
+  { t . viewStats . homeSkgrepoAtBoundary = at_boundary; }}
 
 /// Walk rootward from treeid (exclusive) to find
 /// the nearest unrestricted vognode ancestor's skgrepo.
 fn nearest_unrestrictedVognode_ancestor_skgrepo (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
-) -> Option<SkgRepoName> {
+) -> Option<SkgrepoName> {
   let mut current : NodeId = treeid;
   while let Some (parent_ref)
     = tree . get (current) . unwrap () . parent ()

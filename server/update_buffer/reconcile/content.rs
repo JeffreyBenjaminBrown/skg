@@ -2,7 +2,7 @@ use crate::to_org::complete::contents::clobberWriteProtectedViewnode;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::viewnode::{mk_restricted_viewnode, mk_unknown_viewnode};
 use crate::to_org::util::{EditableMap, make_writeProtected_if_repeat_then_extend_editable_map};
-use crate::types::misc::{ID, SkgConfig, SkgRepoName};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::{
     OverrideResolution, resolve_override};
@@ -39,14 +39,14 @@ enum ContentReality {
 
 struct ChildData {
   title        : String,
-  home_skgrepo : SkgRepoName,
+  home_skgrepo : SkgrepoName,
   body         : Option<String>,
   kind         : ContentReality,
   /// The exact stored relRepo of an unresolved relationship member.
   /// Known children derive their display facts from their graphnode;
   /// an Unknown has no home, so only this retained relationship fact can draw
   /// its optional relRepo herald.
-  relRepo : Option<SkgRepoName>,
+  relRepo : Option<SkgrepoName>,
   /// Some(R) = override substitution applies: draw R, marked
   /// '(overridesHere goal-id)', in place of the goal member. The
   /// title/repo/body above are then R's. Only ContentReality::Real
@@ -74,7 +74,7 @@ pub fn expand_true_content_at_unrestrictedVognode (
   editable_map                   : &mut EditableMap,
   config             : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
   settled                        : bool,
@@ -96,7 +96,7 @@ pub fn expand_true_content_at_unrestrictedVognode (
     // map entry. Ordinary nodes still dedup first-wins (Tentative).
     make_writeProtected_if_repeat_then_extend_editable_map(
       tree, node, editable_map ) ?; }
-  let (pid, initial_skgrepo) : (ID, SkgRepoName) =
+  let (pid, initial_skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_viewnode_at( tree, node,
                                   "expand_true_content_at_unrestrictedVognode" ) ?;
   // This content path produces the pure worktree view; the node's git diff
@@ -174,7 +174,7 @@ fn sync_unrestrictedVognode_from_disk (
 ) -> Result<(), Box<dyn Error>> {
   let disk_title   : String = graphnode . title . clone ();
   let disk_body    : Option<String> = graphnode . body . clone ();
-  let disk_skgrepo : SkgRepoName = graphnode . home_skgrepo . clone ();
+  let disk_skgrepo : SkgrepoName = graphnode . home_skgrepo . clone ();
   write_at_unrestrictedVognode_in_tree (
     tree, node,
     |t| { t . title = disk_title;
@@ -193,7 +193,7 @@ fn reconcile_content_children (
   graphnode                   : &Graphnode,
   config                         : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
   substitution_enabled           : bool,
@@ -222,7 +222,7 @@ fn reconcile_content_children (
     . map ( |m| graph_snap . pid_of ( &m . member )
                  . unwrap_or_else ( || m . member . clone () ))
     . collect ();
-  let relRepos : HashMap<ID, SkgRepoName> = content_members . iter ()
+  let relRepos : HashMap<ID, SkgrepoName> = content_members . iter ()
     .map ( |m| ( graph_snap . pid_of ( &m . member )
                   . unwrap_or_else ( || m . member . clone () ),
                   m . relRepo . clone () ))
@@ -314,7 +314,7 @@ fn replace_raw_content_children_with_visible_overriders (
       let effective : ID = resolve_override (
         config, graph_snap, skgrepo_restriction, &original ) . effective;
       if effective == original { continue; }
-      let skgrepo : SkgRepoName = graph_snap . pid_and_skgrepo (&effective)
+      let skgrepo : SkgrepoName = graph_snap . pid_and_skgrepo (&effective)
         . map (|(_pid, skgrepo)| skgrepo)
         . ok_or_else (|| format! (
           "replace_raw_content_children_with_visible_overriders: no repo for overrider {}",
@@ -366,7 +366,7 @@ pub(in crate::update_buffer) fn mutate_unrestrictedVognode_to_deletednode (
   tree    : &mut Tree<Viewnode>,
   node    : NodeId,
   pid     : &ID,
-  skgrepo : &SkgRepoName,
+  skgrepo : &SkgrepoName,
 ) -> Result<(), Box<dyn Error>> {
   let (title, body) : (String, Option<String>) =
     read_at_node_in_tree ( tree, node,
@@ -482,7 +482,7 @@ fn content_goal_list (
   if !is_subscribee {
     Ok ( content_skgids . to_vec () )
   } else {
-    let (grandparent_pid, grandparent_skgrepo) : (ID, SkgRepoName) =
+    let (grandparent_pid, grandparent_skgrepo) : (ID, SkgrepoName) =
       pid_and_skgrepo_from_ancestor( tree, node, 2,
                                     "content_goal_list" ) ?;
     let grandparent_graphnode : Graphnode =
@@ -502,7 +502,7 @@ fn content_goal_list (
     // explains its absence (leak by omission). Mirrors the
     // 'reconcile_content_children' gate on 'graphnode.contains'
     // just above.
-    let skgrepo_unrestricted = |skgrepo : &SkgRepoName| match skgrepo_restriction {
+    let skgrepo_unrestricted = |skgrepo : &SkgrepoName| match skgrepo_restriction {
       None      => true,
       Some (a)  => a . is_all () || a . contains_skgrepo (skgrepo) };
     let worktree_hidden : Vec<ID> =
@@ -547,11 +547,11 @@ fn complete_content_children (
   tree               : &mut Tree<Viewnode>,
   node               : NodeId,
   goal_list          : &[ID],
-  relRepos : &HashMap<ID, SkgRepoName>,
-  recorder_home      : &SkgRepoName,
+  relRepos : &HashMap<ID, SkgrepoName>,
+  recorder_home      : &SkgrepoName,
   config             : &SkgConfig,
   graph_snap         : &Arc<InRustGraph>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   substitution_enabled : bool,
@@ -647,8 +647,8 @@ fn normalize_relationship_backed_content_unknowns (
   tree                 : &mut Tree<Viewnode>,
   node                 : NodeId,
   goal_list            : &[ID],
-  relRepos             : &HashMap<ID, SkgRepoName>,
-  recorder_home        : &SkgRepoName,
+  relRepos             : &HashMap<ID, SkgrepoName>,
+  recorder_home        : &SkgrepoName,
   graph_snap           : &Arc<InRustGraph>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
 ) -> Result<(), Box<dyn Error>> {
@@ -768,18 +768,18 @@ fn build_child_creation_data (
   tree               : &Tree<Viewnode>,
   node               : NodeId,
   goal_list          : &[ID],
-  relRepos : &HashMap<ID, SkgRepoName>,
+  relRepos : &HashMap<ID, SkgrepoName>,
   config             : &SkgConfig,
   graph_snap         : &Arc<InRustGraph>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   substitution_enabled : bool,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
-  let child_skgrepos : HashMap<ID, SkgRepoName> =
+  let child_skgrepos : HashMap<ID, SkgrepoName> =
     { let node_ref : NodeRef<Viewnode> =
         tree . get (node)
           . ok_or ("build_child_creation_data: node not found") ?;
-      let mut m : HashMap<ID, SkgRepoName> = HashMap::new();
+      let mut m : HashMap<ID, SkgrepoName> = HashMap::new();
       for child_ref in node_ref . children() {
         match &child_ref . value() . kind {
           // Only a member Unrestricted child counts as "already present" -- the
@@ -812,7 +812,7 @@ fn build_child_creation_data (
     // every goal_list ID would fail (ENOENT) for children that
     // this save just deleted, since their .skg file is gone.
     if child_skgrepos . contains_key (skgid) { continue; }
-    let child_skgrepo : SkgRepoName =
+    let child_skgrepo : SkgrepoName =
       match find_skgrepo_with_optional_tantivy (
         graph_snap, skgid, deleted_since_head_pid_src_map, None, config )
       { Some (s) => s,
@@ -823,7 +823,7 @@ fn build_child_creation_data (
           // dangling refs) and makes post-save robust to them too.
           result . insert ( skgid . clone (),
             ChildData { title  : String::new (),
-                        home_skgrepo : SkgRepoName::not_found (),
+                        home_skgrepo : SkgrepoName::not_found (),
                         body         : None,
                         kind         : ContentReality::Unknown,
                         relRepo:
@@ -857,7 +857,7 @@ fn build_child_creation_data (
         } else { None }
       } else { None };
     let fetch_skgid : &ID = drawn_skgid . as_ref () . unwrap_or (skgid);
-    let fetch_skgrepo : SkgRepoName = match &drawn_skgid {
+    let fetch_skgrepo : SkgrepoName = match &drawn_skgid {
       None => child_skgrepo,
       Some (drawn) =>
         // The overrider is owned and unrestricted (the resolver's

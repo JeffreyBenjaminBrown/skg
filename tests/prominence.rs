@@ -15,7 +15,7 @@ use skg::prominence::{
 };
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::InRustGraph;
-use skg::types::misc::{ID, SkgConfig, SkgRepo, SkgRepoName, rel_partners_at_relRepo};
+use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Flag, Graphnode, empty_graphnode};
 use skg::types::save::{NodeInstruction, SaveNode};
 
@@ -101,7 +101,7 @@ fn in_rust_prominence_sources_for_saved_nodes () {
     let mut n : Graphnode = empty_graphnode ();
     n . pid = ID::new (pid);
     n . title = title . to_string ();
-    n . home_skgrepo = SkgRepoName::from ("main");
+    n . home_skgrepo = SkgrepoName::from ("main");
     n . contains = rel_partners_at_relRepo (
       &n . home_skgrepo,
       contains . iter () . map ( |c| ID::new (*c) ) . collect () );
@@ -272,11 +272,11 @@ fn test_extend_regions_for_cycles_detects_cycle () {
 fn test_full_prominence_pipeline () {
   // Load Graphnodes from fixture files.
   let config : SkgConfig =
-    SkgConfig::dummyFromSkgRepos (
+    SkgConfig::dummyFromSkgrepos (
       HashMap::from ([(
-        SkgRepoName::from ("test"),
-        SkgRepo {
-          name         : SkgRepoName::from ("test"),
+        SkgrepoName::from ("test"),
+        Skgrepo {
+          name         : SkgrepoName::from ("test"),
           abbreviation : None,
           path         : PathBuf::from ("tests/prominence/fixtures"),
           owned        : true } )]) );

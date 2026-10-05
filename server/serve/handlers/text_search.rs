@@ -34,7 +34,7 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::git::RelationshipAxes;
 use crate::types::views_state::ViewId;
-use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgRepoName};
+use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgrepoName};
 use crate::skgrepo_sets::{SkgrepoRestriction, search_skgids_for_skgrepo_set_for_test as search_ids_for_skgrepo_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
@@ -57,7 +57,7 @@ use tantivy::schema::document::Value;
 /// the multiplier corresponding to its prominence_source.
 /// Non-origins keep their raw score (multiplier = 1).
 pub type MatchGroups =
-  HashMap < ID, ( SkgRepoName,
+  HashMap < ID, ( SkgrepoName,
                   Vec < ( f32,           // score (after multiplier)
                           String ) >) >; // title or alias
 
@@ -553,8 +553,8 @@ pub fn group_matches_by_skgid (
             . and_then ( |v| v . as_str () )
             . map ( |s| s . to_string () )
             . unwrap_or_default ();
-        let skgrepo : SkgRepoName =
-          SkgRepoName::from (
+        let skgrepo : SkgrepoName =
+          SkgrepoName::from (
             retrieved_doc
               . get_first ( tantivy_index . skgrepo_field )
               . and_then ( |v| v . as_str () )
@@ -642,7 +642,7 @@ pub fn build_search_viewforest (
   let mut viewforest : ViewForest =
     ViewForest::new ();
   let mut id_entries : Vec < ( &ID,
-                               &SkgRepoName,
+                               &SkgrepoName,
                                &Vec < ( f32, String ) > ) > =
     matches_by_skgid . iter ()
     . map ( |(skgid, (skgrepo, matches))| // flatten

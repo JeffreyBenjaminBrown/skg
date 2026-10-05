@@ -5,7 +5,7 @@ use crate::telescope::types::{
 use crate::telescope::decompose::{
   DecompositionInput, DecomposedTelescope, decompose_node,
 };
-use crate::types::misc::{ID, SkgConfig, SkgRepoName, members_msv};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_msv};
 use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::nodes::complete::Graphnode;
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -23,7 +23,7 @@ pub fn graphnode_from_skgid (
 ) -> Result<Graphnode, Box<dyn Error>> {
   let nodes = read_all_skg_files_from_skgrepos (config)?;
   let graph = InRustGraph::from_graphnodes (&nodes);
-  let (pid, skgrepo) : (ID, SkgRepoName) =
+  let (pid, skgrepo) : (ID, SkgrepoName) =
     graph . pid_and_skgrepo (skgid)
     . ok_or_else ( || format! (
       "ID '{}' not found in graph", skgid ) ) ?;
@@ -42,7 +42,7 @@ pub fn graphnode_from_skgid (
 pub fn graphnode_from_pid_and_skgrepo (
   config  : &SkgConfig,
   pid     : ID,
-  skgrepo : &SkgRepoName,
+  skgrepo : &SkgrepoName,
 ) -> io::Result<Graphnode> {
   let Some (telescope) : Option<Telescope> =
     telescope_from_disk (config, &pid) ?
@@ -61,7 +61,7 @@ pub(crate) fn telescope_from_disk (
   config : &SkgConfig,
   pid    : &ID,
 ) -> io::Result<Option<Telescope>> {
-  let mut sections : Vec<(SkgRepoName, GraphnodeOnDisk)> = Vec::new ();
+  let mut sections : Vec<(SkgrepoName, GraphnodeOnDisk)> = Vec::new ();
   for skgrepo_name in config . ordered_skgrepos () {
     let path : String =
       match path_from_pid_and_skgrepo (
@@ -147,8 +147,8 @@ pub fn write_graphnode_telescope (
 /// applying it is the filesystem-mutation phase.
 pub(crate) struct PreparedTelescopeWrite {
   pid             : ID,
-  home            : SkgRepoName,
-  writes          : Vec<(SkgRepoName, String, String)>,
+  home            : SkgrepoName,
+  writes          : Vec<(SkgrepoName, String, String)>,
   deletions       : Vec<String>,
   verify_as_hoist : bool,
 }
@@ -244,7 +244,7 @@ pub(crate) fn prepare_graphnode_telescope (
     . map_err ( |e| io::Error::new (
       io::ErrorKind::InvalidData, e ) ) ?;
 
-  let mut offending_skgrepos : Vec<SkgRepoName> = decomposed . sections ()
+  let mut offending_skgrepos : Vec<SkgrepoName> = decomposed . sections ()
     . iter ()
     .map ( |(skgrepo, _)| skgrepo )
     . filter ( |skgrepo| ! config . skgrepo_is_owned (skgrepo) )
@@ -262,7 +262,7 @@ pub(crate) fn prepare_graphnode_telescope (
           . map ( |skgrepo| format! ("'{}'", skgrepo) )
           . collect::<Vec<String>> () . join (", ") ))); }
 
-  let mut prepared_writes : Vec<(SkgRepoName, String, String)> =
+  let mut prepared_writes : Vec<(SkgrepoName, String, String)> =
     Vec::new ();
   for (skgrepo, node_fs) in decomposed . sections () {
     let path : String =
@@ -274,7 +274,7 @@ pub(crate) fn prepare_graphnode_telescope (
       . map_err ( |e| io::Error::new (
         io::ErrorKind::InvalidData, e . to_string () )) ?;
     prepared_writes . push (( skgrepo . clone (), path, yaml )); }
-  let written_skgrepos : Vec<SkgRepoName> = prepared_writes . iter ()
+  let written_skgrepos : Vec<SkgrepoName> = prepared_writes . iter ()
     . map ( |(skgrepo, _, _)| skgrepo . clone () )
     . collect ();
   let mut prepared_deletions : Vec<String> = Vec::new ();
@@ -310,7 +310,7 @@ fn error_unless_home_is_writable (
   config       : &SkgConfig,
   allow_hoist  : bool,
 ) -> io::Result<bool> {
-  let home : &SkgRepoName = &graphnode . home_skgrepo;
+  let home : &SkgrepoName = &graphnode . home_skgrepo;
   if ! config . skgrepo_is_owned (home) {
     // FOREIGN HOME. Foreign sections are never written. Skipping
     // the home silently would drop the title on the floor, so

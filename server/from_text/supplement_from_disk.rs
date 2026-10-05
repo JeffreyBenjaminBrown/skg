@@ -15,22 +15,22 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::opt_graphnode_by_skgid;
-use crate::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgConfig, SkgRepoName, members_of, rel_partners_at_relRepo};
+use crate::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoName, members_of, rel_partners_at_relRepo};
 use crate::types::phantom::home_from_disk;
 use crate::types::nodes::complete::{
   Graphnode, empty_graphnode, set_flag};
-use crate::types::save::{NodeInstruction, SaveNode, SkgRepoMove};
+use crate::types::save::{NodeInstruction, SaveNode, SkgrepoMove};
 use std::collections::HashMap;
 use std::error::Error;
 
 pub struct NodeInstructions_with_Repomoves {
   pub instructions : Vec<NodeInstruction>,
-  pub skgrepo_moves   : Vec<SkgRepoMove>,
+  pub skgrepo_moves   : Vec<SkgrepoMove>,
 }
 
 struct NodeInstruction_with_Opt_Repomove {
   instruction : NodeInstruction,
-  skgrepo_move   : Option<SkgRepoMove>,
+  skgrepo_move   : Option<SkgrepoMove>,
 }
 
 impl NodeInstructions_with_Repomoves {
@@ -48,7 +48,7 @@ impl NodeInstructions_with_Repomoves {
   ) {
     self . instructions . push (node . instruction);
     if let Some (sm) = node . skgrepo_move {
-      let sm : SkgRepoMove = sm;
+      let sm : SkgrepoMove = sm;
       self . skgrepo_moves . push (sm); }}
 }
 
@@ -60,7 +60,7 @@ pub fn build_diskSupplemented_nodeInstructions (
 ) -> Result<NodeInstructions_with_Repomoves, Box<dyn Error>> {
   let mut result : NodeInstructions_with_Repomoves =
     NodeInstructions_with_Repomoves::with_capacity (intents . len());
-  let prospective_homes : HashMap<ID, SkgRepoName> =
+  let prospective_homes : HashMap<ID, SkgrepoName> =
     homes_declared_by_nodeSaveIntents (&intents);
   for intent in intents {
     let supplemented : NodeInstruction_with_Opt_Repomove =
@@ -75,8 +75,8 @@ pub fn build_diskSupplemented_nodeInstructions (
 /// must make its newly public relationship legal.
 fn homes_declared_by_nodeSaveIntents (
   intents : &[NodeIntent],
-) -> HashMap<ID, SkgRepoName> {
-  let mut homes : HashMap<ID, SkgRepoName> = HashMap::new ();
+) -> HashMap<ID, SkgrepoName> {
+  let mut homes : HashMap<ID, SkgrepoName> = HashMap::new ();
   for intent in intents {
     let NodeIntent::Save (intent) = intent else { continue; };
     for skgid in std::iter::once (&intent . pid) . chain (
@@ -89,7 +89,7 @@ fn supplement_nodeIntent_from_disk (
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
   skgrepo_restriction    : Option<&SkgrepoRestriction>,
-  prospective_homes      : &HashMap<ID, SkgRepoName>,
+  prospective_homes      : &HashMap<ID, SkgrepoName>,
 ) -> Result<NodeInstruction_with_Opt_Repomove, Box<dyn Error>> {
   match intent {
     NodeIntent::Delete (ref delete) => {
@@ -113,7 +113,7 @@ fn supplement_nodeSaveIntent_from_disk (
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
   skgrepo_restriction    : Option<&SkgrepoRestriction>,
-  prospective_homes      : &HashMap<ID, SkgRepoName>,
+  prospective_homes      : &HashMap<ID, SkgrepoName>,
 ) -> Result<NodeInstruction_with_Opt_Repomove, Box<dyn Error>> {
   let pid : ID =
     from_buffer . pid . clone();
@@ -160,7 +160,7 @@ fn supplement_nodeSaveIntent_from_disk (
         from_buffer . into_graphnode();
       let canonicalized : Graphnode =
         canonicalize_skgids_from_disk (from_buffer, &disk_node) ?;
-      let maybe_move : Option<SkgRepoMove> =
+      let maybe_move : Option<SkgrepoMove> =
         detect_skgrepo_move ( config,  &pid,
                              &canonicalized . home_skgrepo,
                              &disk_node . home_skgrepo) ?;
@@ -229,7 +229,7 @@ fn preserve_invisible_members (
         . map (|member| member . member . clone ())
         . unwrap_or_else (|| skgid . clone ())
     }) . collect::<Vec<ID>>() };
-  let recorder_skgrepo : SkgRepoName = supplemented . home_skgrepo . clone ();
+  let recorder_skgrepo : SkgrepoName = supplemented . home_skgrepo . clone ();
   { let disk_contains : Vec<ID> = members_of (&disk_node . contains);
     let buffer_contains : Vec<ID> = normalize_to_disk_raw (
       &members_of (&supplemented . contains), &disk_node . contains);
@@ -338,16 +338,16 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
   explicit          : &RequestedRelRepos,
   graph             : &InRustGraph,
   config            : &SkgConfig,
-  prospective_homes : &HashMap<ID, SkgRepoName>,
+  prospective_homes : &HashMap<ID, SkgrepoName>,
 ) -> Result<Graphnode, String> {
   let recorder_pid  : ID         = supplemented . pid    . clone ();
-  let recorder_home : SkgRepoName = supplemented . home_skgrepo . clone ();
+  let recorder_home : SkgrepoName = supplemented . home_skgrepo . clone ();
   let resolve = |skgid : &ID| -> ID {
     graph . pid_of (skgid)
       . unwrap_or_else ( || skgid . clone () ) };
   let member_key = |skgid : &ID| -> RelationshipMemberKey {
     graph . relationship_member_key (skgid) };
-  let home_of = |skgid : &ID| -> Option<SkgRepoName> {
+  let home_of = |skgid : &ID| -> Option<SkgrepoName> {
     prospective_homes . get ( &resolve (skgid) ) . cloned ()
       .or_else ( || prospective_homes . get (skgid) . cloned () )
       .or_else ( || graph . pid_and_skgrepo (skgid)
@@ -357,7 +357,7 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
   // more private endpoint home. An owned-to-foreign relationship stays at
   // the recorder's home; Skg never proposes writing a foreign section.
   // An unknown target also falls back to the recorder's home.
-  let default_floor_for = |member : &ID| -> SkgRepoName {
+  let default_floor_for = |member : &ID| -> SkgrepoName {
     match home_of (member) {
       Some (target_home) =>
         config . default_relRepo (
@@ -367,9 +367,9 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
   // atom resolves to.
   let sticky_skgrepo_for = |disk_list : &[RelPartner<ID>],
                             member    : &ID|
-  -> SkgRepoName {
+  -> SkgrepoName {
     let key : RelationshipMemberKey = member_key (member);
-    let unclamped : SkgRepoName = 'unclamped : {
+    let unclamped : SkgrepoName = 'unclamped : {
       for d in disk_list { // sticky
         if member_key ( &d . member ) == key {
           break 'unclamped d . relRepo . clone (); }}
@@ -399,9 +399,9 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
   // or made more private. Absent an atom, sticky-else-default.
   let resolve_skgrepo = |disk_list      : &[RelPartner<ID>],
                         member         : &ID,
-                        explicit_here  : &HashMap<ID, SkgRepoName>,
+                        explicit_here  : &HashMap<ID, SkgrepoName>,
                         relation_label : &str|
-  -> Result<SkgRepoName, String> {
+  -> Result<SkgrepoName, String> {
     match explicit_here . get (member) {
       Some (skgrepo) => {
         if config . skgrepo_position (skgrepo) . is_none () {
@@ -416,10 +416,10 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
           return Err ( format! (
             "Cannot save {} (relation '{}'): member '{}' requested repo '{}', which is more public than the recorder's home '{}'.",
             recorder_pid, relation_label, member, skgrepo, recorder_home )); }
-        let default : SkgRepoName = default_floor_for (member);
-        let sticky  : SkgRepoName =
+        let default : SkgrepoName = default_floor_for (member);
+        let sticky  : SkgrepoName =
           sticky_skgrepo_for (disk_list, member);
-        let floor : SkgRepoName = // the more PUBLIC of the two
+        let floor : SkgrepoName = // the more PUBLIC of the two
           if config . is_strictly_more_public (&sticky, &default) {
             sticky } else { default };
         if config . is_strictly_more_public (skgrepo, &floor) {
@@ -467,11 +467,11 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
       for m in v . iter_mut () {
         let submitted : ID = m . member . clone ();
         let key : RelationshipMemberKey = member_key ( &submitted );
-        let sticky : Option<SkgRepoName> =
+        let sticky : Option<SkgrepoName> =
           disk . iter ()
           . find ( |d| member_key ( &d . member ) == key )
           . map ( |d| d . relRepo . clone () );
-        let unclamped : SkgRepoName = match sticky {
+        let unclamped : SkgrepoName = match sticky {
           Some (skgrepo) => skgrepo,
           None => hide_skgrepo (
             graph, config, &recorder_home, &m . member, &subscribes,
@@ -486,7 +486,7 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
       disk_node . aliases . or_default ();
     if let MSV::Specified (v) = &mut supplemented . aliases {
       for m in v . iter_mut () {
-        let explicit_skgrepo : Option<&SkgRepoName> =
+        let explicit_skgrepo : Option<&SkgrepoName> =
           explicit . aliases . get (&m . member);
         if let Some (skgrepo) = explicit_skgrepo {
           if config . skgrepo_position (skgrepo) . is_none () {
@@ -503,7 +503,7 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
               recorder_pid, m . member, skgrepo, recorder_home )); }
           m . relRepo = skgrepo . clone ();
         } else {
-          let sticky_or_default : SkgRepoName = disk . iter ()
+          let sticky_or_default : SkgrepoName = disk . iter ()
             . find ( |d| d . member == m . member )
             . map ( |d| d . relRepo . clone () )
             . unwrap_or_else ( || recorder_home . clone () );
@@ -523,19 +523,19 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
 fn hide_skgrepo (
   graph         : &InRustGraph,
   config        : &SkgConfig,
-  recorder_home : &SkgRepoName,
+  recorder_home : &SkgrepoName,
   hidden        : &ID,
   subscribes    : &[RelPartner<ID>],
   resolve       : &dyn Fn (&ID) -> ID,
-  home_of       : &dyn Fn (&ID) -> Option<SkgRepoName>,
-) -> SkgRepoName {
-  let endpoint_floor : SkgRepoName = {
+  home_of       : &dyn Fn (&ID) -> Option<SkgrepoName>,
+) -> SkgrepoName {
+  let endpoint_floor : SkgrepoName = {
     match home_of (hidden) {
       Some (h) => config . more_private_of (
         recorder_home . clone (), h ),
       None => recorder_home . clone (), }};
   let hidden_key : ID = resolve (hidden);
-  let explaining_skgrepos : Vec<SkgRepoName> = {
+  let explaining_skgrepos : Vec<SkgrepoName> = {
     subscribes . iter ()
       . filter ( |sub| {
         graph . pid_of ( & sub . member )
@@ -545,7 +545,7 @@ fn hide_skgrepo (
           . unwrap_or (false) } )
       . map ( |sub| sub . relRepo . clone () )
       . collect () };
-  let subscription_floor : Option<SkgRepoName> =
+  let subscription_floor : Option<SkgrepoName> =
     explaining_skgrepos . into_iter ()
     . reduce ( |a, b| // keep the more PUBLIC of the two
                if config . is_strictly_more_public (&a, &b) { a }
@@ -575,20 +575,20 @@ pub fn canonicalize_skgids_from_disk (
 pub fn detect_skgrepo_move (
   config         : &SkgConfig,
   pid            : &ID,
-  buffer_skgrepo : &SkgRepoName,
-  disk_skgrepo   : &SkgRepoName,
-) -> Result<Option<SkgRepoMove>, Box<dyn Error>> {
+  buffer_skgrepo : &SkgrepoName,
+  disk_skgrepo   : &SkgrepoName,
+) -> Result<Option<SkgrepoMove>, Box<dyn Error>> {
   if buffer_skgrepo == disk_skgrepo {
     return Ok (None); }
   if config . skgrepo_is_owned (disk_skgrepo)
   && config . skgrepo_is_owned (buffer_skgrepo) {
-    Ok (Some (SkgRepoMove {
+    Ok (Some (SkgrepoMove {
       pid         : pid . clone(),
       old_skgrepo : disk_skgrepo . clone(),
       new_skgrepo : buffer_skgrepo . clone() }))
   } else {
     Err(Box::new(
-      BufferValidationError::CannotMoveToOrFromForeignSkgRepo(
+      BufferValidationError::CannotMoveToOrFromForeignSkgrepo(
         pid . clone(),
         disk_skgrepo . clone(),
         buffer_skgrepo . clone() )) ) }}

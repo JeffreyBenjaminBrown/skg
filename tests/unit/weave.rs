@@ -25,17 +25,17 @@ fn sdm (disk : &[&str], buffer : &[&str]) -> Vec<&'static str> {
 
 #[test]
 fn unrestricted_relRepo_makes_an_unknown_member_visible () {
-  use crate::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
-  use crate::types::misc::{ID, RelPartner, SkgConfig, SkgRepoName};
+  use crate::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
+  use crate::types::misc::{ID, RelPartner, SkgConfig, SkgrepoName};
   use std::collections::{BTreeSet, HashMap};
   let restriction = SkgrepoRestriction {
-    name: SkgRepoSetName::from ("main"),
-    skgrepos: BTreeSet::from ([SkgRepoName::from ("main")]) };
-  let config = SkgConfig::dummyFromSkgRepos (HashMap::new ());
+    name: SkgrepoSetName::from ("main"),
+    skgrepos: BTreeSet::from ([SkgrepoName::from ("main")]) };
+  let config = SkgConfig::dummyFromSkgrepos (HashMap::new ());
   let unknown_at_main = RelPartner::at_relRepo (
-    SkgRepoName::from ("main"), ID::from ("absent"));
+    SkgrepoName::from ("main"), ID::from ("absent"));
   let unknown_at_private = RelPartner::at_relRepo (
-    SkgRepoName::from ("private"), ID::from ("absent"));
+    SkgrepoName::from ("private"), ID::from ("absent"));
   assert! (relationship_member_is_visible (
     &crate::dbs::in_rust_graph::InRustGraph::new (),
     &unknown_at_main, &config, &restriction));

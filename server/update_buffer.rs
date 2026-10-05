@@ -26,9 +26,9 @@ use crate::serve::util::{ format_single_view_sexp, send_response_with_length_pre
 use crate::skgrepo_sets::{SkgrepoRestriction, apply_skgrepo_set_to_viewforest};
 use crate::to_org::expand::role_tree::attach_full_containerward_role_trees_at_treeids_with_skgrepo_set;
 use crate::to_org::util::EditableMap;
-use crate::types::git::{NodeAxes, RelationshipAxes, SkgRepoDiff};
+use crate::types::git::{NodeAxes, RelationshipAxes, SkgrepoDiff};
 use crate::types::views_state::ViewId;
-use crate::types::misc::{ID, SkgRepoName, SkgConfig};
+use crate::types::misc::{ID, SkgrepoName, SkgConfig};
 use crate::types::save::{NodeInstruction, ForkSpec};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
 use crate::types::tree::forest::ViewForest;
@@ -47,12 +47,12 @@ use std::time::Instant;
 pub struct RerenderAfterSaveContext<'a> {
   pub env           : &'a SkgEnv,
   pub runtime       : Arc<RuntimeGeneration>,
-  pub skgrepo_diffs : Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  pub skgrepo_diffs : Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   pub graph_snap    : Arc<InRustGraph>,
   pub errors        : Vec<String>,
   pub warnings      : Vec<String>,
   /// Files deleted since HEAD, keyed by pid, for diff-mode rendering.
-  pub deleted_since_head_pid_src_map : HashMap<ID, SkgRepoName>,
+  pub deleted_since_head_pid_src_map : HashMap<ID, SkgrepoName>,
   /// Pids deleted by this save; not necessarily a subset of git deletes.
   pub deleted_by_this_save_pids      : HashSet<ID>,
   /// Raw extra IDs that belonged to each pid deleted by this save, captured
@@ -85,11 +85,11 @@ impl<'a> RerenderAfterSaveContext<'a> {
     skgrepo_restriction : Option<&'a SkgrepoRestriction>,
   ) -> RerenderAfterSaveContext<'a> {
     let skgrepo_diffs
-      : Option<HashMap<SkgRepoName, SkgRepoDiff>>
+      : Option<HashMap<SkgrepoName, SkgrepoDiff>>
       = if diff_mode_enabled
         { Some ( compute_diff_for_every_skgrepo (&runtime . config)) }
         else {None};
-    let deleted_since_head_pid_src_map : HashMap<ID, SkgRepoName> =
+    let deleted_since_head_pid_src_map : HashMap<ID, SkgrepoName> =
       skgrepo_diffs . as_ref()
       . map ( |d| deleted_skgids_to_skgrepo (d, &runtime . config))
       . unwrap_or_default();
@@ -407,10 +407,10 @@ pub fn render_initial_view (
   // like post-save -- compute the real diffs here and feed them via repo_diffs
   // (which drives the inline process_unrestrictedVognode_diff and the diff-aware PropertyFolder /
   // PartnerFolder reconcilers).
-  let real_diffs : Option<HashMap<SkgRepoName, SkgRepoDiff>> =
+  let real_diffs : Option<HashMap<SkgrepoName, SkgrepoDiff>> =
     if diff_mode { Some ( compute_diff_for_every_skgrepo (&runtime . config) ) }
     else         { None };
-  let deleted_src : HashMap<ID, SkgRepoName> =
+  let deleted_src : HashMap<ID, SkgrepoName> =
     real_diffs . as_ref () . map ( |d| deleted_skgids_to_skgrepo (d, &runtime . config) )
       . unwrap_or_default ();
   let empty_deleted_pids : HashSet<ID> = HashSet::new ();
@@ -578,7 +578,7 @@ fn rewriteInPlace_viewnodes_whose_skgid_is_newly_extra (
     . map ( |n| n . id () )
     . collect ();
   for treeid in treeids {
-    let swap : Option<(ID, SkgRepoName, String, Option<String>)> = {
+    let swap : Option<(ID, SkgrepoName, String, Option<String>)> = {
       let n_ref = viewforest . get (treeid) . ok_or (
         "rewriteInPlace_viewnodes_whose_id_is_newly_extra: node not found") ?;
       match &n_ref . value () . kind {

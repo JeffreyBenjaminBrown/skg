@@ -1,6 +1,6 @@
-use crate::types::git::{ GitDiffStatus, PathDiffStatus, SkgRepoDiff, GraphnodeDiff, NodeChanges };
+use crate::types::git::{ GitDiffStatus, PathDiffStatus, SkgrepoDiff, GraphnodeDiff, NodeChanges };
 use crate::types::list::{compute_interleaved_diff, Diff_Item};
-use crate::types::misc::{ID, MSV, SkgRepoName, members_msv, members_of};
+use crate::types::misc::{ID, MSV, SkgrepoName, members_msv, members_of};
 use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::nodes::complete::Graphnode;
 
@@ -17,11 +17,11 @@ use std::fs;
 /// 'unstaged' compares the index to the worktree.
 pub fn compute_diff_for_skgrepo (
   skgrepo_path : &Path
-) -> Result<SkgRepoDiff, Box<dyn StdError>> {
+) -> Result<SkgrepoDiff, Box<dyn StdError>> {
   let gitrepo : git2::Repository =
     match open_gitrepo (skgrepo_path) {
       Some (r) => r,
-      None => return Ok ( SkgRepoDiff::new_not_gitrepo() ) };
+      None => return Ok ( SkgrepoDiff::new_not_gitrepo() ) };
   let staged : HashMap<PathBuf, GraphnodeDiff> =
     build_stage_diffs (
       skgrepo_path, &gitrepo,
@@ -36,7 +36,7 @@ pub fn compute_diff_for_skgrepo (
     collect_deleted_nodes_for_both (&staged, &unstaged);
   let added_nodes : HashMap<ID, Graphnode> =
     collect_added_nodes_for_both (&staged, &unstaged);
-  Ok ( SkgRepoDiff { is_gitrepo: true,
+  Ok ( SkgrepoDiff { is_gitrepo: true,
                     staged,
                     unstaged,
                     added_nodes,
@@ -112,7 +112,7 @@ fn graphnode_on_disk_as_graphnode_with_default_skgrepo (
 ) -> Option<Graphnode> {
   match serde_yaml::from_str::<GraphnodeOnDisk> (yaml) {
     Ok (node_fs) =>
-      Some ( node_fs . into_complete_as_single_section ( SkgRepoName::default ())),
+      Some ( node_fs . into_complete_as_single_section ( SkgrepoName::default ())),
     Err (e) => {
       tracing::warn! (
         origin, path = %context . display (), error = %e,

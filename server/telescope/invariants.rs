@@ -15,7 +15,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::telescope::types::CompositionWarning;
-use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgRepoName};
+use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName};
 use crate::types::nodes::rust::GraphnodeInRust;
 
 use std::collections::HashSet;
@@ -35,32 +35,32 @@ pub enum TelescopeViolation {
   /// bleeding.
   LeakShapedMember {
     relation    : &'static str,
-    relRepo     : SkgRepoName,
+    relRepo     : SkgrepoName,
     member      : ID,
-    member_home : SkgRepoName,
+    member_home : SkgrepoName,
   },
   /// A dangling relationship recorded more publicly than its extant recorder.
   /// With no target home to consult, the recorder's home is the conservative
   /// privacy ceiling.
   AbsentTargetLeakShapedMember {
     relation      : &'static str,
-    relRepo       : SkgRepoName,
+    relRepo       : SkgrepoName,
     member        : ID,
-    recorder_home : SkgRepoName,
+    recorder_home : SkgrepoName,
   },
   /// A relationship whose relRepo names no configured skgrepo: its section
   /// could never be written. Arises only from junk or a config
   /// that lost a skgrepo.
   UnconfiguredRelRepo {
     relation : &'static str,
-    relRepo: SkgRepoName,
+    relRepo: SkgrepoName,
     member   : ID,
   },
   /// Non-owned sections used the same pid as at least one owned
   /// section. The owned telescope won and these skgrepos were
   /// ignored before composition or id-claim collection.
   IgnoredForeignPidFolderlision {
-    ignored_skgrepos : Vec<SkgRepoName>,
+    ignored_skgrepos : Vec<SkgrepoName>,
   },
   /// Anything the COMPOSITION noticed while combining a node's sections
   /// (a dangling anchor, a title below the home, a stray second
@@ -120,11 +120,11 @@ pub fn telescope_violations_of (
           relRepo : m . relRepo . clone (),
           member : m . member . clone (), } );
         continue; }
-      let target_home : Option<SkgRepoName> =
+      let target_home : Option<SkgrepoName> =
         graph . pid_of ( &m . member )
         . and_then ( |p| graph . nodes . get (&p) )
         . map ( |n| n . home_skgrepo . clone () );
-      let privacy_ceiling : &SkgRepoName = target_home . as_ref ()
+      let privacy_ceiling : &SkgrepoName = target_home . as_ref ()
         . unwrap_or (&node . home_skgrepo);
       if config . is_strictly_more_public ( &m . relRepo, privacy_ceiling ) {
         match target_home {
@@ -166,10 +166,10 @@ pub fn derive_affected_telescope_recorders (
   for raw in affected_skgids {
     let old_pid : Option<ID> = base . pid_of (raw);
     let final_pid : Option<ID> = candidate . pid_of (raw);
-    let old_home : Option<SkgRepoName> = old_pid . as_ref ()
+    let old_home : Option<SkgrepoName> = old_pid . as_ref ()
       .and_then (|pid| base . nodes . get (pid))
       .map (|node| node . home_skgrepo . clone ());
-    let final_home : Option<SkgRepoName> = final_pid . as_ref ()
+    let final_home : Option<SkgrepoName> = final_pid . as_ref ()
       .and_then (|pid| candidate . nodes . get (pid))
       .map (|node| node . home_skgrepo . clone ());
     if old_pid == final_pid && old_home == final_home { continue; }

@@ -6,7 +6,7 @@ use crate::types::viewnode::viewforest_root_viewnode;
 
 use super::*;
 
-fn src () -> SkgRepoName { SkgRepoName::from ("main") }
+fn src () -> SkgrepoName { SkgrepoName::from ("main") }
 fn skgid  (s: &str) -> ID { ID ( s . to_string () ) }
 
 /// Build a GraphnodeInRust directly (no disk I/O) for fixture graphs.

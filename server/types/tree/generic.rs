@@ -1,4 +1,4 @@
-use crate::types::misc::{ID, SkgRepoName};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
 
 use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
@@ -10,7 +10,7 @@ pub fn pid_and_skgrepo_from_ancestor (
   node       : NodeId,
   generation : usize,
   caller     : &str,
-) -> Result<(ID, SkgRepoName), Box<dyn Error>> {
+) -> Result<(ID, SkgrepoName), Box<dyn Error>> {
   read_at_ancestor_in_tree(
     tree, node, generation,
     |vn : &Viewnode| match &vn . kind {

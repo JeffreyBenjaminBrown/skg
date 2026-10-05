@@ -1,5 +1,5 @@
 use crate::types::git::PathDiffStatus;
-use crate::types::misc::{ID, SkgConfig, SkgRepo, SkgRepoName};
+use crate::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
 use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::nodes::complete::Graphnode;
 
@@ -17,10 +17,10 @@ use super::misc::{diff_delta_to_entry, path_relative_to_gitrepo};
 /// Returns Err if neither location has the file.
 pub fn graphnode_from_index_or_head (
   pid    : &ID,
-  src    : &SkgRepoName,
+  src    : &SkgrepoName,
   config : &SkgConfig,
 ) -> Result<Graphnode, Box<dyn StdError>> {
-  let skgrepo_config : &SkgRepo =
+  let skgrepo_config : &Skgrepo =
     config . skgrepos . get (src)
     . ok_or_else ( || format! ( "Repo '{}' not found in config",
                                 src )) ?;

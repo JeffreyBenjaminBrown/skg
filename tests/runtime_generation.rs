@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::collections::HashMap;
 
 fn config () -> SkgConfig {
-  SkgConfig::dummyFromSkgRepos (HashMap::new ())
+  SkgConfig::dummyFromSkgrepos (HashMap::new ())
 }
 
 fn graph_with (pid : &str) -> InRustGraph {

@@ -16,7 +16,7 @@ use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use crate::org_to_text::metadata_value_atom;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, MSV, SkgConfig, SkgRepoName, members_of, rel_partners_at_relRepo};
+use crate::types::misc::{ID, MSV, SkgConfig, SkgrepoName, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
   Flag, Graphnode, flag_is_true};
 use crate::types::save::{ForkSpec, SaveNode};
@@ -43,8 +43,8 @@ use std::collections::{HashMap, HashSet};
 pub fn owned_ancestor_skgrepos_for_foreign_vognodes (
   viewforest : &ViewForest,
   config     : &SkgConfig,
-) -> HashMap<ID, SkgRepoName> {
-  let mut map : HashMap<ID, SkgRepoName> = HashMap::new ();
+) -> HashMap<ID, SkgrepoName> {
+  let mut map : HashMap<ID, SkgrepoName> = HashMap::new ();
   for node in viewforest . nodes () {
     let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = & node . value () . kind
       else { continue; };
@@ -121,11 +121,11 @@ pub fn new_foreign_nodes_adopting_clone_skgrepos (
 /// settled. The last two are guesses: the buffer then shows the
 /// PICK-A-REPO placeholder plus the guess as a suggestion, and the
 /// client asks the user to choose before approving.
-pub struct CloneSkgRepoInputs {
-  pub user_set          : HashMap<ID, SkgRepoName>, // What the user chose in the confirmation buffer, riding back on the approve re-save's fork-repos field.
-  pub explicit_child    : HashMap<ID, SkgRepoName>, // What the saved metadata already specified, via explicit skgrepos on N's new children ('explicit_new_child_repos_for_foreign_vognodes').
-  pub inferred_ancestor : HashMap<ID, SkgRepoName>, // N's nearest owned ancestor in the view ('owned_ancestor_repos_for_foreign_vognodes') -- always unrestricted.
-  pub default           : Option<SkgRepoName>,      // The caller's active-aware config-first owned skgrepo.
+pub struct CloneSkgrepoInputs {
+  pub user_set          : HashMap<ID, SkgrepoName>, // What the user chose in the confirmation buffer, riding back on the approve re-save's fork-repos field.
+  pub explicit_child    : HashMap<ID, SkgrepoName>, // What the saved metadata already specified, via explicit skgrepos on N's new children ('explicit_new_child_repos_for_foreign_vognodes').
+  pub inferred_ancestor : HashMap<ID, SkgrepoName>, // N's nearest owned ancestor in the view ('owned_ancestor_repos_for_foreign_vognodes') -- always unrestricted.
+  pub default           : Option<SkgrepoName>,      // The caller's active-aware config-first owned skgrepo.
 }
 
 /// Build the ForkSpec for a fork of the foreign buffer node N,
@@ -142,20 +142,20 @@ pub fn fork_spec_from_buffer_node (
   buffer_node   : &Graphnode,
   disk_title    : &str, // N's original title (before the edit), for the confirmation buffer's child line.
   disk_contains : &[ID], // N's original contains (before the edit); children the edit deleted become the clone's hides.
-  skgrepos      : &CloneSkgRepoInputs,
+  skgrepos      : &CloneSkgrepoInputs,
 ) -> Result<ForkSpec, BufferValidationError> {
-  let specified : Option<SkgRepoName> =
+  let specified : Option<SkgrepoName> =
     skgrepos . user_set . get (& buffer_node . pid) . cloned ()
     . or_else ( || skgrepos . explicit_child . get (& buffer_node . pid)
                    . cloned () );
   let skgrepo_confirmed : bool =
     specified . is_some ();
-  let clone_skgrepo : SkgRepoName =
+  let clone_skgrepo : SkgrepoName =
     specified
     . or_else ( || skgrepos . inferred_ancestor
                    . get (& buffer_node . pid) . cloned () )
     . or_else ( || skgrepos . default . clone () )
-    . ok_or_else ( || BufferValidationError::ForkSkgRepoUnresolved (
+    . ok_or_else ( || BufferValidationError::ForkSkgrepoUnresolved (
         buffer_node . pid . clone () )) ?;
   Ok ( build_fork_clone (
     buffer_node, disk_title, disk_contains, clone_skgrepo,
@@ -176,8 +176,8 @@ pub fn explicit_new_child_skgrepos_for_foreign_vognodes (
   viewforest                       : &ViewForest,
   new_nodes_with_explicit_skgrepos : &HashSet<ID>,
   config                           : &SkgConfig,
-) -> HashMap<ID, SkgRepoName> {
-  let mut map       : HashMap<ID, SkgRepoName> = HashMap::new ();
+) -> HashMap<ID, SkgrepoName> {
+  let mut map       : HashMap<ID, SkgrepoName> = HashMap::new ();
   let mut ambiguous : HashSet<ID> = HashSet::new ();
   for node in viewforest . nodes () {
     let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = & node . value () . kind
@@ -308,10 +308,10 @@ pub fn validate_fork_specs_in_graph (
           BufferValidationError::ForkAlreadyExists (
             spec . original_skgid . clone (), existing ));
         continue; }
-    let clone_skgrepo : &SkgRepoName = & spec . clone . 0 . home_skgrepo;
+    let clone_skgrepo : &SkgrepoName = & spec . clone . 0 . home_skgrepo;
     if ! config . skgrepo_is_owned (clone_skgrepo) {
       errors . push (
-        BufferValidationError::ForkSkgRepoNotOwned (
+        BufferValidationError::ForkSkgrepoNotOwned (
           spec . original_skgid . clone (),
           clone_skgrepo . clone () ));
       continue; }
@@ -320,7 +320,7 @@ pub fn validate_fork_specs_in_graph (
       . map_or ( true, |a| a . contains_skgrepo (clone_skgrepo) );
     if ! unrestricted {
       errors . push (
-        BufferValidationError::ForkSkgRepoRestricted (
+        BufferValidationError::ForkSkgrepoRestricted (
           spec . original_skgid . clone (),
           clone_skgrepo . clone () )); }}
   errors }
@@ -354,7 +354,7 @@ pub fn build_fork_clone (
   buffer_node       : &Graphnode,
   disk_title        : &str, // N's original (pre-edit) title, kept for the confirmation buffer's child line.
   disk_contains     : &[ID], // N's original (pre-edit) contains.
-  clone_skgrepo     : SkgRepoName,
+  clone_skgrepo     : SkgrepoName,
   skgrepo_confirmed : bool, // whether clone_repo was user-SPECIFIED (vs inferred or defaulted)
 ) -> ForkSpec {
   let buffer_contains_skgids : Vec<ID> =

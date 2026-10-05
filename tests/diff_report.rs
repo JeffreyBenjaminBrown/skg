@@ -2,7 +2,7 @@ use skg::diff_report::diff_report_as_org;
 use skg::diff_report::types::DiffSelection;
 use skg::serve::handlers::diff_report::handle_diff_report_request;
 use skg::test_utils::read_lp_message;
-use skg::types::misc::{SkgConfig, SkgRepo, SkgRepoName};
+use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
 
 use git2::Repository;
 use std::collections::HashMap;
@@ -184,8 +184,8 @@ fn diff_report_handler_sends_length_prefixed_response (
 #[test]
 fn diff_report_shows_cross_repo_inbound_relationships (
 ) -> Result<(), Box<dyn Error>> {
-  let multi : MultiSkgRepoFixture =
-    MultiSkgRepoFixture::new () ?;
+  let multi : MultiSkgrepoFixture =
+    MultiSkgrepoFixture::new () ?;
   multi . left . write_node ("a", "Alpha", "", &[]) ?;
   multi . right . write_node ("b", "Beta", "", &[]) ?;
   multi . left . commit_all ("left initial") ?;
@@ -218,8 +218,8 @@ fn diff_report_shows_cross_repo_inbound_relationships (
 #[test]
 fn diff_report_shows_repo_move_across_repos (
 ) -> Result<(), Box<dyn Error>> {
-  let multi : MultiSkgRepoFixture =
-    MultiSkgRepoFixture::new () ?;
+  let multi : MultiSkgrepoFixture =
+    MultiSkgrepoFixture::new () ?;
   multi . left . write_node ("a", "Moved", "", &[]) ?;
   multi . right . write_node ("keep", "Keep", "", &[]) ?;
   multi . left . commit_all ("left initial") ?;
@@ -304,12 +304,12 @@ fn diff_report_refuses_non_git_repos (
   let skgrepo_dir : PathBuf =
     tmp . path () . join ("main");
   fs::create_dir (&skgrepo_dir) ?;
-  let skgrepo_name : SkgRepoName =
-    SkgRepoName::from ("main");
+  let skgrepo_name : SkgrepoName =
+    SkgrepoName::from ("main");
   let config : SkgConfig =
-    SkgConfig::dummyFromSkgRepos (HashMap::from ([
+    SkgConfig::dummyFromSkgrepos (HashMap::from ([
       (skgrepo_name . clone (),
-       SkgRepo {
+       Skgrepo {
          name: skgrepo_name,
          abbreviation: None,
          path: skgrepo_dir,
@@ -371,14 +371,14 @@ impl SkgrepoWithGitrepo {
   }
 }
 
-struct MultiSkgRepoFixture {
+struct MultiSkgrepoFixture {
   _tmp   : TempDir,
   left   : SkgrepoWithGitrepo,
   right  : SkgrepoWithGitrepo,
   config : SkgConfig,
 }
 
-impl MultiSkgRepoFixture {
+impl MultiSkgrepoFixture {
   fn new (
   ) -> Result<Self, Box<dyn Error>> {
     let tmp : TempDir =
@@ -387,25 +387,25 @@ impl MultiSkgRepoFixture {
       SkgrepoWithGitrepo::new (&tmp . path () . to_path_buf (), "left") ?;
     let right : SkgrepoWithGitrepo =
       SkgrepoWithGitrepo::new (&tmp . path () . to_path_buf (), "right") ?;
-    let left_name : SkgRepoName =
-      SkgRepoName::from ("left");
-    let right_name : SkgRepoName =
-      SkgRepoName::from ("right");
+    let left_name : SkgrepoName =
+      SkgrepoName::from ("left");
+    let right_name : SkgrepoName =
+      SkgrepoName::from ("right");
     let config : SkgConfig =
-      SkgConfig::dummyFromSkgRepos (HashMap::from ([
+      SkgConfig::dummyFromSkgrepos (HashMap::from ([
         (left_name . clone (),
-         SkgRepo {
+         Skgrepo {
            name: left_name,
            abbreviation: None,
            path: left . skgrepo . clone (),
            owned: true }),
         (right_name . clone (),
-         SkgRepo {
+         Skgrepo {
            name: right_name,
            abbreviation: None,
            path: right . skgrepo . clone (),
            owned: true }) ]));
-    Ok ( MultiSkgRepoFixture {
+    Ok ( MultiSkgrepoFixture {
       _tmp: tmp,
       left,
       right,
@@ -424,12 +424,12 @@ impl DiffFixture {
     let skgrepo : PathBuf =
       tmp . path () . join ("main");
     fs::create_dir (&skgrepo) ?;
-    let skgrepo_name : SkgRepoName =
-      SkgRepoName::from ("main");
+    let skgrepo_name : SkgrepoName =
+      SkgrepoName::from ("main");
     let config : SkgConfig =
-      SkgConfig::dummyFromSkgRepos (HashMap::from ([
+      SkgConfig::dummyFromSkgrepos (HashMap::from ([
         (skgrepo_name . clone (),
-         SkgRepo {
+         Skgrepo {
            name: skgrepo_name,
            abbreviation: None,
            path: skgrepo . clone (),

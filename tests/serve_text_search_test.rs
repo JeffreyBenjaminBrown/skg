@@ -4,7 +4,7 @@ use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::org_to_text::viewforest_to_string;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgRepoName, SkgRepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
+use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName, SkgrepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::serve::handlers::text_search::{
@@ -80,7 +80,7 @@ fn test_text_search_org_format (
           &matches_by_skgid,
           &std::collections::HashSet::new () );
       let dummy_config : SkgConfig =
-        SkgConfig::dummyFromSkgRepos (HashMap::new ());
+        SkgConfig::dummyFromSkgrepos (HashMap::new ());
       let result : String =
         viewforest_to_string ( &viewforest, &dummy_config )
         . expect ("search viewforest rendering never fails");
@@ -206,7 +206,7 @@ fn test_search_results_preserve_links_in_title (
       let (viewforest, _ids) = build_search_viewforest (
         "science", &matches_by_skgid, &std::collections::HashSet::new () );
       let dummy_config : SkgConfig =
-        SkgConfig::dummyFromSkgRepos (HashMap::new ());
+        SkgConfig::dummyFromSkgrepos (HashMap::new ());
       let result : String =
         viewforest_to_string ( &viewforest, &dummy_config )
         . expect ("search viewforest rendering never fails");
@@ -365,15 +365,15 @@ fn private_alias_documents_are_filtered_before_grouping (
       node . title = "public title" . to_string ();
       node . aliases = MSV::Specified ( vec! [
         RelPartner::at_relRepo (
-          SkgRepoName::from ("private"),
+          SkgrepoName::from ("private"),
           "secret zanzibar" . to_string () ) ] );
       let nodes : Vec<Graphnode> = vec! [ node ];
       let ( tantivy_index, _ ) : ( TantivyIndex, usize ) =
         wipe_then_init_tantivy_db (
           &nodes, Path::new (index_dir) ) ?;
       let public_only : SkgrepoRestriction = SkgrepoRestriction {
-        name    : SkgRepoSetName::from ("main"),
-        skgrepos : [ SkgRepoName::from ("main") ]
+        name    : SkgrepoSetName::from ("main"),
+        skgrepos : [ SkgrepoName::from ("main") ]
           . into_iter () . collect (), };
       { // Restricted search: the private alias doc must not match.
         let ( best_matches, searcher ) =

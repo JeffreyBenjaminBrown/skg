@@ -231,9 +231,9 @@ fn pid_skgrepo_is_unrestricted (
 mod tests {
   use super::*;
   use crate::types::nodes::complete::{Flag, empty_graphnode};
-  use crate::types::misc::{RelPartner, SkgRepoName};
+  use crate::types::misc::{RelPartner, SkgrepoName};
   use crate::dbs::filesystem::not_nodes::load_config;
-  use crate::skgrepo_sets::SkgRepoSetName;
+  use crate::skgrepo_sets::SkgrepoSetName;
 
   fn node (
     skgid : &str,
@@ -253,7 +253,7 @@ mod tests {
     let mut with_content : Graphnode =
       node ("with-content", "[[id:target][x]]", None);
     with_content . contains = vec![ RelPartner::at_relRepo (
-      SkgRepoName::from ("main"), ID::from ("target")) ];
+      SkgrepoName::from ("main"), ID::from ("target")) ];
     let nodes : Vec<Graphnode> = vec![
       target,
       node ("other", "Another distinct target", None),
@@ -281,19 +281,19 @@ mod tests {
     let config = load_config (
       "tests/repo_sets/fixtures/skgconfig.toml") . unwrap ();
     let restriction : SkgrepoRestriction = SkgrepoRestriction::named (
-      &config, SkgRepoSetName::from ("public")) . unwrap ();
+      &config, SkgrepoSetName::from ("public")) . unwrap ();
     let mut mentioner : Graphnode = node (
       "mentioner", "[[id:target][d]] [[id:private-target][p]]", None);
-    mentioner . home_skgrepo = SkgRepoName::from ("public");
+    mentioner . home_skgrepo = SkgrepoName::from ("public");
     mentioner . contains = vec![RelPartner::at_relRepo (
-      SkgRepoName::from ("private"), ID::from ("visible-child"))];
+      SkgrepoName::from ("private"), ID::from ("visible-child"))];
     let mut target : Graphnode = node ("target", "destination", None);
-    target . home_skgrepo = SkgRepoName::from ("public");
+    target . home_skgrepo = SkgrepoName::from ("public");
     let mut child : Graphnode = node ("visible-child", "child", None);
-    child . home_skgrepo = SkgRepoName::from ("public");
+    child . home_skgrepo = SkgrepoName::from ("public");
     let mut private_target : Graphnode = node (
       "private-target", "private target", None);
-    private_target . home_skgrepo = SkgRepoName::from ("private");
+    private_target . home_skgrepo = SkgrepoName::from ("private");
     let graph : InRustGraph = InRustGraph::from_graphnodes (
       &[mentioner, target, child, private_target]);
     let stats : AllGraphnodeStats = fetch_all_graphnodestats_with_skgrepo_set (

@@ -19,7 +19,7 @@ use skg::test_utils::extract_graphnode_if_save_else_error;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::types::errors::BufferValidationError;
 use skg::types::git::Sign;
-use skg::types::misc::{ID, MSV, SkgConfig, SkgRepoName, members_of, members_msv};
+use skg::types::misc::{ID, MSV, SkgConfig, SkgrepoName, members_of, members_msv};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode, DeleteNode};
 use skg::types::maybe_placed_viewnode::{
@@ -939,12 +939,12 @@ async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
       // Supply a default clone skgrepo (as the production caller does),
       // so the foreign grandchild e2 forks cleanly and the call returns
       // Ok -- this test is about e, not e2.
-      let clone_skgrepo_inputs : skg::from_text::fork::CloneSkgRepoInputs =
-        skg::from_text::fork::CloneSkgRepoInputs {
+      let clone_skgrepo_inputs : skg::from_text::fork::CloneSkgrepoInputs =
+        skg::from_text::fork::CloneSkgrepoInputs {
           user_set          : std::collections::HashMap::new(),
           explicit_child    : std::collections::HashMap::new(),
           inferred_ancestor : std::collections::HashMap::new(),
-          default           : Some (SkgRepoName::from ("owned")), };
+          default           : Some (SkgrepoName::from ("owned")), };
       let ( node_instructions, fork_specs ) =
         validate_and_filter_foreign_instructions (
           instructions, &[],

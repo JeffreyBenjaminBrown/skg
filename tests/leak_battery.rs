@@ -27,7 +27,7 @@ use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationRole};
 use skg::dbs::in_rust_graph::{InRustGraph};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::org_to_text::viewforest_to_string;
-use skg::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName, run_with_skgrepo_set_test_db};
+use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName, run_with_skgrepo_set_test_db};
 use skg::test_utils::graph_handle_from_config;
 use skg::to_org::expand::role_tree::build_and_integrate_containerward_role_tree_with_skgrepo_set;
 use skg::to_org::render::content_view::multi_root_view_with_skgrepo_set;
@@ -73,9 +73,9 @@ fn content_view_of_N_gates_privately_contained_C (
     "/tmp/tantivy-test-leak-battery-content",
     |config, tantivy| Box::pin ( async move {
       let public : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgRepoSetName::from ("public"))?;
+        SkgrepoRestriction::named (config, SkgrepoSetName::from ("public"))?;
       let all : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgRepoSetName::from ("all"))?;
+        SkgrepoRestriction::named (config, SkgrepoSetName::from ("all"))?;
 
       // At "public": N's private membership of C must not render --
       // neither C's id nor its title -- even though C itself is a
@@ -111,9 +111,9 @@ fn inbound_containerward_data_hides_N_at_public (
     "/tmp/tantivy-test-leak-battery-inbound",
     |config, _tantivy| Box::pin ( async move {
       let public : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgRepoSetName::from ("public"))?;
+        SkgrepoRestriction::named (config, SkgrepoSetName::from ("public"))?;
       let all : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgRepoSetName::from ("all"))?;
+        SkgrepoRestriction::named (config, SkgrepoSetName::from ("all"))?;
 
       // Unit-style pin: the gated in-Rust-graph accessor directly.
       // C's containerward data (who contains C) must not name N at
@@ -185,9 +185,9 @@ fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
     "/tmp/tantivy-test-leak-battery-subscriber",
     |config, _tantivy| Box::pin ( async move {
       let public : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgRepoSetName::from ("public"))?;
+        SkgrepoRestriction::named (config, SkgrepoSetName::from ("public"))?;
       let all : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgRepoSetName::from ("all"))?;
+        SkgrepoRestriction::named (config, SkgrepoSetName::from ("all"))?;
       let nodes : Vec<Graphnode> =
         read_all_skg_files_from_skgrepos (config)?;
       let graph : InRustGraph =
@@ -224,9 +224,9 @@ fn default_subscribeeFolder_requires_an_unrestricted_subscription_relationship (
     "/tmp/tantivy-test-leak-battery-default-subscribee-folder",
     |config, tantivy| Box::pin ( async move {
       let public : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgRepoSetName::from ("public"))?;
+        SkgrepoRestriction::named (config, SkgrepoSetName::from ("public"))?;
       let all : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgRepoSetName::from ("all"))?;
+        SkgrepoRestriction::named (config, SkgrepoSetName::from ("all"))?;
 
       // S and C are both public, but S's subscription to C is recorded
       // only in private.  The default folder's existence must follow the
@@ -263,9 +263,9 @@ fn ancestor_heralds_gate_privately_recorded_relations (
     "/tmp/tantivy-test-leak-battery-heralds",
     |config, _tantivy| Box::pin ( async move {
       let public : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgRepoSetName::from ("public"))?;
+        SkgrepoRestriction::named (config, SkgrepoSetName::from ("public"))?;
       let all : SkgrepoRestriction =
-        SkgrepoRestriction::named (config, SkgRepoSetName::from ("all"))?;
+        SkgrepoRestriction::named (config, SkgrepoSetName::from ("all"))?;
       let graph_handle = (
         graph_handle_from_config (config)? );
       let graph = graph_handle . load_full ();
@@ -327,27 +327,27 @@ fn a_lowered_relationship_is_governed_by_its_new_level (
   // default stays hidden. Lowering to the default cannot leak: by
   // definition both endpoints' homes are at least as public as it.
   use skg::dbs::in_rust_graph::relation_accessors::BinaryRolePosition;
-  use skg::types::misc::{RelPartner, SkgRepoName};
+  use skg::types::misc::{RelPartner, SkgrepoName};
   use skg::types::nodes::complete::empty_graphnode;
   let node_at = |pid : &str, skgrepo : &str| -> Graphnode {
     let mut n : Graphnode = empty_graphnode ();
     n . pid = ID::from (pid);
     n . title = pid . to_string ();
-    n . home_skgrepo = SkgRepoName::from (skgrepo);
+    n . home_skgrepo = SkgrepoName::from (skgrepo);
     n };
   let mut recorder : Graphnode = node_at ("recorder", "public");
   recorder . contains = vec! [
     RelPartner::at_relRepo ( // as if just lowered to its default
-      SkgRepoName::from ("public"), ID::from ("lowered") ),
+      SkgrepoName::from ("public"), ID::from ("lowered") ),
     RelPartner::at_relRepo ( // deliberately above its default
-      SkgRepoName::from ("private"), ID::from ("kept") ) ];
+      SkgrepoName::from ("private"), ID::from ("kept") ) ];
   let graph : InRustGraph = InRustGraph::from_graphnodes ( & [
     recorder,
     node_at ("lowered", "public"),
     node_at ("kept",    "public") ] );
   let public : SkgrepoRestriction = SkgrepoRestriction {
-    name    : SkgRepoSetName::from ("public"),
-    skgrepos : [ SkgRepoName::from ("public") ]
+    name    : SkgrepoSetName::from ("public"),
+    skgrepos : [ SkgrepoName::from ("public") ]
       . into_iter () . collect () };
   let member_role : RelationRole = RelationRole::new (
     NodeRelation::Contains, BinaryRolePosition::Second );

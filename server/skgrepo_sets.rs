@@ -3,8 +3,8 @@ use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
 use crate::dbs::init::create_empty_tantivy_index;
 use crate::types::env::find_skgrepo_with_optional_tantivy;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, SkgConfig, SkgRepoName, TantivyIndex};
-pub use crate::types::misc::SkgRepoSetName;
+use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
+pub use crate::types::misc::SkgrepoSetName;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, mk_restricted_viewnode};
 use crate::types::viewnode::{Vognode, Phantom};
@@ -23,8 +23,8 @@ use std::process::Command;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SkgrepoRestriction {
-  pub name    : SkgRepoSetName,
-  pub skgrepos : BTreeSet<SkgRepoName>,
+  pub name    : SkgrepoSetName,
+  pub skgrepos : BTreeSet<SkgrepoName>,
 }
 
 impl SkgrepoRestriction {
@@ -37,7 +37,7 @@ impl SkgrepoRestriction {
 
   pub fn named (
     config : &SkgConfig,
-    name   : SkgRepoSetName,
+    name   : SkgrepoSetName,
   ) -> Result<SkgrepoRestriction, Box<dyn Error>> {
     Ok ( SkgrepoRestriction {
       skgrepos : config . skgrepo_set_skgrepos (&name)?,
@@ -45,7 +45,7 @@ impl SkgrepoRestriction {
 
   pub fn contains_skgrepo (
     &self,
-    skgrepo : &SkgRepoName,
+    skgrepo : &SkgrepoName,
   ) -> bool {
     self . skgrepos . contains (skgrepo) }
 
@@ -62,7 +62,7 @@ impl SkgrepoRestriction {
   ) -> Result<bool, Box<dyn Error>> {
     if self . is_all () {
       return Ok (true); }
-    let deleted_since_head_pid_src_map : HashMap<ID, SkgRepoName> =
+    let deleted_since_head_pid_src_map : HashMap<ID, SkgrepoName> =
       HashMap::new ();
     Ok ( match find_skgrepo_with_optional_tantivy (
       graph, skgid, &deleted_since_head_pid_src_map, None, config ) {
@@ -77,10 +77,10 @@ pub fn filter_path_to_unrestricted_skgrepos_for_test (
   path   : Vec<ID>,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
   let mut result : Vec<ID> = Vec::new ();
-  let deleted_since_head_pid_src_map : HashMap<ID, SkgRepoName> =
+  let deleted_since_head_pid_src_map : HashMap<ID, SkgrepoName> =
     HashMap::new ();
   for skgid in path {
-    let skgrepo : SkgRepoName =
+    let skgrepo : SkgrepoName =
       match find_skgrepo_with_optional_tantivy (
         graph, &skgid, &deleted_since_head_pid_src_map, None, config ) {
         Some (skgrepo) => skgrepo,
@@ -98,7 +98,7 @@ pub fn filter_branches_to_unrestricted_skgrepos_for_test (
   branches : BTreeSet<ID>,
 ) -> Result<BTreeSet<ID>, Box<dyn Error>> {
   let mut result : BTreeSet<ID> = BTreeSet::new ();
-  let deleted_since_head_pid_src_map : HashMap<ID, SkgRepoName> =
+  let deleted_since_head_pid_src_map : HashMap<ID, SkgrepoName> =
     HashMap::new ();
   for skgid in branches {
     if let Some (skgrepo) =

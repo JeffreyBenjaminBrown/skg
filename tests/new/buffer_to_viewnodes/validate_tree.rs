@@ -3,7 +3,7 @@
 use indoc::indoc;
 use regex::Regex;
 use skg::types::errors::BufferValidationError;
-use skg::types::misc::{SkgConfig, SkgRepo, SkgRepoName, TantivyIndex};
+use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
 use skg::types::tree::forest::MpViewForest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use skg::from_text::buffer_to_viewnodes::local::validate_local_structure;
@@ -815,16 +815,16 @@ fn partner_folder_treeids (
     . collect () }
 
 fn validation_config () -> SkgConfig {
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
     HashMap::new ();
   for skgrepo in ["main", "private"] {
-    let skgrepo_name : SkgRepoName = SkgRepoName::from (skgrepo);
+    let skgrepo_name : SkgrepoName = SkgrepoName::from (skgrepo);
     skgrepos . insert (
       skgrepo_name . clone (),
-      SkgRepo {
+      Skgrepo {
         name          : skgrepo_name,
         abbreviation  : None,
         path          : PathBuf::from (format! ("/tmp/{}", skgrepo)),
         owned         : true,
       }); }
-  SkgConfig::dummyFromSkgRepos (skgrepos) }
+  SkgConfig::dummyFromSkgrepos (skgrepos) }

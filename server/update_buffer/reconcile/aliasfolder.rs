@@ -1,7 +1,7 @@
-use crate::types::git::{RelationshipAxes, NodeChanges, SkgRepoDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_unrestrictedVognode};
+use crate::types::git::{RelationshipAxes, NodeChanges, SkgrepoDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_unrestrictedVognode};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, SkgConfig, SkgRepoName, members_of};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, AffectsParent};
 use crate::types::viewnode::{Vognode, PropertyFolder, Property};
@@ -32,7 +32,7 @@ pub fn reconcile_aliasFolder_children (
   tree               : &mut Tree<Viewnode>,
   aliasfolder_treeid : NodeId,
   graph              : &InRustGraph,
-  skgrepo_diffs      : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs      : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   config             : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   { let is_aliasFolder : bool = // barf if not an aliasFolder
@@ -44,7 +44,7 @@ pub fn reconcile_aliasFolder_children (
     if !is_aliasFolder { return Err(
       "reconcile_aliasFolder_children: Node is not an AliasFolder" . into() ); }}
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: parent Unrestricted vognode read through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 0).
-  let (parent_pid, parent_skgrepo) : (ID, SkgRepoName) =
+  let (parent_pid, parent_skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_required_ancestor(
       tree, aliasfolder_treeid, 0,
       "reconcile_aliasFolder_children" ) ?;
@@ -52,7 +52,7 @@ pub fn reconcile_aliasFolder_children (
     graphnode_graphFirst_by_pid_and_skgrepo (
       graph, config, &parent_pid, &parent_skgrepo )
     . map_err ( |_| "reconcile_aliasFolder_children: parent Graphnode not found" ) ?;
-  let alias_relRepos : HashMap<String, SkgRepoName> =
+  let alias_relRepos : HashMap<String, SkgrepoName> =
     parent_graphnode . aliases . or_default () . iter ()
     .map ( |alias| (alias . member . clone (), alias . relRepo . clone ()) )
     .collect ();

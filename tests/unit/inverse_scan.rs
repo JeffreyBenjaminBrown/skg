@@ -1,5 +1,5 @@
 use super::*;
-use crate::skgrepo_sets::SkgRepoSetName;
+use crate::skgrepo_sets::SkgrepoSetName;
 use crate::types::git::NodeChanges;
 use crate::types::misc::MSV;
 use crate::types::nodes::complete::empty_graphnode;
@@ -7,7 +7,7 @@ use crate::types::nodes::fs::GraphnodeOnDisk;
 use std::collections::BTreeSet;
 
 fn skgid (s : &str) -> ID { ID ( s . to_string () ) }
-fn src (s : &str) -> SkgRepoName { SkgRepoName ( s . to_string () ) }
+fn src (s : &str) -> SkgrepoName { SkgrepoName ( s . to_string () ) }
 
 fn graphnode (
   pid       : &str,
@@ -54,8 +54,8 @@ fn added_entry (
     before_node : None,
     after_node : Some (after) } }
 
-fn empty_skgrepo_diff () -> SkgRepoDiff {
-  SkgRepoDiff {
+fn empty_skgrepo_diff () -> SkgrepoDiff {
+  SkgrepoDiff {
     is_gitrepo   : true,
     staged        : HashMap::new (),
     unstaged      : HashMap::new (),
@@ -65,7 +65,7 @@ fn empty_skgrepo_diff () -> SkgRepoDiff {
 #[test]
 fn signs_come_from_modified_deleted_and_added_files_per_stage () {
   let recorder : ID = skgid ("N");
-  let mut sd   : SkgRepoDiff = empty_skgrepo_diff ();
+  let mut sd   : SkgrepoDiff = empty_skgrepo_diff ();
   // edge-r's Modified file removed its relationship to N, STAGED.
   sd . staged . insert (
     PathBuf::from ("edge-r.skg"),
@@ -83,7 +83,7 @@ fn signs_come_from_modified_deleted_and_added_files_per_stage () {
   sd . unstaged . insert (
     PathBuf::from ("bystander.skg"),
     deleted_entry ( graphnode ("bystander", vec! []) ));
-  let diffs : Option<HashMap<SkgRepoName, SkgRepoDiff>> =
+  let diffs : Option<HashMap<SkgrepoName, SkgrepoDiff>> =
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
   let scan : HashMap<ID, RelationshipAxes> =
     inverse_scan_for_inbound_folder (
@@ -101,12 +101,12 @@ fn signs_come_from_modified_deleted_and_added_files_per_stage () {
 
 #[test]
 fn recorder_absent_from_every_diff_yields_nothing () {
-  let mut sd : SkgRepoDiff = empty_skgrepo_diff ();
+  let mut sd : SkgrepoDiff = empty_skgrepo_diff ();
   sd . unstaged . insert (
     PathBuf::from ("other.skg"),
     modified_entry ( vec! [
       Diff_Item::Removed ( skgid ("SOMEONE-ELSE") ) ] ));
-  let diffs : Option<HashMap<SkgRepoName, SkgRepoDiff>> =
+  let diffs : Option<HashMap<SkgrepoName, SkgrepoDiff>> =
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
   let scan : HashMap<ID, RelationshipAxes> =
     inverse_scan_for_inbound_folder (
@@ -120,7 +120,7 @@ fn each_relation_is_read_separately () {
   // override of N is untouched: the overriderFolder's scan must see
   // nothing, the subscriberFolder's scan the Minus.
   let recorder : ID = skgid ("N");
-  let mut sd   : SkgRepoDiff = empty_skgrepo_diff ();
+  let mut sd   : SkgrepoDiff = empty_skgrepo_diff ();
   sd . unstaged . insert (
     PathBuf::from ("m.skg"),
     GraphnodeDiff {
@@ -131,7 +131,7 @@ fn each_relation_is_read_separately () {
         .. NodeChanges::default () } ),
       before_node : None,
       after_node : None } );
-  let diffs : Option<HashMap<SkgRepoName, SkgRepoDiff>> =
+  let diffs : Option<HashMap<SkgrepoName, SkgrepoDiff>> =
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
   assert! ( inverse_scan_for_inbound_folder (
       &recorder, NodeRelation::Overrides, &diffs, None )
@@ -147,15 +147,15 @@ fn cross_skgrepo_move_yields_no_membership_change () {
   // same stage, asserting the same relationship to N before and after: the
   // Minus and Plus must cancel, leaving no membership sign at all.
   let recorder : ID = skgid ("N");
-  let mut sd_a : SkgRepoDiff = empty_skgrepo_diff ();
+  let mut sd_a : SkgrepoDiff = empty_skgrepo_diff ();
   sd_a . unstaged . insert (
     PathBuf::from ("mover.skg"),
     deleted_entry ( graphnode ("mover", vec! ["N"]) ));
-  let mut sd_b : SkgRepoDiff = empty_skgrepo_diff ();
+  let mut sd_b : SkgrepoDiff = empty_skgrepo_diff ();
   sd_b . unstaged . insert (
     PathBuf::from ("mover.skg"),
     added_entry ( graphnode ("mover", vec! ["N"]) ));
-  let diffs : Option<HashMap<SkgRepoName, SkgRepoDiff>> =
+  let diffs : Option<HashMap<SkgrepoName, SkgrepoDiff>> =
     Some ( HashMap::from ([
       ( src ("a"), sd_a ),
       ( src ("b"), sd_b ) ]) );
@@ -180,14 +180,14 @@ fn relRepo_gates_deleted_stage_signs () {
   before . home_skgrepo = src ("public");
   before . overrides = MSV::Specified ( vec! [
     RelPartner::at_relRepo ( src ("private"), recorder . clone () ) ] );
-  let mut sd : SkgRepoDiff = empty_skgrepo_diff ();
+  let mut sd : SkgrepoDiff = empty_skgrepo_diff ();
   sd . unstaged . insert (
     PathBuf::from ("del-r.skg"),
     deleted_entry ( before ) );
-  let diffs : Option<HashMap<SkgRepoName, SkgRepoDiff>> =
+  let diffs : Option<HashMap<SkgrepoName, SkgrepoDiff>> =
     Some ( HashMap::from ([ ( src ("public"), sd ) ]) );
   let public_only : SkgrepoRestriction = SkgrepoRestriction {
-    name    : SkgRepoSetName::from ("public"),
+    name    : SkgrepoSetName::from ("public"),
     skgrepos : BTreeSet::from ([ src ("public") ]) };
   let gated : HashMap<ID, RelationshipAxes> =
     inverse_scan_for_inbound_folder (

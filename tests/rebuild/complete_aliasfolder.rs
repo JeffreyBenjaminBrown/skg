@@ -10,9 +10,9 @@ use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::types::viewnode::Viewnode;
 use skg::types::misc::SkgConfig;
-use skg::types::misc::SkgRepoName;
+use skg::types::misc::SkgrepoName;
 use skg::types::misc::TantivyIndex;
-use skg::types::git::SkgRepoDiff;
+use skg::types::git::SkgrepoDiff;
 
 use ego_tree::{Tree, NodeId};
 
@@ -43,7 +43,7 @@ async fn test_reconcile_alias_folder_children_logic (
 
 ) -> Result < (), Box<dyn Error> > {
 
-  let skgrepo_diffs : Option<HashMap<SkgRepoName, SkgRepoDiff>> = None;
+  let skgrepo_diffs : Option<HashMap<SkgrepoName, SkgrepoDiff>> = None;
   let graph = graph_handle_from_config (config)? . load_full ();
 
   // Create org text with three AliasFolder scenarios
@@ -182,7 +182,7 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
 
 ) -> Result < (), Box<dyn Error> > {
 
-  let skgrepo_diffs : Option<HashMap<SkgRepoName, SkgRepoDiff>> = None;
+  let skgrepo_diffs : Option<HashMap<SkgrepoName, SkgrepoDiff>> = None;
   let graph = graph_handle_from_config (config)? . load_full ();
 
   let org_text : &str =

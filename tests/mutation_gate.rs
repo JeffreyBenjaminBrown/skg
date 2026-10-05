@@ -18,7 +18,7 @@ use skg::dbs::tantivy::background_writer::{
 };
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::types::env::new_mutation_gate;
-use skg::types::misc::{ID, RelPartner, SkgRepoName};
+use skg::types::misc::{ID, RelPartner, SkgrepoName};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::nodes::rust::GraphnodeInRust;
 use skg::types::save::{NodeInstruction, DeleteNode, SaveNode};
@@ -35,7 +35,7 @@ fn node (pid : &str, title : &str, skgrepo : &str) -> Graphnode {
   let mut node = empty_graphnode ();
   node . pid = ID::from (pid);
   node . title = title . to_string ();
-  node . home_skgrepo = SkgRepoName::from (skgrepo);
+  node . home_skgrepo = SkgrepoName::from (skgrepo);
   node }
 
 fn complete_from_rust (node : &GraphnodeInRust) -> Graphnode {
@@ -137,7 +137,7 @@ fn shared_mutation_gate_serializes_snapshot_capture_and_preserves_both_writes ()
 fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
   let mut recorder = node ("recorder", "recorder", "main");
   recorder . contains = vec! [ RelPartner::at_relRepo (
-    SkgRepoName::from ("main"), ID::from ("acquiree")) ];
+    SkgrepoName::from ("main"), ID::from ("acquiree")) ];
   let initial = vec! [
     recorder . clone (),
     node ("acquiree", "old", "main"),
@@ -165,7 +165,7 @@ fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
         NodeInstruction::Save (SaveNode (merged)),
         NodeInstruction::Save (SaveNode (rewritten_recorder)),
         NodeInstruction::Delete (DeleteNode {
-          skgid : ID::from ("acquiree"), home_skgrepo : SkgRepoName::from ("main") }),
+          skgid : ID::from ("acquiree"), home_skgrepo : SkgrepoName::from ("main") }),
       ];
       let mut candidate = (*graph_snapshot) . clone ();
       apply_nodeInstructions_to_inRustGraph (&mut candidate, &instructions);
@@ -182,7 +182,7 @@ fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
       // The request still names the acquiree.  Applying against the
       // post-merge snapshot must canonicalize its inverse entry.
       observer . contains = vec! [ RelPartner::at_relRepo (
-        SkgRepoName::from ("main"), ID::from ("acquiree")) ];
+        SkgrepoName::from ("main"), ID::from ("acquiree")) ];
       swap_in_from_snapshot (
         &handle, &graph_snapshot, &NodeInstruction::Save (SaveNode (observer))); };
     join! (merge_delete, save_after); });
@@ -234,7 +234,7 @@ fn save_plan_captured_after_skgrepo_move_preserves_the_new_skgrepo () {
 
   let graph = handle . load_full ();
   let moved = graph . get (&ID::from ("moved")) . unwrap ();
-  assert_eq! (moved . home_skgrepo, SkgRepoName::from ("private"));
+  assert_eq! (moved . home_skgrepo, SkgrepoName::from ("private"));
   assert_eq! (moved . title, "edited after move");
   assert_eq! (graph . pid_of (&ID::from ("former-id")), Some (ID::from ("moved"))); }
 

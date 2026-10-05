@@ -14,7 +14,7 @@ use crate::telescope::types::{
   ListItem, SectionSlices, Telescope, TelescopeConstructionError,
 };
 use crate::types::misc::{
-  ID, RelPartner, SkgConfig, SkgRepoName,
+  ID, RelPartner, SkgConfig, SkgrepoName,
 };
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::fs::{GraphnodeOnDisk, graphnode_on_disk_from_section};
@@ -29,7 +29,7 @@ pub struct DecompositionInput<'a> {
   pub flags                        : &'a [Flag],
   pub title                        : Option<&'a str>,
   pub body                         : Option<&'a str>,
-  pub home                         : &'a SkgRepoName,
+  pub home                         : &'a SkgrepoName,
   pub aliases                      : &'a [RelPartner<String>],
   pub contains                     : &'a [RelPartner<ID>],
   pub subscribesTo                 : &'a [RelPartner<ID>],
@@ -45,16 +45,16 @@ pub struct DecompositionInput<'a> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DecomposedTelescope {
   pid      : ID,
-  home     : SkgRepoName,
-  sections : Vec<(SkgRepoName, GraphnodeOnDisk)>,
+  home     : SkgrepoName,
+  sections : Vec<(SkgrepoName, GraphnodeOnDisk)>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DecomposedTelescopeConstructionError {
   InvalidTelescope (TelescopeConstructionError),
   HomeMismatch {
-    expected : SkgRepoName,
-    actual   : SkgRepoName,
+    expected : SkgrepoName,
+    actual   : SkgrepoName,
   },
 }
 
@@ -78,8 +78,8 @@ impl std::error::Error for DecomposedTelescopeConstructionError {
 impl DecomposedTelescope {
   pub fn try_new (
     pid      : ID,
-    home     : SkgRepoName,
-    sections : Vec<(SkgRepoName, GraphnodeOnDisk)>,
+    home     : SkgrepoName,
+    sections : Vec<(SkgrepoName, GraphnodeOnDisk)>,
     config   : &SkgConfig,
   ) -> Result<DecomposedTelescope, DecomposedTelescopeConstructionError> {
     let telescope : Telescope = Telescope::try_new (
@@ -95,12 +95,12 @@ impl DecomposedTelescope {
 
   pub fn pid (&self) -> &ID { &self . pid }
 
-  pub fn home (&self) -> &SkgRepoName { &self . home }
+  pub fn home (&self) -> &SkgrepoName { &self . home }
 
-  pub fn sections (&self) -> &[(SkgRepoName, GraphnodeOnDisk)] {
+  pub fn sections (&self) -> &[(SkgrepoName, GraphnodeOnDisk)] {
     &self . sections }
 
-  pub fn into_sections (self) -> Vec<(SkgRepoName, GraphnodeOnDisk)> {
+  pub fn into_sections (self) -> Vec<(SkgrepoName, GraphnodeOnDisk)> {
     self . sections }
 }
 
@@ -108,10 +108,10 @@ pub fn decompose_node (
   input  : &DecompositionInput,
   config : &SkgConfig,
 ) -> Result<DecomposedTelescope, DecomposedTelescopeConstructionError> {
-  let mut sections : HashMap<SkgRepoName, SectionSlices> =
+  let mut sections : HashMap<SkgrepoName, SectionSlices> =
     HashMap::new ();
-  let mut skgrepo_names : Vec<SkgRepoName> = Vec::new ();
-  { let mut note = |skgrepo : &SkgRepoName| {
+  let mut skgrepo_names : Vec<SkgrepoName> = Vec::new ();
+  { let mut note = |skgrepo : &SkgrepoName| {
       if ! sections . contains_key (skgrepo) {
         skgrepo_names . push ( skgrepo . clone () );
         sections . insert (
@@ -129,10 +129,10 @@ pub fn decompose_node (
       . expect ("home section was just noted");
     home . title = input . title . map ( str::to_string );
     home . body  = input . body  . map ( str::to_string ); }
-  let rank = |skgrepo : &SkgRepoName| -> usize {
+  let rank = |skgrepo : &SkgrepoName| -> usize {
     config . skgrepo_position (skgrepo) . unwrap_or (usize::MAX) };
   for (skgrepo, section) in sections . iter_mut () {
-    let is_more_public = |a : &SkgRepoName, b : &SkgRepoName| -> bool {
+    let is_more_public = |a : &SkgrepoName, b : &SkgrepoName| -> bool {
       rank (a) < rank (b) };
     section . contains = decompose_ordered (
       input . contains, skgrepo, &is_more_public );
@@ -163,7 +163,7 @@ pub fn decompose_node (
                  || s . overrides . is_some () )
          . unwrap_or (false) } ); }
   skgrepo_names . sort_by_key ( |skgrepo| rank (skgrepo) );
-  let complete_sections : Vec<(SkgRepoName, GraphnodeOnDisk)> =
+  let complete_sections : Vec<(SkgrepoName, GraphnodeOnDisk)> =
     skgrepo_names . into_iter ()
     . map ( |skgrepo| {
       let slices : SectionSlices = sections . remove (&skgrepo)
@@ -187,13 +187,13 @@ pub fn decompose_node (
 /// None when the skgrepo has no members of this relation.
 fn decompose_ordered (
   effective      : &[RelPartner<ID>],
-  skgrepo        : &SkgRepoName,
-  is_more_public : &dyn Fn (&SkgRepoName, &SkgRepoName) -> bool,
+  skgrepo        : &SkgrepoName,
+  is_more_public : &dyn Fn (&SkgrepoName, &SkgrepoName) -> bool,
 ) -> Option<Vec<ListItem>> {
   if ! effective . iter () . any ( |m| &m . relRepo == skgrepo ) {
     return None; }
   let is_base : bool = { // the most public skgrepo mentioning the relation?
-    let mut most_public : Option<&SkgRepoName> = None;
+    let mut most_public : Option<&SkgrepoName> = None;
     for m in effective {
       match most_public {
         None => { most_public = Some ( &m . relRepo ); }
@@ -222,7 +222,7 @@ fn decompose_ordered (
 /// effective order. None when empty.
 fn decompose_unordered (
   effective : &[RelPartner<ID>],
-  skgrepo   : &SkgRepoName,
+  skgrepo   : &SkgrepoName,
 ) -> Option<Vec<ID>> {
   let mine : Vec<ID> =
     effective . iter ()

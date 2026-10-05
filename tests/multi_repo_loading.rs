@@ -10,7 +10,7 @@ use skg::dbs::filesystem::multiple_nodes::error_unless_each_skgid_names_one_node
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::filesystem::one_node::write_graphnode_to_skgrepo;
 use skg::test_utils::set_skgrepo_retagging_relRepos;
-use skg::types::misc::{SkgRepo, SkgConfig, ID, SkgRepoName};
+use skg::types::misc::{Skgrepo, SkgConfig, ID, SkgrepoName};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 
 /// Helper to create a minimal SkgConfig for tests.
@@ -18,10 +18,10 @@ use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 /// `initialization-error_*.org` reports land inside the tempdir
 /// rather than polluting the project root.
 fn test_config(
-  skgrepos  : HashMap<SkgRepoName, SkgRepo>,
+  skgrepos  : HashMap<SkgrepoName, Skgrepo>,
   data_root : PathBuf,
 ) -> SkgConfig {
-  let mut cfg : SkgConfig = SkgConfig::dummyFromSkgRepos (skgrepos);
+  let mut cfg : SkgConfig = SkgConfig::dummyFromSkgrepos (skgrepos);
   cfg . data_root = data_root;
   cfg }
 
@@ -32,12 +32,12 @@ fn test_load_from_single_skgrepo() {
   fs::create_dir_all (&skgrepo_path) . unwrap();
 
   let config : SkgConfig = { // Needed by write_graphnode_to_repo
-    let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+    let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
       HashMap::new();
     skgrepos . insert(
-      SkgRepoName::from ("main"),
-      SkgRepo {
-        name: SkgRepoName::from ("main"),
+      SkgrepoName::from ("main"),
+      Skgrepo {
+        name: SkgrepoName::from ("main"),
         abbreviation: None,
         path: skgrepo_path . clone(),
         owned: true, } );
@@ -47,7 +47,7 @@ fn test_load_from_single_skgrepo() {
   let mut node : Graphnode = empty_graphnode();
   node . pid = ID::new ("test1");
   node . title = "Test Node 1" . to_string();
-  set_skgrepo_retagging_relRepos ( &mut node, &SkgRepoName::from ("main") );
+  set_skgrepo_retagging_relRepos ( &mut node, &SkgrepoName::from ("main") );
   write_graphnode_to_skgrepo(&node, &config) . unwrap();
 
   let result : IoResult<Vec<Graphnode>> =
@@ -72,18 +72,18 @@ fn test_load_from_multiple_skgrepos() {
   fs::create_dir_all (&shared_path) . unwrap();
 
   let config : SkgConfig = {
-    let mut skgrepos : HashMap<SkgRepoName, SkgRepo> = HashMap::new();
+    let mut skgrepos : HashMap<SkgrepoName, Skgrepo> = HashMap::new();
     skgrepos . insert(
-      SkgRepoName::from ("main"),
-      SkgRepo {
-        name: SkgRepoName::from ("main"),
+      SkgrepoName::from ("main"),
+      Skgrepo {
+        name: SkgrepoName::from ("main"),
         abbreviation: None,
         path: main_path,
         owned: true, } );
     skgrepos . insert(
-      SkgRepoName::from ("shared"),
-      SkgRepo {
-        name: SkgRepoName::from ("shared"),
+      SkgrepoName::from ("shared"),
+      Skgrepo {
+        name: SkgrepoName::from ("shared"),
         abbreviation: None,
         path: shared_path,
         owned: false, } );
@@ -93,13 +93,13 @@ fn test_load_from_multiple_skgrepos() {
   let mut node1 : Graphnode = empty_graphnode();
   node1 . pid = ID::new ("main1");
   node1 . title = "Main Node 1" . to_string();
-  set_skgrepo_retagging_relRepos ( &mut node1, &SkgRepoName::from ("main") );
+  set_skgrepo_retagging_relRepos ( &mut node1, &SkgrepoName::from ("main") );
   write_graphnode_to_skgrepo(&node1, &config) . unwrap();
 
   let mut node2 : Graphnode = empty_graphnode();
   node2 . pid = ID::new ("main2");
   node2 . title = "Main Node 2" . to_string();
-  set_skgrepo_retagging_relRepos ( &mut node2, &SkgRepoName::from ("main") );
+  set_skgrepo_retagging_relRepos ( &mut node2, &SkgrepoName::from ("main") );
   write_graphnode_to_skgrepo(&node2, &config) . unwrap();
 
   // Create a node in the shared skgrepo. Written RAW: 'shared' is
@@ -107,7 +107,7 @@ fn test_load_from_multiple_skgrepos() {
   // foreign home rather than drop the title silently. Planting a
   // foreign fixture is a filesystem act, not a save.
   fs::write (
-    config . skgrepos . get (&SkgRepoName::from ("shared"))
+    config . skgrepos . get (&SkgrepoName::from ("shared"))
       . unwrap () . path . join ("shared1.skg"),
     "pid: shared1\ntitle: Shared Node 1\n" ) . unwrap();
 
@@ -141,19 +141,19 @@ fn test_telescope_is_not_a_conflict_but_two_pids_are() {
   fs::create_dir_all (&shared_path) . unwrap();
 
   let config : SkgConfig = {
-    let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+    let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
       HashMap::new();
     skgrepos . insert(
-      SkgRepoName::from ("main"),
-      SkgRepo {
-        name: SkgRepoName::from ("main"),
+      SkgrepoName::from ("main"),
+      Skgrepo {
+        name: SkgrepoName::from ("main"),
         abbreviation: None,
         path: main_path,
         owned: true, } );
     skgrepos . insert(
-      SkgRepoName::from ("shared"),
-      SkgRepo {
-        name: SkgRepoName::from ("shared"),
+      SkgrepoName::from ("shared"),
+      Skgrepo {
+        name: SkgrepoName::from ("shared"),
         abbreviation: None,
         path: shared_path,
         owned: false, } );
@@ -168,11 +168,11 @@ fn test_telescope_is_not_a_conflict_but_two_pids_are() {
   // pid's sections at other skgrepos, so two sequential
   // write_graphnode_to_repo calls cannot build a telescope.
   fs::write (
-    config . skgrepos . get (&SkgRepoName::from ("main"))
+    config . skgrepos . get (&SkgrepoName::from ("main"))
       . unwrap () . path . join ("duplicate_id.skg"),
     "pid: duplicate_id\ntitle: Node in Main\n" ) . unwrap ();
   fs::write (
-    config . skgrepos . get (&SkgRepoName::from ("shared"))
+    config . skgrepos . get (&SkgrepoName::from ("shared"))
       . unwrap () . path . join ("duplicate_id.skg"),
     "pid: duplicate_id\ntitle: Node in Shared\n" ) . unwrap ();
 
@@ -182,7 +182,7 @@ fn test_telescope_is_not_a_conflict_but_two_pids_are() {
     "same-pid files across repos fold into one telescope" );
   assert_eq!( nodes[0] . title, "Node in Main",
     "the home (most public titled section) wins the title" );
-  assert_eq!( nodes[0] . home_skgrepo, SkgRepoName::from ("main") );
+  assert_eq!( nodes[0] . home_skgrepo, SkgrepoName::from ("main") );
   error_unless_each_skgid_names_one_node (
     &nodes, &config . data_root)
     . expect ("a telescope is not an id conflict");
@@ -193,12 +193,12 @@ fn test_telescope_is_not_a_conflict_but_two_pids_are() {
     node_a . pid = ID::new ("pid-a");
     node_a . title = "A" . to_string();
     node_a . extra_ids = vec! [ ID::new ("contested") ];
-    set_skgrepo_retagging_relRepos ( &mut node_a, &SkgRepoName::from ("main") );
+    set_skgrepo_retagging_relRepos ( &mut node_a, &SkgrepoName::from ("main") );
     let mut node_b : Graphnode = empty_graphnode();
     node_b . pid = ID::new ("pid-b");
     node_b . title = "B" . to_string();
     node_b . extra_ids = vec! [ ID::new ("contested") ];
-    set_skgrepo_retagging_relRepos ( &mut node_b, &SkgRepoName::from ("shared") );
+    set_skgrepo_retagging_relRepos ( &mut node_b, &SkgrepoName::from ("shared") );
     let result : IoResult<()> =
       error_unless_each_skgid_names_one_node (
         & [ node_a, node_b ], &config . data_root);
@@ -222,19 +222,19 @@ fn test_one_id_claimed_by_a_pid_and_anothers_extra_id() {
   fs::create_dir_all (&shared_path) . unwrap();
 
   let config : SkgConfig = {
-    let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+    let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
       HashMap::new();
     skgrepos . insert(
-      SkgRepoName::from ("main"),
-      SkgRepo {
-        name: SkgRepoName::from ("main"),
+      SkgrepoName::from ("main"),
+      Skgrepo {
+        name: SkgrepoName::from ("main"),
         abbreviation: None,
         path: main_path,
         owned: true, } );
     skgrepos . insert(
-      SkgRepoName::from ("shared"),
-      SkgRepo {
-        name: SkgRepoName::from ("shared"),
+      SkgrepoName::from ("shared"),
+      Skgrepo {
+        name: SkgrepoName::from ("shared"),
         abbreviation: None,
         path: shared_path,
         owned: false, } );
@@ -245,13 +245,13 @@ fn test_one_id_claimed_by_a_pid_and_anothers_extra_id() {
   node1 . pid = ID::new ("id1");
   node1 . extra_ids = vec![ID::new ("id2")];
   node1 . title = "Node with Multiple IDs" . to_string();
-  set_skgrepo_retagging_relRepos ( &mut node1, &SkgRepoName::from ("main") );
+  set_skgrepo_retagging_relRepos ( &mut node1, &SkgrepoName::from ("main") );
   write_graphnode_to_skgrepo(&node1, &config) . unwrap();
 
   // Create node in shared that has one overlapping ID. Written RAW:
   // 'shared' is foreign, and the node writer refuses a foreign home.
   fs::write (
-    config . skgrepos . get (&SkgRepoName::from ("shared"))
+    config . skgrepos . get (&SkgrepoName::from ("shared"))
       . unwrap () . path . join ("id2.skg"),
     "pid: id2\ntitle: Another Node\nextra_ids:\n- id3\n" ) . unwrap();
 
@@ -274,12 +274,12 @@ fn test_load_from_empty_skgrepos() {
   fs::create_dir_all (&skgrepo_path) . unwrap();
 
   let result : IoResult<Vec<Graphnode>> = {
-    let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+    let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
       HashMap::new();
     skgrepos . insert(
-      SkgRepoName::from ("empty"),
-      SkgRepo {
-        name: SkgRepoName::from ("empty"),
+      SkgrepoName::from ("empty"),
+      Skgrepo {
+        name: SkgrepoName::from ("empty"),
         abbreviation: None,
         path: skgrepo_path,
         owned: true, } );
@@ -304,19 +304,19 @@ fn test_skgrepo_field_set_correctly() {
   fs::create_dir_all (&skgrepo_b) . unwrap();
 
   let config : SkgConfig = {
-    let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+    let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
       HashMap::new();
     skgrepos . insert(
-      SkgRepoName::from ("repo_a"),
-      SkgRepo {
-        name: SkgRepoName::from ("repo_a"),
+      SkgrepoName::from ("repo_a"),
+      Skgrepo {
+        name: SkgrepoName::from ("repo_a"),
         abbreviation: None,
         path: skgrepo_a,
         owned: true, } );
     skgrepos . insert(
-      SkgRepoName::from ("repo_b"),
-      SkgRepo {
-        name: SkgRepoName::from ("repo_b"),
+      SkgrepoName::from ("repo_b"),
+      Skgrepo {
+        name: SkgrepoName::from ("repo_b"),
         abbreviation: None,
         path: skgrepo_b,
         owned: true, } );
@@ -326,13 +326,13 @@ fn test_skgrepo_field_set_correctly() {
   let mut node_a : Graphnode = empty_graphnode();
   node_a . pid = ID::new ("node_a");
   node_a . title = "Node A" . to_string();
-  set_skgrepo_retagging_relRepos ( &mut node_a, &SkgRepoName::from ("repo_a") );
+  set_skgrepo_retagging_relRepos ( &mut node_a, &SkgrepoName::from ("repo_a") );
   write_graphnode_to_skgrepo(&node_a, &config) . unwrap();
 
   let mut node_b : Graphnode = empty_graphnode();
   node_b . pid = ID::new ("node_b");
   node_b . title = "Node B" . to_string();
-  set_skgrepo_retagging_relRepos ( &mut node_b, &SkgRepoName::from ("repo_b") );
+  set_skgrepo_retagging_relRepos ( &mut node_b, &SkgrepoName::from ("repo_b") );
   write_graphnode_to_skgrepo(&node_b, &config) . unwrap();
 
   let result : IoResult<Vec<Graphnode>> =
@@ -365,19 +365,19 @@ fn test_many_skgid_conflicts_create_org_file() {
   fs::create_dir_all (&skgrepo_a) . unwrap();
   fs::create_dir_all (&skgrepo_b) . unwrap();
 
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
     HashMap::new();
   skgrepos . insert(
-    SkgRepoName::from ("repo_a"),
-    SkgRepo {
-      name: SkgRepoName::from ("repo_a"),
+    SkgrepoName::from ("repo_a"),
+    Skgrepo {
+      name: SkgrepoName::from ("repo_a"),
         abbreviation: None,
       path: skgrepo_a,
       owned: true, } );
   skgrepos . insert(
-    SkgRepoName::from ("repo_b"),
-    SkgRepo {
-      name: SkgRepoName::from ("repo_b"),
+    SkgrepoName::from ("repo_b"),
+    Skgrepo {
+      name: SkgrepoName::from ("repo_b"),
         abbreviation: None,
       path: skgrepo_b,
       owned: true,
@@ -400,8 +400,8 @@ fn test_many_skgid_conflicts_create_org_file() {
     node_b . extra_ids = vec![ID::new (&skgid)];
     node_a . title = format!("Node A {}", i);
     node_b . title = format!("Node B {}", i);
-    set_skgrepo_retagging_relRepos ( &mut node_a, &SkgRepoName::from ("repo_a") );
-    set_skgrepo_retagging_relRepos ( &mut node_b, &SkgRepoName::from ("repo_b") );
+    set_skgrepo_retagging_relRepos ( &mut node_a, &SkgrepoName::from ("repo_a") );
+    set_skgrepo_retagging_relRepos ( &mut node_b, &SkgrepoName::from ("repo_b") );
     nodes . push (node_a);
     nodes . push (node_b); }
 
@@ -461,12 +461,12 @@ fn test_unreadable_files_creates_org_file() {
   // Don't create repo_bad directory - it should cause an error
 
   // Create config with only the good skgrepo for writing
-  let mut write_skgrepos : HashMap<SkgRepoName, SkgRepo> =
+  let mut write_skgrepos : HashMap<SkgrepoName, Skgrepo> =
     HashMap::new();
   write_skgrepos . insert(
-    SkgRepoName::from ("repo_good"),
-    SkgRepo {
-      name: SkgRepoName::from ("repo_good"),
+    SkgrepoName::from ("repo_good"),
+    Skgrepo {
+      name: SkgrepoName::from ("repo_good"),
         abbreviation: None,
       path: skgrepo_good . clone(),
       owned: true, } );
@@ -478,23 +478,23 @@ fn test_unreadable_files_creates_org_file() {
   let mut node : Graphnode = empty_graphnode();
   node . pid = ID::new ("test1");
   node . title = "Test Node" . to_string();
-  set_skgrepo_retagging_relRepos ( &mut node, &SkgRepoName::from ("repo_good") );
+  set_skgrepo_retagging_relRepos ( &mut node, &SkgrepoName::from ("repo_good") );
   write_graphnode_to_skgrepo(&node, &write_config) . unwrap();
 
   // Create config with both skgrepos for reading (including the bad one)
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
     HashMap::new();
   skgrepos . insert(
-    SkgRepoName::from ("repo_good"),
-    SkgRepo {
-      name: SkgRepoName::from ("repo_good"),
+    SkgrepoName::from ("repo_good"),
+    Skgrepo {
+      name: SkgrepoName::from ("repo_good"),
         abbreviation: None,
       path: skgrepo_good,
       owned: true, } );
   skgrepos . insert(
-    SkgRepoName::from ("repo_bad"),
-    SkgRepo {
-      name: SkgRepoName::from ("repo_bad"),
+    SkgrepoName::from ("repo_bad"),
+    Skgrepo {
+      name: SkgrepoName::from ("repo_bad"),
         abbreviation: None,
       path: skgrepo_bad . clone(),
       owned: true, } );
@@ -558,28 +558,28 @@ fn a_write_refuses_a_foreign_home_and_a_title_hoist() {
   fs::create_dir_all (&public_path)  . unwrap();
   fs::create_dir_all (&foreign_path) . unwrap();
   let config : SkgConfig = {
-    let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+    let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
       HashMap::new();
     for (name, path, owned) in
       [ ("public",  public_path  . clone(), true  ),
         ("foreign", foreign_path . clone(), false ) ] {
-      skgrepos . insert ( SkgRepoName::from (name), SkgRepo {
-        name         : SkgRepoName::from (name),
+      skgrepos . insert ( SkgrepoName::from (name), Skgrepo {
+        name         : SkgrepoName::from (name),
         abbreviation : None,
         path,
         owned : owned, } ); }
     let mut config : SkgConfig =
       test_config (skgrepos, temp_dir . path () . to_path_buf ());
     config . skgrepo_order = // most public first
-      vec! [ SkgRepoName::from ("foreign"),
-             SkgRepoName::from ("public") ];
+      vec! [ SkgrepoName::from ("foreign"),
+             SkgrepoName::from ("public") ];
     config };
   { // FOREIGN HOME: refused, rather than silently dropping the title.
     let mut node : Graphnode = empty_graphnode();
     node . pid   = ID::new ("F");
     node . title = "foreign-homed" . to_string();
     set_skgrepo_retagging_relRepos (
-      &mut node, &SkgRepoName::from ("foreign") );
+      &mut node, &SkgrepoName::from ("foreign") );
     let err : IoError =
       write_graphnode_to_skgrepo (&node, &config)
       . expect_err ("a foreign home is not writable");
@@ -593,7 +593,7 @@ fn a_write_refuses_a_foreign_home_and_a_title_hoist() {
     node . pid   = ID::new ("H");
     node . title = "private text" . to_string();
     set_skgrepo_retagging_relRepos (
-      &mut node, &SkgRepoName::from ("public") );
+      &mut node, &SkgrepoName::from ("public") );
     let err : IoError =
       write_graphnode_to_skgrepo (&node, &config)
       . expect_err ("hoisting a title into a titleless home is refused");
@@ -608,7 +608,7 @@ fn a_write_refuses_a_foreign_home_and_a_title_hoist() {
     node . pid   = ID::new ("N");
     node . title = "ordinary" . to_string();
     set_skgrepo_retagging_relRepos (
-      &mut node, &SkgRepoName::from ("public") );
+      &mut node, &SkgrepoName::from ("public") );
     write_graphnode_to_skgrepo (&node, &config)
       . expect ("an owned titled home writes"); }
 }
@@ -623,14 +623,14 @@ fn ordinary_writers_refuse_body_only_hoists_and_preflight_the_batch() {
   for path in [&public_path, &private_path, &foreign_path] {
     fs::create_dir_all (path) . unwrap (); }
   let config : SkgConfig = {
-    let mut skgrepos : HashMap<SkgRepoName, SkgRepo> = HashMap::new ();
+    let mut skgrepos : HashMap<SkgrepoName, Skgrepo> = HashMap::new ();
     for (name, path, owned) in [
       ("public",  public_path  . clone (), true),
       ("private", private_path . clone (), true),
       ("foreign", foreign_path . clone (), false),
     ] {
-      skgrepos . insert ( SkgRepoName::from (name), SkgRepo {
-        name         : SkgRepoName::from (name),
+      skgrepos . insert ( SkgrepoName::from (name), Skgrepo {
+        name         : SkgrepoName::from (name),
         abbreviation : None,
         path,
         owned : owned,
@@ -638,7 +638,7 @@ fn ordinary_writers_refuse_body_only_hoists_and_preflight_the_batch() {
     let mut config : SkgConfig =
       test_config (skgrepos, temp_dir . path () . to_path_buf ());
     config . skgrepo_order = ["public", "private", "foreign"]
-      . into_iter () . map (SkgRepoName::from) . collect ();
+      . into_iter () . map (SkgrepoName::from) . collect ();
     config };
 
   fs::write (
@@ -652,7 +652,7 @@ fn ordinary_writers_refuse_body_only_hoists_and_preflight_the_batch() {
   body_hoist . title = "visible title" . to_string ();
   body_hoist . body = Some ("hidden body" . to_string ());
   set_skgrepo_retagging_relRepos (
-    &mut body_hoist, &SkgRepoName::from ("public") );
+    &mut body_hoist, &SkgrepoName::from ("public") );
   let err : IoError = write_graphnode_to_skgrepo (&body_hoist, &config)
     . expect_err ("a body below home requires interactive Hoist approval");
   assert! (err . to_string () . contains ("would publish it"));
@@ -664,15 +664,15 @@ fn ordinary_writers_refuse_body_only_hoists_and_preflight_the_batch() {
   valid . pid = ID::new ("V");
   valid . title = "valid" . to_string ();
   set_skgrepo_retagging_relRepos (
-    &mut valid, &SkgRepoName::from ("public") );
+    &mut valid, &SkgrepoName::from ("public") );
   let mut invalid : Graphnode = empty_graphnode ();
   invalid . pid = ID::new ("X");
   invalid . title = "invalid" . to_string ();
   set_skgrepo_retagging_relRepos (
-    &mut invalid, &SkgRepoName::from ("public") );
+    &mut invalid, &SkgrepoName::from ("public") );
   invalid . contains . push (
     skg::types::misc::RelPartner::at_relRepo (
-      SkgRepoName::from ("foreign"), ID::new ("child") ));
+      SkgrepoName::from ("foreign"), ID::new ("child") ));
   write_all_nodes_to_fs (vec! [valid, invalid], config)
     . expect_err ("a later foreign output rejects the entire batch");
   assert! (! public_path . join ("V.skg") . exists (),

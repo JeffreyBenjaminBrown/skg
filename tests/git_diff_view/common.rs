@@ -14,7 +14,7 @@ pub use skg::dbs::init::create_empty_tantivy_index;
 pub use skg::to_org::render::content_view::multi_root_view;
 pub use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 pub use skg::test_utils::graph_handle_from_config;
-pub use skg::types::misc::{ID, SkgConfig, SkgRepo, TantivyIndex, SkgRepoName};
+pub use skg::types::misc::{ID, SkgConfig, Skgrepo, TantivyIndex, SkgrepoName};
 pub use skg::dbs::in_rust_graph::InRustGraphHandle;
 pub use skg::types::nodes::fs::GraphnodeOnDisk;
 pub use skg::types::nodes::complete::Graphnode;
@@ -73,13 +73,13 @@ pub async fn setup_test_stores(
   skgrepo_path: &str,
   tantivy_folder: &str,
 ) -> Result<(SkgConfig, TantivyIndex), Box<dyn Error>> {
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> = HashMap::new();
-  skgrepos . insert (SkgRepoName::from ("main"), SkgRepo {
-    name: SkgRepoName::from ("main"),
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> = HashMap::new();
+  skgrepos . insert (SkgrepoName::from ("main"), Skgrepo {
+    name: SkgrepoName::from ("main"),
     abbreviation: None,
     path: PathBuf::from (skgrepo_path),
     owned: true, });
-  let config = SkgConfig::fromSkgReposAndTantivyFolder (
+  let config = SkgConfig::fromSkgreposAndTantivyFolder (
     skgrepos, tantivy_folder );
   let tantivy_index =
     create_empty_tantivy_index (&config . tantivy_folder) ?;
@@ -110,7 +110,7 @@ pub fn read_graphnode(gitrepo_path: &Path, skgid: &str) -> Result<Graphnode, Box
   let path = gitrepo_path . join(format!("{}.skg", skgid));
   let content = fs::read_to_string (&path)?;
   let node_fs: GraphnodeOnDisk = serde_yaml::from_str (&content)?;
-  Ok ( node_fs . into_complete_as_single_section ( SkgRepoName::from ("main") ))
+  Ok ( node_fs . into_complete_as_single_section ( SkgrepoName::from ("main") ))
 }
 
 //

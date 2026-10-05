@@ -24,7 +24,7 @@
 /// relationship changes along -- so the pair is REPORTED for the
 /// user to stage by hand, and never auto-staged.
 
-use crate::types::misc::{ID, SkgConfig, SkgRepo, SkgRepoName};
+use crate::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
 
 use super::misc::path_relative_to_gitrepo;
 use super::read_gitrepo::open_gitrepo;
@@ -39,8 +39,8 @@ use std::path::{Path, PathBuf};
 /// in exactly one (necessarily different) skgrepo.
 struct NodeMove {
   skgid   : ID,
-  from : SkgRepoName,
-  to   : SkgRepoName,
+  from : SkgrepoName,
+  to   : SkgrepoName,
   /// True iff the move is a pure delete/create pair, safe to stage
   /// mechanically; false means it is mixed into pre-existing
   /// section files and is only reported.
@@ -66,7 +66,7 @@ enum SectionSight {
 
 /// What one skgrepo holds for one id, in HEAD and on disk.
 #[derive(Clone, Copy)]
-struct SkgRepoSight {
+struct SkgrepoSight {
   head : SectionSight,
   disk : SectionSight,
 }
@@ -78,7 +78,7 @@ struct SkgRepoSight {
 fn detect_moves (
   config : &SkgConfig,
 ) -> Result<Vec<NodeMove>, String> {
-  let mut sights : BTreeMap<ID, HashMap<SkgRepoName, SkgRepoSight>> =
+  let mut sights : BTreeMap<ID, HashMap<SkgrepoName, SkgrepoSight>> =
     BTreeMap::new (); // BTreeMap: deterministic output order.
   for (skgrepo_name, skgrepo) in &config . skgrepos {
     for (skgid, sight) in
@@ -91,18 +91,18 @@ fn detect_moves (
   let mut moves : Vec<NodeMove> =
     Vec::new ();
   for (skgid, by_skgrepo) in &sights {
-    let froms : Vec<&SkgRepoName> = // title vanished here
+    let froms : Vec<&SkgrepoName> = // title vanished here
       by_skgrepo . iter ()
       . filter ( |(_, s)| s . head == SectionSight::Titled
                  && s . disk != SectionSight::Titled )
       . map ( |(name, _)| name ) . collect ();
-    let tos : Vec<&SkgRepoName> = // title appeared here
+    let tos : Vec<&SkgrepoName> = // title appeared here
       by_skgrepo . iter ()
       . filter ( |(_, s)| s . disk == SectionSight::Titled
                  && s . head != SectionSight::Titled )
       . map ( |(name, _)| name ) . collect ();
     if froms . len () != 1 || tos . len () != 1 { continue; }
-    let (from, to) : (&SkgRepoName, &SkgRepoName) =
+    let (from, to) : (&SkgrepoName, &SkgrepoName) =
       (froms [0], tos [0]);
     let clean : bool = // a pure delete/create pair
       by_skgrepo [from] . disk == SectionSight::Absent
@@ -120,8 +120,8 @@ fn detect_moves (
 /// 'git add'/'git rm' would be meaningless -- so it contributes
 /// nothing.
 fn sights_in_skgrepo (
-  skgrepo : &SkgRepo,
-) -> Result<HashMap<ID, SkgRepoSight>, Box<dyn StdError>> {
+  skgrepo : &Skgrepo,
+) -> Result<HashMap<ID, SkgrepoSight>, Box<dyn StdError>> {
   let skgrepo_path : &Path =
     skgrepo . path . as_path ();
   let gitrepo : Repository = match open_gitrepo (skgrepo_path) {
@@ -131,11 +131,11 @@ fn sights_in_skgrepo (
     disk_skg_sights (skgrepo_path) ?;
   let head : HashMap<ID, SectionSight> =
     head_skg_sights (&gitrepo, skgrepo_path) ?;
-  let mut sights : HashMap<ID, SkgRepoSight> =
+  let mut sights : HashMap<ID, SkgrepoSight> =
     HashMap::new ();
   for skgid in disk . keys () . chain ( head . keys () ) {
     sights . entry ( skgid . clone () )
-      . or_insert ( SkgRepoSight {
+      . or_insert ( SkgrepoSight {
         head : head . get (skgid) . copied ()
           . unwrap_or (SectionSight::Absent),
         disk : disk . get (skgid) . copied ()
@@ -342,7 +342,7 @@ cd "$ORIGIN"
 /// data root.
 fn skgrepo_dir_relative_to_data_root (
   config : &SkgConfig,
-  skgrepo : &SkgRepoName,
+  skgrepo : &SkgrepoName,
 ) -> String {
   let skgrepo_path : &Path = match config . skgrepos . get (skgrepo) {
     Some (s) => s . path . as_path (),

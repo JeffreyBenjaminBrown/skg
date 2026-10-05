@@ -2,7 +2,7 @@ use skg::diff_report::diff::diff_git_snapshots;
 use skg::diff_report::types::{
   DiffReport, GraphSnapshot, NodeBucket, NodeDiffReport, RelationshipDiff,
   GitSnapshotPair, ValueSetDiff};
-use skg::types::misc::{ID, MSV, SkgRepoName, rel_partners_at_relRepo};
+use skg::types::misc::{ID, MSV, SkgrepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 
 use std::collections::{BTreeSet, HashMap};
@@ -15,8 +15,8 @@ fn skgid (
 
 fn skgrepo (
   s : &str,
-) -> SkgRepoName {
-  SkgRepoName::from (s)
+) -> SkgrepoName {
+  SkgrepoName::from (s)
 }
 
 fn node (

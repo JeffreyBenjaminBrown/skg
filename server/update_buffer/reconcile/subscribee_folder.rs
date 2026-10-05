@@ -4,10 +4,10 @@ use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::to_org::complete::partner_folder::child_data::{ChildData, build_child_data, apply_relationship_axes_to_folder_members, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::to_org::complete::partner_folder::goal_list::{goal_list_for_outbound_folder, outbound_member_axes};
-use crate::types::git::{NodeAxes, RelationshipAxes, SkgRepoDiff};
+use crate::types::git::{NodeAxes, RelationshipAxes, SkgrepoDiff};
 use crate::types::phantom::phantom_axes;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
-use crate::types::misc::{ID, RelPartner, SkgRepoName};
+use crate::types::misc::{ID, RelPartner, SkgrepoName};
 use crate::types::tree::generic::{read_at_node_in_tree, with_node_mut};
 use crate::types::tree::viewnode_graphnode::{ unique_non_vognode_child_of_viewnode, insert_non_vognode_as_child};
 use crate::update_buffer::ancestry::required_ancestor;
@@ -21,9 +21,9 @@ use std::error::Error;
 
 struct SubscribeeFolderContext {
   parent_pid             : ID,
-  parent_skgrepo         : SkgRepoName,
+  parent_skgrepo         : SkgrepoName,
   worktree_subscribees   : Vec<ID>,
-  relRepos               : HashMap<ID, SkgRepoName>,
+  relRepos               : HashMap<ID, SkgrepoName>,
 }
 
 /// SubscribeeFolder completion. Called at this folder's own visit in the level-order
@@ -39,9 +39,9 @@ struct SubscribeeFolderContext {
 pub fn reconcile_subscribeeFolder_children (
   node                           : NodeId,
   tree                           : &mut Tree<Viewnode>,
-  skgrepo_diffs                  : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs                  : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   runtime                        : &RuntimeGeneration,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
 ) -> Result<(), Box<dyn Error>> {
@@ -91,7 +91,7 @@ pub fn reconcile_subscribeeFolder_children (
     // subscriber already spent its budget unit when it expanded, so drawing all
     // its subscribees here costs nothing and never truncates the group.
     let axes_for_removed = // the relation this folder represents
-      |child : &ID, child_src : &SkgRepoName|
+      |child : &ID, child_src : &SkgrepoName|
       -> (NodeAxes, RelationshipAxes) {
       phantom_axes ( child, child_src,
                      &context . parent_pid, &context . parent_skgrepo,
@@ -131,7 +131,7 @@ fn read_subscribeeFolder_context (
     . ok_or ("reconcile_subscribeeFolder_children: \
               subscriber ancestor absent (generalized orphan)") ?;
   let (parent_pid, parent_skgrepo)
-    : (ID, SkgRepoName)
+    : (ID, SkgrepoName)
     = read_at_node_in_tree(
       tree, subscriber,
       |vn : &Viewnode| match &vn . kind {
@@ -160,7 +160,7 @@ fn read_subscribeeFolder_context (
       . unwrap_or_default ();
   let worktree_subscribees : Vec<ID> =
     worktree_members . iter () . map ( |m| m . member . clone () ) . collect ();
-  let relRepos : HashMap<ID, SkgRepoName> =
+  let relRepos : HashMap<ID, SkgrepoName> =
     worktree_members . into_iter ()
       // An unresolved destination has no home of its own, so the
       // relationship default is the subscriber's home.  Only retain an

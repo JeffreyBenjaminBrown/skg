@@ -30,7 +30,7 @@ use crate::from_text::weave::member_is_visible;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{
-  NodeInstruction, PostSkgsaveCommitNoticeCandidate, SaveNode, SkgRepoMove };
+  NodeInstruction, PostSkgsaveCommitNoticeCandidate, SaveNode, SkgrepoMove };
 use crate::types::tree::forest::ViewForest;
 use lower::{lower_collected_fieldIntents, nodeMerge_pairs, LoweringOutput};
 use resolve_visibility::resolve_visibility;
@@ -43,7 +43,7 @@ use std::collections::HashSet;
 
 pub struct NonmergeSavePlan {
   pub node_instructions : Vec<NodeInstruction>,
-  pub skgrepo_moves : Vec<SkgRepoMove>,
+  pub skgrepo_moves : Vec<SkgrepoMove>,
   pub flag_targets : HashSet<ID>,
   pub warnings     : Vec<String>, // nonfatal, destined for SaveResponse.warnings (e.g. restricted-node rewrite suppression)
   pub post_skgsave_commit_notice_candidates : Vec<PostSkgsaveCommitNoticeCandidate>,
@@ -86,7 +86,7 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
   let sans_noops : Vec<NodeInstruction> =
     filter_wouldbe_noop_nodeInstructions (graph, with_disk . instructions);
   let (node_instructions, skgrepo_moves, suppressed_writes)
-    : (Vec<NodeInstruction>, Vec<SkgRepoMove>, bool)
+    : (Vec<NodeInstruction>, Vec<SkgrepoMove>, bool)
     = suppress_writes_to_restricted_nodes (
         sans_noops, with_disk . skgrepo_moves,
         skgrepo_restriction );
@@ -162,7 +162,7 @@ fn filter_wouldbe_noop_nodeInstructions (
 #[cfg(test)]
 mod flag_noop_filter_tests {
   use super::*;
-  use crate::types::misc::SkgRepoName;
+  use crate::types::misc::SkgrepoName;
   use crate::types::nodes::complete::{
     Flag, Graphnode, empty_graphnode};
 
@@ -172,7 +172,7 @@ mod flag_noop_filter_tests {
   ) -> Graphnode {
     Graphnode {
       pid          : ID::from (pid),
-      home_skgrepo : SkgRepoName::from ("main"),
+      home_skgrepo : SkgrepoName::from ("main"),
       title        : pid . to_string (),
       flags,
       .. empty_graphnode () }}

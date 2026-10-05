@@ -10,7 +10,7 @@ use crate::dbs::in_rust_graph::{InRustGraph,
 use crate::export_org::claimed_export_targets;
 use crate::types::env::SkgEnv;
 use crate::types::links::org_literal_ranges::HEADLINES_INSIDE_BLOCKS_EXPLANATION;
-use crate::types::misc::{ID, MSV, SkgConfig, SkgRepoName};
+use crate::types::misc::{ID, MSV, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 use std::collections::HashMap;
 use std::collections::BTreeMap;
@@ -23,7 +23,7 @@ use uuid::Uuid;
 pub struct PreparedImportBatch {
   pub input_directory : PathBuf,
   pub host_root : Option<PathBuf>,
-  pub destination_skgrepo : SkgRepoName,
+  pub destination_skgrepo : SkgrepoName,
   pub documents : Vec<ParsedDocument>,
   pub nodes : Vec<Graphnode>,
   pub record_id : Option<ID>,
@@ -42,7 +42,7 @@ pub enum ImportPreparation {
 
 pub fn prepare_import_batch (
   input_directory : &Path,
-  destination_skgrepo : &SkgRepoName,
+  destination_skgrepo : &SkgrepoName,
   host_root : Option<&Path>,
   host_mapping_answered : bool,
   env : &SkgEnv,
@@ -55,7 +55,7 @@ pub fn prepare_import_batch (
 
 pub fn prepare_import_batch_with (
   input_directory : &Path,
-  destination_skgrepo : &SkgRepoName,
+  destination_skgrepo : &SkgrepoName,
   host_root : Option<&Path>,
   host_mapping_answered : bool,
   env : &SkgEnv,
@@ -315,7 +315,7 @@ fn import_record (
   documents : &[(PathBuf, ID)],
   input_directory : &Path,
   host_root : Option<&Path>,
-  skgrepo : &SkgRepoName,
+  skgrepo : &SkgrepoName,
   time : &str,
 ) -> Graphnode {
   let mut node : Graphnode = empty_graphnode ();
@@ -334,7 +334,7 @@ fn import_record_body (
   documents : &[(PathBuf, ID)],
   input_directory : &Path,
   host_root : Option<&Path>,
-  skgrepo : &SkgRepoName,
+  skgrepo : &SkgrepoName,
   time : &str,
 ) -> String {
   let mut body : String = format! (
@@ -356,17 +356,17 @@ mod tests {
   use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
   use crate::dbs::tantivy::search::{SearchOptions, search_index};
   use crate::export_org::export_to_org;
-  use crate::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
-  use crate::types::misc::SkgRepo;
+  use crate::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
+  use crate::types::misc::Skgrepo;
   use std::fs;
 
   fn environment (
     skgrepo_directory : &Path,
     owned : bool,
   ) -> SkgEnv {
-    let name : SkgRepoName = SkgRepoName::from ("notes");
-    let config : SkgConfig = SkgConfig::dummyFromSkgRepos (HashMap::from ([
-      (name . clone (), SkgRepo {
+    let name : SkgrepoName = SkgrepoName::from ("notes");
+    let config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::from ([
+      (name . clone (), Skgrepo {
         name,
         abbreviation : None,
         path         : skgrepo_directory . to_path_buf (),
@@ -390,7 +390,7 @@ mod tests {
       .unwrap ();
     let env      : SkgEnv = environment (&skgrepo, true);
     let prepared : PreparedImportBatch = match prepare_import_batch (
-      &input, &SkgRepoName::from ("notes"), None, false, &env).unwrap () {
+      &input, &SkgrepoName::from ("notes"), None, false, &env).unwrap () {
       ImportPreparation::Prepared (prepared) => prepared,
       ImportPreparation::HostMappingNeeded => panic! ("unexpected host prompt"),
     };
@@ -439,7 +439,7 @@ mod tests {
       "* Top\n#+begin_src\n* inside\n#+end_src\n") . unwrap ();
     let env   : SkgEnv = environment (&skgrepo, true);
     let error : String = prepare_import_batch (
-      &input, &SkgRepoName::from ("notes"), None, false, &env)
+      &input, &SkgrepoName::from ("notes"), None, false, &env)
       . err () . unwrap ();
     assert! (error . starts_with ("Nothing was imported."), "{}", error);
     assert! (error . contains ("bad.org:3: \"* inside\""), "{}", error);
@@ -455,7 +455,7 @@ mod tests {
     fs::write (input . join ("a.md"), "original") . unwrap ();
     let env      : SkgEnv = environment (&skgrepo, true);
     let prepared : PreparedImportBatch = match prepare_import_batch (
-      &input, &SkgRepoName::from ("notes"), None, false, &env).unwrap () {
+      &input, &SkgrepoName::from ("notes"), None, false, &env).unwrap () {
       ImportPreparation::Prepared (prepared) => prepared,
       ImportPreparation::HostMappingNeeded => panic! ("unexpected host prompt"),
     };
@@ -478,7 +478,7 @@ mod tests {
     fs::write (input . join ("a.md"), "original") . unwrap ();
     let env      : SkgEnv = environment (&skgrepo, true);
     let prepared : PreparedImportBatch = match prepare_import_batch (
-      &input, &SkgRepoName::from ("notes"), None, false, &env).unwrap () {
+      &input, &SkgrepoName::from ("notes"), None, false, &env).unwrap () {
       ImportPreparation::Prepared (prepared) => prepared,
       ImportPreparation::HostMappingNeeded => panic! ("unexpected host prompt"),
     };
@@ -503,11 +503,11 @@ mod tests {
     fs::write (input . join ("guide.org"), "Org") . unwrap ();
     let owned : SkgEnv = environment (&skgrepo, true);
     assert! (prepare_import_batch (
-      &input, &SkgRepoName::from ("notes"), None, false, &owned)
+      &input, &SkgrepoName::from ("notes"), None, false, &owned)
       .err () .unwrap () .contains ("Export path conflict"));
     let foreign : SkgEnv = environment (&skgrepo, false);
     assert! (prepare_import_batch (
-      &input, &SkgRepoName::from ("notes"), None, false, &foreign)
+      &input, &SkgrepoName::from ("notes"), None, false, &foreign)
       .err () .unwrap () .contains ("not owned"));
     assert_eq! (fs::read_dir (&skgrepo) . unwrap () . count (), 0);
   }
@@ -527,7 +527,7 @@ mod tests {
     fs::write (input . join ("details.org"), org) . unwrap ();
     let env      : SkgEnv = environment (&skgrepo, true);
     let prepared : PreparedImportBatch = match prepare_import_batch (
-      &input, &SkgRepoName::from ("notes"), None, false, &env).unwrap () {
+      &input, &SkgrepoName::from ("notes"), None, false, &env).unwrap () {
       ImportPreparation::Prepared (prepared) => prepared,
       ImportPreparation::HostMappingNeeded => panic! ("unexpected host prompt"),
     };
@@ -540,7 +540,7 @@ mod tests {
     let nodes : Vec<Graphnode> =
       read_all_skg_files_from_skgrepos_read_only (&config) . unwrap ();
     let restriction : SkgrepoRestriction = SkgrepoRestriction::named (
-      &config, SkgRepoSetName::from ("all")) . unwrap ();
+      &config, SkgrepoSetName::from ("all")) . unwrap ();
     export_to_org (&restriction, &nodes, &output) . unwrap ();
     let exported_markdown : String =
       fs::read_to_string (output . join ("nested/guide.org")) . unwrap ();

@@ -24,7 +24,7 @@ use skg::serve::ViewsState;
 use skg::types::views_state::OpenViews;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex, SkgRepoName};
+use skg::types::misc::{ID, SkgConfig, TantivyIndex, SkgrepoName};
 
 
 #[test]
@@ -80,7 +80,7 @@ async fn merge_container_into_content_impl (
   // a.skg should be deleted from disk.
   let a_path : String =
     skg::util::path_from_pid_and_skgrepo (
-      config, &SkgRepoName::from ("main"), ID::from ("a") ) ?;
+      config, &SkgrepoName::from ("main"), ID::from ("a") ) ?;
   if Path::new (&a_path) . exists() {
     failures . push (
       "a.skg should be deleted after merge" . to_string() ); }
@@ -88,7 +88,7 @@ async fn merge_container_into_content_impl (
   // aa.skg should exist and have the merged content.
   let aa_graphnode =
     graphnode_from_pid_and_skgrepo (
-      config, ID::from ("aa"), &SkgRepoName::from ("main") ) ?;
+      config, ID::from ("aa"), &SkgrepoName::from ("main") ) ?;
   if !aa_graphnode . extra_ids . contains (&ID::from ("a")) {
     failures . push (
       "aa should have 'a' as an extra_id" . to_string() ); }
@@ -120,12 +120,12 @@ async fn merge_container_into_content_impl (
     let preserver_graphnode =
       graphnode_from_pid_and_skgrepo (
         config, preserver_pid . clone(),
-        &SkgRepoName::from ("main") ) ?;
+        &SkgrepoName::from ("main") ) ?;
     if preserver_graphnode . title != "MERGED: a" {
       failures . push ( format!(
         "Text preserver title should be 'MERGED: a', got '{}'",
         preserver_graphnode . title )); }
-    if preserver_graphnode . home_skgrepo != SkgRepoName::from ("main") {
+    if preserver_graphnode . home_skgrepo != SkgrepoName::from ("main") {
       failures . push ( format!(
         "Text preserver repo should be 'main', got '{:?}'",
         preserver_graphnode . home_skgrepo )); }

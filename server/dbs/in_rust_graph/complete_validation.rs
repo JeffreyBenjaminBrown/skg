@@ -14,7 +14,7 @@ use crate::dbs::in_rust_graph::override_invariants::{
   validate_override_invariants,
 };
 use crate::telescope::invariants::{TelescopeViolation, validate_all_telescopes};
-use crate::types::misc::{ID, SkgConfig, SkgRepoName};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
@@ -23,10 +23,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompleteGraphError {
-  DuplicatePrimaryId { pid : ID, homes : Vec<SkgRepoName> },
+  DuplicatePrimaryId { pid : ID, homes : Vec<SkgrepoName> },
   DuplicateExtraId { skgid : ID, carriers : Vec<ID> },
   PrimaryExtraCollision { skgid : ID, primary_carriers : Vec<ID>, extra_carriers : Vec<ID> },
-  UnconfiguredNodeHome { pid : ID, skgrepo : SkgRepoName },
+  UnconfiguredNodeHome { pid : ID, skgrepo : SkgrepoName },
   Override (OverrideInvariantViolation),
   InternalIndex (InternalIndexMismatch),
 }
@@ -50,7 +50,7 @@ pub fn validate_complete_graph (
   config : &SkgConfig,
   nodes : &[Graphnode],
 ) -> CompleteGraphValidation {
-  let mut primary_homes : BTreeMap<ID, Vec<SkgRepoName>> = BTreeMap::new ();
+  let mut primary_homes : BTreeMap<ID, Vec<SkgrepoName>> = BTreeMap::new ();
   let mut extra_carriers : BTreeMap<ID, BTreeSet<ID>> = BTreeMap::new ();
   for node in nodes {
     primary_homes . entry (node . pid . clone ()) . or_default ()

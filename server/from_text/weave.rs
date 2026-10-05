@@ -20,7 +20,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, RelPartner, SkgConfig, SkgRepoName};
+use crate::types::misc::{ID, RelPartner, SkgConfig, SkgrepoName};
 use crate::types::phantom::home_from_disk;
 
 use std::collections::{HashMap, HashSet};
@@ -35,8 +35,8 @@ pub fn member_is_visible (
   config : &SkgConfig,
   restriction : &SkgrepoRestriction,
 ) -> bool {
-  let skgrepo : Option<SkgRepoName> = {
-    let from_graph : Option<SkgRepoName> =
+  let skgrepo : Option<SkgrepoName> = {
+    let from_graph : Option<SkgrepoName> =
       graph . pid_and_skgrepo (skgid)
       . map ( |(_pid, src)| src );
     from_graph . or_else ( || home_from_disk (skgid, config) ) };
@@ -55,7 +55,7 @@ pub fn relationship_member_is_visible (
   restriction : &SkgrepoRestriction,
 ) -> bool {
   if ! restriction . contains_skgrepo (&member . relRepo) { return false; }
-  let home : Option<SkgRepoName> = graph
+  let home : Option<SkgrepoName> = graph
     . pid_and_skgrepo (&member . member)
     . map (|(_pid, skgrepo)| skgrepo)
     . or_else (|| home_from_disk (&member . member, config));

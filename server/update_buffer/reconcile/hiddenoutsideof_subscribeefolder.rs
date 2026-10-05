@@ -2,8 +2,8 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::to_org::complete::partner_folder::child_data::{ChildData, apply_relationship_axes_to_folder_members, build_child_data, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
 use crate::to_org::complete::partner_folder::goal_list::goal_list_for_hiddenOutsideOfSubscribee_folder;
-use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgRepoDiff, file_node_axes_from_skgrepo_diff};
-use crate::types::misc::{ID, SkgRepoName};
+use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgrepoDiff, file_node_axes_from_skgrepo_diff};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::nodes::complete::Graphnode;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
@@ -19,9 +19,9 @@ use std::error::Error;
 
 struct HiddenOutsideContext {
   subscriber_pid      : ID,
-  subscriber_skgrepo  : SkgRepoName,
+  subscriber_skgrepo  : SkgrepoName,
   subscriber_hides    : Vec<ID>,
-  relRepos            : HashMap<ID, SkgRepoName>,
+  relRepos            : HashMap<ID, SkgrepoName>,
   subscribees         : Vec<ID>,
 }
 
@@ -40,9 +40,9 @@ struct HiddenOutsideContext {
 pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
   node                           : NodeId,
   tree                           : &mut Tree<Viewnode>,
-  skgrepo_diffs                  : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs                  : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   runtime                        : &RuntimeGeneration,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
   warning_sink                   : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
@@ -80,7 +80,7 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
     // authoritative: the relationship signs come from the
     // three-snapshot comparison; node signs from the member's own
     // file statuses.
-    |child : &ID, child_src : &SkgRepoName|
+    |child : &ID, child_src : &SkgrepoName|
     -> (NodeAxes, RelationshipAxes) {
     ( file_node_axes_from_skgrepo_diff (
         skgrepo_diffs, child, child_src ),
@@ -122,7 +122,7 @@ fn read_hiddenoutside_context (
   skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result<HiddenOutsideContext, Box<dyn Error>> {
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: subscriber = ancestry-table index 1 (the [SubscribeeFolder, Unrestricted] chain).
-  let (subscriber_pid, subscriber_skgrepo) : (ID, SkgRepoName) =
+  let (subscriber_pid, subscriber_skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_required_ancestor(
       tree, node, 1, kind . caller_label () ) ?;
   let wt_subscriber_graphnode : Graphnode =
@@ -133,7 +133,7 @@ fn read_hiddenoutside_context (
   // subscriber's own outbound lists (hidesFromSubs,
   // subscribesTo); a membership recorded in a restricted skgrepo must
   // not feed this derived folder.
-  let skgrepo_unrestricted = |skgrepo : &SkgRepoName| match skgrepo_restriction {
+  let skgrepo_unrestricted = |skgrepo : &SkgrepoName| match skgrepo_restriction {
     None      => true,
     Some (a)  => a . is_all () || a . contains_skgrepo (skgrepo) };
   let wt_subscriber_hide_members =
@@ -143,7 +143,7 @@ fn read_hiddenoutside_context (
     . collect::<Vec<_>> ();
   let wt_subscriber_hides : Vec<ID> = wt_subscriber_hide_members . iter ()
     . map ( |m| m . member . clone () ) . collect ();
-  let relRepos : HashMap<ID, SkgRepoName> =
+  let relRepos : HashMap<ID, SkgrepoName> =
     wt_subscriber_hide_members . iter ()
     . filter ( |m| m . relRepo != subscriber_skgrepo )
     . map ( |m| (m . member . clone (), m . relRepo . clone ()) )

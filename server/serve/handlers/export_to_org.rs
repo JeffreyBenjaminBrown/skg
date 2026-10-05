@@ -12,7 +12,7 @@ use crate::serve::util::{
   send_response_with_length_prefix,
   tag_sexp_response,
   value_from_request_sexp};
-use crate::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
+use crate::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
 use crate::types::misc::SkgConfig;
 use crate::types::nodes::complete::Graphnode;
 
@@ -40,7 +40,7 @@ pub fn handle_export_to_org_request (
     let name : String =
       value_from_request_sexp ("repo-set", request) ?;
     let restriction : SkgrepoRestriction =
-      SkgrepoRestriction::named (config, SkgRepoSetName::from (name))
+      SkgrepoRestriction::named (config, SkgrepoSetName::from (name))
       . map_err ( |e| e . to_string () ) ?;
     let nodes : Vec<Graphnode> =
       read_all_skg_files_from_skgrepos (config)

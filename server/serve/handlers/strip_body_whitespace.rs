@@ -15,7 +15,7 @@ use crate::dbs::tantivy::write::update_index_with_nodes;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_text_response};
 use crate::types::env::SkgEnv;
-use crate::types::misc::{SkgConfig, SkgRepoName};
+use crate::types::misc::{SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::tantivy::GraphnodeInTantivy;
 
@@ -68,7 +68,7 @@ fn strip_body_whitespace_and_refresh_caches (
     runtime . config . clone (), new_graph, runtime . tantivy_index . clone ());
   let breakdown : String = {
     // BTreeMap so the report lists skgrepos in a stable order.
-    let mut counts : BTreeMap<SkgRepoName, usize> = BTreeMap::new ();
+    let mut counts : BTreeMap<SkgrepoName, usize> = BTreeMap::new ();
     for node in &changed {
       * counts . entry ( node . home_skgrepo . clone () ) . or_insert (0)
         += 1; }

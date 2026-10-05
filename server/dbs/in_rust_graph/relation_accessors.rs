@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::git::NodeChanges;
 use crate::types::list::Diff_Item;
-use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgRepoName, members_of};
+use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgrepoName, members_of};
 use crate::types::nodes::rust::GraphnodeInRust;
 
 /// The five stored outbound relationship types and their endpoint roles.
@@ -331,7 +331,7 @@ impl InRustGraph {
     recorder : &ID,
     relation : NodeRelation,
     target   : &ID,
-  ) -> Option<SkgRepoName> {
+  ) -> Option<SkgrepoName> {
     let target_key : ID = self . pid_of (target) ? ;
     let node : &GraphnodeInRust = self . nodes . get (recorder) ? ;
     let rel_partners : Vec<RelPartner<ID>> = match relation {
@@ -362,7 +362,7 @@ impl InRustGraph {
     recorder    : &ID,
     relation : NodeRelation,
     raw_member : &ID,
-  ) -> Option<SkgRepoName> {
+  ) -> Option<SkgrepoName> {
     self . outbound_rel_partners_for_relation_gated (
       recorder, relation, None ) . into_iter ()
       . find ( |member| &member . member == raw_member )

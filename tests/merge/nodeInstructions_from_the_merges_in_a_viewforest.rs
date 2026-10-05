@@ -3,7 +3,7 @@ use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_view
 use skg::types::tree::forest::ViewForest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::{run_with_test_stores, graph_handle_from_config};
-use skg::types::misc::{ID, MSV, SkgRepoName, members_msv};
+use skg::types::misc::{ID, MSV, SkgrepoName, members_msv};
 use skg::types::save::SaveNode;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use std::error::Error;
@@ -116,7 +116,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
         // Verify node 2 (acquiree) deletion instruction
         assert_eq!( node2_skgid, &ID::from ("2"),
                     "Node 2 should have ID '2'" );
-        assert_eq!( node2_skgrepo, &SkgRepoName::from ("main"),
+        assert_eq!( node2_skgrepo, &SkgrepoName::from ("main"),
                     "Node 2 should have repo 'main'" );
         Ok(())
       })

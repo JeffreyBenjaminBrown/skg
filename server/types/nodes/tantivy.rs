@@ -5,13 +5,13 @@
 //! context-ranking score multiplier and 'NoSearchMatching' feeds Tantivy's
 //! mandatory direct-match exclusion.
 
-use crate::types::misc::{ID, MSV, RelPartner, SkgRepoName};
+use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName};
 use crate::types::nodes::complete::{Flag, Graphnode};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct GraphnodeInTantivy {
   pub pid          : ID,
-  pub home_skgrepo : SkgRepoName, // the home; each alias doc instead
+  pub home_skgrepo : SkgrepoName, // the home; each alias doc instead
                             // carries ITS OWN level (see 'aliases')
   pub title   : String,
   pub overPrivateText_telescope : bool,

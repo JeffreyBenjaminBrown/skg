@@ -2,7 +2,7 @@
 
 use crate::export_org::EXPORT_MARKER_ID;
 use crate::types::misc::{
-  ID, MSV, SkgRepoName, rel_partners_at_relRepo,
+  ID, MSV, SkgrepoName, rel_partners_at_relRepo,
   rel_partners_at_relRepo_msv,
 };
 use crate::types::nodes::complete::{
@@ -28,7 +28,7 @@ pub struct BuiltDocument {
 
 pub fn build_document (
   document : &ParsedDocument,
-  skgrepo : &SkgRepoName,
+  skgrepo : &SkgrepoName,
   new_id : &mut impl FnMut () -> ID,
 ) -> Result<BuiltDocument, String> {
   let export_target : String = export_target (&document . path)?;
@@ -94,7 +94,7 @@ pub fn build_document (
 fn node_for_section (
   document : &ParsedDocument,
   section : &ParsedSection,
-  skgrepo : &SkgRepoName,
+  skgrepo : &SkgrepoName,
   new_id : &mut impl FnMut () -> ID,
 ) -> Graphnode {
   let skgid : ID = section . explicit_id . as_ref ()
@@ -122,7 +122,7 @@ fn node_for_section (
 fn group_super_indentation (
   index : usize,
   outline : &mut Vec<OutlineNode>,
-  skgrepo : &SkgRepoName,
+  skgrepo : &SkgrepoName,
   new_id : &mut impl FnMut () -> ID,
 ) {
   let children : Vec<usize> = outline [index] . children . clone ();
@@ -136,7 +136,7 @@ fn group_super_indentation (
 fn group_children (
   children : Vec<usize>,
   outline : &mut Vec<OutlineNode>,
-  skgrepo : &SkgRepoName,
+  skgrepo : &SkgrepoName,
   new_id : &mut impl FnMut () -> ID,
 ) -> Vec<usize> {
   let mut levels : Vec<usize> = children . iter ()
@@ -172,7 +172,7 @@ fn group_children (
 fn synthetic_node (
   title : &str,
   body : &str,
-  skgrepo : &SkgRepoName,
+  skgrepo : &SkgrepoName,
   new_id : &mut impl FnMut () -> ID,
 ) -> Graphnode {
   let mut node : Graphnode =
@@ -186,7 +186,7 @@ fn synthetic_node (
 
 fn export_marker (
   target : &str,
-  skgrepo : &SkgRepoName,
+  skgrepo : &SkgrepoName,
   new_id : &mut impl FnMut () -> ID,
 ) -> Result<Graphnode, String> {
   let quote : char = if ! target . contains ('"') { '"' }
@@ -227,7 +227,7 @@ mod tests {
     let document : ParsedDocument = parse_document (
       Path::new ("tutorials/start.md"),
       "Introduction\n# A\nA body\n### Deep\nDeep body\n## Normal\nNormal body\n" . to_string ());
-    let skgrepo     : SkgRepoName = SkgRepoName::from ("owned");
+    let skgrepo     : SkgrepoName = SkgrepoName::from ("owned");
     let mut counter : usize = 0;
     let mut next = || { counter += 1; ID::new (&format! ("generated-{}", counter)) };
     let built : BuiltDocument = build_document (&document, &skgrepo, &mut next) . unwrap ();
@@ -248,7 +248,7 @@ mod tests {
     let document : ParsedDocument = parse_document (
       Path::new ("line-breaks.md"),
       "First  \nSecond\\\nThird\n\n```\nLiteral  \n```\n" . to_string ());
-    let skgrepo : SkgRepoName = SkgRepoName::from ("owned");
+    let skgrepo : SkgrepoName = SkgrepoName::from ("owned");
     let mut next = || ID::new (&uuid::Uuid::new_v4 () . to_string ());
     let built : BuiltDocument = build_document (&document, &skgrepo, &mut next) . unwrap ();
     let body : &str = built . nodes [0] . body . as_deref () . unwrap ();

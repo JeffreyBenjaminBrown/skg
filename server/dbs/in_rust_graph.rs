@@ -23,7 +23,7 @@ use arc_swap::ArcSwap;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::types::misc::{ID, SkgRepoName, members_of};
+use crate::types::misc::{ID, SkgrepoName, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
@@ -116,7 +116,7 @@ impl InRustGraph {
 
   /// Resolve an ID (primary or extra) to its '(pid, repo)'.
   /// Returns None if the ID is unknown.
-  pub fn pid_and_skgrepo (&self, skgid: &ID) -> Option<(ID, SkgRepoName)> {
+  pub fn pid_and_skgrepo (&self, skgid: &ID) -> Option<(ID, SkgrepoName)> {
     let pid : ID = self . pid_of (skgid) ?;
     let node : &GraphnodeInRust = self . nodes . get (&pid) ?;
     Some ( ( pid, node . home_skgrepo . clone () ) ) }

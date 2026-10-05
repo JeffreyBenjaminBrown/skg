@@ -47,7 +47,7 @@ use crate::from_text::local_fieldintent_collection::predicates::{
 use crate::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, DefiningFolderRecorder, LocalContext, FieldIntent,
   HiddenOutsideEdit, SubscribeeTextClaim, SubscribeeVisibility };
-use crate::types::misc::{ID, SkgRepoName};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   NodeEditRequest, AffectsParent, Property, PropertyFolder, PartnerFolder, UnrestrictedVognode, Viewnode,
@@ -265,8 +265,8 @@ fn visit_aliasFolder (
 ) -> Result<(), String> {
   if let LocalContext::UnderDefiningFolder (recorder) = context {
     if recorder . is_saveEligible {
-      let aliases : Vec<(String, Option<SkgRepoName>)> = {
-        let mut aliases : Vec<(String, Option<SkgRepoName>)> = Vec::new();
+      let aliases : Vec<(String, Option<SkgrepoName>)> = {
+        let mut aliases : Vec<(String, Option<SkgrepoName>)> = Vec::new();
         let mut seen : HashSet<String> = HashSet::new ();
         for child in node_ref . children() {
           if let ViewnodeKind::Property (Property::Alias {
@@ -377,10 +377,10 @@ fn visit_overridden_folder (
 /// be silently dropped, matching the existing defining-folder dedup
 /// policy ("duplicate defining-folder members are silently deduped").
 fn dedup_members_by_skgid (
-  members : Vec<(ID, Option<SkgRepoName>)>,
-) -> Vec<(ID, Option<SkgRepoName>)> {
+  members : Vec<(ID, Option<SkgrepoName>)>,
+) -> Vec<(ID, Option<SkgrepoName>)> {
   let mut seen   : std::collections::HashSet<ID> = std::collections::HashSet::new();
-  let mut result : Vec<(ID, Option<SkgRepoName>)> = Vec::new();
+  let mut result : Vec<(ID, Option<SkgrepoName>)> = Vec::new();
   for (skgid, skgrepo) in members {
     if seen . insert (skgid . clone()) {
       result . push ((skgid, skgrepo)); }}
@@ -397,8 +397,8 @@ fn dedup_members_by_skgid (
 /// them at save.  TODO/DONE/full-schema/DONE/9-2_source-set-safety.org.)
 fn partnerFolder_members (
   node_ref : NodeRef<Viewnode>,
-) -> Vec<(ID, Option<SkgRepoName>)> {
-  let mut members : Vec<(ID, Option<SkgRepoName>)> = Vec::new();
+) -> Vec<(ID, Option<SkgrepoName>)> {
+  let mut members : Vec<(ID, Option<SkgrepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
@@ -423,8 +423,8 @@ fn partnerFolder_members (
 #[allow(non_snake_case)]
 fn subscribeeFolder_members (
   node_ref : NodeRef<Viewnode>,
-) -> Vec<(ID, Option<SkgRepoName>)> {
-  let mut members : Vec<(ID, Option<SkgRepoName>)> = Vec::new();
+) -> Vec<(ID, Option<SkgrepoName>)> {
+  let mut members : Vec<(ID, Option<SkgrepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
@@ -456,8 +456,8 @@ fn subscribeeFolder_members (
 /// nodes emit positional save intentions for their container".)
 fn content_members (
   node_ref : NodeRef<Viewnode>,
-) -> Vec<(ID, Option<SkgRepoName>)> {
-  let mut contents : Vec<(ID, Option<SkgRepoName>)> = Vec::new();
+) -> Vec<(ID, Option<SkgrepoName>)> {
+  let mut contents : Vec<(ID, Option<SkgrepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {

@@ -9,8 +9,8 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::expand::editable::{ apply_editable_draw_rule, DrawOutcome};
 use crate::to_org::util::EditableMap;
 use crate::types::env::RuntimeGeneration;
-use crate::types::git::SkgRepoDiff;
-use crate::types::misc::{ID, SkgRepoName, TantivyIndex};
+use crate::types::git::SkgrepoDiff;
+use crate::types::misc::{ID, SkgrepoName, TantivyIndex};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, read_at_ancestor_in_tree};
 use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_branches;
 use crate::update_buffer::ancestry::{ folder_is_generalized_orphan, deaden_generalized_orphan_folder, is_folder_kind};
@@ -42,11 +42,11 @@ pub(super) struct CompletionContext<'a> {
   /// reconcile itself produces only the pure worktree view; process_unrestrictedVognode_diff
   /// applies every content diff effect afterward at the node's own visit (TODO/DONE/local-view-update/plan_v2.org §9
   /// reversal / #3).
-  pub(super) skgrepo_diffs                  : &'a Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  pub(super) skgrepo_diffs                  : &'a Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   pub(super) runtime                        : &'a RuntimeGeneration,
   pub(super) graph_snap                     : &'a Arc<InRustGraph>,
   pub(super) errors                         : &'a mut Vec<String>,
-  pub(super) deleted_since_head_pid_src_map : &'a HashMap<ID, SkgRepoName>,
+  pub(super) deleted_since_head_pid_src_map : &'a HashMap<ID, SkgrepoName>,
   pub(super) deleted_by_this_save_pids      : &'a HashSet<ID>,
   pub(super) deleted_by_this_save_extra_ids : &'a HashMap<ID, HashSet<ID>>,
   pub(super) skgrepo_restriction            : Option<&'a SkgrepoRestriction>,
@@ -229,7 +229,7 @@ fn visit_normal_node (
   // write-protected refresh: all of those paths may consult the post-save
   // graph, where the node is necessarily absent. This also ensures every
   // write-protected image becomes Deleted rather than Unknown.
-  let (pid, skgrepo) : (ID, SkgRepoName) =
+  let (pid, skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_viewnode_at (
       tree, treeid, "visit_normal_node deletion preflight" ) ?;
   if context . deleted_by_this_save_pids . contains (&pid) {

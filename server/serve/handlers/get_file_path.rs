@@ -4,7 +4,7 @@ use crate::serve::util::{
   send_response_with_length_prefix,
   tag_text_response};
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, SkgConfig, SkgRepoName};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::util::path_from_pid_and_skgrepo;
 
 use std::fs;
@@ -28,9 +28,9 @@ pub fn handle_get_file_path_request_with_skgrepo_set (
           TcpToClient::GetFilePath,
           &format! ( "Error: {}", e ) ));
       return; } };
-  let skgrepo : SkgRepoName = match value_from_request_sexp (
+  let skgrepo : SkgrepoName = match value_from_request_sexp (
     "repo", request ) {
-    Ok  (v) => SkgRepoName (v),
+    Ok  (v) => SkgrepoName (v),
     Err (e) => {
       send_response_with_length_prefix (
         stream,

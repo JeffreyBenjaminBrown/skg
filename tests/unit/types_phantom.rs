@@ -1,8 +1,8 @@
 use super::*;
 use super::super::git::{GitDiffStatus, NodeChanges};
-use super::super::misc::SkgRepo;
+use super::super::misc::Skgrepo;
 
-fn skgrepo_name (s: &str) -> SkgRepoName { SkgRepoName ( s . to_string () ) }
+fn skgrepo_name (s: &str) -> SkgrepoName { SkgrepoName ( s . to_string () ) }
 fn skgid        (s: &str) -> ID         { ID ( s . to_string () ) }
 
 fn make_parent_diff (
@@ -20,7 +20,7 @@ fn skgrepo_diff_with_parent_contains (
   parent_pid : &ID,
   staged_ops   : Vec<Diff_Item<ID>>,
   unstaged_ops : Vec<Diff_Item<ID>>,
-) -> SkgRepoDiff {
+) -> SkgrepoDiff {
   let parent_file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", parent_pid . 0 ) );
   let mut staged   : HashMap<PathBuf, GraphnodeDiff> = HashMap::new ();
@@ -31,7 +31,7 @@ fn skgrepo_diff_with_parent_contains (
   if !unstaged_ops . is_empty () {
     unstaged . insert ( parent_file,
                         make_parent_diff (unstaged_ops) ); }
-  SkgRepoDiff {
+  SkgrepoDiff {
     is_gitrepo: true,
     staged, unstaged,
     added_nodes: HashMap::new (),
@@ -41,8 +41,8 @@ fn skgrepo_diff_with_parent_contains (
 fn staged_removal_is_attributed_to_staged_side () {
   let parent    : ID = skgid ("parent");
   let child     : ID = skgid ("child");
-  let src       : SkgRepoName = skgrepo_name ("public");
-  let mut diffs : HashMap<SkgRepoName, SkgRepoDiff> = HashMap::new ();
+  let src       : SkgrepoName = skgrepo_name ("public");
+  let mut diffs : HashMap<SkgrepoName, SkgrepoDiff> = HashMap::new ();
   diffs . insert ( src . clone (),
                    skgrepo_diff_with_parent_contains (
                      &parent,
@@ -60,8 +60,8 @@ fn staged_removal_is_attributed_to_staged_side () {
 fn unstaged_removal_is_attributed_to_unstaged_side () {
   let parent    : ID = skgid ("parent");
   let child     : ID = skgid ("child");
-  let src       : SkgRepoName = skgrepo_name ("public");
-  let mut diffs : HashMap<SkgRepoName, SkgRepoDiff> = HashMap::new ();
+  let src       : SkgrepoName = skgrepo_name ("public");
+  let mut diffs : HashMap<SkgrepoName, SkgrepoDiff> = HashMap::new ();
   diffs . insert ( src . clone (),
                    skgrepo_diff_with_parent_contains (
                      &parent,
@@ -78,8 +78,8 @@ fn unstaged_removal_is_attributed_to_unstaged_side () {
 fn staged_add_then_unstaged_remove () {
   let parent    : ID = skgid ("parent");
   let child     : ID = skgid ("child");
-  let src       : SkgRepoName = skgrepo_name ("public");
-  let mut diffs : HashMap<SkgRepoName, SkgRepoDiff> = HashMap::new ();
+  let src       : SkgrepoName = skgrepo_name ("public");
+  let mut diffs : HashMap<SkgrepoName, SkgrepoDiff> = HashMap::new ();
   diffs . insert ( src . clone (),
                    skgrepo_diff_with_parent_contains (
                      &parent,
@@ -98,8 +98,8 @@ fn no_parent_contains_diff_falls_back_to_unstaged_minus () {
   // phantoms) where there's no contains_diff entry for this child.
   let parent : ID = skgid ("parent");
   let child  : ID = skgid ("child");
-  let src    : SkgRepoName = skgrepo_name ("public");
-  let diffs  : HashMap<SkgRepoName, SkgRepoDiff> = HashMap::new ();
+  let src    : SkgrepoName = skgrepo_name ("public");
+  let diffs  : HashMap<SkgrepoName, SkgrepoDiff> = HashMap::new ();
   let (_, mem) = phantom_axes (
     &child, &src, &parent, &src,
     NodeRelation::Contains, Some (&diffs) );
@@ -117,7 +117,7 @@ fn each_relation_reads_its_own_diff_when_one_recorder_bears_both () {
   // whichever relation it checked first.
   let parent : ID = skgid ("parent");
   let child  : ID = skgid ("child");
-  let src    : SkgRepoName = skgrepo_name ("public");
+  let src    : SkgrepoName = skgrepo_name ("public");
   let parent_file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", parent . 0 ) );
   let diff_for = | contains_ops : Vec<Diff_Item<ID>>,
@@ -131,8 +131,8 @@ fn each_relation_reads_its_own_diff_when_one_recorder_bears_both () {
         .. NodeChanges::default () } ),
       before_node: None,
       after_node: None, } };
-  let mut diffs : HashMap<SkgRepoName, SkgRepoDiff> = HashMap::new ();
-  diffs . insert ( src . clone (), SkgRepoDiff {
+  let mut diffs : HashMap<SkgrepoName, SkgrepoDiff> = HashMap::new ();
+  diffs . insert ( src . clone (), SkgrepoDiff {
     is_gitrepo: true,
     staged: HashMap::from ([ // contains relationship removed STAGED
       ( parent_file . clone (),
@@ -176,19 +176,19 @@ fn home_from_disk_is_the_most_public_section () {
   std::fs::create_dir_all (&public_path)  . unwrap ();
   std::fs::create_dir_all (&private_path) . unwrap ();
   let make_config = || -> SkgConfig {
-    let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+    let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
       HashMap::new ();
     for (name, path, owned) in
       [ ("foreign", foreign_path . clone (), false),
         ("zed",     public_path  . clone (), true),
         ("alpha",   private_path . clone (), true) ] {
-      skgrepos . insert ( skgrepo_name (name), SkgRepo {
+      skgrepos . insert ( skgrepo_name (name), Skgrepo {
         name         : skgrepo_name (name),
         abbreviation : None,
         path,
         owned, } ); }
     let mut config : SkgConfig =
-      SkgConfig::dummyFromSkgRepos (skgrepos);
+      SkgConfig::dummyFromSkgrepos (skgrepos);
     config . skgrepo_order = // most public first
       vec! [ skgrepo_name ("foreign"),
              skgrepo_name ("zed"),

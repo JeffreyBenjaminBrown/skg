@@ -10,7 +10,7 @@ use skg::from_text::buffer_to_viewnodes::add_missing_info::{
 use skg::test_utils::{run_with_shared_test_stores, compare_viewnode_trees_modulo_skgid, compare_viewnode_trees};
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, MpViewnodeKind, MpVognode};
-use skg::types::misc::{SkgConfig, ID, SkgRepoName, TantivyIndex};
+use skg::types::misc::{SkgConfig, ID, SkgrepoName, TantivyIndex};
 use skg::types::tree::forest::{
   MpViewForest,
   tree_forest_root_skgids};
@@ -70,7 +70,7 @@ async fn test_repoless_folder_member_gets_graph_skgrepo (
   match &member . value() . kind {
     MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) => {
       assert_eq! (
-        t . home_skgrepo, Some (SkgRepoName::from ("main")),
+        t . home_skgrepo, Some (SkgrepoName::from ("main")),
         "Repoless folder member should inherit its repo from the \
          graph (node root-pid lives in repo 'main'), not stay \
          repoless." );

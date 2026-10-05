@@ -4,14 +4,14 @@
 //! derived fields), plus linksTo — derived from body parsing at
 //! GraphnodeInRust construction time.
 
-use crate::types::misc::{ID, MSV, RelPartner, SkgRepoName};
+use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName};
 use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::links::links_from_node;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct GraphnodeInRust {
   pub pid                          : ID,
-  pub home_skgrepo                 : SkgRepoName,
+  pub home_skgrepo                 : SkgrepoName,
   pub extra_ids                    : Vec<ID>,
   pub title                        : String,
   pub overPrivateText_telescope               : bool,

@@ -4,7 +4,7 @@ use skg::dbs::in_rust_graph::relation_accessors::{
   NodeRelation,
   RelationRole,
 };
-use skg::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgRepoName, rel_partners_at_relRepo};
+use skg::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgrepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 
 fn node (
@@ -18,7 +18,7 @@ fn node (
     empty_graphnode ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
-  node . home_skgrepo = SkgRepoName::from ("main");
+  node . home_skgrepo = SkgrepoName::from ("main");
   node . extra_ids =
     extra_ids . iter () . map ( |skgid| ID::from (*skgid) ) . collect ();
   node . subscribesTo =
@@ -117,10 +117,10 @@ fn stored_outbound_accessor_retains_unresolved_raw_members () {
   recorder . contains = vec! [
     RelPartner {
       member : ID::from ("known-extra"),
-      relRepo : SkgRepoName::from ("main"), },
+      relRepo : SkgrepoName::from ("main"), },
     RelPartner {
       member : ID::from ("absent-raw"),
-      relRepo : SkgRepoName::from ("main"), },
+      relRepo : SkgrepoName::from ("main"), },
   ];
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
     recorder,
@@ -132,10 +132,10 @@ fn stored_outbound_accessor_retains_unresolved_raw_members () {
     vec! [
       RelPartner {
         member : ID::from ("known-extra"),
-        relRepo : SkgRepoName::from ("main"), },
+        relRepo : SkgrepoName::from ("main"), },
       RelPartner {
         member : ID::from ("absent-raw"),
-        relRepo : SkgRepoName::from ("main"), },
+        relRepo : SkgrepoName::from ("main"), },
     ] );
   assert_eq! (
     graph . outbound_skgids_for_relation_gated (

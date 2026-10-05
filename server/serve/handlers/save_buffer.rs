@@ -38,8 +38,8 @@ use crate::serve::util::{
 use crate::from_text::fork::build_fork_confirmation_buffer;
 use crate::types::env::SkgEnv;
 use crate::types::errors::SaveError;
-use crate::types::git::{SkgRepoDiff, GitDiffStatus};
-use crate::types::misc::{ID, SkgRepoName, SkgConfig};
+use crate::types::git::{SkgrepoDiff, GitDiffStatus};
+use crate::types::misc::{ID, SkgrepoName, SkgConfig};
 use crate::types::save::{
   NodeInstruction, PostSkgsaveCommitNoticeCandidate, SavePlan, format_save_error_as_org };
 use crate::types::tree::forest::ViewForest;
@@ -141,7 +141,7 @@ pub fn handle_save_buffer_request (
     // this field once the user approves (the same retry shape used by
     // other request-scoped confirmations).
     fork_approved_from_request (request);
-  let fork_skgrepos : HashMap<ID, SkgRepoName> =
+  let fork_skgrepos : HashMap<ID, SkgrepoName> =
     // The per-fork clone skgrepos the user chose in the confirmation
     // buffer, riding back on the approve re-save. Empty otherwise.
     fork_skgrepos_from_request (request);
@@ -507,8 +507,8 @@ fn fork_approved_from_request (
 /// downstream in 'validate_fork_specs'.
 fn fork_skgrepos_from_request (
   request : &str,
-) -> HashMap<ID, SkgRepoName> {
-  let mut map : HashMap<ID, SkgRepoName> = HashMap::new ();
+) -> HashMap<ID, SkgrepoName> {
+  let mut map : HashMap<ID, SkgrepoName> = HashMap::new ();
   let Ok (sexp) = sexp::parse (request) else { return map; };
   let Sexp::List (items) = sexp else { return map; };
   for item in & items {
@@ -527,7 +527,7 @@ fn fork_skgrepos_from_request (
                  Sexp::Atom ( Atom::S (skgrepo) ) ] = & kv [..]
         { if dot == "." {
             map . insert ( ID ( skgid . clone () ),
-                           SkgRepoName::from ( skgrepo . as_str () )); }} }} }
+                           SkgrepoName::from ( skgrepo . as_str () )); }} }} }
   map }
 
 /// If 'err' is a buffer-validation SaveError that carries no warnings
@@ -566,7 +566,7 @@ pub async fn update_from_and_rerender_buffer (
   views_state                  : &mut ViewsState,
   skgrepo_restriction         : Option<&SkgrepoRestriction>,
   approved_forks              : bool, // true once the user has approved the forks (a re-issued save); false on the first save, which returns a fork-confirmation instead of committing.
-  fork_skgrepos               : &HashMap<ID, SkgRepoName>, // per-fork clone skgrepos the user chose in the confirmation buffer (keyed by N's pid); empty otherwise.
+  fork_skgrepos               : &HashMap<ID, SkgrepoName>, // per-fork clone skgrepos the user chose in the confirmation buffer (keyed by N's pid); empty otherwise.
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let no_hoist_approvals : HashSet<ID> = HashSet::new ();
   update_from_and_rerender_buffer_with_hoist_approval (
@@ -584,7 +584,7 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
   views_state                  : &mut ViewsState,
   skgrepo_restriction         : Option<&SkgrepoRestriction>,
   approved_forks              : bool,
-  fork_skgrepos               : &HashMap<ID, SkgRepoName>,
+  fork_skgrepos               : &HashMap<ID, SkgrepoName>,
   approved_hoist_pids         : &HashSet<ID>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   update_from_and_rerender_buffer_with_approvals (
@@ -603,7 +603,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   views_state                  : &mut ViewsState,
   skgrepo_restriction         : Option<&SkgrepoRestriction>,
   approved_forks              : bool,
-  fork_skgrepos               : &HashMap<ID, SkgRepoName>,
+  fork_skgrepos               : &HashMap<ID, SkgrepoName>,
   approved_hoist_pids         : &HashSet<ID>,
   text_approved_pids        : &HashSet<ID>,
   other_views               : &[ClientViewSnapshot],
@@ -617,7 +617,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   let working_graph = new_handle ((*runtime . graph) . clone ());
   let mut working_tantivy = runtime . tantivy_index . clone ();
   if diff_mode_enabled { // diff mode is undefined for merge commits
-    let skgrepos : Vec<SkgRepoName> =
+    let skgrepos : Vec<SkgrepoName> =
       runtime . config . skgrepos . keys() . cloned() . collect();
     validate_no_merge_commits ( &skgrepos, &runtime . config )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
@@ -857,7 +857,7 @@ fn post_skgsave_commit_hiddenoutside_warnings (
 /// Returns an error message if so,
 /// as diff computation is ambiguous for merge commits.
 pub fn validate_no_merge_commits (
-  skgrepos : &[SkgRepoName],
+  skgrepos : &[SkgrepoName],
   config   : &SkgConfig,
 ) -> Result<(), String> {
   for skgrepo in skgrepos { // Get the skgrepo path from config
@@ -878,8 +878,8 @@ pub fn validate_no_merge_commits (
 
 pub fn compute_diff_for_every_skgrepo (
   config : &SkgConfig
-) -> HashMap<SkgRepoName, SkgRepoDiff> {
-  let mut skgrepo_diffs : HashMap<SkgRepoName, SkgRepoDiff> =
+) -> HashMap<SkgrepoName, SkgrepoDiff> {
+  let mut skgrepo_diffs : HashMap<SkgrepoName, SkgrepoDiff> =
     HashMap::new();
   for (skgrepo_name, skgrepo_config) in &config . skgrepos {
     let skgrepo_path : &Path =
@@ -904,13 +904,13 @@ pub fn compute_diff_for_every_skgrepo (
 /// (a HashMap) and letting the last writer win answered that
 /// arbitrarily, per process.
 pub fn deleted_skgids_to_skgrepo (
-  skgrepo_diffs : &HashMap<SkgRepoName, SkgRepoDiff>,
+  skgrepo_diffs : &HashMap<SkgrepoName, SkgrepoDiff>,
   config        : &SkgConfig,
-) -> HashMap<ID, SkgRepoName> {
-  let mut result : HashMap<ID, SkgRepoName> =
+) -> HashMap<ID, SkgrepoName> {
+  let mut result : HashMap<ID, SkgrepoName> =
     HashMap::new();
   for skgrepo_name in config . ordered_skgrepos () {
-    let Some (skgrepo_diff) : Option<&SkgRepoDiff> =
+    let Some (skgrepo_diff) : Option<&SkgrepoDiff> =
       skgrepo_diffs . get (&skgrepo_name) else { continue; };
     for diffs in [ &skgrepo_diff . staged,
                    &skgrepo_diff . unstaged ] {

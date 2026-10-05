@@ -1,9 +1,9 @@
 use crate::types::git::{RelationshipAxes, NodeChanges};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, SkgConfig, SkgRepoName};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
-use crate::types::git::{SkgRepoDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_unrestrictedVognode};
+use crate::types::git::{SkgrepoDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_unrestrictedVognode};
 use crate::types::tree::generic::error_unless_node_satisfies;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
@@ -26,7 +26,7 @@ pub fn reconcile_idFolder_children (
   idfolder_treeid : NodeId,
   tree            : &mut Tree<Viewnode>,
   graph           : &InRustGraph,
-  skgrepo_diffs   : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs   : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   config          : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
@@ -36,7 +36,7 @@ pub fn reconcile_idFolder_children (
     "reconcile_idFolder_children: Node is not an IDFolder" )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: parent Unrestricted vognode read through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 0).
-  let (parent_pid, parent_skgrepo) : (ID, SkgRepoName) =
+  let (parent_pid, parent_skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_required_ancestor(
       tree, idfolder_treeid, 0,
       "reconcile_idFolder_children" ) ?;

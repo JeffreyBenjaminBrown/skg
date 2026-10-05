@@ -27,7 +27,7 @@
 //! reads share one spec (the per-folder *field* each reconcile then pulls --
 //! subscriber.hides vs subscribee.contains -- stays per-folder).
 
-use crate::types::misc::{ID, SkgRepoName};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::generic::{ read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree };
 use crate::types::tree::viewnode_graphnode::write_at_unrestrictedVognode_in_tree;
 use crate::types::viewnode::{ AffectsParent, PartnerFolder, Viewnode, ViewnodeKind, Vognode };
@@ -172,7 +172,7 @@ pub fn pid_and_skgrepo_from_required_ancestor (
   folder    : NodeId,
   i      : usize,
   caller : &str,
-) -> Result<(ID, SkgRepoName), Box<dyn Error>> {
+) -> Result<(ID, SkgrepoName), Box<dyn Error>> {
   let anc : NodeId =
     required_ancestor (tree, folder, i) ?
     . ok_or_else ( || format! (

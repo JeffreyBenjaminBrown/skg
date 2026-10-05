@@ -6,7 +6,7 @@ use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::override_invariants::OverrideInvariantViolation;
 use skg::telescope::invariants::TelescopeViolation;
 use skg::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, SkgRepo, SkgRepoName,
+  ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName,
 };
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::save::{NodeInstruction, SaveNode};
@@ -17,17 +17,17 @@ use std::path::PathBuf;
 fn config () -> SkgConfig {
   let mut skgrepos = HashMap::new ();
   for (name, owned) in [("public", true), ("private", true), ("foreign", false)] {
-    skgrepos . insert (SkgRepoName::from (name), SkgRepo {
-      name : SkgRepoName::from (name),
+    skgrepos . insert (SkgrepoName::from (name), Skgrepo {
+      name : SkgrepoName::from (name),
       abbreviation : None,
       path : PathBuf::from (format! ("{}-path", name)),
       owned        : owned,
     }); }
-  let mut config = SkgConfig::dummyFromSkgRepos (skgrepos);
+  let mut config = SkgConfig::dummyFromSkgrepos (skgrepos);
   config . skgrepo_order = vec![
-    SkgRepoName::from ("public"),
-    SkgRepoName::from ("private"),
-    SkgRepoName::from ("foreign"),
+    SkgrepoName::from ("public"),
+    SkgrepoName::from ("private"),
+    SkgrepoName::from ("foreign"),
   ];
   config
 }
@@ -36,7 +36,7 @@ fn node (pid : &str, skgrepo : &str) -> Graphnode {
   let mut node = empty_graphnode ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
-  node . home_skgrepo = SkgRepoName::from (skgrepo);
+  node . home_skgrepo = SkgrepoName::from (skgrepo);
   node
 }
 
@@ -90,7 +90,7 @@ fn unknown_home_is_hard_but_relationship_provenance_is_a_warning () {
   let mut recorder = node ("recorder", "public");
   recorder . contains = vec![
     RelPartner::at_relRepo (
-      SkgRepoName::from ("unconfigured-relRepo"), ID::from ("dangling")),
+      SkgrepoName::from ("unconfigured-relRepo"), ID::from ("dangling")),
   ];
   let unknown_home = node ("unknown-home", "unconfigured-home");
   let report = validate_complete_graph (&config (), &[recorder, unknown_home]);
@@ -109,7 +109,7 @@ fn unknown_home_is_hard_but_relationship_provenance_is_a_warning () {
 fn configured_dangling_members_are_tolerated_without_warning () {
   let mut recorder = node ("recorder", "public");
   recorder . subscribesTo = MSV::Specified (vec![RelPartner::at_relRepo (
-    SkgRepoName::from ("public"), ID::from ("absent"))]);
+    SkgrepoName::from ("public"), ID::from ("absent"))]);
   let report = validate_complete_graph (&config (), &[recorder]);
   assert! (report . is_valid ());
   assert! (report . warnings . is_empty ());
@@ -124,7 +124,7 @@ fn canonical_entry_includes_override_monogamy_and_telescope_orientation () {
   for overrider in [&mut a, &mut b] {
     overrider . overrides = MSV::Specified (vec![
       RelPartner::at_relRepo (
-        SkgRepoName::from ("public"), ID::from ("target")),
+        SkgrepoName::from ("public"), ID::from ("target")),
     ]); }
   let report = validate_complete_graph (&config (), &[target, a, b]);
   assert! (report . errors . iter () . any (|error| matches! (
@@ -155,5 +155,5 @@ fn save_candidate_is_rejected_before_publication () {
       if pid == &ID::from ("edited"))));
   // Validation is pure: the caller's current graph remains untouched.
   assert_eq! (current . get (&ID::from ("edited")) . unwrap () . home_skgrepo,
-              SkgRepoName::from ("public"));
+              SkgrepoName::from ("public"));
 }

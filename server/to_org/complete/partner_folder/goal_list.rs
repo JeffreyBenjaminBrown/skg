@@ -7,10 +7,10 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::types::git::{GitDiffStatus, RelationshipAxes, NodeChanges, GraphnodeDiff, Sign, SkgRepoDiff, axes_from_per_stage_diffs, net_diff_from_per_stage, per_stage_node_changes_for_unrestrictedVognode};
+use crate::types::git::{GitDiffStatus, RelationshipAxes, NodeChanges, GraphnodeDiff, Sign, SkgrepoDiff, axes_from_per_stage_diffs, net_diff_from_per_stage, per_stage_node_changes_for_unrestrictedVognode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
-use crate::types::misc::{ID, RelationshipMemberKey, SkgConfig, SkgRepoName, members_of};
+use crate::types::misc::{ID, RelationshipMemberKey, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::phantom::home_from_disk;
 
@@ -40,9 +40,9 @@ fn relationship_member_key (
 /// carry no membership marks from here.
 pub fn goal_list_for_outbound_folder (
   recorder_pid     : &ID,
-  recorder_skgrepo : &SkgRepoName,
+  recorder_skgrepo : &SkgrepoName,
   relation         : NodeRelation,
-  skgrepo_diffs    : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs    : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   worktree_list    : &[ID],
 ) -> (Vec<ID>, HashSet<ID>) {
   if skgrepo_diffs . is_none () {
@@ -66,9 +66,9 @@ pub fn goal_list_for_outbound_folder (
 /// Modified in neither stage map.
 pub fn outbound_member_axes (
   recorder_pid     : &ID,
-  recorder_skgrepo : &SkgRepoName,
+  recorder_skgrepo : &SkgrepoName,
   relation         : NodeRelation,
-  skgrepo_diffs    : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs    : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
 ) -> HashMap<ID, RelationshipAxes> {
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
@@ -93,14 +93,14 @@ pub fn outbound_member_axes (
 /// comparison.
 pub fn three_git_snapshots_of_relation_list (
   pid           : &ID,
-  skgrepo       : &SkgRepoName,
+  skgrepo       : &SkgrepoName,
   relation      : NodeRelation,
   worktree_list : &[ID],
-  skgrepo_diffs : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
 ) -> [Vec<ID>; 3] {
   let file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-  let sd : Option<&SkgRepoDiff> =
+  let sd : Option<&SkgrepoDiff> =
     skgrepo_diffs . as_ref ()
     . and_then ( |d| d . get (skgrepo) )
     . filter ( |sd| sd . is_gitrepo );
@@ -200,12 +200,12 @@ fn axes_from_three_git_snapshots (
 pub fn goal_list_for_hiddenInSubscribee_folder (
   graph                : &InRustGraph,
   subscribee_pid      : &ID,
-  subscribee_skgrepo  : &SkgRepoName,
+  subscribee_skgrepo  : &SkgrepoName,
   subscriber_pid      : &ID,
-  subscriber_skgrepo  : &SkgRepoName,
+  subscriber_skgrepo  : &SkgrepoName,
   subscribee_contains : &[ID],
   subscriber_hides    : &[ID],
-  skgrepo_diffs       : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs       : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
 ) -> (Vec<ID>, HashSet<ID>, HashMap<ID, RelationshipAxes>) {
   let derived = | hides : &[ID], contains : &[ID] | -> Vec<ID> {
     // Intersection, preserving order from the hides list.
@@ -252,10 +252,10 @@ pub fn goal_list_for_hiddenInSubscribee_folder (
 pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
   graph                : &InRustGraph,
   subscriber_pid       : &ID,
-  subscriber_skgrepo   : &SkgRepoName,
+  subscriber_skgrepo   : &SkgrepoName,
   wt_subscriber_hides  : &[ID],
   wt_subscribees       : &[ID],
-  skgrepo_diffs        : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs        : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   config               : &SkgConfig,
 ) -> (Vec<ID>, HashSet<ID>, HashMap<ID, RelationshipAxes>) {
   let derived = | hides : &[ID],
@@ -300,7 +300,7 @@ pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
       . map ( |pid| {
           let wt_contains : Vec<ID> =
             wt_subscribee_content_of (&pid);
-          let skgrepo : Option<SkgRepoName> =
+          let skgrepo : Option<SkgrepoName> =
             graph_skgrepo (graph, &pid, config)
             . or_else ( || skgrepo_in_diffs_for_file (
                 &pid, skgrepo_diffs ));
@@ -339,8 +339,8 @@ pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
 /// a filter folder's HEAD-side membership.
 fn skgrepo_in_diffs_for_file (
   pid           : &ID,
-  skgrepo_diffs : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
-) -> Option<SkgRepoName> {
+  skgrepo_diffs : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
+) -> Option<SkgrepoName> {
   let file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
   skgrepo_diffs . as_ref () ? . iter ()
@@ -361,7 +361,7 @@ fn graph_skgrepo (
   graph  : &InRustGraph,
   pid    : &ID,
   config : &SkgConfig,
-) -> Option<SkgRepoName> {
+) -> Option<SkgrepoName> {
   if let Some (s) =
     graph . pid_and_skgrepo (pid) . map ( |(_, s)| s )
   { return Some (s); }

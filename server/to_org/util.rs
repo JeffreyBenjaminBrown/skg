@@ -3,7 +3,7 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::complete::contents::clobberWriteProtectedViewnode;
 use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_branches;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
-use crate::types::misc::{ID, SkgConfig, SkgRepoName, members_of};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
@@ -70,7 +70,7 @@ pub fn graphnode_and_viewnode_from_skgid (
   config : &SkgConfig,
   skgid  : &ID,
 ) -> Result < Option<( Graphnode, Viewnode )>, Box<dyn Error> > {
-  let resolved : Option<(ID, SkgRepoName)> =
+  let resolved : Option<(ID, SkgrepoName)> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "graphnode_and_viewnode_from_id" ). entered();
       graph . pid_and_skgrepo (skgid) };
@@ -93,7 +93,7 @@ pub(super) fn graphnode_and_viewnode_from_pid_and_skgrepo (
   graph   : &InRustGraph,
   config  : &SkgConfig,
   pid     : &ID,
-  skgrepo : &SkgRepoName,
+  skgrepo : &SkgrepoName,
 ) -> Result < ( Graphnode, Viewnode ), Box<dyn Error> > {
   let graphnode : Graphnode =
     graphnode_graphFirst_by_pid_and_skgrepo (

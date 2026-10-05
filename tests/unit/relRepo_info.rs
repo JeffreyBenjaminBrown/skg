@@ -7,7 +7,7 @@ use super::{relRepo_info, relation_from_client_string};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::types::misc::{
-  ID, RelPartner, SkgConfig, SkgRepo, SkgRepoName};
+  ID, RelPartner, SkgConfig, Skgrepo, SkgrepoName};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 
 use std::collections::HashMap;
@@ -16,20 +16,20 @@ use std::path::PathBuf;
 fn config_with_order (
   names : &[&str],
 ) -> SkgConfig {
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
     HashMap::new ();
   for name in names {
     skgrepos . insert (
-      SkgRepoName::from (*name),
-      SkgRepo {
-        name         : SkgRepoName::from (*name),
+      SkgrepoName::from (*name),
+      Skgrepo {
+        name         : SkgrepoName::from (*name),
         abbreviation : None,
         path         : PathBuf::from ( format! ("owned/{}", name) ),
         owned        : true, } ); }
   let mut config : SkgConfig =
-    SkgConfig::dummyFromSkgRepos (skgrepos);
+    SkgConfig::dummyFromSkgrepos (skgrepos);
   config . skgrepo_order =
-    names . iter () . map ( |n| SkgRepoName::from (*n) ) . collect ();
+    names . iter () . map ( |n| SkgrepoName::from (*n) ) . collect ();
   config }
 
 fn node_at (
@@ -39,7 +39,7 @@ fn node_at (
   let mut n : Graphnode = empty_graphnode ();
   n . pid = ID::new (pid);
   n . title = pid . to_string ();
-  n . home_skgrepo = SkgRepoName::from (skgrepo);
+  n . home_skgrepo = SkgrepoName::from (skgrepo);
   n }
 
 fn pm (
@@ -47,7 +47,7 @@ fn pm (
   member : &str,
 ) -> RelPartner<ID> {
   RelPartner::at_relRepo (
-    SkgRepoName::from (skgrepo), ID::new (member) ) }
+    SkgrepoName::from (skgrepo), ID::new (member) ) }
 
 #[test]
 fn default_is_more_private_of_homes_and_current_is_the_relRepo (
@@ -65,9 +65,9 @@ fn default_is_more_private_of_homes_and_current_is_the_relRepo (
       &graph, &config,
       & ID::new ("recorder"), & ID::new ("child"),
       NodeRelation::Contains ) . unwrap ();
-  assert_eq! ( default, SkgRepoName::from ("trusted"),
+  assert_eq! ( default, SkgrepoName::from ("trusted"),
                "default = more private of the endpoints' homes" );
-  assert_eq! ( current, Some ( SkgRepoName::from ("private") ),
+  assert_eq! ( current, Some ( SkgrepoName::from ("private") ),
                "current = the repo the graph records" );
 }
 
@@ -87,7 +87,7 @@ fn current_is_none_for_an_unrecorded_relationship (
       &graph, &config,
       & ID::new ("recorder"), & ID::new ("child"),
       NodeRelation::Contains ) . unwrap ();
-  assert_eq! ( default, SkgRepoName::from ("private") );
+  assert_eq! ( default, SkgrepoName::from ("private") );
   assert_eq! ( current, None );
 }
 
@@ -108,7 +108,7 @@ fn unknown_recorder_is_an_error_but_unknown_member_uses_recorder_home (
     &graph, &config,
     & ID::new ("recorder"), & ID::new ("ghost"),
     NodeRelation::Contains ) . unwrap ();
-  assert_eq! (default, SkgRepoName::from ("public"));
+  assert_eq! (default, SkgrepoName::from ("public"));
   assert_eq! (current, None);
 }
 
@@ -122,8 +122,8 @@ fn raw_unresolved_member_keeps_its_exact_relRepo (
   let (default, current) = relRepo_info (
     &graph, &config, &ID::new ("recorder"), &ID::new ("absent-raw"),
     NodeRelation::Contains ) . unwrap ();
-  assert_eq! (default, SkgRepoName::from ("public"));
-  assert_eq! (current, Some (SkgRepoName::from ("private")));
+  assert_eq! (default, SkgrepoName::from ("public"));
+  assert_eq! (current, Some (SkgrepoName::from ("private")));
 }
 
 #[test]
@@ -145,9 +145,9 @@ fn owned_recorder_with_foreign_member_defaults_to_recorder_home (
       [("public", "private"), ("private", "public")] {
     let mut config : SkgConfig =
       config_with_order ( & ["public", "private"] );
-    config . skgrepos . get_mut (&SkgRepoName::from (member_home))
+    config . skgrepos . get_mut (&SkgrepoName::from (member_home))
       . unwrap () . owned = false;
-    config . skgrepos . get_mut (&SkgRepoName::from (recorder_home))
+    config . skgrepos . get_mut (&SkgrepoName::from (recorder_home))
       . unwrap () . owned = true;
     let recorder  : Graphnode = node_at ("recorder", recorder_home);
     let member : Graphnode = node_at ("member", member_home);
@@ -156,6 +156,6 @@ fn owned_recorder_with_foreign_member_defaults_to_recorder_home (
     let (default, current) = relRepo_info (
       &graph, &config, &ID::new ("recorder"), &ID::new ("member"),
       NodeRelation::Contains ) . unwrap ();
-    assert_eq! (default, SkgRepoName::from (recorder_home));
+    assert_eq! (default, SkgrepoName::from (recorder_home));
     assert_eq! (current, None); }
 }

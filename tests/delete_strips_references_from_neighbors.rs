@@ -43,7 +43,7 @@ use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::env::SkgEnv;
 use skg::types::views_state::{OpenViews, ViewId};
-use skg::types::misc::{ID, SkgConfig, TantivyIndex, SkgRepoName, members_of, members_msv};
+use skg::types::misc::{ID, SkgConfig, TantivyIndex, SkgrepoName, members_of, members_msv};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode, DeleteNode};
 use skg::util::path_from_pid_and_skgrepo;
@@ -141,7 +141,7 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
     Ok (messages) };
 
   let recorder_path : String = path_from_pid_and_skgrepo (
-    config, &SkgRepoName::from ("main"), ID::from ("owner")) ?;
+    config, &SkgrepoName::from ("main"), ID::from ("owner")) ?;
   let recorder_before : Vec<u8> = fs::read (&recorder_path) ?;
   let confirmation : Vec<String> = invoke (&request (None), &mut env, &mut views_state) ?;
   assert_eq! (confirmation . len (), 3, "{:?}", confirmation);
@@ -161,7 +161,7 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
   // Change a previewed field through the normal save path.  The old token must
   // not authorize a rewrite against this new graph snapshot.
   let mut changed_recorder : Graphnode = graphnode_from_pid_and_skgrepo (
-    config, ID::from ("owner"), &SkgRepoName::from ("main")) ?;
+    config, ID::from ("owner"), &SkgrepoName::from ("main")) ?;
   changed_recorder . title . push_str (" changed after preview");
   let runtime = env . runtime_snapshot ();
   let working_graph = skg::dbs::in_rust_graph::new_handle (
@@ -177,7 +177,7 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
     &request (Some (&approval)), &mut env, &mut views_state) ?;
   assert! (stale [0] . contains ("Cleanup preview is stale"), "{:?}", stale);
   let unchanged : Graphnode = graphnode_from_pid_and_skgrepo (
-    config, ID::from ("owner"), &SkgRepoName::from ("main")) ?;
+    config, ID::from ("owner"), &SkgrepoName::from ("main")) ?;
   assert_eq! (members_of (&unchanged . contains), vec![ID::from ("gone"), ID::from ("kept")],
               "a stale approval must not partially rewrite the recorder");
   let renewed_confirmation : Vec<String> = invoke (
@@ -201,7 +201,7 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
   assert! (completed [3] . contains ("rerender-done"), "{:?}", completed);
 
   let recorder : Graphnode = graphnode_from_pid_and_skgrepo (
-    config, ID::from ("owner"), &SkgRepoName::from ("main")) ?;
+    config, ID::from ("owner"), &SkgrepoName::from ("main")) ?;
   assert_eq! (members_of (&recorder . contains), vec! [ID::from ("kept")]);
   assert! (recorder . subscribesTo . or_default () . is_empty ());
   assert! (recorder . hidesFromSubs . or_default () . is_empty ());
@@ -215,8 +215,8 @@ async fn delete_preserves_foreign_referencer (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let owned : SkgRepoName = SkgRepoName::from ("owned");
-  let foreign : SkgRepoName = SkgRepoName::from ("foreign");
+  let owned : SkgrepoName = SkgrepoName::from ("owned");
+  let foreign : SkgrepoName = SkgrepoName::from ("foreign");
   let foreign_path : String = path_from_pid_and_skgrepo (
     config, &foreign, ID::from ("cheese") ) ?;
   let foreign_before : Vec<u8> = fs::read (&foreign_path) ?;
@@ -310,7 +310,7 @@ async fn delete_in_foreign_overridden_rerenders_as_unknown (
     "the buffer whose foreign root was forked must immediately show the fork: {}",
     response . saved_view);
   let original : Graphnode = graphnode_from_pid_and_skgrepo (
-    config, ID::from ("overrider"), &SkgRepoName::from ("foreign")) ?;
+    config, ID::from ("overrider"), &SkgrepoName::from ("foreign")) ?;
   assert! (members_msv (&original . overrides)
            . into_vec ()
            . contains (&ID::from ("victim-alt")),
@@ -379,7 +379,7 @@ async fn delete_strips_references_impl (
     &Err ( String::new () ), &mut views_state ) . await ?;
 
   let mut failures : Vec<String> = Vec::new ();
-  let main         : SkgRepoName = SkgRepoName::from ("main");
+  let main         : SkgrepoName = SkgrepoName::from ("main");
 
   // 1. victim.skg deleted.
   let victim_path : String =
@@ -456,7 +456,7 @@ async fn strip_pass_amends_user_supplied_savenode_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let main : SkgRepoName = SkgRepoName::from ("main");
+  let main : SkgrepoName = SkgrepoName::from ("main");
   // Build the SaveNode for container by reading the on-disk node
   // verbatim -- contents are still [victim] -- and pair with a
   // DeleteNode for victim.
@@ -529,7 +529,7 @@ async fn strip_pass_handles_extra_ids_impl (
     &mut stream,
     input_org_text, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state ) . await ?;
-  let main       : SkgRepoName = SkgRepoName::from ("main");
+  let main       : SkgrepoName = SkgrepoName::from ("main");
   let referencer : Graphnode =
     graphnode_from_pid_and_skgrepo (
       config, ID::from ("referencer"), &main ) ?;

@@ -68,8 +68,8 @@ pub enum RelationshipMemberKey {
 }
 
 #[derive(Serialize, Clone, PartialEq, Eq, Hash)]
-pub struct SkgRepo {
-  pub name         : SkgRepoName,
+pub struct Skgrepo {
+  pub name         : SkgrepoName,
   pub abbreviation : Option<String>,
   pub path         : PathBuf,
   // DERIVED at config load, never written in TOML (a raw
@@ -85,22 +85,22 @@ pub struct SkgRepo {
 /// defaulting to the path as written (e.g. "eggman/eggs"), which the
 /// herald-label defaulting then abbreviates for owned skgrepos.
 #[derive(Deserialize)]
-struct SkgRepoToml {
-  name         : Option<SkgRepoName>,
+struct SkgrepoToml {
+  name         : Option<SkgrepoName>,
   #[serde(default)]
   abbreviation : Option<String>,
   path         : PathBuf,
 }
 
-impl From<SkgRepoToml> for SkgRepo {
+impl From<SkgrepoToml> for Skgrepo {
   fn from (
-    raw : SkgRepoToml
-  ) -> SkgRepo {
-    let name : SkgRepoName =
+    raw : SkgrepoToml
+  ) -> Skgrepo {
+    let name : SkgrepoName =
       raw . name . unwrap_or_else (
-        || SkgRepoName (
+        || SkgrepoName (
           raw . path . to_string_lossy () . into_owned () ));
-    SkgRepo {
+    Skgrepo {
       name,
       abbreviation : raw . abbreviation,
       path         : raw . path,
@@ -121,20 +121,20 @@ impl From<SkgRepoToml> for SkgRepo {
 /// Every value records the relRepo whose section contains it.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct RelPartner<T> {
-  pub relRepo   : SkgRepoName,
+  pub relRepo   : SkgrepoName,
   pub member    : T,
 }
 
 impl<T> RelPartner<T> {
   pub fn at_relRepo (
-    relRepo   : SkgRepoName,
+    relRepo   : SkgrepoName,
     member    : T,
   ) -> RelPartner<T> {
     RelPartner { relRepo, member }}}
 
 /// Tag every member of a list with one relRepo.
 pub fn rel_partners_at_relRepo<T> (
-  relRepo   : &SkgRepoName,
+  relRepo   : &SkgrepoName,
   members   : Vec<T>,
 ) -> Vec<RelPartner<T>> {
   members . into_iter ()
@@ -152,7 +152,7 @@ pub fn members_of<T : Clone> (
 
 /// 'rel_partners_at_relRepo' lifted over MSV.
 pub fn rel_partners_at_relRepo_msv<T> (
-  relRepo   : &SkgRepoName,
+  relRepo   : &SkgrepoName,
   msv       : MSV<T>,
 ) -> MSV<RelPartner<T>> {
   match msv {
@@ -175,9 +175,9 @@ pub fn members_msv<T : Clone> (
 /// name of a configured skgrepo -- meaning "that skgrepo and everything
 /// more public", i.e. the most private skgrepo to make available.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct SkgRepoSetName ( pub String );
+pub struct SkgrepoSetName ( pub String );
 
-impl SkgRepo {
+impl Skgrepo {
   pub fn herald_label (&self) -> &str {
     self . abbreviation . as_deref ()
       . unwrap_or ( &self . name ) }}
@@ -191,7 +191,7 @@ pub struct SkgConfig {
   pub data_root      : PathBuf, // Directory containing skgconfig.toml. Other relative paths (tantivy_folder, skgrepo paths) are resolved against this at load time.
 
   #[serde ( rename = "repos", deserialize_with = "deserialize_skgrepos" )]
-  pub skgrepos        : HashMap<SkgRepoName, SkgRepo>,
+  pub skgrepos        : HashMap<SkgrepoName, Skgrepo>,
 
   // The skgrepo names in TOML declaration order ('repos' is a HashMap,
   // which loses it). Filled at parse time by the config loaders; empty
@@ -203,10 +203,10 @@ pub struct SkgConfig {
   // 'repo_position', 'is_strictly_more_public', 'more_private_of',
   // 'prefix_through'). No other code may compare skgrepo positions.
   #[serde (skip)]
-  pub skgrepo_order   : Vec<SkgRepoName>,
+  pub skgrepo_order   : Vec<SkgrepoName>,
 
   #[serde(rename = "default_repo_set", default = "default_skgrepo_set_name")]
-  pub default_skgrepo_set : SkgRepoSetName,
+  pub default_skgrepo_set : SkgrepoSetName,
 
   // The directory (as a first path component under the data root)
   // whose skgrepos the user OWNS; every other skgrepo is foreign
@@ -241,9 +241,9 @@ impl SkgConfig {
 /// Each skgrepo has a unique name, defined in the SkgConfig,
 /// used in Viewnode metadata to track provenance.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct SkgRepoName ( pub String );
+pub struct SkgrepoName ( pub String );
 
-impl SkgRepoName {
+impl SkgrepoName {
   /// Reserved sentinel skgrepo for a *non-Unrestricted* viewnode (e.g. a
   /// Diff phantom) whose skgrepo could not be determined. It renders like
   /// any other skgrepo -- the all-caps name alone flags it to the user --
@@ -252,7 +252,7 @@ impl SkgRepoName {
   /// validation (pre-save) or are catastrophic (post-save), never this.
   pub const NOT_FOUND_STR : &'static str = "NOT_FOUND";
   pub fn not_found () -> Self {
-    SkgRepoName ( Self::NOT_FOUND_STR . to_string () ) } }
+    SkgrepoName ( Self::NOT_FOUND_STR . to_string () ) } }
 
 #[derive (Clone)]
 pub struct TantivyIndex {
@@ -284,17 +284,17 @@ pub struct TantivyIndex {
 
 fn deserialize_skgrepos<'de, D> (
   deserializer : D
-) -> Result <HashMap<SkgRepoName, SkgRepo>, D::Error>
+) -> Result <HashMap<SkgrepoName, Skgrepo>, D::Error>
 where
   D : Deserializer<'de>
 {
-  let skgrepos_vec : Vec<SkgRepoToml> =
+  let skgrepos_vec : Vec<SkgrepoToml> =
     Vec::deserialize (deserializer) ?;
-  let mut map : HashMap<SkgRepoName, SkgRepo> =
+  let mut map : HashMap<SkgrepoName, Skgrepo> =
     HashMap::new ();
   for raw in skgrepos_vec {
-    let skgrepo : SkgRepo =
-      SkgRepo::from (raw);
+    let skgrepo : Skgrepo =
+      Skgrepo::from (raw);
     if map . insert (
          skgrepo . name . clone (),
          skgrepo . clone () ) . is_some () {
@@ -303,8 +303,8 @@ where
   Ok (map)
 }
 
-fn default_skgrepo_set_name () -> SkgRepoSetName {
-  SkgRepoSetName::from ("all") }
+fn default_skgrepo_set_name () -> SkgrepoSetName {
+  SkgrepoSetName::from ("all") }
 
 fn default_owned_folder () -> String {
   "owned" . to_string () }
@@ -389,7 +389,7 @@ impl AsRef<str> for ID {
   fn as_ref (&self) -> &str {
     &self . 0 }}
 
-impl Deref for SkgRepoName {
+impl Deref for SkgrepoName {
   // lets RepoName be used like a String
   type Target = String;
   fn deref (&self) -> &Self::Target {
@@ -401,13 +401,13 @@ impl fmt::Display for ID {
          -> fmt::Result {
     write! ( f, "{}", self . 0 ) }}
 
-impl fmt::Display for SkgRepoName {
+impl fmt::Display for SkgrepoName {
   fn fmt ( &self,
             f: &mut fmt::Formatter<'_> )
          -> fmt::Result {
     write! ( f, "{}", self . 0 ) }}
 
-impl fmt::Display for SkgRepoSetName {
+impl fmt::Display for SkgrepoSetName {
   fn fmt ( &self,
             f: &mut fmt::Formatter<'_> )
          -> fmt::Result {
@@ -421,46 +421,46 @@ impl From<&String> for ID {
   fn from ( s : &String ) -> Self {
     ID ( s . clone () ) }}
 
-impl From<String> for SkgRepoName {
+impl From<String> for SkgrepoName {
   fn from ( s : String ) -> Self {
-    SkgRepoName (s) }}
+    SkgrepoName (s) }}
 
-impl From<String> for SkgRepoSetName {
+impl From<String> for SkgrepoSetName {
   fn from ( s : String ) -> Self {
-    SkgRepoSetName (s) }}
+    SkgrepoSetName (s) }}
 
-impl From<&String> for SkgRepoName {
+impl From<&String> for SkgrepoName {
   fn from ( s : &String ) -> Self {
-    SkgRepoName ( s . clone () ) }}
+    SkgrepoName ( s . clone () ) }}
 
-impl From<&String> for SkgRepoSetName {
+impl From<&String> for SkgrepoSetName {
   fn from ( s : &String ) -> Self {
-    SkgRepoSetName ( s . clone () ) }}
+    SkgrepoSetName ( s . clone () ) }}
 
 impl From <&str> for ID {
   fn from(s: &str) -> Self {
     ID ( s . to_string () ) }}
 
-impl From <&str> for SkgRepoName {
+impl From <&str> for SkgrepoName {
   fn from(s: &str) -> Self {
-    SkgRepoName ( s . to_string () ) }}
+    SkgrepoName ( s . to_string () ) }}
 
-impl From <&str> for SkgRepoSetName {
+impl From <&str> for SkgrepoSetName {
   fn from(s: &str) -> Self {
-    SkgRepoSetName ( s . to_string () ) }}
+    SkgrepoSetName ( s . to_string () ) }}
 
 impl SkgConfig {
   /// Creates a SkgConfig with dummy values for everything except skgrepos.
   /// Useful for tests that only need to read .skg files.
-  pub fn dummyFromSkgRepos (
-    skgrepos : HashMap<SkgRepoName, SkgRepo>
+  pub fn dummyFromSkgrepos (
+    skgrepos : HashMap<SkgrepoName, Skgrepo>
   ) -> Self {
     SkgConfig {
       config_path        : PathBuf::from (""),
       data_root          : PathBuf::from ("."),
       skgrepos,
       skgrepo_order       : Vec::new (),
-      default_skgrepo_set : SkgRepoSetName::from ("all"),
+      default_skgrepo_set : SkgrepoSetName::from ("all"),
       owned_folder       : "owned" . to_string (),
       tantivy_folder     : PathBuf::from ("/tmp/unused"),
       port               : 0,
@@ -470,8 +470,8 @@ impl SkgConfig {
       max_role_tree_depth : default_max_role_tree_depth(), }}
 
   /// Creates a SkgConfig with a test-specific Tantivy folder.
-  pub fn fromSkgReposAndTantivyFolder (
-    skgrepos       : HashMap<SkgRepoName, SkgRepo>,
+  pub fn fromSkgreposAndTantivyFolder (
+    skgrepos       : HashMap<SkgrepoName, Skgrepo>,
     tantivy_folder : &str,
   ) -> Self {
     SkgConfig {
@@ -479,7 +479,7 @@ impl SkgConfig {
       data_root          : PathBuf::from ("."),
       skgrepos,
       skgrepo_order       : Vec::new (),
-      default_skgrepo_set : SkgRepoSetName::from ("all"),
+      default_skgrepo_set : SkgrepoSetName::from ("all"),
       owned_folder       : "owned" . to_string (),
       tantivy_folder     : PathBuf::from (tantivy_folder),
       port               : DEFAULT_PORT,
@@ -490,7 +490,7 @@ impl SkgConfig {
 
   pub fn skgrepo_is_owned (
     &self,
-    skgrepo_name : &SkgRepoName
+    skgrepo_name : &SkgrepoName
   ) -> bool {
     self . skgrepos . get (skgrepo_name)
       . map ( |s| s . owned )
@@ -500,7 +500,7 @@ impl SkgConfig {
   /// The owned skgrepo names in privacy order (see 'ordered_repos').
   pub fn owned_skgrepos_in_config_order (
     &self,
-  ) -> Vec<SkgRepoName> {
+  ) -> Vec<SkgrepoName> {
     self . ordered_skgrepos () . into_iter ()
       . filter ( |name| self . skgrepo_is_owned (name) )
       . collect () }
@@ -512,19 +512,19 @@ impl SkgConfig {
   /// one case 'ForkRepoUnresolved' still fires.
   pub fn first_owned_skgrepo_in_config_order (
     &self,
-  ) -> Option<SkgRepoName> {
+  ) -> Option<SkgrepoName> {
     self . owned_skgrepos_in_config_order () . into_iter () . next () }
 
   /// Backwards-compatible name for the config-first owned skgrepo
   /// default; see 'first_owned_repo_in_config_order'.
   pub fn first_owned_skgrepo (
     &self,
-  ) -> Option<SkgRepoName> {
+  ) -> Option<SkgrepoName> {
     self . first_owned_skgrepo_in_config_order () }
 
   pub fn default_skgrepo_set_name (
     &self,
-  ) -> &SkgRepoSetName {
+  ) -> &SkgrepoSetName {
     &self . default_skgrepo_set }
 
   /// THE COMPARISON CHOKEPOINT, with the methods below it. Every
@@ -535,10 +535,10 @@ impl SkgConfig {
   /// No code outside these methods may compare skgrepo positions.
   pub fn ordered_skgrepos (
     &self,
-  ) -> Vec<SkgRepoName> {
+  ) -> Vec<SkgrepoName> {
     if self . skgrepo_order . is_empty () {
       // No declaration order recorded: alphabetical, for determinism.
-      let mut names : Vec<SkgRepoName> =
+      let mut names : Vec<SkgrepoName> =
         self . skgrepos . keys () . cloned () . collect ();
       names . sort ();
       names
@@ -548,7 +548,7 @@ impl SkgConfig {
   /// None for a skgrepo absent from the config.
   pub fn skgrepo_position (
     &self,
-    skgrepo : &SkgRepoName,
+    skgrepo : &SkgrepoName,
   ) -> Option<usize> {
     self . ordered_skgrepos () . iter ()
       . position ( |s| s == skgrepo ) }
@@ -558,8 +558,8 @@ impl SkgConfig {
   /// maximally private, so nothing is less public than it.
   pub fn is_strictly_more_public (
     &self,
-    a : &SkgRepoName,
-    b : &SkgRepoName,
+    a : &SkgrepoName,
+    b : &SkgrepoName,
   ) -> bool {
     match ( self . skgrepo_position (a),
             self . skgrepo_position (b) ) {
@@ -573,9 +573,9 @@ impl SkgConfig {
   /// of its two endpoints' homes.
   pub fn more_private_of (
     &self,
-    a : SkgRepoName,
-    b : SkgRepoName,
-  ) -> SkgRepoName {
+    a : SkgrepoName,
+    b : SkgrepoName,
+  ) -> SkgrepoName {
     if self . is_strictly_more_public (&b, &a) { a } else { b }}
 
   /// The default relRepo for an editable node-to-node
@@ -585,9 +585,9 @@ impl SkgConfig {
   /// a relationship into the foreign skgrepo.
   pub fn default_relRepo (
     &self,
-    recorder_home : &SkgRepoName,
-    member_home   : &SkgRepoName,
-  ) -> SkgRepoName {
+    recorder_home : &SkgrepoName,
+    member_home   : &SkgrepoName,
+  ) -> SkgrepoName {
     if ( self . skgrepo_is_owned (recorder_home) &&
          ! self . skgrepo_is_owned (member_home) ) {
       recorder_home . clone ()
@@ -600,9 +600,9 @@ impl SkgConfig {
   /// not configured.
   pub fn prefix_through (
     &self,
-    skgrepo : &SkgRepoName,
-  ) -> Result<Vec<SkgRepoName>, String> {
-    let ordered : Vec<SkgRepoName> =
+    skgrepo : &SkgrepoName,
+  ) -> Result<Vec<SkgrepoName>, String> {
+    let ordered : Vec<SkgrepoName> =
       self . ordered_skgrepos ();
     let position : usize =
       ordered . iter () . position ( |s| s == skgrepo )
@@ -615,12 +615,12 @@ impl SkgConfig {
   /// through it (that skgrepo and everything more public).
   pub fn skgrepo_set_skgrepos (
     &self,
-    name : &SkgRepoSetName,
-  ) -> Result<BTreeSet<SkgRepoName>, String> {
+    name : &SkgrepoSetName,
+  ) -> Result<BTreeSet<SkgrepoName>, String> {
     if name . 0 == "all" {
       return Ok ( self . skgrepos . keys () . cloned () . collect () ); }
     Ok ( self
-         . prefix_through ( &SkgRepoName::from ( name . 0 . as_str () ))
+         . prefix_through ( &SkgrepoName::from ( name . 0 . as_str () ))
          . map_err ( |_| format! (
            "Repo-set '{}' names no configured repo. A repo-set is 'all' or the name of the most private repo to make available.",
            name )) ?

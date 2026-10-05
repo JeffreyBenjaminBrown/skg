@@ -12,7 +12,7 @@ use super::compose::{ComposedNode, compose_sections, graphnode_from_composition}
 use super::types::{CompositionWarning, ListItem, SectionSlices, Telescope};
 use super::decompose::{DecompositionInput, decompose_node};
 use crate::types::misc::{
-  ID, RelPartner, SkgConfig, SkgRepo, SkgRepoName,
+  ID, RelPartner, SkgConfig, Skgrepo, SkgrepoName,
 };
 use crate::types::nodes::complete::Flag;
 
@@ -21,29 +21,29 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// The test privacy order: S0 most public .. S3 most private.
-fn skgrepo_universe () -> Vec<SkgRepoName> {
-  (0..4) . map ( |i| SkgRepoName ( format! ("S{}", i) ))
+fn skgrepo_universe () -> Vec<SkgrepoName> {
+  (0..4) . map ( |i| SkgrepoName ( format! ("S{}", i) ))
     . collect () }
 
 fn telescope_config () -> SkgConfig {
-  let skgrepos : HashMap<SkgRepoName, SkgRepo> =
+  let skgrepos : HashMap<SkgrepoName, Skgrepo> =
     skgrepo_universe () . into_iter ()
     . map ( |skgrepo| (
       skgrepo . clone (),
-      SkgRepo {
+      Skgrepo {
         name         : skgrepo . clone (),
         abbreviation : None,
         path         : PathBuf::from (format! ("owned/{}", skgrepo)),
         owned        : true,
       } ))
     . collect ();
-  let mut config : SkgConfig = SkgConfig::dummyFromSkgRepos (skgrepos);
+  let mut config : SkgConfig = SkgConfig::dummyFromSkgrepos (skgrepos);
   config . skgrepo_order = skgrepo_universe ();
   config }
 
 fn decompose_sections (
   input : &DecompositionInput,
-) -> Vec<(SkgRepoName, SectionSlices)> {
+) -> Vec<(SkgrepoName, SectionSlices)> {
   decompose_node (input, &telescope_config ()) . unwrap ()
     . into_sections () . into_iter ()
     . map ( |(skgrepo, node_fs)|
@@ -64,7 +64,7 @@ fn arb_rel_partners (
 ) -> impl Strategy<Value = Vec<RelPartner<ID>>> {
   proptest::collection::vec ( 0usize..4, 0..max_len )
     . prop_map ( |skgrepos| {
-      let universe : Vec<SkgRepoName> = skgrepo_universe ();
+      let universe : Vec<SkgrepoName> = skgrepo_universe ();
       skgrepos . into_iter () . enumerate ()
         . map ( |(i, l)| RelPartner::at_relRepo (
           universe [l] . clone (),
@@ -74,7 +74,7 @@ fn arb_rel_partners (
 /// Wrap ordered lists of relation partners (and nothing else) into an
 /// DecompositionInput-shaped ComposedNode for the round-trip tests.
 fn composed_from_lists (
-  home     : &SkgRepoName,
+  home     : &SkgrepoName,
   contains : Vec<RelPartner<ID>>,
   subs     : Vec<RelPartner<ID>>,
   hides    : Vec<RelPartner<ID>>,
@@ -96,9 +96,9 @@ fn composed_from_lists (
 fn decompose_then_compose (
   composed : &ComposedNode,
 ) -> (ComposedNode, Vec<CompositionWarning>) {
-  let home : SkgRepoName =
+  let home : SkgrepoName =
     composed . home . clone () . expect ("home set");
-  let sections : Vec<(SkgRepoName, SectionSlices)> =
+  let sections : Vec<(SkgrepoName, SectionSlices)> =
     decompose_sections (
       & DecompositionInput {
         pid      : &ID::new ("p"),
@@ -122,8 +122,8 @@ fn decompose_then_compose (
 
 #[test]
 fn flags_write_at_home_and_compose_defensively_from_all_sections () {
-  let home = SkgRepoName::from ("S0");
-  let private = SkgRepoName::from ("S2");
+  let home = SkgrepoName::from ("S0");
+  let private = SkgrepoName::from ("S2");
   let misc = vec![
     Flag::Had_ID_Before_Import,
     Flag::NoSearchMatching];
@@ -172,7 +172,7 @@ proptest! {
       . map ( |m| RelPartner::at_relRepo (
         m . relRepo, ID ( format! ("h-{}", m . member . 0 ))))
       . collect ();
-    let home     : SkgRepoName = SkgRepoName::from ("S0");
+    let home     : SkgrepoName = SkgrepoName::from ("S0");
     let composed : ComposedNode =
       composed_from_lists (&home, contains, subs, hides);
     let (recomposed, warnings) = decompose_then_compose (&composed);
@@ -206,11 +206,11 @@ proptest! {
     contains in arb_rel_partners (12),
   ) {
     // decompose . compose . decompose == decompose  (sections are a normal form)
-    let home     : SkgRepoName = SkgRepoName::from ("S0");
+    let home     : SkgrepoName = SkgrepoName::from ("S0");
     let composed : ComposedNode = composed_from_lists (
       &home, contains, Vec::new (), Vec::new ());
     let (recomposed, _) = decompose_then_compose (&composed);
-    let sections_once : Vec<(SkgRepoName, SectionSlices)> =
+    let sections_once : Vec<(SkgrepoName, SectionSlices)> =
       decompose_sections (
         & DecompositionInput {
           pid : &ID::new ("p"), extra_ids : &[], flags : &[],
@@ -220,7 +220,7 @@ proptest! {
           subscribesTo : &[],
           hidesFromSubs : &[],
           overrides : &[], } );
-    let sections_twice : Vec<(SkgRepoName, SectionSlices)> =
+    let sections_twice : Vec<(SkgrepoName, SectionSlices)> =
       decompose_sections (
         & DecompositionInput {
           pid : &ID::new ("p"), extra_ids : &[], flags : &[],
@@ -237,7 +237,7 @@ proptest! {
   fn no_member_ever_changes_skgrepo ( // the silent-leak guard
     contains in arb_rel_partners (12),
   ) {
-    let home     : SkgRepoName = SkgRepoName::from ("S0");
+    let home     : SkgrepoName = SkgrepoName::from ("S0");
     let composed : ComposedNode = composed_from_lists (
       &home, contains . clone (), Vec::new (), Vec::new ());
     let (recomposed, _) = decompose_then_compose (&composed);
@@ -257,15 +257,15 @@ fn dangling_anchor_attaches_after_preceding_run_with_warning (
 ) {
   // S1's section: prepend [p], run (a,[x]), then a run whose anchor
   // is unknown -- its members must follow the PRECEDING run, warned.
-  let sections : Vec<(SkgRepoName, SectionSlices)> = vec! [
-    ( SkgRepoName::from ("S0"),
+  let sections : Vec<(SkgrepoName, SectionSlices)> = vec! [
+    ( SkgrepoName::from ("S0"),
       SectionSlices {
         title : Some ("t" . to_string ()),
         contains : Some ( vec! [
           ListItem::Member ( ID::new ("a") ),
           ListItem::Member ( ID::new ("b") ) ] ),
         .. SectionSlices::default () } ),
-    ( SkgRepoName::from ("S1"),
+    ( SkgrepoName::from ("S1"),
       SectionSlices {
         contains : Some ( vec! [
           ListItem::Member ( ID::new ("p") ),
@@ -290,14 +290,14 @@ fn dangling_anchor_attaches_after_preceding_run_with_warning (
 #[test]
 fn dangling_first_run_joins_the_prepend (
 ) {
-  let sections : Vec<(SkgRepoName, SectionSlices)> = vec! [
-    ( SkgRepoName::from ("S0"),
+  let sections : Vec<(SkgrepoName, SectionSlices)> = vec! [
+    ( SkgrepoName::from ("S0"),
       SectionSlices {
         title : Some ("t" . to_string ()),
         contains : Some ( vec! [
           ListItem::Member ( ID::new ("a") ) ] ),
         .. SectionSlices::default () } ),
-    ( SkgRepoName::from ("S1"),
+    ( SkgrepoName::from ("S1"),
       SectionSlices {
         contains : Some ( vec! [
           ListItem::Anchor { anchor : ID::new ("GONE") },
@@ -317,14 +317,14 @@ fn dangling_first_run_joins_the_prepend (
 #[test]
 fn duplicate_anchors_concatenate_in_file_order (
 ) {
-  let sections : Vec<(SkgRepoName, SectionSlices)> = vec! [
-    ( SkgRepoName::from ("S0"),
+  let sections : Vec<(SkgrepoName, SectionSlices)> = vec! [
+    ( SkgrepoName::from ("S0"),
       SectionSlices {
         title : Some ("t" . to_string ()),
         contains : Some ( vec! [
           ListItem::Member ( ID::new ("a") ) ] ),
         .. SectionSlices::default () } ),
-    ( SkgRepoName::from ("S1"),
+    ( SkgrepoName::from ("S1"),
       SectionSlices {
         contains : Some ( vec! [
           ListItem::Anchor { anchor : ID::new ("a") },
@@ -347,14 +347,14 @@ fn anchors_resolve_through_the_resolver ( // extra-id safety
   let resolve = |skgid : &ID| -> ID {
     // "a-alias" is an extra id of "a"
     if skgid . 0 == "a-alias" { ID::new ("a") } else { skgid . clone () }};
-  let sections : Vec<(SkgRepoName, SectionSlices)> = vec! [
-    ( SkgRepoName::from ("S0"),
+  let sections : Vec<(SkgrepoName, SectionSlices)> = vec! [
+    ( SkgrepoName::from ("S0"),
       SectionSlices {
         title : Some ("t" . to_string ()),
         contains : Some ( vec! [
           ListItem::Member ( ID::new ("a") ) ] ),
         .. SectionSlices::default () } ),
-    ( SkgRepoName::from ("S1"),
+    ( SkgrepoName::from ("S1"),
       SectionSlices {
         contains : Some ( vec! [
           ListItem::Anchor { anchor : ID::new ("a-alias") },
@@ -376,13 +376,13 @@ fn the_home_is_the_most_public_section_titled_or_not (
     // section. So the home is the most public SECTION, not the most
     // public section bearing a title; a titleless one above the
     // title is a violation to report, not a shape to search past.
-  let titleless_public : (SkgRepoName, SectionSlices) =
-    ( SkgRepoName::from ("public"),
+  let titleless_public : (SkgrepoName, SectionSlices) =
+    ( SkgrepoName::from ("public"),
       SectionSlices { contains : Some ( vec! [
         ListItem::Member ( ID::new ("C") ) ] ),
         .. SectionSlices::default () } );
-  let titled_private : (SkgRepoName, SectionSlices) =
-    ( SkgRepoName::from ("private"),
+  let titled_private : (SkgrepoName, SectionSlices) =
+    ( SkgrepoName::from ("private"),
       SectionSlices { title : Some ( "N" . to_string () ),
                       body  : Some ( "secret" . to_string () ),
                       .. SectionSlices::default () } );
@@ -391,25 +391,25 @@ fn the_home_is_the_most_public_section_titled_or_not (
       & [ titleless_public, titled_private ],
       & identity_resolve );
   assert_eq! ( composed . home,
-               Some ( SkgRepoName::from ("public") ),
+               Some ( SkgrepoName::from ("public") ),
                "the home is the most public section" );
   assert_eq! ( composed . title, Some ( "N" . to_string () ),
                "the title still folds in, from wherever it sits" );
   assert! ( warnings . contains ( & CompositionWarning::TitleBelowHome {
-              home     : SkgRepoName::from ("public"),
-              title_at : SkgRepoName::from ("private"), } ),
+              home     : SkgrepoName::from ("public"),
+              title_at : SkgrepoName::from ("private"), } ),
             "the shape is reported: {:?}", warnings );
 }
 
 #[test]
 fn a_titled_most_public_section_raises_no_title_warning (
 ) {
-  let titled_public : (SkgRepoName, SectionSlices) =
-    ( SkgRepoName::from ("public"),
+  let titled_public : (SkgrepoName, SectionSlices) =
+    ( SkgrepoName::from ("public"),
       SectionSlices { title : Some ( "N" . to_string () ),
                       .. SectionSlices::default () } );
-  let titleless_private : (SkgRepoName, SectionSlices) =
-    ( SkgRepoName::from ("private"),
+  let titleless_private : (SkgrepoName, SectionSlices) =
+    ( SkgrepoName::from ("private"),
       SectionSlices { contains : Some ( vec! [
         ListItem::Member ( ID::new ("C") ) ] ),
         .. SectionSlices::default () } );
@@ -418,7 +418,7 @@ fn a_titled_most_public_section_raises_no_title_warning (
       & [ titled_public, titleless_private ],
       & identity_resolve );
   assert_eq! ( composed . home,
-               Some ( SkgRepoName::from ("public") ) );
+               Some ( SkgrepoName::from ("public") ) );
   assert! ( ! warnings . iter () . any ( |w| matches! (
               w, CompositionWarning::TitleBelowHome { .. }
                  | CompositionWarning::NonHomeTitle { .. }
@@ -428,7 +428,7 @@ fn a_titled_most_public_section_raises_no_title_warning (
 }
 
 fn text_node (
-  sections : Vec<(SkgRepoName, SectionSlices)>,
+  sections : Vec<(SkgrepoName, SectionSlices)>,
 ) -> (crate::types::nodes::complete::Graphnode, Vec<CompositionWarning>) {
   let (composed, warnings) = compose_sections (&sections, &identity_resolve);
   let node = graphnode_from_composition (
@@ -439,8 +439,8 @@ fn text_node (
 #[test]
 fn title_and_body_select_independently_and_mark_overPrivateTextness (
 ) {
-  let public = SkgRepoName::from ("public");
-  let private = SkgRepoName::from ("private");
+  let public = SkgrepoName::from ("public");
+  let private = SkgrepoName::from ("private");
 
   let (clean, _) = text_node (vec! [
     ( public . clone (), SectionSlices {
@@ -493,8 +493,8 @@ fn title_and_body_select_independently_and_mark_overPrivateTextness (
 #[test]
 fn later_text_reports_the_repo_that_actually_won (
 ) {
-  let public = SkgRepoName::from ("public");
-  let private = SkgRepoName::from ("private");
+  let public = SkgrepoName::from ("public");
+  let private = SkgrepoName::from ("private");
   let (_node, warnings) = text_node (vec! [
     ( public . clone (), SectionSlices {
         title : Some ("winner" . to_string ()),

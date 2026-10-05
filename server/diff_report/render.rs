@@ -2,7 +2,7 @@ use crate::diff_report::types::{
   CommitStamp, DiffReport, DuplicateIDReport, ListDiffItem,
   NodeDiffReport, RelationshipDiff, RepoForReport, TextDiffLine,
   ValueSetDiff, VanishedNodeReport};
-use crate::types::misc::{ID, SkgRepoName};
+use crate::types::misc::{ID, SkgrepoName};
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -105,7 +105,7 @@ fn render_duplicate_skgids (
 
 fn render_skgrepos (
   out      : &mut String,
-  skgrepos : &BTreeSet<SkgRepoName>,
+  skgrepos : &BTreeSet<SkgrepoName>,
 ) {
   if skgrepos . is_empty () {
     out . push_str ("***** none\n");

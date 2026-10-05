@@ -20,7 +20,7 @@ use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, TantivyIndex};
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::nodes::tantivy::GraphnodeInTantivy;
-use crate::types::save::{NodeInstruction, SaveNode, DeleteNode, NodeMerge, SkgRepoMove};
+use crate::types::save::{NodeInstruction, SaveNode, DeleteNode, NodeMerge, SkgrepoMove};
 use crate::types::nodes::complete::Graphnode;
 
 use std::collections::{HashMap, HashSet};
@@ -56,7 +56,7 @@ fn graph_preparation_save_error (
 /// Returns `Some(new_index)` when Tantivy had to be rebuilt.
 pub async fn update_graph_minus_nodeMerges (
   node_defs     : Vec<NodeInstruction>,
-  skgrepo_moves : &[SkgRepoMove],
+  skgrepo_moves : &[SkgrepoMove],
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
   graph         : &InRustGraphHandle,
@@ -70,7 +70,7 @@ pub async fn update_graph_minus_nodeMerges (
 
 pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
   mut node_defs : Vec<NodeInstruction>,
-  skgrepo_moves       : &[SkgRepoMove],
+  skgrepo_moves       : &[SkgrepoMove],
   config              : SkgConfig,
   tantivy_index       : &TantivyIndex,
   graph               : &InRustGraphHandle,
@@ -172,7 +172,7 @@ pub(crate) fn enqueue_tantivy_delta (
 pub async fn update_graph_including_nodeMerges (
   nodeInstructions  : Vec<NodeInstruction>,
   nodeMerge_instructions : &[NodeMerge],
-  skgrepo_moves       : &[SkgRepoMove],
+  skgrepo_moves       : &[SkgrepoMove],
   config             : SkgConfig,
   tantivy_index      : &mut TantivyIndex,
   graph              : &InRustGraphHandle,
@@ -191,7 +191,7 @@ pub async fn update_graph_including_nodeMerges (
 pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
   nodeInstructions  : Vec<NodeInstruction>,
   nodeMerge_instructions : &[NodeMerge],
-  skgrepo_moves       : &[SkgRepoMove],
+  skgrepo_moves       : &[SkgrepoMove],
   config             : SkgConfig,
   tantivy_index      : &mut TantivyIndex,
   graph              : &InRustGraphHandle,
@@ -268,7 +268,7 @@ impl PreparedSave {
 pub(crate) fn prepare_save_under_mutation_gate (
   mut nodeInstructions  : Vec<NodeInstruction>,
   nodeMerge_instructions : &[NodeMerge],
-  skgrepo_moves       : &[SkgRepoMove],
+  skgrepo_moves       : &[SkgrepoMove],
   config             : &SkgConfig,
   graph              : &InRustGraphHandle,
   approved_hoist_pids : &HashSet<ID>,
@@ -514,7 +514,7 @@ fn remove_from_msv (
 
 pub fn update_fs_from_nodeInstructions (
   node_defs     : &[NodeInstruction],
-  skgrepo_moves : &[SkgRepoMove],
+  skgrepo_moves : &[SkgrepoMove],
   config        : SkgConfig,
 ) -> io::Result<(usize, usize)> { // (deleted, written)
   update_fs_from_nodeInstructions_with_hoist_approval (
@@ -528,7 +528,7 @@ pub fn update_fs_from_nodeInstructions (
 /// closed on overPrivateText disk telescopes.
 pub(crate) fn update_fs_from_nodeInstructions_with_hoist_approval (
   node_defs             : &[NodeInstruction],
-  skgrepo_moves         : &[SkgRepoMove],
+  skgrepo_moves         : &[SkgrepoMove],
   config                : SkgConfig,
   approved_hoist_pids   : &HashSet<ID>,
 ) -> io::Result<(usize, usize)> { // (deleted, written)
@@ -565,7 +565,7 @@ impl PreparedFilesystemUpdate {
 
 pub(crate) fn prepare_fs_update (
   node_defs           : &[NodeInstruction],
-  skgrepo_moves       : &[SkgRepoMove],
+  skgrepo_moves       : &[SkgrepoMove],
   config              : &SkgConfig,
   approved_hoist_pids : &HashSet<ID>,
 ) -> io::Result<PreparedFilesystemUpdate> {

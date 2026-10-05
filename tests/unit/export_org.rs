@@ -3,8 +3,8 @@
 //! so `super::*` reaches the module's private items.
 
 use super::*;
-use crate::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
-use crate::types::misc::{ID, SkgRepoName, rel_partners_at_relRepo};
+use crate::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
+use crate::types::misc::{ID, SkgrepoName, rel_partners_at_relRepo};
 use crate::types::nodes::complete::empty_graphnode;
 
 use std::collections::BTreeSet;
@@ -22,14 +22,14 @@ fn node (
   n . pid      = ID::from (pid);
   n . title    = title . to_string ();
   n . body     = body . map ( |s| s . to_string () );
-  n . home_skgrepo   = SkgRepoName::from ("main");
+  n . home_skgrepo   = SkgrepoName::from ("main");
   n . contains = rel_partners_at_relRepo (
     & n . home_skgrepo,
     contains . iter () . map ( |c| ID::from (*c) ) . collect () );
   n }
 
 fn restriction_all () -> SkgrepoRestriction {
-  SkgrepoRestriction { name  : SkgRepoSetName::from ("all"),
+  SkgrepoRestriction { name  : SkgrepoSetName::from ("all"),
                     skgrepos : BTreeSet::new () } }
 
 //
@@ -320,9 +320,9 @@ fn private_skgrepo_relationship_is_omitted_from_restricted_export () {
   let mut root : Graphnode =
     node ("r", "Root", None, &["ma"]);
   root . contains . push ( RelPartner::at_relRepo (
-    SkgRepoName::from ("main"), ID::from ("pub") ));
+    SkgrepoName::from ("main"), ID::from ("pub") ));
   root . contains . push ( RelPartner::at_relRepo (
-    SkgRepoName::from ("private"), ID::from ("priv") ));
+    SkgrepoName::from ("private"), ID::from ("priv") ));
   let nodes : Vec<Graphnode> = vec! [
     root,
     node ("ma", &format! ("[[id:{}][how]]", MAGIC),
@@ -331,8 +331,8 @@ fn private_skgrepo_relationship_is_omitted_from_restricted_export () {
     node ("priv", "Private child", None, &[]),
   ];
   let main_only : SkgrepoRestriction = SkgrepoRestriction {
-    name    : SkgRepoSetName::from ("main"),
-    skgrepos : [ SkgRepoName::from ("main") ]
+    name    : SkgrepoSetName::from ("main"),
+    skgrepos : [ SkgrepoName::from ("main") ]
       . into_iter () . collect () };
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
   export_to_org (&main_only, &nodes, dir . path ()) . unwrap ();

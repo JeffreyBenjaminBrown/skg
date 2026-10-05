@@ -9,7 +9,7 @@
 /// and they become NodeInstruction *instructions* only after downstream
 /// resolution and disk supplementation.
 
-use crate::types::misc::{ID, SkgRepoName};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use std::collections::HashMap;
 
@@ -68,14 +68,14 @@ pub struct DefiningFolderRecorder {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
 pub enum FieldIntent {
-  SetTitleAndBody { skgrepo : SkgRepoName,
+  SetTitleAndBody { skgrepo : SkgrepoName,
                     title  : String,
                     body   : Option<String>, },
-  SetContains     (Vec<(ID, Option<SkgRepoName>)>),
-  SetAliases      (Vec<(String, Option<SkgRepoName>)>),
-  SetSubscribesTo (Vec<(ID, Option<SkgRepoName>)>),
-  SetOverrides    (Vec<(ID, Option<SkgRepoName>)>),
-  Delete          { skgrepo : SkgRepoName },
+  SetContains     (Vec<(ID, Option<SkgrepoName>)>),
+  SetAliases      (Vec<(String, Option<SkgrepoName>)>),
+  SetSubscribesTo (Vec<(ID, Option<SkgrepoName>)>),
+  SetOverrides    (Vec<(ID, Option<SkgrepoName>)>),
+  Delete          { skgrepo : SkgrepoName },
   NodeMerge       { acquiree : ID },
   SetFlag     { flag : Flag, value : bool },
   // The remaining kinds are combineable.
@@ -121,12 +121,12 @@ pub struct SubscribeeTextClaim {
 /// slots, and 'nodeMerge' excludes 'flag'.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct FieldIntentsForOneId {
-  pub home_skgrepo   : Option<SkgRepoName>, // This is filled by the self-emissions (SetTitleAndBody and Delete).
+  pub home_skgrepo   : Option<SkgrepoName>, // This is filled by the self-emissions (SetTitleAndBody and Delete).
   pub title_and_body : Option<(String, Option<String>)>,
-  pub contains       : Option<Vec<(ID, Option<SkgRepoName>)>>,
-  pub aliases        : Option<Vec<(String, Option<SkgRepoName>)>>,
-  pub subscribesTo   : Option<Vec<(ID, Option<SkgRepoName>)>>,
-  pub overrides      : Option<Vec<(ID, Option<SkgRepoName>)>>,
+  pub contains       : Option<Vec<(ID, Option<SkgrepoName>)>>,
+  pub aliases        : Option<Vec<(String, Option<SkgrepoName>)>>,
+  pub subscribesTo   : Option<Vec<(ID, Option<SkgrepoName>)>>,
+  pub overrides      : Option<Vec<(ID, Option<SkgrepoName>)>>,
   pub delete         : bool,
   pub node_merge     : Option<ID>, // This holds the acquiree.
   pub flag       : Option<(Flag, bool)>,

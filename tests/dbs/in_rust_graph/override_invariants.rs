@@ -5,7 +5,7 @@ use skg::dbs::in_rust_graph::override_invariants::{
   validate_affected_override_invariants,
   validate_override_invariants,
 };
-use skg::types::misc::{ID, MSV, SkgConfig, SkgRepo, SkgRepoName, rel_partners_at_relRepo};
+use skg::types::misc::{ID, MSV, SkgConfig, Skgrepo, SkgrepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::save::{NodeInstruction, DeleteNode, SaveNode};
 
@@ -14,17 +14,17 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 fn config () -> SkgConfig {
-  SkgConfig::dummyFromSkgRepos (HashMap::from ([
-    ( SkgRepoName::from ("owned"),
-      SkgRepo {
-        name: SkgRepoName::from ("owned"),
+  SkgConfig::dummyFromSkgrepos (HashMap::from ([
+    ( SkgrepoName::from ("owned"),
+      Skgrepo {
+        name: SkgrepoName::from ("owned"),
         abbreviation: None,
         path: PathBuf::from ("/tmp/owned"),
         owned: true,
       }),
-    ( SkgRepoName::from ("foreign"),
-      SkgRepo {
-        name: SkgRepoName::from ("foreign"),
+    ( SkgrepoName::from ("foreign"),
+      Skgrepo {
+        name: SkgrepoName::from ("foreign"),
         abbreviation: None,
         path: PathBuf::from ("/tmp/foreign"),
         owned: false,
@@ -40,7 +40,7 @@ fn node (
     empty_graphnode ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
-  node . home_skgrepo = SkgRepoName::from (skgrepo);
+  node . home_skgrepo = SkgrepoName::from (skgrepo);
   node . overrides =
     if overrides . is_empty () {
       MSV::Unspecified
@@ -285,7 +285,7 @@ fn relationship_and_target_deletions_do_not_create_override_errors () {
       node ("repo", "owned", &["target"]),
     ],
     vec![NodeInstruction::Delete (DeleteNode {
-      skgid : ID::from ("target"), home_skgrepo : SkgRepoName::from ("owned"),
+      skgid : ID::from ("target"), home_skgrepo : SkgrepoName::from ("owned"),
     })]);
   assert_eq! (delete_affected, delete_full);
   assert! (delete_affected . is_empty ());

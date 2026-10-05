@@ -1,4 +1,4 @@
-use super::misc::{ID, SkgRepoName};
+use super::misc::{ID, SkgrepoName};
 use std::error::Error;
 use std::io;
 use std::collections::HashSet;
@@ -30,24 +30,24 @@ pub enum BufferValidationError {
   Multiple_Defining_Viewnodes     (ID), // For any given ID, at most one occurrence can be editable. (Its contents are intended to define those of the node.)
   AmbiguousDeletion              (ID),
   DuplicatedContent              (ID), // A node has multiple Content children with the same ID
-  InconsistentSkgRepos            (ID, HashSet<SkgRepoName>), // Multiple viewnodes with same ID have different skgrepos
-  ModifiedForeignNode            (ID, SkgRepoName), // Attempted to modify a node from a foreign skgrepo - (node_id, repo_name)
-  CreatedForeignNode             (ID, SkgRepoName), // Attempted to create a node in a foreign skgrepo - (node_id, repo_name)
-  CannotMoveToOrFromForeignSkgRepo (ID,
-                                   SkgRepoName, // disk skgrepo
-                                   SkgRepoName), // buffer skgrepo
+  InconsistentSkgrepos            (ID, HashSet<SkgrepoName>), // Multiple viewnodes with same ID have different skgrepos
+  ModifiedForeignNode            (ID, SkgrepoName), // Attempted to modify a node from a foreign skgrepo - (node_id, repo_name)
+  CreatedForeignNode             (ID, SkgrepoName), // Attempted to create a node in a foreign skgrepo - (node_id, repo_name)
+  CannotMoveToOrFromForeignSkgrepo (ID,
+                                   SkgrepoName, // disk skgrepo
+                                   SkgrepoName), // buffer skgrepo
   CannotMoveAndMergeSimultaneously (ID),
-  SkgRepoNotInConfig              (ID, SkgRepoName),
+  SkgrepoNotInConfig              (ID, SkgrepoName),
   // Fork errors. Editing a foreign node N is read as a request to
   // clone it (the clone C lives in an owned skgrepo, subscribes to and
   // overrides N). These are the ways that request can be refused.
-  ForkSkgRepoUnresolved           (ID), // N's pid: no OWNED vognode ancestor in the view to inherit C's skgrepo from, and the user set none in the confirmation buffer.
+  ForkSkgrepoUnresolved           (ID), // N's pid: no OWNED vognode ancestor in the view to inherit C's skgrepo from, and the user set none in the confirmation buffer.
   ForkAlreadyExists              (ID,   // N's pid
                                   ID),  // the existing owned clone that already overrides N (monogamy: a node may have at most one owned overrider)
-  ForkSkgRepoRestricted             (ID,           // N's pid
-                                  SkgRepoName),  // C's resolved owned skgrepo, which is RESTRICTED under the skgrepo restriction
-  ForkSkgRepoNotOwned             (ID,           // N's pid
-                                  SkgRepoName),  // C's chosen skgrepo, which the user does NOT own (a typed or hand-edited skgrepo the rotation would never offer)
+  ForkSkgrepoRestricted             (ID,           // N's pid
+                                  SkgrepoName),  // C's resolved owned skgrepo, which is RESTRICTED under the skgrepo restriction
+  ForkSkgrepoNotOwned             (ID,           // N's pid
+                                  SkgrepoName),  // C's chosen skgrepo, which the user does NOT own (a typed or hand-edited skgrepo the rotation would never offer)
   ForkRequestOnUnknownNode       (ID),  // An explicit 'skg-fork-node' request on a node whose id is not in the graph (an unsaved headline): nothing exists to override.
   ForkRequestMultiple            (ID),  // Two headlines for the same id both carry an explicit fork request; at most one is allowed.
   OverrideInvariantViolation     (String),
@@ -67,7 +67,7 @@ pub enum BufferValidationError {
     recorder_title : String,
     changes        : Vec<String>,
   },
-  FlagEditOnForeignNode                 (ID, SkgRepoName),
+  FlagEditOnForeignNode                 (ID, SkgrepoName),
   FlagEditOnUnknownNode                 (ID),
   IDFolder_Edited                   (ID,       // recorder of the IDFolder
                                   Vec<ID>,  // ids the buffer's IDFolder claims
@@ -114,26 +114,26 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Ambiguous deletion request for ID {:?}", skgid),
       BufferValidationError::DuplicatedContent (skgid) =>
         write!(f, "Node has multiple Content children with the same ID {:?}", skgid),
-      BufferValidationError::InconsistentSkgRepos(skgid, skgrepos) => {
-        let skgrepo_list: Vec<&SkgRepoName> = skgrepos . iter() . collect();
+      BufferValidationError::InconsistentSkgrepos(skgid, skgrepos) => {
+        let skgrepo_list: Vec<&SkgrepoName> = skgrepos . iter() . collect();
         write!(f, "Multiple viewnodes with ID {:?} have inconsistent repos: {:?}", skgid, skgrepo_list) },
       BufferValidationError::ModifiedForeignNode(skgid, skgrepo) =>
         write!(f, "Cannot modify node {:?} from foreign repo '{}'", skgid, skgrepo),
       BufferValidationError::CreatedForeignNode(skgid, skgrepo) =>
         write!(f, "Cannot create node {:?} in foreign repo '{}'", skgid, skgrepo),
-      BufferValidationError::CannotMoveToOrFromForeignSkgRepo(skgid, disk_skgrepo, buffer_skgrepo) =>
+      BufferValidationError::CannotMoveToOrFromForeignSkgrepo(skgid, disk_skgrepo, buffer_skgrepo) =>
         write!(f, "Cannot move node {:?} between repos '{}' and '{}': one or both are foreign", skgid, disk_skgrepo, buffer_skgrepo),
       BufferValidationError::CannotMoveAndMergeSimultaneously(skgid) =>
         write!(f, "Cannot move and merge node {:?} in the same save", skgid),
-      BufferValidationError::SkgRepoNotInConfig(skgid, skgrepo) =>
+      BufferValidationError::SkgrepoNotInConfig(skgid, skgrepo) =>
         write!(f, "Node {:?} references repo '{}' which does not exist in config", skgid, skgrepo),
-      BufferValidationError::ForkSkgRepoUnresolved(skgid) =>
+      BufferValidationError::ForkSkgrepoUnresolved(skgid) =>
         write!(f, "Cannot fork node {:?}: no owned repo to put the clone in. It has no owned ancestor in the view to inherit a repo from; set the clone's repo in the confirmation buffer (C-c s s).", skgid),
       BufferValidationError::ForkAlreadyExists(original, existing) =>
         write!(f, "Cannot fork node {:?}: you have already forked it. Your clone is {:?}. Edit that clone instead (a node may have at most one owned override).", original, existing),
-      BufferValidationError::ForkSkgRepoRestricted(skgid, skgrepo) =>
+      BufferValidationError::ForkSkgrepoRestricted(skgid, skgrepo) =>
         write!(f, "Cannot fork node {:?}: the clone's repo '{}' is restricted under the current repo-set. Activate it first; an invisible clone is never created silently.", skgid, skgrepo),
-      BufferValidationError::ForkSkgRepoNotOwned(skgid, skgrepo) =>
+      BufferValidationError::ForkSkgrepoNotOwned(skgid, skgrepo) =>
         write!(f, "Cannot fork node {:?}: the clone's repo '{}' is not one you own. Choose an owned repo for the clone (C-c s s in the confirmation buffer).", skgid, skgrepo),
       BufferValidationError::ForkRequestOnUnknownNode(skgid) =>
         write!(f, "Cannot fork node {:?}: it is not in the graph. Only a saved node can be forked; save it first, then fork.", skgid),

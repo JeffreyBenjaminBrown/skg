@@ -8,7 +8,7 @@ use super::{TelescopeViolation, affected_telescope_warnings,
             validate_all_telescopes};
 use crate::dbs::in_rust_graph::{InRustGraph, apply_nodeInstructions_to_inRustGraph};
 use crate::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, SkgRepo, SkgRepoName,
+  ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName,
   rel_partners_at_relRepo};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
@@ -20,21 +20,21 @@ use std::path::PathBuf;
 /// back to ALPHABETICAL order, where "private" < "public" would
 /// invert the ladder).
 fn two_skgrepo_config () -> SkgConfig {
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
     HashMap::new ();
   for name in ["public", "private"] {
     skgrepos . insert (
-      SkgRepoName::from (name),
-      SkgRepo {
-        name         : SkgRepoName::from (name),
+      SkgrepoName::from (name),
+      Skgrepo {
+        name         : SkgrepoName::from (name),
         abbreviation : None,
         path         : PathBuf::from ( format! ("owned/{}", name) ),
         owned        : true, } ); }
   let mut config : SkgConfig =
-    SkgConfig::dummyFromSkgRepos (skgrepos);
+    SkgConfig::dummyFromSkgrepos (skgrepos);
   config . skgrepo_order = vec! [
-    SkgRepoName::from ("public"),
-    SkgRepoName::from ("private") ];
+    SkgrepoName::from ("public"),
+    SkgrepoName::from ("private") ];
   config }
 
 fn node_at (
@@ -44,7 +44,7 @@ fn node_at (
   let mut n : Graphnode = empty_graphnode ();
   n . pid = ID::new (pid);
   n . title = pid . to_string ();
-  n . home_skgrepo = SkgRepoName::from (skgrepo);
+  n . home_skgrepo = SkgrepoName::from (skgrepo);
   n }
 
 #[test]
@@ -56,10 +56,10 @@ fn leak_shaped_member_is_caught_and_honest_shapes_are_not (
   let public_child  : Graphnode = node_at ("open", "public");
   container . contains = vec! [
     // honest: public member in the public skgrepo
-    RelPartner::at_relRepo ( SkgRepoName::from ("public"),
+    RelPartner::at_relRepo ( SkgrepoName::from ("public"),
                           ID::new ("open") ),
     // THE LEAK: private-homed member recorded in the public skgrepo
-    RelPartner::at_relRepo ( SkgRepoName::from ("public"),
+    RelPartner::at_relRepo ( SkgrepoName::from ("public"),
                           ID::new ("secret") ) ];
   let graph : InRustGraph =
     InRustGraph::from_graphnodes (
@@ -81,7 +81,7 @@ fn private_membership_of_a_public_member_is_fine (
   let mut container : Graphnode = node_at ("container", "private");
   let public_child  : Graphnode = node_at ("open", "public");
   container . contains = vec! [
-    RelPartner::at_relRepo ( SkgRepoName::from ("private"),
+    RelPartner::at_relRepo ( SkgrepoName::from ("private"),
                           ID::new ("open") ) ];
   let graph : InRustGraph =
     InRustGraph::from_graphnodes (
@@ -98,7 +98,7 @@ fn leak_check_resolves_extra_ids (
   let mut private_child : Graphnode = node_at ("secret", "private");
   private_child . extra_ids = vec! [ ID::new ("old-name") ];
   container . contains = vec! [
-    RelPartner::at_relRepo ( SkgRepoName::from ("public"),
+    RelPartner::at_relRepo ( SkgrepoName::from ("public"),
                           ID::new ("old-name") ) ];
   let graph : InRustGraph =
     InRustGraph::from_graphnodes (
@@ -117,10 +117,10 @@ fn unconfigured_skgrepo_and_msv_relations_are_covered (
   let target : Graphnode = node_at ("t", "private");
   node . subscribesTo = MSV::Specified ( vec! [
     // leak via a non-contains relation
-    RelPartner::at_relRepo ( SkgRepoName::from ("public"),
+    RelPartner::at_relRepo ( SkgrepoName::from ("public"),
                           ID::new ("t") ) ] );
   node . hidesFromSubs = MSV::Specified (
-    rel_partners_at_relRepo ( & SkgRepoName::from ("nonexistent-repo"),
+    rel_partners_at_relRepo ( & SkgrepoName::from ("nonexistent-repo"),
                     vec! [ ID::new ("t") ] ));
   let graph : InRustGraph =
     InRustGraph::from_graphnodes ( & [ node, target ] );
@@ -139,7 +139,7 @@ fn unconfigured_skgrepo_and_msv_relations_are_covered (
 fn absent_targets_use_recorder_home_for_all_four_relationships () {
   let config : SkgConfig = two_skgrepo_config ();
   let member : RelPartner<ID> = RelPartner::at_relRepo (
-    SkgRepoName::from ("public"), ID::from ("absent"));
+    SkgrepoName::from ("public"), ID::from ("absent"));
   let mut recorder : Graphnode = node_at ("recorder", "private");
   recorder . contains = vec![member . clone ()];
   recorder . subscribesTo = MSV::Specified (vec![member . clone ()]);
@@ -158,7 +158,7 @@ fn absent_targets_use_recorder_home_for_all_four_relationships () {
       violation,
       TelescopeViolation::AbsentTargetLeakShapedMember {
         relation : actual, recorder_home, ..
-      } if actual == &relation && recorder_home == &SkgRepoName::from ("private")))); }
+      } if actual == &relation && recorder_home == &SkgrepoName::from ("private")))); }
   assert! (violations [0] . to_string () . contains (
     "target is absent, privacy is judged against the extant recorder's home"));
 }
@@ -172,7 +172,7 @@ fn absent_target_at_or_below_recorder_home_is_not_a_warning () {
   ] {
     let mut recorder : Graphnode = node_at ("recorder", recorder_home);
     recorder . contains = vec![RelPartner::at_relRepo (
-      SkgRepoName::from (relRepo), ID::from ("absent"))];
+      SkgrepoName::from (relRepo), ID::from ("absent"))];
     let graph : InRustGraph = InRustGraph::from_graphnodes (&[recorder]);
     assert! (telescope_violations_of (
       &config, &graph, &ID::from ("recorder")) . is_empty ()); }
@@ -186,7 +186,7 @@ fn recorder_with_relation (
 ) -> Graphnode {
   let mut recorder : Graphnode = node_at ("recorder", recorder_home);
   let members : Vec<RelPartner<ID>> = vec![RelPartner::at_relRepo (
-    SkgRepoName::from (relRepo), ID::from (target))];
+    SkgrepoName::from (relRepo), ID::from (target))];
   match relation {
     0 => recorder . contains = members,
     1 => recorder . subscribesTo = MSV::Specified (members),
@@ -229,7 +229,7 @@ fn affected_recorder_derivation_covers_warning_changes_exhaustively () {
         let nodeInstructions    : Vec<NodeInstruction> = match action {
           0 => vec![NodeInstruction::Save (SaveNode (node_at ("X", "public")))],
           1 => vec![NodeInstruction::Delete (DeleteNode {
-            skgid : ID::from ("T"), home_skgrepo : SkgRepoName::from ("public"),
+            skgid : ID::from ("T"), home_skgrepo : SkgrepoName::from ("public"),
           })],
           2 => vec![NodeInstruction::Save (SaveNode (node_at ("T", "private")))],
           3 => {
@@ -244,7 +244,7 @@ fn affected_recorder_derivation_covers_warning_changes_exhaustively () {
             vec![
               NodeInstruction::Save (SaveNode (acquirer)),
               NodeInstruction::Delete (DeleteNode {
-                skgid : ID::from ("N2"), home_skgrepo : SkgRepoName::from ("private"),
+                skgid : ID::from ("N2"), home_skgrepo : SkgrepoName::from ("private"),
               }),
             ]
           },
@@ -311,7 +311,7 @@ fn combined_warning_scope_reports_only_the_final_merge_state () {
   let merge : Vec<NodeInstruction> = vec![
     NodeInstruction::Save (SaveNode (merged_destination)),
     NodeInstruction::Delete (DeleteNode {
-      skgid : ID::from ("X"), home_skgrepo : SkgRepoName::from ("private"),
+      skgid : ID::from ("X"), home_skgrepo : SkgrepoName::from ("private"),
     }),
   ];
   let mut final_graph : InRustGraph = intermediate . clone ();

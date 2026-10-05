@@ -11,7 +11,7 @@ use crate::git_ops::read_gitrepo::{
   get_staged_changed_skg_files, get_unstaged_changed_skg_files,
   head_is_merge_commit, open_gitrepo};
 use crate::types::misc::{
-  ID, SkgConfig, SkgRepo, SkgRepoName, members_msv, members_of};
+  ID, SkgConfig, Skgrepo, SkgrepoName, members_msv, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::links::links_from_node;
@@ -66,7 +66,7 @@ pub fn read_changed_git_snapshot_pair (
   let (before_kind, after_kind) : (GitSnapshotKind, GitSnapshotKind) =
     endpoint_kinds (selection) ?;
   validate_skgrepos_for_selection (config, before_kind, after_kind) ?;
-  let changed_paths : HashMap<SkgRepoName, BTreeSet<PathBuf>> =
+  let changed_paths : HashMap<SkgrepoName, BTreeSet<PathBuf>> =
     changed_paths_by_skgrepo (config, before_kind, after_kind) ?;
   if changed_paths . values () . all ( |paths| paths . is_empty () ) {
     return Ok (Some ( ChangedGitSnapshotPair {
@@ -129,11 +129,11 @@ fn read_graph_snapshot (
 ) -> Result<GraphSnapshot, String> {
   // Sections arrive in privacy order (ordered_repos) so each
   // telescope composes with its most public section first.
-  let mut sections : Vec<(SkgRepoName, GraphnodeOnDisk)> = Vec::new ();
+  let mut sections : Vec<(SkgrepoName, GraphnodeOnDisk)> = Vec::new ();
   for skgrepo_name in config . ordered_skgrepos () {
     let label : String =
       format! ("read repo '{}' from {:?}", skgrepo_name, kind);
-    let mut skgrepo_sections : Vec<(SkgRepoName, GraphnodeOnDisk)> =
+    let mut skgrepo_sections : Vec<(SkgrepoName, GraphnodeOnDisk)> =
       profile_step_result (&label, || match kind {
         GitSnapshotKind::Head =>
           read_skgrepo_from_head (config, &skgrepo_name),
@@ -189,11 +189,11 @@ fn git_snapshot_cache_key (
     return Ok (None); }
   let mut parts : Vec<String> =
     Vec::new ();
-  let mut skgrepo_names : Vec<SkgRepoName> =
+  let mut skgrepo_names : Vec<SkgrepoName> =
     config . skgrepos . keys () . cloned () . collect ();
   skgrepo_names . sort ();
   for skgrepo_name in skgrepo_names {
-    let skgrepo : &SkgRepo =
+    let skgrepo : &Skgrepo =
       config . skgrepos . get (&skgrepo_name) . ok_or_else ( || format! (
         "Repo '{}' not found in config", skgrepo_name )) ?;
     let skgrepo_path : &Path =
@@ -219,7 +219,7 @@ fn git_snapshot_cache_key (
 
 fn head_cache_identity (
   gitrepo        : &Repository,
-  skgrepo_name   : &SkgRepoName,
+  skgrepo_name   : &SkgrepoName,
 ) -> Result<String, String> {
   gitrepo . head ()
     . and_then ( |head| head . peel_to_commit () )
@@ -230,7 +230,7 @@ fn head_cache_identity (
 
 fn index_cache_identity (
   gitrepo        : &Repository,
-  skgrepo_name   : &SkgRepoName,
+  skgrepo_name   : &SkgrepoName,
 ) -> Result<String, String> {
   let index_path : PathBuf =
     gitrepo . path () . join ("index");
@@ -248,8 +248,8 @@ fn changed_paths_by_skgrepo (
   config      : &SkgConfig,
   before_kind : GitSnapshotKind,
   after_kind  : GitSnapshotKind,
-) -> Result<HashMap<SkgRepoName, BTreeSet<PathBuf>>, String> {
-  let mut result : HashMap<SkgRepoName, BTreeSet<PathBuf>> =
+) -> Result<HashMap<SkgrepoName, BTreeSet<PathBuf>>, String> {
+  let mut result : HashMap<SkgrepoName, BTreeSet<PathBuf>> =
     HashMap::new ();
   for (skgrepo_name, skgrepo) in &config . skgrepos {
     let skgrepo_path : &Path =
@@ -307,7 +307,7 @@ fn overlay_changed_after_git_snapshot (
   config        : &SkgConfig,
   after_kind    : GitSnapshotKind,
   before        : &GraphSnapshot,
-  changed_paths : &HashMap<SkgRepoName, BTreeSet<PathBuf>>,
+  changed_paths : &HashMap<SkgrepoName, BTreeSet<PathBuf>>,
 ) -> Result<(GraphSnapshot, BTreeSet<ID>), String> {
   let mut after : GraphSnapshot =
     before . clone ();
@@ -320,7 +320,7 @@ fn overlay_changed_after_git_snapshot (
       . collect ();
   // A changed SECTION re-folds its whole telescope, so read every
   // skgrepo's section for each changed pid at the after endpoint.
-  let mut sections_by_pid : HashMap<ID, Vec<(SkgRepoName, GraphnodeOnDisk)>> =
+  let mut sections_by_pid : HashMap<ID, Vec<(SkgrepoName, GraphnodeOnDisk)>> =
     HashMap::new ();
   for pid in &changed_pids {
     sections_by_pid . insert (
@@ -345,7 +345,7 @@ fn overlay_changed_after_git_snapshot (
     pid_of . get (skgid) . cloned ()
       . unwrap_or_else ( || skgid . clone () ) };
   for pid in &changed_pids {
-    let sections : Vec<(SkgRepoName, GraphnodeOnDisk)> =
+    let sections : Vec<(SkgrepoName, GraphnodeOnDisk)> =
       sections_by_pid . remove (pid)
       . expect ("changed_pids tracks sections_by_pid");
     let before_node : Option<&Graphnode> =
@@ -374,10 +374,10 @@ fn read_telescope_sections_at_endpoint (
   config : &SkgConfig,
   kind   : GitSnapshotKind,
   pid    : &ID,
-) -> Result<Vec<(SkgRepoName, GraphnodeOnDisk)>, String> {
-  let mut sections : Vec<(SkgRepoName, GraphnodeOnDisk)> = Vec::new ();
+) -> Result<Vec<(SkgrepoName, GraphnodeOnDisk)>, String> {
+  let mut sections : Vec<(SkgrepoName, GraphnodeOnDisk)> = Vec::new ();
   for skgrepo_name in config . ordered_skgrepos () {
-    let skgrepo : &SkgRepo =
+    let skgrepo : &Skgrepo =
       config . skgrepos . get (&skgrepo_name) . ok_or_else ( || format! (
         "Repo '{}' not found in config", skgrepo_name )) ?;
     let skgrepo_path : &Path =
@@ -445,7 +445,7 @@ fn affected_pids_for_changed_node (
 fn read_section_at_endpoint (
   kind        : GitSnapshotKind,
   gitrepo        : &Repository,
-  skgrepo_name : &SkgRepoName,
+  skgrepo_name : &SkgrepoName,
   rel_path    : &Path,
 ) -> Result<Option<GraphnodeOnDisk>, String> {
   match kind {
@@ -459,7 +459,7 @@ fn read_section_at_endpoint (
 
 fn read_section_from_head (
   gitrepo        : &Repository,
-  skgrepo_name : &SkgRepoName,
+  skgrepo_name : &SkgrepoName,
   rel_path    : &Path,
 ) -> Result<Option<GraphnodeOnDisk>, String> {
   let tree : git2::Tree =
@@ -487,7 +487,7 @@ fn read_section_from_head (
 
 fn read_section_from_index (
   gitrepo        : &Repository,
-  skgrepo_name : &SkgRepoName,
+  skgrepo_name : &SkgrepoName,
   rel_path    : &Path,
 ) -> Result<Option<GraphnodeOnDisk>, String> {
   let index : git2::Index =
@@ -507,7 +507,7 @@ fn read_section_from_index (
 
 fn read_section_from_worktree (
   gitrepo        : &Repository,
-  skgrepo_name : &SkgRepoName,
+  skgrepo_name : &SkgrepoName,
   rel_path    : &Path,
 ) -> Result<Option<GraphnodeOnDisk>, String> {
   let workdir : &Path =
@@ -572,16 +572,16 @@ fn profile_log (
 /// and record the retained sections' id claims.
 fn git_snapshot_from_sections (
   config   : &SkgConfig,
-  sections : Vec<(SkgRepoName, GraphnodeOnDisk)>,
+  sections : Vec<(SkgrepoName, GraphnodeOnDisk)>,
 ) -> Result<GraphSnapshot, String> {
-  let mut sections_by_pid : HashMap<ID, Vec<(SkgRepoName, GraphnodeOnDisk)>> =
+  let mut sections_by_pid : HashMap<ID, Vec<(SkgrepoName, GraphnodeOnDisk)>> =
     HashMap::new ();
   for (skgrepo_name, node_fs) in sections {
     sections_by_pid . entry (node_fs . pid . clone ())
       . or_insert_with (Vec::new)
       . push (( skgrepo_name, node_fs )); }
   for (pid, telescope_sections) in &mut sections_by_pid {
-    let sections : Vec<(SkgRepoName, GraphnodeOnDisk)> =
+    let sections : Vec<(SkgrepoName, GraphnodeOnDisk)> =
       std::mem::take (telescope_sections);
     let (retained, collision) =
       retain_owned_sections_when_pid_folderlides (sections, config);
@@ -592,7 +592,7 @@ fn git_snapshot_from_sections (
         ignored_skgrepos = ?collision . ignored_skgrepos,
         "diff snapshot ignored non-owned files colliding with an owned telescope" ); }}
   let mut id_claims
-    : HashMap<ID, BTreeMap<ID, BTreeSet<SkgRepoName>>> =
+    : HashMap<ID, BTreeMap<ID, BTreeSet<SkgrepoName>>> =
     HashMap::new ();
   for sections in sections_by_pid . values () {
     for (skgrepo_name, node_fs) in sections {
@@ -627,10 +627,10 @@ fn git_snapshot_from_sections (
 fn fold_telescope_tolerating_homelessness (
   config   : &SkgConfig,
   pid      : &ID,
-  sections : Vec<(SkgRepoName, GraphnodeOnDisk)>,
+  sections : Vec<(SkgrepoName, GraphnodeOnDisk)>,
   resolve  : &dyn Fn (&ID) -> ID,
 ) -> Result<Graphnode, String> {
-  let retry : Vec<(SkgRepoName, GraphnodeOnDisk)> =
+  let retry : Vec<(SkgrepoName, GraphnodeOnDisk)> =
     sections . clone ();
   let telescope : Telescope =
     Telescope::try_new ( pid . clone (), sections, config )
@@ -638,7 +638,7 @@ fn fold_telescope_tolerating_homelessness (
   match compose_telescope ( telescope, resolve )
   { Ok (node) => Ok (node),
     Err (_) => {
-      let mut retry : Vec<(SkgRepoName, GraphnodeOnDisk)> = retry;
+      let mut retry : Vec<(SkgrepoName, GraphnodeOnDisk)> = retry;
       match retry . first_mut () {
         Some ((_, node_fs)) =>
           node_fs . title =
@@ -655,9 +655,9 @@ fn fold_telescope_tolerating_homelessness (
 /// Record one section's id claims: it claims its pid and every
 /// extra id it lists, all attributed to (pid, skgrepo).
 fn record_section_claims (
-  id_claims : &mut HashMap<ID, BTreeMap<ID, BTreeSet<SkgRepoName>>>,
+  id_claims : &mut HashMap<ID, BTreeMap<ID, BTreeSet<SkgrepoName>>>,
   node_fs   : &GraphnodeOnDisk,
-  skgrepo   : &SkgRepoName,
+  skgrepo   : &SkgrepoName,
 ) {
   for skgid in std::iter::once (&node_fs . pid)
     . chain (node_fs . extra_ids . iter ()) {
@@ -669,9 +669,9 @@ fn record_section_claims (
 
 fn read_skgrepo_from_head (
   config       : &SkgConfig,
-  skgrepo_name : &SkgRepoName,
-) -> Result<Vec<(SkgRepoName, GraphnodeOnDisk)>, String> {
-  let skgrepo : &SkgRepo =
+  skgrepo_name : &SkgrepoName,
+) -> Result<Vec<(SkgrepoName, GraphnodeOnDisk)>, String> {
+  let skgrepo : &Skgrepo =
     config . skgrepos . get (skgrepo_name) . ok_or_else ( || format! (
       "Repo '{}' not found in config", skgrepo_name )) ?;
   let skgrepo_path : &Path =
@@ -686,7 +686,7 @@ fn read_skgrepo_from_head (
       . and_then ( |h| h . peel_to_tree () )
       . map_err ( |e| format! (
         "Reading HEAD tree for repo '{}': {}", skgrepo_name, e )) ?;
-  let mut sections : Vec<(SkgRepoName, GraphnodeOnDisk)> = Vec::new ();
+  let mut sections : Vec<(SkgrepoName, GraphnodeOnDisk)> = Vec::new ();
   let mut parse_error : Option<String> = None;
   let walk_result : Result<(), git2::Error> =
     tree . walk (TreeWalkMode::PreOrder, |root, entry| {
@@ -719,9 +719,9 @@ fn read_skgrepo_from_head (
 
 fn read_skgrepo_from_index (
   config       : &SkgConfig,
-  skgrepo_name : &SkgRepoName,
-) -> Result<Vec<(SkgRepoName, GraphnodeOnDisk)>, String> {
-  let skgrepo : &SkgRepo =
+  skgrepo_name : &SkgrepoName,
+) -> Result<Vec<(SkgrepoName, GraphnodeOnDisk)>, String> {
+  let skgrepo : &Skgrepo =
     config . skgrepos . get (skgrepo_name) . ok_or_else ( || format! (
       "Repo '{}' not found in config", skgrepo_name )) ?;
   let skgrepo_path : &Path =
@@ -734,7 +734,7 @@ fn read_skgrepo_from_index (
   let index : git2::Index =
     gitrepo . index () . map_err ( |e| format! (
       "Reading index for repo '{}': {}", skgrepo_name, e )) ?;
-  let mut sections : Vec<(SkgRepoName, GraphnodeOnDisk)> =
+  let mut sections : Vec<(SkgrepoName, GraphnodeOnDisk)> =
     Vec::new ();
   for entry in index . iter () {
     let rel_path : PathBuf =
@@ -800,7 +800,7 @@ pub(super) fn parse_blob_section (
 /// so there is no telescope to compose).
 pub(super) fn parse_blob_node (
   bytes        : &[u8],
-  skgrepo_name : &SkgRepoName,
+  skgrepo_name : &SkgrepoName,
   rel_path     : &Path,
 ) -> Result<Graphnode, String> {
   parse_blob_section (bytes, rel_path)

@@ -5,7 +5,7 @@
 
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::dbs::tantivy::background_writer::lock_tantivy_writes;
-use crate::types::misc::{ID, SkgRepoName, TantivyIndex};
+use crate::types::misc::{ID, SkgrepoName, TantivyIndex};
 use crate::types::nodes::complete::{Flag, flag_is_true};
 use crate::types::nodes::tantivy::GraphnodeInTantivy;
 use crate::types::links::replace_each_link_with_its_label;
@@ -104,7 +104,7 @@ fn create_documents_from_node (
       |b| replace_each_link_with_its_label (b) );
   let mut documents: Vec<TantivyDocument> =
     Vec::new();
-  let mut titles_and_aliases: Vec<(String, SkgRepoName)> =
+  let mut titles_and_aliases: Vec<(String, SkgrepoName)> =
     // Each entry with the REPO its document will carry: the home
     // for the title, the alias's own privacy LEVEL for an alias --
     // so restricted search filtering excludes private aliases of

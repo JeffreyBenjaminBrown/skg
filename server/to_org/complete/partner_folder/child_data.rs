@@ -20,8 +20,8 @@
 ///   the tree is being mutated.
 
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgRepoDiff};
-use crate::types::misc::{ID, SkgRepoName};
+use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgrepoDiff};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::phantom::title_for_phantom;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
@@ -40,14 +40,14 @@ use std::io;
 /// `phantom: None` => normal write-protected child marked AffectsParent::True.
 /// `phantom: Some(axes)` => diff-view phantom marking removal.
 pub struct ChildData {
-  pub home_skgrepo : SkgRepoName,
+  pub home_skgrepo : SkgrepoName,
   pub title        : String,
   pub phantom      : Option<(NodeAxes, RelationshipAxes)>,
   /// True when the exact stored relationship member has no current
   /// node.  It is rendered as an Unknown, never as a title-less unrestricted
   /// fallback.
   pub unknown : bool,
-  pub relRepo : Option<SkgRepoName>,
+  pub relRepo : Option<SkgrepoName>,
 }
 
 /// Build a map from child ID to ChildData for the create-child
@@ -67,18 +67,18 @@ pub fn build_child_data (
   folder_node                       : NodeId,
   goal_list                      : &[ID],
   removed_skgids                 : &HashSet<ID>,
-  axes_for_removed               : &dyn Fn (&ID, &SkgRepoName)
+  axes_for_removed               : &dyn Fn (&ID, &SkgrepoName)
                                      -> (NodeAxes, RelationshipAxes),
-  skgrepo_diffs                  : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
-  relRepos                       : &HashMap<ID, SkgRepoName>,
+  skgrepo_diffs                  : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
+  relRepos                       : &HashMap<ID, SkgrepoName>,
   runtime                        : &RuntimeGeneration,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
-  let existing_children : HashMap<ID, (SkgRepoName, String)> = {
+  let existing_children : HashMap<ID, (SkgrepoName, String)> = {
     let node_ref : NodeRef<Viewnode> =
       tree . get (folder_node)
         . ok_or ("build_child_data: node not found") ?;
-    let mut m : HashMap<ID, (SkgRepoName, String)> = HashMap::new ();
+    let mut m : HashMap<ID, (SkgrepoName, String)> = HashMap::new ();
     for child_ref in node_ref . children () {
       if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         = & child_ref . value () . kind
@@ -93,10 +93,10 @@ pub fn build_child_data (
       // A removed-member diff-phantom is a *non-Unrestricted* viewnode. If its
       // skgrepo can't be determined, fall back to the NOT_FOUND sentinel
       // rather than aborting the whole render (TODO/DONE/local-view-update/plan_v2.org §7.6).
-      let child_src : SkgRepoName =
+      let child_src : SkgrepoName =
         SkgEnv::find_skgrepo_in_generation (
           runtime, child_skgid, deleted_since_head_pid_src_map)
-        . unwrap_or_else ( SkgRepoName::not_found );
+        . unwrap_or_else ( SkgrepoName::not_found );
       let axes : (NodeAxes, RelationshipAxes) =
         axes_for_removed ( child_skgid, &child_src );
       let child_title : String =
@@ -112,7 +112,7 @@ pub fn build_child_data (
       match SkgEnv::find_skgrepo_in_generation (
         runtime, child_skgid, deleted_since_head_pid_src_map) {
         None => { result . insert ( child_skgid . clone (),
-          ChildData { home_skgrepo: SkgRepoName::not_found (), title: String::new (),
+          ChildData { home_skgrepo: SkgrepoName::not_found (), title: String::new (),
                       phantom: None, unknown: true,
                       relRepo: relRepos . get (child_skgid) . cloned () } ); },
         Some (child_src) => {
@@ -140,7 +140,7 @@ pub fn build_child_data (
             Err (e) if e . downcast_ref::<io::Error> ()
               . is_some_and (|io_error| io_error . kind () == io::ErrorKind::NotFound) => {
               result . insert ( child_skgid . clone (),
-                ChildData { home_skgrepo: SkgRepoName::not_found (), title: String::new (),
+                ChildData { home_skgrepo: SkgrepoName::not_found (), title: String::new (),
                             phantom: None, unknown: true,
                             relRepo: relRepos . get (child_skgid) . cloned () } ); },
             Err (e) => return Err (e),
@@ -267,7 +267,7 @@ fn normalize_relationship_backed_partner_unknowns (
             . is_some_and (|data| data . unknown)))
         . expect ("normalization predicate found an unknown raw member")
         . clone () };
-      let relRepo : Option<SkgRepoName> = child_data . get (&skgid)
+      let relRepo : Option<SkgrepoName> = child_data . get (&skgid)
         . and_then (|data| data . relRepo . clone ());
       vn . kind = ViewnodeKind::Vognode (Vognode::Phantom (
         crate::types::viewnode::Phantom::Unknown (
@@ -321,7 +321,7 @@ mod tests {
   use crate::types::viewnode::{mk_writeProtected_viewnode, Phantom};
 
   fn skgid (text : &str) -> ID { ID::from (text) }
-  fn skgrepo (text : &str) -> SkgRepoName { SkgRepoName::from (text) }
+  fn skgrepo (text : &str) -> SkgrepoName { SkgrepoName::from (text) }
 
   #[test]
   fn deleted_primary_with_surviving_extra_member_becomes_unknown () {
@@ -338,7 +338,7 @@ mod tests {
     let child_treeid   : NodeId = tree . root_mut () . append (child) . id ();
     let mut child_data : HashMap<ID, ChildData> = HashMap::new ();
     child_data . insert ( raw_extra . clone (), ChildData {
-      home_skgrepo: SkgRepoName::not_found (), title: String::new (), phantom: None,
+      home_skgrepo: SkgrepoName::not_found (), title: String::new (), phantom: None,
       unknown: true, relRepo: Some (skgrepo ("foreign")) } );
     let mut deleted_extra_ids : HashMap<ID, HashSet<ID>> = HashMap::new ();
     deleted_extra_ids . insert (

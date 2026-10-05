@@ -238,15 +238,15 @@ fn pair (
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::skgrepo_sets::SkgRepoSetName;
-  use crate::types::misc::SkgRepoName;
+  use crate::skgrepo_sets::SkgrepoSetName;
+  use crate::types::misc::SkgrepoName;
   use crate::types::nodes::complete::{
     Graphnode, empty_graphnode};
 
   fn graph_with_overPrivateText_node () -> InRustGraph {
     let mut node : Graphnode = empty_graphnode ();
     node . pid = ID::from ("overPrivateText-pid");
-    node . home_skgrepo = SkgRepoName::from ("home");
+    node . home_skgrepo = SkgrepoName::from ("home");
     node . title = "SECRET title" . to_string ();
     node . extra_ids = vec! [ID::from ("extra-id")];
     node . overPrivateText_telescope = true;
@@ -255,8 +255,8 @@ mod tests {
 
   fn restricted () -> SkgrepoRestriction {
     SkgrepoRestriction {
-      name    : SkgRepoSetName::from ("public"),
-      skgrepos : [SkgRepoName::from ("home")]
+      name    : SkgrepoSetName::from ("public"),
+      skgrepos : [SkgrepoName::from ("home")]
                 . into_iter () . collect (),
     }
   }

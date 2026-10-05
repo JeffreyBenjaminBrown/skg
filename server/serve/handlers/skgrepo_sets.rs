@@ -14,7 +14,7 @@ use crate::serve::util::{
   value_from_request_sexp};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::types::misc::SkgRepoSetName;
+use crate::types::misc::SkgrepoSetName;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::update_buffer::skgrepo_switch::convert_and_prune_for_skgrepo_switch;
@@ -34,7 +34,7 @@ pub fn handle_skgrepo_set_request (
 ) {
   let runtime = env . runtime_snapshot ();
   match request_type_from_request (request) {
-    Ok (RequestType::ListSkgRepoSets) =>
+    Ok (RequestType::ListSkgrepoSets) =>
       send_skgrepo_sets_response (stream, &runtime . config, skgrepo_restriction),
     Ok (RequestType::SkgrepoRestriction) =>
       send_skgrepo_restriction_response (stream, skgrepo_restriction),
@@ -71,9 +71,9 @@ fn set_skgrepo_restriction (
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
 ) {
-  let name : SkgRepoSetName =
+  let name : SkgrepoSetName =
     match value_from_request_sexp ("name", request) {
-      Ok (name) => SkgRepoSetName::from (name),
+      Ok (name) => SkgrepoSetName::from (name),
       Err (e) => {
         refuse_unwinding (stream, skgrepo_restriction, &e);
         return; }};
@@ -137,7 +137,7 @@ fn send_skgrepo_sets_response (
   let response : String =
     format! (
       "((response-type {}) (restriction \"{}\") (sets ({})))",
-      TcpToClient::SkgRepoSets . repr_in_client (),
+      TcpToClient::SkgrepoSets . repr_in_client (),
       escape_string (&restriction . name . 0),
       names_sexp );
   send_response_with_length_prefix (stream, &response); }

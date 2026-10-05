@@ -1,6 +1,6 @@
 use skg::diff_report::git_snapshot::read_git_snapshot_pair;
 use skg::diff_report::types::{DiffSelection, GitSnapshotPair};
-use skg::types::misc::{ID, SkgConfig, SkgRepo, SkgRepoName};
+use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
 
 use git2::Repository;
 use std::collections::HashMap;
@@ -61,19 +61,19 @@ fn config_for (
   data_root   : &Path,
   skgrepo_dir : &Path,
 ) -> SkgConfig {
-  let skgrepo_name : SkgRepoName =
-    SkgRepoName::from ("main");
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+  let skgrepo_name : SkgrepoName =
+    SkgrepoName::from ("main");
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
     HashMap::new ();
   skgrepos . insert (
     skgrepo_name . clone (),
-    SkgRepo {
+    Skgrepo {
       name: skgrepo_name,
       abbreviation: None,
       path: skgrepo_dir . to_path_buf (),
       owned: true });
   let mut config : SkgConfig =
-    SkgConfig::dummyFromSkgRepos (skgrepos);
+    SkgConfig::dummyFromSkgrepos (skgrepos);
   config . data_root = data_root . to_path_buf ();
   config
 }

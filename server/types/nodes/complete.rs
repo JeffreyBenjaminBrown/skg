@@ -13,7 +13,7 @@
 //! 'home_repo'), then serialize the 'GraphnodeOnDisk'. This way the type
 //! system enforces that 'home_repo' never appears in YAML.
 
-use crate::types::misc::{ID, MSV, RelPartner, SkgRepoName};
+use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName};
 
 use std::collections::HashSet;
 
@@ -92,7 +92,7 @@ pub struct Graphnode {
   /// release decisions intentionally use this coarse flag.
   pub overPrivateText_telescope: bool,
   pub aliases: MSV<RelPartner<String>>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.) Each alias carries its relRepo.
-  pub home_skgrepo: SkgRepoName, // skgrepo name, inferred from file location and SkgConfig
+  pub home_skgrepo: SkgrepoName, // skgrepo name, inferred from file location and SkgConfig
   pub pid: ID, // Primary ID. Determines filename, graph identity, Tantivy key, and map key. Never changes.
   pub extra_ids: Vec<ID>, // Extra IDs accumulated through nodeMerges. Usually empty.
   pub body: Option<String>, // Not indexed by the structural graph. The body is all text (if any) between the preceding org headline, to which it belongs, and the next (if there is a next).
@@ -163,7 +163,7 @@ pub fn empty_graphnode () -> Graphnode {
     title                        : String::new (),
     overPrivateText_telescope               : false,
     aliases                      : MSV::Unspecified,
-    home_skgrepo                 : SkgRepoName::from ("main"),
+    home_skgrepo                 : SkgrepoName::from ("main"),
     pid                          : ID::new (""),
     extra_ids                    : Vec::new (),
     body                         : None,

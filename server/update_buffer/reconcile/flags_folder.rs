@@ -1,6 +1,6 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
-use crate::types::misc::{ID, SkgConfig, SkgRepoName};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::{
   Flag, Graphnode, flag_is_true};
 use crate::types::viewnode::{Property, Viewnode, ViewnodeKind};
@@ -17,7 +17,7 @@ pub fn reconcile_flags_folder_children (
   graph        : &InRustGraph,
   config       : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  let (pid, skgrepo) : (ID, SkgRepoName) =
+  let (pid, skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_required_ancestor (
       tree, folder_skgid, 0, "reconcile_flags_folder_children") ?;
   let node : Graphnode = graphnode_graphFirst_by_pid_and_skgrepo (

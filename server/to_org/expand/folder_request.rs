@@ -14,8 +14,8 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::complete::partner_folder::{
   maybe_add_one_partnerFolder, maybe_add_subscribeeFolder_branch };
 use crate::to_org::util::remove_completed_view_request;
-use crate::types::git::SkgRepoDiff;
-use crate::types::misc::{SkgConfig, SkgRepoName};
+use crate::types::git::SkgrepoDiff;
+use crate::types::misc::{SkgConfig, SkgrepoName};
 use crate::types::viewnode::{Viewnode, ViewRequest, FolderRelation, PartnerFolder};
 
 use ego_tree::{NodeId, Tree};
@@ -30,7 +30,7 @@ pub fn build_and_integrate_folder_then_drop_request (
   config             : &SkgConfig,
   errors             : &mut Vec < String >,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  skgrepo_diffs      : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs      : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
     build_and_integrate_folder (
@@ -53,7 +53,7 @@ fn build_and_integrate_folder (
   graph              : &InRustGraph,
   config             : &SkgConfig,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  skgrepo_diffs      : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs      : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   match rel {
     FolderRelation::Aliases =>

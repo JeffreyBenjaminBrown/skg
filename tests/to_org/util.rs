@@ -3,7 +3,7 @@
 use skg::to_org::util::get_skgid_from_viewnode_at;
 use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode, UnrestrictedVognode, default_unrestrictedVognode};
 use skg::types::viewnode::PropertyFolder;
-use skg::types::misc::{ID, SkgRepoName};
+use skg::types::misc::{ID, SkgrepoName};
 use ego_tree::{NodeId,Tree};
 
 #[test]
@@ -13,7 +13,7 @@ fn test_get_skgid_from_viewnode_at_with_skgid() {
     ID::new ("test-id-123");
   let t : UnrestrictedVognode =
     default_unrestrictedVognode ( skgid . clone(),
-                       SkgRepoName::from ("main"),
+                       SkgrepoName::from ("main"),
                        "Test" . to_string() );
   let viewnode : Viewnode =
     Viewnode { focused     : false,

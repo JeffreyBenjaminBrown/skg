@@ -4,7 +4,7 @@ use crate::diff_report::types::{
   TextDiffLine, ValueSetDiff};
 use crate::types::list::{Diff_Item, compute_interleaved_diff};
 use crate::types::misc::{
-  ID, MSV, RelPartner, SkgRepoName, members_of, members_msv};
+  ID, MSV, RelPartner, SkgrepoName, members_of, members_msv};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::links::links_from_node;
 
@@ -191,7 +191,7 @@ fn node_reports (
       text_diff_option (
         before_node . and_then ( |n| n . body . as_deref () ) . unwrap_or (""),
         after_node  . and_then ( |n| n . body . as_deref () ) . unwrap_or (""));
-    let skgrepo_change : Option<(SkgRepoName, SkgRepoName)> =
+    let skgrepo_change : Option<(SkgrepoName, SkgrepoName)> =
       match (before_node, after_node) {
         (Some (b), Some (a)) if b . home_skgrepo != a . home_skgrepo =>
           Some ((b . home_skgrepo . clone (), a . home_skgrepo . clone ())),

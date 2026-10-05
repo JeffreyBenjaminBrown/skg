@@ -7,7 +7,7 @@
 use crate::from_text::local_fieldintent_collection::predicates::{
   unrestricted_child_counts_as_content, member_counts_for_partnerFolder};
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, SkgRepoName};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{PartnerFolder, Property, PropertyFolder, Phantom, Viewnode, ViewnodeKind, Vognode};
@@ -43,11 +43,11 @@ enum OccurrencePathStep {
 struct WriteProtectedOccurrence {
   skgid       : ID,
   title    : String,
-  home_skgrepo : SkgRepoName,
-  content  : Vec<(ID, Option<SkgRepoName>)>,
-  aliases  : Option<Vec<(String, Option<SkgRepoName>)>>,
-  subscribes : Option<Vec<(ID, Option<SkgRepoName>)>>,
-  overrides  : Option<Vec<(ID, Option<SkgRepoName>)>>,
+  home_skgrepo : SkgrepoName,
+  content  : Vec<(ID, Option<SkgrepoName>)>,
+  aliases  : Option<Vec<(String, Option<SkgrepoName>)>>,
+  subscribes : Option<Vec<(ID, Option<SkgrepoName>)>>,
+  overrides  : Option<Vec<(ID, Option<SkgrepoName>)>>,
   hidden_outside : Option<Vec<ID>>,
 }
 
@@ -459,7 +459,7 @@ fn make_direct_unrestricted_children_independent (
 
 fn content_members (
   node : NodeRef<Viewnode>,
-) -> Vec<(ID, Option<SkgRepoName>)> {
+) -> Vec<(ID, Option<SkgrepoName>)> {
   node . children () . filter_map ( |child| match &child . value () . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (restriction))
       if unrestricted_child_counts_as_content (restriction) =>
@@ -472,7 +472,7 @@ fn content_members (
 
 fn aliases (
   node : NodeRef<Viewnode>,
-) -> Option<Vec<(String, Option<SkgRepoName>)>> {
+) -> Option<Vec<(String, Option<SkgrepoName>)>> {
   node . children () . find ( |child| matches! (
     &child . value () . kind, ViewnodeKind::PropertyFolder (PropertyFolder::Alias)))
     . map ( |alias_folder| alias_folder . children () . filter_map ( |alias| {
@@ -485,7 +485,7 @@ fn aliases (
 fn partner_members (
   node : NodeRef<Viewnode>,
   wanted : PartnerFolder,
-) -> Option<Vec<(ID, Option<SkgRepoName>)>> {
+) -> Option<Vec<(ID, Option<SkgrepoName>)>> {
   node . children () . find ( |child| matches! (
     &child . value () . kind, ViewnodeKind::PartnerFolder (folder) if *folder == wanted))
     . map ( |folder| folder . children () . filter_map ( |member| {

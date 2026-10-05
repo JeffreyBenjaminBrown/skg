@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use tempfile::{tempdir, TempDir};
 
 use skg::dbs::filesystem::not_nodes::validate_skgrepo_paths_creating_owned_ones_if_needed;
-use skg::types::misc::{SkgRepo, SkgRepoName};
+use skg::types::misc::{Skgrepo, SkgrepoName};
 
 #[test]
 fn test_validate_existing_owned_skgrepo() {
@@ -15,12 +15,12 @@ fn test_validate_existing_owned_skgrepo() {
   let dir : TempDir = tempdir() . unwrap();
   let skgrepo_path : PathBuf = dir . path() . to_path_buf();
 
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
     HashMap::new();
   skgrepos . insert(
-    SkgRepoName::from ("main"),
-    SkgRepo {
-      name: SkgRepoName::from ("main"),
+    SkgrepoName::from ("main"),
+    Skgrepo {
+      name: SkgrepoName::from ("main"),
         abbreviation: None,
       path: skgrepo_path . clone(),
       owned: true,
@@ -41,12 +41,12 @@ fn test_validate_nonexistent_owned_skgrepo() {
   let skgrepo_path : PathBuf =
     temp_dir . path() . join ("nonexistent_repo");
 
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
     HashMap::new();
   skgrepos . insert(
-    SkgRepoName::from ("main"),
-    SkgRepo {
-      name: SkgRepoName::from ("main"),
+    SkgrepoName::from ("main"),
+    Skgrepo {
+      name: SkgrepoName::from ("main"),
         abbreviation: None,
       path: skgrepo_path . clone(),
       owned: true,
@@ -66,12 +66,12 @@ fn test_validate_existing_foreign_skgrepo() {
   let dir : TempDir = tempdir() . unwrap();
   let skgrepo_path : PathBuf = dir . path() . to_path_buf();
 
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
     HashMap::new();
   skgrepos . insert(
-    SkgRepoName::from ("foreign"),
-    SkgRepo {
-      name: SkgRepoName::from ("foreign"),
+    SkgrepoName::from ("foreign"),
+    Skgrepo {
+      name: SkgrepoName::from ("foreign"),
         abbreviation: None,
       path: skgrepo_path . clone(),
       owned: false,
@@ -91,12 +91,12 @@ fn test_validate_nonexistent_foreign_skgrepo() {
   let skgrepo_path : PathBuf =
     temp_dir . path() . join ("nonexistent_foreign");
 
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
     HashMap::new();
   skgrepos . insert(
-    SkgRepoName::from ("foreign"),
-    SkgRepo {
-      name: SkgRepoName::from ("foreign"),
+    SkgrepoName::from ("foreign"),
+    Skgrepo {
+      name: SkgrepoName::from ("foreign"),
         abbreviation: None,
       path: skgrepo_path . clone(),
       owned: false,
@@ -125,21 +125,21 @@ fn test_validate_multiple_skgrepos() {
   // Path that doesn't exist yet (will be created)
   let new_owned_path : PathBuf = temp_dir . path() . join ("new_owned");
 
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
     HashMap::new();
   skgrepos . insert(
-    SkgRepoName::from ("existing"),
-    SkgRepo {
-      name: SkgRepoName::from ("existing"),
+    SkgrepoName::from ("existing"),
+    Skgrepo {
+      name: SkgrepoName::from ("existing"),
         abbreviation: None,
       path: existing_path . clone(),
       owned: true,
     }
   );
   skgrepos . insert(
-    SkgRepoName::from ("new_owned"),
-    SkgRepo {
-      name: SkgRepoName::from ("new_owned"),
+    SkgrepoName::from ("new_owned"),
+    Skgrepo {
+      name: SkgrepoName::from ("new_owned"),
         abbreviation: None,
       path: new_owned_path . clone(),
       owned: true,
@@ -166,21 +166,21 @@ fn test_validate_multiple_skgrepos_with_foreign_failure() {
   let nonexistent_foreign : PathBuf =
     temp_dir . path() . join ("nonexistent_foreign");
 
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
     HashMap::new();
   skgrepos . insert(
-    SkgRepoName::from ("existing"),
-    SkgRepo {
-      name: SkgRepoName::from ("existing"),
+    SkgrepoName::from ("existing"),
+    Skgrepo {
+      name: SkgrepoName::from ("existing"),
         abbreviation: None,
       path: existing_path . clone(),
       owned: true,
     }
   );
   skgrepos . insert(
-    SkgRepoName::from ("foreign"),
-    SkgRepo {
-      name: SkgRepoName::from ("foreign"),
+    SkgrepoName::from ("foreign"),
+    Skgrepo {
+      name: SkgrepoName::from ("foreign"),
         abbreviation: None,
       path: nonexistent_foreign . clone(),
       owned: false,

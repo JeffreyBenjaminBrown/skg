@@ -4,7 +4,7 @@ use indoc::indoc;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::errors::{SaveError, BufferValidationError};
-use skg::types::misc::{SkgConfig, ID, SkgRepoName};
+use skg::types::misc::{SkgConfig, ID, SkgrepoName};
 
 use skg::types::save::{NodeInstruction, SaveNode, DeleteNode};
 use std::error::Error;
@@ -88,7 +88,7 @@ async fn test_modified_foreign_node_forks_with_default_skgrepo (
         "editing the foreign node should produce one fork" );
       assert_eq! ( save_plan . fork_specs[0] . original_skgid, ID::from ("foreign2") );
       assert_eq! ( save_plan . fork_specs[0] . clone . 0 . home_skgrepo,
-                   SkgRepoName::from ("main"),
+                   SkgrepoName::from ("main"),
         "with no owned ancestor, the clone defaults to the first owned repo" );
       assert! ( save_plan . node_instructions . iter () . all ( |d| ! matches! (
                   d, NodeInstruction::Save (SaveNode (n))
@@ -112,7 +112,7 @@ async fn test_modified_foreign_node_body_forks_with_default_skgrepo (
       assert_eq! ( save_plan . fork_specs . len (), 1,
         "editing the body should produce one fork" );
       assert_eq! ( save_plan . fork_specs[0] . clone . 0 . home_skgrepo,
-                   SkgRepoName::from ("main"),
+                   SkgrepoName::from ("main"),
         "with no owned ancestor, the clone defaults to the first owned repo" );
       Ok(())
     }

@@ -5,9 +5,9 @@ use std::error::Error;
 use skg::dbs::filesystem::one_node::optgraphnode_from_skgid;
 use skg::from_text::supplement_from_disk::{ canonicalize_skgids_from_disk, detect_skgrepo_move, supplement_unspecified_fields_from_disk, };
 use skg::test_utils::run_with_shared_test_stores;
-use skg::types::misc::{ID, MSV, SkgConfig, SkgRepoName, TantivyIndex, members_msv, rel_partners_at_relRepo_msv};
+use skg::types::misc::{ID, MSV, SkgConfig, SkgrepoName, TantivyIndex, members_msv, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
-use skg::types::save::SkgRepoMove;
+use skg::types::save::SkgrepoMove;
 
 
 
@@ -44,7 +44,7 @@ async fn supplement_from_disk_then_extract_graphnode (
       . ok_or ("Expected node on disk") ?;
   let canonicalized : Graphnode =
     canonicalize_skgids_from_disk (user_node, &disk_node) ?;
-  let _skgrepo_move : Option<SkgRepoMove> =
+  let _skgrepo_move : Option<SkgrepoMove> =
     detect_skgrepo_move (
       config,
       &pid,
@@ -95,7 +95,7 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . aliases = rel_partners_at_relRepo_msv (
-        & SkgRepoName::from ("main"),
+        & SkgrepoName::from ("main"),
         MSV::Specified ( vec![ "new alias" . to_string () ] ) ); }
     let result : Graphnode =
       supplement_from_disk_then_extract_graphnode (
@@ -149,7 +149,7 @@ async fn test_none_subscribesTo_get_replaced_with_disk_subscribesTo_logic (
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . subscribesTo = rel_partners_at_relRepo_msv (
-        & SkgRepoName::from ("main"),
+        & SkgrepoName::from ("main"),
         MSV::Specified ( vec![ ID::new ("new_sub") ] ) ); }
     let result : Graphnode =
       supplement_from_disk_then_extract_graphnode (
@@ -202,7 +202,7 @@ async fn test_none_hidesFromSubs_get_replaced_with_disk_hides_logic (
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . hidesFromSubs = rel_partners_at_relRepo_msv (
-        & SkgRepoName::from ("main"),
+        & SkgrepoName::from ("main"),
         MSV::Specified ( vec![ ID::new ("new_hide") ] ) ); }
     let result : Graphnode =
       supplement_from_disk_then_extract_graphnode (
@@ -257,7 +257,7 @@ async fn test_none_overrides_get_replaced_with_disk_overrides_logic (
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . overrides = rel_partners_at_relRepo_msv (
-        & SkgRepoName::from ("main"),
+        & SkgrepoName::from ("main"),
         MSV::Specified ( vec![ ID::new ("new_override") ] ) ); }
     let result : Graphnode =
       supplement_from_disk_then_extract_graphnode (

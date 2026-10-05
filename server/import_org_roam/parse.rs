@@ -36,7 +36,7 @@
 ///    its children by ID.
 
 use crate::types::misc::{
-  ID, MSV, RelPartner, SkgRepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
+  ID, MSV, RelPartner, SkgrepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
 use crate::types::nodes::complete::{Flag, Graphnode};
 
 use std::path::Path;
@@ -302,7 +302,7 @@ fn graphnode_from_section_tree (
   // overwrites 'repo' after parsing. Tag members with this
   // placeholder skgrepo, matching the node's own skgrepo at
   // construction time -- degenerate, and dropped at the FS boundary.
-  let skgrepo     : SkgRepoName = SkgRepoName::default();
+  let skgrepo     : SkgrepoName = SkgrepoName::default();
   let aliases_msv : MSV<String> =
     match tree . section . roam_aliases . clone() {
       None    => MSV::Unspecified,

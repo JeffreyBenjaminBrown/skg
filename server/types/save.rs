@@ -1,4 +1,4 @@
-use super::misc::{ID, SkgRepoName};
+use super::misc::{ID, SkgrepoName};
 use super::nodes::complete::Graphnode;
 use super::errors::{SaveError, BufferValidationError};
 
@@ -11,10 +11,10 @@ use super::errors::{SaveError, BufferValidationError};
 /// one of these is generated
 /// (in addition to the usual NodeInstruction).
 #[derive(Debug)]
-pub struct SkgRepoMove {
+pub struct SkgrepoMove {
   pub pid         : ID,
-  pub old_skgrepo : SkgRepoName,
-  pub new_skgrepo : SkgRepoName,
+  pub old_skgrepo : SkgrepoName,
+  pub new_skgrepo : SkgrepoName,
 }
 
 /// Defines what to do with a single node: save it or delete it.
@@ -42,7 +42,7 @@ pub struct SaveNode(pub Graphnode);
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct DeleteNode {
   pub skgid: ID,
-  pub home_skgrepo: SkgRepoName,
+  pub home_skgrepo: SkgrepoName,
 }
 
 /// The whole plan a save applies to the graph, with no view attached: the
@@ -56,7 +56,7 @@ pub struct DeleteNode {
 pub struct SavePlan {
   pub node_instructions      : Vec<NodeInstruction>,
   pub nodeMerge_instructions : Vec<NodeMerge>,
-  pub skgrepo_moves          : Vec<SkgRepoMove>,
+  pub skgrepo_moves          : Vec<SkgrepoMove>,
   /// Forks detected this save: editing a foreign node N is read as a
   /// request to clone it. Held SEPARATE from 'node_instructions' because a
   /// save carrying forks is gated on the user's confirmation -- the
@@ -87,7 +87,7 @@ pub struct ForkSpec {
   pub clone            : SaveNode,
   pub original_skgid   : ID,
   pub original_title   : String,
-  pub original_skgrepo : SkgRepoName,
+  pub original_skgrepo : SkgrepoName,
   /// True iff the clone's skgrepo was SPECIFIED by the user (in the
   /// confirmation buffer, or via explicit skgrepos on N's new children
   /// in the saved metadata), as opposed to inferred or defaulted. A
@@ -191,7 +191,7 @@ fn format_buffer_validation_error (
     BufferValidationError::DuplicatedContent (skgid) => {
       format!("Node has multiple Content children with the same ID:\n- ID: {}\n",
               skgid . 0) },
-    BufferValidationError::InconsistentSkgRepos(skgid, skgrepos) => {
+    BufferValidationError::InconsistentSkgrepos(skgid, skgrepos) => {
       let skgrepo_list: Vec<String> =
         skgrepos . iter() . map(|s| s . 0 . clone()) . collect();
       format!( "Multiple viewnodes with ID {} have inconsistent repos:\n- Repos: {:?}\n- All occurrences of the same ID must have the same repo.\n",
@@ -202,25 +202,25 @@ fn format_buffer_validation_error (
     BufferValidationError::CreatedForeignNode(skgid, skgrepo) => {
       format!("Cannot create node in foreign repo:\n- ID: {}\n- Repo: {}\n- Foreign repos can only be viewed, not modified.\n",
               skgid . 0, skgrepo) },
-    BufferValidationError::CannotMoveToOrFromForeignSkgRepo(skgid, disk_skgrepo, buffer_skgrepo) => {
+    BufferValidationError::CannotMoveToOrFromForeignSkgrepo(skgid, disk_skgrepo, buffer_skgrepo) => {
       format!("Cannot move node between repos:\n- ID: {}\n- Repo on disk: {}\n- Repo from buffer: {}\n- One or both repos are foreign.\n",
               skgid . 0, disk_skgrepo, buffer_skgrepo) },
     BufferValidationError::CannotMoveAndMergeSimultaneously(skgid) => {
       format!("Cannot move and merge a node simultaneously:\n- ID: {}\n- Please save the move and merge in separate operations.\n",
               skgid . 0) },
-    BufferValidationError::SkgRepoNotInConfig(skgid, skgrepo) => {
+    BufferValidationError::SkgrepoNotInConfig(skgid, skgrepo) => {
       format!("Node references a repo that does not exist in config:\n- ID: {}\n- Repo: {}\n- Please check your config file and ensure this repo is defined.\n",
               skgid . 0, skgrepo) },
-    BufferValidationError::ForkSkgRepoUnresolved(skgid) => {
+    BufferValidationError::ForkSkgrepoUnresolved(skgid) => {
       format!("Cannot fork a foreign node -- no owned repo for the clone:\n- Foreign node: {}\n- It has no owned ancestor in the view to inherit a repo from.\n- Set the clone's repo in the fork-confirmation buffer (C-c s s), then approve.\n",
               skgid . 0) },
     BufferValidationError::ForkAlreadyExists(original, existing) => {
       format!("Cannot fork a node you have already forked:\n- Foreign node: {}\n- Your existing clone: {}\n- A node may have at most one owned override. Edit the existing clone instead.\n",
               original . 0, existing . 0) },
-    BufferValidationError::ForkSkgRepoRestricted(skgid, skgrepo) => {
+    BufferValidationError::ForkSkgrepoRestricted(skgid, skgrepo) => {
       format!("Cannot fork into a restricted repo:\n- Foreign node: {}\n- Clone's resolved repo: {}\n- That repo is not in the skgrepo restriction. Activate it first; an invisible clone is never created silently.\n",
               skgid . 0, skgrepo) },
-    BufferValidationError::ForkSkgRepoNotOwned(skgid, skgrepo) => {
+    BufferValidationError::ForkSkgrepoNotOwned(skgid, skgrepo) => {
       format!("Cannot fork into a repo you do not own:\n- Foreign node: {}\n- Clone's chosen repo: {}\n- Pick an owned repo for the clone (C-c s s in the confirmation buffer).\n",
               skgid . 0, skgrepo) },
     BufferValidationError::ForkRequestOnUnknownNode(skgid) => {
@@ -328,7 +328,7 @@ impl NodeMerge {
   /// - acquiree_to_delete -> (&ID, &RepoName)
   pub fn targets_from_nodeMerge (
     &self
-  ) -> (&Graphnode, &Graphnode, (&ID, &SkgRepoName)) {
+  ) -> (&Graphnode, &Graphnode, (&ID, &SkgrepoName)) {
     ( &self . acquiree_text_preserver . 0,
       &self . updated_acquirer . 0,
       (&self . acquiree_to_delete . skgid, &self . acquiree_to_delete . home_skgrepo) )

@@ -7,7 +7,7 @@ use crate::dbs::filesystem::one_node::{
   PreparedTelescopeWrite, prepare_graphnode_telescope,
   read_graphnode, validate_pid_matches_filename,
 };
-use crate::types::misc::{SkgConfig, SkgRepo, ID, SkgRepoName};
+use crate::types::misc::{SkgConfig, Skgrepo, ID, SkgrepoName};
 use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::nodes::complete::Graphnode;
 
@@ -69,14 +69,14 @@ fn read_all_skg_files_from_skgrepos_impl (
   report_errors : bool,
 ) -> io::Result<(Vec<Graphnode>, Vec<(ID, TelescopeViolation)>)> {
   let mut sections_by_pid
-    : HashMap<ID, Vec<(SkgRepoName, GraphnodeOnDisk)>> = HashMap::new();
+    : HashMap<ID, Vec<(SkgrepoName, GraphnodeOnDisk)>> = HashMap::new();
   let mut pid_order : Vec<ID> = Vec::new(); // deterministic output
   let mut load_errors: Vec<(String, // skgrepo name
                             String, // filename
                             String)> // error message
     = Vec::new();
   for skgrepo_name in config . ordered_skgrepos () {
-    let Some (skgrepo) : Option<&SkgRepo> =
+    let Some (skgrepo) : Option<&Skgrepo> =
       config . skgrepos . get (&skgrepo_name) else { continue; };
     match read_skg_sections_from_folder (&skgrepo_name, config) {
       Ok (sections) => {
@@ -117,7 +117,7 @@ fn read_all_skg_files_from_skgrepos_impl (
 /// owned files before composition or building the extra-id map. A pid
 /// represented entirely by non-owned files remains readable.
 fn retain_owned_telescopes (
-  sections_by_pid : &mut HashMap<ID, Vec<(SkgRepoName, GraphnodeOnDisk)>>,
+  sections_by_pid : &mut HashMap<ID, Vec<(SkgrepoName, GraphnodeOnDisk)>>,
   pid_order       : &[ID],
   config          : &SkgConfig,
 ) -> Vec<(ID, TelescopeViolation)> {
@@ -144,7 +144,7 @@ pub fn graphnode_from_telescope_on_disk (
 ) -> io::Result<Graphnode> {
   crate::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo (
     config, pid . clone (),
-    & SkgRepoName::from ("(any)") ) }
+    & SkgrepoName::from ("(any)") ) }
 
 /// Compose each telescope (already grouped by pid; sections arrive in
 /// privacy order because the caller iterated 'ordered_repos').
@@ -154,7 +154,7 @@ pub fn graphnode_from_telescope_on_disk (
 /// compose complaint comes back as a violation for the caller to
 /// report.
 fn compose_grouped_sections (
-  mut sections_by_pid : HashMap<ID, Vec<(SkgRepoName, GraphnodeOnDisk)>>,
+  mut sections_by_pid : HashMap<ID, Vec<(SkgrepoName, GraphnodeOnDisk)>>,
   pid_order           : Vec<ID>,
   config              : &SkgConfig,
 ) -> io::Result<(Vec<Graphnode>, Vec<(ID, TelescopeViolation)>)> {
@@ -202,7 +202,7 @@ pub fn error_unless_each_skgid_names_one_node (
   nodes     : &[Graphnode],
   data_root : &Path,
 ) -> io::Result<()> {
-  let mut claimants: HashMap < ID, Vec<(ID, SkgRepoName)> > =
+  let mut claimants: HashMap < ID, Vec<(ID, SkgrepoName)> > =
     // Maps each ID to the (pid, home) of every node claiming it
     HashMap::new();
   for node in nodes {
@@ -210,7 +210,7 @@ pub fn error_unless_each_skgid_names_one_node (
       claimants . entry (skgid . clone())
         . or_insert_with (Vec::new)
         . push ((node . pid . clone(), node . home_skgrepo . clone())); }}
-  let contested: HashMap<ID, Vec<(ID, SkgRepoName)>> =
+  let contested: HashMap<ID, Vec<(ID, SkgrepoName)>> =
     claimants . into_iter()
     . filter ( |(_, recorders)| {
       let distinct_pids : HashSet<&ID> =
@@ -236,15 +236,15 @@ pub fn error_unless_each_skgid_names_one_node (
     io::ErrorKind::InvalidData, msg )) }
 
 pub fn read_skg_sections_from_folder (
-  skgrepo_name : &SkgRepoName,
+  skgrepo_name : &SkgrepoName,
   config       : &SkgConfig,
-) -> io::Result < Vec<(SkgRepoName, GraphnodeOnDisk)> > {
-  let skgrepo : &SkgRepo =
+) -> io::Result < Vec<(SkgrepoName, GraphnodeOnDisk)> > {
+  let skgrepo : &Skgrepo =
     config . skgrepos . get (skgrepo_name)
     . ok_or_else(|| io::Error::new(
       io::ErrorKind::NotFound,
       format!("Repo '{}' not found in config", skgrepo_name)))?;
-  let mut sections : Vec<(SkgRepoName, GraphnodeOnDisk)> = Vec::new ();
+  let mut sections : Vec<(SkgrepoName, GraphnodeOnDisk)> = Vec::new ();
   let entries : ReadDir = // an iterator
     fs::read_dir (&skgrepo . path) ?;
   for entry in entries {
@@ -306,7 +306,7 @@ pub fn read_recently_modified_skgfiles_from_skgrepos (
 /// also lists each conflict on stderr; for >10, logs the count and
 /// the file path.
 fn report_skgids_claimed_by_two_nodes(
-  contested : &HashMap<ID, Vec<(ID, SkgRepoName)>>,
+  contested : &HashMap<ID, Vec<(ID, SkgrepoName)>>,
   data_root : &Path,
 ) -> io::Result<()> {
   let count: usize = contested . len();
@@ -315,7 +315,7 @@ fn report_skgids_claimed_by_two_nodes(
     "initialization-error_ids-claimed-by-two-nodes.org");
   if count == 0 {
     return remove_stale_report (&report_path); }
-  let claimant_lines = | claimants : &Vec<(ID, SkgRepoName)> |
+  let claimant_lines = | claimants : &Vec<(ID, SkgrepoName)> |
                        -> Vec<String> {
     let mut lines : Vec<String> = // for deterministic output
       claimants . iter ()
@@ -331,7 +331,7 @@ fn report_skgids_claimed_by_two_nodes(
     content . push_str( &format!(
       "{} id(s) claimed by more than one node. Same-id files ACROSS REPOS are not this: those are the sections of one privacy telescope (docs/telescopes.org). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n",
       count));
-    let mut sorted_skgids: Vec<(&ID, &Vec<(ID, SkgRepoName)>)> =
+    let mut sorted_skgids: Vec<(&ID, &Vec<(ID, SkgrepoName)>)> =
       // for deterministic output
       contested . iter() . collect();
     sorted_skgids . sort_by_key(|(skgid, _)| *skgid);
@@ -427,7 +427,7 @@ pub fn write_all_nodes_to_fs (
 /// each target is the caller's belief about the home; kept in the
 /// signature for its callers, but every owned skgrepo is swept.)
 pub fn delete_all_nodes_from_fs (
-  delete_targets : Vec<(ID, SkgRepoName)>,
+  delete_targets : Vec<(ID, SkgrepoName)>,
   config         : SkgConfig,
 ) -> io::Result<usize> { // number of nodes deleted
 

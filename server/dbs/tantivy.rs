@@ -17,7 +17,7 @@ pub mod search;
 pub mod write;
 
 use crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT;
-use crate::types::misc::{ID, SkgRepoName, TantivyIndex};
+use crate::types::misc::{ID, SkgrepoName, TantivyIndex};
 
 use tantivy::{Index, Term, Searcher, TantivyDocument};
 use tantivy::schema::document::Value;
@@ -136,7 +136,7 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
 pub fn title_and_skgrepo_by_skgid (
   tantivy_index : &TantivyIndex,
   skgid            : &ID,
-) -> Option < (String, SkgRepoName) > {
+) -> Option < (String, SkgrepoName) > {
   let searcher : Searcher = tantivy_index . reader . searcher ();
   let doc_addresses : Vec<tantivy::DocAddress> =
     doc_addresses_for_skgid (
@@ -154,7 +154,7 @@ pub fn title_and_skgrepo_by_skgid (
       . filter ( |s| ! s . is_empty () )
       . or_else ( || string_field (
         &doc, tantivy_index . title_or_alias_field )) ?;
-  let skgrepo : SkgRepoName = SkgRepoName::from (
+  let skgrepo : SkgrepoName = SkgrepoName::from (
     string_field ( &doc, tantivy_index . skgrepo_field )
       . unwrap_or_default () . as_str () );
   Some ( (title, skgrepo) ) }

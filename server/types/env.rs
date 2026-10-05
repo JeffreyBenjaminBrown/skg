@@ -5,7 +5,7 @@
 
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
 use crate::dbs::tantivy::title_and_skgrepo_by_skgid;
-use crate::types::misc::{ID, SkgConfig, SkgRepoName, TantivyIndex};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use crate::types::phantom::home_from_disk;
 
 use std::collections::HashMap;
@@ -147,8 +147,8 @@ impl SkgEnv {
   pub fn find_skgrepo_in_generation (
     runtime : &RuntimeGeneration,
     skgid : &ID,
-    deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
-  ) -> Option<SkgRepoName> {
+    deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
+  ) -> Option<SkgrepoName> {
     if let Some ((_pid, src)) =
       runtime . graph . pid_and_skgrepo (skgid)
     { return Some (src); }
@@ -165,10 +165,10 @@ impl SkgEnv {
 pub fn find_skgrepo_with_optional_tantivy (
   graph                          : &InRustGraph,
   skgid                          : &ID,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   tantivy_index                  : Option<&TantivyIndex>,
   config                         : &SkgConfig,
-) -> Option<SkgRepoName> {
+) -> Option<SkgrepoName> {
   if let Some ((_pid, src)) = graph . pid_and_skgrepo (skgid)
     { return Some (src); }
   if let Some (s) = deleted_since_head_pid_src_map . get (skgid)

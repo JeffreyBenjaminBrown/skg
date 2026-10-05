@@ -2,7 +2,7 @@ use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::util::{get_skgid_from_viewnode_at, remove_completed_view_request};
 use crate::types::git::RelationshipAxes;
-use crate::types::misc::{ID, RelPartner, SkgConfig, SkgRepoName};
+use crate::types::misc::{ID, RelPartner, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, ViewRequest, FolderRelation};
 use crate::types::viewnode::{PropertyFolder, Property};
@@ -56,7 +56,7 @@ pub fn build_and_integrate_aliases (
     return Ok (( )); }
   let node : Option<Graphnode> =
     graphnode_from_graph (graph, &node_id_val);
-  let home : Option<SkgRepoName> =
+  let home : Option<SkgrepoName> =
     node . as_ref () . map ( |node| node . home_skgrepo . clone () );
   let aliases : Vec<RelPartner<String>> = node
     . map ( |node| node . aliases . or_default () . to_vec () )

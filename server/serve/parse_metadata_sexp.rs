@@ -17,7 +17,7 @@
 ///                         [(viewRequests REQUEST...)]))
 
 use crate::types::sexp::atom_to_string;
-use crate::types::misc::{ID, SkgRepoName};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::errors::BufferValidationError;
 use crate::types::nodes::complete::Flag;
 use crate::types::git::{NodeAxes, RelationshipAxes, Sign};
@@ -49,21 +49,21 @@ pub struct ViewnodeMetadata {
   pub non_vognode: Option<MpViewnodeKind>,
   // UnrestrictedVognode fields (ignored if non-vognode is Some)
   pub skgid: Option<ID>,
-  pub home_skgrepo: Option<SkgRepoName>,
+  pub home_skgrepo: Option<SkgrepoName>,
   pub affectsParent: AffectsParent,
   pub birth: Birth,
   pub writeProtected: bool,
   pub graphStats: GraphnodeStats,
   pub viewStats: ViewnodeStats,
   pub edit_request: Option<NodeEditRequest>,
-  pub relRepo_request: Option<SkgRepoName>,
+  pub relRepo_request: Option<SkgrepoName>,
   pub view_requests: HashSet<ViewRequest>,
   pub unrestrictedVognode_node_axes : NodeAxes,
   pub unrestrictedVognode_relationship_axes : RelationshipAxes,
   pub unrestrictedVognode_not_in_git : bool,
   pub property_relationship_axes : RelationshipAxes,
-  pub property_relRepo : Option<SkgRepoName>,
-  pub property_relRepo_request : Option<SkgRepoName>,
+  pub property_relRepo : Option<SkgrepoName>,
+  pub property_relRepo_request : Option<SkgrepoName>,
   pub textchanged_staged   : bool,
   pub textchanged_unstaged : bool,
   // When true, this is a PhantomDeleted (id and skgrepo are used).
@@ -73,8 +73,8 @@ pub struct ViewnodeMetadata {
   // When Some, this is a PhantomUnknown (a phantom for a missing
   // referent). Carries only the id; no skgrepo/title/body apply.
   pub unknown_node_skgid: Option<ID>,
-  pub unknown_relRepo : Option<SkgRepoName>,
-  pub unknown_relRepo_request : Option<SkgRepoName>,
+  pub unknown_relRepo : Option<SkgrepoName>,
+  pub unknown_relRepo_request : Option<SkgrepoName>,
   // When true, this is a restricted-skgrepo placeholder: an anonymous,
   // dataless atom (see RestrictedVognode). It carries no id/repo/etc.
   pub is_restricted_node : bool,
@@ -165,7 +165,7 @@ pub fn viewnode_from_metadata (
             skgid     : metadata . skgid . clone ()
                        . unwrap_or_else ( || ID::from ("")),
             home_skgrepo : metadata . home_skgrepo . clone ()
-                       . unwrap_or_else ( || SkgRepoName::from ("")),
+                       . unwrap_or_else ( || SkgrepoName::from ("")),
             title,
             body,
           } ) )), None, None )
@@ -374,7 +374,7 @@ pub fn parse_metadata_to_viewnodemd (
             if result . property_relRepo . is_some () {
               return Err ( "Alias relRepo may appear only once"
                            . to_string () ); }
-            result . property_relRepo = Some ( SkgRepoName::from (
+            result . property_relRepo = Some ( SkgrepoName::from (
               atom_to_string (&items [1]) ? )); },
           "editRequest" => {
             let mut request_metadata : ViewnodeMetadata = default_metadata ();
@@ -501,7 +501,7 @@ fn parse_node_sexp (
               return Err ( "repo requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
-            metadata . home_skgrepo = Some ( SkgRepoName::from (value) ); },
+            metadata . home_skgrepo = Some ( SkgrepoName::from (value) ); },
           // Semantic relationship / birth facts are display-only.
           // The client strips them before save; the view regenerates them.
           "rels" => {},
@@ -691,7 +691,7 @@ fn parse_deleted_sexp (
               return Err ( "deleted repo requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
-            metadata . home_skgrepo = Some ( SkgRepoName::from (value)); },
+            metadata . home_skgrepo = Some ( SkgrepoName::from (value)); },
           _ => { return Err ( format! ( "Unknown deleted key: {}",
                                          key )); }} },
       _ => { return Err ( "Unexpected element in deleted sexp"
@@ -732,7 +732,7 @@ fn parse_viewstats_sexp (
             // appear as (editRequest (relRepo REPO)).
             let value : String =
               atom_to_string ( &kv_pair[1] ) ?;
-            stats . relRepo = Some ( SkgRepoName::from (value)); },
+            stats . relRepo = Some ( SkgrepoName::from (value)); },
           _ => { return Err ( format! (
             "Unknown viewStats key: {}", key )); }} },
       _ => { return Err ( "Unexpected element in viewStats"
@@ -760,7 +760,7 @@ fn parse_editrequest_sexp (
         } else if key == "relRepo" {
           let skgrepo : String = atom_to_string ( &subitems[1] ) ?;
           metadata . relRepo_request =
-            Some ( SkgRepoName::from (skgrepo) );
+            Some ( SkgrepoName::from (skgrepo) );
         } else {
           return Err ( format! ( "Unknown editRequest key: {}", key )); }
       },

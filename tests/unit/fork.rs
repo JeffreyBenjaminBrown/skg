@@ -9,7 +9,7 @@
 // one.
 
 use super::*;
-use crate::types::misc::{SkgRepo, members_of, rel_partners_at_relRepo};
+use crate::types::misc::{Skgrepo, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
   Flag, empty_graphnode};
 use crate::types::tree::forest::ViewForest;
@@ -19,22 +19,22 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 fn config_two_owned_one_foreign () -> SkgConfig {
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> = HashMap::new ();
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> = HashMap::new ();
   for (name, owns) in [ ("owned1", true),
                         ("owned2", true),
                         ("foreign", false) ] {
     skgrepos . insert (
-      SkgRepoName::from (name),
-      SkgRepo {
-        name         : SkgRepoName::from (name),
+      SkgrepoName::from (name),
+      Skgrepo {
+        name         : SkgrepoName::from (name),
         abbreviation : None,
         path         : PathBuf::from (name),
         owned        : owns, } ); }
-  SkgConfig::fromSkgReposAndTantivyFolder ( skgrepos, "/tmp/none" ) }
+  SkgConfig::fromSkgreposAndTantivyFolder ( skgrepos, "/tmp/none" ) }
 
 fn restriction (skgid : &str, skgrepo : &str) -> Viewnode {
   mk_editable_viewnode (
-    ID::from (skgid), SkgRepoName::from (skgrepo), skgid . to_string (), None ) }
+    ID::from (skgid), SkgrepoName::from (skgrepo), skgid . to_string (), None ) }
 
 fn subscribee_folder () -> Viewnode {
   Viewnode { focused : false, folded : false, body_folded : false,
@@ -79,7 +79,7 @@ fn owned_N_still_infers_the_owned_skgrepo () {
   let map = owned_ancestor_skgrepos_for_foreign_vognodes (
     & build_forest (), & config );
   assert_eq! ( map . get (& ID::from ("M")),
-               Some (& SkgRepoName::from ("owned2")),
+               Some (& SkgrepoName::from ("owned2")),
     "owned -> M must infer the owned ancestor's repo" ); }
 
 #[test]
@@ -90,7 +90,7 @@ fn non_vognode_ancestor_is_skipped () {
   let map = owned_ancestor_skgrepos_for_foreign_vognodes (
     & build_forest (), & config );
   assert_eq! ( map . get (& ID::from ("S")),
-               Some (& SkgRepoName::from ("owned1")),
+               Some (& SkgrepoName::from ("owned1")),
     "a non-vognode between an owned ancestor and a foreign node is skipped" ); }
 
 /// A fork-to-be (clone) with an edited title over the original N it
@@ -100,11 +100,11 @@ fn fork_spec_n_edited (
 ) -> ForkSpec {
   let buffer_node : Graphnode = Graphnode {
     title        : "N-edited" . to_string (),
-    home_skgrepo : SkgRepoName::from ("foreign"),
+    home_skgrepo : SkgrepoName::from ("foreign"),
     pid          : ID::from ("N"),
     .. empty_graphnode () };
   build_fork_clone (
-    & buffer_node, "N-original", &[], SkgRepoName::from ("owned2"),
+    & buffer_node, "N-original", &[], SkgrepoName::from ("owned2"),
     skgrepo_confirmed ) }
 
 #[test]
@@ -114,16 +114,16 @@ fn fork_clone_hides_children_the_edit_deleted () {
   // unintegrated subscribed content the user just dismissed.
   let buffer_node : Graphnode = Graphnode {
     title        : "N-edited" . to_string (),
-    home_skgrepo : SkgRepoName::from ("foreign"),
+    home_skgrepo : SkgrepoName::from ("foreign"),
     pid          : ID::from ("N"),
     contains     : rel_partners_at_relRepo (
-      & SkgRepoName::from ("foreign"),
+      & SkgrepoName::from ("foreign"),
       vec! [ ID::from ("N1") ] ),
     .. empty_graphnode () };
   let spec : ForkSpec = build_fork_clone (
     & buffer_node, "N-original",
     & [ ID::from ("N1"), ID::from ("N2") ],
-    SkgRepoName::from ("owned2"), false );
+    SkgrepoName::from ("owned2"), false );
   assert_eq! (
     members_of (
       spec . clone . 0 . hidesFromSubs . or_default () ),
@@ -198,12 +198,12 @@ fn fork_clone_preserves_only_the_search_matching_flag () {
     if no_search_matching {
       flags . insert (1, Flag::NoSearchMatching); }
     let buffer_node : Graphnode = Graphnode {
-      home_skgrepo : SkgRepoName::from ("foreign"),
+      home_skgrepo : SkgrepoName::from ("foreign"),
       pid          : ID::from ("N"),
       flags,
       .. empty_graphnode () };
     let spec : ForkSpec = build_fork_clone (
-      &buffer_node, "N", &[], SkgRepoName::from ("owned2"), false );
+      &buffer_node, "N", &[], SkgrepoName::from ("owned2"), false );
     assert_eq! (
       spec . clone . 0 . flags,
       if no_search_matching { vec![Flag::NoSearchMatching] }

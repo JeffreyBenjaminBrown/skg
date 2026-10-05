@@ -7,7 +7,7 @@ use skg::save::{update_graph_including_nodeMerges,
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores,
                       tantivy_contains_skgid};
 use skg::types::env::new_mutation_gate;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex, SkgRepoName};
+use skg::types::misc::{ID, SkgConfig, TantivyIndex, SkgrepoName};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, DeleteNode, NodeMerge, SaveNode};
 
@@ -44,7 +44,7 @@ async fn exercise_second_phase_preflight (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let before_graph : Arc<InRustGraph> = graph . load_full ();
-  let ordinary_path : PathBuf = config . skgrepos [&SkgRepoName::from ("main")]
+  let ordinary_path : PathBuf = config . skgrepos [&SkgrepoName::from ("main")]
     . path . join ("ordinary.skg");
   let before_bytes : Vec<u8> = fs::read (&ordinary_path) ?;
   let mut ordinary : Graphnode =
@@ -62,7 +62,7 @@ async fn exercise_second_phase_preflight (
     acquiree_text_preserver : SaveNode (preserver),
     updated_acquirer        : SaveNode (foreign_acquirer),
     acquiree_to_delete      : DeleteNode {
-      skgid : ID::from ("acquiree"), home_skgrepo : SkgRepoName::from ("main"),
+      skgid : ID::from ("acquiree"), home_skgrepo : SkgrepoName::from ("main"),
     },
   };
   let result = update_graph_including_nodeMerges (
@@ -81,7 +81,7 @@ async fn exercise_rejected_merge_override (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let before_graph : Arc<InRustGraph> = graph . load_full ();
-  let skgrepo_path : &PathBuf = &config . skgrepos [&SkgRepoName::from ("main")] . path;
+  let skgrepo_path : &PathBuf = &config . skgrepos [&SkgrepoName::from ("main")] . path;
   let paths : Vec<PathBuf> = ["N1.skg", "N2.skg", "R1.skg", "R2.skg"]
     . iter () . map (|name| skgrepo_path . join (name)) . collect ();
   let before_bytes : Vec<Vec<u8>> = paths . iter ()
@@ -97,7 +97,7 @@ async fn exercise_rejected_merge_override (
     acquiree_text_preserver : SaveNode (preserver),
     updated_acquirer        : SaveNode (n1),
     acquiree_to_delete      : DeleteNode {
-      skgid : ID::from ("N2"), home_skgrepo : SkgRepoName::from ("main"),
+      skgid : ID::from ("N2"), home_skgrepo : SkgrepoName::from ("main"),
     },
   };
   let result : Result<Option<TantivyIndex>, Box<dyn Error>> = merge_nodes (
@@ -124,7 +124,7 @@ async fn exercise_rejected_revocation (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let before_graph : Arc<InRustGraph> = graph . load_full ();
-  let path : PathBuf = config . skgrepos [&SkgRepoName::from ("main")] . path
+  let path : PathBuf = config . skgrepos [&SkgrepoName::from ("main")] . path
     . join ("P.skg");
   let before_bytes : Vec<u8> = fs::read (&path) ?;
   let before_search : bool = tantivy_contains_skgid (tantivy, "P", "P") ?;

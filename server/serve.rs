@@ -46,7 +46,7 @@ use crate::types::errors::BufferValidationError;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::skgrepo_sets::apply_skgrepo_set_to_viewforest;
 use crate::types::maybe_placed_viewnode::{MpViewnode,maybePlaced_to_placed_tree};
-use crate::types::misc::SkgRepoSetName;
+use crate::types::misc::SkgrepoSetName;
 use crate::types::viewnode::Viewnode;
 use crate::types::views_state::{OpenViews, ViewId};
 use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
@@ -110,7 +110,7 @@ fn handle_emacs (
           "failed to initialize skgrepo restriction; falling back to all");
         SkgrepoRestriction::named (
           &runtime . config,
-          SkgRepoSetName::from ("all"))
+          SkgrepoSetName::from ("all"))
         . expect ("reserved repo-set all should always resolve") });
 
   let enrichment_slot // To update search results once the 'enrichment' (containerward role trees + graphnodestats) has been computed.
@@ -239,7 +239,7 @@ fn handle_emacs (
           Ok (RequestType::FlagState) =>
             handle_flag_state_request (
               &mut stream, &request_header, &env ),
-          Ok (RequestType::ListSkgRepoSets)
+          Ok (RequestType::ListSkgrepoSets)
           | Ok (RequestType::SkgrepoRestriction)
           | Ok (RequestType::SetSkgrepoRestriction) =>
             handle_skgrepo_set_request (

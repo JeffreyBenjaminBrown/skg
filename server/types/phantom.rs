@@ -8,17 +8,17 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use super::git::{NodeAxes, RelationshipAxes, GraphnodeDiff, Sign, SkgRepoDiff, node_axes_in_skgrepo_diff};
+use super::git::{NodeAxes, RelationshipAxes, GraphnodeDiff, Sign, SkgrepoDiff, node_axes_in_skgrepo_diff};
 use super::list::Diff_Item;
-use super::misc::{ID, SkgConfig, SkgRepo, SkgRepoName};
+use super::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
 
 /// Unified title lookup for phantom nodes.
 /// Lookup order: repo_diffs deleted_nodes → in-Rust graph/disk → fallback.
 pub fn title_for_phantom (
   graph         : &InRustGraph,
   skgid         : &ID,
-  skgrepo       : &SkgRepoName,
-  skgrepo_diffs : Option<&HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo       : &SkgrepoName,
+  skgrepo_diffs : Option<&HashMap<SkgrepoName, SkgrepoDiff>>,
   config        : &SkgConfig,
 ) -> String {
   skgrepo_diffs
@@ -45,11 +45,11 @@ pub fn title_for_phantom (
 /// then removed unstaged).
 pub fn phantom_axes (
   child_skgid    : &ID,
-  child_skgrepo  : &SkgRepoName,
+  child_skgrepo  : &SkgrepoName,
   parent_skgid   : &ID,
-  parent_skgrepo : &SkgRepoName,
+  parent_skgrepo : &SkgrepoName,
   relation       : NodeRelation, // the relation the caller's folder represents
-  skgrepo_diffs  : Option<&HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs  : Option<&HashMap<SkgrepoName, SkgrepoDiff>>,
 ) -> (NodeAxes, RelationshipAxes) {
   // Node axes: the child's own file-level status in each stage.
   let child_file : PathBuf =
@@ -67,7 +67,7 @@ pub fn phantom_axes (
   // ID in two relations, changed in different stages).
   let parent_file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", parent_skgid . 0 ) );
-  let parent_sd : Option<&SkgRepoDiff> =
+  let parent_sd : Option<&SkgrepoDiff> =
     skgrepo_diffs . and_then ( |d| d . get (parent_skgrepo) );
   let sign_from_parent_stage =
     | stage_map : &HashMap<PathBuf, GraphnodeDiff> | -> Option<Sign> {
@@ -119,14 +119,14 @@ pub fn phantom_axes (
 pub fn home_from_disk (
   skgid     : &ID,
   config : &SkgConfig,
-) -> Option<SkgRepoName> {
+) -> Option<SkgrepoName> {
   let filename : String = format!( "{}.skg", skgid . 0 );
-  let ordered_skgrepos : Vec<SkgRepoName> = config . ordered_skgrepos ();
+  let ordered_skgrepos : Vec<SkgrepoName> = config . ordered_skgrepos ();
   for owned_only in [true, false] {
     for skgrepo_name in &ordered_skgrepos {
       if config . skgrepo_is_owned (skgrepo_name) != owned_only {
         continue; }
-      let Some (skgrepo_config) : Option<&SkgRepo> =
+      let Some (skgrepo_config) : Option<&Skgrepo> =
         config . skgrepos . get (skgrepo_name) else { continue; };
       let path : PathBuf =
         PathBuf::from( &skgrepo_config . path ) . join (&filename);

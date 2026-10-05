@@ -9,7 +9,7 @@ use tempfile::TempDir;
 use skg::git_ops::find_and_stage_moves::stage_moves_script;
 use skg::git_ops::read_gitrepo::{ head_is_merge_commit, get_file_content_at_head };
 use skg::types::list::{compute_interleaved_diff, Diff_Item};
-use skg::types::misc::{ SkgConfig, SkgRepo, SkgRepoName };
+use skg::types::misc::{ SkgConfig, Skgrepo, SkgrepoName };
 
 fn setup_gitrepo() -> (TempDir, Repository) {
   let dir : TempDir =
@@ -116,9 +116,9 @@ fn commit_file (
 fn mk_skgrepo (
   name : &str,
   path : PathBuf,
-) -> SkgRepo {
-  SkgRepo {
-    name         : SkgRepoName::from (name),
+) -> Skgrepo {
+  Skgrepo {
+    name         : SkgrepoName::from (name),
     abbreviation : None,
     path,
     owned : true } }
@@ -130,14 +130,14 @@ fn config_from_subdirs (
   root : &Path,
   names : &[&str],
 ) -> SkgConfig {
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
     HashMap::new();
   for name in names {
     skgrepos . insert (
-      SkgRepoName::from (*name),
+      SkgrepoName::from (*name),
       mk_skgrepo ( name, root . join (name) ) ); }
   let mut config : SkgConfig =
-    SkgConfig::dummyFromSkgRepos (skgrepos);
+    SkgConfig::dummyFromSkgrepos (skgrepos);
   config . data_root = root . to_path_buf();
   config }
 

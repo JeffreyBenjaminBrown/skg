@@ -64,7 +64,7 @@ pub fn find_buffer_errors_for_saving_in_graph (
           BufferValidationError::Multiple_Defining_Viewnodes (skgid)); }
       for (skgid, skgrepos) in inconsistent_skgrepo_skgids {
         errors . push(
-          BufferValidationError::InconsistentSkgRepos(skgid, skgrepos));
+          BufferValidationError::InconsistentSkgrepos(skgid, skgrepos));
       }} }
   { // merge validation
     for error_msg in {

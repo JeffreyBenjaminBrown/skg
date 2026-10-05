@@ -13,7 +13,7 @@ pub mod subscribee_folder;
 pub mod view_requests;
 
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, SkgRepoName};
+use crate::types::misc::{ID, SkgrepoName};
 
 /// TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: rendering omits EVERY
 /// restricted member from goal lists (no placeholders are created).  A
@@ -27,7 +27,7 @@ use crate::types::misc::{ID, SkgRepoName};
 pub fn omit_restricted_members (
   goal     : Vec<ID>,
   restriction : Option<&SkgrepoRestriction>,
-  resolve  : impl Fn (&ID) -> Option<SkgRepoName>,
+  resolve  : impl Fn (&ID) -> Option<SkgrepoName>,
 ) -> Vec<ID> {
   match restriction . filter ( |a| ! a . is_all () ) {
     None => goal,

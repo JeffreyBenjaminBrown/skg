@@ -8,7 +8,7 @@ use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::viewnode::AffectsParent;
 use crate::types::viewnode::{Editability, PropertyFolder, Property};
-use crate::types::misc::{ID, SkgRepoName};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -57,7 +57,7 @@ pub fn add_missing_info_to_viewforest_in_graph(
 ) -> Result<EnrichmentProvenance, Box<dyn Error>> {
   let root_skgid : NodeId = viewforest . internal_root_skgid ();
   replace_ids_with_pids (viewforest, root_skgid, graph);
-  let skgrepo_of_skgid : HashMap<ID, SkgRepoName> =
+  let skgrepo_of_skgid : HashMap<ID, SkgrepoName> =
     skgrepos_for_repoless_ided_nodes_from_graph (viewforest, graph);
   finish_missing_info_enrichment (viewforest, root_skgid, &skgrepo_of_skgid)
 }
@@ -65,7 +65,7 @@ pub fn add_missing_info_to_viewforest_in_graph(
 fn finish_missing_info_enrichment(
   viewforest       : &mut MpViewForest,
   root_skgid       : NodeId,
-  skgrepo_of_skgid : &HashMap<ID, SkgRepoName>,
+  skgrepo_of_skgid : &HashMap<ID, SkgrepoName>,
 ) -> Result<EnrichmentProvenance, Box<dyn Error>> {
   let mut provenance : EnrichmentProvenance =
     EnrichmentProvenance {
@@ -159,7 +159,7 @@ fn inherit_parent_skgrepo_if_possible(
         => t . home_skgrepo . is_none(),
       _ => false, };
   if needs_skgrepo {
-    let parent_skgrepo : Option<SkgRepoName> =
+    let parent_skgrepo : Option<SkgrepoName> =
       node . parent() . and_then(|mut p| {
         match &p . value() . kind {
           MpViewnodeKind::Vognode (MpVognode::Unrestricted (pt))
@@ -180,7 +180,7 @@ fn inherit_parent_skgrepo_if_possible(
 fn skgrepos_for_repoless_ided_nodes_from_graph (
   viewforest : &MpViewForest,
   graph      : &InRustGraph,
-) -> HashMap<ID, SkgRepoName> {
+) -> HashMap<ID, SkgrepoName> {
   let mut skgids : HashSet<ID> = HashSet::new ();
   collect_repoless_unrestricted_skgids (viewforest . root (), &mut skgids);
   skgids . into_iter ()
@@ -215,14 +215,14 @@ fn collect_repoless_unrestricted_skgids (
 /// sharing an id with a write-protected one is never filled.
 fn fill_skgrepo_from_graph_map (
   node             : &mut NodeMut<MpViewnode>,
-  skgrepo_of_skgid : &HashMap<ID, SkgRepoName>,
+  skgrepo_of_skgid : &HashMap<ID, SkgrepoName>,
 ) {
   if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
     = &mut node . value () . kind
   { if t . home_skgrepo . is_some ()
        || ! matches! ( t . editability, Editability::WriteProtected )
     { return; }
-    let resolved : Option<SkgRepoName> =
+    let resolved : Option<SkgrepoName> =
       t . skgid . as_ref ()
       . and_then ( |skgid| skgrepo_of_skgid . get (skgid) . cloned () );
     if let Some (skgrepo) = resolved {

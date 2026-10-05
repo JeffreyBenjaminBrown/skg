@@ -62,7 +62,7 @@ mod tests {
   use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
   use crate::org_to_text::viewforest_to_string;
   use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
-  use crate::types::misc::{SkgRepoName, SkgRepo};
+  use crate::types::misc::{SkgrepoName, Skgrepo};
   use crate::types::nodes::complete::empty_graphnode;
   use crate::types::viewnode::mk_editable_viewnode;
   use std::collections::HashMap;
@@ -70,16 +70,16 @@ mod tests {
   use indoc::indoc;
 
   fn config () -> SkgConfig {
-    let skgrepo = SkgRepoName::from ("main");
-    SkgConfig::fromSkgReposAndTantivyFolder (HashMap::from ([
-      (skgrepo . clone (), SkgRepo {
+    let skgrepo = SkgrepoName::from ("main");
+    SkgConfig::fromSkgreposAndTantivyFolder (HashMap::from ([
+      (skgrepo . clone (), Skgrepo {
         name: skgrepo, abbreviation: None, path: PathBuf::from ("main"),
         owned: true })]), "/tmp/none")
   }
 
   #[test]
   fn builder_emits_true_viewnodes_in_registry_order_and_keeps_empty_folder () {
-    let skgrepo = SkgRepoName::from ("main");
+    let skgrepo = SkgrepoName::from ("main");
     let rich = Graphnode {
       pid: ID::from ("rich"), title: "Rich" . to_string (),
       home_skgrepo: skgrepo . clone (),

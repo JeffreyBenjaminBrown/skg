@@ -31,8 +31,8 @@ too, but they need not be.
 
 In prose, always say "skgrepo" or "gitrepo", never a bare "repo", so the
 two cannot be confused. ("relRepo" is a single coined term, so it keeps
-the short form.) Code says 'skgrepo' and 'gitrepo' too ('SkgRepoName',
-'home_skgrepo'); a skgrepo's config entry is the 'SkgRepo' type.
+the short form.) Code says 'skgrepo' and 'gitrepo' too ('SkgrepoName',
+'home_skgrepo'); a skgrepo's config entry is the 'Skgrepo' type.
 
 The *skgrepo restriction* ('SkgrepoRestriction') is the skgrepo-set a
 connection currently shows; the skgrepo-set =all= means no

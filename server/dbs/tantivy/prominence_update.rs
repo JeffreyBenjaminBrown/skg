@@ -9,7 +9,7 @@
 use crate::consts::{TANTIVY_PER_ID_LOOKUP_LIMIT, TANTIVY_WRITER_BUFFER_BYTES};
 use crate::dbs::tantivy::background_writer::lock_tantivy_writes;
 use crate::dbs::tantivy::write::tantivy_commit_with_status;
-use crate::types::misc::{ID, SkgRepoName, TantivyIndex};
+use crate::types::misc::{ID, SkgrepoName, TantivyIndex};
 
 use tantivy::{IndexWriter, Searcher, Term, TantivyDocument, doc};
 use tantivy::collector::TopDocs;
@@ -63,7 +63,7 @@ pub fn update_prominence_sources (
           . get_first ( tantivy_index . raw_title_field )
           . and_then ( |v| v . as_str () )
           . unwrap_or ("") . to_string ();
-      let skgrepo : SkgRepoName =
+      let skgrepo : SkgrepoName =
         retrieved_doc
           . get_first ( tantivy_index . skgrepo_field )
           . and_then ( |v| v . as_str () )

@@ -517,7 +517,7 @@ fn viewstats_atoms () -> Vec<&'static str> {
   fn guard ( v : ViewnodeStats ) {
     let ViewnodeStats {
       cycle : _,
-      homeSkgRepoAtBoundary : _, // -> the homeRepoHerald atom
+      homeSkgrepoAtBoundary : _, // -> the homeRepoHerald atom
       rel_heralds : _,      // -> the node-level rels atom (semantic sexp)
       overridesHere : _,    // keyed form (a viewStats sub-form)
       omitted_body : _,      // -> the node-level omittedBody atom

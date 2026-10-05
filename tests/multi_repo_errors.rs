@@ -78,11 +78,11 @@ fn test_multi_skgrepo_errors() -> Result<(), Box<dyn Error>> {
     { let inconsistent_skgrepo_errors: Vec<&BufferValidationError>
       = ( errors . iter()
           . filter(
-            |e| matches!(e, BufferValidationError::InconsistentSkgRepos(_, _)))
+            |e| matches!(e, BufferValidationError::InconsistentSkgrepos(_, _)))
           . collect() );
       assert_eq!(inconsistent_skgrepo_errors . len(), 1,
                  "Expected exactly 1 InconsistentRepos error for priv-1");
-      if let BufferValidationError::InconsistentSkgRepos(skgid, skgrepos) = inconsistent_skgrepo_errors[0] {
+      if let BufferValidationError::InconsistentSkgrepos(skgid, skgrepos) = inconsistent_skgrepo_errors[0] {
         assert_eq!(skgid . 0, "priv-1", "InconsistentRepos should be for priv-1");
         assert_eq!(skgrepos . len(), 2, "Should have 2 different repos for priv-1"); }}
 
@@ -312,7 +312,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
           SaveError::BufferValidationErrors { errors, .. } => {
             // Should contain InconsistentRepos error
             let skgrepo_errors: Vec<&BufferValidationError> = errors . iter()
-              . filter(|e| matches!(e, BufferValidationError::InconsistentSkgRepos(_, _)))
+              . filter(|e| matches!(e, BufferValidationError::InconsistentSkgrepos(_, _)))
               . collect();
             assert!(!skgrepo_errors . is_empty(),
                     "Expected InconsistentRepos error in validation");

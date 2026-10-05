@@ -4,7 +4,7 @@
 use super::{strip_body_whitespace_on_disk,
             strip_trailing_whitespace_from_body};
 use crate::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo;
-use crate::types::misc::{ID, SkgConfig, SkgRepo, SkgRepoName};
+use crate::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 
 use std::collections::{HashMap, HashSet};
@@ -55,18 +55,18 @@ fn strips_on_disk_only_where_needed () {
   let foreign_bytes_before : Vec<u8> =
     fs::read ( foreign_dir . join ("theirs.skg") ) . unwrap ();
   let config : SkgConfig = {
-    let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+    let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
       HashMap::new ();
     for (name, dir, owns) in [ ("owned",   &owned_dir,   true),
                                ("foreign", &foreign_dir, false) ] {
       skgrepos . insert (
-        SkgRepoName::from (name),
-        SkgRepo {
-          name         : SkgRepoName::from (name),
+        SkgrepoName::from (name),
+        Skgrepo {
+          name         : SkgrepoName::from (name),
           abbreviation : None,
           path         : dir . clone (),
           owned        : owns, } ); }
-    SkgConfig::fromSkgReposAndTantivyFolder (
+    SkgConfig::fromSkgreposAndTantivyFolder (
       skgrepos,
       & tmp . path () . join ("tantivy") . to_string_lossy () ) };
   let (all_nodes, changed) : (Vec<Graphnode>, Vec<Graphnode>) =
@@ -79,7 +79,7 @@ fn strips_on_disk_only_where_needed () {
                  HashSet::from ([ "dirty", "blank" ]) ); }
   let from_disk = |pid : &str, skgrepo : &str| -> Graphnode {
     graphnode_from_pid_and_skgrepo (
-      &config, ID::from (pid), & SkgRepoName::from (skgrepo)
+      &config, ID::from (pid), & SkgrepoName::from (skgrepo)
     ) . unwrap () };
   assert_eq! ( from_disk ("dirty", "owned") . body,
                Some ( "one\ntwo" . to_string () ));

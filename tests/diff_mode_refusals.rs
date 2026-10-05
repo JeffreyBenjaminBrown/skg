@@ -23,7 +23,7 @@ use skg::serve::handlers::rerender_all_views::handle_git_diff_toggle_and_rerende
 use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
 use skg::serve::handlers::text_search::SearchEnrichmentPayload;
 use skg::skgrepo_sets::{
-  SkgrepoRestriction, SkgRepoSetName};
+  SkgrepoRestriction, SkgrepoSetName};
 use skg::test_utils::{graph_handle_from_config, read_lp_message,
                       skg_env_from_parts};
 use skg::test_utils::run_with_shared_test_stores;
@@ -111,10 +111,10 @@ async fn toggle_refused_under_restricted_set_and_allowed_at_all (
         messages };
       let restricted : SkgrepoRestriction =
         SkgrepoRestriction::named (
-          config, SkgRepoSetName::from ("public"))?;
+          config, SkgrepoSetName::from ("public"))?;
       let all : SkgrepoRestriction =
         SkgrepoRestriction::named (
-          config, SkgRepoSetName::from ("all"))?;
+          config, SkgrepoSetName::from ("all"))?;
       { // Enabling under a restricted set is refused: refusal text
         // in the normal first message, the empty stream after, and
         // the flag unchanged.
@@ -188,7 +188,7 @@ async fn switch_refusals_take_the_unwinding_shape (
           open_views        : OpenViews::new (), };
       let mut restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
-          config, SkgRepoSetName::from ("all"))?;
+          config, SkgrepoSetName::from ("all"))?;
       let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
         Arc::new (Mutex::new (Some (SearchEnrichmentPayload {
           runtime        : env . runtime_snapshot (),
@@ -219,7 +219,7 @@ async fn switch_refusals_take_the_unwinding_shape (
                   "{}", messages [1] );
         assert! ( messages [2] . contains ("rerender-done"),
                   "{}", messages [2] );
-        assert_eq! ( restriction . name, SkgRepoSetName::from ("all"),
+        assert_eq! ( restriction . name, SkgrepoSetName::from ("all"),
           "a refused switch changes nothing" );
         assert! ( enrichment_slot . lock () . unwrap () . is_some (),
           "a refused switch does not cancel search enrichment" );
@@ -232,7 +232,7 @@ async fn switch_refusals_take_the_unwinding_shape (
                   &request_to ("all"));
         assert! ( messages [0] . contains ("Skgrepo restriction: all"),
                   "{}", messages [0] );
-        assert_eq! ( restriction . name, SkgRepoSetName::from ("all") ); }
+        assert_eq! ( restriction . name, SkgrepoSetName::from ("all") ); }
       { // The ride-along: an unknown set name answers in the same
         // unwinding shape (the old response-type "error" reply left
         // Emacs wedged: guard set, all buffers locked, no handler).
@@ -251,14 +251,14 @@ async fn switch_refusals_take_the_unwinding_shape (
                   "{}", messages [1] );
         assert! ( messages [2] . contains ("rerender-done"),
                   "{}", messages [2] );
-        assert_eq! ( restriction . name, SkgRepoSetName::from ("all") ); }
+        assert_eq! ( restriction . name, SkgrepoSetName::from ("all") ); }
       { // Restricted-to-restricted switching with diff mode off is
         // unaffected by the refusals.
         let _ : Vec<String> =
           switch (&mut views_state, &mut restriction,
                   &enrichment_slot, &search_cancelled,
                   &request_to ("public"));
-        assert_eq! ( restriction . name, SkgRepoSetName::from ("public") );
+        assert_eq! ( restriction . name, SkgrepoSetName::from ("public") );
         let messages : Vec<String> =
           switch (&mut views_state, &mut restriction,
                   &enrichment_slot, &search_cancelled,
@@ -267,7 +267,7 @@ async fn switch_refusals_take_the_unwinding_shape (
                     "Skgrepo restriction: private"),
                   "{}", messages [0] );
         assert_eq! ( restriction . name,
-                     SkgRepoSetName::from ("private") ); }
+                     SkgrepoSetName::from ("private") ); }
       Ok (( )) }
 
 async fn refusal_first_messages_parse_and_read_as_documented (
@@ -287,7 +287,7 @@ async fn refusal_first_messages_parse_and_read_as_documented (
           open_views        : OpenViews::new (), };
       let restricted : SkgrepoRestriction =
         SkgrepoRestriction::named (
-          config, SkgRepoSetName::from ("public"))?;
+          config, SkgrepoSetName::from ("public"))?;
       let (mut server, client) =
         connected_tcp_stream_pair ()?;
       std::thread::scope ( |scope| {

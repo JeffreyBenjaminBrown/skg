@@ -434,7 +434,7 @@ fn skgrepos_not_tracked_in_git (
 #[cfg(test)]
 mod tests {
   use super::view_can_display_absent_reference_change;
-  use crate::types::misc::{ID, SkgRepoName};
+  use crate::types::misc::{ID, SkgrepoName};
   use crate::types::tree::forest::ViewForest;
   use crate::types::viewnode::{mk_editable_viewnode, mk_unknown_viewnode};
   use std::collections::HashSet;
@@ -444,7 +444,7 @@ mod tests {
   fn unrestricted_view (pid : &str) -> ViewForest {
     let mut view : ViewForest = ViewForest::new ();
     view . append_root (mk_editable_viewnode (
-      skgid (pid), SkgRepoName::from ("main"), pid . to_string (), None ));
+      skgid (pid), SkgrepoName::from ("main"), pid . to_string (), None ));
     view
   }
 

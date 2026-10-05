@@ -5,21 +5,21 @@
 use skg::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, FieldIntentsForOneId, FieldIntent,
   SubscribeeTextClaim, SubscribeeVisibility };
-use skg::types::misc::{ID, SkgRepoName};
+use skg::types::misc::{ID, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 
 fn title_intent (
   title : &str,
 ) -> FieldIntent {
   FieldIntent::SetTitleAndBody {
-    skgrepo : SkgRepoName::from ("main"),
+    skgrepo : SkgrepoName::from ("main"),
     title   : title . to_string(),
     body    : None } }
 
 fn delete_intent (
 ) -> FieldIntent {
   FieldIntent::Delete {
-    skgrepo : SkgRepoName::from ("main") } }
+    skgrepo : SkgrepoName::from ("main") } }
 
 #[test]
 fn exclusive_slot_rules () {

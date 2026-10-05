@@ -1,11 +1,11 @@
-use crate::from_text::fork::{CloneSkgRepoInputs, fork_spec_from_buffer_node};
+use crate::from_text::fork::{CloneSkgrepoInputs, fork_spec_from_buffer_node};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::dbs::node_lookup::opt_graphnode_by_skgid;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, SkgRepoName, members_of};
-use crate::types::save::{NodeInstruction, SaveNode, DeleteNode, ForkSpec, NodeMerge, SkgRepoMove};
+  ID, MSV, RelPartner, SkgConfig, SkgrepoName, members_of};
+use crate::types::save::{NodeInstruction, SaveNode, DeleteNode, ForkSpec, NodeMerge, SkgrepoMove};
 use crate::types::nodes::complete::Graphnode;
 
 use std::collections::{HashMap, HashSet};
@@ -35,7 +35,7 @@ pub fn validate_and_filter_foreign_instructions(
   instructions       : Vec<NodeInstruction>,
   nodeMerge_instructions : &[NodeMerge],
   graph              : &InRustGraph,
-  clone_skgrepo_inputs : &CloneSkgRepoInputs, // everything clone-repo resolution can draw on, in priority order
+  clone_skgrepo_inputs : &CloneSkgrepoInputs, // everything clone-repo resolution can draw on, in priority order
   adopt_clone_skgrepo : &HashMap<ID, ID>, // new node -> forked N whose clone's repo it adopts (see 'new_foreign_nodes_adopting_clone_repos')
   config             : &SkgConfig,
 ) -> Result<(Vec<NodeInstruction>, Vec<ForkSpec>),
@@ -91,7 +91,7 @@ enum ForeignPolicyOutcome {
   DropUnchangedForeignSave, // Safe to drop because the buffer expresses no change from disk.
   ForkCandidate(Graphnode, // An edited foreign node: clone it (the buffer node N becomes the clone's template). Dropped from the NodeInstructions; a ForkSpec is collected instead.
                Graphnode), // N's DISK node -- the original, before the user's edit. Its title feeds the confirmation buffer's child line (which shows the original honestly, distinct from the clone's edited title); its contains feed the clone's creation-time hides (children the forking edit deleted).
-  AdoptCloneSkgRepo(ID), // A NEW node (bare headline) whose foreign skgrepo was inherited from the named forked node N: kept, but rewritten to N's clone's skgrepo once the ForkSpecs exist ('finalize_foreign_policy_instructions').
+  AdoptCloneSkgrepo(ID), // A NEW node (bare headline) whose foreign skgrepo was inherited from the named forked node N: kept, but rewritten to N's clone's skgrepo once the ForkSpecs exist ('finalize_foreign_policy_instructions').
   Reject(BufferValidationError), // Must reject before persistence.
 }
 
@@ -145,7 +145,7 @@ fn apply_foreign_policy(
           // headline whose foreign skgrepo was merely inherited from a
           // forked parent: that one adopts the parent's clone's skgrepo.
           if let Some (forked) = adopt_clone_skgrepo . get (&node . pid) {
-            Ok (ForeignPolicyOutcome::AdoptCloneSkgRepo(
+            Ok (ForeignPolicyOutcome::AdoptCloneSkgrepo(
               forked . clone() ))
           } else {
             Ok (ForeignPolicyOutcome::Reject(
@@ -189,8 +189,8 @@ fn finalize_foreign_policy_instructions(
       ForeignPolicyOutcome::DropUnchangedForeignSave
         | ForeignPolicyOutcome::ForkCandidate (..) =>
         {},
-      ForeignPolicyOutcome::AdoptCloneSkgRepo (forked) => {
-        let clone_skgrepo : Option<&SkgRepoName> =
+      ForeignPolicyOutcome::AdoptCloneSkgrepo (forked) => {
+        let clone_skgrepo : Option<&SkgrepoName> =
           fork_specs . iter()
           . find ( |spec| spec . original_skgid == *forked )
           . map ( |spec| & spec . clone . 0 . home_skgrepo );
@@ -224,12 +224,12 @@ fn finalize_foreign_policy_instructions(
 /// relRepo equals the inherited home are part of this implicit adoption.
 fn rehome_inherited_new_node (
   node        : &mut Graphnode,
-  new_skgrepo : &SkgRepoName,
+  new_skgrepo : &SkgrepoName,
 ) {
   fn retag<T> (
     members     : &mut [RelPartner<T>],
-    old_skgrepo : &SkgRepoName,
-    new_skgrepo : &SkgRepoName,
+    old_skgrepo : &SkgrepoName,
+    new_skgrepo : &SkgrepoName,
   ) {
     for member in members {
       if member . relRepo == *old_skgrepo {
@@ -237,13 +237,13 @@ fn rehome_inherited_new_node (
 
   fn retag_msv<T> (
     members     : &mut MSV<RelPartner<T>>,
-    old_skgrepo : &SkgRepoName,
-    new_skgrepo : &SkgRepoName,
+    old_skgrepo : &SkgrepoName,
+    new_skgrepo : &SkgrepoName,
   ) {
     if let MSV::Specified (members) = members {
       retag (members, old_skgrepo, new_skgrepo); }}
 
-  let old_skgrepo : SkgRepoName = node . home_skgrepo . clone ();
+  let old_skgrepo : SkgrepoName = node . home_skgrepo . clone ();
   node . home_skgrepo = new_skgrepo . clone ();
   retag (&mut node . contains, &old_skgrepo, new_skgrepo);
   retag_msv (&mut node . aliases, &old_skgrepo, new_skgrepo);
@@ -255,7 +255,7 @@ fn rehome_inherited_new_node (
 
 fn skgrepo_is_foreign(
   config: &SkgConfig,
-  skgrepo: &SkgRepoName,
+  skgrepo: &SkgrepoName,
 ) -> bool {
   config . skgrepos . get (skgrepo)
     . map(|s| !s . owned)
@@ -319,7 +319,7 @@ pub(crate) fn flatten_ms<T: Clone>(
 /// NodeInstructions, while merge acquiree/acquirer ids come from merge
 /// requests in the "placed" (i.e. no longer "maybePlaced") viewforest.
 pub(super) fn validate_no_simultaneous_move_and_nodeMerge (
-  skgrepo_moves          : &[SkgRepoMove],
+  skgrepo_moves          : &[SkgrepoMove],
   nodeMerge_instructions : &[NodeMerge],
 ) -> Result<(), Vec<BufferValidationError>> {
   if skgrepo_moves . is_empty() || nodeMerge_instructions . is_empty() {
@@ -353,23 +353,23 @@ pub(super) fn validate_no_simultaneous_move_and_nodeMerge (
 /// graph."
 pub fn suppress_writes_to_restricted_nodes (
   node_instructions : Vec<NodeInstruction>,
-  skgrepo_moves : Vec<SkgRepoMove>,
+  skgrepo_moves : Vec<SkgrepoMove>,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-) -> (Vec<NodeInstruction>, Vec<SkgRepoMove>, bool) {
+) -> (Vec<NodeInstruction>, Vec<SkgrepoMove>, bool) {
   let Some (restriction) = skgrepo_restriction else {
     return (node_instructions, skgrepo_moves, false); };
   let mut suppressed : bool = false;
   let node_instructions : Vec<NodeInstruction> =
     node_instructions . into_iter ()
     . filter ( |instruction| {
-        let skgrepo : &SkgRepoName = match instruction {
+        let skgrepo : &SkgrepoName = match instruction {
           NodeInstruction::Save (SaveNode (node)) => &node . home_skgrepo,
           NodeInstruction::Delete (d)             => &d . home_skgrepo };
         let keep : bool = restriction . contains_skgrepo (skgrepo);
         if ! keep { suppressed = true; }
         keep } )
     . collect ();
-  let skgrepo_moves : Vec<SkgRepoMove> =
+  let skgrepo_moves : Vec<SkgrepoMove> =
     skgrepo_moves . into_iter ()
     . filter ( |mv| {
         let keep : bool =

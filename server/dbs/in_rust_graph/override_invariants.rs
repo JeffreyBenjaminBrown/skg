@@ -1,6 +1,6 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::resolve_override;
-use crate::types::misc::{ID, SkgConfig, SkgRepoName, members_of};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 
 use std::collections::{HashMap, HashSet};
 
@@ -17,9 +17,9 @@ pub(crate) struct AffectedOverrideValidation {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OverrideInvariantViolation {
-  UnknownSkgRepo {
+  UnknownSkgrepo {
     node: ID,
-    skgrepo: SkgRepoName },
+    skgrepo: SkgrepoName },
   MultipleOwnedOverriders {
     overridden: ID,
     overriders: Vec<ID> },
@@ -246,14 +246,14 @@ fn owned_overriders_of (
 fn node_is_owned (
   config     : &SkgConfig,
   pid        : &ID,
-  skgrepo    : &SkgRepoName,
+  skgrepo    : &SkgrepoName,
   violations : &mut Vec<OverrideInvariantViolation>,
 ) -> Option<bool> {
   match config . skgrepos . get (skgrepo) {
     Some (skgrepo_config) => Some (skgrepo_config . owned),
     None => {
       violations . push (
-        OverrideInvariantViolation::UnknownSkgRepo {
+        OverrideInvariantViolation::UnknownSkgrepo {
           node: pid . clone (),
           skgrepo: skgrepo . clone (), } );
       None }}}
@@ -276,7 +276,7 @@ pub fn format_override_invariant_violations (
   ];
   for violation in violations {
     match violation {
-      OverrideInvariantViolation::UnknownSkgRepo { node, skgrepo } => {
+      OverrideInvariantViolation::UnknownSkgrepo { node, skgrepo } => {
         lines . push (format!(
           "* node {} has unknown repo {}", node, skgrepo ));
       }

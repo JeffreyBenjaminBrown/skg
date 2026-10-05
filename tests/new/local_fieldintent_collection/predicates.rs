@@ -8,7 +8,7 @@ use skg::from_text::local_fieldintent_collection::predicates::{
   unrestricted_child_counts_as_visible_content,
   member_counts_for_partnerFolder };
 use skg::types::git::Sign;
-use skg::types::misc::{ID, SkgRepoName};
+use skg::types::misc::{ID, SkgrepoName};
 use skg::types::viewnode::{
   default_unrestrictedVognode, NodeEditRequest, Editability, AffectsParent,
   UnrestrictedVognode };
@@ -17,7 +17,7 @@ fn base_unrestrictedVognode (
 ) -> UnrestrictedVognode {
   default_unrestrictedVognode (
     ID::from ("n"),
-    SkgRepoName::from ("main"),
+    SkgrepoName::from ("main"),
     "n" . to_string() ) }
 
 fn with_edit_request (

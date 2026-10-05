@@ -1,7 +1,7 @@
 pub mod parse;
 
 use crate::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, SkgRepo, SkgRepoName,
+  ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName,
   members_msv, rel_partners_at_relRepo_msv};
 use crate::telescope::decompose::{
   DecompositionInput, DecomposedTelescope, decompose_node,
@@ -45,7 +45,7 @@ impl fmt::Display for ImportStats {
 pub fn import_org_roam_directory (
   org_dir    : &Path,
   output_dir : &Path,
-  skgrepo    : &SkgRepoName,
+  skgrepo    : &SkgrepoName,
 ) -> Result<ImportStats, Box<dyn Error>> {
   let org_files : Vec<PathBuf> = org_files_in (org_dir);
   refuse_headlines_inside_blocks (&org_files)?; // before wiping anything
@@ -166,7 +166,7 @@ fn merge_into_existing (
     let newcomer_aliases : MSV<String> = members_msv (&newcomer . aliases);
     let new_aliases : &[String] = newcomer_aliases . or_default();
     if ! new_aliases . is_empty() {
-      let skgrepo : SkgRepoName = existing . home_skgrepo . clone();
+      let skgrepo : SkgrepoName = existing . home_skgrepo . clone();
       let merged : &mut Vec<RelPartner<String>> =
         existing . aliases . ensure_specified();
       for alias in new_aliases {
@@ -192,9 +192,9 @@ fn write_graphnode_to_dir (
     // member relRepo == its home), so the decomposition yields exactly one
     // section. A one-repo config lets the importer use the same
     // checked boundary as the ordinary filesystem writer.
-    let skgrepo_name : SkgRepoName = node . home_skgrepo . clone ();
-    let mut config : SkgConfig = SkgConfig::dummyFromSkgRepos (
-      [ ( skgrepo_name . clone (), SkgRepo {
+    let skgrepo_name : SkgrepoName = node . home_skgrepo . clone ();
+    let mut config : SkgConfig = SkgConfig::dummyFromSkgrepos (
+      [ ( skgrepo_name . clone (), Skgrepo {
             name         : skgrepo_name . clone (),
             abbreviation : None,
             path         : output_dir . to_path_buf (),
@@ -219,7 +219,7 @@ fn write_graphnode_to_dir (
           overrides :
             node . overrides . or_default (), },
         &config ) ?;
-    let (_, node_fs) : (SkgRepoName, GraphnodeOnDisk) =
+    let (_, node_fs) : (SkgrepoName, GraphnodeOnDisk) =
       decomposed . into_sections () . into_iter () . next ()
       . expect ("an imported node has a home section");
     node_fs };

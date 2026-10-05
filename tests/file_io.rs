@@ -13,7 +13,7 @@ use skg::save::update_fs_from_nodeInstructions;
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::nodes::fs::GraphnodeOnDisk;
 use skg::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, SkgRepo, SkgRepoName,
+  ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName,
   rel_partners_at_relRepo_msv,
 };
 use skg::types::save::{NodeInstruction, SaveNode};
@@ -26,10 +26,10 @@ const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
 fn save_filesystem_preparation_writes_normalized_skgids (
 ) -> Result<(), Box<dyn std::error::Error>> {
   let dir : tempfile::TempDir = tempfile::tempdir () ?;
-  let skgrepo : SkgRepoName = SkgRepoName::from ("temp");
-  let config  : SkgConfig = SkgConfig::dummyFromSkgRepos (
+  let skgrepo : SkgrepoName = SkgrepoName::from ("temp");
+  let config  : SkgConfig = SkgConfig::dummyFromSkgrepos (
     std::collections::HashMap::from ([
-    (skgrepo . clone (), SkgRepo {
+    (skgrepo . clone (), Skgrepo {
       name         : skgrepo . clone (),
       abbreviation : None,
       path         : dir . path () . to_path_buf (),
@@ -68,15 +68,15 @@ fn test_node_io() {
 
   // Write the example node to a file
   let mut example : Graphnode = graphnode_example();
-  set_skgrepo_retagging_relRepos ( &mut example, &SkgRepoName::from ("output") );
+  set_skgrepo_retagging_relRepos ( &mut example, &SkgrepoName::from ("output") );
   write_graphnode_to_skgrepo ( &example, &config )
     . unwrap ();
 
   // Read that file, reverse its lists, write to another file
   let read_node : Graphnode = graphnode_from_pid_and_skgrepo (
-    &config, example . pid . clone(), &SkgRepoName::from ("output") ) . unwrap ();
+    &config, example . pid . clone(), &SkgrepoName::from ("output") ) . unwrap ();
   let mut reversed = reverse_some_of_node (&read_node);
-  set_skgrepo_retagging_relRepos ( &mut reversed, &SkgRepoName::from ("output") );
+  set_skgrepo_retagging_relRepos ( &mut reversed, &SkgrepoName::from ("output") );
   reversed . pid = ID::new ("reversed");
 
   write_graphnode_to_skgrepo(&reversed, &config) . unwrap();
@@ -129,8 +129,8 @@ fn verify_body_not_needed() {
     "tests/file_io/fixtures/golden/example.skg",
     "/tmp/file_io_test/example.skg" ) . unwrap();
   let mut node = graphnode_from_pid_and_skgrepo (
-    &config, ID::new ("example"), &SkgRepoName::from ("output") ) . unwrap();
-  set_skgrepo_retagging_relRepos ( &mut node, &SkgRepoName::from ("output") );
+    &config, ID::new ("example"), &SkgrepoName::from ("output") ) . unwrap();
+  set_skgrepo_retagging_relRepos ( &mut node, &SkgrepoName::from ("output") );
   node . body = None; // mutate it
   node . pid = ID::new ("no_unindexed"); // match pid to filename
   write_graphnode_to_skgrepo(
@@ -188,7 +188,7 @@ pub fn reverse_some_of_node(node: &Graphnode) -> Graphnode {
 #[test]
 fn test_links_extracted_during_read() -> std::io::Result<()> {
   use std::collections::HashMap;
-  use skg::types::misc::SkgRepo;
+  use skg::types::misc::Skgrepo;
   use tempfile::tempdir;
 
   // Create a temporary directory
@@ -196,18 +196,18 @@ fn test_links_extracted_during_read() -> std::io::Result<()> {
 
   // Create a config with the temp directory as a skgrepo
   let config: SkgConfig = {
-    let mut skgrepos: HashMap<SkgRepoName, SkgRepo> = HashMap::new();
-    skgrepos . insert(SkgRepoName::from ("temp"), SkgRepo {
-      name: SkgRepoName::from ("temp"),
+    let mut skgrepos: HashMap<SkgrepoName, Skgrepo> = HashMap::new();
+    skgrepos . insert(SkgrepoName::from ("temp"), Skgrepo {
+      name: SkgrepoName::from ("temp"),
         abbreviation: None,
       path: dir . path() . to_path_buf(),
       owned: true, });
-    SkgConfig::dummyFromSkgRepos (skgrepos) };
+    SkgConfig::dummyFromSkgrepos (skgrepos) };
 
   let mut test_node : Graphnode = empty_graphnode ();
   { test_node . title = "Title with two links: [[(id link1][First) Link]] and [[(id link2][Second) Link]]"
       . to_string();
-    test_node . home_skgrepo = SkgRepoName::from ("temp");
+    test_node . home_skgrepo = SkgrepoName::from ("temp");
     test_node . aliases = rel_partners_at_relRepo_msv (
       &test_node . home_skgrepo,
       MSV::Specified(vec![ "alias 1" . to_string(),
@@ -218,7 +218,7 @@ fn test_links_extracted_during_read() -> std::io::Result<()> {
   { // Write to a file and read it back.
     write_graphnode_to_skgrepo(&test_node, &config)?;
     let read_node : Graphnode = graphnode_from_pid_and_skgrepo(
-      &config, ID::new ("test123"), &SkgRepoName::from ("temp"))?;
+      &config, ID::new ("test123"), &SkgrepoName::from ("temp"))?;
     assert_eq!( test_node, read_node,
                 "Nodes should have matched." ); }
   Ok (( ))

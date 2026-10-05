@@ -18,7 +18,7 @@
 //! public occurrence, with a warning.
 
 use crate::telescope::types::{CompositionWarning, ListItem, SectionSlices, Telescope};
-use crate::types::misc::{ID, MSV, RelPartner, SkgRepoName};
+use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName};
 use crate::types::nodes::complete::{Flag, Graphnode};
 
 use std::collections::HashMap;
@@ -29,10 +29,10 @@ use std::io;
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ComposedNode {
   pub title                        : Option<String>,
-  pub title_skgrepo                : Option<SkgRepoName>,
+  pub title_skgrepo                : Option<SkgrepoName>,
   pub body                         : Option<String>,
-  pub body_skgrepo                 : Option<SkgRepoName>,
-  pub home                         : Option<SkgRepoName>,
+  pub body_skgrepo                 : Option<SkgrepoName>,
+  pub home                         : Option<SkgrepoName>,
   // None = NO section mentioned the field (lowers to
   // MSV::Unspecified); contains has no such distinction, like
   // Graphnode's.
@@ -95,7 +95,7 @@ pub fn graphnode_from_composition (
   flags     : Vec<Flag>,
   composed    : ComposedNode,
 ) -> Option<Graphnode> {
-  let home                      : SkgRepoName = composed . home ?;
+  let home                      : SkgrepoName = composed . home ?;
   let overPrivateText_telescope : bool =
     composed . title_skgrepo . as_ref () != Some (&home)
     || composed . body_skgrepo . as_ref ()
@@ -128,7 +128,7 @@ pub fn graphnode_from_composition (
 /// lists. 'resolve' maps any ID to its primary ID ('pid_of');
 /// anchors and members are compared through it.
 pub fn compose_sections (
-  sections : &[(SkgRepoName, SectionSlices)],
+  sections : &[(SkgrepoName, SectionSlices)],
   resolve  : &dyn Fn (&ID) -> ID,
 ) -> (ComposedNode, Vec<CompositionWarning>) {
   let mut warnings : Vec<CompositionWarning> = Vec::new ();
@@ -217,7 +217,7 @@ pub fn compose_sections (
 /// One ordered relation's compose. 'slice_of' projects a section's
 /// stored item sequence for this relation (None = no opinion).
 fn compose_ordered (
-  sections : &[(SkgRepoName, SectionSlices)],
+  sections : &[(SkgrepoName, SectionSlices)],
   slice_of : impl Fn (&SectionSlices) -> Option<&[ListItem]>,
   resolve  : &dyn Fn (&ID) -> ID,
   warnings : &mut Vec<CompositionWarning>,
@@ -300,7 +300,7 @@ fn compose_ordered (
 /// One unordered relation's compose: union in skgrepo order, most public
 /// occurrence winning.
 fn compose_unordered (
-  sections : &[(SkgRepoName, SectionSlices)],
+  sections : &[(SkgrepoName, SectionSlices)],
   slice_of : impl Fn (&SectionSlices) -> Option<&[ID]>,
   resolve  : &dyn Fn (&ID) -> ID,
   warnings : &mut Vec<CompositionWarning>,

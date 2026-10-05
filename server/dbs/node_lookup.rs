@@ -2,7 +2,7 @@
 /// Producing a Graphnode from different kinds of information.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, SkgConfig, SkgRepoName};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 
 use std::error::Error;
@@ -28,7 +28,7 @@ pub fn graphnode_graphFirst_by_pid_and_skgrepo (
   graph  : &InRustGraph,
   _config : &SkgConfig,
   pid    : &ID,
-  _skgrepo : &SkgRepoName,
+  _skgrepo : &SkgrepoName,
 ) -> Result<Graphnode, Box<dyn Error>> {
   if let Some (n) = graphnode_from_graph (graph, pid) { return Ok (n); }
   Err (format! ("Node '{}' not found in captured graph generation", pid) . into ()) }

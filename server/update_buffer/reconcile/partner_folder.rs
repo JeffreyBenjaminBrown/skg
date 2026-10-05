@@ -11,8 +11,8 @@ use crate::to_org::complete::partner_folder::goal_list::{
 };
 use crate::to_org::complete::partner_folder::inverse_scan::inverse_scan_for_inbound_folder;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgRepoDiff, file_node_axes_from_skgrepo_diff};
-use crate::types::misc::{ID, RelPartner, SkgRepoName};
+use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgrepoDiff, file_node_axes_from_skgrepo_diff};
+use crate::types::misc::{ID, RelPartner, SkgrepoName};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::phantom::{phantom_axes, home_from_disk};
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
@@ -36,10 +36,10 @@ pub fn reconcile_partnerFolder_children (
   node         : NodeId, // The PartnerFolder. Its parent is an UnrestrictedVognode.
   tree         : &mut Tree<Viewnode>,
   kind         : PartnerFolder,
-  skgrepo_diffs : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   runtime      : &RuntimeGeneration,
   graph_snap   : &Arc<InRustGraph>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   warning_sink : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
@@ -48,7 +48,7 @@ pub fn reconcile_partnerFolder_children (
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the recorder Unrestricted vognode *through* the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
   // (index 0 = the parent), so this can never read an ancestor the table
   // does not list, and the death-check and this read share one spec.
-  let (recorder_pid, recorder_skgrepo) : (ID, SkgRepoName) =
+  let (recorder_pid, recorder_skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_required_ancestor (
       tree, node, 0, kind . caller_label () ) ?;
   let Some (member_role) = kind . relation_member_role () else {
@@ -57,7 +57,7 @@ pub fn reconcile_partnerFolder_children (
       kind . caller_label (), kind) . into ()); };
   let recorder_role =
     member_role . opposite_role ();
-  let skgrepo_resolver = |skgid : &ID| -> Option<SkgRepoName> {
+  let skgrepo_resolver = |skgid : &ID| -> Option<SkgrepoName> {
     graph_snap . pid_and_skgrepo (skgid)
       . map ( |(_pid, src)| src )
       . or_else ( || home_from_disk (skgid, &runtime . config) ) };
@@ -157,7 +157,7 @@ pub fn reconcile_partnerFolder_children (
         removed };
       (goal, removed) }};
   let outbound_axes = // the recorder's own relation diff
-    |child : &ID, child_src : &SkgRepoName|
+    |child : &ID, child_src : &SkgrepoName|
     -> (NodeAxes, RelationshipAxes) {
     phantom_axes ( child, child_src,
                    &recorder_pid, &recorder_skgrepo,
@@ -165,7 +165,7 @@ pub fn reconcile_partnerFolder_children (
                    skgrepo_diffs . as_ref () ) };
   let inbound_axes = // relationship axes from the inverse scan; node
                      // axes from the member's own file statuses
-    |child : &ID, child_src : &SkgRepoName|
+    |child : &ID, child_src : &SkgrepoName|
     -> (NodeAxes, RelationshipAxes) {
     ( file_node_axes_from_skgrepo_diff (
         skgrepo_diffs, child, child_src ),
@@ -173,13 +173,13 @@ pub fn reconcile_partnerFolder_children (
         . unwrap_or ( RelationshipAxes {
             staged : None, unstaged : Some (Sign::Minus) } )) };
   let axes_for_removed // the relation this folder represents
-    : &dyn Fn (&ID, &SkgRepoName) -> (NodeAxes, RelationshipAxes) =
+    : &dyn Fn (&ID, &SkgrepoName) -> (NodeAxes, RelationshipAxes) =
     if outbound { &outbound_axes } else { &inbound_axes };
   // TODO/DONE/local-view-update/plan_v2.org §5.5: a folder fills its members WHOLE and is budget-neutral -- the owning
   // vognode already spent its budget unit when it expanded, so drawing all the
   // relation members here costs nothing and never truncates the group. (The
   // budget bounds how many vognodes EXPAND, not how big one group is.)
-  let relRepos : HashMap<ID, SkgRepoName> =
+  let relRepos : HashMap<ID, SkgrepoName> =
     raw_outbound_members . iter ()
       . filter (|member| graph_snap . pid_of (&member . member) . is_none ())
       . filter (|member| member . relRepo != recorder_skgrepo)

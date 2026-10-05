@@ -25,9 +25,9 @@
 
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::git::{GitDiffStatus, RelationshipAxes, GraphnodeDiff, Sign, SkgRepoDiff};
+use crate::types::git::{GitDiffStatus, RelationshipAxes, GraphnodeDiff, Sign, SkgrepoDiff};
 use crate::types::list::Diff_Item;
-use crate::types::misc::{ID, RelPartner, SkgRepoName};
+use crate::types::misc::{ID, RelPartner, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 
 use std::collections::HashMap;
@@ -53,7 +53,7 @@ use std::path::PathBuf;
 pub fn inverse_scan_for_inbound_folder (
   recorder      : &ID,
   relation      : NodeRelation,
-  skgrepo_diffs : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   restriction   : Option<&SkgrepoRestriction>,
 ) -> HashMap<ID, RelationshipAxes> {
   let Some (diffs) = skgrepo_diffs else {
@@ -81,7 +81,7 @@ pub fn inverse_scan_for_inbound_folder (
 /// Whether 'skgrepo' is visible under 'unrestricted' (None = ungated).
 fn skgrepo_is_unrestricted (
   restriction : Option<&SkgrepoRestriction>,
-  skgrepo : &SkgRepoName,
+  skgrepo : &SkgrepoName,
 ) -> bool {
   match restriction {
     None     => true,
@@ -131,7 +131,7 @@ fn outbound_member_relRepo_of_graphnode (
   nc       : &Graphnode,
   relation : NodeRelation,
   target   : &ID,
-) -> Option<SkgRepoName> {
+) -> Option<SkgrepoName> {
   let rel_partners : &[RelPartner<ID>] = match relation {
     NodeRelation::Contains =>
       & nc . contains,

@@ -13,7 +13,7 @@
 //! unit-testable. The server handler and the `export-org`
 //! subcommand both call it.
 
-use crate::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
+use crate::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
 use crate::types::misc::SkgConfig;
 use crate::types::misc::{ID, RelPartner};
 use crate::types::nodes::complete::Graphnode;
@@ -272,7 +272,7 @@ pub(crate) fn claimed_export_targets (
   config : &SkgConfig,
 ) -> Result<Vec<(ID, String)>, String> {
   let restriction : SkgrepoRestriction = SkgrepoRestriction::named (
-    config, SkgRepoSetName::from ("all"))
+    config, SkgrepoSetName::from ("all"))
     .map_err (|error| error . to_string ())?;
   let aliases : HashMap<ID, ID> = nodes . iter ()
     .flat_map (|node| node . extra_ids . iter ()

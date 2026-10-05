@@ -3,9 +3,9 @@ use skg::dbs::in_rust_graph::override_resolution::{
   OverrideResolution,
   resolve_override,
 };
-use skg::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
+use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
 use skg::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, SkgRepo, SkgRepoName,
+  ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName,
   rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 
@@ -13,24 +13,24 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 fn config () -> SkgConfig {
-  SkgConfig::dummyFromSkgRepos (HashMap::from ([
-    ( SkgRepoName::from ("owned"),
-      SkgRepo {
-        name: SkgRepoName::from ("owned"),
+  SkgConfig::dummyFromSkgrepos (HashMap::from ([
+    ( SkgrepoName::from ("owned"),
+      Skgrepo {
+        name: SkgrepoName::from ("owned"),
         abbreviation: None,
         path: PathBuf::from ("/tmp/owned"),
         owned: true,
       }),
-    ( SkgRepoName::from ("owned2"),
-      SkgRepo {
-        name: SkgRepoName::from ("owned2"),
+    ( SkgrepoName::from ("owned2"),
+      Skgrepo {
+        name: SkgrepoName::from ("owned2"),
         abbreviation: None,
         path: PathBuf::from ("/tmp/owned2"),
         owned: true,
       }),
-    ( SkgRepoName::from ("foreign"),
-      SkgRepo {
-        name: SkgRepoName::from ("foreign"),
+    ( SkgrepoName::from ("foreign"),
+      Skgrepo {
+        name: SkgrepoName::from ("foreign"),
         abbreviation: None,
         path: PathBuf::from ("/tmp/foreign"),
         owned: false,
@@ -46,7 +46,7 @@ fn node (
     empty_graphnode ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
-  node . home_skgrepo = SkgRepoName::from (skgrepo);
+  node . home_skgrepo = SkgrepoName::from (skgrepo);
   node . overrides =
     if overrides . is_empty () {
       MSV::Unspecified
@@ -64,9 +64,9 @@ fn restricted_to (
   skgrepos : &[&str],
 ) -> SkgrepoRestriction {
   SkgrepoRestriction {
-    name    : SkgRepoSetName ( "restricted" . to_string () ),
+    name    : SkgrepoSetName ( "restricted" . to_string () ),
     skgrepos : skgrepos . iter ()
-      . map ( |s| SkgRepoName::from (*s) )
+      . map ( |s| SkgrepoName::from (*s) )
       . collect (),
   }}
 
@@ -164,7 +164,7 @@ fn an_restricted_override_relationship_between_unrestricted_nodes_does_not_subst
     node ("overrider", "owned", &[]);
   overrider . overrides = MSV::Specified (vec![
     RelPartner::at_relRepo (
-      SkgRepoName::from ("owned2"), ID::from ("target")) ]);
+      SkgrepoName::from ("owned2"), ID::from ("target")) ]);
   assert_eq! (
     resolve (
       vec![ node ("target", "owned", &[]), overrider ],

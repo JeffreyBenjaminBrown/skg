@@ -23,7 +23,7 @@ use std::net::TcpStream;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::assert_metadata_eq;
 use skg::serve::ViewsState;
-use skg::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
+use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
 use skg::test_utils::{
   run_with_shared_test_stores,
   graph_handle_from_config};
@@ -31,7 +31,7 @@ use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rer
 use skg::to_org::render::content_view::{
   multi_root_view, multi_root_view_with_skgrepo_set};
 use skg::types::errors::{BufferValidationError, SaveError};
-use skg::types::misc::{ID, SkgConfig, SkgRepoName, TantivyIndex, members_of};
+use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode};
 use skg::types::views_state::OpenViews;
@@ -400,7 +400,7 @@ async fn marked_view_is_shape_stable_across_diff_toggle (
               "((request . \"git diff mode toggle\"))",
               &env, views_state,
               & SkgrepoRestriction::named (
-                  config, SkgRepoSetName ("all" . to_string ()))
+                  config, SkgrepoSetName ("all" . to_string ()))
                 . expect ("set all resolves") ); } ); } );
         drop (server);
         let mut reader : std::io::BufReader<TcpStream> =
@@ -469,7 +469,7 @@ async fn ownership_and_visibility_gate_substitution (
         assert! ( view . contains ("(id N1)"), "{}", view ); }
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
-          config, SkgRepoSetName ("main" . to_string ())) ?;
+          config, SkgrepoSetName ("main" . to_string ())) ?;
       { // A restricted owned overrider does not substitute.
         let (view, _pids, _tree) =
           multi_root_view_with_skgrepo_set (
@@ -553,7 +553,7 @@ async fn chain_half_visible_keeps_the_original (
           "the chain end D is drawn under all:\n{}", view ); }
       let main_set : SkgrepoRestriction =
         SkgrepoRestriction::named (
-          config, SkgRepoSetName ("main" . to_string ())) ?;
+          config, SkgrepoSetName ("main" . to_string ())) ?;
       let view_main : String = {
         // Under 'main', D's skgrepo 'other' is restricted, so the MIDDLE
         // C is drawn instead.
@@ -578,7 +578,7 @@ async fn chain_half_visible_keeps_the_original (
         let p_file : String = {
           let main_path : &std::path::Path =
             & config . skgrepos
-              . get ( &SkgRepoName::from ("main") ) . unwrap () . path;
+              . get ( &SkgrepoName::from ("main") ) . unwrap () . path;
           std::fs::read_to_string ( main_path . join ("P.skg") )
             . unwrap () };
         assert! ( p_file . contains ("- N"),

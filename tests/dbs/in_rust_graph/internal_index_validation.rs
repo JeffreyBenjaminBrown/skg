@@ -2,7 +2,7 @@ use skg::dbs::in_rust_graph::{InRustGraph, apply_nodeInstructions_to_inRustGraph
 use skg::dbs::in_rust_graph::internal_index_validation::{
   format_internal_index_mismatches, validate_internal_indexes,
 };
-use skg::types::misc::{ID, MSV, SkgRepoName, rel_partners_at_relRepo};
+use skg::types::misc::{ID, MSV, SkgrepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::save::{NodeInstruction, DeleteNode, SaveNode};
 
@@ -15,7 +15,7 @@ fn node (pid : &str) -> Graphnode {
   node }
 
 fn full_fixture () -> InRustGraph {
-  let skgrepo = SkgRepoName::from ("main");
+  let skgrepo = SkgrepoName::from ("main");
   let mut recorder = node ("recorder");
   recorder . contains = rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("target-alias"), ID::from ("dangling")]);
@@ -77,7 +77,7 @@ fn exact_diagnostics_cover_all_six_corrupt_indexes_in_stable_order () {
 
 #[test]
 fn incremental_update_delete_and_extra_id_acquisition_remain_coherent () {
-  let skgrepo = SkgRepoName::from ("main");
+  let skgrepo = SkgrepoName::from ("main");
   let mut recorder = node ("recorder");
   recorder . contains = rel_partners_at_relRepo (&skgrepo, vec![ID::from ("future-alias")]);
   let mut disposable = node ("disposable");
@@ -109,7 +109,7 @@ fn incremental_update_delete_and_extra_id_acquisition_remain_coherent () {
 
 #[test]
 fn alias_acquisition_rekeys_all_five_inverse_indexes () {
-  let skgrepo         : SkgRepoName = SkgRepoName::from ("main");
+  let skgrepo         : SkgrepoName = SkgrepoName::from ("main");
   let mut recorder : Graphnode = node ("recorder");
   recorder . contains = rel_partners_at_relRepo (&skgrepo, vec![ID::from ("future")]);
   recorder . subscribesTo = MSV::Specified (rel_partners_at_relRepo (
@@ -144,7 +144,7 @@ fn alias_acquisition_rekeys_all_five_inverse_indexes () {
 
 #[test]
 fn merge_transfer_rekeys_primary_and_extra_spellings () {
-  let skgrepo         : SkgRepoName = SkgRepoName::from ("main");
+  let skgrepo         : SkgrepoName = SkgrepoName::from ("main");
   let mut recorder : Graphnode = node ("recorder");
   recorder . contains = rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("acquiree"), ID::from ("old-extra")]);
@@ -175,7 +175,7 @@ fn merge_transfer_rekeys_primary_and_extra_spellings () {
 
 #[test]
 fn deletion_rekeys_surviving_raw_primary_extra_and_text_references () {
-  let skgrepo      : SkgRepoName = SkgRepoName::from ("main");
+  let skgrepo      : SkgrepoName = SkgrepoName::from ("main");
   let mut recorder : Graphnode = node ("foreign-recorder");
   let raw_skgids : Vec<ID> = vec![ID::from ("target"), ID::from ("extra")];
   recorder . contains = rel_partners_at_relRepo (&skgrepo, raw_skgids . clone ());
@@ -215,7 +215,7 @@ fn deletion_rekeys_surviving_raw_primary_extra_and_text_references () {
 
 #[test]
 fn changed_recorder_removes_and_adds_all_five_inverse_contributions () {
-  let skgrepo    : SkgRepoName = SkgRepoName::from ("main");
+  let skgrepo    : SkgrepoName = SkgrepoName::from ("main");
   let mut old : Graphnode = node ("recorder");
   old . contains = rel_partners_at_relRepo (&skgrepo, vec![ID::from ("old")]);
   old . subscribesTo = MSV::Specified (old . contains . clone ());
@@ -255,7 +255,7 @@ proptest! {
     raw_indexes in proptest::collection::vec (0usize..6, 0..10),
     action in 0usize..3,
   ) {
-    let skgrepo : SkgRepoName = SkgRepoName::from ("main");
+    let skgrepo : SkgrepoName = SkgrepoName::from ("main");
     let universe : [&str; 6] = ["P", "E", "Q", "U", "X", "Y"];
     let raw_skgids : Vec<ID> = raw_indexes . iter ()
       . map (|index| ID::from (universe [*index]))

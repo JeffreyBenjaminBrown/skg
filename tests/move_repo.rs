@@ -11,7 +11,7 @@ use skg::save::update_graph_minus_nodeMerges;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::errors::{SaveError, BufferValidationError};
 
-use skg::types::misc::{ID, SkgConfig, SkgRepoName, TantivyIndex, members_of};
+use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::NodeInstruction;
 use std::error::Error;
@@ -133,11 +133,11 @@ async fn test_move_node_to_another_owned_skgrepo (
       let node_b : Graphnode =
         graphnode_from_skgid (&config, &ID::new ("b"))
 ?;
-      assert_eq!(node_b . home_skgrepo, SkgRepoName::from ("private"),
+      assert_eq!(node_b . home_skgrepo, SkgrepoName::from ("private"),
                  "Graphnode read from disk should have repo=private"); }
 
     { // Graph: skgrepo should be updated
-      let (pid, skgrepo) : (ID, SkgRepoName) =
+      let (pid, skgrepo) : (ID, SkgrepoName) =
         graph . load_full () . pid_and_skgrepo (&ID::new ("b"))
         . expect ("b should exist in graph");
       assert_eq!(pid . 0, "b");
@@ -154,11 +154,11 @@ async fn test_move_node_to_another_owned_skgrepo (
       let node_a : Graphnode =
         graphnode_from_skgid (&config, &ID::new ("a"))
 ?;
-      assert_eq!(node_a . home_skgrepo, SkgRepoName::from ("public"));
+      assert_eq!(node_a . home_skgrepo, SkgrepoName::from ("public"));
       let node_c : Graphnode =
         graphnode_from_skgid (&config, &ID::new ("c"))
 ?;
-      assert_eq!(node_c . home_skgrepo, SkgRepoName::from ("public")); }
+      assert_eq!(node_c . home_skgrepo, SkgrepoName::from ("public")); }
 
     { // Containment relationships should be unchanged
       let node_a : Graphnode =
@@ -222,7 +222,7 @@ async fn test_move_node_referenced_by_extra_id (
 
     { // Graph: skgrepo updated, extra_ids preserved
       let graph_snapshot = graph . load_full ();
-      let (pid, skgrepo) : (ID, SkgRepoName) =
+      let (pid, skgrepo) : (ID, SkgrepoName) =
         graph_snapshot . pid_and_skgrepo (&ID::new ("b"))
         . expect ("b should exist in graph");
       assert_eq!(pid . 0, "b");
@@ -316,7 +316,7 @@ async fn test_move_to_foreign_skgrepo_rejected (
       let inner : &dyn Error = e . as_ref();
       assert!(inner . downcast_ref::<BufferValidationError>()
               . map_or (false, |bve| matches!(
-                bve, BufferValidationError::CannotMoveToOrFromForeignSkgRepo(_, _, _))),
+                bve, BufferValidationError::CannotMoveToOrFromForeignSkgrepo(_, _, _))),
               "Expected CannotMoveToOrFromForeignRepo, got: {}", e);
     } else if let Err (other) = &result {
       panic!("Expected DatabaseError wrapping CannotMoveToOrFromForeignRepo, got: {:?}", other);

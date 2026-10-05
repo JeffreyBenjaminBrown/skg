@@ -10,7 +10,7 @@ use crate::dbs::in_rust_graph::internal_index_validation::{
   LocalIndexValidation, validate_local_internal_indexes,
 };
 use crate::types::misc::{
-  ID, MSV, SkgConfig, SkgRepo, SkgRepoName, rel_partners_at_relRepo,
+  ID, MSV, SkgConfig, Skgrepo, SkgrepoName, rel_partners_at_relRepo,
 };
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
@@ -22,9 +22,9 @@ use std::sync::Arc;
 use proptest::prelude::*;
 
 fn config () -> SkgConfig {
-  let skgrepo : SkgRepoName = SkgRepoName::from ("main");
-  SkgConfig::dummyFromSkgRepos (HashMap::from ([
-    (skgrepo . clone (), SkgRepo {
+  let skgrepo : SkgrepoName = SkgrepoName::from ("main");
+  SkgConfig::dummyFromSkgrepos (HashMap::from ([
+    (skgrepo . clone (), Skgrepo {
       name         : skgrepo,
       abbreviation : None,
       path         : PathBuf::from ("unused"),
@@ -47,14 +47,14 @@ fn changed_relationship_fixture (
 ) -> (InRustGraph, InRustGraph, Vec<NodeInstruction>, GraphChangeSet) {
   let mut old_recorder : Graphnode = node ("recorder");
   old_recorder . contains = rel_partners_at_relRepo (
-    &SkgRepoName::from ("main"), vec![ID::from ("old")]);
+    &SkgrepoName::from ("main"), vec![ID::from ("old")]);
   let mut base_nodes : Vec<Graphnode> = vec![old_recorder];
   base_nodes . extend ((0..unrelated_count)
     . map (|i| node (&format! ("unrelated-{i}"))));
   let base : InRustGraph = InRustGraph::from_graphnodes (&base_nodes);
   let mut final_recorder : Graphnode = node ("recorder");
   final_recorder . contains = rel_partners_at_relRepo (
-    &SkgRepoName::from ("main"), vec![ID::from ("new")]);
+    &SkgrepoName::from ("main"), vec![ID::from ("new")]);
   let nodeInstructions : Vec<NodeInstruction> =
     vec![NodeInstruction::Save (SaveNode (final_recorder))];
   let (changes, errors, revocations)
@@ -179,7 +179,7 @@ fn simultaneous_overlay_accepts_merge_style_primary_transfer () {
       NodeInstruction::Save (SaveNode (acquirer)),
       NodeInstruction::Delete (DeleteNode {
         skgid           : ID::from ("N2"),
-        home_skgrepo : SkgRepoName::from ("main"),
+        home_skgrepo : SkgrepoName::from ("main"),
       }),
     ]) . unwrap ();
   assert_eq! (
@@ -202,7 +202,7 @@ fn repeated_definitions_use_the_last_graph_state () {
       NodeInstruction::Save (SaveNode (first)),
       NodeInstruction::Delete (DeleteNode {
         skgid           : ID::from ("P"),
-        home_skgrepo : SkgRepoName::from ("main"),
+        home_skgrepo : SkgrepoName::from ("main"),
       }),
       NodeInstruction::Save (SaveNode (last)),
     ]) . unwrap ();
@@ -219,7 +219,7 @@ fn repeated_save_then_delete_leaves_no_graph_node () {
       NodeInstruction::Save (SaveNode (node ("P"))),
       NodeInstruction::Delete (DeleteNode {
         skgid           : ID::from ("P"),
-        home_skgrepo : SkgRepoName::from ("main"),
+        home_skgrepo : SkgrepoName::from ("main"),
       }),
     ]) . unwrap ();
   assert! (prepared . candidate () . get (&ID::from ("P")) . is_none ());
@@ -235,7 +235,7 @@ fn repeated_delete_then_save_leaves_the_saved_graph_node () {
     &config (), base, vec![
       NodeInstruction::Delete (DeleteNode {
         skgid           : ID::from ("P"),
-        home_skgrepo : SkgRepoName::from ("main"),
+        home_skgrepo : SkgrepoName::from ("main"),
       }),
       NodeInstruction::Save (SaveNode (saved)),
     ]) . unwrap ();
@@ -323,7 +323,7 @@ fn local_index_check_catches_an_omitted_insertion () {
 fn local_index_check_catches_an_omitted_canonical_migration () {
   let mut recorder : Graphnode = node ("recorder");
   recorder . contains = rel_partners_at_relRepo (
-    &SkgRepoName::from ("main"), vec![ID::from ("future")]);
+    &SkgrepoName::from ("main"), vec![ID::from ("future")]);
   let base : InRustGraph = InRustGraph::from_graphnodes (&[recorder]);
   let mut target : Graphnode = node ("target");
   target . extra_ids = vec![ID::from ("future")];
@@ -376,7 +376,7 @@ fn local_index_check_work_does_not_grow_with_unrelated_nodes () {
 
 #[test]
 fn merge_override_collision_names_participants_and_both_repairs () {
-  let skgrepo : SkgRepoName = SkgRepoName::from ("main");
+  let skgrepo : SkgrepoName = SkgrepoName::from ("main");
   let mut n1 : Graphnode = node ("N1");
   n1 . title = "Acquirer title" . to_string ();
   let mut n2 : Graphnode = node ("N2");

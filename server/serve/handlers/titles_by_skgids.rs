@@ -10,12 +10,12 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::send_response_with_length_prefix;
 use crate::skgrepo_sets::{
   SkgrepoRestriction,
-  SkgRepoSetName,
+  SkgrepoSetName,
   titles_for_skgrepo_set_for_test,
 };
 use crate::types::phantom::home_from_disk;
-use crate::types::git::SkgRepoDiff;
-use crate::types::misc::{ID, SkgRepoName, SkgConfig, TantivyIndex};
+use crate::types::git::SkgrepoDiff;
+use crate::types::misc::{ID, SkgrepoName, SkgConfig, TantivyIndex};
 use crate::types::sexp::extract_string_list_from_sexp;
 
 use sexp::{Sexp, Atom};
@@ -44,7 +44,7 @@ pub fn handle_titles_by_skgids_request (
   let restriction : SkgrepoRestriction =
     SkgrepoRestriction::named (
       config,
-      SkgRepoSetName::from ("all"))
+      SkgrepoSetName::from ("all"))
     . expect ("reserved repo-set all should always resolve");
   handle_titles_by_skgids_request_with_skgrepo_set (
     stream, request, tantivy_index, config,
@@ -83,7 +83,7 @@ pub fn handle_titles_by_skgids_request_with_skgrepo_set (
     . collect ();
   let mut title_map : HashMap<ID, String> =
     titles_by_skgids (tantivy_index, &skgids);
-  let skgrepo_diffs : Option<HashMap<SkgRepoName, SkgRepoDiff>> =
+  let skgrepo_diffs : Option<HashMap<SkgrepoName, SkgrepoDiff>> =
     if diff_mode_enabled || title_map . len () < skgids . len () {
       Some (compute_diff_for_every_skgrepo (config))
     } else { None };
@@ -163,7 +163,7 @@ fn elisp_string_literal (
 pub fn add_deleted_node_titles_by_skgids (
   title_map     : &mut HashMap<ID, String>,
   skgids           : &[ID],
-  skgrepo_diffs : &HashMap<SkgRepoName, SkgRepoDiff>,
+  skgrepo_diffs : &HashMap<SkgrepoName, SkgrepoDiff>,
 ) {
   let requested_skgids : HashSet<ID> =
     skgids . iter () . cloned () . collect ();
@@ -178,7 +178,7 @@ pub fn add_deleted_node_titles_by_skgids (
 pub fn add_addedNode_titles_by_skgids (
   title_map     : &mut HashMap<ID, String>,
   skgids           : &[ID],
-  skgrepo_diffs : &HashMap<SkgRepoName, SkgRepoDiff>,
+  skgrepo_diffs : &HashMap<SkgrepoName, SkgrepoDiff>,
 ) {
   let requested_skgids : HashSet<ID> =
     skgids . iter () . cloned () . collect ();

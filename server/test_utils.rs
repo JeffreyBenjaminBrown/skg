@@ -16,7 +16,7 @@ use crate::serve::handlers::save_buffer::{
 };
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
 use crate::types::views_state::ViewId;
-use crate::types::misc::{MSV, SkgConfig, SkgRepo, ID, TantivyIndex, SkgRepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
+use crate::types::misc::{MSV, SkgConfig, Skgrepo, ID, TantivyIndex, SkgrepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::maybe_placed_viewnode::{ MpViewnode, MpViewnodeKind };
@@ -205,16 +205,16 @@ impl SharedStoreSession {
         config . tantivy_folder = self . tantivy_folder . clone ();
         config
       } else {
-        let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+        let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
           HashMap::new ();
         skgrepos . insert (
-          SkgRepoName::from ("main"),
-          SkgRepo {
-            name         : SkgRepoName::from ("main"),
+          SkgrepoName::from ("main"),
+          Skgrepo {
+            name         : SkgrepoName::from ("main"),
             abbreviation : None,
             path         : self . temp_fixtures . clone (),
             owned        : true, });
-        SkgConfig::fromSkgReposAndTantivyFolder (
+        SkgConfig::fromSkgreposAndTantivyFolder (
           skgrepos,
           self . tantivy_folder . to_str () . unwrap () ) }};
     self . wipe_then_repopulate () }
@@ -229,16 +229,16 @@ impl SharedStoreSession {
   ) -> Result<(), Box<dyn Error>> {
     println! ("-- sub-test: {}", subtest_name);
     self . config = {
-      let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+      let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
         HashMap::new ();
       skgrepos . insert (
-        SkgRepoName::from ("main"),
-        SkgRepo {
-          name         : SkgRepoName::from ("main"),
+        SkgrepoName::from ("main"),
+        Skgrepo {
+          name         : SkgrepoName::from ("main"),
           abbreviation : None,
           path         : skgrepo_path . to_path_buf (),
           owned        : true, });
-      SkgConfig::fromSkgReposAndTantivyFolder (
+      SkgConfig::fromSkgreposAndTantivyFolder (
         skgrepos,
         self . tantivy_folder . to_str () . unwrap () ) };
     self . wipe_then_repopulate () }
@@ -295,7 +295,7 @@ where
       temp_fixtures  : temp_fixtures . clone (),
       tantivy_folder : tantivy_folder . clone (),
       config         : // placeholder; every sub-test runs after a reset, which overwrites it
-        SkgConfig::fromSkgReposAndTantivyFolder (
+        SkgConfig::fromSkgreposAndTantivyFolder (
           HashMap::new (),
           tantivy_folder . to_str () . unwrap () ),
       tantivy        : create_empty_tantivy_index (&tantivy_folder) ?, };
@@ -465,7 +465,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_skgrepos_test (
   viewid_from_request_result  : &Result<ViewId, String>,
   views_state                 : &mut ViewsState,
   approved_forks              : bool,
-  fork_skgrepos               : &HashMap<ID, SkgRepoName>,
+  fork_skgrepos               : &HashMap<ID, SkgrepoName>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut env : SkgEnv =
     skg_env_from_parts (config, tantivy_index, graph);
@@ -489,7 +489,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_skgrepos_test (
 /// work item save-leveling.
 pub fn set_skgrepo_retagging_relRepos (
   node    : &mut Graphnode,
-  skgrepo : &SkgRepoName,
+  skgrepo : &SkgrepoName,
 ) {
   node . home_skgrepo = skgrepo . clone ();
   for m in node . contains . iter_mut () {
@@ -533,15 +533,15 @@ pub fn setup_test_tantivy (
   fixtures_folder: &str,
   tantivy_folder: &str,
 ) -> Result<(SkgConfig, TantivyIndex), Box<dyn Error>> {
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> = HashMap::new();
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> = HashMap::new();
   skgrepos . insert (
-    SkgRepoName::from ("main"),
-    SkgRepo {
-      name         : SkgRepoName::from ("main"),
+    SkgrepoName::from ("main"),
+    Skgrepo {
+      name         : SkgrepoName::from ("main"),
       abbreviation : None,
       path         : prefer_owned_subdir (Path::new (fixtures_folder)),
       owned        : true, });
-  let config : SkgConfig = SkgConfig::fromSkgReposAndTantivyFolder (
+  let config : SkgConfig = SkgConfig::fromSkgreposAndTantivyFolder (
     skgrepos, tantivy_folder );
   let tantivy_index : TantivyIndex =
     create_empty_tantivy_index (&config . tantivy_folder) ?;
@@ -745,7 +745,7 @@ pub fn strip_org_comments(s: &str) -> String {
 
 /// Example Graphnode for use in tests.
 pub fn graphnode_example () -> Graphnode {
-  let skgrepo : SkgRepoName = SkgRepoName::from ("main");
+  let skgrepo : SkgrepoName = SkgrepoName::from ("main");
   Graphnode {
     title: "This text gets indexed." . to_string(),
     overPrivateText_telescope: false,

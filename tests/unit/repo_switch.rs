@@ -1,6 +1,6 @@
 use super::*;
-use crate::skgrepo_sets::SkgRepoSetName;
-use crate::types::misc::{ID, SkgRepoName};
+use crate::skgrepo_sets::SkgrepoSetName;
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::viewnode::{
   mk_writeProtected_viewnode, mk_editable_viewnode,
   viewforest_root_viewnode, AffectsParent };
@@ -9,17 +9,17 @@ use std::collections::BTreeSet;
 
 fn restriction_public () -> SkgrepoRestriction {
   SkgrepoRestriction {
-    name    : SkgRepoSetName ("public" . to_string ()),
-    skgrepos : BTreeSet::from ([ SkgRepoName::from ("public") ]) }}
+    name    : SkgrepoSetName ("public" . to_string ()),
+    skgrepos : BTreeSet::from ([ SkgrepoName::from ("public") ]) }}
 
 fn def (skgid : &str, skgrepo : &str) -> Viewnode {
   mk_editable_viewnode (
-    ID::from (skgid), SkgRepoName::from (skgrepo),
+    ID::from (skgid), SkgrepoName::from (skgrepo),
     skgid . to_string (), None ) }
 
 fn writeProtected (skgid : &str, skgrepo : &str) -> Viewnode {
   mk_writeProtected_viewnode (
-    ID::from (skgid), SkgRepoName::from (skgrepo),
+    ID::from (skgid), SkgrepoName::from (skgrepo),
     skgid . to_string (), AffectsParent::True ) }
 
 fn folder (kind : PartnerFolder) -> Viewnode {

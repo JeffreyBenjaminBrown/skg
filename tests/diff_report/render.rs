@@ -2,7 +2,7 @@ use skg::diff_report::render::render_report;
 use skg::diff_report::types::{
   DiffReport, ListDiffItem, NodeBucket, NodeDiffReport, RelationshipDiff,
   RepoForReport};
-use skg::types::misc::{ID, SkgRepoName};
+use skg::types::misc::{ID, SkgrepoName};
 
 use std::collections::HashMap;
 
@@ -18,7 +18,7 @@ fn node_report (
 ) -> NodeDiffReport {
   NodeDiffReport {
     pid: skgid (pid),
-    home_skgrepo: RepoForReport::After (SkgRepoName::from ("main")),
+    home_skgrepo: RepoForReport::After (SkgrepoName::from ("main")),
     title: title . to_string (),
     title_diff: None,
     body_diff: None,

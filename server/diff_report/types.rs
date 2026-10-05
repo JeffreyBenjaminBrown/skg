@@ -1,4 +1,4 @@
-use crate::types::misc::{ID, SkgRepoName};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -37,7 +37,7 @@ pub struct GraphSnapshot {
   /// claiming an id from several skgrepos is the normal telescope
   /// shape; TWO pids claiming one id is the duplicate-ID VIOLATION
   /// the report warns about.
-  pub id_claims : HashMap<ID, BTreeMap<ID, BTreeSet<SkgRepoName>>>,
+  pub id_claims : HashMap<ID, BTreeMap<ID, BTreeSet<SkgrepoName>>>,
 }
 
 impl GraphSnapshot {
@@ -45,7 +45,7 @@ impl GraphSnapshot {
   pub fn skgrepos_claiming_skgid (
     &self,
     skgid : &ID,
-  ) -> BTreeSet<SkgRepoName> {
+  ) -> BTreeSet<SkgrepoName> {
     self . id_claims . get (skgid)
       . map ( |by_pid| by_pid . values () . flatten ()
               . cloned () . collect () )
@@ -70,7 +70,7 @@ pub struct VanishedNodeReport {
 
 #[derive(Clone, Debug)]
 pub struct VanishedNodeSighting {
-  pub home_skgrepo : SkgRepoName,
+  pub home_skgrepo : SkgrepoName,
   pub last_present : CommitStamp,
   pub vanished_at  : Option<CommitStamp>, // its first-parent descendant, which lacks the file
   pub title        : String,             // the node's title when last present
@@ -88,8 +88,8 @@ pub struct CommitStamp {
 #[derive(Clone, Debug)]
 pub struct DuplicateIDReport {
   pub skgid           : ID,
-  pub before_skgrepos : BTreeSet<SkgRepoName>,
-  pub after_skgrepos  : BTreeSet<SkgRepoName>,
+  pub before_skgrepos : BTreeSet<SkgrepoName>,
+  pub after_skgrepos  : BTreeSet<SkgrepoName>,
   pub title           : String,
 }
 
@@ -106,7 +106,7 @@ pub struct NodeDiffReport {
   pub title               : String,
   pub title_diff          : Option<Vec<TextDiffLine>>,
   pub body_diff           : Option<Vec<TextDiffLine>>,
-  pub skgrepo_change      : Option<(SkgRepoName, SkgRepoName)>,
+  pub skgrepo_change      : Option<(SkgrepoName, SkgrepoName)>,
   pub value_set_diffs     : Vec<ValueSetDiff>,
   pub relationship_diffs  : Vec<RelationshipDiff>,
   pub content_list_diff : Option<Vec<ListDiffItem>>,
@@ -114,8 +114,8 @@ pub struct NodeDiffReport {
 
 #[derive(Clone, Debug)]
 pub enum RepoForReport {
-  Before (SkgRepoName),
-  After  (SkgRepoName),
+  Before (SkgrepoName),
+  After  (SkgrepoName),
 }
 
 #[derive(Clone, Debug)]

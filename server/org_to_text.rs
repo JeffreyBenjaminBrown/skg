@@ -288,7 +288,7 @@ fn unrestrictedVognode_metadata_to_string (
         unrestrictedVognode . viewStats . relRepo {
         parts . push ( format! (
           "(relRepo {})", metadata_value_atom (skgrepo) )); }
-      if unrestrictedVognode . viewStats . homeSkgRepoAtBoundary {
+      if unrestrictedVognode . viewStats . homeSkgrepoAtBoundary {
         if let Some (src_config)
         = config . skgrepos . get ( &unrestrictedVognode . home_skgrepo )
         { parts . push ( format! (

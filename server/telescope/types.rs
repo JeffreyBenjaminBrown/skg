@@ -17,7 +17,7 @@
 
 use serde::{Serialize, Deserialize};
 
-use crate::types::misc::{ID, SkgConfig, SkgRepoName};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::fs::GraphnodeOnDisk;
 
@@ -45,7 +45,7 @@ use std::fmt;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Telescope {
   pid      : ID,
-  sections : Vec<(SkgRepoName, GraphnodeOnDisk)>,
+  sections : Vec<(SkgrepoName, GraphnodeOnDisk)>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -56,23 +56,23 @@ pub enum TelescopeConstructionError {
   MixedPid {
     expected : ID,
     actual   : ID,
-    skgrepo  : SkgRepoName,
+    skgrepo  : SkgrepoName,
   },
-  UnknownSkgRepo {
-    skgrepo : SkgRepoName,
+  UnknownSkgrepo {
+    skgrepo : SkgrepoName,
   },
-  DuplicateSkgRepo {
-    skgrepo : SkgRepoName,
+  DuplicateSkgrepo {
+    skgrepo : SkgrepoName,
   },
   OutOfOrder {
-    previous : SkgRepoName,
-    next     : SkgRepoName,
+    previous : SkgrepoName,
+    next     : SkgrepoName,
   },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IgnoredForeignPidFolderlision {
-  pub ignored_skgrepos : Vec<SkgRepoName>,
+  pub ignored_skgrepos : Vec<SkgrepoName>,
 }
 
 /// If a pid has any owned section, its owned sections are the
@@ -80,16 +80,16 @@ pub struct IgnoredForeignPidFolderlision {
 /// with no owned section remains an ordinary foreign telescope.
 /// Input order is preserved.
 pub fn retain_owned_sections_when_pid_folderlides (
-  sections : Vec<(SkgRepoName, GraphnodeOnDisk)>,
+  sections : Vec<(SkgrepoName, GraphnodeOnDisk)>,
   config   : &SkgConfig,
-) -> ( Vec<(SkgRepoName, GraphnodeOnDisk)>,
+) -> ( Vec<(SkgrepoName, GraphnodeOnDisk)>,
        Option<IgnoredForeignPidFolderlision> ) {
   let has_owned : bool = sections . iter ()
     . any ( |(skgrepo, _)| config . skgrepo_is_owned (skgrepo) );
   if ! has_owned {
     return (sections, None); }
-  let mut retained : Vec<(SkgRepoName, GraphnodeOnDisk)> = Vec::new ();
-  let mut ignored_skgrepos : Vec<SkgRepoName> = Vec::new ();
+  let mut retained : Vec<(SkgrepoName, GraphnodeOnDisk)> = Vec::new ();
+  let mut ignored_skgrepos : Vec<SkgrepoName> = Vec::new ();
   for (skgrepo, node_fs) in sections {
     if config . skgrepo_is_owned (&skgrepo) {
       retained . push (( skgrepo, node_fs )); }
@@ -113,11 +113,11 @@ impl fmt::Display for TelescopeConstructionError {
         write! ( f,
           "Telescope '{}' contains a section from repo '{}' whose embedded pid is '{}'.",
           expected, skgrepo, actual ),
-      TelescopeConstructionError::UnknownSkgRepo { skgrepo } =>
+      TelescopeConstructionError::UnknownSkgrepo { skgrepo } =>
         write! ( f,
           "Telescope contains a section from unconfigured repo '{}'.",
           skgrepo ),
-      TelescopeConstructionError::DuplicateSkgRepo { skgrepo } =>
+      TelescopeConstructionError::DuplicateSkgrepo { skgrepo } =>
         write! ( f,
           "Telescope contains more than one section from repo '{}'.",
           skgrepo ),
@@ -132,17 +132,17 @@ impl std::error::Error for TelescopeConstructionError {
 impl Telescope {
   pub fn try_new (
     pid      : ID,
-    sections : Vec<(SkgRepoName, GraphnodeOnDisk)>,
+    sections : Vec<(SkgrepoName, GraphnodeOnDisk)>,
     config   : &SkgConfig,
   ) -> Result<Telescope, TelescopeConstructionError> {
     if sections . is_empty () {
       return Err ( TelescopeConstructionError::Empty { pid } ); }
-    let positions : HashMap<SkgRepoName, usize> =
+    let positions : HashMap<SkgrepoName, usize> =
       config . ordered_skgrepos () . into_iter () . enumerate ()
       . map ( |(position, skgrepo)| (skgrepo, position) )
       . collect ();
-    let mut seen_skgrepos : HashSet<SkgRepoName> = HashSet::new ();
-    let mut previous : Option<(usize, SkgRepoName)> = None;
+    let mut seen_skgrepos : HashSet<SkgrepoName> = HashSet::new ();
+    let mut previous : Option<(usize, SkgrepoName)> = None;
     for (skgrepo, node_fs) in &sections {
       if node_fs . pid != pid {
         return Err ( TelescopeConstructionError::MixedPid {
@@ -150,10 +150,10 @@ impl Telescope {
           actual   : node_fs . pid . clone (),
           skgrepo  : skgrepo . clone (), } ); }
       let position : usize = * positions . get (skgrepo)
-        . ok_or_else ( || TelescopeConstructionError::UnknownSkgRepo {
+        . ok_or_else ( || TelescopeConstructionError::UnknownSkgrepo {
           skgrepo : skgrepo . clone (), } ) ?;
       if ! seen_skgrepos . insert ( skgrepo . clone () ) {
-        return Err ( TelescopeConstructionError::DuplicateSkgRepo {
+        return Err ( TelescopeConstructionError::DuplicateSkgrepo {
           skgrepo : skgrepo . clone (), } ); }
       if let Some ((previous_position, previous_skgrepo)) = &previous {
         if *previous_position >= position {
@@ -171,13 +171,13 @@ impl Telescope {
   /// The most public section's skgrepo.
   pub fn home (
     &self,
-  ) -> &SkgRepoName {
+  ) -> &SkgrepoName {
     & self . sections . first ()
       . expect ("Telescope construction guarantees a section") . 0 }
 
   pub fn sections (
     &self,
-  ) -> &[(SkgRepoName, GraphnodeOnDisk)] {
+  ) -> &[(SkgrepoName, GraphnodeOnDisk)] {
     &self . sections }
 
   /// Every extra id any section claims, first occurrence first.
@@ -209,7 +209,7 @@ impl Telescope {
   /// The sections in the form the composition consumes, order preserved.
   pub fn into_slices (
     self,
-  ) -> Vec<(SkgRepoName, SectionSlices)> {
+  ) -> Vec<(SkgrepoName, SectionSlices)> {
     self . sections . into_iter ()
       . map ( |(skgrepo, node_fs)|
               (skgrepo, node_fs . into_section_slices ()) )
@@ -315,25 +315,25 @@ pub enum CompositionWarning {
   /// home skgrepo cannot see it. Distinct from 'NonHomeTitle' (a
   /// stray SECOND title) and 'MissingTitle' (no title anywhere).
   TitleBelowHome {
-    home     : crate::types::misc::SkgRepoName,
-    title_at : crate::types::misc::SkgRepoName,
+    home     : crate::types::misc::SkgrepoName,
+    title_at : crate::types::misc::SkgrepoName,
   },
   /// The selected body is below the home. Title and body select
   /// independently, so this may occur with a title at home.
   BodyBelowHome {
-    home    : crate::types::misc::SkgRepoName,
-    body_at : crate::types::misc::SkgRepoName,
+    home    : crate::types::misc::SkgrepoName,
+    body_at : crate::types::misc::SkgrepoName,
   },
   /// A section below the one holding the title carried a title too;
   /// the more public one won.
   NonHomeTitle {
-    skgrepo      : crate::types::misc::SkgRepoName,
-    selected_at : crate::types::misc::SkgRepoName,
+    skgrepo      : crate::types::misc::SkgrepoName,
+    selected_at : crate::types::misc::SkgrepoName,
   },
   /// A later section carried a body; the more-public selected body won.
   NonHomeBody {
-    skgrepo      : crate::types::misc::SkgRepoName,
-    selected_at : crate::types::misc::SkgRepoName,
+    skgrepo      : crate::types::misc::SkgrepoName,
+    selected_at : crate::types::misc::SkgrepoName,
   },
   /// No section carried a title.
   MissingTitle,
@@ -380,7 +380,7 @@ impl std::fmt::Display for CompositionWarning {
 mod telescope_construction_tests {
   use super::{Telescope, TelescopeConstructionError};
   use crate::types::misc::{
-    ID, SkgConfig, SkgRepo, SkgRepoName};
+    ID, SkgConfig, Skgrepo, SkgrepoName};
   use crate::types::nodes::fs::GraphnodeOnDisk;
 
   use std::collections::HashMap;
@@ -388,8 +388,8 @@ mod telescope_construction_tests {
 
   fn skgrepo (
     name : &str,
-  ) -> SkgRepoName {
-    SkgRepoName::from (name) }
+  ) -> SkgrepoName {
+    SkgrepoName::from (name) }
 
   fn node_fs (
     pid : &str,
@@ -407,21 +407,21 @@ mod telescope_construction_tests {
       flags                        : Vec::new (), } }
 
   fn config () -> SkgConfig {
-    let ordered : Vec<SkgRepoName> =
+    let ordered : Vec<SkgrepoName> =
       ["public", "trusted", "private"] . into_iter ()
       . map (skgrepo) . collect ();
-    let skgrepos : HashMap<SkgRepoName, SkgRepo> =
+    let skgrepos : HashMap<SkgrepoName, Skgrepo> =
       ordered . iter () . cloned ()
       . map ( |name| {
         ( name . clone (),
-          SkgRepo {
+          Skgrepo {
             path         : PathBuf::from ( &name . 0 ),
             name,
             abbreviation : None,
             owned        : true, } ) } )
       . collect ();
     let mut config : SkgConfig =
-      SkgConfig::dummyFromSkgRepos (skgrepos);
+      SkgConfig::dummyFromSkgrepos (skgrepos);
     config . skgrepo_order = ordered;
     config }
 
@@ -453,13 +453,13 @@ mod telescope_construction_tests {
         vec! [ (skgrepo ("public"), node_fs ("N")),
                (skgrepo ("public"), node_fs ("N")) ],
         &config ),
-      Err (TelescopeConstructionError::DuplicateSkgRepo { .. }) ));
+      Err (TelescopeConstructionError::DuplicateSkgrepo { .. }) ));
     assert! ( matches! (
       Telescope::try_new (
         ID::from ("N"),
         vec! [ (skgrepo ("unknown"), node_fs ("N")) ],
         &config ),
-      Err (TelescopeConstructionError::UnknownSkgRepo { .. }) ));
+      Err (TelescopeConstructionError::UnknownSkgrepo { .. }) ));
     assert! ( matches! (
       Telescope::try_new (
         ID::from ("N"),

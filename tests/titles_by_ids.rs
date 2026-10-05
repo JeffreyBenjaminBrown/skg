@@ -6,8 +6,8 @@ use skg::serve::handlers::titles_by_skgids::{
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::test_utils::read_lp_message;
-use skg::types::git::SkgRepoDiff;
-use skg::types::misc::{ID, MSV, SkgConfig, SkgRepo, SkgRepoName, SkgRepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
+use skg::types::git::SkgrepoDiff;
+use skg::types::misc::{ID, MSV, SkgConfig, Skgrepo, SkgrepoName, SkgrepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::{empty_graphnode, Graphnode};
 
 use std::collections::{BTreeSet, HashMap};
@@ -27,7 +27,7 @@ fn titles_by_skgids_handler_sends_parseable_titles (
   node . title =
     "?" . to_string ();
   node . home_skgrepo =
-    SkgRepoName::from ("main");
+    SkgrepoName::from ("main");
   node . aliases =
     rel_partners_at_relRepo_msv ( & node . home_skgrepo, MSV::Specified (vec!["Alias One" . to_string ()]) );
   let mut spaced_title_node : Graphnode =
@@ -37,7 +37,7 @@ fn titles_by_skgids_handler_sends_parseable_titles (
   spaced_title_node . title =
     "The Real Title, with spaces" . to_string ();
   spaced_title_node . home_skgrepo =
-    SkgRepoName::from ("main");
+    SkgrepoName::from ("main");
   let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
       &vec![node, spaced_title_node],
@@ -59,7 +59,7 @@ fn titles_by_skgids_handler_sends_parseable_titles (
     request,
     &InRustGraph::new (),
     &tantivy_index,
-    &SkgConfig::dummyFromSkgRepos (HashMap::new ()),
+    &SkgConfig::dummyFromSkgrepos (HashMap::new ()),
     false );
   drop (server);
   let mut reader =
@@ -91,7 +91,7 @@ fn titles_by_skgids_handler_sends_parseable_titles (
 #[test]
 fn restricted_title_lookup_challenges_without_releasing_text (
 ) -> Result<(), Box<dyn Error>> {
-  let skgrepo  : SkgRepoName = SkgRepoName::from ("main");
+  let skgrepo  : SkgrepoName = SkgrepoName::from ("main");
   let mut node : Graphnode = empty_graphnode ();
   node . pid = ID::new ("overPrivateText-title-id");
   node . home_skgrepo = skgrepo . clone ();
@@ -101,8 +101,8 @@ fn restricted_title_lookup_challenges_without_releasing_text (
     InRustGraph::from_graphnodes (&[node . clone ()]);
   let (index, _) = wipe_then_init_tantivy_db (
     &[node], Path::new ("/tmp/tantivy-test-title-release") ) ?;
-  let config : SkgConfig = SkgConfig::dummyFromSkgRepos (HashMap::from ([
-    (skgrepo . clone (), SkgRepo {
+  let config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::from ([
+    (skgrepo . clone (), Skgrepo {
       name         : skgrepo . clone (),
       abbreviation : None,
       path         : Path::new ("/tmp") . to_path_buf (),
@@ -110,7 +110,7 @@ fn restricted_title_lookup_challenges_without_releasing_text (
     })
   ]));
   let restriction = SkgrepoRestriction {
-    name    : SkgRepoSetName::from ("public"),
+    name    : SkgrepoSetName::from ("public"),
     skgrepos : BTreeSet::from ([skgrepo]),
   };
   let respond = |request : &str| -> Result<String, Box<dyn Error>> {
@@ -149,13 +149,13 @@ fn deleted_titles_supplement_tantivy_title_map (
     vec! [extra_id . clone ()];
   deleted_node . title =
     "Deleted Title" . to_string ();
-  let mut skgrepo_diff : SkgRepoDiff =
-    SkgRepoDiff::new_not_gitrepo ();
+  let mut skgrepo_diff : SkgrepoDiff =
+    SkgrepoDiff::new_not_gitrepo ();
   skgrepo_diff . deleted_nodes . insert (
     pid . clone (), deleted_node );
-  let skgrepo_diffs : HashMap<SkgRepoName, SkgRepoDiff> =
+  let skgrepo_diffs : HashMap<SkgrepoName, SkgrepoDiff> =
     HashMap::from ([
-      (SkgRepoName::from ("main"), skgrepo_diff) ]);
+      (SkgrepoName::from ("main"), skgrepo_diff) ]);
   let mut title_map : HashMap<ID, String> =
     HashMap::new ();
   add_deleted_node_titles_by_skgids (
@@ -175,8 +175,8 @@ fn titles_by_skgids_finds_deleted_git_file_title_without_diff_mode (
 ) -> Result<(), Box<dyn Error>> {
   let skgid : ID =
     ID::new ("a782564f-029a-45d7-b96e-1986d8759924");
-  let skgrepo_name : SkgRepoName =
-    SkgRepoName::from ("main");
+  let skgrepo_name : SkgrepoName =
+    SkgrepoName::from ("main");
   let temp_dir : TempDir =
     TempDir::new ()?;
   let skgrepo_dir : &Path =
@@ -195,9 +195,9 @@ fn titles_by_skgids_finds_deleted_git_file_title_without_diff_mode (
       &Vec::<Graphnode>::new (),
       &temp_dir . path () . join ("tantivy"))?;
   let config : SkgConfig =
-    SkgConfig::dummyFromSkgRepos (HashMap::from ([
+    SkgConfig::dummyFromSkgrepos (HashMap::from ([
       (skgrepo_name . clone (),
-       SkgRepo {
+       Skgrepo {
          name          : skgrepo_name,
          abbreviation  : None,
          path          : skgrepo_dir . to_path_buf (),
@@ -237,8 +237,8 @@ fn titles_by_skgids_finds_untracked_git_file_title_without_diff_mode (
 ) -> Result<(), Box<dyn Error>> {
   let skgid : ID =
     ID::new ("abf5bac1-de1c-4026-868a-60a51a5a3176");
-  let skgrepo_name : SkgRepoName =
-    SkgRepoName::from ("main");
+  let skgrepo_name : SkgrepoName =
+    SkgrepoName::from ("main");
   let temp_dir : TempDir =
     TempDir::new ()?;
   let skgrepo_dir : &Path =
@@ -256,9 +256,9 @@ fn titles_by_skgids_finds_untracked_git_file_title_without_diff_mode (
       &Vec::<Graphnode>::new (),
       &temp_dir . path () . join ("tantivy"))?;
   let config : SkgConfig =
-    SkgConfig::dummyFromSkgRepos (HashMap::from ([
+    SkgConfig::dummyFromSkgrepos (HashMap::from ([
       (skgrepo_name . clone (),
-       SkgRepo {
+       Skgrepo {
          name          : skgrepo_name,
          abbreviation  : None,
          path          : skgrepo_dir . to_path_buf (),

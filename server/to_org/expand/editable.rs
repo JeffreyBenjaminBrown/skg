@@ -4,8 +4,8 @@ use crate::to_org::expand::role_tree::build_and_integrate_role_tree_then_drop_re
 use crate::to_org::expand::folder_request::build_and_integrate_folder_then_drop_request;
 use crate::to_org::expand::flags::build_and_integrate_flags_then_drop_request;
 use crate::to_org::util::{ EditableMap, Finalizable, get_skgid_from_viewnode_at, makeWriteProtectedAndClobber, unrestrictedVognode_in_tree_is_writeProtected };
-use crate::types::misc::{ID, SkgConfig, SkgRepoName};
-use crate::types::git::SkgRepoDiff;
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::git::SkgrepoDiff;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, ViewRequest, FolderRelation, Editability, AffectsParent };
 use crate::types::viewnode::Vognode;
 use crate::types::nodes::complete::Graphnode;
@@ -24,7 +24,7 @@ pub fn execute_view_requests (
   config             : &SkgConfig,
   errors             : &mut Vec < String >,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  skgrepo_diffs      : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs      : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   for (treeid, request) in requests {
     match request {
@@ -172,7 +172,7 @@ fn from_disk_replace_title_body_and_graphnode (
   graph   : &InRustGraph,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  let (pid, src) : (ID, SkgRepoName) =
+  let (pid, src) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_viewnode_at ( tree, treeid,
       "from_disk_replace_title_body_and_graphnode" ) ?;
   let graphnode : Graphnode = graphnode_graphFirst_by_pid_and_skgrepo (

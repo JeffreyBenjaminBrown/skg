@@ -8,7 +8,7 @@ use crate::serve::util::{
   send_response_with_length_prefix,
   tag_sexp_response,
   value_from_request_sexp};
-use crate::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
+use crate::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
 use crate::types::misc::SkgConfig;
 
 use std::net::TcpStream;
@@ -22,7 +22,7 @@ pub fn handle_diff_report_request (
   let restriction : SkgrepoRestriction =
     SkgrepoRestriction::named (
       config,
-      SkgRepoSetName::from ("all"))
+      SkgrepoSetName::from ("all"))
     . expect ("reserved repo-set all should always resolve");
   handle_diff_report_request_with_repo_set (
     stream, request, config, &restriction ) }

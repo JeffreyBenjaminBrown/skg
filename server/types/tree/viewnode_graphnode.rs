@@ -3,7 +3,7 @@
 use crate::to_org::util::get_skgid_from_viewnode_at;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, MSV, SkgConfig, SkgRepoName};
+use crate::types::misc::{ID, MSV, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
     Viewnode, ViewnodeKind, UnrestrictedVognode, AffectsParent };
 use crate::types::viewnode::{Vognode, Phantom, PropertyFolder, Property, PartnerFolder};
@@ -43,7 +43,7 @@ pub fn pid_and_skgrepo_from_viewnode_at (
   tree        : &Tree<Viewnode>,
   treeid      : NodeId,
   caller_name : &str,
-) -> Result<(ID, SkgRepoName), Box<dyn Error>> {
+) -> Result<(ID, SkgrepoName), Box<dyn Error>> {
   let node_ref : NodeRef<Viewnode> =
     tree . get (treeid) . ok_or_else ( ||
       format! ( "{}: node not found", caller_name ) ) ?;
@@ -116,7 +116,7 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
   let grandparent_ref : NodeRef < Viewnode > =
     parent_ref . parent ()
     . ok_or ("SubscribeeFolder has no parent (subscriber)") ?;
-  let (subscriber_skgid, subscriber_skgrepo) : (ID, SkgRepoName) =
+  let (subscriber_skgid, subscriber_skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_viewnode_at (
       tree, grandparent_ref . id (),
       "pid_for_subscribee_and_its_subscriber_grandparent" ) ?;

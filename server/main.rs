@@ -12,12 +12,12 @@ use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::export_org::{
   export_candidate_pids, export_to_org, ExportReport};
-use skg::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
+use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
 use skg::dbs::init::{InitContextHandoff, initialize_dbs};
 use skg::types::env::SkgEnv;
 use skg::import_org_roam::{ImportStats, import_org_roam_directory};
 use skg::serve::serve;
-use skg::types::misc::{ID, SkgConfig, SkgRepoName, TantivyIndex};
+use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use skg::types::nodes::complete::Graphnode;
 
 use std::collections::HashSet;
@@ -293,7 +293,7 @@ fn run_import (
     std::process::exit (1); }
   let org_dir    : &Path       = Path::new (&args[2]);
   let output_dir : &Path       = Path::new (&args[3]);
-  let skgrepo    : SkgRepoName  = SkgRepoName::from (&args[4]);
+  let skgrepo    : SkgrepoName  = SkgrepoName::from (&args[4]);
   let stats : ImportStats =
     match import_org_roam_directory (org_dir, output_dir, &skgrepo) {
       Ok (stats) => stats,
@@ -331,10 +331,10 @@ fn run_export_org (
     else { "data/skgconfig.toml" . to_string() };
   let config : SkgConfig =
     load_config (&config_path) ?;
-  let set_name : SkgRepoSetName =
+  let set_name : SkgrepoSetName =
     if positional . len () > 1 {
-      SkgRepoSetName::from (positional[1] . as_str()) }
-    else { SkgRepoSetName::from ("all") };
+      SkgrepoSetName::from (positional[1] . as_str()) }
+    else { SkgrepoSetName::from ("all") };
   let output_dir : String =
     if positional . len () > 2 { positional[2] . clone () }
     else { "org-exports" . to_string() };

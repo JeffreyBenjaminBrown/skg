@@ -6,7 +6,7 @@ use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_viewforest;
 use skg::nodeMerge::merge_nodes;
 use skg::test_utils::{run_with_shared_test_stores, tantivy_contains_skgid, graph_handle_from_config, audit_inrustgraph_or_panic};
-use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SkgRepoName};
+use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SkgrepoName};
 use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{NodeEditRequest, Viewnode, ViewnodeKind, Vognode, UnrestrictedVognode, Editability, viewforest_root_viewnode, default_unrestrictedVognode};
 use skg::types::nodes::complete::Graphnode;
@@ -32,7 +32,7 @@ fn mk_test_viewnode (
       body         : None,
       edit_request },
     .. default_unrestrictedVognode ( ID::from (skgid),
-                          SkgRepoName::from ("main"),
+                          SkgrepoName::from ("main"),
                           title . to_string() ) };
   Viewnode { focused     : false,
             folded      : false,
@@ -113,14 +113,14 @@ fn verify_filesystem_after_merge_2_into_1(
 ) -> Result<(), Box<dyn Error>> {
   let node_2_path: String =
     path_from_pid_and_skgrepo ( config,
-                               &SkgRepoName::from ("main"),
+                               &SkgrepoName::from ("main"),
                                ID::from ("2")) ?;
   assert!( !Path::new (&node_2_path) . exists(),
             "2.skg should be deleted" );
 
   // Node 1's file should be updated
   let node_1: Graphnode = graphnode_from_pid_and_skgrepo(
-    config, ID::from ("1"), &SkgRepoName::from ("main") )?;
+    config, ID::from ("1"), &SkgrepoName::from ("main") )?;
   assert_eq!(&node_1 . pid, &ID::from ("1"));
   assert_eq!(node_1 . extra_ids . len(), 2, "Node 1 should have 2 extra_ids");
   assert_eq!(&node_1 . extra_ids[0], &ID::from ("2"));
@@ -178,7 +178,7 @@ fn verify_filesystem_after_merge_2_into_1(
 
   let acquiree_text_preserver_path: String =
     path_from_pid_and_skgrepo ( config,
-                               &SkgRepoName::from ("main"),
+                               &SkgrepoName::from ("main"),
                                acquiree_text_preserver_skgid . clone() ) ?;
   assert!( Path::new (&acquiree_text_preserver_path) . exists(),
            "acquiree_text_preserver file should exist" );
@@ -186,7 +186,7 @@ fn verify_filesystem_after_merge_2_into_1(
   let acquiree_text_preserver: Graphnode =
     graphnode_from_pid_and_skgrepo( config,
                                  acquiree_text_preserver_skgid . clone(),
-                                 &SkgRepoName::from ("main") )?;
+                                 &SkgrepoName::from ("main") )?;
   assert!(acquiree_text_preserver . title . starts_with ("MERGED: "));
   assert_eq!(acquiree_text_preserver . title, "MERGED: 2");
   assert_eq!(acquiree_text_preserver . body, Some("2 body" . to_string()));
@@ -289,14 +289,14 @@ fn verify_filesystem_after_merge_1_into_2(
 ) -> Result<(), Box<dyn Error>> {
   let node_1_path: String =
     path_from_pid_and_skgrepo ( config,
-                               &SkgRepoName::from ("main"),
+                               &SkgrepoName::from ("main"),
                                ID::from ("1")) ?;
   assert!( !Path::new (&node_1_path) . exists(),
             "1.skg should be deleted" );
 
   // Node 2's file should be updated
   let node_2: Graphnode = graphnode_from_pid_and_skgrepo(
-    config, ID::from ("2"), &SkgRepoName::from ("main") )?;
+    config, ID::from ("2"), &SkgrepoName::from ("main") )?;
 
   // Should have pid=2, extra_ids=[2-extra-id, 1]
   assert_eq!(&node_2 . pid, &ID::from ("2"));
@@ -355,7 +355,7 @@ fn verify_filesystem_after_merge_1_into_2(
 
   let acquiree_text_preserver_path: String =
     path_from_pid_and_skgrepo( config,
-                              &SkgRepoName::from ("main"),
+                              &SkgrepoName::from ("main"),
                               acquiree_text_preserver_skgid . clone() ) ?;
   assert!( Path::new (&acquiree_text_preserver_path) . exists(),
            "acquiree_text_preserver file should exist" );
@@ -363,7 +363,7 @@ fn verify_filesystem_after_merge_1_into_2(
   let acquiree_text_preserver: Graphnode =
     graphnode_from_pid_and_skgrepo( config,
                                  acquiree_text_preserver_skgid . clone(),
-                                 &SkgRepoName::from ("main") )?;
+                                 &SkgrepoName::from ("main") )?;
   assert!(acquiree_text_preserver . title . starts_with ("MERGED: "));
   assert_eq!(acquiree_text_preserver . title, "MERGED: 1");
   assert_eq!(acquiree_text_preserver . body,
@@ -450,7 +450,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
     "hides-1-from-subscriptions.skg", "overrider-of-1.skg",
     "links-to-1.skg",
   ] . iter () . map (|name|
-    config . skgrepos [&SkgRepoName::from ("main")] . path . join (name))
+    config . skgrepos [&SkgrepoName::from ("main")] . path . join (name))
     . collect ();
   let neighbor_before : Vec<(Vec<u8>, SystemTime)> = neighbor_paths . iter ()
     . map (|path| Ok ((fs::read (path) ?, fs::metadata (path) ? . modified () ?)))

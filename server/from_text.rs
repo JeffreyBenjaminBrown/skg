@@ -27,7 +27,7 @@ use buffer_to_viewnodes::add_missing_info::{
   na_affectsParent_under_visible_parent_becomes_isContainer,
   EnrichmentProvenance};
 use fork::{
-  CloneSkgRepoInputs,
+  CloneSkgrepoInputs,
   explicit_new_child_skgrepos_for_foreign_vognodes,
   fork_spec_from_buffer_node,
   new_foreign_nodes_adopting_clone_skgrepos,
@@ -40,7 +40,7 @@ use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{ViewnodeKind, Vognode, ViewRequest};
 use std::collections::{HashMap, HashSet};
-use crate::types::misc::SkgRepoName;
+use crate::types::misc::SkgrepoName;
 use crate::types::save::ForkSpec;
 
 /// Save preparation deliberately validates at several
@@ -79,7 +79,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
   graph              : &crate::dbs::in_rust_graph::InRustGraph,
   config             : &SkgConfig,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  fork_skgrepos      : &HashMap<ID, SkgRepoName>,
+  fork_skgrepos      : &HashMap<ID, SkgrepoName>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_graph (
     buffer_text, graph, config, skgrepo_restriction, fork_skgrepos, None ) }
@@ -92,7 +92,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
   graph       : &crate::dbs::in_rust_graph::InRustGraph,
   config      : &SkgConfig,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  fork_skgrepos : &HashMap<ID, SkgRepoName>,
+  fork_skgrepos : &HashMap<ID, SkgrepoName>,
   previous_viewforest : Option<&ViewForest>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   let skgrepo_restriction : Option<&SkgrepoRestriction> =
@@ -189,7 +189,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
   // C's repo is inferred from N's nearest OWNED vognode ancestor in
   // the view. The flat NodeInstructions have lost that ancestry, so resolve
   // it here, where the placed viewforest is live, keyed by foreign pid.
-  let owned_ancestor_skgrepo : HashMap<ID, SkgRepoName> =
+  let owned_ancestor_skgrepo : HashMap<ID, SkgrepoName> =
     owned_ancestor_skgrepos_for_foreign_vognodes (&viewforest, config);
   let adopt_clone_skgrepo : HashMap<ID, ID> = {
     // Bare new headlines under a foreign node are not foreign-creation
@@ -202,7 +202,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
       . cloned () . collect ();
     new_foreign_nodes_adopting_clone_skgrepos (
       &viewforest, & new_with_inherited_skgrepo, config ) };
-  let explicit_child_skgrepo : HashMap<ID, SkgRepoName> = {
+  let explicit_child_skgrepo : HashMap<ID, SkgrepoName> = {
     // A clone skgrepo the user already SPECIFIED, via explicit owned
     // skgrepos on the forked node's new children (fork-fixes Case 2):
     // the confirmation flow shows it as settled instead of asking.
@@ -212,7 +212,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
       . cloned () . collect ();
     explicit_new_child_skgrepos_for_foreign_vognodes (
       &viewforest, & new_with_explicit_skgrepo, config ) };
-  let default_clone_skgrepo : Option<SkgRepoName> = {
+  let default_clone_skgrepo : Option<SkgrepoName> = {
     // The active-aware default for a fork whose skgrepo can be neither
     // user-set nor inferred: prefer the CONFIG-FIRST owned skgrepo that
     // is UNRESTRICTED under the restricted set, so the fork reaches the
@@ -222,14 +222,14 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
     // -- then ForkRepoRestricted fires only when the user owns no UNRESTRICTED
     // skgrepo at all (the genuine "activate one first" case), and
     // ForkRepoUnresolved only when the user owns no skgrepo at all.
-    let owned_in_order : Vec<SkgRepoName> =
+    let owned_in_order : Vec<SkgrepoName> =
       config . owned_skgrepos_in_config_order ();
-    let unrestricted_owned : Option<SkgRepoName> = skgrepo_restriction . and_then (
+    let unrestricted_owned : Option<SkgrepoName> = skgrepo_restriction . and_then (
       |restriction| owned_in_order . iter ()
         . find ( |name| restriction . contains_skgrepo (name) )
         . cloned () );
     unrestricted_owned . or_else ( || owned_in_order . into_iter () . next () ) };
-  let clone_skgrepo_inputs : CloneSkgRepoInputs = CloneSkgRepoInputs {
+  let clone_skgrepo_inputs : CloneSkgrepoInputs = CloneSkgrepoInputs {
     user_set          : fork_skgrepos . clone (),
     explicit_child    : explicit_child_skgrepo,
     inferred_ancestor : owned_ancestor_skgrepo,
@@ -310,7 +310,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos (
   buffer_text        : &str,
   config             : &SkgConfig,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  fork_skgrepos      : &HashMap<ID, SkgRepoName>,
+  fork_skgrepos      : &HashMap<ID, SkgrepoName>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   let nodes = crate::dbs::filesystem::multiple_nodes
     ::read_all_skg_files_from_skgrepos (config)
@@ -371,7 +371,7 @@ fn explicit_fork_specs_from_viewforest (
   viewforest           : &ViewForest,
   graph                : &crate::dbs::in_rust_graph::InRustGraph,
   config               : &SkgConfig,
-  clone_skgrepo_inputs : &CloneSkgRepoInputs,
+  clone_skgrepo_inputs : &CloneSkgrepoInputs,
 ) -> Result<Vec<ForkSpec>, Vec<BufferValidationError>> {
   let mut specs  : Vec<ForkSpec> = Vec::new ();
   let mut errors : Vec<BufferValidationError> = Vec::new ();

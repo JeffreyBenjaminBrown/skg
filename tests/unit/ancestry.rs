@@ -5,7 +5,7 @@ use crate::types::viewnode::{
   Phantom, PhantomDeleted, Property, PropertyFolder };
 
 fn sid (s : &str) -> ID { ID::from (s) }
-fn src () -> SkgRepoName { SkgRepoName::from ("main") }
+fn src () -> SkgrepoName { SkgrepoName::from ("main") }
 
 fn normal (title : &str, pi : AffectsParent) -> Viewnode {
   mk_writeProtected_viewnode (sid (title), src (), title . to_string (), pi) }

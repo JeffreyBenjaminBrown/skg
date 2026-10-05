@@ -13,7 +13,7 @@ use skg::dbs::tantivy::escape::{escape_tantivy_intra_word, escape_tantivy_litera
 use skg::dbs::tantivy::search::{
   SearchOptions, has_overPrivateText_telescope, search_index};
 use skg::dbs::tantivy::write::update_index_with_nodes;
-use skg::types::misc::{ID, MSV, SkgRepoName, TantivyIndex, rel_partners_at_relRepo_msv};
+use skg::types::misc::{ID, MSV, SkgrepoName, TantivyIndex, rel_partners_at_relRepo_msv};
 use skg::types::nodes::tantivy::GraphnodeInTantivy;
 use skg::types::nodes::complete::{Flag, Graphnode, empty_graphnode};
 
@@ -512,7 +512,7 @@ fn overPrivateText_telescope_filter_runs_inside_the_search_query (
   overPrivateText . title = "shared privacy term" . to_string ();
   overPrivateText . overPrivateText_telescope = true;
   overPrivateText . aliases = rel_partners_at_relRepo_msv (
-    &SkgRepoName::from ("main"),
+    &SkgrepoName::from ("main"),
     MSV::Specified (vec! ["dirty alias secret" . to_string ()]) );
   let (index, _) = wipe_then_init_tantivy_db (
     &[clean, overPrivateText], Path::new ("/tmp/tantivy-test-overPrivateText-filter") ) ?;
@@ -796,14 +796,14 @@ fn test_title_by_skgid_returns_title_not_alias (
       Path::new (index_dir) )?;
   assert_eq! (indexed_count, 3,
     "Expected 3 documents (1 title + 2 aliases)");
-  let result : Option<(String, SkgRepoName)> =
+  let result : Option<(String, SkgrepoName)> =
     title_and_skgrepo_by_skgid (
       &tantivy_index,
       &ID::new ("node-with-aliases") );
   assert_eq! (result . as_ref () . map ( |(t, _)| t . as_str () ),
     Some ("The Real Title"),
     "title_and_repo_by_id should return the title, not an alias");
-  let missing : Option<(String, SkgRepoName)> =
+  let missing : Option<(String, SkgrepoName)> =
     title_and_skgrepo_by_skgid (
       &tantivy_index,
       &ID::new ("nonexistent-id") );

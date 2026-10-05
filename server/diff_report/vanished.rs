@@ -13,7 +13,7 @@ use crate::diff_report::git_snapshot::{
 use crate::diff_report::types::{
   CommitStamp, GraphSnapshot, VanishedNodeReport, VanishedNodeSighting};
 use crate::git_ops::read_gitrepo::open_gitrepo;
-use crate::types::misc::{ID, MSV, SkgConfig, SkgRepoName, members_msv, members_of};
+use crate::types::misc::{ID, MSV, SkgConfig, SkgrepoName, members_msv, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::links::links_from_node;
 
@@ -68,8 +68,8 @@ pub fn investigate_vanished_skgids (
     . map ( |skgid| VanishedNodeReport {
         skgid : skgid . clone (), sightings : Vec::new () } )
     . collect ();
-  let skgrepo_names : Vec<&SkgRepoName> = {
-    let mut names : Vec<&SkgRepoName> =
+  let skgrepo_names : Vec<&SkgrepoName> = {
+    let mut names : Vec<&SkgrepoName> =
       config . skgrepos . keys () . collect ();
     names . sort (); // deterministic report order
     names };
@@ -94,7 +94,7 @@ pub fn investigate_vanished_skgids (
 fn sight_skgids_in_gitrepo (
   gitrepo        : &Repository,
   prefix      : &Path,
-  skgrepo_name : &SkgRepoName,
+  skgrepo_name : &SkgrepoName,
   skgids         : &BTreeSet<ID>,
   reports     : &mut [VanishedNodeReport],
 ) {
@@ -134,7 +134,7 @@ fn commit_stamp (
 fn sighting_at_commit (
   gitrepo        : &Repository,
   prefix      : &Path,
-  skgrepo_name : &SkgRepoName,
+  skgrepo_name : &SkgrepoName,
   skgid          : &ID,
   commit      : &Commit,
   descendant  : Option<git2::Oid>,
@@ -178,7 +178,7 @@ fn sighting_at_commit (
 fn inbound_references_in_tree (
   gitrepo        : &Repository,
   prefix      : &Path,
-  skgrepo_name : &SkgRepoName,
+  skgrepo_name : &SkgrepoName,
   skgid          : &ID,
   tree        : &git2::Tree,
 ) -> Vec<(ID, &'static str)> {

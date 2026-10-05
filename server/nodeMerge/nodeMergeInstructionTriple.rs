@@ -4,7 +4,7 @@ use crate::from_text::local_fieldintent_collection::lower::nodeMerge_pairs;
 use crate::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
 use crate::from_text::local_fieldintent_collection::types::CollectedFieldIntents;
 use crate::types::save::{NodeMerge, SaveNode, DeleteNode};
-use crate::types::misc::{MSV, RelPartner, SkgConfig, SkgRepoName, ID, members_of, rel_partners_at_relRepo};
+use crate::types::misc::{MSV, RelPartner, SkgConfig, SkgrepoName, ID, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
   Flag, Graphnode, flag_is_true, set_flag};
 use crate::types::list::dedup_vector;
@@ -139,11 +139,11 @@ fn three_nodeMerged_graphnodes(
   // its home.
   let combine_rel_partners =
     |lists : &[&[RelPartner<ID>]]| -> Vec<RelPartner<ID>> {
-      let home    : &SkgRepoName = & updated_acquirer . home_skgrepo;
+      let home    : &SkgrepoName = & updated_acquirer . home_skgrepo;
       let mut out : Vec<RelPartner<ID>> = Vec::new ();
       for list in lists {
         for m in *list {
-          let skgrepo : SkgRepoName = config . more_private_of (
+          let skgrepo : SkgrepoName = config . more_private_of (
             m . relRepo . clone (), home . clone () );
           match out . iter_mut ()
             . find ( |o| o . member == m . member ) {
@@ -179,7 +179,7 @@ fn three_nodeMerged_graphnodes(
     for list in [ acquirer_from_disk . aliases . or_default (),
                   acquiree_from_disk . aliases . or_default () ] {
       for m in list {
-        let skgrepo : SkgRepoName = config . more_private_of (
+        let skgrepo : SkgrepoName = config . more_private_of (
           m . relRepo . clone (),
           updated_acquirer . home_skgrepo . clone () );
         match combined . iter_mut ()
@@ -270,15 +270,15 @@ fn create_acquiree_text_preserver(acquiree: &Graphnode) -> Graphnode {
 #[cfg(test)]
 mod flag_tests {
   use super::*;
-  use crate::types::misc::SkgRepo;
+  use crate::types::misc::Skgrepo;
   use crate::types::nodes::complete::{empty_graphnode, flag_is_true};
   use std::collections::HashMap;
   use std::path::PathBuf;
 
   fn config () -> SkgConfig {
-    let skgrepo : SkgRepoName = SkgRepoName::from ("owned");
-    SkgConfig::fromSkgReposAndTantivyFolder (
-      HashMap::from ([(skgrepo . clone (), SkgRepo {
+    let skgrepo : SkgrepoName = SkgrepoName::from ("owned");
+    SkgConfig::fromSkgreposAndTantivyFolder (
+      HashMap::from ([(skgrepo . clone (), Skgrepo {
         name         : skgrepo,
         abbreviation : None,
         path         : PathBuf::from ("owned"),
@@ -296,11 +296,11 @@ mod flag_tests {
     ] {
       let mut acquirer : Graphnode = Graphnode {
         pid          : ID::from ("A"),
-        home_skgrepo : SkgRepoName::from ("owned"),
+        home_skgrepo : SkgrepoName::from ("owned"),
         .. empty_graphnode () };
       let mut acquiree : Graphnode = Graphnode {
         pid          : ID::from ("B"),
-        home_skgrepo : SkgRepoName::from ("owned"),
+        home_skgrepo : SkgrepoName::from ("owned"),
         .. empty_graphnode () };
       acquirer . flags . extend ([
         Flag::Had_ID_Before_Import,

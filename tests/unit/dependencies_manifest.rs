@@ -4,7 +4,7 @@
 //! on agreement).
 
 use super::{foreign_manifest_order_warnings, write_dependencies_manifests};
-use crate::types::misc::{SkgConfig, SkgRepo, SkgRepoName};
+use crate::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -13,24 +13,24 @@ fn config_at (
   data_root : &std::path::Path,
   entries   : &[(&str, &str, bool)], // (name, relative path, owned)
 ) -> SkgConfig {
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
     HashMap::new ();
   for (name, rel, owned) in entries {
     let path : PathBuf = data_root . join (rel);
     std::fs::create_dir_all (&path) . unwrap ();
     skgrepos . insert (
-      SkgRepoName::from (*name),
-      SkgRepo {
-        name         : SkgRepoName::from (*name),
+      SkgrepoName::from (*name),
+      Skgrepo {
+        name         : SkgrepoName::from (*name),
         abbreviation : None,
         path,
         owned : *owned, } ); }
   let mut config : SkgConfig =
-    SkgConfig::dummyFromSkgRepos (skgrepos);
+    SkgConfig::dummyFromSkgrepos (skgrepos);
   config . data_root = data_root . to_path_buf ();
   config . skgrepo_order =
     entries . iter ()
-    . map ( |(name, _, _)| SkgRepoName::from (*name) )
+    . map ( |(name, _, _)| SkgrepoName::from (*name) )
     . collect ();
   config }
 
@@ -43,7 +43,7 @@ fn manifests_list_prefixes_for_owned_skgrepos_only (
     & [ ("public",  "owned/public",  true),
         ("eggs",    "eggman/eggs",   false),
         ("private", "owned/private", true) ] );
-  let written : Vec<SkgRepoName> =
+  let written : Vec<SkgrepoName> =
     write_dependencies_manifests (&config) . unwrap ();
   assert_eq! ( written . len (), 2, "owned repos only" );
   let private_manifest : String =

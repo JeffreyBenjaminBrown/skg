@@ -17,7 +17,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::util::{ get_skgid_from_viewnode_at, graphnode_and_viewnode_from_skgid, remove_completed_view_request};
 
-use crate::types::misc::{ID, SkgConfig, SkgRepoName};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::tree::viewnode_graphnode::{ find_child_by_skgid, find_children_by_skgids};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::viewnode::ViewRequest;
@@ -507,7 +507,7 @@ fn role_graft_relRepo (
   origin  : &ID,
   partner : &ID,
   role    : RelationRole,
-) -> Option<SkgRepoName> {
+) -> Option<SkgrepoName> {
   if role . is_first_role () {
     graph . relRepo ( partner, role . relation, origin )
   } else {

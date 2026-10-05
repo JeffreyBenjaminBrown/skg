@@ -28,7 +28,7 @@
 //! automatically.
 
 use crate::git_ops::read_gitrepo::skgrepo_git_remote;
-use crate::types::misc::{SkgConfig, SkgRepoName};
+use crate::types::misc::{SkgConfig, SkgrepoName};
 
 use std::io;
 use std::path::PathBuf;
@@ -68,9 +68,9 @@ fn render_dependency_entry (entry : &DependencyEntry) -> String {
 /// whose manifests were (re)written.
 pub fn write_dependencies_manifests (
   config : &SkgConfig,
-) -> io::Result<Vec<SkgRepoName>> {
-  let ordered : Vec<SkgRepoName> = config . ordered_skgrepos ();
-  let mut written : Vec<SkgRepoName> = Vec::new ();
+) -> io::Result<Vec<SkgrepoName>> {
+  let ordered : Vec<SkgrepoName> = config . ordered_skgrepos ();
+  let mut written : Vec<SkgrepoName> = Vec::new ();
   for (position, name) in ordered . iter () . enumerate () {
     if ! config . skgrepo_is_owned (name) { continue; }
     let Some (skgrepo) = config . skgrepos . get (name) else {
@@ -141,7 +141,7 @@ fn dependency_entry_path (e : &toml::Value) -> Option<String> {
 pub fn foreign_manifest_order_warnings (
   config : &SkgConfig,
 ) -> Vec<String> {
-  let ordered : Vec<SkgRepoName> = config . ordered_skgrepos ();
+  let ordered : Vec<SkgrepoName> = config . ordered_skgrepos ();
   let final_component = |p : &std::path::Path| -> Option<String> {
     p . components () . next_back ()
       . and_then ( |c| match c {

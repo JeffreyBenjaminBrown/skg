@@ -25,7 +25,7 @@
 use serde::{Serialize, Deserialize};
 
 use crate::telescope::types::{ListItem, SectionSlices};
-use crate::types::misc::{ID, MSV, SkgRepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
+use crate::types::misc::{ID, MSV, SkgrepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::complete::Flag;
 
@@ -99,7 +99,7 @@ impl GraphnodeOnDisk {
   /// missing-title reporting.
   pub fn into_complete_as_single_section (
     self,
-    skgrepo : SkgRepoName,
+    skgrepo : SkgrepoName,
   ) -> Graphnode {
     let members_only = |items : Vec<ListItem>| -> Vec<ID> {
       items . into_iter ()

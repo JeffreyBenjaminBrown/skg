@@ -17,8 +17,8 @@ use crate::to_org::complete::partner_folder::goal_list::{
   goal_list_for_outbound_folder };
 use crate::to_org::complete::partner_folder::inverse_scan::inverse_scan_for_inbound_folder;
 use crate::to_org::util::graphnode_and_viewnode_from_skgid;
-use crate::types::git::SkgRepoDiff;
-use crate::types::misc::{ID, SkgConfig, SkgRepoName, members_of};
+use crate::types::git::SkgrepoDiff;
+use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder};
 use crate::types::viewnode::Vognode;
@@ -58,7 +58,7 @@ fn build_initial_render_child_data (
   for skgid in skgids {
     let lookup : Option<(Graphnode, Viewnode)> =
       graphnode_and_viewnode_from_skgid (graph, config, skgid) ?;
-    let (primary_pid, skgrepo, title, unknown) : (ID, SkgRepoName, String, bool) = match lookup {
+    let (primary_pid, skgrepo, title, unknown) : (ID, SkgrepoName, String, bool) = match lookup {
       Some ((nc, _vn)) =>
         ( nc . pid . clone (),
           nc . home_skgrepo . clone (),
@@ -68,7 +68,7 @@ fn build_initial_render_child_data (
               // an PhantomUnknown case. We pass the raw id through with
               // a sentinel skgrepo/title so the reconcile call can
               // still run.
-        ( skgid . clone (), SkgRepoName::from (""), String::new (), true ), };
+        ( skgid . clone (), SkgrepoName::from (""), String::new (), true ), };
     if resolved . contains_key (&primary_pid) { continue; }
     goal . push (primary_pid . clone ());
     resolved . insert (
@@ -109,7 +109,7 @@ pub fn maybe_add_subscribeeFolder_branch (
   graph   : &InRustGraph,
   config  : &SkgConfig,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  skgrepo_diffs : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   force_create_when_empty : bool, // a Folder view-request materializes the
     // editable subscribeeFolder as an empty "add here" surface even with
     // no subscribees.
@@ -132,7 +132,7 @@ pub fn maybe_add_subscribeeFolder_branch (
       tree, treeid,
       &ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) )? . is_some ()
     { return Ok (( )); }}
-  let ( subscriber_pid, subscriber_skgrepo ) : (ID, SkgRepoName) =
+  let ( subscriber_pid, subscriber_skgrepo ) : (ID, SkgrepoName) =
     read_at_node_in_tree (
       tree, treeid,
       |vn| match &vn . kind {
@@ -251,7 +251,7 @@ pub fn maybe_add_default_partnerFolder_branches (
   graph              : &InRustGraph,
   config             : &SkgConfig,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  skgrepo_diffs      : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs      : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   error_unless_node_satisfies(
     tree, treeid,
@@ -286,7 +286,7 @@ pub fn maybe_add_one_partnerFolder (
   config  : &SkgConfig,
   graph   : &InRustGraph,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  skgrepo_diffs : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   force_create_when_empty : bool,
 ) -> Result < (), Box<dyn Error> > {
   if unique_non_vognode_child_of_viewnode (
@@ -294,7 +294,7 @@ pub fn maybe_add_one_partnerFolder (
     )? . is_some ()
   { // There already is one. Don't draw a new one.
     return Ok (( )); }
-  let (recorder_pid, recorder_skgrepo) : (ID, SkgRepoName) =
+  let (recorder_pid, recorder_skgrepo) : (ID, SkgrepoName) =
     read_at_node_in_tree (
       tree, treeid,
       |vn| match &vn . kind {
@@ -359,7 +359,7 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
   graph              : &InRustGraph,
   config             : &SkgConfig,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  skgrepo_diffs      : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  skgrepo_diffs      : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   if ! type_and_parent_type_consistent_with_subscribee (
     tree, subscribee_treeid )?
@@ -403,14 +403,14 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
     // phantoms (created bare; the BFS reconciles them in).
     let head_side_occupied : bool =
       skgrepo_diffs . is_some ()
-      && { let skgrepo_of = | pid : &ID | -> SkgRepoName {
+      && { let skgrepo_of = | pid : &ID | -> SkgrepoName {
              graph . pid_and_skgrepo (pid)
                . map ( |(_p, src)| src )
                . or_else ( || home_from_disk (pid, config) )
-               . unwrap_or_else ( SkgRepoName::not_found ) };
-           let subscribee_skgrepo : SkgRepoName =
+               . unwrap_or_else ( SkgrepoName::not_found ) };
+           let subscribee_skgrepo : SkgrepoName =
              skgrepo_of (&subscribee_pid);
-           let subscriber_skgrepo : SkgRepoName =
+           let subscriber_skgrepo : SkgrepoName =
              skgrepo_of (&subscriber_pid);
            let subscribee_contains : Vec<ID> =
              graphnode_graphFirst_by_pid_and_skgrepo (

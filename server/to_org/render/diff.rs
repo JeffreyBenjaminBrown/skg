@@ -13,9 +13,9 @@
 /// child but the worktree's parent.contains lacks it.
 
 use crate::types::env::find_skgrepo_with_optional_tantivy;
-use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgRepoDiff, GraphnodeDiff, GitDiffStatus, NodeChanges, added_relationship_axes_from_per_stage_diffs, node_axes_in_skgrepo_diff, net_diff_from_per_stage, removed_relationship_axes_from_per_stage_diffs};
+use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgrepoDiff, GraphnodeDiff, GitDiffStatus, NodeChanges, added_relationship_axes_from_per_stage_diffs, node_axes_in_skgrepo_diff, net_diff_from_per_stage, removed_relationship_axes_from_per_stage_diffs};
 use crate::types::list::Diff_Item;
-use crate::types::misc::{ID, SkgConfig, SkgRepoName, TantivyIndex};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use crate::types::phantom::title_for_phantom;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, mk_phantom_viewnode };
 use crate::types::viewnode::{Vognode, Phantom, PropertyFolder, Property};
@@ -34,18 +34,18 @@ use std::path::PathBuf;
 pub(crate) fn process_unrestrictedVognode_diff (
   mut node_mut                   : NodeMut<Viewnode>,
   graph                          : &InRustGraph,
-  skgrepo_diffs                  : &HashMap<SkgRepoName, SkgRepoDiff>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
+  skgrepo_diffs                  : &HashMap<SkgrepoName, SkgrepoDiff>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   tantivy_index                  : Option<&TantivyIndex>,
   config                         : &SkgConfig,
 ) -> Result<(), String> {
   let treeid : NodeId =
     node_mut . id();
-  let (pid, skgrepo) : (ID, SkgRepoName) =
+  let (pid, skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_viewnode_at (
       node_mut . tree(), treeid, "process_unrestrictedVognode_diff"
     ) . map_err ( |e| e . to_string() ) ?;
-  let skgrepo_diff : &SkgRepoDiff =
+  let skgrepo_diff : &SkgrepoDiff =
     match skgrepo_diffs . get (&skgrepo) {
       Some (d) => d,
       None => return Ok (( )) };
@@ -274,9 +274,9 @@ fn insert_phantoms_for_missing_contains (
   parent_treeid                  : NodeId,
   net_contains                   : &[Diff_Item<ID>],
   relationship_axes_by_skgid     : &HashMap<ID, RelationshipAxes>,
-  skgrepo_diff                   : &SkgRepoDiff,
-  skgrepo_diffs                  : &HashMap<SkgRepoName, SkgRepoDiff>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
+  skgrepo_diff                   : &SkgrepoDiff,
+  skgrepo_diffs                  : &HashMap<SkgrepoName, SkgrepoDiff>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   tantivy_index                  : Option<&TantivyIndex>,
   config                         : &SkgConfig,
 ) -> Result<(), String> {
@@ -308,11 +308,11 @@ fn insert_phantoms_for_missing_contains (
     // in no skgrepo -- fall back to the NOT_FOUND sentinel rather than
     // aborting the whole render (matching the PartnerFolder removed-member
     // path; TODO/DONE/local-view-update/plan_v2.org §7.6).
-    let child_skgrepo : SkgRepoName =
+    let child_skgrepo : SkgrepoName =
       find_skgrepo_with_optional_tantivy (
         graph, &skgid, deleted_since_head_pid_src_map,
         tantivy_index, config )
-        . unwrap_or_else ( SkgRepoName::not_found );
+        . unwrap_or_else ( SkgrepoName::not_found );
     let child_node_axes : NodeAxes =
       node_axes_for_phantom (&skgid, &child_skgrepo, skgrepo_diff, skgrepo_diffs);
     let child_title : String =
@@ -337,15 +337,15 @@ fn insert_phantoms_for_missing_contains (
 /// child's '.skg' file shows up as Deleted in either stage.
 fn node_axes_for_phantom (
   skgid            : &ID,
-  skgrepo       : &SkgRepoName,
-  skgrepo_diff  : &SkgRepoDiff,
-  skgrepo_diffs : &HashMap<SkgRepoName, SkgRepoDiff>,
+  skgrepo       : &SkgrepoName,
+  skgrepo_diff  : &SkgrepoDiff,
+  skgrepo_diffs : &HashMap<SkgrepoName, SkgrepoDiff>,
 ) -> NodeAxes {
   let file_path : PathBuf =
     PathBuf::from ( format! ( "{}.skg", skgid . 0 ));
   // Prefer the repo_diff for the phantom's own skgrepo if available,
   // otherwise fall back to the parent's repo_diff.
-  let resolved : &SkgRepoDiff =
+  let resolved : &SkgrepoDiff =
     skgrepo_diffs . get (skgrepo) . unwrap_or (skgrepo_diff);
   node_axes_in_skgrepo_diff ( Some (resolved), &file_path ) }
 

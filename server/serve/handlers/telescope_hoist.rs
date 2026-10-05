@@ -8,7 +8,7 @@
 
 use crate::dbs::filesystem::one_node::telescope_from_disk;
 use crate::telescope::compose::compose_telescope_collecting_warnings;
-use crate::types::misc::{ID, SkgConfig, SkgRepoName};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::save::{NodeInstruction, NodeMerge, SaveNode};
 use crate::types::sexp::extract_string_list_from_sexp;
 
@@ -19,7 +19,7 @@ use std::io;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HoistCandidate {
   pub pid  : ID,
-  pub home : SkgRepoName,
+  pub home : SkgrepoName,
 }
 
 /// Exact approvals have their own field because permission to release overPrivateText
@@ -72,7 +72,7 @@ pub fn candidates_from_disk (
   for pid in touched {
     let Some (telescope) = telescope_from_disk (config, &pid) ?
       else { continue; };
-    let home : SkgRepoName = telescope . home () . clone ();
+    let home : SkgrepoName = telescope . home () . clone ();
     if ! config . skgrepo_is_owned (&home) {
       return Err ( io::Error::new (
         io::ErrorKind::PermissionDenied,
@@ -158,7 +158,7 @@ mod tests {
   use super::*;
   use crate::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo;
   use crate::save::update_fs_from_nodeInstructions_with_hoist_approval;
-  use crate::types::misc::SkgRepo;
+  use crate::types::misc::Skgrepo;
   use crate::types::nodes::fs::GraphnodeOnDisk;
   use std::collections::HashMap;
   use std::fs;
@@ -167,7 +167,7 @@ mod tests {
 
   fn config_and_paths () -> (TempDir, SkgConfig, HashMap<&'static str, PathBuf>) {
     let temp : TempDir = tempdir () . unwrap ();
-    let mut skgrepos : HashMap<SkgRepoName, SkgRepo> = HashMap::new ();
+    let mut skgrepos : HashMap<SkgrepoName, Skgrepo> = HashMap::new ();
     let mut paths : HashMap<&'static str, PathBuf> = HashMap::new ();
     for (name, owned) in [
         ("public", true), ("middle", true),
@@ -175,16 +175,16 @@ mod tests {
       let path : PathBuf = temp . path () . join (name);
       fs::create_dir_all (&path) . unwrap ();
       paths . insert (name, path . clone ());
-      skgrepos . insert ( SkgRepoName::from (name), SkgRepo {
-        name         : SkgRepoName::from (name),
+      skgrepos . insert ( SkgrepoName::from (name), Skgrepo {
+        name         : SkgrepoName::from (name),
         abbreviation : None,
         path,
         owned : owned,
       } ); }
-    let mut config : SkgConfig = SkgConfig::dummyFromSkgRepos (skgrepos);
+    let mut config : SkgConfig = SkgConfig::dummyFromSkgrepos (skgrepos);
     config . data_root = temp . path () . to_path_buf ();
     config . skgrepo_order = ["public", "middle", "private", "foreign"]
-      . into_iter () . map (SkgRepoName::from) . collect ();
+      . into_iter () . map (SkgrepoName::from) . collect ();
     (temp, config, paths)
   }
 
@@ -193,7 +193,7 @@ mod tests {
     config : &SkgConfig,
   ) -> NodeInstruction {
     let mut node = graphnode_from_pid_and_skgrepo (
-      config, ID::from (pid), &SkgRepoName::from ("public") ) . unwrap ();
+      config, ID::from (pid), &SkgrepoName::from ("public") ) . unwrap ();
     // Buffer-authored nodes carry no disk overPrivateTextness authority. The save gate
     // has just rederived that fact from disk.
     node . overPrivateText_telescope = false;
@@ -216,7 +216,7 @@ mod tests {
     let response : String = confirmation_response (&[
       HoistCandidate {
         pid  : ID::from ("P"),
-        home : SkgRepoName::from ("public"),
+        home : SkgrepoName::from ("public"),
       },
     ]);
     assert! (response . contains ("P"));
@@ -261,7 +261,7 @@ mod tests {
     update_fs_from_nodeInstructions_with_hoist_approval (
       &node_instructions, &[], config . clone (), &approved ) . unwrap ();
     let reread = graphnode_from_pid_and_skgrepo (
-      &config, ID::from ("P"), &SkgRepoName::from ("public") ) . unwrap ();
+      &config, ID::from ("P"), &SkgrepoName::from ("public") ) . unwrap ();
     assert! (! reread . overPrivateText_telescope);
     assert_eq! (reread . title, "lower title");
     assert_eq! (reread . body . as_deref (), Some ("lower body"));
@@ -282,7 +282,7 @@ mod tests {
     assert! (lower . to_yaml () . unwrap () . contains ("private-child"));
     for pid in ["T", "B"] {
       assert! (! graphnode_from_pid_and_skgrepo (
-        &config, ID::from (pid), &SkgRepoName::from ("public") )
+        &config, ID::from (pid), &SkgrepoName::from ("public") )
         .unwrap () . overPrivateText_telescope); }
   }
 

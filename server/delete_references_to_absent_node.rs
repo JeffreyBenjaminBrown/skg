@@ -6,7 +6,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::save::graphnode_from_graphnodeInRust;
-use crate::types::misc::{ID, RelPartner, MSV, SkgConfig, SkgRepoName};
+use crate::types::misc::{ID, RelPartner, MSV, SkgConfig, SkgrepoName};
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::links::links_with_ranges_from_text;
 
@@ -30,11 +30,11 @@ impl StructuredField {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StructuralOccurrence {
   pub recorder_pid     : ID,
-  pub recorder_skgrepo : SkgRepoName,
+  pub recorder_skgrepo : SkgrepoName,
   pub recorder_title   : String,
   pub field            : StructuredField,
   pub raw_skgid        : ID,
-  pub relRepo          : SkgRepoName,
+  pub relRepo          : SkgrepoName,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -43,7 +43,7 @@ pub enum TextField { Title, Body }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LinkOccurrence {
   pub recorder_pid     : ID,
-  pub recorder_skgrepo : SkgRepoName,
+  pub recorder_skgrepo : SkgrepoName,
   pub field            : TextField,
   pub line             : usize,
   pub label            : String,
@@ -220,30 +220,30 @@ fn remove_exact (
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::types::misc::{SkgRepo};
+  use crate::types::misc::{Skgrepo};
   use crate::types::nodes::complete::{empty_graphnode, Graphnode};
   use std::collections::HashMap;
   use std::path::PathBuf;
 
   fn skgid (text : &str) -> ID { ID::from (text) }
   fn member (skgrepo : &str, raw : &str) -> RelPartner<ID> {
-    RelPartner::at_relRepo (SkgRepoName::from (skgrepo), skgid (raw)) }
+    RelPartner::at_relRepo (SkgrepoName::from (skgrepo), skgid (raw)) }
 
   fn config () -> SkgConfig {
-    let skgrepo = |name : &str, owned : bool| SkgRepo {
-      name: SkgRepoName::from (name), abbreviation: None,
+    let skgrepo = |name : &str, owned : bool| Skgrepo {
+      name: SkgrepoName::from (name), abbreviation: None,
       path: PathBuf::from (if owned { "owned/main" } else { "foreign/other" }),
       owned: owned };
-    SkgConfig::dummyFromSkgRepos (HashMap::from ([
-      (SkgRepoName::from ("main"), skgrepo ("main", true)),
-      (SkgRepoName::from ("foreign"), skgrepo ("foreign", false)),
+    SkgConfig::dummyFromSkgrepos (HashMap::from ([
+      (SkgrepoName::from ("main"), skgrepo ("main", true)),
+      (SkgrepoName::from ("foreign"), skgrepo ("foreign", false)),
     ]))
   }
 
   fn node (pid : &str, skgrepo : &str) -> Graphnode {
     let mut node : Graphnode = empty_graphnode ();
     node . pid = skgid (pid);
-    node . home_skgrepo = SkgRepoName::from (skgrepo);
+    node . home_skgrepo = SkgrepoName::from (skgrepo);
     node . title = format! ("{} [[id:gone][title label]]", pid);
     node . body = Some ( // the verbatim example is not a reference
       "line one\n=[[id:gone][body label]]= example\n[[id:gone][body label]]"

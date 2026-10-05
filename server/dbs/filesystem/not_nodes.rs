@@ -1,4 +1,4 @@
-use crate::types::misc::{SkgConfig, SkgRepo, SkgRepoName};
+use crate::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
 
 use std::collections::HashMap;
 use std::fs;
@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 /// - If it is marked owned (in the config), create it.
 /// - If it is foreign, fail.
 pub fn validate_skgrepo_paths_creating_owned_ones_if_needed (
-  skgrepos: &HashMap<SkgRepoName, SkgRepo>
+  skgrepos: &HashMap<SkgrepoName, Skgrepo>
 ) -> io::Result<()> {
   for (skgrepo_name, skgrepo) in skgrepos . iter() {
     if !skgrepo . path . exists() { // If it doesn't exist
@@ -32,7 +32,7 @@ pub fn validate_skgrepo_paths_creating_owned_ones_if_needed (
 /// 'SkgConfig'). Empty when the TOML has no parseable skgrepos array.
 fn skgrepo_order_from_toml (
   contents : &str,
-) -> Vec<SkgRepoName> {
+) -> Vec<SkgrepoName> {
   toml::from_str::<toml::Value> (contents) . ok ()
     . as_ref ()
     . and_then ( |v| v . get ("repos") )
@@ -40,7 +40,7 @@ fn skgrepo_order_from_toml (
     . map ( |arr| arr . iter ()
             . filter_map ( |t| t . get ("name")
                            . and_then ( |n| n . as_str () )
-                           . map (SkgRepoName::from) )
+                           . map (SkgrepoName::from) )
             . collect () )
     . unwrap_or_default () }
 
@@ -118,7 +118,7 @@ fn reject_retired_config_keys (
 ///   mirroring the folder layout.
 fn derive_ownership_and_labels (
   config    : &mut SkgConfig,
-  raw_paths : &HashMap<SkgRepoName, PathBuf>,
+  raw_paths : &HashMap<SkgrepoName, PathBuf>,
 ) {
   let owned_root : PathBuf =
     config . data_root . join ( &config . owned_folder );
@@ -155,7 +155,7 @@ pub fn load_config (
   let mut config: SkgConfig =
     toml::from_str (&contents) ?;
   config . skgrepo_order = skgrepo_order_from_toml (&contents);
-  let raw_paths : HashMap<SkgRepoName, PathBuf> =
+  let raw_paths : HashMap<SkgrepoName, PathBuf> =
     config . skgrepos . iter ()
     . map ( |(name, s)| (name . clone (), s . path . clone ()) )
     . collect ();
@@ -222,7 +222,7 @@ pub fn load_config_with_overrides (
   let mut config: SkgConfig =
     toml::from_str (&contents)?;
   config . skgrepo_order = skgrepo_order_from_toml (&contents);
-  let raw_paths : HashMap<SkgRepoName, PathBuf> =
+  let raw_paths : HashMap<SkgrepoName, PathBuf> =
     config . skgrepos . iter ()
     . map ( |(name, s)| (name . clone (), s . path . clone ()) )
     . collect ();
@@ -243,7 +243,7 @@ pub fn load_config_with_overrides (
     config . tantivy_folder =
       std::path::PathBuf::from(format!("/tmp/tantivy-{}", name)); }
   for (skgrepo_name, new_path) in skgrepo_overrides {
-    let key : SkgRepoName = SkgRepoName::from (*skgrepo_name);
+    let key : SkgrepoName = SkgrepoName::from (*skgrepo_name);
     if let Some (skgrepo) = config . skgrepos . get_mut (&key) {
       skgrepo . path = new_path . clone();
     } else {
@@ -256,11 +256,11 @@ pub fn load_config_with_overrides (
 fn validate_skgrepo_sets (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-  if config . skgrepos . contains_key (&SkgRepoName::from ("all")) {
+  if config . skgrepos . contains_key (&SkgrepoName::from ("all")) {
     return Err ("Configured repo may not be named 'all'" . into ()); }
   if config . default_skgrepo_set . 0 != "all"
   && ! config . skgrepos . contains_key (
-       &SkgRepoName::from ( config . default_skgrepo_set . 0 . as_str () )) {
+       &SkgrepoName::from ( config . default_skgrepo_set . 0 . as_str () )) {
     return Err (format! (
       "default_repo_set '{}' names no configured repo. It must be 'all' or the name of the most private repo to make available.",
       config . default_skgrepo_set

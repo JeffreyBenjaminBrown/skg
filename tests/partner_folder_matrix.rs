@@ -25,7 +25,7 @@ use std::error::Error;
 use std::net::TcpStream;
 
 use skg::skgrepo_sets::{
-  SkgrepoRestriction, SkgRepoSetName, run_with_skgrepo_set_test_db};
+  SkgrepoRestriction, SkgrepoSetName, run_with_skgrepo_set_test_db};
 use skg::test_utils::graph_handle_from_config;
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::{
@@ -683,7 +683,7 @@ async fn omission_scenarios (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let restriction : SkgrepoRestriction =
-    SkgrepoRestriction::named (config, SkgRepoSetName::from ("public")) ?;
+    SkgrepoRestriction::named (config, SkgrepoSetName::from ("public")) ?;
   { // write-protected subscriberFolder: restricted omitted, unrestricted shown
     let s : &str = "subscriberFolder/omission";
     let (buf, _p, _t) : (String, Vec<ID>, Tree<Viewnode>) =

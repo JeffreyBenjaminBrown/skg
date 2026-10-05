@@ -1,9 +1,9 @@
-use crate::types::git::{GitDiffStatus, NodeChanges, GraphnodeDiff, SkgRepoDiff, per_stage_node_changes_for_unrestrictedVognode};
+use crate::types::git::{GitDiffStatus, NodeChanges, GraphnodeDiff, SkgrepoDiff, per_stage_node_changes_for_unrestrictedVognode};
 
 use super::*;
 use std::path::PathBuf;
 
-fn skgrepo_name (s: &str) -> SkgRepoName { SkgRepoName ( s . to_string () ) }
+fn skgrepo_name (s: &str) -> SkgrepoName { SkgrepoName ( s . to_string () ) }
 fn skgid          (s: &str) -> ID          { ID ( s . to_string () ) }
 
 fn make_diff_entry (text_changed: bool) -> GraphnodeDiff {
@@ -19,28 +19,28 @@ fn sd_with (
   pid     : &ID,
   staged  : Option<bool>,
   unstag  : Option<bool>,
-) -> SkgRepoDiff {
+) -> SkgrepoDiff {
   let file : PathBuf = PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
   let mut s : HashMap<PathBuf, GraphnodeDiff> = HashMap::new ();
   let mut u : HashMap<PathBuf, GraphnodeDiff> = HashMap::new ();
   if let Some (t) = staged { s . insert (file . clone (), make_diff_entry (t)); }
   if let Some (t) = unstag { u . insert (file,           make_diff_entry (t)); }
-  SkgRepoDiff {
+  SkgrepoDiff {
     is_gitrepo: true,
     staged: s, unstaged: u,
     added_nodes: HashMap::new (),
     deleted_nodes: HashMap::new (), } }
 
-fn diffs_with (src: &SkgRepoName, sd: SkgRepoDiff)
-  -> Option<HashMap<SkgRepoName, SkgRepoDiff>> {
-  let mut m : HashMap<SkgRepoName, SkgRepoDiff> = HashMap::new ();
+fn diffs_with (src: &SkgrepoName, sd: SkgrepoDiff)
+  -> Option<HashMap<SkgrepoName, SkgrepoDiff>> {
+  let mut m : HashMap<SkgrepoName, SkgrepoDiff> = HashMap::new ();
   m . insert (src . clone (), sd);
   Some (m) }
 
 fn text_changed_both (
-  diffs : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  diffs : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   pid   : &ID,
-  src   : &SkgRepoName,
+  src   : &SkgrepoName,
 ) -> (bool, bool) {
   let (s, u) = per_stage_node_changes_for_unrestrictedVognode (diffs, pid, src);
   ( s . map ( |n| n . text_changed ) . unwrap_or (false),
@@ -129,7 +129,7 @@ fn same_session_surviving_content_membership_becomes_unknown () {
   restriction . focused = true;
   restriction . folded = true;
   let child : NodeId = tree . root_mut () . append (restriction) . id ();
-  let mut relRepos : HashMap<ID, SkgRepoName> = HashMap::new ();
+  let mut relRepos : HashMap<ID, SkgrepoName> = HashMap::new ();
   relRepos . insert (ghost . clone (), skgrepo_name ("private"));
   let graph_snap : std::sync::Arc<InRustGraph> =
     std::sync::Arc::new (InRustGraph::new ());
@@ -162,7 +162,7 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
     primary . clone (), skgrepo_name ("main"), "last seen" . to_string (), None );
   restriction . focused = true;
   let child : NodeId = tree . root_mut () . append (restriction) . id ();
-  let mut relRepos : HashMap<ID, SkgRepoName> = HashMap::new ();
+  let mut relRepos : HashMap<ID, SkgrepoName> = HashMap::new ();
   relRepos . insert (raw_extra . clone (), skgrepo_name ("foreign"));
   let graph_snap : std::sync::Arc<InRustGraph> =
     std::sync::Arc::new (InRustGraph::new ());
@@ -208,9 +208,9 @@ fn independent_same_skgid_child_is_prefetched () {
     { t . affectsParent = AffectsParent::False; }
   tree . root_mut () . append (child);
   let config : SkgConfig =
-    SkgConfig::dummyFromSkgRepos ( HashMap::new () );
-  let no_deletes  : HashMap<ID, SkgRepoName> = HashMap::new ();
-  let no_relRepos : HashMap<ID, SkgRepoName> = HashMap::new ();
+    SkgConfig::dummyFromSkgrepos ( HashMap::new () );
+  let no_deletes  : HashMap<ID, SkgrepoName> = HashMap::new ();
+  let no_relRepos : HashMap<ID, SkgrepoName> = HashMap::new ();
   let graph_snap : std::sync::Arc<InRustGraph> =
     std::sync::Arc::new ( InRustGraph::new () );
   let data : HashMap<ID, ChildData> =

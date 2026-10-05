@@ -14,7 +14,7 @@ use crate::serve::util::{
   send_response_with_length_prefix,
   value_from_request_sexp };
 use crate::types::env::SkgEnv;
-use crate::types::misc::{ID, SkgRepoName};
+use crate::types::misc::{ID, SkgrepoName};
 
 use std::net::TcpStream;
 
@@ -48,7 +48,7 @@ fn relRepo_info_response_body (
     value_from_request_sexp ("member", request) ? );
   let relation : NodeRelation = relation_from_client_string (
     & value_from_request_sexp ("relation", request) ? ) ?;
-  let (default, current) : (SkgRepoName, Option<SkgRepoName>) =
+  let (default, current) : (SkgrepoName, Option<SkgrepoName>) =
     relRepo_info (
       &runtime . graph, &runtime . config,
       &recorder, &member, relation ) ?;
@@ -70,19 +70,19 @@ pub fn relRepo_info (
   recorder : &ID,
   member   : &ID,
   relation : NodeRelation,
-) -> Result<(SkgRepoName, Option<SkgRepoName>), String> {
-  let (recorder_pid, recorder_home) : (ID, SkgRepoName) =
+) -> Result<(SkgrepoName, Option<SkgrepoName>), String> {
+  let (recorder_pid, recorder_home) : (ID, SkgrepoName) =
     graph . pid_and_skgrepo (recorder)
     . ok_or_else ( || format! (
       "recorder '{}' is not in the graph", recorder )) ?;
-  let member_home : SkgRepoName = graph . pid_and_skgrepo (member)
+  let member_home : SkgrepoName = graph . pid_and_skgrepo (member)
     . map ( |(_pid, src)| src )
     // An unresolved destination has no home to make this relationship more
     // private, so its writable relationship defaults to the recorder's home.
     . unwrap_or_else ( || recorder_home . clone () );
-  let default : SkgRepoName = config . default_relRepo (
+  let default : SkgrepoName = config . default_relRepo (
     &recorder_home, &member_home );
-  let current : Option<SkgRepoName> =
+  let current : Option<SkgrepoName> =
     graph . relRepo_for_stored_member ( &recorder_pid, relation, member );
   Ok (( default, current )) }
 

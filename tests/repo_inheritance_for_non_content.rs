@@ -4,7 +4,7 @@
 // then the node's skgrepo is not heralded,
 // even if the parent ignores it.
 
-use skg::types::misc::{ ID, SkgRepoName, SkgConfig, SkgRepo };
+use skg::types::misc::{ ID, SkgrepoName, SkgConfig, Skgrepo };
 use skg::types::viewnode::{ AffectsParent, Viewnode, ViewnodeKind, viewforest_root_viewnode, mk_editable_viewnode, mk_writeProtected_viewnode };
 use skg::types::viewnode::Vognode;
 use skg::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
@@ -15,23 +15,23 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 fn two_skgrepo_config () -> SkgConfig {
-  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
     HashMap::new ();
   skgrepos . insert (
-    SkgRepoName::from ("pub"),
-    SkgRepo {
-      name         : SkgRepoName::from ("pub"),
+    SkgrepoName::from ("pub"),
+    Skgrepo {
+      name         : SkgrepoName::from ("pub"),
       abbreviation : None,
       path         : PathBuf::from ("/tmp/pub"),
       owned        : true } );
   skgrepos . insert (
-    SkgRepoName::from ("priv"),
-    SkgRepo {
-      name         : SkgRepoName::from ("priv"),
+    SkgrepoName::from ("priv"),
+    Skgrepo {
+      name         : SkgrepoName::from ("priv"),
       abbreviation : None,
       path         : PathBuf::from ("/tmp/priv"),
       owned        : true } );
-  SkgConfig::dummyFromSkgRepos (skgrepos) }
+  SkgConfig::dummyFromSkgrepos (skgrepos) }
 
 /// When a node N has the same skgrepo as its nearest unrestrictedVognode ancestor,
 /// even if N is marked affectsParent=false,
@@ -46,13 +46,13 @@ fn skgrepo_inheritance_across_non_content_same_skgrepo () {
   let a_skgid = {
     let vn : Viewnode = mk_editable_viewnode (
       ID::from ("a"),
-      SkgRepoName::from ("pub"),
+      SkgrepoName::from ("pub"),
       "node A" . to_string (),
       None );
     viewforest . root_mut () . append (vn) . id () };
   { let vn : Viewnode = mk_writeProtected_viewnode (
       ID::from ("b"),
-      SkgRepoName::from ("pub"),
+      SkgrepoName::from ("pub"),
       "node B" . to_string (),
       AffectsParent::False );
     viewforest . get_mut (a_skgid) . unwrap () . append (vn); }
@@ -71,7 +71,7 @@ fn skgrepo_inheritance_across_non_content_same_skgrepo () {
   let ViewnodeKind::Vognode ( Vognode::Unrestricted (t) )
     = & b_ref . value () . kind
     else { panic! ("expected UnrestrictedVognode") };
-  assert! ( ! t . viewStats . homeSkgRepoAtBoundary,
+  assert! ( ! t . viewStats . homeSkgrepoAtBoundary,
             "Same repo across non-content boundary \
              should NOT be at boundary" ); }
 
@@ -88,13 +88,13 @@ fn skgrepo_inheritance_across_non_content_different_skgrepo () {
   let a_skgid = {
     let vn : Viewnode = mk_editable_viewnode (
       ID::from ("a"),
-      SkgRepoName::from ("pub"),
+      SkgrepoName::from ("pub"),
       "node A" . to_string (),
       None );
     viewforest . root_mut () . append (vn) . id () };
   { let vn : Viewnode = mk_writeProtected_viewnode (
       ID::from ("b"),
-      SkgRepoName::from ("priv"),
+      SkgrepoName::from ("priv"),
       "node B" . to_string (),
       AffectsParent::False );
     viewforest . get_mut (a_skgid) . unwrap () . append (vn); }
@@ -111,6 +111,6 @@ fn skgrepo_inheritance_across_non_content_different_skgrepo () {
   let ViewnodeKind::Vognode ( Vognode::Unrestricted (t) )
     = & b_ref . value () . kind
     else { panic! ("expected UnrestrictedVognode") };
-  assert! ( t . viewStats . homeSkgRepoAtBoundary,
+  assert! ( t . viewStats . homeSkgrepoAtBoundary,
             "Different repo across non-content boundary \
              should be at boundary" ); }

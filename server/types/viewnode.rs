@@ -7,7 +7,7 @@
 /// aliases, IDs, and partner folders.
 
 use super::git::{NodeAxes, RelationshipAxes, Sign};
-use super::misc::{ID, SkgRepoName};
+use super::misc::{ID, SkgrepoName};
 use super::nodes::complete::Flag;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use std::collections::HashSet;
@@ -123,7 +123,7 @@ pub enum Phantom {
 #[derive( Debug, Clone, PartialEq )]
 pub struct PhantomDeleted {
   pub skgid        : ID,
-  pub home_skgrepo : SkgRepoName,
+  pub home_skgrepo : SkgrepoName,
   pub title        : String,
   pub body         : Option < String >,
 }
@@ -155,9 +155,9 @@ pub struct PhantomDeleted {
 pub struct PhantomUnknown {
   pub skgid                 : ID,
   /// Display-only fact about this occurrence's binding relationship.
-  pub relRepo         : Option<SkgRepoName>,
+  pub relRepo         : Option<SkgrepoName>,
   /// A pending relRepo change, consumed only by save.
-  pub relRepo_request : Option<SkgRepoName>,
+  pub relRepo_request : Option<SkgrepoName>,
 }
 
 /// An anonymous "something from a restricted repo is/was here"
@@ -182,9 +182,9 @@ pub struct PhantomUnknown {
 #[derive( Debug, Clone, PartialEq )]
 pub struct RestrictedVognode;
 
-pub type UnrestrictedVognode   = UnrestrictedVognode_Generic < ID, SkgRepoName >;
+pub type UnrestrictedVognode   = UnrestrictedVognode_Generic < ID, SkgrepoName >;
 pub type MpUnrestrictedVognode = UnrestrictedVognode_Generic < Option < ID >,
-                                             Option < SkgRepoName >>;
+                                             Option < SkgrepoName >>;
 
 /// A Viewnode that corresponds to a Graphnode.
 #[derive( Debug, Clone, PartialEq )]
@@ -200,7 +200,7 @@ pub struct UnrestrictedVognode_Generic < Id, Repo > {
   pub viewStats     : ViewnodeStats,
   /// A requested skgrepo for this occurrence's binding relationship. Unlike
   /// `viewStats.relRepo`, this is save intent.
-  pub relRepo_request : Option<SkgRepoName>,
+  pub relRepo_request : Option<SkgrepoName>,
 
   pub view_requests : HashSet < ViewRequest >,
   /// Per-stage diff state for the node's '.skg' file (the node axis).
@@ -214,9 +214,9 @@ pub struct UnrestrictedVognode_Generic < Id, Repo > {
   pub editability  : Editability,
 }
 
-pub type PhantomDiff   = PhantomDiff_Generic < ID, SkgRepoName >;
+pub type PhantomDiff   = PhantomDiff_Generic < ID, SkgrepoName >;
 pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
-                                               Option < SkgRepoName >>;
+                                               Option < SkgrepoName >>;
 
 /// The slim payload of a `Phantom::Diff` -- one of the three phantom
 /// ("phantom") kinds, alongside PhantomDeleted and PhantomUnknown (see
@@ -343,7 +343,7 @@ pub struct GraphnodeStats {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewnodeStats {
   pub cycle                 : bool,
-  pub homeSkgRepoAtBoundary : bool, // True if a root or if skgrepo differs from skgrepo of nearest unrestrictedVognode ancestor.
+  pub homeSkgrepoAtBoundary : bool, // True if a root or if skgrepo differs from skgrepo of nearest unrestrictedVognode ancestor.
   /// The relationship heralds as the SEMANTIC `(rels ...)` sexp string
   /// (server/herald_tokens.rs `relationship_heralds_sexp`): per-relation
   /// member counts and which tracked ancestors are members on each side,
@@ -387,7 +387,7 @@ pub struct ViewnodeStats {
   /// treats this value as a fieldIntent.
   /// Herald: red "~NAME" immediately before the ⌂ homeRepoHerald
   /// (server/heralds.rs).
-  pub relRepo            : Option<SkgRepoName>,
+  pub relRepo            : Option<SkgrepoName>,
 }
 
 #[derive( Debug, Clone, PartialEq, Eq, Hash )]
@@ -400,8 +400,8 @@ pub enum PropertyFolder {
 #[derive( Debug, Clone, PartialEq )]
 pub enum Property {
   Alias { text: String, // an alias for the node's grandparent
-          relRepo: Option<SkgRepoName>,
-          relRepo_request: Option<SkgRepoName>,
+          relRepo: Option<SkgrepoName>,
+          relRepo_request: Option<SkgrepoName>,
           relationship_axes: RelationshipAxes },
   ID { skgid: ID, // an ID of grandparent (the parent being an IDFolder)
        relationship_axes: RelationshipAxes },
@@ -697,7 +697,7 @@ impl Vognode {
 
   pub fn pid_and_skgrepo (
     &self,
-  ) -> Option<(&ID, &SkgRepoName)> {
+  ) -> Option<(&ID, &SkgrepoName)> {
     match self {
       Vognode::Unrestricted   (t) => Some ((&t . skgid, &t . home_skgrepo)),
       Vognode::Restricted (_) => None,
@@ -720,7 +720,7 @@ impl Phantom {
 
   pub fn pid_and_skgrepo (
     &self,
-  ) -> Option<(&ID, &SkgRepoName)> {
+  ) -> Option<(&ID, &SkgrepoName)> {
     match self {
       Phantom::Diff    (p) => Some ((&p . skgid, &p . home_skgrepo)),
       Phantom::Deleted (d) => Some ((&d . skgid, &d . home_skgrepo)),
@@ -902,7 +902,7 @@ impl Default for ViewnodeStats {
   fn default () -> Self {
     ViewnodeStats {
       cycle             : false,
-      homeSkgRepoAtBoundary  : false,
+      homeSkgrepoAtBoundary  : false,
       rel_heralds       : None,
       overridesHere     : None,
       omitted_body      : false,
@@ -917,7 +917,7 @@ impl Default for ViewnodeStats {
 /// Useful when you need to customize other fields after construction.
 pub fn default_unrestrictedVognode (
   skgid   : ID,
-  skgrepo : SkgRepoName,
+  skgrepo : SkgrepoName,
   title   : String,
 ) -> UnrestrictedVognode {
   UnrestrictedVognode {
@@ -943,7 +943,7 @@ pub fn default_unrestrictedVognode (
 /// negative for this to be a real phantom; callers must ensure that.
 pub fn mk_phantom_viewnode (
   skgid      : ID,
-  skgrepo    : SkgRepoName,
+  skgrepo    : SkgrepoName,
   title      : String,
   node_axes  : NodeAxes,
   relationship_axes : RelationshipAxes,
@@ -964,7 +964,7 @@ pub fn mk_phantom_viewnode (
 
 pub fn mk_editable_viewnode (
   skgid   : ID,
-  skgrepo : SkgRepoName,
+  skgrepo : SkgrepoName,
   title   : String,
   body    : Option < String >,
 ) -> Viewnode { mk_viewnode ( skgid,
@@ -1010,7 +1010,7 @@ pub fn mk_restricted_viewnode (
 /// Body is always None since write-protected nodes don't have editable content.
 pub fn mk_writeProtected_viewnode (
   skgid     : ID,
-  skgrepo : SkgRepoName,
+  skgrepo : SkgrepoName,
   title  : String,
   affectsParent  : AffectsParent,
 ) -> Viewnode {
@@ -1019,7 +1019,7 @@ pub fn mk_writeProtected_viewnode (
 
 pub fn mk_writeProtected_viewnode_with_birth (
   skgid    : ID,
-  skgrepo  : SkgRepoName,
+  skgrepo  : SkgrepoName,
   title    : String,
   affectsParent : AffectsParent,
   birth    : Birth,
@@ -1065,7 +1065,7 @@ pub fn mk_writeProtected_from_viewnode (
 /// without considering the rest of the Viewnode tree.
 pub fn mk_viewnode (
   skgid         : ID,
-  skgrepo       : SkgRepoName,
+  skgrepo       : SkgrepoName,
   title         : String,
   affectsParent      : AffectsParent,
   birth         : Birth,

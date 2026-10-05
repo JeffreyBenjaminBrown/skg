@@ -20,7 +20,7 @@
 use crate::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, HiddenOutsideEdit, FieldIntentsForOneId, SubscribeeVisibility };
 use crate::types::misc::{
-  ID, MSV, RelPartner, SkgRepoName, members_msv, members_of,
+  ID, MSV, RelPartner, SkgrepoName, members_msv, members_of,
   rel_partners_at_relRepo, rel_partners_at_relRepo_msv };
 use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::save::{NodeInstruction, SaveNode, DeleteNode};
@@ -38,7 +38,7 @@ pub enum NodeIntent {
 
 pub struct NodeSaveIntent {
   pub pid               : ID,
-  pub home_skgrepo      : SkgRepoName,
+  pub home_skgrepo      : SkgrepoName,
   pub title             : String,
   pub body              : Option<String>,
   // contains / subscribesTo / overrides pair each member
@@ -49,12 +49,12 @@ pub struct NodeSaveIntent {
   // Some entries into a side-channel BEFORE 'into_graphnode'
   // discards them, for 'apply_sticky_relRepos' to validate against
   // each relationship's floor.
-  pub contains          : MSV<(ID, Option<SkgRepoName>)>,
+  pub contains          : MSV<(ID, Option<SkgrepoName>)>,
   pub extra_ids         : Vec<ID>,
-  pub aliases           : MSV<(String, Option<SkgRepoName>)>,
-  pub subscribesTo      : MSV<(ID, Option<SkgRepoName>)>,
+  pub aliases           : MSV<(String, Option<SkgrepoName>)>,
+  pub subscribesTo      : MSV<(ID, Option<SkgrepoName>)>,
   pub hidesFromSubs     : MSV<ID>,
-  pub overrides         : MSV<(ID, Option<SkgRepoName>)>,
+  pub overrides         : MSV<(ID, Option<SkgrepoName>)>,
   pub flags              : Vec<Flag>,
   pub flag_request  : Option<(Flag, bool)>,
 }
@@ -74,17 +74,17 @@ pub struct NodeSaveIntent {
 /// TODO/DONE/privacy-telescope/5_plan.org).
 #[derive(Clone, Debug, Default)]
 pub struct RequestedRelRepos {
-  pub contains          : HashMap<ID, SkgRepoName>,
-  pub aliases           : HashMap<String, SkgRepoName>,
-  pub subscribesTo      : HashMap<ID, SkgRepoName>,
-  pub overrides         : HashMap<ID, SkgRepoName>,
+  pub contains          : HashMap<ID, SkgrepoName>,
+  pub aliases           : HashMap<String, SkgrepoName>,
+  pub subscribesTo      : HashMap<ID, SkgrepoName>,
+  pub overrides         : HashMap<ID, SkgrepoName>,
 }
 
 /// Strip the per-member explicit-repo payload down to plain IDs, by
 /// reference (read-only consumers, e.g.
 /// 'nodeSaveIntents_with_specified_contains').
 fn skgids_only_msv_ref (
-  msv : &MSV<(ID, Option<SkgRepoName>)>,
+  msv : &MSV<(ID, Option<SkgrepoName>)>,
 ) -> MSV<ID> {
   match msv {
     MSV::Unspecified   => MSV::Unspecified,
@@ -93,7 +93,7 @@ fn skgids_only_msv_ref (
 
 /// As 'ids_only_msv_ref', consuming.
 fn skgids_only_msv (
-  msv : MSV<(ID, Option<SkgRepoName>)>,
+  msv : MSV<(ID, Option<SkgrepoName>)>,
 ) -> MSV<ID> {
   match msv {
     MSV::Unspecified   => MSV::Unspecified,
@@ -102,7 +102,7 @@ fn skgids_only_msv (
 
 /// As above, for the non-MSV 'contains' slice.
 fn skgids_only (
-  list : &[(ID, Option<SkgRepoName>)],
+  list : &[(ID, Option<SkgrepoName>)],
 ) -> Vec<ID> {
   list . iter () . map ( |(skgid, _)| skgid . clone () ) . collect () }
 
@@ -136,7 +136,7 @@ impl NodeIntent {
     // plain 'or_default()' round-trip.
     fn no_explicit_msv (
       msv : &MSV<RelPartner<ID>>,
-    ) -> MSV<(ID, Option<SkgRepoName>)> {
+    ) -> MSV<(ID, Option<SkgrepoName>)> {
       match msv {
         MSV::Unspecified   => MSV::Unspecified,
         MSV::Specified (v) => MSV::Specified (
@@ -204,8 +204,8 @@ impl NodeSaveIntent {
     &self,
   ) -> RequestedRelRepos {
     fn collect (
-      list : &[(ID, Option<SkgRepoName>)],
-    ) -> HashMap<ID, SkgRepoName> {
+      list : &[(ID, Option<SkgrepoName>)],
+    ) -> HashMap<ID, SkgrepoName> {
       list . iter ()
         . filter_map ( |(skgid, skgrepo)| skgrepo . clone ()
                        . map ( |s| (skgid . clone (), s) ) )
@@ -223,7 +223,7 @@ impl NodeSaveIntent {
   pub fn into_graphnode (
     self,
   ) -> Graphnode {
-    let skgrepo  : SkgRepoName = self . home_skgrepo . clone();
+    let skgrepo  : SkgrepoName = self . home_skgrepo . clone();
     let mut node : Graphnode = Graphnode {
       title                        : self . title,
       overPrivateText_telescope               : false,
@@ -419,7 +419,7 @@ impl LoweredNodeIntents {
   /// iterating.
   pub fn nodeSaveIntents_with_specified_contains (
     &self,
-  ) -> Vec<(ID, SkgRepoName, Vec<ID>, MSV<ID>)> {
+  ) -> Vec<(ID, SkgrepoName, Vec<ID>, MSV<ID>)> {
     self . order . iter ()
       . filter_map ( |pid| match self . by_pid . get (pid) {
           Some (NodeIntent::Save (intent)) =>

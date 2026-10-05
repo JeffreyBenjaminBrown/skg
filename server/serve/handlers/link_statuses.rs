@@ -93,8 +93,8 @@ fn quoted (s : &str) -> String {
 mod tests {
   use super::*;
   use crate::dbs::filesystem::not_nodes::load_config;
-  use crate::skgrepo_sets::SkgRepoSetName;
-  use crate::types::misc::SkgRepoName;
+  use crate::skgrepo_sets::SkgrepoSetName;
+  use crate::types::misc::SkgrepoName;
   use crate::types::nodes::complete::{Graphnode, empty_graphnode};
   use crate::dbs::in_rust_graph::InRustGraphHandle;
   use arc_swap::ArcSwap;
@@ -104,19 +104,19 @@ mod tests {
   fn statuses_use_the_current_graph_and_hide_restricted_skgrepos () {
     let mut config : SkgConfig = load_config (
       "tests/repo_sets/fixtures/skgconfig.toml") . unwrap ();
-    config . skgrepos . get_mut (&SkgRepoName::from ("public"))
+    config . skgrepos . get_mut (&SkgrepoName::from ("public"))
       .unwrap () . abbreviation = Some ("pub" . to_string ());
     let restriction : SkgrepoRestriction = SkgrepoRestriction::named (
-      &config, SkgRepoSetName::from ("public")) . unwrap ();
+      &config, SkgrepoSetName::from ("public")) . unwrap ();
     let visible : Graphnode = Graphnode {
       pid : ID::from ("visible"),
       extra_ids : vec![ID::from ("old-visible")],
-      home_skgrepo : SkgRepoName::from ("public"),
+      home_skgrepo : SkgrepoName::from ("public"),
       title : "A title that must stay out of lookup results" .to_string (),
       .. empty_graphnode () };
     let private : Graphnode = Graphnode {
       pid : ID::from ("private"),
-      home_skgrepo : SkgRepoName::from ("private"),
+      home_skgrepo : SkgrepoName::from ("private"),
       title : "Private title" .to_string (),
       .. empty_graphnode () };
     let graph : InRustGraph = InRustGraph::from_graphnodes (
@@ -143,7 +143,7 @@ mod tests {
     let config : SkgConfig = load_config (
       "tests/repo_sets/fixtures/skgconfig.toml") . unwrap ();
     let restriction : SkgrepoRestriction = SkgrepoRestriction::named (
-      &config, SkgRepoSetName::from ("public")) . unwrap ();
+      &config, SkgrepoSetName::from ("public")) . unwrap ();
     let handle : InRustGraphHandle = Arc::new (ArcSwap::from_pointee (
       InRustGraph::new ()));
     let requested : Vec<ID> = vec![ID::from ("old-new")];
@@ -155,7 +155,7 @@ mod tests {
       Graphnode {
         pid : ID::from ("new"),
         extra_ids : requested . clone (),
-        home_skgrepo : SkgRepoName::from ("public"),
+        home_skgrepo : SkgrepoName::from ("public"),
         .. empty_graphnode () } ]);
     handle . store (Arc::new (current));
     let result = classify_link_skgids (
@@ -164,7 +164,7 @@ mod tests {
       LinkStatus::Resolved {
         pid : ID::from ("new"),
         skgrepo_label : config . skgrepos
-          [&SkgRepoName::from ("public")] . herald_label () . to_string (),
+          [&SkgrepoName::from ("public")] . herald_label () . to_string (),
       })]);
   }
 }

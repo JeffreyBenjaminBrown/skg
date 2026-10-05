@@ -52,7 +52,7 @@ fn should_visit (
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::types::misc::{ID, SkgRepoName};
+  use crate::types::misc::{ID, SkgrepoName};
   use std::collections::HashMap;
 
   #[test]
@@ -85,7 +85,7 @@ mod tests {
         fs::read_to_string (root . join (path)) . unwrap ())
     }) . collect ();
     let mut next = || ID::new (&uuid::Uuid::new_v4 () . to_string ());
-    let skgrepo   : SkgRepoName = SkgRepoName::from ("owned");
+    let skgrepo   : SkgrepoName = SkgrepoName::from ("owned");
     let mut built : Vec<build::BuiltDocument> = documents . iter ()
       .map (|document| build::build_document (document, &skgrepo, &mut next)
         .unwrap ()) . collect ();

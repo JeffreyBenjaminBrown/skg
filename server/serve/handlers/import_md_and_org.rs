@@ -5,7 +5,7 @@ use crate::serve::util::{
   send_response_with_length_prefix, tag_sexp_response,
   value_from_request_sexp};
 use crate::types::env::SkgEnv;
-use crate::types::misc::SkgRepoName;
+use crate::types::misc::SkgrepoName;
 use futures::executor::block_on;
 use sexp::{Atom, Sexp};
 use std::net::TcpStream;
@@ -64,7 +64,7 @@ pub fn handle_import_md_and_org_request (
       let host_root : Option<PathBuf> = host_answer . as_deref ()
         .filter (|value| ! value . is_empty ()) . map (PathBuf::from);
       match prepare_import_batch (
-        Path::new (&input), &SkgRepoName::from (skgrepo),
+        Path::new (&input), &SkgrepoName::from (skgrepo),
         host_root . as_deref (), host_answer . is_some (), env) {
         Ok (ImportPreparation::HostMappingNeeded) => send_import_response (
           stream, TcpToClient::ImportMdAndOrgHostMappingNeeded,
@@ -147,7 +147,7 @@ mod tests {
   use crate::dbs::init::empty_in_ram_tantivy_index;
   use crate::dbs::in_rust_graph::InRustGraph;
   use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
-  use crate::types::misc::{SkgConfig, SkgRepo};
+  use crate::types::misc::{SkgConfig, Skgrepo};
   use std::collections::HashMap;
   use std::fs;
   use std::io::{BufRead, BufReader, Read};
@@ -185,9 +185,9 @@ mod tests {
     fs::create_dir (&input) . unwrap ();
     fs::create_dir (&skgrepo) . unwrap ();
     fs::write (input . join ("note.md"), "# Note\nBody\n") . unwrap ();
-    let skgrepo_name : SkgRepoName = SkgRepoName::from ("notes");
-    let config : SkgConfig = SkgConfig::dummyFromSkgRepos (HashMap::from ([
-      (skgrepo_name . clone (), SkgRepo {
+    let skgrepo_name : SkgrepoName = SkgrepoName::from ("notes");
+    let config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::from ([
+      (skgrepo_name . clone (), Skgrepo {
         name : skgrepo_name . clone (), abbreviation : None,
         path : skgrepo . clone (), owned : true, }),
     ]));
