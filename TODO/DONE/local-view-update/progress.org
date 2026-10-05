@@ -1478,7 +1478,7 @@ left it.
 - 'death-leafward': the mechanism that decides when a structural col has lost a
   required ancestor and must be torn down. I call it a 'critical path' because a
   bug there would corrupt views, so I refactor it only cautiously.
-- 'the one-definitive-view plan': a SEPARATE, not-yet-started effort to ensure a
+- 'the one-editable-view plan': a SEPARATE, not-yet-started effort to ensure a
   given node is shown as editable in at most one open buffer at a time.
 - 'a seam' / 'hook': an intentionally-empty extension point left in the code so
   a future feature has an obvious place to plug in.
@@ -1676,15 +1676,15 @@ If not, please do; if so, please mark this and its ancestors DONE.
 (the 'please dedup' note and the 'Smaller cosmetic copy-pastes' item) DONE.
 *** A future hook the plan asked for, which I chose not to add (review §5.4)
 The plan wanted me to pre-install an empty extension point for the separate,
-not-yet-started one-definitive-view effort: a function that for now just returns
+not-yet-started one-editable-view effort: a function that for now just returns
 "nothing", consulted at one spot in the view's draw logic. I left it out: a
 function that does nothing and changes no behavior is speculative dead code,
 which this project's conventions say to avoid. For the record, when the
-one-definitive-view effort actually begins, the place to add it is the draw-rule
+one-editable-view effort actually begins, the place to add it is the draw-rule
 function ('apply_definitive_draw_rule' in server/to_org/expand/definitive.rs),
 on the branch that handles a node id not yet seen elsewhere in the buffer.
 **** DONE yeah we can ignore that
-****** Agreed -- not adding the hook. No plan_v2 follow-up; when one-definitive-view
+****** Agreed -- not adding the hook. No plan_v2 follow-up; when one-editable-view
 is actually built, its author adds the seam then (the spot is noted just above).
 *** A locking test I did not write (review §2.5)
 On save, the server locks and then progressively unlocks other affected buffers

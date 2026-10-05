@@ -146,7 +146,7 @@ fallback, add =debug_assert!(no Definitive request survives)= and correct §18.
 
 ** 2.4 The §5.4 cross-buffer "seam" was not stubbed  [verified*]
 §5.4 asked for a defined no-op seam -- =fn registry_owner(id) -> Option<ViewUri>=
-returning =None= today -- so the future one-definitive-view plan has an attach
+returning =None= today -- so the future one-editable-view plan has an attach
 point. It is entirely absent; =apply_definitive_draw_rule='s absent-id branch
 falls straight through to register Tentative/Final. Behavior is correct today
 (it is a no-op anyway), but the promised seam doesn't exist. Minor; either add

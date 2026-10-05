@@ -1,8 +1,8 @@
-* Proposal: Only one definitive view for each node across all buffers.
+* Proposal: Only one editable view for each node across all buffers.
 ** currently
-There can be a definitive view of a node in any number of buffers.
+There can be a editable view of a node in any number of buffers.
 For each buffer there can be at most one,
-but there can be multiple buffers with definitive views of the same node.
+but there can be multiple buffers with editable views of the same node.
 
 'skg-view' will take the user to the registered location of a node,
 if it is already the root of a buffer.
@@ -15,16 +15,16 @@ for such lookup.
 ** desired
 Rather than only register roots for lookup via skg-view
 (actually maybe there are other functions that can look it up too)
-we should register the definitive view for every node.
-There should only be one definitive view of any node across all buffers.
-If a user tries to change the metadata manually to make something definitive,
-that save should be rejected; the only way to make a node definitive
+we should register the editable view for every node.
+There should only be one editable view of any node across all buffers.
+If a user tries to change the metadata manually to make something editable,
+that save should be rejected; the only way to make a node editable
 is to formally request it
-(see C-c l d : skg-local-definitive and
+(see C-c l d : skg-local-editable and
      C-c l i : skg-local-write-protected
 in docs/COMMANDS.org).
-A definitive view request should not just make write-protected
-any prior definitive appearance of the node in *that* buffer,
+A editable view request should not just make write-protected
+any prior editable appearance of the node in *that* buffer,
 but also in all the other buffers.
 ** request
 Please analyze my options and describe them.

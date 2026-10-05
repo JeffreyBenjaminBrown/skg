@@ -505,7 +505,7 @@ changing those quotations would make the record less accurate and can break
 links between prose and old commits.
 
 Current TODO material is different: update documents that still guide future
-work or name current symbols.  In particular, =TODO/one-definitive-view/= and
+work or name current symbols.  In particular, =TODO/one-editable-view/= and
 =TODO/lying-names.org= discuss current implementation names.  This TODO entry
 in =TODO.org= can be marked done or replaced by a link here when the migration
 lands.

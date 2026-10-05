@@ -567,7 +567,7 @@ This should be strengthened before trusting it to validate reconciliation
 changes. Use parsed assertions where order is irrelevant, and explicit
 ordered checks where it matters.
 
-[[file:one-definitive-view/plan.org][One definitive view across buffers]] is a
+[[file:one-editable-view/plan.org][One editable view across buffers]] is a
 product-policy proposal with global-state consequences. I would defer it as
 a simplification vehicle: the current per-view completion engine can be
 cleaned up without deciding that behavior.

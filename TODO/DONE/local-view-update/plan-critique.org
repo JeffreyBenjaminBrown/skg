@@ -23,7 +23,7 @@ recursed into to draw its content*." Those cannot both hold.
   its content shows at the definitive sibling *in the same buffer*.
 - *Cross-buffer*, the definitive occurrence is in another buffer, invisible to
   this user, so the deferred node must still show its subtree read-only. The
-  [[../one-definitive-view/plan.org][one-definitive-view plan]] explicitly wants this ("rendered indefinitive but
+  [[../one-editable-view/plan.org][one-editable-view plan]] explicitly wants this ("rendered indefinitive but
   still depicted with children").
 
 So "indefinitive" is doing two jobs -- /collapsed-because-shown-elsewhere-here/

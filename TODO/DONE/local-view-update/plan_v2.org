@@ -25,7 +25,7 @@ update itself and create/repair its own view-descendants; the driver is dumb.
   the same machinery, deleting a pile of de-novo-only code (§13).
 
 ** Three sibling efforts this composes with (do not duplicate them)
-- [[../one-definitive-view/plan.org][one-definitive-view/plan.org]] -- *cross-buffer* one-definitive-per-ID (a global
+- [[../one-editable-view/plan.org][one-editable-view/plan.org]] -- *cross-buffer* one-definitive-per-ID (a global
   =definitive_ids= registry across open views). This plan's Tentative/Final map
   is the *within-buffer* mechanism; §5.4 says how they compose (a no-op hook
   until that plan lands).
@@ -273,7 +273,7 @@ that the driver has a defined seam, the §5.2 draw rule takes one extra read --
 =fn registry_owner(id) -> Option<ViewUri>= consulted when an ID is *absent*
 from the within-buffer map; if another view owns it, treat the within-buffer
 state as Final-elsewhere and render indefinitive (its content is *not*
-expanded, the uniform indefinitive rule, §6.2). Until the one-definitive-view
+expanded, the uniform indefinitive rule, §6.2). Until the one-editable-view
 plan is implemented this hook returns =None= for everything. Do not re-specify
 the registry's maintenance here.
 
