@@ -24,8 +24,8 @@ use std::collections::{BTreeMap, BTreeSet};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompleteGraphError {
   DuplicatePrimaryId { pid : ID, homes : Vec<SkgRepoName> },
-  DuplicateExtraId { skgid : ID, owners : Vec<ID> },
-  PrimaryExtraCollision { skgid : ID, primary_owners : Vec<ID>, extra_owners : Vec<ID> },
+  DuplicateExtraId { skgid : ID, carriers : Vec<ID> },
+  PrimaryExtraCollision { skgid : ID, primary_carriers : Vec<ID>, extra_carriers : Vec<ID> },
   UnconfiguredNodeHome { pid : ID, skgrepo : SkgRepoName },
   Override (OverrideInvariantViolation),
   InternalIndex (InternalIndexMismatch),
@@ -51,12 +51,12 @@ pub fn validate_complete_graph (
   nodes : &[Graphnode],
 ) -> CompleteGraphValidation {
   let mut primary_homes : BTreeMap<ID, Vec<SkgRepoName>> = BTreeMap::new ();
-  let mut extra_owners : BTreeMap<ID, BTreeSet<ID>> = BTreeMap::new ();
+  let mut extra_carriers : BTreeMap<ID, BTreeSet<ID>> = BTreeMap::new ();
   for node in nodes {
     primary_homes . entry (node . pid . clone ()) . or_default ()
       . push (node . home_skgrepo . clone ());
     for extra in node . normalized_extra_ids () {
-      extra_owners . entry (extra) . or_default ()
+      extra_carriers . entry (extra) . or_default ()
         . insert (node . pid . clone ()); }}
 
   let mut errors : Vec<CompleteGraphError> = Vec::new ();
@@ -66,22 +66,22 @@ pub fn validate_complete_graph (
       homes . sort ();
       errors . push (CompleteGraphError::DuplicatePrimaryId {
         pid : pid . clone (), homes }); }}
-  for (skgid, owners) in &extra_owners {
-    if owners . len () > 1 {
+  for (skgid, carriers) in &extra_carriers {
+    if carriers . len () > 1 {
       errors . push (CompleteGraphError::DuplicateExtraId {
         skgid : skgid . clone (),
-        owners : owners . iter () . cloned () . collect (), }); }}
+        carriers : carriers . iter () . cloned () . collect (), }); }}
   for skgid in primary_homes . keys () {
-    if let Some (extras) = extra_owners . get (skgid) {
-      let extra_owners : Vec<ID> = extras . iter ()
-        . filter ( |owner| *owner != skgid )
+    if let Some (extras) = extra_carriers . get (skgid) {
+      let extra_carriers : Vec<ID> = extras . iter ()
+        . filter ( |carrier| *carrier != skgid )
         . cloned ()
         . collect ();
-      if ! extra_owners . is_empty () {
+      if ! extra_carriers . is_empty () {
         errors . push (CompleteGraphError::PrimaryExtraCollision {
           skgid : skgid . clone (),
-          primary_owners : vec![skgid . clone ()],
-          extra_owners, }); }}}
+          primary_carriers : vec![skgid . clone ()],
+          extra_carriers, }); }}}
   let mut nodes_by_pid : Vec<&Graphnode> = nodes . iter () . collect ();
   nodes_by_pid . sort_by (|a, b| a . pid . cmp (&b . pid));
   for node in nodes_by_pid {
@@ -133,12 +133,12 @@ pub fn format_complete_graph_errors (errors : &[CompleteGraphError]) -> String {
     let detail = match error {
       CompleteGraphError::DuplicatePrimaryId { pid, homes } => format! (
         "duplicate primary id '{}' in homes {:?}", pid, homes),
-      CompleteGraphError::DuplicateExtraId { skgid, owners } => format! (
-        "duplicate extra id '{}' claimed by {:?}", skgid, owners),
+      CompleteGraphError::DuplicateExtraId { skgid, carriers } => format! (
+        "duplicate extra id '{}' claimed by {:?}", skgid, carriers),
       CompleteGraphError::PrimaryExtraCollision {
-        skgid, primary_owners, extra_owners } => format! (
+        skgid, primary_carriers, extra_carriers } => format! (
           "id '{}' is both primary {:?} and extra on {:?}",
-          skgid, primary_owners, extra_owners),
+          skgid, primary_carriers, extra_carriers),
       CompleteGraphError::UnconfiguredNodeHome { pid, skgrepo } => format! (
         "node '{}' has unconfigured home repo '{}'", pid, skgrepo),
       CompleteGraphError::Override (violation) =>

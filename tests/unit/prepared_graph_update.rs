@@ -45,18 +45,18 @@ fn node (
 fn changed_edge_fixture (
   unrelated_count : usize,
 ) -> (InRustGraph, InRustGraph, Vec<NodeInstruction>, GraphChangeSet) {
-  let mut old_owner : Graphnode = node ("owner");
-  old_owner . contains = rel_partners_at_relRepo (
+  let mut old_recorder : Graphnode = node ("recorder");
+  old_recorder . contains = rel_partners_at_relRepo (
     &SkgRepoName::from ("main"), vec![ID::from ("old")]);
-  let mut base_nodes : Vec<Graphnode> = vec![old_owner];
+  let mut base_nodes : Vec<Graphnode> = vec![old_recorder];
   base_nodes . extend ((0..unrelated_count)
     . map (|i| node (&format! ("unrelated-{i}"))));
   let base : InRustGraph = InRustGraph::from_graphnodes (&base_nodes);
-  let mut final_owner : Graphnode = node ("owner");
-  final_owner . contains = rel_partners_at_relRepo (
+  let mut final_recorder : Graphnode = node ("recorder");
+  final_recorder . contains = rel_partners_at_relRepo (
     &SkgRepoName::from ("main"), vec![ID::from ("new")]);
   let nodeInstructions : Vec<NodeInstruction> =
-    vec![NodeInstruction::Save (SaveNode (final_owner))];
+    vec![NodeInstruction::Save (SaveNode (final_recorder))];
   let (changes, errors, revocations)
     : (GraphChangeSet, Vec<CompleteGraphError>, Vec<super::ExtraIdRevocation>) =
     validate_identity_and_derive_changes (&config (), &base, &nodeInstructions);
@@ -68,14 +68,14 @@ fn changed_edge_fixture (
 }
 
 fn add_membership (
-  index : &mut im::HashMap<ID, im::HashSet<ID>>,
-  key   : &str,
-  owner : &str,
+  index    : &mut im::HashMap<ID, im::HashSet<ID>>,
+  key      : &str,
+  recorder : &str,
 ) {
-  let mut owners : im::HashSet<ID> = index . get (&ID::from (key))
+  let mut recorders : im::HashSet<ID> = index . get (&ID::from (key))
     . cloned () . unwrap_or_default ();
-  owners . insert (ID::from (owner));
-  index . insert (ID::from (key), owners);
+  recorders . insert (ID::from (recorder));
+  index . insert (ID::from (key), recorders);
 }
 
 #[test]
@@ -126,22 +126,22 @@ fn preparation_owns_normalized_nodeInstructions () {
 }
 
 #[test]
-fn identity_overlay_rejects_untouched_primary_and_extra_owners () {
-  let mut alias_owner : Graphnode = node ("alias-owner");
-  alias_owner . extra_ids = vec![ID::from ("owned-extra")];
+fn identity_overlay_rejects_untouched_primary_and_extra_carriers () {
+  let mut alias_carrier : Graphnode = node ("alias-carrier");
+  alias_carrier . extra_ids = vec![ID::from ("owned-extra")];
   let base : Arc<InRustGraph> = Arc::new (InRustGraph::from_graphnodes (&[
-    node ("primary-owner"), alias_owner,
+    node ("primary-carrier"), alias_carrier,
   ]));
   let mut claimant : Graphnode = node ("claimant");
   claimant . extra_ids = vec![
-    ID::from ("primary-owner"), ID::from ("owned-extra")];
+    ID::from ("primary-carrier"), ID::from ("owned-extra")];
   let error : GraphUpdatePreparationError = prepare_graph_update (
     &config (), base, vec![NodeInstruction::Save (SaveNode (claimant))])
     . expect_err ("both untouched claims must be protected");
   assert! (error . complete_graph_errors . iter () . any (|error| matches! (
     error,
     CompleteGraphError::PrimaryExtraCollision { skgid, .. }
-      if skgid == &ID::from ("primary-owner"))));
+      if skgid == &ID::from ("primary-carrier"))));
   assert! (error . complete_graph_errors . iter () . any (|error| matches! (
     error,
     CompleteGraphError::DuplicateExtraId { skgid, .. }
@@ -158,11 +158,11 @@ fn identity_overlay_rejects_two_saves_claiming_one_new_skgid () {
     &config (), Arc::new (InRustGraph::new ()), vec![
       NodeInstruction::Save (SaveNode (first)),
       NodeInstruction::Save (SaveNode (second)),
-    ]) . expect_err ("two final owners must conflict");
+    ]) . expect_err ("two final carriers must conflict");
   assert! (matches! (
     error . complete_graph_errors . first (),
-    Some (CompleteGraphError::DuplicateExtraId { skgid, owners })
-      if skgid == &ID::from ("shared") && owners == &vec![
+    Some (CompleteGraphError::DuplicateExtraId { skgid, carriers })
+      if skgid == &ID::from ("shared") && carriers == &vec![
         ID::from ("first"), ID::from ("second")]
   ));
 }
@@ -187,8 +187,8 @@ fn simultaneous_overlay_accepts_merge_style_primary_transfer () {
     Some (ID::from ("N1")));
   assert! (prepared . changes . canonicalization_changes . iter () . any (
     |change| change . skgid == ID::from ("N2")
-      && change . old_owner == Some (ID::from ("N2"))
-      && change . new_owner == Some (ID::from ("N1"))));
+      && change . old_carrier == Some (ID::from ("N2"))
+      && change . new_carrier == Some (ID::from ("N1"))));
 }
 
 #[test]
@@ -302,7 +302,7 @@ fn identity_lookup_work_does_not_grow_with_the_base_graph () {
 #[test]
 fn local_index_check_catches_an_omitted_removal () {
   let (base, mut candidate, nodeInstructions, changes) = changed_edge_fixture (0);
-  add_membership (&mut candidate . contained_by, "old", "owner");
+  add_membership (&mut candidate . contained_by, "old", "recorder");
   let report : LocalIndexValidation = validate_local_internal_indexes (
     &base, &candidate, &nodeInstructions, &changes);
   assert! (report . errors . iter () . any (|error|
@@ -321,10 +321,10 @@ fn local_index_check_catches_an_omitted_insertion () {
 
 #[test]
 fn local_index_check_catches_an_omitted_canonical_migration () {
-  let mut owner : Graphnode = node ("owner");
-  owner . contains = rel_partners_at_relRepo (
+  let mut recorder : Graphnode = node ("recorder");
+  recorder . contains = rel_partners_at_relRepo (
     &SkgRepoName::from ("main"), vec![ID::from ("future")]);
-  let base : InRustGraph = InRustGraph::from_graphnodes (&[owner]);
+  let base : InRustGraph = InRustGraph::from_graphnodes (&[recorder]);
   let mut target : Graphnode = node ("target");
   target . extra_ids = vec![ID::from ("future")];
   let nodeInstructions : Vec<NodeInstruction> =
@@ -336,7 +336,7 @@ fn local_index_check_catches_an_omitted_canonical_migration () {
   let mut candidate : InRustGraph = base . clone ();
   apply_nodeInstructions_to_inRustGraph (&mut candidate, &nodeInstructions);
   candidate . contained_by . remove (&ID::from ("target"));
-  add_membership (&mut candidate . contained_by, "future", "owner");
+  add_membership (&mut candidate . contained_by, "future", "recorder");
   let report : LocalIndexValidation = validate_local_internal_indexes (
     &base, &candidate, &nodeInstructions, &changes);
   assert_eq! (

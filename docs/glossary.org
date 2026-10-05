@@ -97,6 +97,9 @@ is a *member* of the recorder's list. Either end is the other's
 one monomorphic list, usually all partners on the same side of some
 relation with the folder's viewparent.
 
+The node that has an ID, as its PID or as an extra ID, is that ID's
+*carrier*. (Not "owner": the user *owns* skgrepos.)
+
 *** privacy order and relRepo
 
 The position of a skgrepo in the config's privacy order (most public

@@ -53,7 +53,7 @@ that hand-authored or temporarily incomplete graphs remain representable.
 | =overrides_view_of= | overrider | overridden | Replaces the overridden node in recursive content rendering when the eligible owned override chain resolves to it. |
 | =links_to= | mentioner | mentioned | Plain Org ID links derived from text. |
 
-Home skgrepo and extra-ID ownership are node properties, not separate runtime
+Home skgrepo and which node carries each extra ID are node properties, not separate runtime
 relationship entities.  Relationship relRepo remains part of every stored
 =RelPartner= and participates in skgrepo-set/privacy gating.
 
@@ -85,7 +85,7 @@ repair while retaining readable data.
 
 The incremental proof relies on induction: startup or rebuild establishes a
 valid base, and each serialized save proves that its delta preserves validity.
-Identity ownership is evaluated as one simultaneous final-state overlay;
+Which node carries each ID is evaluated as one simultaneous final-state overlay;
 override checks include touched skgrepos, changed canonical targets, and
 untouched inbound overriders affected by either.  Local index checks compare
 only keys that could change.  The complete validator remains an independent

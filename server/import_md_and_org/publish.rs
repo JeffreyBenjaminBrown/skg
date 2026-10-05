@@ -38,12 +38,12 @@ pub(crate) fn prepare_import_publication (
         node . home_skgrepo)); }
     for skgid in node . all_skgids () {
       validate_safe_skgid (skgid)?;
-      if let Some (owner) = claims . insert (skgid . clone (), node . pid . clone ()) {
+      if let Some (carrier) = claims . insert (skgid . clone (), node . pid . clone ()) {
         return Err (format! ("ID {} is claimed by both {} and {} in this import",
-          skgid, owner, node . pid)); }
-      if let Some ((owner, skgrepo)) = runtime . graph . pid_and_skgrepo (skgid) {
+          skgid, carrier, node . pid)); }
+      if let Some ((carrier, skgrepo)) = runtime . graph . pid_and_skgrepo (skgid) {
         return Err (format! ("ID {} already belongs to {} in repo {}",
-          skgid, owner, skgrepo)); } } }
+          skgid, carrier, skgrepo)); } } }
   check_authoritative_disk_claims (&claims, config)?;
   let nodeInstructions : Vec<NodeInstruction> = nodes . iter () . cloned ()
     .map (|node| NodeInstruction::Save (SaveNode (node))) . collect ();
@@ -107,10 +107,10 @@ fn check_authoritative_disk_claims (
     for (_, section) in sections {
       for skgid in std::iter::once (&section . pid)
         .chain (section . extra_ids . iter ()) {
-        if let Some (new_owner) = claims . get (skgid) {
+        if let Some (new_carrier) = claims . get (skgid) {
           return Err (format! (
             "ID {} for imported node {} is already claimed on disk by {} in repo {}",
-            skgid, new_owner, section . pid, skgrepo)); } } }
+            skgid, new_carrier, section . pid, skgrepo)); } } }
     for pid in claims . values () {
       let path : String = crate::util::path_from_pid_and_skgrepo (
         config, &skgrepo, pid . clone ())?;

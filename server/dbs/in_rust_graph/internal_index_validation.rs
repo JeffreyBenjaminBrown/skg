@@ -129,24 +129,24 @@ fn validate_local_identity (
   result    : &mut Vec<InternalIndexMismatch>,
 ) {
   for skgid in &changes . affected_skgids {
-    let final_owner : Option<ID> =
+    let final_carrier : Option<ID> =
       match changes . canonicalization_changes . iter ()
         . find (|change| &change . skgid == skgid) {
-        Some (change) => change . new_owner . clone (),
+        Some (change) => change . new_carrier . clone (),
         None          => base . pid_of (skgid),
       };
-    let expected_extra_owner : Option<ID> = match &final_owner {
-      Some (owner) if owner != skgid => Some (owner . clone ()),
+    let expected_extra_carrier : Option<ID> = match &final_carrier {
+      Some (carrier) if carrier != skgid => Some (carrier . clone ()),
       _                           => None,
     };
-    let actual_extra_owner : Option<ID> =
+    let actual_extra_carrier : Option<ID> =
       candidate . extra_id_to_pid . get (skgid) . cloned ();
-    if expected_extra_owner != actual_extra_owner {
+    if expected_extra_carrier != actual_extra_carrier {
       result . push (InternalIndexMismatch {
         index    : "extra_id_to_pid",
         key      : skgid . clone (),
-        expected : expected_extra_owner . into_iter () . collect (),
-        actual   : actual_extra_owner . into_iter () . collect (),
+        expected : expected_extra_carrier . into_iter () . collect (),
+        actual   : actual_extra_carrier . into_iter () . collect (),
       }); }
   }
 }
@@ -205,16 +205,16 @@ fn membership_mismatch (
 pub fn validate_internal_indexes (
   graph : &InRustGraph,
 ) -> Vec<InternalIndexMismatch> {
-  let mut expected_extra_owners : ExpectedIndex = BTreeMap::new ();
+  let mut expected_extra_carriers : ExpectedIndex = BTreeMap::new ();
   for node in graph . nodes . values () {
     for extra in &node . extra_ids {
-      expected_extra_owners . entry (extra . clone ()) . or_default ()
+      expected_extra_carriers . entry (extra . clone ()) . or_default ()
         . insert (node . pid . clone ()); }}
 
   let canonical = |raw : &ID| -> ID {
-    match expected_extra_owners . get (raw) {
-      Some (owners) if owners . len () == 1 =>
-        owners . first () . unwrap () . clone (),
+    match expected_extra_carriers . get (raw) {
+      Some (carriers) if carriers . len () == 1 =>
+        carriers . first () . unwrap () . clone (),
       _ => raw . clone (), } };
   let mut contained_by : ExpectedIndex = BTreeMap::new ();
   let mut subscribers_of : ExpectedIndex = BTreeMap::new ();
@@ -248,12 +248,12 @@ pub fn validate_internal_indexes (
   compare_set_index (
     "mentioners_of", &mentioners_of, &graph . mentioners_of, &mut result);
 
-  let actual_extra_owners : ExpectedIndex = graph . extra_id_to_pid . iter ()
+  let actual_extra_carriers : ExpectedIndex = graph . extra_id_to_pid . iter ()
     . map (|(extra, pid)| {
       (extra . clone (), std::iter::once (pid . clone ()) . collect ()) })
     . collect ();
   compare_btree_indexes (
-    "extra_id_to_pid", &expected_extra_owners, &actual_extra_owners, &mut result);
+    "extra_id_to_pid", &expected_extra_carriers, &actual_extra_carriers, &mut result);
   result
 }
 

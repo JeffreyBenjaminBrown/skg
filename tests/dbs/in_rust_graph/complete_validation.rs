@@ -65,40 +65,40 @@ fn identity_errors_are_aggregated_and_deterministically_ordered () {
 
 #[test]
 fn repeated_skgids_of_one_recorder_are_normalized_not_rejected () {
-  let mut owner = node ("owner", "public");
-  owner . extra_ids = vec![
+  let mut carrier = node ("carrier", "public");
+  carrier . extra_ids = vec![
     ID::from ("B"),
-    ID::from ("owner"),
+    ID::from ("carrier"),
     ID::from ("A"),
     ID::from ("B"),
     ID::from ("A"),
   ];
-  let report = validate_complete_graph (&config (), &[owner]);
+  let report = validate_complete_graph (&config (), &[carrier]);
   assert! (report . is_valid (), "{:?}", report . errors);
   assert_eq! (
-    report . graph . get (&ID::from ("owner")) . unwrap () . extra_ids,
+    report . graph . get (&ID::from ("carrier")) . unwrap () . extra_ids,
     vec![ID::from ("B"), ID::from ("A")]);
   assert_eq! (
     report . graph . extra_id_to_pid . get (&ID::from ("B")),
-    Some (&ID::from ("owner")));
+    Some (&ID::from ("carrier")));
   assert! (! report . graph . extra_id_to_pid . contains_key (
-    &ID::from ("owner")));
+    &ID::from ("carrier")));
 }
 
 #[test]
 fn unknown_home_is_hard_but_edge_provenance_is_a_warning () {
-  let mut owner = node ("owner", "public");
-  owner . contains = vec![
+  let mut recorder = node ("recorder", "public");
+  recorder . contains = vec![
     RelPartner::at_relRepo (
       SkgRepoName::from ("unconfigured-relRepo"), ID::from ("dangling")),
   ];
   let unknown_home = node ("unknown-home", "unconfigured-home");
-  let report = validate_complete_graph (&config (), &[owner, unknown_home]);
+  let report = validate_complete_graph (&config (), &[recorder, unknown_home]);
   assert! (report . errors . iter () . any (|error| matches! (
     error, CompleteGraphError::UnconfiguredNodeHome { pid, .. }
       if pid == &ID::from ("unknown-home"))));
   assert! (report . warnings . iter () . any (|(pid, warning)|
-    pid == &ID::from ("owner") && matches! (
+    pid == &ID::from ("recorder") && matches! (
       warning, TelescopeViolation::UnconfiguredRelRepo { member, .. }
         if member == &ID::from ("dangling"))));
   // The unresolved member itself is retained, not diagnosed as an error.
@@ -107,10 +107,10 @@ fn unknown_home_is_hard_but_edge_provenance_is_a_warning () {
 
 #[test]
 fn configured_dangling_members_are_tolerated_without_warning () {
-  let mut owner = node ("owner", "public");
-  owner . subscribes_to = MSV::Specified (vec![RelPartner::at_relRepo (
+  let mut recorder = node ("recorder", "public");
+  recorder . subscribes_to = MSV::Specified (vec![RelPartner::at_relRepo (
     SkgRepoName::from ("public"), ID::from ("absent"))]);
-  let report = validate_complete_graph (&config (), &[owner]);
+  let report = validate_complete_graph (&config (), &[recorder]);
   assert! (report . is_valid ());
   assert! (report . warnings . is_empty ());
   assert! (report . graph . subscribers_of . contains_key (&ID::from ("absent")));

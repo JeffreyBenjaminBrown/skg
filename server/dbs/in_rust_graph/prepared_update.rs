@@ -33,15 +33,15 @@ use std::sync::Arc;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct CanonicalizationChange {
   pub(crate) skgid        : ID,
-  pub(crate) old_owner : Option<ID>,
-  pub(crate) new_owner : Option<ID>,
+  pub(crate) old_carrier  : Option<ID>,
+  pub(crate) new_carrier  : Option<ID>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct IdentityAcquisition {
   pub(crate) skgid        : ID,
-  pub(crate) old_owner : Option<ID>,
-  pub(crate) new_owner : ID,
+  pub(crate) old_carrier  : Option<ID>,
+  pub(crate) new_carrier  : ID,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -139,7 +139,7 @@ struct NormalizedNodeInstructionBatch {
 }
 
 #[derive(Default)]
-struct OwnersForId {
+struct CarriersForId {
   primary : BTreeSet<ID>,
   extra   : BTreeSet<ID>,
 }
@@ -319,19 +319,19 @@ fn derive_merge_override_collisions (
     }) . collect ();
   let mut result : Vec<MergeOverrideCollision> = Vec::new ();
   for acquisition in &changes . identity_acquisitions {
-    let Some (acquiree_skgid) = &acquisition . old_owner else { continue; };
-    if acquiree_skgid == &acquisition . new_owner
-      || ! collision_targets . contains (&acquisition . new_owner)
+    let Some (acquiree_skgid) = &acquisition . old_carrier else { continue; };
+    if acquiree_skgid == &acquisition . new_carrier
+      || ! collision_targets . contains (&acquisition . new_carrier)
     { continue; }
     let existing_skgids : Vec<ID> = owned_overriders_at (
-      config, base, &acquisition . new_owner);
+      config, base, &acquisition . new_carrier);
     let redirected_skgids : Vec<ID> = owned_overriders_at (
       config, base, acquiree_skgid);
     if existing_skgids . is_empty () || redirected_skgids . is_empty () {
       continue; }
     result . push (MergeOverrideCollision {
       acquired_skgid : acquisition . skgid . clone (),
-      acquirer : participant (candidate, base, &acquisition . new_owner),
+      acquirer : participant (candidate, base, &acquisition . new_carrier),
       acquiree : participant (base, candidate, acquiree_skgid),
       existing_overriders : existing_skgids . iter ()
         . map (|skgid| participant (base, candidate, skgid)) . collect (),
@@ -440,15 +440,15 @@ fn validate_identity_and_derive_changes (
     if let NodeInstruction::Save (SaveNode (node)) = nodeInstruction {
       affected_skgids . extend (node . all_skgids () . cloned ()); }}
 
-  let mut claims : BTreeMap<ID, OwnersForId> = BTreeMap::new ();
+  let mut claims : BTreeMap<ID, CarriersForId> = BTreeMap::new ();
   for skgid in &affected_skgids {
     if base . nodes . contains_key (skgid) && ! touched_pids . contains (skgid) {
       claims . entry (skgid . clone ()) . or_default ()
         . primary . insert (skgid . clone ()); }
-    if let Some (owner) = base . extra_id_to_pid . get (skgid) {
-      if ! touched_pids . contains (owner) {
+    if let Some (carrier) = base . extra_id_to_pid . get (skgid) {
+      if ! touched_pids . contains (carrier) {
         claims . entry (skgid . clone ()) . or_default ()
-          . extra . insert (owner . clone ()); }}}
+          . extra . insert (carrier . clone ()); }}}
   for nodeInstruction in nodeInstructions {
     if let NodeInstruction::Save (SaveNode (node)) = nodeInstruction {
       claims . entry (node . pid . clone ()) . or_default ()
@@ -458,21 +458,21 @@ fn validate_identity_and_derive_changes (
           . extra . insert (node . pid . clone ()); }}}
 
   let mut errors : Vec<CompleteGraphError> = Vec::new ();
-  for (skgid, owners) in &claims {
-    if owners . extra . len () > 1 {
+  for (skgid, carriers) in &claims {
+    if carriers . extra . len () > 1 {
       errors . push (CompleteGraphError::DuplicateExtraId {
         skgid     : skgid . clone (),
-        owners : owners . extra . iter () . cloned () . collect (),
+        carriers  : carriers . extra . iter () . cloned () . collect (),
       }); }
-    let extra_owners : Vec<ID> = owners . extra . iter ()
-      . filter ( |owner| ! owners . primary . contains (*owner) )
+    let extra_carriers : Vec<ID> = carriers . extra . iter ()
+      . filter ( |carrier| ! carriers . primary . contains (*carrier) )
       . cloned ()
       . collect ();
-    if ! owners . primary . is_empty () && ! extra_owners . is_empty () {
+    if ! carriers . primary . is_empty () && ! extra_carriers . is_empty () {
       errors . push (CompleteGraphError::PrimaryExtraCollision {
         skgid             : skgid . clone (),
-        primary_owners : owners . primary . iter () . cloned () . collect (),
-        extra_owners,
+        primary_carriers  : carriers . primary . iter () . cloned () . collect (),
+        extra_carriers,
       }); }}
   for nodeInstruction in nodeInstructions {
     if let NodeInstruction::Save (SaveNode (node)) = nodeInstruction {
@@ -507,26 +507,26 @@ fn validate_identity_and_derive_changes (
     . collect ();
   sorted_affected_skgids . sort ();
   for skgid in sorted_affected_skgids {
-    let old_owner : Option<ID> = base . pid_of (&skgid);
-    let new_owner : Option<ID> = final_owner_of (&claims, &skgid);
-    if old_owner != new_owner {
+    let old_carrier : Option<ID> = base . pid_of (&skgid);
+    let new_carrier : Option<ID> = final_carrier_of (&claims, &skgid);
+    if old_carrier != new_carrier {
       canonicalization_changes . push (CanonicalizationChange {
         skgid        : skgid . clone (),
-        old_owner : old_owner . clone (),
-        new_owner : new_owner . clone (),
+        old_carrier  : old_carrier . clone (),
+        new_carrier  : new_carrier . clone (),
       });
-      if let Some (new_owner) = new_owner {
+      if let Some (new_carrier) = new_carrier {
         identity_acquisitions . push (IdentityAcquisition {
           skgid,
-          old_owner,
-          new_owner,
+          old_carrier,
+          new_carrier,
         }); }} }
 
   let mut recorders_to_reindex : HashSet<ID> = touched_pids . clone ();
   for change in &canonicalization_changes {
-    let old_key : &ID = change . old_owner . as_ref ()
+    let old_key : &ID = change . old_carrier . as_ref ()
       . unwrap_or (&change . skgid);
-    let new_key : &ID = change . new_owner . as_ref ()
+    let new_key : &ID = change . new_carrier . as_ref ()
       . unwrap_or (&change . skgid);
     if old_key != new_key {
       recorders_to_reindex . extend (inbound_recorders_at (base, old_key)); }}
@@ -550,12 +550,12 @@ fn validate_identity_and_derive_changes (
   }, errors, revocations)
 }
 
-fn final_owner_of (
-  claims : &BTreeMap<ID, OwnersForId>,
+fn final_carrier_of (
+  claims    : &BTreeMap<ID, CarriersForId>,
   skgid     : &ID,
 ) -> Option<ID> {
-  let owners : &OwnersForId = claims . get (skgid) ?;
-  owners . primary . first () . or_else (|| owners . extra . first ())
+  let carriers : &CarriersForId = claims . get (skgid) ?;
+  carriers . primary . first () . or_else (|| carriers . extra . first ())
     . cloned ()
 }
 
