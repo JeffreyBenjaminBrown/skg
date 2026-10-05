@@ -58,7 +58,7 @@ true-content subtree.  This modifies metadata but does not save."
          (error-message (funcall string-value 'error))
          (canonical-skgid (funcall string-value 'id))
          (value (funcall string-value 'value))
-         (owned (funcall string-value 'user-owned)))
+         (owned (funcall string-value 'owned)))
     (run-at-time
      0 nil
      (lambda ()

@@ -75,7 +75,7 @@
                    (lambda () (setq save-count (1+ save-count)))))
           (skg--set-flag-search-matching-from-state
            buffer marker "root" nil
-           (format "((response-type flag-state) (id \"root\") (flag \"noSearchMatching\") (value \"%s\") (repo \"main\") (user-owned \"true\"))"
+           (format "((response-type flag-state) (id \"root\") (flag \"noSearchMatching\") (value \"%s\") (repo \"main\") (owned \"true\"))"
                    (car case))))
         (should (equal initial (cadr case)))
         (should (test-skg-flag--has-request-p 1 (nth 3 case)))
@@ -95,7 +95,7 @@
       (should-error
        (skg--set-flag-search-matching-from-state
         buffer marker "root" nil
-        "((id \"root\") (value \"false\") (user-owned \"true\"))")
+        "((id \"root\") (value \"false\") (owned \"true\"))")
        :type 'user-error))))
 
 (ert-deftest test-skg-flag-root-refusals-and-key-bindings ()

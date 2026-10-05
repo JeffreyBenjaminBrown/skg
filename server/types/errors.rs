@@ -31,8 +31,8 @@ pub enum BufferValidationError {
   AmbiguousDeletion              (ID),
   DuplicatedContent              (ID), // A node has multiple Content children with the same ID
   InconsistentSkgrepos            (ID, HashSet<SkgrepoName>), // Multiple viewnodes with same ID have different skgrepos
-  ModifiedForeignNode            (ID, SkgrepoName), // Attempted to modify a node from a foreign skgrepo - (node_id, repo_name)
-  CreatedForeignNode             (ID, SkgrepoName), // Attempted to create a node in a foreign skgrepo - (node_id, repo_name)
+  ModifiedForeignNode            (ID, SkgrepoName), // Attempted to modify a node from a foreign skgrepo - (skgid, repo_name)
+  CreatedForeignNode             (ID, SkgrepoName), // Attempted to create a node in a foreign skgrepo - (skgid, repo_name)
   CannotMoveToOrFromForeignSkgrepo (ID,
                                    SkgrepoName, // disk skgrepo
                                    SkgrepoName), // buffer skgrepo

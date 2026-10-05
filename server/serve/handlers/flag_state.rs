@@ -37,7 +37,7 @@ fn flag_state_response_body (
   let (pid, skgrepo, value, owned) = flag_state (
     &runtime . graph, &runtime . config, &skgid, flag) ?;
   Ok (format! (
-    "(id {}) (flag {}) (value {}) (repo {}) (user-owned {})",
+    "(id {}) (flag {}) (value {}) (repo {}) (owned {})",
     quoted (&pid . 0), quoted (flag . wire_name ()),
     quoted (if value { "true" } else { "false" }),
     quoted (&skgrepo . 0), quoted (if owned { "true" } else { "false" })))

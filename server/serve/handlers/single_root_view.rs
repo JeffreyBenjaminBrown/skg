@@ -40,9 +40,9 @@ pub fn handle_single_root_view_request (
   let view_id_result : Result<ViewId, String> =
     view_id_from_request (request);
   match node_skgid_from_single_root_view_request (request) {
-    Ok (node_id) => {
+    Ok (skgid) => {
       match skgrepo_restriction . skgid_skgrepo_is_unrestricted (
-        &runtime . graph, &runtime . config, &node_id ) {
+        &runtime . graph, &runtime . config, &skgid ) {
         Ok (true) => {},
         Ok (false) => {
           let response_sexp : String =
@@ -50,7 +50,7 @@ pub fn handle_single_root_view_request (
               &String::new (),
               &vec! [format! (
                 "Node {} is not in skgrepo restriction {}",
-                node_id,
+                skgid,
                 skgrepo_restriction . name )],
               &[] );
           send_response_with_length_prefix (
@@ -72,7 +72,7 @@ pub fn handle_single_root_view_request (
           return; }}
       if let Some (existing_view_id)
         = views_state . open_views
-          . content_view_id_for_root_skgid ( &node_id )
+          . content_view_id_for_root_skgid ( &skgid )
         { // Following a link to a root that is already open lands in
           // that ordinary content buffer.
           let switch_sexp : String =
@@ -97,7 +97,7 @@ pub fn handle_single_root_view_request (
             let mut render_warnings : Vec<String> = Vec::new ();
             match multi_root_view_via_runtime (
               &runtime,
-              &[node_id . clone ()],
+              &[skgid . clone ()],
               views_state . diff_mode_enabled,
               Some (skgrepo_restriction),
               &mut render_warnings )

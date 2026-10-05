@@ -93,7 +93,7 @@ describe('skg.flag staging', function ()
     handler('', sexpr.read(
       '((response-type flag-state) (id "root")'
       .. ' (flag "noSearchMatching") (value "false")'
-      .. ' (repo "main") (user-owned "true"))'))
+      .. ' (repo "main") (owned "true"))'))
     assert.are.equal('search matching', initial)
     assert.is_true(has_request(2, 'true'))
   end)

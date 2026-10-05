@@ -439,7 +439,7 @@ So far there are these endpoints:
     (flag . "noSearchMatching"))=.
   - Response: =((response-type flag-state) (id "CANONICAL-PID")
     (flag "noSearchMatching") (value "true") (repo "REPO")
-    (user-owned "true"))=. Extra IDs resolve to the canonical PID. Unknown IDs
+    (owned "true"))=. Extra IDs resolve to the canonical PID. Unknown IDs
     or flag atoms return =(error "...")= under the same response type.
   - The endpoint is read-only and may report =hadId=, =wasOverloaded=, or
     =noSearchMatching=. Ownership is advisory; save-time validation remains

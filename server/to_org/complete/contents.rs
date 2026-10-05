@@ -21,12 +21,12 @@ pub fn clobberWriteProtectedViewnode (
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
 
-  let (node_id, skgrepo) : (ID, SkgrepoName) =
+  let (skgid, skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_viewnode_at (
       tree, treeid, "clobberWriteProtectedViewnode" ) ?;
   let graphnode : Graphnode =
     graphnode_graphFirst_by_pid_and_skgrepo (
-      graph, config, &node_id, &skgrepo ) ?;
+      graph, config, &skgid, &skgrepo ) ?;
   let title : String = graphnode . title . clone();
   let skgrepo : SkgrepoName = graphnode . home_skgrepo . clone();
   write_at_unrestrictedVognode_in_tree (

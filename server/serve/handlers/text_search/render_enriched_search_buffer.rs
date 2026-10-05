@@ -33,9 +33,9 @@ pub(crate) fn insert_full_containerward_role_trees_into_search_view (
         => Some (( c . id (), t . skgid . clone () )),
       _ => None } )
     . collect () };
-  for (node_treeid, node_id) in &level1_skgids {
-    if ! search_results . contains (node_id) { continue; }
-    if let Some (role_tree) = containerward_role_trees_by_skgid . get (node_id) {
+  for (node_treeid, skgid) in &level1_skgids {
+    if ! search_results . contains (skgid) { continue; }
+    if let Some (role_tree) = containerward_role_trees_by_skgid . get (skgid) {
       // The role tree root is the result node itself;
       // its children (containers) go under the level-1 node.
       if let ContainerwardRoleTree::Inner ( _, children ) = role_tree {
@@ -43,7 +43,7 @@ pub(crate) fn insert_full_containerward_role_trees_into_search_view (
           // Insert in reverse so the first child in
           // the role tree ends up first among siblings.
           insert_full_containerward_role_tree (
-            child, node_id, *node_treeid,
+            child, skgid, *node_treeid,
             viewforest, graph, tantivy_index, config, restriction ); } } } } }
 
 /// Recursively insert an ContainerwardRoleTree and its children
@@ -118,14 +118,14 @@ pub fn insert_overrideward_view_subtrees (
         => Some (( c . id (), t . skgid . clone () )),
       _ => None } )
     . collect () };
-  for (node_treeid, node_id) in &level1_skgids {
-    if ! search_results . contains (node_id) { continue; }
+  for (node_treeid, skgid) in &level1_skgids {
+    if ! search_results . contains (skgid) { continue; }
     for dir in [ OverrideDir::Overriddenward,
                  OverrideDir::Overriderward ] {
       let mut path : HashSet<ID> =
-        HashSet::from ([ node_id . clone () ]);
+        HashSet::from ([ skgid . clone () ]);
       graft_override_chain (
-        node_id, *node_treeid, dir, graph,
+        skgid, *node_treeid, dir, graph,
         viewforest, restriction, &mut path ); }} }
 
 /// Every id that 'insert_overrideward_view_subtrees' would
@@ -210,7 +210,7 @@ fn graft_override_chain (
 /// under the given parent.
 /// Returns the new child's NodeId.
 fn prepend_containing_child_from_tantivy (
-  node_id       : &ID, // what to prepend
+  skgid         : &ID, // what to prepend
   parent_treeid : NodeId, // where to prepend
   viewforest        : &mut Tree<Viewnode>,
   tantivy_index : &TantivyIndex,
@@ -218,18 +218,18 @@ fn prepend_containing_child_from_tantivy (
   restriction   : &SkgrepoRestriction,
 ) -> Option<NodeId> {
   let viewnode : Viewnode =
-    match title_and_skgrepo_by_skgid ( tantivy_index, node_id ) {
+    match title_and_skgrepo_by_skgid ( tantivy_index, skgid ) {
       Some ((title, skgrepo)) => {
         if ! restriction . contains_skgrepo (&skgrepo) {
           return None;
         } else {
           mk_writeProtected_viewnode_with_birth (
-            node_id . clone (), skgrepo, title,
+            skgid . clone (), skgrepo, title,
             AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER) ) }},
       None =>
         mk_writeProtected_viewnode_with_birth (
-          node_id . clone (), SkgrepoName::from ("search"),
-          node_id . as_str () . to_string (),
+          skgid . clone (), SkgrepoName::from ("search"),
+          skgid . as_str () . to_string (),
           AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER) ) };
   let mut parent_mut : NodeMut<Viewnode> =
     viewforest . get_mut (parent_treeid) . unwrap ();

@@ -111,7 +111,7 @@ local function request (recursive)
       if err then vim.notify('flag state: ' .. err) return end
       local canonical_skgid = payload.field_text(response, 'id')
       local value = payload.field_text(response, 'value')
-      local owned = payload.field_text(response, 'user-owned')
+      local owned = payload.field_text(response, 'owned')
       if owned ~= 'true' then
         vim.notify('Cannot set search matching on a foreign node') return end
       if not vim.api.nvim_buf_is_loaded(buf) then return end
