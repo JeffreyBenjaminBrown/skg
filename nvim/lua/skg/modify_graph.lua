@@ -148,8 +148,8 @@ function M.replace_content_with_link ()
   if not metadata.activeNode_sexp_p(sexp) then
     error('Cannot replace this branch with a link:'
           .. ' it is not an activeNode') end
-  local id = metadata.node_id(sexp)
-  if not id then
+  local skgid = metadata.node_id(sexp)
+  if not skgid then
     error('Cannot replace this branch with a link:'
           .. ' node has no ID') end
   M.check_container(M.container_data(line))
@@ -163,7 +163,7 @@ function M.replace_content_with_link ()
   local label = M.read_link_label(
     M.replace_headline_links_with_labels(split.title))
   local replacement = string.format('%s[[id:%s][%s]]',
-                                    split.stars, id, label)
+                                    split.stars, skgid, label)
   vim.api.nvim_buf_set_lines(0, line - 1, M.subtree_end(line), false,
                              { replacement })
   require('skg.save').request_save_buffer()
@@ -201,13 +201,13 @@ function M.replace_link_with_content ()
   if not line then error('Not on a headline') end
   vim.api.nvim_win_set_cursor(0, { line, 0 })
   M.check_container(M.container_data(line))
-  local node_id = metadata.node_id(
+  local node_skgid = metadata.node_id(
     metadata.metadata_sexp_at_line_or_nil(line) or {})
   local link = M.single_link_in_leaf(line)
-  if node_id then
+  if node_skgid then
     vim.notify(string.format(
       'Warning: replacing existing node %s may have created an orphan',
-      node_id))
+      node_skgid))
   end
   local split = metadata.split_as_stars_metadata_title(
     metadata.line_text(line))

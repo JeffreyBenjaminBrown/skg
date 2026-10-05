@@ -94,27 +94,27 @@ function M.annotate_buffer (buf)
   local generation = (vim.b[buf].skg_readable_ids_generation or 0) + 1
   vim.b[buf].skg_readable_ids_generation = generation
   local unique = {}
-  local ids = {}
+  local skgids = {}
   for _, position in ipairs(positions) do
     if not unique[position.id] then
       unique[position.id] = true
-      table.insert(ids, position.id)
+      table.insert(skgids, position.id)
     end
   end
-  M.request_titles(ids, generation, buf)
+  M.request_titles(skgids, generation, buf)
 end
 
 ---Send a titles-by-ids request; GENERATION and BUF ride the FIFO for
 ---the response handler.
----@param ids string[]
+---@param skgids string[]
 ---@param generation integer
 ---@param buf integer
-function M.request_titles (ids, generation, buf, approved_pids)
+function M.request_titles (skgids, generation, buf, approved_pids)
   local ok, err = pcall(function ()
     M.ensure_title_response_handler()
     state.lp_reset()
     local ids_form = { sexpr.symbol('ids') }
-    for _, id in ipairs(ids) do table.insert(ids_form, id) end
+    for _, skgid in ipairs(skgids) do table.insert(ids_form, skgid) end
     local request_form = {
       sexpr.pair(sexpr.symbol('request'), 'titles by ids'),
       ids_form }
@@ -124,7 +124,7 @@ function M.request_titles (ids, generation, buf, approved_pids)
         table.insert(approval, pid) end
       table.insert(request_form, approval) end
     local request = sexpr.to_string(request_form) .. '\n'
-    table.insert(M.pending_title_requests, { generation, buf, ids })
+    table.insert(M.pending_title_requests, { generation, buf, skgids })
     state.lp_pending_count = state.lp_pending_count + 1
     client.send_string(request)
   end)

@@ -58,9 +58,9 @@ end
 function M.point_in_link_p ()
   local line = metadata.line_text()
   local pos = vim.api.nvim_win_get_cursor(0)[2] + 1
-  local start, _, id, label =
+  local start, _, skgid, label =
     M.match_containing(line, M.link_pattern, pos, false)
-  if start then return { id = id, label = label } end
+  if start then return { id = skgid, label = label } end
   return nil
 end
 
@@ -155,8 +155,8 @@ function M.point_in_metadata_p ()
   local metadata_end = start_col + #split.metadata
   if pos >= start_col and pos < metadata_end then
     local sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
-    local id = sexp and M.extract_id_from_metadata_sexp(sexp)
-    if id then return { id = id, label = split.title } end
+    local skgid = sexp and M.extract_id_from_metadata_sexp(sexp)
+    if skgid then return { id = skgid, label = split.title } end
   end
   return nil
 end
@@ -297,12 +297,12 @@ function M.goto_id_near_point ()
 end
 
 ---Open a content view for ID, prompting when not given.
----@param id string|nil
-function M.goto_by_id (id)
-  id = id or vim.fn.input('Node ID: ')
-  if id == nil or id == '' then return end
-  vim.notify('Visiting node: ' .. id)
-  content_view.request_single_root_content_view_from_id(id)
+---@param skgid string|nil
+function M.goto_by_id (skgid)
+  skgid = skgid or vim.fn.input('Node ID: ')
+  if skgid == nil or skgid == '' then return end
+  vim.notify('Visiting node: ' .. skgid)
+  content_view.request_single_root_content_view_from_id(skgid)
 end
 
 ---If point is on an [[id:..][label]] link, visit that id.
@@ -330,9 +330,9 @@ function M.goto_and_close_this ()
   goto_then_close(M.goto_id_near_point)
 end
 
----@param id string|nil
-function M.goto_by_id_and_close_this (id)
-  goto_then_close(function () M.goto_by_id(id) end)
+---@param skgid string|nil
+function M.goto_by_id_and_close_this (skgid)
+  goto_then_close(function () M.goto_by_id(skgid) end)
 end
 
 return M

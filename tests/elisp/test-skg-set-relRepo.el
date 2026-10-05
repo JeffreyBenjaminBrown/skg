@@ -412,11 +412,11 @@ write-protected-but-true member (e) over content (f), a
 subscribeeFolder member (g) over subscribee-as-such content (h), and an
 aliasFolder.")
 
-(defun test--line-of-id (id)
+(defun test--line-of-id (skgid)
   "Return the text of the buffer line whose metadata carries ID."
   (save-excursion
     (goto-char (point-min))
-    (search-forward (format "(id %s)" id))
+    (search-forward (format "(id %s)" skgid))
     (buffer-substring-no-properties
      (line-beginning-position) (line-end-position))))
 
@@ -433,12 +433,12 @@ subscribee-as-such member are pruned, and folder members are untouched."
      (let ((count (skg--set-relRepo-recursive-walk
                    'contained "trusted")))
        (should (= count 3)) ;; a, b, e
-       (dolist (id '("a" "b" "e"))
+       (dolist (skgid '("a" "b" "e"))
          (should (string-match-p "(relRepo trusted)"
-                                 (test--line-of-id id))))
-       (dolist (id '("r" "c" "d" "f" "g" "h"))
+                                 (test--line-of-id skgid))))
+       (dolist (skgid '("r" "c" "d" "f" "g" "h"))
          (should-not (string-match-p "relRepo"
-                                     (test--line-of-id id))))))))
+                                     (test--line-of-id skgid))))))))
 
 (ert-deftest test-recursive-walk-subscribee ()
   "Kind `subscribee' hits only subscribeeFolder members, leaving content
@@ -453,9 +453,9 @@ children and subscribee-as-such content untouched."
        (should (= count 1)) ;; g
        (should (string-match-p "(relRepo private)"
                                (test--line-of-id "g")))
-       (dolist (id '("r" "a" "b" "c" "d" "e" "f" "h"))
+       (dolist (skgid '("r" "a" "b" "c" "d" "e" "f" "h"))
          (should-not (string-match-p "relRepo"
-                                     (test--line-of-id id))))))))
+                                     (test--line-of-id skgid))))))))
 
 (ert-deftest test-recursive-walk-root-edge-inclusive ()
   "Starting the walk below the view root includes the start node's
@@ -519,9 +519,9 @@ member's content children are not reached."
      (goto-char (point-min))
      (should (= 0 (skg--set-relRepo-recursive-walk
                    'contained "trusted")))
-     (dolist (id '("s" "sc"))
+     (dolist (skgid '("s" "sc"))
        (should-not (string-match-p "relRepo"
-                                   (test--line-of-id id)))))))
+                                   (test--line-of-id skgid)))))))
 
 (ert-deftest test-recursive-walk-write-protected-folder-anchor ()
   "A writable folder under an WRITE_PROTECTED anchor is not collected at
@@ -564,9 +564,9 @@ the subtree, while preserving display facts."
      (goto-char (point-min))
      (should (= 2 (skg--set-relRepo-recursive-walk
                    'contained skg--relRepo-no-override)))
-     (dolist (id '("a" "b"))
+     (dolist (skgid '("a" "b"))
        (should-not (string-match-p "editRequest"
-                                   (test--line-of-id id)))))))
+                                   (test--line-of-id skgid)))))))
 
 ;; --- The kind menu: skg--select-relationship-kind ---
 
@@ -635,9 +635,9 @@ window plumbing are stubbed as in the other handler tests."
                (skg-set-relRepo-recursive)
                (test--choose-menu-role "** contained"))
              (with-current-buffer view-buffer
-               (dolist (id '("a" "b" "e"))
+               (dolist (skgid '("a" "b" "e"))
                  (should (string-match-p "(relRepo trusted)"
-                                         (test--line-of-id id))))
+                                         (test--line-of-id skgid))))
                (should-not (string-match-p "relRepo"
                                            (test--line-of-id "g")))))
          (when (get-buffer "*skg-relationship-kinds*")
@@ -681,12 +681,12 @@ leave behind, and on acceptance writes (relRepo NEW) atoms on them."
            (should (seq-find (lambda (m)
                                (string-match-p "Also publicized 2" m))
                              msgs))))
-       (dolist (id '("r" "a" "b"))
+       (dolist (skgid '("r" "a" "b"))
          (should (string-match-p "(repo public)"
-                                 (test--line-of-id id))))
-       (dolist (id '("a" "b"))
+                                 (test--line-of-id skgid))))
+       (dolist (skgid '("a" "b"))
          (should (string-match-p "(relRepo public)"
-                                 (test--line-of-id id))))
+                                 (test--line-of-id skgid))))
        (should-not (string-match-p "relRepo"
                                    (test--line-of-id "r")))))))
 
@@ -757,9 +757,9 @@ it are not offered (they cannot actually publicize)."
                                   (string-match-p "\\*Messages\\*" m)))
                            msgs))))
      (should (string-match-p "(repo private)" (test--line-of-id "e")))
-     (dolist (id '("r" "f"))
+     (dolist (skgid '("r" "f"))
        (should (string-match-p "(repo public)"
-                               (test--line-of-id id)))))))
+                               (test--line-of-id skgid)))))))
 
 (ert-deftest test-set-repo-single-publicizes-a-public-parents-child-edge ()
   "Moving a private child into public offers its public parent's edge too."

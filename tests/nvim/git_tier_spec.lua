@@ -10,7 +10,7 @@ local helpers = dofile(
 local config = require('skg.config')
 local git_add = require('skg.git_add')
 local goto_git = require('skg.goto_git')
-local readable_ids = require('skg.readable_ids')
+local readable_skgids = require('skg.readable_ids')
 
 local function buffer_with (text)
   local buf = vim.api.nvim_create_buf(true, false)
@@ -104,10 +104,10 @@ describe('skg.readable_ids', function ()
         end
       end)
     local buf = buffer_with(uuid_a .. ' and ' .. uuid_b)
-    readable_ids.enable(buf)
+    readable_skgids.enable(buf)
     vim.wait(2000, function ()
       local marks = vim.api.nvim_buf_get_extmarks(
-        buf, readable_ids.namespace, 0, -1, { details = true })
+        buf, readable_skgids.namespace, 0, -1, { details = true })
       for _, mark in ipairs(marks) do
         if mark[4].virt_text then return true end
       end
@@ -115,7 +115,7 @@ describe('skg.readable_ids', function ()
     end, 10)
     local conceals, titles = 0, {}
     for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(
-        buf, readable_ids.namespace, 0, -1, { details = true })) do
+        buf, readable_skgids.namespace, 0, -1, { details = true })) do
       if mark[4].conceal then conceals = conceals + 1 end
       if mark[4].virt_text then
         table.insert(titles, mark[4].virt_text[1][1]) end
@@ -136,7 +136,7 @@ describe('skg.readable_ids', function ()
         end
       end)
     local buf = buffer_with(uuid_a)
-    readable_ids.enable(buf)
+    readable_skgids.enable(buf)
     vim.wait(1000, function () return respond_late ~= nil end, 10)
     -- A newer scan supersedes the outstanding one.
     vim.b[buf].skg_readable_ids_generation =
@@ -146,7 +146,7 @@ describe('skg.readable_ids', function ()
       .. ' (content ((%s . "stale title"))))', uuid_a)))
     vim.wait(300, function () return false end, 50)
     for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(
-        buf, readable_ids.namespace, 0, -1, { details = true })) do
+        buf, readable_skgids.namespace, 0, -1, { details = true })) do
       assert.is_nil(mark[4].virt_text)
     end
     server.close()

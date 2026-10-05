@@ -42,7 +42,7 @@ If point is not on a link, print a message and do nothing."
                         line-start line-end ))
           ( link-regex "\\[\\[id:\\([^]]+\\)\\]\\[\\([^]]+\\)\\]\\]" )
           ( found-link nil ) ;; mutates
-          ( link-id nil ))   ;; mutates
+          ( link-skgid nil ))   ;; mutates
     (save-excursion
       ;; Search for links in the current line
       (goto-char line-start)
@@ -50,16 +50,16 @@ If point is not on a link, print a message and do nothing."
                    ( re-search-forward link-regex line-end t ))
         (let ( ( match-start ( match-beginning 0 ))
                ( match-end ( match-end 0 ))
-               ( id ( match-string-no-properties 1 )) )
+               ( skgid ( match-string-no-properties 1 )) )
           (when ( and ;; Check if point is within this link
                   ( >= pos match-start )
                   ( <= pos match-end ))
             (setq found-link t)
-            (setq link-id id )) )) )
+            (setq link-skgid skgid )) )) )
     (if found-link
         (progn
-          (message "Visiting node: %s" link-id)
-          (skg-request-single-root-content-view-from-id link-id))
+          (message "Visiting node: %s" link-skgid)
+          (skg-request-single-root-content-view-from-id link-skgid))
       (message "Point not on a link")) ))
 
 (defun skg--id-at-point ()
@@ -146,16 +146,16 @@ sides of point are ambiguous: it says so and visits nothing."
      ((eq result 'ambiguous)
       (message "Point sits between IDs; move onto (or nearer to) one."))
      (result
-      (let (( id (car result) ))
-        (message "Visiting node: %s" id)
-        (skg-request-single-root-content-view-from-id id)))
+      (let (( skgid (car result) ))
+        (message "Visiting node: %s" skgid)
+        (skg-request-single-root-content-view-from-id skgid)))
      (t (message "No ID found on this line")) )))
 
-(defun skg-goto-by-id (id)
+(defun skg-goto-by-id (skgid)
   "Open a content view for ID, prompting when called interactively. (skg-goto is usually more convenient.)"
   (interactive "sNode ID: ")
-  (message "Visiting node: %s" id)
-  (skg-request-single-root-content-view-from-id id))
+  (message "Visiting node: %s" skgid)
+  (skg-request-single-root-content-view-from-id skgid))
 
 (defun skg-goto-and-close-this ()
   "Like `skg-goto', but also kill the buffer it was called from
@@ -166,12 +166,12 @@ once the goto request has been issued."
     (when (buffer-live-p buf)
       (kill-buffer buf))))
 
-(defun skg-goto-by-id-and-close-this (id)
+(defun skg-goto-by-id-and-close-this (skgid)
   "Like `skg-goto-by-id', but also kill the buffer it was called
 from once the goto request has been issued."
   (interactive "sNode ID: ")
   (let ((buf (current-buffer)))
-    (skg-goto-by-id id)
+    (skg-goto-by-id skgid)
     (when (buffer-live-p buf)
       (kill-buffer buf))))
 
@@ -247,9 +247,9 @@ ID and label. Otherwise push the headline's metadata ID and title."
   (interactive)
   (let (( link-hit (skg--point-in-link-p) ))
     (if link-hit
-        (let (( id    (car link-hit) )
+        (let (( skgid    (car link-hit) )
               ( label (cdr link-hit) ))
-          (push (list id label) skg-linkstack)
+          (push (list skgid label) skg-linkstack)
           (message "pushed to stack: %s" label) )
       (let* (( headline (skg-get-current-headline-text) )
              ( split (skg-split-as-stars-metadata-title headline) )
@@ -259,8 +259,8 @@ ID and label. Otherwise push the headline's metadata ID and title."
                  (not (string-empty-p metadata-sexp)) )
             (let (( sexp (read metadata-sexp) ))
               (if (skg--metadata-sexp-contains-id-p sexp)
-                  (let (( id (skg--extract-id-from-metadata-sexp sexp) ))
-                    (push (list id title) skg-linkstack)
+                  (let (( skgid (skg--extract-id-from-metadata-sexp sexp) ))
+                    (push (list skgid title) skg-linkstack)
                     (message "pushed to stack: %s" title) )
                 (message "No ID in metadata on this line") ))
           (message "No metadata on this line") )) )))
@@ -275,12 +275,12 @@ Othewrise (because the stack is empty) print a message and return nil."
 (defun skg--insert-link-from-entry (entry)
   "Insert an org link at point, using ENTRY, a (id title) pair.
 Prompts for the link label, defaulting to the title."
-  (let* (( id (car entry) )
+  (let* (( skgid (car entry) )
          ( title (cadr entry) )
          ( label (if (minibufferp)
                      title
                    (read-string "Link label: " title))) )
-    (insert (format "[[id:%s][%s]]" id label)) ))
+    (insert (format "[[id:%s][%s]]" skgid label)) ))
 
 (defun skg--org-stars-for-node-insertion ()
   "Return headline stars for inserting a node at point."
@@ -302,11 +302,11 @@ writable headline would instead erase that body and content.)
 If point is already after headline stars at the start of a line,
 insert only the metadata and title.  Otherwise insert a full same-level
 headline."
-  (let* (( id (car entry) )
+  (let* (( skgid (car entry) )
          ( title (cadr entry) )
          ( request-definitive-view
            (and (bound-and-true-p skg-view-uri)
-                (if (skg--buffer-has-editable-occurrence-p id)
+                (if (skg--buffer-has-editable-occurrence-p skgid)
                     (progn (message "NOTE: Pasting node write-protected because a writable occurrence is already present in this same buffer.")
                            nil)
                   t )) )
@@ -314,7 +314,7 @@ headline."
            (format (if request-definitive-view
                        "(skg (node (id %s) writeProtected (viewRequests definitiveView))) %s"
                      "(skg (node (id %s) writeProtected)) %s")
-                   id title )) )
+                   skgid title )) )
     (if (save-excursion
           (let ((pos (point)))
             (beginning-of-line)
@@ -327,7 +327,7 @@ headline."
                       (skg--org-stars-for-node-insertion)
                       node-text)))))
 
-(defun skg--buffer-has-editable-occurrence-p (id)
+(defun skg--buffer-has-editable-occurrence-p (skgid)
   "Return non-nil if the current buffer has a headline for node ID that
 is writable, or that will become writable at the next save because it
 requests a definitive view.  The server allows only one of those per ID."
@@ -340,7 +340,7 @@ requests a definitive view.  The server allows only one of those per ID."
         (let (( sexp (ignore-errors ;; a half-edited headline is not an occurrence
                        (skg--metadata-sexp-at-point-or-nil)) ))
           (when (and (skg--activeNode-sexp-p sexp)
-                     (equal (skg--node-id sexp) id)
+                     (equal (skg--node-id sexp) skgid)
                      (or (not (skg--node-write-protected-p sexp))
                          (skg-sexp-subtree-p
                           sexp '(skg (node (viewRequests definitiveView))))))
@@ -419,11 +419,11 @@ title comes from the stack entry."
                 (when (and (>= pos skg-start)
                            (< pos skg-end)
                            (skg--metadata-sexp-contains-id-p sexp) )
-                  (let ( (id (skg--extract-id-from-metadata-sexp sexp))
+                  (let ( (skgid (skg--extract-id-from-metadata-sexp sexp))
                          (title (string-trim
                                  (buffer-substring-no-properties
                                   skg-end (line-end-position)) )) )
-                    (cons id title)) ))
+                    (cons skgid title)) ))
             (error nil) )) )) ))
 
 (defun skg--metadata-sexp-contains-id-p
@@ -622,9 +622,9 @@ Each (id label) pair becomes a headline with label as title and id as body.
 Head of stack (most recently pushed) appears at top of buffer."
   (mapconcat
    (lambda (entry)
-     (let (( id (car entry) )
+     (let (( skgid (car entry) )
            ( label (cadr entry) ))
-       (format "* %s\n%s" label id) ))
+       (format "* %s\n%s" label skgid) ))
    skg-linkstack
    "\n" ))
 

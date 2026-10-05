@@ -148,10 +148,10 @@ describe('skg.link_annotations', function ()
     for _, case in ipairs(cases) do
       local buf = vim.api.nvim_create_buf(true, false)
       vim.api.nvim_buf_set_lines(buf, 0, -1, false, case.lines)
-      local ids = {}
+      local skgids = {}
       for _, position in ipairs(annotations.collect(buf)) do
-        table.insert(ids, position.id) end
-      assert.are.same({ case.name, case.live }, { case.name, ids })
+        table.insert(skgids, position.id) end
+      assert.are.same({ case.name, case.live }, { case.name, skgids })
       vim.api.nvim_buf_delete(buf, { force = true })
     end
   end)
@@ -160,10 +160,10 @@ describe('skg.link_annotations', function ()
     local buf = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
       '* h', '#+begin_example', '[[id:a][A]]', '* next [[id:b][B]]' })
-    local ids = {}
+    local skgids = {}
     for _, position in ipairs(annotations.collect(buf)) do
-      table.insert(ids, position.id) end
-    assert.are.same({ 'b' }, ids)
+      table.insert(skgids, position.id) end
+    assert.are.same({ 'b' }, skgids)
     vim.api.nvim_buf_delete(buf, { force = true })
   end)
 end)

@@ -38,7 +38,7 @@ local function any_dirty_view ()
   return false
 end
 
-local function send (id, approved_preview)
+local function send (skgid, approved_preview)
   lock.begin_stream('delete absent references')
   lock.lock_all_skg_buffers()
   rerender.register_rerender_stream_handlers()
@@ -54,7 +54,7 @@ local function send (id, approved_preview)
       vim.bo[buf].filetype = 'org'
       vim.api.nvim_set_current_buf(buf)
       if vim.fn.confirm('Remove the structured references?', '&Yes\n&No', 2) == 1 then
-        rerender.after_empty_stream = function () send(id, approval) end end
+        rerender.after_empty_stream = function () send(skgid, approval) end end
     end, true)
   state.register_response_handler('delete-references-result',
     function (_text, response)
@@ -74,17 +74,17 @@ local function send (id, approved_preview)
     end, true)
   state.lp_reset()
   local request = { sexpr.pair(sexpr.symbol('request'), 'delete references to absent node'),
-                    sexpr.pair(sexpr.symbol('id'), id) }
+                    sexpr.pair(sexpr.symbol('id'), skgid) }
   if approved_preview then
     table.insert(request, sexpr.pair(sexpr.symbol('approved-preview'), approved_preview)) end
   client.send_string(sexpr.to_string(request) .. '\n')
 end
 
 function M.request ()
-  local id = unknown_id_at_point()
-  if not id then error('skg: point must be on an Unknown headline') end
+  local skgid = unknown_id_at_point()
+  if not skgid then error('skg: point must be on an Unknown headline') end
   if any_dirty_view() then error('skg: save or revert every view before global cleanup') end
-  send(id, nil)
+  send(skgid, nil)
 end
 
 return M

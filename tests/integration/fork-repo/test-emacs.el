@@ -13,14 +13,14 @@
   (apply #'message (concat "✗ FAIL: " message) args)
   (kill-emacs 1))
 
-(defun fork-repo-test--buffer-showing (id)
+(defun fork-repo-test--buffer-showing (skgid)
   "Return a live skg view buffer whose text mentions (id ID)."
   (seq-find
    (lambda (b)
      (and (buffer-live-p b)
           (with-current-buffer b
             (and (boundp 'skg-view-uri) skg-view-uri
-                 (string-match-p (regexp-quote (format "(id %s)" id))
+                 (string-match-p (regexp-quote (format "(id %s)" skgid))
                                  (buffer-substring-no-properties
                                   (point-min) (point-max)))))))
    (buffer-list)))

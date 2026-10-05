@@ -18,14 +18,14 @@ true-content subtree.  This modifies metadata but does not save."
   (interactive "P")
   (unless (org-at-heading-p) (user-error "Not on a headline"))
   (let* ((metadata (skg--metadata-sexp-at-point-or-nil))
-         (id (skg--flag-eligible-root-id metadata))
+         (skgid (skg--flag-eligible-root-id metadata))
          (buffer (current-buffer))
          (marker (point-marker)))
     (skg-register-response-handler
      'flag-state
      (lambda (_tcp-proc payload)
        (skg--set-flag-search-matching-from-state
-        buffer marker id recursive payload))
+        buffer marker skgid recursive payload))
      t)
     (skg-lp-reset)
     (process-send-string
@@ -33,7 +33,7 @@ true-content subtree.  This modifies metadata but does not save."
      (concat
       (prin1-to-string
        `((request . "flag state")
-         (id . ,id)
+         (id . ,skgid)
          (flag . "noSearchMatching")))
       "\n"))))
 
@@ -49,14 +49,14 @@ true-content subtree.  This modifies metadata but does not save."
       (user-error "Save the node first; it has no graph ID")))
 
 (defun skg--set-flag-search-matching-from-state
-    (buffer marker expected-id recursive payload)
+    (buffer marker expected-skgid recursive payload)
   "Handle a flag-state PAYLOAD, guarding BUFFER/MARKER against staleness."
   (let* ((response (read payload))
          (string-value (lambda (key)
                          (let ((entry (assoc key response)))
                            (and entry (format "%s" (cadr entry))))))
          (error-message (funcall string-value 'error))
-         (canonical-id (funcall string-value 'id))
+         (canonical-skgid (funcall string-value 'id))
          (value (funcall string-value 'value))
          (owned (funcall string-value 'user-owned)))
     (run-at-time
@@ -71,13 +71,13 @@ true-content subtree.  This modifies metadata but does not save."
              (user-error "skg: headline vanished before the search-matching prompt"))
            (goto-char marker)
            (let* ((metadata (skg--metadata-sexp-at-point-or-nil))
-                  (current-id (and metadata (skg--node-id metadata))))
+                  (current-skgid (and metadata (skg--node-id metadata))))
              (when error-message
                (user-error "flag state: %s" error-message))
-             (unless (and current-id
-                          (or (string= current-id expected-id)
-                              (and canonical-id
-                                   (string= current-id canonical-id))))
+             (unless (and current-skgid
+                          (or (string= current-skgid expected-skgid)
+                              (and canonical-skgid
+                                   (string= current-skgid canonical-skgid))))
                (user-error "The headline changed while flag state was loading"))
              (unless (string= owned "true")
                (user-error "Cannot set search matching on a foreign node"))
@@ -112,11 +112,11 @@ true-content subtree.  This modifies metadata but does not save."
       (save-excursion
         (goto-char marker)
         (let* ((meta (skg--metadata-sexp-at-point-or-nil))
-               (id (and meta (skg--node-id meta)))
+               (skgid (and meta (skg--node-id meta)))
                (reason
                 (cond
-                 ((not id) "no saved ID")
-                 ((gethash id seen) "duplicate occurrence")
+                 ((not skgid) "no saved ID")
+                 ((gethash skgid seen) "duplicate occurrence")
                  ((skg--node-write-protected-p meta) "write-protected")
                  ((skg-sexp-cdr-at-path meta '(skg node editRequest))
                   "already has an editRequest")
@@ -124,8 +124,8 @@ true-content subtree.  This modifies metadata but does not save."
                                (skg--owned-repos))) "foreign repo"))))
           (cond
            ((equal reason "duplicate occurrence") nil)
-           (reason (push (format "%s (%s)" (or id "no-id") reason) skipped))
-           (t (puthash id t seen)
+           (reason (push (format "%s (%s)" (or skgid "no-id") reason) skipped))
+           (t (puthash skgid t seen)
               (skg--stamp-search-matching-request desired)
               (setq changed (1+ changed))))))
       (set-marker marker nil))

@@ -87,10 +87,10 @@ local function headline_structure (buf)
         local ok, parsed = pcall(sexpr.read, split.metadata)
         if ok then sexp = parsed end
       end
-      local id = sexp and metadata.node_id(sexp) or nil
-      if id then
+      local skgid = sexp and metadata.node_id(sexp) or nil
+      if skgid then
         table.insert(result,
-          { #(split.stars:match('^%*+')), relation_from_sexp(sexp), id })
+          { #(split.stars:match('^%*+')), relation_from_sexp(sexp), skgid })
       end
     end
   end

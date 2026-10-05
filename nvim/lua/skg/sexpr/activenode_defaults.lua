@@ -306,19 +306,19 @@ function M.strip_one_field (group, field_name, child_level)
       -- (merge ID) structured as: editRequest / merge / XYZ.
       -- Extract the ID, handling org links in the ID child.
       if #group > 2 then
-        local id = M.extract_id_from_text(vim.trim(group[3].text))
+        local skgid = M.extract_id_from_text(vim.trim(group[3].text))
         return { { level = child_level, text = field_name },
                  { level = child_level + 1, text = 'merge' },
-                 { level = child_level + 2, text = id } } end
+                 { level = child_level + 2, text = skgid } } end
       return group end
     if value_text:sub(1, #'merge ') == 'merge ' then
       -- The user typed "merge <ID>" as a single headline text;
       -- restructure to nested merge / ID.
-      local id = M.extract_id_from_text(
+      local skgid = M.extract_id_from_text(
         vim.trim(value_text:sub(#'merge' + 1)))
       return { { level = child_level, text = field_name },
                { level = child_level + 1, text = 'merge' },
-               { level = child_level + 2, text = id } } end
+               { level = child_level + 2, text = skgid } } end
     return group end
   if field_name == 'viewRequests' then
     if value_text == nil then
@@ -376,8 +376,8 @@ end
 ---@return string
 function M.extract_id_from_text (text)
   local trimmed = vim.trim(text)
-  local id = trimmed:match('%[%[id:([^%]]+)%]%[')
-  return id or trimmed
+  local skgid = trimmed:match('%[%[id:([^%]]+)%]%[')
+  return skgid or trimmed
 end
 
 ---@param ... table[] headline lists

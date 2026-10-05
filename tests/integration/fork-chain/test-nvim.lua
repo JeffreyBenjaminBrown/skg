@@ -16,8 +16,8 @@ local save = require('skg.save')
 local view_requests = require('skg.view_requests')
 
 ---Return a live skg view buffer whose text mentions (id ID).
-local function buffer_showing (id)
-  local needle = '(id ' .. id .. ')'
+local function buffer_showing (skgid)
+  local needle = '(id ' .. skgid .. ')'
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_view_uri ~= nil
        and T.buffer_text(buf):find(needle, 1, true) then

@@ -137,13 +137,13 @@ target, then the buffer is saved."
   (interactive)
   (org-back-to-heading t)
   (let* ((parent (skg--content-link-replacement-container-data))
-         (node-id (skg--node-id
+         (node-skgid (skg--node-id
                    (skg--metadata-sexp-at-point-or-nil)))
          (link (skg--single-link-in-current-leaf)))
     (skg--check-content-link-replacement-container parent)
-    (when node-id
+    (when node-skgid
       (message "Warning: replacing existing node %s may have created an orphan"
-               node-id))
+               node-skgid))
     (skg--replace-current-leaf-with-linked-content link)
     (skg-request-save-buffer)))
 
@@ -154,10 +154,10 @@ target, then the buffer is saved."
          (metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
     (unless (skg--activeNode-sexp-p metadata-sexp)
       (user-error "Cannot replace this branch with a link: it is not an activeNode"))
-    (let ((id (skg--node-id metadata-sexp)))
-      (unless id
+    (let ((skgid (skg--node-id metadata-sexp)))
+      (unless skgid
         (user-error "Cannot replace this branch with a link: node has no ID"))
-      (list :id id
+      (list :id skgid
             :title (nth 2 split)))))
 
 (defun skg--content-link-replacement-container-data ()
@@ -181,14 +181,14 @@ target, then the buffer is saved."
     (when (skg--node-write-protected-p metadata-sexp)
       (user-error "Cannot replace this branch with a link: container is write-protected"))))
 
-(defun skg--replace-current-subtree-with-link-headline (id title)
+(defun skg--replace-current-subtree-with-link-headline (skgid title)
   "Replace the current org subtree with a headline linking to ID.
 The default link label is TITLE with any nested links reduced to plain text."
   (let* ((stars (nth 0 (skg-split-as-stars-metadata-title
                        (skg-get-current-headline-text))))
          (default-label (skg--replace-headline-links-with-labels title))
          (label (skg--read-link-label default-label))
-         (replacement (format "%s[[id:%s][%s]]\n" stars id label))
+         (replacement (format "%s[[id:%s][%s]]\n" stars skgid label))
          (start (line-beginning-position))
          (end (save-excursion
                 (org-end-of-subtree t t))))
@@ -251,10 +251,10 @@ one link is not an id link."
   "Replace the current leaf with a write-protected ActiveVognode for LINK."
   (let* ((stars (nth 0 (skg-split-as-stars-metadata-title
                        (skg-get-current-headline-text))))
-         (id (plist-get link :id))
-         (label (or (plist-get link :label) id))
+         (skgid (plist-get link :id))
+         (label (or (plist-get link :label) skgid))
          (replacement (format "%s(skg (node (id %s) writeProtected (viewRequests definitiveView))) %s\n"
-                              stars id label))
+                              stars skgid label))
          (start (line-beginning-position))
          (end (save-excursion
                 (org-end-of-subtree t t))))

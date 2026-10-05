@@ -190,7 +190,7 @@ report -- loudly, when write-protected occurrences were skipped."
                           (skg--change-repo-at-point-unless-write-protected
                            new-skgrepo)))
          (changed-count (car change-result))
-         (write-protected-ids (cdr change-result))
+         (write-protected-skgids (cdr change-result))
          (fixed-count
           (when (and stuck
                      (y-or-n-p
@@ -199,9 +199,9 @@ report -- loudly, when write-protected occurrences were skipped."
                               (if (= (length stuck) 1) "" "s")
                               (if (= (length stuck) 1) "" "s"))))
             (skg--apply-stuck-relRepos stuck))))
-    (dolist (id write-protected-ids)
+    (dolist (skgid write-protected-skgids)
       (message "skg-set-repo: write-protected occurrence NOT changed (the save would ignore it): %s"
-               id))
+               skgid))
     (message "%s"
              (concat
               (format "Repo changed from %s to %s on %d node%s. Save to apply."
@@ -213,10 +213,10 @@ report -- loudly, when write-protected occurrences were skipped."
                         fixed-count (if (= fixed-count 1) "" "s")))
                (stuck
                 " Relationships kept their old, more private repos; C-c s R can publicize them later."))
-              (when write-protected-ids
+              (when write-protected-skgids
                 (format "  WARNING: %d write-protected node%s NOT changed -- the save would silently ignore them. See *Messages* for the ID list."
-                        (length write-protected-ids)
-                        (if (= (length write-protected-ids) 1) "" "s")))))))
+                        (length write-protected-skgids)
+                        (if (= (length write-protected-skgids) 1) "" "s")))))))
 
 (defun skg--analyze-move-stuck-edges (old-skgrepo new-skgrepo recursive)
   "With point on the node a `skg-set-repo' move starts from, and
@@ -375,11 +375,11 @@ member of a write-protected folder, or with an ID missing."
     (unless (or (skg--activeNode-sexp-p member-sexp)
                 (skg--unknown-headline-p member-sexp))
       (user-error "Not on an activeNode or Unknown headline"))
-    (let ((member-id (skg--relationship-member-id member-sexp))
+    (let ((member-skgid (skg--relationship-member-id member-sexp))
           (parent-sexp (save-excursion
                          (and (org-up-heading-safe)
                               (skg--metadata-sexp-at-point-or-nil)))))
-      (unless member-id
+      (unless member-skgid
         (user-error "No id in this headline's metadata"))
       (unless parent-sexp
         (user-error
@@ -400,23 +400,23 @@ member of a write-protected folder, or with an ID missing."
                             skg--writable-folder-relations))))
         (cond
          (writable-folder
-          (let ((anchor-id
+          (let ((anchor-skgid
                  (save-excursion
                    (and (org-up-heading-safe) ;; to the folder
                         (org-up-heading-safe) ;; to its anchor
                         (skg--node-id
                          (skg--metadata-sexp-at-point-or-nil))))))
-            (unless anchor-id
+            (unless anchor-skgid
               (user-error "Could not find the folder's anchor headline"))
-            (list :recorder anchor-id
-                  :member member-id
+            (list :recorder anchor-skgid
+                  :member member-skgid
                   :relation (cdr writable-folder))))
          ((skg--activeNode-sexp-p parent-sexp)
-          (let ((parent-id (skg--node-id parent-sexp)))
-            (unless parent-id
+          (let ((parent-skgid (skg--node-id parent-sexp)))
+            (unless parent-skgid
               (user-error "No id in the parent headline's metadata"))
-            (list :recorder parent-id
-                  :member member-id
+            (list :recorder parent-skgid
+                  :member member-skgid
                   :relation "contains")))
          (t (user-error
              "The parent headline is neither a node nor a writable folder")))))))
@@ -830,14 +830,14 @@ bare ID or an org id link like [[id:ID][label]].
 Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive
    (list (skg--read-id-or-link "Acquiree ID or link: ")))
-  (let ((acquiree-id (skg--id-from-link-or-text acquiree-id-or-link)))
-    (when (string-empty-p acquiree-id)
+  (let ((acquiree-skgid (skg--id-from-link-or-text acquiree-id-or-link)))
+    (when (string-empty-p acquiree-skgid)
       (user-error "Acquiree ID cannot be empty"))
     (skg-edit-metadata-at-point
      `(skg (node (DELETE (editRequest))
-                 (editRequest (merge ,(intern acquiree-id))))))
+                 (editRequest (merge ,(intern acquiree-skgid))))))
     (message "Merge request set for acquiree %s. Save to apply."
-             acquiree-id)))
+             acquiree-skgid)))
 
 (defun skg--read-id-or-link (prompt)
   "Read an ID or link with linkstack paste/pop bindings in the minibuffer."
@@ -877,14 +877,14 @@ Its viewdescendants are still traversed: they are self-writers, so
 their repo edits take effect even under a write-protected parent."
   (save-excursion
     (let* ((changed-count 0)
-           (write-protected-ids '())
+           (write-protected-skgids '())
            (start-level (org-outline-level))
            (change-or-collect
             (lambda ()
               (let ((meta (skg--metadata-sexp-at-point-or-nil)))
                 (if (skg--node-write-protected-p meta)
                     (push (or (skg--node-id meta) "(no id)")
-                          write-protected-ids)
+                          write-protected-skgids)
                   (setq changed-count
                         (+ changed-count
                            (skg--change-repo-at-point new-skgrepo))))))))
@@ -899,7 +899,7 @@ their repo edits take effect even under a write-protected parent."
             (when (equal (skg--node-repo metadata-sexp) old-skgrepo)
               (funcall change-or-collect))
             (outline-next-heading))))
-      (cons changed-count (nreverse write-protected-ids)))))
+      (cons changed-count (nreverse write-protected-skgids)))))
 
 (defun skg--goto-next-headline-after-subtree ()
   "Move to the next headline after the current subtree."

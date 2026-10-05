@@ -16,8 +16,8 @@
     (unless (funcall predicate)
       (error "Timed out waiting for link annotation response"))))
 
-(defun link-test-status (id kind)
-  (eq (car (gethash id skg-link-annotations--cache)) kind))
+(defun link-test-status (skgid kind)
+  (eq (car (gethash skgid skg-link-annotations--cache)) kind))
 
 (defun link-test-suffix (fragment)
   (cl-some

@@ -522,14 +522,14 @@ function M.set_merge_request (acquiree_id_or_link)
                  or vim.fn.input('Acquiree ID or link: ')
   if answer == nil or answer == '' then
     error('Acquiree ID cannot be empty') end
-  local acquiree_id = M.id_from_link_or_text(answer)
-  if acquiree_id == '' then
+  local acquiree_skgid = M.id_from_link_or_text(answer)
+  if acquiree_skgid == '' then
     error('Acquiree ID cannot be empty') end
   M.edit_metadata_at_point(sexpr.read(string.format(
     '(skg (node (DELETE (editRequest)) (editRequest (merge %s))))',
-    acquiree_id)))
+    acquiree_skgid)))
   vim.notify(string.format(
-    'Merge request set for acquiree %s. Save to apply.', acquiree_id))
+    'Merge request set for acquiree %s. Save to apply.', acquiree_skgid))
 end
 
 ---An ID from TEXT, accepting org id links or bare IDs.
@@ -537,8 +537,8 @@ end
 ---@return string
 function M.id_from_link_or_text (text)
   local trimmed = vim.trim(text)
-  local id = trimmed:match('%[%[id:([^%]]+)%]%[')
-  return id or trimmed
+  local skgid = trimmed:match('%[%[id:([^%]]+)%]%[')
+  return skgid or trimmed
 end
 
 ---Delete all kv-pairs keyed KEY from the metadata of the headline at

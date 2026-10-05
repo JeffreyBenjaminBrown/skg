@@ -289,11 +289,11 @@ config-load time."
   "Return absolute directory for REPO-NAME per skgconfig.toml, or nil."
   (cdr (assoc repo-name (skg--repo-paths))))
 
-(defun skg--abs-path-for-id-and-repo (id skgrepo)
+(defun skg--abs-path-for-id-and-repo (skgid skgrepo)
   "Return the absolute path of ID.skg within REPO's directory,
 or nil if REPO is not declared in the config."
   (let ((dir (skg--repo-dir skgrepo)))
     (when dir
-      (expand-file-name (concat id ".skg") dir))))
+      (expand-file-name (concat skgid ".skg") dir))))
 
 (provide 'skg-config)

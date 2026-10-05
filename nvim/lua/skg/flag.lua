@@ -26,9 +26,9 @@ local function eligible_root (line)
   if metadata.node_write_protected_p(meta) then
     error('Cannot set search matching on a write-protected node') end
   if edit_request_p(meta) then error('This node already has an editRequest') end
-  local id = metadata.node_id(meta)
-  if not id then error('Save the node first; it has no graph ID') end
-  return id
+  local skgid = metadata.node_id(meta)
+  if not skgid then error('Save the node first; it has no graph ID') end
+  return skgid
 end
 
 local function stamp (line, desired)
@@ -65,19 +65,19 @@ local function apply (root_line, desired, recursive)
   local seen, skipped, changed = {}, {}, 0
   for _, line in ipairs(recursive_targets(root_line)) do
     local meta = metadata.metadata_sexp_at_line_or_nil(line)
-    local id = metadata.node_id(meta)
+    local skgid = metadata.node_id(meta)
     local reason
-    if not id then reason = 'no saved ID'
-    elseif seen[id] then reason = 'duplicate occurrence'
+    if not skgid then reason = 'no saved ID'
+    elseif seen[skgid] then reason = 'duplicate occurrence'
     elseif metadata.node_write_protected_p(meta) then reason = 'write-protected'
     elseif edit_request_p(meta) then reason = 'already has an editRequest'
     elseif not owned[metadata.node_repo(meta)] then reason = 'foreign repo' end
     if reason == 'duplicate occurrence' then
       -- A PID already stamped is intentionally silent.
     elseif reason then
-      table.insert(skipped, string.format('%s (%s)', id or 'no-id', reason))
+      table.insert(skipped, string.format('%s (%s)', skgid or 'no-id', reason))
     else
-      seen[id] = true
+      seen[skgid] = true
       stamp(line, desired)
       changed = changed + 1
     end
@@ -92,7 +92,7 @@ local function request (recursive)
   local buf = vim.api.nvim_get_current_buf()
   local line = focus.owning_headline_line()
   if not line then error('Not on a headline') end
-  local expected_id = eligible_root(line)
+  local expected_skgid = eligible_root(line)
   local mark = vim.api.nvim_buf_set_extmark(
     buf, request_namespace, line - 1, 0, { right_gravity = true })
   state.register_response_handler('flag-state',
@@ -109,7 +109,7 @@ local function request (recursive)
       end
       local err = payload.field_text(response, 'error')
       if err then vim.notify('flag state: ' .. err) return end
-      local canonical_id = payload.field_text(response, 'id')
+      local canonical_skgid = payload.field_text(response, 'id')
       local value = payload.field_text(response, 'value')
       local owned = payload.field_text(response, 'user-owned')
       if owned ~= 'true' then
@@ -118,8 +118,8 @@ local function request (recursive)
       vim.api.nvim_buf_call(buf, function ()
         local current_line = position[1] + 1
         local current_meta = metadata.metadata_sexp_at_line_or_nil(current_line)
-        local current_id = current_meta and metadata.node_id(current_meta)
-        if current_id ~= expected_id and current_id ~= canonical_id then
+        local current_skgid = current_meta and metadata.node_id(current_meta)
+        if current_skgid ~= expected_skgid and current_skgid ~= canonical_skgid then
           vim.notify('The headline changed while flag state was loading') return end
         local ok = pcall(eligible_root, current_line)
         if not ok then
@@ -137,7 +137,7 @@ local function request (recursive)
   state.lp_reset()
   client.send_string(string.format(
     '((request . "flag state") (id . %q) (flag . "noSearchMatching"))\n',
-    expected_id))
+    expected_skgid))
 end
 
 function M.set_search_matching () request(false) end

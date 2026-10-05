@@ -28,10 +28,10 @@ local function first_metadata_sexp ()
 end
 
 ---The metadata sexp whose node id is ID, from any line.
-local function metadata_sexp_by_id (id)
+local function metadata_sexp_by_id (skgid)
   for line = 1, vim.api.nvim_buf_line_count(0) do
     local sexp = metadata.metadata_sexp_at_line_or_nil(line)
-    if sexp and metadata.node_id(sexp) == id then return sexp end
+    if sexp and metadata.node_id(sexp) == skgid then return sexp end
   end
   return nil
 end
@@ -178,22 +178,22 @@ describe('skg.metadata commands', function ()
     end
     metadata.set_repo_recursive()
     picker.prompt_for_repo_change = original
-    for _, id in ipairs({ 'root', 'content-child',
+    for _, skgid in ipairs({ 'root', 'content-child',
                           'content-grandchild',
                           'public-under-mismatch' }) do
-      assert.is_true(subtree_p(metadata_sexp_by_id(id),
-        '(skg (node (repo private)))'), id)
-      assert.is_true(subtree_p(metadata_sexp_by_id(id),
-        '(skg (node (viewStats (homeRepoHerald ⌂:private))))'), id)
+      assert.is_true(subtree_p(metadata_sexp_by_id(skgid),
+        '(skg (node (repo private)))'), skgid)
+      assert.is_true(subtree_p(metadata_sexp_by_id(skgid),
+        '(skg (node (viewStats (homeRepoHerald ⌂:private))))'), skgid)
     end
     assert.is_true(subtree_p(metadata_sexp_by_id('mismatched-content'),
       '(skg (node (repo foreign)))'))
-    for _, id in ipairs({ 'link-child', 'under-link',
+    for _, skgid in ipairs({ 'link-child', 'under-link',
                           'under-non-vognode' }) do
-      assert.is_true(subtree_p(metadata_sexp_by_id(id),
-        '(skg (node (repo public)))'), id)
-      assert.is_false(subtree_p(metadata_sexp_by_id(id),
-        '(skg (node (repo private)))'), id)
+      assert.is_true(subtree_p(metadata_sexp_by_id(skgid),
+        '(skg (node (repo public)))'), skgid)
+      assert.is_false(subtree_p(metadata_sexp_by_id(skgid),
+        '(skg (node (repo private)))'), skgid)
     end
   end)
 

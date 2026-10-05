@@ -33,15 +33,15 @@ local saw_relaxed_lock = false
 
 local function phase_1_open_three_views ()
   print('=== PHASE 1: Open three overlapping views ===')
-  for _, id in ipairs({ 'a', 'b', 'solo' }) do
-    content_view.request_single_root_content_view_from_id(id)
-    local buf = T.wait_for_buffer('skg://' .. id)
+  for _, skgid in ipairs({ 'a', 'b', 'solo' }) do
+    content_view.request_single_root_content_view_from_id(skgid)
+    local buf = T.wait_for_buffer('skg://' .. skgid)
     if not buf then
       T.fail(string.format('[phase 1]: buffer skg://%s was not'
-                           .. ' created', id))
+                           .. ' created', skgid))
     end
-    view_bufs[id] = buf
-    print('opened view skg://' .. id)
+    view_bufs[skgid] = buf
+    print('opened view skg://' .. skgid)
   end
 end
 
@@ -59,9 +59,9 @@ local function phase_2_edit_and_save_a ()
   local original_broad = save.broad_save_lock_handler
   save.broad_save_lock_handler = function (response)
     original_broad(response)
-    for _, id in ipairs({ 'a', 'b', 'solo' }) do
-      T.check(vim.b[view_bufs[id]].skg_save_locked == true,
-              'broad save-lock retained skg://' .. id)
+    for _, skgid in ipairs({ 'a', 'b', 'solo' }) do
+      T.check(vim.b[view_bufs[skgid]].skg_save_locked == true,
+              'broad save-lock retained skg://' .. skgid)
     end
     saw_broad_lock = true
   end

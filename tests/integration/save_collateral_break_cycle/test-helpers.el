@@ -68,11 +68,11 @@ without metadata are skipped."
                              (error nil)))
                      (id-list (when sexp
                                 (skg-sexp-cdr-at-path sexp '(skg node id))))
-                     (id (when id-list
+                     (skgid (when id-list
                            (format "%s" (car id-list))))
                      (relation (headline--relation-from-sexp sexp)))
-                (when id
-                  (push (list depth relation id) result)))))
+                (when skgid
+                  (push (list depth relation skgid) result)))))
           (forward-line 1)))
       (nreverse result))))
 

@@ -14,25 +14,25 @@
   (apply #'message (concat "✗ FAIL: " message) args)
   (kill-emacs 1))
 
-(defun fork-test--buffer-showing (id)
+(defun fork-test--buffer-showing (skgid)
   "Return a live skg view buffer whose text mentions (id ID)."
   (seq-find
    (lambda (b)
      (and (buffer-live-p b)
           (with-current-buffer b
             (and (boundp 'skg-view-uri) skg-view-uri
-                 (string-match-p (regexp-quote (format "(id %s)" id))
+                 (string-match-p (regexp-quote (format "(id %s)" skgid))
                                  (buffer-substring-no-properties
                                   (point-min) (point-max)))))))
    (buffer-list)))
 
-(defun fork-test--goto-headline (id)
+(defun fork-test--goto-headline (skgid)
   "Move point onto the headline carrying (id ID) in the current buffer.
 Fails the test if it is not found."
   (goto-char (point-min))
   (unless (re-search-forward
-           (regexp-quote (format "(id %s) (repo owned)" id)) nil t)
-    (test-fail "could not find %s's headline:\n%s" id (buffer-string))))
+           (regexp-quote (format "(id %s) (repo owned)" skgid)) nil t)
+    (test-fail "could not find %s's headline:\n%s" skgid (buffer-string))))
 
 (defun integration-test-fork-owned ()
   "Drive the explicit fork: dirty-refusal, approve, and decline."

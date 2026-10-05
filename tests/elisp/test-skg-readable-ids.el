@@ -20,9 +20,9 @@
 (defconst test-skg-readable-ids--id-active
   "44444444-4444-4444-8444-444444444444")
 
-(defun test-skg-readable-ids--titles-payload (id title)
+(defun test-skg-readable-ids--titles-payload (skgid title)
   (format "((response-type titles-by-ids) (content ((%S . %S))))"
-          id title))
+          skgid title))
 
 (defun test-skg-readable-ids--after-string-count ()
   (let ((count 0))
@@ -40,11 +40,11 @@
         (setq count (1+ count))))
     count))
 
-(defun test-skg-readable-ids--after-string-count-at-id (id)
+(defun test-skg-readable-ids--after-string-count-at-id (skgid)
   (save-excursion
     (goto-char (point-min))
     (let ((count 0))
-      (while (search-forward id nil t)
+      (while (search-forward skgid nil t)
         (dolist (ov (overlays-in (match-beginning 0) (match-end 0)))
           (when (and (overlay-get ov 'skg-magit-title)
                      (overlay-get ov 'after-string))

@@ -28,14 +28,14 @@ file section and the user is informed."
   (interactive)
   (let (( node-info (skg--magit-node-info-at-point) ))
     (when node-info
-      (let (( node-id     (car node-info) )
+      (let (( node-skgid     (car node-info) )
             ( parent-info (skg--magit-parent-info-at-point) ))
         (when parent-info
           (skg--request-file-path-with-handler
            (car parent-info) (cdr parent-info)
            (lambda (tcp-proc payload)
              (skg--magit-goto-in-parent-handle-response
-              node-id tcp-proc payload))))))))
+              node-skgid tcp-proc payload))))))))
 
 (defun skg-goto-in-magit-and-close-this ()
   "Like `skg-goto-in-magit', but also kill the buffer it was called
@@ -69,10 +69,10 @@ or nil (with a user message) if no valid node metadata is found."
         (message "No id in this line's metadata.")
         nil)
        (t
-        (let (( id     (skg--extract-id-from-metadata-sexp sexp) )
+        (let (( skgid     (skg--extract-id-from-metadata-sexp sexp) )
               ( skgrepo (skg--extract-repo-from-metadata-sexp sexp) ))
-          (if (and id skgrepo)
-              (cons id skgrepo)
+          (if (and skgid skgrepo)
+              (cons skgid skgrepo)
             (message "Could not extract id or repo from metadata.")
             nil)))))))
 
@@ -94,14 +94,14 @@ or nil (with a user message) if no valid parent metadata is found."
       (message "Parent headline has no node metadata.")
       nil)
      (t
-      (let (( parent-id     (skg--extract-id-from-metadata-sexp parent-sexp) )
+      (let (( parent-skgid     (skg--extract-id-from-metadata-sexp parent-sexp) )
             ( parent-skgrepo (skg--extract-repo-from-metadata-sexp parent-sexp) ))
-        (if (and parent-id parent-skgrepo)
-            (cons parent-id parent-skgrepo)
+        (if (and parent-skgid parent-skgrepo)
+            (cons parent-skgid parent-skgrepo)
           (message "Could not extract id or repo from parent.")
           nil))))))
 
-(defun skg--request-file-path-with-handler (id skgrepo handler)
+(defun skg--request-file-path-with-handler (skgid skgrepo handler)
   "Send a get-file-path request for ID and REPO, using HANDLER for the response."
   (skg-register-response-handler
    'get-file-path handler t)
@@ -110,7 +110,7 @@ or nil (with a user message) if no valid parent metadata is found."
          ( request-sexp
            (concat (prin1-to-string
                     `((request . "get file path")
-                      (id . ,id)
+                      (id . ,skgid)
                       (repo . ,skgrepo)))
                    "\n") ))
     (process-send-string tcp-proc request-sexp)))
@@ -208,7 +208,7 @@ in multiple sections."
                    (skg--magit-format-section-kinds sections)
                    (skg--magit-kind-label (car (car sections))))))))))
 
-(defun skg--magit-goto-in-parent-handle-response (node-id _tcp-proc payload)
+(defun skg--magit-goto-in-parent-handle-response (node-skgid _tcp-proc payload)
   "Handle the get-file-path response for `skg-goto-in-magit-parent'.
 Navigate to the first line in the parent's first magit section
 that contains NODE-ID. Warn if NODE-ID appears multiple times
@@ -229,14 +229,14 @@ and inform the user."
                  ( first-kind    (car first-entry) )
                  ( first-section (cdr first-entry) )
                  ( match-count
-                   (skg--magit-count-id-in-hunks first-section node-id) )
+                   (skg--magit-count-id-in-hunks first-section node-skgid) )
                  ( found
-                   (skg--magit-goto-first-id-in-hunks first-section node-id) ))
+                   (skg--magit-goto-first-id-in-hunks first-section node-skgid) ))
             (cond
              ((not found)
               (magit-section-goto first-section)
               (message "%s not found in parent's %s section; point is on the parent file section.%s"
-                       node-id
+                       node-skgid
                        (skg--magit-kind-label first-kind)
                        (if (> parent-section-count 1)
                            (format " Parent also appears in: %s."
@@ -259,16 +259,16 @@ and inform the user."
                              (mapconcat #'identity
                                         (nreverse warnings) "; "))
                   (message "Point is on first appearance of %s in parent's %s section."
-                           node-id
+                           node-skgid
                            (skg--magit-kind-label first-kind)))))))))))))
 
-(defun skg--magit-count-id-in-hunks (file-section id)
+(defun skg--magit-count-id-in-hunks (file-section skgid)
   "Count the lines in FILE-SECTION's hunks that contain ID.
 Returns 0 if FILE-SECTION is nil or has no hunks."
   (if (not file-section)
       0
     (let (( count    0 )
-          ( id-regex (regexp-quote id) ))
+          ( id-regex (regexp-quote skgid) ))
       (dolist (child (oref file-section children))
         (when (eq (oref child type) 'hunk)
           (save-excursion
@@ -277,7 +277,7 @@ Returns 0 if FILE-SECTION is nil or has no hunks."
               (setq count (1+ count))))))
       count)))
 
-(defun skg--magit-goto-first-id-in-hunks (file-section id)
+(defun skg--magit-goto-first-id-in-hunks (file-section skgid)
   "Expand FILE-SECTION and its hunks, then move point to the start of
 the first line in any hunk that contains ID.
 Returns non-nil on a match, nil otherwise."
@@ -285,7 +285,7 @@ Returns non-nil on a match, nil otherwise."
     (magit-section-show file-section)
     (dolist (child (oref file-section children))
       (magit-section-show child))
-    (let (( id-regex (regexp-quote id) )
+    (let (( id-regex (regexp-quote skgid) )
           ( found    nil ))
       (catch 'done
         (dolist (child (oref file-section children))

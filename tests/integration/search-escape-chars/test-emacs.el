@@ -6,7 +6,7 @@
 
 (defvar integration-test-phase "starting")
 
-(defun test-one-escape-query (query expected-id)
+(defun test-one-escape-query (query expected-skgid)
   "Run QUERY and verify the search buffer contains (id EXPECTED-ID)."
   (message "=== Searching literal: %s ===" query)
   (setq integration-test-phase (format "searching %s" query))
@@ -19,7 +19,7 @@
         (with-current-buffer search-buffer
           (let* ((content (buffer-substring-no-properties
                            (point-min) (point-max)))
-                 (needle (format "(id %s)" expected-id)))
+                 (needle (format "(id %s)" expected-skgid)))
             (if (string-match-p (regexp-quote needle) content)
                 (message "✓ PASS: found %s for query %S" needle query)
               (progn

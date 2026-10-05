@@ -111,7 +111,7 @@ and inserts [[id:ID][LABEL]] at the saved buffer:position."
       ;; nil, or `ambiguous' (unreachable here -- a search buffer is
       ;; never in skg-file-minor-mode -- but never a valid pick).
       (user-error "No ID near point" ))
-    (let* ((id     (car found))
+    (let* ((skgid     (car found))
            (raw    (cdr found))
            (label  (skg-replace-links-with-labels raw))
            (target skg--link-from-search-target)
@@ -124,8 +124,8 @@ and inserts [[id:ID][LABEL]] at the saved buffer:position."
       (kill-buffer search-buf)
       (switch-to-buffer dest-buf)
       (goto-char (min pos (point-max)))
-      (insert (format "[[id:%s][%s]]" id label))
-      (message "Inserted link to %s" id))))
+      (insert (format "[[id:%s][%s]]" skgid label))
+      (message "Inserted link to %s" skgid))))
 
 (add-hook 'skg--search-buffer-setup-hook
           #'skg--maybe-activate-link-from-search-mode)

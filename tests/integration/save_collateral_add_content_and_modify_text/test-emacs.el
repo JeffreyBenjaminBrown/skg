@@ -125,15 +125,15 @@
              (sexp (condition-case nil
                        (car (read-from-string metadata-str))
                      (error nil)))
-             (id (skg--extract-id-from-metadata-sexp sexp)))
+             (skgid (skg--extract-id-from-metadata-sexp sexp)))
         (unless (equal title "c")
           (message "✗ FAIL [phase 4]: line for c had title %S, expected \"c\"" title)
           (kill-emacs 1))
-        (unless id
+        (unless skgid
           (message "✗ FAIL [phase 4]: line for c has no node id in metadata")
           (message "  Metadata: %S" metadata-str)
           (kill-emacs 1))
-        (message "✓ PASS [phase 4]: c was assigned UUID %s" id)))))
+        (message "✓ PASS [phase 4]: c was assigned UUID %s" skgid)))))
 
 (defun phase-5-verify-collateral ()
   "Check collateral buffer A.

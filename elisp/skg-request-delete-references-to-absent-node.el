@@ -23,11 +23,11 @@
                           (buffer-modified-p buf)))
                    (buffer-list))
       (user-error "Save or revert every skg view before global reference cleanup"))
-    (let ((id (skg--relationship-member-id metadata)))
-      (unless id (user-error "Unknown headline lacks its raw ID"))
-      (skg--delete-absent-send id nil))))
+    (let ((skgid (skg--relationship-member-id metadata)))
+      (unless skgid (user-error "Unknown headline lacks its raw ID"))
+      (skg--delete-absent-send skgid nil))))
 
-(defun skg--delete-absent-send (id approved-preview)
+(defun skg--delete-absent-send (skgid approved-preview)
   "Send cleanup request for ID; APPROVED-PREVIEW is echoed verbatim on retry."
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
     (skg--begin-stream "delete absent references")
@@ -53,7 +53,7 @@
            ;; The server sends an empty stream after confirmation.  A timer
            ;; after rerender-done avoids nesting a request in its filter.
            (setq skg--rerender-after-empty-stream
-                 (lambda () (skg--delete-absent-send id approval))))))
+                 (lambda () (skg--delete-absent-send skgid approval))))))
      t)
     (skg-register-response-handler
      'delete-references-result
@@ -80,7 +80,7 @@
      tcp-proc
      (concat (prin1-to-string
               (append `((request . "delete references to absent node")
-                        (id . ,id))
+                        (id . ,skgid))
                       (when approved-preview
                         `((approved-preview . ,approved-preview)))))
              "\n"))))

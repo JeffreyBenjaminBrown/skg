@@ -240,11 +240,11 @@ function M.cycle (direction)
     metadata.replace_line(line,
       string.rep('*', level) .. ' ' .. new_value)
     if new_value == 'merge' then
-      local id = vim.fn.input(
+      local skgid = vim.fn.input(
         'Enter merge target ID (or paste a link): ')
-      if id ~= '' then
+      if skgid ~= '' then
         metadata.replace_line(line,
-          string.rep('*', level) .. ' merge ' .. id)
+          string.rep('*', level) .. ' merge ' .. skgid)
       end
     end
   elseif parent == 'repo' then

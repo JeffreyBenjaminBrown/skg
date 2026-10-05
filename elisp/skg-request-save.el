@@ -738,9 +738,9 @@ child's id N -- the key by which the server applies the chosen repo."
             ;; clone-to-be's repo to a later fork's child.
             (setq parent-skgrepo (and sexp (skg--node-repo sexp))))
            ((and (= level 2) sexp parent-skgrepo)
-            (let ((id (skg--node-id sexp)))
-              (when id
-                (push (cons id parent-skgrepo) pairs))))))
+            (let ((skgid (skg--node-id sexp)))
+              (when skgid
+                (push (cons skgid parent-skgrepo) pairs))))))
         (forward-line 1)))
     (nreverse pairs)))
 

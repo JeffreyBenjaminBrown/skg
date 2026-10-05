@@ -69,11 +69,11 @@ vim.api.nvim_create_autocmd({ 'BufReadPost', 'BufNewFile' }, {
 vim.api.nvim_create_autocmd('User', {
   pattern = 'NeogitStatusRefreshed',
   callback = function ()
-    local readable_ids = require('skg.readable_ids')
+    local readable_skgids = require('skg.readable_ids')
     for _, buf in ipairs(vim.api.nvim_list_bufs()) do
       if vim.api.nvim_buf_is_valid(buf)
-         and readable_ids.enabled_p(buf) then
-        readable_ids.annotate_buffer(buf)
+         and readable_skgids.enabled_p(buf) then
+        readable_skgids.annotate_buffer(buf)
       end
     end
   end,

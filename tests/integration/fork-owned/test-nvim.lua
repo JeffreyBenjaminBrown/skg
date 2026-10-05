@@ -17,8 +17,8 @@ local save = require('skg.save')
 local view_requests = require('skg.view_requests')
 
 ---Return a live skg view buffer whose text mentions (id ID).
-local function buffer_showing (id)
-  local needle = '(id ' .. id .. ')'
+local function buffer_showing (skgid)
+  local needle = '(id ' .. skgid .. ')'
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_view_uri ~= nil
        and T.buffer_text(buf):find(needle, 1, true) then
@@ -55,10 +55,10 @@ end
 
 ---Move the cursor onto the headline carrying (id ID) (repo owned) in
 ---the current buffer. Fails the test if it is not found.
-local function goto_owned_headline (id)
+local function goto_owned_headline (skgid)
   return goto_line_containing(
-    string.format('(id %s) (repo owned)', id),
-    string.format("could not find %s's headline", id))
+    string.format('(id %s) (repo owned)', skgid),
+    string.format("could not find %s's headline", skgid))
 end
 
 ---Move the cursor in the CURRENT buffer onto the first line that

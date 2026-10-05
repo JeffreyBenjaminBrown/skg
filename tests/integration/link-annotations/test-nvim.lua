@@ -19,8 +19,8 @@ local view_text = '* (skg (node (id src) (repo public))) '
 local buf = buffer.open_org_buffer_from_text(
   view_text, 'skg://link-integration', 'link-integration')
 
-local function status (id, kind)
-  return annotations.cache[id] and annotations.cache[id][1] == kind
+local function status (skgid, kind)
+  return annotations.cache[skgid] and annotations.cache[skgid][1] == kind
 end
 
 local function suffix (fragment)

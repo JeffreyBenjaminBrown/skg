@@ -38,11 +38,11 @@ function M.id_push ()
     vim.notify('No metadata on this line')
     return end
   local sexp = metadata.metadata_sexp_at_line_or_nil(nil)
-  local id = sexp and id_search.extract_id_from_metadata_sexp(sexp)
-  if not id then
+  local skgid = sexp and id_search.extract_id_from_metadata_sexp(sexp)
+  if not skgid then
     vim.notify('No ID in metadata on this line')
     return end
-  table.insert(state.linkstack, 1, { id, split.title })
+  table.insert(state.linkstack, 1, { skgid, split.title })
   vim.notify('pushed to stack: ' .. split.title)
 end
 
@@ -144,13 +144,13 @@ end
 ---Does the current buffer have a headline for node ID that is
 ---writable, or that will become writable at the next save because it
 ---requests an editable view? The server allows only one of those per ID.
----@param id string
+---@param skgid string
 ---@return boolean
-function M.buffer_has_editable_occurrence_p (id)
+function M.buffer_has_editable_occurrence_p (skgid)
   for line = 1, vim.api.nvim_buf_line_count(0) do
     local sexp = metadata.metadata_sexp_at_line_or_nil(line)
     if metadata.activeNode_sexp_p(sexp)
-       and metadata.node_id(sexp) == id
+       and metadata.node_id(sexp) == skgid
        and (not metadata.node_write_protected_p(sexp)
             or metadata.node_requests_definitive_view_p(sexp)) then
       return true end

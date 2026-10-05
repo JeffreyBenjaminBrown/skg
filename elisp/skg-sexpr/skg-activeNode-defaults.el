@@ -314,20 +314,20 @@ CHILD-LEVEL is the level of the field headline."
         ;; Extract ID, handle org links in the ID child
         (if (> (length group) 2)
             (let* ((id-text (string-trim (cdr (nth 2 group))))
-                   (id (skg-activeNode--extract-id-from-text id-text)))
+                   (skgid (skg-activeNode--extract-id-from-text id-text)))
               (list (cons child-level field-name)
                     (cons (1+ child-level) "merge")
-                    (cons (+ child-level 2) id)))
+                    (cons (+ child-level 2) skgid)))
           group))
        ((string-prefix-p "merge " value-text)
         ;; User typed "merge <ID>" as a single headline text
         ;; Restructure to nested: **** merge / ***** ID
         (let* ((rest (string-trim
                       (substring value-text (length "merge"))))
-               (id (skg-activeNode--extract-id-from-text rest)))
+               (skgid (skg-activeNode--extract-id-from-text rest)))
           (list (cons child-level field-name)
                 (cons (1+ child-level) "merge")
-                (cons (+ child-level 2) id))))
+                (cons (+ child-level 2) skgid))))
        (t group)))
      ((string= field-name "viewRequests")
       (cond

@@ -92,9 +92,9 @@ Dispatch is based on the parent headline text."
                         field-value values direction)))
           (org-edit-headline new-val)
           (when (string= new-val "merge")
-            (let ((id (read-string
+            (let ((skgid (read-string
                        "Enter merge target ID (or paste a link): ")))
-              (org-edit-headline (concat "merge " id))))))
+              (org-edit-headline (concat "merge " skgid))))))
        ;; Skgrepo with no config: prompt
        ((string= parent "repo")
         (org-edit-headline (read-string "Repo: " field-value)))

@@ -7,20 +7,20 @@
 (require 'skg-buffer)
 (require 'skg-request-save) ; For message formatting/display helpers
 
-(defun skg--single-root-view-request-string (clean-id view-uri
+(defun skg--single-root-view-request-string (clean-skgid view-uri
                                                       &optional approved-pids)
   "The request sexp string for a single root content view of CLEAN-ID."
   (concat (prin1-to-string
            (append
             `((request . "single root content view")
-              (id . ,clean-id)
+              (id . ,clean-skgid)
               (view-uri . ,view-uri))
             (when approved-pids
               `((approved-overPrivateText-pids ,@approved-pids)))))
           "\n"))
 
 (defun skg-request-single-root-content-view-from-id
-    (node-id &optional tcp-proc approved-pids view-uri
+    (node-skgid &optional tcp-proc approved-pids view-uri
              stale-uri-retry-p)
   "Ask Rust for a single-root content view of NODE-ID.
 Registers a response handler in the dispatch map.
@@ -32,12 +32,12 @@ STALE-URI-RETRY-P is an internal guard that prevents repeated recovery."
   (interactive "sNode ID: ")
   (let* ((tcp-proc (or tcp-proc (skg-tcp-connect-to-rust)))
          (view-uri (or view-uri (org-id-uuid)))
-         (clean-id (if (stringp node-id)
-                       (substring-no-properties node-id)
-                     node-id))
+         (clean-skgid (if (stringp node-skgid)
+                       (substring-no-properties node-skgid)
+                     node-skgid))
          (request-s-exp
           (skg--single-root-view-request-string
-           clean-id view-uri approved-pids)))
+           clean-skgid view-uri approved-pids)))
     ;; Register handler in dispatch map (one-shot)
     (skg-register-response-handler
      'content-view
@@ -46,7 +46,7 @@ STALE-URI-RETRY-P is an internal guard that prevents repeated recovery."
              (assoc-delete-all 'overPrivateText-telescope-confirmation
                                skg-response-handler-map))
        (skg-handle-content-view-sexp
-        tcp-proc payload view-uri clean-id approved-pids
+        tcp-proc payload view-uri clean-skgid approved-pids
         stale-uri-retry-p))
      t)
     ;; Alternative to content-view. Keep it non-one-shot so only the
@@ -69,14 +69,14 @@ STALE-URI-RETRY-P is an internal guard that prevents repeated recovery."
                             (cadr (assoc 'pids response)))))
          (when (y-or-n-p (concat prompt " "))
            (skg-request-single-root-content-view-from-id
-            clean-id tcp-proc pids view-uri
+            clean-skgid tcp-proc pids view-uri
             stale-uri-retry-p))))
      nil)
     (skg-lp-reset)
     (process-send-string tcp-proc request-s-exp)) )
 
 (defun skg--finish-switchToContentView
-    (tcp-proc switch-uri node-id approved-pids
+    (tcp-proc switch-uri node-skgid approved-pids
               stale-uri-retry-p)
   "Display SWITCH-URI, or repair stale server bookkeeping once."
   (let ((buf (skg-find-buffer-by-uri switch-uri)))
@@ -88,26 +88,26 @@ STALE-URI-RETRY-P is an internal guard that prevents repeated recovery."
       (if stale-uri-retry-p
           (message
            "skg: could not visit %s: server twice returned a missing view (%s)"
-           node-id switch-uri)
+           node-skgid switch-uri)
         (skg-send-close-view-uri tcp-proc switch-uri)
         (skg-request-single-root-content-view-from-id
-         node-id tcp-proc approved-pids nil t)))
+         node-skgid tcp-proc approved-pids nil t)))
      ((eq buf (current-buffer))
       (message "Already viewing this node (it is a root of this view)"))
      (t (pop-to-buffer buf)))))
 
 (defun skg--defer-switch-to-content-view
-    (tcp-proc switch-uri node-id approved-pids
+    (tcp-proc switch-uri node-skgid approved-pids
               stale-uri-retry-p)
   "Handle a switch response outside the network process filter."
   (run-at-time
    0 nil #'skg--finish-switchToContentView
-   tcp-proc switch-uri node-id approved-pids
+   tcp-proc switch-uri node-skgid approved-pids
    stale-uri-retry-p))
 
 (defun skg-handle-content-view-sexp
     (tcp-proc sexp-string view-uri
-              &optional node-id approved-pids
+              &optional node-skgid approved-pids
               stale-uri-retry-p)
   "Parse and handle content view response s-exp.
 Expected shape: ((content ...) (errors ...) (warnings ...)).
@@ -123,7 +123,7 @@ retry."
         (if switch-uri
             ;; The requested ID is already a root of an open view.
             (skg--defer-switch-to-content-view
-             tcp-proc (format "%s" switch-uri) node-id approved-pids
+             tcp-proc (format "%s" switch-uri) node-skgid approved-pids
              stale-uri-retry-p)
           ;; Normal content view response.
           (let* ((content-value (cadr (assoc 'content response)))

@@ -22,20 +22,20 @@ while preserving all other text properties."
                   (backward-char (length (current-kill 0)))
                   (point)))
          (end (point))
-         (has-id nil))
+         (has-skgid nil))
 
     ;; Check if the pasted text has any ID properties
     (save-excursion
       (goto-char start)
       (while (and (< (point) end)
-                  (not has-id))
+                  (not has-skgid))
         (let ((id-prop (get-text-property (point) 'id)))
           (when id-prop
-            (setq has-id t)))
+            (setq has-skgid t)))
         (forward-char 1)))
 
     ;; If ID properties were found, modify the kill-ring entry
-    (when has-id
+    (when has-skgid
       ;; Get the current kill-ring text
       (let* ((current-text (current-kill 0))
              ;; Create a new string with the same content
@@ -50,7 +50,7 @@ while preserving all other text properties."
         (message "Pasted with ID property. ID property stripped from copy that remains in kill-ring.")))
 
     ;; If no ID property was found, just leave everything as is
-    (unless has-id
+    (unless has-skgid
       (message "Pasted text without ID property."))))
 
 (define-minor-mode skg-id-copy-minor-mode

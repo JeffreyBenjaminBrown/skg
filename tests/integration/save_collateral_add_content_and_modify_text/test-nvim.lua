@@ -94,10 +94,10 @@ local function headline_structure (buf)
         local ok, parsed = pcall(sexpr.read, split.metadata)
         if ok then sexp = parsed end
       end
-      local id = sexp and metadata.node_id(sexp) or nil
-      if id then
+      local skgid = sexp and metadata.node_id(sexp) or nil
+      if skgid then
         table.insert(result,
-          { #(split.stars:match('^%*+')), relation_from_sexp(sexp), id })
+          { #(split.stars:match('^%*+')), relation_from_sexp(sexp), skgid })
       end
     end
   end
@@ -249,9 +249,9 @@ do -- The line for c should now have its title and a server id.
     local ok, parsed = pcall(sexpr.read, split.metadata)
     if ok then sexp = parsed end
   end
-  local id = sexp and metadata.node_id(sexp) or nil
-  T.check(id, 'phase 4: line for c has no node id in metadata')
-  print('phase 4: c was assigned id ' .. tostring(id))
+  local skgid = sexp and metadata.node_id(sexp) or nil
+  T.check(skgid, 'phase 4: line for c has no node id in metadata')
+  print('phase 4: c was assigned id ' .. tostring(skgid))
 end
 
 print('=== PHASE 5: Verify collateral buffer A ===')
