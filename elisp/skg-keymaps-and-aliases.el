@@ -123,9 +123,9 @@ and hide INTERNAL from M-x completion."
   (progn;; show FOLDERS (C-c l) and PATHS (C-c p): request a local
     ;; view change the server fulfills on save. Each command auto-saves.
     (define-key map (kbd "C-c l a") #'skg-show-folderOf-aliases)
-    (define-key map (kbd "C-c l o") #'skg-show-folderOf-overrides_view_of)
-    (define-key map (kbd "C-c l h") #'skg-show-folderOf-hides_from_its_subscriptions)
-    (define-key map (kbd "C-c l s") #'skg-show-folderOf-subscribes_to)
+    (define-key map (kbd "C-c l o") #'skg-show-folderOf-overridesViewOf)
+    (define-key map (kbd "C-c l h") #'skg-show-folderOf-hidesFromItsSubscriptions)
+    (define-key map (kbd "C-c l s") #'skg-show-folderOf-subscribesTo)
     (define-key map (kbd "C-c l p") #'skg-show-folderOf-flags)
     ;; UPPER = the partner's active (first) role; lower = passive (second).
     (define-key map (kbd "C-c p C") #'skg-show-paths-through-containers)

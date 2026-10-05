@@ -333,15 +333,15 @@ subscribee-as-such); the heralds advertise other nonempty relations.
 The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:
 type an alias in and save.
-*** C-c l o : skg-show-folderOf-overrides_view_of
+*** C-c l o : skg-show-folderOf-overridesViewOf
 The overriddenFolder (the nodes this node overrides -- WRITABLE, shown
 even when empty as an "add an override here" surface) and the
 overriderFolder (the nodes that override this one -- write-protected, ☮).
-*** C-c l h : skg-show-folderOf-hides_from_its_subscriptions
+*** C-c l h : skg-show-folderOf-hidesFromItsSubscriptions
 The hiderFolder and hiddenFolder -- BOTH write-protected (☮). Hiding is edited from
 a subscribee-as-such, never from these folders. On a node that neither
 hides nor is hidden, nothing appears.
-*** C-c l s : skg-show-folderOf-subscribes_to
+*** C-c l s : skg-show-folderOf-subscribesTo
 The subscribeeFolder (the nodes this node subscribes to -- WRITABLE, shown
 even when empty) and the subscriberFolder (the nodes that subscribe to
 this one -- write-protected, ☮).

@@ -188,8 +188,8 @@ Returns the parsed s-expression or nil if not found."
 The UPPER/lower path letters select opposite roles, so C-c p O and
 C-c p o must bind to distinct commands."
   (dolist (pair '(("C-c l a" . skg-show-folderOf-aliases)
-                  ("C-c l o" . skg-show-folderOf-overrides_view_of)
-                  ("C-c l s" . skg-show-folderOf-subscribes_to)
+                  ("C-c l o" . skg-show-folderOf-overridesViewOf)
+                  ("C-c l s" . skg-show-folderOf-subscribesTo)
                   ("C-c p C" . skg-show-paths-through-containers)
                   ("C-c p L" . skg-show-paths-through-mentioners)
                   ("C-c p l" . skg-show-paths-through-mentioned)

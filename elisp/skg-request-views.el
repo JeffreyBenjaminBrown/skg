@@ -44,11 +44,11 @@ an interactive command NAME that requests REQUEST-FORM and auto-saves."
   ;; Folders ('C-c l'): both folders of the relation.
   (skg-show-folderOf-aliases    (folder aliases)
     "Show the aliases folder for the headline at point.")
-  (skg-show-folderOf-overrides_view_of  (folder overrides_view_of)
+  (skg-show-folderOf-overridesViewOf  (folder overrides_view_of)
     "Show the override folders (overriddenFolder + overriderFolder).")
-  (skg-show-folderOf-hides_from_its_subscriptions      (folder hides_from_its_subscriptions)
+  (skg-show-folderOf-hidesFromItsSubscriptions      (folder hides_from_its_subscriptions)
     "Show the hide folders (hiderFolder + hiddenFolder).")
-  (skg-show-folderOf-subscribes_to (folder subscribes_to)
+  (skg-show-folderOf-subscribesTo (folder subscribes_to)
     "Show the subscription folders (subscribeeFolder + subscriberFolder).")
   (skg-show-folderOf-flags flags
     "Show the write-protected flags folder for the node at point.")
