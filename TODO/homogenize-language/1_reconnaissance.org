@@ -836,7 +836,12 @@ Recommendation: rename the telescope sense. Candidates: *compose* /
 "visible fold" / "full fold" become "visible composition" / "full
 composition". Identifier tier ('telescope/fold.rs', 'FoldWarning') plus
 docs.
-*** TODO J : compose/decompose is perfect
+*** ONGOING J : compose/decompose is perfect
+**** Claude says: doing it
+The telescope sense only: 'telescope/fold.rs' -> 'compose.rs',
+'unfold.rs' -> 'decompose.rs', 'FoldWarning' -> 'CompositionWarning',
+"visible/full fold" -> "visible/full composition", and the prose. Org
+folding ('folded', 'bodyFolded', 'skg-add-folded-markers') keeps "fold".
 ** hide
 The 'hides_from_its_subscriptions' relation; 'hidden_body' (a body the
 rendering omits); "hidden in its parent" (the comment on
@@ -856,9 +861,39 @@ If the body is absent from the buffer, 'omittedBody' is right.
 **** active/inactive
 Let's ought to call this 'unrestricted/restricted',
 and rename the command from 'limit' to 'restrict'.
+**** TODO Claude says: doing the body atom and the command; the rest needs a mapping you approve
+- *Body.* Today's 'hiddenBody' atom marks a write-protected occurrence
+  whose graphnode has a body that the rendering leaves out of the
+  buffer, so by your rule it becomes 'omittedBody'. Bodies folded with
+  'skg-org-body-toggle' are marked by the 'bodyFolded' atom, which is
+  Org folding and keeps its name. So nothing is called 'hiddenBody'
+  afterwards; "hidden" is free for the relation.
+- *hidesFromSubs.* That's the relation name from your table, so it
+  waits on [[*Claude says: your new names are a rename; how far should it reach?][how far the relation rename reaches]].
+- *Command.* 'skg-limit-repo-set' -> 'skg-restrict-repo-set' (Neovim:
+  ':SkgRestrictRepoSet'). (Its "repo" waits on the skgrepo command
+  question.)
+***** TODO Which names should active/inactive become?
+"active"/"inactive" is load-bearing across code and wire, so here is
+the mapping I'd use. Correct it before I start:
+- a skgrepo in the current restriction: "unrestricted skgrepo";
+  outside it: "restricted skgrepo".
+- 'Vognode::Active' / 'ActiveVognode' -> 'Unrestricted' /
+  'UnrestrictedVognode'; 'Vognode::Inactive' / 'InactiveVognode' ->
+  'Restricted' / 'RestrictedVognode'.
+- the repo-set itself ('ActiveSkgRepoSet', "the active repo-set"):
+  "the restriction" ('SkgRepoRestriction'), and 'all' is "no
+  restriction".
+- wire: the 'inactiveNode' atom, the 'inactive' link-status value, the
+  "set active repo set" request and 'active-repo-set' response. Those
+  are format-tier; rename them too, or keep them for now?
 ** DONE owner
 Edge holder vs extra-ID holder vs user ownership. See [[*The two ends of an edge: holder, member, partner][holder]].
-*** TODO edge recorder, extra-id carrier, user owns
+*** ONGOING edge recorder, extra-id carrier, user owns
+**** Claude says: doing "carrier"
+The ID-ownership sense ('extra_owners', 'primary_owners',
+'OwnersForId', 'old_owner' / 'new_owner' in identity changes) becomes
+"carrier": the node that carries an ID, as its PID or as an extra ID.
 *** DONE Claude says: settled there (recorder); only the extra-ID sense remains
 ** DONE write-protected: three senses
 - a viewnode occurrence whose edits are not saved ('Editability::WriteProtected');
@@ -867,7 +902,7 @@ Edge holder vs extra-ID holder vs user ownership. See [[*The two ends of an edge
 The first two share the glossary's sense "cannot be changed from here".
 The third is different: it is about ownership, not this view.
 Recommendation: say "foreign" for repos, never "write-protected".
-*** TODO J : yes
+*** DONE J : yes
 *** DONE Claude says: done under [[*Ownership][Ownership]]
 ** generation
 The published runtime generation ('RuntimeGeneration'); an ancestor's
@@ -887,13 +922,30 @@ BufferGeneration
 In proces, 'ancestor distance' seems confusing, but
 'its distance from the ancestor' and
 'the ancestor's distance from it' are clear.
+**** TODO Claude says: not quite; the ancestor sense is user-facing, and one other is too
+- The ancestor sense is user-facing: 'heralds.org' says "counting
+  folders as generations" and "a generation appears as {27}".
+- The runtime sense appears once in user docs: 'COMMANDS.org' says old
+  views "belong to the previous runtime generation". I'd reword that
+  to "were rendered before the rebuild", so the user never meets it.
+- The buffer sense is internal (link-status replies), as you thought.
+So here's my plan: in user docs, the ancestor sense becomes "its
+distance from the ancestor"; in code it becomes 'DigraphGeneration'
+(I read your three names as runtime, ancestor and buffer, in my
+order). 'RuntimeGeneration' stays; the client's buffer sense becomes
+'buffer_generation' / 'buffer-generation'. Is "DigraphGeneration" the
+ancestor sense? I'll wait for that answer before touching it, and do
+the runtime and buffer parts now.
 ** snapshot
 Graph snapshot ('GraphSnapshot', 'graph_snap'); git snapshots (HEAD,
 index, worktree in the diff report: "selected snapshots"); the buffer
 snapshot that search enrichment requests ('request-snapshot'); the
 baseline/current snapshots of dirty views in the save envelope.
 Recommendation: always qualify (graph / git / buffer snapshot).
-*** TODO J : yes
+*** ONGOING J : yes
+**** Claude says: doing it
+Prose says "graph snapshot", "git snapshot" or "buffer snapshot", and
+code names that say bare 'snapshot' get the qualifier.
 ** index
 Tantivy's index, git's index (the staging area: "compare HEAD to
 index"), and the in-Rust graph's inverse indexes ('contained_by' etc.).
@@ -905,6 +957,23 @@ relationshipMaps and inverseRelationshipMap?
 Actually that's pretty wordy; better relMap and inverseRelMap.
 
 I'm literally asking. Don't proceed on this; just answer, please.
+**** TODO Claude says: yes, if they're called maps; but there are five of each
+The in-Rust graph's "indexes" are maps from a member to the nodes that
+list it: 'contained_by', 'subscribers_of', 'hiders_of',
+'overriders_of', 'mentioners_of'. Each inverts one relation. So:
+- They are maps, and "index" there invites confusion with the search
+  index and the git index. "relMap" says what they are.
+- But the forward direction isn't a map in the code: it's the
+  relationship lists inside each node ('contains', 'subscribes_to', ...).
+  A 'relMap' type would name something that doesn't exist on its own.
+  So I'd name only the inverse ones: 'inverseRelMaps' collectively, and
+  keep the per-relation field names, which already say what they hold
+  ('contained_by', ...).
+- "inverse index" is what the docs call them today (the technical data
+  model's "Graph indexes" table). With your name it becomes "inverse
+  relMaps".
+Meanwhile I'm doing the settled part: qualifying "index" everywhere
+else ("search index", "git index").
 ** context
 Search ranking ('ContextOriginType', "context-origin multiplier",
 "Rooty" nodes, 'tests/contexts/'); the downward-flowing state in local
@@ -914,7 +983,12 @@ sense and harmless. The first is a domain concept with a generic name.
 Recommendation: rename the search-ranking sense to something specific,
 e.g. *prominence* ('ProminenceSource': root, cycle member, mentioned,
 had-ID, multi-contained). "Rooty" then becomes "prominent".
-*** TODO J : yes
+*** ONGOING J : yes
+**** Claude says: doing it
+'ContextOriginType' -> 'ProminenceSource', "context-origin multiplier"
+-> "prominence multiplier", "rooty" -> "prominent", and the module
+'context.rs' -> 'prominence.rs'. The other "context"s (LocalContext,
+CompletionContext, ...) stay.
 ** fork: a clone, or a branch point
 Forking a node (the clone operation) vs a branch point in a
 containerward path ('PathToFirstNonlinearity' docs: "if it ends in a
@@ -927,9 +1001,16 @@ Delete the first glossary entry or reword it.
 And explain in the glossary: A branching viewnode is a viewnode
 with multiple children. Explain not to confuse that with a branch,
 which might be degenerate (with 1 or 0 children).
+**** TODO Claude says: doing it for views; the path code needs a graph word
+A role tree, once drawn, has branching viewnodes, so the glossary entry
+and 'role_tree.rs' will say "branching viewnode", with your caveat about
+"branch". But 'paths.rs' walks the graph before anything is drawn: the
+node it stops at has several containers, not several viewchildren.
+There I'd say "branching graphnode" (a graphnode with more than one
+partner in the direction walked). OK?
 ** DONE md
 Metadata (glossary) vs Markdown ('import-md-and-org'). See [[*metadata / sexp / header / md][metadata]].
-*** TODO J : yes
+*** DONE J : yes
 *** DONE Claude says: done there
 ** ephemeral
 "ephemeral data stores" (graph and Tantivy, rebuilt from disk at startup)
@@ -940,6 +1021,15 @@ Recommendation: "derived stores" for the first (above); keep
 matches "display fact".
 *** TODO J
 Are these user-facing? If not, session-lifetime and view-lifetime seem best.
+**** TODO Claude says: one is
+- "ephemeral data stores" is user-facing: 'skg-rebuild-ephemeral-data-stores',
+  ':SkgRebuildEphemeralDataStores', and the request "rebuild ephemeral
+  data stores".
+- The glossary's "ephem" (view-lifetime data, like viewStats) is not.
+So I'll make the glossary entry "view-lifetime" now. For the stores,
+the choice is the user-facing name. "derived stores" says what they
+are; "session-lifetime" is also accurate, since they are rebuilt each
+server session. Which do you want users to see?
 ** dependencies
 'DEPENDENCIES.toml' (which repos a repo may reference) vs
 'save_dependencies' / 'dependencies_from_registered' (the IDs a dirty
@@ -948,6 +1038,12 @@ the save sense to "view footprint" or "view reach". The api doc already
 says the server "unions dependencies from" each dirty view.
 *** TODO J
 Rename the file OTHER_SKGREPO_DEPENDENCIES.toml.
+**** Claude says: doing it
+The server writes the new name into each owned skgrepo. Two
+consequences: your owned skgrepos keep a stale 'DEPENDENCIES.toml'
+until you delete it (I won't touch your data), and a foreign skgrepo's
+manifest is read only under the new name, so its order warnings appear
+once its author's server has written the new file.
 The other terms can stay, I think -- if they're just in code,
 the type signature should make clear what kind of thing is being depended on.
 ** commit
@@ -959,37 +1055,54 @@ mutation step. Leave "commit" for git and Tantivy, where it is the
 library's word.
 *** TODO J
 call them git-commit, skgsave-commit and tantivy-commit
+**** Claude says: doing it
+In prose and in code names wherever "commit" is ambiguous.
+'skgsave-commit' is the step of a save that writes files and swaps in
+the new graph.
 ** publish
 Publishing a graph generation (atomic swap); Hoist "publishes the
 selected title and body at home"; and sharing notes publicly
 (docs/sharing-model). Recommendation: keep "publish" for sharing, which
 is the user's sense. Say "install" or "swap in" for generations, and
 "Hoist moves the text to home" for Hoist.
-*** TODO J : agreeed, using 'swap in'
+*** ONGOING J : agreeed, using 'swap in'
+**** Claude says: doing it
+Generations are "swapped in"; Hoist "moves the text to home";
+"publish" stays for sharing.
 ** content
 The contains list vs the wire field '(content "...")' (every response's
 payload) vs buffer contents. The wire field is everywhere and harmless
 in code, but it makes "content view" responses read oddly
 ('(response-type content-view) (content "...")'). Low priority; mention
 it in the api doc's preamble and move on.
-*** TODO J : agreed, not a big deal
+*** ONGOING J : agreed, not a big deal
+**** Claude says: doing it (one sentence in the api doc's preamble)
 ** view
 A whole view (one URI) vs the "additional views" a 'ViewRequest' asks
 for (folders, role trees, flags) inside a view. Recommendation: keep
 "view request" for the request, and call what it adds a "projection"
 (the glossary already calls the flags folder an "optional projection").
-*** TODO better 'viewbranch'
+*** ONGOING better 'viewbranch'
 The view is the whole buffer (in the Emacs case, at least);
 a viewbranch is any subtree.
+**** TODO Claude says: doing the prose; one question about the request name
+Glossary: a *viewbranch* is any subtree of a view; a view request adds
+viewbranches (folders, role trees, the flags folder). Prose that says
+"additional views" or "projection" will say "viewbranch". Should the
+type 'ViewRequest' and the wire atom '(viewRequests ...)' follow, as
+"viewbranch request"? Today "view request" reads as "a request about
+the view", which is still true, so I'd leave them.
 ** member
 Membership in a list or folder vs 'Vognode::is_graph_member' /
 'id_if_graph_member' (the node currently exists in the graph).
 Recommendation: rename the latter "current" ('is_current_graphnode'),
 which is how its doc comment already explains it.
-*** TODO J : yes
+*** ONGOING J : yes
+**** Claude says: doing it ('is_graph_member' -> 'is_current_graphnode')
 ** DONE level
 Outline depth vs privacy level. See [[*Repos][Repos]].
-*** TODO J : already covered, right?
+*** DONE J : already covered, right?
+**** Claude says: yes
 *** DONE Claude says: done there ("privacy level" spelled out)
 ** marker
 The bare metadata atoms 'focused' / 'folded' ('skg-add-folded-markers');
@@ -1003,12 +1116,22 @@ api doc mostly says that already.
 *** TODO J
 It sounds like we could say 'metadata' instead of 'marker'
 for a lot of those, no?
+**** TODO Claude says: for most of them, yes
+- 'focused' / 'folded' / 'bodyFolded': yes, they are metadata atoms
+  ("focus and fold metadata"). The clients' "save markers" are these
+  same atoms, added before a save.
+- 'overridesHere': yes, a viewStats fact, i.e. metadata.
+- The export marker: no. It is a node (a child whose title links to
+  the export instruction node), so "export instruction child".
+- "# MOVES DETECTED BUT NOT STAGED": no, a comment in a generated shell
+  script. Just "comment".
+So "marker" would disappear entirely. Shall I?
 ** DONE origin
 See [[*Fork vocabulary][fork vocabulary]].
 ** DONE atom
 S-expression atom only. See [[*Against "graphnode -> atom" (your dubious TODO)][against atom]].
 * Opportunities to simplify or reorganize
-** One verb per relation, with V-er / V-ed roles
+** DONE One verb per relation, with V-er / V-ed roles
 *** DONE Claude says: superseded by your relation table
 You chose contains, linksTo, subscribesTo, overrides, hidesFromSubs
 under [[*Relation names and role names (your CRITICAL TODO)][relation names]]; only how far the rename reaches is open.
@@ -1016,7 +1139,7 @@ under [[*Relation names and role names (your CRITICAL TODO)][relation names]]; o
 Described [[*Recommendation: one verb per relation, roles V-er and V-ed][above]]. It's the biggest change here and the biggest payoff: a
 reader who knows the relation name knows its roles, its folder names,
 and its herald letter.
-** The holder / member / partner triad
+** DONE The holder / member / partner triad
 *** DONE Claude says: done as recorder / member / partner
 *** Original text
 Also [[*The two ends of an edge: holder, member, partner][above]]. It removes the "owned owner" problem and gives
