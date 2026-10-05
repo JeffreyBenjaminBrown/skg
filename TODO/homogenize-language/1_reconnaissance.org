@@ -585,14 +585,19 @@ Both clients and many tests use them. "editableView" and
 'skg-set-editable' would match. Also 'TODO/one-definitive-view/', a
 live plan, is named for the old word.
 ****** DONE J : yes
-******* ONGOING Claude says: done ('32ca7a60'); the plan directory is still named for the old word
+******* DONE Claude says: done ('32ca7a60'); the plan directory is still named for the old word
 'definitiveView' -> 'editableView', 'ViewRequest::Definitive' ->
 'Editable', 'skg-set-definitive' -> 'skg-set-editable' (key unchanged),
 "DVR" -> "EVR". I didn't rename 'TODO/one-definitive-view/': renaming
 it means editing links in 'TODO.org', which had your uncommitted
 edits, and in finished plans under 'TODO/DONE/'. Shall I, now or
 later?
-******** TODO yes now please
+******** DONE yes now please
+********* DONE Claude says: done ('455d7e04')
+It's 'TODO/one-editable-view/' now; its text uses the current names
+('EditableMap', "editable view", EVR), and every link to it is fixed.
+I committed only my one-line change to 'TODO.org', not your new
+"migrate .skg format" entry.
 ** DONE Phantoms, placeholders, and references to nothing
 *** Placeholder vs phantom
 'Phantom' is a type with three variants. "placeholder" is used for
