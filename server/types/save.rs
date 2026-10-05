@@ -231,27 +231,27 @@ fn format_buffer_validation_error (
               skgid . 0) },
     BufferValidationError::OverrideInvariantViolation(msg) => {
       format!("{}\n", msg) },
-    BufferValidationError::DefinitiveRequestOnEditableNode (skgid) => {
-      format!("Definitive view request on a node that is already definitive:\n- ID: {}\n- The node already shows its content; no expansion needed.\n",
+    BufferValidationError::EditableViewRequestOnEditableNode (skgid) => {
+      format!("Editable view request on a node that is already editable:\n- ID: {}\n- The node already shows its content; no expansion needed.\n",
               skgid . 0) },
-    BufferValidationError::DefinitiveRequestOnNodeWithContentChildren (skgid) => {
-      format!("Definitive view request on a node with content children:\n- ID: {}\n- The expansion would clobber those children.\n- Save without the request first, then delete children and retry.\n",
+    BufferValidationError::EditableViewRequestOnNodeWithContentChildren (skgid) => {
+      format!("Editable view request on a node with content children:\n- ID: {}\n- The expansion would clobber those children.\n- Save without the request first, then delete children and retry.\n",
               skgid . 0) },
-    BufferValidationError::MultipleDefinitiveRequestsForSameId (skgid) => {
-      format!("Multiple definitive view requests for the same ID:\n- ID: {}\n- At most one definitive view request per ID is allowed.\n",
+    BufferValidationError::MultipleEditableViewRequestsForSameId (skgid) => {
+      format!("Multiple editable view requests for the same ID:\n- ID: {}\n- At most one editable view request per ID is allowed.\n",
               skgid . 0) },
     BufferValidationError::EmptyTitle(skgid) => {
-      format!("Node has an empty title:\n- ID: {}\n- Every definitive node must have a non-empty title.\n",
+      format!("Node has an empty title:\n- ID: {}\n- Every editable node must have a non-empty title.\n",
               skgid . 0) },
     BufferValidationError::LocalStructureViolation(msg, skgid) => {
       format!("Local structure violation:\n- ID: {}\n- {}\n",
               skgid . 0, msg) },
     BufferValidationError::EditRequestOnWriteProtectedOccurrence (skgid) => {
-      format!("Edit request on a write-protected (possibly a phantom) node:\n- ID: {}\n- Write-protected nodes cannot carry write instructions.\n- To delete or merge this node, visit a definitive view of it first (C-c g RET).\n",
+      format!("Edit request on a write-protected (possibly a phantom) node:\n- ID: {}\n- Write-protected nodes cannot carry write instructions.\n- To delete or merge this node, visit a editable view of it first (C-c g RET).\n",
               skgid . 0) },
     BufferValidationError::EditedWriteProtectedOccurrence {
       skgid, title, changes } => {
-      format!("Edited write-protected occurrence:\n- ID: {}\n- Title: {}\n- Changes: {}\n- This occurrence is write-protected; no changes were saved.\n- Re-render, then edit a definitive occurrence instead.\n",
+      format!("Edited write-protected occurrence:\n- ID: {}\n- Title: {}\n- Changes: {}\n- This occurrence is write-protected; no changes were saved.\n- Re-render, then edit a editable occurrence instead.\n",
               skgid . 0, title, changes . join ("; ")) },
     BufferValidationError::FlagsSurfaceEdited {
       recorder_skgid, recorder_title, changes } => {

@@ -1,5 +1,5 @@
 use crate::to_org::complete::partner_folder::{ maybe_add_hiddenInSubscribeeFolder_branch, type_and_parent_type_consistent_with_subscribee };
-use crate::to_org::expand::definitive::execute_view_requests;
+use crate::to_org::expand::editable::execute_view_requests;
 use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::git::SkgRepoDiff;
 use crate::types::misc::{SkgConfig, SkgRepoName};

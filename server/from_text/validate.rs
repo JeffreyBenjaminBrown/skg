@@ -263,12 +263,12 @@ fn skgrepo_is_foreign(
 
 /// Returns true if the buffer node differs from the disk node
 /// in any editable field (title, body, contains), any flag, or
-/// any non-definitive field that the buffer expresses an opinion on.
+/// any non-editable field that the buffer expresses an opinion on.
 ///
 /// For *editable* fields (title, body, contains):
 /// Some([]) and None are equivalent, so we normalize them for comparison.
 ///
-/// For *non-definitive* fields (aliases, overrides,
+/// For *non-editable* fields (aliases, overrides,
 /// subscribesTo, hidesFromSubs): Unspecified means "no opinion"
 /// (because the user did not mention it in the buffer),
 /// and therefore does not represent an edit.

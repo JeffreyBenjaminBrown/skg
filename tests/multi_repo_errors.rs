@@ -288,7 +288,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     // Two instances of pub-1 with different skgrepos (validation should catch this)
     {
       let buffer_with_inconsistent_skgrepos: &str = indoc! {"
-        * (skg (node (id pub-1) (repo public))) pub-1                # definitive instance with 'public'
+        * (skg (node (id pub-1) (repo public))) pub-1                # editable instance with 'public'
         * (skg (node (id pub-1) (repo private) writeProtected)) pub-1  # write-protected instance with 'private'
       "};
 

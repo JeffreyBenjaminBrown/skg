@@ -421,7 +421,7 @@ aliasFolder.")
      (line-beginning-position) (line-end-position))))
 
 (ert-deftest test-recursive-walk-content ()
-  "Kind `content' hits true content children of definitive
+  "Kind `content' hits true content children of editable
 activeNode parents only: the root's own (na) relationship is skipped, the
 false branch and everything below the write-protected node and the
 subscribee-as-such member are pruned, and folder members are untouched."
@@ -477,7 +477,7 @@ own relationship to its view-parent."
 
 (ert-deftest test-recursive-walk-overridden-and-member-content ()
   "An overriddenFolder member matches kind `overridden'; the member's
-own content children (the member being definitive) match kind
+own content children (the member being editable) match kind
 `content' through the folder."
   (let ((tree (concat
                "* (skg (node (id anchor) (repo public))) anchor\n"
@@ -506,7 +506,7 @@ own content children (the member being definitive) match kind
                                    (test--line-of-id "o")))))))
 
 (ert-deftest test-recursive-walk-prunes-write-protected-folder ()
-  "A write-protected folder's whole branch is pruned: even a definitive
+  "A write-protected folder's whole branch is pruned: even a editable
 member's content children are not reached."
   (test--with-skg-content-view
    (concat
@@ -527,7 +527,7 @@ member's content children are not reached."
   "A writable folder under an WRITE_PROTECTED anchor is not collected at
 save, so its members do not match -- whether the walk starts at the
 anchor (pruned below the write-protected node) or at the folder itself
-(refused by the anchor-definitiveness check)."
+(refused by the anchor-editableness check)."
   (let ((tree (concat
                "* (skg (node (id anchor) (repo public) writeProtected)) anchor\n"
                "** (skg subscribeeFolder)\n"

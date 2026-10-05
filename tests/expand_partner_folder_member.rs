@@ -82,7 +82,7 @@ fn subtree_for_node_in_folder (
     . collect::<Vec<&str>> () . join ("\n")
 }
 
-fn add_definitive_requests_to_folder_members (
+fn add_editable_view_requests_to_folder_members (
   buf : &str,
   members : &[(&str, &str)],
 ) -> String {
@@ -102,7 +102,7 @@ fn add_definitive_requests_to_folder_members (
       && line . contains (&format! ("(id {})", skgid)) } )
     { output . push ( line . replace (
         " writeProtected ",
-        " writeProtected (viewRequests definitiveView) " ) ); }
+        " writeProtected (viewRequests editableView) " ) ); }
     else { output . push (line . to_string ()); }
     if let Some (folder) = [
       "subscribeeFolder", "subscriberFolder", "overriddenFolder",
@@ -158,7 +158,7 @@ fn initial_and_as_such_editable_nodes_get_only_the_default_folders
         ("Hidden", "hiddenFolder"),
         ("Hider", "hiderFolder") ];
       let expanded_request : String =
-        add_definitive_requests_to_folder_members (&with_folders, &members);
+        add_editable_view_requests_to_folder_members (&with_folders, &members);
       let saved : String =
         save (&expanded_request, config, tantivy, &graph)
         . await ? . saved_view;
@@ -166,18 +166,18 @@ fn initial_and_as_such_editable_nodes_get_only_the_default_folders
         let subtree : String =
           subtree_for_node_in_folder (&saved, skgid, folder);
         assert! ( subtree . contains ("subscribeeFolder"),
-          "definitive PartnerFolder member {} should get its nonempty \
+          "editable PartnerFolder member {} should get its nonempty \
            subscribeeFolder:\n{}", skgid, saved );
         for exotic in [ "subscriberFolder", "overriddenFolder",
                          "overriderFolder", "hiderFolder", "hiddenFolder" ] {
           assert! ( ! subtree . contains (exotic),
-            "definitive PartnerFolder member {} should not get {} by \
+            "editable PartnerFolder member {} should not get {} by \
              default:\n{}", skgid, exotic, saved ); }}
       let subscribee_subtree : String =
         subtree_for_node_in_folder (
           &saved, "Subscribee", "subscribeeFolder");
       assert! ( subscribee_subtree . contains ("hiddenInSubscribeeFolder"),
-        "a definitive subscribee-as-such should also show its nonempty \
+        "a editable subscribee-as-such should also show its nonempty \
          hidden-here folder:\n{}", saved );
       let subscriber_subtree : String =
         subtree_for_node_in_folder (&saved, "S", "subscriberFolder");

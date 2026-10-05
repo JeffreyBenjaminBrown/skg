@@ -750,11 +750,11 @@ command, but does not edit anything."
   "Non-nil iff the headline at point is a true activeNode or Unknown whose
 relationship to its view-parent is of KIND, writable-and-collected
 from this position: for `content', the view-parent must be a
-definitive activeNode not in subscribee-as-such position (an
+editable activeNode not in subscribee-as-such position (an
 write-protected or subscribee-as-such parent's contains is not
 collected at save, so a relRepo request under one would be
 inert); for `subscribee' and `overridden', the viewparent must be
-the matching writable folder with a definitive anchor."
+the matching writable folder with a editable anchor."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (and (or (and (skg--activeNode-sexp-p meta)
                   (skg--node-affectsParent-content-of-p meta))
@@ -770,11 +770,11 @@ the matching writable folder with a definitive anchor."
                    ((skg--non-vognode-atom-present-p parent-sexp
                                                   'subscribeeFolder)
                     (and (eq kind 'subscribee)
-                         (skg--folder-anchor-definitive-p)))
+                         (skg--folder-anchor-editable-p)))
                    ((skg--non-vognode-atom-present-p parent-sexp
                                                   'overriddenFolder)
                     (and (eq kind 'overridden)
-                         (skg--folder-anchor-definitive-p)))
+                         (skg--folder-anchor-editable-p)))
                    (t nil))))))))
 
 (defun skg--relRepo-prune-below-p (metadata-sexp)
@@ -798,8 +798,8 @@ position: an true activeNode member of a subscribeeFolder."
                  (skg--metadata-sexp-at-point-or-nil)
                  'subscribeeFolder))))))
 
-(defun skg--folder-anchor-definitive-p ()
-  "Non-nil iff the folder headline at point has a definitive activeNode
+(defun skg--folder-anchor-editable-p ()
+  "Non-nil iff the folder headline at point has a editable activeNode
 anchor (its viewparent). A write-protected anchor's writable folders are
 not collected at save (the folder recorder is not save-eligible), so
 atoms on their members have no effect."

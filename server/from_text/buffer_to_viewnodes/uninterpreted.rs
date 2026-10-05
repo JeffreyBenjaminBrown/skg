@@ -198,7 +198,7 @@ fn linecol_to_viewnode(
           title   : title . clone (),
           changes : vec!["added body text" . to_string ()], },
         None => BufferValidationError::Other (
-          "A write-protected node has body text, which saving would discard. Add an ID and edit a definitive occurrence instead."
+          "A write-protected node has body text, which saving would discard. Add an ID and edit a editable occurrence instead."
           . to_string ()), })
     } else { None } );
   Ok ( ( level, viewnode, error_opt, warning_opt ) ) }

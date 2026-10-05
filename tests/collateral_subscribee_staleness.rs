@@ -72,7 +72,7 @@ fn drop_member_line ( buf : &str, fragment : &str ) -> String {
     . join ("\n") + "\n" }
 
 #[test]
-fn collateral_definitive_subscriber_subscribeeFolder_refreshes
+fn collateral_editable_subscriber_subscribeeFolder_refreshes
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
     "skg-test-collateral-subscribee-staleness",
@@ -129,6 +129,6 @@ fn collateral_definitive_subscriber_subscribeeFolder_refreshes
         "M must remain in B's subscribeeFolder:\n{}", b_collateral );
       assert! ( ! b_collateral . contains ("(id N)"),
         "N must be gone from B's subscribeeFolder collaterally \
-         (definitive subscriber must refresh from the graph):\n{}",
+         (editable subscriber must refresh from the graph):\n{}",
         b_collateral );
       Ok (( )) } )) }

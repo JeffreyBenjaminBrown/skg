@@ -264,7 +264,7 @@ not the headline's metadata ID and title."
                      "** (skg (node (id id-1) writeProtected)) Title from stack")) )))
 
 ;; In a view, paste-node requests an editable view unless the buffer
-;; already has a writable (or definitive-requesting) occurrence.
+;; already has a writable (or editable-requesting) occurrence.
 (defun skg-test--paste-node-in-view (existing-text)
   "Paste id-1 at the end of a view containing EXISTING-TEXT.
 Return (BUFFER-TEXT . LAST-MESSAGE)."
@@ -280,13 +280,13 @@ Return (BUFFER-TEXT . LAST-MESSAGE)."
         (skg-paste-node))
       (cons (buffer-string) last-message)) ))
 
-(ert-deftest test-skg-paste-node-in-view-requests-definitive-view ()
-  "With no writable occurrence present, the paste requests a definitive view."
+(ert-deftest test-skg-paste-node-in-view-requests-editable-view ()
+  "With no writable occurrence present, the paste requests a editable view."
   (let (( result (skg-test--paste-node-in-view
                   "* (skg (node (id id-1) writeProtected)) Elsewhere\n") ))
     (should (equal (car result)
                    (concat "* (skg (node (id id-1) writeProtected)) Elsewhere\n"
-                           "* (skg (node (id id-1) writeProtected (viewRequests definitiveView))) Title from stack\n")))
+                           "* (skg (node (id id-1) writeProtected (viewRequests editableView))) Title from stack\n")))
     (should (null (cdr result))) ))
 
 (ert-deftest test-skg-paste-node-in-view-beside-writable-occurrence ()
@@ -300,9 +300,9 @@ Return (BUFFER-TEXT . LAST-MESSAGE)."
                    "NOTE: Pasting node write-protected because a writable occurrence is already present in this same buffer.")) ))
 
 (ert-deftest test-skg-paste-node-in-view-twice ()
-  "A pending definitive view request counts as a writable occurrence."
+  "A pending editable view request counts as a writable occurrence."
   (let (( result (skg-test--paste-node-in-view
-                  "* (skg (node (id id-1) writeProtected (viewRequests definitiveView))) First\n") ))
+                  "* (skg (node (id id-1) writeProtected (viewRequests editableView))) First\n") ))
     (should (string-suffix-p
              "\n* (skg (node (id id-1) writeProtected)) Title from stack\n"
              (car result)))

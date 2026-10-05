@@ -133,13 +133,13 @@ describe('skg.linkstack paste and pop', function ()
     return buffer_text(), notified
   end
 
-  it('in a view, paste_node requests a definitive view', function ()
+  it('in a view, paste_node requests a editable view', function ()
     local text, notified = paste_node_in_view(
       '* (skg (node (id id-1) writeProtected)) Elsewhere')
     assert.are.equal(
       '* (skg (node (id id-1) writeProtected)) Elsewhere\n'
       .. '* (skg (node (id id-1) writeProtected'
-      .. ' (viewRequests definitiveView))) Title from stack\n',
+      .. ' (viewRequests editableView))) Title from stack\n',
       text)
     assert.is_nil(notified)
   end)
@@ -157,10 +157,10 @@ describe('skg.linkstack paste and pop', function ()
                      notified)
   end)
 
-  it('a pending definitive view request counts as writable', function ()
+  it('a pending editable view request counts as writable', function ()
     local text, notified = paste_node_in_view(
       '* (skg (node (id id-1) writeProtected'
-      .. ' (viewRequests definitiveView))) First')
+      .. ' (viewRequests editableView))) First')
     assert.is_truthy(text:find(
       '\n* (skg (node (id id-1) writeProtected)) Title from stack\n',
       1, true))

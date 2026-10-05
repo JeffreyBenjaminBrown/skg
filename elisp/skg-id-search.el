@@ -296,7 +296,7 @@ Prompts for the link label, defaulting to the title."
 (defun skg--insert-node-from-entry (entry)
   "Insert a write-protected ActiveVognode headline from ENTRY, an (id title) pair.
 In a view whose buffer has no writable occurrence of the node, the
-headline also requests a definitive view, so the next save makes it
+headline also requests a editable view, so the next save makes it
 writable with its real title, body and content.  (Saving a bare
 writable headline would instead erase that body and content.)
 If point is already after headline stars at the start of a line,
@@ -304,15 +304,15 @@ insert only the metadata and title.  Otherwise insert a full same-level
 headline."
   (let* (( skgid (car entry) )
          ( title (cadr entry) )
-         ( request-definitive-view
+         ( request-editable-view
            (and (bound-and-true-p skg-view-uri)
                 (if (skg--buffer-has-editable-occurrence-p skgid)
                     (progn (message "NOTE: Pasting node write-protected because a writable occurrence is already present in this same buffer.")
                            nil)
                   t )) )
          ( node-text
-           (format (if request-definitive-view
-                       "(skg (node (id %s) writeProtected (viewRequests definitiveView))) %s"
+           (format (if request-editable-view
+                       "(skg (node (id %s) writeProtected (viewRequests editableView))) %s"
                      "(skg (node (id %s) writeProtected)) %s")
                    skgid title )) )
     (if (save-excursion
@@ -330,7 +330,7 @@ headline."
 (defun skg--buffer-has-editable-occurrence-p (skgid)
   "Return non-nil if the current buffer has a headline for node ID that
 is writable, or that will become writable at the next save because it
-requests a definitive view.  The server allows only one of those per ID."
+requests a editable view.  The server allows only one of those per ID."
   (save-excursion
     (goto-char (point-min))
     (let (( found nil ))
@@ -343,7 +343,7 @@ requests a definitive view.  The server allows only one of those per ID."
                      (equal (skg--node-id sexp) skgid)
                      (or (not (skg--node-write-protected-p sexp))
                          (skg-sexp-subtree-p
-                          sexp '(skg (node (viewRequests definitiveView))))))
+                          sexp '(skg (node (viewRequests editableView))))))
             (setq found t)))
         (forward-line 1))
       found)))
@@ -368,7 +368,7 @@ Prompts for the link label, defaulting to the title from the stack."
 (defun skg-paste-node ()
   "Insert a write-protected ActiveVognode headline from the top of `skg-linkstack'.
 Does not modify the stack.  The inserted metadata contains the node ID
-and `writeProtected`, and maybe a definitive view request (see
+and `writeProtected`, and maybe a editable view request (see
 `skg--insert-node-from-entry'); the headline title comes from the stack entry."
   (interactive)
   (let (( entry (skg--linkstack-top-or-message) ))
@@ -395,7 +395,7 @@ Prompts for the link label, defaulting to the title from the stack."
 (defun skg-pop-node ()
   "Pop the top of `skg-linkstack' and insert a write-protected ActiveVognode headline.
 The inserted metadata contains the node ID and `writeProtected`, and maybe a
-definitive view request (see `skg--insert-node-from-entry'); the headline
+editable view request (see `skg--insert-node-from-entry'); the headline
 title comes from the stack entry."
   (interactive)
   (let (( entry (skg--linkstack-top-or-message) ))

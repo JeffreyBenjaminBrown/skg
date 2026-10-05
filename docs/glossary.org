@@ -462,7 +462,7 @@ display fact is =(overridesHere N)=; see "override substitution".
 
 Both are requests the client writes into metadata and the server
 consumes. A *view request* (=(viewRequests ...)=: =folder=, =roleTree=,
-=flags=, =definitiveView=) asks for more of the view (viewbranches); the server
+=flags=, =editableView=) asks for more of the view (viewbranches); the server
 fulfills it while completing the view and then drops it. (=fork= is
 also written as a view request, but the save consumes it.) An *edit
 request* (=(editRequest ...)=: =merge=, =toDelete=, =flag=, =relRepo=) asks
@@ -640,8 +640,8 @@ an editable occurrence's title, body and children are saved; a
 write-protected occurrence shows no body, and edits to it change
 nothing. A buffer may hold at most one editable occurrence of a node,
 so that two occurrences cannot contradict each other. Make one
-editable with =skg-set-definitive= (=C-c s d=), which writes a
-=definitiveView= view request.
+editable with =skg-set-editable= (=C-c s d=), which writes a
+=editableView= view request.
 
 *** birth
 

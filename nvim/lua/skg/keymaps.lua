@@ -85,7 +85,7 @@ M.commands = {
                                   desc = 'Graft the subscribers (auto-saves)' },
   ShowSubscribeewardTree = { module = 'skg.view_requests', fn = 'show_subscribeeward_tree',
                                   desc = 'Graft the subscribees (auto-saves)' },
-  SetDefinitive = { module = 'skg.view_requests', fn = 'set_definitive',
+  SetEditable = { module = 'skg.view_requests', fn = 'set_editable',
                     desc = 'Make this the editable view of its node' },
   SetWriteProtected = { module = 'skg.metadata', fn = 'set_write_protected',
                       desc = 'Make this view of its node write-protected' },
@@ -238,7 +238,7 @@ M.content_view_bindings = {
   { 'ph', 'ShowHiddenwardTree' },    -- C-c p h
   { 'pS', 'ShowSubscriberwardTree' }, -- C-c p S
   { 'ps', 'ShowSubscribeewardTree' }, -- C-c p s
-  { 'sd', 'SetDefinitive' },             -- C-c s d
+  { 'sd', 'SetEditable' },             -- C-c s d
   { 'sw', 'SetWriteProtected' },          -- C-c s w
   { 'sm', 'SetMergeRequest' },           -- C-c s m
   { 'ss', 'SetRepo' },                 -- C-c s s

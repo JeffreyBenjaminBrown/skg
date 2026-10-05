@@ -122,7 +122,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
         . expect ("write-protected collateral view should be rerendered");
       assert_eq! (
         write_protected_update . matches ("(deleted (id L)") . count (), 2,
-        "both the definitive and write-protected images must become DeletedNode: {}",
+        "both the editable and write-protected images must become DeletedNode: {}",
         write_protected_update );
       Ok (( )) } )) }
 

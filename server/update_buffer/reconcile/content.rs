@@ -63,7 +63,7 @@ struct ChildData {
 ///   ViewRequest::Editable), so its map entry and write-protected/def are already
 ///   correct -- skip 'make_write-protected_if_repeat_then_extend_defmap', which would
 ///   otherwise write-protect a just-made-Final node against its own entry.
-/// - `cascade`: this node is Final (DVR-made); per TODO/DONE/local-view-update/plan_v2.org §5.3 it hands a
+/// - `cascade`: this node is Final (EVR-made); per TODO/DONE/local-view-update/plan_v2.org §5.3 it hands a
 ///   ViewRequest::Editable to each of its affected content children so the
 ///   BFS draws each Final (clobbering competing Tentative occurrences).
 /// - `node_budget`: the TODO/DONE/local-view-update/plan_v2.org §5.5 remaining budget of new Viewnodes; content-child
@@ -91,7 +91,7 @@ pub fn expand_true_content_at_activeVognode (
                                 ViewnodeKind::Vognode (Vognode::Active (_))),
     "expand_true_content_at_activeVognode: expected Active vognode" ) ?;
   if ! settled {
-    // A DVR node was already resolved by apply_editable_draw_rule; running
+    // A EVR node was already resolved by apply_editable_draw_rule; running
     // the dedup here would write-protect it against its own (just-inserted)
     // map entry. Ordinary nodes still dedup first-wins (Tentative).
     make_writeProtected_if_repeat_then_extend_editable_map(
@@ -159,7 +159,7 @@ fn attach_cascade_dvrs_to_affected_content (
   for cid in child_skgids {
     write_at_activeVognode_in_tree (
       tree, cid,
-      |t| { t . view_requests . insert ( ViewRequest::Definitive ); } )
+      |t| { t . view_requests . insert ( ViewRequest::Editable ); } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   Ok (( )) }
 

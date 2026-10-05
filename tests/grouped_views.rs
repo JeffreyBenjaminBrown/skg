@@ -5,8 +5,8 @@
 #[path = "content_view.rs"]
 mod content_view;
 
-#[path = "definitive_view_cascade_and_budget.rs"]
-mod definitive_view_cascade_and_budget;
+#[path = "editable_view_cascade_and_budget.rs"]
+mod editable_view_cascade_and_budget;
 
 #[path = "hidden_from_subscriptions.rs"]
 mod hidden_from_subscriptions;

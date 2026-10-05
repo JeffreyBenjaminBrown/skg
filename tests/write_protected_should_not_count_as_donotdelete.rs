@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_saves -E 'test(write_protected_should_not_count_as_donotdelete::)'
 //
 // Reproduces the bug Jeff hit: a buffer that has the same node
-// shown definitive-with-editRequest-delete in one place AND
+// shown editable-with-editRequest-delete in one place AND
 // write-protected elsewhere triggers AmbiguousDeletion validation,
 // even though a write-protected view cannot be edited and shouldn't count as
 // a "do not delete" stance.

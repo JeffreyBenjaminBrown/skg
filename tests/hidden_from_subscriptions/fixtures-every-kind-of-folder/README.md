@@ -6,7 +6,7 @@ Tests that both `HiddenOutsideOfSubscribeeFolder` and `HiddenInSubscribeeFolder`
 
 Most nodes have titles equal to their IDs.
 Subscribees don't, though.
-The test function 'add_definitive_view_request_to_subscribees'
+The test function 'add_editable_view_request_to_subscribees'
 needs an easy way to find them,
 so in their titles (which used to match)
 I have replaced "E" with "subscribee-".

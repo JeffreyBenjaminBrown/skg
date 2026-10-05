@@ -75,7 +75,7 @@ fn partners_and_folders_prune () {
   let surviving_folder : NodeId = t . get_mut (recorder) . unwrap ()
     . append (folder (PartnerFolder::Subscribee)) . id ();
   t . get_mut (surviving_folder) . unwrap ()
-    . append (def ("definitive-partner", "public"));
+    . append (def ("editable-partner", "public"));
   convert_and_prune_for_skgrepo_switch (
     &mut t, &active_public ()) . unwrap ();
   assert! ( t . get (emptied_folder)
@@ -85,7 +85,7 @@ fn partners_and_folders_prune () {
   assert! ( t . get (surviving_folder)
               . map ( |n| n . parent () . is_some () )
               . unwrap_or (false),
-    "a folder holding a definitive partner survives" ); }
+    "a folder holding a editable partner survives" ); }
 
 // Pruning a focused subtree transfers focus to the surviving parent.
 #[test]

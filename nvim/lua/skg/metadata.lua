@@ -295,10 +295,10 @@ end
 
 ---@param metadata_sexp any
 ---@return boolean does it request an editable view?
-function M.node_requests_definitive_view_p (metadata_sexp)
+function M.node_requests_editable_view_p (metadata_sexp)
   return compare.subtree_p(metadata_sexp,
     { SKG, { NODE, { sexpr.symbol('viewRequests'),
-                     sexpr.symbol('definitiveView') } } })
+                     sexpr.symbol('editableView') } } })
 end
 
 ---@param metadata_sexp any

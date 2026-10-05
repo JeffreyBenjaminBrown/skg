@@ -770,7 +770,7 @@ node's heralds.
 - =(roleTree ROLENAME)= — build the role tree for one partner role, grafting
   the partners as inverted write-protected children, the role grafts. ROLENAME
   is one of the nine in =PARTNER_ROLE_VOCAB=. Emitted by the =C-c p= commands.
-- =definitiveView= — make a write-protected, childless node editable.
+- =editableView= — make a write-protected, childless node editable.
 - =flags= — add one write-protected =flagsFolder=, retained even when empty.
   Its true-only viewnodes use =(flag hadId)=, =(flag wasOverloaded)=, and
   =(flag noSearchMatching)= metadata in that order. Viewnodes have no Org title;

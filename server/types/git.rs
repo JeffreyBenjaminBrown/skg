@@ -334,7 +334,7 @@ pub fn added_relationship_axes_from_per_stage_diffs<T: Clone + Eq + std::hash::H
 /// from the file's git status in that stage (Added → Plus,
 /// Deleted → Minus, Modified / absent → None).
 ///
-/// Used by the definitive-expand path (extendDefinitiveSubtree_fromGit, for the
+/// Used by the editable-expand path (extendEditableSubtree_fromGit, for the
 /// ActiveVognode's own node axes and for phantoms of a removed parent's
 /// children).
 pub fn file_node_axes_from_skgrepo_diff (

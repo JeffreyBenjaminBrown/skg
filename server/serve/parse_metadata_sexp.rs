@@ -801,7 +801,7 @@ fn parse_editrequest_sexp (
 
 
 /// Parse the (viewRequests ...) s-expression and update viewRequests.
-/// Each request is either the bare atom 'definitiveView', or a nested
+/// Each request is either the bare atom 'editableView', or a nested
 /// '(folder RELNAME)' / '(roleTree ROLENAME)' form.
 fn parse_viewrequests_sexp (
   items : &[Sexp],
@@ -811,7 +811,7 @@ fn parse_viewrequests_sexp (
     let request : ViewRequest = match request_element {
       Sexp::Atom (_) => {
         let atom : String = atom_to_string (request_element) ?;
-        if atom == "definitiveView" { ViewRequest::Definitive }
+        if atom == "editableView" { ViewRequest::Editable }
         else if atom == "fork" { ViewRequest::Fork }
         else if atom == "flags" { ViewRequest::Flags }
         else { return Err ( format! (
@@ -831,7 +831,7 @@ fn parse_viewrequests_sexp (
           _ => return Err ( format! (
             "Unknown view request form: ({} ...)", head )), } },
       _ => return Err (
-        "Unexpected element in viewRequests (expected 'definitiveView' \
+        "Unexpected element in viewRequests (expected 'editableView' \
          or '(folder ...)' / '(roleTree ...)')" . to_string () ), };
     requests . insert (request); }
   Ok (( )) }

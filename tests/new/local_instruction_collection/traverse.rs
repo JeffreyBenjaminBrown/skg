@@ -158,7 +158,7 @@ fn folders_under_toDelete_or_writeProtected_recorders_emit_nothing () {
            "a write-protected vognode and its folders emit nothing" ); }
 
 #[test]
-fn definitive_member_of_write_protected_folder_emits_for_itself_only () {
+fn editable_member_of_write_protected_folder_emits_for_itself_only () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id recorder) (repo main))) recorder
@@ -179,7 +179,7 @@ fn definitive_member_of_write_protected_folder_emits_for_itself_only () {
     assert_eq!( recorder . subscribesTo, None ); }}
 
 #[test]
-fn definitive_child_of_inactive_vognode_emits () {
+fn editable_child_of_inactive_vognode_emits () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id root) (repo main))) root
@@ -196,7 +196,7 @@ fn definitive_child_of_inactive_vognode_emits () {
                membership is owned by the disk weave" ); }
 
 #[test]
-fn definitive_node_inside_diff_phantom_subtree_emits () {
+fn editable_node_inside_diff_phantom_subtree_emits () {
   let input : &str =
     indoc! {"
       * (skg (node (id root) (repo main))) root
@@ -227,7 +227,7 @@ fn definitive_node_inside_diff_phantom_subtree_emits () {
            "the phantom itself emits nothing" );
   { let survivor : &FieldIntentsForOneId = entry (&collected, "survivor");
     assert!( survivor . title_and_body . is_some(),
-             "a definitive node beneath a phantom emits for itself" ); }
+             "a editable node beneath a phantom emits for itself" ); }
   assert_eq!( entry (&collected, "root") . contains, Some (vec![]),
               "the phantom is not content of its parent" ); }
 
@@ -244,7 +244,7 @@ fn writeProtected_subscribee_as_such_emits_nothing () {
   assert_eq!( entry (&collected, "subscriber") . visibility, vec![] ); }
 
 #[test]
-fn definitive_subscribee_under_writeProtected_subscriber_claims_without_visibility () {
+fn editable_subscribee_under_writeProtected_subscriber_claims_without_visibility () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id subscriber) (repo main) writeProtected)) subscriber

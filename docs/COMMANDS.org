@@ -387,7 +387,7 @@ cannot affect the node they depict. They are also truncated --
 that is, shown without content --
 in order to prevent the view from becoming redundant and huge.
 *** PITFALL: Don't make something 'editable' by directly editing its metadata.
-Instead, use skg-set-definitive, below.
+Instead, use skg-set-editable, below.
 That's because Skg has to make other occurrences of it
 (in this same buffer -- and maybe in the future other buffers too)
 write-protected. That's because a buffer can only be saved
@@ -398,7 +398,7 @@ This same caveat does not apply to making a node write-protected.
 While there does exist a command for that (skg-set-write-protected)
 you can also 'do it yourself'
 by visiting a metadata buffer for the node (skg-view-metadata).
-*** C-c s d : skg-set-definitive
+*** C-c s d : skg-set-editable
 If you want to see the editable view of that node
 from a place where it is currently shown in a write-protected form,
 call this function. It will make the current editable view

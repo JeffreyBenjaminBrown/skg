@@ -1,7 +1,7 @@
-// cargo nextest run --test grouped_views -E 'test(definitive_view_cascade_and_budget::)'
+// cargo nextest run --test grouped_views -E 'test(editable_view_cascade_and_budget::)'
 //
 // Tests for editable view request expansion.
-// These tests verify that when a node has a "Definitive" view request,
+// These tests verify that when a node has a "Editable" view request,
 // its content children are expanded from disk using BFS with truncation.
 
 use indoc::indoc;
@@ -32,34 +32,34 @@ fn mk_test_tcp_stream ()
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str =
-    "tests/definitive_view_cascade_and_budget/fixtures";
+    "tests/editable_view_cascade_and_budget/fixtures";
   run_with_shared_test_stores (
-    "skg-test-definitive-view-cascade-and-budget",
+    "skg-test-editable-view-cascade-and-budget",
     |s| Box::pin ( async move {
-      s . reset ("test_definitive_view_ample_budget", fixtures) ?;
-      test_definitive_view_ample_budget (
+      s . reset ("test_editable_view_ample_budget", fixtures) ?;
+      test_editable_view_ample_budget (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_definitive_view_limit_5_or_6", fixtures) ?;
-      test_definitive_view_limit_5_or_6 (
+      s . reset ("test_editable_view_limit_5_or_6", fixtures) ?;
+      test_editable_view_limit_5_or_6 (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_definitive_view_limit_1_to_4", fixtures) ?;
-      test_definitive_view_limit_1_to_4 (
+      s . reset ("test_editable_view_limit_1_to_4", fixtures) ?;
+      test_editable_view_limit_1_to_4 (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_definitive_view_conflicting", fixtures) ?;
-      test_definitive_view_conflicting (
+      s . reset ("test_editable_view_conflicting", fixtures) ?;
+      test_editable_view_conflicting (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_definitive_view_with_cycle",
-                 "tests/definitive_view_cascade_and_budget/fixtures-cycle") ?;
-      test_definitive_view_with_cycle (
+      s . reset ("test_editable_view_with_cycle",
+                 "tests/editable_view_cascade_and_budget/fixtures-cycle") ?;
+      test_editable_view_with_cycle (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_definitive_view_with_repeat", fixtures) ?;
-      test_definitive_view_with_repeat (
+      s . reset ("test_editable_view_with_repeat", fixtures) ?;
+      test_editable_view_with_repeat (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_definitive_view_request_cleared", fixtures) ?;
-      test_definitive_view_request_cleared (
+      s . reset ("test_editable_view_request_cleared", fixtures) ?;
+      test_editable_view_request_cleared (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_budget_aliasfolder_is_neutral",
-                 "tests/definitive_view_cascade_and_budget/fixtures-aliases") ?;
+                 "tests/editable_view_cascade_and_budget/fixtures-aliases") ?;
       test_budget_aliasfolder_is_neutral (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
@@ -70,14 +70,14 @@ fn all_tests
 // 12 expansions (1,2,11,12,13,121,122,123,124,1211,1212,1221), so a budget of
 // 20 is ample and nothing is left write-protected.
 // ===================================================
-async fn test_definitive_view_ample_budget (
+async fn test_editable_view_ample_budget (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
         * (skg (node (id 1) (repo main))) 1
         ** (skg (node (id 11))) 11
-        ** (skg (node (id 12) writeProtected (viewRequests definitiveView))) 12
+        ** (skg (node (id 12) writeProtected (viewRequests editableView))) 12
         ** (skg (node (id 13))) 13
         * (skg (node (id 2) (repo main))) 2
       "};
@@ -126,7 +126,7 @@ async fn test_definitive_view_ample_budget (
       "};
 
       assert_metadata_eq!(result, expected,
-        "Definitive view with an ample budget should expand all children");
+        "Editable view with an ample budget should expand all children");
 
       Ok (( )) }
 
@@ -134,18 +134,18 @@ async fn test_definitive_view_ample_budget (
 // Test: Editable view with limit=5 vs limit=6
 // ===================================================
 // §5.5 budget is granular: limit=5 spends its last unit on 1211 (1212 not
-// created); limit=6 affords both 1211 and 1212. Nodes whose DVR is reached
+// created); limit=6 affords both 1211 and 1212. Nodes whose EVR is reached
 // after the budget is spent are stripped to write-protected. (No sibling-group
 // padding: the two limits now differ by one created node.)
 
-async fn test_definitive_view_limit_5_or_6 (
+async fn test_editable_view_limit_5_or_6 (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
         * (skg (node (id 1) (repo main))) 1
         ** (skg (node (id 11))) 11
-        ** (skg (node (id 12) writeProtected (viewRequests definitiveView))) 12
+        ** (skg (node (id 12) writeProtected (viewRequests editableView))) 12
         ** (skg (node (id 13))) 13
         * (skg (node (id 2) (repo main))) 2
       "};
@@ -241,14 +241,14 @@ async fn test_definitive_view_limit_5_or_6 (
 // so the sibling group is completed, all are write-protected,
 // and the grandchild generation is not visited at all.
 
-async fn test_definitive_view_limit_1_to_4 (
+async fn test_editable_view_limit_1_to_4 (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
         * (skg (node (id 1) (repo main))) 1
         ** (skg (node (id 11))) 11
-        ** (skg (node (id 12) writeProtected (viewRequests definitiveView))) 12
+        ** (skg (node (id 12) writeProtected (viewRequests editableView))) 12
         ** (skg (node (id 13))) 13
         * (skg (node (id 2) (repo main))) 2
       "};
@@ -335,7 +335,7 @@ async fn test_definitive_view_limit_1_to_4 (
 // editable view on a second occurrence of X, the first should become
 // write-protected.
 
-async fn test_definitive_view_conflicting (
+async fn test_editable_view_conflicting (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -346,7 +346,7 @@ async fn test_definitive_view_conflicting (
         * (skg (node (id 1) (repo main))) 1
         ** (skg (node (id 12))) 12
         *** (skg (node (id 122) writeProtected omittedBody)) 122
-        * (skg (node (id 12) (repo main) writeProtected (viewRequests definitiveView))) 12 copy
+        * (skg (node (id 12) (repo main) writeProtected (viewRequests editableView))) 12 copy
       "};
 
       let result = {
@@ -383,7 +383,7 @@ async fn test_definitive_view_conflicting (
       "};
 
       assert_metadata_eq!(result, expected,
-        "First definitive occurrence should become write-protected when second requests definitive");
+        "First editable occurrence should become write-protected when second requests editable");
 
       Ok (( )) }
 
@@ -392,14 +392,14 @@ async fn test_definitive_view_conflicting (
 // ===================================================
 // Create fixtures for a cycle: a contains b contains a
 
-async fn test_definitive_view_with_cycle (
+async fn test_editable_view_with_cycle (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       // Node a has editable request
       // a contains b contains a (cycle)
       let input_org_text = indoc! {"
-        * (skg (node (id cyc-a) (repo main) writeProtected (viewRequests definitiveView))) cyc-a
+        * (skg (node (id cyc-a) (repo main) writeProtected (viewRequests editableView))) cyc-a
       "};
 
       let result = {
@@ -430,7 +430,7 @@ async fn test_definitive_view_with_cycle (
       "};
 
       assert_metadata_eq!(result, expected,
-        "Definitive view should detect cycles and mark them");
+        "Editable view should detect cycles and mark them");
 
       Ok (( )) }
 
@@ -440,13 +440,13 @@ async fn test_definitive_view_with_cycle (
 // If a node is already visited (editable elsewhere), it should be
 // marked write-protected when encountered again during expansion.
 
-async fn test_definitive_view_with_repeat (
+async fn test_editable_view_with_repeat (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
         * (skg (node (id 121) (repo main))) 121
-        * (skg (node (id 12) (repo main) writeProtected (viewRequests definitiveView))) 12
+        * (skg (node (id 12) (repo main) writeProtected (viewRequests editableView))) 12
       "};
 
       let result = {
@@ -470,8 +470,8 @@ async fn test_definitive_view_with_repeat (
       let expected = indoc! {
         // Upon saving, the write-protected view of node 12 had no effect, but the
         // editable view of 121 (editable in the *buffer*) deleted its
-        // children at extraction. In the rerender, node 12's definitiveView
-        // cascades (§5.3) a DVR onto its content child 121, which is Final
+        // children at extraction. In the rerender, node 12's editableView
+        // cascades (§5.3) a EVR onto its content child 121, which is Final
         // and so clobbers the Tentative bare root 121 (§5.2). So the bare
         // root 121 is now write-protected and 12's child 121 is the editable
         // occurrence (childless, since the save emptied 121's contains).
@@ -490,7 +490,7 @@ async fn test_definitive_view_with_repeat (
       "};
 
       assert_metadata_eq!(result, expected,
-        "Definitive view should mark repeated nodes as writeProtected");
+        "Editable view should mark repeated nodes as writeProtected");
 
       Ok (( )) }
 
@@ -498,12 +498,12 @@ async fn test_definitive_view_with_repeat (
 // Test: Editable view request clears after processing
 // =====================================================
 
-async fn test_definitive_view_request_cleared (
+async fn test_editable_view_request_cleared (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
-        * (skg (node (id 12) (repo main) writeProtected (viewRequests definitiveView))) 12
+        * (skg (node (id 12) (repo main) writeProtected (viewRequests editableView))) 12
       "};
 
       let result = {

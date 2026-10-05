@@ -352,7 +352,7 @@ pub fn herald_rule_table () -> HeraldRule {
           rule ("folder",  vec! [ any (vec! [ s ("req:folder:"),  RuleChild::It ]) ]),
           rule ("roleTree", vec! [ any (vec! [ s ("req:roleTree:"), RuleChild::It ]) ]),
           rule ("flags", vec! [ s ("req:flags") ]),
-          rule ("definitiveView", vec! [ s ("req:definitive") ]) ]),
+          rule ("editableView", vec! [ s ("req:editable") ]) ]),
         interc (Some (Go), "", Some ("staged"), vec! [
           s ("✓"),
           leaf (Nonstandard, "addedN", "N"),

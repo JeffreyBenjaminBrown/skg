@@ -7,7 +7,7 @@
 ;;;     BOTH folders of the relation;
 ;;;   - ROLE TREES, `skg-show-*ward-tree' : (roleTree ROLENAME), the
 ;;;     role tree for that one partner role.
-;;; (`skg-request-definitive-view', a different concept, is also here.)
+;;; (`skg-request-editable-view', a different concept, is also here.)
 
 (require 'skg-metadata)
 (require 'skg-request-save)
@@ -17,7 +17,7 @@
 (defun skg--request-view-and-save (view-request)
   "Request VIEW-REQUEST for the headline at point, then save.
 VIEW-REQUEST is a request form -- (folder RELNAME), (roleTree ROLENAME),
-or the bare symbol definitiveView -- spliced into a (viewRequests ...)
+or the bare symbol editableView -- spliced into a (viewRequests ...)
 atom via `skg-edit-metadata-at-point'."
   (save-excursion
     (org-back-to-heading t)
@@ -73,14 +73,14 @@ an interactive command NAME that requests REQUEST-FORM and auto-saves."
   (skg-show-subscribeeward-tree  (roleTree subscribee)
     "Show the role tree through the nodes the node subscribes to."))
 
-(defun skg-request-definitive-view ()
-  "Edit metadata to request a definitive view for the headline at point.
+(defun skg-request-editable-view ()
+  "Edit metadata to request a editable view for the headline at point.
 The node must be write-protected and childless. Does NOT auto-save."
   (interactive)
   (save-excursion
     (org-back-to-heading t)
     (skg-edit-metadata-at-point
-     `(skg (node (viewRequests definitiveView))))))
+     `(skg (node (viewRequests editableView))))))
 
 (defun skg-fork-node ()
   "Fork the (owned) node at point: create a private clone that overrides it.
@@ -92,7 +92,7 @@ Refuses if the buffer has unsaved changes (\"Save the buffer before
 forking.\"), so the clone's saved state matches what you see. Otherwise
 stamps (viewRequests fork) into the headline's own (skg (node ...)) --
 targeting the headline's OWN id, never an (overridesHere N) marker it may
-carry -- and auto-saves (unlike `skg-request-definitive-view'). The server
+carry -- and auto-saves (unlike `skg-request-editable-view'). The server
 returns the usual fork-confirmation buffer; Emacs prompts for the clone's
 repo (unless already specified), then approve with C-c C-c or decline
 with C-c C-k."

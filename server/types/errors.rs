@@ -51,9 +51,9 @@ pub enum BufferValidationError {
   ForkRequestOnUnknownNode       (ID),  // An explicit 'skg-fork-node' request on a node whose id is not in the graph (an unsaved headline): nothing exists to override.
   ForkRequestMultiple            (ID),  // Two headlines for the same id both carry an explicit fork request; at most one is allowed.
   OverrideInvariantViolation     (String),
-  DefinitiveRequestOnEditableNode      (ID), // An editable view request on a node that is already editable
-  DefinitiveRequestOnNodeWithContentChildren (ID), // An editable view request on a node that has content (affectsParent=Container) children. Non-content children (e.g. containerward role tree stubs) don't trigger this.
-  MultipleDefinitiveRequestsForSameId    (ID), // Multiple editable view requests for the same ID
+  EditableViewRequestOnEditableNode      (ID), // An editable view request on a node that is already editable
+  EditableViewRequestOnNodeWithContentChildren (ID), // An editable view request on a node that has content (affectsParent=Container) children. Non-content children (e.g. containerward role tree stubs) don't trigger this.
+  MultipleEditableViewRequestsForSameId    (ID), // Multiple editable view requests for the same ID
   EmptyTitle                             (ID),
   LocalStructureViolation        (String, ID), // (error message, nearest ancestor ID)
   EditRequestOnWriteProtectedOccurrence      (ID), // Write-protected nodes -- phantoms in particular -- cannot carry write instructions like (editRequest delete) or (editRequest (merge X)). The user must visit an editable view of the node first.
@@ -109,7 +109,7 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "{} node should not have a body. Node title: '{}'",
                kind, title),
       BufferValidationError::Multiple_Defining_Viewnodes (skgid) =>
-        write!(f, "Multiple occurrences of node {:?} are definitive", skgid),
+        write!(f, "Multiple occurrences of node {:?} are editable", skgid),
       BufferValidationError::AmbiguousDeletion (skgid) =>
         write!(f, "Ambiguous deletion request for ID {:?}", skgid),
       BufferValidationError::DuplicatedContent (skgid) =>
@@ -141,23 +141,23 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Multiple fork requests for the same node {:?}. At most one fork request per node is allowed.", skgid),
       BufferValidationError::OverrideInvariantViolation(msg) =>
         write!(f, "{}", msg),
-      BufferValidationError::DefinitiveRequestOnEditableNode (skgid) =>
-        write!(f, "Definitive view request on a node that is already definitive (ID {:?}). The node already shows its content; no expansion needed.", skgid),
-      BufferValidationError::DefinitiveRequestOnNodeWithContentChildren (skgid) =>
-        write!(f, "Definitive view request on a node with content children (ID {:?}). The expansion would clobber those children. Save without the request first, then delete children and retry.", skgid),
-      BufferValidationError::MultipleDefinitiveRequestsForSameId (skgid) =>
-        write!(f, "Multiple definitive view requests for the same ID {:?}. At most one request per ID is allowed.", skgid),
+      BufferValidationError::EditableViewRequestOnEditableNode (skgid) =>
+        write!(f, "Editable view request on a node that is already editable (ID {:?}). The node already shows its content; no expansion needed.", skgid),
+      BufferValidationError::EditableViewRequestOnNodeWithContentChildren (skgid) =>
+        write!(f, "Editable view request on a node with content children (ID {:?}). The expansion would clobber those children. Save without the request first, then delete children and retry.", skgid),
+      BufferValidationError::MultipleEditableViewRequestsForSameId (skgid) =>
+        write!(f, "Multiple editable view requests for the same ID {:?}. At most one request per ID is allowed.", skgid),
       BufferValidationError::EmptyTitle(skgid) =>
-        write!(f, "Node {:?} has an empty title. Every definitive node must have a non-empty title.", skgid),
+        write!(f, "Node {:?} has an empty title. Every editable node must have a non-empty title.", skgid),
       BufferValidationError::LocalStructureViolation(msg, skgid) =>
         write!(f, "Local structure violation at ID {:?}: {}", skgid, msg),
       BufferValidationError::IDFolder_Edited(recorder, buffer_skgids, real_skgids) =>
         write!(f, "The idFolder under node {:?} was edited (buffer claims {:?}; real ids are {:?}). Reordering is fine, but IDs cannot be added, removed or edited through the buffer; edit the .skg file directly.", recorder, buffer_skgids, real_skgids),
       BufferValidationError::EditRequestOnWriteProtectedOccurrence (skgid) =>
-        write!(f, "Edit request on write-protected (phantom) node {:?}. Phantoms are write-protected; write-protected nodes cannot carry write instructions. Visit a definitive view of the node first (C-c g RET).", skgid),
+        write!(f, "Edit request on write-protected (phantom) node {:?}. Phantoms are write-protected; write-protected nodes cannot carry write instructions. Visit a editable view of the node first (C-c g RET).", skgid),
       BufferValidationError::EditedWriteProtectedOccurrence {
         skgid, title, changes } =>
-        write!(f, "The write-protected occurrence of node {:?} ({:?}) was edited ({}) but is write-protected. Re-render, then edit a definitive occurrence instead.",
+        write!(f, "The write-protected occurrence of node {:?} ({:?}) was edited ({}) but is write-protected. Re-render, then edit a editable occurrence instead.",
                skgid, title, changes . join ("; ")),
       BufferValidationError::FlagsSurfaceEdited {
         recorder_skgid, recorder_title, changes } =>

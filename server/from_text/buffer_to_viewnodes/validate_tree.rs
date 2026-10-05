@@ -73,7 +73,7 @@ pub fn find_buffer_errors_for_saving_in_graph (
       nodeMerge_errors }
     { errors . push(
         BufferValidationError::Other (error_msg)); }}
-  validate_definitive_view_requests(
+  validate_editable_view_requests(
     viewforest, &mut errors);
   validate_fork_view_requests(
     viewforest, graph, config, &mut errors);
@@ -284,7 +284,7 @@ fn validate_view_roots (
 ///   they won't be clobbered by it.
 /// - No other node with the same ID has an editable view request,
 ///   because there can only be one editable view.
-fn validate_definitive_view_requests (
+fn validate_editable_view_requests (
   viewforest : &MpViewForest,
   errors : &mut Vec<BufferValidationError>,
 ) {
@@ -295,15 +295,15 @@ fn validate_definitive_view_requests (
     { let viewnode : &MpViewnode =
         node_ref . value();
       // TODO/DONE/local-view-update/plan_v2.org §11: only an Active node carries view_requests; a phantom never can,
-      // so the Definitive-request validations below apply to Active only.
+      // so the Editable-request validations below apply to Active only.
       if let MpViewnodeKind::Vognode (
         MpVognode::Active (t))
       = &viewnode . kind
-      { if t . view_requests . contains (&ViewRequest::Definitive)
+      { if t . view_requests . contains (&ViewRequest::Editable)
         { if let Some (skgid) = &t . skgid {
           { // Must be write-protected
             if ! t . is_writeProtected ()
-            { errors . push( BufferValidationError::DefinitiveRequestOnEditableNode(
+            { errors . push( BufferValidationError::EditableViewRequestOnEditableNode(
               skgid . clone() )); }}
           { // Must have no content children.
             let has_content_children : bool =
@@ -313,9 +313,9 @@ fn validate_definitive_view_requests (
                   if ct . affectsParent == AffectsParent::True ));
             if has_content_children
             { errors . push(
-              BufferValidationError::DefinitiveRequestOnNodeWithContentChildren(
+              BufferValidationError::EditableViewRequestOnNodeWithContentChildren(
                 skgid . clone() )); }}
           { // At most one request per ID
             if ! ids_with_requests . insert(skgid . clone())
-            { errors . push( BufferValidationError::MultipleDefinitiveRequestsForSameId(
+            { errors . push( BufferValidationError::MultipleEditableViewRequestsForSameId(
               skgid . clone() )); }} }}} }}}

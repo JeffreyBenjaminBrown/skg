@@ -444,7 +444,7 @@ fn validate_inactive_node (
 /// check; a phantom writes nothing and is ignored at save, so its skgrepo --
 /// which may be the NOT_FOUND sentinel for an unresolvable reference -- is
 /// save-inert and goes unchecked. (validate_activeVognode also appends the
-/// definitive-title check; a phantom is title-exempt, being write-protected.)
+/// editable-title check; a phantom is title-exempt, being write-protected.)
 fn validate_vognode_identity_and_structure (
   tree       : &Tree<MpViewnode>,
   treeid     : NodeId,
@@ -490,12 +490,12 @@ fn validate_activeVognode (
       "A flag request requires a saved node ID; save the node first."
       . to_string ()); }
   if has_empty_title (t) {
-    errors . push("Definitive node has an empty title." . to_string()); }
+    errors . push("Editable node has an empty title." . to_string()); }
   errors }
 
 /// Validate a phantom (TODO/DONE/local-view-update/plan_v2.org §11): the same
 /// identity and child-structure checks as an ActiveVognode, minus the two
-/// ActiveVognode-only rules. The definitive-title rule does not apply (a phantom is
+/// ActiveVognode-only rules. The editable-title rule does not apply (a phantom is
 /// always write-protected, hence exempt). The repo-in-config rule does not
 /// apply either: a phantom writes nothing and is ignored at save, so its
 /// skgrepo -- possibly the NOT_FOUND sentinel for a reference that resolves to

@@ -504,7 +504,7 @@ C-c p o must bind to distinct commands."
         (buffer-string)
         (concat
          "* (skg (node (id r) (repo public))) R\n"
-         "** (skg (node (id p) writeProtected (viewRequests definitiveView))) P\n"
+         "** (skg (node (id p) writeProtected (viewRequests editableView))) P\n"
          "** (skg (node (id s) (repo public))) sibling\n"))))))
 
 (ert-deftest test-skg-replace-link-with-content-warns-for-existing-node ()
@@ -593,7 +593,7 @@ C-c p o must bind to distinct commands."
       (should (= save-count 0)))))
 
 (ert-deftest test-skg-replace-link-with-content-rejects-write-protected-container ()
-  "Test replacement requires a definitive container."
+  "Test replacement requires a editable container."
   (with-temp-buffer
     (org-mode)
     (insert

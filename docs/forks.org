@@ -14,7 +14,7 @@ relations (=subscribes=, =overrides=,
 
 You do not run a special command. You just *edit the foreign node*:
 
-1. Make the foreign node /editable/ with the definitive-view
+1. Make the foreign node /editable/ with the editable-view
    request, =C-c s d=. (A foreign node is write-protected until you do this.)
 2. Edit it however you like — its title, its body, add / remove / reorder
    its children, at any depth.

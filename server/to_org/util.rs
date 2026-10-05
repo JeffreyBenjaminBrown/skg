@@ -22,11 +22,11 @@ use std::time;
 
 
 /// Whether an ID's editable occurrence is Final (claimed by a
-/// editable view request, DVR) or merely Tentative (an ordinary
-/// saved/completed editable). A DVR clobbers a Tentative occurrence
-/// but defers to a Final one (TODO/DONE/local-view-update/plan_v2.org §5.2). The DVR cascade (TODO/DONE/local-view-update/plan_v2.org §5.3) is
-/// not yet implemented, so today no second DVR ever reaches an
-/// already-Final ID (validation forbids two user DVRs per ID); the
+/// editable view request, EVR) or merely Tentative (an ordinary
+/// saved/completed editable). A EVR clobbers a Tentative occurrence
+/// but defers to a Final one (TODO/DONE/local-view-update/plan_v2.org §5.2). The EVR cascade (TODO/DONE/local-view-update/plan_v2.org §5.3) is
+/// not yet implemented, so today no second EVR ever reaches an
+/// already-Final ID (validation forbids two user EVRs per ID); the
 /// defer-to-Final branch is therefore correct-but-dormant until cascade
 /// lands. NodeId is the occurrence's position in the viewforest.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

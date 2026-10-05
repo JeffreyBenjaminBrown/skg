@@ -212,7 +212,7 @@ function M.replace_link_with_content ()
   local split = metadata.split_as_stars_metadata_title(
     metadata.line_text(line))
   local replacement = string.format(
-    '%s(skg (node (id %s) writeProtected (viewRequests definitiveView))) %s',
+    '%s(skg (node (id %s) writeProtected (viewRequests editableView))) %s',
     split.stars, link.id, link.label or link.id)
   vim.api.nvim_buf_set_lines(0, line - 1, M.subtree_end(line), false,
                              { replacement })

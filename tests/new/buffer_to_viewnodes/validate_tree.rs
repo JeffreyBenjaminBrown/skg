@@ -55,11 +55,11 @@ fn all_tests
       s . reset ("test_empty_title_allowed_for_writeProtected_and_delete", fixtures) ?;
       test_empty_title_allowed_for_writeProtected_and_delete (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_definitive_request_with_only_non_content_children_is_allowed", fixtures) ?;
-      test_definitive_request_with_only_non_content_children_is_allowed (
+      s . reset ("test_editable_view_request_with_only_non_content_children_is_allowed", fixtures) ?;
+      test_editable_view_request_with_only_non_content_children_is_allowed (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_definitive_request_with_content_child_is_rejected", fixtures) ?;
-      test_definitive_request_with_content_child_is_rejected (
+      s . reset ("test_editable_view_request_with_content_child_is_rejected", fixtures) ?;
+      test_editable_view_request_with_content_child_is_rejected (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
@@ -508,7 +508,7 @@ async fn test_empty_title_allowed_for_writeProtected_and_delete (
                  "WriteProtected and delete-requested nodes should not trigger empty title errors");
       Ok(( )) }
 
-async fn test_definitive_request_with_only_non_content_children_is_allowed (
+async fn test_editable_view_request_with_only_non_content_children_is_allowed (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -519,7 +519,7 @@ async fn test_definitive_request_with_only_non_content_children_is_allowed (
   // with that. Only Container children would be clobbered.
       let input : &str =
         indoc! {"
-                * (skg (node (id parent) (repo main) writeProtected (viewRequests definitiveView))) parent
+                * (skg (node (id parent) (repo main) writeProtected (viewRequests editableView))) parent
                 ** (skg (node (id ancestor) (repo main) (affectsParent false))) non-content child
             "};
       let viewforest : MpViewForest =
@@ -529,15 +529,15 @@ async fn test_definitive_request_with_only_non_content_children_is_allowed (
           &viewforest, config ) ?;
       let hits : Vec<&BufferValidationError> = errors . iter ()
         . filter ( |e| matches! (
-          e, BufferValidationError::DefinitiveRequestOnNodeWithContentChildren (_) ))
+          e, BufferValidationError::EditableViewRequestOnNodeWithContentChildren (_) ))
         . collect ();
       assert_eq! ( hits . len (), 0,
         "Non-content children should not trigger \
-         DefinitiveRequestOnNodeWithContentChildren. Errors: {:?}",
+         EditableViewRequestOnNodeWithContentChildren. Errors: {:?}",
         errors );
       Ok (( )) }
 
-async fn test_definitive_request_with_content_child_is_rejected (
+async fn test_editable_view_request_with_content_child_is_rejected (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -545,7 +545,7 @@ async fn test_definitive_request_with_content_child_is_rejected (
   // DOES conflict with expansion, so the error should fire.
       let input : &str =
         indoc! {"
-                * (skg (node (id parent) (repo main) writeProtected (viewRequests definitiveView))) parent
+                * (skg (node (id parent) (repo main) writeProtected (viewRequests editableView))) parent
                 ** (skg (node (id c) (repo main))) content child
             "};
       let viewforest : MpViewForest =
@@ -555,12 +555,12 @@ async fn test_definitive_request_with_content_child_is_rejected (
           &viewforest, config ) ?;
       let hits : Vec<&BufferValidationError> = errors . iter ()
         . filter ( |e| matches! (
-          e, BufferValidationError::DefinitiveRequestOnNodeWithContentChildren (skgid)
+          e, BufferValidationError::EditableViewRequestOnNodeWithContentChildren (skgid)
             if skgid . 0 == "parent" ))
         . collect ();
       assert_eq! ( hits . len (), 1,
         "A Container child should trigger exactly one \
-         DefinitiveRequestOnNodeWithContentChildren for 'parent'. \
+         EditableViewRequestOnNodeWithContentChildren for 'parent'. \
          Errors: {:?}",
         errors );
       Ok (( )) }
@@ -621,7 +621,7 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
     = org_to_uninterpreted_viewforest (input_editable) . unwrap ();
   assert! ( ! parsing_errors3 . iter () . any ( |e|
     matches! (e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (_)) ),
-    "(editRequest delete) on a definitive node must not trigger EditRequestOnWriteProtectedOccurrence. Parse errors: {:?}",
+    "(editRequest delete) on a editable node must not trigger EditRequestOnWriteProtectedOccurrence. Parse errors: {:?}",
     parsing_errors3 );
 }
 

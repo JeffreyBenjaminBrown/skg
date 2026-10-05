@@ -148,7 +148,7 @@ describe('skg.modify_graph replacements', function ()
     assert.are.equal(table.concat({
       '* (skg (node (id parent) (repo public))) container',
       '** (skg (node (id target) writeProtected (viewRequests'
-      .. ' definitiveView))) target label' }, '\n'), buffer_text())
+      .. ' editableView))) target label' }, '\n'), buffer_text())
     local warned = false
     for _, msg in ipairs(notified) do
       if tostring(msg):find('orphan') then warned = true end
@@ -206,11 +206,11 @@ describe('skg.view_requests', function ()
       '(viewRequests (roleTree container))', 1, true))
   end)
 
-  it('set_definitive stamps without saving', function ()
+  it('set_editable stamps without saving', function ()
     buffer_with('* (skg (node (id n3) writeProtected)) title')
-    view_requests.set_definitive()
+    view_requests.set_editable()
     assert.is_truthy(buffer_text():find(
-      '(viewRequests definitiveView)', 1, true))
+      '(viewRequests editableView)', 1, true))
     assert.are.equal(0, saved_count)
   end)
 

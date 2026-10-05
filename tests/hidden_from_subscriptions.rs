@@ -50,13 +50,13 @@ fn mk_test_tcp_stream_pair ()
     listener . accept () . unwrap ();
   (write_end, read_end) }
 
-/// Add (viewRequests definitiveView) to all subscribee nodes in org text.
+/// Add (viewRequests editableView) to all subscribee nodes in org text.
 /// Modifies the node section of each subscribee to request an editable view.
 /// Subscribees are ActiveVognode children of SubscribeeFolders.
 ///
 /// KLUDGE: We identify subscribees by matching on "subscribee-" in the title.
 /// That's easier than navigating the org-tree's topoogy.
-fn add_definitive_view_request_to_subscribees (
+fn add_editable_view_request_to_subscribees (
   org_text : &str,
 ) -> String {
   // Process line-by-line, inserting viewRequests after write-protected
@@ -70,10 +70,10 @@ fn add_definitive_view_request_to_subscribees (
         // (no more atoms) or by `(rels ...)' or `(viewStats ...)'.
         if line . contains ("writeProtected)") {
           line . replace (
-            "writeProtected)", "writeProtected (viewRequests definitiveView))")
+            "writeProtected)", "writeProtected (viewRequests editableView))")
         } else {
           line . replace (
-            "writeProtected ", "writeProtected (viewRequests definitiveView) ") }
+            "writeProtected ", "writeProtected (viewRequests editableView) ") }
       } else {
         line . to_string()
       }
@@ -387,7 +387,7 @@ async fn test_deleting_foreign_subscribee_content_preserves_branch_edit (
           false )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
-        &add_definitive_view_request_to_subscribees (&initial_view),
+        &add_editable_view_request_to_subscribees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
@@ -419,7 +419,7 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
           false )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
-        &add_definitive_view_request_to_subscribees (&initial_view),
+        &add_editable_view_request_to_subscribees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
@@ -532,7 +532,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
 
     let (expanded, collateral_views) =
       save_buffer_and_read_collateral_views (
-        &add_definitive_view_request_to_subscribees (&initial_view),
+        &add_editable_view_request_to_subscribees (&initial_view),
         &saved_uri, &config, tantivy, &graph,
         &mut views_state ) . await?;
     assert!(
@@ -599,7 +599,7 @@ async fn test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
           false )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
-        &add_definitive_view_request_to_subscribees (&initial_view),
+        &add_editable_view_request_to_subscribees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
@@ -641,7 +641,7 @@ async fn test_moving_foreign_subscribee_content_elsewhere_still_hides (
           false )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
-        &add_definitive_view_request_to_subscribees (&initial_view),
+        &add_editable_view_request_to_subscribees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
@@ -678,7 +678,7 @@ async fn test_extra_view_child_under_foreign_subscribee_is_deleted (
           false )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
-        &add_definitive_view_request_to_subscribees (&initial_view),
+        &add_editable_view_request_to_subscribees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
@@ -796,8 +796,8 @@ async fn test_subscribee_and_filter_folders (
 
     let expanded = { // Request editable views, then save
       let modified_view : String =
-        add_definitive_view_request_to_subscribees (&initial_view);
-      println!("Modified view (with definitive requests):\n{}", modified_view);
+        add_editable_view_request_to_subscribees (&initial_view);
+      println!("Modified view (with editable requests):\n{}", modified_view);
       let graph : InRustGraphHandle =
         (
           graph_handle_from_config (config) ?);
@@ -812,7 +812,7 @@ async fn test_subscribee_and_filter_folders (
           &Err ( String::new () ), &mut views_state
         ) . await ?;
       response . saved_view };
-    println!("View from R after save with definitive view requests:\n{}", expanded);
+    println!("View from R after save with editable view requests:\n{}", expanded);
 
     let expected_expanded = indoc! {
       "* (skg (node (id R) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 3))))) R
@@ -866,8 +866,8 @@ async fn test_hidden_within_but_none_without (
 
     let expanded = { // request editable views, then save
       let modified_view : String =
-        add_definitive_view_request_to_subscribees (&initial_view);
-      println!("Modified view (with definitive requests):\n{}", modified_view);
+        add_editable_view_request_to_subscribees (&initial_view);
+      println!("Modified view (with editable requests):\n{}", modified_view);
       let graph : InRustGraphHandle =
         (
           graph_handle_from_config (config) ?);
@@ -882,7 +882,7 @@ async fn test_hidden_within_but_none_without (
           &Err ( String::new () ), &mut views_state
         ) . await ?;
       response . saved_view };
-    println!("View from R after save with definitive view requests:\n{}", expanded);
+    println!("View from R after save with editable view requests:\n{}", expanded);
 
     // HiddenInSubscribeeFolder precedes content regardless of .skg order.
     // E1.skg has [E11, H, E12] but view shows HiddenInSubscribeeFolder (with H) before E11 and E12.
@@ -920,7 +920,7 @@ async fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
           false )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
-        &add_definitive_view_request_to_subscribees (&initial_view),
+        &add_editable_view_request_to_subscribees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
@@ -978,7 +978,7 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
 
     let (expanded, collateral_views) =
       save_buffer_and_read_collateral_views (
-        &add_definitive_view_request_to_subscribees (&initial_view),
+        &add_editable_view_request_to_subscribees (&initial_view),
         &saved_uri, &config, tantivy, &graph,
         &mut views_state ) . await?;
     assert!(
@@ -1038,7 +1038,7 @@ async fn test_deleting_from_hiddenin_folder_does_not_unhide (
           false )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
-        &add_definitive_view_request_to_subscribees (&initial_view),
+        &add_editable_view_request_to_subscribees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
@@ -1096,8 +1096,8 @@ async fn test_hidden_without_but_none_within (
       "Initial view from R: H in HiddenOutsideOfSubscribeeFolder; E1 and E2 are writeProtected bare leaves");
     let with_subscribees_expanded = {
       let modified_view : String =
-        add_definitive_view_request_to_subscribees (&initial_view);
-      println!("Modified view (with definitive requests):\n{}", modified_view);
+        add_editable_view_request_to_subscribees (&initial_view);
+      println!("Modified view (with editable requests):\n{}", modified_view);
       let graph : InRustGraphHandle =
         (
           graph_handle_from_config (config) ?);
@@ -1111,7 +1111,7 @@ async fn test_hidden_without_but_none_within (
 
         &Err ( String::new () ), &mut views_state ) . await ?;
       response . saved_view };
-    println!("View from R after save with definitive view requests:\n{}",
+    println!("View from R after save with editable view requests:\n{}",
              with_subscribees_expanded);
     let expected_expanded = indoc! {
       "* (skg (node (id R) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
@@ -1179,14 +1179,14 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
       response . warnings );
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
-        &add_definitive_view_request_to_subscribees (&rerendered),
+        &add_editable_view_request_to_subscribees (&rerendered),
         &config, tantivy, &graph, &mut views_state
       ) . await ?;
     assert! (
       expanded . contains ("hiddenInSubscribeeFolder")
       && expanded . lines () . any ( |line| line . contains ("(id E11)") ),
       "The hidden child should appear in hiddenHere once its subscribee is \
-       definitive:\n{}", expanded );
+       editable:\n{}", expanded );
     let without_h : String = expanded . lines ()
       . filter (|line| ! line . contains ("(id H)"))
       . collect::<Vec<_>> () . join ("\n") + "\n";
@@ -1233,8 +1233,8 @@ async fn test_overlapping_hidden_within (
       "Initial view from R: write-protected subscribees are bare leaves; H doesn't appear");
     let expanded = {
       let modified_view : String =
-        add_definitive_view_request_to_subscribees (&initial_view);
-      println!("Modified view (with definitive requests):\n{}",
+        add_editable_view_request_to_subscribees (&initial_view);
+      println!("Modified view (with editable requests):\n{}",
                modified_view);
       let graph : InRustGraphHandle =
         (
@@ -1249,7 +1249,7 @@ async fn test_overlapping_hidden_within (
 
         &Err ( String::new () ), &mut views_state ) . await ?;
       response . saved_view };
-    println!("View from R after save with definitive view requests:\n{}", expanded);
+    println!("View from R after save with editable view requests:\n{}", expanded);
     let expected_expanded = indoc! {
       "* (skg (node (id R) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
        ** (skg subscribeeFolder)

@@ -109,7 +109,7 @@ outline heuristic, not a precise graph-content query."
 (defun skg-replace-content-with-link ()
   "Replace the branch at point with a link to its former root.
 Point may be on the headline or in its body.  The root must be an
-existing ActiveVognode with an ID.  Its viewparent must be a definitive
+existing ActiveVognode with an ID.  Its viewparent must be a editable
 ActiveVognode whose repo is owned by the user.  The whole org subtree
 at point is replaced by a same-level headline whose title is an
 org id link to the former root, then the buffer is saved."
@@ -130,7 +130,7 @@ org id link to the former root, then the buffer is saved."
   "Replace the leaf at point with content linked from that leaf.
 Point may be on the headline or in the body.  The leaf must have
 exactly one org bracket link in its title plus body, no
-viewdescendants, and a definitive ActiveVognode viewparent whose repo
+viewdescendants, and a editable ActiveVognode viewparent whose repo
 is owned by the user.  The link must be an id link.  The leaf is
 replaced by a write-protected same-level ActiveVognode for the link
 target, then the buffer is saved."
@@ -253,7 +253,7 @@ one link is not an id link."
                        (skg-get-current-headline-text))))
          (skgid (plist-get link :id))
          (label (or (plist-get link :label) skgid))
-         (replacement (format "%s(skg (node (id %s) writeProtected (viewRequests definitiveView))) %s\n"
+         (replacement (format "%s(skg (node (id %s) writeProtected (viewRequests editableView))) %s\n"
                               stars skgid label))
          (start (line-beginning-position))
          (end (save-excursion

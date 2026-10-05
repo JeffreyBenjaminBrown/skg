@@ -6,7 +6,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::skgrepo_sets::ActiveSkgRepoSet;
-use crate::to_org::expand::definitive::{ apply_editable_draw_rule, DrawOutcome};
+use crate::to_org::expand::editable::{ apply_editable_draw_rule, DrawOutcome};
 use crate::to_org::util::EditableMap;
 use crate::types::env::RuntimeGeneration;
 use crate::types::git::SkgRepoDiff;
@@ -88,7 +88,7 @@ pub(super) fn complete_viewforest (
   let root_treeid : NodeId = viewforest . root () . id ();
   // The single TODO/DONE/local-view-update/plan_v2.org §3 level-order BFS: each node's visit
   // (dispatch_node_update) does ALL of its own update -- content
-  // reconcile, the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule + TODO/DONE/local-view-update/plan_v2.org §5.3 cascade for definitive-view
+  // reconcile, the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule + TODO/DONE/local-view-update/plan_v2.org §5.3 cascade for editable-view
   // requests, the inline diff, the other view requests, ensuring an editable
   // subscribee's HiddenInSubscribeeFolder, and per-folder reconciliation. Folders and
   // content children created during a node's visit are reached later in the
@@ -214,8 +214,8 @@ fn dispatch_node_update (
   Ok(( )) }
 
 /// The Active-node visit (TODO/DONE/local-view-update/plan_v2.org §6.1/§6.2): settle the Finalizable state
-/// for a definitive-view request *before* drawing content (so a Final node
-/// can cascade), reconcile content, run the remaining (non-Definitive) view
+/// for a editable-view request *before* drawing content (so a Final node
+/// can cascade), reconcile content, run the remaining (non-Editable) view
 /// requests, ensure an editable subscribee's HiddenInSubscribeeFolder, and
 /// finally (in diff mode) compute this node's diff inline. The BFS reaches
 /// every folder/child this creates and reconciles it in turn.
@@ -240,10 +240,10 @@ fn visit_normal_node (
     read_at_node_in_tree ( tree, treeid,
       |vn : &Viewnode| match &vn . kind {
         ViewnodeKind::Vognode (Vognode::Active (t)) =>
-          t . view_requests . contains (& ViewRequest::Definitive),
+          t . view_requests . contains (& ViewRequest::Editable),
         _ => false } ) ?;
   let mut settled : bool = false; // TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule already ran
-  let mut cascade : bool = false; // node is Final -> hand DVRs to children
+  let mut cascade : bool = false; // node is Final -> hand EVRs to children
   // TODO/DONE/local-view-update/plan_v2.org §5.5: the budget counts vognode *expansions* (each costs 1, charged in
   // expand_true_content_at_activeVognode); once it hits 0 every later vognode is left
   // write-protected -- a visible, collapsed headline. We never truncate a group
@@ -256,11 +256,11 @@ fn visit_normal_node (
            |vn : &Viewnode| matches! ( &vn . kind, ViewnodeKind::BufferRoot ) )
          . unwrap_or (false) {
     // Budget spent and this is not a view root: draw it write-protected and expand
-    // nothing under it; strip any DVR so it is not treated as Final. The content
+    // nothing under it; strip any EVR so it is not treated as Final. The content
     // engine (settled) then clobbers+returns.
     write_at_activeVognode_in_tree (
       tree, treeid,
-      |t| { t . view_requests . remove (& ViewRequest::Definitive);
+      |t| { t . view_requests . remove (& ViewRequest::Editable);
             t . editability = Editability::WriteProtected; } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
     settled = true;
@@ -292,7 +292,7 @@ fn visit_normal_node (
         ViewnodeKind::Vognode (Vognode::Active (_)) ) ) ?;
   if ! still_normal { return Ok (( )); }
   // Create the default folders when this node is first presented as
-  // editable: on a de-novo render, or when a definitive-view request has
+  // editable: on a de-novo render, or when a editable-view request has
   // just expanded an existing occurrence.  Folder members are included;
   // hid*/overrid*-as-such nodes get the same defaults as ordinary nodes, and
   // the subscribee-specific HiddenIn folder is added by the pass below.

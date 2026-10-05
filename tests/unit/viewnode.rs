@@ -29,7 +29,7 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
     Editability::Editable {
       body : None,
       edit_request : Some (NodeEditRequest::Delete) },
-    [ViewRequest::Definitive] . into_iter () . collect () );
+    [ViewRequest::Editable] . into_iter () . collect () );
   if let ViewnodeKind::Vognode (Vognode::Active (node)) = &mut active . kind {
     node . relRepo_request = Some (SkgRepoName::from ("private")); }
   active . consume_edit_request_after_save ();
@@ -37,7 +37,7 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   else { panic! ("expected active node"); };
   assert_eq! (active . relRepo_request, None);
   assert_eq! (active . edit_request (), None);
-  assert! (active . view_requests . contains (&ViewRequest::Definitive));
+  assert! (active . view_requests . contains (&ViewRequest::Editable));
 
   let mut unknown : Viewnode = Viewnode {
     focused : false, folded : false, body_folded : false,

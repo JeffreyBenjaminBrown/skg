@@ -116,17 +116,17 @@ end
 ---headline.
 ---@param entry table
 function M.insert_node_from_entry (entry)
-  local request_definitive_view = false
+  local request_editable_view = false
   if vim.b.skg_view_uri ~= nil then
     if M.buffer_has_editable_occurrence_p(entry[1]) then
       vim.notify('NOTE: Pasting node write-protected because a writable'
                  .. ' occurrence is already present in this same buffer.')
     else
-      request_definitive_view = true end
+      request_editable_view = true end
   end
   local node_text = string.format(
-    request_definitive_view
-      and '(skg (node (id %s) writeProtected (viewRequests definitiveView))) %s'
+    request_editable_view
+      and '(skg (node (id %s) writeProtected (viewRequests editableView))) %s'
       or '(skg (node (id %s) writeProtected)) %s',
     entry[1], entry[2])
   local line = metadata.line_text()
@@ -152,7 +152,7 @@ function M.buffer_has_editable_occurrence_p (skgid)
     if metadata.activeNode_sexp_p(sexp)
        and metadata.node_id(sexp) == skgid
        and (not metadata.node_write_protected_p(sexp)
-            or metadata.node_requests_definitive_view_p(sexp)) then
+            or metadata.node_requests_editable_view_p(sexp)) then
       return true end
   end
   return false

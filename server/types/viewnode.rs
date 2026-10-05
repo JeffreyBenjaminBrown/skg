@@ -506,7 +506,7 @@ impl FolderRelation {
 /// Multiple view requests can be active simultaneously.
 /// - 'Folder(rel)' builds BOTH folders of the relation, populated from the graph.
 /// - 'RoleTree(role)' builds the role tree for that one partner role.
-/// - 'Definitive' makes the (write-protected) node editable.
+/// - 'Editable' makes the (write-protected) node editable.
 /// - 'Fork' is the explicit 'skg-fork-node' gesture: clone this (owned)
 ///   node into a private fork that overrides it. Consumed on the save
 ///   path (fork detection), not during view completion.
@@ -515,7 +515,7 @@ pub enum ViewRequest {
   Folder (FolderRelation),
   RoleTree (RelationRole),
   Flags,
-  Definitive,
+  Editable,
   Fork,
 }
 
@@ -736,7 +736,7 @@ impl ViewRequest {
   /// counts elsewhere. Enumerated for the herald conformance test
   /// (server/heralds.rs).
   pub const EMITTABLE_MATCH_ATOMS : [&'static str; 4] =
-    [ "folder", "roleTree", "flags", "definitiveView" ];
+    [ "folder", "roleTree", "flags", "editableView" ];
 }
 
 impl AsRef<Viewnode> for Viewnode {
@@ -882,7 +882,7 @@ impl fmt::Display for ViewRequest {
       ViewRequest::Folder  (rel)  => write! (f, "(folder {})",  rel  . relname  ()),
       ViewRequest::RoleTree (role) => write! (f, "(roleTree {})", role . rolename ()),
       ViewRequest::Flags   => write! (f, "flags"),
-      ViewRequest::Definitive  => write! (f, "definitiveView"),
+      ViewRequest::Editable    => write! (f, "editableView"),
       ViewRequest::Fork        => write! (f, "fork"), } } }
 
 //

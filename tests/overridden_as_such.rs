@@ -120,7 +120,7 @@ async fn expand_e_under (
         if line_col == folder && line . contains ("(id E)") {
           out . push ( line . replace (
             "writeProtected",
-            "writeProtected (viewRequests definitiveView)" )); }
+            "writeProtected (viewRequests editableView)" )); }
         else { out . push ( line . to_string () ); }}
       out . join ("\n") + "\n" };
   assert_ne! ( edited, view_with_folder,

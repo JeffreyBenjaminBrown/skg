@@ -63,7 +63,7 @@ Uses headline-titles style parsing. Returns t if found, nil otherwise."
   "Add an aliases view request to node 11, append a standalone
 subee root with its child subee-1, and save.
 The child must be supplied explicitly: the standalone subee root
-is definitive, so the save pipeline generates a save instruction
+is editable, so the save pipeline generates a save instruction
 for it. Without subee-1 in the buffer, that instruction would set
 contains to [], overwriting subee.skg on disk."
   (message "=== PHASE 2: Extend buffer 1 with second root and alias ===")

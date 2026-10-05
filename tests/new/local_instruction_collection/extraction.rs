@@ -657,7 +657,7 @@ fn subscribee_hiderel_intent_ignores_writeProtected_subscribee (
     indoc! {"
             * (skg (node (id subscriber) (repo main))) subscriber
             ** (skg subscribeeFolder)
-            *** (skg (node (id subscribee) (repo main) writeProtected (viewRequests definitiveView))) subscribee
+            *** (skg (node (id subscribee) (repo main) writeProtected (viewRequests editableView))) subscribee
             "};
 
   assert_eq!(
@@ -674,7 +674,7 @@ fn subscribee_hiderel_intent_ignores_writeProtected_subscriber (
   // instance of that subscriber.
   let input : &str =
     indoc! {"
-            * (skg (node (id subscriber) (repo main) writeProtected (viewRequests definitiveView))) subscriber
+            * (skg (node (id subscriber) (repo main) writeProtected (viewRequests editableView))) subscriber
             ** (skg subscribeeFolder)
             *** (skg (node (id subscribee) (repo main))) subscribee
             **** (skg (node (id a) (repo main))) a

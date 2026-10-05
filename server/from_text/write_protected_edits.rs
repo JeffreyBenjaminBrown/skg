@@ -544,7 +544,7 @@ mod tests {
       *** (skg (node (id subscribee) (repo main))) subscribee
     "});
     let mut child_text_changed = forest (indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected (viewRequests definitiveView))) recorder
+      * (skg (node (id recorder) (repo main) writeProtected (viewRequests editableView))) recorder
       ** (skg (node (id content) (repo main))) changed child text
       ** (skg subscribeeFolder)
       *** (skg (node (id subscribee) (repo main))) subscribee

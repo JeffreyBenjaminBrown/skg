@@ -253,7 +253,7 @@ fn contentof_writeProtected_parent_false_claim_flipped () {
 }
 
 #[test]
-fn contentof_definitive_parent_skipped () {
+fn contentof_editable_parent_skipped () {
   // Parent is EDITABLE; the check is skipped regardless of whether
   // the graph agrees (save just redefined P's contains to match
   // the buffer, so asking the graph would be circular). Claim preserved.
@@ -273,7 +273,7 @@ fn contentof_definitive_parent_skipped () {
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
   assert_eq! (affectsParent_if_normal (&viewforest, c_skgid), AffectsParent::True,
-    "Definitive parent: Container claim is never flipped here");
+    "Editable parent: Container claim is never flipped here");
 }
 
 #[test]

@@ -3,7 +3,7 @@
 -- letting the server fulfill the request during completion. Two
 -- families, both auto-saving: FOLDERS (folder RELNAME), building
 -- both folders of the relation, and ROLE TREES (roleTree ROLENAME), the role tree
--- for one partner role. Also the definitive-view request (no
+-- for one partner role. Also the editable-view request (no
 -- auto-save) and the explicit fork. The Lua port of
 -- elisp/skg-request-views.el.
 
@@ -48,11 +48,11 @@ end
 
 ---Request an editable view for the headline at point (the node must
 ---be write-protected and childless). Does NOT auto-save.
-function M.set_definitive ()
+function M.set_editable ()
   local line = focus.owning_headline_line()
   if not line then error('Not on a headline') end
   metadata.edit_metadata_at_line(line,
-    sexpr.read('(skg (node (viewRequests definitiveView)))'))
+    sexpr.read('(skg (node (viewRequests editableView)))'))
 end
 
 ---Fork the (owned) node at point: create a private clone that

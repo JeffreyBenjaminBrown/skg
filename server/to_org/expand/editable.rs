@@ -47,13 +47,13 @@ pub fn execute_view_requests (
       ViewRequest::Flags => {
         build_and_integrate_flags_then_drop_request (
           viewforest, treeid, graph, config, errors ) ?; },
-      ViewRequest::Definitive =>
+      ViewRequest::Editable =>
         // View completion (dispatch_node_update) settles every Editable
         // request at the node's own visit (apply_editable_draw_rule, the TODO/DONE/local-view-update/plan_v2.org §5.2
         // draw rule + TODO/DONE/local-view-update/plan_v2.org §5.3 cascade), before this post-content view-request pass
         // runs, so none should reach here. Fail loudly if one does, rather than
         // silently dropping it.
-        return Err ( "execute_view_requests: a ViewRequest::Definitive survived \
+        return Err ( "execute_view_requests: a ViewRequest::Editable survived \
           to the view-request pass; it should have been consumed by the draw \
           rule at the node's visit" . into () ),
       ViewRequest::Fork =>
@@ -66,9 +66,9 @@ pub fn execute_view_requests (
   Ok (( )) }
 
 /// The result of applying the TODO/DONE/local-view-update/plan_v2.org §5.2 Tentative/Final draw rule to a node that
-/// carries a 'ViewRequest::Definitive' (a user DVR, or a TODO/DONE/local-view-update/plan_v2.org §5.3 cascade DVR).
+/// carries a 'ViewRequest::Editable' (a user EVR, or a TODO/DONE/local-view-update/plan_v2.org §5.3 cascade EVR).
 pub enum DrawOutcome {
-  /// An existing Final occurrence of this id won: the DVR was dropped and
+  /// An existing Final occurrence of this id won: the EVR was dropped and
   /// the node left write-protected. No content expansion should follow.
   Deferred,
   /// The node was made Final (and any prior Tentative occurrence of its id
@@ -77,8 +77,8 @@ pub enum DrawOutcome {
 }
 
 /// Apply the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule for a node carrying
-/// 'ViewRequest::Definitive', WITHOUT expanding its content:
-/// - defer to an existing Final occurrence (drop the DVR, stay
+/// 'ViewRequest::Editable', WITHOUT expanding its content:
+/// - defer to an existing Final occurrence (drop the EVR, stay
 ///   write-protected) -> 'DrawOutcome::Deferred';
 /// - otherwise write-protect any prior Tentative occurrence of the id, mark
 ///   this node Final (resyncing title/body from disk), register it in the map,
@@ -97,14 +97,14 @@ pub fn apply_editable_draw_rule (
     viewforest, treeid ) ?;
   if let Some (&prior) = visited . get (& node_pid) {
     if prior . is_final () && prior . treeid () != treeid {
-      // TODO/DONE/local-view-update/plan_v2.org §5.2: an existing Final occurrence wins; discard this DVR and make
+      // TODO/DONE/local-view-update/plan_v2.org §5.2: an existing Final occurrence wins; discard this EVR and make
       // the node write-protected. (Setting write-protected matters for a TODO/DONE/local-view-update/plan_v2.org §5.3
-      // cascade DVR landing on a freshly-created editable child whose id
-      // is already Final elsewhere; for a user DVR on an already-write-protected
+      // cascade EVR landing on a freshly-created editable child whose id
+      // is already Final elsewhere; for a user EVR on an already-write-protected
       // node it is a no-op. The expand step then clobbers/refreshes it.)
       write_at_activeVognode_in_tree (
         viewforest, treeid,
-        |t| { t . view_requests . remove (& ViewRequest::Definitive);
+        |t| { t . view_requests . remove (& ViewRequest::Editable);
               t . editability = Editability::WriteProtected; } )
         . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
       return Ok ( DrawOutcome::Deferred ); }
@@ -115,14 +115,14 @@ pub fn apply_editable_draw_rule (
   { // Remove request, mark editable, replace title/body, add to visited.
     write_at_activeVognode_in_tree (
       viewforest, treeid, |t| {
-        t . view_requests . remove (& ViewRequest::Definitive);
+        t . view_requests . remove (& ViewRequest::Editable);
         t . editability = Editability::Editable {
           body         : None,
           edit_request : None }; } )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     from_disk_replace_title_body_and_graphnode (
       viewforest, treeid, graph, config ) ?;
-    // A DVR target is Final (TODO/DONE/local-view-update/plan_v2.org §5.2): later DVRs for this ID defer to it.
+    // A EVR target is Final (TODO/DONE/local-view-update/plan_v2.org §5.2): later EVRs for this ID defer to it.
     visited . insert ( node_pid . clone(), Finalizable::Final (treeid) ); }
   Ok ( DrawOutcome::MadeFinal ) }
 
