@@ -157,7 +157,7 @@ fn an_active_owned_overrider_substitutes_under_a_restricted_set () {
       cycle          : vec![], } ); }
 
 #[test]
-fn an_inactive_override_edge_between_active_nodes_does_not_substitute () {
+fn an_inactive_override_relationship_between_active_nodes_does_not_substitute () {
   let active : ActiveSkgRepoSet =
     restricted_to ( &["owned", "foreign"] );
   let mut overrider : Graphnode =
@@ -194,7 +194,7 @@ fn a_chain_of_two_resolves_transitively_with_path () {
       cycle          : vec![], } ); }
 
 #[test]
-fn inactive_overrider_home_stops_a_chain_at_that_edge () {
+fn inactive_overrider_home_stops_a_chain_at_that_relationship () {
   let active : ActiveSkgRepoSet =
     // y's repo 'owned2' is inactive; x's skgrepo 'owned' is active.
     restricted_to ( &["owned", "foreign"] );
@@ -228,7 +228,7 @@ fn a_cycle_is_detected_and_substitutes_nothing () {
       cycle          : vec![ ID::from ("a"), ID::from ("b") ], } ); }
 
 #[test]
-fn extra_id_input_and_extra_id_edge_both_resolve () {
+fn extra_id_input_and_extra_id_relationship_both_resolve () {
   let mut target : Graphnode =
     node ("target", "foreign", &[]);
   target . extra_ids = vec![ ID::from ("target-extra") ];

@@ -274,7 +274,7 @@ fn explicit_skgrepo_more_public_than_floor_is_rejected (
 }
 
 #[test]
-fn explicit_relRepo_moves_a_sticky_edge_to_its_default (
+fn explicit_relRepo_moves_a_sticky_relationship_to_its_default (
 ) {
   // The BUG-and-fix_make-edge-more-public.org fix: an explicit
   // relRepo validates against the DEFAULT floor, not the disk relRepo,
@@ -297,7 +297,7 @@ fn explicit_relRepo_moves_a_sticky_edge_to_its_default (
     apply_sticky_relRepos_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
   assert_eq! ( resolved . contains, vec! [
     pm ("public", "child") ],
-    "an explicit repo AT the default lowers the sticky edge's privacy" );
+    "an explicit repo AT the default lowers the sticky relationship's privacy" );
 }
 
 #[test]
@@ -390,11 +390,11 @@ fn explicit_at_a_more_public_than_default_disk_skgrepo_round_trips (
       apply_sticky_relRepos_in_graph (
         buffer, &disk, &explicit, &graph, &config ) . unwrap ();
     assert_eq! ( resolved . contains, vec! [ pm ("trusted", "child") ],
-      "making a legacy more-public edge more private is accepted" ); }
+      "making a legacy more-public relationship more private is accepted" ); }
 }
 
 #[test]
-fn explicit_lowering_moves_the_edge_between_section_files (
+fn explicit_lowering_moves_the_relationship_between_section_files (
 ) {
   // The repro from BUG-and-fix_make-edge-more-public.org, as files:
   // a child once homed in "private" was moved home to "trusted",
@@ -421,7 +421,7 @@ fn explicit_lowering_moves_the_edge_between_section_files (
   let trusted_file = tmp . path () . join ("trusted/recorder.skg");
   let public_file  = tmp . path () . join ("public/recorder.skg");
   assert! ( private_file . is_file (),
-            "before: the stuck edge lives in the private section" );
+            "before: the stuck relationship lives in the private section" );
   assert! ( public_file . is_file (),
             "before: the home section exists" );
   assert! ( ! trusted_file . is_file (),
@@ -439,7 +439,7 @@ fn explicit_lowering_moves_the_edge_between_section_files (
   assert! ( ! private_file . is_file (),
             "after: the emptied private section is deleted" );
   assert! ( trusted_file . is_file (),
-            "after: the edge's new section exists" );
+            "after: the relationship's new section exists" );
   assert! ( std::fs::read_to_string (&trusted_file) . unwrap ()
             . contains ("child"),
             "after: the trusted section holds the membership" );
@@ -449,7 +449,7 @@ fn explicit_lowering_moves_the_edge_between_section_files (
 }
 
 #[test]
-fn same_save_child_home_move_allows_publicizing_its_parent_edge (
+fn same_save_child_home_move_allows_publicizing_its_parent_relationship (
 ) {
   // A skgrepo move and its parent's explicit relRepo request occur in one
   // save. The parent must calculate the relationship default from the child's NEW
@@ -470,7 +470,7 @@ fn same_save_child_home_move_allows_publicizing_its_parent_edge (
 
   let planned = build_diskSupplemented_nodeInstructions (
     vec! [ parent_intent, child_intent ], &graph, &config, None )
-    . expect ("the same-save home move makes public the edge's default");
+    . expect ("the same-save home move makes public the relationship's default");
   let parent = planned . instructions . into_iter ()
     .find_map ( |instruction| match instruction {
       NodeInstruction::Save (SaveNode (node)) if node . pid == ID::new ("parent")
@@ -516,7 +516,7 @@ fn same_save_hidden_node_home_move_sets_the_new_hide_skgrepo (
 }
 
 #[test]
-fn new_private_child_in_the_same_save_gets_a_private_edge (
+fn new_private_child_in_the_same_save_gets_a_private_relationship (
 ) {
   // The child is absent from the pre-save graph, so its Save intent is the
   // only available skgrepo of its home. Falling back to the public parent's
@@ -546,7 +546,7 @@ fn new_private_child_in_the_same_save_gets_a_private_edge (
 }
 
 #[test]
-fn owned_to_foreign_new_edges_default_to_the_recorder_home (
+fn owned_to_foreign_new_relationships_default_to_the_recorder_home (
 ) {
   for relation in ["contains", "subscribesTo", "overrides"] {
     for (recorder_home, member_home) in

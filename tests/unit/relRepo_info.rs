@@ -72,7 +72,7 @@ fn default_is_more_private_of_homes_and_current_is_the_relRepo (
 }
 
 #[test]
-fn current_is_none_for_an_unrecorded_edge (
+fn current_is_none_for_an_unrecorded_relationship (
 ) {
   // E.g. a relationship just typed into a buffer and not yet saved: the
   // default is still computable from the homes.

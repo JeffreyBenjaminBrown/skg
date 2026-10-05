@@ -447,7 +447,7 @@ mod relationship_default_tests {
   use std::path::PathBuf;
 
   #[test]
-  fn owned_to_foreign_recorder_home_edge_has_no_override_herald () {
+  fn owned_to_foreign_recorder_home_relationship_has_no_override_herald () {
     let mut config : SkgConfig = {
       let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
         HashMap::new ();

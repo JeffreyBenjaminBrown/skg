@@ -42,7 +42,7 @@ fn node (
   node
 }
 
-fn changed_edge_fixture (
+fn changed_relationship_fixture (
   unrelated_count : usize,
 ) -> (InRustGraph, InRustGraph, Vec<NodeInstruction>, GraphChangeSet) {
   let mut old_recorder : Graphnode = node ("recorder");
@@ -301,7 +301,7 @@ fn identity_lookup_work_does_not_grow_with_the_base_graph () {
 
 #[test]
 fn local_index_check_catches_an_omitted_removal () {
-  let (base, mut candidate, nodeInstructions, changes) = changed_edge_fixture (0);
+  let (base, mut candidate, nodeInstructions, changes) = changed_relationship_fixture (0);
   add_membership (&mut candidate . contained_by, "old", "recorder");
   let report : LocalIndexValidation = validate_local_internal_indexes (
     &base, &candidate, &nodeInstructions, &changes);
@@ -311,7 +311,7 @@ fn local_index_check_catches_an_omitted_removal () {
 
 #[test]
 fn local_index_check_catches_an_omitted_insertion () {
-  let (base, mut candidate, nodeInstructions, changes) = changed_edge_fixture (0);
+  let (base, mut candidate, nodeInstructions, changes) = changed_relationship_fixture (0);
   candidate . contained_by . remove (&ID::from ("new"));
   let report : LocalIndexValidation = validate_local_internal_indexes (
     &base, &candidate, &nodeInstructions, &changes);
@@ -347,7 +347,7 @@ fn local_index_check_catches_an_omitted_canonical_migration () {
 
 #[test]
 fn local_index_check_catches_an_empty_key_left_behind () {
-  let (base, mut candidate, nodeInstructions, changes) = changed_edge_fixture (0);
+  let (base, mut candidate, nodeInstructions, changes) = changed_relationship_fixture (0);
   candidate . contained_by . insert (
     ID::from ("old"), im::HashSet::new ());
   let report : LocalIndexValidation = validate_local_internal_indexes (
@@ -359,9 +359,9 @@ fn local_index_check_catches_an_empty_key_left_behind () {
 #[test]
 fn local_index_check_work_does_not_grow_with_unrelated_nodes () {
   let (small_base, small_candidate, small_nodeInstructions, small_changes) =
-    changed_edge_fixture (0);
+    changed_relationship_fixture (0);
   let (large_base, large_candidate, large_nodeInstructions, large_changes) =
-    changed_edge_fixture (1_000);
+    changed_relationship_fixture (1_000);
   let small : LocalIndexValidation = validate_local_internal_indexes (
     &small_base, &small_candidate, &small_nodeInstructions, &small_changes);
   let large : LocalIndexValidation = validate_local_internal_indexes (

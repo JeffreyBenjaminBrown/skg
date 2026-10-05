@@ -17,9 +17,9 @@ With a prefix argument RECURSIVE, instead run
 relationship kind and a repo and applies the repo throughout the
 subtree at point.
 
-The headline at point represents one edge: `contains' for a content
+The headline at point represents one relationship: `contains' for a content
 child, the folder's relation for a writable PartnerFolder member. This
-command asks the server for the edge's DEFAULT repo and its CURRENT
+command asks the server for the relationship's DEFAULT repo and its CURRENT
 repo, then
 prompts -- with both tab-completion and S-left/S-right cycling,
 like the other repo dialogs -- over the repos at least as
@@ -30,27 +30,27 @@ offerable, else the current relRepo or default, so RET preserves the
 most specific available choice.
 
 Choosing a repo writes an `(editRequest (relRepo REPO))'
-metadata request. The no-override choice removes that request, which on save means the edge
+metadata request. The no-override choice removes that request, which on save means the relationship
 keeps its saved repo (sticky), NOT that it resets to its default.
-To lower an edge's privacy to its default (e.g. after making the
+To lower an relationship's privacy to its default (e.g. after making the
 more private endpoint's home more public), choose the default relRepo
 itself; once saved at the default, the display fact and its red ~herald
 stop being rendered.
 
-Refuses on write-protected folder members (the edge belongs to the other
-end) and on root headlines (no edge). Like other metadata edits,
+Refuses on write-protected folder members (the relationship belongs to the other
+end) and on root headlines (no relationship). Like other metadata edits,
 this only modifies the buffer; it does NOT save. Call
 `skg-request-save-buffer' afterward. The server re-validates at
 save time, so a stale or hand-typed repo more public than the
-edge's default is still rejected there."
+relationship's default is still rejected there."
   (interactive "P")
   (if recursive
       (skg-set-relRepo-recursive)
     (skg--set-relRepo-at-point)))
 
 (defun skg--set-relRepo-at-point ()
-  "The single-edge path of `skg-set-relRepo': classify
-the edge at point, ask the server for its (default, current) repos,
+  "The single-relationship path of `skg-set-relRepo': classify
+the relationship at point, ask the server for its (default, current) repos,
 and prompt from the reply."
   (let ((buffer (current-buffer))
         (marker (point-marker)))
@@ -69,7 +69,7 @@ and prompt from the reply."
                    (if current
                        (format " (current %S)" current)
                      ""))))
-      (let ((edge (skg--rel-at-point)))
+      (let ((relationship (skg--rel-at-point)))
         (skg-register-response-handler
          'relRepo-info
          (lambda (_tcp-proc payload)
@@ -81,9 +81,9 @@ and prompt from the reply."
          (concat
           (prin1-to-string
            `((request . "relRepo info")
-             (owner . ,(plist-get edge :owner))
-             (member . ,(plist-get edge :member))
-             (relation . ,(plist-get edge :relation))))
+             (owner . ,(plist-get relationship :owner))
+             (member . ,(plist-get relationship :member))
+             (relation . ,(plist-get relationship :relation))))
           "\n"))))))
 
 (defun skg--set-relRepo-from-info (buffer marker payload)

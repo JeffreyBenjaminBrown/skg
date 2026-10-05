@@ -381,7 +381,7 @@ impl InRustGraph {
       . filter_map ( |member| self . pid_of (member) )
       . collect () }
 
-  /// Inbound partners whose EDGES to this node are visible at the
+  /// Inbound partners whose RELATIONSHIPS to this node are visible at the
   /// active set (see 'relRepo'). Pass None for all of them.
   pub fn inbound_pids_for_relation_gated (
     &self,
@@ -444,7 +444,7 @@ impl InRustGraph {
     self . other_member_pids_gated (pid, role, None) }
 
   /// 'other_member_pids' with relRepo gating: partners whose
-  /// EDGE is above the active prefix are omitted, in both
+  /// RELATIONSHIP is above the active prefix are omitted, in both
   /// directions (see 'relRepo').
   pub fn other_member_pids_gated (
     &self,

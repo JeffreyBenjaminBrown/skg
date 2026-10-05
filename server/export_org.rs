@@ -475,7 +475,7 @@ fn collect_events (
     // pop (and thus render) in forward order.
     let mut kids : Vec<ID> = Vec::new ();
     for member in node . contains . iter () {
-      if ! relRepo_is_active (member, active) { continue; } // the EDGE's
+      if ! relRepo_is_active (member, active) { continue; } // the RELATIONSHIP's
         // skgrepo is inactive: the visible composition omits it, even when
         // the child's home is active.
       let cpid : ID = resolve_pid (&member . member, alias_to_pid);
@@ -746,7 +746,7 @@ fn node_active (
 ) -> bool {
   active . is_all () || active . contains_skgrepo (&node . home_skgrepo) }
 
-/// Whether an EDGE is visible under the active set: its recorded
+/// Whether an RELATIONSHIP is visible under the active set: its recorded
 /// relRepo must be active. (The visible composition = active
 /// sections' lists only.)
 fn relRepo_is_active (

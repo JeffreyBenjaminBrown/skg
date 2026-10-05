@@ -86,7 +86,7 @@ fn repeated_skgids_of_one_recorder_are_normalized_not_rejected () {
 }
 
 #[test]
-fn unknown_home_is_hard_but_edge_provenance_is_a_warning () {
+fn unknown_home_is_hard_but_relationship_provenance_is_a_warning () {
   let mut recorder = node ("recorder", "public");
   recorder . contains = vec![
     RelPartner::at_relRepo (

@@ -76,10 +76,10 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
     : ( MapToContent, MapToContainers )
     = content_maps_from_nodes (&nodes);
   let maps_time : f64 = t4 . elapsed () . as_secs_f64 ();
-  let edge_count : usize =
+  let relationship_count : usize =
     contains_map . values () . map ( |v| v . len () ) . sum ();
-  println! ("2d. contains_maps ({} containers, {} edges): {:.6}s",
-            contains_map . len (), edge_count, maps_time);
+  println! ("2d. contains_maps ({} containers, {} relationships): {:.6}s",
+            contains_map . len (), relationship_count, maps_time);
 
   let extract_total : f64 =
     had_time + ids_time + links_time + maps_time;

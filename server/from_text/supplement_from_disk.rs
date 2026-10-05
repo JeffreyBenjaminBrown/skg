@@ -425,11 +425,11 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
         if config . is_strictly_more_public (skgrepo, &floor) {
           Err ( format! (
             "Cannot save {} (relation '{}'): member '{}' requested \
-             repo '{}', but this edge's floor is '{}'. An edge's \
+             repo '{}', but this relationship's floor is '{}'. An relationship's \
              privacy can never move more public than its applicable \
              default, nor more public than its current relRepo when \
              that repo already precedes the default. To publicize \
-             the edge further, first \
+             the relationship further, first \
              publicize the more private endpoint's home.",
             recorder_pid, relation_label, member, skgrepo, floor ))
         } else { Ok ( skgrepo . clone () ) } },

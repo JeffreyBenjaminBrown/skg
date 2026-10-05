@@ -87,10 +87,10 @@ pub fn compute_and_store_prominence_sources (
   map_to_containers   : &MapToContainers,
 ) -> Result<HashMap<ID, String>, Box<dyn Error>> {
   tracing::info! ("Computing prominence sources...");
-  let edge_count : usize =
+  let relationship_count : usize =
     map_to_content . values () . map ( |v| v . len () ) . sum ();
-  tracing::info! ("  {} nodes, {} edges, {} mentioned nodes.",
-            all_node_skgids . len (), edge_count, mentioned_skgids . len ());
+  tracing::info! ("  {} nodes, {} relationships, {} mentioned nodes.",
+            all_node_skgids . len (), relationship_count, mentioned_skgids . len ());
   let mut prominence_sources : HashMap<ID, ProminenceSource> =
     identify_origins (
       all_node_skgids, map_to_containers, mentioned_skgids, had_id_set );

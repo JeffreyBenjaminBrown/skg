@@ -312,7 +312,7 @@ fn marker_child_is_excluded_from_content () {
 //
 
 #[test]
-fn private_skgrepo_edge_is_omitted_from_restricted_export () {
+fn private_skgrepo_relationship_is_omitted_from_restricted_export () {
   // Root and both children live in "main", but the relationship to "priv"
   // is RECORDED in skgrepo "private". A main-only export renders the
   // visible composition: "pub" appears, "priv" does not -- even though
@@ -340,7 +340,7 @@ fn private_skgrepo_edge_is_omitted_from_restricted_export () {
     fs::read_to_string ( dir . path () . join ("r.org") ) . unwrap ();
   assert! ( content . contains ("Public child"), "{}", content );
   assert! ( ! content . contains ("Private child"),
-            "an edge from a private repo leaked into a main-only export:\n{}",
+            "an relationship from a private repo leaked into a main-only export:\n{}",
             content );
   { // Under "all", both children render.
     let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();

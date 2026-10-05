@@ -472,7 +472,7 @@ pub fn prepend_writeProtected_indep_child_with_skgrepo_set (
       { if ! active . contains_skgrepo (&skgrepo)
         { return Ok (None); }} }
     // relRepo gating (render-and-gating, 5_plan.org): the partner
-    // NODE's skgrepo (above) is not enough -- the EDGE grafting it
+    // NODE's skgrepo (above) is not enough -- the RELATIONSHIP grafting it
     // here can be recorded in a more private skgrepo than either
     // endpoint's home (a private reading-list membership between two
     // public nodes). 'birth' names the role the partner plays toward

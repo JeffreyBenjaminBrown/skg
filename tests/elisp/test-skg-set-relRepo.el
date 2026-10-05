@@ -67,7 +67,7 @@ skg-config-dir is set and `skg--repo-names' works."
 ;; --- Relationship classification: skg--rel-at-point ---
 
 (ert-deftest test-rel-content-child ()
-  "A content child's edge: recorder = viewparent, relation = contains."
+  "A content child's relationship: recorder = viewparent, relation = contains."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id recorder) (repo public))) recorder\n"
@@ -82,7 +82,7 @@ skg-config-dir is set and `skg--repo-names' works."
                       :relation "contains"))))))
 
 (ert-deftest test-rel-writable-folder-member ()
-  "A subscribeeFolder member's edge: recorder = the folder's ANCHOR (its
+  "A subscribeeFolder member's relationship: recorder = the folder's ANCHOR (its
 viewparent), relation = the folder's relation."
   (test--with-skg-content-view
    (concat
@@ -116,7 +116,7 @@ viewparent), relation = the folder's relation."
        (should (string-match-p "subscriberFolder" (cadr err)))))))
 
 (ert-deftest test-rel-refuses-on-root ()
-  "Refuses on a root headline: with no viewparent there is no edge."
+  "Refuses on a root headline: with no viewparent there is no relationship."
   (test--with-skg-content-view
    "* (skg (node (id x) (repo public))) x\n"
    test--config-public-private-trusted
@@ -275,7 +275,7 @@ the displayed relRepo fact; its message says the SAVED skgrepo survives
      (should-not (string-match-p "relRepo" (test--buffer-line 2))))))
 
 (ert-deftest test-alias-command-derives-default-locally ()
-  "The alias gesture uses its owning node's home without an edge-info request."
+  "The alias gesture uses its owning node's home without an relationship-info request."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id recorder) (repo private))) recorder\n"
@@ -294,7 +294,7 @@ the displayed relRepo fact; its message says the SAVED skgrepo survives
                     "trusted"))
                  ((symbol-function 'process-send-string)
                   (lambda (&rest _)
-                    (ert-fail "alias command must not contact edge endpoint"))))
+                    (ert-fail "alias command must not contact relationship endpoint"))))
          (skg--set-relRepo-at-point))
        (should (equal seen-choices
                       (list "private" "trusted"
@@ -422,7 +422,7 @@ aliasFolder.")
 
 (ert-deftest test-recursive-walk-content ()
   "Kind `content' hits true content children of definitive
-activeNode parents only: the root's own (na) edge is skipped, the
+activeNode parents only: the root's own (na) relationship is skipped, the
 false branch and everything below the write-protected node and the
 subscribee-as-such member are pruned, and folder members are untouched."
   (test--with-skg-content-view
@@ -457,9 +457,9 @@ children and subscribee-as-such content untouched."
          (should-not (string-match-p "relRepo"
                                      (test--line-of-id skgid))))))))
 
-(ert-deftest test-recursive-walk-root-edge-inclusive ()
+(ert-deftest test-recursive-walk-root-relationship-inclusive ()
   "Starting the walk below the view root includes the start node's
-own edge to its view-parent."
+own relationship to its view-parent."
   (test--with-skg-content-view
    test--recursive-content-tree
    test--config-public-private-trusted
@@ -643,9 +643,9 @@ window plumbing are stubbed as in the other handler tests."
          (when (get-buffer "*skg-relationship-kinds*")
            (kill-buffer "*skg-relationship-kinds*")))))))
 
-;; --- set-repo stuck-edge offer and write-protected warning ---
+;; --- set-repo stuck-relationship offer and write-protected warning ---
 ;; (Here rather than in test-skg-metadata.el because these need the
-;; config harness: the stuck-edge analysis reads the privacy ladder.
+;; config harness: the stuck-relationship analysis reads the privacy ladder.
 ;; In test--config-public-private-trusted the order is public,
 ;; private, trusted -- so private -> public publicizes.)
 
@@ -659,8 +659,8 @@ window plumbing are stubbed as in the other handler tests."
                  nil)))
       (cons (funcall fn) (nreverse messages)))))
 
-(ert-deftest test-set-repo-recursive-offers-stuck-edge-fix ()
-  "A publicizing recursive move detects the content edges it would
+(ert-deftest test-set-repo-recursive-offers-stuck-relationship-fix ()
+  "A publicizing recursive move detects the content relationships it would
 leave behind, and on acceptance writes (relRepo NEW) atoms on them."
   (test--with-skg-content-view
    (concat
@@ -691,7 +691,7 @@ leave behind, and on acceptance writes (relRepo NEW) atoms on them."
                                    (test--line-of-id "r")))))))
 
 (ert-deftest test-set-repo-recursive-decline-mentions-recursive-relrepo ()
-  "Declining the stuck-edge offer leaves the edges alone and points
+  "Declining the stuck-relationship offer leaves the relationships alone and points
 at C-c s R."
   (test--with-skg-content-view
    (concat
@@ -711,7 +711,7 @@ at C-c s R."
      (should-not (string-match-p "relRepo" (test--line-of-id "a"))))))
 
 (ert-deftest test-set-repo-recursive-no-offer-when-privatizing ()
-  "A privatizing move strands nothing (edges rise automatically), so
+  "A privatizing move strands nothing (relationships rise automatically), so
 no offer is made."
   (test--with-skg-content-view
    (concat
@@ -724,14 +724,14 @@ no offer is made."
                 (lambda (_current) "trusted"))
                ((symbol-function 'y-or-n-p)
                 (lambda (_prompt)
-                  (error "Should not offer a stuck-edge fix"))))
+                  (error "Should not offer a stuck-relationship fix"))))
        (test--messages-during (lambda () (skg-set-repo t))))
      (should (string-match-p "(repo trusted)" (test--line-of-id "a")))
      (should-not (string-match-p "relRepo" (test--line-of-id "a"))))))
 
 (ert-deftest test-set-repo-recursive-warns-about-write-protected ()
   "A write-protected matching instance is NOT edited; its ID goes to
-*Messages* and the summary carries a loud WARNING. Edges touching
+*Messages* and the summary carries a loud WARNING. Relationships touching
 it are not offered (they cannot actually publicize)."
   (test--with-skg-content-view
    (concat
@@ -745,7 +745,7 @@ it are not offered (they cannot actually publicize)."
                 (lambda (_current) "public"))
                ((symbol-function 'y-or-n-p)
                 (lambda (_prompt)
-                  (error "Should not offer: both edges touch the write-protected node"))))
+                  (error "Should not offer: both relationships touch the write-protected node"))))
        (let ((msgs (cdr (test--messages-during
                          (lambda () (skg-set-repo t))))))
          (should (seq-find (lambda (m)
@@ -761,8 +761,8 @@ it are not offered (they cannot actually publicize)."
        (should (string-match-p "(repo public)"
                                (test--line-of-id skgid)))))))
 
-(ert-deftest test-set-repo-single-publicizes-a-public-parents-child-edge ()
-  "Moving a private child into public offers its public parent's edge too."
+(ert-deftest test-set-repo-single-publicizes-a-public-parents-child-relationship ()
+  "Moving a private child into public offers its public parent's relationship too."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id parent) (repo public))) parent\n"
@@ -783,9 +783,9 @@ it are not offered (they cannot actually publicize)."
      (should (string-match-p "(relRepo public)"
                              (test--line-of-id "child"))))))
 
-(ert-deftest test-set-repo-single-offers-direct-child-edges ()
-  "A single (non-recursive) publicizing move offers only the edges it
-actually changes: its direct children's inbound edges whose default
+(ert-deftest test-set-repo-single-offers-direct-child-relationships ()
+  "A single (non-recursive) publicizing move offers only the relationships it
+actually changes: its direct children's inbound relationships whose default
 rises. A child still more private than the new repo is left alone."
   (test--with-skg-content-view
    (concat

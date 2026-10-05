@@ -494,28 +494,28 @@ impl GraphFacts {
       for contained in &contains_skgids {
         if ambiguous_pids . contains (contained) {
           continue; }
-        facts . add_edge ("content", &node . pid, contained);
-        facts . add_edge ("container", contained, &node . pid); }
+        facts . add_relationship ("content", &node . pid, contained);
+        facts . add_relationship ("container", contained, &node . pid); }
       for subscribee in members_msv (&node . subscribesTo) . or_default () {
         if ambiguous_pids . contains (subscribee) {
           continue; }
-        facts . add_edge ("subscriber", &node . pid, subscribee);
-        facts . add_edge ("subscribee", subscribee, &node . pid); }
+        facts . add_relationship ("subscriber", &node . pid, subscribee);
+        facts . add_relationship ("subscribee", subscribee, &node . pid); }
       for hidden in members_msv (&node . hidesFromSubs) . or_default () {
         if ambiguous_pids . contains (hidden) {
           continue; }
-        facts . add_edge ("hider", &node . pid, hidden);
-        facts . add_edge ("hidden", hidden, &node . pid); }
+        facts . add_relationship ("hider", &node . pid, hidden);
+        facts . add_relationship ("hidden", hidden, &node . pid); }
       for overridden in members_msv (&node . overrides) . or_default () {
         if ambiguous_pids . contains (overridden) {
           continue; }
-        facts . add_edge ("overrider", &node . pid, overridden);
-        facts . add_edge ("overridden", overridden, &node . pid); }
+        facts . add_relationship ("overrider", &node . pid, overridden);
+        facts . add_relationship ("overridden", overridden, &node . pid); }
       for link in links_from_node (node) {
         if ambiguous_pids . contains (&link . skgid) {
           continue; }
-        facts . add_edge ("mentioner", &node . pid, &link . skgid);
-        facts . add_edge ("mentioned", &link . skgid, &node . pid); } }
+        facts . add_relationship ("mentioner", &node . pid, &link . skgid);
+        facts . add_relationship ("mentioned", &link . skgid, &node . pid); } }
     facts
   }
 
@@ -561,41 +561,41 @@ impl GraphFacts {
         if ambiguous_pids . contains (contained) {
           continue; }
         if track_outbound {
-          facts . add_edge ("content", &node . pid, contained); }
+          facts . add_relationship ("content", &node . pid, contained); }
         if tracked_pids . contains (contained) {
-          facts . add_edge ("container", contained, &node . pid); }}
+          facts . add_relationship ("container", contained, &node . pid); }}
       for subscribee in members_msv (&node . subscribesTo) . or_default () {
         if ambiguous_pids . contains (subscribee) {
           continue; }
         if track_outbound {
-          facts . add_edge ("subscriber", &node . pid, subscribee); }
+          facts . add_relationship ("subscriber", &node . pid, subscribee); }
         if tracked_pids . contains (subscribee) {
-          facts . add_edge ("subscribee", subscribee, &node . pid); }}
+          facts . add_relationship ("subscribee", subscribee, &node . pid); }}
       for hidden in members_msv (&node . hidesFromSubs) . or_default () {
         if ambiguous_pids . contains (hidden) {
           continue; }
         if track_outbound {
-          facts . add_edge ("hider", &node . pid, hidden); }
+          facts . add_relationship ("hider", &node . pid, hidden); }
         if tracked_pids . contains (hidden) {
-          facts . add_edge ("hidden", hidden, &node . pid); }}
+          facts . add_relationship ("hidden", hidden, &node . pid); }}
       for overridden in members_msv (&node . overrides) . or_default () {
         if ambiguous_pids . contains (overridden) {
           continue; }
         if track_outbound {
-          facts . add_edge ("overrider", &node . pid, overridden); }
+          facts . add_relationship ("overrider", &node . pid, overridden); }
         if tracked_pids . contains (overridden) {
-          facts . add_edge ("overridden", overridden, &node . pid); }}
+          facts . add_relationship ("overridden", overridden, &node . pid); }}
       for link in links_from_node (node) {
         if ambiguous_pids . contains (&link . skgid) {
           continue; }
         if track_outbound {
-          facts . add_edge ("mentioner", &node . pid, &link . skgid); }
+          facts . add_relationship ("mentioner", &node . pid, &link . skgid); }
         if tracked_pids . contains (&link . skgid) {
-          facts . add_edge ("mentioned", &link . skgid, &node . pid); }}}
+          facts . add_relationship ("mentioned", &link . skgid, &node . pid); }}}
     facts
   }
 
-  fn add_edge (
+  fn add_relationship (
     &mut self,
     role : &'static str,
     from : &ID,

@@ -141,7 +141,7 @@ On a headline that has no metadata yet, instead populates it minimally
 via `skg--populate-minimal-node-metadata' (RECURSIVE is then moot).
 
 When the move would leave content relationships stuck at their old,
-more private repos (the sticky rule never lowers an edge's privacy
+more private repos (the sticky rule never lowers an relationship's privacy
 without an explicit gesture; see
 TODO/DONE/MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org),
 offers to publicize them in the same go by writing
@@ -164,7 +164,7 @@ Does NOT save; call `skg-request-save-buffer' afterward."
         (skg--validate-repo-name new-skgrepo)
         (if (string= current-skgrepo new-skgrepo)
             (message "Repo unchanged: %s" current-skgrepo)
-          (skg--set-repo-and-handle-stuck-edges
+          (skg--set-repo-and-handle-stuck-relationships
            current-skgrepo new-skgrepo recursive))))))
 
 (defun skg-set-repo-recursive ()
@@ -176,14 +176,14 @@ Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive)
   (skg-set-repo t))
 
-(defun skg--set-repo-and-handle-stuck-edges (old-skgrepo new-skgrepo recursive)
+(defun skg--set-repo-and-handle-stuck-relationships (old-skgrepo new-skgrepo recursive)
   "The body of `skg-set-repo' once a real move is requested:
-analyze which content edges the move would leave stuck at more
+analyze which content relationships the move would leave stuck at more
 private repos, retarget the repos (skipping write-protected
-occurrences), offer to publicize the stuck edges in the same go, and
+occurrences), offer to publicize the stuck relationships in the same go, and
 report -- loudly, when write-protected occurrences were skipped."
   (let* ((stuck ;; analyzed BEFORE any rewrite: it needs the old skgrepos
-          (skg--analyze-move-stuck-edges old-skgrepo new-skgrepo recursive))
+          (skg--analyze-move-stuck-relationships old-skgrepo new-skgrepo recursive))
          (change-result (if recursive
                             (skg--change-repo-recursive old-skgrepo
                                                           new-skgrepo)
@@ -218,18 +218,18 @@ report -- loudly, when write-protected occurrences were skipped."
                         (length write-protected-skgids)
                         (if (= (length write-protected-skgids) 1) "" "s")))))))
 
-(defun skg--analyze-move-stuck-edges (old-skgrepo new-skgrepo recursive)
+(defun skg--analyze-move-stuck-relationships (old-skgrepo new-skgrepo recursive)
   "With point on the node a `skg-set-repo' move starts from, and
-BEFORE any repo is rewritten: return the true content edges
+BEFORE any repo is rewritten: return the true content relationships
 the move would leave stuck in a more private repo than their new
 default, as a list of (MARKER . REPO) -- MARKER at the child
-headline, REPO the edge's new default. Only edges without an
-existing `(relRepo ...)' atom qualify: an atom-carrying edge was
+headline, REPO the relationship's new default. Only relationships without an
+existing `(relRepo ...)' atom qualify: an atom-carrying relationship was
 already assigned a deliberate relRepo. The walk's root itself is always
 retargeted (unless write-protected); its viewparent lies outside the
 move, so its repo counts as unchanging. With RECURSIVE nil only
-the point node moves, so only its own edge and its direct
-children's edges are examined."
+the point node moves, so only its own relationship and its direct
+children's relationships are examined."
   (save-excursion
     (let* ((stuck '())
            (start-level (org-outline-level))
@@ -251,7 +251,7 @@ children's edges are examined."
                                        (equal skgrepo old-skgrepo))
                                   new-skgrepo
                                 skgrepo)))
-                       (skgrepo (skg--content-edge-stuck-repo
+                       (skgrepo (skg--content-relationship-stuck-repo
                                parent-skgrepo
                                (funcall eff parent-skgrepo
                                         parent-retargets-p)
@@ -278,15 +278,15 @@ children's edges are examined."
             (outline-next-heading))))
       (nreverse stuck))))
 
-(defun skg--content-edge-stuck-repo (parent-eff-old parent-eff-new
+(defun skg--content-relationship-stuck-repo (parent-eff-old parent-eff-new
                                       child-eff-old child-eff-new)
-  "The repo to which the content edge at point (from its view-parent
+  "The repo to which the content relationship at point (from its view-parent
 to the headline at point) should be publicized after a repo move,
-or nil when the move does not strand it: nil when the edge carries
+or nil when the move does not strand it: nil when the relationship carries
 an explicit `(editRequest (relRepo ...))' request (deliberately
 repo-specified), when a
 default cannot be computed (a repo unknown to the config -- the
-save validates anyway), or when the edge's default does not become
+save validates anyway), or when the relationship's default does not become
 more public. The four arguments are the endpoints' repos before
 and after the move."
   (unless (skg--relRepo-requested-value)
@@ -348,26 +348,26 @@ request is unsupported from this side.  HiddenOutside membership is
 editable as a derived filter, but hide repos are still derived and
 cannot carry this request.
 `skg-set-relRepo' refuses on a member of one of these:
-the edge belongs to the other end, so setting its repo here would
+the relationship belongs to the other end, so setting its repo here would
 be meaningless.")
 
 (defconst skg--writable-folder-relations
   '((subscribeeFolder . "subscribesTo")
     (overriddenFolder . "overrides"))
-  "The PartnerFolder atoms whose members' edges are WRITABLE
+  "The PartnerFolder atoms whose members' relationships are WRITABLE
 from this side, each mapped to its relation's wire name
 (NodeRelation::relation_name, server/dbs/in_rust_graph/
 relation_accessors.rs). The folder's viewparent (the anchor) owns the
-outbound edge to each member.")
+outbound relationship to each member.")
 
 (defun skg--rel-at-point ()
-  "Classify the relationship edge the headline at point represents.
+  "Classify the relationship relationship the headline at point represents.
 Returns a plist (:recorder RECORDER-ID :member MEMBER-ID :relation NAME):
 for a content child, the viewparent contains the node at point; for
 a writable-folder member, the folder's anchor (the folder's viewparent) owns
 the folder's relation toward the node at point. Signals `user-error'
-when point represents no writable edge: not on an activeNode or Unknown
-headline, on a root headline (no viewparent, so no edge), on a
+when point represents no writable relationship: not on an activeNode or Unknown
+headline, on a root headline (no viewparent, so no relationship), on a
 member of a write-protected folder, or with an ID missing."
   (unless (org-at-heading-p)
     (user-error "Not on a headline"))
@@ -383,7 +383,7 @@ member of a write-protected folder, or with an ID missing."
         (user-error "No id in this headline's metadata"))
       (unless parent-sexp
         (user-error
-         "Root headline: there is no relationship edge here to set"))
+         "Root headline: there is no relationship relationship here to set"))
       (let ((write-protected-atom
              (and (consp parent-sexp)
                   (seq-find (lambda (atom)
@@ -474,16 +474,16 @@ server's save-time floor check backstops any stale offer)."
 (defconst skg--relRepo-no-override
   "(no override: follow sticky-else-default)"
   "The menu entry that REMOVES the pending `(editRequest (relRepo ...))' request instead of
-setting one. For an edge already on disk this means the SAVED repo
+setting one. For an relationship already on disk this means the SAVED repo
 survives (sticky); it does NOT mean \"reset to the default\". To
-lower an edge's privacy to its default, choose the default relRepo
+lower an relationship's privacy to its default, choose the default relRepo
 explicitly.")
 
 (defun skg--apply-relRepo-choice (choice)
   "Apply CHOICE -- a repo name, or
 `skg--relRepo-no-override' -- to the headline at point.
 Edits only the buffer; returns a message string describing what the
-next save will do with the edge."
+next save will do with the relationship."
   (when (skg--node-edit-request-at-point-p)
     (user-error "Cannot request a relRepo where delete or merge is pending"))
   (if (equal choice skg--relRepo-no-override)
@@ -522,9 +522,9 @@ next save will do with the edge."
 
 (defconst skg--relationship-role-menu-prose
   '(("container" nil
-     "The node would CONTAIN its view-parent -- the shape of a containerward role graft. The edge belongs to the role role graft's own contains list, wherever that list is drawn definitively; it cannot be set from the role role graft's position.")
+     "The node would CONTAIN its view-parent -- the shape of a containerward role graft. The relationship belongs to the role role graft's own contains list, wherever that list is drawn definitively; it cannot be set from the role role graft's position.")
     ("content" content
-     "The view-parent contains the node: ordinary content. Sets the repo of each parent-contains-child edge.")
+     "The view-parent contains the node: ordinary content. Sets the repo of each parent-contains-child relationship.")
     ("mentioner" nil
      "Links are inferred from body text; they carry no false relRepo, so there is nothing to set.")
     ("mentioned" nil
@@ -546,9 +546,9 @@ next save will do with the edge."
 `skg-set-relRepo-recursive' shows it. ROLE-NAME is the role the
 VIEW-CHILD would play toward its view-parent. KIND-OR-NIL is the
 symbol the walk dispatches on (`content', `subscribee' or
-`overridden') for the three roles whose edge is writable from the
+`overridden') for the three roles whose relationship is writable from the
 child's buffer position, and nil for the rest; DESCRIPTION then
-explains why the edge cannot be set from that position.")
+explains why the relationship cannot be set from that position.")
 
 (defun skg--relationship-kind-menu-tree ()
   "The relationship-kind menu for `skg-set-relRepo-recursive': one
@@ -568,7 +568,7 @@ each ROLE an entry of `skg--relationship-role-menu-prose'."
 menu buffer, called with the chosen kind symbol.")
 
 (defun skg-set-relRepo-recursive ()
-  "Set the relRepo of every matching relationship edge in the
+  "Set the relRepo of every matching relationship relationship in the
 subtree at point.
 
 First presents an org-menu of the schema's five node-node relations
@@ -581,15 +581,15 @@ RET on any other role explains why it cannot be set from there.
 
 Then prompts for a repo over the whole ladder, plus the
 no-override choice that instead REMOVES existing `(relRepo ...)'
-atoms. Unlike `skg-set-relRepo', no per-edge default is
-fetched: the subtree's edges have different defaults, so the save's
+atoms. Unlike `skg-set-relRepo', no per-relationship default is
+fetched: the subtree's relationships have different defaults, so the save's
 floor check (see `apply_sticky_relRepos') is what validates each one.
 
-The walk starts at the node at point (inclusive: its own edge to
+The walk starts at the node at point (inclusive: its own relationship to
 its view-parent counts when it matches) and recurses only on
 viewchildren that affect their viewparents: affectsParent=true
 activeNodes and writable folders. It prunes below write-protected nodes
-and subscribee-as-such members (their viewchildren's edges are not
+and subscribee-as-such members (their viewchildren's relationships are not
 collected at save), and prunes write-protected folders and other non-vognodes
 entirely.
 
@@ -611,7 +611,7 @@ NOT save. Call `skg-request-save-buffer' afterward."
                   (choices (append ladder
                                    (list skg--relRepo-no-override)))
                   (choice (skg--completing-read-with-cycle
-                           (format "Repo for every '%s' edge in the subtree (S-left/right cycle; the save validates each edge's floor): "
+                           (format "Repo for every '%s' relationship in the subtree (S-left/right cycle; the save validates each relationship's floor): "
                                    kind)
                            choices nil t nil nil nil nil choices))
                   (count (skg--set-relRepo-recursive-walk
@@ -619,9 +619,9 @@ NOT save. Call `skg-request-save-buffer' afterward."
              (message "%s"
                       (if (equal choice
                                  skg--relRepo-no-override)
-                          (format "Override removed on %d '%s' edge%s: on save each keeps its saved (sticky) repo, or its default if new. Save to apply."
+                          (format "Override removed on %d '%s' relationship%s: on save each keeps its saved (sticky) repo, or its default if new. Save to apply."
                                   count kind (if (= count 1) "" "s"))
-                        (format "relRepo set to '%s' on %d '%s' edge%s. Save to apply."
+                        (format "relRepo set to '%s' on %d '%s' relationship%s. Save to apply."
                                 choice count kind
                                 (if (= count 1) "" "s")))))))))))
 
@@ -676,7 +676,7 @@ explains the refusal; q aborts."
      ((not role)
       (message "Pick a role: a level-2 headline"))
      ((not kind)
-      (user-error "Cannot set that kind of edge from the child's position: %s"
+      (user-error "Cannot set that kind of relationship from the child's position: %s"
                   refusal))
      (t
       (if (get-buffer-window) ;; nil in batch tests, where no window shows the menu
@@ -694,7 +694,7 @@ where edits still affect the graph: it prunes below write-protected
 nodes and subscribee-as-such members, prunes non-true
 (affectsParent=false) nodes -- except the walk's root, which the
 user chose deliberately -- and prunes non-vognodes other than the two
-writable folders. Returns the number of edges true."
+writable folders. Returns the number of relationships true."
   (let ((targets (skg--relRepo-recursive-targets kind)))
     ;; Do not let a late conflict leave earlier targets edited.  This
     ;; preflight is deliberately before the first metadata rewrite.
@@ -782,7 +782,7 @@ the matching writable folder with a definitive anchor."
 headline at point (with METADATA-SEXP its parsed metadata): an
 write-protected node's contains is not collected at save, and a
 subscribee-as-such member's viewchildren are hide/unhide signals,
-not writable edges."
+not writable relationships."
   (or (skg--node-write-protected-p metadata-sexp)
       (skg--subscribee-as-such-at-point-p)))
 

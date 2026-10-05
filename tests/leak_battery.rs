@@ -216,7 +216,7 @@ fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
       Ok (( )) } )) }
 
 #[test]
-fn default_subscribeeFolder_requires_an_active_subscription_edge (
+fn default_subscribeeFolder_requires_an_active_subscription_relationship (
 ) -> Result<(), Box<dyn Error>> {
   run_with_skgrepo_set_test_db (
     "skg-test-leak-battery-default-subscribee-folder",
@@ -272,7 +272,7 @@ fn ancestor_heralds_gate_privately_recorded_relations (
       // Buffer: C with child S. S subscribes to C, but that relationship is
       // recorded only in S's PRIVATE section, so the ancestor-flag
       // pass must not tint S's herald with the 'S' token at public.
-      // (Both nodes are individually public; the EDGE is what gates.)
+      // (Both nodes are individually public; the RELATIONSHIP is what gates.)
       let herald_of_S = | active : &ActiveSkgRepoSet |
       -> Result<Option<String>, Box<dyn Error>> {
         let mut viewforest : Tree<Viewnode> =
@@ -318,7 +318,7 @@ fn ancestor_heralds_gate_privately_recorded_relations (
       Ok (( )) } )) }
 
 #[test]
-fn a_lowered_edge_is_governed_by_its_new_level (
+fn a_lowered_relationship_is_governed_by_its_new_level (
 ) {
   // BUG-and-fix_make-edge-more-public.org: after the explicit
   // gesture lowers a relationship's privacy to its default, the gated
@@ -354,12 +354,12 @@ fn a_lowered_edge_is_governed_by_its_new_level (
   assert! ( graph . relation_membership_is_visible (
     & ID::from ("recorder"), & ID::from ("lowered"), member_role,
     Some (&public) ),
-    "an edge lowered to its default renders under the set that \
+    "an relationship lowered to its default renders under the set that \
      includes that default" );
   assert! ( ! graph . relation_membership_is_visible (
     & ID::from ("recorder"), & ID::from ("kept"), member_role,
     Some (&public) ),
-    "a sibling edge still above its default stays gated" );
+    "a sibling relationship still above its default stays gated" );
   assert! ( graph . relation_membership_is_visible (
     & ID::from ("recorder"), & ID::from ("kept"), member_role, None ),
     "the full fold sees everything" ); }

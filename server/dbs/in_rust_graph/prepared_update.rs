@@ -380,7 +380,7 @@ fn format_merge_override_collision (
         "{} ('{}')", participant . skgid, participant . title))
       . collect::<Vec<String>> () . join (", ") };
   format! (
-    "Node merge cannot acquire ID '{}' because canonicalizing it from {} ('{}') to {} ('{}') would make one node have multiple owned overriders.\nParticipants:\n  existing overrider(s): {}\n  redirected overrider(s): {}\nBefore the merge:\n  R1 -> N1\n  R2 -> N2\nThe merge would produce:\n  R1 -> N1\n  R2 -> N1\nRemove either edge, or choose precedence:\n  R2 -> R1 -> N1\nor\n  R1 -> R2 -> N1",
+    "Node merge cannot acquire ID '{}' because canonicalizing it from {} ('{}') to {} ('{}') would make one node have multiple owned overriders.\nParticipants:\n  existing overrider(s): {}\n  redirected overrider(s): {}\nBefore the merge:\n  R1 -> N1\n  R2 -> N2\nThe merge would produce:\n  R1 -> N1\n  R2 -> N1\nRemove either relationship, or choose precedence:\n  R2 -> R1 -> N1\nor\n  R1 -> R2 -> N1",
     collision . acquired_skgid,
     collision . acquiree . skgid, collision . acquiree . title,
     collision . acquirer . skgid, collision . acquirer . title,

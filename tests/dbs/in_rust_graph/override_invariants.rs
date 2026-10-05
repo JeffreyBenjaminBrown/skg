@@ -268,16 +268,16 @@ fn ownership_class_change_can_create_monogamy_violation () {
 }
 
 #[test]
-fn edge_and_target_deletions_do_not_create_override_errors () {
-  let (edge_affected, edge_full) = affected_and_full (
+fn relationship_and_target_deletions_do_not_create_override_errors () {
+  let (relationship_affected, relationship_full) = affected_and_full (
     vec![
       node ("target", "owned", &[]),
       node ("repo", "owned", &["target"]),
     ],
     vec![NodeInstruction::Save (SaveNode (
       node ("repo", "owned", &[]))) ]);
-  assert_eq! (edge_affected, edge_full);
-  assert! (edge_affected . is_empty ());
+  assert_eq! (relationship_affected, relationship_full);
+  assert! (relationship_affected . is_empty ());
 
   let (delete_affected, delete_full) = affected_and_full (
     vec![

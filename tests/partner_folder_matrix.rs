@@ -782,6 +782,6 @@ fn buffer_save_rejects_second_owned_overrider
         MSV::Unspecified       => true,
         MSV::Specified (skgids)   => skgids . is_empty (), };
       assert! ( overrides_empty,
-        "a rejected save must not write mono-r2's override edge: {:?}",
+        "a rejected save must not write mono-r2's override relationship: {:?}",
         r2 . overrides );
       Ok (( )) } )) }
