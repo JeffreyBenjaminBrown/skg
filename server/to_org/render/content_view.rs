@@ -59,7 +59,7 @@ pub fn multi_root_view (
 /// SkgEnv and routes through the ONE view completion path (multi_root_view_via_env). Used only
 /// by tests (production calls multi_root_view_via_env directly).
 /// The shim builds a fixture-local graph from disk and, when Tantivy is not
-/// supplied, uses an empty in-RAM index.
+/// supplied, uses an empty in-RAM search index.
 fn multi_root_view_inner (
   config             : &SkgConfig,
   tantivy_index      : Option<&TantivyIndex>,

@@ -115,7 +115,7 @@ async fn abandoned_enrichment_ends_with_contentless_enrichment (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  { // The session's index starts empty.
+  { // The session's search index starts empty.
     let tantivy_nodes : Vec<GraphnodeInTantivy> =
       read_all_skg_files_from_skgrepos (config)?
       . iter () . map (GraphnodeInTantivy::from) . collect ();

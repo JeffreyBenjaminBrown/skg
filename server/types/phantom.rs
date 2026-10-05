@@ -33,7 +33,7 @@ pub fn title_for_phantom (
 /// Diff axes for a phantom node, for use by the save / rerender pipeline.
 ///
 /// A phantom is a child that appears in the view because it was in
-/// the parent's contains list at some point (HEAD or index) but is
+/// the parent's contains list at some point (HEAD or the git index) but is
 /// not in the worktree's contains list.
 ///
 /// Axes are computed per-stage from the git diff data, so that

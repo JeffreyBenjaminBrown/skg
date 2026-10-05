@@ -425,7 +425,7 @@ mod tests {
     let (hits, _) = search_index (
       &env . runtime_snapshot () . tantivy_index,
       "Notes", &SearchOptions::default ()) . unwrap ();
-    assert! (! hits . is_empty (), "imported title is searchable after index drain");
+    assert! (! hits . is_empty (), "imported title is searchable after search-index drain");
   }
 
   #[test]

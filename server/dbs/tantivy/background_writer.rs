@@ -4,13 +4,13 @@
 //! 'writer.commit()' (see profiling-save.org) — used to block the
 //! response, even though the save's re-rendered result is built from
 //! the in-Rust graph and never reads the search index. The save now
-//! ENQUEUES its index update here and returns; the commit happens off
+//! ENQUEUES its search-index update here and returns; the commit happens off
 //! the critical path.
 //!
 //! A single worker thread applies the queued updates in FIFO order, so
 //! two rapid saves of the same node can never commit out of order. A
 //! search blocks on 'wait_for_tantivy_writes_idle' until the queue has
-//! drained, so it always sees an index reflecting every save issued so
+//! drained, so it always sees a search index reflecting every save issued so
 //! far (read-your-writes), at the cost of waiting through any in-flight
 //! commit.
 //!
@@ -19,7 +19,7 @@
 //! context pass), since backgrounding the worker means it can now run
 //! concurrently with those. On a background-write failure the worker
 //! logs and moves on: the filesystem already holds the truth, so the
-//! index stays recoverable via a 'rebuild ephemeral data stores'.
+//! search index stays recoverable via a 'rebuild ephemeral data stores'.
 
 use crate::save::update_tantivy_from_nodeInstructions;
 use crate::types::misc::{ID, TantivyIndex};
@@ -32,15 +32,15 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
 /// Held by every Tantivy writer for the duration of its writer's life,
 /// so two never coexist (Tantivy allows one IndexWriter per directory).
 /// Recovers a poisoned mutex: a panic mid-write must not wedge all
-/// future writes, since the index is a rebuildable cache.
+/// future writes, since the search index is a rebuildable cache.
 static TANTIVY_WRITE_LOCK : Mutex<()> = Mutex::new (());
 
 pub fn lock_tantivy_writes () -> MutexGuard<'static, ()> {
   TANTIVY_WRITE_LOCK . lock ()
     . unwrap_or_else ( |poisoned| poisoned . into_inner () ) }
 
-/// One queued index update: the nodeInstructions, the per-pid context
-/// origin types to stamp on each doc, and a handle to the index. Owned,
+/// One queued search-index update: the nodeInstructions, the per-pid context
+/// origin types to stamp on each doc, and a handle to the search index. Owned,
 /// so it can move to the worker thread.
 pub struct TantivyWriteTask {
   pub tantivy_index : TantivyIndex,
@@ -100,7 +100,7 @@ pub fn enqueue_tantivy_write (
     decrement_and_maybe_notify (&worker . inflight); } }
 
 /// Block until every enqueued Tantivy write has committed, so the
-/// caller (a search) sees an index reflecting all saves issued so far.
+/// caller (a search) sees a search index reflecting all saves issued so far.
 pub fn wait_for_tantivy_writes_idle () {
   let worker : &Worker = worker ();
   let mut count : MutexGuard<usize> =

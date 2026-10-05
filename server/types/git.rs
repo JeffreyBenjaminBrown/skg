@@ -22,7 +22,7 @@ pub enum Sign { Plus, Minus }
 /// 'staged'   compares HEAD  vs index.
 /// 'unstaged' compares index vs worktree.
 /// Both signs being identical within a single NodeAxes is impossible
-/// (it would require the file to be both present and absent in the index)
+/// (it would require the file to be both present and absent in the git index)
 /// but the type does not enforce that; consumers must.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct NodeAxes {
@@ -53,7 +53,7 @@ pub struct SkgRepoDiff {
   /// search index has seen them.
   pub added_nodes: HashMap<ID, Graphnode>,
   /// Nodes that existed in HEAD but not in worktree (deleted files).
-  /// Loaded from git HEAD or from the index. Used for phantom titles.
+  /// Loaded from git HEAD or from the git index. Used for phantom titles.
   pub deleted_nodes: HashMap<ID, Graphnode>,
 }
 

@@ -301,7 +301,7 @@ whether to include unstaged changes.
 Then opens an org report (=skg://diff-report=) summarizing
 semantic graph changes across all configured skgrepos.
 
-The report is based on git/index/worktree state,
+The report is based on git HEAD/index/worktree state,
 so the command refuses to run while any Skg view buffer
 has unsaved edits.
 *** <localleader>tm         : :SkgStageMoves

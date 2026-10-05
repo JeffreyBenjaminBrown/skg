@@ -140,7 +140,7 @@ impl SkgEnv {
   ///    deleted between HEAD and now).
   /// 3. Tantivy (in-process indexed lookup; ~6us at p50).
   /// 4. Disk scan (slow last resort; covers nodes that were created
-  ///    out-of-band since the last index sync).
+  ///    out-of-band since the last search-index sync).
   ///
   /// Tantivy is only an optimization here: the graph is authoritative for
   /// identity and skgrepo lookup, and this helper stays synchronous.

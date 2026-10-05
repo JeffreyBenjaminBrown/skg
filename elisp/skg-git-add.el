@@ -2,7 +2,7 @@
 ;;;
 ;;; PURPOSE: `git add' new .skg files in a subtree, but only when
 ;;; each file is not yet known to git at all (untracked, not even in
-;;; the index). User commands:
+;;; the git index). User commands:
 ;;;
 ;;; - `skg-git-add-if-new-recursive' (C-c t A): act on the node at
 ;;;    point and every viewdescendant.
@@ -10,7 +10,7 @@
 ;;;    show a git-add command for all new (untracked) files,
 ;;;    in 'skg-readable-ids-mode'.
 ;;;
-;;; "Not in the index" (rather than "not in HEAD") is the predicate,
+;;; "Not in the git index" (rather than "not in HEAD") is the predicate,
 ;;; so that a previously-staged-but-modified file is NOT re-added by
 ;;; this command: the user's subsequent modifications would otherwise
 ;;; be silently staged. The command's job is to make the file exist

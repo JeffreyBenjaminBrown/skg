@@ -95,7 +95,7 @@ fn test_many_tantivy_things (
   { new_node . title = "This is one big tuna." . to_string();
     new_node . pid = ID::new ("6"); }
 
-  // Update the index with the new node
+  // Update the search index with the new node
   let update_count: usize =
     update_index_with_nodes (
       &[GraphnodeInTantivy::from (&new_node)],
@@ -103,7 +103,7 @@ fn test_many_tantivy_things (
   assert_eq!(update_count, 1,
             "Expected to update exactly 1 document, but updated: {}",
             update_count);
-  println!("✓ Successfully updated index with new node 6");
+  println!("✓ Successfully updated search index with new node 6");
 
   // Search again - now node 6 should be first, node 1 should be second
   let (final_matches, final_searcher)

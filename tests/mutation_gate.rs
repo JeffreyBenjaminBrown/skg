@@ -2,7 +2,7 @@
 //!
 //! Two writers that both clone the same ArcSwap snapshot and independently
 //! publish a replacement lose whichever write stores first.  The real save
-//! pipeline also writes disk and derived indexes, so its shared MutationGate
+//! pipeline also writes disk, graph indexes and the search index, so its shared MutationGate
 //! must cover snapshot capture through publication.  These tests force that
 //! old interleaving without involving filesystem timing or external services.
 

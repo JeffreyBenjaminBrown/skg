@@ -43,7 +43,7 @@ impl CompleteGraphValidation {
 }
 
 /// Validate all facts requiring the complete set: identity, configured homes,
-/// override topology, internal indexes, and telescope provenance/privacy.
+/// override topology, internal graph indexes, and telescope provenance/privacy.
 /// Relationship roles themselves are represented by distinct typed fields;
 /// dangling member IDs are deliberately retained and are not errors.
 pub fn validate_complete_graph (
@@ -90,7 +90,7 @@ pub fn validate_complete_graph (
         pid : node . pid . clone (), skgrepo : node . home_skgrepo . clone () }); }}
 
   let graph = InRustGraph::from_graphnodes (nodes);
-  // Topology and derived-index diagnostics are meaningful only when identity
+  // Topology and graph-index diagnostics are meaningful only when identity
   // is unambiguous; otherwise graph construction necessarily chose winners.
   let identity_is_unambiguous = ! errors . iter () . any (|error| matches! (
     error,

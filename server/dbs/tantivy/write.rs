@@ -1,4 +1,4 @@
-// PURPOSE: The index-write path: update/delete/add document
+// PURPOSE: The search-index write path: update/delete/add document
 // helpers, plus `create_documents_from_node` (one title doc + one
 // doc per alias), and the shared `commit_with_status` used by both
 // this module and `context_update`.
@@ -14,7 +14,7 @@ use tantivy::{IndexWriter, Term, TantivyDocument, doc};
 use std::collections::HashMap;
 use std::error::Error;
 
-/// Updates the index with the provided GraphnodeInTantivys.
+/// Updates the search index with the provided GraphnodeInTantivys.
 ///   For existing IDs, updates the title.
 ///   For new IDs, adds new entries.
 /// Returns the number of documents processed.
@@ -23,13 +23,13 @@ pub fn update_index_with_nodes (
   tantivy_index: &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {
 
-  let _wlock = // serialize with the background save-index worker & other writers
+  let _wlock = // serialize with the background search-index worker & other writers
     lock_tantivy_writes ();
   let mut writer: IndexWriter =
     tantivy_index . index . writer (
       TANTIVY_WRITER_BUFFER_BYTES)?;
   delete_nodes_from_index(
-    // Delete those IDs from the index. (They'll come back.)
+    // Delete those IDs from the search index. (They'll come back.)
     nodes . iter(), &mut writer, tantivy_index)?;
   let processed_count: usize = // Add new associations.
     add_documents_to_tantivy_writer (

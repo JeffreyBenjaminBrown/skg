@@ -4,7 +4,7 @@ This document describes the complete runtime graph model.  The =.skg= files
 and =skgconfig.toml= are authoritative.  At startup and explicit rebuild, the
 server composes all file sections into =Graphnode= values, validates the whole
 set, builds an immutable =InRustGraph= graph snapshot, and builds Tantivy from the
-same values.  Tantivy is a derived text index; it is not graph authority.
+same values.  Tantivy is a derived search index; it is not graph authority.
 
 For a gentler introduction, see [[./data-model_friendly.org][the friendly data-model guide]].  For
 privacy-section composing and decomposing, see [[./telescopes.org][telescopes]].
@@ -74,8 +74,8 @@ rejected when any of these conditions holds:
    overrider (override monogamy).
 6. Owned override relationships contain a cycle.  Linear override chains are
    allowed; foreign override facts are display-only and do not substitute.
-7. Any stored derived graph index differs from an independently recomputed
-   index.
+7. Any stored graph index differs from an independently recomputed
+   one.
 
 Relationship roles are enforced by distinct Rust fields.  A node has exactly
 one =home_repo= in its composed representation.  Telescope validation also
@@ -87,7 +87,7 @@ The incremental proof relies on induction: startup or rebuild establishes a
 valid base, and each serialized save proves that its delta preserves validity.
 Which node carries each ID is evaluated as one simultaneous final-state overlay;
 override checks include touched skgrepos, changed canonical targets, and
-untouched inbound overriders affected by either.  Local index checks compare
+untouched inbound overriders affected by either.  Local graph-index checks compare
 only keys that could change.  The complete validator remains an independent
 startup/rebuild gate and test oracle.
 

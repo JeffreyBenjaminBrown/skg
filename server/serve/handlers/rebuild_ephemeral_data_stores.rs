@@ -47,12 +47,12 @@ pub fn rebuild_ephemeral_data_stores_in_place (
   tracing::info!("Rebuilding ephemeral data stores from .skg files...");
   // Rebuild is an authoritative publication just like a save.  Clone the Arc
   // before locking so the guard does not borrow `env` while this function
-  // replaces its config/index fields below.
+  // replaces its config/search-index fields below.
   let mutation_gate = env . mutation_gate ();
   let _mutation_guard = block_on ( mutation_gate . lock () );
   let runtime = env . runtime_snapshot ();
-  // Let any in-flight background save-index writes finish before we wipe
-  // and rebuild the index out from under them.
+  // Let any in-flight background search-index writes finish before we wipe
+  // and rebuild the search index out from under them.
   crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
   let result : Result<(), String> = (|| {
     let config_path : String =
@@ -92,7 +92,7 @@ pub fn rebuild_ephemeral_data_stores_in_place (
       &mentioned_skgids, &map_to_content, &map_to_containers )
       . map_err ( |e| format! ("Context computation failed: {}", e) ) ?;
     tracing::info!("Context rankings recomputed.");
-    { // Publish config, graph, and replacement index as one generation.
+    { // Publish config, graph, and replacement search index as one generation.
       env . runtime . publish (
         Arc::new (fresh_config), Arc::new (fresh_graph), new_tantivy);
       tracing::info!("In-Rust graph rebuilt."); }

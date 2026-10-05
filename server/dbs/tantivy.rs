@@ -1,4 +1,4 @@
-// PURPOSE: Tantivy integration. This file holds schema + index
+// PURPOSE: Tantivy integration. This file holds schema + search-index
 // opening, plus exact-ID document lookups. The other phases live
 // in submodules:
 //   - escape:         query preprocessing (pure strings).
@@ -241,7 +241,7 @@ fn pick_title_doc (
   fallback . map ( |d| (d, true) ) }
 
 /// Fetch a stored doc by address. Logs a warning on failure so
-/// operators can diagnose corrupt indexes; returns None so callers
+/// operators can diagnose corrupt search indexes; returns None so callers
 /// can skip this address and continue.
 fn load_doc_or_warn (
   searcher : &Searcher,

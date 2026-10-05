@@ -68,7 +68,7 @@ pub(super) fn build_coverage_matcher (
 
 /// Compute the coverage multiplier for one match-doc.
 /// SEARCHABLE_TITLE is the doc's title_or_alias text -- the field
-/// the index actually matched against. Returns 1.0 when MATCHER is
+/// the search index actually matched against. Returns 1.0 when MATCHER is
 /// None.
 pub(super) fn coverage_factor (
   matcher          : &CoverageMatcher,

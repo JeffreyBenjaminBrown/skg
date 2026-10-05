@@ -27,7 +27,7 @@ pub fn update_context_origin_types (
 ) -> Result<usize, Box<dyn Error>> {
   let searcher : Searcher =
     tantivy_index . reader . searcher ();
-  let _wlock = // serialize with the background save-index worker & other writers
+  let _wlock = // serialize with the background search-index worker & other writers
     lock_tantivy_writes ();
   let mut writer : IndexWriter =
     tantivy_index . index . writer (

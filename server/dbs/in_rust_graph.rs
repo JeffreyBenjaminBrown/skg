@@ -71,7 +71,7 @@ impl InRustGraph {
   /// Two-pass, because canonical-keyed inverse indexes need to
   /// map each outbound relation's second member (see
   /// [[docs/data-model_technical.org]]) to its corresponding pid (which might
-  /// be the id itself) via 'extra_id_to_pid' at index time. A
+  /// be the id itself) via 'extra_id_to_pid' while building the inverse indexes. A
   /// single-pass load couldn't do this for a reference to an
   /// extra_id of a not-yet-loaded node. First pass populates
   /// 'extra_id_to_pid' only; second pass inserts nodes and builds

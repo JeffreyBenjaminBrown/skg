@@ -1,6 +1,6 @@
 // PURPOSE: The text-search API. Builds Tantivy queries from a string
 // (either through the QueryParser with optional operator syntax, or
-// through RegexQuery), runs them against the index, and returns
+// through RegexQuery), runs them against the search index, and returns
 // (score, DocAddress) pairs plus the Searcher so callers can fetch
 // stored fields.
 
@@ -82,7 +82,7 @@ pub fn search_index (
     best_matches },
        searcher )) }
 
-/// Whether the current index contains any telescope-coarse overPrivateText document.
+/// Whether the current search index contains any telescope-coarse overPrivateText document.
 /// This is used only for search preflight; it returns no matching IDs.
 pub fn has_overPrivateText_telescope (
   tantivy_index : &TantivyIndex,

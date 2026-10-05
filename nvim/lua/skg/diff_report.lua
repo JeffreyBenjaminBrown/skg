@@ -13,7 +13,7 @@ local state = require('skg.state')
 local M = {}
 
 ---Request the report. Refuses while any skg buffer has unsaved
----edits (the report reads git/index/worktree state). Asks which
+---edits (the report reads git HEAD/index/worktree state). Asks which
 ---stages to include: staged?, and if so unstaged?; declining staged
 ---implies unstaged only.
 ---@param include_staged boolean|nil for tests; prompted when nil

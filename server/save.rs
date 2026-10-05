@@ -52,7 +52,7 @@ fn graph_preparation_save_error (
 ///   1) Filesystem (source of truth)
 ///   2) immutable in-Rust graph publication
 ///   3) Tantivy background update
-/// Returns `None` for the ordinary queued-index path.
+/// Returns `None` for the ordinary queued search-index path.
 /// Returns `Some(new_index)` when Tantivy had to be rebuilt.
 pub async fn update_graph_minus_nodeMerges (
   node_defs     : Vec<NodeInstruction>,
@@ -153,11 +153,11 @@ pub(crate) fn enqueue_tantivy_delta (
         candidate, &node_defs ) };
 
   // Tantivy (background): the search index is a derived cache that the
-  // save's response never reads, so enqueue the index update to commit
+  // save's response never reads, so enqueue the search-index update to commit
   // off the critical path, in FIFO order (a single worker). Searches
   // block on 'wait_for_tantivy_writes_idle' until it lands. A
   // background failure is logged, not propagated — the filesystem is
-  // the source of truth, so 'rebuild ephemeral data stores' resyncs the index.
+  // the source of truth, so 'rebuild ephemeral data stores' resyncs the search index.
   enqueue_tantivy_write ( TantivyWriteTask {
     tantivy_index : tantivy_index . clone (),
     instructions  : node_defs,
@@ -614,8 +614,8 @@ pub(crate) fn prepare_fs_update (
   } ) }
 
 
-/// Updates the index with the provided NodeInstructions.
-/// Deletes IDs from the index for every nodeInstruction,
+/// Updates the search index with the provided NodeInstructions.
+/// Deletes IDs from the search index for every nodeInstruction,
 /// but only adds documents for nodeInstructions where is_save.
 /// Returns the number of documents processed.
 pub(crate) fn update_tantivy_from_nodeInstructions (
@@ -661,9 +661,9 @@ pub(crate) fn update_tantivy_from_nodeInstructions (
     commit_with_status(
       &mut writer, tantivy_index, processed_count, "Updated")? ; }
   // Wait out the writer's background merge threads before returning, so
-  // the index is fully quiescent: 'commit()' alone can leave merge
+  // the search index is fully quiescent: 'commit()' alone can leave merge
   // threads writing segment files, which (when this runs on the
-  // background worker) would race a test's index-directory cleanup, and
+  // background worker) would race a test's search-index directory cleanup, and
   // makes 'wait_for_tantivy_writes_idle' mean what it says.
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "tantivy_wait_merging_threads" ). entered();

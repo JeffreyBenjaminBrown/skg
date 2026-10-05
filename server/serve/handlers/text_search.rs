@@ -168,7 +168,7 @@ pub fn handle_text_search_request (
         return None; }};
   match search_terms {
     Ok (search_terms) => {
-      // Wait for any in-flight background save-index writes to commit, so
+      // Wait for any in-flight background search-index writes to commit, so
       // the search reflects every save issued so far (read-your-writes).
       wait_for_tantivy_writes_idle ();
       let runtime = env . runtime_snapshot ();
@@ -272,7 +272,7 @@ pub fn handle_text_search_request (
           send_search_results_without_enrichment (
             stream,
             &search_terms,
-            & format! ("Error searching index: {}", e) );
+            & format! ("Error querying the search index: {}", e) );
           None }} },
     Err (err) => {
       let error_msg : String =
@@ -546,7 +546,7 @@ pub fn group_matches_by_skgid (
             . and_then ( |v| v . as_str() )
             . map ( |s| s . to_string() )) };
         // Read title_or_alias separately for coverage counting --
-        // it's the field the index actually matched against.
+        // it's the field the search index actually matched against.
         let searchable_title : String =
           retrieved_doc
             . get_first ( tantivy_index . title_or_alias_field )

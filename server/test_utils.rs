@@ -43,7 +43,7 @@ use tantivy::schema::document::Value;
 /// 1. Copying fixtures to a temp directory (so saves don't corrupt originals)
 /// 2. Setting up a Tantivy index
 /// 3. Running test functions
-/// 4. Cleaning up the database, index, and temp fixtures
+/// 4. Cleaning up the database, search index, and temp fixtures
 ///
 /// The test_fn closure receives references to SkgConfig and TantivyIndex
 /// and can run multiple test functions sequentially.
@@ -333,7 +333,7 @@ async fn guarded_test_then_cleanup(
     . catch_unwind() . await;
   // A save's Tantivy write now commits in the background and outlives
   // update_from_and_rerender_buffer; drain it before deleting the test
-  // index out from under the worker.
+  // search index out from under the worker.
   crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
   let cleanup_result: Result<(), Box<dyn Error>> =
     cleanup_test_tantivy(tantivy_folder . as_deref()) ;
@@ -513,7 +513,7 @@ pub fn audit_inrustgraph_or_panic (
   let errors = crate::dbs::in_rust_graph::internal_index_validation
     ::validate_internal_indexes (&graph_snap);
   if ! errors . is_empty () {
-    panic! ("graph index audit failed:\n{:#?}", errors); }
+    panic! ("internal graph-index audit failed:\n{:#?}", errors); }
   Ok (( )) }
 
 /// A converted fixture (author-folder layout) keeps its .skg files
@@ -547,7 +547,7 @@ pub fn setup_test_tantivy (
     create_empty_tantivy_index (&config . tantivy_folder) ?;
   Ok ((config, tantivy_index)) }
 
-/// Drain Tantivy's writer and remove a test index.
+/// Drain Tantivy's writer and remove a test search index.
 pub fn cleanup_test_tantivy (
   tantivy_folder: Option<&Path>,
 ) -> Result<(), Box<dyn Error>> {

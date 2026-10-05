@@ -448,6 +448,23 @@ map during local instruction collection. In prose, say "merge nodes"
 or "merge instructions"; bare "merge" appears only in client-facing
 wire strings, where only nodes can merge.
 
+*** "snapshot" is always qualified: graph, git or buffer snapshot
+
+A /graph snapshot/ is one immutable state of the in-Rust graph
+('GraphSnapshot'). A /git snapshot/ is one of HEAD, the git index or
+the worktree, as the diff report reads them. A /buffer snapshot/ is a
+buffer's text as a client sends it: for search enrichment, or for a
+dirty view in the save envelope. The wire atoms 'request-snapshot' and
+'snapshot response' predate the rule and mean buffer snapshots.
+
+*** "index" is always qualified: search, git or graph index
+
+The /search index/ is Tantivy's. The /git index/ is git's staging
+area; next to HEAD and worktree it needs no qualifier ("HEAD vs
+index"). A /graph index/ is a derived map inside the in-Rust graph:
+the /inverse indexes/ ('contained_by', 'subscribers_of', ...), each
+the inverse of one relation, plus 'extra_id_to_pid'.
+
 *** mp = maybe-placed
 
 A viewnode that might have an ID and skgrepo,

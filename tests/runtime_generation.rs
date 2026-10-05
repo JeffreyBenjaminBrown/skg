@@ -75,7 +75,7 @@ fn rebuild_candidate_uses_a_sibling_directory_without_wiping_live_index () {
   let (generation_config, generation_index) = rebuild_tantivy_as_generation (
     &candidate_config, &[node_for_generation ("candidate")], 7) . unwrap ();
   assert_ne! (generation_config . tantivy_folder, live_path);
-  assert! (live_path . is_dir (), "the published index directory survives");
+  assert! (live_path . is_dir (), "the published search-index directory survives");
   assert! (generation_config . tantivy_folder . is_dir ());
   assert! (! Arc::ptr_eq (&live_index . index, &generation_index . index));
 }

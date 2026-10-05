@@ -136,9 +136,9 @@ pub fn rebuild_tantivy_from_nodes (
       Path::new ( & config . tantivy_folder )) ?;
   Ok (tantivy_index) }
 
-/// Build a live-reload candidate in a sibling directory, leaving the index in
+/// Build a live-reload candidate in a sibling directory, leaving the search index in
 /// the currently published generation untouched.  The returned config points
-/// at the candidate directory and is published atomically with the index.
+/// at the candidate directory and is published atomically with the search index.
 pub fn rebuild_tantivy_as_generation (
   config : &SkgConfig,
   nodes : &[Graphnode],
@@ -157,7 +157,7 @@ pub fn rebuild_tantivy_as_generation (
 }
 
 /// Prior-process generation directories are never live after restart.  Retire
-/// only siblings with our exact generated prefix; the configured base index
+/// only siblings with our exact generated prefix; the configured base search index
 /// and unrelated directories are never candidates.
 fn retire_stale_tantivy_generation_directories (base : &Path) {
   let parent = base . parent () . unwrap_or_else (|| Path::new ("."));
@@ -177,7 +177,7 @@ fn retire_stale_tantivy_generation_directories (base : &Path) {
           "could not retire stale Tantivy generation directory"); } } }
 }
 
-/// Create an empty TantivyIndex, cleaning up any existing index first.
+/// Create an empty TantivyIndex, cleaning up any existing search index first.
 pub fn create_empty_tantivy_index (
   index_path : &Path,
 ) -> Result<TantivyIndex, Box<dyn Error>> {
@@ -189,18 +189,18 @@ pub fn create_empty_tantivy_index (
 
 /// An empty in-RAM Tantivy index (no folder IO, nothing wiped). Used to build a
 /// SkgEnv for a DE-NOVO render driven through post-save view completion in paths/tests
-/// that have no real tantivy on hand: find_repo falls back past an empty index
-/// to the in-Rust graph / disk, so the index's contents don't matter there.
+/// that have no real tantivy on hand: find_repo falls back past an empty search index
+/// to the in-Rust graph / disk, so the search index's contents don't matter there.
 pub fn empty_in_ram_tantivy_index (
 ) -> Result<TantivyIndex, Box<dyn Error>> {
   tantivy_index_from_index (
     Index::create_in_ram ( mk_tantivy_schema () ) ) }
 
-/// Removes any existing index at given path,
+/// Removes any existing search index at given path,
 /// creates a new one there,
 /// and populates it.
 ///
-/// PITFALL: The index is not the data it indexes.
+/// PITFALL: The search index is not the data it indexes.
 /// This only deletes the former.
 pub fn wipe_then_init_tantivy_db (
   nodes      : &[Graphnode],

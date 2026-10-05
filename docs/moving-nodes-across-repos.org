@@ -125,7 +125,7 @@ no separate move step in memory — the save is sufficient.
 
 **** 3. Tantivy
 Tantivy is not given the =RepoMove= list at all. Skgrepo moves are
-applied implicitly: the index update is "delete every doc by ID,
+applied implicitly: the search-index update is "delete every doc by ID,
 then re-add docs for every save," and the =SaveNode= carries the
 new =repo= field, so the re-added document has the correct skgrepo.
 

@@ -117,7 +117,7 @@ pub fn build_child_data (
                       relRepo: relRepos . get (child_skgid) . cloned () } ); },
         Some (child_src) => {
           // `find_repo` deliberately falls back through Tantivy.  During a
-          // same-save rerender that index can still name a just-deleted node;
+          // same-save rerender the search index can still name a just-deleted node;
           // do not let that stale hint turn a retained raw relationship member
           // into a failed disk read.  An unreadable, formerly indexed file
           // means precisely an Unknown relationship member.

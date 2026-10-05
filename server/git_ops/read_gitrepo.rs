@@ -12,7 +12,7 @@ use super::misc::{diff_delta_to_entry, path_relative_to_gitrepo};
 
 
 /// Load a Graphnode for a node whose worktree file is gone, preferring
-/// the index version over HEAD when both exist (since the index is
+/// the git index version over HEAD when both exist (since the git index is
 /// staged and therefore more recent).
 /// Returns Err if neither location has the file.
 pub fn graphnode_from_index_or_head (
@@ -34,7 +34,7 @@ pub fn graphnode_from_index_or_head (
   let rel_path : PathBuf =
     path_relative_to_gitrepo ( &gitrepo, &skgrepo_path . join (&file_path) )
     . unwrap_or (file_path . clone ());
-  // Index first.
+  // Git index first.
   if let Some (content) = get_file_content_at_index (&gitrepo, &rel_path) ? {
     let node_fs : GraphnodeOnDisk = serde_yaml::from_str (&content) . map_err (
       |e| format! ( "Failed to parse Graphnode for {} from index: {}",
@@ -43,13 +43,13 @@ pub fn graphnode_from_index_or_head (
   // HEAD fallback.
   let content : String = get_file_content_at_head (&gitrepo, &rel_path) ?
     . ok_or_else ( || format! (
-      "File {:?} not found in index or HEAD", rel_path )) ?;
+      "File {:?} not found in the git index or HEAD", rel_path )) ?;
   let node_fs : GraphnodeOnDisk = serde_yaml::from_str (&content) . map_err (
     |e| format! ( "Failed to parse Graphnode for {} from HEAD: {}",
                   pid . 0, e )) ?;
   Ok ( node_fs . into_complete_as_single_section ( src . clone ())) }
 
-/// Get the list of staged changes: files whose contents in the index
+/// Get the list of staged changes: files whose contents in the git index
 /// differ from HEAD.
 pub fn get_staged_changed_skg_files (
   gitrepo : &Repository
@@ -67,7 +67,7 @@ pub fn get_staged_changed_skg_files (
   diff_to_entries (&diff) }
 
 /// Get the list of unstaged changes: files whose worktree contents
-/// differ from the index. Includes untracked files.
+/// differ from the git index. Includes untracked files.
 pub fn get_unstaged_changed_skg_files (
   gitrepo : &Repository
 ) -> Result<Vec<PathDiffStatus>, Error> {
@@ -160,7 +160,7 @@ pub fn get_file_content_at_head (
     Err (e) => Err (e) }}
 
 /// Get the content of a file at the index (the staging area).
-/// Returns None if the file is not in the index.
+/// Returns None if the file is not in the git index.
 /// The path should be relative to the repository root.
 pub fn get_file_content_at_index (
   gitrepo     : &Repository,

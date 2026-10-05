@@ -38,7 +38,7 @@ So far there are these endpoints:
       documents do not influence result order or which title/alias is
       shown for an active result.
     - =overPrivateText-telescopes= is normally absent on the first request. Under
-      a restricted skgrepo-set, if the index contains any telescope
+      a restricted skgrepo-set, if the search index contains any telescope
       whose selected title or body lies below home, the server does no
       query and responds with LP
       =((response-type overPrivateText-telescope-confirmation)
@@ -176,7 +176,7 @@ So far there are these endpoints:
     when present. Any intersection refuses the save conservatively; malformed
     or missing dirty dependency data also refuses. A refusal returns
     =save-result= with nil content and actionable errors naming view URIs and
-    IDs, and performs no filesystem, graph, index, registry, or collateral
+    IDs, and performs no filesystem, graph, search index, registry, or collateral
     update. There is no save-anyway path.
   - The first ALTERNATIVE terminal message: after validation, a save
     rereads every telescope it will write. If any currently selects a
