@@ -72,7 +72,7 @@ pub fn initialize_dbs (
     config, &nodes, graph, tantivy_index);
   if let Err (e) = write_dependencies_manifests (config) {
     tracing::warn! (
-      error = %e, "could not write DEPENDENCIES.toml manifests" ); }
+      error = %e, "could not write OTHER_SKGREPO_DEPENDENCIES.toml manifests" ); }
   for warning in foreign_manifest_order_warnings (config) {
     tracing::warn! ("{}", warning); }
   (env, handoff, nodes)

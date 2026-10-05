@@ -1018,9 +1018,9 @@ Here the available skgrepo-sets are =public= = {public},
 =private= = {public, private}, =Fred= = =all= = {public, private,
 Fred}.
 
-** DEPENDENCIES.toml
+** OTHER_SKGREPO_DEPENDENCIES.toml
 
-At every server start the server writes a =DEPENDENCIES.toml=
+At every server start the server writes an =OTHER_SKGREPO_DEPENDENCIES.toml=
 manifest into each OWNED skgrepo directory. Its =dependencies= is a
 list of pairs, one per skgrepo that skgrepo may reference — itself and
 everything more public, in privacy order, the skgrepo itself last.

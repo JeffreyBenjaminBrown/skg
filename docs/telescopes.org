@@ -154,6 +154,6 @@ A skgrepo is yours iff its directory sits under the config's
 =owned_folder= (default =owned/=) — see =api-and-formats.org=. Only
 owned sections are ever written; a save that empties an owned
 section deletes the file, and re-privatizing later recreates it.
-Each owned skgrepo also receives a generated =DEPENDENCIES.toml=
+Each owned skgrepo also receives a generated =OTHER_SKGREPO_DEPENDENCIES.toml=
 naming the skgrepos it may reference (everything at least as public),
 so a skgrepo you share carries its own dependency claim.

@@ -1,12 +1,12 @@
-//! DEPENDENCIES.toml: the publisher-side fix for the one structural
+//! OTHER_SKGREPO_DEPENDENCIES.toml: the publisher-side fix for the one structural
 //! regression the telescope carries relative to the retired chain
 //! design -- a foreign telescope's composition ORDER lives in the
 //! receiver's config, not in the data (5_plan.org, work item
 //! dependencies-manifest; decided in 4_discussion, "lets Skg
-//! automatically generate a DEPENDENCIES.toml").
+//! automatically generate a OTHER_SKGREPO_DEPENDENCIES.toml").
 //!
 //! PUBLISHER half: at init, every OWNED skgrepo directory gets a
-//! DEPENDENCIES.toml whose `dependencies` is a list of pairs, one per
+//! OTHER_SKGREPO_DEPENDENCIES.toml whose `dependencies` is a list of pairs, one per
 //! Skgrepo its telescope sections may reference -- itself and
 //! everything more public, in privacy order, the skgrepo itself last.
 //! Each pair says where a receiver can fetch that skgrepo: `path`
@@ -101,7 +101,7 @@ pub fn write_dependencies_manifests (
          # itself and everything more public, MOST PUBLIC FIRST, the\n\
          # Skg repo itself last. A receiver should order these the same\n\
          # way relative to one another, or the privacy telescopes\n\
-         # spanning them will fold in the wrong order. `path` is the\n\
+         # spanning them will compose in the wrong order. `path` is the\n\
          # data-root-relative directory; `git-remote` is where a\n\
          # receiver can fetch it (the fetch URL `git remote -v`\n\
          # prints, `origin` preferred), omitted when the Skg repo is\n\
@@ -114,7 +114,7 @@ pub fn write_dependencies_manifests (
       c . push_str ("]\n");
       c };
     let manifest_path : PathBuf =
-      skgrepo . path . join ("DEPENDENCIES.toml");
+      skgrepo . path . join ("OTHER_SKGREPO_DEPENDENCIES.toml");
     let unchanged : bool = // byte-stability
       std::fs::read_to_string (&manifest_path)
       . map ( |old| old == content )
@@ -160,7 +160,7 @@ pub fn foreign_manifest_order_warnings (
     let Some (skgrepo) = config . skgrepos . get (name) else {
       continue; };
     let manifest_path : PathBuf =
-      skgrepo . path . join ("DEPENDENCIES.toml");
+      skgrepo . path . join ("OTHER_SKGREPO_DEPENDENCIES.toml");
     let Ok (contents) =
       std::fs::read_to_string (&manifest_path) else { continue; };
     let entries : Vec<String> =
@@ -184,7 +184,7 @@ pub fn foreign_manifest_order_warnings (
       if let Some ((prev_gitrepo, prev_position)) = &last {
         if position < *prev_position {
           warnings . push ( format! (
-            "Repo '{}' ships a DEPENDENCIES.toml placing '{}' more public than '{}', but this config orders them the other way. Telescopes spanning them will fold in the publisher-unintended order; consider reordering [[repos]].",
+            "Repo '{}' ships a OTHER_SKGREPO_DEPENDENCIES.toml placing '{}' more public than '{}', but this config orders them the other way. Telescopes spanning them will fold in the publisher-unintended order; consider reordering [[repos]].",
             name, prev_gitrepo, gitrepo )); }}
       last = Some ((gitrepo, position)); }}
   warnings }
