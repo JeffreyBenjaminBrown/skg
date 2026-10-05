@@ -366,7 +366,7 @@ pub struct ViewnodeStats {
   /// node has a body -- a body the rendering hides. Herald "B",
   /// hugging the ☮ (TODO/more.org). Display-only, like the assembled
   /// herald strings; the parser accepts and discards it.
-  pub hidden_body           : bool,
+  pub omitted_body           : bool,
   /// Some(NAME) when the relationship instance this position's
   /// binding relationship to its viewparent represents (=contains= for an
   /// ordinary content child; the folder's relation for a simple
@@ -905,7 +905,7 @@ impl Default for ViewnodeStats {
       homeSkgRepoAtBoundary  : false,
       rel_heralds       : None,
       overridesHere     : None,
-      hidden_body       : false,
+      omitted_body      : false,
       relRepo        : None,
     }} }
 

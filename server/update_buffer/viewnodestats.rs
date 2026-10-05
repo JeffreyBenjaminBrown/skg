@@ -64,7 +64,7 @@ fn set_viewnodestats_recursive (
       set_herald_strings_in_viewnode (
         tree, treeid, &node_pid, graph, active,
         container_to_contents, content_to_containers );
-      set_hidden_body (tree, treeid, &node_pid, graph);
+      set_omitted_body (tree, treeid, &node_pid, graph);
       set_relRepo (tree, treeid, graph, config);
       Some (node_pid)
     } else { None };
@@ -340,17 +340,17 @@ fn birth_facts_for_folder (
       vec![ BirthFact::new (
               NodeRelation::HidesFromItsSubscriptions, Side::In, Some (3) ) ], } }
 
-/// Sets hidden_body on the active vognode at treeid: true iff the node
+/// Sets omitted_body on the active vognode at treeid: true iff the node
 /// is drawn WRITE_PROTECTED here while its graphnode has a body -- one
 /// the rendering hides. Herald "B" on the ☮ (TODO/more.org). False
 /// without a graph handle (some tests): better no B than a wrong one.
-fn set_hidden_body (
+fn set_omitted_body (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
   node_pid : &ID,
   graph    : Option<&InRustGraph>,
 ) {
-  let hidden_body : bool = {
+  let omitted_body : bool = {
     let ViewnodeKind::Vognode (Vognode::Active (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
@@ -362,7 +362,7 @@ fn set_hidden_body (
              . map_or ( false, |n| n . body . is_some () ) } ) };
   if let ViewnodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
-  { t . viewStats . hidden_body = hidden_body; }}
+  { t . viewStats . omitted_body = omitted_body; }}
 
 /// Sets relRepo on the active vognode at treeid (render-and-gating,
 /// 5_plan.org; see 'ViewnodeStats::relRepo' for the full contract).

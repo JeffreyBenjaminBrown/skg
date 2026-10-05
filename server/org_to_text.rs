@@ -359,9 +359,9 @@ fn activeVognode_metadata_to_string (
       // cannot be edited (see Editability in types/viewnode.rs). The metadata
       // sexp uses only this short form on both emission and parsing.
       parts . push ( "writeProtected" . to_string () );
-      if activeVognode . viewStats . hidden_body {
+      if activeVognode . viewStats . omitted_body {
         // The rendering is hiding a body (herald "B" on the ☮).
-        parts . push ( "hiddenBody" . to_string () ); }}
+        parts . push ( "omittedBody" . to_string () ); }}
     if let Some (s) = rels_herald (activeVognode)
     { parts . push (s); }
     if let Some (s) = view_stats (activeVognode, config)

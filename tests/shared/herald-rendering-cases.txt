@@ -239,7 +239,7 @@
 ---- text: DELETED
 ---- styles: message*7
 ==== node: write-protected with a hidden body
-(skg (node (id x) writeProtected hiddenBody))
+(skg (node (id x) writeProtected omittedBody))
 ---- text: ☮B
 ---- styles: crucial*2
 ==== node: a private relRepo and its home repo

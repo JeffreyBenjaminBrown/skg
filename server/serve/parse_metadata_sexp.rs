@@ -549,7 +549,7 @@ fn parse_node_sexp (
           // The server emits and accepts this exact atom (see org_to_text.rs).
           "writeProtected" =>
             metadata . writeProtected = true,
-          "hiddenBody" =>
+          "omittedBody" =>
             // Display-only (like rels): the view
             // regenerates it, so accept and discard.
             {},

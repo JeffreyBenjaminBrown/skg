@@ -310,7 +310,7 @@ pub fn herald_rule_table () -> HeraldRule {
         leaf_abut (Crucial, "writeProtected", "☮"),
         // Emitted only on a write-protected node whose graphnode has a
         // body -- one the rendering hides. ABUT so the B rides the ☮.
-        leaf_abut (Crucial, "hiddenBody", "B"),
+        leaf_abut (Crucial, "omittedBody", "B"),
         // The relationship heralds are per-CHARACTER styled spans that
         // the lens cannot style, so the server assembles semantic
         // (rels ...) facts and the CLIENT renders them. This rule only POSITIONS them: the
@@ -470,7 +470,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     "deadViewnode",
     // Keys inside node / diffPhantom / deleted / unknown forms:
     "id", "repo",
-    "affectsParent", "writeProtected", "hiddenBody", "notInGit",
+    "affectsParent", "writeProtected", "omittedBody", "notInGit",
     // The assembled relationship-herald atom, a payload of styled spans
     // (server/herald_tokens.rs); its span sub-forms are value position,
     // consumed by the client's renderer, so they are not match atoms.
@@ -520,7 +520,7 @@ fn viewstats_atoms () -> Vec<&'static str> {
       homeSkgRepoAtBoundary : _, // -> the homeRepoHerald atom
       rel_heralds : _,      // -> the node-level rels atom (semantic sexp)
       overridesHere : _,    // keyed form (a viewStats sub-form)
-      hidden_body : _,      // -> the node-level hiddenBody atom
+      omitted_body : _,      // -> the node-level omittedBody atom
       relRepo : _,       // -> the relRepo display-fact atom and herald
     } = v; }
   let _ = guard;

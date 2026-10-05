@@ -409,7 +409,7 @@ It is not abbreviated "md", which means Markdown (as in
 
 Metadata holds two kinds of thing. A *display fact* is computed by the
 server each time it renders: viewStats, the =(rels ...)= form,
-=hiddenBody=, the display =(relRepo NAME)=. The parser ignores or
+=omittedBody=, the display =(relRepo NAME)=. The parser ignores or
 discards display facts, so editing them changes nothing. *Save input*
 is what a save reads and applies: titles, bodies, the order and
 membership of children, and =editRequest= atoms. The one load-bearing

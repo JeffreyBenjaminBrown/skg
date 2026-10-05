@@ -51,7 +51,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | the birth letter     | high        | the letter of a relation that put this occurrence here                       |
 | relationship sides   | their tier  | counts and ancestor flags; see [[*Relationship heralds][Relationship heralds]]                     |
 | property counts      | low         | =A3= aliases, =I1= extra IDs, =F2= true flags                                 |
-| position markers     | crucial     | =☮= write-protected, =B= hidden body, =⊥= affects not its parent, =ĥ= overrides here |
+| position markers     | crucial     | =☮= write-protected, =B= omitted body, =⊥= affects not its parent, =ĥ= overrides here |
 |                      | medium      | =⟳= cycle                                                                     |
 | home-repo heralds    | normal      | =⌂:LABEL=                                                                     |
 |                      | yucky       | =~NAME=, a relRepo more private than the default                              |
@@ -154,7 +154,7 @@ is saved. See [[file:override.org][override behavior]].
 
 ** Other heralds
 =☮= marks a write-protected position: a node, a folder, or a flag row.
-On a node, =B= rides the ☮ when the node's body exists but is hidden.
+On a node, =B= rides the ☮ when the node's body exists but is omitted from the buffer.
 =⊥= means a displayed child does not affect its parent's membership on
 save. =⟳= marks a cycle.
 
