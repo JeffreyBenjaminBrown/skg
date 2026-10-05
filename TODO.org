@@ -1,6 +1,8 @@
 * REMEMBER
 ** not to dirty the production skg's code.
 ** to set the model
+* migrate .skg format
+python3 tools/migrate-skg-keys-2026-10/migrate.py data/owned
 * ONGOING TODO/import-md-and-org/
 ** TODO duplicate file problem
 *** I asked

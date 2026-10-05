@@ -1600,14 +1600,14 @@ a modest gain. Your call whether it's worth it.
 [[*context][Discussion]].
 *** Claude says: not EASY
 Easy to execute once you pick the word.
-** ONGOING Shall I move finished plans out of TODO/ into TODO/DONE/ before any vocabulary sweep?
+** DONE Shall I move finished plans out of TODO/ into TODO/DONE/ before any vocabulary sweep?
 I'd propose a list for you to approve, starting with ditch-typedb/,
 from-dot-claude/ (including its duplicates), typedb-performance-research,
 split-and-extend-paths-and-cols/. [[*Bury finished plans instead of rewriting them][Discussion]].
 *** Claude says: split into an EASY part and a TODO part
 The EASY part is the next headline. Everything else stays here for you
 to judge, since you know which plans are done.
-**** ONGOING J : yes
+**** DONE J : yes
 It's too late to move them before the other work,
 but yes, please move them.
 ***** DONE Claude says: not done yet; next I'd propose the list
@@ -1615,8 +1615,8 @@ The certain ones were moved in the item below. For the rest I'd go
 through TODO/ and propose a list of finished plans for you to confirm
 before moving anything. Shall I?
 ****** DONE J : yes please
-****** TODO Claude says: here's the list; I'll move whatever you approve
-Finished, by their own status notes:
+****** DONE Claude says: here's the list; I'll move whatever you approve
+******* Finished, by their own status notes:
 - 'split-and-extend-paths-and-cols/': "FEATURE COMPLETE -- all nine steps
   done (2026-06-20)".
 - 'incremental-validation/': every step of '2_plan.org' is DONE, through
@@ -1629,21 +1629,25 @@ Finished, by their own status notes:
   'strip-inactive-node-fields' carried out the result.
 - 'refer-to-ids-not-buffer-names/': headed "maybe done", with an Outcome
   section and passing suites. Probably finished; your call.
-
-Obsolete, since TypeDB is gone:
+******** DONE J : yes please
+********* DONE Claude says: moved ('39168a1d')
+******* Obsolete, since TypeDB is gone:
 - 'faster-tests.org' and 'faster-tests-progress.org' (the costs they
   measure are TypeDB setup; the grouped test binaries they led to exist).
 - 'incremental-init-might-be-broken.org' (TypeDB incremental init).
 - 'what-affects-dbs.org' (TypeDB and Tantivy).
 - 'sources-have-no-stats.org' (a TypeDB-era herald bug; I can't tell
   whether its fix landed, so this one is less certain).
-
-Finished, but maybe reference rather than history:
+******** DONE J : yes please
+********* DONE Claude says: moved ('39168a1d')
+******* Finished, but maybe reference rather than history:
 - 'vim-client/': the port is done, but 'deviations.org' documents how
   the Neovim client differs from Emacs, which users of either might
   want. I'd move 'deviations.org' to 'docs/' and the rest to TODO/DONE/.
-
-Staying, because they're open or I can't tell: everything with open
+******** DONE J : yes please, keep the deviations somewhere in docs/, then archive
+********* DONE Claude says: done ('39168a1d'): 'docs/nvim-client-deviations.org'; the rest is in 'TODO/DONE/vim-client/'
+******* Staying, because they're open or I can't tell:
+everything with open
 TODO or ONGOING items (dup-ids-maybe-bad, forks, override-chains,
 partial-reload-and-magit, import-md-and-org, noindex-and-boolprops,
 uniform-heralds, heralds_sept-2026, lying-names, feasible-now-probably,
