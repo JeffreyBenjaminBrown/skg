@@ -1,24 +1,24 @@
 /// Applying a repo-set switch to an already-drawn view
 /// (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org).  Two passes:
-/// convert every Active viewnode from a now-inactive skgrepo into an
-/// InactiveVognode, then prune (DFS postorder, so emptied parents prune
+/// convert every Unrestricted viewnode from a now-restricted skgrepo into an
+/// RestrictedVognode, then prune (DFS postorder, so emptied parents prune
 /// in the same sweep) every:
-/// - InactiveVognode leaf;
-/// - Property leaf whose owning vognode (grandparent) is inactive;
-/// - write-protected leaf partner (child of a PartnerFolder), active or
-///   inactive: a write-protected partner defines nothing, and
+/// - RestrictedVognode leaf;
+/// - Property leaf whose owning vognode (grandparent) is restricted;
+/// - write-protected leaf partner (child of a PartnerFolder), unrestricted or
+///   restricted: a write-protected partner defines nothing, and
 ///   completion regenerates current membership afterward;
 /// - empty PropertyFolder or PartnerFolder;
 /// - DeadViewnode leaf.
-/// What survives includes active nodes, inactive nodes with
+/// What survives includes unrestricted nodes, restricted nodes with
 /// surviving children (the retained case), and editable partners
 /// (the user may be mid-edit inside them).  Completion (run with folder
 /// creation enabled) then rebuilds folders and members for the new
-/// active set.
+/// skgrepo restriction.
 
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::viewnode::{
-  mk_inactive_viewnode, PartnerFolder, PropertyFolder, Viewnode, ViewnodeKind,
+  mk_restricted_viewnode, PartnerFolder, PropertyFolder, Viewnode, ViewnodeKind,
   Vognode };
 use crate::update_buffer::util::subtree_satisfies;
 
@@ -27,18 +27,18 @@ use std::error::Error;
 
 pub fn convert_and_prune_for_skgrepo_switch (
   tree   : &mut Tree<Viewnode>,
-  active : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
 ) -> Result<(), Box<dyn Error>> {
-  convert_now_inactive_actives (tree, active);
+  convert_now_restricted_vognodes (tree, restriction);
   let root : NodeId = tree . root () . id ();
   prune_children_postorder (tree, root) ?;
   Ok (( )) }
 
-fn convert_now_inactive_actives (
+fn convert_now_restricted_vognodes (
   tree   : &mut Tree<Viewnode>,
-  active : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
 ) {
-  if active . is_all () { return; }
+  if restriction . is_all () { return; }
   let skgids : Vec<NodeId> =
     tree . root () . descendants ()
     . map ( |n| n . id () )
@@ -47,9 +47,9 @@ fn convert_now_inactive_actives (
     let conversion : Option<ViewnodeKind> =
       tree . get (skgid)
       . and_then ( |n| match &n . value () . kind {
-          ViewnodeKind::Vognode (Vognode::Active (t))
-            if ! active . contains_skgrepo (&t . home_skgrepo)
-            => Some ( mk_inactive_viewnode () . kind ),
+          ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+            if ! restriction . contains_skgrepo (&t . home_skgrepo)
+            => Some ( mk_restricted_viewnode () . kind ),
           _ => None } );
     if let Some (kind) = conversion {
       tree . get_mut (skgid) . unwrap () . value () . kind = kind; }}}
@@ -92,18 +92,18 @@ fn should_prune (
     . map ( |p| matches! ( &p . value () . kind,
                            ViewnodeKind::PartnerFolder (_) ))
     . unwrap_or (false);
-  let grandaffects_parent_inactive : bool =
+  let grandaffects_parent_restricted : bool =
     node_ref . parent ()
     . and_then ( |p| p . parent () )
     . map ( |gp| matches! ( &gp . value () . kind,
-                            ViewnodeKind::Vognode (Vognode::Inactive (_)) ))
+                            ViewnodeKind::Vognode (Vognode::Restricted (_)) ))
     . unwrap_or (false);
   Ok ( match &node_ref . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Inactive (_)) =>
+    ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
       is_leaf,
     ViewnodeKind::Property (_) =>
-      is_leaf && grandaffects_parent_inactive,
-    ViewnodeKind::Vognode (Vognode::Active (t)) =>
+      is_leaf && grandaffects_parent_restricted,
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
       is_leaf && affects_parent_partnerFolder && t . is_writeProtected (),
     ViewnodeKind::PropertyFolder (PropertyFolder::ID)
       | ViewnodeKind::PropertyFolder (PropertyFolder::Alias)

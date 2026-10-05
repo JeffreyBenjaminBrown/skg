@@ -27,7 +27,7 @@ use crate::from_text::local_fieldintent_collection::lower::LoweredNodeIntents;
 use crate::from_text::local_fieldintent_collection::types::{
   HiddenOutsideEdit, SubscribeeVisibility };
 use crate::from_text::weave::member_is_visible;
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, members_of};
 use crate::types::nodes::complete::Graphnode;
@@ -44,7 +44,7 @@ pub fn resolve_visibility (
   hidden_outside : &[(ID, HiddenOutsideEdit)],
   graph       : &InRustGraph,
   config      : &SkgConfig,
-  restricted_skgrepo_set : Option<&ActiveSkgRepoSet>, // None means no restriction; callers normalize 'all' to None.
+  skgrepo_restriction : Option<&SkgrepoRestriction>, // None means no restriction; callers normalize 'all' to None.
 ) -> Result<(LoweredNodeIntents, Vec<PostSkgsaveCommitNoticeCandidate>), Box<dyn Error>> {
   validate_no_overlapping_subscribee_hiderel_conflicts (
     visibility, graph, config ) ?;
@@ -52,7 +52,7 @@ pub fn resolve_visibility (
     // Before the signal loop below, so that an explicit
     // subscribee-as-such gesture about the same child wins.
     &mut lowered, visibility, graph, config,
-    restricted_skgrepo_set ) ?;
+    skgrepo_restriction ) ?;
   for (subscriber, signal) in visibility {
     let Some (subscribee_from_disk) =
       opt_graphnode_by_skgid (
@@ -94,11 +94,11 @@ pub fn resolve_visibility (
       &inferred_unhides ); }
   let post_skgsave_commit_notice_candidates = apply_hiddenoutside_edits (
     &mut lowered, hidden_outside, graph, config,
-    restricted_skgrepo_set ) ?;
+    skgrepo_restriction ) ?;
   Ok ((lowered, post_skgsave_commit_notice_candidates)) }
 
 /// Applies the submitted visible-outside subset after all ordinary hide
-/// inference.  Only the old *visible outside* viewnodes are replaceable: inactive
+/// inference.  Only the old *visible outside* viewnodes are replaceable: restricted
 /// relationship members and viewnodes classified inside a subscribee remain owned
 /// by the graph and survive an edit of this derived filter.
 fn apply_hiddenoutside_edits (
@@ -106,7 +106,7 @@ fn apply_hiddenoutside_edits (
   edits                  : &[(ID, HiddenOutsideEdit)],
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
-  restricted_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction    : Option<&SkgrepoRestriction>,
 ) -> Result<Vec<PostSkgsaveCommitNoticeCandidate>, Box<dyn Error>> {
   let mut seen : HashSet<ID> = HashSet::new ();
   let mut candidates : Vec<PostSkgsaveCommitNoticeCandidate> = Vec::new ();
@@ -130,8 +130,8 @@ fn apply_hiddenoutside_edits (
         opt_graphnode_by_skgid (graph, config, &subscribee_skgid) ?
       else { continue; };
       for member in &subscribee . contains {
-        if restricted_skgrepo_set . map_or (
-          true, |active| active . contains_skgrepo (&member . relRepo))
+        if skgrepo_restriction . map_or (
+          true, |restriction| restriction . contains_skgrepo (&member . relRepo))
         { inside . insert (key (&member . member)); }} }
 
     // The replacement domain is intentionally built from disk, rather than
@@ -140,8 +140,8 @@ fn apply_hiddenoutside_edits (
     let replaceable_outside : HashSet<ID> =
       subscriber_from_disk . hidesFromSubs . or_default ()
       . iter ()
-      . filter (|member| restricted_skgrepo_set . map_or (
-        true, |active| active . contains_skgrepo (&member . relRepo)))
+      . filter (|member| skgrepo_restriction . map_or (
+        true, |restriction| restriction . contains_skgrepo (&member . relRepo)))
       .map (|member| key (&member . member))
       .filter (|member_key| ! inside . contains (member_key))
       .collect ();
@@ -193,7 +193,7 @@ fn infer_hides_from_contains_removals (
   visibility             : &[(ID, SubscribeeVisibility)],
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
-  restricted_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction    : Option<&SkgrepoRestriction>,
 ) -> Result<(), Box<dyn Error>> {
   for (subscriber_pid, skgrepo, new_contains, subscribes_msv)
     in lowered . nodeSaveIntents_with_specified_contains () {
@@ -215,8 +215,8 @@ fn infer_hides_from_contains_removals (
       subscriber_contains . iter ()
         . filter ( |skgid| ! new_contains_set . contains (skgid) )
         . filter ( |skgid| ! signal_visible . contains (skgid) )
-        . filter ( |skgid| restricted_skgrepo_set . map_or (
-            true, |active| member_is_visible (graph, skgid, config, active) ))
+        . filter ( |skgid| skgrepo_restriction . map_or (
+            true, |restriction| member_is_visible (graph, skgid, config, restriction) ))
         . cloned () . collect () };
     let inferred_unhides : Vec<ID> = {
       let disk_contains : HashSet<&ID> =

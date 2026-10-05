@@ -217,8 +217,8 @@ fn format_buffer_validation_error (
     BufferValidationError::ForkAlreadyExists(original, existing) => {
       format!("Cannot fork a node you have already forked:\n- Foreign node: {}\n- Your existing clone: {}\n- A node may have at most one owned override. Edit the existing clone instead.\n",
               original . 0, existing . 0) },
-    BufferValidationError::ForkSkgRepoInactive(skgid, skgrepo) => {
-      format!("Cannot fork into an inactive repo:\n- Foreign node: {}\n- Clone's resolved repo: {}\n- That repo is not in the active repo-set. Activate it first; an invisible clone is never created silently.\n",
+    BufferValidationError::ForkSkgRepoRestricted(skgid, skgrepo) => {
+      format!("Cannot fork into a restricted repo:\n- Foreign node: {}\n- Clone's resolved repo: {}\n- That repo is not in the skgrepo restriction. Activate it first; an invisible clone is never created silently.\n",
               skgid . 0, skgrepo) },
     BufferValidationError::ForkSkgRepoNotOwned(skgid, skgrepo) => {
       format!("Cannot fork into a repo you do not own:\n- Foreign node: {}\n- Clone's chosen repo: {}\n- Pick an owned repo for the clone (C-c s s in the confirmation buffer).\n",

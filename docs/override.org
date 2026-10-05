@@ -34,7 +34,7 @@ automatic substitution.
 Visiting an ID opens that exact node as the raw root of a content view.
 It does not redirect to an overrider and does not stop at a choice
 buffer.  Re-visiting an ID that is already a root switches to its open
-content view.  A node whose home skgrepo is inactive in the current
+content view.  A node whose home skgrepo is restricted in the current
 skgrepo-set cannot be visited.
 
 This makes every viewnode used for navigation a stable destination.  In
@@ -115,7 +115,7 @@ content, it automatically includes a nonempty folder for content hidden
 there.
 
 Under a restricted skgrepo-set, both override folders omit relationships
-whose relRepo is inactive and partners whose home skgrepo is inactive.
+whose relRepo is restricted and partners whose home skgrepo is restricted.
 Saving the visible subset preserves memberships stored in hidden
 telescope sections.
 
@@ -138,7 +138,7 @@ D overrides C overrides N
 #+end_example
 
 a full-repo content view draws =D= where =N= occurs.  If =D='s home
-skgrepo is inactive but =C='s is active, it draws =C=.  If no owned
+skgrepo is restricted but =C='s is unrestricted, it draws =C=.  If no owned
 overrider is drawable, it draws =N=.  A monogamy violation makes the
 resolver refuse to choose a branch; a cycle makes it abandon
 substitution and return the originally requested node.
@@ -195,7 +195,7 @@ carrier's title, body, or folders still edits the carrier itself.
 The server rejects a forged or stale marker whose carrier is not on
 =N='s owned override chain.  The validation walk is intentionally
 visibility-ungated so that a marker which was honest when rendered does
-not become invalid merely because the active skgrepo-set changed.
+not become invalid merely because the skgrepo restriction changed.
 
 ** Heralds and reasons for placement
 
@@ -271,8 +271,8 @@ view-subtrees, =O= relationship counts, and automatic substitution all
 derive their topology from relRepo-gated relationship accessors.
 
 For automatic substitution, an override hop is followable only when the
-relationship's relRepo and the overrider node's home skgrepo are active and the
-overrider is owned.  A relationship outside the active skgrepo-set
+relationship's relRepo and the overrider node's home skgrepo are unrestricted and the
+overrider is owned.  A relationship outside the skgrepo restriction
 therefore cannot silently select a node which the corresponding folders, role trees, heralds, and search subtree omit.
 
 *** Other relationships

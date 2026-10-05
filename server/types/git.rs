@@ -202,14 +202,14 @@ impl GitDiffStatus {
 // Functions
 //
 
-/// Returns the (staged, unstaged) pair of NodeChanges for an ActiveVognode.
+/// Returns the (staged, unstaged) pair of NodeChanges for an UnrestrictedVognode.
 /// Either element may be None (that stage has no diff entry for this
 /// file, or the entry has 'node_changes: None').
 ///
 /// Consumers that need a flat HEAD→worktree view can compose both
 /// stages via 'net_diff_from_per_stage'. Consumers that need
 /// per-stage signs use 'axes_from_per_stage_diffs'.
-pub fn per_stage_node_changes_for_activeVognode<'a> (
+pub fn per_stage_node_changes_for_unrestrictedVognode<'a> (
   skgrepo_diffs : &'a Option<HashMap<SkgRepoName, SkgRepoDiff>>,
   pid           : &ID,
   skgrepo       : &SkgRepoName,
@@ -335,7 +335,7 @@ pub fn added_relationship_axes_from_per_stage_diffs<T: Clone + Eq + std::hash::H
 /// Deleted → Minus, Modified / absent → None).
 ///
 /// Used by the editable-expand path (extendEditableSubtree_fromGit, for the
-/// ActiveVognode's own node axes and for phantoms of a removed parent's
+/// UnrestrictedVognode's own node axes and for phantoms of a removed parent's
 /// children).
 pub fn file_node_axes_from_skgrepo_diff (
   skgrepo_diffs : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,

@@ -39,7 +39,7 @@ use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
 
-/// Collect (pid, affectsParent) pairs for all ActiveVognode children of a node.
+/// Collect (pid, affectsParent) pairs for all UnrestrictedVognode children of a node.
 fn children_info (
   tree : &Tree<Viewnode>,
   treeid : NodeId,
@@ -47,13 +47,13 @@ fn children_info (
   tree . get (treeid) . unwrap () . children ()
     . filter_map ( |child| {
       if let ViewnodeKind::Vognode (
-        Vognode::Active (t)) =
+        Vognode::Unrestricted (t)) =
         &child . value () . kind {
         Some (( t.skgid.0 . clone (), t.birth ))
       } else { None } } )
     . collect () }
 
-/// Find a child ActiveVognode by pid, returning its NodeId.
+/// Find a child UnrestrictedVognode by pid, returning its NodeId.
 fn find_child (
   tree : &Tree<Viewnode>,
   parent : NodeId,
@@ -62,7 +62,7 @@ fn find_child (
   tree . get (parent) . unwrap () . children ()
     . find ( |child| {
       if let ViewnodeKind::Vognode (
-        Vognode::Active (t)) =
+        Vognode::Unrestricted (t)) =
         &child . value () . kind {
         t.skgid.0 == pid
       } else { false } } )

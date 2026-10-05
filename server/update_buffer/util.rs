@@ -174,8 +174,8 @@ where Relevant : Fn (&Viewnode) -> bool,
   let problem_discard_response =
     |n: &mut Viewnode| { n . focused = true; };
   // TODO/DONE/local-view-update/plan_v2.org §6.0 stale-member rule: a stale member (relevant child not in the goal)
-  // that is an Active, affectsParent=true *branch* (has children) is demoted to
-  // non-member so the user's subtree survives; a stale InactiveVognode
+  // that is an Unrestricted, affectsParent=true *branch* (has children) is demoted to
+  // non-member so the user's subtree survives; a stale RestrictedVognode
   // *branch* is deadened to a DeadViewnode instead (it has no
   // affectsParent to demote; the orphan handling then preserves its
   // subtree as independent -- TODO/DONE/full-schema/DONE/9-2_source-set-safety.org);
@@ -190,10 +190,10 @@ where Relevant : Fn (&Viewnode) -> bool,
           . ok_or ("demote_invalid: node not found") ?;
         let has_children : bool = n . children () . next () . is_some ();
         match &n . value () . kind {
-          ViewnodeKind::Vognode (Vognode::Active (t))
+          ViewnodeKind::Vognode (Vognode::Unrestricted (t))
             if has_children && t . affectsParent == AffectsParent::True
             => StaleTreatment::Demote,
-          ViewnodeKind::Vognode (Vognode::Inactive (_))
+          ViewnodeKind::Vognode (Vognode::Restricted (_))
             if has_children
             => StaleTreatment::Deaden,
           _ => StaleTreatment::Detach } };
@@ -201,7 +201,7 @@ where Relevant : Fn (&Viewnode) -> bool,
         StaleTreatment::Detach => Ok (false),
         StaleTreatment::Demote => {
           with_node_mut ( tree, stale_treeid, |mut n| {
-            if let ViewnodeKind::Vognode (Vognode::Active (t))
+            if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
               = &mut n . value () . kind
               { t . affectsParent = AffectsParent::False; } } )
             . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;

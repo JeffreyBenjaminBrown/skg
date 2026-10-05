@@ -208,7 +208,7 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///
 ///   * Two non-vognode-level staged/unstaged INTERC rules and two
 ///     node-level ones -- the non-vognode-level pair omits the N / -N
-///     axes because node-axis markers only apply to ActiveVognodes,
+///     axes because node-axis markers only apply to UnrestrictedVognodes,
 ///     not to non-vognodes.
 ///
 ///   * The 'affectsParent' sub-rule 'true' is vacuous: the server leaves
@@ -284,12 +284,12 @@ pub fn herald_rule_table () -> HeraldRule {
         rule ("editRequest", vec! [
           crule (Nonstandard, "relRepo", vec! [
             any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ]),
-      // An inactive vognode is anonymous and dataless: the bare
-      // atom 'inactiveNode' (see InactiveVognode), like the other dataless
+      // A restricted vognode is anonymous and dataless: the bare
+      // atom 'restrictedNode' (see RestrictedVognode), like the other dataless
       // non-vognode markers. Its id/repo would leak hidden content, so
       // they are not emitted.
-      crule (Message, "inactiveNode", vec! [
-        s ("node from inactive repo") ]),
+      crule (Message, "restrictedNode", vec! [
+        s ("node from restricted skgrepo") ]),
       interc (Some (Go), "", Some ("staged"), vec! [
         s ("✓"),
         leaf (Nonstandard, "addedR", "R"),
@@ -466,7 +466,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     // Bare buffer-position atoms, from org_to_text.rs:
     "focused", "folded", "bodyFolded",
     // Form heads, from org_to_text.rs:
-    "node", "diffPhantom", "deleted", "unknown", "inactiveNode",
+    "node", "diffPhantom", "deleted", "unknown", "restrictedNode",
     "deadViewnode",
     // Keys inside node / diffPhantom / deleted / unknown forms:
     "id", "repo",
@@ -509,7 +509,7 @@ fn graphstats_atoms () -> Vec<&'static str> {
   let _ = guard;
   vec! [] }
 
-/// ViewnodeStats match atoms, from activeVognode_metadata_to_string's
+/// ViewnodeStats match atoms, from unrestrictedVognode_metadata_to_string's
 /// view_stats (org_to_text.rs). Birth and relationship facts are
 /// node-level '(rels ...)' data, not viewStats sub-forms.
 fn viewstats_atoms () -> Vec<&'static str> {

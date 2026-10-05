@@ -5,7 +5,7 @@
 //! folder occurrences).
 
 use crate::from_text::local_fieldintent_collection::predicates::{
-  active_child_counts_as_content, member_counts_for_partnerFolder};
+  unrestricted_child_counts_as_content, member_counts_for_partnerFolder};
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, SkgRepoName};
 use crate::types::nodes::complete::Flag;
@@ -20,8 +20,8 @@ use std::collections::HashSet;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum OccurrencePathStep {
-  Active (ID),
-  Inactive,
+  Unrestricted (ID),
+  Restricted,
   DiffPhantom (ID),
   DeletedPhantom (ID),
   UnknownPhantom (ID),
@@ -59,7 +59,7 @@ struct LocatedWriteProtectedOccurrence {
 
 /// Reject edits to write-protected occurrences that were present at the same
 /// location in the server's last rendering. An unmatched current occurrence
-/// is new, so it is allowed; its direct Active-node children are made
+/// is new, so it is allowed; its direct Unrestricted-node children are made
 /// non-members because that new occurrence cannot write a contains relation.
 pub fn errors_and_normalize_new_writeProtected_occurrences (
   current  : &mut ViewForest,
@@ -140,7 +140,7 @@ pub fn errors_and_normalize_new_writeProtected_occurrences (
     . filter ( |(index, _)| ! current_is_matched [*index] )
     . map ( |(_, occurrence)| occurrence . treeid )
     . collect ();
-  make_direct_active_children_independent (current, &new_occurrence_skgids);
+  make_direct_unrestricted_children_independent (current, &new_occurrence_skgids);
   errors
 }
 
@@ -200,7 +200,7 @@ fn collect_flags_surfaces (
 ) {
   let mut own_path : Vec<OccurrencePathStep> = parent_path . to_vec ();
   own_path . push (path_step (node . value ()));
-  if let ViewnodeKind::Vognode (Vognode::Active (recorder)) = &node . value () . kind {
+  if let ViewnodeKind::Vognode (Vognode::Unrestricted (recorder)) = &node . value () . kind {
     let folders : Vec<FlagsFolderSurface> = node . children ()
       . filter_map (|child| {
         let ViewnodeKind::PropertyFolder (PropertyFolder::Flags {
@@ -388,16 +388,16 @@ fn collect_occurrences (
 ) {
   let mut own_path : Vec<OccurrencePathStep> = parent_path . to_vec ();
   own_path . push (path_step (node . value ()));
-  if let ViewnodeKind::Vognode (Vognode::Active (active)) =
+  if let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =
     &node . value () . kind
-  { if active . is_writeProtected () {
+  { if restriction . is_writeProtected () {
     occurrences . push (LocatedWriteProtectedOccurrence {
       treeid      : node . id (),
       parent_path : parent_path . to_vec (),
       state       : WriteProtectedOccurrence {
-        skgid       : active . skgid . clone (),
-        title    : active . title . clone (),
-        home_skgrepo   : active . home_skgrepo . clone (),
+        skgid       : restriction . skgid . clone (),
+        title    : restriction . title . clone (),
+        home_skgrepo   : restriction . home_skgrepo . clone (),
         content  : content_members (node),
         aliases  : aliases (node),
         subscribes : partner_members (node, PartnerFolder::Subscribee),
@@ -412,10 +412,10 @@ fn path_step (
   node : &Viewnode,
 ) -> OccurrencePathStep {
   match &node . kind {
-    ViewnodeKind::Vognode (Vognode::Active (active)) =>
-      OccurrencePathStep::Active (active . skgid . clone ()),
-    ViewnodeKind::Vognode (Vognode::Inactive (_)) =>
-      OccurrencePathStep::Inactive,
+    ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =>
+      OccurrencePathStep::Unrestricted (restriction . skgid . clone ()),
+    ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
+      OccurrencePathStep::Restricted,
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (phantom))) =>
       OccurrencePathStep::DiffPhantom (phantom . skgid . clone ()),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (phantom))) =>
@@ -441,7 +441,7 @@ fn path_step (
   }
 }
 
-fn make_direct_active_children_independent (
+fn make_direct_unrestricted_children_independent (
   viewforest            : &mut ViewForest,
   new_occurrence_skgids : &[NodeId],
 ) {
@@ -452,18 +452,18 @@ fn make_direct_active_children_independent (
     . collect ();
   for child_skgid in child_skgids {
     if let Some (mut child) = viewforest . get_mut (child_skgid) {
-      if let ViewnodeKind::Vognode (Vognode::Active (active)) =
+      if let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =
         &mut child . value () . kind
-      { active . affectsParent = crate::types::viewnode::AffectsParent::False; }} }
+      { restriction . affectsParent = crate::types::viewnode::AffectsParent::False; }} }
 }
 
 fn content_members (
   node : NodeRef<Viewnode>,
 ) -> Vec<(ID, Option<SkgRepoName>)> {
   node . children () . filter_map ( |child| match &child . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Active (active))
-      if active_child_counts_as_content (active) =>
-        Some ((active . collected_skgid (), active . relRepo_request . clone ())),
+    ViewnodeKind::Vognode (Vognode::Unrestricted (restriction))
+      if unrestricted_child_counts_as_content (restriction) =>
+        Some ((restriction . collected_skgid (), restriction . relRepo_request . clone ())),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
       Some ((unknown . skgid . clone (), unknown . relRepo_request . clone ())),
     _ => None,
@@ -490,9 +490,9 @@ fn partner_members (
     &child . value () . kind, ViewnodeKind::PartnerFolder (folder) if *folder == wanted))
     . map ( |folder| folder . children () . filter_map ( |member| {
       match &member . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Active (active))
-          if member_counts_for_partnerFolder (active) =>
-            Some ((active . skgid . clone (), active . relRepo_request . clone ())),
+        ViewnodeKind::Vognode (Vognode::Unrestricted (restriction))
+          if member_counts_for_partnerFolder (restriction) =>
+            Some ((restriction . skgid . clone (), restriction . relRepo_request . clone ())),
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
           Some ((unknown . skgid . clone (), unknown . relRepo_request . clone ())),
         _ => None,
@@ -511,8 +511,8 @@ fn hidden_outside_members (
         ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee))))
     . map ( |hidden_outside| hidden_outside . children () . filter_map ( |member|
       match &member . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Active (active))
-          if member_counts_for_partnerFolder (active) => Some (active . skgid . clone ()),
+        ViewnodeKind::Vognode (Vognode::Unrestricted (restriction))
+          if member_counts_for_partnerFolder (restriction) => Some (restriction . skgid . clone ()),
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
           Some (unknown . skgid . clone ()),
         _ => None,
@@ -580,8 +580,8 @@ mod tests {
       &mut current, &original) . is_empty ());
     let child = current . nodes () . find_map ( |node| match
       &node . value () . kind
-    { ViewnodeKind::Vognode (Vognode::Active (active))
-        if active . skgid == ID::from ("child") => Some (active),
+    { ViewnodeKind::Vognode (Vognode::Unrestricted (restriction))
+        if restriction . skgid == ID::from ("child") => Some (restriction),
       _ => None, }) . unwrap ();
     assert_eq! (child . affectsParent, AffectsParent::False);
   }

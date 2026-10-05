@@ -39,8 +39,8 @@ true-content subtree.  This modifies metadata but does not save."
 
 (defun skg--flag-eligible-root-id (metadata)
   "Validate root METADATA and return its saved graph ID."
-  (unless (skg--activeNode-sexp-p metadata)
-    (user-error "Search matching can be set only on an active node"))
+  (unless (skg--unrestrictedNode-sexp-p metadata)
+    (user-error "Search matching can be set only on an unrestricted node"))
   (when (skg--node-write-protected-p metadata)
     (user-error "Cannot set search matching on a write-protected node"))
   (when (skg-sexp-cdr-at-path metadata '(skg node editRequest))
@@ -134,7 +134,7 @@ true-content subtree.  This modifies metadata but does not save."
              (if skipped (mapconcat #'identity (nreverse skipped) ", ") "none"))))
 
 (defun skg--flag-recursive-targets ()
-  "Return markers for root and active true-content descendants only."
+  "Return markers for root and unrestricted true-content descendants only."
   (save-excursion
     (org-back-to-heading t)
     (let ((targets (list (copy-marker (line-beginning-position))))
@@ -142,7 +142,7 @@ true-content subtree.  This modifies metadata but does not save."
       (outline-next-heading)
       (while (and (not (eobp)) (> (org-outline-level) root-level))
         (let ((meta (skg--metadata-sexp-at-point-or-nil)))
-          (if (and (skg--activeNode-sexp-p meta)
+          (if (and (skg--unrestrictedNode-sexp-p meta)
                    (skg--node-affectsParent-content-of-p meta))
               (progn
                 (push (copy-marker (line-beginning-position)) targets)

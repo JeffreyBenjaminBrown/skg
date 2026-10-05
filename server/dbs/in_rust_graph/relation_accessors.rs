@@ -279,7 +279,7 @@ impl InRustGraph {
     &self,
     pid      : &ID,
     relation : NodeRelation,
-    active   : Option<&crate::skgrepo_sets::ActiveSkgRepoSet>,
+    restriction : Option<&crate::skgrepo_sets::SkgrepoRestriction>,
   ) -> Vec<RelPartner<ID>> {
     let Some (node) = self . nodes . get (pid) else {
       return Vec::new (); };
@@ -296,25 +296,25 @@ impl InRustGraph {
         return Vec::new (),
     };
     members . into_iter ()
-      . filter ( |member| match active {
+      . filter ( |member| match restriction {
         None => true,
         Some (set) => set . is_all ()
           || set . contains_skgrepo (&member . relRepo), } )
       . collect () }
 
-  /// Raw outbound member IDs whose relRepo is in the active set. Unlike the
+  /// Raw outbound member IDs whose relRepo is in the skgrepo restriction. Unlike the
   /// PID-oriented accessor, this retains unresolved stored IDs so rendering
   /// can preserve them as Unknown phantoms.
   pub fn outbound_skgids_for_relation_gated (
     &self,
     pid      : &ID,
     relation : NodeRelation,
-    active   : Option<&crate::skgrepo_sets::ActiveSkgRepoSet>,
+    restriction : Option<&crate::skgrepo_sets::SkgrepoRestriction>,
   ) -> Vec<ID> {
     if relation == NodeRelation::LinksTo {
       return self . outbound_skgids_for_relation (pid, relation); }
     self . outbound_rel_partners_for_relation_gated (
-      pid, relation, active ) . into_iter ()
+      pid, relation, restriction ) . into_iter ()
       . map ( |member| member . member )
       . collect () }
 
@@ -322,7 +322,7 @@ impl InRustGraph {
   /// read from the recorder's outbound list. None when no such relationship
   /// exists. This is how INBOUND
   /// surfaces gate: an inbound partner P of X is visible at the
-  /// active set iff relRepo(P, R, X) is active -- private
+  /// skgrepo restriction iff relRepo(P, R, X) is unrestricted -- private
   /// memberships must not surface through ancestry, role trees, or
   /// inbound folders when the content direction hides them
   /// (render-and-gating, 5_plan.org).
@@ -368,30 +368,30 @@ impl InRustGraph {
       . find ( |member| &member . member == raw_member )
       . map ( |member| member . relRepo ) }
 
-  /// Outbound members whose relRepo is in the active set: the
+  /// Outbound members whose relRepo is in the skgrepo restriction: the
   /// visible composition of one relation. Pass None for the full composition.
   pub fn outbound_pids_for_relation_gated (
     &self,
     pid      : &ID,
     relation : NodeRelation,
-    active   : Option<&crate::skgrepo_sets::ActiveSkgRepoSet>,
+    restriction : Option<&crate::skgrepo_sets::SkgrepoRestriction>,
   ) -> Vec<ID> {
     self . outbound_skgids_for_relation_gated (
-      pid, relation, active ) . iter ()
+      pid, relation, restriction ) . iter ()
       . filter_map ( |member| self . pid_of (member) )
       . collect () }
 
   /// Inbound partners whose RELATIONSHIPS to this node are visible at the
-  /// active set (see 'relRepo'). Pass None for all of them.
+  /// skgrepo restriction (see 'relRepo'). Pass None for all of them.
   pub fn inbound_pids_for_relation_gated (
     &self,
     pid      : &ID,
     relation : NodeRelation,
-    active   : Option<&crate::skgrepo_sets::ActiveSkgRepoSet>,
+    restriction : Option<&crate::skgrepo_sets::SkgrepoRestriction>,
   ) -> Vec<ID> {
     self . inbound_pids_for_relation (pid, relation)
       . into_iter ()
-      . filter ( |partner| match active {
+      . filter ( |partner| match restriction {
         None => true,
         Some (a) => a . is_all ()
           || self . relRepo (partner, relation, pid)
@@ -444,20 +444,20 @@ impl InRustGraph {
     self . other_member_pids_gated (pid, role, None) }
 
   /// 'other_member_pids' with relRepo gating: partners whose
-  /// RELATIONSHIP is above the active prefix are omitted, in both
+  /// RELATIONSHIP is above the skgrepo restriction are omitted, in both
   /// directions (see 'relRepo').
   pub fn other_member_pids_gated (
     &self,
     pid    : &ID,
     role   : RelationRole,
-    active : Option<&crate::skgrepo_sets::ActiveSkgRepoSet>,
+    restriction : Option<&crate::skgrepo_sets::SkgrepoRestriction>,
   ) -> Vec<ID> {
     if role . is_first_role () {
       self . outbound_pids_for_relation_gated (
-        pid, role . relation, active )
+        pid, role . relation, restriction )
     } else {
       self . inbound_pids_for_relation_gated (
-        pid, role . relation, active ) } }
+        pid, role . relation, restriction ) } }
 
   pub fn relation_membership_is_real (
     &self,
@@ -469,7 +469,7 @@ impl InRustGraph {
       recorder_pid, member_pid, member_role, None ) }
 
   /// 'relation_membership_is_real' with relRepo gating: a relationship
-  /// whose relRepo is outside the active prefix does not count
+  /// whose relRepo is outside the skgrepo restriction does not count
   /// as a membership (see 'relRepo'). Pass None to ask about the
   /// full composition.
   pub fn relation_membership_is_visible (
@@ -477,11 +477,11 @@ impl InRustGraph {
     recorder_pid : &ID,
     member_pid   : &ID,
     member_role  : RelationRole,
-    active       : Option<&crate::skgrepo_sets::ActiveSkgRepoSet>,
+    restriction  : Option<&crate::skgrepo_sets::SkgrepoRestriction>,
   ) -> bool {
     let members : Vec<ID> =
       self . other_member_pids_gated (
-        recorder_pid, member_role . opposite_role (), active );
+        recorder_pid, member_role . opposite_role (), restriction );
     members . contains (member_pid) }
 }
 

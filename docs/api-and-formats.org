@@ -38,10 +38,10 @@ So far there are these endpoints:
       - "regex=true": interpret the query as a per-token regex; a RegexQuery is built directly and the QueryParser is bypassed.
       - "body=true": also search node bodies (titles are always searched).
       - "operators=true": preserve Tantivy phrase and operator syntax (AND / OR / phrase / +foo / -bar / grouping / field:). Intra-word operator chars still get escaped heuristically so C++ etc. remain findable. In regex mode, the query is parsed as a boolean expression over the per-token regexes: AND / OR / NOT / +foo / -bar, conventional precedence (NOT > AND > OR, bare adjacency = OR), and grouping via parens that stand ALONE between whitespace (a paren attached to a pattern is regex syntax within that piece). Malformed operator syntax is an error; phrase syntax does not apply. Detailed in docs/COMMANDS.org.
-    - The active skgrepo-set is applied before grouping, ranking,
-      alias/title selection, and display truncation. Inactive-repo
+    - The skgrepo restriction is applied before grouping, ranking,
+      alias/title selection, and display truncation. Restricted-skgrepo
       documents do not influence result order or which title/alias is
-      shown for an active result.
+      shown for an unrestricted result.
     - =overPrivateText-telescopes= is normally absent on the first request. Under
       a restricted skgrepo-set, if the search index contains any telescope
       whose selected title or body lies below home, the server does no
@@ -57,7 +57,7 @@ So far there are these endpoints:
 
   - Phase 1, immediate: Server sends LP =((response-type
     search-results) (content "ORG") (warnings ("..." ...)))=.
-    Results are ordinary write-protected non-content active vognodes (not
+    Results are ordinary write-protected non-content unrestricted vognodes (not
     special non-vognode types). A no-match or error response has the same
     response type and a single =content= field.
 
@@ -81,8 +81,8 @@ So far there are these endpoints:
        response-type "search-enrichment" with =(("terms" "TERMS")
        ("content" "ORG") ("warnings" (...)))=. Emacs replaces the
        buffer and exits readonly.
-    - Enrichment uses the same active skgrepo-set as the original
-      search. Containerward role tree truncates before inactive
+    - Enrichment uses the same skgrepo restriction as the original
+      search. Containerward role tree truncates before restricted
       containers.
     - Each result's overrideward view-subtree contains its visible
       override relatives in both directions: what it overrides and what
@@ -104,9 +104,9 @@ So far there are these endpoints:
     prompt. An approved retry carries those
     exact PIDs in =approved-overPrivateText-pids=; approval is not cached.
     Skgrepo-set =all= returns the ordinary response with a warning.
-  - If =NODE_ID= resolves to an inactive skgrepo, the server refuses the
+  - If =NODE_ID= resolves to a restricted skgrepo, the server refuses the
     request with a human-readable message and does not open a buffer.
-    Following a link to an inactive-repo node behaves the same way.
+    Following a link to a restricted-skgrepo node behaves the same way.
   - The requested node opens as itself, drawn raw. Because the raw root
     is an overridden node drawn raw, its immediate children also draw
     raw (one level); substitution resumes at the grandchildren. See
@@ -175,7 +175,7 @@ So far there are these endpoints:
        =content= is the re-rendered saved buffer (nil on failure). =errors= is a list of failure-explaining strings. =warnings= is a list of nonfatal messages. Both lists are present and empty if none.
   - Before mutation, the server computes the update-relevant neighborhood of
     every prepared write/delete identity independently in the before and
-    candidate graphs. Other registered views containing an affected active ID
+    candidate graphs. Other registered views containing an affected unrestricted ID
     are rerendered. For every dirty client view, the server parses and unions
     dependencies from its clean baseline, current text, and registered forest
     when present. Any intersection refuses the save conservatively; malformed
@@ -246,8 +246,8 @@ So far there are these endpoints:
   - The server deliberately returns the computed path when the file no
     longer exists, so deleted nodes can still be located in a git diff.
   - Does not require the live graph or Tantivy -- only the config.
-  - If the requested skgrepo is inactive in the current connection's
-    active skgrepo-set, the server refuses to expose the path. Direct
+  - If the requested skgrepo is restricted in the current connection's
+    skgrepo restriction, the server refuses to expose the path. Direct
     file visits outside Skg are not intercepted.
 
 ** Git diff mode toggle
@@ -262,7 +262,7 @@ So far there are these endpoints:
     When enabled, subsequent =single root content view= and =save buffer=
     responses include diff annotations showing changes
     between git HEAD and the worktree.
-  - Refusal: ENABLING diff mode requires the active skgrepo-set =all=.
+  - Refusal: ENABLING diff mode requires the skgrepo restriction =all=.
     Under a restricted set the server refuses: the git-diff-mode
     response carries the refusal text as =content=, followed by an
     EMPTY rerender stream (a rerender-lock naming no views, then
@@ -300,12 +300,12 @@ So far there are these endpoints:
     A client batches and deduplicates literal link target IDs in a view.
   - Response: LP =((response-type link-statuses) (request-id "TOKEN")
     (results (("ID" resolved "PID" "REPO-LABEL")
-              ("ID" inactive) ("ID" missing) ...)))=.
+              ("ID" restricted) ("ID" missing) ...)))=.
     Results follow the requested IDs. =PID= is the resolved primary ID,
     including resolution from an extra ID. =REPO-LABEL= is the visible
-    target's home-repo herald label, not the link's relRepo. Inactive
+    target's home-repo herald label, not the link's relRepo. Restricted
     and missing rows return neither title nor skgrepo. The lookup reads the
-    current in-Rust graph snapshot and active skgrepo-set, independently
+    current in-Rust graph snapshot and skgrepo restriction, independently
     of Tantivy title-index commits. =request-id= associates asynchronous
     responses with their requesting buffer and its buffer generation.
 
@@ -330,7 +330,7 @@ So far there are these endpoints:
   - Refuses to produce an ordinary report if any configured skgrepo is not a
     gitrepo, has no HEAD commit, has a selected merge-commit HEAD baseline,
     or contains an unreadable =.skg= blob in the selected git snapshots.
-  - Refuses to run unless the active skgrepo-set is =all=; restricted
+  - Refuses to run unless the skgrepo restriction is =all=; restricted
     skgrepo-set diff reports are not defined yet.
   - Because it runs only under =all=, a report involving an overPrivateText
     telescope is returned with the shared text-release warning; this
@@ -395,7 +395,7 @@ So far there are these endpoints:
     anchored at =ORIGIN= (the data root, captured before the loop).
     The logic lives in
     =server/git_ops/find_and_stage_moves.rs=.
-  - Scans all skgrepos regardless of the active skgrepo-set (a move can
+  - Scans all skgrepos regardless of the skgrepo restriction (a move can
     cross skgrepo-set boundaries). Skgrepos that are not gitrepos
     contribute nothing. When no moves are found, the script body is a
     single =# No moves detected.= comment.
@@ -609,26 +609,26 @@ one automatically.
     itself plus everything more public, and =all= means every skgrepo.
   - Request: ((request . "list repo sets"))
   - Response: LP response-type "repo-sets" with
-    =((active "NAME") (sets ("NAME1" "NAME2" ...)))=. The sets are
+    =((restriction "NAME") (sets ("NAME1" "NAME2" ...)))=. The sets are
     the skgrepo names in privacy order (most public first) followed
     by =all=; order is meaningful (it is the privacy ladder), so
     clients should preserve it.
-  - Request: ((request . "active repo set"))
-  - Response: LP response-type "active-repo-set" with
-    =((active "NAME"))=.
-  - Request: =((request . "set active repo set") (name . "NAME")
+  - Request: ((request . "skgrepo restriction"))
+  - Response: LP response-type "skgrepo-restriction" with
+    =((restriction "NAME"))=.
+  - Request: =((request . "set skgrepo restriction") (name . "NAME")
     (approved-overPrivateText-pids "PID" ...))=.
   - Response: Multiple length-prefixed messages, sent sequentially:
     1. Skgrepo-set response:
-       =Content-Length: N\r\n\r\n(("response-type" "active-repo-set") ("active" "NAME") ("content" "Active repo-set: NAME"))=
+       =Content-Length: N\r\n\r\n(("response-type" "skgrepo-restriction") ("restriction" "NAME") ("content" "Skgrepo restriction: NAME"))=
     2. The rerender stream, as in "rerender all views":
        rerender-lock → rerender-view* → rerender-done. Each open view
        is re-rendered in place under the new set: nodes whose skgrepo
-       became inactive are converted and pruned (an inactive node
-       with active viewchildren is retained, write-protected), and
+       became restricted are converted and pruned (a restricted node
+       with unrestricted viewchildren is retained, write-protected), and
        PartnerFolders regenerate per the new set, so widening the set
        reveals members and folders.
-  - Behavior: The active skgrepo-set is per Emacs TCP connection. It
+  - Behavior: The skgrepo restriction is per Emacs TCP connection. It
     defaults from =skgconfig.toml=, resets on reconnect, and is not
     written back to the config. Changing it requires confirmation in
     Emacs, re-renders (not closes) all active Skg buffers for that
@@ -637,20 +637,20 @@ one automatically.
     is on is refused, before any side effect (no enrichment
     cancellation, no set change, no rerendering). The refusal — and
     likewise the endpoint's error paths (missing or unknown set
-    name) — answers in the normal active-repo-set response-type,
+    name) — answers in the normal skgrepo-restriction response-type,
     carrying the explanatory text as =content= and the UNCHANGED set
-    as =active=, followed by an EMPTY rerender stream (a
+    as =restriction=, followed by an EMPTY rerender stream (a
     rerender-lock naming no views, then rerender-done), so the
     client's preemptive buffer locks and stream guard unwind.
     Switching TO =all= is always allowed. The resulting
-    per-connection invariant: diff mode on implies active skgrepo-set
+    per-connection invariant: diff mode on implies skgrepo restriction
     =all=.
   - Rerender authorization precedes both the set change and release of
     view text. If the proposed set would render an overPrivateText telescope, the
     first reply is LP =overPrivateText-telescope-confirmation= with
     =(operation repo-set-switch-rerender)= and exact PIDs, followed by an EMPTY
     rerender stream. A retry adds =approved-overPrivateText-pids=; declining
-    leaves the active set and open-view registry unchanged.
+    leaves the skgrepo restriction and open-view registry unchanged.
 
 ** Titles by ids
   - Request: =((request . "titles by ids") (ids "ID1" "ID2" ...)
@@ -661,9 +661,9 @@ one automatically.
   - IDs not found in Tantivy are simply absent from the response, except
     that deleted =.skg= files visible in the current git diff can also
     supply titles.
-  - Inactive-repo IDs are omitted from the title map, even if they
+  - Restricted-skgrepo IDs are omitted from the title map, even if they
     exist in Tantivy or on disk. =skg-readable-ids-mode= may still
-    shorten UUIDs uniformly, but it must not title-annotate inactive
+    shorten UUIDs uniformly, but it must not title-annotate restricted
     IDs.
   - Used by =skg-readable-ids-mode= to annotate UUIDs in magit buffers with their titles.
   - Under a restricted skgrepo-set, requested titles involving overPrivateText
@@ -839,7 +839,7 @@ Nonzero =(aliases K)=, =(extraIds K)= and =(flags K)= are property counts.
 See [[file:./heralds.org][heralds.org]] for the rendered notation and styles.
 
 There is no longer a
-=(graphStats ...)= sexp on an active node: its counts fold into the
+=(graphStats ...)= sexp on an unrestricted node: its counts fold into the
 form above (=overriding= / =subscribing= / =hiding= become the =O= / =S= /
 =H= tokens; =aliasing= / =extraIDs=/true flags become the
 =Ak= / =Ik= / =Fk= property tokens),
@@ -858,7 +858,7 @@ under different parents):
 
 - =cycle= — this position repeats an ancestor's ID;
 - =(homeRepoHerald ⌂:LABEL)= — the node sits at a skgrepo boundary (a
-  root, or a skgrepo differing from its nearest active-vognode ancestor);
+  root, or a skgrepo differing from its nearest unrestricted-vognode ancestor);
 - =(relRepo NAME)= — yucky herald "~NAME", drawn immediately before
   the ⌂ skgrepo herald; the relRepo of the RELATIONSHIP this
   headline represents (the =contains= relationship to a content child, or
@@ -902,7 +902,7 @@ remove graph context.
 
 When view completion would CREATE a viewnode for node N as
 recursive content, and an owned overrider R of N is visible
-under the active skgrepo-set, it draws R instead -- transitively (a
+under the skgrepo restriction, it draws R instead -- transitively (a
 owned chain D overrides C overrides N is legal and resolves to
 the last visible link), cycle-guarded, and never in diff mode.
 Ordinary completion does not rewrite an existing raw viewnode merely because
@@ -925,7 +925,7 @@ PartnerFolder member, a view root, or the overridden-as-such (a member
 child of an overriddenFolder) -- also draw raw: the user is looking at the
 original, so its children are the original's, not the overrider's. This is one
 level deep -- substitution resumes at the grandchildren -- and it is strict:
-a node whose only overrider is invisible under the active skgrepo-set is
+a node whose only overrider is invisible under the skgrepo restriction is
 "overridden but drawn raw" too, so its children draw raw as well.
 
 A substituted viewnode carries the keyed viewStats form
@@ -942,8 +942,8 @@ explanation. With chains the honest carrier may be a MIDDLE link
 (drawn when a later link's mentioner is hidden), so the check accepts
 any node on the chain and rejects only off-chain markers. A
 skgrepo-set switch that makes a
-drawn substitute's skgrepo inactive turns it into an anonymous
-=inactiveNode= (the marker does not survive -- an inactive node is
+drawn substitute's skgrepo restricted turns it into an anonymous
+=restrictedNode= (the marker does not survive -- a restricted node is
 dataless); the original it stood for is preserved in its container's
 contains by disk supplementation.
 
@@ -962,7 +962,7 @@ Pass its path as a command-line argument (default: =data/skgconfig.toml=) when s
 | =initial_node_limit= | no       | 1000    | Max nodes to render in initial content views.                    |
 | =timing_log=         | no       | false   | When true, writes a JSON log to =<data_root>/logs/server.jsonl=. |
 | =beep_when_server_becomes_available= | no | true | When true, plays a local sound after server initialization finishes. |
-| =default_repo_set= | no | =all= | Skgrepo-set active when a client connects. Runtime changes are per connection and are not written back. |
+| =default_repo_set= | no | =all= | The skgrepo restriction when a client connects. Runtime changes are per connection and are not written back. |
 
 The retired keys =db_name=, =delete_on_quit=, and =auto_audit_daily= are
 rejected with a migration error; remove them from older configurations.
@@ -998,7 +998,7 @@ table is rejected with an error. The sets are exactly the
 set consisting of itself and every more-public skgrepo, and the
 reserved name =all= means every skgrepo. Choosing a set is choosing
 "the most private skgrepo to make available." =default_repo_set=
-(top-level field) names the set active when a client connects.
+(top-level field) names the skgrepo restriction when a client connects.
 
 Example:
 
@@ -1145,7 +1145,7 @@ non-vognodes with per-stage diff information. The 'staged' stage
 compares HEAD to the index; 'unstaged' compares the index to the
 worktree.
 
-Inside a =(node ...)= form (active vognodes):
+Inside a =(node ...)= form (unrestricted vognodes):
 - =(staged AXES)= and/or =(unstaged AXES)=, where =AXES= is a sequence
   of bare atoms drawn from ={addedN, deletedN, addedR, removedR}=. =N= =
   node (the node's =.skg= file appeared/disappeared in this
@@ -1188,12 +1188,12 @@ Examples:
 (skg (textChanged staged unstaged))
 #+end_example
 
-** Inactive-repo nodes: omission, retention, and save preservation
+** Restricted-skgrepo nodes: omission, retention, and save preservation
 
-Under a restricted skgrepo-set, rendering omits nodes from inactive
+Under a restricted skgrepo-set, rendering omits nodes from restricted
 skgrepos entirely -- content, subscribees, and every PartnerFolder's
-members alike. No inactive vognode appears, and omission is recursive: an
-omitted container's whole branch is omitted, active descendants
+members alike. No restricted vognode appears, and omission is recursive: an
+omitted container's whole branch is omitted, unrestricted descendants
 included (they stay reachable by search or direct visit).
 
 Saving preserves what rendering omitted: an omitted relationship
@@ -1203,30 +1203,30 @@ anchored weave) for =contains= and =subscribesTo=, set-difference
 for =overrides=. Edits to visible members, including
 deletions, are honored.
 
-The one place an inactive node still appears is retention: when a
+The one place a restricted node still appears is retention: when a
 skgrepo-set switch is applied to an open view (an already-drawn
-buffer), an inactive node with active viewchildren stays on screen
-as an anonymous inactive vognode, so its active descendants are not
+buffer), a restricted node with unrestricted viewchildren stays on screen
+as an anonymous restricted vognode, so its unrestricted descendants are not
 orphaned:
 
 #+begin_example
-(skg inactiveNode)
+(skg restrictedNode)
 #+end_example
 
-The inactive vognode is dataless by design: an inactive node's id, skgrepo,
+The restricted vognode is dataless by design: a restricted node's id, skgrepo,
 and title all describe content the user hid by restricting the
 skgrepo-set, so emitting any of it would leak. It carries no id or
 skgrepo and renders titleless. It is save-inert: it emits no fieldIntent
 (its membership in its parent's list is owned entirely by disk
 supplementation, not the buffer), it is not a collateral re-render target, and
 editing its (empty) title/body is a buffer validation error. Its
-active children remain fully editable. A de-novo render under a
-restricted set never produces one -- inactive members are omitted and
+unrestricted children remain fully editable. A de-novo render under a
+restricted set never produces one -- restricted members are omitted and
 their content is never expanded.
 
-Edits to inactive nodes themselves are /suppressed/ at save, not
-fatal: any nodeInstruction that would write an inactive skgrepo is
-dropped and the save succeeds with the warning "Inactive nodes
+Edits to restricted nodes themselves are /suppressed/ at save, not
+fatal: any nodeInstruction that would write a restricted skgrepo is
+dropped and the save succeeds with the warning "Restricted nodes
 present in saved buffer remain unchanged in graph." An untouched
 stale node saves silently (its identical-to-disk nodeInstruction is
 discarded as a no-op first).

@@ -93,7 +93,7 @@ describe('skg.readable_ids', function ()
   local uuid_b = '557a869b-02ba-4c59-a5d3-5fb469a12353'
 
   it('conceals id tails even before titles arrive', function ()
-    -- Mirrors "shorten inactive ids without title overlay": an id the
+    -- Mirrors "shorten restricted ids without title overlay": an id the
     -- server does not name still displays shortened.
     local server = helpers.connect_to_fake_server(
       function (line, respond)

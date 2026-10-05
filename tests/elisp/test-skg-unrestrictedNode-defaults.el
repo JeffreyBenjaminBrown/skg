@@ -1,25 +1,25 @@
-;;; test-skg-activeNode-defaults.el --- Tests for skg-activeNode-defaults
+;;; test-skg-unrestrictedNode-defaults.el --- Tests for skg-unrestrictedNode-defaults
 
 (load-file (expand-file-name "../../elisp/skg-test-utils.el"
                              (file-name-directory load-file-name)))
 (require 'ert)
-(require 'skg-activeNode-defaults)
+(require 'skg-unrestrictedNode-defaults)
 
 ;;
-;; skg-activeNode-sexp-p
+;; skg-unrestrictedNode-sexp-p
 ;;
 
-(ert-deftest test-activeNode-sexp-p-positive ()
-  "Recognizes an ActiveVognode sexp."
-  (should (skg-activeNode-sexp-p '(skg (node (id abc) (repo jeff))))))
+(ert-deftest test-unrestrictedNode-sexp-p-positive ()
+  "Recognizes an UnrestrictedVognode sexp."
+  (should (skg-unrestrictedNode-sexp-p '(skg (node (id abc) (repo jeff))))))
 
-(ert-deftest test-activeNode-sexp-p-negative-not-skg ()
+(ert-deftest test-unrestrictedNode-sexp-p-negative-not-skg ()
   "Rejects non-skg sexp."
-  (should-not (skg-activeNode-sexp-p '(foo (node (id abc))))))
+  (should-not (skg-unrestrictedNode-sexp-p '(foo (node (id abc))))))
 
-(ert-deftest test-activeNode-sexp-p-negative-not-node ()
+(ert-deftest test-unrestrictedNode-sexp-p-negative-not-node ()
   "Rejects skg sexp without node."
-  (should-not (skg-activeNode-sexp-p '(skg (alias (id abc))))))
+  (should-not (skg-unrestrictedNode-sexp-p '(skg (alias (id abc))))))
 
 ;;
 ;; skg-headlines-to-org
@@ -36,10 +36,10 @@
 ;;
 
 (ert-deftest test-expand-minimal-sexp ()
-  "Expanding a minimal ActiveVognode inserts all default fields."
+  "Expanding a minimal UnrestrictedVognode inserts all default fields."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-activeNode-expand-defaults-in-org org-text))
+         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     ;; Should have: skg, node, id : abc, repo : jeff,
@@ -65,7 +65,7 @@
   "Expanding a sexp with bare writeProtected shows 'true' child."
   (let* ((sexp '(skg (node (id abc) (repo jeff) writeProtected)))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-activeNode-expand-defaults-in-org org-text))
+         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
          (write-protected-idx (cl-position "writeProtected" headlines
@@ -82,7 +82,7 @@
   "Expanding a sexp without affectsParent inserts 'true (default)'."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-activeNode-expand-defaults-in-org org-text))
+         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
          (affectsParent-idx (cl-position "affectsParent" headlines
@@ -99,8 +99,8 @@
   "Stripping an unmodified expanded org returns the original sexp."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-activeNode-expand-defaults-in-org org-text))
-         (stripped (skg-activeNode-strip-defaults-from-org expanded))
+         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
@@ -126,7 +126,7 @@
                            "**** none (default)\n"
                            "*** viewRequests\n"
                            "**** none (default)"))
-         (stripped (skg-activeNode-strip-defaults-from-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result '(skg (node (id abc) (repo jeff) writeProtected))))))
 
@@ -152,7 +152,7 @@
                            "**** none\n"
                            "*** viewRequests\n"
                            "**** none"))
-         (stripped (skg-activeNode-strip-defaults-from-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result '(skg (node (id abc) (repo jeff)))))))
 
@@ -164,8 +164,8 @@
   "Round-trip: expand then strip on minimal sexp is identity."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-activeNode-expand-defaults-in-org org-text))
-         (stripped (skg-activeNode-strip-defaults-from-org expanded))
+         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
@@ -173,8 +173,8 @@
   "Round-trip: expand then strip preserves bare writeProtected."
   (let* ((sexp '(skg (node (id abc) (repo jeff) writeProtected)))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-activeNode-expand-defaults-in-org org-text))
-         (stripped (skg-activeNode-strip-defaults-from-org expanded))
+         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
@@ -182,8 +182,8 @@
   "Round-trip: expand then strip preserves (editRequest delete)."
   (let* ((sexp '(skg (node (id abc) (repo jeff) (editRequest delete))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-activeNode-expand-defaults-in-org org-text))
-         (stripped (skg-activeNode-strip-defaults-from-org expanded))
+         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
@@ -191,8 +191,8 @@
   "Round-trip: expand then strip preserves (editRequest (merge XYZ))."
   (let* ((sexp '(skg (node (id abc) (repo jeff) (editRequest (merge XYZ)))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-activeNode-expand-defaults-in-org org-text))
-         (stripped (skg-activeNode-strip-defaults-from-org expanded))
+         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
@@ -204,7 +204,7 @@
   "Fields appear in canonical order after expansion."
   (let* ((sexp '(skg (node (repo jeff) (graphStats 42) (id abc) writeProtected)))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-activeNode-expand-defaults-in-org org-text))
+         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
          (level-3 (mapcar #'cdr
@@ -231,7 +231,7 @@
                            "**** jeff\n"
                            "*** editRequest\n"
                            "**** merge [[id:XYZ][some label]]"))
-         (stripped (skg-activeNode-strip-defaults-from-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result
                    '(skg (node (id abc) (repo jeff)
@@ -251,7 +251,7 @@
                            "**** jeff\n"
                            "*** affectsParent\n"
                            "**** false"))
-         (stripped (skg-activeNode-strip-defaults-from-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result
                    '(skg (node (id abc) (repo jeff) (affectsParent false)))))))
@@ -273,7 +273,7 @@
                            "***** aliases\n"
                            "**** roleTree\n"
                            "***** container"))
-         (stripped (skg-activeNode-strip-defaults-from-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result
                    '(skg (node (id abc) (repo jeff)
@@ -297,7 +297,7 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
                            "*** birth\n"
                            "*** editRequest\n"
                            "*** viewRequests"))
-         (stripped (skg-activeNode-strip-defaults-from-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result '(skg (node (repo only)))))))
 
@@ -308,7 +308,7 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
                            "*** repo\n"
                            "**** only\n"
                            "*** viewRequests"))
-         (stripped (skg-activeNode-strip-defaults-from-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result '(skg (node (repo only)))))))
 
@@ -320,7 +320,7 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
   "Expanding with default-repo marks matching repo value."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-activeNode-expand-defaults-in-org org-text "jeff"))
+         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text "jeff"))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     (should (cl-find "jeff (default)" headlines
@@ -330,7 +330,7 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
   "Expanding with default-repo leaves non-matching repo value bare."
   (let* ((sexp '(skg (node (id abc) (repo bob))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-activeNode-expand-defaults-in-org org-text "jeff"))
+         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text "jeff"))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     (should (cl-find "bob" headlines :key #'cdr :test #'string=))
@@ -341,7 +341,7 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
   "Expanding a node with no repo inserts default repo."
   (let* ((sexp '(skg (node (id abc))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-activeNode-expand-defaults-in-org org-text "jeff"))
+         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text "jeff"))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     (should (cl-find "repo" headlines :key #'cdr :test #'string=))
@@ -356,7 +356,7 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
                            "**** abc\n"
                            "*** repo\n"
                            "**** jeff (default)"))
-         (stripped (skg-activeNode-strip-defaults-from-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result '(skg (node (id abc) (repo jeff)))))))
 
@@ -368,7 +368,7 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
                            "**** abc\n"
                            "*** repo\n"
                            "**** bob"))
-         (stripped (skg-activeNode-strip-defaults-from-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result '(skg (node (id abc) (repo bob)))))))
 
@@ -376,16 +376,16 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
   "Round-trip with default-repo: expand then strip is identity."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-activeNode-expand-defaults-in-org org-text "jeff"))
-         (stripped (skg-activeNode-strip-defaults-from-org expanded))
+         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text "jeff"))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
 (ert-deftest test-round-trip-new-node-no-repo ()
   "Round-trip for new node: expand with default, strip keeps repo."
   (let* ((org-text "* skg\n** node")
-         (expanded (skg-activeNode-expand-defaults-in-org org-text "jeff"))
-         (stripped (skg-activeNode-strip-defaults-from-org expanded))
+         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text "jeff"))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result '(skg (node (repo jeff)))))))
 
@@ -400,7 +400,7 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
   (let* ((sexp '(skg (node (id abc) (repo public)
                            (rels "C5"))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-activeNode-expand-defaults-in-org org-text))
+         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     ;; Repo field must be present
@@ -420,8 +420,8 @@ sexp<->org bijection is symbol-based, so the display-only herald strings
 here; see test-round-trip-with-links-in-herald's removal.)"
   (let* ((sexp '(skg (node (id abc) (repo public))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-activeNode-expand-defaults-in-org org-text))
-         (stripped (skg-activeNode-strip-defaults-from-org expanded))
+         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
@@ -432,7 +432,7 @@ preserves repo and all fields."
                            (repo public)
                            (rels "C5 4(1,1)L"))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-activeNode-expand-defaults-in-org org-text))
+         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     ;; Repo must be present
@@ -462,7 +462,7 @@ preserves repo and all fields."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
          (expanded
-          (skg-activeNode-expand-defaults-in-org
+          (skg-unrestrictedNode-expand-defaults-in-org
            org-text nil "actual title"))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
@@ -477,7 +477,7 @@ preserves repo and all fields."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
          (expanded
-          (skg-activeNode-expand-defaults-in-org org-text nil ""))
+          (skg-unrestrictedNode-expand-defaults-in-org org-text nil ""))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     (should (equal (car headlines) '(1 . "skg")))))
@@ -487,10 +487,10 @@ preserves repo and all fields."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
          (expanded
-          (skg-activeNode-expand-defaults-in-org
+          (skg-unrestrictedNode-expand-defaults-in-org
            org-text nil "actual title"))
-         (stripped (skg-activeNode-strip-defaults-from-org expanded))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
-(provide 'test-skg-activeNode-defaults)
+(provide 'test-skg-unrestrictedNode-defaults)

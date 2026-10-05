@@ -154,9 +154,9 @@ describe('skg.heralds', function ()
     heralds.disable(buf)
   end)
 
-  it('displays the inactive vognode as a message', function ()
-    local chunks = heralds.chunks_from_metadata('(skg inactiveNode)')
-    assert.are.equal('node from inactive repo',
+  it('displays the restricted vognode as a message', function ()
+    local chunks = heralds.chunks_from_metadata('(skg restrictedNode)')
+    assert.are.equal('node from restricted skgrepo',
                      heralds.chunks_text(chunks))
     assert.are.equal('SkgHeraldMessage', chunks[1][2])
   end)

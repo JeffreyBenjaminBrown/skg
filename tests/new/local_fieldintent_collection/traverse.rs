@@ -179,20 +179,20 @@ fn editable_member_of_write_protected_folder_emits_for_itself_only () {
     assert_eq!( recorder . subscribesTo, None ); }}
 
 #[test]
-fn editable_child_of_inactive_vognode_emits () {
+fn editable_child_of_restricted_vognode_emits () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id root) (repo main))) root
-      ** (skg (inactiveNode (id hidden) (repo private)))
+      ** (skg (restrictedNode (id hidden) (repo private)))
       *** (skg (node (id stowaway) (repo main))) stowaway
       "} );
   { let stowaway : &FieldIntentsForOneId = entry (&collected, "stowaway");
     assert!( stowaway . title_and_body . is_some() ); }
   assert!( collected . by_pid . get (&ID::from ("hidden")) . is_none(),
-           "the inactive node itself emits nothing" );
+           "the restricted node itself emits nothing" );
   assert_eq!( entry (&collected, "root") . contains,
               Some (vec![]),
-              "the inactive node is not content of its parent; its \
+              "the restricted node is not content of its parent; its \
                membership is owned by the disk weave" ); }
 
 #[test]
@@ -209,13 +209,13 @@ fn editable_node_inside_diff_phantom_subtree_emits () {
       forest . nodes()
       . find ( |n| matches!(
           &n . value() . kind,
-          ViewnodeKind::Vognode (Vognode::Active (t))
+          ViewnodeKind::Vognode (Vognode::Unrestricted (t))
             if t . skgid == ID::from ("fading") ))
       . map ( |n| n . id() )
       . expect ("fading node not found");
     { let tree : &mut Tree<Viewnode> =
         forest . as_internal_tree_mut();
-      if let ViewnodeKind::Vognode (Vognode::Active (t)) =
+      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
         &mut tree . get_mut (fading_treeid) . unwrap() . value() . kind
       { t . relationship_axes . unstaged = Some (Sign::Minus); }
       tree . get_mut (fading_treeid) . unwrap()

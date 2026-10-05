@@ -28,21 +28,21 @@
 /// validation precludes, it stays total, emitting nothing rather
 /// than erroring.
 /// .
-/// DEFINITION: a vognode is *save-eligible* iff it is Active,
+/// DEFINITION: a vognode is *save-eligible* iff it is Unrestricted,
 /// editable, lacks a Delete edit request, and is not in
 /// subscribee-as-such position. (Its position may be anywhere else --
 /// including as a member of a write-protected folder, where it is
 /// save-eligible for itself but invisible to the folder's recorder.)
 /// .
 /// DEFINITION: a vognode is *in subscribee-as-such position* iff it
-/// is an Active, affectsParent=true direct child of a SubscribeeFolder.
+/// is an Unrestricted, affectsParent=true direct child of a SubscribeeFolder.
 /// A non-member child of a SubscribeeFolder is not a member of the
 /// folder, hence not shown *as* a subscribee: it is an ordinary
 /// self-writer parked there.
 
 use crate::from_text::local_fieldintent_collection::predicates::{
-  active_child_counts_as_content,
-  active_child_counts_as_visible_content,
+  unrestricted_child_counts_as_content,
+  unrestricted_child_counts_as_visible_content,
   member_counts_for_partnerFolder };
 use crate::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, DefiningFolderRecorder, LocalContext, FieldIntent,
@@ -50,7 +50,7 @@ use crate::from_text::local_fieldintent_collection::types::{
 use crate::types::misc::{ID, SkgRepoName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  NodeEditRequest, AffectsParent, Property, PropertyFolder, PartnerFolder, ActiveVognode, Viewnode,
+  NodeEditRequest, AffectsParent, Property, PropertyFolder, PartnerFolder, UnrestrictedVognode, Viewnode,
   ViewnodeKind, Vognode, Phantom };
 
 use ego_tree::NodeRef;
@@ -71,10 +71,10 @@ fn visit (
   collected : &mut CollectedFieldIntents,
 ) -> Result<(), String> {
   match &node_ref . value() . kind {
-    ViewnodeKind::Vognode (Vognode::Active (t)) =>
-      visit_active_vognode (node_ref, t, context, collected),
-    ViewnodeKind::Vognode (Vognode::Inactive (_)) =>
-      // An Inactive vognode is anonymous and emits nothing; its
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+      visit_unrestricted_vognode (node_ref, t, context, collected),
+    ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
+      // A Restricted vognode is anonymous and emits nothing; its
       // membership is owned by disk supplementation, not extraction. With no
       // identity it owns no defining folder, so (like a DeadViewnode) any
       // folder found under it stays silent.
@@ -121,9 +121,9 @@ fn visit (
       recurse_with_uniform_context (
         node_ref, &LocalContext::UnderWriteProtectedFolder, collected), }}
 
-fn visit_active_vognode (
+fn visit_unrestricted_vognode (
   node_ref  : NodeRef<Viewnode>,
-  t         : &ActiveVognode,
+  t         : &UnrestrictedVognode,
   context   : &LocalContext,
   collected : &mut CollectedFieldIntents,
 ) -> Result<(), String> {
@@ -336,7 +336,7 @@ fn visit_hiddenOutside_folder (
       let mut members : Vec<ID> = Vec::new ();
       for child in node_ref . children() {
         match &child . value() . kind {
-          ViewnodeKind::Vognode (Vognode::Active (t))
+          ViewnodeKind::Vognode (Vognode::Unrestricted (t))
             if member_counts_for_partnerFolder (t) => {
               if t . relRepo_request . is_some () {
                 return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
@@ -386,13 +386,13 @@ fn dedup_members_by_skgid (
       result . push ((skgid, skgrepo)); }}
   result }
 
-/// This returns the members of an OverriddenFolder: its Active
+/// This returns the members of an OverriddenFolder: its Unrestricted
 /// children that pass the PartnerFolder membership predicate, silently
 /// deduplicated (by ID; see 'dedup_members_by_id'), preserving
 /// first-occurrence order. Each member is paired with its headline's
 /// explicit '(editRequest (relRepo NAME))' request, if any (see
-/// 'FieldIntent').  (Inactive
-/// children are NOT members here: the overriddenFolder omits inactive
+/// 'FieldIntent').  (Restricted
+/// children are NOT members here: the overriddenFolder omits restricted
 /// members from display, and the set-difference merge preserves
 /// them at save.  TODO/DONE/full-schema/DONE/9-2_source-set-safety.org.)
 fn partnerFolder_members (
@@ -401,7 +401,7 @@ fn partnerFolder_members (
   let mut members : Vec<(ID, Option<SkgRepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
-      ViewnodeKind::Vognode (Vognode::Active (t))
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . skgid . clone(),
                            t . relRepo_request . clone())),
@@ -411,13 +411,13 @@ fn partnerFolder_members (
       _ => {}, }}
   dedup_members_by_skgid (members) }
 
-/// This returns the members of a SubscribeeFolder: its Active children
+/// This returns the members of a SubscribeeFolder: its Unrestricted children
 /// that pass the PartnerFolder membership predicate, deduplicated (by
 /// ID; see 'dedup_members_by_id'). Like 'content_members' (and for
-/// the same reason), inactive children contribute nothing:
+/// the same reason), restricted children contribute nothing:
 /// 'subscribesTo' is order-meaningful, but disk supplementation (its weave)
 /// already restores invisible subscribees at their disk position, so
-/// a buffer-present inactive vognode must not feed this list.
+/// a buffer-present restricted vognode must not feed this list.
 /// Each member is paired with its headline's explicit
 /// '(editRequest (relRepo NAME))' request, if any.
 #[allow(non_snake_case)]
@@ -427,7 +427,7 @@ fn subscribeeFolder_members (
   let mut members : Vec<(ID, Option<SkgRepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
-      ViewnodeKind::Vognode (Vognode::Active (t))
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . skgid . clone(),
                            t . relRepo_request . clone())),
@@ -437,22 +437,22 @@ fn subscribeeFolder_members (
       _ => {}, }}
   dedup_members_by_skgid (members) }
 
-/// This returns the content of an editable vognode: its Active
+/// This returns the content of an editable vognode: its Unrestricted
 /// children that pass the contains predicate. It does not dedup,
 /// because validation ('nonignored_children_have_distinct_ids')
 /// already guarantees distinctness. Each member is paired with its
 /// headline's explicit '(editRequest (relRepo NAME))' request, if any (see
 /// 'FieldIntent').
 ///
-/// Inactive children contribute NOTHING here: an inactive node emits
+/// Restricted children contribute NOTHING here: a restricted node emits
 /// no save intention for its container. Its membership in the
 /// container's contains is owned entirely by disk supplementation
 /// ('preserve_invisible_members' -> weave in from_text/weave.rs),
 /// which restores invisible members from disk at their disk position.
-/// Including a buffer-present inactive child would let a stale or
+/// Including a buffer-present restricted child would let a stale or
 /// concurrently-edited buffer resurrect a member that was
 /// authoritatively removed, and would persist reorderings of a
-/// write-protected placeholder. (See TODO/problems.org, "Retained inactive
+/// write-protected placeholder. (See TODO/problems.org, "Retained restricted
 /// nodes emit positional save intentions for their container".)
 fn content_members (
   node_ref : NodeRef<Viewnode>,
@@ -460,8 +460,8 @@ fn content_members (
   let mut contents : Vec<(ID, Option<SkgRepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
-      ViewnodeKind::Vognode (Vognode::Active (t)) => {
-        if active_child_counts_as_content (t) {
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
+        if unrestricted_child_counts_as_content (t) {
           contents . push ((
             // collected_id, not id: a drawn overrider stands for
             // the original member it was drawn in place of.
@@ -487,8 +487,8 @@ fn visible_content_members (
   let mut visible : Vec<ID> = Vec::new();
   for child in node_ref . children() {
     match &child . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Active (t))
-        if active_child_counts_as_visible_content (t) => {
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+        if unrestricted_child_counts_as_visible_content (t) => {
         visible . push (
           // collected_id: a drawn overrider presents the original,
           // so hide/unhide inference must speak of the original.

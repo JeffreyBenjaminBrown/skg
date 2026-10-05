@@ -171,7 +171,7 @@ fn relRepo_gates_deleted_stage_signs () {
   // del-r's file was Deleted; its before_node's override of N was
   // recorded in the PRIVATE skgrepo (a RelPartner whose skgrepo
   // differs from del-r's own -- public -- home). A public-only
-  // active set must not see the resulting phantom sign; ungated
+  // skgrepo restriction must not see the resulting phantom sign; ungated
   // (None) still does.
   let recorder      : ID = skgid ("N");
   let mut before : Graphnode = empty_graphnode ();
@@ -186,7 +186,7 @@ fn relRepo_gates_deleted_stage_signs () {
     deleted_entry ( before ) );
   let diffs : Option<HashMap<SkgRepoName, SkgRepoDiff>> =
     Some ( HashMap::from ([ ( src ("public"), sd ) ]) );
-  let public_only : ActiveSkgRepoSet = ActiveSkgRepoSet {
+  let public_only : SkgrepoRestriction = SkgrepoRestriction {
     name    : SkgRepoSetName::from ("public"),
     skgrepos : BTreeSet::from ([ src ("public") ]) };
   let gated : HashMap<ID, RelationshipAxes> =
@@ -194,7 +194,7 @@ fn relRepo_gates_deleted_stage_signs () {
       &recorder, NodeRelation::Overrides, &diffs,
       Some (&public_only) );
   assert! ( gated . is_empty (),
-    "a Deleted-stage sign recorded at an inactive repo must not \
+    "a Deleted-stage sign recorded at a restricted repo must not \
      surface: {:?}", gated );
   let ungated : HashMap<ID, RelationshipAxes> =
     inverse_scan_for_inbound_folder (

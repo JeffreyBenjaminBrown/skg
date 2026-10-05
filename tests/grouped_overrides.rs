@@ -28,8 +28,8 @@ mod expand_raw_overridden_children;
 #[path = "idempotence.rs"]
 mod idempotence;
 
-#[path = "inactive_suppression.rs"]
-mod inactive_suppression;
+#[path = "restricted_suppression.rs"]
+mod restricted_suppression;
 
 #[path = "overridden_as_such.rs"]
 mod overridden_as_such;

@@ -233,8 +233,8 @@ function M.current_headline_metadata_sexp ()
 end
 
 ---@param metadata_sexp any
----@return boolean does METADATA_SEXP describe an ActiveVognode?
-function M.activeNode_sexp_p (metadata_sexp)
+---@return boolean does METADATA_SEXP describe an UnrestrictedVognode?
+function M.unrestrictedNode_sexp_p (metadata_sexp)
   return metadata_sexp ~= nil
          and compare.subtree_p(metadata_sexp, { SKG, { NODE } })
 end
@@ -357,8 +357,8 @@ function M.delete ()
     'This change will only be applied when you save the buffer.')
 end
 
----Mark the headline at point, and every activeNode viewdescendant,
----for deletion. Non-activeNode descendants (phantoms, folders, ...) are
+---Mark the headline at point, and every unrestrictedNode viewdescendant,
+---for deletion. Non-unrestrictedNode descendants (phantoms, folders, ...) are
 ---skipped. Does NOT save.
 function M.delete_recursive ()
   if not M.at_headline_p() then error('Not on a headline') end
@@ -369,7 +369,7 @@ function M.delete_recursive ()
   local line = M.next_headline_line(start_line)
   while line and (M.outline_level(line) or 0) > start_level do
     local meta = M.metadata_sexp_at_line_or_nil(line)
-    if meta and M.activeNode_sexp_p(meta) then
+    if meta and M.unrestrictedNode_sexp_p(meta) then
       M.edit_metadata_at_line(line, edits) end
     line = M.next_headline_line(line)
   end
@@ -423,7 +423,7 @@ function M.strip_metadata_from_org_text (org_text)
   return table.concat(lines, '\n')
 end
 
----Write minimal ActiveVognode metadata onto the metadata-less headline
+---Write minimal UnrestrictedVognode metadata onto the metadata-less headline
 ---at point, prompting for an owned skgrepo (no prompt when only one).
 ---@return string|nil the chosen skgrepo
 function M.populate_minimal_node_metadata ()
@@ -487,7 +487,7 @@ function M.change_repo_recursive (old_skgrepo, new_skgrepo)
   local line = M.next_headline_line(start_line)
   while line and (M.outline_level(line) or 0) > start_level do
     local metadata = M.metadata_sexp_at_line_or_nil(line)
-    if not (M.activeNode_sexp_p(metadata)
+    if not (M.unrestrictedNode_sexp_p(metadata)
             and M.node_affectsParent_content_of_p(metadata)) then
       line = M.next_headline_after_subtree(line)
     else

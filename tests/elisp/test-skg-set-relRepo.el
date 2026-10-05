@@ -126,7 +126,7 @@ viewparent), relation = the folder's relation."
                               :type 'user-error)))
        (should (string-match-p "Root headline" (cadr err)))))))
 
-(ert-deftest test-rel-refuses-off-activeNode ()
+(ert-deftest test-rel-refuses-off-unrestrictedNode ()
   "Refuses on a non-vognode headline (no (node ...) form)."
   (test--with-skg-content-view
    (concat
@@ -422,7 +422,7 @@ aliasFolder.")
 
 (ert-deftest test-recursive-walk-content ()
   "Kind `content' hits true content children of editable
-activeNode parents only: the root's own (na) relationship is skipped, the
+unrestrictedNode parents only: the root's own (na) relationship is skipped, the
 false branch and everything below the write-protected node and the
 subscribee-as-such member are pruned, and folder members are untouched."
   (test--with-skg-content-view

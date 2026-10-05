@@ -24,7 +24,7 @@
 /// move story instead.
 
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::git::{GitDiffStatus, RelationshipAxes, GraphnodeDiff, Sign, SkgRepoDiff};
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, RelPartner, SkgRepoName};
@@ -41,11 +41,11 @@ use std::path::PathBuf;
 /// goal list as a phantom; a present member's Plus signs become its
 /// 'addedR' marks.
 ///
-/// 'active': relRepo gating (render-and-gating, 5_plan.org). A
+/// 'unrestricted': relRepo gating (render-and-gating, 5_plan.org). A
 /// Deleted/Added file's before/after Graphnode carries full
 /// RelPartner values, so those two stages gate on the specific
 /// relationship's relRepo -- a phantom "used to link here" must not surface
-/// from a membership recorded outside the active set. The Modified
+/// from a membership recorded outside the skgrepo restriction. The Modified
 /// stage cannot: 'NodeChanges' diff lists have their skgrepos stripped
 /// (the historical relation-partner work item deferred this; still true
 /// here), so a Modified-file sign is emitted regardless of skgrepo. None = ungated
@@ -54,7 +54,7 @@ pub fn inverse_scan_for_inbound_folder (
   recorder      : &ID,
   relation      : NodeRelation,
   skgrepo_diffs : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
-  active        : Option<&ActiveSkgRepoSet>,
+  restriction   : Option<&SkgrepoRestriction>,
 ) -> HashMap<ID, RelationshipAxes> {
   let Some (diffs) = skgrepo_diffs else {
     return HashMap::new (); };
@@ -65,7 +65,7 @@ pub fn inverse_scan_for_inbound_folder (
       [ (0, & sd . staged), (1, & sd . unstaged) ]
     { for (path, ncd) in stage_map {
         if let Some ((member, sign)) =
-          member_and_sign_for_recorder (recorder, relation, path, ncd, active)
+          member_and_sign_for_recorder (recorder, relation, path, ncd, restriction)
         { signs . entry (member)
             . or_insert_with ( || [ Vec::new (), Vec::new () ] )
             [stage_index] . push (sign); }}}}
@@ -78,12 +78,12 @@ pub fn inverse_scan_for_inbound_folder (
     . filter ( |(_, axes)| ! axes . is_empty () )
     . collect () }
 
-/// Whether 'skgrepo' is visible under 'active' (None = ungated).
-fn skgrepo_is_active (
-  active : Option<&ActiveSkgRepoSet>,
+/// Whether 'skgrepo' is visible under 'unrestricted' (None = ungated).
+fn skgrepo_is_unrestricted (
+  restriction : Option<&SkgrepoRestriction>,
   skgrepo : &SkgRepoName,
 ) -> bool {
-  match active {
+  match restriction {
     None     => true,
     Some (a) => a . is_all () || a . contains_skgrepo (skgrepo) } }
 
@@ -95,7 +95,7 @@ fn member_and_sign_for_recorder (
   relation : NodeRelation,
   path     : &PathBuf,
   ncd      : &GraphnodeDiff,
-  active   : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> Option<(ID, Sign)> {
   match ncd . status {
     GitDiffStatus::Modified => {
@@ -113,13 +113,13 @@ fn member_and_sign_for_recorder (
     GitDiffStatus::Deleted => {
       let before : &Graphnode = ncd . before_node . as_ref () ?;
       match outbound_member_relRepo_of_graphnode (before, relation, recorder) {
-        Some (relRepo) if skgrepo_is_active (active, &relRepo) =>
+        Some (relRepo) if skgrepo_is_unrestricted (restriction, &relRepo) =>
           Some (( before . pid . clone (), Sign::Minus )),
         _ => None } },
     GitDiffStatus::Added => {
       let after : &Graphnode = ncd . after_node . as_ref () ?;
       match outbound_member_relRepo_of_graphnode (after, relation, recorder) {
-        Some (relRepo) if skgrepo_is_active (active, &relRepo) =>
+        Some (relRepo) if skgrepo_is_unrestricted (restriction, &relRepo) =>
           Some (( after . pid . clone (), Sign::Plus )),
         _ => None } } } }
 

@@ -2,7 +2,7 @@
 ///
 /// Format:
 ///   Non-vognodes: (skg [focused] [folded] nonVognodeKind)
-///   ActiveVognodes: (skg [focused] [folded]
+///   UnrestrictedVognodes: (skg [focused] [folded]
 ///                   (node [(id ID)]
 ///                         [(repo REPO)]
 ///                         [(affectsParent true|false|na)]
@@ -23,12 +23,12 @@ use crate::types::nodes::complete::Flag;
 use crate::types::git::{NodeAxes, RelationshipAxes, Sign};
 use crate::types::viewnode::{
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
-  Property, PropertyFolder, PartnerFolder, PhantomDeleted, InactiveVognode, PhantomUnknown,
+  Property, PropertyFolder, PartnerFolder, PhantomDeleted, RestrictedVognode, PhantomUnknown,
   Birth, Editability, AffectsParent,
 };
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::maybe_placed_viewnode::{
-    MpViewnode, MpViewnodeKind, MpActiveVognode, MpPhantomDiff,
+    MpViewnode, MpViewnodeKind, MpUnrestrictedVognode, MpPhantomDiff,
     MpVognode, MpPhantom,
 };
 
@@ -47,7 +47,7 @@ pub struct ViewnodeMetadata {
   pub body_folded: bool,
   // None means vognode, Some means non-vognode.
   pub non_vognode: Option<MpViewnodeKind>,
-  // ActiveVognode fields (ignored if non-vognode is Some)
+  // UnrestrictedVognode fields (ignored if non-vognode is Some)
   pub skgid: Option<ID>,
   pub home_skgrepo: Option<SkgRepoName>,
   pub affectsParent: AffectsParent,
@@ -58,9 +58,9 @@ pub struct ViewnodeMetadata {
   pub edit_request: Option<NodeEditRequest>,
   pub relRepo_request: Option<SkgRepoName>,
   pub view_requests: HashSet<ViewRequest>,
-  pub activeVognode_node_axes  : NodeAxes,
-  pub activeVognode_relationship_axes : RelationshipAxes,
-  pub activeVognode_not_in_git : bool,
+  pub unrestrictedVognode_node_axes : NodeAxes,
+  pub unrestrictedVognode_relationship_axes : RelationshipAxes,
+  pub unrestrictedVognode_not_in_git : bool,
   pub property_relationship_axes : RelationshipAxes,
   pub property_relRepo : Option<SkgRepoName>,
   pub property_relRepo_request : Option<SkgRepoName>,
@@ -75,9 +75,9 @@ pub struct ViewnodeMetadata {
   pub unknown_node_skgid: Option<ID>,
   pub unknown_relRepo : Option<SkgRepoName>,
   pub unknown_relRepo_request : Option<SkgRepoName>,
-  // When true, this is an inactive-repo placeholder: an anonymous,
-  // dataless marker (see InactiveVognode). It carries no id/repo/etc.
-  pub is_inactive_node : bool,
+  // When true, this is a restricted-skgrepo placeholder: an anonymous,
+  // dataless marker (see RestrictedVognode). It carries no id/repo/etc.
+  pub is_restricted_node : bool,
   // When true, this is a PhantomDiff. It carries the same fields as a
   // node (id/repo/write-protected/graphStats/diff axes), parsed via
   // parse_node_sexp, but emits and is recognized by its own root atom
@@ -101,9 +101,9 @@ pub fn default_metadata() -> ViewnodeMetadata {
     edit_request: None,
     relRepo_request: None,
     view_requests: HashSet::new(),
-    activeVognode_node_axes  : NodeAxes::default(),
-    activeVognode_relationship_axes : RelationshipAxes::default(),
-    activeVognode_not_in_git : false,
+    unrestrictedVognode_node_axes : NodeAxes::default(),
+    unrestrictedVognode_relationship_axes : RelationshipAxes::default(),
+    unrestrictedVognode_not_in_git : false,
     property_relationship_axes : RelationshipAxes::default(),
     property_relRepo : None,
     property_relRepo_request : None,
@@ -114,7 +114,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     unknown_node_skgid: None,
     unknown_relRepo: None,
     unknown_relRepo_request: None,
-    is_inactive_node: false,
+    is_restricted_node: false,
     is_diff_phantom: false, }}
 
 /// Create an MpViewnode from parsed metadata components.
@@ -146,16 +146,16 @@ pub fn viewnode_from_metadata (
               "Unknown phantom content cannot be edited" . to_string () ))
           } else { None },
           None )
-      } else if metadata . is_inactive_node {
+      } else if metadata . is_restricted_node {
         let error : Option<BufferValidationError> =
           if body . is_some ()
           || ! title . is_empty () {
             Some ( BufferValidationError::Other (
-              "Inactive vognode content cannot be edited"
+              "Restricted vognode content cannot be edited"
               . to_string () ))
           } else { None };
         ( MpViewnodeKind::Vognode (
-            MpVognode::Inactive ( InactiveVognode ) ),
+            MpVognode::Restricted ( RestrictedVognode ) ),
           error, None )
       } else if metadata . is_dead_viewnode {
         ( MpViewnodeKind::DeadViewnode, None, None )
@@ -220,7 +220,7 @@ pub fn viewnode_from_metadata (
           other => other . clone () };
         ( non_vognode_with_title, error, folder_title_warning )
       } else {
-      // MpActiveVognode
+      // MpUnrestrictedVognode
       { let editability : Editability =
           if metadata . writeProtected
           { Editability::WriteProtected }
@@ -246,7 +246,7 @@ pub fn viewnode_from_metadata (
               "relRepo request on a write-protected node"
               . to_string () )) }
           else { None };
-        let t : MpActiveVognode = MpActiveVognode {
+        let t : MpUnrestrictedVognode = MpUnrestrictedVognode {
             title,
             skgid            : metadata . skgid . clone (),
             home_skgrepo     : metadata . home_skgrepo . clone (),
@@ -256,9 +256,9 @@ pub fn viewnode_from_metadata (
             viewStats        : metadata . viewStats . clone (),
             relRepo_request : metadata . relRepo_request . clone (),
             view_requests    : metadata . view_requests . clone (),
-            node_axes        : metadata . activeVognode_node_axes,
-            relationship_axes       : metadata . activeVognode_relationship_axes,
-            not_in_git       : metadata . activeVognode_not_in_git,
+            node_axes        : metadata . unrestrictedVognode_node_axes,
+            relationship_axes       : metadata . unrestrictedVognode_relationship_axes,
+            not_in_git       : metadata . unrestrictedVognode_not_in_git,
             editability, };
         let node_kind : MpViewnodeKind =
           if metadata . is_diff_phantom
@@ -270,9 +270,9 @@ pub fn viewnode_from_metadata (
             // editability/affectsParent/etc. here loses nothing.
             MpViewnodeKind::Vognode (MpVognode::Phantom (
               MpPhantom::Diff (
-                MpPhantomDiff::from_activeVognode (t) ))) }
+                MpPhantomDiff::from_unrestrictedVognode (t) ))) }
           else
-          { MpViewnodeKind::Vognode ( MpVognode::Active (t) ) };
+          { MpViewnodeKind::Vognode ( MpVognode::Unrestricted (t) ) };
         ( node_kind,
           error, None ) }
     };
@@ -353,8 +353,8 @@ pub fn parse_metadata_to_viewnodemd (
             // (unknown (id X)) -- placeholder for a referenced
             // node with no record anywhere. No skgrepo/title/body.
             parse_unknownnode_sexp ( &items[1..], &mut result ) ?; },
-          "inactiveNode" => {
-            parse_inactivenode_sexp ( &items[1..], &mut result ) ?; },
+          "restrictedNode" => {
+            parse_restrictednode_sexp ( &items[1..], &mut result ) ?; },
           "staged" => {
             // (staged ATOMS) at top level is for Properties (Alias/ID).
             apply_axis_atoms_to_property (
@@ -416,7 +416,7 @@ pub fn parse_metadata_to_viewnodemd (
           "id" | "repo" | "view" | "code" => {
             return Err ( format! (
               "Legacy metadata format detected (found '{}' at top level). \
-               The new format uses (skg [focused] [folded] (node ...)) for ActiveVognodes \
+               The new format uses (skg [focused] [folded] (node ...)) for UnrestrictedVognodes \
                and (skg [focused] [folded] nonVognodeKind) for Non-vognodes.",
               first )); },
           _ => { return Err ( format! ( "Unknown metadata key: {}",
@@ -428,11 +428,11 @@ pub fn parse_metadata_to_viewnodemd (
           "focused"  => result . focused = true,
           "folded"   => result . folded = true,
           "bodyFolded" => result . body_folded = true,
-          // An inactive vognode is a dataless bare-atom marker
-          // (see InactiveVognode). The legacy field-bearing list form
-          // '(inactiveNode ...)' is still tolerated by the List arm
+          // A restricted vognode is a dataless bare-atom marker
+          // (see RestrictedVognode). The legacy field-bearing list form
+          // '(restrictedNode ...)' is still tolerated by the List arm
           // above so a stale buffer round-trips.
-          "inactiveNode" => result . is_inactive_node = true,
+          "restrictedNode" => result . is_restricted_node = true,
           // Non-vognode kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
           "alias"    => result . non_vognode = Some ( MpViewnodeKind::Property ( Property::Alias { text: String::new(), relRepo: None, relRepo_request: None, relationship_axes: RelationshipAxes::default() } ) ),
           "aliasFolder" => result . non_vognode = Some (MpViewnodeKind::PropertyFolder (PropertyFolder::Alias)),
@@ -528,17 +528,17 @@ fn parse_node_sexp (
               _ => return Err ( format! (
                 "Invalid affectsParent value: {}", value )), }; },
           "staged" => {
-            apply_axis_atoms_to_activeVognode (
+            apply_axis_atoms_to_unrestrictedVognode (
               &subitems[1..],
               true,  // staged
-              &mut metadata . activeVognode_node_axes,
-              &mut metadata . activeVognode_relationship_axes ) ?; },
+              &mut metadata . unrestrictedVognode_node_axes,
+              &mut metadata . unrestrictedVognode_relationship_axes ) ?; },
           "unstaged" => {
-            apply_axis_atoms_to_activeVognode (
+            apply_axis_atoms_to_unrestrictedVognode (
               &subitems[1..],
               false, // unstaged
-              &mut metadata . activeVognode_node_axes,
-              &mut metadata . activeVognode_relationship_axes ) ?; },
+              &mut metadata . unrestrictedVognode_node_axes,
+              &mut metadata . unrestrictedVognode_relationship_axes ) ?; },
           _ => { return Err ( format! ( "Unknown node key: {}",
                                          key )); }} },
       Sexp::Atom (_) => {
@@ -554,7 +554,7 @@ fn parse_node_sexp (
             // regenerates it, so accept and discard.
             {},
           "notInGit" =>
-            metadata . activeVognode_not_in_git = true,
+            metadata . unrestrictedVognode_not_in_git = true,
           _ => {
             return Err ( format! ( "Unknown node value: {}",
                                     bare_value )); }} },
@@ -563,8 +563,8 @@ fn parse_node_sexp (
   Ok (( )) }
 
 /// Apply a sequence of axis atoms (addedN, deletedN, addedR, removedR) to
-/// an ActiveVognode's node and relationship axes for the given stage.
-fn apply_axis_atoms_to_activeVognode (
+/// an UnrestrictedVognode's node and relationship axes for the given stage.
+fn apply_axis_atoms_to_unrestrictedVognode (
   atoms      : &[Sexp],
   is_staged  : bool,
   node_axes  : &mut NodeAxes,
@@ -656,17 +656,17 @@ fn parse_unknownnode_sexp (
                            . to_string () ); }} }
   Ok (( )) }
 
-/// Parse the LEGACY list form '(inactiveNode ...)'. The server now
-/// emits the bare atom 'inactiveNode' (handled in the atom arm), but an
+/// Parse the LEGACY list form '(restrictedNode ...)'. The server now
+/// emits the bare atom 'restrictedNode' (handled in the atom arm), but an
 /// older server's field-bearing list form is tolerated here -- its
 /// children (id/repo/membership/overridesHere) are discarded -- so a
-/// stale buffer still round-trips. An inactive vognode is an
-/// anonymous, dataless marker (see InactiveVognode).
-fn parse_inactivenode_sexp (
+/// stale buffer still round-trips. A restricted vognode is an
+/// anonymous, dataless marker (see RestrictedVognode).
+fn parse_restrictednode_sexp (
   _items   : &[Sexp],
   metadata : &mut ViewnodeMetadata,
 ) -> Result<(), String> {
-  metadata . is_inactive_node = true;
+  metadata . is_restricted_node = true;
   Ok (( )) }
 
 /// Parse the (deleted (id X) (repo S)) s-expression contents.

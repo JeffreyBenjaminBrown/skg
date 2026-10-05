@@ -294,7 +294,7 @@ Prompts for the link label, defaulting to the title."
     "*"))
 
 (defun skg--insert-node-from-entry (entry)
-  "Insert a write-protected ActiveVognode headline from ENTRY, an (id title) pair.
+  "Insert a write-protected UnrestrictedVognode headline from ENTRY, an (id title) pair.
 In a view whose buffer has no writable occurrence of the node, the
 headline also requests a editable view, so the next save makes it
 writable with its real title, body and content.  (Saving a bare
@@ -339,7 +339,7 @@ requests a editable view.  The server allows only one of those per ID."
         (beginning-of-line)
         (let (( sexp (ignore-errors ;; a half-edited headline is not an occurrence
                        (skg--metadata-sexp-at-point-or-nil)) ))
-          (when (and (skg--activeNode-sexp-p sexp)
+          (when (and (skg--unrestrictedNode-sexp-p sexp)
                      (equal (skg--node-id sexp) skgid)
                      (or (not (skg--node-write-protected-p sexp))
                          (skg-sexp-subtree-p
@@ -366,7 +366,7 @@ Prompts for the link label, defaulting to the title from the stack."
       (skg--insert-link-from-entry entry) )))
 
 (defun skg-paste-node ()
-  "Insert a write-protected ActiveVognode headline from the top of `skg-linkstack'.
+  "Insert a write-protected UnrestrictedVognode headline from the top of `skg-linkstack'.
 Does not modify the stack.  The inserted metadata contains the node ID
 and `writeProtected`, and maybe a editable view request (see
 `skg--insert-node-from-entry'); the headline title comes from the stack entry."
@@ -393,7 +393,7 @@ Prompts for the link label, defaulting to the title from the stack."
       (skg--insert-link-from-entry entry) )))
 
 (defun skg-pop-node ()
-  "Pop the top of `skg-linkstack' and insert a write-protected ActiveVognode headline.
+  "Pop the top of `skg-linkstack' and insert a write-protected UnrestrictedVognode headline.
 The inserted metadata contains the node ID and `writeProtected`, and maybe a
 editable view request (see `skg--insert-node-from-entry'); the headline
 title comes from the stack entry."
@@ -428,7 +428,7 @@ title comes from the stack entry."
 
 (defun skg--metadata-sexp-contains-id-p
     (sexp)
-  "Return t if SEXP contains an id under the ActiveVognode shape
+  "Return t if SEXP contains an id under the UnrestrictedVognode shape
 (skg (node (id ...))), the diff-phantom shape
 (skg (diffPhantom (id ...))), or the Deleted-phantom shape
 (skg (deleted (id ...)))."
@@ -438,7 +438,7 @@ title comes from the stack entry."
 
 (defun skg--extract-id-from-metadata-sexp
     (sexp)
-  "Extract the id value from SEXP. Accepts the ActiveVognode shape
+  "Extract the id value from SEXP. Accepts the UnrestrictedVognode shape
 (skg (node (id X) ...)), the diff-phantom shape
 (skg (diffPhantom (id X) ...)), or the Deleted-phantom shape
 (skg (deleted (id X) ...)). Returns the id as a string, or nil."
@@ -448,7 +448,7 @@ title comes from the stack entry."
     (when val (format "%s" val))))
 
 (defun skg--extract-repo-from-metadata-sexp (sexp)
-  "Extract the repo value from SEXP. Accepts the ActiveVognode shape
+  "Extract the repo value from SEXP. Accepts the UnrestrictedVognode shape
 (skg (node (repo X) ...)), the diff-phantom shape
 (skg (diffPhantom (repo X) ...)), or the Deleted-phantom shape
 (skg (deleted (repo X) ...)). Returns the repo as a string, or nil."

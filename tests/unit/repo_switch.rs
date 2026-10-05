@@ -7,8 +7,8 @@ use crate::types::viewnode::{
 
 use std::collections::BTreeSet;
 
-fn active_public () -> ActiveSkgRepoSet {
-  ActiveSkgRepoSet {
+fn restriction_public () -> SkgrepoRestriction {
+  SkgrepoRestriction {
     name    : SkgRepoSetName ("public" . to_string ()),
     skgrepos : BTreeSet::from ([ SkgRepoName::from ("public") ]) }}
 
@@ -29,9 +29,9 @@ fn folder (kind : PartnerFolder) -> Viewnode {
     body_folded : false,
     kind        : ViewnodeKind::PartnerFolder (kind) } }
 
-// A now-inactive childless branch disappears; a now-inactive node
-// with an active child is retained as an InactiveVognode (converted,
-// not pruned); the active child survives.
+// A now-restricted childless branch disappears; a now-restricted node
+// with an unrestricted child is retained as a RestrictedVognode (converted,
+// not pruned); the unrestricted child survives.
 #[test]
 fn conversion_and_retention () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
@@ -45,19 +45,19 @@ fn conversion_and_retention () {
   t . get_mut (kept) . unwrap ()
     . append (def ("survivor", "public"));
   convert_and_prune_for_skgrepo_switch (
-    &mut t, &active_public ()) . unwrap ();
+    &mut t, &restriction_public ()) . unwrap ();
   assert! ( t . get (gone) . map ( |n| n . parent () . is_none () )
               . unwrap_or (true),
-    "a childless now-inactive node is pruned" );
+    "a childless now-restricted node is pruned" );
   assert! ( matches! (
       &t . get (kept) . unwrap () . value () . kind,
-      ViewnodeKind::Vognode (Vognode::Inactive (_)) ),
-    "a now-inactive node with an active child is retained as an InactiveVognode" );
+      ViewnodeKind::Vognode (Vognode::Restricted (_)) ),
+    "a now-restricted node with an unrestricted child is retained as a RestrictedVognode" );
   assert! (
     t . get (kept) . unwrap () . children () . count () == 1,
-    "the active child survives under the retained node" ); }
+    "the unrestricted child survives under the retained node" ); }
 
-// All write-protected leaf partners are pruned, active and inactive
+// All write-protected leaf partners are pruned, unrestricted and restricted
 // alike, and the emptied folder goes with them; an editable partner
 // survives.
 #[test]
@@ -69,15 +69,15 @@ fn partners_and_folders_prune () {
   let emptied_folder : NodeId = t . get_mut (recorder) . unwrap ()
     . append (folder (PartnerFolder::Subscriber)) . id ();
   t . get_mut (emptied_folder) . unwrap ()
-    . append (writeProtected ("active-member", "public"));
+    . append (writeProtected ("unrestricted-member", "public"));
   t . get_mut (emptied_folder) . unwrap ()
-    . append (writeProtected ("inactive-member", "private"));
+    . append (writeProtected ("restricted-member", "private"));
   let surviving_folder : NodeId = t . get_mut (recorder) . unwrap ()
     . append (folder (PartnerFolder::Subscribee)) . id ();
   t . get_mut (surviving_folder) . unwrap ()
     . append (def ("editable-partner", "public"));
   convert_and_prune_for_skgrepo_switch (
-    &mut t, &active_public ()) . unwrap ();
+    &mut t, &restriction_public ()) . unwrap ();
   assert! ( t . get (emptied_folder)
               . map ( |n| n . parent () . is_none () )
               . unwrap_or (true),
@@ -98,6 +98,6 @@ fn focus_transfers_to_surviving_parent () {
     . append (def ("gone", "private")) . id ();
   t . get_mut (gone) . unwrap () . value () . focused = true;
   convert_and_prune_for_skgrepo_switch (
-    &mut t, &active_public ()) . unwrap ();
+    &mut t, &restriction_public ()) . unwrap ();
   assert! ( t . get (parent) . unwrap () . value () . focused,
     "focus transfers from a pruned subtree to its surviving parent" ); }

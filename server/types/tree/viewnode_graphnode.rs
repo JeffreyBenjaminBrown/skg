@@ -5,7 +5,7 @@ use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, MSV, SkgConfig, SkgRepoName};
 use crate::types::viewnode::{
-    Viewnode, ViewnodeKind, ActiveVognode, AffectsParent };
+    Viewnode, ViewnodeKind, UnrestrictedVognode, AffectsParent };
 use crate::types::viewnode::{Vognode, Phantom, PropertyFolder, Property, PartnerFolder};
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind };
@@ -18,23 +18,23 @@ use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
-/// Apply a mutating function to the ActiveVognode at the given tree position.
-/// Errors if the node is not found or is not an ActiveVognode.
-pub fn write_at_activeVognode_in_tree<F, R> (
+/// Apply a mutating function to the UnrestrictedVognode at the given tree position.
+/// Errors if the node is not found or is not an UnrestrictedVognode.
+pub fn write_at_unrestrictedVognode_in_tree<F, R> (
   tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
   f      : F,
 ) -> Result<R, String>
-where F: FnOnce (&mut ActiveVognode) -> R {
+where F: FnOnce (&mut UnrestrictedVognode) -> R {
   write_at_node_in_tree (
     tree, treeid,
     |viewnode| { match &mut viewnode . kind {
-      // TODO/DONE/local-view-update/plan_v2.org §11: a phantom is not an ActiveVognode (it carries a slim PhantomDiff), so
-      // this Active-only mutator cannot apply to one (a phantom has no
+      // TODO/DONE/local-view-update/plan_v2.org §11: a phantom is not an UnrestrictedVognode (it carries a slim PhantomDiff), so
+      // this Unrestricted-only mutator cannot apply to one (a phantom has no
       // view_requests/editability/etc).
-      ViewnodeKind::Vognode (Vognode::Active (t))
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         => Ok ( f (t) ),
-      _ => Err ( "write_at_activeVognode_in_tree: expected ActiveVognode"
+      _ => Err ( "write_at_unrestrictedVognode_in_tree: expected UnrestrictedVognode"
                    . to_string () ) }} ) ? }
 
 /// Extract (ID, skgrepo) from a non-phantom vognode that carries both.
@@ -58,7 +58,7 @@ pub fn pid_and_skgrepo_from_viewnode_at (
       caller_name ) . into() ),
   }}
 
-/// Get the ID from this node if it's an MpActiveVognode with an ID,
+/// Get the ID from this node if it's an MpUnrestrictedVognode with an ID,
 /// otherwise recursively try ancestors.
 /// Returns an error if no ancestor has an ID (e.g., reached BufferRoot).
 pub fn skgid_from_self_or_nearest_ancestor (
@@ -70,7 +70,7 @@ pub fn skgid_from_self_or_nearest_ancestor (
     . ok_or ("id_from_self_or_nearest_ancestor: node not found")?;
   loop {
     match &node . value() . kind {
-      MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
+      MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =>
         { if let Some (skgid) = &t . skgid { return Ok(skgid . clone()); }}
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) =>
         { if let Some (skgid) = &p . skgid { return Ok(skgid . clone()); }}
@@ -202,7 +202,7 @@ pub fn find_children_by_skgids (
   let mut result : HashMap < ID, NodeId > = HashMap::new();
   for child in tree . get (parent_treeid) . unwrap() . children() {
     match &child . value() . kind {
-      ViewnodeKind::Vognode (Vognode::Active (t)) =>
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         if target_skgids . contains (&t . skgid)
         { result . insert (t . skgid . clone (), child . id()); },
       ViewnodeKind::Vognode (Vognode::Phantom (p @ (Phantom::Diff (_)
@@ -215,7 +215,7 @@ pub fn find_children_by_skgids (
 /// Check if all nodes at the specified generation satisfy the predicate.
 /// Returns true if the generation is empty (vacuously true).
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes ActiveVognodes with affectsParent != True.
+/// If skip_non_content, excludes UnrestrictedVognodes with affectsParent != True.
 pub fn generation_includes_only<F> (
   tree                : &Tree<MpViewnode>,
   treeid : NodeId,
@@ -231,7 +231,7 @@ where F: Fn (&MpViewnode) -> bool
 
 /// Check if the generation is nonempty and all nodes satisfy the predicate.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes ActiveVognodes with affectsParent != True.
+/// If skip_non_content, excludes UnrestrictedVognodes with affectsParent != True.
 pub fn generation_exists_and_includes<F> (
   tree                : &Tree<MpViewnode>,
   treeid : NodeId,
@@ -249,7 +249,7 @@ where F: Fn (&MpViewnode) -> bool
 
 /// Check if the specified generation is empty.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes ActiveVognodes with affectsParent != True.
+/// If skip_non_content, excludes UnrestrictedVognodes with affectsParent != True.
 pub fn generation_does_not_exist (
   tree                : &Tree<MpViewnode>,
   treeid : NodeId,
@@ -264,7 +264,7 @@ pub fn generation_does_not_exist (
 /// Positive generation = descendants (1 = children, 2 = grandchildren, etc.)
 /// Generation 0 returns just the node itself.
 /// If 'skip_non_content' is true and generation > 0,
-///   then we exclude ActiveVognodes with affectsParent != True.
+///   then we exclude UnrestrictedVognodes with affectsParent != True.
 fn collect_generation (
   tree               : &Tree<MpViewnode>,
   treeid : NodeId,
@@ -297,7 +297,7 @@ fn collect_generation (
                           // TODO/DONE/local-view-update/plan_v2.org §11: a phantom has no affectsParent and is implicitly
                           // a member (content), so it is never filtered here.
                           !matches!(&c . value() . kind,
-                                    MpViewnodeKind::Vognode (MpVognode::Active (t))
+                                    MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
                                     if t . affectsParent != AffectsParent::True ))
               . map(|c| c . id()) ); }}
       current_gen = next_gen; }

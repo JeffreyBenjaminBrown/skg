@@ -4,7 +4,7 @@ use std::error::Error;
 use crate::dbs::in_rust_graph::query::find_related_nodes;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::ID;
 
 /// Most paths probably end without a branch point or a cycle, but the same path can actually end in both: If it ends in a branch point, any of its branches might be cycles.
@@ -19,21 +19,21 @@ pub struct PathToFirstNonlinearity {
 /// branch points, cycles, or extra path length.
 pub fn paths_to_first_nonlinearities_in_graph (
   graph       : &InRustGraph,
-  active      : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
   node        : &ID,
   relation    : &str,
   input_role  : &str,
   output_role : &str,
 ) -> Result<Vec<PathToFirstNonlinearity>, Box<dyn Error>> {
   let result = path_to_first_nonlinearity_in_graph (
-    graph, active, node, relation, input_role, output_role)?;
+    graph, restriction, node, relation, input_role, output_role)?;
   if result . path . is_empty () && ! result . branches . is_empty () {
     let mut branches : Vec<ID> = result . branches . into_iter () . collect ();
     branches . sort ();
     let mut paths = Vec::with_capacity (branches . len ());
     for branch in branches {
       let mut sub = path_to_first_nonlinearity_in_graph (
-        graph, active, &branch, relation, input_role, output_role)?;
+        graph, restriction, &branch, relation, input_role, output_role)?;
       sub . path . insert (0, branch);
       paths . push (sub); }
     Ok (paths)
@@ -51,7 +51,7 @@ pub fn path_containerward_to_first_nonlinearity_in_graph (
 
 fn path_to_first_nonlinearity_in_graph (
   graph       : &InRustGraph,
-  active      : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
   node        : &ID,
   relation    : &str,
   input_role  : &str,
@@ -70,7 +70,7 @@ fn path_to_first_nonlinearity_in_graph (
   let mut current = node . clone ();
   loop {
     let related = related_nodes_from_graph_gated (
-      graph, active, &current, relation_kind,
+      graph, restriction, &current, relation_kind,
       input_role == first_role, relation, input_role, output_role);
     if related . is_empty () {
       path . remove (0);
@@ -94,7 +94,7 @@ fn path_to_first_nonlinearity_in_graph (
 
 fn related_nodes_from_graph_gated (
   graph       : &InRustGraph,
-  active      : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
   origin      : &ID,
   relation    : NodeRelation,
   origin_is_first_role : bool,
@@ -105,18 +105,18 @@ fn related_nodes_from_graph_gated (
   find_related_nodes (
     graph, &[origin . clone ()], relation_name, input_role, output_role)
     . into_iter ()
-    . filter (|partner| match active {
+    . filter (|partner| match restriction {
       None => true,
       Some (set) if set . is_all () => true,
       Some (set) => {
-        let target_is_active = graph . pid_and_skgrepo (partner)
+        let target_is_unrestricted = graph . pid_and_skgrepo (partner)
           . map (|(_, skgrepo)| set . contains_skgrepo (&skgrepo))
           . unwrap_or (false);
         let relRepo = if origin_is_first_role {
           graph . relRepo (origin, relation, partner)
         } else {
           graph . relRepo (partner, relation, origin) };
-        target_is_active && relRepo
+        target_is_unrestricted && relRepo
           . map (|skgrepo| set . contains_skgrepo (&skgrepo))
           . unwrap_or (false) } })
     . collect ()

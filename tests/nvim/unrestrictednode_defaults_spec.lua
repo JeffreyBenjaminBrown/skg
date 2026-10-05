@@ -1,8 +1,8 @@
--- Mirrors tests/elisp/test-skg-activeNode-defaults.el.
+-- Mirrors tests/elisp/test-skg-unrestrictedNode-defaults.el.
 
 local sexpr = require('skg.sexpr.parse')
 local bijection = require('skg.sexpr.org_bijection')
-local defaults = require('skg.sexpr.activenode_defaults')
+local defaults = require('skg.sexpr.unrestrictednode_defaults')
 
 ---Find a headline with text TEXT among HEADLINES; returns its index.
 local function find_text (headlines, text)
@@ -34,24 +34,24 @@ local function strip_to_sexp (org_text)
     defaults.strip_defaults_from_org(org_text))
 end
 
-describe('skg.sexpr.activenode_defaults.activeNode_sexp_p', function ()
-  it('recognizes an ActiveVognode sexp', function ()
-    assert.is_true(defaults.activeNode_sexp_p(
+describe('skg.sexpr.unrestrictednode_defaults.unrestrictedNode_sexp_p', function ()
+  it('recognizes an UnrestrictedVognode sexp', function ()
+    assert.is_true(defaults.unrestrictedNode_sexp_p(
       sexpr.read('(skg (node (id abc) (repo jeff)))')))
   end)
 
   it('rejects a non-skg sexp', function ()
-    assert.is_false(defaults.activeNode_sexp_p(
+    assert.is_false(defaults.unrestrictedNode_sexp_p(
       sexpr.read('(foo (node (id abc)))')))
   end)
 
   it('rejects a skg sexp without node', function ()
-    assert.is_false(defaults.activeNode_sexp_p(
+    assert.is_false(defaults.unrestrictedNode_sexp_p(
       sexpr.read('(skg (alias (id abc)))')))
   end)
 end)
 
-describe('skg.sexpr.activenode_defaults.headlines_to_org', function ()
+describe('skg.sexpr.unrestrictednode_defaults.headlines_to_org', function ()
   it('converts a headline list to org text', function ()
     assert.are.equal('* skg\n** node\n*** id\n**** abc',
       defaults.headlines_to_org({
@@ -60,8 +60,8 @@ describe('skg.sexpr.activenode_defaults.headlines_to_org', function ()
   end)
 end)
 
-describe('skg.sexpr.activenode_defaults expansion', function ()
-  it('inserts all default fields into a minimal ActiveVognode', function ()
+describe('skg.sexpr.unrestrictednode_defaults expansion', function ()
+  it('inserts all default fields into a minimal UnrestrictedVognode', function ()
     local headlines =
       expanded_headlines('(skg (node (id abc) (repo jeff)))')
     -- skg, node, id/abc, skgrepo/jeff, write-protected/false, affectsParent/true,
@@ -106,7 +106,7 @@ describe('skg.sexpr.activenode_defaults expansion', function ()
   end)
 end)
 
-describe('skg.sexpr.activenode_defaults stripping', function ()
+describe('skg.sexpr.unrestrictednode_defaults stripping', function ()
   it('is identity on an unmodified expansion', function ()
     assert.are.same(sexpr.read('(skg (node (id abc) (repo jeff)))'),
       round_trip('(skg (node (id abc) (repo jeff)))'))
@@ -209,7 +209,7 @@ describe('skg.sexpr.activenode_defaults stripping', function ()
   end)
 end)
 
-describe('skg.sexpr.activenode_defaults repo defaults', function ()
+describe('skg.sexpr.unrestrictednode_defaults repo defaults', function ()
   it('marks a matching repo value with (default)', function ()
     local headlines = expanded_headlines(
       '(skg (node (id abc) (repo jeff)))', 'jeff')
@@ -258,7 +258,7 @@ describe('skg.sexpr.activenode_defaults repo defaults', function ()
   end)
 end)
 
-describe('skg.sexpr.activenode_defaults real-world metadata', function ()
+describe('skg.sexpr.unrestrictednode_defaults real-world metadata', function ()
   it('preserves an existing repo and appends non-canonical fields',
      function ()
     local headlines = expanded_headlines(
@@ -289,7 +289,7 @@ describe('skg.sexpr.activenode_defaults real-world metadata', function ()
   end)
 end)
 
-describe('skg.sexpr.activenode_defaults display title', function ()
+describe('skg.sexpr.unrestrictednode_defaults display title', function ()
   it('prepends the title group', function ()
     local headlines = expanded_headlines(
       '(skg (node (id abc) (repo jeff)))', nil, 'actual title')

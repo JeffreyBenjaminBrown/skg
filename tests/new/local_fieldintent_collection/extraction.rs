@@ -134,35 +134,35 @@ fn set_relationship_axes_unstaged_minus (
   tree : &mut Tree<Viewnode>,
   skgid   : &str,
 ) {
-  set_relationship_axes_unstaged_minus_keeping_active (tree, skgid);
+  set_relationship_axes_unstaged_minus_keeping_unrestricted (tree, skgid);
   let target_skgid : ego_tree::NodeId =
-    find_active_or_phantom (tree, skgid);
-  // The target is an Active node here; the next line flips it to a phantom.
+    find_unrestricted_or_phantom (tree, skgid);
+  // The target is an Unrestricted node here; the next line flips it to a phantom.
   tree . get_mut (target_skgid) . unwrap()
     . value()
     . normal_to_phantom (); }
 
 /// This is like 'set_relationship_axes_unstaged_minus', but it leaves the
-/// node Active: a would-be diff phantom that has not been converted,
+/// node Unrestricted: a would-be diff phantom that has not been converted,
 /// which is how such nodes reach save extraction.
-fn set_relationship_axes_unstaged_minus_keeping_active (
+fn set_relationship_axes_unstaged_minus_keeping_unrestricted (
   tree : &mut Tree<Viewnode>,
   skgid   : &str,
 ) {
   let target_skgid : ego_tree::NodeId =
-    find_active_or_phantom (tree, skgid);
-  if let ViewnodeKind::Vognode (Vognode::Active (t)) =
+    find_unrestricted_or_phantom (tree, skgid);
+  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
     &mut tree . get_mut (target_skgid) . unwrap() . value() . kind
   { t . relationship_axes . unstaged = Some (Sign::Minus); }}
 
-fn find_active_or_phantom (
+fn find_unrestricted_or_phantom (
   tree : &Tree<Viewnode>,
   skgid   : &str,
 ) -> ego_tree::NodeId {
   for node_ref in tree . nodes() {
     let is_target : bool =
       match &node_ref . value() . kind {
-        ViewnodeKind::Vognode (Vognode::Active (t)) =>
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
           t . skgid == ID::from (skgid),
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) =>
           p . skgid == ID::from (skgid),
@@ -312,8 +312,8 @@ fn test_extract_nonmergeSavePlan_no_aliases() {
 }
 
 #[test]
-fn inactive_placeholders_emit_neither_savenode_nor_contains () {
-  // Raw extraction (no skgrepo set / weave): an inactive vognode
+fn restricted_placeholders_emit_neither_savenode_nor_contains () {
+  // Raw extraction (no skgrepo set / weave): a restricted vognode
   // emits no save intention at all. It produces no SaveNode, and it
   // does NOT appear in its container's extracted contains -- the
   // container's membership of an invisible node is owned by the disk
@@ -322,9 +322,9 @@ fn inactive_placeholders_emit_neither_savenode_nor_contains () {
   let input : &str =
     indoc! {"
             * (skg (node (id root) (repo main))) root
-            ** (skg (node (id active-a) (repo main))) active A
-            ** (skg (inactiveNode (id hidden) (repo private)))
-            ** (skg (node (id active-b) (repo main))) active B
+            ** (skg (node (id active-a) (repo main))) unrestricted A
+            ** (skg (restrictedNode (id hidden) (repo private)))
+            ** (skg (node (id active-b) (repo main))) unrestricted B
         "};
   let viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
@@ -334,11 +334,11 @@ fn inactive_placeholders_emit_neither_savenode_nor_contains () {
   assert_eq!(
     save_skgids (&instructions),
     vec![ID::from ("root"), ID::from ("active-a"), ID::from ("active-b")],
-    "inactive vognodes should not produce SaveNodes");
+    "restricted vognodes should not produce SaveNodes");
   assert_eq!(
     members_of (&saved_node_by_skgid (&instructions, "root") . contains),
     vec![ID::from ("active-a"), ID::from ("active-b")],
-    "an inactive vognode is not an extracted content member");
+    "a restricted vognode is not an extracted content member");
 }
 
 #[test]
@@ -1125,7 +1125,7 @@ async fn ordinary_same_skgid_occurrence_keeps_contains_edit_when_also_as_subscri
       Ok (()) }
 
 #[test]
-fn idfolder_resident_activeVognode_saves_itself_but_is_not_content (
+fn idfolder_resident_unrestrictedVognode_saves_itself_but_is_not_content (
 ) {
   let input : &str =
     indoc! {"
@@ -1430,7 +1430,7 @@ fn would_be_diff_phantom_child_is_excluded_from_contains (
         "};
   let mut viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
-  set_relationship_axes_unstaged_minus_keeping_active (&mut viewforest, "b");
+  set_relationship_axes_unstaged_minus_keeping_unrestricted (&mut viewforest, "b");
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
@@ -1467,7 +1467,7 @@ fn would_be_diff_phantom_member_is_excluded_from_subscribees (
         "};
   let mut viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
-  set_relationship_axes_unstaged_minus_keeping_active (&mut viewforest, "ghost");
+  set_relationship_axes_unstaged_minus_keeping_unrestricted (&mut viewforest, "ghost");
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
@@ -1516,7 +1516,7 @@ fn would_be_diff_phantom_child_still_counts_as_visible_content (
   // This pins an asymmetry: the visible-content predicate has no
   // diff-phantom condition, unlike the contains and PartnerFolder
   // membership predicates. See
-  // 'active_child_counts_as_visible_content'.
+  // 'unrestricted_child_counts_as_visible_content'.
   let input : &str =
     indoc! {"
             * (skg (node (id subscriber) (repo main))) subscriber
@@ -1526,7 +1526,7 @@ fn would_be_diff_phantom_child_still_counts_as_visible_content (
         "};
   let mut viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
-  set_relationship_axes_unstaged_minus_keeping_active (
+  set_relationship_axes_unstaged_minus_keeping_unrestricted (
     &mut viewforest, "still-visible");
   let intents : Vec<(ID, SubscribeeVisibility)> =
     visibility_pairs_from_tree (viewforest);

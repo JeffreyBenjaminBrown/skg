@@ -97,7 +97,7 @@ end
 -- ── shared guards for the two replacements ─────────────────────────
 
 ---Metadata of the viewparent of the headline at LINE; errors when
----there is none or it is not an activeNode.
+---there is none or it is not an unrestrictedNode.
 ---@param line integer
 ---@return any
 function M.container_data (line)
@@ -107,9 +107,9 @@ function M.container_data (line)
     error('Cannot replace this branch with a link:'
           .. ' node has no container') end
   local sexp = metadata.metadata_sexp_at_line_or_nil(parent)
-  if not metadata.activeNode_sexp_p(sexp) then
+  if not metadata.unrestrictedNode_sexp_p(sexp) then
     error('Cannot replace this branch with a link:'
-          .. ' container is not an activeNode') end
+          .. ' container is not an unrestrictedNode') end
   return sexp
 end
 
@@ -137,17 +137,17 @@ end
 -- ── replace content with link ──────────────────────────────────────
 
 ---Replace the branch at point with a link to its former root, then
----save. The root must be an existing ActiveVognode with an ID; its
----viewparent must be an editable, owned ActiveVognode. Asks before
+---save. The root must be an existing UnrestrictedVognode with an ID; its
+---viewparent must be an editable, owned UnrestrictedVognode. Asks before
 ---proceeding when the title already contains a link.
 function M.replace_content_with_link ()
   local line = focus.owning_headline_line()
   if not line then error('Not on a headline') end
   vim.api.nvim_win_set_cursor(0, { line, 0 })
   local sexp = metadata.metadata_sexp_at_line_or_nil(line)
-  if not metadata.activeNode_sexp_p(sexp) then
+  if not metadata.unrestrictedNode_sexp_p(sexp) then
     error('Cannot replace this branch with a link:'
-          .. ' it is not an activeNode') end
+          .. ' it is not an unrestrictedNode') end
   local skgid = metadata.node_id(sexp)
   if not skgid then
     error('Cannot replace this branch with a link:'
@@ -193,7 +193,7 @@ end
 
 ---Replace the leaf at point with content linked from that leaf, then
 ---save. The leaf must have exactly one org bracket link in its title
----plus body, no viewdescendants, and an editable, owned ActiveVognode
+---plus body, no viewdescendants, and an editable, owned UnrestrictedVognode
 ---viewparent; the link must be an id link. Warns when the leaf
 ---already had an ID (the old node may become an orphan).
 function M.replace_link_with_content ()

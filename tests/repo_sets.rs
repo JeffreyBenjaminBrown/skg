@@ -16,10 +16,10 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
 use skg::serve::handlers::text_search::SearchEnrichmentPayload;
 use skg::skgrepo_sets::{
-  ActiveSkgRepoSet,
+  SkgrepoRestriction,
   SkgRepoSetName,
-  filter_path_to_active_skgrepos_for_test,
-  filter_branches_to_active_skgrepos_for_test,
+  filter_path_to_unrestricted_skgrepos_for_test,
+  filter_branches_to_unrestricted_skgrepos_for_test,
   prepare_git_diff_fixture,
   run_with_skgrepo_set_test_db};
 use skg::dbs::node_lookup::graphnode_from_graph;
@@ -64,42 +64,42 @@ fn all_tests
       s . reset ("repo_set_switch_rerenders_views_and_cancels_stale_search_enrichment", fixtures) ?;
       skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("content_view_omits_inactive_contained_nodes", fixtures) ?;
-      content_view_omits_inactive_contained_nodes (
+      s . reset ("content_view_omits_restricted_contained_nodes", fixtures) ?;
+      content_view_omits_restricted_contained_nodes (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_with_fixture_prep (
         // prepare_git_diff_fixture leaves the public skgrepo with a
         // real worktree-vs-HEAD diff, which this sub-test renders.
-        "diff_view_omits_inactive_members_without_content_leak", fixtures,
+        "diff_view_omits_restricted_members_without_content_leak", fixtures,
         |root| prepare_git_diff_fixture (root) ) ?;
-      diff_view_omits_inactive_members_without_content_leak (
+      diff_view_omits_restricted_members_without_content_leak (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("search_filters_inactive_repos_before_ranking_and_truncation", fixtures) ?;
-      search_filters_inactive_skgrepos_before_ranking_and_truncation (
+      s . reset ("search_filters_restricted_repos_before_ranking_and_truncation", fixtures) ?;
+      search_filters_restricted_skgrepos_before_ranking_and_truncation (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("inactive_placeholder_in_buffer_does_not_drive_contains", fixtures) ?;
-      inactive_placeholder_in_buffer_does_not_drive_contains (
+      s . reset ("restricted_placeholder_in_buffer_does_not_drive_contains", fixtures) ?;
+      restricted_placeholder_in_buffer_does_not_drive_contains (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("saving_edits_to_inactive_placeholder_content_are_rejected", fixtures) ?;
-      saving_edits_to_inactive_placeholder_content_are_rejected (
+      s . reset ("saving_edits_to_restricted_placeholder_content_are_rejected", fixtures) ?;
+      saving_edits_to_restricted_placeholder_content_are_rejected (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("restricted_repo_search_and_save_work_together_end_to_end", fixtures) ?;
       restricted_skgrepo_search_and_save_work_together_end_to_end (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("containerward_expansion_truncates_before_inactive_container", fixtures) ?;
-      containerward_expansion_truncates_before_inactive_container (
+      s . reset ("containerward_expansion_truncates_before_restricted_container", fixtures) ?;
+      containerward_expansion_truncates_before_restricted_container (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks", fixtures) ?;
       mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("stale_inactive_placeholders_under_folders_save_without_error", fixtures) ?;
-      stale_inactive_placeholders_under_folders_save_without_error (
+      s . reset ("stale_restricted_placeholders_under_folders_save_without_error", fixtures) ?;
+      stale_restricted_placeholders_under_folders_save_without_error (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("inactive_subscribee_placeholder_does_not_contribute_to_subscribesTo", fixtures) ?;
-      inactive_subscribee_placeholder_does_not_contribute_to_subscribesTo (
+      s . reset ("restricted_subscribee_placeholder_does_not_contribute_to_subscribesTo", fixtures) ?;
+      restricted_subscribee_placeholder_does_not_contribute_to_subscribesTo (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("weave_preserves_omitted_inactive_content_members", fixtures) ?;
-      weave_preserves_omitted_inactive_content_members (
+      s . reset ("weave_preserves_omitted_restricted_content_members", fixtures) ?;
+      weave_preserves_omitted_restricted_content_members (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("restricted_save_preserves_invisible_override_targets", fixtures) ?;
       restricted_save_preserves_invisible_override_targets (
@@ -107,18 +107,18 @@ fn all_tests
       Ok (( )) } )) }
 
 /// PIN (the override-substitution-across-switch case discussed in
-/// TODO/strip-inactive-node-fields-progress.org): a drawn override
-/// substitute whose skgrepo goes inactive on a skgrepo-set switch
-/// becomes an anonymous bare-atom 'inactiveNode'; the rerender draws the
-/// original directly (an inactive overrider does not substitute) with
+/// TODO/strip-restricted-node-fields-progress.org): a drawn override
+/// substitute whose skgrepo goes restricted on a skgrepo-set switch
+/// becomes an anonymous bare-atom 'restrictedNode'; the rerender draws the
+/// original directly (a restricted overrider does not substitute) with
 /// NO leak of the overrider's title or id, retaining the overrider's
-/// active descendant; and the container's contains still saves to the
+/// unrestricted descendant; and the container's contains still saves to the
 /// original, never to the overrider.
 ///
 /// Fixtures: public 'ovr-sub-container' -> 'ovr-sub-original' (N);
 /// private 'ovr-sub-overrider' (R) overrides ovr-sub-original and
 /// contains the public 'ovr-sub-child' (D). Under "all" R substitutes
-/// for N; switching to "public" makes R inactive.
+/// for N; switching to "public" makes R restricted.
 ///
 /// Installs the explicit graph handle (override resolution reads
 /// it), so it assumes per-test process isolation (nextest), like
@@ -146,16 +146,16 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
         view_all );
       assert! (
         view_all . contains ("private overrider title must not leak"),
-        "under 'all' the active overrider is drawn:\n{}", view_all );
+        "under 'all' the unrestricted overrider is drawn:\n{}", view_all );
 
-      // 2. Switch to "public": R goes inactive; the view re-renders.
+      // 2. Switch to "public": R goes restricted; the view re-renders.
       let graph : skg::dbs::in_rust_graph::InRustGraphHandle =
         skg::test_utils::graph_handle_from_config (config) ?;
       let env : skg::types::env::SkgEnv =
         skg::test_utils::skg_env_from_parts (
           config, tantivy, &graph );
-      let mut active : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (config, SkgRepoSetName::from ("all")) ?;
+      let mut restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (config, SkgRepoSetName::from ("all")) ?;
       let mut views_state : ViewsState =
         ViewsState { diff_mode_enabled : false,
                      open_views        : OpenViews::new () };
@@ -176,8 +176,8 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
         scope . spawn ( || {
           handle_skgrepo_set_request (
             &mut server_stream,
-            "((request . \"set active repo set\") (name . \"public\"))",
-            &env, &mut views_state, &mut active,
+            "((request . \"set skgrepo restriction\") (name . \"public\"))",
+            &env, &mut views_state, &mut restriction,
             &enrichment_slot, &search_cancelled); } ); } );
 
       // 3. The re-rendered view: N drawn directly, R anonymized.
@@ -186,27 +186,27 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
           . viewid_to_view (&view_id)
           . expect ("the switched view should still be registered");
         viewforest_to_string (forest, config) ? };
-      assert! ( view_public . contains ("inactiveNode"),
-        "the overrider should become an anonymous inactive vognode:\n{}",
+      assert! ( view_public . contains ("restrictedNode"),
+        "the overrider should become an anonymous restricted vognode:\n{}",
         view_public );
       assert! ( view_public . contains ("ovr-sub-original"),
         "the original N should be drawn directly:\n{}", view_public );
       assert! (
         ! view_public . contains ("private overrider title must not leak"),
-        "the inactive overrider's title must not leak:\n{}", view_public );
+        "the restricted overrider's title must not leak:\n{}", view_public );
       assert! ( ! view_public . contains ("ovr-sub-overrider"),
-        "the inactive overrider's id must not leak:\n{}", view_public );
+        "the restricted overrider's id must not leak:\n{}", view_public );
       assert! ( ! view_public . contains ("overridesHere"),
-        "an anonymous inactive vognode carries no override marker:\n{}",
+        "an anonymous restricted vognode carries no override marker:\n{}",
         view_public );
       assert! ( view_public . contains ("ovr-sub-child"),
-        "the overrider's active descendant is retained:\n{}",
+        "the overrider's unrestricted descendant is retained:\n{}",
         view_public );
 
       // 4. Saving the switched view keeps N in the container's
-      //    contains, and the inactive overrider writes nothing.
-      let public : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (config, SkgRepoSetName::from ("public")) ?;
+      //    contains, and the restricted overrider writes nothing.
+      let public : SkgrepoRestriction =
+        SkgrepoRestriction::named (config, SkgRepoSetName::from ("public")) ?;
       let plan = buffer_to_validated_saveplan (
         &view_public, config, Some (&public) )  ? . 1;
       if let Some (c) = plan . node_instructions . iter () . find_map (
@@ -220,7 +220,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
       assert! (
         ! save_skgids (&plan . node_instructions)
           . contains (&ID::from ("ovr-sub-overrider")),
-        "the inactive overrider produces no SaveNode" );
+        "the restricted overrider produces no SaveNode" );
       Ok (( )) } )) }
 
 fn save_skgids (
@@ -272,7 +272,7 @@ fn true_child_skgids (
 ) -> BTreeSet<ID> {
   tree . get (parent_skgid) . unwrap () . children ()
     . filter_map ( |child| match &child . value () . kind {
-      ViewnodeKind::Vognode ( Vognode::Active (node) )
+      ViewnodeKind::Vognode ( Vognode::Unrestricted (node) )
         => Some (node . skgid . clone ()),
       ViewnodeKind::Vognode (Vognode::Phantom ( Phantom::Diff (p) ))
         => Some (p . skgid . clone ()),
@@ -337,8 +337,8 @@ async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment 
       let env : skg::types::env::SkgEnv =
         skg::test_utils::skg_env_from_parts (
           config, tantivy, &graph );
-      let mut active : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (
+      let mut restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (
           config,
           SkgRepoSetName::from ("public"))?;
       let mut views_state : ViewsState =
@@ -371,16 +371,16 @@ async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment 
         scope . spawn ( || {
           handle_skgrepo_set_request (
             &mut server_stream,
-            "((request . \"set active repo set\") (name . \"all\"))",
+            "((request . \"set skgrepo restriction\") (name . \"all\"))",
             &env,
             &mut views_state,
-            &mut active,
+            &mut restriction,
             &enrichment_slot,
             &search_cancelled); } ); } );
       assert_eq! (
-        active . name,
+        restriction . name,
         SkgRepoSetName::from ("all"),
-        "repo-set switch should update the active set" );
+        "repo-set switch should update the skgrepo restriction" );
       assert! (
         views_state . open_views . views . contains_key (&view_id),
         "repo-set switch should KEEP registered views (re-rendered \
@@ -393,15 +393,15 @@ async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment 
         "repo-set switch should cancel in-flight search enrichment" );
       Ok (( )) }
 
-async fn content_view_omits_inactive_contained_nodes (
+async fn content_view_omits_restricted_contained_nodes (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: rendering OMITS
-  // inactive children (no placeholders); the weave preserves their
+  // restricted children (no placeholders); the weave preserves their
   // memberships at save.
-      let active : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (
+      let restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (
           &config,
           SkgRepoSetName::from ("public"))?;
       let (actual, pids, _viewforest) : (String, Vec<ID>, Tree<Viewnode>) =
@@ -409,29 +409,29 @@ async fn content_view_omits_inactive_contained_nodes (
           config, None,
           &[ID::from ("root")],
           false,
-          &active ) ?;
+          &restriction ) ?;
       assert! (
         ! actual . contains ("private-a"),
-        "an inactive contained node must be omitted entirely: {}",
+        "a restricted contained node must be omitted entirely: {}",
         actual );
       assert! (actual . contains ("active-a"));
       assert! (actual . contains ("active-b"));
       assert! (
         ! actual . contains ("private title must not leak"),
-        "inactive content must not reveal its title: {}",
+        "restricted content must not reveal its title: {}",
         actual );
       assert! (
         ! pids . contains (&ID::from ("private-a")),
-        "an omitted inactive node is not in the view, so not in its pid set: {:?}",
+        "an omitted restricted node is not in the view, so not in its pid set: {:?}",
         pids );
       Ok (( )) }
 
-async fn diff_view_omits_inactive_members_without_content_leak (
+async fn diff_view_omits_restricted_members_without_content_leak (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      let active : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (
+      let restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (
           &config,
           SkgRepoSetName::from ("public"))?;
       let (actual, _pids, _viewforest) : (String, Vec<ID>, Tree<Viewnode>) =
@@ -439,13 +439,13 @@ async fn diff_view_omits_inactive_members_without_content_leak (
           config, None,
           &[ID::from ("diff-root")],
           true,
-          &active ) ?;
+          &restriction ) ?;
       // Defense in depth: the connection-level refusals
       // (TODO/DONE/full-schema/DONE/12-2_diff-mode-policy_discussion.org) keep
       // diff mode and restricted skgrepo-sets from combining through
       // the two state doors, but this render seam remains directly
       // constructible (as this test does), so when the modes mix,
-      // inactive members are omitted from restricted diff views
+      // restricted members are omitted from restricted diff views
       // entirely -- current members and removed-member phantoms
       // alike -- and nothing private leaks.
       for forbidden in [
@@ -462,45 +462,45 @@ async fn diff_view_omits_inactive_members_without_content_leak (
           forbidden,
           actual ); }
       assert! ( actual . contains ("active-a"),
-        "active content still renders: {}", actual );
+        "unrestricted content still renders: {}", actual );
       Ok (( )) }
 
-async fn search_filters_inactive_skgrepos_before_ranking_and_truncation (
+async fn search_filters_restricted_skgrepos_before_ranking_and_truncation (
   config  : &SkgConfig,
 
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      let active : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (
+      let restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (
           &config,
           SkgRepoSetName::from ("public"))?;
       let skgids : Vec<ID> =
         skg::serve::handlers::text_search::search_skgids_for_skgrepo_set_for_test (
           &tantivy,
           &config,
-          &active,
+          &restriction,
           "shared ranking term",
           2 )?;
       assert_eq! (
         skgids,
         vec![ID::from ("active-search-hit")],
-        "inactive high-scoring hits must be filtered before ranking \
+        "restricted high-scoring hits must be filtered before ranking \
          and display truncation" );
       Ok (( )) }
 
-async fn inactive_placeholder_in_buffer_does_not_drive_contains (
+async fn restricted_placeholder_in_buffer_does_not_drive_contains (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // An inactive vognode is write-protected: it emits no save intention
+  // A restricted vognode is write-protected: it emits no save intention
   // for its container. Its presence and position in the container's
   // contains are owned by the disk merge (weave), not the buffer. So
   // reordering the placeholder cannot move its disk member, and a
   // stale placeholder for a node absent from disk is not resurrected.
   // (Disk root.contains = [active-a, private-a, active-b]; private-a's
-  // skgrepo is inactive under the "public" set.)
-      let active : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (
+  // skgrepo is restricted under the "public" set.)
+      let restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (
           config, SkgRepoSetName ("public" . to_string ())) ?;
       { // The user drags the placeholder to the end. The save keeps
         // private-a at its DISK position (after active-a), not the
@@ -509,11 +509,11 @@ async fn inactive_placeholder_in_buffer_does_not_drive_contains (
           * (skg (node (id root) (repo public))) root
           ** (skg (node (id active-a) (repo public) writeProtected)) active-a
           ** (skg (node (id active-b) (repo public) writeProtected)) active-b
-          ** (skg (inactiveNode (id private-a) (repo private)))
+          ** (skg (restrictedNode (id private-a) (repo private)))
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
-            reordered, config, Some (&active) ) ?
+            reordered, config, Some (&restriction) ) ?
           . 1 . node_instructions;
         let graph = graph_handle_from_config (config)? . load_full ();
         assert_eq! (
@@ -525,7 +525,7 @@ async fn inactive_placeholder_in_buffer_does_not_drive_contains (
            member" );
         assert! (
           ! save_skgids (&instructions) . contains (&ID::from ("private-a")),
-          "an inactive vognode must not produce a SaveNode" ); }
+          "a restricted vognode must not produce a SaveNode" ); }
       { // A stale placeholder for a node NOT in root's disk contains
         // (private-removed) must not be resurrected into contains; the
         // real invisible member (private-a) is still preserved.
@@ -533,11 +533,11 @@ async fn inactive_placeholder_in_buffer_does_not_drive_contains (
           * (skg (node (id root) (repo public))) root
           ** (skg (node (id active-a) (repo public) writeProtected)) active-a
           ** (skg (node (id active-b) (repo public) writeProtected)) active-b
-          ** (skg (inactiveNode (id private-removed) (repo private)))
+          ** (skg (restrictedNode (id private-removed) (repo private)))
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
-            stale, config, Some (&active) ) ?
+            stale, config, Some (&restriction) ) ?
           . 1 . node_instructions;
         let graph = graph_handle_from_config (config)? . load_full ();
         let contains : Vec<ID> =
@@ -553,13 +553,13 @@ async fn inactive_placeholder_in_buffer_does_not_drive_contains (
           "private-removed must not appear in contains" ); }
       Ok (( )) }
 
-async fn saving_edits_to_inactive_placeholder_content_are_rejected (
+async fn saving_edits_to_restricted_placeholder_content_are_rejected (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let buffer = indoc! {"
         * (skg (node (id root) (repo public))) root
-        ** (skg (inactiveNode (id private-a) (repo private))) edited title
+        ** (skg (restrictedNode (id private-a) (repo private))) edited title
         This body edit should be rejected.
       "};
       let result =
@@ -567,7 +567,7 @@ async fn saving_edits_to_inactive_placeholder_content_are_rejected (
           buffer, config, None ) ;
       assert! (
         matches! ( result, Err (SaveError::BufferValidationErrors { .. }) ),
-        "editing inactive vognode title/body should be rejected: {:?}",
+        "editing restricted vognode title/body should be rejected: {:?}",
         result );
 	      Ok (( )) }
 
@@ -575,30 +575,30 @@ async fn restricted_skgrepo_search_and_save_work_together_end_to_end (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      let active : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (
+      let restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (
           &config,
           SkgRepoSetName::from ("public"))?;
       let skgids : Vec<ID> =
         skg::serve::handlers::text_search::search_skgids_for_skgrepo_set_for_test (
           tantivy,
           &config,
-          &active,
+          &restriction,
           "shared ranking term",
           10 )?;
       assert_eq! (
         skgids,
         vec![ID::from ("active-search-hit")],
-        "restricted search should only return active-repo hits" );
+        "restricted search should only return unrestricted-repo hits" );
       let (rendered, _pids, _viewforest) : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view_with_skgrepo_set (
           config, None,
           &[ID::from ("root")],
           false,
-          &active ) ?;
+          &restriction ) ?;
       assert! (
         ! rendered . contains ("private-a"),
-        "restricted content view must omit inactive members: {}",
+        "restricted content view must omit restricted members: {}",
         rendered );
       let edited_buffer = indoc! {"
         * (skg (node (id root) (repo public))) root
@@ -607,7 +607,7 @@ async fn restricted_skgrepo_search_and_save_work_together_end_to_end (
       "};
       let instructions : Vec<NodeInstruction> =
         buffer_to_validated_saveplan (
-          edited_buffer, config, Some (&active) ) ?
+          edited_buffer, config, Some (&restriction) ) ?
         . 1 . node_instructions;
       let graph = graph_handle_from_config (config)? . load_full ();
       assert_eq! (
@@ -615,24 +615,24 @@ async fn restricted_skgrepo_search_and_save_work_together_end_to_end (
           &instructions, "root", &graph) . contains),
         vec![ ID::from ("active-a"), ID::from ("private-a"),
               ID::from ("active-b") ],
-        "restricted save should preserve the omitted inactive member \
+        "restricted save should preserve the omitted restricted member \
          via the weave" );
       assert! (
         ! save_skgids (&instructions) . contains (&ID::from ("private-a")),
-        "restricted save should not write inactive-repo nodes" );
+        "restricted save should not write restricted-skgrepo nodes" );
       assert_eq! (
         saved_node_by_skgid (&instructions, "active-b") . title,
         "active-b edited through restricted view",
-        "restricted save should still write active-repo edits" );
+        "restricted save should still write unrestricted-repo edits" );
       Ok (( )) }
 
 #[test]
-fn backward_path_truncates_before_first_inactive_node (
+fn backward_path_truncates_before_first_restricted_node (
 ) -> Result<(), Box<dyn Error>> {
   let config =
     load_config ("tests/repo_sets/fixtures/skgconfig.toml")?;
-  let active : ActiveSkgRepoSet =
-    ActiveSkgRepoSet::named (
+  let restriction : SkgrepoRestriction =
+    SkgrepoRestriction::named (
       &config,
       SkgRepoSetName::from ("public"))?;
   let graph = graph_handle_from_config (&config)? . load_full ();
@@ -642,10 +642,10 @@ fn backward_path_truncates_before_first_inactive_node (
       ID::from ("private-container"),
       ID::from ("active-root-after-private") ];
   assert_eq! (
-    filter_path_to_active_skgrepos_for_test (&graph, &config, &active, path)?,
+    filter_path_to_unrestricted_skgrepos_for_test (&graph, &config, &restriction, path)?,
     vec![ID::from ("active-container")],
-    "mid-path filtering should keep exactly the active prefix \
-     and stop before the first inactive node" );
+    "mid-path filtering should keep exactly the unrestricted prefix \
+     and stop before the first restricted node" );
   Ok (( )) }
 
 #[test]
@@ -653,8 +653,8 @@ fn backward_path_filters_forks_per_branch_and_omits_empty_forks (
 ) -> Result<(), Box<dyn Error>> {
   let config =
     load_config ("tests/repo_sets/fixtures/skgconfig.toml")?;
-  let active : ActiveSkgRepoSet =
-    ActiveSkgRepoSet::named (
+  let restriction : SkgrepoRestriction =
+    SkgrepoRestriction::named (
       &config,
       SkgRepoSetName::from ("public"))?;
   let graph = graph_handle_from_config (&config)? . load_full ();
@@ -663,28 +663,28 @@ fn backward_path_filters_forks_per_branch_and_omits_empty_forks (
       ID::from ("active-fork-branch"),
       ID::from ("private-fork-branch")]);
   assert_eq! (
-    filter_branches_to_active_skgrepos_for_test (
-      &graph, &config, &active, mixed_branches)?,
+    filter_branches_to_unrestricted_skgrepos_for_test (
+      &graph, &config, &restriction, mixed_branches)?,
     BTreeSet::from ([ID::from ("active-fork-branch")]),
-    "partially inactive forks should render only active branches" );
-  let inactive_branches : BTreeSet<ID> =
+    "partially restricted forks should render only unrestricted branches" );
+  let restricted_branches : BTreeSet<ID> =
     BTreeSet::from ([
       ID::from ("private-fork-branch"),
       ID::from ("private-other-branch")]);
   assert! (
-    filter_branches_to_active_skgrepos_for_test (
-      &graph, &config, &active, inactive_branches)?
+    filter_branches_to_unrestricted_skgrepos_for_test (
+      &graph, &config, &restriction, restricted_branches)?
     . is_empty (),
-    "fully inactive forks should not render an empty fork folder" );
+    "fully restricted forks should not render an empty fork folder" );
   Ok (( )) }
 
-async fn containerward_expansion_truncates_before_inactive_container (
+async fn containerward_expansion_truncates_before_restricted_container (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let graph = skg::test_utils::graph_handle_from_config (config)? . load_full ();
-      let active : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (
+      let restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (
           &config,
           SkgRepoSetName::from ("public"))?;
       let mut viewforest : Tree<Viewnode> =
@@ -697,24 +697,24 @@ async fn containerward_expansion_truncates_before_inactive_container (
         child_skgid,
         &graph,
         config,
-        Some (&active)) ?;
+        Some (&restriction)) ?;
       let child_children : BTreeSet<ID> =
         true_child_skgids (&viewforest, child_skgid);
       assert_eq! (
         child_children,
         BTreeSet::from ([ID::from ("active-container")]),
-        "containerward expansion should keep the active prefix and \
-         truncate before the inactive container" );
+        "containerward expansion should keep the unrestricted prefix and \
+         truncate before the restricted container" );
       let rendered : String =
         viewforest_to_string (&viewforest, config)?;
       assert! (
         ! rendered . contains ("private-container"),
-        "inactive container should not render as a placeholder or \
-         ActiveVognode: {}",
+        "restricted container should not render as a placeholder or \
+         UnrestrictedVognode: {}",
         rendered );
       assert! (
         ! rendered . contains ("active-root-after-private"),
-        "nodes beyond the first inactive container should be unreachable: {}",
+        "nodes beyond the first restricted container should be unreachable: {}",
         rendered );
       Ok (( )) }
 
@@ -723,8 +723,8 @@ async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks 
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let graph = skg::test_utils::graph_handle_from_config (config)? . load_full ();
-      let active : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (
+      let restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (
           &config,
           SkgRepoSetName::from ("public"))?;
       let mut viewforest : Tree<Viewnode> =
@@ -744,12 +744,12 @@ async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks 
         &graph,
         config,
         Birth::RoleGraft (RelationRole::MENTIONER),
-        Some (&active)) ?;
+        Some (&restriction)) ?;
       assert_eq! (
         true_child_skgids (&viewforest, child_skgid),
         BTreeSet::from ([ID::from ("active-fork-branch")]),
-        "mentionerward fork expansion should retain active branches \
-         independently and omit inactive branches" );
+        "mentionerward fork expansion should retain unrestricted branches \
+         independently and omit restricted branches" );
 
       let mut empty_fork_viewforest : Tree<Viewnode> =
         viewforest_from_org (indoc! {"
@@ -768,36 +768,36 @@ async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks 
         &graph,
         config,
         Birth::RoleGraft (RelationRole::MENTIONER),
-        Some (&active)) ?;
+        Some (&restriction)) ?;
       assert! (
         true_child_skgids (&empty_fork_viewforest, empty_fork_child_skgid)
         . is_empty (),
-        "all-inactive mentionerward forks should not leave children or \
+        "all-restricted mentionerward forks should not leave children or \
          empty fork folders" );
       Ok (( )) }
 
 #[test]
-fn search_enrichment_truncates_role_tree_before_inactive_container (
+fn search_enrichment_truncates_role_tree_before_restricted_container (
 ) -> Result<(), Box<dyn Error>> {
   let config =
     load_config ("tests/repo_sets/fixtures/skgconfig.toml")?;
-  let active : ActiveSkgRepoSet =
-    ActiveSkgRepoSet::named (
+  let restriction : SkgrepoRestriction =
+    SkgrepoRestriction::named (
       &config,
       SkgRepoSetName::from ("public"))?;
   let mut result_node : Graphnode =
     skg::types::nodes::complete::empty_graphnode ();
   result_node . pid = ID::from ("active-search-hit");
-  result_node . title = "active search hit" . to_string ();
+  result_node . title = "unrestricted search hit" . to_string ();
   set_skgrepo_retagging_relRepos ( &mut result_node, &SkgRepoName::from ("public") );
   result_node . aliases = rel_partners_at_relRepo_msv (
     & result_node . home_skgrepo,
     MSV::Specified (vec!["search term" . to_string ()]) );
-  let mut active_container : Graphnode =
+  let mut unrestricted_container : Graphnode =
     skg::types::nodes::complete::empty_graphnode ();
-  active_container . pid = ID::from ("active-container");
-  active_container . title = "active-container" . to_string ();
-  set_skgrepo_retagging_relRepos ( &mut active_container, &SkgRepoName::from ("public") );
+  unrestricted_container . pid = ID::from ("active-container");
+  unrestricted_container . title = "active-container" . to_string ();
+  set_skgrepo_retagging_relRepos ( &mut unrestricted_container, &SkgRepoName::from ("public") );
   let mut private_container : Graphnode =
     skg::types::nodes::complete::empty_graphnode ();
   private_container . pid = ID::from ("private-container");
@@ -805,20 +805,20 @@ fn search_enrichment_truncates_role_tree_before_inactive_container (
     "private container title must not leak" . to_string ();
   set_skgrepo_retagging_relRepos ( &mut private_container, &SkgRepoName::from ("private") );
   let graph = skg::dbs::in_rust_graph::InRustGraph::from_graphnodes (
-    &[result_node . clone (), active_container . clone (),
+    &[result_node . clone (), unrestricted_container . clone (),
       private_container . clone ()]);
   let index_dir : &str =
     "/tmp/tantivy-test-repo-sets-search-enrichment-truncation";
   let (tantivy, _count) =
     wipe_then_init_tantivy_db (
-      &[ result_node, active_container, private_container ],
+      &[ result_node, unrestricted_container, private_container ],
       Path::new (index_dir))?;
   let mut matches_by_skgid =
     skg::serve::handlers::text_search::MatchGroups::new ();
   matches_by_skgid . insert (
     ID::from ("active-search-hit"),
     ( SkgRepoName::from ("public"),
-      vec![(1.0, "active search hit" . to_string ())] ));
+      vec![(1.0, "unrestricted search hit" . to_string ())] ));
   let containerward_role_trees_by_skgid : HashMap<ID, ContainerwardRoleTree> =
     HashMap::from ([(
       ID::from ("active-search-hit"),
@@ -838,42 +838,42 @@ fn search_enrichment_truncates_role_tree_before_inactive_container (
         &containerward_role_trees_by_skgid,
         &tantivy,
         &config,
-        &active)?;
+        &restriction)?;
   assert! (
     rendered . contains ("active-container"),
-    "active ancestry should render: {}",
+    "unrestricted ancestry should render: {}",
     rendered );
   assert! (
     rendered . contains ("(homeRepoHerald ⌂:public)"),
     "enriched search results should show the repo herald at the \
-     repo boundary (the active-repo root): {}",
+     repo boundary (the restriction-repo root): {}",
     rendered );
   assert! (
     ! rendered . contains ("private-container"),
-    "inactive enrichment ancestry should be truncated before the \
-     inactive container: {}",
+    "restricted enrichment ancestry should be truncated before the \
+     restricted container: {}",
     rendered );
   assert! (
     ! rendered . contains ("private container title must not leak"),
-    "inactive enrichment ancestry must not reveal title text: {}",
+    "restricted enrichment ancestry must not reveal title text: {}",
     rendered );
   if Path::new (index_dir) . exists () {
     fs::remove_dir_all (index_dir)?; }
   Ok (( )) }
 
 #[test]
-fn titles_by_skgids_omits_inactive_skgrepo_titles (
+fn titles_by_skgids_omits_restricted_skgrepo_titles (
 ) -> Result<(), Box<dyn Error>> {
   let config =
     load_config ("tests/repo_sets/fixtures/skgconfig.toml")?;
-  let active : ActiveSkgRepoSet =
-    ActiveSkgRepoSet::named (
+  let restriction : SkgrepoRestriction =
+    SkgrepoRestriction::named (
       &config,
       SkgRepoSetName::from ("public"))?;
   let titles =
     skg::serve::handlers::titles_by_skgids::titles_by_skgids_for_skgrepo_set_for_test (
       &config,
-      &active,
+      &restriction,
       &[ ID::from ("active-a"),
          ID::from ("private-a") ])?;
   assert_eq! (
@@ -881,73 +881,73 @@ fn titles_by_skgids_omits_inactive_skgrepo_titles (
     Some (&"active-a" . to_string ()));
   assert! (
     ! titles . contains_key (&ID::from ("private-a")),
-    "inactive-repo title lookup must omit private-a" );
+    "restricted-skgrepo title lookup must omit private-a" );
   Ok (( )) }
 
-async fn stale_inactive_placeholders_under_folders_save_without_error (
+async fn stale_restricted_placeholders_under_folders_save_without_error (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: the formerly-unsavable
   // buffer. A buffer rendered before a skgrepo-set switch can hold
-  // InactiveVognodes under folders; saving it must not error.
+  // RestrictedVognodes under folders; saving it must not error.
       let buffer = indoc! {"
         * (skg (node (id root) (repo public))) root
         ** (skg subscriberFolder)
-        *** (skg (inactiveNode (id private-a) (repo private)))
+        *** (skg (restrictedNode (id private-a) (repo private)))
         ** (skg (node (id active-b) (repo public) writeProtected)) active-b
       "};
-      let active : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (
+      let restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (
           config, SkgRepoSetName ("public" . to_string ())) ?;
       let result =
         buffer_to_validated_saveplan (
-          buffer, config, Some (&active) ) ;
+          buffer, config, Some (&restriction) ) ;
       assert! ( result . is_ok (),
-        "an InactiveVognode under a folder must not block saving: {:?}",
+        "a RestrictedVognode under a folder must not block saving: {:?}",
         result . err () . map ( |e| format! ("{:?}", e)) );
       Ok (( )) }
 
-async fn inactive_subscribee_placeholder_does_not_contribute_to_subscribesTo (
+async fn restricted_subscribee_placeholder_does_not_contribute_to_subscribesTo (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // An inactive vognode emits no subscribesTo membership, just as
+  // A restricted vognode emits no subscribesTo membership, just as
   // it emits no contains relationship_axes: 'subscribesTo' is
   // order-meaningful, but the disk merge (weave) owns invisible
   // subscribees, so a buffer-present placeholder must not feed the
   // recorder's subscribeeFolder. (root has no subscribesTo on disk, so the
-  // active member is the only one written.)
+  // unrestricted member is the only one written.)
       let buffer = indoc! {"
         * (skg (node (id root) (repo public))) root
         ** (skg subscribeeFolder)
-        *** (skg (inactiveNode (id private-a) (repo private)))
+        *** (skg (restrictedNode (id private-a) (repo private)))
         *** (skg (node (id active-b) (repo public) writeProtected)) active-b
       "};
-      let active : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (
+      let restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (
           config, SkgRepoSetName ("public" . to_string ())) ?;
       let instructions : Vec<NodeInstruction> =
         buffer_to_validated_saveplan (
-          buffer, config, Some (&active) )  ?
+          buffer, config, Some (&restriction) )  ?
         . 1 . node_instructions;
       assert_eq! (
         members_of (
           saved_node_by_skgid (&instructions, "root")
             . subscribesTo . or_default () ),
         vec! [ ID::from ("active-b") ],
-        "the inactive vognode must not be a subscribee member" );
+        "the restricted vognode must not be a subscribee member" );
       Ok (( )) }
 
-async fn weave_preserves_omitted_inactive_content_members (
+async fn weave_preserves_omitted_restricted_content_members (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: under a restricted
-  // set, a buffer that omits inactive members must not delete them;
+  // set, a buffer that omits restricted members must not delete them;
   // visible edits (reorder, delete) still land.
-      let active : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (
+      let restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (
           config, SkgRepoSetName ("public" . to_string ())) ?;
       let graph = graph_handle_from_config (config)? . load_full ();
       { // Disk: root contains [active-a, private-a, active-b].
@@ -960,14 +960,14 @@ async fn weave_preserves_omitted_inactive_content_members (
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
-            buffer, config, Some (&active) )  ?
+            buffer, config, Some (&restriction) )  ?
           . 1 . node_instructions;
         assert_eq! (
           members_of (& saved_or_graph_node_by_skgid (
             &instructions, "root", &graph) . contains),
           vec![ ID::from ("active-a"), ID::from ("private-a"),
                 ID::from ("active-b") ],
-          "omitted inactive member must survive, anchored" ); }
+          "omitted restricted member must survive, anchored" ); }
       { // Reordering the visible members carries the anchored
         // invisible member with its anchor.
         let buffer = indoc! {"
@@ -977,7 +977,7 @@ async fn weave_preserves_omitted_inactive_content_members (
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
-            buffer, config, Some (&active) )  ?
+            buffer, config, Some (&restriction) )  ?
           . 1 . node_instructions;
         assert_eq! (
           members_of (& saved_or_graph_node_by_skgid (
@@ -993,7 +993,7 @@ async fn weave_preserves_omitted_inactive_content_members (
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
-            buffer, config, Some (&active) )  ?
+            buffer, config, Some (&restriction) )  ?
           . 1 . node_instructions;
         assert_eq! (
           members_of (& saved_or_graph_node_by_skgid (
@@ -1010,11 +1010,11 @@ async fn restricted_save_preserves_invisible_override_targets (
   // The pipeline-level half of the second named regression
   // (TODO/DONE/full-schema/DONE/13_test-rel-matrix.org): a node overrides
   // [ovr-visible, ovr-inactive] where ovr-inactive's skgrepo is
-  // inactive. Rendering restricted shows only ovr-visible; the
+  // restricted. Rendering restricted shows only ovr-visible; the
   // set-difference merge must keep ovr-inactive across a restricted
   // save, even when the visible member is deleted.
-      let active : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (
+      let restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (
           &config, SkgRepoSetName::from ("public") )?;
       let override_set = |node : &Graphnode| -> Vec<ID> {
         match &node . overrides {
@@ -1031,7 +1031,7 @@ async fn restricted_save_preserves_invisible_override_targets (
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
-            unmodified, &config, Some (&active) ) ?
+            unmodified, &config, Some (&restriction) ) ?
           . 1 . node_instructions;
         if let Some (NodeInstruction::Save (SaveNode (recorder))) =
           instructions . iter () . find ( |i| matches! (
@@ -1048,7 +1048,7 @@ async fn restricted_save_preserves_invisible_override_targets (
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
-            deleted, &config, Some (&active) ) ?
+            deleted, &config, Some (&restriction) ) ?
           . 1 . node_instructions;
         assert_eq! (
           override_set ( saved_node_by_skgid (&instructions, "ovr-owner") ),

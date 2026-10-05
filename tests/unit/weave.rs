@@ -24,11 +24,11 @@ fn sdm (disk : &[&str], buffer : &[&str]) -> Vec<&'static str> {
   set_difference_merge ( &disk, vis, &buffer ) }
 
 #[test]
-fn active_relRepo_makes_an_unknown_member_visible () {
-  use crate::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
+fn unrestricted_relRepo_makes_an_unknown_member_visible () {
+  use crate::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
   use crate::types::misc::{ID, RelPartner, SkgConfig, SkgRepoName};
   use std::collections::{BTreeSet, HashMap};
-  let active = ActiveSkgRepoSet {
+  let restriction = SkgrepoRestriction {
     name: SkgRepoSetName::from ("main"),
     skgrepos: BTreeSet::from ([SkgRepoName::from ("main")]) };
   let config = SkgConfig::dummyFromSkgRepos (HashMap::new ());
@@ -38,10 +38,10 @@ fn active_relRepo_makes_an_unknown_member_visible () {
     SkgRepoName::from ("private"), ID::from ("absent"));
   assert! (relationship_member_is_visible (
     &crate::dbs::in_rust_graph::InRustGraph::new (),
-    &unknown_at_main, &config, &active));
+    &unknown_at_main, &config, &restriction));
   assert! (! relationship_member_is_visible (
     &crate::dbs::in_rust_graph::InRustGraph::new (),
-    &unknown_at_private, &config, &active));
+    &unknown_at_private, &config, &restriction));
 }
 
 #[test]
@@ -83,8 +83,8 @@ fn weave_all_visible_deleted () {
 
 #[test]
 fn weave_positioned_invisible_member_moves_with_buffer () {
-  // R is inactive but PRESENT in the buffer (a retained
-  // InactiveVognode): the buffer's order wins for it, and it serves as
+  // R is restricted but PRESENT in the buffer (a retained
+  // RestrictedVognode): the buffer's order wins for it, and it serves as
   // an anchor for the run that follows it on disk.
   assert_eq! ( w (&["a","R","X","b"], &["b","R","a"]),
                vec! ["b","R","X","a"] ); }

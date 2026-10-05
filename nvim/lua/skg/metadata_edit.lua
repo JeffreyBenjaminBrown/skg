@@ -18,7 +18,7 @@
 
 local bijection = require('skg.sexpr.org_bijection')
 local config = require('skg.config')
-local defaults = require('skg.sexpr.activenode_defaults')
+local defaults = require('skg.sexpr.unrestrictednode_defaults')
 local metadata = require('skg.metadata')
 local sexpr = require('skg.sexpr.parse')
 
@@ -43,13 +43,13 @@ function M.edit_metadata ()
     M.open_empty_node_view(source_buf, line_number, split)
     return end
   local sexp = sexpr.read(split.metadata)
-  local is_activeNode = defaults.activeNode_sexp_p(sexp)
+  local is_unrestrictedNode = defaults.unrestrictedNode_sexp_p(sexp)
   local org_text = bijection.sexp_to_org(sexp)
-  if is_activeNode then
+  if is_unrestrictedNode then
     org_text = defaults.expand_defaults_in_org(
       org_text, nil, split.title) end
   M.open_edit_buffer(org_text, source_buf, line_number,
-                     #split.stars, #split.metadata, is_activeNode)
+                     #split.stars, #split.metadata, is_unrestrictedNode)
   M.goto_field_value('repo')
 end
 
@@ -100,10 +100,10 @@ end
 ---@param line_number integer
 ---@param metadata_start integer 0-based byte column
 ---@param metadata_length integer
----@param is_activeNode boolean
+---@param is_unrestrictedNode boolean
 function M.open_edit_buffer (org_text, source_buf, line_number,
                              metadata_start, metadata_length,
-                             is_activeNode)
+                             is_unrestrictedNode)
   local buf = vim.api.nvim_create_buf(true, false)
   vim.api.nvim_buf_set_name(
     buf, 'skg://metadata-edit/' .. tostring(buf))
@@ -119,7 +119,7 @@ function M.open_edit_buffer (org_text, source_buf, line_number,
   vim.b[buf].skg_edit_line = line_number
   vim.b[buf].skg_edit_start = metadata_start
   vim.b[buf].skg_edit_length = metadata_length
-  vim.b[buf].skg_edit_is_activeNode = is_activeNode
+  vim.b[buf].skg_edit_is_unrestrictedNode = is_unrestrictedNode
   vim.api.nvim_create_autocmd('BufWriteCmd', {
     buffer = buf,
     callback = function () M.commit(buf) end })
@@ -159,7 +159,7 @@ function M.commit (buf)
     error('The buffer this metadata came from is no longer open') end
   local org_text = table.concat(
     vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
-  if vim.b[buf].skg_edit_is_activeNode then
+  if vim.b[buf].skg_edit_is_unrestrictedNode then
     org_text = defaults.strip_defaults_from_org(org_text) end
   local new_sexp = bijection.org_to_sexp(org_text)
   local new_text = sexpr.to_string(new_sexp)

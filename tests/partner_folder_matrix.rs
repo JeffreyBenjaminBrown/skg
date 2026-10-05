@@ -25,7 +25,7 @@ use std::error::Error;
 use std::net::TcpStream;
 
 use skg::skgrepo_sets::{
-  ActiveSkgRepoSet, SkgRepoSetName, run_with_skgrepo_set_test_db};
+  SkgrepoRestriction, SkgRepoSetName, run_with_skgrepo_set_test_db};
 use skg::test_utils::graph_handle_from_config;
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::{
@@ -525,10 +525,10 @@ async fn folder_request_scenarios (
 async fn saveplan_nodes (
   buf    : &str,
   config : &SkgConfig,
-  active : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> Result<Vec<NodeInstruction>, Box<dyn Error>> {
   let (_vf, plan, _warnings) =
-    buffer_to_validated_saveplan (buf, config, active)  ?;
+    buffer_to_validated_saveplan (buf, config, restriction)  ?;
   Ok (plan . node_instructions) }
 
 /// A fresh write-protected public member line at the given indentation.
@@ -673,8 +673,8 @@ async fn hiddenFolder_delete_does_not_unhide (
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
-// Omission under a restricted skgrepo-set: an inactive-repo member
-// beside an active one is omitted from the render (no placeholder);
+// Omission under a restricted skgrepo-set: a restricted-skgrepo member
+// beside an unrestricted one is omitted from the render (no placeholder);
 // for the editable folder, the save weaves the omitted member back.
 //////////////////////////////////////////////////////////////
 
@@ -682,36 +682,36 @@ async fn omission_scenarios (
   fails : &mut Fails,
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  let active : ActiveSkgRepoSet =
-    ActiveSkgRepoSet::named (config, SkgRepoSetName::from ("public")) ?;
-  { // write-protected subscriberFolder: inactive omitted, active shown
+  let restriction : SkgrepoRestriction =
+    SkgrepoRestriction::named (config, SkgRepoSetName::from ("public")) ?;
+  { // write-protected subscriberFolder: restricted omitted, unrestricted shown
     let s : &str = "subscriberFolder/omission";
     let (buf, _p, _t) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view_with_skgrepo_set (
         config, None, &[ID::from ("omSub-owner")],
-        false, &active ) ?;
+        false, &restriction ) ?;
     fails . want_absent (s, &buf, "subscriberFolder");
     fails . want_absent (s, &buf, "omSub-active");
     fails . want_absent (s, &buf, "omSub-inactive"); }
-  { // editable subscribeeFolder: inactive omitted from render, but the
+  { // editable subscribeeFolder: restricted omitted from render, but the
     // restricted save weaves it back into subscribesTo.
     let s : &str = "subscribeeFolder/omission";
     let (buf, _p, _t) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view_with_skgrepo_set (
         config, None, &[ID::from ("omWsub-owner")],
-        false, &active ) ?;
+        false, &restriction ) ?;
     fails . want_contains (s, &buf, "(id omWsub-active)");
     fails . want_absent (s, &buf, "omWsub-inactive");
     // Delete the only VISIBLE subscribee and save under the restricted
     // set: the weave must still preserve the invisible omWsub-inactive
     // (a restricted save cannot delete what it cannot see), while the
-    // deleted active member is removed. So subscribesTo = [inactive].
-    let active_line : String =
+    // deleted unrestricted member is removed. So subscribesTo = [restricted].
+    let unrestricted_line : String =
       line_containing (&buf, "(id omWsub-active)") . to_string ();
     let edited : String =
-      buf . replace (&format! ("{}\n", active_line), "");
+      buf . replace (&format! ("{}\n", unrestricted_line), "");
     let nodes : Vec<NodeInstruction> =
-      saveplan_nodes (&edited, config, Some (&active)) . await ?;
+      saveplan_nodes (&edited, config, Some (&restriction)) . await ?;
     match saved_node_by_skgid (&nodes, "omWsub-owner") {
       Some (n) => { let subs : Vec<ID> = match &n . subscribesTo {
           MSV::Specified (skgids) => members_of (skgids),

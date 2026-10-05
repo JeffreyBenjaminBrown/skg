@@ -127,7 +127,7 @@ Two differences from the implicit fork:
 
 The result is an *override chain*: =D overrides C overrides N=. Chains
 of any length are legal (only a /cycle/ is forbidden — see
-[[file:./sharing-model.org][the sharing model]]). When all skgrepos are active,
+[[file:./sharing-model.org][the sharing model]]). When all skgrepos are unrestricted,
 viewing =N='s container draws the chain's end =D=; restrict the
 skgrepo-set to hide =D='s skgrepo and the same view draws the middle =C=
 instead — either way =N= stays in the container's contents. If you point

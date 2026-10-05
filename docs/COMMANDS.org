@@ -45,8 +45,8 @@ Marks the node at point for deletion from the graph.
 Upon saving the view, it will vanish not just from this view,
 but from the graph itself.
 *** C-u C-c <backspace> : skg-delete-recursive
-Same as skg-delete, but also marks every activeNode viewdescendant
-of the node at point. Descendent headlines that are not activeNodes
+Same as skg-delete, but also marks every unrestrictedNode viewdescendant
+of the node at point. Descendent headlines that are not unrestrictedNodes
 (phantoms, aliasFolder, id-folder, etc.) are skipped.
 
 Prefix-arg variant of skg-delete; callable directly via M-x
@@ -445,12 +445,12 @@ The stuck-relationship offer and the write-protected warning described
 under =C-c s s= apply here too, across the whole subtree.
 *** C-c s x : skg-set-flag-search-matching
 Prompts between =search matching= and =no search matching=, with shift-arrow
-cycling, and stages an idempotent request on the saved active node at point.
+cycling, and stages an idempotent request on the saved unrestricted node at point.
 It refuses foreign and write-protected nodes and conflicts with another
 =editRequest=. It does not save; save the view to apply it.
 
 With =C-u=, the selected value is applied uniformly to the true-content
-subtree only. Non-vognodes, role trees, non-member children, inactive nodes, and
+subtree only. Non-vognodes, role trees, non-member children, restricted nodes, and
 phantoms are pruned. Repeated PIDs are changed once; ineligible descendants
 are skipped and reported in =*Messages*=.
 *** C-c s m : skg-set-merge-request
@@ -552,7 +552,7 @@ validates each relationship (an offered skgrepo more public than some relationsh
 default makes the save fail, naming that relationship).
 
 The walk applies to, and recurses on, only viewchildren that affect
-their viewparents: affectsParent=true activeNodes, through the two
+their viewparents: affectsParent=true unrestrictedNodes, through the two
 editable folders. It prunes below write-protected nodes and
 subscribee-as-such members (their viewchildren's relationships are not
 collected at save), and prunes write-protected folders and other non-vognodes
@@ -578,11 +578,11 @@ ID, the command warns that the old node might become an orphan.
 
 The headline title plus body must contain exactly one org bracket
 link, and that link must be an =id:= link. The node must have no
-viewdescendants. Its viewparent must be an editable activeNode
+viewdescendants. Its viewparent must be an editable unrestrictedNode
 whose skgrepo is owned in =skgconfig.toml=.
 
 The command replaces the whole leaf with a same-level
-write-protected activeNode for the link target. The parent is
+write-protected unrestrictedNode for the link target. The parent is
 editable, so saving records the dest as content of the
 parent; the replacement child is write-protected, so its own text is
 not rewritten from the link label.
@@ -613,8 +613,8 @@ be there, then save the buffer.
 Point can be on the headline or in the node body.
 The command uses the headline either way.
 
-The node being replaced must be an existing activeNode with an ID,
-and a viewchild of an editable activeNode whose skgrepo is
+The node being replaced must be an existing unrestrictedNode with an ID,
+and a viewchild of an editable unrestrictedNode whose skgrepo is
 owned in =skgconfig.toml=. The command acts locally,
 replacing only this occurrence in the current buffer:
 the headline at point and all of its viewdescendants,
@@ -686,7 +686,7 @@ server to use that skgrepo-set for subsequent requests. Choose =all=
 (the whole ladder) to remove the restriction.
 
 If the proposed set would rerender overPrivateText telescope text, Skg asks before
-changing the active set or any view. Declining leaves both unchanged and
+changing the skgrepo restriction or any view. Declining leaves both unchanged and
 an empty rerender stream releases the client's preemptive locks.
 *** C-c v r : skg-readable-ids-mode
 This changes how node IDs are displayed.
@@ -706,7 +706,7 @@ server round-trip at all. See =C-c v R= for when it goes stale.
 Empties the session's ID-to-title cache (see =C-c v r=) and
 re-annotates the current buffer. Use it after anything that changes
 what titles the server would answer with: a node retitled, or the
-active skgrepo-set widened (IDs inactive under the old set were
+skgrepo restriction widened (IDs restricted under the old set were
 cached as unresolvable).
 *** C-c v s : skg-view-linkstack
 View and maybe edit the set of links you've stored.

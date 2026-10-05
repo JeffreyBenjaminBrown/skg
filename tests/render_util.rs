@@ -4,7 +4,7 @@ use skg::assert_metadata_eq;
 use skg::org_to_text::viewnode_to_text;
 use skg::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
 use skg::types::misc::{ID, SkgConfig, SkgRepo, SkgRepoName};
-use skg::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, ActiveVognode, Editability, ViewnodeStats, default_activeVognode };
+use skg::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, UnrestrictedVognode, Editability, ViewnodeStats, default_unrestrictedVognode };
 use skg::types::viewnode::PropertyFolder;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -15,32 +15,32 @@ fn test_viewnode_to_text_no_metadata () {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind    : ViewnodeKind::Vognode (Vognode::Active (
-      default_activeVognode ( ID::from ("test"),
+    kind    : ViewnodeKind::Vognode (Vognode::Unrestricted (
+      default_unrestrictedVognode ( ID::from ("test"),
                          SkgRepoName::from ("main"),
                          "Test Title" . to_string() ))) };
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSkgRepos (HashMap::new ()) )
-    . expect ("ActiveVognode rendering never fails");
+    . expect ("UnrestrictedVognode rendering never fails");
   assert_metadata_eq! ( result, "* (skg (node (id test) (repo main))) Test Title\n" ); }
 
 #[test]
 fn test_viewnode_to_text_with_body () {
-  let t : ActiveVognode = ActiveVognode {
+  let t : UnrestrictedVognode = UnrestrictedVognode {
     editability : Editability::Editable {
       body         : Some ( "Test body content" . to_string() ),
       edit_request : None },
-    .. default_activeVognode ( ID::from ("test"),
+    .. default_unrestrictedVognode ( ID::from ("test"),
                           SkgRepoName::from ("main"),
                           "Test Title" . to_string() ) };
   let node : Viewnode = Viewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind    : ViewnodeKind::Vognode (Vognode::Active (t)), };
+    kind    : ViewnodeKind::Vognode (Vognode::Unrestricted (t)), };
   let result : String =
     viewnode_to_text ( 2, &node, &SkgConfig::dummyFromSkgRepos (HashMap::new ()) )
-    . expect ("ActiveVognode rendering never fails");
+    . expect ("UnrestrictedVognode rendering never fails");
   assert_metadata_eq! ( result, "** (skg (node (id test) (repo main))) Test Title\nTest body content\n" ); }
 
 #[test]
@@ -59,34 +59,34 @@ fn test_viewnode_to_text_with_metadata () {
 
 #[test]
 fn test_viewnode_to_text_with_skgid_metadata () {
-  let t : ActiveVognode = ActiveVognode {
+  let t : UnrestrictedVognode = UnrestrictedVognode {
     editability : Editability::WriteProtected,
-    .. default_activeVognode ( ID::from ("test123"),
+    .. default_unrestrictedVognode ( ID::from ("test123"),
                           SkgRepoName::from ("main"),
                           "Test Title" . to_string() ) };
   let node : Viewnode = Viewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind    : ViewnodeKind::Vognode (Vognode::Active (t)), };
+    kind    : ViewnodeKind::Vognode (Vognode::Unrestricted (t)), };
   let result : String =
     viewnode_to_text ( 3, &node, &SkgConfig::dummyFromSkgRepos (HashMap::new ()) )
-    . expect ("ActiveVognode rendering never fails");
+    . expect ("UnrestrictedVognode rendering never fails");
   assert_metadata_eq! ( result, "*** (skg (node (id test123) (repo main) writeProtected)) Test Title\n" ); }
 
 #[test]
 fn skgrepo_name_with_whitespace_is_one_round_trippable_atom () {
   let skgrepo         : SkgRepoName = SkgRepoName::from ("Mr Cheese");
-  let mut active_node : ActiveVognode =
-    default_activeVognode (
+  let mut unrestricted_node : UnrestrictedVognode =
+    default_unrestrictedVognode (
       ID::from ("cheese-node"), skgrepo . clone (),
       "Cooking" . to_string () );
-  active_node . viewStats . homeSkgRepoAtBoundary = true;
+  unrestricted_node . viewStats . homeSkgRepoAtBoundary = true;
   let node : Viewnode = Viewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind : ViewnodeKind::Vognode (Vognode::Active (active_node)) };
+    kind : ViewnodeKind::Vognode (Vognode::Unrestricted (unrestricted_node)) };
   let config = SkgConfig::dummyFromSkgRepos (HashMap::from ([
     ( skgrepo . clone (), SkgRepo {
         name         : skgrepo,
@@ -95,7 +95,7 @@ fn skgrepo_name_with_whitespace_is_one_round_trippable_atom () {
         owned        : false } ) ]));
   let rendered : String =
     viewnode_to_text (1, &node, &config)
-    . expect ("ActiveVognode rendering never fails");
+    . expect ("UnrestrictedVognode rendering never fails");
   assert_eq! (
     rendered,
     "* (skg (node (id cheese-node) (repo \"Mr Cheese\") (viewStats (homeRepoHerald \"⌂:Mr Cheese\")))) Cooking\n" );
@@ -112,21 +112,21 @@ fn skgrepo_name_with_whitespace_is_one_round_trippable_atom () {
 
 #[test]
 fn test_metadata_ordering () {
-  let t : ActiveVognode = ActiveVognode {
+  let t : UnrestrictedVognode = UnrestrictedVognode {
     viewStats : ViewnodeStats {
       cycle             : true,
       .. ViewnodeStats::default() },
-    .. default_activeVognode ( ID::from ("xyz"),
+    .. default_unrestrictedVognode ( ID::from ("xyz"),
                           SkgRepoName::from ("main"),
                           "Test" . to_string() ) };
   let node : Viewnode = Viewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind    : ViewnodeKind::Vognode (Vognode::Active (t)), };
+    kind    : ViewnodeKind::Vognode (Vognode::Unrestricted (t)), };
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSkgRepos (HashMap::new ()) )
-    . expect ("ActiveVognode rendering never fails");
+    . expect ("UnrestrictedVognode rendering never fails");
   assert_metadata_eq! ( result, "* (skg (node (id xyz) (repo main) (viewStats cycle))) Test\n" ); }
 
 #[test]
@@ -134,16 +134,16 @@ fn test_rel_heralds_emitted () {
   // The semantic (rels ...) string round-trips verbatim; a node with
   // none emits no rels atom.
   let mk = | rels : Option<&str> | -> String {
-    let t : ActiveVognode = ActiveVognode {
+    let t : UnrestrictedVognode = UnrestrictedVognode {
       viewStats : ViewnodeStats {
         rel_heralds : rels . map ( |s| s . to_string () ),
         .. ViewnodeStats::default () },
-      .. default_activeVognode ( ID::from ("n"),
+      .. default_unrestrictedVognode ( ID::from ("n"),
                             SkgRepoName::from ("main"),
                             "N" . to_string () ) };
     let node = Viewnode {
       focused : false, folded : false, body_folded : false,
-      kind : ViewnodeKind::Vognode (Vognode::Active (t)) };
+      kind : ViewnodeKind::Vognode (Vognode::Unrestricted (t)) };
     viewnode_to_text (
       1, &node, &SkgConfig::dummyFromSkgRepos (HashMap::new ()) )
       . unwrap () };

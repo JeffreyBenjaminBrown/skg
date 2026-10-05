@@ -42,7 +42,7 @@ relRepo: the skgrepo of the section that records it.
 
 Reading the node *composes* the sections, most public first, into one
 effective node. Under a restricted skgrepo-set you see the *visible
-composition* — only the active sections' contributions — while =all= shows
+composition* — only the unrestricted sections' contributions — while =all= shows
 the *full composition*. A more private section can both /add/ members and
 /place/ them: its members interleave into the more public list via
 placement anchors, so your private ordering of a public list

@@ -14,7 +14,7 @@ use crate::dbs::in_rust_graph::containerward_role_tree::{ ContainerwardRoleTree,
 use crate::dbs::in_rust_graph::paths::{
   paths_to_first_nonlinearities_in_graph, PathToFirstNonlinearity};
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::util::{ get_skgid_from_viewnode_at, graphnode_and_viewnode_from_skgid, remove_completed_view_request};
 
 use crate::types::misc::{ID, SkgConfig, SkgRepoName};
@@ -41,11 +41,11 @@ pub fn build_and_integrate_role_tree_then_drop_request (
   role          : RelationRole,
   config        : &SkgConfig,
   errors        : &mut Vec < String >,
-  active        : Option<&ActiveSkgRepoSet>,
+  restriction   : Option<&SkgrepoRestriction>,
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
     build_and_integrate_role_tree_with_skgrepo_set (
-      tree, treeid, graph, role, config, active );
+      tree, treeid, graph, role, config, restriction );
   remove_completed_view_request (
     tree, treeid,
     ViewRequest::RoleTree (role),
@@ -64,7 +64,7 @@ pub fn build_and_integrate_role_tree_with_skgrepo_set (
   graph     : &InRustGraph,
   role      : RelationRole,
   config    : &SkgConfig,
-  active    : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> Result < (), Box<dyn Error> > {
   let (relation, input_role, output_role)
     : (&'static str, &'static str, &'static str) =
@@ -73,10 +73,10 @@ pub fn build_and_integrate_role_tree_with_skgrepo_set (
     tree, treeid, graph, config,
     relation, input_role, output_role,
     Birth::RoleGraft (role),
-    active ) ?;
+    restriction ) ?;
   if role != RelationRole::CONTAINER {
     attach_full_containerward_role_trees_for_birth_role (
-      tree, treeid, role, graph, config, active ) ?; }
+      tree, treeid, role, graph, config, restriction ) ?; }
   Ok (( )) }
 
 /// Integrate a containerward role tree into a Viewnode tree (no role tree
@@ -96,10 +96,10 @@ pub fn build_and_integrate_containerward_role_tree_with_skgrepo_set (
   treeid    : NodeId,
   graph     : &InRustGraph,
   config    : &SkgConfig,
-  active    : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> Result < (), Box<dyn Error> > {
   build_and_integrate_role_tree_with_skgrepo_set (
-    tree, treeid, graph, RelationRole::CONTAINER, config, active ) }
+    tree, treeid, graph, RelationRole::CONTAINER, config, restriction ) }
 
 /// Integrate mentionerward paths (link skgrepos of the node), attaching
 /// each skgrepo's containerward role tree. Thin wrapper over the generic
@@ -131,17 +131,17 @@ fn build_and_integrate_role_trees (
   input_role  : &str,
   output_role : &str,
   birth       : Birth,
-  active      : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> Result < Vec<ID>, Box<dyn Error> > {
   let terminus_pid : ID =
     get_skgid_from_viewnode_at ( tree, treeid ) ?;
   let paths : Vec<PathToFirstNonlinearity> =
     paths_to_first_nonlinearities_in_graph (
-      graph, active, &terminus_pid, relation, input_role, output_role )?;
+      graph, restriction, &terminus_pid, relation, input_role, output_role )?;
   let pids : Vec<ID> =
     extract_pids_from_paths ( &paths );
   integrate_role_trees (
-    treeid, tree, graph, paths, birth, config, active
+    treeid, tree, graph, paths, birth, config, restriction
   ) ?;
   Ok (pids) }
 
@@ -153,13 +153,13 @@ fn integrate_role_trees (
   paths   : Vec<PathToFirstNonlinearity>,
   birth   : Birth,
   config  : &SkgConfig,
-  active  : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> Result < (), Box<dyn Error> > {
   for p in paths {
     integrate_path_that_might_branch_or_cycle_with_skgrepo_set (
       tree, treeid,
       p.path, p.branches, p.cycle_nodes,
-      graph, config, birth, active
+      graph, config, birth, restriction
     ) ?; }
   Ok(()) }
 
@@ -189,21 +189,21 @@ pub fn integrate_path_that_might_branch_or_cycle_with_skgrepo_set (
   graph       : &InRustGraph,
   config      : &SkgConfig,
   birth       : Birth,
-  active      : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> Result < (), Box<dyn Error> > {
   let last_treeid : NodeId =
     integrate_linear_portion_of_path (
-      tree, treeid, &path, graph, config, birth, active
+      tree, treeid, &path, graph, config, birth, restriction
     ) ?;
   if ! branches . is_empty () {
     integrate_branches_in_node (
       tree, last_treeid, branches, graph, config, birth
-      , active ) ?;
+      , restriction ) ?;
   } else if ! cycle_nodes . is_empty () {
     // PITFALL: If there are branches, cycle nodes are ignored.
     integrate_cycle_nodes (
       tree, last_treeid, cycle_nodes, graph, config, birth
-      , active ) ?; }
+      , restriction ) ?; }
   Ok (( )) }
 
 /// Recursively integrate the remaining path into the tree.
@@ -216,7 +216,7 @@ fn integrate_linear_portion_of_path (
   graph   : &InRustGraph,
   config  : &SkgConfig,
   birth   : Birth,
-  active  : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> Result<NodeId, Box<dyn Error>> {
     if path . is_empty () {
       return Ok (treeid); }
@@ -229,7 +229,7 @@ fn integrate_linear_portion_of_path (
           match
             prepend_writeProtected_indep_child_with_skgrepo_set (
                     tree, treeid, path_head, graph, config, birth
-                    , active ) ?
+                    , restriction ) ?
           {
             Some (child_skgid) => child_skgid,
             None => return Ok (treeid), } } };
@@ -240,7 +240,7 @@ fn integrate_linear_portion_of_path (
       graph,
       config,
       birth,
-      active ) }
+      restriction ) }
 
 /// Add branch nodes as children of the specified node, which thereby
 /// becomes a branching viewnode (if there are at least two).
@@ -254,7 +254,7 @@ fn integrate_branches_in_node (
   graph    : &InRustGraph,
   config   : &SkgConfig,
   birth    : Birth,
-  active   : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> Result < (), Box<dyn Error> > {
   let found_children : HashMap < ID, NodeId > =
     find_children_by_skgids ( tree, treeid, &branches );
@@ -268,7 +268,7 @@ fn integrate_branches_in_node (
   for branch_skgid in branches_to_add {
     prepend_writeProtected_indep_child_with_skgrepo_set (
       tree, treeid, &branch_skgid, graph, config, birth
-      , active ) ?; }
+      , restriction ) ?; }
   Ok (( )) }
 
 /// Add cycle nodes as children of the specified node.
@@ -280,7 +280,7 @@ fn integrate_cycle_nodes (
   graph       : &InRustGraph,
   config      : &SkgConfig,
   birth       : Birth,
-  active      : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> Result < (), Box<dyn Error> > {
   let found_children : HashMap < ID, NodeId > =
     find_children_by_skgids ( tree, treeid, &cycle_nodes );
@@ -293,7 +293,7 @@ fn integrate_cycle_nodes (
   for cycle_skgid in to_add {
     prepend_writeProtected_indep_child_with_skgrepo_set (
       tree, treeid, &cycle_skgid, graph, config, birth
-      , active ) ?; }
+      , restriction ) ?; }
   Ok (( )) }
 
 /// Extract every PID from a Vec<PathToFirstNonlinearity>,
@@ -325,26 +325,26 @@ fn attach_full_containerward_role_trees_for_birth_role (
   role    : RelationRole,
   graph   : &InRustGraph,
   config  : &SkgConfig,
-  active  : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> Result<(), Box<dyn Error>> {
   // Collect the role's grafted partner nodes before mutating the tree.
   let role_treeids : Vec<NodeId> = {
     let mut result : Vec<NodeId> = Vec::new ();
     for edge in tree . get (treeid) . unwrap () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
-        if let ViewnodeKind::Vognode (Vognode::Active (t))
+        if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           = &node_ref . value () . kind
         { if t . birth == Birth::RoleGraft (role) {
             result . push ( node_ref . id () ); }} }}
     result };
   attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
-    tree, &role_treeids, graph, config, active ) }
+    tree, &role_treeids, graph, config, restriction ) }
 
-/// For each NodeId, look up its ActiveVognode pid in the tree, fetch
+/// For each NodeId, look up its UnrestrictedVognode pid in the tree, fetch
 /// every such pid's containerward role tree from the graph (in
 /// parallel via `containerward_role_trees_by_id_from_ids`), and prepend any
 /// `Inner`-shaped role tree under that NodeId as write-protected
-/// `Birth::RoleGraft(CONTAINER)` children. NodeIds that aren't ActiveVognodes,
+/// `Birth::RoleGraft(CONTAINER)` children. NodeIds that aren't UnrestrictedVognodes,
 /// or whose role tree is `Root`/`Repeated`/`DepthTruncated`, are
 /// skipped.
 pub fn attach_full_containerward_role_trees_at_treeids (
@@ -362,14 +362,14 @@ pub fn attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
   treeids : &[NodeId],
   graph   : &InRustGraph,
   config  : &SkgConfig,
-  active  : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> Result<(), Box<dyn Error>> {
   let pairs : Vec<(NodeId, ID)> =
     treeids . iter ()
       . filter_map ( |treeid|
         tree . get (*treeid) . and_then ( |n|
           match & n . value () . kind {
-            ViewnodeKind::Vognode (Vognode::Active (t))
+            ViewnodeKind::Vognode (Vognode::Unrestricted (t))
               => Some ( (*treeid, t . skgid . clone ()) ),
             _ => None } ) )
       . collect ();
@@ -380,7 +380,7 @@ pub fn attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
     containerward_role_trees_by_skgid_from_skgids (
       graph, &skgids, config . max_role_tree_depth );
   attach_full_containerward_role_trees_from_map (
-    tree, &pairs, &role_trees_by_skgid, graph, config, active ) }
+    tree, &pairs, &role_trees_by_skgid, graph, config, restriction ) }
 
 /// Inner helper: given pre-collected pairs and a pre-fetched map,
 /// prepend each pair's `Inner` role tree. Pulled out only because
@@ -392,7 +392,7 @@ fn attach_full_containerward_role_trees_from_map (
   role_trees_by_skgid : &HashMap<ID, ContainerwardRoleTree>,
   graph               : &InRustGraph,
   config              : &SkgConfig,
-  active              : Option<&ActiveSkgRepoSet>,
+  restriction         : Option<&SkgrepoRestriction>,
 ) -> Result<(), Box<dyn Error>> {
   for ( treeid, pid ) in pairs {
     let role_tree : &ContainerwardRoleTree = match role_trees_by_skgid . get (pid) {
@@ -402,7 +402,7 @@ fn attach_full_containerward_role_trees_from_map (
       for child in children . iter () . rev () {
         insert_full_containerward_role_tree_recursive (
           child, *treeid,
-          tree, graph, config, active ) ?; }} }
+          tree, graph, config, restriction ) ?; }} }
   Ok (( )) }
 
 /// Recursively insert an ContainerwardRoleTree as write-protected
@@ -415,12 +415,12 @@ pub fn insert_full_containerward_role_tree_recursive (
   tree       : &mut Tree<Viewnode>,
   graph      : &InRustGraph,
   config     : &SkgConfig,
-  active     : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> Result<(), Box<dyn Error>> {
     let child_treeid : NodeId = match
       prepend_writeProtected_indep_child_with_skgrepo_set (
         tree, parent_treeid, node . skgid (),
-        graph, config, Birth::RoleGraft (RelationRole::CONTAINER), active
+        graph, config, Birth::RoleGraft (RelationRole::CONTAINER), restriction
       ) ?
     {
         Some (child_treeid) => child_treeid,
@@ -429,7 +429,7 @@ pub fn insert_full_containerward_role_tree_recursive (
       for child in children . iter () . rev () {
         insert_full_containerward_role_tree_recursive (
           child, child_treeid,
-          tree, graph, config, active
+          tree, graph, config, restriction
         ) ?; } }
     Ok (()) }
 
@@ -462,14 +462,14 @@ pub fn prepend_writeProtected_indep_child_with_skgrepo_set (
   graph         : &InRustGraph,
   config        : &SkgConfig,
   birth         : Birth,
-  active        : Option<&ActiveSkgRepoSet>,
+  restriction   : Option<&SkgrepoRestriction>,
 ) -> Result < Option<NodeId>, Box<dyn Error> > {
-  if let Some (active) = active {
-    if ! active . is_all () {
+  if let Some (restriction) = restriction {
+    if ! restriction . is_all () {
       if let Some (skgrepo) = graph . pid_and_skgrepo (child_skgid)
         . map (|(_, skgrepo)| skgrepo)
         . or_else (|| crate::types::phantom::home_from_disk (child_skgid, config))
-      { if ! active . contains_skgrepo (&skgrepo)
+      { if ! restriction . contains_skgrepo (&skgrepo)
         { return Ok (None); }} }
     // relRepo gating (render-and-gating, 5_plan.org): the partner
     // NODE's skgrepo (above) is not enough -- the RELATIONSHIP grafting it
@@ -482,11 +482,11 @@ pub fn prepend_writeProtected_indep_child_with_skgrepo_set (
     // The captured graph is the authoritative home of relationship relRepos.
     if let Birth::RoleGraft (role) = birth {
       if let Ok (parent_pid) = get_skgid_from_viewnode_at (tree, parent_treeid) {
-          let skgrepo_active : bool =
+          let skgrepo_unrestricted : bool =
             role_graft_relRepo (graph, &parent_pid, child_skgid, role)
-            . map ( |skgrepo| active . contains_skgrepo (&skgrepo) )
+            . map ( |skgrepo| restriction . contains_skgrepo (&skgrepo) )
             . unwrap_or (false);
-          if ! skgrepo_active { return Ok (None); }}}}
+          if ! skgrepo_unrestricted { return Ok (None); }}}}
   let new_child_treeid : NodeId =
     prepend_writeProtected_indep_child (
       tree, parent_treeid, child_skgid, graph, config, birth )

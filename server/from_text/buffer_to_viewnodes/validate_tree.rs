@@ -112,7 +112,7 @@ pub fn find_buffer_errors_for_saving (
 /// Edits to an idFolder's membership abort the save (decision from
 /// vision.org, via metaplan_2.org and
 /// TODO/DONE/full-schema/DONE/8_readonly-set-ergonomics.org): for each present
-/// idFolder whose parent is an ActiveVognode with an ID, the multiset of ID
+/// idFolder whose parent is an UnrestrictedVognode with an ID, the multiset of ID
 /// non-vognodes beneath it must equal the recorder's real ID list (pid
 /// plus extra_ids). Reordering passes (the rerender re-sorts
 /// anyway); adding, deleting or text-editing an ID property fails,
@@ -121,7 +121,7 @@ pub fn find_buffer_errors_for_saving (
 /// it net-removed is git history, not a membership claim, and is
 /// excluded before comparing. An absent idFolder means no opinion, as
 /// for other folders. Shapes that other validations reject (an idFolder
-/// without an ActiveVognode parent, a parent without an ID) are skipped
+/// without an UnrestrictedVognode parent, a parent without an ID) are skipped
 /// here rather than double-reported.
 #[allow(non_snake_case)]
 fn idFolder_membership_errors (
@@ -140,7 +140,7 @@ fn idFolder_membership_errors (
     let recorder : ID =
       match node_ref . parent ()
         . map ( |p| &p . value () . kind ) {
-        Some (MpViewnodeKind::Vognode (MpVognode::Active (t)))
+        Some (MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)))
           => match &t . skgid {
               Some (skgid) => skgid . clone (),
               None      => continue },
@@ -182,7 +182,7 @@ fn idFolder_membership_errors (
 /// failing after a skgrepo-set switch). With chains the drawn node can
 /// be a MIDDLE link (when a later link's mentioner is hidden), so the
 /// check accepts any honest carrier and rejects only an off-chain
-/// marker. Markers on retained InactiveVognodes are checked identically.
+/// marker. Markers on retained RestrictedVognodes are checked identically.
 /// The explicit graph is required, so every present marker is checked against
 /// the same graph snapshot used by the rest of save planning.
 #[allow(non_snake_case)]
@@ -196,14 +196,14 @@ fn overridesHere_marker_errors (
     let Edge::Open (node_ref) = edge else { continue; };
     let (carrier, original) : (Option<ID>, ID) =
       match &node_ref . value () . kind {
-        MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
+        MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =>
           match &t . viewStats . overridesHere {
             Some (original) =>
               ( t . skgid . clone (), original . clone () ),
             None => continue },
-        // An inactive vognode is anonymous: it carries no override
+        // A restricted vognode is anonymous: it carries no override
         // marker, so it can never mismatch.
-        MpViewnodeKind::Vognode (MpVognode::Inactive (_)) => continue,
+        MpViewnodeKind::Vognode (MpVognode::Restricted (_)) => continue,
         _ => continue };
     let chain_ok : bool =
       match &carrier {
@@ -240,7 +240,7 @@ fn validate_fork_view_requests (
   let mut ids_with_requests : HashSet<ID> = HashSet::new ();
   for edge in viewforest . root () . traverse () {
     let Edge::Open (node_ref) = edge else { continue; };
-    let MpViewnodeKind::Vognode (MpVognode::Active (t)) =
+    let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =
       & node_ref . value () . kind else { continue; };
     if ! t . view_requests . contains (& ViewRequest::Fork) { continue; }
     let Some (skgid) = & t . skgid else { continue; }; // enrichment gives every node a pid
@@ -266,19 +266,19 @@ fn validate_view_roots (
   for root in viewforest . roots () {
     if ! matches! (
       &root . value () . kind,
-        MpViewnodeKind::Vognode (MpVognode::Active (_))
-        | MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive root (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org)
+        MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))
+        | MpViewnodeKind::Vognode (MpVognode::Restricted (_)) // a retained restricted root (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org)
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_)))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))))
     { errors . push (
         BufferValidationError::Other (
-          "View roots must be ActiveVognodes, inactive vognodes, deleted nodes or Unknown phantoms."
+          "View roots must be UnrestrictedVognodes, restricted vognodes, deleted nodes or Unknown phantoms."
           . to_string () )); }}}
 
 /// For each node in the viewforest, if it has an editable view request,
 /// verify that:
 /// - The node is write-protected.
-/// - It has no content children (ActiveVognode children with affectsParent ==
+/// - It has no content children (UnrestrictedVognode children with affectsParent ==
 ///   Container). Non-content children — containerward role tree stubs,
 ///   mentioners, non-vognodes, etc. — don't block expansion:
 ///   they won't be clobbered by it.
@@ -294,10 +294,10 @@ fn validate_editable_view_requests (
   { if let Edge::Open (node_ref) = edge
     { let viewnode : &MpViewnode =
         node_ref . value();
-      // TODO/DONE/local-view-update/plan_v2.org §11: only an Active node carries view_requests; a phantom never can,
-      // so the Editable-request validations below apply to Active only.
+      // TODO/DONE/local-view-update/plan_v2.org §11: only an Unrestricted node carries view_requests; a phantom never can,
+      // so the Editable-request validations below apply to Unrestricted only.
       if let MpViewnodeKind::Vognode (
-        MpVognode::Active (t))
+        MpVognode::Unrestricted (t))
       = &viewnode . kind
       { if t . view_requests . contains (&ViewRequest::Editable)
         { if let Some (skgid) = &t . skgid {
@@ -309,7 +309,7 @@ fn validate_editable_view_requests (
             let has_content_children : bool =
               node_ref . children () . any ( |child| matches! (
                 &child . value () . kind,
-                MpViewnodeKind::Vognode (MpVognode::Active (ct))
+                MpViewnodeKind::Vognode (MpVognode::Unrestricted (ct))
                   if ct . affectsParent == AffectsParent::True ));
             if has_content_children
             { errors . push(

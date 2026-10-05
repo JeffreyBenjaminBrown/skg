@@ -1,5 +1,5 @@
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::complete::contents::clobberWriteProtectedViewnode;
 use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_branches;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
@@ -7,9 +7,9 @@ use crate::types::misc::{ID, SkgConfig, SkgRepoName, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
-use crate::types::tree::viewnode_graphnode::write_at_activeVognode_in_tree;
+use crate::types::tree::viewnode_graphnode::write_at_unrestrictedVognode_in_tree;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ Birth, Viewnode, ViewnodeKind, Editability, AffectsParent, ActiveVognode, mk_editable_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ Birth, Viewnode, ViewnodeKind, Editability, AffectsParent, UnrestrictedVognode, mk_editable_viewnode, mk_unknown_viewnode };
 use crate::types::viewnode::{Vognode, Phantom};
 use crate::types::tree::forest::{ViewForest, tree_forest_root_skgids};
 
@@ -119,7 +119,7 @@ pub(super) fn makeWriteProtectedAndClobber (
   graph   : &crate::dbs::in_rust_graph::InRustGraph,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  write_at_activeVognode_in_tree (
+  write_at_unrestrictedVognode_in_tree (
     tree, treeid,
     |t| { t . editability = Editability::WriteProtected; }
     ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -139,18 +139,18 @@ pub fn complete_branch_minus_content (
   visited  : &mut EditableMap,
   graph    : &crate::dbs::in_rust_graph::InRustGraph,
   config   : &SkgConfig,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result<(), Box<dyn Error>> {
   detect_and_mark_cycle_v1 ( tree, treeid ) ?;
   make_writeProtected_if_repeat_then_extend_editable_map (
     tree, treeid, visited ) ?;
-  if activeVognode_in_tree_is_writeProtected ( tree, treeid )?
+  if unrestrictedVognode_in_tree_is_writeProtected ( tree, treeid )?
   { clobberWriteProtectedViewnode (
       tree, treeid, graph, config ) ?; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "maybe_add_default_partnerFolder_branches" ). entered();
     maybe_add_default_partnerFolder_branches (
-      tree, treeid, graph, config, active_skgrepo_set,
+      tree, treeid, graph, config, skgrepo_restriction,
       // This birth path runs outside the diff-aware BFS (search
       // results, ancestry attachment, stubs); diff-mode folder
       // existence is decided at each node's completion visit, which
@@ -173,7 +173,7 @@ pub fn make_writeProtected_if_repeat_then_extend_editable_map (
   let pid : ID = // Will error if node is a Non-vognode.
     get_skgid_from_viewnode_at ( tree, treeid ) ?;
   let is_writeProtected : bool =
-    write_at_activeVognode_in_tree (
+    write_at_unrestrictedVognode_in_tree (
       tree, treeid,
       |t| { if editableMap . contains_key (&pid)
                { // It's a repeat, so make it write-protected.
@@ -194,7 +194,7 @@ pub fn detect_and_mark_cycle_v1 (
   let is_cycle : bool = {
     let pid : ID = get_skgid_from_viewnode_at ( tree, treeid ) ?;
     is_ancestor_skgid ( tree, treeid, &pid ) ? };
-  write_at_activeVognode_in_tree
+  write_at_unrestrictedVognode_in_tree
     ( tree, treeid,
       |t| { t . viewStats . cycle = is_cycle; } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -212,7 +212,7 @@ pub fn stub_viewforest_from_root_skgids (
   graph    : &crate::dbs::in_rust_graph::InRustGraph,
   config   : &SkgConfig,
   visited  : &mut EditableMap,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result < ViewForest, Box<dyn Error> > {
   let mut viewforest : ViewForest =
     ViewForest::new ();
@@ -222,11 +222,11 @@ pub fn stub_viewforest_from_root_skgids (
     build_node_branch_minus_content (
       Some ( (viewforest . as_internal_tree_mut (),
               viewforest_root_treeid) ),
-      root_skgid, graph, config, visited, active_skgrepo_set
+      root_skgid, graph, config, visited, skgrepo_restriction
     ) ?; }
   Ok (viewforest) }
 
-/// Mark forest-root ActiveVognodes as having no parent in the view.
+/// Mark forest-root UnrestrictedVognodes as having no parent in the view.
 pub fn mark_view_roots_parent_na (
   viewforest : &mut Tree<Viewnode>,
 ) {
@@ -236,22 +236,22 @@ pub fn mark_view_roots_parent_na (
     let mut node_mut : NodeMut<Viewnode> =
       viewforest . get_mut (root_skgid) . unwrap ();
     let vn : &mut Viewnode = node_mut . value ();
-    if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
+    if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
       = vn . kind
       { t . affectsParent = AffectsParent::NA; }}}
 
-/// Walk the view and correct any ActiveVognode whose metadata claims a
+/// Walk the view and correct any UnrestrictedVognode whose metadata claims a
 /// relationship to its parent that the actual graph doesn't support.
 /// Silently clears stale birth claims or flips stale membership claims
 /// to non-member;
 /// the rendered herald then no longer misleads.
 ///
 /// Three kinds of claim are checked:
-/// - 'Birth::RoleGraft(role)' on child C with ActiveVognode parent P:
+/// - 'Birth::RoleGraft(role)' on child C with UnrestrictedVognode parent P:
 ///   claim is "C plays 'role' toward P" (e.g. CONTAINER -> C contains
 ///   P; MENTIONER -> C's body/title links to P). Verified against the
 ///   in-Rust graph via 'relation_membership_is_real', keyed by the role.
-/// - 'AffectsParent::True' on child C with WRITE_PROTECTED ActiveVognode
+/// - 'AffectsParent::True' on child C with WRITE_PROTECTED UnrestrictedVognode
 ///   parent P: claim is "C is part of P's content". Verified
 ///   against P's 'contains' in the in-Rust graph. Editable parents are
 ///   skipped because the save just redefined their 'contains' to
@@ -261,7 +261,7 @@ pub fn mark_view_roots_parent_na (
 /// so extra_id aliasing (typically a nodeMerge side-effect) doesn't
 /// produce false mismatches.
 ///
-/// Forest roots have no ActiveVognode parent and therefore
+/// Forest roots have no UnrestrictedVognode parent and therefore
 /// do not fall through this check. Also relies on the save pipeline's
 /// invariant that the prepared graph swap-in has updated the in-Rust-graph
 /// graph before the rerender pass runs (see
@@ -280,16 +280,16 @@ pub fn validate_affectsParent_relationships (
     // these will be marked birth = unremarkable
   for edge in viewforest . root () . traverse () {
     if let Edge::Open (child_ref) = edge {
-      let child_tn : &ActiveVognode =
+      let child_tn : &UnrestrictedVognode =
         match & child_ref . value () . kind {
-          ViewnodeKind::Vognode (Vognode::Active (t)) => t,
+          ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t,
           _ => continue };
       let parent_ref : NodeRef<Viewnode> = match child_ref . parent () {
         Some (p) => p, None => continue };
-      let parent_tn : &ActiveVognode =
+      let parent_tn : &UnrestrictedVognode =
         match & parent_ref . value () . kind {
-          ViewnodeKind::Vognode (Vognode::Active (t)) => t,
-          // A non-ActiveVognode parent (BufferRoot, a property or folder, Deleted, DeadViewnode) is not a legitimate subject for any of these relational claims; skip without correcting.
+          ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t,
+          // A non-UnrestrictedVognode parent (BufferRoot, a property or folder, Deleted, DeadViewnode) is not a legitimate subject for any of these relational claims; skip without correcting.
           _ => continue };
       if child_tn . affectsParent == AffectsParent::NA {
         // The child was a root, and the user gave it a parent, so let the parent contain it.
@@ -322,24 +322,24 @@ pub fn validate_affectsParent_relationships (
   for skgid in to_independent {
     let mut node_mut : NodeMut<Viewnode> =
       viewforest . get_mut (skgid) . unwrap ();
-    if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
+    if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
       = node_mut . value () . kind
     { t . affectsParent = AffectsParent::False; } }
   for skgid in to_affected {
     let mut node_mut : NodeMut<Viewnode> =
       viewforest . get_mut (skgid) . unwrap ();
-    if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
+    if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
       = node_mut . value () . kind
     { t . affectsParent = AffectsParent::True; } }
   for skgid in to_unremarkable {
     let mut node_mut : NodeMut<Viewnode> =
       viewforest . get_mut (skgid) . unwrap ();
-    if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
+    if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
       = node_mut . value () . kind
     { t . birth = Birth::Unremarkable; } } }
 
 /// Jeff's invariant (TODO/DONE/local-view-update/progress.org §11 thread): a *non-dead generalized orphan*
-/// must have AffectsParent=False. A Active node whose PARENT is a
+/// must have AffectsParent=False. An Unrestricted node whose PARENT is a
 /// non-container -- a Diff phantom, a Deleted, or a DeadViewnode -- is exactly
 /// that: it survives (is not itself dead) but its container is gone, so its
 /// member claim (that it is part of that parent's membership) cannot hold.
@@ -351,7 +351,7 @@ pub fn validate_affectsParent_relationships (
 /// - PARENT is a Folder (PropertyFolder / PartnerFolder): the child is a legitimate folder
 ///   MEMBER; membership is correct -> leave. (A folder whose own ancestry broke is
 ///   deadened to DeadViewnode first, and then THIS pass catches its members.)
-/// - PARENT is an Active vognode: handled by validate_affectsParent_relationships.
+/// - PARENT is an Unrestricted vognode: handled by validate_affectsParent_relationships.
 /// - PARENT is BufferRoot: the child is a forest root, handled by
 ///   mark_view_roots_parent_na.
 /// Belt-and-suspenders: most cases are already demoted during the BFS
@@ -368,7 +368,7 @@ pub fn mark_orphans_under_dead_parents_false (
     if let Edge::Open (child_ref) = edge {
       let is_affected_normal : bool =
         matches! ( & child_ref . value () . kind,
-          ViewnodeKind::Vognode (Vognode::Active (t))
+          ViewnodeKind::Vognode (Vognode::Unrestricted (t))
             if t . affectsParent == AffectsParent::True );
       if ! is_affected_normal { continue; }
       let affects_parent_non_container : bool =
@@ -381,7 +381,7 @@ pub fn mark_orphans_under_dead_parents_false (
   for skgid in targets {
     let mut node_mut : NodeMut<Viewnode> =
       viewforest . get_mut (skgid) . unwrap ();
-    if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
+    if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
       = node_mut . value () . kind
     { t . affectsParent = AffectsParent::False; } } }
 
@@ -409,7 +409,7 @@ pub fn skgids_that_can_have_graphnodestats (
   for edge in tree . root () . traverse () {
     if let Edge::Open (node_ref) = edge {
       if let Some (vid) =
-        node_ref . value () . active_or_diff_phantom_skgid ()
+        node_ref . value () . unrestricted_or_diff_phantom_skgid ()
       { skgids . push ( vid . clone () ); }}}
   skgids }
 
@@ -445,7 +445,7 @@ pub fn get_skgid_from_viewnode_at (
   match node_kind {
     ViewnodeKind::Vognode (v) if v . is_current_graphnode ()
       => v . skgid () . cloned () . ok_or_else (
-           || "get_skgid_from_viewnode_at: inactive vognode has no id"
+           || "get_skgid_from_viewnode_at: restricted vognode has no id"
               . into () ),
     _ => Err ( "get_skgid_from_viewnode_at: caller must pass a non-phantom vognode" . into() ),
   }}
@@ -463,7 +463,7 @@ pub fn build_node_branch_minus_content (
   graph              : &crate::dbs::in_rust_graph::InRustGraph,
   config             : &SkgConfig,
   visited            : &mut EditableMap,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result < NodeId, Box<dyn Error> > {
   let t0 : time::Instant = time::Instant::now();
   let result : Result < NodeId, Box<dyn Error> > =
@@ -482,7 +482,7 @@ pub fn build_node_branch_minus_content (
               . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
             complete_branch_minus_content (
               tree, child_treeid, visited,
-              graph, config, active_skgrepo_set ) ?;
+              graph, config, skgrepo_restriction ) ?;
             Ok (child_treeid) },
           None => { // Uknown node. Add it, don't 'complete' it.
             let viewnode : Viewnode =
@@ -505,7 +505,7 @@ pub fn build_node_branch_minus_content (
             let root_treeid : NodeId = tree . root () . id ();
             complete_branch_minus_content (
               &mut tree, root_treeid, visited,
-              graph, config, active_skgrepo_set ) ?;
+              graph, config, skgrepo_restriction ) ?;
             Ok (root_treeid) },
           None => { // A singleton tree with a PhantomUnknown.
             let viewnode : Viewnode =
@@ -521,9 +521,9 @@ pub fn build_node_branch_minus_content (
 // Reading from Graphnodes and Viewnodes, esp. in trees
 // ==============================================
 
-/// Check if an ActiveVognode is write-protected.
+/// Check if an UnrestrictedVognode is write-protected.
 /// Errs if given a Non-vognode.
-pub fn activeVognode_in_tree_is_writeProtected (
+pub fn unrestrictedVognode_in_tree_is_writeProtected (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
@@ -532,10 +532,10 @@ pub fn activeVognode_in_tree_is_writeProtected (
                            |viewnode| viewnode . kind . clone() )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   match node_kind {
-    ViewnodeKind::Vognode (Vognode::Active (t))   => Ok (t . is_writeProtected ()),
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Ok (t . is_writeProtected ()),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) => Ok (p . is_writeProtected ()),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))
-      | ViewnodeKind::Vognode (Vognode::Inactive (_))
+      | ViewnodeKind::Vognode (Vognode::Restricted (_))
       | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_))) => Ok (false),
     _                                                => Err (
       "is_writeProtected: caller must pass a vognode" . into( )),
@@ -574,7 +574,7 @@ where T: AsMut<Viewnode>,
     errors . push ( format! ( "{}: {}", error_msg, e )); }
   let mut node_mut : NodeMut<T> =
     tree . get_mut (treeid) . ok_or ("remove_completed_view_request: node not found") ?;
-  if let ViewnodeKind::Vognode (Vognode::Active (t))
+  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
     = &mut node_mut . value () . as_mut () . kind
     { t . view_requests . remove (&view_request); }
   Ok (()) }

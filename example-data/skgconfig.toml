@@ -6,7 +6,7 @@ default_repo_set = "public"
 # private last. That order defines the available repo-sets: each
 # repo names the set consisting of itself and everything more
 # public (a prefix of this list), and the reserved name "all" means
-# every repo. default_repo_set above names the set active when a
+# every repo. default_repo_set above names the skgrepo restriction when a
 # client connects: here, just the "public" repo.
 
 [[repos]]

@@ -41,12 +41,12 @@
        nil
        (prin1-to-string
         '((content "")
-          (errors ("inactive repo"))
+          (errors ("restricted repo"))
           (warnings ())))
        "view-1")
       (should-not opened)
       (should (equal (car shown) "*SKG Content View Messages*"))
-      (should (string-match-p "^\\* errors\n\\*\\* inactive repo"
+      (should (string-match-p "^\\* errors\n\\*\\* restricted repo"
                               (nth 2 shown))))))
 
 (ert-deftest test-switch-to-view-is-displayed-by-deferred-callback ()

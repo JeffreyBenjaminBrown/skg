@@ -99,7 +99,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
       let (c_view, _, _) = single_root_view (
         config, Some (tantivy), &ID::from ("C"), false) ?;
       let dirty_c : String = format! ("{}\nindependent edit", c_view);
-      // The collateral fixture contains only endpoint X as an active node.
+      // The collateral fixture contains only endpoint X as an unrestricted node.
       // Reaching it therefore proves the A -> X ordinary graph hop, rather
       // than shared ancestry supplied by a larger rendered view.
       let x_view_id : ViewId = ViewId::ContentView ("endpoint-x" . into ());

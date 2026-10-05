@@ -7,7 +7,7 @@ use crate::serve::handlers::text_release::{
   decide as decide_text_release};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_errors_warnings_sexp, format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response, tag_text_response};
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
@@ -38,7 +38,7 @@ pub fn handle_rerender_all_views_request (
   request    : &str,
   env        : &SkgEnv,
   views_state : &mut ViewsState,
-  active_skgrepo_set : &ActiveSkgRepoSet,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) {
   let excluded : HashSet<ViewId> =
     match excluded_view_ids_from_request (request) {
@@ -52,7 +52,7 @@ pub fn handle_rerender_all_views_request (
             &format_errors_warnings_sexp (&[error], &[])));
         return; } };
   stream_rerender_views_excluding (
-    stream, env, views_state, active_skgrepo_set,
+    stream, env, views_state, skgrepo_restriction,
     &approved_pids_from_request (request), &excluded); }
 
 fn excluded_view_ids_from_request (
@@ -93,17 +93,17 @@ fn stream_rerender_views_excluding (
   stream : &mut TcpStream,
   env : &SkgEnv,
   views_state : &mut ViewsState,
-  active_skgrepo_set : &ActiveSkgRepoSet,
+  skgrepo_restriction : &SkgrepoRestriction,
   approved_pids : &HashSet<crate::types::misc::ID>,
   excluded : &HashSet<ViewId>,
 ) {
   let mut prepared : PreparedRerenders = prepare_rerender_views (
     env, views_state, views_state . diff_mode_enabled,
-    Some (active_skgrepo_set), None, false);
+    Some (skgrepo_restriction), None, false);
   prepared . view_ids . retain (|view_id| ! excluded . contains (view_id));
   prepared . views . retain (|view| ! excluded . contains (&view . view_id));
   if ! authorize_prepared_rerenders (
-    stream, &mut prepared, Some (active_skgrepo_set),
+    stream, &mut prepared, Some (skgrepo_restriction),
     "rerender-all-views", approved_pids) {
     return; }
   stream_prepared_rerenders (stream, views_state, prepared);
@@ -113,14 +113,14 @@ fn stream_rerender_views_excluding (
 /// Sends: rerender-lock → rerender-view* → rerender-done.
 /// Shared by 'handle_rerender_all_views_request',
 /// 'handle_git_diff_toggle_and_rerender', and the skgrepo-set switch
-/// ('set_active_repo_set'), which passes a per-view prepass (the
+/// ('restrict_repo_set'), which passes a per-view prepass (the
 /// convert-and-prune step) and asks for PartnerFolder re-creation
 /// (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org).
 pub fn stream_rerender_views (
   stream     : &mut TcpStream,
   env        : &SkgEnv,
   views_state : &mut ViewsState,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   prepass    : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
   create_partnerFolders : bool,
   operation          : &str,
@@ -128,9 +128,9 @@ pub fn stream_rerender_views (
 ) {
   let mut prepared : PreparedRerenders = prepare_rerender_views (
     env, views_state, views_state . diff_mode_enabled,
-    active_skgrepo_set, prepass, create_partnerFolders );
+    skgrepo_restriction, prepass, create_partnerFolders );
   if ! authorize_prepared_rerenders (
-    stream, &mut prepared, active_skgrepo_set,
+    stream, &mut prepared, skgrepo_restriction,
     operation, approved_pids ) {
     return; }
   stream_prepared_rerenders (stream, views_state, prepared);
@@ -143,13 +143,13 @@ pub fn stream_rerender_views_after_absent_reference_cleanup (
   stream     : &mut TcpStream,
   env        : &SkgEnv,
   views_state : &mut ViewsState,
-  active_skgrepo_set : &ActiveSkgRepoSet,
+  skgrepo_restriction : &SkgrepoRestriction,
   raw_skgid     : &crate::types::misc::ID,
   affected_recorder_pids : &HashSet<crate::types::misc::ID>,
 ) {
   let prepared = prepare_rerender_views_where (
     env, env . runtime_snapshot (), views_state, views_state . diff_mode_enabled,
-    Some (active_skgrepo_set), None, false,
+    Some (skgrepo_restriction), None, false,
     |viewforest| view_can_display_absent_reference_change (
       viewforest, raw_skgid, affected_recorder_pids ));
   stream_prepared_rerenders (stream, views_state, prepared);
@@ -162,13 +162,13 @@ pub(crate) fn prepare_rerender_views (
   env                 : &SkgEnv,
   views_state         : &ViewsState,
   diff_mode_enabled   : bool,
-  active_skgrepo_set  : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
   create_partnerFolders  : bool,
 ) -> PreparedRerenders {
   let runtime = env . runtime_snapshot ();
   prepare_rerender_views_with_runtime (
-    env, runtime, views_state, diff_mode_enabled, active_skgrepo_set, prepass,
+    env, runtime, views_state, diff_mode_enabled, skgrepo_restriction, prepass,
     create_partnerFolders)
 }
 
@@ -177,12 +177,12 @@ pub(crate) fn prepare_rerender_views_with_runtime (
   runtime             : std::sync::Arc<RuntimeGeneration>,
   views_state         : &ViewsState,
   diff_mode_enabled   : bool,
-  active_skgrepo_set  : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
   create_partnerFolders  : bool,
 ) -> PreparedRerenders {
   prepare_rerender_views_where (
-    env, runtime, views_state, diff_mode_enabled, active_skgrepo_set, prepass,
+    env, runtime, views_state, diff_mode_enabled, skgrepo_restriction, prepass,
     create_partnerFolders, |_| true )
 }
 
@@ -194,7 +194,7 @@ fn prepare_rerender_views_where (
   runtime             : std::sync::Arc<RuntimeGeneration>,
   views_state         : &ViewsState,
   diff_mode_enabled   : bool,
-  active_skgrepo_set  : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
   create_partnerFolders  : bool,
   include             : impl Fn (&ViewForest) -> bool,
@@ -204,7 +204,7 @@ fn prepare_rerender_views_where (
     .map (|(view_id, _)| view_id . clone ()) . collect ();
   let mut context : RerenderAfterSaveContext =
     RerenderAfterSaveContext::without_save_with_runtime (
-      env, runtime, diff_mode_enabled, active_skgrepo_set );
+      env, runtime, diff_mode_enabled, skgrepo_restriction );
   let mut rendered_views : Vec<PreparedView> = Vec::new ();
   for view_id in &view_ids {
     let mut viewforest : ViewForest = match
@@ -270,18 +270,18 @@ fn view_can_display_absent_reference_change (
 pub(crate) fn authorize_prepared_rerenders (
   stream             : &mut TcpStream,
   prepared           : &mut PreparedRerenders,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   operation          : &str,
   approved_pids      : &HashSet<crate::types::misc::ID>,
 ) -> bool {
-  let Some (active) = active_skgrepo_set else { return true; };
+  let Some (restriction) = skgrepo_restriction else { return true; };
   let candidates : Vec<crate::types::misc::ID> =
     prepared . views . iter ()
     . flat_map ( |view|
       pids_from_viewforest (&view . viewforest) . into_iter () )
     . collect ();
   let release = decide_text_release (
-    operation, active, &candidates,
+    operation, restriction, &candidates,
     &prepared . runtime . graph, approved_pids );
   match release {
     TextReleaseDecision::Challenge { .. } => {
@@ -352,10 +352,10 @@ pub fn handle_git_diff_toggle_and_rerender (
   request    : &str,
   env        : &SkgEnv,
   views_state : &mut ViewsState,
-  active_skgrepo_set : &ActiveSkgRepoSet,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) {
   if ! views_state . diff_mode_enabled
-     && ! active_skgrepo_set . is_all () {
+     && ! skgrepo_restriction . is_all () {
     { // Refuse to ENABLE diff mode under a restricted skgrepo-set.
       // (Disabling is always allowed: it only makes state legal.)
       // The refusal takes the quiet shape: the endpoint's normal
@@ -365,8 +365,8 @@ pub fn handle_git_diff_toggle_and_rerender (
       // "\nWarning:", which the Emacs diff-toggle handler treats
       // as a window-pop trigger.
       let msg : String = format! (
-        "Git diff mode requires active repo-set all; current active repo-set is {}. Switch the repo-set to all first.",
-        active_skgrepo_set . name . 0 );
+        "Git diff mode requires no skgrepo restriction (the skgrepo-set all); current skgrepo restriction is {}. Switch the repo-set to all first.",
+        skgrepo_restriction . name . 0 );
       tracing::info! ( msg = %msg, "Git diff mode toggle refused" );
       send_response_with_length_prefix (
         stream,
@@ -375,10 +375,10 @@ pub fn handle_git_diff_toggle_and_rerender (
       return; }}
   let next_diff_mode : bool = ! views_state . diff_mode_enabled;
   let mut prepared : PreparedRerenders = prepare_rerender_views (
-    env, views_state, next_diff_mode, Some (active_skgrepo_set),
+    env, views_state, next_diff_mode, Some (skgrepo_restriction),
     None, false );
   if ! authorize_prepared_rerenders (
-    stream, &mut prepared, Some (active_skgrepo_set),
+    stream, &mut prepared, Some (skgrepo_restriction),
     "diff-mode-rerender", &approved_pids_from_request (request) ) {
     return; }
   views_state . diff_mode_enabled = next_diff_mode;
@@ -441,7 +441,7 @@ mod tests {
 
   fn skgid (text : &str) -> ID { ID::from (text) }
 
-  fn active_view (pid : &str) -> ViewForest {
+  fn unrestricted_view (pid : &str) -> ViewForest {
     let mut view : ViewForest = ViewForest::new ();
     view . append_root (mk_editable_viewnode (
       skgid (pid), SkgRepoName::from ("main"), pid . to_string (), None ));
@@ -449,7 +449,7 @@ mod tests {
   }
 
   fn view_with_unknown (raw_skgid : &str) -> ViewForest {
-    let mut view : ViewForest = active_view ("unrelated-owner");
+    let mut view : ViewForest = unrestricted_view ("unrelated-owner");
     let root = view . first_root () . unwrap () . id ();
     view . get_mut (root) . unwrap () . append (mk_unknown_viewnode (skgid (raw_skgid)));
     view
@@ -459,13 +459,13 @@ mod tests {
   fn absent_reference_cleanup_selects_only_affected_recorder_or_raw_unknown () {
     let recorders : HashSet<ID> = HashSet::from ([skgid ("changed-owner")]);
     assert! (view_can_display_absent_reference_change (
-      &active_view ("changed-owner"), &skgid ("gone"), &recorders),
+      &unrestricted_view ("changed-owner"), &skgid ("gone"), &recorders),
       "an open recorder can display its rewritten relationship" );
     assert! (view_can_display_absent_reference_change (
       &view_with_unknown ("gone"), &skgid ("gone"), &recorders),
       "Unknowns are absent from the PID index but still need removal" );
     assert! (! view_can_display_absent_reference_change (
-      &active_view ("unrelated-owner"), &skgid ("gone"), &recorders),
+      &unrestricted_view ("unrelated-owner"), &skgid ("gone"), &recorders),
       "an unrelated view must receive neither a lock nor a replacement" );
   }
 }

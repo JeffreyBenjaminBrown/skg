@@ -47,7 +47,7 @@ fn test_multi_skgrepo_errors() -> Result<(), Box<dyn Error>> {
 
     { // Repo validation errors: one for dub-1 (nonexistent skgrepo "dub")
       // and one for pub-1 (no skgrepo at all).
-      let skgrepo_re = Regex::new(r"(?i)activevognode.*must.*repo") . unwrap();
+      let skgrepo_re = Regex::new(r"(?i)unrestrictedvognode.*must.*repo") . unwrap();
       let skgrepo_errors: Vec<&BufferValidationError>
       = ( errors . iter()
           . filter(

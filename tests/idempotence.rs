@@ -10,7 +10,7 @@
 // not assert de-novo == first-rerender -- those can legitimately differ in
 // metadata; idempotence is specifically that a second rerender changes nothing.)
 //
-// Fixture exercises several Viewnode kinds in one view: Active content (a -> b,
+// Fixture exercises several Viewnode kinds in one view: Unrestricted content (a -> b,
 // c), an AliasFolder + Alias (b has alias "bee"), the IDFolders, a SubscribeeFolder +
 // subscribee-as-such (c subscribes to d), the HiddenOutsideOfSubscribeeFolder, and
 // a PartnerFolder -- e subscribes to b, so b shows a SubscriberFolder listing e.

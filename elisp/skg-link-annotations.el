@@ -163,7 +163,7 @@ character."
                  (not (eq kind 'missing)))
         (let* ((label (pcase kind
                         ('resolved (format "⌂:%s" (nth 2 status)))
-                        ('inactive "⌂:inactive")
+                        ('restricted "⌂:restricted")
                         ('lookup-failed "⌂:lookup failed")
                         (_ "⌂:…")))
                (face (if (eq kind 'resolved)
@@ -243,7 +243,7 @@ character."
                              (pcase (cadr row)
                                ('resolved (list 'resolved (nth 2 row)
                                                 (nth 3 row)))
-                               ('inactive '(inactive))
+                               ('restricted '(restricted))
                                ('missing '(missing))
                                (_ '(lookup-failed)))
                              skg-link-annotations--cache))))

@@ -39,7 +39,7 @@ use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rer
 use skg::serve::ViewsState;
 use skg::serve::handlers::delete_references_to_absent_node::
   handle_delete_references_to_absent_node_request;
-use skg::skgrepo_sets::ActiveSkgRepoSet;
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::env::SkgEnv;
 use skg::types::views_state::{OpenViews, ViewId};
@@ -100,7 +100,7 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut env : SkgEnv = skg_env_from_parts (
     config, tantivy, &graph );
-  let active          : ActiveSkgRepoSet = ActiveSkgRepoSet::default_from_config (config) ?;
+  let restriction     : SkgrepoRestriction = SkgrepoRestriction::default_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false, open_views : OpenViews::new (), };
   for (view_id, root) in [("affected", "owner"),
@@ -132,7 +132,7 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
     // async test's executor, as production does on its connection thread.
     std::thread::scope (|scope| {
       scope . spawn (|| handle_delete_references_to_absent_node_request (
-        &mut server, request, env, views_state, &active )); });
+        &mut server, request, env, views_state, &restriction )); });
     drop (server);
     let mut reader : BufReader<TcpStream> = BufReader::new (client);
     let mut messages : Vec<String> = Vec::new ();

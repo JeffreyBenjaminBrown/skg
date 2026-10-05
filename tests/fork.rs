@@ -22,7 +22,7 @@ use skg::from_text::buffer_to_validated_saveplan;
 use skg::from_text::buffer_to_validated_saveplan_with_fork_skgrepos;
 use skg::org_to_text::viewforest_to_string;
 use skg::serve::ViewsState;
-use skg::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
+use skg::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_approval_test;
@@ -170,8 +170,8 @@ fn all_tests
       s . reset ("fork_monogamy", fixtures) ?;
       fork_monogamy (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("fork_repo_inactive", fixtures) ?;
-      fork_skgrepo_inactive (
+      s . reset ("fork_repo_restricted", fixtures) ?;
+      fork_skgrepo_restricted (
         &s . config ) . await ?;
       s . reset ("fork_confirmation_gates_skgsave_commit", fixtures) ?;
       fork_confirmation_gates_skgsave_commit (
@@ -195,8 +195,8 @@ fn all_tests
       s . reset ("fork_user_set_repo_overrides", two_owned) ?;
       fork_user_set_skgrepo_overrides (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("fork_default_prefers_active_owned_repo", two_owned) ?;
-      fork_default_prefers_active_owned_skgrepo (
+      s . reset ("fork_default_prefers_unrestricted_owned_repo", two_owned) ?;
+      fork_default_prefers_unrestricted_owned_skgrepo (
         &s . config ) . await ?;
       s . reset ("fork_user_set_repo_not_owned_rejected", two_owned) ?;
       fork_user_set_skgrepo_not_owned_rejected (
@@ -309,24 +309,24 @@ async fn explicit_fork_round_trip_and_monogamy (
   Ok (( )) }
 
 /// Under a restricted skgrepo-set, the clone-repo DEFAULT must prefer an
-/// owned skgrepo that is ACTIVE. Here "owned" (alphabetically first owned)
-/// is inactive and "owned2" is the only active owned skgrepo; a foreign
+/// owned skgrepo that is UNRESTRICTED. Here "owned" (alphabetically first owned)
+/// is restricted and "owned2" is the only unrestricted owned skgrepo; a foreign
 /// node with no owned ancestor must default to "owned2" and reach the
-/// confirmation stage, not dead-end on ForkRepoInactive.
-async fn fork_default_prefers_active_owned_skgrepo (
+/// confirmation stage, not dead-end on ForkRepoRestricted.
+async fn fork_default_prefers_unrestricted_owned_skgrepo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  let active : ActiveSkgRepoSet = ActiveSkgRepoSet {
+  let restriction : SkgrepoRestriction = SkgrepoRestriction {
     name    : SkgRepoSetName ("only-owned2" . to_string ()),
     skgrepos : BTreeSet::from ([ SkgRepoName::from ("owned2"),
                                SkgRepoName::from ("foreign") ]), };
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
-    FORK_ROOT_BUFFER, config, Some (&active) )  ?;
+    FORK_ROOT_BUFFER, config, Some (&restriction) )  ?;
   assert_eq! ( save_plan . fork_specs . len (), 1,
-    "the fork must resolve, not dead-end on an inactive default repo" );
+    "the fork must resolve, not dead-end on a restricted default repo" );
   assert_eq! ( save_plan . fork_specs[0] . clone . 0 . home_skgrepo,
                SkgRepoName::from ("owned2"),
-    "with 'owned' inactive, the default must prefer the active owned 'owned2'; got {:?}",
+    "with 'owned' restricted, the default must prefer the unrestricted owned 'owned2'; got {:?}",
     save_plan . fork_specs[0] . clone . 0 . home_skgrepo );
   Ok (( )) }
 
@@ -645,28 +645,28 @@ async fn fork_monogamy (
       "expected ForkAlreadyExists rejecting the re-fork, got {:?}", other ), }
   Ok (( )) }
 
-/// Skgrepo-set: a fork whose resolved owned skgrepo is inactive under the
-/// active skgrepo-set is forbidden ('ForkRepoInactive'), so an
-/// invisible clone is never created silently. Here the active set is
-/// {foreign} only, so the clone's inferred skgrepo "owned" is inactive.
-async fn fork_skgrepo_inactive (
+/// Skgrepo-set: a fork whose resolved owned skgrepo is restricted under the
+/// skgrepo restriction is forbidden ('ForkRepoRestricted'), so an
+/// invisible clone is never created silently. Here the skgrepo restriction is
+/// {foreign} only, so the clone's inferred skgrepo "owned" is restricted.
+async fn fork_skgrepo_restricted (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   // Save planning reloads the freshly reset fixture graph.
-  let active : ActiveSkgRepoSet = ActiveSkgRepoSet {
+  let restriction : SkgrepoRestriction = SkgrepoRestriction {
     name    : SkgRepoSetName ("only-foreign" . to_string ()),
     skgrepos : BTreeSet::from ([ SkgRepoName::from ("foreign") ]), };
   let result = buffer_to_validated_saveplan (
-    FORK_BUFFER, config, Some (&active) ) ;
+    FORK_BUFFER, config, Some (&restriction) ) ;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
-        BufferValidationError::ForkSkgRepoInactive (orig, skgrepo)
+        BufferValidationError::ForkSkgRepoRestricted (orig, skgrepo)
           if *orig == ID::from ("N")
              && *skgrepo == SkgRepoName::from ("owned") )),
-        "expected ForkRepoInactive(N, owned), got {:?}", errors ); }
+        "expected ForkRepoRestricted(N, owned), got {:?}", errors ); }
     other => panic! (
-      "expected ForkRepoInactive, got {:?}", other ), }
+      "expected ForkRepoRestricted, got {:?}", other ), }
   Ok (( )) }
 
 /// The SavePlan a foreign edit produces carries one ForkSpec whose

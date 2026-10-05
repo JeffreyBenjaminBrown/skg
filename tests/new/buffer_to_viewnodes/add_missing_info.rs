@@ -46,7 +46,7 @@ fn all_tests
 /// non-vognode, so 'inherit_parent_repo_if_possible' cannot supply a
 /// skgrepo; enrichment must resolve it from the graph by id instead.
 /// Before the fix this node stayed repoless and the save was refused
-/// with "ActiveVognode must have a repo that exists in the config".
+/// with "UnrestrictedVognode must have a repo that exists in the config".
 async fn test_repoless_folder_member_gets_graph_skgrepo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
@@ -68,7 +68,7 @@ async fn test_repoless_folder_member_gets_graph_skgrepo (
   let folder   = recorder . first_child() . unwrap();
   let member = folder . first_child() . unwrap();
   match &member . value() . kind {
-    MpViewnodeKind::Vognode (MpVognode::Active (t)) => {
+    MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) => {
       assert_eq! (
         t . home_skgrepo, Some (SkgRepoName::from ("main")),
         "Repoless folder member should inherit its repo from the \
@@ -78,7 +78,7 @@ async fn test_repoless_folder_member_gets_graph_skgrepo (
         t . skgid . as_ref() . unwrap() . 0, "root-pid",
         "The referenced id 'root' should have resolved to its pid \
          'root-pid'." ); }
-    _ => panic! ("expected an ActiveVognode subscribee member") }
+    _ => panic! ("expected an UnrestrictedVognode subscribee member") }
   Ok (( )) }
 
 async fn test_add_missing_info_comprehensive (
@@ -165,14 +165,14 @@ fn test_na_affectsParent_under_visible_parent_becomes_isContainer () {
 
   match &root_node . value() . kind {
     MpViewnodeKind::Vognode (
-      MpVognode::Active (t)) =>
+      MpVognode::Unrestricted (t)) =>
       assert_eq! (t . affectsParent, AffectsParent::NA),
-    _ => panic! ("expected root ActiveVognode") }
+    _ => panic! ("expected root UnrestrictedVognode") }
   match &moved_node . value() . kind {
     MpViewnodeKind::Vognode (
-      MpVognode::Active (t)) =>
+      MpVognode::Unrestricted (t)) =>
       assert_eq! (t . affectsParent, AffectsParent::True),
-    _ => panic! ("expected moved ActiveVognode") }
+    _ => panic! ("expected moved UnrestrictedVognode") }
 }
 
 async fn test_skgrepo_inheritance_multi_level (

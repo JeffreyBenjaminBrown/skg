@@ -186,10 +186,10 @@
 (skg alias (unstaged removedR))
 ---- text: alias ✗-R
 ---- styles: message*5 -*1 stop*1 nonstandard*2
-==== placeholders: inactive node
-(skg inactiveNode)
----- text: node from inactive repo
----- styles: message*23
+==== placeholders: restricted node
+(skg restrictedNode)
+---- text: node from restricted skgrepo
+---- styles: message*28
 ==== carriers: two subscribers, one the parent
 (skg (node (id x) (rels (subscribesTo (in 2 (ancestors 1))))))
 ---- text: 2aS

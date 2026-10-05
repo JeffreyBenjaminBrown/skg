@@ -1,4 +1,4 @@
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::to_org::complete::partner_folder::child_data::{ChildData, apply_relationship_axes_to_folder_members, build_child_data, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
 use crate::to_org::complete::partner_folder::goal_list::goal_list_for_hiddenOutsideOfSubscribee_folder;
@@ -7,7 +7,7 @@ use crate::types::misc::{ID, SkgRepoName};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::nodes::complete::Graphnode;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
-use crate::update_buffer::reconcile::omit_inactive_members;
+use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::reconcile::partner_folder::push_repair_warnings;
 use crate::update_buffer::util::fold_members_of_newborn_folder;
 use crate::update_buffer::warnings::CompletionWarning;
@@ -28,12 +28,12 @@ struct HiddenOutsideContext {
 /// HiddenOutsideOfSubscribeeFolder completion (called at this folder's own BFS visit).
 ///
 /// Tree structure:
-///   Subscriber (ActiveVognode)                       <- ancestor 2
+///   Subscriber (UnrestrictedVognode)                       <- ancestor 2
 ///     └─ SubscribeeFolder (Non-vognode)               <- ancestor 1 = parent
-///          ├─ Subscribee_A (ActiveVognode)           <- sibling
-///          ├─ Subscribee_B (ActiveVognode)           <- sibling
+///          ├─ Subscribee_A (UnrestrictedVognode)           <- sibling
+///          ├─ Subscribee_B (UnrestrictedVognode)           <- sibling
 ///          └─ HiddenOutsideOfSubscribeeFolder      <- self
-///               └─ [hidden ActiveVognode children]
+///               └─ [hidden UnrestrictedVognode children]
 ///
 /// Collects nodes that the subscriber hides from its subscriptions
 /// but that are NOT top-level content of any subscribee.
@@ -44,7 +44,7 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
   runtime                        : &RuntimeGeneration,
   deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
-  active_skgrepo_set             : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction            : Option<&SkgrepoRestriction>,
   warning_sink                   : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
   let kind : PartnerFolder =
@@ -53,10 +53,10 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
 
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: the parent-is-SubscribeeFolder check is subsumed by reading the
   // subscriber through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 1 validates the
-  // [SubscribeeFolder, Active] prefix), so a separate validation is unneeded.
+  // [SubscribeeFolder, Unrestricted] prefix), so a separate validation is unneeded.
   let context : HiddenOutsideContext =
     read_hiddenoutside_context (
-      tree, node, kind, runtime, active_skgrepo_set) ?;
+      tree, node, kind, runtime, skgrepo_restriction) ?;
   let (goal_list, removed_skgids, member_axes)
     : (Vec<ID>, HashSet<ID>, HashMap<ID, RelationshipAxes>) =
     goal_list_for_hiddenOutsideOfSubscribee_folder (
@@ -65,10 +65,10 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
       &context . subscriber_hides, &context . subscribees,
       skgrepo_diffs, &runtime . config );
   let goal_list : Vec<ID> =
-    // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: omit inactive
+    // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: omit restricted
     // members; no retention for this filter folder.
-    omit_inactive_members (
-      goal_list, active_skgrepo_set,
+    omit_restricted_members (
+      goal_list, skgrepo_restriction,
       |skgid : &ID| SkgEnv::find_skgrepo_in_generation (
         runtime, skgid, deleted_since_head_pid_src_map) );
   // TODO/DONE/local-view-update/plan_v2.org §5.5: a folder fills its members WHOLE and is budget-neutral -- the owning
@@ -119,9 +119,9 @@ fn read_hiddenoutside_context (
   node               : NodeId,
   kind               : PartnerFolder,
   runtime            : &RuntimeGeneration,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result<HiddenOutsideContext, Box<dyn Error>> {
-  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: subscriber = ancestry-table index 1 (the [SubscribeeFolder, Active] chain).
+  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: subscriber = ancestry-table index 1 (the [SubscribeeFolder, Unrestricted] chain).
   let (subscriber_pid, subscriber_skgrepo) : (ID, SkgRepoName) =
     pid_and_skgrepo_from_required_ancestor(
       tree, node, 1, kind . caller_label () ) ?;
@@ -131,15 +131,15 @@ fn read_hiddenoutside_context (
       &subscriber_pid, &subscriber_skgrepo ) ?;
   // relRepo gating (render-and-gating, 5_plan.org): both are the
   // subscriber's own outbound lists (hidesFromSubs,
-  // subscribesTo); a membership recorded in an inactive skgrepo must
+  // subscribesTo); a membership recorded in a restricted skgrepo must
   // not feed this derived folder.
-  let skgrepo_active = |skgrepo : &SkgRepoName| match active_skgrepo_set {
+  let skgrepo_unrestricted = |skgrepo : &SkgRepoName| match skgrepo_restriction {
     None      => true,
     Some (a)  => a . is_all () || a . contains_skgrepo (skgrepo) };
   let wt_subscriber_hide_members =
     wt_subscriber_graphnode . hidesFromSubs
     . or_default () . iter ()
-    . filter ( |m| skgrepo_active (& m . relRepo) )
+    . filter ( |m| skgrepo_unrestricted (& m . relRepo) )
     . collect::<Vec<_>> ();
   let wt_subscriber_hides : Vec<ID> = wt_subscriber_hide_members . iter ()
     . map ( |m| m . member . clone () ) . collect ();
@@ -151,7 +151,7 @@ fn read_hiddenoutside_context (
   let wt_subscribees : Vec<ID> =
     wt_subscriber_graphnode . subscribesTo
     . or_default () . iter ()
-    . filter ( |m| skgrepo_active (& m . relRepo) )
+    . filter ( |m| skgrepo_unrestricted (& m . relRepo) )
     . map ( |m| m . member . clone () )
     . collect ();
   Ok (HiddenOutsideContext {

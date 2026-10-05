@@ -35,7 +35,7 @@ use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::git::RelationshipAxes;
 use crate::types::views_state::ViewId;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgRepoName};
-use crate::skgrepo_sets::{ActiveSkgRepoSet, search_skgids_for_skgrepo_set_for_test as search_ids_for_skgrepo_set_for_test_impl};
+use crate::skgrepo_sets::{SkgrepoRestriction, search_skgids_for_skgrepo_set_for_test as search_ids_for_skgrepo_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, AffectsParent, mk_writeProtected_viewnode};
@@ -64,12 +64,12 @@ pub type MatchGroups =
 pub fn search_skgids_for_skgrepo_set_for_test (
   tantivy_index : &TantivyIndex,
   config        : &SkgConfig,
-  active        : &ActiveSkgRepoSet,
+  restriction   : &SkgrepoRestriction,
   terms         : &str,
   limit         : usize,
 ) -> Result<Vec<ID>, Box<dyn std::error::Error>> {
   search_ids_for_skgrepo_set_for_test_impl (
-    tantivy_index, config, active, terms, limit ) }
+    tantivy_index, config, restriction, terms, limit ) }
 
 pub fn enriched_search_buffer_for_skgrepo_set_for_test (
   graph                             : &InRustGraph,
@@ -79,7 +79,7 @@ pub fn enriched_search_buffer_for_skgrepo_set_for_test (
   containerward_role_trees_by_skgid : &HashMap<ID, ContainerwardRoleTree>,
   tantivy_index                     : &TantivyIndex,
   config                            : &SkgConfig,
-  active                            : &ActiveSkgRepoSet,
+  restriction                       : &SkgrepoRestriction,
 ) -> Result<String, Box<dyn std::error::Error>> {
   let (mut viewforest, _ids) : (ViewForest, Vec<ID>) =
     build_search_viewforest (terms, matches_by_skgid, &HashSet::new ());
@@ -90,12 +90,12 @@ pub fn enriched_search_buffer_for_skgrepo_set_for_test (
     containerward_role_trees_by_skgid,
     tantivy_index,
     config,
-    active );
+    restriction );
   render_enriched_search_buffer::insert_overrideward_view_subtrees (
     &mut viewforest,
     graph,
     search_results,
-    active );
+    restriction );
   set_viewnodestats_in_viewforest (
     // Mirror the production enrichment path (handle_snapshot_response):
     // compute view-relative stats so the rendered buffer carries the
@@ -107,7 +107,7 @@ pub fn enriched_search_buffer_for_skgrepo_set_for_test (
     & HashMap::new (),
     & HashMap::new (),
     config,
-    Some (active) );
+    Some (restriction) );
   Ok ( viewforest_to_string ( &viewforest, config )? ) }
 
 /// Structured enrichment data passed through the slot,
@@ -143,7 +143,7 @@ pub fn handle_text_search_request (
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
   views_state       : &mut ViewsState,
-  active           : &ActiveSkgRepoSet,
+  restriction      : &SkgrepoRestriction,
 ) -> Option<String> {
   let parsed_sexp : Result < Sexp, String > =
     sexp::parse (request)
@@ -181,14 +181,14 @@ pub fn handle_text_search_request (
               &search_terms,
               &format! ("Error checking search privacy: {}", error) );
             return None; }};
-      if ! active . is_all ()
+      if ! restriction . is_all ()
          && index_has_overPrivateText
          && search_choice . is_none () {
         send_response_with_length_prefix (
           stream, &search_challenge_response () );
         return None; }
       let include_overPrivateText_telescopes : bool =
-        active . is_all ()
+        restriction . is_all ()
         || search_choice == Some (SearchOverPrivateTextChoice::Include);
       let search_opts : SearchOptions = SearchOptions {
         regex     : bool_key ( &sexp, "regex" ),
@@ -206,15 +206,15 @@ pub fn handle_text_search_request (
               stream, &search_terms, "No matches found." );
             return None; }
           let matches_by_skgid : MatchGroups =
-            filter_match_groups_to_active_skgrepos (
+            filter_match_groups_to_unrestricted_skgrepos (
               group_matches_by_skgid (
               best_matches,
               searcher,
               &runtime . tantivy_index,
               &search_terms,
               &search_opts,
-              Some (active) ),
-              active );
+              Some (restriction) ),
+              restriction );
           if matches_by_skgid . is_empty () {
             send_search_results_without_enrichment (
               stream, &search_terms, "No matches found." );
@@ -224,7 +224,7 @@ pub fn handle_text_search_request (
               &matches_by_skgid,
               &runtime . graph,
               &runtime . config,
-              active );
+              restriction );
           let (viewforest, search_results) : (ViewForest, Vec<ID>) =
             build_search_viewforest (
               &search_terms,
@@ -235,7 +235,7 @@ pub fn handle_text_search_request (
               search_results . iter () . cloned () . collect ()
             } else { HashSet::new () };
           let release = decide_text_release (
-            "text-search", active, &search_results,
+            "text-search", restriction, &search_results,
             &runtime . graph, &approved );
           if matches! (
             release, TextReleaseDecision::Challenge { .. } ) {
@@ -265,7 +265,7 @@ pub fn handle_text_search_request (
             // phase 2 (enriched) search results, backgrounded
             enrichment_slot, search_cancelled,
             runtime . clone (),
-            &search_terms, &search_results, active,
+            &search_terms, &search_results, restriction,
             include_overPrivateText_telescopes );
           Some (search_terms) },
         Err (e) => {
@@ -334,15 +334,15 @@ fn bool_key (
     . unwrap_or_default ()
     == "true" }
 
-fn filter_match_groups_to_active_skgrepos (
+fn filter_match_groups_to_unrestricted_skgrepos (
   matches_by_skgid : MatchGroups,
-  active        : &ActiveSkgRepoSet,
+  restriction   : &SkgrepoRestriction,
 ) -> MatchGroups {
-  if active . is_all () {
+  if restriction . is_all () {
     return matches_by_skgid; }
   matches_by_skgid . into_iter ()
     . filter ( |(_, (skgrepo, _))|
-      active . contains_skgrepo (skgrepo) )
+      restriction . contains_skgrepo (skgrepo) )
     . collect () }
 
 /// Spawn a background thread to compute containerward acnestries
@@ -355,7 +355,7 @@ fn spawn_enrichment_thread (
   runtime          : Arc<RuntimeGeneration>,
   search_terms     : &str,
   search_results   : &[ID],
-  active           : &ActiveSkgRepoSet,
+  restriction      : &SkgrepoRestriction,
   include_overPrivateText_telescopes : bool,
 ) {
   { // Clear stale enrichment before spawning.
@@ -367,7 +367,7 @@ fn spawn_enrichment_thread (
   let slot_clone    : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::clone (enrichment_slot);
   let cancel_clone  : Arc<AtomicBool>   = Arc::clone (search_cancelled);
-  let active_clone  : ActiveSkgRepoSet   = active . clone ();
+  let restriction_clone : SkgrepoRestriction   = restriction . clone ();
   let terms_clone   : String            = search_terms . to_string ();
   let ids_clone     : Vec<ID>           = search_results . to_vec ();
   let max_depth : usize = runtime . config . max_role_tree_depth;
@@ -395,13 +395,13 @@ fn spawn_enrichment_thread (
         collect_skgids_from_role_tree_node ( tree, &mut skgid_set ); }
       skgid_set . extend (
         render_enriched_search_buffer::collect_overrideward_view_subtree_skgids (
-          &runtime . graph, &ids_clone, &active_clone ) );
+          &runtime . graph, &ids_clone, &restriction_clone ) );
       skgid_set . into_iter () . collect () };
     let graphnodestats : AllGraphnodeStats =
       fetch_all_graphnodestats_with_skgrepo_set (
         &runtime . graph,
         &all_enriched_skgids,
-        Some (&active_clone) )
+        Some (&restriction_clone) )
       . unwrap_or_else ( |e| {
         tracing::warn! ("search enrichment: graphnodestats failed: {}", e);
         AllGraphnodeStats::empty () } );
@@ -514,7 +514,7 @@ pub fn group_matches_by_skgid (
   tantivy_index : &TantivyIndex,
   search_terms  : &str,
   search_opts   : &SearchOptions,
-  active        : Option<&ActiveSkgRepoSet>,
+  restriction   : Option<&SkgrepoRestriction>,
 ) -> MatchGroups {
   let matcher : CoverageMatcher = // pre-build once
     build_coverage_matcher (search_terms, search_opts);
@@ -559,7 +559,7 @@ pub fn group_matches_by_skgid (
               . get_first ( tantivy_index . skgrepo_field )
               . and_then ( |v| v . as_str () )
               . unwrap_or ("") );
-        if let Some (a) = active {
+        if let Some (a) = restriction {
           // Per-DOCUMENT skgrepo filtering, BEFORE grouping: an
           // alias document carries the ALIAS's relRepo as
           // its skgrepo, so a restricted search must drop it here
@@ -612,7 +612,7 @@ pub fn suppressed_result_skgids (
   matches_by_skgid : &MatchGroups,
   graph            : &InRustGraph,
   config           : &SkgConfig,
-  active           : &ActiveSkgRepoSet,
+  restriction      : &SkgrepoRestriction,
 ) -> HashSet<ID> {
   let candidates : HashSet<ID> =
     matches_by_skgid . keys () . cloned () . collect ();
@@ -627,7 +627,7 @@ pub fn suppressed_result_skgids (
     let mut seen  : HashSet<ID> = HashSet::from ([ owned . clone () ]);
     while let Some (cur) = stack . pop () {
       for target in graph . outbound_pids_for_relation_gated (
-        &cur, NodeRelation::Overrides, Some (active) ) {
+        &cur, NodeRelation::Overrides, Some (restriction) ) {
         if ! seen . insert (target . clone ()) { continue; }
         if candidates . contains (&target) {
           suppressed . insert (target . clone ()); }

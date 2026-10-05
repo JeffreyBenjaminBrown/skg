@@ -36,7 +36,7 @@ pub struct OpenViews {
 /// Direct viewforest mutation would make pids stale.
 pub struct ViewState {
   pub viewforest : ViewForest,
-  pub pids       : HashSet<ID>, // the Active vognodes in the buffer (the
+  pub pids       : HashSet<ID>, // the Unrestricted vognodes in the buffer (the
                             // kind this view renders meaningfully; see
                             // pids_from_viewforest)
 }
@@ -160,11 +160,11 @@ impl OpenViews {
 //
 
 /// The pids a view "contains" for collateral detection (views_containing): the
-/// primary ids of its Active vognodes -- the only kind backed by a
-/// real, current graphnode that this view renders meaningfully. Inactive
+/// primary ids of its Unrestricted vognodes -- the only kind backed by a
+/// real, current graphnode that this view renders meaningfully. Restricted
 /// placeholders are excluded: they are anonymous markers whose rerender shows
 /// nothing about the node, so a save touching that node need not re-render this
-/// view (its active descendants register themselves). Deleted / Unknown / Diff
+/// view (its unrestricted descendants register themselves). Deleted / Unknown / Diff
 /// phantom are excluded too: they are not graph members. The single source of
 /// which kinds count: update_view derives its pids through it, and the de-novo
 /// caller (multi_root_view_via_env) computes the pids it passes to register_view
@@ -174,7 +174,7 @@ pub fn pids_from_viewforest (
 ) -> HashSet<ID> {
   viewforest . nodes ()
     . filter_map ( |n| match &n . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Active (t)) =>
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         Some ( t . skgid . clone () ),
       _ => None } )
     . collect () }
@@ -191,7 +191,7 @@ fn root_skgids_from_viewforest (
 ) -> HashSet<ID> {
   let mut skgids : HashSet<ID> = HashSet::new ();
   for child in viewforest . roots () {
-    if let Some (vid) = child . value () . active_or_diff_phantom_skgid () {
+    if let Some (vid) = child . value () . unrestricted_or_diff_phantom_skgid () {
       skgids . insert ( vid . clone () );
       if let Some (pid) = graph . pid_of ( vid ) {
           if let Some (node) = graph . nodes . get (&pid) {

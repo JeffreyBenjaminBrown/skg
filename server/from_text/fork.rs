@@ -14,7 +14,7 @@ use crate::dbs::in_rust_graph::override_invariants::existing_owned_overrider_of;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use crate::org_to_text::metadata_value_atom;
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, SkgRepoName, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
@@ -26,13 +26,13 @@ use crate::types::viewnode::{ViewnodeKind, Vognode};
 use std::collections::{HashMap, HashSet};
 
 /// For every FOREIGN vognode in the view, the skgrepo of its nearest
-/// vognode ancestor, recorded IFF that ancestor is an OWNED Active
+/// vognode ancestor, recorded IFF that ancestor is an OWNED Unrestricted
 /// vognode. A fork's clone C must live in an owned skgrepo; the foreign
 /// node N's own repo is write-protected, so C inherits from N's IMMEDIATE
 /// container context -- the nearest vognode ancestor reached by skipping
 /// only non-vognodes (folders, etc.). The walk STOPS at that nearest vognode
 /// ancestor and never passes it: if the ancestor is foreign (or
-/// inactive), nothing is inferred (the skgrepo then defaults, or the user
+/// restricted), nothing is inferred (the skgrepo then defaults, or the user
 /// sets it in the confirmation buffer). Inferring a distant owned node
 /// reached by skipping a foreign ancestor would be wrong -- a clone
 /// belongs in the skgrepo of the node that actually contains N here.
@@ -46,21 +46,21 @@ pub fn owned_ancestor_skgrepos_for_foreign_vognodes (
 ) -> HashMap<ID, SkgRepoName> {
   let mut map : HashMap<ID, SkgRepoName> = HashMap::new ();
   for node in viewforest . nodes () {
-    let ViewnodeKind::Vognode (Vognode::Active (t)) = & node . value () . kind
+    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = & node . value () . kind
       else { continue; };
     if config . skgrepo_is_owned (& t . home_skgrepo) { continue; } // not foreign
     let mut current = node;
     while let Some (parent) = current . parent () {
       match & parent . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Active (pt)) => {
+        ViewnodeKind::Vognode (Vognode::Unrestricted (pt)) => {
           // N's nearest vognode ancestor: record its skgrepo IFF owned,
           // then stop -- never walk past it.
           if config . skgrepo_is_owned (& pt . home_skgrepo) {
             map . entry ( t . skgid . clone () )
               . or_insert_with ( || pt . home_skgrepo . clone () ); }
           break; }
-        ViewnodeKind::Vognode (Vognode::Inactive (_)) =>
-          // An inactive vognode is a real container boundary too (and
+        ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
+          // A restricted vognode is a real container boundary too (and
           // never an owned skgrepo): infer nothing.
           break,
         _ =>
@@ -74,11 +74,11 @@ pub fn owned_ancestor_skgrepos_for_foreign_vognodes (
 /// contains, which FORKS the parent, and the new node belongs in the
 /// CLONE's skgrepo, exactly as a new node under an owned parent lands
 /// in that parent's skgrepo. This maps each such new node to the pid
-/// of the foreign node whose fork it rides: its nearest Active
+/// of the foreign node whose fork it rides: its nearest Unrestricted
 /// vognode ancestor that is not itself such a new node (a chain of
 /// new headlines climbs to the first non-new node), skipping
 /// non-vognodes. No entry is recorded when the anchor is missing,
-/// Inactive, or (impossibly, since the skgrepo was inherited down the
+/// Restricted, or (impossibly, since the skgrepo was inherited down the
 /// chain) owned -- the node is then still judged a foreign creation.
 /// The NodeInstruction rewrite driven by this map happens in
 /// 'validate_and_filter_foreign_instructions', where the ForkSpecs
@@ -90,7 +90,7 @@ pub fn new_foreign_nodes_adopting_clone_skgrepos (
 ) -> HashMap<ID, ID> {
   let mut map : HashMap<ID, ID> = HashMap::new ();
   for node in viewforest . nodes () {
-    let ViewnodeKind::Vognode (Vognode::Active (t)) = & node . value () . kind
+    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = & node . value () . kind
       else { continue; };
     if ! new_nodes_with_inherited_skgrepos . contains (& t . skgid)
       { continue; }
@@ -99,7 +99,7 @@ pub fn new_foreign_nodes_adopting_clone_skgrepos (
     let mut current = node;
     while let Some (parent) = current . parent () {
       match & parent . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Active (pt)) => {
+        ViewnodeKind::Vognode (Vognode::Unrestricted (pt)) => {
           if new_nodes_with_inherited_skgrepos . contains (& pt . skgid) {
             // Another new headline in the same chain: keep climbing.
             current = parent;
@@ -107,7 +107,7 @@ pub fn new_foreign_nodes_adopting_clone_skgrepos (
           if ! config . skgrepo_is_owned (& pt . home_skgrepo) {
             map . insert ( t . skgid . clone (), pt . skgid . clone () ); }
           break; }
-        ViewnodeKind::Vognode (Vognode::Inactive (_)) =>
+        ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
           break,
         _ =>
           // A non-vognode (folder, etc.): skip it and keep walking rootward.
@@ -124,7 +124,7 @@ pub fn new_foreign_nodes_adopting_clone_skgrepos (
 pub struct CloneSkgRepoInputs {
   pub user_set          : HashMap<ID, SkgRepoName>, // What the user chose in the confirmation buffer, riding back on the approve re-save's fork-repos field.
   pub explicit_child    : HashMap<ID, SkgRepoName>, // What the saved metadata already specified, via explicit skgrepos on N's new children ('explicit_new_child_repos_for_foreign_vognodes').
-  pub inferred_ancestor : HashMap<ID, SkgRepoName>, // N's nearest owned ancestor in the view ('owned_ancestor_repos_for_foreign_vognodes') -- always active.
+  pub inferred_ancestor : HashMap<ID, SkgRepoName>, // N's nearest owned ancestor in the view ('owned_ancestor_repos_for_foreign_vognodes') -- always unrestricted.
   pub default           : Option<SkgRepoName>,      // The caller's active-aware config-first owned skgrepo.
 }
 
@@ -132,12 +132,12 @@ pub struct CloneSkgRepoInputs {
 /// resolving C's owned repo per 'CloneRepoInputs'. Every fork
 /// carries a concrete owned skgrepo unless the user owns NO skgrepo at
 /// all -- only then does 'ForkRepoUnresolved' fire. (The chosen
-/// skgrepo is validated owned + active later, in
+/// skgrepo is validated owned + unrestricted later, in
 /// 'validate_fork_specs'; resolution here only fills it. The default
 /// is active-aware so that, under a restricted skgrepo-set with both
-/// an inactive and an active owned skgrepo, the fork still reaches the
+/// a restricted and an unrestricted owned skgrepo, the fork still reaches the
 /// confirmation buffer rather than dead-ending on
-/// 'ForkRepoInactive'.)
+/// 'ForkRepoRestricted'.)
 pub fn fork_spec_from_buffer_node (
   buffer_node   : &Graphnode,
   disk_title    : &str, // N's original title (before the edit), for the confirmation buffer's child line.
@@ -167,7 +167,7 @@ pub fn fork_spec_from_buffer_node (
 /// already said where this material belongs, so the clone of the
 /// foreign parent goes there too and the confirmation flow does not
 /// ask again. Per foreign node N, this records the one owned skgrepo
-/// its new explicit-repo immediate Active children agree on;
+/// its new explicit-repo immediate Unrestricted children agree on;
 /// nothing is recorded when they disagree (ambiguous -- the flow then
 /// asks) or when there are none. 'new_nodes_with_explicit_repos' is
 /// enrichment's new-nodes set MINUS its inherited-repo set: only a
@@ -180,12 +180,12 @@ pub fn explicit_new_child_skgrepos_for_foreign_vognodes (
   let mut map       : HashMap<ID, SkgRepoName> = HashMap::new ();
   let mut ambiguous : HashSet<ID> = HashSet::new ();
   for node in viewforest . nodes () {
-    let ViewnodeKind::Vognode (Vognode::Active (t)) = & node . value () . kind
+    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = & node . value () . kind
       else { continue; };
     if config . skgrepo_is_owned (& t . home_skgrepo)
       { continue; } // only a foreign node forks
     for child in node . children () {
-      let ViewnodeKind::Vognode (Vognode::Active (ct))
+      let ViewnodeKind::Vognode (Vognode::Unrestricted (ct))
         = & child . value () . kind
         else { continue; };
       if ! new_nodes_with_explicit_skgrepos . contains (& ct . skgid)
@@ -286,10 +286,10 @@ pub fn build_fork_confirmation_buffer (
 ///   Inference and the default only ever yield owned skgrepos, but a
 ///   user-set skgrepo (typed, or hand-edited) might not be -- reject with
 ///   'ForkRepoNotOwned'.
-/// - *skgrepo-set*: the clone's owned skgrepo must be ACTIVE under the
-///   active skgrepo-set. Under a restricted set the user is not meant to
-///   touch inactive skgrepos, and an invisible clone is never created
-///   silently; reject with 'ForkRepoInactive'.
+/// - *skgrepo-set*: the clone's owned skgrepo must be UNRESTRICTED under the
+///   skgrepo restriction. Under a restricted set the user is not meant to
+///   touch restricted skgrepos, and an invisible clone is never created
+///   silently; reject with 'ForkRepoRestricted'.
 ///
 /// 'restricted_repo_set' is None when nothing is restricted (the set
 /// 'all'). The monogamy check uses the explicit save-planning graph; the
@@ -298,7 +298,7 @@ pub fn validate_fork_specs_in_graph (
   fork_specs             : &[ForkSpec],
   graph                  : &crate::dbs::in_rust_graph::InRustGraph,
   config                 : &SkgConfig,
-  restricted_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction    : Option<&SkgrepoRestriction>,
 ) -> Vec<BufferValidationError> {
   let mut errors : Vec<BufferValidationError> = Vec::new ();
   for spec in fork_specs {
@@ -315,12 +315,12 @@ pub fn validate_fork_specs_in_graph (
           spec . original_skgid . clone (),
           clone_skgrepo . clone () ));
       continue; }
-    let active : bool =
-      restricted_skgrepo_set
+    let unrestricted : bool =
+      skgrepo_restriction
       . map_or ( true, |a| a . contains_skgrepo (clone_skgrepo) );
-    if ! active {
+    if ! unrestricted {
       errors . push (
-        BufferValidationError::ForkSkgRepoInactive (
+        BufferValidationError::ForkSkgRepoRestricted (
           spec . original_skgid . clone (),
           clone_skgrepo . clone () )); }}
   errors }
@@ -328,14 +328,14 @@ pub fn validate_fork_specs_in_graph (
 pub fn validate_fork_specs (
   fork_specs             : &[ForkSpec],
   config                 : &SkgConfig,
-  restricted_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction    : Option<&SkgrepoRestriction>,
 ) -> Vec<BufferValidationError> {
   let graph = match read_all_skg_files_from_skgrepos (config) {
     Ok (nodes) => InRustGraph::from_graphnodes (&nodes),
     Err (e) => return vec! [BufferValidationError::Other (
       format! ("Could not read graph for fork validation: {}", e))], };
   validate_fork_specs_in_graph (
-    fork_specs, &graph, config, restricted_skgrepo_set ) }
+    fork_specs, &graph, config, skgrepo_restriction ) }
 
 /// Construct the clone C from the edited foreign buffer node N and a
 /// resolved owned skgrepo. C copies N's title/body/contains (the

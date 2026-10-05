@@ -648,18 +648,18 @@ fn compare_two_viewnode_branches_recursively_modulo_skgid (
   let n1 : &MpViewnode = node1 . value();
   let n2 : &MpViewnode = node2 . value();
   match (&n1 . kind, &n2 . kind) {
-    ( MpViewnodeKind::Vognode (MpVognode::Active (_))
+    ( MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_))),
-      MpViewnodeKind::Vognode (MpVognode::Active (_))
+      MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_)))) =>
-    { // Copy the ID from one to the other, then compare. TODO/DONE/local-view-update/plan_v2.org §11: Active and
+    { // Copy the ID from one to the other, then compare. TODO/DONE/local-view-update/plan_v2.org §11: Unrestricted and
       // Diff phantom payloads are now different types, so read n2's id via the
       // shared accessor and write n1_copy's per variant.
       let id2 : Option<ID> = n2 . skgid_opt () . cloned ();
       let mut n1_copy : MpViewnode =
         n1 . clone();
       match &mut n1_copy . kind {
-        MpViewnodeKind::Vognode (MpVognode::Active (t)) => t . skgid = id2,
+        MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) => t . skgid = id2,
         MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) => p . skgid = id2,
         _ => {} }
       if n1_copy != *n2 { return false; }}

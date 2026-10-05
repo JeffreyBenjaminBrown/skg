@@ -8,7 +8,7 @@ use skg::nodeMerge::merge_nodes;
 use skg::test_utils::{run_with_shared_test_stores, tantivy_contains_skgid, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SkgRepoName};
 use skg::types::tree::forest::ViewForest;
-use skg::types::viewnode::{NodeEditRequest, Viewnode, ViewnodeKind, Vognode, ActiveVognode, Editability, viewforest_root_viewnode, default_activeVognode};
+use skg::types::viewnode::{NodeEditRequest, Viewnode, ViewnodeKind, Vognode, UnrestrictedVognode, Editability, viewforest_root_viewnode, default_unrestrictedVognode};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::NodeMerge;
 use skg::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo;
@@ -27,17 +27,17 @@ fn mk_test_viewnode (
   skgid        : &str,
   edit_request : Option<NodeEditRequest>,
 ) -> Viewnode {
-  let t : ActiveVognode = ActiveVognode {
+  let t : UnrestrictedVognode = UnrestrictedVognode {
     editability : Editability::Editable {
       body         : None,
       edit_request },
-    .. default_activeVognode ( ID::from (skgid),
+    .. default_unrestrictedVognode ( ID::from (skgid),
                           SkgRepoName::from ("main"),
                           title . to_string() ) };
   Viewnode { focused     : false,
             folded      : false,
             body_folded : false,
-            kind        : ViewnodeKind::Vognode (Vognode::Active (t)) }}
+            kind        : ViewnodeKind::Vognode (Vognode::Unrestricted (t)) }}
 
 #[test]
 fn all_tests

@@ -5,15 +5,15 @@
 //! the instruction node EXPORT_MARKER_ID and whose body yields a
 //! `target_filepath` -- is written to
 //! `<output_base>/<target_filepath>.org` as a recursive content
-//! view, limited to a chosen skgrepo-set, stripped of skg metadata,
+//! view, restricted to a chosen skgrepo-set, stripped of skg metadata,
 //! with `[[id:..][label]]` links rewritten to relative org links.
 //!
-//! The core (`export_to_org`) takes nodes + an ActiveRepoSet + an
+//! The core (`export_to_org`) takes nodes + an SkgrepoRestriction + an
 //! output base, so it needs neither the live graph nor Tantivy and is
 //! unit-testable. The server handler and the `export-org`
 //! subcommand both call it.
 
-use crate::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
+use crate::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
 use crate::types::misc::SkgConfig;
 use crate::types::misc::{ID, RelPartner};
 use crate::types::nodes::complete::Graphnode;
@@ -161,10 +161,10 @@ struct Ev {
 //
 
 /// Render and write every export root reachable in `nodes` under
-/// `active`, into `output_base`. Independent of the live graph and Tantivy; does
+/// `unrestricted`, into `output_base`. Independent of the live graph and Tantivy; does
 /// filesystem writes only under `output_base`.
 pub fn export_to_org (
-  active      : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
   nodes       : &[Graphnode],
   output_base : &Path,
 ) -> Result<ExportReport, Box<dyn Error>> {
@@ -183,7 +183,7 @@ pub fn export_to_org (
   let (roots_by_pid, marker_pids) : (HashMap<ID, ExportRoot>,
                                      HashSet<ID>) =
     discover_roots (
-      nodes, &alias_to_pid, active, &mut warnings );
+      nodes, &alias_to_pid, restriction, &mut warnings );
 
   // Process roots in a deterministic order (by target), so that the
   // canonical home of a multiply-contained node is stable.
@@ -198,7 +198,7 @@ pub fn export_to_org (
     . map ( |r| ( *r,
                   collect_events (
                     &r . root_pid, &by_pid, &alias_to_pid,
-                    &roots_by_pid, &marker_pids, active ) ) )
+                    &roots_by_pid, &marker_pids, restriction ) ) )
     . collect ();
 
   let homes : HashMap<ID, Home> =
@@ -235,7 +235,7 @@ pub fn export_to_org (
 /// where its file is written. This performs discovery only; it writes no
 /// files and is therefore safe to use at the release preflight.
 pub fn export_candidate_pids (
-  active : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
   nodes  : &[Graphnode],
 ) -> Vec<ID> {
   let by_pid : HashMap<ID, &Graphnode> =
@@ -250,13 +250,13 @@ pub fn export_candidate_pids (
     aliases };
   let mut ignored_warnings : Vec<String> = Vec::new ();
   let (roots_by_pid, marker_pids) = discover_roots (
-    nodes, &alias_to_pid, active, &mut ignored_warnings );
+    nodes, &alias_to_pid, restriction, &mut ignored_warnings );
   let mut candidates : HashSet<ID> = marker_pids . clone ();
   for root in roots_by_pid . values () {
     candidates . extend (
       collect_events (
         &root . root_pid, &by_pid, &alias_to_pid,
-        &roots_by_pid, &marker_pids, active )
+        &roots_by_pid, &marker_pids, restriction )
       . into_iter ()
       . map ( |event| event . pid ) ); }
   let mut candidates : Vec<ID> = candidates . into_iter () . collect ();
@@ -271,7 +271,7 @@ pub(crate) fn claimed_export_targets (
   nodes : &[Graphnode],
   config : &SkgConfig,
 ) -> Result<Vec<(ID, String)>, String> {
-  let active : ActiveSkgRepoSet = ActiveSkgRepoSet::named (
+  let restriction : SkgrepoRestriction = SkgrepoRestriction::named (
     config, SkgRepoSetName::from ("all"))
     .map_err (|error| error . to_string ())?;
   let aliases : HashMap<ID, ID> = nodes . iter ()
@@ -279,7 +279,7 @@ pub(crate) fn claimed_export_targets (
       .map (|extra| (extra . clone (), node . pid . clone ())))
     .collect ();
   let mut warnings : Vec<String> = Vec::new ();
-  let (roots, _) = discover_roots (nodes, &aliases, &active, &mut warnings);
+  let (roots, _) = discover_roots (nodes, &aliases, &restriction, &mut warnings);
   Ok (roots . into_values ()
     .map (|root| (root . root_pid, root . target)) . collect ())
 }
@@ -314,7 +314,7 @@ fn write_export_file (
 fn discover_roots (
   nodes        : &[Graphnode],
   alias_to_pid : &HashMap<ID, ID>,
-  active       : &ActiveSkgRepoSet,
+  restriction  : &SkgrepoRestriction,
   warnings     : &mut Vec<String>,
 ) -> (HashMap<ID, ExportRoot>, HashSet<ID>) {
   let marker_skgid : ID = ID::from (EXPORT_MARKER_ID);
@@ -344,7 +344,7 @@ fn discover_roots (
   for parent in &sorted {
     let marker_children : Vec<String> =
       parent . contains . iter ()
-      . filter ( |m| relRepo_is_active (m, active) )
+      . filter ( |m| relRepo_is_unrestricted (m, restriction) )
       . map ( |m| &m . member )
       . filter_map ( |cid|
         marker_target . get (
@@ -358,11 +358,11 @@ fn discover_roots (
         "node {} has more than one export-marker child; using the \
          first ({:?})",
         parent . pid, target ) ); }
-    if ! node_active (parent, active) {
+    if ! node_unrestricted (parent, restriction) {
       warnings . push ( format! (
-        "export root {} is in repo {} which is inactive under \
+        "export root {} is in repo {} which is restricted under \
          repo-set {}; skipping",
-        parent . pid, parent . home_skgrepo, active . name ) );
+        parent . pid, parent . home_skgrepo, restriction . name ) );
       continue; }
     if let Some (owner) = target_owner . get (&target) {
       warnings . push ( format! (
@@ -454,7 +454,7 @@ fn collect_events (
   alias_to_pid : &HashMap<ID, ID>,
   roots_by_pid : &HashMap<ID, ExportRoot>,
   marker_pids  : &HashSet<ID>,
-  active       : &ActiveSkgRepoSet,
+  restriction  : &SkgrepoRestriction,
 ) -> Vec<Ev> {
   let mut out : Vec<Ev> = Vec::new ();
   let mut rendered : HashSet<ID> = HashSet::new ();
@@ -475,15 +475,15 @@ fn collect_events (
     // pop (and thus render) in forward order.
     let mut kids : Vec<ID> = Vec::new ();
     for member in node . contains . iter () {
-      if ! relRepo_is_active (member, active) { continue; } // the RELATIONSHIP's
-        // skgrepo is inactive: the visible composition omits it, even when
-        // the child's home is active.
+      if ! relRepo_is_unrestricted (member, restriction) { continue; } // the RELATIONSHIP's
+        // skgrepo is restricted: the visible composition omits it, even when
+        // the child's home is unrestricted.
       let cpid : ID = resolve_pid (&member . member, alias_to_pid);
       if marker_pids . contains (&cpid) { continue; } // markers never render
       let child : &Graphnode = match by_pid . get (&cpid) {
         Some (c) => c,
         None     => continue, }; // dangling contains entry: silently skip
-      if ! node_active (child, active) { continue; } // omit inactive (recursive)
+      if ! node_unrestricted (child, restriction) { continue; } // omit restricted (recursive)
       kids . push (cpid); }
     for cpid in kids . into_iter () . rev () {
       stack . push ( (cpid, depth + 1, false) ); }}
@@ -740,20 +740,20 @@ fn resolve_pid (
 ) -> ID {
   alias_to_pid . get (skgid) . cloned () . unwrap_or_else (|| skgid . clone ()) }
 
-fn node_active (
+fn node_unrestricted (
   node   : &Graphnode,
-  active : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
 ) -> bool {
-  active . is_all () || active . contains_skgrepo (&node . home_skgrepo) }
+  restriction . is_all () || restriction . contains_skgrepo (&node . home_skgrepo) }
 
-/// Whether an RELATIONSHIP is visible under the active set: its recorded
-/// relRepo must be active. (The visible composition = active
+/// Whether an RELATIONSHIP is visible under the skgrepo restriction: its recorded
+/// relRepo must be unrestricted. (The visible composition = unrestricted
 /// sections' lists only.)
-fn relRepo_is_active (
+fn relRepo_is_unrestricted (
   member : &RelPartner<ID>,
-  active : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
 ) -> bool {
-  active . is_all () || active . contains_skgrepo (&member . relRepo) }
+  restriction . is_all () || restriction . contains_skgrepo (&member . relRepo) }
 
 fn title_has_link (
   node : &Graphnode,

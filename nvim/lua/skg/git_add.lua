@@ -163,7 +163,7 @@ function M.subtree_last_line (start)
 end
 
 ---@param sexp any
----@return boolean is SEXP an ActiveVognode marked as a new worktree file?
+---@return boolean is SEXP an UnrestrictedVognode marked as a new worktree file?
 function M.metadata_has_unstaged_new_file_p (sexp)
   local values = metadata.sexp_cdr_at_path(sexp,
                                            { 'skg', 'node', 'unstaged' })

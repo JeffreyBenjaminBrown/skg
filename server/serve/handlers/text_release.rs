@@ -7,11 +7,11 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::protocol::TcpToClient;
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::ID;
 use crate::types::sexp::extract_string_list_from_sexp;
 use crate::types::viewnode::{
-  Viewnode, ViewnodeKind, Vognode, mk_inactive_viewnode};
+  Viewnode, ViewnodeKind, Vognode, mk_restricted_viewnode};
 
 use ego_tree::{NodeId, NodeMut, Tree};
 use sexp::{Atom, Sexp};
@@ -89,7 +89,7 @@ pub fn search_challenge_response () -> String {
 /// extra ID cannot evade the telescope-coarse policy.
 pub fn decide (
   operation      : &str,
-  active         : &ActiveSkgRepoSet,
+  restriction    : &SkgrepoRestriction,
   candidate_pids : &[ID],
   graph          : &InRustGraph,
   approved_pids  : &HashSet<ID>,
@@ -97,14 +97,14 @@ pub fn decide (
   let overPrivateText_pids : Vec<ID> =
     canonical_overPrivateText_pids (candidate_pids, graph);
   decide_for_overPrivateText_pids (
-    operation, active, overPrivateText_pids, approved_pids )
+    operation, restriction, overPrivateText_pids, approved_pids )
 }
 
 /// Apply the shared policy when a caller has classified overPrivateTextness from a
 /// skgrepo other than the live graph, such as deleted-node diff data.
 pub fn decide_for_overPrivateText_pids (
   operation     : &str,
-  active        : &ActiveSkgRepoSet,
+  restriction   : &SkgrepoRestriction,
   mut overPrivateText_pids : Vec<ID>,
   approved_pids : &HashSet<ID>,
 ) -> TextReleaseDecision {
@@ -113,7 +113,7 @@ pub fn decide_for_overPrivateText_pids (
   if overPrivateText_pids . is_empty () {
     return TextReleaseDecision::Allow; }
   let warning : String = warning_for (operation, &overPrivateText_pids);
-  if active . is_all ()
+  if restriction . is_all ()
      || overPrivateText_pids . iter () . all (
           |pid| approved_pids . contains (pid) ) {
     return TextReleaseDecision::AllowWithWarning { warning }; }
@@ -148,7 +148,7 @@ pub fn challenge_response (
   ] ) . to_string () )
 }
 
-/// Replace overPrivateText active nodes with text-free inactive vognodes. Search
+/// Replace overPrivateText unrestricted nodes with text-free restricted vognodes. Search
 /// exclusion uses this after enrichment so role-tree and override grafting
 /// cannot broaden the choice made before the Tantivy query.
 pub fn exclude_overPrivateText_nodes_from_viewforest (
@@ -163,8 +163,8 @@ pub fn exclude_overPrivateText_nodes_from_viewforest (
     let should_convert : bool =
       viewforest . get (treeid)
       . and_then ( |node| match &node . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Active (active_node)) =>
-          graph . pid_of (&active_node . skgid),
+        ViewnodeKind::Vognode (Vognode::Unrestricted (unrestricted_node)) =>
+          graph . pid_of (&unrestricted_node . skgid),
         _ => None, } )
       . and_then ( |pid| graph . get (&pid) )
       . map ( |node| node . overPrivateText_telescope )
@@ -172,7 +172,7 @@ pub fn exclude_overPrivateText_nodes_from_viewforest (
     if should_convert {
       let mut node : NodeMut<crate::types::viewnode::Viewnode> =
         viewforest . get_mut (treeid) . unwrap ();
-      node . value () . kind = mk_inactive_viewnode () . kind; }}
+      node . value () . kind = mk_restricted_viewnode () . kind; }}
 }
 
 fn canonical_overPrivateText_pids (
@@ -253,8 +253,8 @@ mod tests {
     InRustGraph::from_graphnodes (&[node])
   }
 
-  fn restricted () -> ActiveSkgRepoSet {
-    ActiveSkgRepoSet {
+  fn restricted () -> SkgrepoRestriction {
+    SkgrepoRestriction {
       name    : SkgRepoSetName::from ("public"),
       skgrepos : [SkgRepoName::from ("home")]
                 . into_iter () . collect (),

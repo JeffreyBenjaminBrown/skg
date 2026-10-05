@@ -7,7 +7,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::types::git::{GitDiffStatus, RelationshipAxes, NodeChanges, GraphnodeDiff, Sign, SkgRepoDiff, axes_from_per_stage_diffs, net_diff_from_per_stage, per_stage_node_changes_for_activeVognode};
+use crate::types::git::{GitDiffStatus, RelationshipAxes, NodeChanges, GraphnodeDiff, Sign, SkgRepoDiff, axes_from_per_stage_diffs, net_diff_from_per_stage, per_stage_node_changes_for_unrestrictedVognode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::misc::{ID, RelationshipMemberKey, SkgConfig, SkgRepoName, members_of};
@@ -49,7 +49,7 @@ pub fn goal_list_for_outbound_folder (
     return (worktree_list . to_vec (), HashSet::new ()); }
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
-    per_stage_node_changes_for_activeVognode (
+    per_stage_node_changes_for_unrestrictedVognode (
       skgrepo_diffs, recorder_pid, recorder_skgrepo );
   if staged_nc . is_none () && unstaged_nc . is_none () {
     return (worktree_list . to_vec (), HashSet::new ()); }
@@ -72,7 +72,7 @@ pub fn outbound_member_axes (
 ) -> HashMap<ID, RelationshipAxes> {
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
-    per_stage_node_changes_for_activeVognode (
+    per_stage_node_changes_for_unrestrictedVognode (
       skgrepo_diffs, recorder_pid, recorder_skgrepo );
   axes_from_per_stage_diffs (
     staged_nc   . and_then ( |c| relation . diff_in_nodechanges (c) ),

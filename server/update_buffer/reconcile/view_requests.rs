@@ -1,6 +1,6 @@
 use crate::to_org::complete::partner_folder::{ maybe_add_hiddenInSubscribeeFolder_branch, type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::expand::editable::execute_view_requests;
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::git::SkgRepoDiff;
 use crate::types::misc::{SkgConfig, SkgRepoName};
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
@@ -12,27 +12,27 @@ use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
-pub fn execute_activeVognode_view_requests (
+pub fn execute_unrestrictedVognode_view_requests (
   node               : NodeId,
   tree               : &mut Tree<Viewnode>,
   graph              : &crate::dbs::in_rust_graph::InRustGraph,
   config             : &SkgConfig,
   errors             : &mut Vec<String>,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   skgrepo_diffs      : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
     tree, node,
     |vn : &Viewnode| matches!( &vn . kind,
-                                ViewnodeKind::Vognode (Vognode::Active (_)) ),
-    "execute_activeVognode_view_requests: expected ActiveVognode" )
+                                ViewnodeKind::Vognode (Vognode::Unrestricted (_)) ),
+    "execute_unrestrictedVognode_view_requests: expected UnrestrictedVognode" )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   let requests : Vec<(NodeId, ViewRequest)> =
     extract_view_requests( tree, node ) ?;
   if ! requests . is_empty() {
     execute_view_requests(
       tree, requests, graph, config, errors,
-      active_skgrepo_set, skgrepo_diffs ) ?; }
+      skgrepo_restriction, skgrepo_diffs ) ?; }
   Ok(( )) }
 
 pub fn ensure_hiddenInFolder_under_editable_subscribee (
@@ -40,7 +40,7 @@ pub fn ensure_hiddenInFolder_under_editable_subscribee (
   node               : NodeId,
   graph              : &crate::dbs::in_rust_graph::InRustGraph,
   config             : &SkgConfig,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   skgrepo_diffs      : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
 ) -> Result<(), Box<dyn Error>> {
   let is_subscribee : bool =
@@ -50,14 +50,14 @@ pub fn ensure_hiddenInFolder_under_editable_subscribee (
   let is_writeProtected : bool =
     read_at_node_in_tree( tree, node,
       |vn : &Viewnode| match &vn . kind {
-        ViewnodeKind::Vognode (Vognode::Active (t))
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           => t . is_writeProtected (),
         _ => false } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   if is_writeProtected { return Ok (( )); }
   maybe_add_hiddenInSubscribeeFolder_branch (
     tree, node, graph, config,
-    active_skgrepo_set, skgrepo_diffs ) }
+    skgrepo_restriction, skgrepo_diffs ) }
 
 /// Read the node's non-consumed view_requests as a Vec. View completion
 /// (dispatch_node_update) settles
@@ -71,7 +71,7 @@ fn extract_view_requests (
   let mut view_requests : HashSet<ViewRequest> =
     read_at_node_in_tree( tree, node,
       |vn : &Viewnode| match &vn . kind {
-        ViewnodeKind::Vognode (Vognode::Active (t))
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           => t . view_requests . clone(),
         _ => HashSet::new() } )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;

@@ -356,7 +356,7 @@ mod tests {
   use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
   use crate::dbs::tantivy::search::{SearchOptions, search_index};
   use crate::export_org::export_to_org;
-  use crate::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
+  use crate::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
   use crate::types::misc::SkgRepo;
   use std::fs;
 
@@ -539,9 +539,9 @@ mod tests {
     let config = env . runtime_snapshot () . config . clone ();
     let nodes : Vec<Graphnode> =
       read_all_skg_files_from_skgrepos_read_only (&config) . unwrap ();
-    let active : ActiveSkgRepoSet = ActiveSkgRepoSet::named (
+    let restriction : SkgrepoRestriction = SkgrepoRestriction::named (
       &config, SkgRepoSetName::from ("all")) . unwrap ();
-    export_to_org (&active, &nodes, &output) . unwrap ();
+    export_to_org (&restriction, &nodes, &output) . unwrap ();
     let exported_markdown : String =
       fs::read_to_string (output . join ("nested/guide.org")) . unwrap ();
     let exported_org : String =

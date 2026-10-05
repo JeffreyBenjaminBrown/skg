@@ -3,7 +3,7 @@
 //! so `super::*` reaches the module's private items.
 
 use super::*;
-use crate::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
+use crate::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
 use crate::types::misc::{ID, SkgRepoName, rel_partners_at_relRepo};
 use crate::types::nodes::complete::empty_graphnode;
 
@@ -28,8 +28,8 @@ fn node (
     contains . iter () . map ( |c| ID::from (*c) ) . collect () );
   n }
 
-fn active_all () -> ActiveSkgRepoSet {
-  ActiveSkgRepoSet { name    : SkgRepoSetName::from ("all"),
+fn restriction_all () -> SkgrepoRestriction {
+  SkgrepoRestriction { name  : SkgRepoSetName::from ("all"),
                     skgrepos : BTreeSet::new () } }
 
 //
@@ -105,7 +105,7 @@ fn sample_nodes () -> Vec<Graphnode> {
 fn export_preflight_names_rendered_nodes_and_markers_only () {
   let mut nodes : Vec<Graphnode> = sample_nodes ();
   nodes . push (node ("unrelated", "not exported", None, &[]));
-  let candidates : Vec<ID> = export_candidate_pids (&active_all (), &nodes);
+  let candidates : Vec<ID> = export_candidate_pids (&restriction_all (), &nodes);
   assert! ( candidates . contains (&ID::from ("a")) );
   assert! ( candidates . contains (&ID::from ("b")) );
   assert! ( candidates . contains (&ID::from ("ma")),
@@ -118,7 +118,7 @@ fn export_writes_expected_files_and_links () {
   let nodes : Vec<Graphnode> = sample_nodes ();
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
   let report : ExportReport =
-    export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
+    export_to_org (&restriction_all (), &nodes, dir . path ()) . unwrap ();
 
   assert_eq! (report . roots_found, 3);
   assert_eq! (report . broken_links, 1); // the [[id:zzz]] link
@@ -177,7 +177,7 @@ fn headline_links_survive_and_linked_ones_get_custom_ids () {
           Some ("target_filepath = z"), &[]),
   ];
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
-  export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
+  export_to_org (&restriction_all (), &nodes, dir . path ()) . unwrap ();
   let a : String =
     fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
   assert! (a . contains (
@@ -205,7 +205,7 @@ fn headline_links_survive_and_linked_ones_get_custom_ids () {
           Some ("target_filepath = s"), &[]),
   ];
   let dir2 : tempfile::TempDir = tempfile::tempdir () . unwrap ();
-  export_to_org (&active_all (), &nodes2, dir2 . path ()) . unwrap ();
+  export_to_org (&restriction_all (), &nodes2, dir2 . path ()) . unwrap ();
   let r : String =
     fs::read_to_string (dir2 . path () . join ("r.org")) . unwrap ();
   assert! (r [export_header_length (&r) ..] . starts_with (
@@ -231,7 +231,7 @@ fn diamond_node_rendered_once_then_linked () {
     node ("leaf","Leaf", None, &[]),
   ];
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
-  export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
+  export_to_org (&restriction_all (), &nodes, dir . path ()) . unwrap ();
   let a : String =
     fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
   assert_eq! (a . matches ("Shared\nshared body") . count (), 1,
@@ -263,7 +263,7 @@ fn links_to_a_repeated_title_use_custom_id () {
   ];
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
   let report : ExportReport =
-    export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
+    export_to_org (&restriction_all (), &nodes, dir . path ()) . unwrap ();
   let a : String =
     fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
   assert! (a . contains ("[[*language][first]]"), "a.org:\n{}", a);
@@ -288,7 +288,7 @@ fn title_link_to_instruction_without_target_is_content () {
           Some ("explanatory body"), &[]),
   ];
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
-  export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
+  export_to_org (&restriction_all (), &nodes, dir . path ()) . unwrap ();
   let a : String =
     fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
   assert! (a . contains ("** see the instruction node"),
@@ -300,7 +300,7 @@ fn title_link_to_instruction_without_target_is_content () {
 fn marker_child_is_excluded_from_content () {
   let nodes : Vec<Graphnode> = sample_nodes ();
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
-  export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
+  export_to_org (&restriction_all (), &nodes, dir . path ()) . unwrap ();
   let a : String =
     fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
   // "how" is the marker child's label; it must not appear as content.
@@ -316,7 +316,7 @@ fn private_skgrepo_relationship_is_omitted_from_restricted_export () {
   // Root and both children live in "main", but the relationship to "priv"
   // is RECORDED in skgrepo "private". A main-only export renders the
   // visible composition: "pub" appears, "priv" does not -- even though
-  // priv's home is active.
+  // priv's home is unrestricted.
   let mut root : Graphnode =
     node ("r", "Root", None, &["ma"]);
   root . contains . push ( RelPartner::at_relRepo (
@@ -330,7 +330,7 @@ fn private_skgrepo_relationship_is_omitted_from_restricted_export () {
     node ("pub",  "Public child",  None, &[]),
     node ("priv", "Private child", None, &[]),
   ];
-  let main_only : ActiveSkgRepoSet = ActiveSkgRepoSet {
+  let main_only : SkgrepoRestriction = SkgrepoRestriction {
     name    : SkgRepoSetName::from ("main"),
     skgrepos : [ SkgRepoName::from ("main") ]
       . into_iter () . collect () };
@@ -344,7 +344,7 @@ fn private_skgrepo_relationship_is_omitted_from_restricted_export () {
             content );
   { // Under "all", both children render.
     let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
-    export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
+    export_to_org (&restriction_all (), &nodes, dir . path ()) . unwrap ();
     let content : String =
       fs::read_to_string ( dir . path () . join ("r.org") ) . unwrap ();
     assert! ( content . contains ("Private child"), "{}", content ); }}
@@ -365,7 +365,7 @@ real [[id:gone][broken]]";
   ];
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
   let report : ExportReport =
-    export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
+    export_to_org (&restriction_all (), &nodes, dir . path ()) . unwrap ();
   let a : String =
     fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
   assert! (a . contains (&body [.. body . len () - "real [[id:gone][broken]]" . len ()]),
@@ -392,7 +392,7 @@ fn headline_like_body_lines_are_defused () {
   ];
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
   let report : ExportReport =
-    export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
+    export_to_org (&restriction_all (), &nodes, dir . path ()) . unwrap ();
   let a : String =
     fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
   assert_eq! (&a [export_header_length (&a) ..], "\

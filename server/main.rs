@@ -12,7 +12,7 @@ use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::export_org::{
   export_candidate_pids, export_to_org, ExportReport};
-use skg::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
+use skg::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
 use skg::dbs::init::{InitContextHandoff, initialize_dbs};
 use skg::types::env::SkgEnv;
 use skg::import_org_roam::{ImportStats, import_org_roam_directory};
@@ -338,12 +338,12 @@ fn run_export_org (
   let output_dir : String =
     if positional . len () > 2 { positional[2] . clone () }
     else { "org-exports" . to_string() };
-  let active : ActiveSkgRepoSet =
-    ActiveSkgRepoSet::named (&config, set_name) ?;
+  let restriction : SkgrepoRestriction =
+    SkgrepoRestriction::named (&config, set_name) ?;
   let nodes : Vec<Graphnode> =
     read_all_skg_files_from_skgrepos (&config) ?;
   let candidates : HashSet<ID> =
-    export_candidate_pids (&active, &nodes) . into_iter () . collect ();
+    export_candidate_pids (&restriction, &nodes) . into_iter () . collect ();
   let mut overPrivateText_pids : Vec<ID> = nodes . iter ()
     . filter ( |node| node . overPrivateText_telescope
       && candidates . contains (&node . pid) )
@@ -354,17 +354,17 @@ fn run_export_org (
     let pids : String = overPrivateText_pids . iter ()
       . map ( |pid| pid . as_str () )
       . collect::<Vec<&str>> () . join (", ");
-    if ! active . is_all () && ! include_overPrivateText_telescopes {
+    if ! restriction . is_all () && ! include_overPrivateText_telescopes {
       return Err (format! (
         "export-org would release title or body selected below home for PIDs {} under repo-set {}; rerun with --include-overPrivateText-telescopes to approve",
-        pids, active . name ) . into ()); }
+        pids, restriction . name ) . into ()); }
     eprintln! (
       "Warning: export-org includes title or body selected below home for PIDs {}.",
       pids ); }
   let output_base : PathBuf =
     std::env::current_dir () ? . join (output_dir);
   let report : ExportReport =
-    export_to_org (&active, &nodes, &output_base) ?;
+    export_to_org (&restriction, &nodes, &output_base) ?;
   print! ("{}", report . summary ());
   Ok (( )) }
 

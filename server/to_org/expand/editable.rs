@@ -1,9 +1,9 @@
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::role_tree::build_and_integrate_role_tree_then_drop_request;
 use crate::to_org::expand::folder_request::build_and_integrate_folder_then_drop_request;
 use crate::to_org::expand::flags::build_and_integrate_flags_then_drop_request;
-use crate::to_org::util::{ EditableMap, Finalizable, get_skgid_from_viewnode_at, makeWriteProtectedAndClobber, activeVognode_in_tree_is_writeProtected };
+use crate::to_org::util::{ EditableMap, Finalizable, get_skgid_from_viewnode_at, makeWriteProtectedAndClobber, unrestrictedVognode_in_tree_is_writeProtected };
 use crate::types::misc::{ID, SkgConfig, SkgRepoName};
 use crate::types::git::SkgRepoDiff;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, ViewRequest, FolderRelation, Editability, AffectsParent };
@@ -11,7 +11,7 @@ use crate::types::viewnode::Vognode;
 use crate::types::nodes::complete::Graphnode;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::tree::viewnode_graphnode::{write_at_activeVognode_in_tree, pid_and_skgrepo_from_viewnode_at};
+use crate::types::tree::viewnode_graphnode::{write_at_unrestrictedVognode_in_tree, pid_and_skgrepo_from_viewnode_at};
 
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::HashMap;
@@ -23,7 +23,7 @@ pub fn execute_view_requests (
   graph              : &crate::dbs::in_rust_graph::InRustGraph,
   config             : &SkgConfig,
   errors             : &mut Vec < String >,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   skgrepo_diffs      : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   for (treeid, request) in requests {
@@ -35,7 +35,7 @@ pub fn execute_view_requests (
       ViewRequest::Folder (rel) => {
         build_and_integrate_folder_then_drop_request (
           viewforest, treeid, graph, rel, config, errors,
-          active_skgrepo_set, skgrepo_diffs ) ?; },
+          skgrepo_restriction, skgrepo_diffs ) ?; },
       ViewRequest::RoleTree (role) => {
         // Relation-generic: every partner role routes through the one
         // role-tree engine (container, mentioner, and the seven new
@@ -43,7 +43,7 @@ pub fn execute_view_requests (
         // separately (finish_viewforest) and removed before this pass.
         build_and_integrate_role_tree_then_drop_request (
           viewforest, treeid, graph, role, config, errors,
-          active_skgrepo_set ) ?; },
+          skgrepo_restriction ) ?; },
       ViewRequest::Flags => {
         build_and_integrate_flags_then_drop_request (
           viewforest, treeid, graph, config, errors ) ?; },
@@ -102,7 +102,7 @@ pub fn apply_editable_draw_rule (
       // cascade EVR landing on a freshly-created editable child whose id
       // is already Final elsewhere; for a user EVR on an already-write-protected
       // node it is a no-op. The expand step then clobbers/refreshes it.)
-      write_at_activeVognode_in_tree (
+      write_at_unrestrictedVognode_in_tree (
         viewforest, treeid,
         |t| { t . view_requests . remove (& ViewRequest::Editable);
               t . editability = Editability::WriteProtected; } )
@@ -113,7 +113,7 @@ pub fn apply_editable_draw_rule (
                                      prior . treeid (),
                                      visited, graph, config ) ?; }}
   { // Remove request, mark editable, replace title/body, add to visited.
-    write_at_activeVognode_in_tree (
+    write_at_unrestrictedVognode_in_tree (
       viewforest, treeid, |t| {
         t . view_requests . remove (& ViewRequest::Editable);
         t . editability = Editability::Editable {
@@ -129,7 +129,7 @@ pub fn apply_editable_draw_rule (
 /// Does two things:
 /// - Mark a node, and its entire content subtree, as write-protected.
 /// - Remove them from `visited`.
-/// Only recurses into non-ignored ActiveVognode children;
+/// Only recurses into non-ignored UnrestrictedVognode children;
 ///   ignored and non-vognode children persist unchanged.
 /// TODO : This will need complication to properly handle
 ///   sharing-related nodes among the input node's descendents.
@@ -150,12 +150,12 @@ fn writeProtect_content_subtree (
       let content_child_treeids : Vec < NodeId > =
         node_ref . children ()
         . filter ( |c| matches! ( &c . value() . kind,
-                                  ViewnodeKind::Vognode (Vognode::Active (t))
+                                  ViewnodeKind::Vognode (Vognode::Unrestricted (t))
                                   if t . affectsParent == AffectsParent::True ))
         . map ( |c| c . id () )
         . collect ();
       (node_pid, content_child_treeids) };
-  if ! activeVognode_in_tree_is_writeProtected ( tree, treeid ) ? {
+  if ! unrestrictedVognode_in_tree_is_writeProtected ( tree, treeid ) ? {
     visited . remove (&node_pid);
     makeWriteProtectedAndClobber ( tree, treeid, graph, config ) ?; }
   for child_treeid in content_child_treeids { // recurse
@@ -181,7 +181,7 @@ fn from_disk_replace_title_body_and_graphnode (
   if title . is_empty () {
     return Err ( format! ( "Graphnode {} has empty title", pid ) . into () ); }
   let body : Option < String > = graphnode . body . clone ();
-  write_at_activeVognode_in_tree
+  write_at_unrestrictedVognode_in_tree
     ( tree, treeid,
       |t| { t . title = title;
             if let Editability::Editable { body: ref mut b, .. }

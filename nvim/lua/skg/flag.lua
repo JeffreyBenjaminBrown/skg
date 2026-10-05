@@ -21,8 +21,8 @@ end
 
 local function eligible_root (line)
   local meta = metadata.metadata_sexp_at_line_or_nil(line)
-  if not metadata.activeNode_sexp_p(meta) then
-    error('Search matching can be set only on an active node') end
+  if not metadata.unrestrictedNode_sexp_p(meta) then
+    error('Search matching can be set only on an unrestricted node') end
   if metadata.node_write_protected_p(meta) then
     error('Cannot set search matching on a write-protected node') end
   if edit_request_p(meta) then error('This node already has an editRequest') end
@@ -43,7 +43,7 @@ local function recursive_targets (root_line)
   local line = metadata.next_headline_line(root_line)
   while line and (metadata.outline_level(line) or 0) > root_level do
     local meta = metadata.metadata_sexp_at_line_or_nil(line)
-    if metadata.activeNode_sexp_p(meta)
+    if metadata.unrestrictedNode_sexp_p(meta)
        and metadata.node_affectsParent_content_of_p(meta) then
       table.insert(result, line)
       line = metadata.next_headline_line(line)

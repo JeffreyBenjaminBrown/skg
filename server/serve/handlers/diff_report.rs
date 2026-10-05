@@ -8,7 +8,7 @@ use crate::serve::util::{
   send_response_with_length_prefix,
   tag_sexp_response,
   value_from_request_sexp};
-use crate::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
+use crate::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
 use crate::types::misc::SkgConfig;
 
 use std::net::TcpStream;
@@ -19,36 +19,36 @@ pub fn handle_diff_report_request (
   request : &str,
   config  : &SkgConfig,
 ) {
-  let active : ActiveSkgRepoSet =
-    ActiveSkgRepoSet::named (
+  let restriction : SkgrepoRestriction =
+    SkgrepoRestriction::named (
       config,
       SkgRepoSetName::from ("all"))
     . expect ("reserved repo-set all should always resolve");
   handle_diff_report_request_with_repo_set (
-    stream, request, config, &active ) }
+    stream, request, config, &restriction ) }
 
 pub fn handle_diff_report_request_with_repo_set (
   stream  : &mut TcpStream,
   request : &str,
   config  : &SkgConfig,
-  active  : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
 ) {
   let result : Result<(String, Vec<String>), String> =
-    if active . is_all () {
+    if restriction . is_all () {
       parse_selection (request)
       . and_then ( |selection|
         diff_report_as_org_with_overPrivateText_pids (config, selection) )
       . map ( |(report, overPrivateText_pids)| {
         let warnings = match decide_for_overPrivateText_pids (
-          "diff-report", active, overPrivateText_pids, &HashSet::new () ) {
+          "diff-report", restriction, overPrivateText_pids, &HashSet::new () ) {
           TextReleaseDecision::AllowWithWarning { warning } =>
             vec! [warning],
           _ => Vec::new (), };
         (report, warnings) } )
     } else {
       Err (format! (
-        "Diff report requires active repo-set all; current active repo-set is {}",
-        active . name )) };
+        "Diff report requires no skgrepo restriction (the skgrepo-set all); current skgrepo restriction is {}",
+        restriction . name )) };
   let (content, errors, warnings)
     : (String, Vec<String>, Vec<String>) =
     match result {

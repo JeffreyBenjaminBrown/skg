@@ -3,7 +3,7 @@ use crate::types::git::RelationshipAxes;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  Viewnode, ViewnodeKind, Vognode, Phantom, Property, PropertyFolder, ActiveVognode, PhantomDiff,
+  Viewnode, ViewnodeKind, Vognode, Phantom, Property, PropertyFolder, UnrestrictedVognode, PhantomDiff,
   PhantomDeleted, PhantomUnknown, NodeEditRequest, GraphnodeStats,
   AffectsParent,
 };
@@ -165,10 +165,10 @@ pub fn viewnode_to_string (
       Ok ( dead_viewnode_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded )),
-    ViewnodeKind::Vognode (Vognode::Active (activeVognode)) =>
-      Ok ( activeVognode_metadata_to_string (
+    ViewnodeKind::Vognode (Vognode::Unrestricted (unrestrictedVognode)) =>
+      Ok ( unrestrictedVognode_metadata_to_string (
         viewnode . focused, viewnode . folded,
-        viewnode . body_folded, activeVognode, config )),
+        viewnode . body_folded, unrestrictedVognode, config )),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (phantom))) =>
       Ok ( phantomDiff_metadata_to_string (
         viewnode . focused, viewnode . folded,
@@ -181,8 +181,8 @@ pub fn viewnode_to_string (
       Ok ( phantomUnknown_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, unknown_node )),
-    ViewnodeKind::Vognode (Vognode::Inactive (_)) =>
-      Ok ( inactive_node_metadata_to_string (
+    ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
+      Ok ( restricted_node_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded )) } }
 
@@ -256,41 +256,41 @@ fn append_relationship_axes_stage_forms (
   if let Some (atom) = relationship_axes . unstaged_atom ()
     { parts . push ( format! ( "(unstaged {})", atom ) ); } }
 
-/// Render metadata for an ActiveVognode:
+/// Render metadata for an UnrestrictedVognode:
 ///   (skg [focused] [folded] (node ...))
-fn activeVognode_metadata_to_string (
+fn unrestrictedVognode_metadata_to_string (
   focused     : bool,
   folded      : bool,
   body_folded : bool,
-  activeVognode   : & ActiveVognode,
+  unrestrictedVognode : & UnrestrictedVognode,
   config      : & SkgConfig,
 ) -> String {
   fn node_sexp (
-    activeVognode : & ActiveVognode,
+    unrestrictedVognode : & UnrestrictedVognode,
     config    : & SkgConfig,
   ) -> String {
-    fn rels_herald ( activeVognode : & ActiveVognode ) -> Option < String > {
+    fn rels_herald ( unrestrictedVognode : & UnrestrictedVognode ) -> Option < String > {
       // The semantic (rels ...) sexp, assembled in the viewnodestats
       // pass (server/herald_tokens.rs); emitted verbatim.
-      activeVognode . viewStats . rel_heralds . clone () }
+      unrestrictedVognode . viewStats . rel_heralds . clone () }
     fn view_stats (
-      activeVognode : & ActiveVognode,
+      unrestrictedVognode : & UnrestrictedVognode,
       config    : & SkgConfig,
     ) -> Option < String > {
       let mut parts : Vec < String > = Vec::new ();
-      if activeVognode . viewStats . cycle {
+      if unrestrictedVognode . viewStats . cycle {
         parts . push ( "cycle" . to_string () ); }
       if let Some (ref original) =
-        activeVognode . viewStats . overridesHere {
+        unrestrictedVognode . viewStats . overridesHere {
         parts . push ( format! ("(overridesHere {})",
                                  original . 0 )); }
       if let Some (ref skgrepo) =
-        activeVognode . viewStats . relRepo {
+        unrestrictedVognode . viewStats . relRepo {
         parts . push ( format! (
           "(relRepo {})", metadata_value_atom (skgrepo) )); }
-      if activeVognode . viewStats . homeSkgRepoAtBoundary {
+      if unrestrictedVognode . viewStats . homeSkgRepoAtBoundary {
         if let Some (src_config)
-        = config . skgrepos . get ( &activeVognode . home_skgrepo )
+        = config . skgrepos . get ( &unrestrictedVognode . home_skgrepo )
         { parts . push ( format! (
             "(homeRepoHerald {})",
             metadata_value_atom (
@@ -298,13 +298,13 @@ fn activeVognode_metadata_to_string (
       if parts . is_empty () { None }
       else { Some ( format! (
                "(viewStats {})", parts . join (" ") )) }}
-    fn edit_request ( activeVognode : & ActiveVognode
+    fn edit_request ( unrestrictedVognode : & UnrestrictedVognode
                     ) -> Option < String > {
-      if let Some (skgrepo) = &activeVognode . relRepo_request {
+      if let Some (skgrepo) = &unrestrictedVognode . relRepo_request {
         return Some ( format! (
           "(editRequest (relRepo {}))",
           metadata_value_atom (skgrepo) ) ); }
-      activeVognode . edit_request () . map ( | edit_req | {
+      unrestrictedVognode . edit_request () . map ( | edit_req | {
         let edit_str : String = match edit_req {
           NodeEditRequest::NodeMerge (skgid) => format! ( "(merge {})", skgid . 0 ),
           NodeEditRequest::Delete => "delete" . to_string (),
@@ -312,80 +312,80 @@ fn activeVognode_metadata_to_string (
             format! ( "(flag {} {})",
               flag . wire_name (), value ) };
         format! ( "(editRequest {})", edit_str ) } ) }
-    fn view_requests ( activeVognode : & ActiveVognode
+    fn view_requests ( unrestrictedVognode : & UnrestrictedVognode
                      ) -> Option < String > {
-      if activeVognode . view_requests . is_empty () { return None; }
+      if unrestrictedVognode . view_requests . is_empty () { return None; }
       let mut request_strings : Vec < String > =
-        activeVognode . view_requests . iter ()
+        unrestrictedVognode . view_requests . iter ()
           . map ( | req | req . to_string () )
           . collect ();
       request_strings . sort ();
       Some ( format! ( "(viewRequests {})",
                        request_strings . join (" ") )) }
-    fn staged_axes ( activeVognode : & ActiveVognode ) -> Option < String > {
+    fn staged_axes ( unrestrictedVognode : & UnrestrictedVognode ) -> Option < String > {
       let mut atoms : Vec<&'static str> = Vec::new ();
-      if let Some (a) = activeVognode . node_axes  . staged_atom ()
+      if let Some (a) = unrestrictedVognode . node_axes  . staged_atom ()
         { atoms . push (a); }
-      if let Some (a) = activeVognode . relationship_axes . staged_atom ()
+      if let Some (a) = unrestrictedVognode . relationship_axes . staged_atom ()
         { atoms . push (a); }
       if atoms . is_empty () { None }
       else { Some ( format! ( "(staged {})", atoms . join (" "))) } }
-    fn unstaged_axes ( activeVognode : & ActiveVognode ) -> Option < String > {
+    fn unstaged_axes ( unrestrictedVognode : & UnrestrictedVognode ) -> Option < String > {
       let mut atoms : Vec<&'static str> = Vec::new ();
-      if let Some (a) = activeVognode . node_axes  . unstaged_atom ()
+      if let Some (a) = unrestrictedVognode . node_axes  . unstaged_atom ()
         { atoms . push (a); }
-      if let Some (a) = activeVognode . relationship_axes . unstaged_atom ()
+      if let Some (a) = unrestrictedVognode . relationship_axes . unstaged_atom ()
         { atoms . push (a); }
       if atoms . is_empty () { None }
       else { Some ( format! ( "(unstaged {})", atoms . join (" "))) } }
-    fn not_in_git_atom ( activeVognode : & ActiveVognode ) -> Option < String > {
-      if activeVognode . not_in_git { Some ("notInGit" . to_string ()) }
+    fn not_in_git_atom ( unrestrictedVognode : & UnrestrictedVognode ) -> Option < String > {
+      if unrestrictedVognode . not_in_git { Some ("notInGit" . to_string ()) }
       else                      { None } }
     let mut parts : Vec < String > =
       vec! [ "node" . to_string () ];
-    parts . push ( format! ( "(id {})", activeVognode . skgid . 0 ));
+    parts . push ( format! ( "(id {})", unrestrictedVognode . skgid . 0 ));
     parts . push ( format! (
-      "(repo {})", metadata_value_atom (&activeVognode . home_skgrepo) ));
+      "(repo {})", metadata_value_atom (&unrestrictedVognode . home_skgrepo) ));
     // AffectsParent::True is left implicit because it is the default
     // membership relation.
-    match activeVognode . affectsParent {
+    match unrestrictedVognode . affectsParent {
       AffectsParent::True => {},
       AffectsParent::NA =>
         parts . push ( "(affectsParent na)" . to_string () ),
       AffectsParent::False =>
         parts . push ( "(affectsParent false)" . to_string () ) }
-    if activeVognode . is_writeProtected () {
+    if unrestrictedVognode . is_writeProtected () {
       // `writeProtected` means "write-protected" -- a view of a node that
       // cannot be edited (see Editability in types/viewnode.rs). The metadata
       // sexp uses only this short form on both emission and parsing.
       parts . push ( "writeProtected" . to_string () );
-      if activeVognode . viewStats . omitted_body {
+      if unrestrictedVognode . viewStats . omitted_body {
         // The rendering is hiding a body (herald "B" on the ☮).
         parts . push ( "omittedBody" . to_string () ); }}
-    if let Some (s) = rels_herald (activeVognode)
+    if let Some (s) = rels_herald (unrestrictedVognode)
     { parts . push (s); }
-    if let Some (s) = view_stats (activeVognode, config)
+    if let Some (s) = view_stats (unrestrictedVognode, config)
     { parts . push (s); }
-    if let Some (s) = edit_request (activeVognode)
+    if let Some (s) = edit_request (unrestrictedVognode)
     { parts . push (s); }
-    if let Some (s) = view_requests (activeVognode)
+    if let Some (s) = view_requests (unrestrictedVognode)
     { parts . push (s); }
-    if let Some (s) = staged_axes (activeVognode)
+    if let Some (s) = staged_axes (unrestrictedVognode)
     { parts . push (s); }
-    if let Some (s) = unstaged_axes (activeVognode)
+    if let Some (s) = unstaged_axes (unrestrictedVognode)
     { parts . push (s); }
-    if let Some (s) = not_in_git_atom (activeVognode)
+    if let Some (s) = not_in_git_atom (unrestrictedVognode)
     { parts . push (s); }
     format! ( "({})", parts . join (" ")) }
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  parts . push ( node_sexp (activeVognode, config));
+  parts . push ( node_sexp (unrestrictedVognode, config));
   parts . join (" ") }
 
 /// Render metadata for a PhantomDiff (TODO/DONE/local-view-update/plan_v2.org §11). The root atom is
-/// `diffPhantom`, distinct from the `node` atom an ActiveVognode emits, so the
+/// `diffPhantom`, distinct from the `node` atom an UnrestrictedVognode emits, so the
 /// client can tell a moved/removed phantom apart from a live node without
 /// inferring it from the diff axes. A phantom is always write-protected (so always
 /// emits `writeProtected` and never a body, editRequest, or viewRequests) and its
@@ -426,7 +426,7 @@ fn phantomDiff_metadata_to_string (
       { parts . push ( format! ( "(unstaged {})", atoms . join (" "))); } }
     if phantom . not_in_git
     { parts . push ( "notInGit" . to_string () ); }
-    let _ = config; // reserved for parity with activeVognode_metadata_to_string
+    let _ = config; // reserved for parity with unrestrictedVognode_metadata_to_string
     format! ( "({})", parts . join (" ")) }
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
@@ -477,12 +477,12 @@ fn phantomUnknown_metadata_to_string (
   parts . push ( format! ( "(unknown {})", unknown_parts . join (" ") ) );
   parts . join (" ") }
 
-/// Render an inactive vognode as the bare atom 'inactiveNode',
+/// Render a restricted vognode as the bare atom 'restrictedNode',
 /// like the other dataless non-vognode markers (aliasFolder, subscribeeFolder,
 /// ...). It carries no id/repo/etc. -- those describe content the
 /// user hid by restricting the skgrepo-set, so emitting them would leak
-/// (see InactiveVognode).
-fn inactive_node_metadata_to_string (
+/// (see RestrictedVognode).
+fn restricted_node_metadata_to_string (
   focused       : bool,
   folded        : bool,
   body_folded   : bool,
@@ -491,7 +491,7 @@ fn inactive_node_metadata_to_string (
   if focused     { parts . push ( "focused"    . to_string () ); }
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  parts . push ( "inactiveNode" . to_string () );
+  parts . push ( "restrictedNode" . to_string () );
   parts . join (" ") }
 
 /// Render metadata for a DeadViewnode:

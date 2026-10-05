@@ -83,7 +83,7 @@ fn finish_missing_info_enrichment(
       let id_assigned : bool =
         assign_new_skgid_if_absent (&mut node)?; // Do this *after* PID replacement, so fresh UUIDs do not trigger a pointless graph lookup.
       if skgrepo_inherited || id_assigned {
-        if let MpViewnodeKind::Vognode (MpVognode::Active (t))
+        if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
           = & node . value () . kind
         { if let Some (skgid) = & t . skgid {
             if id_assigned {
@@ -107,24 +107,24 @@ pub fn na_affectsParent_under_visible_parent_becomes_isContainer (
       . map ( |p| p . id() != root_skgid )
       . unwrap_or (false);
     if ! affects_parent_visible { continue; }
-    if let MpViewnodeKind::Vognode (MpVognode::Active (t))
+    if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
       = &node_ref . value() . kind
       { if t . affectsParent == AffectsParent::NA
         { need_changing . push (node_ref . id()); }}}
   for treeid in need_changing { // change them
     let mut node_mut : NodeMut<MpViewnode> =
       viewforest . get_mut (treeid) . unwrap();
-    if let MpViewnodeKind::Vognode (MpVognode::Active (t))
+    if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
       = &mut node_mut . value() . kind
       { t . affectsParent = AffectsParent::True; }}}
 
 /// Make it a Property::Alias if both:
-/// - it is an ActiveVognode
+/// - it is an UnrestrictedVognode
 /// - its parent is an AliasFolder
 fn make_alias_if_appropriate(
   node: &mut NodeMut<MpViewnode>
 ) -> Result<(), String> {
-  if let MpViewnodeKind::Vognode (MpVognode::Active (_))
+  if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))
     = &node . value() . kind
   { // It is a real, normal vognode.
     let affects_parent_aliasFolder : bool =
@@ -135,7 +135,7 @@ fn make_alias_if_appropriate(
       . unwrap_or (false);
     if affects_parent_aliasFolder { // Make it an Alias.
       let org : &mut MpViewnode = node . value();
-      let MpViewnodeKind::Vognode (MpVognode::Active (t))
+      let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         : &MpViewnodeKind
         = &org . kind
       else { unreachable!() };
@@ -147,33 +147,33 @@ fn make_alias_if_appropriate(
   Ok (( )) }
 
 /// Inherit parent's skgrepo if both:
-/// - this is a repoless ActiveVognode
-/// - its parent is an ActiveVognode with a skgrepo
+/// - this is a repoless UnrestrictedVognode
+/// - its parent is an UnrestrictedVognode with a skgrepo
 /// Returns whether it inherited one.
 fn inherit_parent_skgrepo_if_possible(
   node: &mut NodeMut<MpViewnode>
 ) -> Result<bool, String> {
   let needs_skgrepo : bool =
     match &node . value() . kind {
-      MpViewnodeKind::Vognode (MpVognode::Active (t))
+      MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         => t . home_skgrepo . is_none(),
       _ => false, };
   if needs_skgrepo {
     let parent_skgrepo : Option<SkgRepoName> =
       node . parent() . and_then(|mut p| {
         match &p . value() . kind {
-          MpViewnodeKind::Vognode (MpVognode::Active (pt))
+          MpViewnodeKind::Vognode (MpVognode::Unrestricted (pt))
             => pt . home_skgrepo . clone(),
           _ => None, }} );
     if let Some (skgrepo) = parent_skgrepo {
-      if let MpViewnodeKind::Vognode (MpVognode::Active (t))
+      if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         = &mut node . value() . kind
       { t . home_skgrepo = Some (skgrepo);
         return Ok (true); }}}
   Ok (false) }
 
 /// Look up, from the graph, the skgrepo of every repoless,
-/// write-protected ActiveVognode that already carries an id (ids are pids
+/// write-protected UnrestrictedVognode that already carries an id (ids are pids
 /// here). Ids the graph does not know resolve to nothing and are
 /// omitted from the map, so those nodes fall through to
 /// parent-inheritance in the DFS.
@@ -182,42 +182,42 @@ fn skgrepos_for_repoless_ided_nodes_from_graph (
   graph      : &InRustGraph,
 ) -> HashMap<ID, SkgRepoName> {
   let mut skgids : HashSet<ID> = HashSet::new ();
-  collect_repoless_active_skgids (viewforest . root (), &mut skgids);
+  collect_repoless_unrestricted_skgids (viewforest . root (), &mut skgids);
   skgids . into_iter ()
     . filter_map (|skgid| graph . pid_and_skgrepo (&skgid)
       . map (|(_pid, skgrepo)| (skgid, skgrepo)))
     . collect ()
 }
 
-/// Collect the ids of repoless, WRITE_PROTECTED ActiveVognodes that
+/// Collect the ids of repoless, WRITE_PROTECTED UnrestrictedVognodes that
 /// already carry an id. Editable nodes are excluded on purpose (see
 /// 'resolve_repos_for_repoless_ided_nodes').
-fn collect_repoless_active_skgids (
+fn collect_repoless_unrestricted_skgids (
   node_ref : NodeRef<MpViewnode>,
   skgids      : &mut HashSet<ID>,
 ) {
-  if let MpViewnodeKind::Vognode (MpVognode::Active (t))
+  if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
     = &node_ref . value () . kind
     { if t . home_skgrepo . is_none ()
          && matches! ( t . editability, Editability::WriteProtected )
       { if let Some (skgid) = &t . skgid {
           skgids . insert ( skgid . clone () ); }}}
   for child in node_ref . children () {
-    collect_repoless_active_skgids ( child, skgids ); }}
+    collect_repoless_unrestricted_skgids ( child, skgids ); }}
 
-/// If the node is a repoless, WRITE_PROTECTED ActiveVognode whose id the
+/// If the node is a repoless, WRITE_PROTECTED UnrestrictedVognode whose id the
 /// graph resolved, set its skgrepo from 'repo_of_id' (built before the
 /// DFS). This is how a bare folder-member reference acquires the skgrepo of
 /// the existing node it names -- something
 /// 'inherit_parent_repo_if_possible' cannot do, since the viewparent
-/// is a non-vognode rather than an ActiveVognode with a skgrepo. The
+/// is a non-vognode rather than an UnrestrictedVognode with a skgrepo. The
 /// write-protected gate matches the folder above, so an editable node
 /// sharing an id with a write-protected one is never filled.
 fn fill_skgrepo_from_graph_map (
   node             : &mut NodeMut<MpViewnode>,
   skgrepo_of_skgid : &HashMap<ID, SkgRepoName>,
 ) {
-  if let MpViewnodeKind::Vognode (MpVognode::Active (t))
+  if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
     = &mut node . value () . kind
   { if t . home_skgrepo . is_some ()
        || ! matches! ( t . editability, Editability::WriteProtected )
@@ -228,12 +228,12 @@ fn fill_skgrepo_from_graph_map (
     if let Some (skgrepo) = resolved {
       t . home_skgrepo = Some (skgrepo); }}}
 
-/// Assign a new UUID to an ActiveVognode if it doesn't have an ID.
+/// Assign a new UUID to an UnrestrictedVognode if it doesn't have an ID.
 /// Returns whether it assigned one.
 fn assign_new_skgid_if_absent(
   node: &mut NodeMut<MpViewnode>
 ) -> Result<bool, String> {
-  if let MpViewnodeKind::Vognode (MpVognode::Active (t))
+  if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
     = &mut node . value() . kind {
     if t . skgid . is_none() {
       let new_skgid : String = Uuid::new_v4() . to_string();

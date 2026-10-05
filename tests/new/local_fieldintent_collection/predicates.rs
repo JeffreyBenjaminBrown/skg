@@ -4,27 +4,27 @@
 /// (TODO/DONE/local-fieldintent-collection/3_plan.org, "testing").
 
 use skg::from_text::local_fieldintent_collection::predicates::{
-  active_child_counts_as_content,
-  active_child_counts_as_visible_content,
+  unrestricted_child_counts_as_content,
+  unrestricted_child_counts_as_visible_content,
   member_counts_for_partnerFolder };
 use skg::types::git::Sign;
 use skg::types::misc::{ID, SkgRepoName};
 use skg::types::viewnode::{
-  default_activeVognode, NodeEditRequest, Editability, AffectsParent,
-  ActiveVognode };
+  default_unrestrictedVognode, NodeEditRequest, Editability, AffectsParent,
+  UnrestrictedVognode };
 
-fn base_activeVognode (
-) -> ActiveVognode {
-  default_activeVognode (
+fn base_unrestrictedVognode (
+) -> UnrestrictedVognode {
+  default_unrestrictedVognode (
     ID::from ("n"),
     SkgRepoName::from ("main"),
     "n" . to_string() ) }
 
 fn with_edit_request (
   edit_request : NodeEditRequest,
-) -> ActiveVognode {
-  let mut t : ActiveVognode =
-    base_activeVognode ();
+) -> UnrestrictedVognode {
+  let mut t : UnrestrictedVognode =
+    base_unrestrictedVognode ();
   t . editability = Editability::Editable {
     body         : None,
     edit_request : Some (edit_request) };
@@ -33,25 +33,25 @@ fn with_edit_request (
 #[test]
 fn relation_folder_membership_conditions () {
   assert!( member_counts_for_partnerFolder (
-    &base_activeVognode () ));
+    &base_unrestrictedVognode () ));
   { // affectsParent != True excludes.
-    let mut t : ActiveVognode = base_activeVognode ();
+    let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
     t . affectsParent = AffectsParent::False;
     assert!( ! member_counts_for_partnerFolder (&t) ); }
   { // A negative staged relationship axis (would-be diff phantom) excludes.
-    let mut t : ActiveVognode = base_activeVognode ();
+    let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
     t . relationship_axes . staged = Some (Sign::Minus);
     assert!( ! member_counts_for_partnerFolder (&t) ); }
   { // A negative unstaged relationship axis excludes.
-    let mut t : ActiveVognode = base_activeVognode ();
+    let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
     t . relationship_axes . unstaged = Some (Sign::Minus);
     assert!( ! member_counts_for_partnerFolder (&t) ); }
   { // A negative unstaged node axis (file deleted) excludes.
-    let mut t : ActiveVognode = base_activeVognode ();
+    let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
     t . node_axes . unstaged = Some (Sign::Minus);
     assert!( ! member_counts_for_partnerFolder (&t) ); }
   { // A positive axis does not exclude.
-    let mut t : ActiveVognode = base_activeVognode ();
+    let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
     t . relationship_axes . unstaged = Some (Sign::Plus);
     assert!( member_counts_for_partnerFolder (&t) ); }
   // A Delete edit request excludes; a NodeMerge edit request does not.
@@ -64,43 +64,43 @@ fn relation_folder_membership_conditions () {
 fn content_membership_coincides_with_relation_folder_membership () {
   // The two predicates encode one condition today; if they ever
   // diverge, this test should be split per condition.
-  let cases : Vec<ActiveVognode> = {
-    let mut cases : Vec<ActiveVognode> =
-      vec![ base_activeVognode (),
+  let cases : Vec<UnrestrictedVognode> = {
+    let mut cases : Vec<UnrestrictedVognode> =
+      vec![ base_unrestrictedVognode (),
             with_edit_request (NodeEditRequest::Delete),
             with_edit_request (NodeEditRequest::NodeMerge (ID::from ("other"))) ];
-    { let mut t : ActiveVognode = base_activeVognode ();
+    { let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
       t . affectsParent = AffectsParent::False;
       cases . push (t); }
-    { let mut t : ActiveVognode = base_activeVognode ();
+    { let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
       t . relationship_axes . unstaged = Some (Sign::Minus);
       cases . push (t); }
-    { let mut t : ActiveVognode = base_activeVognode ();
+    { let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
       t . node_axes . unstaged = Some (Sign::Minus);
       cases . push (t); }
     cases };
   for t in &cases {
-    assert_eq!( active_child_counts_as_content (t),
+    assert_eq!( unrestricted_child_counts_as_content (t),
                 member_counts_for_partnerFolder (t) ); }}
 
 #[test]
 fn visible_content_membership_conditions () {
-  assert!( active_child_counts_as_visible_content (
-    &base_activeVognode () ));
+  assert!( unrestricted_child_counts_as_visible_content (
+    &base_unrestrictedVognode () ));
   { // affectsParent != True excludes.
-    let mut t : ActiveVognode = base_activeVognode ();
+    let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
     t . affectsParent = AffectsParent::False;
-    assert!( ! active_child_counts_as_visible_content (&t) ); }
+    assert!( ! unrestricted_child_counts_as_visible_content (&t) ); }
   // A Delete edit request excludes; a NodeMerge edit request does not.
-  assert!( ! active_child_counts_as_visible_content (
+  assert!( ! unrestricted_child_counts_as_visible_content (
     &with_edit_request (NodeEditRequest::Delete) ));
-  assert!( active_child_counts_as_visible_content (
+  assert!( unrestricted_child_counts_as_visible_content (
     &with_edit_request (NodeEditRequest::NodeMerge (ID::from ("other"))) ));
   { // This pins an asymmetry: negative diff axes do NOT exclude
     // here, unlike in the contains and PartnerFolder
     // predicates.
-    let mut t : ActiveVognode = base_activeVognode ();
+    let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
     t . relationship_axes . staged   = Some (Sign::Minus);
     t . relationship_axes . unstaged = Some (Sign::Minus);
     t . node_axes  . unstaged = Some (Sign::Minus);
-    assert!( active_child_counts_as_visible_content (&t) ); }}
+    assert!( unrestricted_child_counts_as_visible_content (&t) ); }}

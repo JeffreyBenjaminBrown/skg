@@ -1,9 +1,9 @@
-// cargo nextest run --test grouped_overrides -E 'test(inactive_suppression::)'
+// cargo nextest run --test grouped_overrides -E 'test(restricted_suppression::)'
 //
-// TODO/DONE/full-schema/DONE/9-2_source-set-safety.org, inactive-node rewrite
+// TODO/DONE/full-schema/DONE/9-2_source-set-safety.org, restricted-node rewrite
 // suppression: under a restricted skgrepo-set, any nodeInstruction that
-// would modify an inactive node is dropped, not executed and not
-// fatal, with the warning "Inactive nodes present in saved buffer
+// would modify a restricted node is dropped, not executed and not
+// fatal, with the warning "Restricted nodes present in saved buffer
 // remain unchanged in graph." -- and only when something was
 // actually suppressed: an untouched stale node's identical-to-disk
 // nodeInstruction is discarded by the noop filter first, so it saves
@@ -17,7 +17,7 @@
 use indoc::indoc;
 
 use skg::from_text::buffer_to_validated_saveplan;
-use skg::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName, run_with_skgrepo_set_test_db};
+use skg::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName, run_with_skgrepo_set_test_db};
 use skg::types::misc::{ID, members_of};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode};
@@ -43,19 +43,19 @@ fn saved_node_by_skgid<'a> (
     . unwrap_or_else ( || panic! ("no SaveNode for {}", skgid) ) }
 
 #[test]
-fn writes_to_inactive_nodes_are_suppressed_with_warning (
+fn writes_to_restricted_nodes_are_suppressed_with_warning (
 ) -> Result<(), Box<dyn Error>> {
   run_with_skgrepo_set_test_db (
-    "skg-test-inactive-suppression",
+    "skg-test-restricted-suppression",
     "tests/repo_sets/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-inactive-suppression",
+    "/tmp/tantivy-test-restricted-suppression",
     |config, _tantivy| Box::pin ( async move {
       (
         skg::test_utils::graph_handle_from_config (config) ? );
-      let active : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (
+      let restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (
           config, SkgRepoSetName ("public" . to_string ())) ?;
-      { // An EDITED now-inactive editable node: write suppressed,
+      { // An EDITED now-restricted editable node: write suppressed,
         // warning attached, containment preserved.
         let buffer = indoc! {"
           * (skg (node (id root) (repo public))) root
@@ -64,19 +64,19 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
         "};
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
-            buffer, config, Some (&active) )  ?;
+            buffer, config, Some (&restriction) )  ?;
         assert! (
           ! save_skgids (&plan . node_instructions)
             . contains (&ID::from ("private-a")),
-          "the edit to the inactive node must be suppressed" );
+          "the edit to the restricted node must be suppressed" );
         assert! (
           warnings . iter () . any ( |w| w . contains (
-            "Inactive nodes present in saved buffer remain unchanged in graph")),
+            "Restricted nodes present in saved buffer remain unchanged in graph")),
           "suppression must warn: {:?}", warnings );
         assert_eq! (
           members_of (&saved_node_by_skgid (&plan . node_instructions, "root") . contains),
           vec![ ID::from ("active-b"), ID::from ("private-a") ],
-          "the active parent keeps containing the inactive child" ); }
+          "the unrestricted parent keeps containing the restricted child" ); }
       { // The same stale node UNTOUCHED: the noop filter drops its
         // nodeInstruction before suppression looks, so no warning.
         let buffer = indoc! {"
@@ -87,7 +87,7 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
         "};
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
-            buffer, config, Some (&active) )  ?;
+            buffer, config, Some (&restriction) )  ?;
         assert! (
           ! save_skgids (&plan . node_instructions)
             . contains (&ID::from ("private-a")),
@@ -97,7 +97,7 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
             "remain unchanged in graph")),
           "an untouched stale buffer saves without the suppression \
            warning: {:?}", warnings ); }
-      { // Moving a node into an inactive skgrepo: move suppressed,
+      { // Moving a node into a restricted skgrepo: move suppressed,
         // warning attached, node unmoved.
         let buffer = indoc! {"
           * (skg (node (id root) (repo public))) root
@@ -105,14 +105,14 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
         "};
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
-            buffer, config, Some (&active) )  ?;
+            buffer, config, Some (&restriction) )  ?;
         assert! (
           plan . skgrepo_moves . is_empty (),
-          "a move into an inactive repo must be suppressed" );
+          "a move into a restricted repo must be suppressed" );
         assert! (
           ! save_skgids (&plan . node_instructions)
             . contains (&ID::from ("active-b")),
-          "the write claiming the inactive repo must be suppressed" );
+          "the write claiming the restricted repo must be suppressed" );
         assert! (
           warnings . iter () . any ( |w| w . contains (
             "remain unchanged in graph")),

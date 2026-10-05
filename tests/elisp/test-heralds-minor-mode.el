@@ -136,17 +136,17 @@ at its floor (low), and the birth letter \"C\" (high)."
                              ( overlays-at herald-start ))) )
         ( should-not display-overlay )) )) )
 
-(ert-deftest test-heralds-inactive-node-display ()
-  "An anonymous inactive vognode displays as a message herald.
-The server emits the bare atom `inactiveNode' (like the other
+(ert-deftest test-heralds-restricted-node-display ()
+  "An anonymous restricted vognode displays as a message herald.
+The server emits the bare atom `restrictedNode' (like the other
 dataless non-vognode markers) -- it carries no id/repo, because those
 would leak content the user hid by restricting the repo-set."
   (with-temp-buffer
-    (insert "(skg inactiveNode)")
+    (insert "(skg restrictedNode)")
     (let ((result (heralds-from-metadata
-                   "(skg inactiveNode)")))
+                   "(skg restrictedNode)")))
       (should (equal (substring-no-properties result)
-                     "node from inactive repo"))
+                     "node from restricted skgrepo"))
       (should (eq (get-text-property 0 'face result)
                   'heralds-message-face)))
     (heralds-minor-mode 1)
@@ -156,7 +156,7 @@ would leak content the user hid by restricting the repo-set."
            (display-text (overlay-get display-overlay 'display)))
       (should display-overlay)
       (should (equal (substring-no-properties display-text)
-                     "node from inactive repo"))
+                     "node from restricted skgrepo"))
       (should (eq (get-text-property 0 'face display-text)
                   'heralds-message-face)))))
 

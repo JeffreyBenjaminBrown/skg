@@ -17,7 +17,7 @@ use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::Viewnode;
 use crate::types::views_state::pids_from_viewforest;
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::SkgEnv;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::init::empty_in_ram_tantivy_index;
@@ -65,7 +65,7 @@ fn multi_root_view_inner (
   tantivy_index      : Option<&TantivyIndex>,
   root_skgids        : &[ID],
   diff_mode_enabled  : bool,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   let tantivy_owned : TantivyIndex = match tantivy_index {
@@ -83,7 +83,7 @@ fn multi_root_view_inner (
     Arc::new (InRustGraph::from_graphnodes (&nodes)),
     tantivy_owned);
   multi_root_view_via_env (
-    &env, root_skgids, diff_mode_enabled, active_skgrepo_set,
+    &env, root_skgids, diff_mode_enabled, skgrepo_restriction,
     // The test shims discard render warnings; the production
     // caller (the single-root handler) surfaces them.
     &mut Vec::new () ) }
@@ -98,13 +98,13 @@ pub fn multi_root_view_via_env (
   env                : &SkgEnv,
   root_skgids        : &[ID],
   diff_mode_enabled  : bool,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   warnings_out       : &mut Vec<String>,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   let runtime = env . runtime_snapshot ();
   multi_root_view_via_runtime (
-    &runtime, root_skgids, diff_mode_enabled, active_skgrepo_set, warnings_out)
+    &runtime, root_skgids, diff_mode_enabled, skgrepo_restriction, warnings_out)
 
 }
 
@@ -112,16 +112,16 @@ pub(crate) fn multi_root_view_via_runtime (
   runtime            : &crate::types::env::RuntimeGeneration,
   root_skgids        : &[ID],
   diff_mode_enabled  : bool,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   warnings_out       : &mut Vec<String>,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>), Box<dyn Error> > {
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the diff (when diff_mode_enabled) is computed inline by
-  // view completion, per Active node at its BFS visit.
+  // view completion, per Unrestricted node at its BFS visit.
   let mut viewforest : ViewForest =
     { let (viewforest, render_warnings)
         : (ViewForest, Vec<String>) =
         render_initial_view (
-          runtime, root_skgids, active_skgrepo_set,
+          runtime, root_skgids, skgrepo_restriction,
           diff_mode_enabled ) ?;
       warnings_out . extend (render_warnings);
       viewforest };
@@ -132,8 +132,8 @@ pub(crate) fn multi_root_view_via_runtime (
   let buffer_content : String =
     finish_viewforest (
       &mut viewforest, &runtime . graph, &runtime . config,
-      active_skgrepo_set ) ?;
-  // TODO/DONE/local-view-update/plan_v2.org §20.5: the pids the caller registers for this view -- the {Active, Inactive}
+      skgrepo_restriction ) ?;
+  // TODO/DONE/local-view-update/plan_v2.org §20.5: the pids the caller registers for this view -- the {Unrestricted, Restricted}
   // set, via the one shared skgrepo of which-kinds-count
   // (views_state::pids_from_viewforest), the same helper update_view uses post-save.
   let pids : Vec<ID> =
@@ -146,11 +146,11 @@ pub fn multi_root_view_with_skgrepo_set (
   tantivy_index      : Option<&TantivyIndex>,
   root_skgids        : &[ID],
   diff_mode_enabled  : bool,
-  active_skgrepo_set : &ActiveSkgRepoSet,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   // multi_root_view_inner applies the skgrepo set during rendering (inside
   // multi_root_view_via_env), so this wrapper just forwards it.
   multi_root_view_inner (
     config, tantivy_index, root_skgids,
-    diff_mode_enabled, Some (active_skgrepo_set) ) }
+    diff_mode_enabled, Some (skgrepo_restriction) ) }

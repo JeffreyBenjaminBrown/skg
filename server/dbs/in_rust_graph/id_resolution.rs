@@ -28,7 +28,7 @@ pub fn collect_skgids_in_tree (
   ids_to_lookup : & mut Vec < ID >
 ) {
   if let MpViewnodeKind::Vognode (
-       MpVognode::Active (t))
+       MpVognode::Unrestricted (t))
     = &node_ref . value () . kind
     { if let Some (skgid) = &t . skgid
       { ids_to_lookup . push ( skgid . clone () ); }}
@@ -42,7 +42,7 @@ pub fn assign_pids_throughout_tree_from_map (
   pid_map : & HashMap < ID, Option < ID > >
 ) {
   if let MpViewnodeKind::Vognode (
-       MpVognode::Active (t))
+       MpVognode::Unrestricted (t))
     = &mut node_ref . value() . kind
     { let pid_opt : Option < ID > = t . skgid . as_ref ()
         . and_then ( |skgid| pid_map . get (skgid) )

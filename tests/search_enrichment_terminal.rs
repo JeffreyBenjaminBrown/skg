@@ -18,7 +18,7 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::text_search::{
   SearchEnrichmentPayload, abandon_search_enrichment,
   handle_text_search_request};
-use skg::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
+use skg::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
 use skg::test_utils::{graph_handle_from_config, read_lp_message,
                       skg_env_from_parts};
 use skg::test_utils::run_with_shared_test_stores;
@@ -87,8 +87,8 @@ async fn no_match_search_ends_with_contentless_enrichment (
     ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (), };
-  let all : ActiveSkgRepoSet =
-    ActiveSkgRepoSet::named (config, SkgRepoSetName::from ("all"))?;
+  let all : SkgrepoRestriction =
+    SkgrepoRestriction::named (config, SkgRepoSetName::from ("all"))?;
   let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::new (Mutex::new (None));
   let search_cancelled : Arc<AtomicBool> =
@@ -127,8 +127,8 @@ async fn abandoned_enrichment_ends_with_contentless_enrichment (
     ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (), };
-  let all : ActiveSkgRepoSet =
-    ActiveSkgRepoSet::named (config, SkgRepoSetName::from ("all"))?;
+  let all : SkgrepoRestriction =
+    SkgrepoRestriction::named (config, SkgRepoSetName::from ("all"))?;
   let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::new (Mutex::new (None));
   let search_cancelled : Arc<AtomicBool> =

@@ -42,7 +42,7 @@ fn kind_at (tree : &Tree<Viewnode>, skgid : NodeId) -> ViewnodeKind {
 
 fn parentis_at (tree : &Tree<Viewnode>, skgid : NodeId) -> Option<AffectsParent> {
   match &tree . get (skgid) . unwrap () . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Active (t)) => Some (t . affectsParent),
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some (t . affectsParent),
     _ => None } }
 
 fn is_detached (tree : &Tree<Viewnode>, parent : NodeId, skgid : NodeId) -> bool {
@@ -77,7 +77,7 @@ fn relation_folder_under_deadviewnode_is_orphan () {
   let rc : NodeId = child (&mut t, dead, role_folder (PartnerFolder::Subscriber));
   assert! ( folder_is_generalized_orphan (&t, rc) . unwrap () ); }
 
-// Multi-level: the immediate parent (subscribee) is a live Active, but the
+// Multi-level: the immediate parent (subscribee) is a live Unrestricted, but the
 // FAR ancestor (subscriber, depth 3) is dead -- the generalized (not just
 // immediate-parent) check must catch it.
 fn build_subscribee_chain (

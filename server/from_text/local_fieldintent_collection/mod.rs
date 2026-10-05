@@ -25,9 +25,9 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::from_text::supplement_from_disk::{
   build_diskSupplemented_nodeInstructions,
   NodeInstructions_with_Repomoves };
-use crate::from_text::validate::{buffernode_differs_from_disknode, suppress_writes_to_inactive_nodes};
+use crate::from_text::validate::{buffernode_differs_from_disknode, suppress_writes_to_restricted_nodes};
 use crate::from_text::weave::member_is_visible;
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{
   NodeInstruction, PostSkgsaveCommitNoticeCandidate, SaveNode, SkgRepoMove };
@@ -45,7 +45,7 @@ pub struct NonmergeSavePlan {
   pub node_instructions : Vec<NodeInstruction>,
   pub skgrepo_moves : Vec<SkgRepoMove>,
   pub flag_targets : HashSet<ID>,
-  pub warnings     : Vec<String>, // nonfatal, destined for SaveResponse.warnings (e.g. inactive-node rewrite suppression)
+  pub warnings     : Vec<String>, // nonfatal, destined for SaveResponse.warnings (e.g. restricted-node rewrite suppression)
   pub post_skgsave_commit_notice_candidates : Vec<PostSkgsaveCommitNoticeCandidate>,
 }
 
@@ -57,7 +57,7 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
   viewforest             : &ViewForest,
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
-  restricted_skgrepo_set : Option<&ActiveSkgRepoSet>, // None means no restriction; callers normalize 'all' to None.
+  skgrepo_restriction    : Option<&SkgrepoRestriction>, // None means no restriction; callers normalize 'all' to None.
 ) -> Result<(NonmergeSavePlan, Vec<(ID, ID)>), Box<dyn Error>> {
   let _span : tracing::span::EnteredSpan = tracing::info_span!(
     "extract_nonmergeSavePlan_locally" ). entered();
@@ -78,38 +78,38 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     resolve_visibility (
       intents, &visibility, &hidden_outside, graph, config,
-      restricted_skgrepo_set ) ? };
+      skgrepo_restriction ) ? };
   let with_disk : NodeInstructions_with_Repomoves =
     build_diskSupplemented_nodeInstructions (
       resolved . into_ordered_intents(),
-      graph, config, restricted_skgrepo_set ) ?;
+      graph, config, skgrepo_restriction ) ?;
   let sans_noops : Vec<NodeInstruction> =
     filter_wouldbe_noop_nodeInstructions (graph, with_disk . instructions);
   let (node_instructions, skgrepo_moves, suppressed_writes)
     : (Vec<NodeInstruction>, Vec<SkgRepoMove>, bool)
-    = suppress_writes_to_inactive_nodes (
+    = suppress_writes_to_restricted_nodes (
         sans_noops, with_disk . skgrepo_moves,
-        restricted_skgrepo_set );
+        skgrepo_restriction );
   let (nodeMerge_acquisitions, suppressed_merges)
     : (Vec<(ID, ID)>, bool)
-    = match restricted_skgrepo_set {
+    = match skgrepo_restriction {
         None => (nodeMerge_acquisitions, false),
-        Some (active) => {
+        Some (restriction) => {
           // A nodeMerge writes both nodes' files; under a restricted
           // set it is suppressed unless both sides are provably
-          // active (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org).
+          // unrestricted (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org).
           let before : usize = nodeMerge_acquisitions . len ();
           let kept : Vec<(ID, ID)> =
             nodeMerge_acquisitions . into_iter ()
             . filter ( |(acquirer, acquiree)|
-                member_is_visible (graph, acquirer, config, active)
-                && member_is_visible (graph, acquiree, config, active) )
+                member_is_visible (graph, acquirer, config, restriction)
+                && member_is_visible (graph, acquiree, config, restriction) )
             . collect ();
           let suppressed : bool = kept . len () < before;
           (kept, suppressed) }};
   let warnings : Vec<String> =
     if suppressed_writes || suppressed_merges {
-      vec! [ "Inactive nodes present in saved buffer remain unchanged in graph."
+      vec! [ "Restricted nodes present in saved buffer remain unchanged in graph."
              . to_string () ] }
     else { Vec::new () };
   Ok (( NonmergeSavePlan {
@@ -124,13 +124,13 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
 pub fn extract_nonmergeSavePlan_locally (
   viewforest             : &ViewForest,
   config                 : &SkgConfig,
-  restricted_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction    : Option<&SkgrepoRestriction>,
 ) -> Result<(NonmergeSavePlan, Vec<(ID, ID)>), Box<dyn Error>> {
   let nodes = crate::dbs::filesystem::multiple_nodes
     ::read_all_skg_files_from_skgrepos (config)?;
   let graph = InRustGraph::from_graphnodes (&nodes);
   extract_nonmergeSavePlan_locally_in_graph (
-    viewforest, &graph, config, restricted_skgrepo_set ) }
+    viewforest, &graph, config, skgrepo_restriction ) }
 
 /// Filters out Save instructions that would be no-ops,
 /// because they match the pre-save in-Rust graph entry

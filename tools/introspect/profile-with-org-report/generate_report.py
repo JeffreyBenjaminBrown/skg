@@ -608,7 +608,7 @@ def main() -> None:
         f"The runtime graph began with {int(metadata['runtime_graph_nodes']):,} folded nodes and "
         f"{int(metadata['runtime_graph_edges']):,} containment edges. The copied owned tree contained "
         f"{int(metadata['graph_files_before']):,} =.skg= files ({int(metadata['graph_bytes_before']):,} bytes), "
-        f"including owned folders not active in this config. Across all runs, {added} files were added, "
+        f"including owned folders not unrestricted in this config. Across all runs, {added} files were added, "
         f"{removed} removed, and {size_changed} pre-existing files changed size.",
         "",
         "The CPU tree subdivides every branch at or above 5% of total CPU until each leaf is below "
@@ -619,7 +619,7 @@ def main() -> None:
         "",
         "| quantity | observed |",
         "|----------+----------|",
-        f"| active runtime nodes | {int(metadata['runtime_graph_nodes']):,} |",
+        f"| unrestricted runtime nodes | {int(metadata['runtime_graph_nodes']):,} |",
         f"| containment edges | {int(metadata['runtime_graph_edges']):,} |",
         f"| save definitions per run | {', '.join(map(str, definitions))} |",
         f"| filesystem deletes/writes per run | {', '.join(f'{deleted}/{written}' for deleted, written in file_changes)} |",

@@ -106,7 +106,7 @@ function M.org_stars_for_node_insertion ()
   return '*'
 end
 
----Insert a write-protected ActiveVognode headline from ENTRY. In a view
+---Insert a write-protected UnrestrictedVognode headline from ENTRY. In a view
 ---whose buffer has no editable occurrence of the node, the headline
 ---also requests an editable view, so the next save makes it writable
 ---with its real title, body and content. (Saving a bare writable
@@ -149,7 +149,7 @@ end
 function M.buffer_has_editable_occurrence_p (skgid)
   for line = 1, vim.api.nvim_buf_line_count(0) do
     local sexp = metadata.metadata_sexp_at_line_or_nil(line)
-    if metadata.activeNode_sexp_p(sexp)
+    if metadata.unrestrictedNode_sexp_p(sexp)
        and metadata.node_id(sexp) == skgid
        and (not metadata.node_write_protected_p(sexp)
             or metadata.node_requests_editable_view_p(sexp)) then

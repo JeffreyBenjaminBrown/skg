@@ -4,7 +4,7 @@
 --
 -- Opens two buffers over a containment cycle (a contains b, b
 -- contains a). From buffer B, edits a's title and adds a new child
--- "c" of a (no metadata -- the server reads it as an ActiveVognode with
+-- "c" of a (no metadata -- the server reads it as an UnrestrictedVognode with
 -- a random UUID). Verifies that buffer B's save response reflects the
 -- changes (title, new node with UUID). Then checks collateral buffer
 -- A.

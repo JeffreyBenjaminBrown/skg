@@ -1,8 +1,8 @@
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::to_org::complete::partner_folder::child_data::{ChildData, build_child_data, apply_relationship_axes_to_folder_members, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
-use crate::update_buffer::reconcile::omit_inactive_members;
+use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::to_org::complete::partner_folder::goal_list::{goal_list_for_outbound_folder, outbound_member_axes};
 use crate::types::git::{NodeAxes, RelationshipAxes, SkgRepoDiff};
 use crate::types::phantom::phantom_axes;
@@ -27,7 +27,7 @@ struct SubscribeeFolderContext {
 }
 
 /// SubscribeeFolder completion. Called at this folder's own visit in the level-order
-/// BFS (after its Active parent has been visited and created it).
+/// BFS (after its Unrestricted parent has been visited and created it).
 ///
 /// WHAT IT DOES:
 /// - Error unless it's a SubscribeeFolder.
@@ -43,26 +43,26 @@ pub fn reconcile_subscribeeFolder_children (
   runtime                        : &RuntimeGeneration,
   deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
-  active_skgrepo_set             : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction            : Option<&SkgrepoRestriction>,
 ) -> Result<(), Box<dyn Error>> {
   let kind : PartnerFolder = PartnerFolder::Subscribee;
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   let context : SubscribeeFolderContext =
     read_subscribeeFolder_context (
-      tree, node, runtime, active_skgrepo_set) ?;
+      tree, node, runtime, skgrepo_restriction) ?;
   let (goal_list, removed_skgids) : (Vec<ID>, HashSet<ID>) =
     goal_list_for_outbound_folder (
       &context . parent_pid, &context . parent_skgrepo,
       NodeRelation::SubscribesTo,
       skgrepo_diffs, &context . worktree_subscribees );
   let goal_list : Vec<ID> =
-    // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: omit every inactive
+    // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: omit every restricted
     // subscribee from the goal (the weave preserves them at save). A
-    // retained inactive vognode already in the tree survives anyway
+    // retained restricted vognode already in the tree survives anyway
     // -- the folder reconciler treats it as irrelevant, not goal-matched.
-    omit_inactive_members (
-      goal_list, active_skgrepo_set,
+    omit_restricted_members (
+      goal_list, skgrepo_restriction,
       |skgid : &ID| SkgEnv::find_skgrepo_in_generation (
         runtime, skgid, deleted_since_head_pid_src_map) );
 
@@ -122,9 +122,9 @@ fn read_subscribeeFolder_context (
   tree               : &Tree<Viewnode>,
   node               : NodeId,
   runtime            : &RuntimeGeneration,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result<SubscribeeFolderContext, Box<dyn Error>> {
-  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the subscriber Active vognode through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
+  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the subscriber Unrestricted vognode through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
   // (index 0 = the parent), rather than at a hard-coded generation.
   let subscriber : NodeId =
     required_ancestor (tree, node, 0) ?
@@ -135,23 +135,23 @@ fn read_subscribeeFolder_context (
     = read_at_node_in_tree(
       tree, subscriber,
       |vn : &Viewnode| match &vn . kind {
-        ViewnodeKind::Vognode (Vognode::Active (t))
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           => Some(( t . skgid . clone(),
                     t . home_skgrepo . clone() )),
         _ => None } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
-    . ok_or ("reconcile_subscribeeFolder_children: parent is not an ActiveVognode") ?;
+    . ok_or ("reconcile_subscribeeFolder_children: parent is not an UnrestrictedVognode") ?;
   let worktree_members : Vec<RelPartner<ID>> =
     // relRepo gating (render-and-gating, 5_plan.org): this is the
     // RECORDER's own outbound list (like 'contains' in
     // reconcile/content.rs), so a subscription recorded at an
-    // inactive level must not appear here even though the
-    // subscribee node itself may be active.
+    // restricted level must not appear here even though the
+    // subscribee node itself may be unrestricted.
     graphnode_graphFirst_by_pid_and_skgrepo (
       &runtime . graph, &runtime . config, &parent_pid, &parent_skgrepo )
       . ok ()
       . map ( |skg| skg . subscribesTo . or_default () . iter ()
-              . filter ( |m| match active_skgrepo_set {
+              . filter ( |m| match skgrepo_restriction {
                   None      => true,
                   Some (a)  => a . is_all ()
                     || a . contains_skgrepo (& m . relRepo) } )

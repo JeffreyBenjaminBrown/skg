@@ -1,5 +1,5 @@
 use crate::from_text::fork::{CloneSkgRepoInputs, fork_spec_from_buffer_node};
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::dbs::node_lookup::opt_graphnode_by_skgid;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::errors::BufferValidationError;
@@ -339,24 +339,24 @@ pub(super) fn validate_no_simultaneous_move_and_nodeMerge (
   if errors . is_empty() { Ok (())
   } else { Err (errors) }}
 
-/// TODO/DONE/full-schema/DONE/9-2_source-set-safety.org, inactive-node rewrite
+/// TODO/DONE/full-schema/DONE/9-2_source-set-safety.org, restricted-node rewrite
 /// suppression: under a restricted skgrepo-set, any nodeInstruction that
-/// would modify an inactive node is DROPPED rather than executed or
+/// would modify a restricted node is DROPPED rather than executed or
 /// fatal.  A stale buffer (rendered before a skgrepo-set switch) can
-/// legitimately hold whole now-inactive subtrees; aborting would
+/// legitimately hold whole now-restricted subtrees; aborting would
 /// force the user to delete them from view, which would itself be
 /// destructive.  Runs after the noop filter, so an untouched stale
 /// node (whose identical-to-disk nodeInstruction the noop filter already
 /// discarded) does not count as suppressed.  Returns whether
 /// anything was dropped, so the caller can attach the warning
-/// "Inactive nodes present in saved buffer remain unchanged in
+/// "Restricted nodes present in saved buffer remain unchanged in
 /// graph."
-pub fn suppress_writes_to_inactive_nodes (
+pub fn suppress_writes_to_restricted_nodes (
   node_instructions : Vec<NodeInstruction>,
   skgrepo_moves : Vec<SkgRepoMove>,
-  restricted_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> (Vec<NodeInstruction>, Vec<SkgRepoMove>, bool) {
-  let Some (active) = restricted_skgrepo_set else {
+  let Some (restriction) = skgrepo_restriction else {
     return (node_instructions, skgrepo_moves, false); };
   let mut suppressed : bool = false;
   let node_instructions : Vec<NodeInstruction> =
@@ -365,7 +365,7 @@ pub fn suppress_writes_to_inactive_nodes (
         let skgrepo : &SkgRepoName = match instruction {
           NodeInstruction::Save (SaveNode (node)) => &node . home_skgrepo,
           NodeInstruction::Delete (d)             => &d . home_skgrepo };
-        let keep : bool = active . contains_skgrepo (skgrepo);
+        let keep : bool = restriction . contains_skgrepo (skgrepo);
         if ! keep { suppressed = true; }
         keep } )
     . collect ();
@@ -373,8 +373,8 @@ pub fn suppress_writes_to_inactive_nodes (
     skgrepo_moves . into_iter ()
     . filter ( |mv| {
         let keep : bool =
-          active . contains_skgrepo (&mv . old_skgrepo)
-          && active . contains_skgrepo (&mv . new_skgrepo);
+          restriction . contains_skgrepo (&mv . old_skgrepo)
+          && restriction . contains_skgrepo (&mv . new_skgrepo);
         if ! keep { suppressed = true; }
         keep } )
     . collect ();

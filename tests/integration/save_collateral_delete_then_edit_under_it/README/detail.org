@@ -268,7 +268,7 @@ aliasFolder also becomes =DeadViewnode=; its leaf child
 which the postorder pass detaches. So aliasFolder and its
 alias disappear entirely.
 
-subee is a ActiveVognode under the (now =DeadViewnode=)
+subee is an UnrestrictedVognode under the (now =DeadViewnode=)
 subscribeeFolder. =complete_viewtree= completes it normally,
 adding subee-1 as a real child. This is the "tricky" line.
 
@@ -277,7 +277,7 @@ Expected headline-titles (approximately):
 ((1 . "1")
  (2 . "11")           ;; DeletedNode
  (3 . "")             ;; DeadViewnode (was subscribeeFolder)
- (4 . "subee")        ;; ActiveVognode, completed
+ (4 . "subee")        ;; UnrestrictedVognode, completed
  (5 . "subee-1")      ;; child from completion
  (5 . "")             ;; DeadViewnode (was hiddenInSubscribeeFolder)
  (6 . "subee-1")      ;; hidden node preserved
@@ -296,7 +296,7 @@ disappear entirely.
 
 DeadViewnode has no title (renders as empty). The assertion
 should check for the presence of the right number of
-empty-titled headlines at the right depths, and the ActiveVognode
+empty-titled headlines at the right depths, and the UnrestrictedVognode
 titles at the right depths.
 
 * Phase 4: Add subee-2 from buffer 1
@@ -323,7 +323,7 @@ Expected headline-titles (approximately):
 ((1 . "1")
  (2 . "11")           ;; DeletedNode, still present
  (3 . "")             ;; DeadViewnode
- (4 . "subee")        ;; ActiveVognode, completed
+ (4 . "subee")        ;; UnrestrictedVognode, completed
  (5 . "subee-1")      ;; existing child
  (5 . "subee-2")      ;; new child (now has UUID + metadata)
  (5 . "")             ;; DeadViewnode
@@ -341,7 +341,7 @@ After fixing =build_child_creation_data= (see Rust code fix
 section below), the collateral update for buffer 2 succeeds.
 =complete_viewtree= re-processes =subee=, reads the updated
 =subee.skg= (which now lists =subee-2= in =contains=), and
-creates subee-2 as a new ActiveVognode child.
+creates subee-2 as a new UnrestrictedVognode child.
 
 Expected headline-titles:
 #+begin_example
@@ -374,8 +374,8 @@ Expected headline-titles (approximately):
 ((1 . "1")
  (2 . "11")           ;; DeletedNode
  (3 . "")             ;; DeadViewnode
- (4 . "subee")        ;; ActiveVognode (writeProtected)
- (4 . "new-root")     ;; new ActiveVognode (now has UUID)
+ (4 . "subee")        ;; UnrestrictedVognode (writeProtected)
+ (4 . "new-root")     ;; new UnrestrictedVognode (now has UUID)
  (4 . "")             ;; DeadViewnode
  (5 . "also-hidden")  ;; hidden node preserved
  (1 . "subee")        ;; standalone root, unchanged
@@ -529,7 +529,7 @@ expects =(skg (node ...))= structure.
 
 The prompt uses shorthand throughout: =** (deleted)= means a
 =DeletedNode=, =*** (deadviewnode)= means =DeadViewnode=,
-=* (writeProtected) 11= means a write-protected ActiveVognode, etc. None of these
+=* (writeProtected) 11= means a write-protected UnrestrictedVognode, etc. None of these
 are the literal org-mode rendering.
 
 The actual rendering would be:
@@ -568,7 +568,7 @@ Fix: add a =home_from_disk= fallback to
 After the fix, the collateral update succeeds: =complete_viewtree=
 processes =subee=, reads the updated =subee.skg=, finds =subee-2=
 in =contains=, looks up its repo from disk, and creates it as
-a new ActiveVognode child. Buffer 2 gains =subee-2= under =subee=.
+a new UnrestrictedVognode child. Buffer 2 gains =subee-2= under =subee=.
 
 This also fixes the known limitation in the
 =save_collateral_add_content_and_modify_text= test. After applying

@@ -1,4 +1,4 @@
-use crate::types::git::{RelationshipAxes, NodeChanges, SkgRepoDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_activeVognode};
+use crate::types::git::{RelationshipAxes, NodeChanges, SkgRepoDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_unrestrictedVognode};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgRepoName, members_of};
@@ -13,18 +13,18 @@ use std::collections::HashMap;
 use std::error::Error;
 
 /// Reconciles an AliasFolder's children against
-///   the aliases on disk (via the map) for its parent ActiveVognode.
+///   the aliases on disk (via the map) for its parent UnrestrictedVognode.
 ///
 /// Per the spec in buffer-update.org:
 /// - Verify this node is an AliasFolder
-/// - Verify its parent is an ActiveVognode
+/// - Verify its parent is an UnrestrictedVognode
 /// - Fetch the corresponding Graphnode from the map
 /// - Read its aliases into 'aliases'
 /// - Partition the AliasFolder's children into:
-///   - ActiveVognodes with affectsParent != True
+///   - UnrestrictedVognodes with affectsParent != True
 ///   - Alias property nodes
 ///   (Error if any child does not fit these categories.)
-/// - Reorder children: ignored ActiveVognodes first, then Alias nodes
+/// - Reorder children: ignored UnrestrictedVognodes first, then Alias nodes
 /// - Among the Alias children, discard any not in 'aliases'
 /// - Create new Alias nodes for values in 'aliases' not already present
 /// - Order the final Alias children to match the order in 'aliases'
@@ -43,7 +43,7 @@ pub fn reconcile_aliasFolder_children (
       . map_err( |e| -> Box<dyn Error> { e . into() } )?;
     if !is_aliasFolder { return Err(
       "reconcile_aliasFolder_children: Node is not an AliasFolder" . into() ); }}
-  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: parent Active vognode read through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 0).
+  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: parent Unrestricted vognode read through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 0).
   let (parent_pid, parent_skgrepo) : (ID, SkgRepoName) =
     pid_and_skgrepo_from_required_ancestor(
       tree, aliasfolder_treeid, 0,
@@ -58,7 +58,7 @@ pub fn reconcile_aliasFolder_children (
     .collect ();
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
-    per_stage_node_changes_for_activeVognode (
+    per_stage_node_changes_for_unrestrictedVognode (
       skgrepo_diffs, &parent_pid, &parent_skgrepo );
   let (goal_list, axes_map)
     : (Vec<String>, HashMap<String, RelationshipAxes>) =
@@ -109,14 +109,14 @@ pub fn reconcile_aliasFolder_children (
     &goal_list,
     create_alias )?;
   treat_certain_children(
-      // Currently unreachable: validation rejects active vognode
-      // children of AliasFolder. If that is later relaxed, only Active
+      // Currently unreachable: validation rejects unrestricted vognode
+      // children of AliasFolder. If that is later relaxed, only Unrestricted
       // Vognodes need repair; affectsParent is a vestigial field in Phantoms.
       tree, aliasfolder_treeid,
       |vn : &Viewnode| matches!( &vn . kind,
-                                  ViewnodeKind::Vognode (Vognode::Active (_)) ),
+                                  ViewnodeKind::Vognode (Vognode::Unrestricted (_)) ),
       |vn : &mut Viewnode| {
-        if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
+        if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
           = vn . kind
           { t . affectsParent = AffectsParent::False; }},
     ) . map_err( |e| -> Box<dyn Error> { e . into() } )?;

@@ -58,8 +58,8 @@ Marks the node at point for deletion from the graph.
 Upon saving the view, it will vanish not just from this view,
 but from the graph itself.
 *** <localleader>dR : :SkgDeleteRecursive
-Same as Delete, but also marks every activeNode viewdescendant
-of the node at point. Descendent headlines that are not activeNodes
+Same as Delete, but also marks every unrestrictedNode viewdescendant
+of the node at point. Descendent headlines that are not unrestrictedNodes
 (phantoms, aliasFolder, id-folder, etc.) are skipped.
 
 Its own binding, not a prefix-arg variant -- nvim has no prefix-arg
@@ -439,7 +439,7 @@ existing =editRequest= are refused.
 *** <localleader>sX : :SkgSetFlagSearchMatchingRecursive
 Applies one selected state uniformly through the true-content subtree,
 deduplicating PIDs and reporting ineligible descendants. It prunes non-vognodes,
-role trees, non-member branches, inactive nodes, and phantoms. Save with
+role trees, non-member branches, restricted nodes, and phantoms. Save with
 =:w= afterward.
 *** <localleader>sm : :SkgSetMergeRequest
 (See [[./merging.org][the docs on merging]] for why would you merge two nodes,
@@ -463,11 +463,11 @@ ID, the command warns that the old node might become an orphan.
 
 The headline title plus body must contain exactly one org bracket
 link, and that link must be an =id:= link. The node must have no
-viewdescendants. Its viewparent must be an editable activeNode
+viewdescendants. Its viewparent must be an editable unrestrictedNode
 whose skgrepo is owned in =skgconfig.toml=.
 
 The command replaces the whole leaf with a same-level
-write-protected activeNode for the link target. The parent is
+write-protected unrestrictedNode for the link target. The parent is
 editable, so saving records the dest as content of the
 parent; the replacement child is write-protected, so its own text is
 not rewritten from the link label.
@@ -501,8 +501,8 @@ be there, then save the buffer.
 Point can be on the headline or in the node body.
 The command uses the headline either way.
 
-The node being replaced must be an existing activeNode with an ID,
-and a viewchild of an editable activeNode whose skgrepo is
+The node being replaced must be an existing unrestrictedNode with an ID,
+and a viewchild of an editable unrestrictedNode whose skgrepo is
 owned in =skgconfig.toml=. The command acts locally,
 replacing only this occurrence in the current buffer:
 the headline at point and all of its viewdescendants,
@@ -542,8 +542,8 @@ See [[file:heralds.org][the herald legend]] for the tokens and styles.
 Toggle display-only home skgrepo suffixes on Skg links in this buffer.
 The suffixes start off. Links confirmed missing are yucky and underlined
 even with suffixes off. See [[file:heralds.org::*Link annotations][link annotations]].
-*** <localleader>vl : :SkgLimitRepoSet
-Limits display and search to one configured skgrepo-set for this
+*** <localleader>vl : :SkgRestrictRepoSet
+Restricts display and search to one configured skgrepo-set for this
 Neovim connection.
 
 The command asks which skgrepo-set to activate, with TAB completion
@@ -552,7 +552,7 @@ to use that skgrepo-set and rerenders open Skg buffers in place. Choose
 =all= to remove the restriction.
 
 If the proposed set would rerender overPrivateText telescope text, Skg asks before
-changing the active set or any view. Declining leaves both unchanged and
+changing the skgrepo restriction or any view. Declining leaves both unchanged and
 an empty rerender stream releases the client's preemptive locks.
 *** <localleader>vm : :SkgViewMetadata
 When called from a node in a view of the graph,

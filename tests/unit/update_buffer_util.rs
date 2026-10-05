@@ -1,6 +1,6 @@
 use super::*;
 use crate::types::misc::ID;
-use crate::types::viewnode::{ mk_inactive_viewnode, viewforest_root_viewnode };
+use crate::types::viewnode::{ mk_restricted_viewnode, viewforest_root_viewnode };
 use ego_tree::Tree;
 
 // The orderkey closure is fallible: a relevant child whose kind the
@@ -13,19 +13,19 @@ fn relevant_child_of_wrong_kind_yields_err_not_panic () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   t . get_mut (root) . unwrap () . append (
-    mk_inactive_viewnode () );
+    mk_restricted_viewnode () );
   let result : Result<RepairSummary<ID>, Box<dyn Error>> =
     complete_relevant_children_in_viewforest (
       &mut t, root,
-      |_vn : &Viewnode| true, // relevance admits the Inactive child
+      |_vn : &Viewnode| true, // relevance admits the Restricted child
       |vn : &Viewnode| match &vn . kind {
-        ViewnodeKind::Vognode (Vognode::Active (activeVognode))
-          => Ok ( activeVognode . skgid . clone () ),
-        _ => Err ( "child is not an Active vognode" . to_string () ) },
+        ViewnodeKind::Vognode (Vognode::Unrestricted (unrestrictedVognode))
+          => Ok ( unrestrictedVognode . skgid . clone () ),
+        _ => Err ( "child is not an Unrestricted vognode" . to_string () ) },
       & [] as &[ID],
       |skgid : &ID| Err ( format! ( "create_child should not run for {}",
                                  skgid . 0 )) );
   assert! ( result . is_err (),
     "a relevant child the orderkey closure rejects must yield Err" );
   assert! ( result . unwrap_err () . to_string ()
-            . contains ("not an Active vognode") ); }
+            . contains ("not an Unrestricted vognode") ); }

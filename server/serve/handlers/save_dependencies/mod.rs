@@ -139,12 +139,12 @@ fn dependencies_from_uninterpreted (
   let mut result : HashSet<ID> = HashSet::new ();
   for node in forest . nodes () {
     match &node . value () . kind {
-      MpViewnodeKind::Vognode (MpVognode::Active (active)) => {
-        result . extend (active . skgid . iter () . cloned ());
-        result . extend (active . viewStats . overridesHere . iter () . cloned ());
+      MpViewnodeKind::Vognode (MpVognode::Unrestricted (restriction)) => {
+        result . extend (restriction . skgid . iter () . cloned ());
+        result . extend (restriction . viewStats . overridesHere . iter () . cloned ());
         if let Editability::Editable {
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
-        } = &active . editability
+        } = &restriction . editability
         { result . insert (target . clone ()); }}
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (phantom))) =>
         result . extend (phantom . skgid . iter () . cloned ()),
@@ -164,12 +164,12 @@ fn dependencies_from_registered (
   let mut result : HashSet<ID> = HashSet::new ();
   for node in forest . nodes () {
     match &node . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Active (active)) => {
-        result . insert (active . skgid . clone ());
-        result . extend (active . viewStats . overridesHere . iter () . cloned ());
+      ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) => {
+        result . insert (restriction . skgid . clone ());
+        result . extend (restriction . viewStats . overridesHere . iter () . cloned ());
         if let Editability::Editable {
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
-        } = &active . editability
+        } = &restriction . editability
         { result . insert (target . clone ()); }}
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (phantom))) => {
         result . insert (phantom . skgid . clone ()); }

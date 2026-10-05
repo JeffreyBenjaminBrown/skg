@@ -14,7 +14,7 @@ pub mod weave;
 pub mod validate;
 
 use crate::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::{ID, SkgConfig, members_of};
 use crate::types::save::{NodeMerge, NodeInstruction, SavePlan};
@@ -61,13 +61,13 @@ pub fn buffer_to_validated_saveplan_in_graph (
   buffer_text        : &str,
   graph              : &crate::dbs::in_rust_graph::InRustGraph,
   config             : &SkgConfig,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   // No user-set clone skgrepos: every fork's skgrepo resolves by
   // inference-else-default. The fork-confirmation re-save uses the
   // _with_fork_repos entry below.
   buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
-    buffer_text, graph, config, active_skgrepo_set, &HashMap::new () )
+    buffer_text, graph, config, skgrepo_restriction, &HashMap::new () )
     }
 
 /// As 'buffer_to_validated_saveplan', but with the per-fork clone
@@ -78,11 +78,11 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
   buffer_text        : &str,
   graph              : &crate::dbs::in_rust_graph::InRustGraph,
   config             : &SkgConfig,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   fork_skgrepos      : &HashMap<ID, SkgRepoName>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_graph (
-    buffer_text, graph, config, active_skgrepo_set, fork_skgrepos, None ) }
+    buffer_text, graph, config, skgrepo_restriction, fork_skgrepos, None ) }
 
 /// As 'buffer_to_validated_saveplan_with_fork_repos_in_graph', while also
 /// comparing an open view's last server-rendered forest. This detects edits to
@@ -91,14 +91,14 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
   buffer_text : &str,
   graph       : &crate::dbs::in_rust_graph::InRustGraph,
   config      : &SkgConfig,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   fork_skgrepos : &HashMap<ID, SkgRepoName>,
   previous_viewforest : Option<&ViewForest>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
-  let restricted_skgrepo_set : Option<&ActiveSkgRepoSet> =
+  let skgrepo_restriction : Option<&SkgrepoRestriction> =
     // The set 'all' restricts nothing; downstream stages treat None
     // as "no restriction", so normalize here, once.
-    active_skgrepo_set . filter ( |a| ! a . is_all () );
+    skgrepo_restriction . filter ( |a| ! a . is_all () );
   let ( mut maybePlaced_viewforest, parsing_errors, parsing_warnings )
     : ( MpViewForest, Vec<BufferValidationError>, Vec<String> )
     = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -157,7 +157,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
     : ( NonmergeSavePlan, Vec<(ID, ID)> )
     = crate::from_text::local_fieldintent_collection
       ::extract_nonmergeSavePlan_locally_in_graph (
-        &viewforest, graph, config, restricted_skgrepo_set )
+        &viewforest, graph, config, skgrepo_restriction )
  . map_err (SaveError::DatabaseError) ?;
   { // A flag preference is never an implicit-fork gesture.
     // Validate while its side-channel identity is still available; the
@@ -215,20 +215,20 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
   let default_clone_skgrepo : Option<SkgRepoName> = {
     // The active-aware default for a fork whose skgrepo can be neither
     // user-set nor inferred: prefer the CONFIG-FIRST owned skgrepo that
-    // is ACTIVE under the restricted set, so the fork reaches the
+    // is UNRESTRICTED under the restricted set, so the fork reaches the
     // confirmation buffer (where the user can rotate it) instead of
-    // dead-ending on ForkRepoInactive when an inactive owned skgrepo
+    // dead-ending on ForkRepoRestricted when a restricted owned skgrepo
     // happens to sort first. Falls back to the config-first owned skgrepo
-    // -- then ForkRepoInactive fires only when the user owns no ACTIVE
+    // -- then ForkRepoRestricted fires only when the user owns no UNRESTRICTED
     // skgrepo at all (the genuine "activate one first" case), and
     // ForkRepoUnresolved only when the user owns no skgrepo at all.
     let owned_in_order : Vec<SkgRepoName> =
       config . owned_skgrepos_in_config_order ();
-    let active_owned : Option<SkgRepoName> = restricted_skgrepo_set . and_then (
-      |active| owned_in_order . iter ()
-        . find ( |name| active . contains_skgrepo (name) )
+    let unrestricted_owned : Option<SkgRepoName> = skgrepo_restriction . and_then (
+      |restriction| owned_in_order . iter ()
+        . find ( |name| restriction . contains_skgrepo (name) )
         . cloned () );
-    active_owned . or_else ( || owned_in_order . into_iter () . next () ) };
+    unrestricted_owned . or_else ( || owned_in_order . into_iter () . next () ) };
   let clone_skgrepo_inputs : CloneSkgRepoInputs = CloneSkgRepoInputs {
     user_set          : fork_skgrepos . clone (),
     explicit_child    : explicit_child_skgrepo,
@@ -268,10 +268,10 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
     specs };
   { // Reject forks monogamy or the skgrepo-set forbids (before any
     // skgsave-commit). Monogamy reads the live graph; the skgrepo-set check uses
-    // the active set.
+    // the skgrepo restriction.
     let fork_errors : Vec<BufferValidationError> =
       validate_fork_specs_in_graph (
-        &fork_specs, graph, config, restricted_skgrepo_set);
+        &fork_specs, graph, config, skgrepo_restriction);
     if ! fork_errors . is_empty () {
       return Err ( SaveError::BufferValidationErrors {
         errors   : fork_errors,
@@ -296,20 +296,20 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
 pub fn buffer_to_validated_saveplan (
   buffer_text        : &str,
   config             : &SkgConfig,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   let nodes = crate::dbs::filesystem::multiple_nodes
     ::read_all_skg_files_from_skgrepos (config)
     . map_err (|e| SaveError::DatabaseError (Box::new (e)))?;
   let graph = crate::dbs::in_rust_graph::InRustGraph::from_graphnodes (&nodes);
   buffer_to_validated_saveplan_in_graph (
-    buffer_text, &graph, config, active_skgrepo_set ) }
+    buffer_text, &graph, config, skgrepo_restriction ) }
 
 /// Transitional compatibility for the fork-confirmation surface.
 pub fn buffer_to_validated_saveplan_with_fork_skgrepos (
   buffer_text        : &str,
   config             : &SkgConfig,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   fork_skgrepos      : &HashMap<ID, SkgRepoName>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   let nodes = crate::dbs::filesystem::multiple_nodes
@@ -317,7 +317,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos (
     . map_err (|e| SaveError::DatabaseError (Box::new (e)))?;
   let graph = crate::dbs::in_rust_graph::InRustGraph::from_graphnodes (&nodes);
   buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
-    buffer_text, &graph, config, active_skgrepo_set, fork_skgrepos ) }
+    buffer_text, &graph, config, skgrepo_restriction, fork_skgrepos ) }
 
 /// One nonfatal warning per DANGLING link this save writes: a
 /// '[[id:X][label]]' in a saved title or body where X is neither in
@@ -377,7 +377,7 @@ fn explicit_fork_specs_from_viewforest (
   let mut errors : Vec<BufferValidationError> = Vec::new ();
   let mut seen   : HashSet<ID> = HashSet::new ();
   for node in viewforest . nodes () {
-    let ViewnodeKind::Vognode (Vognode::Active (t)) = & node . value () . kind
+    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = & node . value () . kind
       else { continue; };
     if ! t . view_requests . contains (& ViewRequest::Fork) { continue; }
     let pid : &ID = & t . skgid;

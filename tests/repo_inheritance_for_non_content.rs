@@ -33,7 +33,7 @@ fn two_skgrepo_config () -> SkgConfig {
       owned        : true } );
   SkgConfig::dummyFromSkgRepos (skgrepos) }
 
-/// When a node N has the same skgrepo as its nearest activeVognode ancestor,
+/// When a node N has the same skgrepo as its nearest unrestrictedVognode ancestor,
 /// even if N is marked affectsParent=false,
 /// homeRepoAtBoundary should be false.
 #[test]
@@ -68,15 +68,15 @@ fn skgrepo_inheritance_across_non_content_same_skgrepo () {
   let b_ref =
     viewforest . get (a_skgid) . unwrap ()
     . first_child () . unwrap ();
-  let ViewnodeKind::Vognode ( Vognode::Active (t) )
+  let ViewnodeKind::Vognode ( Vognode::Unrestricted (t) )
     = & b_ref . value () . kind
-    else { panic! ("expected ActiveVognode") };
+    else { panic! ("expected UnrestrictedVognode") };
   assert! ( ! t . viewStats . homeSkgRepoAtBoundary,
             "Same repo across non-content boundary \
              should NOT be at boundary" ); }
 
 /// When a non-content child (affectsParent != True) has a different skgrepo
-/// from its nearest activeVognode ancestor,
+/// from its nearest unrestrictedVognode ancestor,
 /// homeRepoAtBoundary should be true.
 #[test]
 fn skgrepo_inheritance_across_non_content_different_skgrepo () {
@@ -108,9 +108,9 @@ fn skgrepo_inheritance_across_non_content_different_skgrepo () {
   let b_ref =
     viewforest . get (a_skgid) . unwrap ()
     . first_child () . unwrap ();
-  let ViewnodeKind::Vognode ( Vognode::Active (t) )
+  let ViewnodeKind::Vognode ( Vognode::Unrestricted (t) )
     = & b_ref . value () . kind
-    else { panic! ("expected ActiveVognode") };
+    else { panic! ("expected UnrestrictedVognode") };
   assert! ( t . viewStats . homeSkgRepoAtBoundary,
             "Different repo across non-content boundary \
              should be at boundary" ); }

@@ -43,7 +43,7 @@ use crate::serve::util::{ read_length_prefixed_content, request_type_from_reques
 use crate::to_org::util::mark_view_roots_parent_na;
 use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::skgrepo_sets::apply_skgrepo_set_to_viewforest;
 use crate::types::maybe_placed_viewnode::{MpViewnode,maybePlaced_to_placed_tree};
 use crate::types::misc::SkgRepoSetName;
@@ -101,14 +101,14 @@ fn handle_emacs (
     ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (), };
-  let mut active_skgrepo_set : ActiveSkgRepoSet =
-    ActiveSkgRepoSet::default_from_config (
+  let mut skgrepo_restriction : SkgrepoRestriction =
+    SkgrepoRestriction::default_from_config (
       &runtime . config )
       . unwrap_or_else ( |e| {
         tracing::error! (
           error = %e,
-          "failed to initialize active repo-set; falling back to all");
-        ActiveSkgRepoSet::named (
+          "failed to initialize skgrepo restriction; falling back to all");
+        SkgrepoRestriction::named (
           &runtime . config,
           SkgRepoSetName::from ("all"))
         . expect ("reserved repo-set all should always resolve") });
@@ -148,7 +148,7 @@ fn handle_emacs (
               &request_header,
               &env,
               &mut views_state,
-              &active_skgrepo_set ),
+              &skgrepo_restriction ),
           Ok (RequestType::SaveBuffer) =>
             // PITFALL: Uses the same BufReader that read the request,
             // so that any already-buffered header/payload are visible.
@@ -158,7 +158,7 @@ fn handle_emacs (
               &request_header,
               &mut env,
               &mut views_state,
-              &active_skgrepo_set ),
+              &skgrepo_restriction ),
           Ok (RequestType::CloseView) => {
             let closed_view_id : Option<ViewId> =
               handle_close_view_request (
@@ -179,7 +179,7 @@ fn handle_emacs (
           Ok (RequestType::DeleteReferencesToAbsentNode) =>
             handle_delete_references_to_absent_node_request (
               &mut stream, &request_header, &mut env, &mut views_state,
-              &active_skgrepo_set ),
+              &skgrepo_restriction ),
           Ok (RequestType::SnapshotResponse) => {
             buffer_snapshot_requested = false;
             search_enrichment_owed_for_terms = None;
@@ -190,7 +190,7 @@ fn handle_emacs (
               &enrichment_slot,
               &env,
               &mut views_state,
-              &active_skgrepo_set ); }
+              &skgrepo_restriction ); }
           Ok (RequestType::TextSearch) => {
             // Cancel any in-flight background search
             search_cancelled . store (true, Ordering::SeqCst);
@@ -203,7 +203,7 @@ fn handle_emacs (
                 &enrichment_slot,
                 &search_cancelled,
                 &mut views_state,
-                &active_skgrepo_set ); }
+                &skgrepo_restriction ); }
           Ok (RequestType::VerifyConnection) =>
             handle_verify_connection_request (
               &mut stream ),
@@ -214,22 +214,22 @@ fn handle_emacs (
             handle_get_file_path_request_with_skgrepo_set ( &mut stream,
                                            &request_header,
                                            &runtime . config,
-                                           &active_skgrepo_set ),
+                                           &skgrepo_restriction ),
           Ok (RequestType::TitlesByIds) =>
             handle_titles_by_skgids_request_with_skgrepo_set (
               &mut stream, &request_header,
               &runtime . tantivy_index, &runtime . config,
               views_state . diff_mode_enabled,
-              &active_skgrepo_set,
+              &skgrepo_restriction,
               &runtime . graph ),
           Ok (RequestType::LinkStatuses) =>
             handle_link_statuses_request (
               &mut stream, &request_header, &runtime . graph,
-              &runtime . config, &active_skgrepo_set ),
+              &runtime . config, &skgrepo_restriction ),
           Ok (RequestType::DiffReport) =>
             handle_diff_report_request_with_repo_set (
               &mut stream, &request_header, &runtime . config,
-              &active_skgrepo_set ),
+              &skgrepo_restriction ),
           Ok (RequestType::StageMoves) =>
             handle_stage_moves_request (
               &mut stream, &runtime . config ),
@@ -240,14 +240,14 @@ fn handle_emacs (
             handle_flag_state_request (
               &mut stream, &request_header, &env ),
           Ok (RequestType::ListSkgRepoSets)
-          | Ok (RequestType::ActiveSkgRepoSet)
-          | Ok (RequestType::SetActiveSkgRepoSet) =>
+          | Ok (RequestType::SkgrepoRestriction)
+          | Ok (RequestType::SetSkgrepoRestriction) =>
             handle_skgrepo_set_request (
               &mut stream,
               &request_header,
               &env,
               &mut views_state,
-              &mut active_skgrepo_set,
+              &mut skgrepo_restriction,
               &enrichment_slot,
               &search_cancelled ),
           Ok (RequestType::HeraldRules) =>
@@ -258,7 +258,7 @@ fn handle_emacs (
               &request_header,
               &env,
               &mut views_state,
-              &active_skgrepo_set ),
+              &skgrepo_restriction ),
           Ok (RequestType::ExportToOrg) =>
             handle_export_to_org_request ( &mut stream,
                                            &runtime . config,
@@ -279,7 +279,7 @@ fn handle_emacs (
               &request_header,
               &env,
               &mut views_state,
-              &active_skgrepo_set ),
+              &skgrepo_restriction ),
           Err (err) => {
             tracing::error!(error = %err, "Error determining request type");
             send_response_with_length_prefix (
@@ -331,7 +331,7 @@ fn handle_snapshot_response (
   enrichment_slot : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   _env            : &SkgEnv,
   views_state      : &mut ViewsState,
-  active_skgrepo_set : &ActiveSkgRepoSet,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) {
   let terms_result : Result<String, String> =
     value_from_request_sexp ("terms", request);
@@ -348,7 +348,7 @@ fn handle_snapshot_response (
       let buffer_text : String = buffer_text_result ?;
       enrich_search_buffer_snapshot (
         &terms, &buffer_text, enrichment_slot,
-        views_state, active_skgrepo_set ) } );
+        views_state, skgrepo_restriction ) } );
   let response : String = match enrichment_result {
     Ok (enriched_sexp) => {
       tracing::debug! (bytes = enriched_sexp . len (),
@@ -370,7 +370,7 @@ fn enrich_search_buffer_snapshot (
   buffer_text        : &str,
   enrichment_slot    : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   views_state        : &mut ViewsState,
-  active_skgrepo_set : &ActiveSkgRepoSet,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result<String, String> {
   let payload : SearchEnrichmentPayload = {
     let mut guard : MutexGuard<Option<SearchEnrichmentPayload>> =
@@ -396,10 +396,10 @@ fn enrich_search_buffer_snapshot (
   insert_full_containerward_role_trees_into_search_view (
     &mut viewforest, &runtime . graph, &payload . search_results,
     &payload . containerward_role_trees_by_skgid, &runtime . tantivy_index,
-    &runtime . config, active_skgrepo_set );
+    &runtime . config, skgrepo_restriction );
   insert_overrideward_view_subtrees (
     &mut viewforest, &runtime . graph, &payload . search_results,
-    active_skgrepo_set );
+    skgrepo_restriction );
   { let root_treeid : NodeId =
       viewforest . root () . id ();
     set_metadata_relationships_in_node_recursive (
@@ -415,10 +415,10 @@ fn enrich_search_buffer_snapshot (
     & payload . graphnodestats . container_to_contents,
     & payload . graphnodestats . content_to_containers,
     &runtime . config,
-    Some (active_skgrepo_set) );
+    Some (skgrepo_restriction) );
   apply_skgrepo_set_to_viewforest (
     &mut viewforest,
-    active_skgrepo_set );
+    skgrepo_restriction );
   if ! payload . include_overPrivateText_telescopes {
     exclude_overPrivateText_nodes_from_viewforest (
       &mut viewforest, &runtime . graph ); }
@@ -426,8 +426,8 @@ fn enrich_search_buffer_snapshot (
     viewforest . root () . descendants ()
     . filter_map ( |node| match &node . value () . kind {
       crate::types::viewnode::ViewnodeKind::Vognode (
-        crate::types::viewnode::Vognode::Active (active_node)) =>
-          Some (active_node . skgid . clone ()),
+        crate::types::viewnode::Vognode::Unrestricted (unrestricted_node)) =>
+          Some (unrestricted_node . skgid . clone ()),
       _ => None, } )
     . collect ();
   let approved : std::collections::HashSet<_> =
@@ -435,7 +435,7 @@ fn enrich_search_buffer_snapshot (
       rendered_pids . iter () . cloned () . collect ()
     } else { std::collections::HashSet::new () };
   let release = decide_text_release (
-    "search-enrichment", active_skgrepo_set, &rendered_pids,
+    "search-enrichment", skgrepo_restriction, &rendered_pids,
     &runtime . graph, &approved );
   if matches! (release, TextReleaseDecision::Challenge { .. }) {
     // Preflight and the load-bearing payload should make this unreachable.

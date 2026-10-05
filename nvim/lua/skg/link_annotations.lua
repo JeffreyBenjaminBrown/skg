@@ -154,7 +154,7 @@ function M.paint (buf, positions)
     end
     -- A dangling link's label is styled above and gets no suffix.
     if suffix_enabled and kind ~= 'missing' then
-      local label = ({ inactive = '⌂:inactive',
+      local label = ({ restricted = '⌂:restricted',
                        lookup_failed = '⌂:lookup failed', pending = '⌂:…' })[kind]
                     or ('⌂:' .. status[3])
       local group = kind == 'resolved' and 'SkgHeraldNormal' or 'SkgHeraldYucky'

@@ -6,7 +6,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgRepoName, TantivyIndex};
 pub use crate::types::misc::SkgRepoSetName;
 use crate::types::nodes::complete::Graphnode;
-use crate::types::viewnode::{Viewnode, ViewnodeKind, mk_inactive_viewnode};
+use crate::types::viewnode::{Viewnode, ViewnodeKind, mk_restricted_viewnode};
 use crate::types::viewnode::{Vognode, Phantom};
 use crate::test_utils::cleanup_test_tantivy;
 
@@ -22,24 +22,24 @@ use std::pin::Pin;
 use std::process::Command;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ActiveSkgRepoSet {
+pub struct SkgrepoRestriction {
   pub name    : SkgRepoSetName,
   pub skgrepos : BTreeSet<SkgRepoName>,
 }
 
-impl ActiveSkgRepoSet {
+impl SkgrepoRestriction {
   pub fn default_from_config (
     config : &SkgConfig,
-  ) -> Result<ActiveSkgRepoSet, Box<dyn Error>> {
-    ActiveSkgRepoSet::named (
+  ) -> Result<SkgrepoRestriction, Box<dyn Error>> {
+    SkgrepoRestriction::named (
       config,
       config . default_skgrepo_set_name () . clone ()) }
 
   pub fn named (
     config : &SkgConfig,
     name   : SkgRepoSetName,
-  ) -> Result<ActiveSkgRepoSet, Box<dyn Error>> {
-    Ok ( ActiveSkgRepoSet {
+  ) -> Result<SkgrepoRestriction, Box<dyn Error>> {
+    Ok ( SkgrepoRestriction {
       skgrepos : config . skgrepo_set_skgrepos (&name)?,
       name } ) }
 
@@ -54,7 +54,7 @@ impl ActiveSkgRepoSet {
   ) -> bool {
     self . name . 0 == "all" }
 
-  pub fn skgid_skgrepo_is_active (
+  pub fn skgid_skgrepo_is_unrestricted (
     &self,
     graph  : &InRustGraph,
     config : &SkgConfig,
@@ -70,10 +70,10 @@ impl ActiveSkgRepoSet {
       None          => false } ) }
 }
 
-pub fn filter_path_to_active_skgrepos_for_test (
+pub fn filter_path_to_unrestricted_skgrepos_for_test (
   graph  : &InRustGraph,
   config : &SkgConfig,
-  active : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
   path   : Vec<ID>,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
   let mut result : Vec<ID> = Vec::new ();
@@ -85,16 +85,16 @@ pub fn filter_path_to_active_skgrepos_for_test (
         graph, &skgid, &deleted_since_head_pid_src_map, None, config ) {
         Some (skgrepo) => skgrepo,
         None => break };
-    if active . contains_skgrepo (&skgrepo) {
+    if restriction . contains_skgrepo (&skgrepo) {
       result . push (skgid);
     } else {
       break; }}
   Ok (result) }
 
-pub fn filter_branches_to_active_skgrepos_for_test (
+pub fn filter_branches_to_unrestricted_skgrepos_for_test (
   graph    : &InRustGraph,
   config   : &SkgConfig,
-  active   : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
   branches : BTreeSet<ID>,
 ) -> Result<BTreeSet<ID>, Box<dyn Error>> {
   let mut result : BTreeSet<ID> = BTreeSet::new ();
@@ -105,15 +105,15 @@ pub fn filter_branches_to_active_skgrepos_for_test (
       find_skgrepo_with_optional_tantivy (
         graph, &skgid, &deleted_since_head_pid_src_map, None, config )
     {
-      if active . contains_skgrepo (&skgrepo) {
+      if restriction . contains_skgrepo (&skgrepo) {
         result . insert (skgid); }}}
   Ok (result) }
 
 pub fn apply_skgrepo_set_to_viewforest (
   viewforest : &mut Tree<Viewnode>,
-  active     : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
 ) {
-  if active . is_all () {
+  if restriction . is_all () {
     return; }
   let skgids : Vec<NodeId> =
     viewforest . root () . descendants ()
@@ -125,17 +125,17 @@ pub fn apply_skgrepo_set_to_viewforest (
       let Some (n) = viewforest . get (skgid) else { continue; }; // already detached with an ancestor
       let has_children : bool = n . has_children ();
       match &n . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Active (t))
-          if ! active . contains_skgrepo (&t . home_skgrepo)
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+          if ! restriction . contains_skgrepo (&t . home_skgrepo)
           => Some ( Treatment::Convert ),
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
-          if ! active . contains_skgrepo (&p . home_skgrepo)
+          if ! restriction . contains_skgrepo (&p . home_skgrepo)
           // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org (interim,
           // until diff mode and restricted sets refuse to combine):
-          // a removed-member phantom for an inactive node is
-          // quietly omitted, like every other inactive member. One
+          // a removed-member phantom for a restricted node is
+          // quietly omitted, like every other restricted member. One
           // with children (e.g. an attached role tree) is converted
-          // instead, so nothing active is silently dropped.
+          // instead, so nothing unrestricted is silently dropped.
           => if has_children { Some ( Treatment::Convert ) }
              else { Some ( Treatment::Detach ) },
         _ => None } };
@@ -145,7 +145,7 @@ pub fn apply_skgrepo_set_to_viewforest (
         let mut node_mut : NodeMut<Viewnode> =
           viewforest . get_mut (skgid) . unwrap ();
         node_mut . value () . kind =
-          mk_inactive_viewnode () . kind; },
+          mk_restricted_viewnode () . kind; },
       Some (Treatment::Detach) => {
         let mut node_mut : NodeMut<Viewnode> =
           viewforest . get_mut (skgid) . unwrap ();
@@ -154,7 +154,7 @@ pub fn apply_skgrepo_set_to_viewforest (
 
 pub fn titles_for_skgrepo_set_for_test (
   config : &SkgConfig,
-  active : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
   skgids    : &[ID],
 ) -> Result<HashMap<ID, String>, Box<dyn Error>> {
   let nodes : Vec<Graphnode> =
@@ -163,7 +163,7 @@ pub fn titles_for_skgrepo_set_for_test (
     skgids . iter () . cloned () . collect ();
   let mut result : HashMap<ID, String> = HashMap::new ();
   for node in nodes {
-    if active . contains_skgrepo (&node . home_skgrepo)
+    if restriction . contains_skgrepo (&node . home_skgrepo)
     && wanted . contains (&node . pid) {
       result . insert (node . pid, node . title); }}
   Ok (result) }
@@ -171,14 +171,14 @@ pub fn titles_for_skgrepo_set_for_test (
 pub fn search_skgids_for_skgrepo_set_for_test (
   _tantivy : &TantivyIndex,
   config   : &SkgConfig,
-  active   : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
   terms    : &str,
   limit    : usize,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
   let mut hits : Vec<ID> =
     read_all_skg_files_from_skgrepos (config)?
     . into_iter ()
-    . filter ( |n| active . contains_skgrepo (&n . home_skgrepo) )
+    . filter ( |n| restriction . contains_skgrepo (&n . home_skgrepo) )
     . filter ( |n| {
       n . title . contains (terms)
       || n . aliases . or_default () . iter () . any ( |a|

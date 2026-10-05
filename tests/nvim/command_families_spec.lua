@@ -4,7 +4,7 @@
 -- commit/cycle round trips (test-skg-insert-heading.el's empty-node
 -- view cases and test-skg-metadata-editing.el's spirit).
 
-local defaults = require('skg.sexpr.activenode_defaults')
+local defaults = require('skg.sexpr.unrestrictednode_defaults')
 local metadata = require('skg.metadata')
 local metadata_edit = require('skg.metadata_edit')
 local modify_graph = require('skg.modify_graph')

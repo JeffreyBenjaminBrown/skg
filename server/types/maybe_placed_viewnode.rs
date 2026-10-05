@@ -4,13 +4,13 @@
 /// Only needed briefly after parsing a buffer from the client;
 /// after validation, converted to placed types.
 
-pub use super::viewnode::{MpActiveVognode, MpPhantomDiff};
+pub use super::viewnode::{MpUnrestrictedVognode, MpPhantomDiff};
 use super::viewnode::PhantomDiff;
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
 use super::git::{NodeAxes, RelationshipAxes};
-use super::viewnode::{ Viewnode, ViewnodeKind, ActiveVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, InactiveVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Birth, Editability, AffectsParent, };
+use super::viewnode::{ Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Birth, Editability, AffectsParent, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -30,7 +30,7 @@ pub struct MpViewnode {
   pub kind        : MpViewnodeKind,
 }
 
-// MpActiveVognode is defined in viewnode.rs.
+// MpUnrestrictedVognode is defined in viewnode.rs.
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MpViewnodeKind {
@@ -44,8 +44,8 @@ pub enum MpViewnodeKind {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MpVognode {
-  Active   (MpActiveVognode),
-  Inactive (InactiveVognode),
+  Unrestricted   (MpUnrestrictedVognode),
+  Restricted (RestrictedVognode),
   Phantom  (MpPhantom),
 }
 
@@ -60,15 +60,15 @@ pub enum MpPhantom {
 // Conversion implementations
 //
 
-impl TryFrom<MpActiveVognode> for ActiveVognode {
+impl TryFrom<MpUnrestrictedVognode> for UnrestrictedVognode {
   type Error = String;
 
-  fn try_from(u: MpActiveVognode) -> Result<Self, Self::Error> {
+  fn try_from(u: MpUnrestrictedVognode) -> Result<Self, Self::Error> {
     let skgid = u . skgid . ok_or_else(
       || format!("Node '{}' has no ID", u . title))?;
     let skgrepo = u . home_skgrepo . ok_or_else(
       || format!("Node '{}' has no repo", u . title))?;
-    Ok(ActiveVognode {
+    Ok(UnrestrictedVognode {
       title          : u . title,
       skgid          : skgid,
       home_skgrepo: skgrepo,
@@ -125,11 +125,11 @@ impl TryFrom<MpViewnodeKind> for ViewnodeKind {
 
   fn try_from(u: MpViewnodeKind) -> Result<Self, Self::Error> {
     match u {
-      MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
+      MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =>
         Ok (ViewnodeKind::Vognode (
-          Vognode::Active (ActiveVognode::try_from (t)?))),
-      MpViewnodeKind::Vognode (MpVognode::Inactive (i)) =>
-        Ok (ViewnodeKind::Vognode (Vognode::Inactive (i))),
+          Vognode::Unrestricted (UnrestrictedVognode::try_from (t)?))),
+      MpViewnodeKind::Vognode (MpVognode::Restricted (i)) =>
+        Ok (ViewnodeKind::Vognode (Vognode::Restricted (i))),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) =>
         Ok (ViewnodeKind::Vognode (Vognode::Phantom (
           Phantom::Diff (PhantomDiff::try_from (p)?)))),
@@ -164,9 +164,9 @@ impl TryFrom<MpViewnode> for Viewnode {
 
 // Infallible conversions from placed to maybePlaced types.
 
-impl From<ActiveVognode> for MpActiveVognode {
-  fn from(t: ActiveVognode) -> Self {
-    MpActiveVognode {
+impl From<UnrestrictedVognode> for MpUnrestrictedVognode {
+  fn from(t: UnrestrictedVognode) -> Self {
+    MpUnrestrictedVognode {
       title          : t . title,
       skgid          : Some(t . skgid),
       home_skgrepo   : Some(t . home_skgrepo),
@@ -187,11 +187,11 @@ impl From<ActiveVognode> for MpActiveVognode {
 impl From<ViewnodeKind> for MpViewnodeKind {
   fn from(k: ViewnodeKind) -> Self {
     match k {
-      ViewnodeKind::Vognode (Vognode::Active (t)) =>
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         MpViewnodeKind::Vognode (
-          MpVognode::Active (MpActiveVognode::from (t))),
-      ViewnodeKind::Vognode (Vognode::Inactive (i)) =>
-        MpViewnodeKind::Vognode (MpVognode::Inactive (i)),
+          MpVognode::Unrestricted (MpUnrestrictedVognode::from (t))),
+      ViewnodeKind::Vognode (Vognode::Restricted (i)) =>
+        MpViewnodeKind::Vognode (MpVognode::Restricted (i)),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) =>
         MpViewnodeKind::Vognode (MpVognode::Phantom (
           MpPhantom::Diff (MpPhantomDiff::from (p)))),
@@ -279,9 +279,9 @@ pub fn maybePlaced_to_placed_viewforest (
 // Defaults
 //
 
-impl Default for MpActiveVognode {
+impl Default for MpUnrestrictedVognode {
   fn default() -> Self {
-    MpActiveVognode {
+    MpUnrestrictedVognode {
       title          : String::new(),
       skgid          : None,
       home_skgrepo   : None,
@@ -308,7 +308,7 @@ impl Default for MpViewnode {
       folded      : false,
       body_folded : false,
       kind        : MpViewnodeKind::Vognode (
-        MpVognode::Active (MpActiveVognode::default())),
+        MpVognode::Unrestricted (MpUnrestrictedVognode::default())),
     }
   }
 }
@@ -320,7 +320,7 @@ impl Default for MpViewnode {
 impl MpViewnode {
   pub fn title (&self) -> &str {
     match &self . kind {
-      MpViewnodeKind::Vognode (MpVognode::Active (t)) => &t . title,
+      MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) => &t . title,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) => &p . title,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
         &d . title,
@@ -330,14 +330,14 @@ impl MpViewnode {
       MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::BufferRoot
         | MpViewnodeKind::DeadViewnode
-        | MpViewnodeKind::Vognode (MpVognode::Inactive (_))
+        | MpViewnodeKind::Vognode (MpVognode::Restricted (_))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
         "", }}
 
   /// A distinguishable label for error messages.
   pub fn error_label (&self) -> String {
     match &self . kind {
-      MpViewnodeKind::Vognode (MpVognode::Active (t))
+      MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         => t . title . clone(),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p)))
         => p . title . clone(),
@@ -359,15 +359,15 @@ impl MpViewnode {
         format!("deleted:{}", d . skgid . 0),
       MpViewnodeKind::DeadViewnode =>
         "deadViewnode" . to_string (),
-      MpViewnodeKind::Vognode (MpVognode::Inactive (_)) =>
-        "inactive" . to_string (),
+      MpViewnodeKind::Vognode (MpVognode::Restricted (_)) =>
+        "restricted" . to_string (),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
         format!("unknown:{}", u . skgid . 0), }}
 
   /// The body text to render for this node, when it has one.
   pub fn body (&self) -> Option<&String> {
     match &self . kind {
-      MpViewnodeKind::Vognode (MpVognode::Active (t))
+      MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         => t . body (),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p)))
         => p . body (),
@@ -378,21 +378,21 @@ impl MpViewnode {
       MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::BufferRoot
         | MpViewnodeKind::DeadViewnode
-        | MpViewnodeKind::Vognode (MpVognode::Inactive (_))
+        | MpViewnodeKind::Vognode (MpVognode::Restricted (_))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
         None, }}
 
   /// PITFALL: Don't let this convince you a Scaff can have an ID.
   pub fn skgid_opt (&self) -> Option<&ID> {
     match &self . kind {
-      MpViewnodeKind::Vognode (MpVognode::Active (t))
+      MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         => t . skgid . as_ref(),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p)))
         => p . skgid . as_ref(),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
         Some (&d . skgid),
-      // An inactive vognode is anonymous: no id.
-      MpViewnodeKind::Vognode (MpVognode::Inactive (_)) =>
+      // A restricted vognode is anonymous: no id.
+      MpViewnodeKind::Vognode (MpVognode::Restricted (_)) =>
         None,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
         Some (&u . skgid),
@@ -403,10 +403,10 @@ impl MpViewnode {
         | MpViewnodeKind::DeadViewnode =>
         None, }}
 
-  /// True for the two ActiveVognode-ish kinds: an Active vognode or a Diff phantom.
-  pub fn is_active_or_diff_phantom (&self) -> bool {
+  /// True for the two UnrestrictedVognode-ish kinds: an Unrestricted vognode or a Diff phantom.
+  pub fn is_unrestricted_or_diff_phantom (&self) -> bool {
     matches! ( &self . kind,
-      MpViewnodeKind::Vognode (MpVognode::Active (_))
+      MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_))) ) }
 }
 

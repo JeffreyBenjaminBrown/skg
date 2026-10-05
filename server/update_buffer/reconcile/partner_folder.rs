@@ -13,10 +13,10 @@ use crate::to_org::complete::partner_folder::inverse_scan::inverse_scan_for_inbo
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgRepoDiff, file_node_axes_from_skgrepo_diff};
 use crate::types::misc::{ID, RelPartner, SkgRepoName};
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::phantom::{phantom_axes, home_from_disk};
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
-use crate::update_buffer::reconcile::omit_inactive_members;
+use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::{CompletionWarning, RepairKind};
 use crate::types::viewnode::{FolderPolicy, AffectsParent, PartnerFolder, Viewnode, ViewnodeKind, Vognode};
@@ -29,11 +29,11 @@ use std::sync::Arc;
 /// Reconciles one PartnerFolder (TODO/DONE/local-view-update/plan_v2.org §19 terminology: a folder = a collecting non-vognode)
 /// from a node in the viewforest with the current in-Rust graph snapshot's data
 /// about that node.
-/// Makes the folder's ActiveVognode children marked affectsParent=true match a goal list,
+/// Makes the folder's UnrestrictedVognode children marked affectsParent=true match a goal list,
 /// preserving reusable children and creating missing ones,
 /// then demotes stale children marked affectsParent=true to 'affectsParent=false'.
 pub fn reconcile_partnerFolder_children (
-  node         : NodeId, // The PartnerFolder. Its parent is an ActiveVognode.
+  node         : NodeId, // The PartnerFolder. Its parent is an UnrestrictedVognode.
   tree         : &mut Tree<Viewnode>,
   kind         : PartnerFolder,
   skgrepo_diffs : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
@@ -41,11 +41,11 @@ pub fn reconcile_partnerFolder_children (
   graph_snap   : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   warning_sink : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
   kind . error_unless_node_is_this_kind (tree, node) ?;
-  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the recorder Active vognode *through* the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
+  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the recorder Unrestricted vognode *through* the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
   // (index 0 = the parent), so this can never read an ancestor the table
   // does not list, and the death-check and this read share one spec.
   let (recorder_pid, recorder_skgrepo) : (ID, SkgRepoName) =
@@ -68,7 +68,7 @@ pub fn reconcile_partnerFolder_children (
     // canonical-PID accessor is still right for inverse/write-protected folders, but
     // would erase an Unknown from the writable OverriddenFolder.
     graph_snap . outbound_rel_partners_for_relation_gated (
-      &recorder_pid, member_role . relation, active_skgrepo_set )
+      &recorder_pid, member_role . relation, skgrepo_restriction )
   } else { Vec::new () };
   let inbound_scan : HashMap<ID, RelationshipAxes> =
     // Inbound folders' relationships live in the MEMBERS' files; the inverse
@@ -78,22 +78,22 @@ pub fn reconcile_partnerFolder_children (
     if ! outbound && skgrepo_diffs . is_some () {
       inverse_scan_for_inbound_folder (
         &recorder_pid, member_role . relation, skgrepo_diffs,
-        active_skgrepo_set )
+        skgrepo_restriction )
     } else { HashMap::new () };
   let (goal_list, removed_skgids) : (Vec<ID>, HashSet<ID>) = {
     let graph_members : Vec<ID> =
       // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: these folders omit
-      // inactive members, with no retention (a stale InactiveVognode
+      // restricted members, with no retention (a stale RestrictedVognode
       // child gets the reconciler's delete-leaf / deaden-branch rule).
-      omit_inactive_members (
+      omit_restricted_members (
         if outbound {
           raw_outbound_members . iter ()
             . map ( |member| graph_snap . pid_of (&member . member)
                    . unwrap_or_else ( || member . member . clone () ) )
             . collect ()
         } else { graph_snap . other_member_pids_gated (
-          &recorder_pid, recorder_role, active_skgrepo_set ) },
-        active_skgrepo_set,
+          &recorder_pid, recorder_role, skgrepo_restriction ) },
+        skgrepo_restriction,
         skgrepo_resolver );
     if outbound && skgrepo_diffs . is_some () {
       // Diff mode, outbound folder: the recorder's per-stage relation diff
@@ -106,9 +106,9 @@ pub fn reconcile_partnerFolder_children (
         goal_list_for_outbound_folder (
           &recorder_pid, &recorder_skgrepo, member_role . relation,
           skgrepo_diffs, &graph_members );
-      let goal : Vec<ID> = // phantoms can be inactive too
-        omit_inactive_members (
-          goal, active_skgrepo_set, skgrepo_resolver );
+      let goal : Vec<ID> = // phantoms can be restricted too
+        omit_restricted_members (
+          goal, skgrepo_restriction, skgrepo_resolver );
       (goal, removed)
     } else {
       let mut goal : Vec<ID> = match kind . policy () {
@@ -145,9 +145,9 @@ pub fn reconcile_partnerFolder_children (
             . map ( |(skgid, _)| skgid . clone () )
             . filter ( |skgid| ! goal_set . contains (skgid) )
             . collect () };
-        tail = // phantoms of inactive members are omitted too
-          omit_inactive_members (
-            tail, active_skgrepo_set,
+        tail = // phantoms of restricted members are omitted too
+          omit_restricted_members (
+            tail, skgrepo_restriction,
             |skgid : &ID| SkgEnv::find_skgrepo_in_generation (
               runtime, skgid, deleted_since_head_pid_src_map ));
         tail . sort_by ( |a, b| a . 0 . cmp (&b . 0) );
@@ -239,7 +239,7 @@ pub fn push_repair_warnings (
         children } ); }}}
 
 /// The effective goal list for a FolderPolicy::WriteProtectedSet folder:
-/// the folder's existing Active affectsParent=true children, in their
+/// the folder's existing Unrestricted affectsParent=true children, in their
 /// current view order, filtered to graph-real members (first
 /// occurrence of a duplicate wins; the reconciler detaches the
 /// duplicates themselves), then every graph member not yet listed,
@@ -260,7 +260,7 @@ fn view_order_preserving_goal_list (
       tree . get (folder)
       . ok_or ("view_order_preserving_goal_list: folder not found") ?;
     for child in folder_ref . children () {
-      if let ViewnodeKind::Vognode (Vognode::Active (t))
+      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         = & child . value () . kind
       { if t . affectsParent == AffectsParent::True
           && member_set . contains (&t . skgid)

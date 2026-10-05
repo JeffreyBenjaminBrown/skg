@@ -3,7 +3,7 @@ use skg::dbs::in_rust_graph::override_resolution::{
   OverrideResolution,
   resolve_override,
 };
-use skg::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
+use skg::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
 use skg::types::misc::{
   ID, MSV, RelPartner, SkgConfig, SkgRepo, SkgRepoName,
   rel_partners_at_relRepo};
@@ -62,8 +62,8 @@ fn node (
 
 fn restricted_to (
   skgrepos : &[&str],
-) -> ActiveSkgRepoSet {
-  ActiveSkgRepoSet {
+) -> SkgrepoRestriction {
+  SkgrepoRestriction {
     name    : SkgRepoSetName ( "restricted" . to_string () ),
     skgrepos : skgrepos . iter ()
       . map ( |s| SkgRepoName::from (*s) )
@@ -72,12 +72,12 @@ fn restricted_to (
 
 fn resolve (
   nodes  : Vec<Graphnode>,
-  active : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
   skgid  : &str,
 ) -> OverrideResolution {
   let graph : InRustGraph =
     InRustGraph::from_graphnodes (&nodes);
-  resolve_override (&config (), &graph, active, &ID::from (skgid)) }
+  resolve_override (&config (), &graph, restriction, &ID::from (skgid)) }
 
 #[test]
 fn no_overrider_resolves_to_self () {
@@ -122,9 +122,9 @@ fn a_single_owned_overrider_substitutes () {
       cycle          : vec![], } ); }
 
 #[test]
-fn an_inactive_owned_overrider_does_not_substitute () {
-  let active : ActiveSkgRepoSet =
-    // 'owned2' (the overrider's skgrepo) is not in the active set.
+fn an_restricted_owned_overrider_does_not_substitute () {
+  let restriction : SkgrepoRestriction =
+    // 'owned2' (the overrider's skgrepo) is not in the skgrepo restriction.
     restricted_to ( &["owned", "foreign"] );
   assert_eq! (
     resolve (
@@ -132,7 +132,7 @@ fn an_inactive_owned_overrider_does_not_substitute () {
         node ("target", "owned", &[]),
         node ("overrider", "owned2", &["target"]),
       ],
-      Some (&active), "target" ),
+      Some (&restriction), "target" ),
     OverrideResolution {
       effective      : ID::from ("target"),
       path           : vec![],
@@ -140,8 +140,8 @@ fn an_inactive_owned_overrider_does_not_substitute () {
       cycle          : vec![], } ); }
 
 #[test]
-fn an_active_owned_overrider_substitutes_under_a_restricted_set () {
-  let active : ActiveSkgRepoSet =
+fn an_unrestricted_owned_overrider_substitutes_under_a_restricted_set () {
+  let restriction : SkgrepoRestriction =
     restricted_to ( &["owned", "owned2"] );
   assert_eq! (
     resolve (
@@ -149,7 +149,7 @@ fn an_active_owned_overrider_substitutes_under_a_restricted_set () {
         node ("target", "owned", &[]),
         node ("overrider", "owned2", &["target"]),
       ],
-      Some (&active), "target" ),
+      Some (&restriction), "target" ),
     OverrideResolution {
       effective      : ID::from ("overrider"),
       path           : vec![ ID::from ("overrider") ],
@@ -157,8 +157,8 @@ fn an_active_owned_overrider_substitutes_under_a_restricted_set () {
       cycle          : vec![], } ); }
 
 #[test]
-fn an_inactive_override_relationship_between_active_nodes_does_not_substitute () {
-  let active : ActiveSkgRepoSet =
+fn an_restricted_override_relationship_between_unrestricted_nodes_does_not_substitute () {
+  let restriction : SkgrepoRestriction =
     restricted_to ( &["owned", "foreign"] );
   let mut overrider : Graphnode =
     node ("overrider", "owned", &[]);
@@ -168,7 +168,7 @@ fn an_inactive_override_relationship_between_active_nodes_does_not_substitute ()
   assert_eq! (
     resolve (
       vec![ node ("target", "owned", &[]), overrider ],
-      Some (&active), "target" ),
+      Some (&restriction), "target" ),
     OverrideResolution {
       effective      : ID::from ("target"),
       path           : vec![],
@@ -194,9 +194,9 @@ fn a_chain_of_two_resolves_transitively_with_path () {
       cycle          : vec![], } ); }
 
 #[test]
-fn inactive_overrider_home_stops_a_chain_at_that_relationship () {
-  let active : ActiveSkgRepoSet =
-    // y's repo 'owned2' is inactive; x's skgrepo 'owned' is active.
+fn restricted_overrider_home_stops_a_chain_at_that_relationship () {
+  let restriction : SkgrepoRestriction =
+    // y's repo 'owned2' is restricted; x's skgrepo 'owned' is unrestricted.
     restricted_to ( &["owned", "foreign"] );
   assert_eq! (
     resolve (
@@ -205,7 +205,7 @@ fn inactive_overrider_home_stops_a_chain_at_that_relationship () {
         node ("y", "owned2", &["z"]),
         node ("x", "owned", &["y"]),
       ],
-      Some (&active), "z" ),
+      Some (&restriction), "z" ),
     OverrideResolution {
       effective      : ID::from ("z"),
       path           : vec![],

@@ -1,12 +1,12 @@
 use super::*;
 use crate::types::viewnode::{mk_writeProtected_viewnode, viewforest_root_viewnode};
 
-fn active_affected (id_str : &str) -> Viewnode {
+fn unrestricted_affected (id_str : &str) -> Viewnode {
   mk_writeProtected_viewnode (
     ID::from (id_str), SkgRepoName::from ("main"),
     id_str . to_string (), AffectsParent::True ) }
 
-fn active_independent (id_str : &str) -> Viewnode {
+fn unrestricted_independent (id_str : &str) -> Viewnode {
   mk_writeProtected_viewnode (
     ID::from (id_str), SkgRepoName::from ("main"),
     id_str . to_string (), AffectsParent::False ) }
@@ -28,10 +28,10 @@ fn view_order_wins_and_missing_members_append () {
   let folder : NodeId = t . get_mut (root) . unwrap ()
     . append (mk_folder (PartnerFolder::Subscriber)) . id ();
   { let mut folder_mut = t . get_mut (folder) . unwrap ();
-    folder_mut . append (active_affected ("c"));
-    folder_mut . append (active_affected ("x"));    // nonmember
-    folder_mut . append (active_affected ("a"));
-    folder_mut . append (active_independent ("b")); } // parked, not a member claim
+    folder_mut . append (unrestricted_affected ("c"));
+    folder_mut . append (unrestricted_affected ("x"));    // nonmember
+    folder_mut . append (unrestricted_affected ("a"));
+    folder_mut . append (unrestricted_independent ("b")); } // parked, not a member claim
   let graph_members : Vec<ID> =
     vec! [ ID::from ("a"), ID::from ("b"), ID::from ("c") ];
   let goal : Vec<ID> =
@@ -47,9 +47,9 @@ fn duplicate_member_first_occurrence_wins () {
   let folder : NodeId = t . get_mut (root) . unwrap ()
     . append (mk_folder (PartnerFolder::Hider)) . id ();
   { let mut folder_mut = t . get_mut (folder) . unwrap ();
-    folder_mut . append (active_affected ("c"));
-    folder_mut . append (active_affected ("c"));
-    folder_mut . append (active_affected ("a")); }
+    folder_mut . append (unrestricted_affected ("c"));
+    folder_mut . append (unrestricted_affected ("c"));
+    folder_mut . append (unrestricted_affected ("a")); }
   let graph_members : Vec<ID> =
     vec! [ ID::from ("a"), ID::from ("c") ];
   let goal : Vec<ID> =

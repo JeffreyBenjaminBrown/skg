@@ -27,7 +27,7 @@ use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationRole};
 use skg::dbs::in_rust_graph::{InRustGraph};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::org_to_text::viewforest_to_string;
-use skg::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName, run_with_skgrepo_set_test_db};
+use skg::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName, run_with_skgrepo_set_test_db};
 use skg::test_utils::graph_handle_from_config;
 use skg::to_org::expand::role_tree::build_and_integrate_containerward_role_tree_with_skgrepo_set;
 use skg::to_org::render::content_view::multi_root_view_with_skgrepo_set;
@@ -57,7 +57,7 @@ fn true_child_skgids (
 ) -> BTreeSet<ID> {
   tree . get (parent_skgid) . unwrap () . children ()
     . filter_map ( |child| match &child . value () . kind {
-      ViewnodeKind::Vognode ( Vognode::Active (node) )
+      ViewnodeKind::Vognode ( Vognode::Unrestricted (node) )
         => Some (node . skgid . clone ()),
       ViewnodeKind::Vognode (Vognode::Phantom ( Phantom::Diff (p) ))
         => Some (p . skgid . clone ()),
@@ -72,10 +72,10 @@ fn content_view_of_N_gates_privately_contained_C (
     "tests/leak_battery/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-leak-battery-content",
     |config, tantivy| Box::pin ( async move {
-      let public : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (config, SkgRepoSetName::from ("public"))?;
-      let all : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (config, SkgRepoSetName::from ("all"))?;
+      let public : SkgrepoRestriction =
+        SkgrepoRestriction::named (config, SkgRepoSetName::from ("public"))?;
+      let all : SkgrepoRestriction =
+        SkgrepoRestriction::named (config, SkgRepoSetName::from ("all"))?;
 
       // At "public": N's private membership of C must not render --
       // neither C's id nor its title -- even though C itself is a
@@ -110,10 +110,10 @@ fn inbound_containerward_data_hides_N_at_public (
     "tests/leak_battery/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-leak-battery-inbound",
     |config, _tantivy| Box::pin ( async move {
-      let public : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (config, SkgRepoSetName::from ("public"))?;
-      let all : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (config, SkgRepoSetName::from ("all"))?;
+      let public : SkgrepoRestriction =
+        SkgrepoRestriction::named (config, SkgRepoSetName::from ("public"))?;
+      let all : SkgrepoRestriction =
+        SkgrepoRestriction::named (config, SkgRepoSetName::from ("all"))?;
 
       // Unit-style pin: the gated in-Rust-graph accessor directly.
       // C's containerward data (who contains C) must not name N at
@@ -184,10 +184,10 @@ fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
     "tests/leak_battery/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-leak-battery-subscriber",
     |config, _tantivy| Box::pin ( async move {
-      let public : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (config, SkgRepoSetName::from ("public"))?;
-      let all : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (config, SkgRepoSetName::from ("all"))?;
+      let public : SkgrepoRestriction =
+        SkgrepoRestriction::named (config, SkgRepoSetName::from ("public"))?;
+      let all : SkgrepoRestriction =
+        SkgrepoRestriction::named (config, SkgRepoSetName::from ("all"))?;
       let nodes : Vec<Graphnode> =
         read_all_skg_files_from_skgrepos (config)?;
       let graph : InRustGraph =
@@ -216,17 +216,17 @@ fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
       Ok (( )) } )) }
 
 #[test]
-fn default_subscribeeFolder_requires_an_active_subscription_relationship (
+fn default_subscribeeFolder_requires_an_unrestricted_subscription_relationship (
 ) -> Result<(), Box<dyn Error>> {
   run_with_skgrepo_set_test_db (
     "skg-test-leak-battery-default-subscribee-folder",
     "tests/leak_battery/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-leak-battery-default-subscribee-folder",
     |config, tantivy| Box::pin ( async move {
-      let public : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (config, SkgRepoSetName::from ("public"))?;
-      let all : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (config, SkgRepoSetName::from ("all"))?;
+      let public : SkgrepoRestriction =
+        SkgrepoRestriction::named (config, SkgRepoSetName::from ("public"))?;
+      let all : SkgrepoRestriction =
+        SkgrepoRestriction::named (config, SkgRepoSetName::from ("all"))?;
 
       // S and C are both public, but S's subscription to C is recorded
       // only in private.  The default folder's existence must follow the
@@ -237,7 +237,7 @@ fn default_subscribeeFolder_requires_an_active_subscription_relationship (
           &[ ID::from ("S") ], false, &public ) ?;
       assert! (
         ! at_public . contains ("subscribeeFolder"),
-        "an inactive subscription must not leave an empty default \
+        "a restricted subscription must not leave an empty default \
          subscribeeFolder behind:\n{}", at_public );
 
       let (at_all, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
@@ -246,11 +246,11 @@ fn default_subscribeeFolder_requires_an_active_subscription_relationship (
           &[ ID::from ("S") ], false, &all ) ?;
       assert! (
         at_all . contains ("subscribeeFolder"),
-        "the active subscription must create the default folder under all:\n{}",
+        "the unrestricted subscription must create the default folder under all:\n{}",
         at_all );
       assert! (
         at_all . contains ("leak-battery-C"),
-        "the active subscription's member must render under all:\n{}",
+        "the unrestricted subscription's member must render under all:\n{}",
         at_all );
       Ok (( )) } )) }
 
@@ -262,10 +262,10 @@ fn ancestor_heralds_gate_privately_recorded_relations (
     "tests/leak_battery/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-leak-battery-heralds",
     |config, _tantivy| Box::pin ( async move {
-      let public : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (config, SkgRepoSetName::from ("public"))?;
-      let all : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (config, SkgRepoSetName::from ("all"))?;
+      let public : SkgrepoRestriction =
+        SkgrepoRestriction::named (config, SkgRepoSetName::from ("public"))?;
+      let all : SkgrepoRestriction =
+        SkgrepoRestriction::named (config, SkgRepoSetName::from ("all"))?;
       let graph_handle = (
         graph_handle_from_config (config)? );
       let graph = graph_handle . load_full ();
@@ -273,7 +273,7 @@ fn ancestor_heralds_gate_privately_recorded_relations (
       // recorded only in S's PRIVATE section, so the ancestor-flag
       // pass must not tint S's herald with the 'S' token at public.
       // (Both nodes are individually public; the RELATIONSHIP is what gates.)
-      let herald_of_S = | active : &ActiveSkgRepoSet |
+      let herald_of_S = | restriction : &SkgrepoRestriction |
       -> Result<Option<String>, Box<dyn Error>> {
         let mut viewforest : Tree<Viewnode> =
           viewforest_from_org (
@@ -284,7 +284,7 @@ fn ancestor_heralds_gate_privately_recorded_relations (
           // early-return before the ancestor flags (its "no stats ->
           // no heralds" guard). Zero counts render no tokens of
           // their own, so any token present comes from a flag.
-          if let ViewnodeKind::Vognode (Vognode::Active (t)) =
+          if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
             &mut value . kind {
             t . graphStats . rels =
               Some ( RelationCounts::default () ); }}
@@ -294,13 +294,13 @@ fn ancestor_heralds_gate_privately_recorded_relations (
           & HashMap::new (),
           & HashMap::new (),
           config,
-          Some (active) );
+          Some (restriction) );
         let c_treeid : NodeId = first_child_skgid (&viewforest);
         let s_ref = viewforest . get (c_treeid) . unwrap ()
           . first_child () . unwrap ();
-        let ViewnodeKind::Vognode (Vognode::Active (t)) =
+        let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
           & s_ref . value () . kind
-        else { return Err ("S is not an Active vognode" . into ()); };
+        else { return Err ("S is not an Unrestricted vognode" . into ()); };
         Ok ( t . viewStats . rel_heralds . clone () ) };
       // In the semantic wire the subscription shows as a `subscribes`
       // relation; gated out at public, present under `all`. (S's only
@@ -345,7 +345,7 @@ fn a_lowered_relationship_is_governed_by_its_new_level (
     recorder,
     node_at ("lowered", "public"),
     node_at ("kept",    "public") ] );
-  let public : ActiveSkgRepoSet = ActiveSkgRepoSet {
+  let public : SkgrepoRestriction = SkgrepoRestriction {
     name    : SkgRepoSetName::from ("public"),
     skgrepos : [ SkgRepoName::from ("public") ]
       . into_iter () . collect () };

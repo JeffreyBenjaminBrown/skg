@@ -14,10 +14,10 @@
 //! ancestry chain*: a folder is a generalized orphan if ANY ancestor in its
 //! required-ancestry chain -- not only the parent -- is the wrong viewnode
 //! kind. Death is a VIEW property, not a graph property: a position that must
-//! be a vognode holding anything but Vognode::Active, or a position that must
+//! be a vognode holding anything but Vognode::Unrestricted, or a position that must
 //! be a specific folder holding anything but that folder, is dead. No
 //! graph / Graphnode read is involved. This is sound because, in BFS order,
-//! an Active node converts to Deleted at its own visit, strictly before any
+//! an Unrestricted node converts to Deleted at its own visit, strictly before any
 //! descendant folder is visited; so by the time a folder checks, a dead ancestor
 //! already shows the wrong kind in the tree.
 //!
@@ -29,7 +29,7 @@
 
 use crate::types::misc::{ID, SkgRepoName};
 use crate::types::tree::generic::{ read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree };
-use crate::types::tree::viewnode_graphnode::write_at_activeVognode_in_tree;
+use crate::types::tree::viewnode_graphnode::write_at_unrestrictedVognode_in_tree;
 use crate::types::viewnode::{ AffectsParent, PartnerFolder, Viewnode, ViewnodeKind, Vognode };
 use crate::update_buffer::util::detach_viewnode_transferring_focus;
 
@@ -40,7 +40,7 @@ use std::error::Error;
 /// against the *actual ancestor at that tree depth*.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ExpectedAncestor {
-  /// Must be a `Vognode::Active` (anything else at this depth means death).
+  /// Must be a `Vognode::Unrestricted` (anything else at this depth means death).
   NormalVognode,
   /// Must be exactly this folder kind (TODO/DONE/local-view-update/plan_v2.org §19: a folder = a collecting non-vognode). The
   /// only intermediate-chain folder the table uses is the SubscribeeFolder.
@@ -66,11 +66,11 @@ fn required_ancestry (
   kind : &ViewnodeKind,
 ) -> &'static [ExpectedAncestor] {
   match kind {
-    // PropertyFolder(Alias) and PropertyFolder(ID): parent Active vognode.
+    // PropertyFolder(Alias) and PropertyFolder(ID): parent Unrestricted vognode.
     ViewnodeKind::PropertyFolder (_) => ANC_NORMAL,
-    // Subscribee folder: parent = subscriber (Active).
+    // Subscribee folder: parent = subscriber (Unrestricted).
     // PartnerFolders (Subscriber/Overridden/Overrider/Hider/Hidden): parent
-    // Active vognode.
+    // Unrestricted vognode.
     ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)
       | ViewnodeKind::PartnerFolder (PartnerFolder::Subscriber)
       | ViewnodeKind::PartnerFolder (PartnerFolder::Overridden)
@@ -90,7 +90,7 @@ fn matches_expected (
 ) -> bool {
   match expected {
     ExpectedAncestor::NormalVognode =>
-      matches! ( actual, ViewnodeKind::Vognode (Vognode::Active (_)) ),
+      matches! ( actual, ViewnodeKind::Vognode (Vognode::Unrestricted (_)) ),
     ExpectedAncestor::Folder (rc) =>
       matches! ( actual, ViewnodeKind::PartnerFolder (r) if r == rc ),
   } }
@@ -209,7 +209,7 @@ pub fn deaden_generalized_orphan_folder (
   Ok (( )) }
 
 /// Dispose one direct child of a deadened orphan folder (TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5.1.a):
-/// - a member (affectsParent=true Active) view-leaf -> delete;
+/// - a member (affectsParent=true Unrestricted) view-leaf -> delete;
 /// - a member branch (has children) -> demote to affectsParent=false, so
 ///   the user's subtree survives;
 /// - a nested folder (PropertyFolder / PartnerFolder) -> LEAVE it untouched: it is itself a
@@ -224,8 +224,8 @@ pub fn deaden_generalized_orphan_folder (
 ///   below.)
 /// - any other non-vognode, non-phantom child (a Property, a DeadViewnode) -> convert
 ///   to DeadViewnode;
-/// - any other child (a non-member vognode -- a non-member Active or an
-///   Inactive -- or any Phantom: Diff/Deleted/Unknown) -> keep untouched.
+/// - any other child (a non-member vognode -- a non-member Unrestricted or an
+///   Restricted -- or any Phantom: Diff/Deleted/Unknown) -> keep untouched.
 fn dispose_orphaned_folder_child (
   tree  : &mut Tree<Viewnode>,
   child : NodeId,
@@ -234,7 +234,7 @@ fn dispose_orphaned_folder_child (
     : (bool, bool, bool, bool) = {
     let c : NodeRef<Viewnode> = tree . get (child)
       . ok_or ("dispose_orphaned_folder_child: child not found") ?;
-    ( c . value () . is_activeVognode_and_affectsParent_true (),
+    ( c . value () . is_unrestrictedVognode_and_affectsParent_true (),
       c . children () . next () . is_none (),
       matches! ( &c . value () . kind,
                  ViewnodeKind::Vognode (_) ),
@@ -243,7 +243,7 @@ fn dispose_orphaned_folder_child (
     if is_leaf {
       detach_viewnode_transferring_focus (tree, child) ?;
     } else {
-      write_at_activeVognode_in_tree ( tree, child,
+      write_at_unrestrictedVognode_in_tree ( tree, child,
         |t| { t . affectsParent = AffectsParent::False; } )
         . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   } else if is_folder {

@@ -59,7 +59,7 @@ you might not want to review the command manually.)"
 
 (defun skg-git-add-if-new-recursive-preview ()
   "Show an executable buffer that stages new files in the current subtree.
-The current headline and its viewdescendants are scanned for ActiveVognode
+The current headline and its viewdescendants are scanned for UnrestrictedVognode
 metadata containing `(unstaged addedN)'. The generated form rechecks
 the git index before staging each file, so evaluating it will not
 stage later modifications to files that are already known to git."
@@ -178,7 +178,7 @@ interactively-folded content view."
       (nreverse pairs))))
 
 (defun skg--metadata-has-unstaged-new-file-p (sexp)
-  "Return t if SEXP is an ActiveVognode marked as a new worktree file."
+  "Return t if SEXP is an UnrestrictedVognode marked as a new worktree file."
   (memq 'addedN (skg-sexp-cdr-at-path sexp '(skg node unstaged))))
 
 (provide 'skg-git-add)

@@ -15,7 +15,7 @@ use crate::serve::util::{
   tag_text_response};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::misc::ID;
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::views_state::ViewId;
 
 use futures::executor::block_on;
@@ -34,14 +34,14 @@ pub fn handle_single_root_view_request (
   request    : &str,
   env        : &SkgEnv,
   views_state : &mut ViewsState,
-  active_skgrepo_set : &ActiveSkgRepoSet,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) {
   let runtime = env . runtime_snapshot ();
   let view_id_result : Result<ViewId, String> =
     view_id_from_request (request);
   match node_skgid_from_single_root_view_request (request) {
     Ok (node_id) => {
-      match active_skgrepo_set . skgid_skgrepo_is_active (
+      match skgrepo_restriction . skgid_skgrepo_is_unrestricted (
         &runtime . graph, &runtime . config, &node_id ) {
         Ok (true) => {},
         Ok (false) => {
@@ -49,9 +49,9 @@ pub fn handle_single_root_view_request (
             format_buffer_response_sexp (
               &String::new (),
               &vec! [format! (
-                "Node {} is not in active repo-set {}",
+                "Node {} is not in skgrepo restriction {}",
                 node_id,
-                active_skgrepo_set . name )],
+                skgrepo_restriction . name )],
               &[] );
           send_response_with_length_prefix (
             stream,
@@ -99,12 +99,12 @@ pub fn handle_single_root_view_request (
               &runtime,
               &[node_id . clone ()],
               views_state . diff_mode_enabled,
-              Some (active_skgrepo_set),
+              Some (skgrepo_restriction),
               &mut render_warnings )
             { Ok ( (buffer_content, pids, viewforest) ) => {
                 let release = decide_text_release (
                   "single-root-view",
-                  active_skgrepo_set,
+                  skgrepo_restriction,
                   &pids,
                   &runtime . graph,
                   &approved_overPrivateText_pids );

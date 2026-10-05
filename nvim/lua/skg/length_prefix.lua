@@ -65,7 +65,7 @@ function M.dispatch_by_type (payload)
     entry.handler(payload, response)
     if response_type == 'save-result'
        or response_type == 'rerender-done'
-       or response_type == 'active-repo-set'
+       or response_type == 'skgrepo-restriction'
        or response_type == 'delete-references-result'
        or response_type == 'rebuild-ephemeral-data-stores' then
       local annotations = package.loaded['skg.link_annotations']

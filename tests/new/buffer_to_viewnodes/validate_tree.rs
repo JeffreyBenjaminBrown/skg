@@ -99,7 +99,7 @@ async fn test_find_buffer_errors_for_saving (
         . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(_, _)))
         . collect();
 
-      // AliasFolder children must be Aliases (bad_child is an ActiveVognode child of AliasFolder)
+      // AliasFolder children must be Aliases (bad_child is an UnrestrictedVognode child of AliasFolder)
       { let aliasfolder_children_re =
           Regex::new(r"(?i)aliasFolder.*children.*must.*alias") . unwrap();
         let aliasfolder_children_errors: Vec<&BufferValidationError> =
@@ -181,28 +181,28 @@ async fn test_find_buffer_errors_for_saving (
                    if title == "Alias with body problem and orphaned" && kind == "alias")
         }), "Should find Body_of_NonVognode error for alias"); }
 
-      // View roots must be ActiveVognodes or deleted nodes.
-      { let viewroot_re = Regex::new(r"(?i)view roots.*must.*activeVognode.*deleted") . unwrap();
+      // View roots must be UnrestrictedVognodes or deleted nodes.
+      { let viewroot_re = Regex::new(r"(?i)view roots.*must.*unrestrictedVognode.*deleted") . unwrap();
         let viewroot_errors: Vec<&BufferValidationError> =
           errors . iter()
           . filter(|e| matches!(e, BufferValidationError::Other (msg)
                                if viewroot_re . is_match (msg)))
           . collect();
         assert_eq!(viewroot_errors . len(), 1,
-                   "Should find 1 'View roots must be ActiveVognodes or deleted nodes' error"); }
+                   "Should find 1 'View roots must be UnrestrictedVognodes or deleted nodes' error"); }
 
-      // ActiveVognode child belongs elsewhere (root has Alias children directly, not via AliasFolder)
-      { let activeVognode_children_re =
-          Regex::new(r"(?i)activeVognode.*child.*belongs.*elsewhere") . unwrap();
-        let activeVognode_children_errors: Vec<&BufferValidationError> =
+      // UnrestrictedVognode child belongs elsewhere (root has Alias children directly, not via AliasFolder)
+      { let unrestrictedVognode_children_re =
+          Regex::new(r"(?i)unrestrictedVognode.*child.*belongs.*elsewhere") . unwrap();
+        let unrestrictedVognode_children_errors: Vec<&BufferValidationError> =
           local_errors . iter() . copied()
         . filter( |e| matches!( e,
                                 BufferValidationError::LocalStructureViolation(
                                   msg, _)
-                               if activeVognode_children_re . is_match (msg)))
+                               if unrestrictedVognode_children_re . is_match (msg)))
           . collect();
-        assert_eq!(activeVognode_children_errors . len(), 1,
-                   "Should find 1 misplaced ActiveVognode child error"); }
+        assert_eq!(unrestrictedVognode_children_errors . len(), 1,
+                   "Should find 1 misplaced UnrestrictedVognode child error"); }
 
       // "Alias with body problem" fails two checks (no children + AliasFolder parent),
       // but multiple errors on one node combine into a single LocalStructureViolation.
@@ -626,11 +626,11 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
 }
 
 #[test]
-fn test_inactive_placeholder_content_edits_rejected_at_parse_time () {
+fn test_restricted_placeholder_content_edits_rejected_at_parse_time () {
   let input_with_title_edit : &str =
     indoc! {"
       * (skg (node (id root) (repo main))) parent
-      ** (skg (inactiveNode (id hidden) (repo private))) edited title
+      ** (skg (restrictedNode (id hidden) (repo private))) edited title
     "};
   let (_viewforest, parsing_errors, _warnings)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
@@ -638,14 +638,14 @@ fn test_inactive_placeholder_content_edits_rejected_at_parse_time () {
   assert!(
     parsing_errors . iter () . any ( |e| matches!(
       e, BufferValidationError::Other (msg)
-         if msg . contains ("Inactive vognode content cannot be edited"))),
-    "Changing an inactive vognode title should be rejected. Parse errors: {:?}",
+         if msg . contains ("Restricted vognode content cannot be edited"))),
+    "Changing a restricted vognode title should be rejected. Parse errors: {:?}",
     parsing_errors );
 
   let input_with_body_edit : &str =
     indoc! {"
       * (skg (node (id root) (repo main))) parent
-      ** (skg (inactiveNode (id hidden) (repo private)))
+      ** (skg (restrictedNode (id hidden) (repo private)))
       edited body
     "};
   let (_viewforest2, parsing_errors2, _warnings__viewforest2)
@@ -654,21 +654,21 @@ fn test_inactive_placeholder_content_edits_rejected_at_parse_time () {
   assert!(
     parsing_errors2 . iter () . any ( |e| matches!(
       e, BufferValidationError::Other (msg)
-         if msg . contains ("Inactive vognode content cannot be edited"))),
-    "Adding inactive vognode body text should be rejected. Parse errors: {:?}",
+         if msg . contains ("Restricted vognode content cannot be edited"))),
+    "Adding restricted vognode body text should be rejected. Parse errors: {:?}",
     parsing_errors2 );
 }
 
 #[test]
-fn test_inactive_placeholder_active_children_allowed_locally () {
+fn test_restricted_placeholder_unrestricted_children_allowed_locally () {
   // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org, the retained case:
-  // an inactive node stays on screen because of its active
-  // children, so an InactiveVognode with active children must pass.
+  // a restricted node stays on screen because of its unrestricted
+  // children, so a RestrictedVognode with unrestricted children must pass.
   let input : &str =
     indoc! {"
       * (skg (node (id root) (repo main))) parent
-      ** (skg (inactiveNode (id hidden) (repo private)))
-      *** (skg (node (id child) (repo main))) active child
+      ** (skg (restrictedNode (id hidden) (repo private)))
+      *** (skg (node (id child) (repo main))) unrestricted child
     "};
   let (viewforest, parsing_errors, _warnings_viewforest)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
@@ -679,30 +679,30 @@ fn test_inactive_placeholder_active_children_allowed_locally () {
     parsing_errors );
 
   let config : SkgConfig = validation_config ();
-  let inactive_skgid = viewforest . root () . traverse ()
+  let restricted_skgid = viewforest . root () . traverse ()
     . filter_map ( |edge| match edge {
       ego_tree::iter::Edge::Open (node_ref)
         if matches! (
           node_ref . value () . kind,
           MpViewnodeKind::Vognode (
-            MpVognode::Inactive (_))) =>
+            MpVognode::Restricted (_))) =>
           Some (node_ref . id ()),
       _ => None, })
     . next ()
-    . expect ("inactive vognode should exist");
+    . expect ("restricted vognode should exist");
 
   validate_local_structure (
-      &viewforest, inactive_skgid, &config)
+      &viewforest, restricted_skgid, &config)
     . expect (
-      "an Inactive vognode with an active child (the retained case) must pass validation");
+      "a Restricted vognode with an unrestricted child (the retained case) must pass validation");
 }
 
 #[test]
-fn test_inactive_placeholder_under_activeVognode_allowed_locally () {
+fn test_restricted_placeholder_under_unrestrictedVognode_allowed_locally () {
   let input : &str =
     indoc! {"
       * (skg (node (id root) (repo main))) parent
-      ** (skg (inactiveNode (id hidden) (repo private)))
+      ** (skg (restrictedNode (id hidden) (repo private)))
     "};
   let (viewforest, parsing_errors, _warnings_viewforest)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
@@ -717,21 +717,21 @@ fn test_inactive_placeholder_under_activeVognode_allowed_locally () {
     . expect ("root child should exist")
     . id ();
   validate_local_structure (&viewforest, root_skgid, &config)
-    . expect ("ActiveVognode should accept an inactive vognode child");
+    . expect ("UnrestrictedVognode should accept a restricted vognode child");
 }
 
 #[test]
-fn inactive_placeholder_does_not_collide_with_content () {
-  // An inactive vognode is anonymous and is not a content member
+fn restricted_placeholder_does_not_collide_with_content () {
+  // A restricted vognode is anonymous and is not a content member
   // (its membership is owned by the disk weave), so it cannot
   // duplicate a real content child's id -- the buffer validates even
-  // when an active child happens to be the very node the placeholder
+  // when an unrestricted child happens to be the very node the placeholder
   // stands in for.
   let input : &str =
     indoc! {"
       * (skg (node (id root) (repo main))) parent
-      ** (skg (node (id hidden) (repo main))) active child
-      ** (skg inactiveNode)
+      ** (skg (node (id hidden) (repo main))) unrestricted child
+      ** (skg restrictedNode)
     "};
   let (viewforest, parsing_errors, _warnings_viewforest)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
@@ -747,7 +747,7 @@ fn inactive_placeholder_does_not_collide_with_content () {
     . id ();
   validate_local_structure (&viewforest, root_skgid, &config)
     . expect (
-      "an inactive vognode must not collide with content");
+      "a restricted vognode must not collide with content");
 }
 
 #[test]
@@ -800,7 +800,7 @@ fn duplicate_members_of_write_protected_folders_are_still_rejected () {
       . expect_err (
         "duplicate members of a write-protected folder should fail validation");
     assert!(
-      error . message . contains ("must not have duplicate ActiveVognode children"),
+      error . message . contains ("must not have duplicate UnrestrictedVognode children"),
       "Unexpected write-protected-folder validation error: {:?}",
       error ); }}
 

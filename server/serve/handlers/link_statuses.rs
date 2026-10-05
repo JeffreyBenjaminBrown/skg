@@ -1,10 +1,10 @@
 //! Batch existence and home-repo lookup from the current graph snapshot.
-//! It exposes no title or inactive node skgrepo information.
+//! It exposes no title or restricted node skgrepo information.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, value_from_request_sexp};
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::sexp::extract_string_list_from_sexp;
 use sexp::Sexp;
@@ -13,21 +13,21 @@ use std::net::TcpStream;
 #[derive(Debug, Eq, PartialEq)]
 pub enum LinkStatus {
   Resolved { pid : ID, skgrepo_label : String },
-  Inactive,
+  Restricted,
   Missing,
 }
 
 pub fn classify_link_skgids (
   graph  : &InRustGraph,
   config : &SkgConfig,
-  active : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
   skgids : &[ID],
 ) -> Vec<(ID, LinkStatus)> {
   skgids . iter () . map (|skgid| {
     let status : LinkStatus = match graph . pid_and_skgrepo (skgid) {
       None => LinkStatus::Missing,
-      Some ((_pid, skgrepo)) if ! active . is_all ()
-        && ! active . contains_skgrepo (&skgrepo) => LinkStatus::Inactive,
+      Some ((_pid, skgrepo)) if ! restriction . is_all ()
+        && ! restriction . contains_skgrepo (&skgrepo) => LinkStatus::Restricted,
       Some ((pid, skgrepo)) => {
         let skgrepo_label : String = config . skgrepos . get (&skgrepo)
           .map (|s| s . herald_label () . to_string ())
@@ -40,10 +40,10 @@ pub fn handle_link_statuses_request (
   request : &str,
   graph   : &InRustGraph,
   config  : &SkgConfig,
-  active  : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
 ) {
   let response : String = match link_statuses_response (
-    request, graph, config, active ) {
+    request, graph, config, restriction ) {
     Ok (body) => body,
     Err (message) => format! ("(error {})", quoted (&message)), };
   send_response_with_length_prefix (stream, &format! (
@@ -54,7 +54,7 @@ fn link_statuses_response (
   request : &str,
   graph   : &InRustGraph,
   config  : &SkgConfig,
-  active  : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
 ) -> Result<String, String> {
   let request_id : String = value_from_request_sexp (
     "request-id", request) ?;
@@ -64,11 +64,11 @@ fn link_statuses_response (
     .map_err (|e| e . to_string ()) ?
     . into_iter () . map (ID::from) . collect ();
   let rows : Vec<String> = classify_link_skgids (
-    graph, config, active, &skgids)
+    graph, config, restriction, &skgids)
     .into_iter ()
     .map (|(skgid, status)| match status {
       LinkStatus::Missing => format! ("({} missing)", quoted (&skgid . 0)),
-      LinkStatus::Inactive => format! ("({} inactive)", quoted (&skgid . 0)),
+      LinkStatus::Restricted => format! ("({} restricted)", quoted (&skgid . 0)),
       LinkStatus::Resolved { pid, skgrepo_label } => format! (
         "({} resolved {} {})",
         quoted (&skgid . 0), quoted (&pid . 0), quoted (&skgrepo_label)), })
@@ -101,12 +101,12 @@ mod tests {
   use std::sync::Arc;
 
   #[test]
-  fn statuses_use_the_current_graph_and_hide_inactive_skgrepos () {
+  fn statuses_use_the_current_graph_and_hide_restricted_skgrepos () {
     let mut config : SkgConfig = load_config (
       "tests/repo_sets/fixtures/skgconfig.toml") . unwrap ();
     config . skgrepos . get_mut (&SkgRepoName::from ("public"))
       .unwrap () . abbreviation = Some ("pub" . to_string ());
-    let active : ActiveSkgRepoSet = ActiveSkgRepoSet::named (
+    let restriction : SkgrepoRestriction = SkgrepoRestriction::named (
       &config, SkgRepoSetName::from ("public")) . unwrap ();
     let visible : Graphnode = Graphnode {
       pid : ID::from ("visible"),
@@ -123,17 +123,17 @@ mod tests {
       &[visible, private]);
     let skgids : Vec<ID> = ["old-visible", "private", "unknown"]
       .into_iter () . map (ID::from) .collect ();
-    assert_eq! (classify_link_skgids (&graph, &config, &active, &skgids), vec![
+    assert_eq! (classify_link_skgids (&graph, &config, &restriction, &skgids), vec![
       (ID::from ("old-visible"), LinkStatus::Resolved {
         pid : ID::from ("visible"), skgrepo_label : "pub" .to_string () }),
-      (ID::from ("private"), LinkStatus::Inactive),
+      (ID::from ("private"), LinkStatus::Restricted),
       (ID::from ("unknown"), LinkStatus::Missing) ]);
     let response : String = link_statuses_response (
       "((request . \"link statuses\") (request-id . \"buffer:9\") (ids \"old-visible\" \"private\" \"unknown\"))",
-      &graph, &config, &active ) . unwrap ();
+      &graph, &config, &restriction ) . unwrap ();
     assert! (response . contains ("(request-id \"buffer:9\")"));
     assert! (response . contains ("(\"old-visible\" resolved \"visible\" \"pub\")"));
-    assert! (response . contains ("(\"private\" inactive)"));
+    assert! (response . contains ("(\"private\" restricted)"));
     assert! (response . contains ("(\"unknown\" missing)"));
     assert! (! response . contains ("Private title"));
   }
@@ -142,13 +142,13 @@ mod tests {
   fn a_newly_swapped_in_graph_answers_before_any_title_index_update () {
     let config : SkgConfig = load_config (
       "tests/repo_sets/fixtures/skgconfig.toml") . unwrap ();
-    let active : ActiveSkgRepoSet = ActiveSkgRepoSet::named (
+    let restriction : SkgrepoRestriction = SkgrepoRestriction::named (
       &config, SkgRepoSetName::from ("public")) . unwrap ();
     let handle : InRustGraphHandle = Arc::new (ArcSwap::from_pointee (
       InRustGraph::new ()));
     let requested : Vec<ID> = vec![ID::from ("old-new")];
     assert_eq! (classify_link_skgids (
-      &handle . load_full (), &config, &active, &requested),
+      &handle . load_full (), &config, &restriction, &requested),
       vec![(ID::from ("old-new"), LinkStatus::Missing)]);
 
     let current : InRustGraph = InRustGraph::from_graphnodes (&[
@@ -159,7 +159,7 @@ mod tests {
         .. empty_graphnode () } ]);
     handle . store (Arc::new (current));
     let result = classify_link_skgids (
-      &handle . load_full (), &config, &active, &requested);
+      &handle . load_full (), &config, &restriction, &requested);
     assert_eq! (result, vec![(ID::from ("old-new"),
       LinkStatus::Resolved {
         pid : ID::from ("new"),

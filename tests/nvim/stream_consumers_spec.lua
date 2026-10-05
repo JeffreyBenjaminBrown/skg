@@ -123,11 +123,11 @@ describe('skg stream consumers', function ()
      function ()
     local seen = nil
     server = helpers.connect_to_fake_server(function (line, respond)
-      if line:find('set active repo set', 1, true) then
+      if line:find('set skgrepo restriction', 1, true) then
         seen = line
         respond(helpers.framed(
-          '((response-type active-repo-set) (active "public")'
-          .. ' (content "Active repo-set: public"))'))
+          '((response-type skgrepo-restriction) (restriction "public")'
+          .. ' (content "Skgrepo restriction: public"))'))
         respond(helpers.framed(
           '((response-type rerender-lock) (lock-views ()))'))
         respond(helpers.framed(
@@ -135,11 +135,11 @@ describe('skg stream consumers', function ()
           .. ' (warnings ()))'))
       end
     end)
-    repo_sets.set_active_repo_set('public')
+    repo_sets.restrict_repo_set('public')
     vim.wait(3000, function ()
       return lock.stream_in_progress == nil and seen ~= nil end, 10)
     assert.are.equal(
-      '((request . "set active repo set") (name . "public"))',
+      '((request . "set skgrepo restriction") (name . "public"))',
       seen)
   end)
 

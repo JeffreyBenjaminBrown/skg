@@ -2,7 +2,7 @@
 /// Nodes of the graph are represented via the 'Graphnode' type.
 /// Nodes of the tree are represented via the 'Viewnode' type.
 /// Some 'Viewnode's represent graphnodes, which need not exist; these are
-/// 'Vognode's (active, inactive, or phantom).
+/// 'Vognode's (unrestricted, restricted, or phantom).
 /// Others encode information about neighboring tree nodes, such as
 /// aliases, IDs, and partner folders.
 
@@ -70,13 +70,13 @@ pub enum ViewnodeKind {
   DeadViewnode,
 }
 
-/// A viewnode that represents a graphnode, which need not exist: Active
-/// and Inactive vognodes represent current graphnodes; a Phantom
+/// A viewnode that represents a graphnode, which need not exist: Unrestricted
+/// and Restricted vognodes represent current graphnodes; a Phantom
 /// represents a missing or historical one.
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
-  Active   (ActiveVognode),
-  Inactive (InactiveVognode), // From a skgrepo that is inactive (see "repo sets").
+  Unrestricted   (UnrestrictedVognode),
+  Restricted (RestrictedVognode), // From a skgrepo that is restricted (see "repo sets").
   Phantom  (Phantom),
 }
 
@@ -86,7 +86,7 @@ pub enum Vognode {
 /// in how much they can still say about it.
 #[derive( Debug, Clone, PartialEq )]
 pub enum Phantom {
-  Diff    (PhantomDiff), // Diff-only phantom: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim PhantomDiff, not an ActiveVognode -- a phantom is always write-protected/bodyless and its affectsParent is never read or rendered, so it needs none of ActiveVognode's affectsParent/birth/viewStats/view_requests/editability. See PhantomDiff_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
+  Diff    (PhantomDiff), // Diff-only phantom: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim PhantomDiff, not an UnrestrictedVognode -- a phantom is always write-protected/bodyless and its affectsParent is never read or rendered, so it needs none of UnrestrictedVognode's affectsParent/birth/viewStats/view_requests/editability. See PhantomDiff_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
   Deleted (PhantomDeleted), // Epistemically: No longer exists in the graph. Procedurally: Skg just watched the user delete this node (maybe from a different view), but for some reason (e.g. its view-descendents are interesting, or it is a root) had to retain an image of it here.
   // PITFALL: There is an exception. If Skg watches a user delete a node, while that user has a view of a foreign node that refers to the deleted node, that "foreigner's view" will show it as Unknown rather than Deleted. This is to maintain consistency with how that relationship to a nonexistent node will appear when viewed in later sessions.
   Unknown (PhantomUnknown), // Skg can't find it (and, unlike Deleted, does not know why). Can result from bad data, or from a reference to another user's node that has since been deleted.
@@ -101,9 +101,9 @@ pub enum Phantom {
 ///
 /// ARISES: during post-save / collateral re-render (NOT in git diff mode), when
 /// a node already materialized in the view turns up in
-/// `deleted_by_this_save_pids`. An Active content child flips here via
-/// `mutate_activeVognode_to_deletednode`. (An Inactive node is NOT flipped: it is an
-/// anonymous inactive vognode, and turning it into a DELETED marker would leak that a
+/// `deleted_by_this_save_pids`. An Unrestricted content child flips here via
+/// `mutate_unrestrictedVognode_to_deletednode`. (A Restricted node is NOT flipped: it is an
+/// anonymous restricted vognode, and turning it into a DELETED marker would leak that a
 /// hidden node vanished, so it just lingers until the next full rerender drops
 /// it.) So it marks a node that genuinely no longer exists in the graph, killed
 /// by a completed save (this buffer's or a shared one's) -- not a git artifact.
@@ -118,7 +118,7 @@ pub enum Phantom {
 /// DISTINCT INFO: unlike PhantomUnknown it knows its `repo`, and unlike either
 /// other phantom it keeps the `title`/`body` it last displayed -- because it was
 /// a fully materialized node right up until the save deleted it, so that text is
-/// still worth showing. (The title is empty for one promoted from an Inactive
+/// still worth showing. (The title is empty for one promoted from a Restricted
 /// node, which carried none.) It holds no diff axes: it is not about git stages.
 #[derive( Debug, Clone, PartialEq )]
 pub struct PhantomDeleted {
@@ -160,35 +160,35 @@ pub struct PhantomUnknown {
   pub relRepo_request : Option<SkgRepoName>,
 }
 
-/// An anonymous "something from an inactive repo is/was here"
-/// vognode. It carries NO data on purpose: an inactive node's id,
+/// An anonymous "something from a restricted repo is/was here"
+/// vognode. It carries NO data on purpose: a restricted node's id,
 /// skgrepo, title, etc. describe content the user hid by restricting
-/// the active skgrepo-set, so rendering any of it would leak.
+/// the skgrepo restriction, so rendering any of it would leak.
 ///
-/// SCOPE: an InactiveVognode arises ONLY from a skgrepo-set REDUCTION of an
+/// SCOPE: a RestrictedVognode arises ONLY from a skgrepo-set REDUCTION of an
 /// already-drawn buffer ('update_buffer/repo_switch.rs' converts
-/// now-inactive Active nodes in place), where it is kept to host
-/// already-drawn active descendants. A de-novo render under a
-/// restricted set NEVER creates one: inactive content members are
-/// omitted from goal lists ('omit_inactive_members') and their content
-/// is never expanded (completion does nothing at an inactive node's
+/// now-restricted Unrestricted nodes in place), where it is kept to host
+/// already-drawn unrestricted descendants. A de-novo render under a
+/// restricted set NEVER creates one: restricted content members are
+/// omitted from goal lists ('omit_restricted_members') and their content
+/// is never expanded (completion does nothing at a restricted node's
 /// visit). So a public node reachable only through a private parent
 /// simply does not appear on a fresh restricted view.
 ///
 /// Being dataless, it is save-inert everywhere: it emits no save intention
 /// (its membership is owned by disk supplementation), is not a collateral
 /// pid, is irrelevant to every reconciler (preserved as-is, never
-/// goal-matched), and renders as the bare atom 'inactiveNode'.
+/// goal-matched), and renders as the bare atom 'restrictedNode'.
 #[derive( Debug, Clone, PartialEq )]
-pub struct InactiveVognode;
+pub struct RestrictedVognode;
 
-pub type ActiveVognode   = ActiveVognode_Generic < ID, SkgRepoName >;
-pub type MpActiveVognode = ActiveVognode_Generic < Option < ID >,
+pub type UnrestrictedVognode   = UnrestrictedVognode_Generic < ID, SkgRepoName >;
+pub type MpUnrestrictedVognode = UnrestrictedVognode_Generic < Option < ID >,
                                              Option < SkgRepoName >>;
 
 /// A Viewnode that corresponds to a Graphnode.
 #[derive( Debug, Clone, PartialEq )]
-pub struct ActiveVognode_Generic < Id, Repo > {
+pub struct UnrestrictedVognode_Generic < Id, Repo > {
   pub title         : String,
   pub skgid         : Id,
   pub home_skgrepo  : Repo,
@@ -225,7 +225,7 @@ pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
 /// ARISES: only in git diff mode, from the diff-completion code. Two shapes,
 /// both detected by `diff_axes_require_phantom`: a "removed" member (present in
 /// the parent's HEAD/index contains but gone from the worktree's, inserted by
-/// `insert_phantoms_for_missing_contains` / `mk_phantom_viewnode`), or an Active
+/// `insert_phantoms_for_missing_contains` / `mk_phantom_viewnode`), or an Unrestricted
 /// node flipped in place by `normal_to_phantom` because its own relationship/
 /// node axes went negative. "removed" vs "removedHere" (its .skg file is
 /// still in the worktree, so the graph can still answer about it) is told apart by
@@ -235,14 +235,14 @@ pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
 /// correct HEAD position among surviving siblings, decorated with per-stage diff
 /// atoms. Always write-protected and bodyless (enforced by `normal_to_phantom` /
 /// `mk_phantom_viewnode`); its affectsParent is never read or rendered (implicit
-/// member); an Active child left under it is demoted to non-member.
+/// member); an Unrestricted child left under it is demoted to non-member.
 ///
 /// DISTINCT INFO: it is the only phantom that carries the git-diff coordinates
 /// -- per-stage `node_axes` and `relationship_axes` plus `not_in_git` -- because
 /// it exists solely to show a change between git snapshots. It keeps a `title`
 /// and `repo` (resolved via `title_for_phantom`; the skgrepo may be the
 /// RepoName NOT_FOUND sentinel) and `graphStats`, which IS rendered on
-/// phantoms. It needs NONE of ActiveVognode's affectsParent / birth / viewStats /
+/// phantoms. It needs NONE of UnrestrictedVognode's affectsParent / birth / viewStats /
 /// view_requests / editability (TODO/DONE/local-view-update/plan_v2.org §11 reduction; see §18): nothing
 /// reads a phantom's affectsParent, and every phantom is write-protected.
 #[derive( Debug, Clone, PartialEq )]
@@ -261,11 +261,11 @@ pub struct PhantomDiff_Generic < Id, Repo > {
 }
 
 impl < Id, Repo > PhantomDiff_Generic < Id, Repo > {
-  /// Build a phantom payload from an ActiveVognode, keeping only the phantom-relevant
+  /// Build a phantom payload from an UnrestrictedVognode, keeping only the phantom-relevant
   /// fields and discarding affectsParent / birth / viewStats / view_requests /
-  /// editability. Used when flipping an Active node to a phantom and by the
+  /// editability. Used when flipping an Unrestricted node to a phantom and by the
   /// placed<->maybe-placed conversions.
-  pub fn from_activeVognode ( t : ActiveVognode_Generic < Id, Repo > ) -> Self {
+  pub fn from_unrestrictedVognode ( t : UnrestrictedVognode_Generic < Id, Repo > ) -> Self {
     PhantomDiff_Generic {
       title      : t . title,
       skgid         : t . skgid,
@@ -291,7 +291,7 @@ impl < Id, Repo > PhantomDiff_Generic < Id, Repo > {
     && self . node_axes . unstaged != Some (Sign::Minus) }
 }
 
-/// Each ActiveVognode has one of these.
+/// Each UnrestrictedVognode has one of these.
 /// - A Editable represents an editable view.
 ///   The user's changes to title, body and children
 ///   will be written to disk and the dbs when they save.
@@ -343,7 +343,7 @@ pub struct GraphnodeStats {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewnodeStats {
   pub cycle                 : bool,
-  pub homeSkgRepoAtBoundary : bool, // True if a root or if skgrepo differs from skgrepo of nearest activeVognode ancestor.
+  pub homeSkgRepoAtBoundary : bool, // True if a root or if skgrepo differs from skgrepo of nearest unrestrictedVognode ancestor.
   /// The relationship heralds as the SEMANTIC `(rels ...)` sexp string
   /// (server/herald_tokens.rs `relationship_heralds_sexp`): per-relation
   /// member counts and which tracked ancestors are members on each side,
@@ -383,7 +383,7 @@ pub struct ViewnodeStats {
   /// HiddenOutsideOfSubscribee), which have no single
   /// 'relation_member_role' to read a skgrepo from.
   /// This is a display fact, unlike a requested replacement stored in
-  /// 'ActiveVognode_Generic::relRepo_request'.  Save extraction never
+  /// 'UnrestrictedVognode_Generic::relRepo_request'.  Save extraction never
   /// treats this value as a fieldIntent.
   /// Herald: red "~NAME" immediately before the ⌂ homeRepoHerald
   /// (server/heralds.rs).
@@ -503,7 +503,7 @@ impl FolderRelation {
 }
 
 /// Requests for viewbranches related to a node.
-/// Multiple view requests can be active simultaneously.
+/// Multiple view requests can be unrestricted simultaneously.
 /// - 'Folder(rel)' builds BOTH folders of the relation, populated from the graph.
 /// - 'RoleTree(role)' builds the role tree for that one partner role.
 /// - 'Editable' makes the (write-protected) node editable.
@@ -528,7 +528,7 @@ pub enum ViewRequest {
 /// - any relationship axis being '-' (removed in some stage), or
 /// - the worktree node axis being '-' (file deleted), or
 /// - the "moved twice" pattern: stagedM = +, unstagedM = -.
-/// Shared by ActiveVognode_Generic and PhantomDiff_Generic, which both carry
+/// Shared by UnrestrictedVognode_Generic and PhantomDiff_Generic, which both carry
 /// these axes.
 pub fn diff_axes_require_phantom (
   node_axes  : &NodeAxes,
@@ -538,7 +538,7 @@ pub fn diff_axes_require_phantom (
   || relationship_axes . unstaged == Some (Sign::Minus)
   || node_axes  . unstaged == Some (Sign::Minus) }
 
-impl < Id, Repo > ActiveVognode_Generic < Id, Repo > {
+impl < Id, Repo > UnrestrictedVognode_Generic < Id, Repo > {
   pub fn should_be_diffPhantom (
     &self,
   ) -> bool {
@@ -571,7 +571,7 @@ impl < Id, Repo > ActiveVognode_Generic < Id, Repo > {
       Editability::WriteProtected => None, }}
 }
 
-impl ActiveVognode {
+impl UnrestrictedVognode {
   /// The COLLECTED ID: what this viewnode contributes to its
   /// parent's collected lists -- the 'overridesHere' original when
   /// the node was drawn in place of one, else its own ID. Save
@@ -584,8 +584,8 @@ impl ActiveVognode {
     . unwrap_or_else ( || self . skgid . clone () ) }
 }
 
-impl MpActiveVognode {
-  /// As 'ActiveVognode::collected_id', for the maybe-placed stage (the
+impl MpUnrestrictedVognode {
+  /// As 'UnrestrictedVognode::collected_id', for the maybe-placed stage (the
   /// node might not have an ID yet; a marker, if present, wins).
   pub fn collected_skgid (&self) -> Option<ID> {
     self . viewStats . overridesHere . clone ()
@@ -686,12 +686,12 @@ impl Property {
 }
 
 impl Vognode {
-  /// None for an Inactive vognode: it is an anonymous inactive vognode with
-  /// no id (see InactiveVognode). A phantom returns the id it stands for.
+  /// None for a Restricted vognode: it is an anonymous restricted vognode with
+  /// no id (see RestrictedVognode). A phantom returns the id it stands for.
   pub fn skgid (&self) -> Option<&ID> {
     match self {
-      Vognode::Active   (t) => Some (&t . skgid),
-      Vognode::Inactive (_) => None,
+      Vognode::Unrestricted   (t) => Some (&t . skgid),
+      Vognode::Restricted (_) => None,
       Vognode::Phantom  (p) => Some (p . skgid ()),
     } }
 
@@ -699,13 +699,13 @@ impl Vognode {
     &self,
   ) -> Option<(&ID, &SkgRepoName)> {
     match self {
-      Vognode::Active   (t) => Some ((&t . skgid, &t . home_skgrepo)),
-      Vognode::Inactive (_) => None,
+      Vognode::Unrestricted   (t) => Some ((&t . skgid, &t . home_skgrepo)),
+      Vognode::Restricted (_) => None,
       Vognode::Phantom  (p) => p . pid_and_skgrepo (),
     } }
 
   /// Whether this vognode represents a current graphnode
-  /// (Active or Inactive), as opposed to a phantom.
+  /// (Unrestricted or Restricted), as opposed to a phantom.
   pub fn is_current_graphnode (&self) -> bool {
     ! matches! (self, Vognode::Phantom (_)) }
 }
@@ -756,10 +756,10 @@ impl Viewnode {
     &mut self,
   ) {
     match &mut self . kind {
-      ViewnodeKind::Vognode (Vognode::Active (active)) => {
-        active . relRepo_request = None;
+      ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) => {
+        restriction . relRepo_request = None;
         if let Editability::Editable { edit_request, .. } =
-          &mut active . editability
+          &mut restriction . editability
         { *edit_request = None; }},
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
         unknown . relRepo_request = None,
@@ -770,7 +770,7 @@ impl Viewnode {
   pub fn normal_to_phantom (
     &mut self,
   ) {
-    if let ViewnodeKind::Vognode (Vognode::Active (t))
+    if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
       = &self . kind
       { if t . should_be_diffPhantom ()
         { // A phantom is ALWAYS write-protected and renders no body (Jeff's
@@ -779,17 +779,17 @@ impl Viewnode {
           // editable occurrence -- if Removed it has nothing to define, and if
           // RemovedHere "edit it here, where it isn't" is dangerously
           // confusing. So drop body/edit_request when flipping a (possibly
-          // Editable) Active node to a phantom. mk_phantom_viewnode already
+          // Editable) Unrestricted node to a phantom. mk_phantom_viewnode already
           // builds from a `WriteProtected` base, so now every phantom is
           // write-protected by construction.
           let phantom : PhantomDiff =
-            PhantomDiff::from_activeVognode ( t . clone () );
+            PhantomDiff::from_unrestrictedVognode ( t . clone () );
           self . kind = ViewnodeKind::Vognode (Vognode::Phantom (
             Phantom::Diff (phantom))); }}}
 
   pub fn title (&self) -> &str {
     match &self . kind {
-      ViewnodeKind::Vognode (Vognode::Active (t)) => &t . title,
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => &t . title,
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) => &p . title,
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) =>
         &d . title,
@@ -800,46 +800,46 @@ impl Viewnode {
         | ViewnodeKind::BufferRoot
         | ViewnodeKind::DeadViewnode
         | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))
-        | ViewnodeKind::Vognode (Vognode::Inactive (_)) =>
+        | ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
         "",
     }}
 
-  /// Reasonable for both ActiveVognodes and Non-vognodes.
+  /// Reasonable for both UnrestrictedVognodes and Non-vognodes.
   pub fn body (&self) -> Option < &String > {
     match &self . kind {
-      ViewnodeKind::Vognode (Vognode::Active (t)) => t . body (),
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t . body (),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) => p . body (),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) => d . body . as_ref (),
       ViewnodeKind::PropertyFolder (folder) => folder . body (),
       ViewnodeKind::Property (property) => property . body (),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))
-        | ViewnodeKind::Vognode (Vognode::Inactive (_))
+        | ViewnodeKind::Vognode (Vognode::Restricted (_))
         | ViewnodeKind::PartnerFolder (_)
         | ViewnodeKind::BufferRoot
         | ViewnodeKind::DeadViewnode => None,
     }}
 
-  pub fn is_activeVognode_and_affectsParent_true (&self) -> bool {
+  pub fn is_unrestrictedVognode_and_affectsParent_true (&self) -> bool {
     match &self . kind {
-      ViewnodeKind::Vognode (Vognode::Active (t)) =>
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         t . affectsParent == AffectsParent::True,
       _ => false,
     }}
 
   /// The id of a vognode that represents a current graphnode: None
-  /// for phantoms, inactive vognodes and non-vognodes.
+  /// for phantoms, restricted vognodes and non-vognodes.
   pub fn skgid_if_current_graphnode (&self) -> Option<&ID> {
     match &self . kind {
       ViewnodeKind::Vognode (v) if v . is_current_graphnode () => v . skgid (),
       _ => None,
     }}
 
-  /// The id of an Active vognode or a Diff phantom -- the two ActiveVognode-ish
+  /// The id of an Unrestricted vognode or a Diff phantom -- the two UnrestrictedVognode-ish
   /// kinds. None for everything else
-  /// (Inactive, Deleted/Unknown phantoms, folders, non-vognodes, BufferRoot).
-  pub fn active_or_diff_phantom_skgid (&self) -> Option<&ID> {
+  /// (Restricted, Deleted/Unknown phantoms, folders, non-vognodes, BufferRoot).
+  pub fn unrestricted_or_diff_phantom_skgid (&self) -> Option<&ID> {
     match &self . kind {
-      ViewnodeKind::Vognode (Vognode::Active (t)) => Some (&t . skgid),
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some (&t . skgid),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))   => Some (&p . skgid),
       _ => None,
     }}
@@ -913,14 +913,14 @@ impl Default for ViewnodeStats {
 // Constructor functions
 //
 
-/// Create an ActiveVognode with default values for all fields except id, skgrepo, and title.
+/// Create an UnrestrictedVognode with default values for all fields except id, skgrepo, and title.
 /// Useful when you need to customize other fields after construction.
-pub fn default_activeVognode (
+pub fn default_unrestrictedVognode (
   skgid   : ID,
   skgrepo : SkgRepoName,
   title   : String,
-) -> ActiveVognode {
-  ActiveVognode {
+) -> UnrestrictedVognode {
+  UnrestrictedVognode {
     title,
     skgid,
     home_skgrepo: skgrepo,
@@ -950,16 +950,16 @@ pub fn mk_phantom_viewnode (
 ) -> Viewnode {
   let mut viewnode : Viewnode =
     mk_writeProtected_viewnode ( skgid, skgrepo, title, AffectsParent::True );
-  if let ViewnodeKind::Vognode (Vognode::Active (mut t)) = viewnode . kind
+  if let ViewnodeKind::Vognode (Vognode::Unrestricted (mut t)) = viewnode . kind
     { t . node_axes  = node_axes;
       t . relationship_axes = relationship_axes;
       viewnode . kind = ViewnodeKind::Vognode (Vognode::Phantom (
-        Phantom::Diff ( PhantomDiff::from_activeVognode (t) ))); }
+        Phantom::Diff ( PhantomDiff::from_unrestrictedVognode (t) ))); }
   else
-    // mk_writeProtected_viewnode always yields an Active vognode; if that ever
+    // mk_writeProtected_viewnode always yields an Unrestricted vognode; if that ever
     // changes, fail loudly rather than silently return a non-phantom.
     { unreachable! (
-        "mk_phantom_viewnode: mk_writeProtected_viewnode did not yield an Active vognode" ); }
+        "mk_phantom_viewnode: mk_writeProtected_viewnode did not yield an Unrestricted vognode" ); }
   viewnode }
 
 pub fn mk_editable_viewnode (
@@ -996,14 +996,14 @@ pub fn mk_unknown_viewnode (
       } ) )),
   }}
 
-pub fn mk_inactive_viewnode (
+pub fn mk_restricted_viewnode (
 ) -> Viewnode {
   Viewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
     kind        : ViewnodeKind::Vognode (
-      Vognode::Inactive ( InactiveVognode ) ),
+      Vognode::Restricted ( RestrictedVognode ) ),
   }}
 
 /// Create a write-protected Viewnode from disk data.
@@ -1033,14 +1033,14 @@ pub fn mk_writeProtected_viewnode_with_birth (
 
 /// Convert an editable Viewnode to write-protected.
 /// Discards body and edit_request.
-/// Errors if the input is not an ActiveVognode.
+/// Errors if the input is not an UnrestrictedVognode.
 pub fn mk_writeProtected_from_viewnode (
   mut viewnode : Viewnode,
   affectsParent    : AffectsParent,
   birth       : Birth,
 ) -> Result < Viewnode, String > {
   match &mut viewnode . kind {
-    ViewnodeKind::Vognode (Vognode::Active (t)) => {
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
       // Mutate in place, so that every field not named here
       // (view_requests, diff axes, graphStats, viewStats, and any
       // field added later) is preserved rather than silently reset.
@@ -1056,7 +1056,7 @@ pub fn mk_writeProtected_from_viewnode (
         p . skgid . clone (), p . home_skgrepo . clone (), p . title . clone (),
         affectsParent, birth )),
     _ => Err (
-      "mk_writeProtected_from_viewnode: expected ActiveVognode"
+      "mk_writeProtected_from_viewnode: expected UnrestrictedVognode"
         . to_string () ) }}
 
 /// Create a Viewnode with *nearly* full metadata control.
@@ -1076,12 +1076,12 @@ pub fn mk_viewnode (
              folded      : false,
              body_folded : false,
              kind        : ViewnodeKind::Vognode (
-               Vognode::Active (
-                 ActiveVognode { affectsParent,
+               Vognode::Unrestricted (
+                 UnrestrictedVognode { affectsParent,
                             birth,
                             view_requests,
                             editability,
-                            .. default_activeVognode (
+                            .. default_unrestrictedVognode (
                               skgid, skgrepo, title ) } ) ) }}
 
 /// Helper to create a BufferRoot Viewnode.

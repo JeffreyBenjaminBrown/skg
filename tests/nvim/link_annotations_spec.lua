@@ -53,7 +53,7 @@ describe('skg.link_annotations', function ()
     vim.bo[buf].modified = false
     annotations.cache['old-visible'] = { 'resolved', 'visible', 'pub' }
     annotations.cache.gone = { 'missing' }
-    annotations.cache.private = { 'inactive' }
+    annotations.cache.private = { 'restricted' }
     annotations.enable(buf)
     local broken = 0
     for _, mark in ipairs(marks(buf)) do
@@ -73,7 +73,7 @@ describe('skg.link_annotations', function ()
     assert.are.equal(0, #suffixes(buf))
     annotations.toggle_repo_overlay(buf)
     -- the broken link [[id:gone]] gets no suffix
-    assert.same({ ' [⌂:pub]', ' [⌂:inactive]' }, suffixes(buf))
+    assert.same({ ' [⌂:pub]', ' [⌂:restricted]' }, suffixes(buf))
     assert.same(lines, vim.api.nvim_buf_get_lines(buf, 0, -1, false))
     assert.is_false(vim.bo[buf].modified)
     annotations.refresh(buf)

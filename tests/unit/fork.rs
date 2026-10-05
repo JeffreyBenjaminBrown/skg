@@ -3,9 +3,9 @@
 //
 // The rule under test ('owned_ancestor_repos_for_foreign_vognodes'):
 // a foreign node's clone inherits the skgrepo of its NEAREST vognode
-// ancestor, recorded only if that ancestor is an owned Active vognode.
+// ancestor, recorded only if that ancestor is an owned Unrestricted vognode.
 // The walk skips non-vognodes (folders) but STOPS at the first vognode -- it
-// never passes a foreign or inactive ancestor to reach a distant owned
+// never passes a foreign or restricted ancestor to reach a distant owned
 // one.
 
 use super::*;
@@ -32,7 +32,7 @@ fn config_two_owned_one_foreign () -> SkgConfig {
         owned        : owns, } ); }
   SkgConfig::fromSkgReposAndTantivyFolder ( skgrepos, "/tmp/none" ) }
 
-fn active (skgid : &str, skgrepo : &str) -> Viewnode {
+fn restriction (skgid : &str, skgrepo : &str) -> Viewnode {
   mk_editable_viewnode (
     ID::from (skgid), SkgRepoName::from (skgrepo), skgid . to_string (), None ) }
 
@@ -46,19 +46,19 @@ fn subscribee_folder () -> Viewnode {
 /// - owned1 R -> subscribeeFolder -> foreign S  (folder skipped: owned1 for S)
 fn build_forest () -> ViewForest {
   let mut f : ViewForest = ViewForest::new ();
-  let p : ego_tree::NodeId = f . append_root ( active ("P", "owned2") );
+  let p : ego_tree::NodeId = f . append_root ( restriction ("P", "owned2") );
   let ff : ego_tree::NodeId =
-    f . get_mut (p) . unwrap () . append ( active ("F", "foreign") ) . id ();
+    f . get_mut (p) . unwrap () . append ( restriction ("F", "foreign") ) . id ();
   let _n : ego_tree::NodeId =
-    f . get_mut (ff) . unwrap () . append ( active ("N", "foreign") ) . id ();
-  let q : ego_tree::NodeId = f . append_root ( active ("Q", "owned2") );
+    f . get_mut (ff) . unwrap () . append ( restriction ("N", "foreign") ) . id ();
+  let q : ego_tree::NodeId = f . append_root ( restriction ("Q", "owned2") );
   let _m : ego_tree::NodeId =
-    f . get_mut (q) . unwrap () . append ( active ("M", "foreign") ) . id ();
-  let r : ego_tree::NodeId = f . append_root ( active ("R", "owned1") );
+    f . get_mut (q) . unwrap () . append ( restriction ("M", "foreign") ) . id ();
+  let r : ego_tree::NodeId = f . append_root ( restriction ("R", "owned1") );
   let rc : ego_tree::NodeId =
     f . get_mut (r) . unwrap () . append ( subscribee_folder () ) . id ();
   let _s : ego_tree::NodeId =
-    f . get_mut (rc) . unwrap () . append ( active ("S", "foreign") ) . id ();
+    f . get_mut (rc) . unwrap () . append ( restriction ("S", "foreign") ) . id ();
   f }
 
 #[test]

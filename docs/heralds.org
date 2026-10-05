@@ -9,7 +9,7 @@ an ID in magit, are *annotations*, not heralds.) Toggle the compact display with
 (=<localleader>vh=) in Neovim. The expanded metadata is useful when you
 need to inspect the exact facts or requests.
 
-Relationship counts describe the latest rendered graph under the active
+Relationship counts describe the latest rendered graph under the unrestricted
 skgrepo-set. They count distinct visible nodes, including visible
 relationships, and resolve extra IDs. They do not count repeated
 links or unsaved buffer edits as new graph facts. A folded body can still
@@ -60,9 +60,9 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | diff facts           | nonstandard | =N -N R -R=, =text changed=, =diff:not-in-git=                                |
 |                      | go          | =✓= staged                                                                    |
 |                      | stop        | =✗= unstaged                                                                  |
-| phantoms, inactive   | message     | =Reference to unknown node.=, =node from inactive repo=, =DELETED=            |
+| phantoms, restricted   | message     | =Reference to unknown node.=, =node from restricted skgrepo=, =DELETED=            |
 | link annotations     | normal      | a resolved target's =[⌂:pub]=                                                 |
-|                      | yucky       | =[⌂:inactive]=, =[⌂:…]=, =[⌂:lookup failed]=, a dangling link's label           |
+|                      | yucky       | =[⌂:restricted]=, =[⌂:…]=, =[⌂:lookup failed]=, a dangling link's label           |
 
 ** Relationship heralds
 *** Letters and sides
@@ -171,8 +171,8 @@ overloaded during org-roam import=, and =no search matching= when true.
 request a view. =delete=, =merge:...=, and =request:no search matching=
 or =request:search matching= are save requests.
 
-An unknown node is labeled =Reference to unknown node.=; an inactive
-skgrepo yields an anonymous =node from inactive repo= marker, which
+An unknown node is labeled =Reference to unknown node.=; a restricted
+skgrepo yields an anonymous =node from restricted skgrepo= marker, which
 reveals no node title or skgrepo. =DELETED= marks a deleted node, or a
 viewnode whose node was deleted.
 
@@ -190,12 +190,12 @@ Use 'skg-toggle-repo-overlay-on-links' (=C-c v L=) in Emacs or
 ':SkgToggleRepoOverlayOnLinks' (=<localleader>vL=) in Neovim.
 Suffixes start off and the toggle is local to the buffer. A resolved
 target shows its skgrepo, for example =[⌂:pub]=. Extra IDs resolve to
-their target's home skgrepo. =[⌂:inactive]=, =[⌂:…]= and
-=[⌂:lookup failed]= distinguish inactive, pending and lookup-failed
+their target's home skgrepo. =[⌂:restricted]=, =[⌂:…]= and
+=[⌂:lookup failed]= distinguish restricted, pending and lookup-failed
 targets, and reveal no skgrepo name. A dangling link gets no suffix.
 
 Even with suffixes off, the label of a link confirmed dangling in the
-current graph is yucky and underlined. Inactive or still unknown
+current graph is yucky and underlined. Restricted or still unknown
 targets are not marked broken. These display-only annotations do not
 change link text, save contents, or exact-ID navigation.
 

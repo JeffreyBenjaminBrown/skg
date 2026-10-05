@@ -153,7 +153,7 @@ fn successful_save_consumes_relRepo_edit_request (
       "(id b) (repo public)",
       "(id b) (repo public) (editRequest (relRepo private))" );
     assert_ne! (save_input, initial_buffer,
-      "fixture rendering should expose b's active-node metadata");
+      "fixture rendering should expose b's unrestricted-node metadata");
 
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,

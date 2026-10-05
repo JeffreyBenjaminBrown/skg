@@ -23,21 +23,21 @@ fn partnerFolder_policy_mapping () {
 
 #[test]
 fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
-  let mut active : Viewnode = mk_viewnode (
-    ID::from ("active"), SkgRepoName::from ("public"), "active" . into (),
+  let mut restriction : Viewnode = mk_viewnode (
+    ID::from ("unrestricted"), SkgRepoName::from ("public"), "unrestricted" . into (),
     AffectsParent::True, Birth::Unremarkable,
     Editability::Editable {
       body : None,
       edit_request : Some (NodeEditRequest::Delete) },
     [ViewRequest::Editable] . into_iter () . collect () );
-  if let ViewnodeKind::Vognode (Vognode::Active (node)) = &mut active . kind {
+  if let ViewnodeKind::Vognode (Vognode::Unrestricted (node)) = &mut restriction . kind {
     node . relRepo_request = Some (SkgRepoName::from ("private")); }
-  active . consume_edit_request_after_save ();
-  let ViewnodeKind::Vognode (Vognode::Active (active)) = &active . kind
-  else { panic! ("expected active node"); };
-  assert_eq! (active . relRepo_request, None);
-  assert_eq! (active . edit_request (), None);
-  assert! (active . view_requests . contains (&ViewRequest::Editable));
+  restriction . consume_edit_request_after_save ();
+  let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) = &restriction . kind
+  else { panic! ("expected unrestricted node"); };
+  assert_eq! (restriction . relRepo_request, None);
+  assert_eq! (restriction . edit_request (), None);
+  assert! (restriction . view_requests . contains (&ViewRequest::Editable));
 
   let mut unknown : Viewnode = Viewnode {
     focused : false, folded : false, body_folded : false,

@@ -40,8 +40,8 @@ pub enum LocalContext {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DefiningFolderRecorder {
   pub skgid              : ID,
-  pub is_editable     : bool, // True iff the recorder is Active and editable.
-  pub is_saveEligible : bool, // True iff the recorder is editable, Active, carries no Delete request, and is not in subscribee-as-such position.
+  pub is_editable     : bool, // True iff the recorder is Unrestricted and editable.
+  pub is_saveEligible : bool, // True iff the recorder is editable, Unrestricted, carries no Delete request, and is not in subscribee-as-such position.
 }
 
 /// A FieldIntent is what one visit can emit. Each emission

@@ -23,7 +23,7 @@ use crate::serve::handlers::text_release::{
 };
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
-use crate::skgrepo_sets::{ActiveSkgRepoSet, apply_skgrepo_set_to_viewforest};
+use crate::skgrepo_sets::{SkgrepoRestriction, apply_skgrepo_set_to_viewforest};
 use crate::to_org::expand::role_tree::attach_full_containerward_role_trees_at_treeids_with_skgrepo_set;
 use crate::to_org::util::EditableMap;
 use crate::types::git::{NodeAxes, RelationshipAxes, SkgRepoDiff};
@@ -59,7 +59,7 @@ pub struct RerenderAfterSaveContext<'a> {
   /// before graph mutation.  A still-stored relationship can name one of
   /// these IDs after the pid itself has disappeared.
   pub deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
-  pub active_skgrepo_set             : Option<&'a ActiveSkgRepoSet>,
+  pub skgrepo_restriction            : Option<&'a SkgrepoRestriction>,
 }
 
 impl<'a> RerenderAfterSaveContext<'a> {
@@ -68,12 +68,12 @@ impl<'a> RerenderAfterSaveContext<'a> {
     diff_mode_enabled : bool,
     node_instructions      : &[NodeInstruction],
     deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
-    active_skgrepo_set : Option<&'a ActiveSkgRepoSet>,
+    skgrepo_restriction : Option<&'a SkgrepoRestriction>,
   ) -> RerenderAfterSaveContext<'a> {
     let runtime = env . runtime_snapshot ();
     Self::for_save_with_runtime (
       env, runtime, diff_mode_enabled, node_instructions,
-      deleted_by_this_save_extra_ids, active_skgrepo_set)
+      deleted_by_this_save_extra_ids, skgrepo_restriction)
   }
 
   fn for_save_with_runtime (
@@ -82,7 +82,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
     diff_mode_enabled : bool,
     node_instructions : &[NodeInstruction],
     deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
-    active_skgrepo_set : Option<&'a ActiveSkgRepoSet>,
+    skgrepo_restriction : Option<&'a SkgrepoRestriction>,
   ) -> RerenderAfterSaveContext<'a> {
     let skgrepo_diffs
       : Option<HashMap<SkgRepoName, SkgRepoDiff>>
@@ -111,25 +111,25 @@ impl<'a> RerenderAfterSaveContext<'a> {
       deleted_since_head_pid_src_map,
       deleted_by_this_save_pids,
       deleted_by_this_save_extra_ids,
-      active_skgrepo_set,
+      skgrepo_restriction,
     }}
 
   pub fn without_save (
     env                : &'a SkgEnv,
     diff_mode_enabled  : bool,
-    active_skgrepo_set : Option<&'a ActiveSkgRepoSet>,
+    skgrepo_restriction : Option<&'a SkgrepoRestriction>,
   ) -> RerenderAfterSaveContext<'a> {
     RerenderAfterSaveContext::for_save (
-      env, diff_mode_enabled, &[], HashMap::new (), active_skgrepo_set ) }
+      env, diff_mode_enabled, &[], HashMap::new (), skgrepo_restriction ) }
 
   pub fn without_save_with_runtime (
     env : &'a SkgEnv,
     runtime : Arc<RuntimeGeneration>,
     diff_mode_enabled : bool,
-    active_skgrepo_set : Option<&'a ActiveSkgRepoSet>,
+    skgrepo_restriction : Option<&'a SkgrepoRestriction>,
   ) -> RerenderAfterSaveContext<'a> {
     RerenderAfterSaveContext::for_save_with_runtime (
-      env, runtime, diff_mode_enabled, &[], HashMap::new (), active_skgrepo_set ) }
+      env, runtime, diff_mode_enabled, &[], HashMap::new (), skgrepo_restriction ) }
 }
 
 struct RenderedCollateralView {
@@ -156,7 +156,7 @@ pub fn update_views_after_save (
   runtime                     : Arc<RuntimeGeneration>,
   viewid_from_request_result  : &Result<ViewId, String>,
   views_state                 : &mut ViewsState,
-  active_skgrepo_set          : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction         : Option<&SkgrepoRestriction>,
   deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
   text_approved_pids        : &HashSet<ID>,
   fork_specs                  : &[ForkSpec],
@@ -171,7 +171,7 @@ pub fn update_views_after_save (
         "RerenderAfterSaveContext::for_save" ). entered();
       RerenderAfterSaveContext::for_save_with_runtime (
         env, runtime, diff_mode_enabled, &node_instructions,
-        deleted_by_this_save_extra_ids, active_skgrepo_set ) };
+        deleted_by_this_save_extra_ids, skgrepo_restriction ) };
   let mut saved_view_mut : ViewForest = saved_view;
   replace_saved_view_fork_roots (&mut saved_view_mut, fork_specs) ?;
   // The skgsave-commit has happened, so every `(editRequest ...)` in the
@@ -183,19 +183,19 @@ pub fn update_views_after_save (
       "rewriteInPlace_viewnodes_whose_id_is_newly_extra" ). entered();
     rewriteInPlace_viewnodes_whose_skgid_is_newly_extra (
       &mut saved_view_mut, &context . graph_snap ) ? };
-  // Gate the forests' existing active nodes before rendering, so even a
+  // Gate the forests' existing unrestricted nodes before rendering, so even a
   // rendering error cannot echo protected title/body text. A second decision
   // below covers nodes introduced by completion/expansion.
-  if let Some (active) = active_skgrepo_set {
+  if let Some (restriction) = skgrepo_restriction {
     let mut input_candidates : Vec<ID> =
-      active_skgids_in_viewforest (&saved_view_mut);
+      unrestricted_skgids_in_viewforest (&saved_view_mut);
     for view_id in &collateral_view_ids {
       if let Some (viewforest) = views_state . open_views
           . viewid_to_view (view_id) {
         input_candidates . extend (
-          active_skgids_in_viewforest (viewforest) ); }}
+          unrestricted_skgids_in_viewforest (viewforest) ); }}
     let release : TextReleaseDecision = decide (
-      "save-rerender", active, &input_candidates,
+      "save-rerender", restriction, &input_candidates,
       &context . graph_snap, text_approved_pids );
     if matches! (release, TextReleaseDecision::Challenge { .. }) {
       return Ok ( SaveResponse {
@@ -230,13 +230,13 @@ pub fn update_views_after_save (
   // Everything textual is now staged in memory. Decide before changing the
   // open-view registry or streaming the first view.
   let mut release_candidates : Vec<ID> =
-    active_skgids_in_viewforest (&saved_view_mut);
+    unrestricted_skgids_in_viewforest (&saved_view_mut);
   for collateral in &collateral_views {
     release_candidates . extend (
-      active_skgids_in_viewforest (&collateral . viewforest) ); }
-  if let Some (active) = active_skgrepo_set {
+      unrestricted_skgids_in_viewforest (&collateral . viewforest) ); }
+  if let Some (restriction) = skgrepo_restriction {
     let release : TextReleaseDecision = decide (
-      "save-rerender", active, &release_candidates,
+      "save-rerender", restriction, &release_candidates,
       &context . graph_snap, text_approved_pids );
     match release {
       decision @ TextReleaseDecision::Challenge { .. } => {
@@ -275,13 +275,13 @@ pub fn update_views_after_save (
     hoist_confirmation  : None,
     text_release_confirmation : None, } ) }
 
-fn active_skgids_in_viewforest (
+fn unrestricted_skgids_in_viewforest (
   viewforest : &ViewForest,
 ) -> Vec<ID> {
   viewforest . nodes ()
     .filter_map ( |node| match &node . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Active (active)) =>
-        Some ( active . skgid . clone () ),
+      ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =>
+        Some ( restriction . skgid . clone () ),
       _ => None,
     } )
     .collect ()
@@ -302,8 +302,8 @@ fn replace_saved_view_fork_roots (
     let original : Option<ID> =
       viewforest . get (root_skgid) . and_then (|root| match
         &root . value () . kind {
-          ViewnodeKind::Vognode (Vognode::Active (active)) =>
-            Some (active . skgid . clone ()),
+          ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =>
+            Some (restriction . skgid . clone ()),
           _ => None, });
     let Some (original) = original else { continue; };
     let Some (spec) = fork_specs . iter ()
@@ -312,15 +312,15 @@ fn replace_saved_view_fork_roots (
     let clone = & spec . clone . 0;
     let mut root = viewforest . get_mut (root_skgid)
       . ok_or ("replace_saved_view_fork_roots: root not found") ?;
-    if let ViewnodeKind::Vognode (Vognode::Active (active)) =
+    if let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =
       &mut root . value () . kind
-    { active . skgid = clone . pid . clone ();
-      active . home_skgrepo = clone . home_skgrepo . clone ();
-      active . title = clone . title . clone ();
-      if let Editability::Editable { body, .. } = &mut active . editability
+    { restriction . skgid = clone . pid . clone ();
+      restriction . home_skgrepo = clone . home_skgrepo . clone ();
+      restriction . title = clone . title . clone ();
+      if let Editability::Editable { body, .. } = &mut restriction . editability
       { *body = clone . body . clone (); }
-      active . view_requests . remove (&ViewRequest::Fork);
-      active . viewStats . overridesHere = Some (original); }}
+      restriction . view_requests . remove (&ViewRequest::Fork);
+      restriction . viewStats . overridesHere = Some (original); }}
   Ok (())
 }
 
@@ -366,7 +366,7 @@ fn rerender_collateral_view (
 /// (create_partnerFolders_for_fresh_nodes = true), expands content, reconciles
 /// folders, and applies the TODO/DONE/local-view-update/plan_v2.org §5.5 node budget.
 /// When diff_mode, the git diff is computed inline by view completion (per node,
-/// at its BFS visit, via process_activeVognode_diff) -- the same path post-save uses.
+/// at its BFS visit, via process_unrestrictedVognode_diff) -- the same path post-save uses.
 /// The caller (multi_root_view_via_env) then adds containerward role tree and
 /// stats.
 /// Returns the completed viewforest plus any warning strings the
@@ -376,7 +376,7 @@ fn rerender_collateral_view (
 pub fn render_initial_view (
   runtime     : &RuntimeGeneration,
   root_skgids : &[ID],
-  active      : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
   diff_mode   : bool,
 ) -> Result<(ViewForest, Vec<String>), Box<dyn Error>> {
   // Build the stub roots. Its EditableMap is discarded: view completion below uses
@@ -386,7 +386,7 @@ pub fn render_initial_view (
   let mut viewforest : ViewForest =
     crate::to_org::util::stub_viewforest_from_root_skgids (
       root_skgids, &runtime . graph, &runtime . config, &mut stub_editable_map,
-      active ) ?;
+      restriction ) ?;
   // De-novo (and ONLY de-novo) asks each view-root for its containerward
   // ancestry, as a self-consuming view request. The during-completion dispatch
   // leaves view-root Containerward alone (extract_view_requests); finish_viewforest
@@ -397,7 +397,7 @@ pub fn render_initial_view (
   // ViewRequest::Editable; adding one would over-trigger the TODO/DONE/local-view-update/plan_v2.org §5.3 cascade.)
   for root_treeid in viewforest . root_skgids () {
     if let Some (mut node_mut) = viewforest . get_mut (root_treeid) {
-      if let ViewnodeKind::Vognode (Vognode::Active (t)) =
+      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
         &mut node_mut . value () . kind
       { t . view_requests . insert ( ViewRequest::RoleTree (RelationRole::CONTAINER) ); }} }
   let graph_snap : Arc<InRustGraph> = runtime . graph . clone ();
@@ -405,7 +405,7 @@ pub fn render_initial_view (
   let mut errors : Vec<String> = Vec::new ();
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): de-novo diff is computed INLINE by view completion, exactly
   // like post-save -- compute the real diffs here and feed them via repo_diffs
-  // (which drives the inline process_activeVognode_diff and the diff-aware PropertyFolder /
+  // (which drives the inline process_unrestrictedVognode_diff and the diff-aware PropertyFolder /
   // PartnerFolder reconcilers).
   let real_diffs : Option<HashMap<SkgRepoName, SkgRepoDiff>> =
     if diff_mode { Some ( compute_diff_for_every_skgrepo (&runtime . config) ) }
@@ -424,7 +424,7 @@ pub fn render_initial_view (
     deleted_since_head_pid_src_map : &deleted_src,
     deleted_by_this_save_pids      : &empty_deleted_pids,
     deleted_by_this_save_extra_ids : &HashMap::new (),
-    active_skgrepo_set             : active,
+    skgrepo_restriction            : restriction,
     node_budget                    : runtime . config . initial_node_limit,
     create_partnerFolders_for_fresh_nodes : true,
     diff_tantivy_index : if diff_mode { Some (&runtime . tantivy_index) }
@@ -454,7 +454,7 @@ pub fn rerender_view (
     let mut editable_map       : EditableMap = EditableMap::new ();
     let mut completion_context : CompletionContext = CompletionContext {
       editable_map                         : &mut editable_map,
-      // The real per-repo diffs drive ALL diff inline: process_activeVognode_diff
+      // The real per-repo diffs drive ALL diff inline: process_unrestrictedVognode_diff
       // (content axes + phantom flip + TextChanged/IDFolder/AliasFolder) and the
       // diff-aware PropertyFolder / PartnerFolder reconcilers, each at its own BFS visit
       // (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3). The content reconcile itself stays worktree-only.
@@ -465,7 +465,7 @@ pub fn rerender_view (
       deleted_since_head_pid_src_map : &context . deleted_since_head_pid_src_map,
       deleted_by_this_save_pids      : &context . deleted_by_this_save_pids,
       deleted_by_this_save_extra_ids : &context . deleted_by_this_save_extra_ids,
-      active_skgrepo_set             : context . active_skgrepo_set,
+      skgrepo_restriction            : context . skgrepo_restriction,
       node_budget                    : context . runtime . config . initial_node_limit,
       // Post-save (and rerender-all) reuse the saved buffer's PartnerFolders
       // and pass false. The repo-switch rerender passes true: its prune
@@ -481,7 +481,7 @@ pub fn rerender_view (
       complete_viewforest (
         viewforest, &mut completion_context ) ? }; }
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the content/non-vognode diff was applied INLINE during the
-  // BFS above (process_activeVognode_diff at each Active node's visit, driven by
+  // BFS above (process_unrestrictedVognode_diff at each Unrestricted node's visit, driven by
   // repo_diffs = the real diffs).
   let result : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -490,14 +490,14 @@ pub fn rerender_view (
         viewforest,
         &context . runtime . graph,
         &context . runtime . config,
-        context . active_skgrepo_set ) } ?;
+        context . skgrepo_restriction ) } ?;
   tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   Ok (result) }
 
 /// The shared post-completion tail for BOTH render paths (TODO/DONE/local-view-update/plan_v2.org §20.3): the de-novo
 /// view (multi_root_view_via_env, server/to_org/render/content_view.rs) and the
-/// post-save re-render (rerender_view, above). Given a viewforest whose ActiveVognode
+/// post-save re-render (rerender_view, above). Given a viewforest whose UnrestrictedVognode
 /// content + git diff have already been completed, it:
 ///   - fulfills a ViewRequest::RoleTree (RelationRole::CONTAINER) carried by a view-ROOT (only de-novo
 ///     sets it; see render_initial_view), building that root's
@@ -509,7 +509,7 @@ pub fn rerender_view (
 ///   - validates affectsParent against the captured graph (the de-novo path could
 ///     skip it for speed, but running it in both keeps the tails one),
 ///   - computes graph- then viewnode stats,
-///   - applies the active skgrepo set, and renders to a buffer string.
+///   - applies the skgrepo restriction, and renders to a buffer string.
 /// Step order is immaterial between the affectsParent marks and graphnodestats:
 /// affectsParent is a view property and graphnodestats reads only the in-Rust graph,
 /// never affectsParent, so the final state is identical either way.
@@ -517,18 +517,18 @@ pub fn finish_viewforest (
   viewforest         : &mut ViewForest,
   graph              : &InRustGraph,
   config             : &SkgConfig,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result<String, Box<dyn Error>> {
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "fulfill_root_containerward_requests" ). entered();
     fulfill_root_containerward_requests (
-      viewforest, graph, config, active_skgrepo_set ) ? ; }
+      viewforest, graph, config, skgrepo_restriction ) ? ; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "attach_full_containerward_role_trees_to_removedhere_phantoms" ). entered();
     attach_full_containerward_role_trees_to_removedhere_phantoms (
-      viewforest, graph, config, active_skgrepo_set ) ? ; }
+      viewforest, graph, config, skgrepo_restriction ) ? ; }
   mark_view_roots_parent_na ( viewforest );
-  // §A (Jeff's invariant): an Active survivor left under a non-container parent
+  // §A (Jeff's invariant): an Unrestricted survivor left under a non-container parent
   // (a phantom / Deleted / DeadViewnode) is a non-dead generalized orphan and
   // must become a non-member.
   mark_orphans_under_dead_parents_false ( viewforest );
@@ -537,19 +537,19 @@ pub fn finish_viewforest (
   // under a new parent it doesn't link to).
   validate_affectsParent_relationships ( viewforest, graph );
   let ( container_to_contents, content_to_containers ) =
-    match active_skgrepo_set {
-      Some (active) =>
+    match skgrepo_restriction {
+      Some (restriction) =>
         set_graphnodestats_in_viewforest_with_skgrepo_set (
-          viewforest, graph, config, active ),
+          viewforest, graph, config, restriction ),
       None =>
         set_graphnodestats_in_viewforest (
           viewforest, graph, config ),
     } ?;
   set_viewnodestats_in_viewforest (
     viewforest, graph, &container_to_contents, &content_to_containers, config,
-    active_skgrepo_set );
-  if let Some (active) = active_skgrepo_set {
-    apply_skgrepo_set_to_viewforest ( viewforest, active ); }
+    skgrepo_restriction );
+  if let Some (restriction) = skgrepo_restriction {
+    apply_skgrepo_set_to_viewforest ( viewforest, restriction ); }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "viewforest_to_string" ). entered();
     viewforest_to_string ( viewforest, config ) } }
@@ -567,7 +567,7 @@ pub fn finish_viewforest (
 /// to include the rest of the subscriber's content.
 ///
 /// PITFALL: The function does not actually remember the nodeMerge history.
-/// It merely identifies each ActiveVognode in 'viewforest'
+/// It merely identifies each UnrestrictedVognode in 'viewforest'
 /// whose pid is an extra_id of some distinct node in the snapshot.
 fn rewriteInPlace_viewnodes_whose_skgid_is_newly_extra (
   viewforest : &mut Tree<Viewnode>,
@@ -582,9 +582,9 @@ fn rewriteInPlace_viewnodes_whose_skgid_is_newly_extra (
       let n_ref = viewforest . get (treeid) . ok_or (
         "rewriteInPlace_viewnodes_whose_id_is_newly_extra: node not found") ?;
       match &n_ref . value () . kind {
-        // Only Active nodes are rewritten below (a phantom is never an
+        // Only Unrestricted nodes are rewritten below (a phantom is never an
         // editable occurrence), so only they need a swap computed.
-        ViewnodeKind::Vognode (Vognode::Active (t))
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           => { match graph_snap . pid_of (&t . skgid)
                { Some (primary) if primary != t . skgid => {
                      graph_snap . get (&primary) . map ( |r| (
@@ -597,7 +597,7 @@ fn rewriteInPlace_viewnodes_whose_skgid_is_newly_extra (
     if let Some ((new_pid, new_skgrepo, new_title, new_body)) = swap
     { let mut n_mut = viewforest . get_mut (treeid)
         . ok_or ("rewriteInPlace_viewnodes_whose_id_is_newly_extra: node_mut failed") ?;
-      if let ViewnodeKind::Vognode (Vognode::Active (t))
+      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
       = &mut n_mut . value () . kind
       { t . skgid = new_pid;
         t . home_skgrepo = new_skgrepo;
@@ -679,7 +679,7 @@ fn remove_branches_that_git_marked_removed (
 
 /// Remove non-vognodes that exist only to display diff information:
 /// TextChanged and IDFolder.
-/// These are regenerated from scratch by 'process_activeVognode_diff' (the inline
+/// These are regenerated from scratch by 'process_unrestrictedVognode_diff' (the inline
 /// per-node diff) at each node's BFS visit, so stale ones must be stripped first.
 /// AliasFolder is NOT removed: it may have been requested by the user
 /// (not just injected by diff mode), and tracking which case applies
@@ -705,7 +705,7 @@ fn remove_diff_only_properties (
       } else { Ok (true) } } ) ?;
   Ok (( )) }
 
-/// Clear diff metadata from all ActiveVognodes in the viewforest.
+/// Clear diff metadata from all UnrestrictedVognodes in the viewforest.
 /// Diff-only non-vognodes (TextChanged, IDFolder) are
 /// removed by 'remove_diff_only_properties' before this runs.
 fn clear_diff_metadata (
@@ -722,7 +722,7 @@ fn clear_diff_metadata (
         // but they are regenerated from scratch by their reconcilers at their
         // own BFS visit, so clearing them here is unnecessary.
         match &mut node . value() . kind {
-          ViewnodeKind::Vognode (Vognode::Active (t)) => {
+          ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
             t . node_axes  = NodeAxes::default ();
             t . relationship_axes = RelationshipAxes::default ();
             t . not_in_git = false; }
@@ -751,23 +751,23 @@ fn fulfill_root_containerward_requests (
   viewforest : &mut ViewForest,
   graph      : &InRustGraph,
   config     : &SkgConfig,
-  active     : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> Result<(), Box<dyn Error>> {
   let requesting_root_treeids : Vec<NodeId> =
     viewforest . root_skgids () . into_iter ()
       . filter ( |treeid| viewforest . get (*treeid)
           . map ( |n| match &n . value () . kind {
-              ViewnodeKind::Vognode (Vognode::Active (t)) =>
+              ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
                 t . view_requests . contains (& ViewRequest::RoleTree (RelationRole::CONTAINER)),
               _ => false } )
           . unwrap_or (false) )
       . collect ();
   if requesting_root_treeids . is_empty () { return Ok (( )); }
   attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
-    viewforest, &requesting_root_treeids, graph, config, active ) ?;
+    viewforest, &requesting_root_treeids, graph, config, restriction ) ?;
   for treeid in requesting_root_treeids { // drop the now-fulfilled request
     if let Some (mut node_mut) = viewforest . get_mut (treeid) {
-      if let ViewnodeKind::Vognode (Vognode::Active (t)) =
+      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
         &mut node_mut . value () . kind
       { t . view_requests . remove (& ViewRequest::RoleTree (RelationRole::CONTAINER)); }} }
   Ok (( )) }
@@ -779,14 +779,14 @@ fn attach_full_containerward_role_trees_to_removedhere_phantoms (
   viewforest    : &mut ViewForest,
   graph         : &InRustGraph,
   config        : &SkgConfig,
-  active        : Option<&ActiveSkgRepoSet>,
+  restriction   : Option<&SkgrepoRestriction>,
 ) -> Result<(), Box<dyn Error>> {
   let phantom_treeids : Vec<NodeId> = {
     let mut result : Vec<NodeId> = Vec::new ();
     for edge in viewforest . root () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
         let is_removedhere : bool = match &node_ref . value () . kind {
-          ViewnodeKind::Vognode (Vognode::Active (t)) =>
+          ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
             t . is_removedhere_diffPhantom (),
           ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) =>
             p . is_removedhere_diffPhantom (),
@@ -795,4 +795,4 @@ fn attach_full_containerward_role_trees_to_removedhere_phantoms (
         { result . push ( node_ref . id () ); }} }
     result };
   attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
-    viewforest, &phantom_treeids, graph, config, active ) }
+    viewforest, &phantom_treeids, graph, config, restriction ) }

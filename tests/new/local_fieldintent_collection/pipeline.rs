@@ -90,9 +90,9 @@ fn all_tests
                  "tests/merge/merge_nodes/fixtures") ?;
       pipeline_write_protected_folder_member_edits (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("pipeline_inactive_subtree",
+      s . reset ("pipeline_restricted_subtree",
                  "tests/merge/merge_nodes/fixtures") ?;
-      pipeline_inactive_subtree (
+      pipeline_restricted_subtree (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("pipeline_phantom_subtree",
                  "tests/merge/merge_nodes/fixtures") ?;
@@ -227,14 +227,14 @@ async fn pipeline_write_protected_folder_member_edits (
         vec![ID::from ("intruder-child")] );
       Ok (( )) }
 
-async fn pipeline_inactive_subtree (
+async fn pipeline_restricted_subtree (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
             * (skg (node (id root) (repo main))) root
-            ** (skg (inactiveNode (id hidden) (repo main)))
+            ** (skg (restrictedNode (id hidden) (repo main)))
             *** (skg (node (id stowaway) (repo main))) stowaway
             "};
       let (plan, _) =
@@ -247,7 +247,7 @@ async fn pipeline_inactive_subtree (
       assert_eq!(
         members_of (&saved_node_by_skgid (&plan . node_instructions, "root") . contains),
         Vec::<ID>::new(),
-        "the inactive node emits no contains membership; under a \
+        "the restricted node emits no contains membership; under a \
          restricted set the weave restores it from disk (see \
          tests/repo_sets.rs)" );
       Ok (( )) }
@@ -272,11 +272,11 @@ async fn pipeline_phantom_subtree (
           tree . nodes()
           . find ( |n| matches!(
               &n . value() . kind,
-              ViewnodeKind::Vognode (Vognode::Active (t))
+              ViewnodeKind::Vognode (Vognode::Unrestricted (t))
                 if t . skgid == ID::from ("fading") ))
           . map ( |n| n . id() )
           . expect ("fading node not found");
-        if let ViewnodeKind::Vognode (Vognode::Active (t)) =
+        if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
           &mut tree . get_mut (fading_treeid) . unwrap() . value() . kind
         { t . relationship_axes . unstaged = Some (Sign::Minus); }
         tree . get_mut (fading_treeid) . unwrap()

@@ -9,7 +9,7 @@
 /// 'aliases' is handled by the AliasFolder builder ('expand/aliases.rs'),
 /// not here -- the dispatch in 'execute_view_requests' routes it there.
 
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::complete::partner_folder::{
   maybe_add_one_partnerFolder, maybe_add_subscribeeFolder_branch };
@@ -29,12 +29,12 @@ pub fn build_and_integrate_folder_then_drop_request (
   rel                : FolderRelation,
   config             : &SkgConfig,
   errors             : &mut Vec < String >,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   skgrepo_diffs      : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
     build_and_integrate_folder (
-      tree, treeid, rel, graph, config, active_skgrepo_set,
+      tree, treeid, rel, graph, config, skgrepo_restriction,
       skgrepo_diffs );
   remove_completed_view_request (
     tree, treeid,
@@ -52,7 +52,7 @@ fn build_and_integrate_folder (
   rel                : FolderRelation,
   graph              : &InRustGraph,
   config             : &SkgConfig,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   skgrepo_diffs      : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   match rel {
@@ -66,25 +66,25 @@ fn build_and_integrate_folder (
       // overriddenFolder (writable) -- forced empty; overriderFolder (write-protected).
       maybe_add_one_partnerFolder (
         tree, treeid, PartnerFolder::Overridden, config, graph,
-        active_skgrepo_set, skgrepo_diffs, true ) ?;
+        skgrepo_restriction, skgrepo_diffs, true ) ?;
       maybe_add_one_partnerFolder (
         tree, treeid, PartnerFolder::Overrider, config, graph,
-        active_skgrepo_set, skgrepo_diffs, false ) ?; },
+        skgrepo_restriction, skgrepo_diffs, false ) ?; },
     FolderRelation::HidesFromSubs => {
       // Both sides write-protected: hiding is editable only from a
       // subscribee-as-such, never from a hider/hidden folder.
       maybe_add_one_partnerFolder (
         tree, treeid, PartnerFolder::Hider, config, graph,
-        active_skgrepo_set, skgrepo_diffs, false ) ?;
+        skgrepo_restriction, skgrepo_diffs, false ) ?;
       maybe_add_one_partnerFolder (
         tree, treeid, PartnerFolder::Hidden, config, graph,
-        active_skgrepo_set, skgrepo_diffs, false ) ?; },
+        skgrepo_restriction, skgrepo_diffs, false ) ?; },
     FolderRelation::SubscribesTo => {
       // subscribeeFolder (writable) -- forced empty; subscriberFolder (write-protected).
       maybe_add_subscribeeFolder_branch (
         tree, treeid, graph, config,
-        active_skgrepo_set, skgrepo_diffs, true ) ?;
+        skgrepo_restriction, skgrepo_diffs, true ) ?;
       maybe_add_one_partnerFolder (
         tree, treeid, PartnerFolder::Subscriber, config, graph,
-        active_skgrepo_set, skgrepo_diffs, false ) ?; }, }
+        skgrepo_restriction, skgrepo_diffs, false ) ?; }, }
   Ok (( )) }

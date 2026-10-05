@@ -10,7 +10,7 @@ use std::net::TcpStream;
 
 /// Build, for every detected single-repo-to-single-repo node
 /// move, a shell script that stages it, and send it to the client as
-/// a buffer. Scans all configured skgrepos irrespective of the active
+/// a buffer. Scans all configured skgrepos irrespective of the unrestricted
 /// skgrepo-set: a move can cross skgrepo-set boundaries, so restricting
 /// would hide moves. Non-gitrepos simply contribute nothing.
 pub fn handle_stage_moves_request (

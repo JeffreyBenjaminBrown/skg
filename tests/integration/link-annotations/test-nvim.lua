@@ -45,26 +45,26 @@ end
 
 T.check(T.wait_for(function ()
   return status('old-dest', 'resolved') and status('gone', 'missing')
-         and status('private-node', 'inactive')
-end, 10), 'initial resolved, missing, and inactive statuses arrived')
+         and status('private-node', 'restricted')
+end, 10), 'initial resolved, missing, and restricted statuses arrived')
 T.check(buffer.text(buf) == view_text and not vim.bo[buf].modified,
         'initial annotations leave buffer text and modified state alone')
 T.check(vim.b[buf].skg_link_repo_suffix ~= true,
         'repo suffix starts off')
 local repo_sets = require('skg.repo_sets')
 local state = require('skg.state')
-repo_sets.set_active_repo_set('all')
+repo_sets.restrict_repo_set('all')
 T.check(T.wait_for(function ()
   return status('private-node', 'resolved')
          and state.lp_pending_count == 0 end, 10),
   'widening the repo-set refreshes a link target without a headline')
-repo_sets.set_active_repo_set('public')
+repo_sets.restrict_repo_set('public')
 T.check(T.wait_for(function ()
-  return status('private-node', 'inactive')
+  return status('private-node', 'restricted')
          and state.lp_pending_count == 0 end, 10),
   'narrowing the repo-set hides its repo again')
 annotations.toggle_repo_overlay(buf)
-T.check(suffix('⌂:PUB') and suffix('⌂:inactive') and not suffix('PRIV')
+T.check(suffix('⌂:PUB') and suffix('⌂:restricted') and not suffix('PRIV')
         and not suffix('missing') and broken_count() > 0,
         'suffixes distinguish visible and unavailable targets; broken links get none')
 save.replace_buffer_with_new_content(buf, view_text)
@@ -93,7 +93,7 @@ assert(os.rename(data .. '/private/private-node.skg',
 misc.rebuild_ephemeral_data_stores()
 T.check(T.wait_for(function ()
   return status('private-node', 'resolved') end, 10),
-  'repo move refreshes inactive target')
+  'repo move refreshes restricted target')
 local broken_before = broken_count()
 assert(os.remove(data .. '/public/dest.skg'))
 misc.rebuild_ephemeral_data_stores()

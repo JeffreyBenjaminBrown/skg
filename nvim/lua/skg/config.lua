@@ -8,7 +8,7 @@
 
 local M = {}
 
----The absolute path of the active skgconfig.toml, set by
+---The absolute path of the unrestricted skgconfig.toml, set by
 ---require('skg').init. (The analog of 'skg-config-dir', which lived
 ---in skg-state; here the config module owns it.)
 ---@type string|nil

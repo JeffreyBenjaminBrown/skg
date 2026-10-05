@@ -3,7 +3,7 @@ use skg::serve::handlers::titles_by_skgids::{
   add_deleted_node_titles_by_skgids,
   handle_titles_by_skgids_request,
   handle_titles_by_skgids_request_with_skgrepo_set};
-use skg::skgrepo_sets::ActiveSkgRepoSet;
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::test_utils::read_lp_message;
 use skg::types::git::SkgRepoDiff;
@@ -109,7 +109,7 @@ fn restricted_title_lookup_challenges_without_releasing_text (
       owned        : true,
     })
   ]));
-  let active = ActiveSkgRepoSet {
+  let restriction = SkgrepoRestriction {
     name    : SkgRepoSetName::from ("public"),
     skgrepos : BTreeSet::from ([skgrepo]),
   };
@@ -118,7 +118,7 @@ fn restricted_title_lookup_challenges_without_releasing_text (
     let client : TcpStream = TcpStream::connect (listener . local_addr ()?)?;
     let (mut server, _) = listener . accept ()?;
     handle_titles_by_skgids_request_with_skgrepo_set (
-      &mut server, request, &index, &config, false, &active, &graph );
+      &mut server, request, &index, &config, false, &restriction, &graph );
     drop (server);
     Ok (read_lp_message (&mut std::io::BufReader::new (client))?)
   };

@@ -1,4 +1,4 @@
-use crate::types::git::{GitDiffStatus, NodeChanges, GraphnodeDiff, SkgRepoDiff, per_stage_node_changes_for_activeVognode};
+use crate::types::git::{GitDiffStatus, NodeChanges, GraphnodeDiff, SkgRepoDiff, per_stage_node_changes_for_unrestrictedVognode};
 
 use super::*;
 use std::path::PathBuf;
@@ -42,7 +42,7 @@ fn text_changed_both (
   pid   : &ID,
   src   : &SkgRepoName,
 ) -> (bool, bool) {
-  let (s, u) = per_stage_node_changes_for_activeVognode (diffs, pid, src);
+  let (s, u) = per_stage_node_changes_for_unrestrictedVognode (diffs, pid, src);
   ( s . map ( |n| n . text_changed ) . unwrap_or (false),
     u . map ( |n| n . text_changed ) . unwrap_or (false) )
 }
@@ -123,12 +123,12 @@ fn same_session_surviving_content_membership_becomes_unknown () {
   let mut tree : Tree<Viewnode> = Tree::new (mk_editable_viewnode (
     skgid ("parent"), skgrepo_name ("main"), "parent" . to_string (), None ));
   let parent : NodeId = tree . root () . id ();
-  let mut active : Viewnode = mk_editable_viewnode (
+  let mut restriction : Viewnode = mk_editable_viewnode (
     ghost . clone (), skgrepo_name ("main"), "last seen" . to_string (),
     Some ("last seen body" . to_string ()) );
-  active . focused = true;
-  active . folded = true;
-  let child : NodeId = tree . root_mut () . append (active) . id ();
+  restriction . focused = true;
+  restriction . folded = true;
+  let child : NodeId = tree . root_mut () . append (restriction) . id ();
   let mut relRepos : HashMap<ID, SkgRepoName> = HashMap::new ();
   relRepos . insert (ghost . clone (), skgrepo_name ("private"));
   let graph_snap : std::sync::Arc<InRustGraph> =
@@ -158,10 +158,10 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
   let mut tree : Tree<Viewnode> = Tree::new (mk_editable_viewnode (
     skgid ("parent"), skgrepo_name ("main"), "parent" . to_string (), None ));
   let parent : NodeId = tree . root () . id ();
-  let mut active : Viewnode = mk_editable_viewnode (
+  let mut restriction : Viewnode = mk_editable_viewnode (
     primary . clone (), skgrepo_name ("main"), "last seen" . to_string (), None );
-  active . focused = true;
-  let child : NodeId = tree . root_mut () . append (active) . id ();
+  restriction . focused = true;
+  let child : NodeId = tree . root_mut () . append (restriction) . id ();
   let mut relRepos : HashMap<ID, SkgRepoName> = HashMap::new ();
   relRepos . insert (raw_extra . clone (), skgrepo_name ("foreign"));
   let graph_snap : std::sync::Arc<InRustGraph> =
@@ -176,7 +176,7 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
 
   let rendered = tree . get (child) . unwrap () . value ();
   assert! (rendered . focused,
-    "extra-id normalization preserves the active child wrapper state");
+    "extra-id normalization preserves the unrestricted child wrapper state");
   match &rendered . kind {
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
       assert_eq! (unknown . skgid, raw_extra,
@@ -187,10 +187,10 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
 
 // review-2 §2.1 regression: a content goal id present only as a
 // affectsParent=false child must still get ChildData pre-fetched.
-// complete_content_children counts only affectsParent=true Active children as
+// complete_content_children counts only affectsParent=true Unrestricted children as
 // "already present", so a non-member same-id child is sent to the create
 // closure; if build_child_creation_data skipped pre-fetching it (because it
-// collected the skip-set from ALL Active children, non-member included), the
+// collected the skip-set from ALL Unrestricted children, non-member included), the
 // closure's child_data.get(id).expect(..) panics. The skip-set must match the
 // present-set: a non-member same-id child must NOT be skipped.
 #[test]
@@ -204,7 +204,7 @@ fn independent_same_skgid_child_is_prefetched () {
   let mut child : Viewnode =
     mk_editable_viewnode (
       goal . clone (), skgrepo_name ("main"), "c" . to_string (), None );
-  if let ViewnodeKind::Vognode (Vognode::Active (t)) = &mut child . kind
+  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut child . kind
     { t . affectsParent = AffectsParent::False; }
   tree . root_mut () . append (child);
   let config : SkgConfig =

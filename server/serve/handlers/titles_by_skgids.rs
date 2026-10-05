@@ -9,7 +9,7 @@ use crate::serve::handlers::save_buffer::compute_diff_for_every_skgrepo;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::send_response_with_length_prefix;
 use crate::skgrepo_sets::{
-  ActiveSkgRepoSet,
+  SkgrepoRestriction,
   SkgRepoSetName,
   titles_for_skgrepo_set_for_test,
 };
@@ -24,10 +24,10 @@ use std::net::TcpStream;
 
 pub fn titles_by_skgids_for_skgrepo_set_for_test (
   config : &SkgConfig,
-  active : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
   skgids    : &[ID],
 ) -> Result<HashMap<ID, String>, Box<dyn std::error::Error>> {
-  titles_for_skgrepo_set_for_test (config, active, skgids) }
+  titles_for_skgrepo_set_for_test (config, restriction, skgids) }
 
 /// Handle a "titles by ids" request from Emacs.
 /// Parses the ID list, performs a bulk Tantivy lookup, supplements
@@ -41,14 +41,14 @@ pub fn handle_titles_by_skgids_request (
   config            : &SkgConfig,
   diff_mode_enabled : bool,
 ) {
-  let active : ActiveSkgRepoSet =
-    ActiveSkgRepoSet::named (
+  let restriction : SkgrepoRestriction =
+    SkgrepoRestriction::named (
       config,
       SkgRepoSetName::from ("all"))
     . expect ("reserved repo-set all should always resolve");
   handle_titles_by_skgids_request_with_skgrepo_set (
     stream, request, tantivy_index, config,
-    diff_mode_enabled, &active, graph ) }
+    diff_mode_enabled, &restriction, graph ) }
 
 pub fn handle_titles_by_skgids_request_with_skgrepo_set (
   stream            : &mut TcpStream,
@@ -56,7 +56,7 @@ pub fn handle_titles_by_skgids_request_with_skgrepo_set (
   tantivy_index     : &TantivyIndex,
   config            : &SkgConfig,
   diff_mode_enabled : bool,
-  active            : &ActiveSkgRepoSet,
+  restriction       : &SkgrepoRestriction,
   graph             : &InRustGraph,
 ) {
   let parsed : Sexp =
@@ -93,14 +93,14 @@ pub fn handle_titles_by_skgids_request_with_skgrepo_set (
     add_deleted_node_titles_by_skgids (
       &mut title_map, &skgids, skgrepo_diffs ); }
   title_map . retain ( |skgid, _| {
-    if active . is_all () {
+    if restriction . is_all () {
       true
     } else {
       graph . pid_and_skgrepo (skgid) . map (|(_, skgrepo)| skgrepo)
       . or_else (|| crate::dbs::tantivy::title_and_skgrepo_by_skgid (
         tantivy_index, skgid ) . map (|(_, skgrepo)| skgrepo))
       . or_else (|| home_from_disk (skgid, config))
-      . map ( |skgrepo| active . contains_skgrepo (&skgrepo) )
+      . map ( |skgrepo| restriction . contains_skgrepo (&skgrepo) )
       . unwrap_or (false) } } );
   let requested : HashSet<ID> = skgids . iter () . cloned () . collect ();
   let mut overPrivateText_pids : Vec<ID> = skgids . iter ()
@@ -117,7 +117,7 @@ pub fn handle_titles_by_skgids_request_with_skgrepo_set (
            && node . all_skgids () . any ( |skgid| requested . contains (skgid) ) {
           overPrivateText_pids . push (node . pid . clone ()); }}}}
   let release = decide_for_overPrivateText_pids (
-    "titles-by-ids", active, overPrivateText_pids,
+    "titles-by-ids", restriction, overPrivateText_pids,
     &approved_pids_from_request (request) );
   if matches! (release, TextReleaseDecision::Challenge { .. }) {
     send_response_with_length_prefix (

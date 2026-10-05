@@ -11,7 +11,7 @@
 use crate::from_text::local_fieldintent_collection::lower::{
   RequestedRelRepos, NodeIntent, NodeSaveIntent };
 use crate::from_text::weave::{relationship_member_is_visible, set_difference_merge, weave};
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::opt_graphnode_by_skgid;
@@ -56,7 +56,7 @@ pub fn build_diskSupplemented_nodeInstructions (
   intents                : Vec<NodeIntent>,
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
-  restricted_skgrepo_set : Option<&ActiveSkgRepoSet>, // None means no restriction; callers normalize 'all' to None.
+  skgrepo_restriction    : Option<&SkgrepoRestriction>, // None means no restriction; callers normalize 'all' to None.
 ) -> Result<NodeInstructions_with_Repomoves, Box<dyn Error>> {
   let mut result : NodeInstructions_with_Repomoves =
     NodeInstructions_with_Repomoves::with_capacity (intents . len());
@@ -65,7 +65,7 @@ pub fn build_diskSupplemented_nodeInstructions (
   for intent in intents {
     let supplemented : NodeInstruction_with_Opt_Repomove =
       supplement_nodeIntent_from_disk (
-        intent, graph, config, restricted_skgrepo_set, &prospective_homes ) ?;
+        intent, graph, config, skgrepo_restriction, &prospective_homes ) ?;
     result . push (supplemented); }
   Ok (result) }
 
@@ -88,14 +88,14 @@ fn supplement_nodeIntent_from_disk (
   intent                 : NodeIntent,
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
-  restricted_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction    : Option<&SkgrepoRestriction>,
   prospective_homes      : &HashMap<ID, SkgRepoName>,
 ) -> Result<NodeInstruction_with_Opt_Repomove, Box<dyn Error>> {
   match intent {
     NodeIntent::Delete (ref delete) => {
-      if let Some (active) = restricted_skgrepo_set {
-        refuse_delete_with_inactive_sections (
-          config, active, & delete . skgid )
+      if let Some (restriction) = skgrepo_restriction {
+        refuse_delete_with_restricted_sections (
+          config, restriction, & delete . skgid )
           . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
       Ok (NodeInstruction_with_Opt_Repomove {
         instruction : intent . into_node_instruction()
@@ -105,14 +105,14 @@ fn supplement_nodeIntent_from_disk (
     _ => supplement_nodeSaveIntent_from_disk (
       intent . save_intent()
         . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
-      graph, config, restricted_skgrepo_set, prospective_homes ),
+      graph, config, skgrepo_restriction, prospective_homes ),
   }}
 
 fn supplement_nodeSaveIntent_from_disk (
   from_buffer            : NodeSaveIntent,
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
-  restricted_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction    : Option<&SkgrepoRestriction>,
   prospective_homes      : &HashMap<ID, SkgRepoName>,
 ) -> Result<NodeInstruction_with_Opt_Repomove, Box<dyn Error>> {
   let pid : ID =
@@ -171,10 +171,10 @@ fn supplement_nodeSaveIntent_from_disk (
         if let Some ((flag, value)) = flag_request {
           set_flag (&mut supplemented . flags, flag, value); }
         let supplemented : Graphnode =
-          match restricted_skgrepo_set {
+          match skgrepo_restriction {
             None => supplemented,
-            Some (active) => preserve_invisible_members (
-              supplemented, &disk_node, graph, config, active ) };
+            Some (restriction) => preserve_invisible_members (
+              supplemented, &disk_node, graph, config, restriction ) };
         apply_sticky_relRepos_in_graph_with_prospective_homes (
           supplemented, &disk_node, &requested_relRepos,
           graph, config, prospective_homes )
@@ -198,7 +198,7 @@ fn preserve_invisible_members (
   disk_node        : &Graphnode,
   graph            : &InRustGraph,
   config           : &SkgConfig,
-  active           : &ActiveSkgRepoSet,
+  restriction      : &SkgrepoRestriction,
 ) -> Graphnode {
   let member_key = |skgid : &ID| -> RelationshipMemberKey {
     graph . relationship_member_key (skgid) };
@@ -206,17 +206,17 @@ fn preserve_invisible_members (
     disk_node . contains . iter ()
       . find (|member| &member . member == skgid)
       . is_some_and (|member| relationship_member_is_visible (
-        graph, member, config, active)) };
+        graph, member, config, restriction)) };
   let subscribes_visible = |skgid : &ID| -> bool {
     disk_node . subscribesTo . or_default () . iter ()
       .find (|member| &member . member == skgid)
       .is_some_and (|member| relationship_member_is_visible (
-        graph, member, config, active)) };
+        graph, member, config, restriction)) };
   let overrides_visible = |skgid : &ID| -> bool {
     disk_node . overrides . or_default () . iter ()
       .find (|member| &member . member == skgid)
       .is_some_and (|member| relationship_member_is_visible (
-        graph, member, config, active)) };
+        graph, member, config, restriction)) };
   // Rendering may canonicalize a resolvable extra ID to its primary PID.  The
   // comparison key says that is the same relationship, but the disk spelling
   // is load-bearing: restore it before the weave so an untouched round trip
@@ -267,21 +267,21 @@ fn preserve_invisible_members (
   supplemented }
 
 /// Deleting a node deletes its whole TELESCOPE, including sections
-/// the active skgrepo-set cannot see; refuse rather than silently
+/// the skgrepo restriction cannot see; refuse rather than silently
 /// destroy them. (The agreed small leak: the refusal reveals that
-/// inactive sections exist.)
-pub fn refuse_delete_with_inactive_sections (
+/// restricted sections exist.)
+pub fn refuse_delete_with_restricted_sections (
   config : &SkgConfig,
-  active : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
   pid    : &ID,
 ) -> Result<(), String> {
   for skgrepo_name in config . ordered_skgrepos () {
-    if active . contains_skgrepo (&skgrepo_name) { continue; }
+    if restriction . contains_skgrepo (&skgrepo_name) { continue; }
     if let Ok (path) = crate::util::path_from_pid_and_skgrepo (
       config, &skgrepo_name, pid . clone () ) {
       if std::path::Path::new (&path) . is_file () {
         return Err ( format! (
-          "Cannot delete '{}': it has telescope sections in inactive repos. Widen the repo-set (e.g. to 'all') and retry.",
+          "Cannot delete '{}': it has telescope sections in restricted repos. Widen the repo-set (e.g. to 'all') and retry.",
           pid )); }} }
   Ok (( )) }
 

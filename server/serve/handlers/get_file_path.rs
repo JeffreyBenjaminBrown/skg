@@ -3,7 +3,7 @@ use crate::serve::util::{
   value_from_request_sexp,
   send_response_with_length_prefix,
   tag_text_response};
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgRepoName};
 use crate::util::path_from_pid_and_skgrepo;
 
@@ -16,7 +16,7 @@ pub fn handle_get_file_path_request_with_skgrepo_set (
   stream  : &mut TcpStream,
   request : &str,
   config  : &SkgConfig,
-  active  : &ActiveSkgRepoSet,
+  restriction : &SkgrepoRestriction,
 ) {
   let skgid : ID = match value_from_request_sexp (
     "id", request ) {
@@ -38,14 +38,14 @@ pub fn handle_get_file_path_request_with_skgrepo_set (
           TcpToClient::GetFilePath,
           &format! ( "Error: {}", e ) ));
       return; } };
-  if ! active . contains_skgrepo (&skgrepo) {
+  if ! restriction . contains_skgrepo (&skgrepo) {
     send_response_with_length_prefix (
       stream,
       & tag_text_response (
         TcpToClient::GetFilePath,
         &format! (
-          "Error: repo {} is not in active repo-set {}",
-          skgrepo, active . name ) ));
+          "Error: repo {} is not in skgrepo restriction {}",
+          skgrepo, restriction . name ) ));
     return; }
   let raw_path : String = match path_from_pid_and_skgrepo (
     config,

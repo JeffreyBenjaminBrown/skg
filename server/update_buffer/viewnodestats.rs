@@ -3,7 +3,7 @@ use crate::dbs::in_rust_graph::stats::mentioner_is_substantive;
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole };
 use crate::herald_tokens::{AncestorFlags, BirthFact, Side, relationship_heralds_sexp};
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgRepoName};
 use crate::types::viewnode::{
   Birth, GraphnodeStats, AffectsParent, PartnerFolder, Viewnode, ViewnodeKind, Vognode };
@@ -26,7 +26,7 @@ pub fn set_viewnodestats_in_viewforest (
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
   config                : &SkgConfig,
-  active                : Option<&ActiveSkgRepoSet>,
+  restriction           : Option<&SkgrepoRestriction>,
 ) {
   let multi_skgrepo : bool = config . skgrepos . len () > 1;
   let mut ancestor_skgids : HashSet<ID> = HashSet::new ();
@@ -37,7 +37,7 @@ pub fn set_viewnodestats_in_viewforest (
     multi_skgrepo,
     Some (graph),
     config,
-    active,
+    restriction,
     &mut ancestor_skgids,
     container_to_contents,
     content_to_containers ); }
@@ -48,13 +48,13 @@ fn set_viewnodestats_recursive (
   multi_skgrepo         : bool,
   graph                 : Option<&InRustGraph>,
   config                : &SkgConfig,
-  active                : Option<&ActiveSkgRepoSet>,
+  restriction           : Option<&SkgrepoRestriction>,
   ancestor_skgids       : &mut HashSet<ID>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
   let opt_pid : Option<ID> =
-    if let ViewnodeKind::Vognode (Vognode::Active (t)) =
+    if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     { let node_pid : ID = t . skgid . clone ();
       detect_and_mark_cycle_v2 (
@@ -62,7 +62,7 @@ fn set_viewnodestats_recursive (
       if multi_skgrepo {
         set_skgrepo_at_boundary (tree, treeid); }
       set_herald_strings_in_viewnode (
-        tree, treeid, &node_pid, graph, active,
+        tree, treeid, &node_pid, graph, restriction,
         container_to_contents, content_to_containers );
       set_omitted_body (tree, treeid, &node_pid, graph);
       set_relRepo (tree, treeid, graph, config);
@@ -82,7 +82,7 @@ fn set_viewnodestats_recursive (
       multi_skgrepo,
       graph,
       config,
-      active,
+      restriction,
       ancestor_skgids,
       container_to_contents,
       content_to_containers ); }
@@ -90,31 +90,31 @@ fn set_viewnodestats_recursive (
     if let Some ( ref pid ) = opt_pid
     { ancestor_skgids . remove (pid); } } }
 
-/// What the active vognode at treeid is born of, and which ancestors to
+/// What the unrestricted vognode at treeid is born of, and which ancestors to
 /// flag. The viewparent is a generation-1 ancestor (a non-vognode folder
 /// carries no flag); a folder member additionally flags the folder's
 /// required-ancestry vognodes (recorder = the last entry) at their tree-gen
 /// distances.
 enum ParentKind {
-  Vognode (ID),                 // an Active vognode parent
+  Vognode (ID),                 // an Unrestricted vognode parent
   Folder (PartnerFolder, NodeId),   // a PartnerFolder parent (its treeid)
   Other,
 }
 
 /// Compute and store semantic relationship and birth facts for
-/// the active vognode at treeid.
+/// the unrestricted vognode at treeid.
 fn set_herald_strings_in_viewnode (
   tree                  : &mut Tree<Viewnode>,
   treeid                : NodeId,
   node_pid              : &ID,
   graph                 : Option<&InRustGraph>,
-  active                : Option<&ActiveSkgRepoSet>,
+  restriction           : Option<&SkgrepoRestriction>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
   let (gstats, affectsParent, birth, overridesHere)
     : (GraphnodeStats, AffectsParent, Birth, bool) = {
-    let ViewnodeKind::Vognode (Vognode::Active (t)) =
+    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
     ( t . graphStats . clone (), t . affectsParent, t . birth,
@@ -128,7 +128,7 @@ fn set_herald_strings_in_viewnode (
   let ancestors : Vec<(ID, usize)> = tracked_ancestors (tree, &parent_kind);
   for (anc_pid, generation) in &ancestors {
     flag_ancestor_relations (
-      &mut flags, graph, active,
+      &mut flags, graph, restriction,
       container_to_contents, content_to_containers,
       node_pid, anc_pid, *generation ); }
   let unintegrated : Option<usize> =
@@ -138,18 +138,18 @@ fn set_herald_strings_in_viewnode (
         let subscriber_pid : &ID = &ancestors . iter ()
           . find (|(_, generation)| *generation == 2) ? . 0;
         let visible = |skgid : &ID| -> bool {
-          match active {
+          match restriction {
             None => true,
             Some (a) if a . is_all () => true,
             Some (a) => g . nodes . get (skgid)
               .is_some_and (|n| a . contains_skgrepo (&n . home_skgrepo)), }};
         let contents : Vec<ID> = g . outbound_pids_for_relation_gated (
-          node_pid, NodeRelation::Contains, active )
+          node_pid, NodeRelation::Contains, restriction )
           . into_iter () . filter (|skgid| visible (skgid)) . collect ();
         let hidden : Vec<ID> = g . outbound_pids_for_relation_gated (
-          subscriber_pid, NodeRelation::HidesFromSubs, active );
+          subscriber_pid, NodeRelation::HidesFromSubs, restriction );
         let contained : Vec<ID> = g . outbound_pids_for_relation_gated (
-          subscriber_pid, NodeRelation::Contains, active );
+          subscriber_pid, NodeRelation::Contains, restriction );
         let members : HashSet<ID> = unintegrated_content_skgids (
           g, &contents, &hidden, &contained )
           . into_iter () . collect ();
@@ -165,7 +165,7 @@ fn set_herald_strings_in_viewnode (
   let rel_heralds : Option<String> = relationship_heralds_sexp (
     &counts, gstats . aliases, gstats . extra_ids, gstats . flags,
     &flags, &birth_facts, unintegrated );
-  if let ViewnodeKind::Vognode (Vognode::Active (t)) =
+  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . rel_heralds = rel_heralds; } }
 
@@ -176,7 +176,7 @@ fn parent_kind_of (
   let parent_ref = match tree . get (treeid) . unwrap () . parent () {
     Some (p) => p, None => return ParentKind::Other, };
   match & parent_ref . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Active (t)) =>
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
       ParentKind::Vognode ( t . skgid . clone () ),
     ViewnodeKind::PartnerFolder (folder) =>
       ParentKind::Folder ( *folder, parent_ref . id () ),
@@ -199,26 +199,26 @@ fn tracked_ancestors (
       loop {
         match required_ancestor (tree, *folder_treeid, i) {
           Ok (Some (anc_skgid)) => {
-            if let Some (pid) = active_vognode_pid (tree, anc_skgid) {
+            if let Some (pid) = unrestricted_vognode_pid (tree, anc_skgid) {
               out . push ( (pid, i + 2) ); }
             i += 1; }
           _ => break, } }
       out }
     ParentKind::Other => Vec::new (), } }
 
-fn active_vognode_pid (
+fn unrestricted_vognode_pid (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Option<ID> {
   match & tree . get (treeid) ? . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Active (t)) => Some ( t . skgid . clone () ),
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some ( t . skgid . clone () ),
     _ => None, } }
 
 /// Record, for the tracked ancestor 'anc_pid' at 'generation', every
 /// relation it is a member of on each side relative to 'node_pid'.
 /// Contains membership is read from the repo-filtered containment
 /// maps; the other four relations from the in-Rust graph. Every flag
-/// is relRepo gated: a relationship recorded outside the active prefix
+/// is relRepo gated: a relationship recorded outside the skgrepo restriction
 /// must not tint an ancestor herald in a more public view (it would
 /// reveal the very relationship the user privatized). The contains
 /// gate needs the graph (the maps carry no levels); without one
@@ -226,7 +226,7 @@ fn active_vognode_pid (
 fn flag_ancestor_relations (
   flags                 : &mut AncestorFlags,
   graph                 : Option<&InRustGraph>,
-  active                : Option<&ActiveSkgRepoSet>,
+  restriction           : Option<&SkgrepoRestriction>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
   node_pid              : &ID,
@@ -234,7 +234,7 @@ fn flag_ancestor_relations (
   generation            : usize,
 ) {
   let contains_rel_is_visible = |recorder : &ID, target : &ID| -> bool {
-    match (graph, active) {
+    match (graph, restriction) {
       (Some (g), Some (a)) if ! a . is_all () =>
         g . relRepo (recorder, NodeRelation::Contains, target)
           . map ( |skgrepo| a . contains_skgrepo (&skgrepo) )
@@ -255,15 +255,15 @@ fn flag_ancestor_relations (
     // inbound: ancestor R's node (ancestor plays the first role).
     if graph . relation_membership_is_visible (
       node_pid, anc_pid,
-      RelationRole::new (rel, BinaryRolePosition::First), active ) {
+      RelationRole::new (rel, BinaryRolePosition::First), restriction ) {
       flags . record (rel, true, generation);
       if rel == NodeRelation::LinksTo
-        && mentioner_is_substantive (graph, active, anc_pid) {
+        && mentioner_is_substantive (graph, restriction, anc_pid) {
         flags . links_substantive_in . push (generation); } }
     // outbound: node R's ancestor (ancestor plays the second role).
     if graph . relation_membership_is_visible (
       node_pid, anc_pid,
-      RelationRole::new (rel, BinaryRolePosition::Second), active ) {
+      RelationRole::new (rel, BinaryRolePosition::Second), restriction ) {
       flags . record (rel, false, generation); } } }
 
 /// The birth facts -- which relations explain this occurrence, on which
@@ -340,7 +340,7 @@ fn birth_facts_for_folder (
       vec![ BirthFact::new (
               NodeRelation::HidesFromSubs, Side::In, Some (3) ) ], } }
 
-/// Sets omitted_body on the active vognode at treeid: true iff the node
+/// Sets omitted_body on the unrestricted vognode at treeid: true iff the node
 /// is drawn WRITE_PROTECTED here while its graphnode has a body -- one
 /// the rendering hides. Herald "B" on the ☮ (TODO/more.org). False
 /// without a graph handle (some tests): better no B than a wrong one.
@@ -351,7 +351,7 @@ fn set_omitted_body (
   graph    : Option<&InRustGraph>,
 ) {
   let omitted_body : bool = {
-    let ViewnodeKind::Vognode (Vognode::Active (t)) =
+    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
     t . is_writeProtected ()
@@ -360,11 +360,11 @@ fn set_omitted_body (
              . unwrap_or_else ( || node_pid . clone () );
            g . nodes . get (&pid)
              . map_or ( false, |n| n . body . is_some () ) } ) };
-  if let ViewnodeKind::Vognode (Vognode::Active (t)) =
+  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . omitted_body = omitted_body; }}
 
-/// Sets relRepo on the active vognode at treeid (render-and-gating,
+/// Sets relRepo on the unrestricted vognode at treeid (render-and-gating,
 /// 5_plan.org; see 'ViewnodeStats::relRepo' for the full contract).
 /// Computes the (recorder, relation, target) triple that identifies the
 /// binding relationship this position represents -- contains for an ordinary
@@ -388,7 +388,7 @@ fn set_relRepo (
     let graph : &InRustGraph = match graph {
       Some (g) => g, None => break 'compute None, };
     let (node_pid, affectsParent, birth) : (ID, AffectsParent, Birth) = {
-      let ViewnodeKind::Vognode (Vognode::Active (t)) =
+      let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
         & tree . get (treeid) . unwrap () . value () . kind
       else { break 'compute None; };
       ( t . collected_skgid (), t . affectsParent, t . birth ) };
@@ -407,7 +407,7 @@ fn set_relRepo (
           else { break 'compute None; }; // compound filter folders
           let Some (anchor_pid) =
             tree . get (folder_treeid) . unwrap () . parent ()
-            . and_then ( |p| active_vognode_pid (tree, p . id ()) )
+            . and_then ( |p| unrestricted_vognode_pid (tree, p . id ()) )
           else { break 'compute None; };
           if role . is_first_role () {
             // This position's own node OWNS the outbound relationship (e.g.
@@ -433,7 +433,7 @@ fn set_relRepo (
           config . default_relRepo (&a, &b),
         _ => break 'compute None, }};
     if skgrepo == default { None } else { Some (skgrepo) } };
-  if let ViewnodeKind::Vognode (Vognode::Active (t)) =
+  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . relRepo = relRepo; }}
 
@@ -490,39 +490,39 @@ mod relationship_default_tests {
 
     set_relRepo (
       &mut tree, member_treeid, Some (&graph), &config );
-    let ViewnodeKind::Vognode (Vognode::Active (rendered_member)) =
+    let ViewnodeKind::Vognode (Vognode::Unrestricted (rendered_member)) =
       & tree . get (member_treeid) . unwrap () . value () . kind
-    else { panic! ("member should be active"); };
+    else { panic! ("member should be unrestricted"); };
     assert_eq! ( rendered_member . viewStats . relRepo, None,
       "the recorder-home default must not render a fake relRepo override" );
   }
 }
 
-/// Sets homeRepoAtBoundary on the active vognode at treeid.
-/// True if no active vognode ancestor exists (i.e. a root),
-/// or if the nearest active vognode ancestor has a different skgrepo.
+/// Sets homeRepoAtBoundary on the unrestricted vognode at treeid.
+/// True if no unrestricted vognode ancestor exists (i.e. a root),
+/// or if the nearest unrestricted vognode ancestor has a different skgrepo.
 fn set_skgrepo_at_boundary (
   tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
 ) {
   let node_skgrepo : SkgRepoName = {
-    let ViewnodeKind::Vognode (Vognode::Active (t)) =
+    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
     t . home_skgrepo . clone () };
   let ancestor_skgrepo : Option<SkgRepoName> =
-    nearest_activeVognode_ancestor_skgrepo (tree, treeid);
+    nearest_unrestrictedVognode_ancestor_skgrepo (tree, treeid);
   let at_boundary : bool =
     match ancestor_skgrepo {
       None => true,
       Some (s) => s != node_skgrepo };
-  if let ViewnodeKind::Vognode (Vognode::Active (t)) =
+  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . homeSkgRepoAtBoundary = at_boundary; }}
 
 /// Walk rootward from treeid (exclusive) to find
-/// the nearest active vognode ancestor's skgrepo.
-fn nearest_activeVognode_ancestor_skgrepo (
+/// the nearest unrestricted vognode ancestor's skgrepo.
+fn nearest_unrestrictedVognode_ancestor_skgrepo (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Option<SkgRepoName> {
@@ -530,7 +530,7 @@ fn nearest_activeVognode_ancestor_skgrepo (
   while let Some (parent_ref)
     = tree . get (current) . unwrap () . parent ()
     { current = parent_ref . id ();
-      if let ViewnodeKind::Vognode (Vognode::Active (t))
+      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         = & parent_ref . value () . kind
         { return Some ( t . home_skgrepo . clone () ); }}
   None }
@@ -543,6 +543,6 @@ fn detect_and_mark_cycle_v2 (
   node_pid        : &ID,
   ancestor_skgids : &HashSet<ID>,
 ) {
-  if let ViewnodeKind::Vognode (Vognode::Active (t)) =
+  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . cycle = ancestor_skgids . contains (node_pid); } }

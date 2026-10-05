@@ -132,7 +132,7 @@ async fn test_path_with_branches_no_cycle_impl(
   for edge in viewforest . root() . traverse() {
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
       if let ViewnodeKind::Vognode (
-        Vognode::Active (t)) =
+        Vognode::Unrestricted (t)) =
         &node_ref . value() . kind {
         if t . skgid . 0 == "1" {
           node_1_skgid = Some(node_ref . id());
@@ -211,7 +211,7 @@ async fn test_path_with_branches_with_cycle_impl(
   for edge in viewforest . root() . traverse() {
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
       if let ViewnodeKind::Vognode (
-        Vognode::Active (t)) =
+        Vognode::Unrestricted (t)) =
         &node_ref . value() . kind {
         if t . skgid . 0 == "1" {
           node_1_skgid = Some(node_ref . id());

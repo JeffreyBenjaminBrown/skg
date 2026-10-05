@@ -1,9 +1,9 @@
--- PURPOSE: Expand/strip default fields for ActiveVognode metadata
+-- PURPOSE: Expand/strip default fields for UnrestrictedVognode metadata
 -- editing. After sexp_to_org, expand inserts missing editable fields
 -- with defaults; before org_to_sexp, strip removes default-valued
--- fields. The Lua port of elisp/skg-sexpr/skg-activeNode-defaults.el.
+-- fields. The Lua port of elisp/skg-sexpr/skg-unrestrictedNode-defaults.el.
 --
--- ENTRY POINTS: activeNode_sexp_p, expand_defaults_in_org,
+-- ENTRY POINTS: unrestrictedNode_sexp_p, expand_defaults_in_org,
 -- strip_defaults_from_org, headlines_to_org.
 --
 -- Headlines here are the {level, text} tables produced by
@@ -37,10 +37,10 @@ function M.editable_default_for (name)
   return nil
 end
 
----Is SEXP an ActiveVognode sexp?
+---Is SEXP an UnrestrictedVognode sexp?
 ---@param sexp any
 ---@return boolean
-function M.activeNode_sexp_p (sexp)
+function M.unrestrictedNode_sexp_p (sexp)
   return compare.subtree_p(sexp,
            { parse.symbol('skg'), { parse.symbol('node') } })
          or compare.subtree_p(sexp,
@@ -61,7 +61,7 @@ end
 
 -- ── Expand ─────────────────────────────────────────────────────────
 
----Expand default fields in ORG_TEXT for ActiveVognode metadata editing:
+---Expand default fields in ORG_TEXT for UnrestrictedVognode metadata editing:
 ---reorder the '** node' section's fields to canonical order, insert
 ---missing editable fields with defaults, and expand bare boolean
 ---atoms to have a value child. If DEFAULT_REPO is given, insert it
@@ -116,7 +116,7 @@ function M.find_node_headline (headlines)
   for index, headline in ipairs(headlines) do
     if headline.text == 'node' then return index end
   end
-  error("skg.activenode_defaults: no 'node' headline found")
+  error("skg.unrestrictednode_defaults: no 'node' headline found")
 end
 
 ---Split HEADLINES into the node's children and the remainder.

@@ -8,11 +8,11 @@
 /// - A `goal_list` is the ordered list of node IDs that a folder
 ///   should present after completion.  The list is computed from the
 ///   graph and, in diff views, from git-diff state.
-/// - A goal child is a child Viewnode whose ActiveVognode ID appears in
+/// - A goal child is a child Viewnode whose UnrestrictedVognode ID appears in
 ///   that `goal_list`, whether it already existed in the buffer or
 ///   was created during reconciliation.
 /// - A relevant child is one this reconciliation pass is allowed to
-///   manage: for PartnerFolders, an ActiveVognode marked affectsParent=true.
+///   manage: for PartnerFolders, an UnrestrictedVognode marked affectsParent=true.
 ///   Relevant children whose IDs are not in the goal list are removed
 ///   or otherwise demoted by the caller-specific cleanup step.
 /// - `ChildData` is the pre-fetched title/repo/phantom metadata
@@ -44,7 +44,7 @@ pub struct ChildData {
   pub title        : String,
   pub phantom      : Option<(NodeAxes, RelationshipAxes)>,
   /// True when the exact stored relationship member has no current
-  /// node.  It is rendered as an Unknown, never as a title-less active
+  /// node.  It is rendered as an Unknown, never as a title-less unrestricted
   /// fallback.
   pub unknown : bool,
   pub relRepo : Option<SkgRepoName>,
@@ -80,7 +80,7 @@ pub fn build_child_data (
         . ok_or ("build_child_data: node not found") ?;
     let mut m : HashMap<ID, (SkgRepoName, String)> = HashMap::new ();
     for child_ref in node_ref . children () {
-      if let ViewnodeKind::Vognode (Vognode::Active (t))
+      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         = & child_ref . value () . kind
         { m . insert ( t . skgid . clone (),
                        ( t . home_skgrepo . clone (),
@@ -90,7 +90,7 @@ pub fn build_child_data (
   for child_skgid in goal_list {
     if result . contains_key (child_skgid) { continue; }
     if removed_skgids . contains (child_skgid) {
-      // A removed-member diff-phantom is a *non-Active* viewnode. If its
+      // A removed-member diff-phantom is a *non-Unrestricted* viewnode. If its
       // skgrepo can't be determined, fall back to the NOT_FOUND sentinel
       // rather than aborting the whole render (TODO/DONE/local-view-update/plan_v2.org §7.6).
       let child_src : SkgRepoName =
@@ -188,19 +188,19 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
   let summary : RepairSummary<ID> =
     complete_relevant_children_in_viewforest (
     tree, folder_node,
-    // An InactiveVognode child is IRRELEVANT
+    // A RestrictedVognode child is IRRELEVANT
     // (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org): the goal omits
-    // every inactive member, and a retained placeholder already in the
+    // every restricted member, and a retained placeholder already in the
     // folder survives as an irrelevant child (preserved as-is, not
     // goal-matched), so it needs no id.
     |vn : &Viewnode| match &vn . kind {
-      ViewnodeKind::Vognode (Vognode::Active (t))
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         => t . affectsParent == AffectsParent::True,
       ViewnodeKind::Vognode (Vognode::Phantom (crate::types::viewnode::Phantom::Unknown (_)))
         => true,
       _ => false },
     |vn : &Viewnode| match &vn . kind {
-      ViewnodeKind::Vognode (Vognode::Active (t))
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         => Ok ( t . skgid . clone () ),
       ViewnodeKind::Vognode (Vognode::Phantom (crate::types::viewnode::Phantom::Unknown (u)))
         => Ok ( u . skgid . clone () ),
@@ -233,7 +233,7 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
     tree, folder_node, goal_list) ?;
   Ok (summary) }
 
-/// An already-open PartnerFolder can still hold an Active occurrence after its
+/// An already-open PartnerFolder can still hold an Unrestricted occurrence after its
 /// graphnode was deleted.  When the rebuilt raw goal retains that membership,
 /// turn it into Unknown before the generic deletion pass.  Replacing only the
 /// kind keeps focus/folding state but removes title, body, home, and node edits.
@@ -246,22 +246,22 @@ fn normalize_relationship_backed_partner_unknowns (
   treat_certain_children (
     tree, folder_node,
     |vn : &Viewnode| match &vn . kind {
-      ViewnodeKind::Vognode (Vognode::Active (active)) =>
-        active . affectsParent == AffectsParent::True
-        && (child_data . get (&active . skgid)
+      ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =>
+        restriction . affectsParent == AffectsParent::True
+        && (child_data . get (&restriction . skgid)
             . is_some_and (|data| data . unknown)
-            || deleted_by_this_save_extra_ids . get (&active . skgid)
+            || deleted_by_this_save_extra_ids . get (&restriction . skgid)
                . is_some_and (|extra_ids| extra_ids . iter () . any (
                  |raw_skgid| child_data . get (raw_skgid)
                    . is_some_and (|data| data . unknown)))),
       _ => false },
     |vn : &mut Viewnode| {
-      let active_skgid : ID = match &vn . kind {
-        ViewnodeKind::Vognode (Vognode::Active (active)) => active . skgid . clone (),
+      let unrestricted_skgid : ID = match &vn . kind {
+        ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) => restriction . skgid . clone (),
         _ => unreachable! (), };
-      let skgid : ID = if child_data . get (&active_skgid)
-        . is_some_and (|data| data . unknown) { active_skgid . clone () }
-      else { deleted_by_this_save_extra_ids . get (&active_skgid)
+      let skgid : ID = if child_data . get (&unrestricted_skgid)
+        . is_some_and (|data| data . unknown) { unrestricted_skgid . clone () }
+      else { deleted_by_this_save_extra_ids . get (&unrestricted_skgid)
         . and_then (|extra_ids| extra_ids . iter () . find (
           |raw_skgid| child_data . get (*raw_skgid)
             . is_some_and (|data| data . unknown)))
@@ -276,7 +276,7 @@ fn normalize_relationship_backed_partner_unknowns (
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }
 
-/// Stamp per-stage membership signs onto a folder's existing Active
+/// Stamp per-stage membership signs onto a folder's existing Unrestricted
 /// members, from a per-member axes map (an outbound folder reads the
 /// recorder's relation diff via 'outbound_member_axes'; an inbound folder
 /// reads the inverse scan):
@@ -284,8 +284,8 @@ fn normalize_relationship_backed_partner_unknowns (
 ///   ('addedR'), mirroring 'mark_relationship_axes_on_existing_children's
 ///   rule for content children (Minus positions are phantoms,
 ///   handled by the goal list);
-/// - an Active child whose net result is REMOVED -- reachable only
-///   when a stale saved buffer still holds, as an Active member, a
+/// - an Unrestricted child whose net result is REMOVED -- reachable only
+///   when a stale saved buffer still holds, as an Unrestricted member, a
 ///   write-protected-folder member whose relationship is gone -- gets the full axes
 ///   and flips to a phantom, so the rendered buffer cannot show a
 ///   removed relationship as a live member.
@@ -298,9 +298,9 @@ pub fn apply_relationship_axes_to_folder_members (
   treat_certain_children (
     tree, folder_node,
     |vn : &Viewnode| matches! (
-      &vn . kind, ViewnodeKind::Vognode (Vognode::Active (_)) ),
+      &vn . kind, ViewnodeKind::Vognode (Vognode::Unrestricted (_)) ),
     |vn : &mut Viewnode| {
-      if let ViewnodeKind::Vognode (Vognode::Active (t))
+      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         = &mut vn . kind
       { if let Some (m) = axes_by_skgid . get (&t . skgid) {
           if m . net_is_present () {
@@ -374,12 +374,12 @@ fn mark_goal_children_as_folder_members (
   treat_certain_children (
     tree, folder_node,
     |vn : &Viewnode| match &vn . kind {
-      ViewnodeKind::Vognode (Vognode::Active (t)) =>
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         goal_set . contains (&t . skgid)
         && ! t . should_be_diffPhantom (),
       _ => false },
     |vn : &mut Viewnode| {
-      if let ViewnodeKind::Vognode (Vognode::Active (t))
+      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         = &mut vn . kind
         { t . affectsParent = AffectsParent::True; }} )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;

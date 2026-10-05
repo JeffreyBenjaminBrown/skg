@@ -100,7 +100,7 @@
       (skg-approve-fork)))
   (message "✓ the public clone was forked into a private clone (repo rotated)")
 
-  ;; 7. Reopen P (all skgrepos active): the chain end D -- a PRIVATE-repo
+  ;; 7. Reopen P (all skgrepos unrestricted): the chain end D -- a PRIVATE-repo
   ;;    node -- is now drawn in N's place, still marked (overridesHere N).
   (let ((p-buf (chain-test--reopen-P)))
     (let ((end-drawn

@@ -81,7 +81,7 @@ fn collect_instructions(
       HashMap<ID, HashSet<SkgRepoName>>
   ) {
     let viewnode : &MpViewnode = node_ref . value();
-    if let MpViewnodeKind::Vognode (MpVognode::Active (t))
+    if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
       = &viewnode . kind
     { if let Some (skgid) = &t . skgid {
         if ! t . is_writeProtected () { // write-protected nodes contribute no instructions

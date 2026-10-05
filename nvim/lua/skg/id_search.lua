@@ -101,7 +101,7 @@ function M.metadata_sexp_contains_id_p (sexp)
   return M.extract_id_from_metadata_sexp(sexp) ~= nil
 end
 
----The id from SEXP, accepting the ActiveVognode, diff-phantom, and
+---The id from SEXP, accepting the UnrestrictedVognode, diff-phantom, and
 ---Deleted-phantom shapes. Nil when absent.
 ---@param sexp any
 ---@return string|nil

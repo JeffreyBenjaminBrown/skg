@@ -4,11 +4,11 @@
 //! it passes to the repo-resolution function.
 
 use super::{apply_sticky_relRepos_in_graph, build_diskSupplemented_nodeInstructions,
-            refuse_delete_with_inactive_sections};
+            refuse_delete_with_restricted_sections};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::from_text::local_fieldintent_collection::lower::{
   NodeIntent, RequestedRelRepos};
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{
   ID, MSV, RelPartner, SkgConfig, SkgRepo, SkgRepoName,
   SkgRepoSetName};
@@ -647,7 +647,7 @@ fn explicit_alias_relRepo_is_load_bearing_and_validated (
 }
 
 #[test]
-fn restricted_delete_refusal_sees_inactive_sections (
+fn restricted_delete_refusal_sees_restricted_sections (
 ) {
   let tmp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
   let mut config : SkgConfig =
@@ -660,19 +660,19 @@ fn restricted_delete_refusal_sees_inactive_sections (
   std::fs::write (
     tmp . path () . join ("private/n.skg"),
     "pid: n\n" ) . unwrap ();
-  let active : ActiveSkgRepoSet = ActiveSkgRepoSet {
+  let restriction : SkgrepoRestriction = SkgrepoRestriction {
     name    : SkgRepoSetName::from ("public"),
     skgrepos : [ SkgRepoName::from ("public") ]
       . into_iter () . collect (), };
   let refusal : Result<(), String> =
-    refuse_delete_with_inactive_sections (
-      &config, &active, &ID::new ("n") );
+    refuse_delete_with_restricted_sections (
+      &config, &restriction, &ID::new ("n") );
   assert! ( refusal . is_err (), "private section must refuse" );
   assert! ( refusal . unwrap_err ()
-            . contains ("inactive repos") );
-  assert! ( refuse_delete_with_inactive_sections (
-    &config, &active, &ID::new ("only-public") ) . is_ok (),
-    "a node with no inactive sections deletes fine" );
+            . contains ("restricted repos") );
+  assert! ( refuse_delete_with_restricted_sections (
+    &config, &restriction, &ID::new ("only-public") ) . is_ok (),
+    "a node with no restricted sections deletes fine" );
 }
 
 #[test]
@@ -683,10 +683,10 @@ fn relrepo_fact_and_request_round_trip_separately (
   use crate::org_to_text::viewnode_to_string;
   use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
   use crate::types::viewnode::{
-    default_activeVognode, ActiveVognode, Viewnode, ViewnodeKind, Vognode };
+    default_unrestrictedVognode, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode };
 
-  let mut t : ActiveVognode =
-    default_activeVognode (
+  let mut t : UnrestrictedVognode =
+    default_unrestrictedVognode (
       ID::new ("n"), SkgRepoName::from ("public"), "N" . to_string () );
   t . viewStats . relRepo = Some ( SkgRepoName::from ("private") );
   t . relRepo_request = Some ( SkgRepoName::from ("secret") );
@@ -694,7 +694,7 @@ fn relrepo_fact_and_request_round_trip_separately (
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind        : ViewnodeKind::Vognode ( Vognode::Active (t) ), };
+    kind        : ViewnodeKind::Vognode ( Vognode::Unrestricted (t) ), };
   let config : SkgConfig =
     config_with_order ( & ["public", "private"] );
   let rendered : String =
@@ -749,14 +749,14 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
   use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
   use crate::types::nodes::complete::Flag;
   use crate::types::viewnode::{
-    default_activeVognode, ActiveVognode, NodeEditRequest, Viewnode,
+    default_unrestrictedVognode, UnrestrictedVognode, NodeEditRequest, Viewnode,
     ViewnodeKind, Vognode};
 
   for value in [false, true] {
-    let mut active : ActiveVognode = default_activeVognode (
+    let mut restriction : UnrestrictedVognode = default_unrestrictedVognode (
       ID::new ("n"), SkgRepoName::from ("public"), "N" . to_string () );
     if let crate::types::viewnode::Editability::Editable {
-      edit_request, .. } = &mut active . editability
+      edit_request, .. } = &mut restriction . editability
     { *edit_request = Some (NodeEditRequest::SetFlag {
         flag : Flag::NoSearchMatching,
         value, }); }
@@ -765,7 +765,7 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
       focused     : false,
       folded      : false,
       body_folded : false,
-      kind        : ViewnodeKind::Vognode (Vognode::Active (active)), };
+      kind        : ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)), };
     let config : SkgConfig = config_with_order (&["public"]);
     let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
     assert! ( rendered . contains (&format! (
@@ -776,9 +776,9 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
       Some (NodeEditRequest::SetFlag {
         flag : Flag::NoSearchMatching, value }) );
     node . consume_edit_request_after_save ();
-    let ViewnodeKind::Vognode (Vognode::Active (active)) = &node . kind
+    let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) = &node . kind
       else { unreachable! (); };
-    assert_eq! (active . edit_request (), None); }
+    assert_eq! (restriction . edit_request (), None); }
 
   for malformed in [
     "(skg (node (id n) (editRequest (flag nope true))))",

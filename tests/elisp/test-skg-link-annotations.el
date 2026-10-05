@@ -10,7 +10,7 @@
     (puthash "old-visible" '(resolved "visible" "pub")
              skg-link-annotations--cache)
     (puthash "gone" '(missing) skg-link-annotations--cache)
-    (puthash "private" '(inactive) skg-link-annotations--cache)
+    (puthash "private" '(restricted) skg-link-annotations--cache)
     (with-temp-buffer
       (insert "* Unicode [[id:old-visible][café]] and [[id:gone][gone]]\n"
               "Body [[id:private][private]] and [[https://x][web]]\n")
@@ -37,7 +37,7 @@
                                  when text collect (substring-no-properties text))))
           ;; The broken link [[id:gone]] gets no suffix.
           (should (member " [⌂:pub]" suffixes))
-          (should (member " [⌂:inactive]" suffixes))
+          (should (member " [⌂:restricted]" suffixes))
           (should (= (length suffixes) 2)))
         (should (equal (buffer-string) original))
         (should-not (buffer-modified-p))

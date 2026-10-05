@@ -54,16 +54,16 @@ fn affectsParent_if_normal (
   treeid     : NodeId,
 ) -> AffectsParent {
   match & viewforest . get (treeid) . unwrap () . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Active (t)) => t . affectsParent,
-    _ => panic! ("expected ActiveVognode") } }
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t . affectsParent,
+    _ => panic! ("expected UnrestrictedVognode") } }
 
 fn birth_if_normal (
   viewforest : &Tree<Viewnode>,
   treeid     : NodeId,
 ) -> Birth {
   match & viewforest . get (treeid) . unwrap () . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Active (t)) => t . birth,
-    _ => panic! ("expected ActiveVognode") } }
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t . birth,
+    _ => panic! ("expected UnrestrictedVognode") } }
 
 #[test]
 fn linksto_false_claim_flipped_to_independent () {
@@ -138,9 +138,9 @@ fn containerof_false_claim_flipped () {
 
 #[test]
 fn orphan_under_dead_parent_demoted_member_under_folder_kept () {
-  // §A (Jeff's invariant): a member Active node under a non-container
+  // §A (Jeff's invariant): a member Unrestricted node under a non-container
   // parent (Diff phantom / DeadViewnode) demotes to non-member; a legitimate
-  // folder MEMBER (member Active under a PartnerFolder) is left untouched.
+  // folder MEMBER (member Unrestricted under a PartnerFolder) is left untouched.
   use crate::types::viewnode::{ mk_phantom_viewnode, PartnerFolder };
   use crate::types::git::{ NodeAxes, RelationshipAxes };
   let mut vf : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());

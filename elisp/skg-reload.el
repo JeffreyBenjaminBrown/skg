@@ -106,7 +106,7 @@ rather than via `unload-feature'."
             skg-sexpr-org-bijection
             skg-sexpr-search
             skg-shared
-            skg-activeNode-defaults
+            skg-unrestrictedNode-defaults
             skg-state
             skg-test-utils
             skg-readable-ids

@@ -118,7 +118,7 @@ metadata.change_repo_at_line(clone_line_2, 'private')
 save.approve_fork()
 print('the public clone was forked into a private clone (repo rotated)')
 
--- 7. Reopen P (all skgrepos active): the chain end D -- a PRIVATE-repo
+-- 7. Reopen P (all skgrepos unrestricted): the chain end D -- a PRIVATE-repo
 --    node -- is now drawn in N's place, still marked (overridesHere N).
 p_buf = reopen_P()
 local function chain_end_drawn ()

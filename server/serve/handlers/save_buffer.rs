@@ -10,7 +10,7 @@ use crate::save::{
   PreparedSave, prepare_save_under_mutation_gate,
 };
 use crate::serve::ViewsState;
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::handlers::telescope_hoist::{
   HoistCandidate,
@@ -129,7 +129,7 @@ pub fn handle_save_buffer_request (
   request    : &str,
   env        : &mut SkgEnv,
   views_state : &mut ViewsState,
-  active_skgrepo_set : &ActiveSkgRepoSet,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) {
   let viewid_from_request_result : Result<ViewId, String> =
     view_id_from_request (request);
@@ -178,7 +178,7 @@ pub fn handle_save_buffer_request (
             views_state . diff_mode_enabled,
             &viewid_from_request_result,
             views_state,
-            Some (active_skgrepo_set),
+            Some (skgrepo_restriction),
             approved_forks,
             &fork_skgrepos,
             &approved_hoist_pids,
@@ -503,7 +503,7 @@ fn fork_approved_from_request (
 /// skgrepo the user chose for its clone (rotated, or left at the default,
 /// in the fork-confirmation buffer). Absent on an ordinary save and on
 /// the first (unapproved) save -- then every clone skgrepo resolves by
-/// inference-else-default. The chosen skgrepo is validated owned + active
+/// inference-else-default. The chosen skgrepo is validated owned + unrestricted
 /// downstream in 'validate_fork_specs'.
 fn fork_skgrepos_from_request (
   request : &str,
@@ -564,14 +564,14 @@ pub async fn update_from_and_rerender_buffer (
   diff_mode_enabled           : bool,
   viewid_from_request_result  : &Result<ViewId, String>,
   views_state                  : &mut ViewsState,
-  active_skgrepo_set          : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction         : Option<&SkgrepoRestriction>,
   approved_forks              : bool, // true once the user has approved the forks (a re-issued save); false on the first save, which returns a fork-confirmation instead of committing.
   fork_skgrepos               : &HashMap<ID, SkgRepoName>, // per-fork clone skgrepos the user chose in the confirmation buffer (keyed by N's pid); empty otherwise.
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let no_hoist_approvals : HashSet<ID> = HashSet::new ();
   update_from_and_rerender_buffer_with_hoist_approval (
     stream, org_buffer_text, env, diff_mode_enabled,
-    viewid_from_request_result, views_state, active_skgrepo_set,
+    viewid_from_request_result, views_state, skgrepo_restriction,
     approved_forks, fork_skgrepos, &no_hoist_approvals ) . await
 }
 
@@ -582,14 +582,14 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
   diff_mode_enabled           : bool,
   viewid_from_request_result  : &Result<ViewId, String>,
   views_state                  : &mut ViewsState,
-  active_skgrepo_set          : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction         : Option<&SkgrepoRestriction>,
   approved_forks              : bool,
   fork_skgrepos               : &HashMap<ID, SkgRepoName>,
   approved_hoist_pids         : &HashSet<ID>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   update_from_and_rerender_buffer_with_approvals (
     stream, org_buffer_text, env, diff_mode_enabled,
-    viewid_from_request_result, views_state, active_skgrepo_set,
+    viewid_from_request_result, views_state, skgrepo_restriction,
     approved_forks, fork_skgrepos, approved_hoist_pids,
     &HashSet::new (), &[] ) . await
 }
@@ -601,7 +601,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   diff_mode_enabled           : bool,
   viewid_from_request_result  : &Result<ViewId, String>,
   views_state                  : &mut ViewsState,
-  active_skgrepo_set          : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction         : Option<&SkgrepoRestriction>,
   approved_forks              : bool,
   fork_skgrepos               : &HashMap<ID, SkgRepoName>,
   approved_hoist_pids         : &HashSet<ID>,
@@ -629,7 +629,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
           ) . entered();
         buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_graph (
           org_buffer_text, &runtime . graph, &runtime . config,
-          active_skgrepo_set, fork_skgrepos,
+          skgrepo_restriction, fork_skgrepos,
           viewid_from_request_result . as_ref () . ok ()
             . and_then ( |view_id| views_state . open_views
               . viewid_to_view (view_id) ) )
@@ -802,7 +802,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         swapped_in . clone (),
         viewid_from_request_result,
         views_state,
-        active_skgrepo_set,
+        skgrepo_restriction,
         deleted_by_this_save_extra_ids,
         text_approved_pids,
         &fork_specs ) ?;

@@ -1,10 +1,10 @@
 /// Per-node git-diff decoration for the git diff view.
-/// process_activeVognode_diff decorates one Active vognode and generates its
+/// process_unrestrictedVognode_diff decorates one Unrestricted vognode and generates its
 /// diff-only children. TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): it is now called INLINE, at each
 /// node's own BFS visit (server/update_buffer/complete.rs), for both the
 /// post-save and de-novo paths.
 ///
-/// Each ActiveVognode and Non-vognode is decorated with per-stage diff axes:
+/// Each UnrestrictedVognode and Non-vognode is decorated with per-stage diff axes:
 ///   N (node) describes whether the node's '.skg' file changed
 ///     between HEAD↔index (staged) or index↔worktree (unstaged).
 ///   R (relationship) describes whether the node's appearance at this
@@ -26,12 +26,12 @@ use ego_tree::{NodeMut, NodeRef, NodeId};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-/// Decorate a active vognode and generate any diff-only children
-/// implied by staged and unstaged GraphnodeDiffs. Called inline per Active
+/// Decorate an unrestricted vognode and generate any diff-only children
+/// implied by staged and unstaged GraphnodeDiffs. Called inline per Unrestricted
 /// node at its own BFS visit (for both de-novo and post-save), TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3:
 /// the node flips to a phantom here and its folders then self-deaden via their own
 /// generalized-orphan check at their later visits.
-pub(crate) fn process_activeVognode_diff (
+pub(crate) fn process_unrestrictedVognode_diff (
   mut node_mut                   : NodeMut<Viewnode>,
   graph                          : &InRustGraph,
   skgrepo_diffs                  : &HashMap<SkgRepoName, SkgRepoDiff>,
@@ -43,14 +43,14 @@ pub(crate) fn process_activeVognode_diff (
     node_mut . id();
   let (pid, skgrepo) : (ID, SkgRepoName) =
     pid_and_skgrepo_from_viewnode_at (
-      node_mut . tree(), treeid, "process_activeVognode_diff"
+      node_mut . tree(), treeid, "process_unrestrictedVognode_diff"
     ) . map_err ( |e| e . to_string() ) ?;
   let skgrepo_diff : &SkgRepoDiff =
     match skgrepo_diffs . get (&skgrepo) {
       Some (d) => d,
       None => return Ok (( )) };
   if ! skgrepo_diff . is_gitrepo {
-    if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
+    if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
       = node_mut . value() . kind
       { t . not_in_git = true; }
     return Ok (( )); }
@@ -67,7 +67,7 @@ pub(crate) fn process_activeVognode_diff (
     staged   . and_then ( |d| d . status . to_node_axis_sign ());
   let unstaged_n : Option<Sign> =
     unstaged . and_then ( |d| d . status . to_node_axis_sign ());
-  if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
+  if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
     = node_mut . value() . kind
     { t . node_axes . staged   = staged_n;
       t . node_axes . unstaged = unstaged_n; }
@@ -101,7 +101,7 @@ pub(crate) fn process_activeVognode_diff (
             staged   : staged_text,
             unstaged : unstaged_text } ) } ); }
   // The IDFolder/AliasFolder diff-only properties are folders, so if this node flipped to a
-  // phantom they would be generalized orphans (a folder requires a Active-vognode
+  // phantom they would be generalized orphans (a folder requires an Unrestricted-vognode
   // ancestor) and get deadened + pruned at their own BFS visit -- i.e. emitted
   // here only to be destroyed before render. Skip creating them on a flipped
   // node: same final tree, without the wasted work. (The node's id/alias
@@ -144,7 +144,7 @@ pub(crate) fn process_activeVognode_diff (
   mark_relationship_axes_on_existing_children (
     &mut node_mut, treeid, &added_relationship_axes_by_skgid );
   if matches! ( & node_mut . value () . kind,
-                ViewnodeKind::Vognode (Vognode::Active (t))
+                ViewnodeKind::Vognode (Vognode::Unrestricted (t))
                   if t . is_writeProtected () ) {
     // TODO/fork-fixes.org: no git phantoms under a write-protected node.
     // It draws none of its worktree children, so a removed-member
@@ -247,11 +247,11 @@ fn mark_relationship_axes_on_existing_children (
       node_mut . tree() . get_mut (child_skgid) . unwrap();
     let child_id_and_relationship_axes : Option<(ID, &mut RelationshipAxes)> =
       match &mut child . value() . kind {
-        ViewnodeKind::Vognode (Vognode::Active (t)) =>
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
           Some ((t . skgid . clone (), &mut t . relationship_axes)),
-        // No Inactive arm: diff mode requires the "all" skgrepo set
+        // No Restricted arm: diff mode requires the "all" skgrepo set
         // (diff_report.rs and repo_sets.rs refuse otherwise), under
-        // which no node is inactive, so inactive vognodes never
+        // which no node is restricted, so restricted vognodes never
         // reach diff rendering.
         _ => None };
     if let Some ((skgid, relationship_axes)) = child_id_and_relationship_axes {
@@ -291,18 +291,18 @@ fn insert_phantoms_for_missing_contains (
     let mut m : HashMap<ID, NodeId> = HashMap::new ();
     for c in node_ref . children () {
       match &c . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Active (t))
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           => { m . insert ( t . skgid . clone (), c . id () ); },
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
           => { m . insert ( p . skgid . clone (), c . id () ); },
-        // No Inactive arm: inactive vognodes never reach diff
+        // No Restricted arm: restricted vognodes never reach diff
         // rendering (diff mode requires the "all" skgrepo set).
         _ => {}, }}
     m };
   for (skgid, anchor) in plan {
     let relationship_axes : RelationshipAxes =
       relationship_axes_by_skgid . get (&skgid) . copied () . unwrap_or_default ();
-    // A removed-member diff-phantom is a *non-Active* viewnode. If its
+    // A removed-member diff-phantom is a *non-Unrestricted* viewnode. If its
     // skgrepo can't be determined -- e.g. a contains pointer at HEAD to a
     // node whose .skg file was deleted by an earlier commit and so exists
     // in no skgrepo -- fall back to the NOT_FOUND sentinel rather than

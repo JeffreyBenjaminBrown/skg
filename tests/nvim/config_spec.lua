@@ -86,7 +86,7 @@ describe('skg.config', function ()
                     'abc123', 'nonexistent'))
   end)
 
-  it('returns nil wrappers when no config is active', function ()
+  it('returns nil wrappers when no config is unrestricted', function ()
     config.config_file_path = nil
     assert.is_nil(config.repo_names())
     assert.is_nil(config.owned_repos())

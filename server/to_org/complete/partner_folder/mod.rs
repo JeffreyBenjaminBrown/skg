@@ -3,9 +3,9 @@ pub mod goal_list;
 pub mod inverse_scan;
 pub mod kind;
 
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::phantom::home_from_disk;
-use crate::update_buffer::reconcile::omit_inactive_members;
+use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
@@ -78,8 +78,8 @@ fn build_initial_render_child_data (
   Ok ((goal, resolved)) }
 
 /// Check if a node's type and parent type are consistent with being a Subscribee.
-/// A Subscribee is an ActiveVognode whose parent is a SubscribeeFolder.
-/// (Checking that its grandparent (the subscriber) is an ActiveVognode
+/// A Subscribee is an UnrestrictedVognode whose parent is a SubscribeeFolder.
+/// (Checking that its grandparent (the subscriber) is an UnrestrictedVognode
 /// happens from the SubscribeeFolder, so needn't be repeated here.)
 pub fn type_and_parent_type_consistent_with_subscribee (
   tree    : &Tree<Viewnode>,
@@ -88,15 +88,15 @@ pub fn type_and_parent_type_consistent_with_subscribee (
   let node_ref : NodeRef < Viewnode > =
     tree . get (treeid)
     . ok_or ("type_and_parent_type_consistent_with_subscribee: node not found") ?;
-  let is_activeVognode_and_affectsParent_true : bool =
-    node_ref . value () . is_activeVognode_and_affectsParent_true ();
+  let is_unrestrictedVognode_and_affectsParent_true : bool =
+    node_ref . value () . is_unrestrictedVognode_and_affectsParent_true ();
   let affects_parent_subscribeeFolder : bool =
     node_ref . parent ()
     . map ( |p| matches! (
               & p . value () . kind,
               ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)))
     . unwrap_or (false);
-  Ok ( is_activeVognode_and_affectsParent_true
+  Ok ( is_unrestrictedVognode_and_affectsParent_true
        && affects_parent_subscribeeFolder ) }
 
 /// If appropriate, prepend a SubscribeeFolder child containing:
@@ -108,7 +108,7 @@ pub fn maybe_add_subscribeeFolder_branch (
   treeid  : NodeId, // if applicable, this is the subscriber
   graph   : &InRustGraph,
   config  : &SkgConfig,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   skgrepo_diffs : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
   force_create_when_empty : bool, // a Folder view-request materializes the
     // editable subscribeeFolder as an empty "add here" surface even with
@@ -117,13 +117,13 @@ pub fn maybe_add_subscribeeFolder_branch (
   error_unless_node_satisfies(
     tree, treeid,
     |vn| matches!( &vn . kind,
-                    ViewnodeKind::Vognode (Vognode::Active (_))),
-    "maybe_add_subscribeeFolder_branch: expected ActiveVognode" ) ?;
+                    ViewnodeKind::Vognode (Vognode::Unrestricted (_))),
+    "maybe_add_subscribeeFolder_branch: expected UnrestrictedVognode" ) ?;
   { let is_writeProtected : bool =
       read_at_node_in_tree(
         tree, treeid,
         |vn| matches!( &vn . kind,
-                        ViewnodeKind::Vognode (Vognode::Active (t))
+                        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
                         if t . is_writeProtected () ))
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_writeProtected { return Ok(( )); } }
@@ -136,22 +136,22 @@ pub fn maybe_add_subscribeeFolder_branch (
     read_at_node_in_tree (
       tree, treeid,
       |vn| match &vn . kind {
-        ViewnodeKind::Vognode (Vognode::Active (t))
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           => Some (( graph . pid_of (&t . skgid)
                        . unwrap_or_else (|| t . skgid . clone ()),
                      t . home_skgrepo . clone () )),
         _ => None } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
-    . ok_or ("maybe_add_subscribeeFolder_branch: expected ActiveVognode") ?;
+    . ok_or ("maybe_add_subscribeeFolder_branch: expected UnrestrictedVognode") ?;
   let subscribee_skgids : Vec<ID> = graph . outbound_skgids_for_relation_gated (
-    &subscriber_pid, NodeRelation::SubscribesTo, active_skgrepo_set );
+    &subscriber_pid, NodeRelation::SubscribesTo, skgrepo_restriction );
   let subscribee_skgids : Vec<ID> =
-    // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: inactive
+    // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: restricted
     // subscribees are omitted at de novo creation (no retained
     // members exist yet); a folder left empty by this is not created.
-    omit_inactive_members (
+    omit_restricted_members (
       subscribee_skgids,
-      active_skgrepo_set,
+      skgrepo_restriction,
       |skgid : &ID| graph . pid_and_skgrepo (skgid)
                  . map ( |(_pid, src)| src )
                  . or_else ( || home_from_disk (skgid, config) ));
@@ -172,17 +172,17 @@ pub fn maybe_add_subscribeeFolder_branch (
   let hidden_outside_content : HashSet < ID > = {
     // hidden IDs that are outside all subscribee content. Read
     // relRepo-GATED from the captured graph: hides and memberships
-    // recorded outside the active prefix must not shape this derived folder.
+    // recorded outside the skgrepo restriction must not shape this derived folder.
     let r_hides : HashSet < ID > =
           graph . outbound_pids_for_relation_gated (
             & subscriber_pid,
             NodeRelation::HidesFromSubs,
-            active_skgrepo_set )
+            skgrepo_restriction )
           . into_iter () . collect ();
     let all_subscribee_content : HashSet < ID > =
           subscribee_skgids . iter ()
           . flat_map ( |skgid| graph . outbound_pids_for_relation_gated (
-            skgid, NodeRelation::Contains, active_skgrepo_set ))
+            skgid, NodeRelation::Contains, skgrepo_restriction ))
           . collect ();
     r_hides . iter ()
       . filter ( | skgid | ! all_subscribee_content . contains (skgid) )
@@ -250,24 +250,24 @@ pub fn maybe_add_default_partnerFolder_branches (
   treeid             : NodeId,
   graph              : &InRustGraph,
   config             : &SkgConfig,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   skgrepo_diffs      : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   error_unless_node_satisfies(
     tree, treeid,
     |vn| matches!( &vn . kind,
-                    ViewnodeKind::Vognode (Vognode::Active (_) )),
-    "maybe_add_default_partnerFolder_branches: expected ActiveVognode" ) ?;
+                    ViewnodeKind::Vognode (Vognode::Unrestricted (_) )),
+    "maybe_add_default_partnerFolder_branches: expected UnrestrictedVognode" ) ?;
   { let is_writeProtected : bool =
       read_at_node_in_tree(
         tree, treeid,
         |vn| matches!( &vn . kind,
-                        ViewnodeKind::Vognode (Vognode::Active (t))
+                        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
                         if t . is_writeProtected () ) )
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_writeProtected { return Ok(( )); } }
   maybe_add_subscribeeFolder_branch (
-    tree, treeid, graph, config, active_skgrepo_set,
+    tree, treeid, graph, config, skgrepo_restriction,
     skgrepo_diffs, false ) ?;
   Ok (( )) }
 
@@ -285,7 +285,7 @@ pub fn maybe_add_one_partnerFolder (
   kind    : PartnerFolder,
   config  : &SkgConfig,
   graph   : &InRustGraph,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   skgrepo_diffs : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
   force_create_when_empty : bool,
 ) -> Result < (), Box<dyn Error> > {
@@ -298,9 +298,9 @@ pub fn maybe_add_one_partnerFolder (
     read_at_node_in_tree (
       tree, treeid,
       |vn| match &vn . kind {
-        ViewnodeKind::Vognode (Vognode::Active (t))
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           => Ok (( t . skgid . clone (), t . home_skgrepo . clone () )),
-        _ => Err ("expected ActiveVognode" . to_string ()), } )
+        _ => Err ("expected UnrestrictedVognode" . to_string ()), } )
     .map_err( |e| -> Box<dyn Error> { e . into() } ) ??;
   let Some (member_role) = kind . relation_member_role ()
     // The two Hidden*SubscribeeFolders lack this, hence end here.
@@ -308,13 +308,13 @@ pub fn maybe_add_one_partnerFolder (
   let recorder_role =
     member_role . opposite_role ();
   let member_skgids : Vec<ID> =
-    // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: inactive members
-    // are omitted, so a folder whose members are all inactive is not
+    // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: restricted members
+    // are omitted, so a folder whose members are all restricted is not
     // created at all (de novo creation has no retained members).
-    omit_inactive_members (
+    omit_restricted_members (
       graph . other_member_pids_gated (
-        &recorder_pid, recorder_role, active_skgrepo_set ),
-      active_skgrepo_set,
+        &recorder_pid, recorder_role, skgrepo_restriction ),
+      skgrepo_restriction,
       |skgid : &ID| graph . pid_and_skgrepo (skgid)
                  . map ( |(_pid, src)| src )
                  . or_else ( || home_from_disk (skgid, config) ));
@@ -333,7 +333,7 @@ pub fn maybe_add_one_partnerFolder (
          } else { // inbound: the inverse scan
            inverse_scan_for_inbound_folder (
              &recorder_pid, member_role . relation, skgrepo_diffs,
-             active_skgrepo_set )
+             skgrepo_restriction )
            . values ()
            . any ( |axes| ! axes . net_is_present () ) };
     if ! head_side_occupied && ! force_create_when_empty {
@@ -358,7 +358,7 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
   subscribee_treeid  : NodeId,
   graph              : &InRustGraph,
   config             : &SkgConfig,
-  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
   skgrepo_diffs      : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   if ! type_and_parent_type_consistent_with_subscribee (
@@ -377,18 +377,18 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
     : ( HashSet < ID >, HashSet < ID > )
     = {
       // relRepo-GATED from the captured graph: hides and memberships
-      // outside the active prefix must not shape this derived folder.
+      // outside the skgrepo restriction must not shape this derived folder.
       {
         let subscriber_hides : HashSet<ID> =
           graph . outbound_pids_for_relation_gated (
             & subscriber_pid,
             NodeRelation::HidesFromSubs,
-            active_skgrepo_set )
+            skgrepo_restriction )
           . into_iter () . collect ();
         let subscribee_content : HashSet<ID> =
           graph . outbound_pids_for_relation_gated (
             & subscribee_pid, NodeRelation::Contains,
-            active_skgrepo_set )
+            skgrepo_restriction )
           . into_iter () . collect ();
         ( subscribee_content . iter ()
             . filter ( |skgid| ! subscriber_hides . contains (skgid) )

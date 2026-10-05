@@ -14,10 +14,10 @@
 (defconst test-skg-readable-ids--id-b
   "22222222-2222-4222-8222-222222222222")
 
-(defconst test-skg-readable-ids--id-inactive
+(defconst test-skg-readable-ids--id-restricted
   "33333333-3333-4333-8333-333333333333")
 
-(defconst test-skg-readable-ids--id-active
+(defconst test-skg-readable-ids--id-unrestricted
   "44444444-4444-4444-8444-444444444444")
 
 (defun test-skg-readable-ids--titles-payload (skgid title)
@@ -91,7 +91,7 @@
           "Title B"))
 	        (should (= 1 (test-skg-readable-ids--after-string-count)))) )))
 
-(ert-deftest test-skg-readable-ids-shortens-inactive-ids-without-title-overlay ()
+(ert-deftest test-skg-readable-ids-shortens-restricted-ids-without-title-overlay ()
   (let ((skg-response-handler-map nil)
         (skg-lp--pending-count 0)
         (skg-lp--buf (unibyte-string))
@@ -104,22 +104,22 @@
                  (lambda (_proc _string) nil)))
         (insert
          (format
-          "* (skg (inactiveNode (id %s) (repo private)))\n* (skg (node (id %s) (repo public))) active\n"
-          test-skg-readable-ids--id-inactive
-          test-skg-readable-ids--id-active))
+          "* (skg (restrictedNode (id %s) (repo private)))\n* (skg (node (id %s) (repo public))) unrestricted\n"
+          test-skg-readable-ids--id-restricted
+          test-skg-readable-ids--id-unrestricted))
         (setq skg-readable-ids--buffer-generation 0)
         (skg-readable-ids--annotate-buffer)
         (should (= 2 (test-skg-readable-ids--display-count)))
         (skg-lp--dispatch-by-type
          nil
          (test-skg-readable-ids--titles-payload
-          test-skg-readable-ids--id-active
-          "Active Title"))
+          test-skg-readable-ids--id-unrestricted
+          "Unrestricted Title"))
         (should (= 1 (test-skg-readable-ids--after-string-count)))
         (should (= 0 (test-skg-readable-ids--after-string-count-at-id
-                      test-skg-readable-ids--id-inactive)))
+                      test-skg-readable-ids--id-restricted)))
         (should (= 1 (test-skg-readable-ids--after-string-count-at-id
-                      test-skg-readable-ids--id-active)))))))
+                      test-skg-readable-ids--id-unrestricted)))))))
 
 (defconst test-skg-readable-ids--id-c
   "55555555-5555-4555-8555-555555555555")

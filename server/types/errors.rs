@@ -44,8 +44,8 @@ pub enum BufferValidationError {
   ForkSkgRepoUnresolved           (ID), // N's pid: no OWNED vognode ancestor in the view to inherit C's skgrepo from, and the user set none in the confirmation buffer.
   ForkAlreadyExists              (ID,   // N's pid
                                   ID),  // the existing owned clone that already overrides N (monogamy: a node may have at most one owned overrider)
-  ForkSkgRepoInactive             (ID,           // N's pid
-                                  SkgRepoName),  // C's resolved owned skgrepo, which is INACTIVE under the active skgrepo-set
+  ForkSkgRepoRestricted             (ID,           // N's pid
+                                  SkgRepoName),  // C's resolved owned skgrepo, which is RESTRICTED under the skgrepo restriction
   ForkSkgRepoNotOwned             (ID,           // N's pid
                                   SkgRepoName),  // C's chosen skgrepo, which the user does NOT own (a typed or hand-edited skgrepo the rotation would never offer)
   ForkRequestOnUnknownNode       (ID),  // An explicit 'skg-fork-node' request on a node whose id is not in the graph (an unsaved headline): nothing exists to override.
@@ -131,8 +131,8 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Cannot fork node {:?}: no owned repo to put the clone in. It has no owned ancestor in the view to inherit a repo from; set the clone's repo in the confirmation buffer (C-c s s).", skgid),
       BufferValidationError::ForkAlreadyExists(original, existing) =>
         write!(f, "Cannot fork node {:?}: you have already forked it. Your clone is {:?}. Edit that clone instead (a node may have at most one owned override).", original, existing),
-      BufferValidationError::ForkSkgRepoInactive(skgid, skgrepo) =>
-        write!(f, "Cannot fork node {:?}: the clone's repo '{}' is inactive under the current repo-set. Activate it first; an invisible clone is never created silently.", skgid, skgrepo),
+      BufferValidationError::ForkSkgRepoRestricted(skgid, skgrepo) =>
+        write!(f, "Cannot fork node {:?}: the clone's repo '{}' is restricted under the current repo-set. Activate it first; an invisible clone is never created silently.", skgid, skgrepo),
       BufferValidationError::ForkSkgRepoNotOwned(skgid, skgrepo) =>
         write!(f, "Cannot fork node {:?}: the clone's repo '{}' is not one you own. Choose an owned repo for the clone (C-c s s in the confirmation buffer).", skgid, skgrepo),
       BufferValidationError::ForkRequestOnUnknownNode(skgid) =>

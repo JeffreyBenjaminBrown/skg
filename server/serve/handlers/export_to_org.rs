@@ -12,14 +12,14 @@ use crate::serve::util::{
   send_response_with_length_prefix,
   tag_sexp_response,
   value_from_request_sexp};
-use crate::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
+use crate::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
 use crate::types::misc::SkgConfig;
 use crate::types::nodes::complete::Graphnode;
 
 use std::net::TcpStream;
 use std::path::PathBuf;
 
-/// Export every export root, limited to the requested skgrepo-set,
+/// Export every export root, restricted to the requested skgrepo-set,
 /// into a chosen directory. Two REQUIRED request fields:
 /// `(repo-set . "NAME")` -- the set the client picked (with its
 /// circular selector) -- and `(output-dir . "PATH")` -- where to
@@ -36,11 +36,11 @@ pub fn handle_export_to_org_request (
   request : &str,
 ) {
   let prepared : Result<
-    (ActiveSkgRepoSet, Vec<Graphnode>, PathBuf), String> = ( || {
+    (SkgrepoRestriction, Vec<Graphnode>, PathBuf), String> = ( || {
     let name : String =
       value_from_request_sexp ("repo-set", request) ?;
-    let active : ActiveSkgRepoSet =
-      ActiveSkgRepoSet::named (config, SkgRepoSetName::from (name))
+    let restriction : SkgrepoRestriction =
+      SkgrepoRestriction::named (config, SkgRepoSetName::from (name))
       . map_err ( |e| e . to_string () ) ?;
     let nodes : Vec<Graphnode> =
       read_all_skg_files_from_skgrepos (config)
@@ -54,19 +54,19 @@ pub fn handle_export_to_org_request (
       std::env::current_dir ()
       . map_err ( |e| format! ("current_dir: {}", e) ) ?
       . join (&output_dir); // join with an absolute PATH yields PATH
-    Ok ((active, nodes, output_base)) } ) ();
-  let (active, nodes, output_base) = match prepared {
+    Ok ((restriction, nodes, output_base)) } ) ();
+  let (restriction, nodes, output_base) = match prepared {
     Ok (prepared) => prepared,
     Err (error) => {
       send_export_result (stream, Err (error));
       return; }};
-  let candidate_pids = export_candidate_pids (&active, &nodes);
+  let candidate_pids = export_candidate_pids (&restriction, &nodes);
   let overPrivateText_pids = candidate_pids . into_iter ()
     . filter ( |pid| nodes . iter () . any (
       |node| node . pid == *pid && node . overPrivateText_telescope ) )
     . collect ();
   let release = decide_for_overPrivateText_pids (
-    "export-to-org", &active, overPrivateText_pids,
+    "export-to-org", &restriction, overPrivateText_pids,
     &approved_pids_from_request (request) );
   if matches! (release, TextReleaseDecision::Challenge { .. }) {
     send_response_with_length_prefix (
@@ -76,7 +76,7 @@ pub fn handle_export_to_org_request (
     TextReleaseDecision::AllowWithWarning { warning } => Some (warning),
     _ => None, };
   let result : Result<(String, Vec<String>), String> =
-    export_to_org (&active, &nodes, &output_base)
+    export_to_org (&restriction, &nodes, &output_base)
     . map ( |report : ExportReport| {
       let summary : String = report . summary ();
       let mut warnings = report . warnings;

@@ -34,10 +34,10 @@ Viewnodes are not all graphnodes:
 ```
 viewnode = vognode | propertyFolder | property | partnerFolder
          | bufferRoot | deadViewnode
-vognode  = active | inactive | phantom
+vognode  = unrestricted | restricted | phantom
 ```
 
-A vognode represents a graphnode, which need not exist. Active and inactive
+A vognode represents a graphnode, which need not exist. Unrestricted and restricted
 vognodes represent current graphnodes; phantoms represent missing or
 historical occurrences. Property folders and partner folders carry aliases,
 IDs, flags, or relationships.

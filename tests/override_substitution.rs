@@ -23,7 +23,7 @@ use std::net::TcpStream;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::assert_metadata_eq;
 use skg::serve::ViewsState;
-use skg::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
+use skg::skgrepo_sets::{SkgrepoRestriction, SkgRepoSetName};
 use skg::test_utils::{
   run_with_shared_test_stores,
   graph_handle_from_config};
@@ -399,7 +399,7 @@ async fn marked_view_is_shape_stable_across_diff_toggle (
               &mut server,
               "((request . \"git diff mode toggle\"))",
               &env, views_state,
-              & ActiveSkgRepoSet::named (
+              & SkgrepoRestriction::named (
                   config, SkgRepoSetName ("all" . to_string ()))
                 . expect ("set all resolves") ); } ); } );
         drop (server);
@@ -467,18 +467,18 @@ async fn ownership_and_visibility_gate_substitution (
         assert! ( marked_lines (&view, "N1") . is_empty (),
           "FR is foreign; N1 draws raw:\n{}", view );
         assert! ( view . contains ("(id N1)"), "{}", view ); }
-      let active : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (
+      let restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (
           config, SkgRepoSetName ("main" . to_string ())) ?;
-      { // An inactive owned overrider does not substitute.
+      { // A restricted owned overrider does not substitute.
         let (view, _pids, _tree) =
           multi_root_view_with_skgrepo_set (
             config, None,
-            &[ ID::from ("P2") ], false, &active ) ?;
+            &[ ID::from ("P2") ], false, &restriction ) ?;
         assert! ( marked_lines (&view, "N2") . is_empty (),
-          "R2's repo is inactive; N2 draws raw:\n{}", view );
+          "R2's repo is restricted; N2 draws raw:\n{}", view );
         assert! ( view . contains ("(id N2)"), "{}", view ); }
-      { // The same overrider substitutes when its skgrepo is active.
+      { // The same overrider substitutes when its skgrepo is unrestricted.
         let (view, _pids, _tree) =
           multi_root_view (
             config, None,
@@ -486,27 +486,27 @@ async fn ownership_and_visibility_gate_substitution (
         let marked : Vec<&str> = marked_lines (&view, "N2");
         assert_eq! ( marked . len (), 1, "{}", view );
         assert! ( marked [0] . contains ("(id R2)"), "{}", view ); }
-      { // Omission beats substitution: inactive original, active
+      { // Omission beats substitution: restricted original, unrestricted
         // overrider -> neither is drawn.
         let (view, _pids, _tree) =
           multi_root_view_with_skgrepo_set (
             config, None,
-            &[ ID::from ("P3") ], false, &active ) ?;
+            &[ ID::from ("P3") ], false, &restriction ) ?;
         assert! ( ! view . contains ("(id N3)"),
-          "the inactive original is omitted:\n{}", view );
+          "the restricted original is omitted:\n{}", view );
         assert! ( ! view . contains ("(id R3)"),
           "its overrider must not be drawn in its place (the \
-           marker would name an inactive node):\n{}", view ); }
+           marker would name a restricted node):\n{}", view ); }
       Ok (( )) }
 
-/// Save 'buf' under a specific active skgrepo-set (the test shims save
+/// Save 'buf' under a specific skgrepo restriction (the test shims save
 /// under 'all'). Asserts no save errors and returns the rerendered
 /// view.
 async fn save_under_set (
   buf     : &str,
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
-  set     : &ActiveSkgRepoSet,
+  set     : &SkgrepoRestriction,
 ) -> Result<String, Box<dyn Error>> {
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
@@ -551,11 +551,11 @@ async fn chain_half_visible_keeps_the_original (
           "one substitute for N under all:\n{}", view );
         assert! ( marked [0] . contains ("(id D)"),
           "the chain end D is drawn under all:\n{}", view ); }
-      let main_set : ActiveSkgRepoSet =
-        ActiveSkgRepoSet::named (
+      let main_set : SkgrepoRestriction =
+        SkgrepoRestriction::named (
           config, SkgRepoSetName ("main" . to_string ())) ?;
       let view_main : String = {
-        // Under 'main', D's skgrepo 'other' is inactive, so the MIDDLE
+        // Under 'main', D's skgrepo 'other' is restricted, so the MIDDLE
         // C is drawn instead.
         let (view, _p, _t) =
           multi_root_view_with_skgrepo_set (

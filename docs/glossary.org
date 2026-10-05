@@ -30,11 +30,16 @@ together. A *gitrepo* is a Git repository. Skgrepos are usually gitrepos
 too, but they need not be.
 
 In prose, always say "skgrepo" or "gitrepo", never a bare "repo", so the
-two cannot be confused. ("repo-set" and "relRepo" are single coined
-terms, so they keep the short form.) In code a skgrepo is still 'repo'
-in most identifiers ('RepoName', 'home_repo'), or 'skgrepo' where a
-gitrepo shares the scope; a gitrepo is 'gitrepo'. Its config entry is
-the 'SkgRepo' type.
+two cannot be confused. ("relRepo" is a single coined term, so it keeps
+the short form.) Code says 'skgrepo' and 'gitrepo' too ('SkgRepoName',
+'home_skgrepo'); a skgrepo's config entry is the 'SkgRepo' type.
+
+The *skgrepo restriction* ('SkgrepoRestriction') is the skgrepo-set a
+connection currently shows; the skgrepo-set =all= means no
+restriction. A skgrepo inside it is *unrestricted*, one outside it
+*restricted*, and so are their nodes: an unrestricted vognode is drawn
+in full, a restricted one only as an anonymous placeholder
+(=restrictedNode=).
 
 *** owned, foreign
 
@@ -126,7 +131,7 @@ folding and partial nodeIntents both depend on the difference.
 The *composition* of a telescope combines its sections, most public
 first, into one effective node (=server/telescope/compose.rs=). The
 *full composition* uses every section; a *visible composition* uses only the
-sections active under the current skgrepo-set, and is what a
+sections unrestricted under the current skgrepo restriction, and is what a
 restricted view renders. *Decomposition* is the save-side inverse:
 splitting the effective node back into sections, byte-stably.
 
@@ -537,7 +542,7 @@ the end of the chain of owned, currently-VISIBLE
 'overrides' relationships leading out of N. The chain is often one
 relationship, but may be longer (an owned chain D overrides C overrides
 N is legal; only a cycle is forbidden), and visibility gating can
-stop it at a MIDDLE node when a later link's mentioner is inactive --
+stop it at a MIDDLE node when a later link's mentioner is restricted --
 so the drawn node is the last visible link, not necessarily the
 chain's end. The resolver is 'resolve_override' in
 'server/dbs/in_rust_graph/override_resolution.rs'. Foreign override
@@ -618,8 +623,8 @@ bare "node" is fine where only one kind is possible.
 
 A *vognode* is a viewnode representing a graphnode ('Vognode' in
 'server/types/viewnode.rs'). It is one of three kinds:
-- *active*: the graphnode is in an active skgrepo, so the view shows it;
-- *inactive*: it is in an inactive skgrepo, so the view shows only an
+- *unrestricted*: the graphnode is in an unrestricted skgrepo, so the view shows it;
+- *restricted*: it is in a restricted skgrepo, so the view shows only an
   anonymous, dataless marker;
 - a *phantom*: the graphnode is no longer in the graph, or never was.
 
@@ -636,7 +641,7 @@ to the occurrence; graphStats belong to the graphnode.
 
 *** editable, write-protected
 
-Each occurrence of an active vognode is either *editable* or
+Each occurrence of an unrestricted vognode is either *editable* or
 *write-protected* ('Editability' in 'server/types/viewnode.rs'). Edits to
 an editable occurrence's title, body and children are saved; a
 write-protected occurrence shows no body, and edits to it change
@@ -664,7 +669,7 @@ A vognode standing for something that is not a current graph member
 *** save-inert
 
 A viewnode is *save-inert* if it emits no fieldIntents: phantoms and
-inactive vognodes. Its descendants may still emit them, so save
+restricted vognodes. Its descendants may still emit them, so save
 extraction still visits them.
 
 *** title != headline

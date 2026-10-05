@@ -20,7 +20,7 @@
 //!   section as a whole node. Used only where a single FILE is the
 //!   honest unit: historical blobs (the vanished-node search) and
 //!   diff MODE's per-file reads (safe because diff mode requires
-//!   the active skgrepo-set "all", so no composition is hidden).
+//!   the skgrepo restriction "all", so no composition is hidden).
 
 use serde::{Serialize, Deserialize};
 

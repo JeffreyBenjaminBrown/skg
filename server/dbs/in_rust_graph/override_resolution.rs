@@ -8,11 +8,11 @@
 //! Two gates, applied per relationship:
 //! - OWNERSHIP is set-independent: a relationship is followed only if its
 //!   overrider's skgrepo is owned, regardless of the
-//!   active skgrepo-set.
-//! - VISIBILITY: when an 'ActiveRepoSet' is supplied, a relationship is
+//!   skgrepo restriction.
+//! - VISIBILITY: when an 'ShowSkgrepoRestriction' is supplied, a relationship is
 //!   followed only if both its relRepo and its overrider's home skgrepo
-//!   are active. An inactive relationship cannot affect visible topology,
-//!   and an inactive overrider cannot be drawn; either one stops the walk
+//!   are unrestricted. A restricted relationship cannot affect visible topology,
+//!   and a restricted overrider cannot be drawn; either one stops the walk
 //!   at the last visible node. Callers that ask "what marker would the
 //!   server have written, ever?" (the tamper check) pass None, i.e.
 //!   visibility-ungated.
@@ -30,7 +30,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig};
 
 use std::collections::HashSet;
@@ -62,7 +62,7 @@ pub struct OverrideResolution {
 pub fn resolve_override (
   config : &SkgConfig,
   graph  : &InRustGraph,
-  active : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
   skgid  : &ID,
 ) -> OverrideResolution {
   let input_pid : ID = // extra-ID safety: resolve before walking
@@ -74,7 +74,7 @@ pub fn resolve_override (
   let mut path : Vec<ID> = Vec::new ();
   loop {
     let candidates : Vec<ID> =
-      followable_overriders_of (config, graph, active, &current);
+      followable_overriders_of (config, graph, restriction, &current);
     if candidates . len () != 1 {
       // 0: nothing (visible, owned) overrides 'current'.
       // >1: monogamy-violating data; refuse to choose a branch.
@@ -114,7 +114,7 @@ pub fn resolve_override (
 /// node can be any link of the chain (a MIDDLE carrier, when a later
 /// link's skgrepo is hidden), not only the end, so it must accept any
 /// honest carrier and reject only an off-chain (faked/stale) marker.
-/// VISIBILITY-UNGATED ('active' = None) so a marker that was honest
+/// VISIBILITY-UNGATED ('unrestricted' = None) so a marker that was honest
 /// when rendered does not start failing after a skgrepo-set switch;
 /// 'path' is the full owned chain (ownership still gates).
 pub fn carrier_on_owned_chain (
@@ -127,8 +127,8 @@ pub fn carrier_on_owned_chain (
     . path . contains (carrier) }
 
 /// The overriders of 'pid' that substitution may follow: the relationship's
-/// relRepo is active, and the overrider is both owned and at an
-/// active home skgrepo. Relationship visibility comes from the same
+/// relRepo is unrestricted, and the overrider is both owned and at an
+/// unrestricted home skgrepo. Relationship visibility comes from the same
 /// directional gated accessor used by folders, paths, and counts.
 /// Ownership is modeled on 'owned_overriders_of' in
 /// [[./override_invariants.rs]], which serves validation and so applies no
@@ -136,19 +136,19 @@ pub fn carrier_on_owned_chain (
 fn followable_overriders_of (
   config : &SkgConfig,
   graph  : &InRustGraph,
-  active : Option<&ActiveSkgRepoSet>,
+  restriction : Option<&SkgrepoRestriction>,
   pid    : &ID,
 ) -> Vec<ID> {
   let mut result : Vec<ID> = Vec::new ();
   for overrider in graph . other_member_pids_gated (
-    pid, RelationRole::OVERRIDDEN, active ) {
+    pid, RelationRole::OVERRIDDEN, restriction ) {
     if let Some (overrider_node) = graph . nodes . get (&overrider) {
       let owned : bool =
         config . skgrepos . get (&overrider_node . home_skgrepo)
         . map ( |sc| sc . owned )
         . unwrap_or (false);
       let home_visible : bool =
-        active
+        restriction
         . map ( |a| a . is_all ()
                 || a . contains_skgrepo (&overrider_node . home_skgrepo) )
         . unwrap_or (true);
