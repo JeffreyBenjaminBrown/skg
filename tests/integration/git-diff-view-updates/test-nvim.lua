@@ -22,16 +22,16 @@ local function child_named (list, name)
   return nil
 end
 
----A backpath graft's ROLENAME from its SEMANTIC relationship facts, or
----nil. RELS_BODY is the cdr of the (rels ...) form. A graft relates
+---A role role graft's ROLENAME from its SEMANTIC relationship facts, or
+---nil. RELS_BODY is the cdr of the (rels ...) form. A role graft relates
 ---OUTBOUND to a tracked ancestor: a relation with an (out ...
 ---(ancestors ...)) side, mapped to its role (contains -> container,
 ---links_to -> mentioner, subscribes -> subscribee, overrides ->
 ---overrider, hides -> hider). Only meaningful for a node already known
----to be a graft (affectsParent false).
+---to be a role graft (affectsParent false).
 ---@param rels_body any|nil
 ---@return string|nil
-local function graft_role_from_rels (rels_body)
+local function role_of_role_graft_from_rels (rels_body)
   if not rels_body then return nil end
   local roles = { { 'contains', 'container' }, { 'links_to', 'mentioner' },
                   { 'subscribes_to', 'subscribee' }, { 'overrides_view_of', 'overrider' },
@@ -47,7 +47,7 @@ local function graft_role_from_rels (rels_body)
 end
 
 ---Classify a parsed metadata SEXP (or nil) into a relation string:
----the graft role of a backpath graft (false node with an
+---the role graft role of a role graft (false node with an
 ---outbound-ancestor relation), else the explicit affectsParent, else the
 ---implicit 'true'. Port of headline--relation-from-sexp.
 ---@param sexp any|nil
@@ -58,9 +58,9 @@ local function relation_from_sexp (sexp)
   local rels_body =
     metadata.sexp_cdr_at_path(sexp, { 'skg', 'node', 'rels' })
   local independent = affectsParent_list and affectsParent_list[1] == INDEPENDENT
-  local graft_role = independent
-    and graft_role_from_rels(rels_body) or nil
-  if graft_role then return graft_role end
+  local role_graft_role = independent
+    and role_of_role_graft_from_rels(rels_body) or nil
+  if role_graft_role then return role_graft_role end
   if not affectsParent_list or affectsParent_list[1] == AFFECTED then
     return 'true' end
   return sexpr.atom_text(affectsParent_list[1])

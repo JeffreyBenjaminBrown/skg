@@ -14,7 +14,7 @@ use crate::context::ContextOriginType;
 use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
 use crate::dbs::tantivy::search::{
   SearchOptions, has_overPrivateText_telescope, search_index};
-use crate::dbs::in_rust_graph::ancestry::{ AncestryTree, ancestry_by_id_from_ids};
+use crate::dbs::in_rust_graph::containerward_role_tree::{ ContainerwardRoleTree, containerward_role_trees_by_id_from_ids};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::in_rust_graph::stats::{
@@ -76,18 +76,18 @@ pub fn enriched_search_buffer_for_repo_set_for_test (
   terms          : &str,
   matches_by_id  : &MatchGroups,
   search_results : &[ID],
-  ancestry_by_id : &HashMap<ID, AncestryTree>,
+  containerward_role_trees_by_id : &HashMap<ID, ContainerwardRoleTree>,
   tantivy_index  : &TantivyIndex,
   config         : &SkgConfig,
   active         : &ActiveRepoSet,
 ) -> Result<String, Box<dyn std::error::Error>> {
   let (mut viewforest, _ids) : (ViewForest, Vec<ID>) =
     build_search_viewforest (terms, matches_by_id, &HashSet::new ());
-  render_enriched_search_buffer::insert_containerward_ancestries_into_search_view (
+  render_enriched_search_buffer::insert_full_containerward_role_trees_into_search_view (
     &mut viewforest,
     graph,
     search_results,
-    ancestry_by_id,
+    containerward_role_trees_by_id,
     tantivy_index,
     config,
     active );
@@ -116,7 +116,7 @@ pub struct SearchEnrichmentPayload {
   pub runtime        : Arc<RuntimeGeneration>,
   pub terms          : String,
   pub search_results : Vec<ID>,
-  pub ancestry_by_id : HashMap<ID, AncestryTree>,
+  pub containerward_role_trees_by_id : HashMap<ID, ContainerwardRoleTree>,
   pub graphnodestats : AllGraphnodeStats,
   /// Load-bearing across the asynchronous snapshot exchange: enrichment
   /// must not broaden a preflight decision to exclude overPrivateText telescopes.
@@ -329,29 +329,29 @@ fn spawn_enrichment_thread (
   let active_clone  : ActiveRepoSet   = active . clone ();
   let terms_clone   : String            = search_terms . to_string ();
   let ids_clone     : Vec<ID>           = search_results . to_vec ();
-  let max_depth : usize = runtime . config . max_ancestry_depth;
+  let max_depth : usize = runtime . config . max_role_tree_depth;
   std::thread::spawn ( move || {
     tracing::info! (
       generation = runtime . generation,
       result_count = ids_clone . len (),
       "search enrichment thread started");
-    let ancestry_by_id : HashMap<ID, AncestryTree> =
-      ancestry_by_id_from_ids (
+    let containerward_role_trees_by_id : HashMap<ID, ContainerwardRoleTree> =
+      containerward_role_trees_by_id_from_ids (
         &runtime . graph, &ids_clone, max_depth );
-    tracing::info! ("search enrichment: ancestry computed ({} entries)",
-              ancestry_by_id . len ());
+    tracing::info! ("search enrichment: role tree computed ({} entries)",
+              containerward_role_trees_by_id . len ());
     if cancel_clone . load (Ordering::SeqCst) {
-      tracing::info! ("search enrichment: cancelled after ancestry");
+      tracing::info! ("search enrichment: cancelled after role tree");
       return; }
     let all_enriched_ids : Vec<ID> = {
-      // Collect result IDs + every ID from ancestry trees + every
+      // Collect result IDs + every ID from role trees + every
       // override relative the enrichment will graft (so those grafted
       // nodes get their graphStats, hence their override heralds).
       let mut id_set : HashSet<ID> = HashSet::new ();
       for id in &ids_clone {
         id_set . insert ( id . clone () ); }
-      for tree in ancestry_by_id . values () {
-        collect_ids_from_ancestry_node ( tree, &mut id_set ); }
+      for tree in containerward_role_trees_by_id . values () {
+        collect_ids_from_role_tree_node ( tree, &mut id_set ); }
       id_set . extend (
         render_enriched_search_buffer::collect_overrideward_view_subtree_ids (
           &runtime . graph, &ids_clone, &active_clone ) );
@@ -376,18 +376,18 @@ fn spawn_enrichment_thread (
       runtime,
       terms          : terms_clone,
       search_results : ids_clone,
-      ancestry_by_id,
+      containerward_role_trees_by_id,
       graphnodestats,
       include_overPrivateText_telescopes } ); } ); }
 
-fn collect_ids_from_ancestry_node(
-  node   : &AncestryTree,
+fn collect_ids_from_role_tree_node(
+  node   : &ContainerwardRoleTree,
   id_set : &mut HashSet<ID>,
 ) {
   id_set . insert ( node . id () . clone () );
-  if let AncestryTree::Inner ( _, children ) = node {
+  if let ContainerwardRoleTree::Inner ( _, children ) = node {
     for child in children {
-      collect_ids_from_ancestry_node ( child, id_set ); }}}
+      collect_ids_from_role_tree_node ( child, id_set ); }}}
 
 /// Build the tagged s-exp for a search enrichment payload.
 /// Format: (("response-type" "search-enrichment")
@@ -549,12 +549,12 @@ pub fn group_matches_by_id (
 /// Alias children if aliases matched.
 /// The result ids to drop from the top level because a USER-OWNED
 /// result recursively overrides them: they will reappear as
-/// overriddenward graft descendants of that owned result
+/// overriddenward role-graft descendants of that owned result
 /// (TODO/override-ancestry-in-search-results.org, "Suppression"). A
 /// FOREIGN overrider never suppresses -- so a pure-foreign mutual
 /// override shows both, and a "boring" foreign overrider does not hide
 /// the node it overrides. Reachability follows relRepo-visible
-/// outbound overrides, matching what the graft will actually draw.
+/// outbound overrides, matching what the role graft will actually draw.
 /// Only search hits ('matches_by_id' keys) are ever suppressed. A
 /// user-owned overrider that matched the query but ranks past the
 /// display limit could suppress its target without itself being shown

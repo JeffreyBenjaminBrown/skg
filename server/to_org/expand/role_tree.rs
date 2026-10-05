@@ -1,13 +1,14 @@
-/// PURPOSE: "Integrate" a "path" into an Viewnode tree.
-/// PITFALL: Both of those terms are tricky.
-/// - The 'path' is actually more general than that:
-///   If at the end it forks, it includes the first layer of branches,
-///   and if it cycles,
-///   the first node to cycle is duplicated at the end.
-/// - I say 'integrate' rather than 'insert' because some of the path,
-///   maybe even all of it, might already be there.
+/// PURPOSE: "Integrate" a role tree into a Viewnode tree (see "role
+/// tree" in docs/glossary.org). Its nodes other than the origin are
+/// role grafts.
+/// PITFALL: The tree is drawn as paths to their first nonlinearity
+/// (server/dbs/in_rust_graph/paths.rs): each follows single partners
+/// until it forks, then includes the first layer of branches, and if it
+/// cycles, the first node to cycle is duplicated at the end.
+/// I say 'integrate' rather than 'insert' because some of the tree,
+/// maybe even all of it, might already be there.
 
-use crate::dbs::in_rust_graph::ancestry::{ AncestryTree, ancestry_by_id_from_ids};
+use crate::dbs::in_rust_graph::containerward_role_tree::{ ContainerwardRoleTree, containerward_role_trees_by_id_from_ids};
 use crate::dbs::in_rust_graph::paths::{
   paths_to_first_nonlinearities_in_graph, PathToFirstNonlinearity};
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -26,12 +27,12 @@ use std::collections::{HashSet, HashMap};
 use std::error::Error;
 
 
-/// Fulfill a '(viewRequests (path ROLENAME))' request: build the
-/// backpath for 'role' and drop the request. Relation-generic -- the
+/// Fulfill a '(viewRequests (roleTree ROLENAME))' request: build the
+/// role tree for 'role' and drop the request. Relation-generic -- the
 /// '(relation, input_role, output_role)' triple comes from the role
-/// ('RelationRole::backpath_triple'), so one call site serves all nine
+/// ('RelationRole::role_tree_triple'), so one call site serves all nine
 /// partner roles.
-pub fn build_and_integrate_path_view_then_drop_request (
+pub fn build_and_integrate_role_tree_then_drop_request (
   tree          : &mut Tree<Viewnode>,
   node_id       : NodeId,
   graph         : &InRustGraph,
@@ -41,21 +42,21 @@ pub fn build_and_integrate_path_view_then_drop_request (
   active        : Option<&ActiveRepoSet>,
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
-    build_and_integrate_path_with_repo_set (
+    build_and_integrate_role_tree_with_repo_set (
       tree, node_id, graph, role, config, active );
   remove_completed_view_request (
     tree, node_id,
-    ViewRequest::Path (role),
+    ViewRequest::RoleTree (role),
     "Failed to integrate path view",
     errors, result ) }
 
-/// Build the backpath for one partner 'role', and -- for every role
+/// Build the role tree for one partner 'role', and -- for every role
 /// EXCEPT the container role -- attach each grafted partner's
-/// containerward ancestry beneath it, so the partner is shown in its
+/// containerward role tree beneath it, so the partner is shown in its
 /// own container context (as mentionerward has always done for link
-/// repos). The container role itself IS that ancestry, so it does not
+/// repos). The container role itself IS that role tree, so it does not
 /// re-attach.
-pub fn build_and_integrate_path_with_repo_set (
+pub fn build_and_integrate_role_tree_with_repo_set (
   tree      : &mut Tree<Viewnode>,
   node_id   : NodeId,
   graph     : &InRustGraph,
@@ -65,61 +66,61 @@ pub fn build_and_integrate_path_with_repo_set (
 ) -> Result < (), Box<dyn Error> > {
   let (relation, input_role, output_role)
     : (&'static str, &'static str, &'static str) =
-    role . backpath_triple ();
-  let _ : Vec<ID> = build_and_integrate_backpaths (
+    role . role_tree_triple ();
+  let _ : Vec<ID> = build_and_integrate_role_trees (
     tree, node_id, graph, config,
     relation, input_role, output_role,
-    Birth::Backpath (role),
+    Birth::RoleGraft (role),
     active ) ?;
   if role != RelationRole::CONTAINER {
-    attach_containerward_ancestries_for_birth_role (
+    attach_full_containerward_role_trees_for_birth_role (
       tree, node_id, role, graph, config, active ) ?; }
   Ok (( )) }
 
-/// Integrate a containerward path into a Viewnode tree (no ancestry
+/// Integrate a containerward path into a Viewnode tree (no role tree
 /// re-attach). Thin wrapper kept for callers/tests; the engine is the
-/// generic 'build_and_integrate_path_with_repo_set'.
-pub fn build_and_integrate_containerward_path (
+/// generic 'build_and_integrate_role_tree_with_repo_set'.
+pub fn build_and_integrate_containerward_role_tree (
   tree      : &mut Tree<Viewnode>,
   node_id   : NodeId,
   graph     : &InRustGraph,
   config    : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  build_and_integrate_path_with_repo_set (
+  build_and_integrate_role_tree_with_repo_set (
     tree, node_id, graph, RelationRole::CONTAINER, config, None ) }
 
-pub fn build_and_integrate_containerward_path_with_repo_set (
+pub fn build_and_integrate_containerward_role_tree_with_repo_set (
   tree      : &mut Tree<Viewnode>,
   node_id   : NodeId,
   graph     : &InRustGraph,
   config    : &SkgConfig,
   active    : Option<&ActiveRepoSet>,
 ) -> Result < (), Box<dyn Error> > {
-  build_and_integrate_path_with_repo_set (
+  build_and_integrate_role_tree_with_repo_set (
     tree, node_id, graph, RelationRole::CONTAINER, config, active ) }
 
 /// Integrate mentionerward paths (link repos of the node), attaching
-/// each repo's containerward ancestry. Thin wrapper over the generic
+/// each repo's containerward role tree. Thin wrapper over the generic
 /// engine with the mentioner role.
-pub fn build_and_integrate_mentionerward_path (
+pub fn build_and_integrate_mentionerward_role_tree (
   tree      : &mut Tree<Viewnode>,
   node_id   : NodeId,
   graph     : &InRustGraph,
   config    : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  build_and_integrate_path_with_repo_set (
+  build_and_integrate_role_tree_with_repo_set (
     tree, node_id, graph, RelationRole::MENTIONER, config, None ) }
 
-/// Plural 'backpaths' because if the origin
+/// Plural 'role trees' because if the origin
 /// immediately forks in the backward direction,
 /// this will generate a path at each fork.
 /// Otherwise it will only generate one path.
 ///
 /// RETURNS the deduplicated set of pids that appear anywhere in
 /// the integrated paths (including branches and cycle nodes).
-/// Mentionerward callers use this to fetch ancestries for each
+/// Mentionerward callers use this to fetch role trees for each
 /// link repo; containerward callers can ignore it.
-fn build_and_integrate_backpaths (
+fn build_and_integrate_role_trees (
   tree        : &mut Tree<Viewnode>,
   node_id     : NodeId,
   graph       : &InRustGraph,
@@ -137,13 +138,13 @@ fn build_and_integrate_backpaths (
       graph, active, &terminus_pid, relation, input_role, output_role )?;
   let pids : Vec<ID> =
     extract_pids_from_paths ( &paths );
-  integrate_backpaths (
+  integrate_role_trees (
     node_id, tree, graph, paths, birth, config, active
   ) ?;
   Ok (pids) }
 
 /// At 'node_id' in 'tree', integrate 'paths' of homogenous birth 'birth'.
-fn integrate_backpaths (
+fn integrate_role_trees (
   node_id : NodeId,
   tree    : &mut Tree<Viewnode>,
   graph   : &InRustGraph,
@@ -161,7 +162,7 @@ fn integrate_backpaths (
   Ok(()) }
 
 /// Integrate a (maybe forked or cyclic) path into an Viewnode tree,
-/// using provided backpath data.
+/// using provided role tree data.
 pub fn integrate_path_that_might_fork_or_cycle (
   tree        : &mut Tree<Viewnode>,
   node_id     : NodeId,
@@ -311,11 +312,11 @@ fn extract_pids_from_paths (
         result . push ( id . clone () ); } } }
   result }
 
-/// Walk the subtree under node_id to find every Birth::Backpath(role)
+/// Walk the subtree under node_id to find every Birth::RoleGraft(role)
 /// node grafted by this path build. For each, insert its containerward
-/// ancestry as subheadlines with Birth::Backpath(CONTAINER), so the
+/// role tree as subheadlines with Birth::RoleGraft(CONTAINER), so the
 /// partner is shown in its own container context.
-fn attach_containerward_ancestries_for_birth_role (
+fn attach_full_containerward_role_trees_for_birth_role (
   tree    : &mut Tree<Viewnode>,
   node_id : NodeId,
   role    : RelationRole,
@@ -330,30 +331,30 @@ fn attach_containerward_ancestries_for_birth_role (
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
         if let ViewnodeKind::Vognode (Vognode::Active (t))
           = &node_ref . value () . kind
-        { if t . birth == Birth::Backpath (role) {
+        { if t . birth == Birth::RoleGraft (role) {
             result . push ( node_ref . id () ); }} }}
     result };
-  attach_containerward_ancestries_at_nodeids_with_repo_set (
+  attach_full_containerward_role_trees_at_nodeids_with_repo_set (
     tree, &role_nodeids, graph, config, active ) }
 
 /// For each NodeId, look up its ActiveVognode pid in the tree, fetch
-/// every such pid's containerward ancestry from the graph (in
-/// parallel via `ancestry_by_id_from_ids`), and prepend any
-/// `Inner`-shaped ancestry under that NodeId as write-protected
-/// `Birth::Backpath(CONTAINER)` children. NodeIds that aren't ActiveVognodes,
-/// or whose ancestry is `Root`/`Repeated`/`DepthTruncated`, are
+/// every such pid's containerward role tree from the graph (in
+/// parallel via `containerward_role_trees_by_id_from_ids`), and prepend any
+/// `Inner`-shaped role tree under that NodeId as write-protected
+/// `Birth::RoleGraft(CONTAINER)` children. NodeIds that aren't ActiveVognodes,
+/// or whose role tree is `Root`/`Repeated`/`DepthTruncated`, are
 /// skipped.
-pub fn attach_containerward_ancestries_at_nodeids (
+pub fn attach_full_containerward_role_trees_at_nodeids (
   tree    : &mut Tree<Viewnode>,
   nodeids : &[NodeId],
   graph   : &InRustGraph,
   config  : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  attach_containerward_ancestries_at_nodeids_with_repo_set (
+  attach_full_containerward_role_trees_at_nodeids_with_repo_set (
     tree, nodeids, graph, config, None )
 }
 
-pub fn attach_containerward_ancestries_at_nodeids_with_repo_set (
+pub fn attach_full_containerward_role_trees_at_nodeids_with_repo_set (
   tree    : &mut Tree<Viewnode>,
   nodeids : &[NodeId],
   graph   : &InRustGraph,
@@ -372,41 +373,41 @@ pub fn attach_containerward_ancestries_at_nodeids_with_repo_set (
   if pairs . is_empty () { return Ok (( )); }
   let ids : Vec<ID> =
     pairs . iter () . map ( |(_, id)| id . clone () ) . collect ();
-  let ancestry_map : HashMap<ID, AncestryTree> =
-    ancestry_by_id_from_ids (
-      graph, &ids, config . max_ancestry_depth );
-  attach_containerward_ancestries_from_map (
-    tree, &pairs, &ancestry_map, graph, config, active ) }
+  let role_trees_by_id : HashMap<ID, ContainerwardRoleTree> =
+    containerward_role_trees_by_id_from_ids (
+      graph, &ids, config . max_role_tree_depth );
+  attach_full_containerward_role_trees_from_map (
+    tree, &pairs, &role_trees_by_id, graph, config, active ) }
 
 /// Inner helper: given pre-collected pairs and a pre-fetched map,
-/// prepend each pair's `Inner` ancestry. Pulled out only because
-/// `attach_containerward_ancestries_at_nodeids` and the surrounding
+/// prepend each pair's `Inner` role tree. Pulled out only because
+/// `attach_full_containerward_role_trees_at_nodeids` and the surrounding
 /// recursive insertion both call into the same rev-prepend loop.
-fn attach_containerward_ancestries_from_map (
+fn attach_full_containerward_role_trees_from_map (
   tree         : &mut Tree<Viewnode>,
   pairs        : &[(NodeId, ID)],
-  ancestry_map : &HashMap<ID, AncestryTree>,
+  role_trees_by_id : &HashMap<ID, ContainerwardRoleTree>,
   graph        : &InRustGraph,
   config       : &SkgConfig,
   active       : Option<&ActiveRepoSet>,
 ) -> Result<(), Box<dyn Error>> {
   for ( treeid, pid ) in pairs {
-    let ancestry : &AncestryTree = match ancestry_map . get (pid) {
+    let role_tree : &ContainerwardRoleTree = match role_trees_by_id . get (pid) {
       Some (a) => a,
       None     => continue, };
-    if let AncestryTree::Inner ( _, children ) = ancestry {
+    if let ContainerwardRoleTree::Inner ( _, children ) = role_tree {
       for child in children . iter () . rev () {
-        insert_containerward_ancestry_tree_recursive (
+        insert_full_containerward_role_tree_recursive (
           child, *treeid,
           tree, graph, config, active ) ?; }} }
   Ok (( )) }
 
-/// Recursively insert an AncestryTree as write-protected
+/// Recursively insert an ContainerwardRoleTree as write-protected
 /// Content subheadlines under the given parent.
 /// Iterates children in reverse so that prepending
 /// preserves the original order.
-pub fn insert_containerward_ancestry_tree_recursive (
-  node       : &AncestryTree,
+pub fn insert_full_containerward_role_tree_recursive (
+  node       : &ContainerwardRoleTree,
   parent_nid : NodeId,
   tree       : &mut Tree<Viewnode>,
   graph      : &InRustGraph,
@@ -416,14 +417,14 @@ pub fn insert_containerward_ancestry_tree_recursive (
     let child_nid : NodeId = match
       prepend_writeProtected_indep_child_with_repo_set (
         tree, parent_nid, node . id (),
-        graph, config, Birth::Backpath (RelationRole::CONTAINER), active
+        graph, config, Birth::RoleGraft (RelationRole::CONTAINER), active
       ) ?
     {
       Some (child_nid) => child_nid,
       None => return Ok (()), };
-    if let AncestryTree::Inner ( _, children ) = node {
+    if let ContainerwardRoleTree::Inner ( _, children ) = node {
       for child in children . iter () . rev () {
-        insert_containerward_ancestry_tree_recursive (
+        insert_full_containerward_role_tree_recursive (
           child, child_nid,
           tree, graph, config, active
         ) ?; } }
@@ -474,12 +475,12 @@ pub fn prepend_writeProtected_indep_child_with_repo_set (
     // public nodes). 'birth' names the role the partner plays toward
     // whatever sits at 'parent_treeid' (the origin, for the first
     // hop; a previously-grafted partner, for a later hop or an
-    // ancestry step), so the edge and its owner are derivable.
+    // role-tree step), so the edge and its owner are derivable.
     // The captured graph is the authoritative home of edge relRepos.
-    if let Birth::Backpath (role) = birth {
+    if let Birth::RoleGraft (role) = birth {
       if let Ok (parent_pid) = get_id_from_treenode (tree, parent_treeid) {
           let repo_active : bool =
-            backpath_relRepo (graph, &parent_pid, child_skgid, role)
+            role_graft_relRepo (graph, &parent_pid, child_skgid, role)
             . map ( |repo| active . contains_repo (&repo) )
             . unwrap_or (false);
           if ! repo_active { return Ok (None); }}}}
@@ -489,7 +490,7 @@ pub fn prepend_writeProtected_indep_child_with_repo_set (
  ?;
   Ok (Some (new_child_treeid)) }
 
-/// The relRepo of the edge grafting 'partner' at backpath role 'role'
+/// The relRepo of the edge grafting 'partner' at role tree role 'role'
 /// toward 'origin' (the node the partner is being attached under).
 /// 'role' names the role the PARTNER plays (per RelationRole's doc:
 /// "output_role is THIS (partner) role") -- the inverse of
@@ -498,7 +499,7 @@ pub fn prepend_writeProtected_indep_child_with_repo_set (
 /// FIRST position (e.g. CONTAINER), the partner owns the edge (an
 /// inbound partner of origin, in the "someone else's outbound list
 /// names me" sense); otherwise origin owns it.
-fn backpath_relRepo (
+fn role_graft_relRepo (
   graph   : &InRustGraph,
   origin  : &ID,
   partner : &ID,

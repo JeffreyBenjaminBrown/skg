@@ -231,7 +231,7 @@ or go to the view of it that was already open if that exists.
 The requested node itself is always the raw root. Recursive content
 below it can still use override substitution. Override facts remain
 visible in enriched search results and through the override folder
-and path commands.
+and role-tree commands.
 
 If you're not sure whether the cursor is on something visitable
 (a link or a node's metadata),
@@ -352,29 +352,29 @@ heralds carry their labels, in canonical order.
 The empty folder is retained. Import provenance viewnodes have no setter; use the
 search-matching command below for =No search matching=. Delete the whole
 folder branch to dismiss this optional view without changing any flag.
-** <localleader>p : show a path (the backpath through one relation role)
+** <localleader>p : show a role tree (through one relation role)
 Like the folders, each inserts a request that, on save, grafts the
 partners reached through one relation role as inverted, write-protected
 children, climbing transitively until a fork, cycle, or root. UPPER =
 the partner's active (first) role; lower = its passive (second) role.
 Every command auto-saves.
-*** <localleader>pC : :SkgShowPathsThroughContainers
-The nodes that contain this node (its containment ancestry).
-*** <localleader>pL : :SkgShowPathsThroughMentioners
+*** <localleader>pC : :SkgShowContainerwardTree
+The nodes that contain this node (its containerward role tree).
+*** <localleader>pL : :SkgShowMentionerwardTree
 The nodes that link to this node (its mentioners).
-*** <localleader>pl : :SkgShowPathsThroughMentioned
+*** <localleader>pl : :SkgShowMentionedwardTree
 The nodes this node links to (the nodes it mentions).
-*** <localleader>pO : :SkgShowPathsThroughOverriders
+*** <localleader>pO : :SkgShowOverriderwardTree
 The nodes that override this node.
-*** <localleader>po : :SkgShowPathsThroughOverridden
+*** <localleader>po : :SkgShowOverriddenwardTree
 The nodes this node overrides.
-*** <localleader>pH : :SkgShowPathsThroughHiders
+*** <localleader>pH : :SkgShowHiderwardTree
 The nodes that hide this node from their subscriptions.
-*** <localleader>ph : :SkgShowPathsThroughHidden
+*** <localleader>ph : :SkgShowHiddenwardTree
 The nodes this node hides from its subscriptions.
-*** <localleader>pS : :SkgShowPathsThroughSubscribers
+*** <localleader>pS : :SkgShowSubscriberwardTree
 The nodes that subscribe to this node.
-*** <localleader>ps : :SkgShowPathsThroughSubscribees
+*** <localleader>ps : :SkgShowSubscribeewardTree
 The nodes this node subscribes to.
 ** <localleader>s : setting node properties
 *** first some vocab: 'definitive' and 'write-protected'
@@ -439,7 +439,7 @@ existing =editRequest= are refused.
 *** <localleader>sX : :SkgSetFlagSearchMatchingRecursive
 Applies one selected state uniformly through the true-content subtree,
 deduplicating PIDs and reporting ineligible descendants. It prunes non-vognodes,
-backpaths, independent branches, inactive nodes, and phantoms. Save with
+role trees, independent branches, inactive nodes, and phantoms. Save with
 =:w= afterward.
 *** <localleader>sm : :SkgSetMergeRequest
 (See [[./merging.org][the docs on merging]] for why would you merge two nodes,

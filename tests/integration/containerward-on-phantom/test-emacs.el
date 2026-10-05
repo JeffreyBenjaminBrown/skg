@@ -1,4 +1,4 @@
-;;; Integration test: auto-inserted containerward ancestry on removed-here phantoms.
+;;; Integration test: auto-inserted containerward role tree on removed-here phantoms.
 ;;;
 ;;; Graph (at HEAD):  a contains [b, c],  b contains [c].
 ;;;
@@ -7,7 +7,7 @@
 ;;;          b.skg is updated (contains: []).
 ;;; Phase 3: Toggle diff mode on.
 ;;;          Under b, c appears as a removed-here phantom.
-;;; Phase 4: Document the current missing containerward ancestry behavior.
+;;; Phase 4: Document the current missing containerward role tree behavior.
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../save_collateral_break_cycle/test-helpers.el")

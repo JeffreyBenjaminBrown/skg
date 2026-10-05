@@ -279,7 +279,7 @@ fn validate_view_roots (
 /// verify that:
 /// - The node is write-protected.
 /// - It has no content children (ActiveVognode children with affectsParent ==
-///   Container). Non-content children — containerward ancestry stubs,
+///   Container). Non-content children — containerward role tree stubs,
 ///   mentioners, non-vognodes, etc. — don't block expansion:
 ///   they won't be clobbered by it.
 /// - No other node with the same ID has a definitive view request,

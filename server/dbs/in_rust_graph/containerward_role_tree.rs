@@ -2,74 +2,74 @@ use std::collections::{HashMap, HashSet};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::ID;
 
-/// A node in the full containerward ancestry tree.
+/// A node in the full containerward role tree tree.
 ///
 /// Root: a genuine root (no containers).
 /// Repeated: already visited via another branch (cycle or diamond).
-/// DepthTruncated: max_ancestry_depth reached; may have containers we didn't explore.
+/// DepthTruncated: max_role_tree_depth reached; may have containers we didn't explore.
 /// Inner: plays content to at least one container; children are its containers.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AncestryTree {
+pub enum ContainerwardRoleTree {
   Root           ( ID ),
   Repeated       ( ID ),
   DepthTruncated ( ID ),
-  Inner          ( ID, Vec<AncestryTree> ),
+  Inner          ( ID, Vec<ContainerwardRoleTree> ),
 }
 
-impl AncestryTree {
+impl ContainerwardRoleTree {
   pub fn id ( &self ) -> &ID {
     match self {
-      AncestryTree::Root           (id)      => id,
-      AncestryTree::Repeated       (id)      => id,
-      AncestryTree::DepthTruncated (id)      => id,
-      AncestryTree::Inner          ( id, _ ) => id, }} }
+      ContainerwardRoleTree::Root           (id)      => id,
+      ContainerwardRoleTree::Repeated       (id)      => id,
+      ContainerwardRoleTree::DepthTruncated (id)      => id,
+      ContainerwardRoleTree::Inner          ( id, _ ) => id, }} }
 
 /// Internal: tracks what will happen to a child node
-/// during the BFS in 'full_containerward_ancestry'.
+/// during the BFS in 'full_containerward_role_tree'.
 enum NodeFate {
   Open (usize), // will be expanded; usize is its position key
   Repeated,
 }
 
-/// Recursively build an AncestryTree from the BFS maps.
+/// Recursively build an ContainerwardRoleTree from the BFS maps.
 fn assemble(
   key                  : usize,
   id_of                : &HashMap<usize, ID>,
   children_of          : &HashMap<usize, Vec<(ID, NodeFate)>>,
   depth_truncated_keys : &HashSet<usize>,
-) -> AncestryTree {
+) -> ContainerwardRoleTree {
   let id : ID =
     id_of . get (& key)
     . expect ("id_of should have every key")
     . clone ();
   if depth_truncated_keys . contains (& key) {
-    return AncestryTree::DepthTruncated (id); }
+    return ContainerwardRoleTree::DepthTruncated (id); }
   match children_of . get (& key) {
     None =>
-      AncestryTree::Root (id),
+      ContainerwardRoleTree::Root (id),
     Some ( child_entries ) if child_entries . is_empty () =>
-      AncestryTree::Root (id),
+      ContainerwardRoleTree::Root (id),
     Some ( child_entries ) => {
-      let children : Vec<AncestryTree> =
+      let children : Vec<ContainerwardRoleTree> =
         child_entries . iter ()
         . map ( |(child_id, fate)| match fate {
           NodeFate::Repeated =>
-            AncestryTree::Repeated ( child_id . clone () ),
+            ContainerwardRoleTree::Repeated ( child_id . clone () ),
           NodeFate::Open ( child_key ) =>
             assemble (
               *child_key, id_of, children_of,
               depth_truncated_keys ), } )
         . collect ();
-      AncestryTree::Inner ( id, children ) }, } }
+      ContainerwardRoleTree::Inner ( id, children ) }, } }
 
-/// In-Rust-graph containerward ancestry, walking the 'contained_by'
+/// In-Rust-graph containerward role tree, walking the 'contained_by'
 /// inverse index. Uses breadth-first traversal with no
 /// async / no parallel queries / no frontier-batching.
-pub fn full_containerward_ancestry_from_in_rust_graph (
+pub fn full_containerward_role_tree_from_in_rust_graph (
   graph     : &InRustGraph,
   origin    : &ID,
   max_depth : usize,
-) -> AncestryTree {
+) -> ContainerwardRoleTree {
   let mut children_of : HashMap<usize, Vec<(ID, NodeFate)>> =
     HashMap::new ();
   let mut id_of : HashMap<usize, ID> =
@@ -124,17 +124,17 @@ pub fn full_containerward_ancestry_from_in_rust_graph (
     origin_key, & id_of, & children_of,
     & depth_truncated_keys ) }
 
-/// Compute full containerward ancestry for each ID.
-pub fn ancestry_by_id_from_ids (
+/// Compute full containerward role tree for each ID.
+pub fn containerward_role_trees_by_id_from_ids (
   graph     : &InRustGraph,
   ids       : &[ID],
   max_depth : usize,
-) -> HashMap<ID, AncestryTree> {
-  let mut map : HashMap<ID, AncestryTree> =
+) -> HashMap<ID, ContainerwardRoleTree> {
+  let mut map : HashMap<ID, ContainerwardRoleTree> =
     HashMap::new ();
   for id in ids {
     map . insert (
       id . clone (),
-      full_containerward_ancestry_from_in_rust_graph (
+      full_containerward_role_tree_from_in_rust_graph (
         graph, id, max_depth ) ); }
   map }

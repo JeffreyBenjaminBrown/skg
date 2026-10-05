@@ -5,8 +5,8 @@
 ;;; request during completion. Two families, both auto-saving (Q10):
 ;;;   - FOLDERS, `skg-show-folder-*' : (folder RELNAME), builds
 ;;;     BOTH folders of the relation;
-;;;   - PATHS, `skg-show-paths-through-*' : (path ROLENAME), the
-;;;     backpath for that one partner role.
+;;;   - ROLE TREES, `skg-show-*ward-tree' : (roleTree ROLENAME), the
+;;;     role tree for that one partner role.
 ;;; (`skg-request-definitive-view', a different concept, is also here.)
 
 (require 'skg-metadata)
@@ -16,7 +16,7 @@
 
 (defun skg--request-view-and-save (view-request)
   "Request VIEW-REQUEST for the headline at point, then save.
-VIEW-REQUEST is a request form -- (folder RELNAME), (path ROLENAME),
+VIEW-REQUEST is a request form -- (folder RELNAME), (roleTree ROLENAME),
 or the bare symbol definitiveView -- spliced into a (viewRequests ...)
 atom via `skg-edit-metadata-at-point'."
   (save-excursion
@@ -52,26 +52,26 @@ an interactive command NAME that requests REQUEST-FORM and auto-saves."
     "Show the subscription folders (subscribeeFolder + subscriberFolder).")
   (skg-show-folderOf-flags flags
     "Show the write-protected flags folder for the node at point.")
-  ;; Paths ('C-c p'): the backpath for one partner role. UPPER = the
+  ;; Role trees ('C-c p'): the role tree for one partner role. UPPER = the
   ;; partner's active (first) role, lower = its passive (second) role.
-  (skg-show-paths-through-containers   (path container)
-    "Show paths through the containers of the node (nodes that contain it).")
-  (skg-show-paths-through-mentioners (path mentioner)
-    "Show paths through the mentioners of the node (nodes that link to it).")
-  (skg-show-paths-through-mentioned   (path mentioned)
-    "Show paths through the nodes the node mentions (links to).")
-  (skg-show-paths-through-overriders   (path overrider)
-    "Show paths through the overriders of the node (nodes that override it).")
-  (skg-show-paths-through-overridden   (path overridden)
-    "Show paths through the nodes the node overrides.")
-  (skg-show-paths-through-hiders       (path hider)
-    "Show paths through the hiders of the node (nodes that hide it).")
-  (skg-show-paths-through-hidden       (path hidden)
-    "Show paths through the nodes the node hides.")
-  (skg-show-paths-through-subscribers  (path subscriber)
-    "Show paths through the subscribers of the node (nodes that subscribe to it).")
-  (skg-show-paths-through-subscribees  (path subscribee)
-    "Show paths through the nodes the node subscribes to."))
+  (skg-show-containerward-tree   (roleTree container)
+    "Show the role tree through the containers of the node (nodes that contain it).")
+  (skg-show-mentionerward-tree (roleTree mentioner)
+    "Show the role tree through the mentioners of the node (nodes that link to it).")
+  (skg-show-mentionedward-tree   (roleTree mentioned)
+    "Show the role tree through the nodes the node mentions (links to).")
+  (skg-show-overriderward-tree   (roleTree overrider)
+    "Show the role tree through the overriders of the node (nodes that override it).")
+  (skg-show-overriddenward-tree   (roleTree overridden)
+    "Show the role tree through the nodes the node overrides.")
+  (skg-show-hiderward-tree       (roleTree hider)
+    "Show the role tree through the hiders of the node (nodes that hide it).")
+  (skg-show-hiddenward-tree       (roleTree hidden)
+    "Show the role tree through the nodes the node hides.")
+  (skg-show-subscriberward-tree  (roleTree subscriber)
+    "Show the role tree through the subscribers of the node (nodes that subscribe to it).")
+  (skg-show-subscribeeward-tree  (roleTree subscribee)
+    "Show the role tree through the nodes the node subscribes to."))
 
 (defun skg-request-definitive-view ()
   "Edit metadata to request a definitive view for the headline at point.

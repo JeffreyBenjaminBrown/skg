@@ -190,12 +190,12 @@ C-c p o must bind to distinct commands."
   (dolist (pair '(("C-c l a" . skg-show-folderOf-aliases)
                   ("C-c l o" . skg-show-folderOf-overridesViewOf)
                   ("C-c l s" . skg-show-folderOf-subscribesTo)
-                  ("C-c p C" . skg-show-paths-through-containers)
-                  ("C-c p L" . skg-show-paths-through-mentioners)
-                  ("C-c p l" . skg-show-paths-through-mentioned)
-                  ("C-c p O" . skg-show-paths-through-overriders)
-                  ("C-c p o" . skg-show-paths-through-overridden)
-                  ("C-c p s" . skg-show-paths-through-subscribees)))
+                  ("C-c p C" . skg-show-containerward-tree)
+                  ("C-c p L" . skg-show-mentionerward-tree)
+                  ("C-c p l" . skg-show-mentionedward-tree)
+                  ("C-c p O" . skg-show-overriderward-tree)
+                  ("C-c p o" . skg-show-overriddenward-tree)
+                  ("C-c p s" . skg-show-subscribeeward-tree)))
     (should (eq (lookup-key skg-content-view-mode-map (kbd (car pair)))
                 (cdr pair)))))
 
@@ -307,7 +307,7 @@ C-c p o must bind to distinct commands."
       "*** (skg (node (id content-grandchild) (repo public))) content grandchild\n"
       "** (skg (node (id mismatched-content) (repo foreign))) mismatched content\n"
       "*** (skg (node (id public-under-mismatch) (repo public))) public under mismatch\n"
-      "** (skg (node (id link-child) (repo public) (affectsParent false) (birth backpath mentioner))) link child\n"
+      "** (skg (node (id link-child) (repo public) (affectsParent false) (birth roleGraft mentioner))) link child\n"
       "*** (skg (node (id under-link) (repo public))) under link\n"
       "** (skg aliasFolder) aliases\n"
       "*** (skg (node (id under-non-vognode) (repo public))) under non-vognode\n"))

@@ -2,7 +2,7 @@
 -- (viewRequests ...) atom to the headline at point and saving,
 -- letting the server fulfill the request during completion. Two
 -- families, both auto-saving: FOLDERS (folder RELNAME), building
--- both folders of the relation, and PATHS (path ROLENAME), the backpath
+-- both folders of the relation, and ROLE TREES (roleTree ROLENAME), the role tree
 -- for one partner role. Also the definitive-view request (no
 -- auto-save) and the explicit fork. The Lua port of
 -- elisp/skg-request-views.el.
@@ -13,7 +13,7 @@ local sexpr = require('skg.sexpr.parse')
 
 local M = {}
 
----Request VIEW_REQUEST_TEXT (e.g. '(folder aliases)', '(path container)',
+---Request VIEW_REQUEST_TEXT (e.g. '(folder aliases)', '(roleTree container)',
 ---'fork') for the headline owning point, then save.
 ---@param view_request_text string
 function M.request_view_and_save (view_request_text)
@@ -31,15 +31,15 @@ local command_rows = {
   { 'show_folderOf_hidesFromItsSubscriptions', '(folder hides_from_its_subscriptions)' },
   { 'show_folderOf_subscribesTo', '(folder subscribes_to)' },
   { 'show_folderOf_flags', 'flags' },
-  { 'show_paths_through_containers', '(path container)' },
-  { 'show_paths_through_mentioners', '(path mentioner)' },
-  { 'show_paths_through_mentioned', '(path mentioned)' },
-  { 'show_paths_through_overriders', '(path overrider)' },
-  { 'show_paths_through_overridden', '(path overridden)' },
-  { 'show_paths_through_hiders', '(path hider)' },
-  { 'show_paths_through_hidden', '(path hidden)' },
-  { 'show_paths_through_subscribers', '(path subscriber)' },
-  { 'show_paths_through_subscribees', '(path subscribee)' },
+  { 'show_containerward_tree', '(roleTree container)' },
+  { 'show_mentionerward_tree', '(roleTree mentioner)' },
+  { 'show_mentionedward_tree', '(roleTree mentioned)' },
+  { 'show_overriderward_tree', '(roleTree overrider)' },
+  { 'show_overriddenward_tree', '(roleTree overridden)' },
+  { 'show_hiderward_tree', '(roleTree hider)' },
+  { 'show_hiddenward_tree', '(roleTree hidden)' },
+  { 'show_subscriberward_tree', '(roleTree subscriber)' },
+  { 'show_subscribeeward_tree', '(roleTree subscribee)' },
 }
 for _, row in ipairs(command_rows) do
   local name, form = row[1], row[2]

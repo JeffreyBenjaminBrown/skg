@@ -85,12 +85,12 @@
         (setq integration-test-phase "new-buffer-created")))))
 
 (defun test-request-containerward-view ()
-  "Call skg-show-paths-through-containers on node 12."
+  "Call skg-show-containerward-tree on node 12."
   (message "=== PHASE 3: Requesting containerward view for node 12 ===")
 
   (with-current-buffer "*skg-content-view*"
-    (message "Calling skg-show-paths-through-containers...")
-    (skg-show-paths-through-containers) ;; this also saves the buffer
+    (message "Calling skg-show-containerward-tree...")
+    (skg-show-containerward-tree) ;; this also saves the buffer
 
     ;; Wait for response
     (skg-test-wait-for-response)
@@ -110,7 +110,7 @@
             ;; It's easier to read this way, without metadata.
             (concat "* 1\n"
                     "** 11\n"
-                    "** 12\n" ;; backpath was requested here
+                    "** 12\n" ;; role tree was requested here
                     "*** 1\n" ;; its first element
                     "**** 0\n" ;; its second element
                     "*** 121\n"

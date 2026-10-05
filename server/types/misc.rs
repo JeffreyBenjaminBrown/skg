@@ -230,8 +230,8 @@ pub struct SkgConfig {
   #[serde(default = "default_beep_when_server_becomes_available")]
   pub beep_when_server_becomes_available : bool, // Play a local sound when server initialization finishes.
 
-  #[serde(default = "default_max_ancestry_depth")]
-  pub max_ancestry_depth : usize, // Max BFS depth for full containerward ancestry.
+  #[serde(default = "default_max_role_tree_depth")]
+  pub max_role_tree_depth : usize, // Max BFS depth for full containerward role tree.
 }
 
 impl SkgConfig {
@@ -318,7 +318,7 @@ fn default_initial_node_limit() -> usize {
 fn default_beep_when_server_becomes_available() -> bool {
   true }
 
-fn default_max_ancestry_depth() -> usize {
+fn default_max_role_tree_depth() -> usize {
   20 }
 
 
@@ -467,7 +467,7 @@ impl SkgConfig {
       initial_node_limit : DEFAULT_INITIAL_NODE_LIMIT,
       timing_log         : false,
       beep_when_server_becomes_available : false,
-      max_ancestry_depth : default_max_ancestry_depth(), }}
+      max_role_tree_depth : default_max_role_tree_depth(), }}
 
   /// Creates a SkgConfig with a test-specific Tantivy folder.
   pub fn fromReposAndTantivyFolder (
@@ -486,7 +486,7 @@ impl SkgConfig {
       initial_node_limit : DEFAULT_INITIAL_NODE_LIMIT,
       timing_log         : false,
       beep_when_server_becomes_available : false,
-      max_ancestry_depth : default_max_ancestry_depth(), }}
+      max_role_tree_depth : default_max_role_tree_depth(), }}
 
   pub fn user_owns_repo (
     &self,

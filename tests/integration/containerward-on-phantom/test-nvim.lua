@@ -1,4 +1,4 @@
--- Integration test: auto-inserted containerward ancestry on
+-- Integration test: auto-inserted containerward role tree on
 -- removed-here phantoms, nvim client. The Lua mirror of test-emacs.el
 -- in this directory.
 --
@@ -9,7 +9,7 @@
 --          b.skg is updated (contains: []).
 -- Phase 3: Toggle diff mode on.
 --          Under b, c appears as a removed-here phantom.
--- Phase 4: Document the current missing containerward ancestry
+-- Phase 4: Document the current missing containerward role tree
 --          behavior.
 --
 -- The elisp test's headline-classification helpers (from
@@ -39,11 +39,11 @@ local function child_named (list, name)
   return nil
 end
 
----A backpath graft's ROLENAME from its SEMANTIC relationship facts
----(RELS_BODY = the cdr of (rels ...)), or nil. A graft relates OUTBOUND
+---A role role graft's ROLENAME from its SEMANTIC relationship facts
+---(RELS_BODY = the cdr of (rels ...)), or nil. A role graft relates OUTBOUND
 ---to a tracked ancestor: a relation with an (out ... (ancestors ...))
----side, mapped to its role. Mirrors headline--graft-role-from-rels.
-local function graft_role_from_rels (rels_body)
+---side, mapped to its role. Mirrors headline--role-of-role-graft-from-rels.
+local function role_of_role_graft_from_rels (rels_body)
   if not rels_body then return nil end
   local roles = { { 'contains', 'container' }, { 'links_to', 'mentioner' },
                   { 'subscribes_to', 'subscribee' }, { 'overrides_view_of', 'overrider' },
@@ -59,7 +59,7 @@ local function graft_role_from_rels (rels_body)
 end
 
 ---Classify a headline's parsed metadata SEXP into a relation string: a
----graft role name, 'true', or the literal affectsParent symbol text
+---role-graft role name, 'true', or the literal affectsParent symbol text
 ---(e.g. 'na', 'false'). Mirrors headline--relation-from-sexp.
 ---@param sexp any|nil
 ---@return string
@@ -72,10 +72,10 @@ local function relation_from_sexp (sexp)
     or nil
   local independent = affectsParent_list ~= nil and affectsParent_list[1] ~= nil
     and affectsParent_list[1] == sexpr.symbol('false')
-  local graft_role = independent
-    and graft_role_from_rels(rels_body)
+  local role_graft_role = independent
+    and role_of_role_graft_from_rels(rels_body)
     or nil
-  if graft_role then return graft_role end
+  if role_graft_role then return role_graft_role end
   if affectsParent_list == nil or #affectsParent_list == 0
      or affectsParent_list[1] == sexpr.symbol('true') then
     return 'true'

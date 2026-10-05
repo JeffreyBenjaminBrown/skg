@@ -235,6 +235,28 @@ irrelevant children to the front).  This is deliberate, not a bug: the
 membership is generated and ordered, so a note you park inside a folder is
 kept but visibly separated from the live membership.
 
+*** role tree, role graft, and the -ward adjectives
+A *role tree* is drawn under a node, its origin, by following one
+relation role away from it: under the origin go the nodes playing that
+role toward it, under each of those the nodes playing the role toward
+them, and so on. A role, unlike a relation, is directed, so the tree
+goes one way. A role-tree request '(roleTree ROLE)' draws one (e.g.
+'skg-show-mentionerward-tree'); search enrichment draws containerward
+and override role trees under results. A role tree drawn on request
+follows single partners until a node has several, then includes that
+first layer; a full containerward role tree ('ContainerwardRoleTree')
+goes as deep as 'max_role_tree_depth'.
+
+A *role graft* is one node of a role tree other than its origin. It is
+in the view because of the role, not because its parent contains it, so
+it carries 'affectsParent false' and a birth fact naming its role's
+relation. ("Role" is in the name because other things might someday be
+grafted onto views.)
+
+The adjectives containerward, mentionerward, overriderward,
+overriddenward, and so on name the role a role tree follows: a
+containerward role tree follows the container role.
+
 *** ephem = ephemeral
 
 Some data regarding a node is ephemeral --

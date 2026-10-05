@@ -515,7 +515,7 @@ async fn test_definitive_request_with_only_non_content_children_is_allowed (
   // A definitive view request on a write-protected node whose children
   // are all NON-content (affectsParent != Affected) should be permitted: the
   // expansion would fill the node with content, and non-content
-  // children (e.g. 'birth backpath container' ancestry stubs) don't conflict
+  // children (e.g. containerward role grafts) don't conflict
   // with that. Only Container children would be clobbered.
       let input : &str =
         indoc! {"

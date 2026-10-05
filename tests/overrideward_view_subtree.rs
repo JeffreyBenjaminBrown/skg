@@ -56,8 +56,8 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (&s . config) ? . load_full ();
       suppression_anchors_at_user_owned (
         &graph, &s . config, &active ) ?;
-      override_relatives_graft_as_descendants ( &graph, &active ) ?;
-      end_to_end_render_shows_suppressed_grafts_with_heralds (
+      override_relatives_are_role_grafted_as_descendants ( &graph, &active ) ?;
+      end_to_end_render_shows_suppressed_role_grafts_with_heralds (
         &graph, &s . config, &active ) . await ?;
       Ok (( )) } )) }
 
@@ -70,7 +70,7 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
 /// (the parent overrides it), birth = overrides -- which only renders
 /// because the pre-fetch now includes the override-relative ids
 /// ('collect_overrideward_view_subtree_ids').
-async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
+async fn end_to_end_render_shows_suppressed_role_grafts_with_heralds (
   graph  : &InRustGraph,
   config : &SkgConfig,
   active : &ActiveRepoSet,
@@ -90,7 +90,7 @@ async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
     search_results, vec![ ID::from ("U") ],
     "F and G are suppressed, so only U is a top-level result" );
   // Production's pre-fetch id-set: results + ancestry (none here) +
-  // the override relatives the graft will add.
+  // the override relatives the role graft will add.
   let all_ids : Vec<ID> = {
     let mut ids : HashSet<ID> =
       search_results . iter () . cloned () . collect ();
@@ -137,7 +137,7 @@ async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
     let line : String = herald_line (title);
     assert! ( line . contains ("(overrides_view_of (in 1 (ancestors 1))")
               && line . contains ("(birth (overrides_view_of in 1))"),
-      "the override graft must render its override birth herald -- its \
+      "the override role graft must render its override birth herald -- its \
        parent overrides it (overrides inbound from the gen-1 ancestor) \
        and overrides is its birth -- proving graphStats were \
        fetched for it: {}", line ); }
@@ -172,8 +172,8 @@ fn suppression_anchors_at_user_owned (
   Ok (( )) }
 
 /// U's overriddenward chain grafts beneath it as write-protected descendants
-/// marked with the OVERRIDDEN backpath role: U -> F -> G.
-fn override_relatives_graft_as_descendants (
+/// marked with the OVERRIDDEN role-graft birth: U -> F -> G.
+fn override_relatives_are_role_grafted_as_descendants (
   graph : &InRustGraph,
   active : &ActiveRepoSet,
 ) -> Result<(), Box<dyn Error>> {
@@ -190,14 +190,14 @@ fn override_relatives_graft_as_descendants (
   let f : NodeRef<Viewnode> =
     find_child ( u, "F" )
     . expect ("F (the node U overrides) should be grafted under U");
-  assert! ( is_overriddenward_graft (f),
-    "F should carry the OVERRIDDEN backpath role under U" );
+  assert! ( is_overriddenward_role_graft (f),
+    "F should carry the OVERRIDDEN role-graft birth under U" );
   let g : NodeRef<Viewnode> =
     find_child ( f, "G" )
     . expect ("G (the node F overrides) should be grafted under F");
-  assert! ( is_overriddenward_graft (g),
-    "G should carry the OVERRIDDEN backpath role under F" );
-  // Nothing overrides U, so no overriderward graft appears there.
+  assert! ( is_overriddenward_role_graft (g),
+    "G should carry the OVERRIDDEN role-graft birth under F" );
+  // Nothing overrides U, so no overriderward role graft appears there.
   assert! ( find_child (u, "G") . is_none (),
     "G must hang under F, not directly under U" );
   Ok (( )) }
@@ -223,10 +223,10 @@ fn active_id_is (
     ViewnodeKind::Vognode (Vognode::Active (t))
       if t . id == ID::from (id) ) }
 
-fn is_overriddenward_graft (
+fn is_overriddenward_role_graft (
   node : NodeRef<Viewnode>,
 ) -> bool {
   matches! ( &node . value () . kind,
     ViewnodeKind::Vognode (Vognode::Active (t))
       if matches! ( &t . birth,
-        Birth::Backpath (r) if r . rolename () == "overridden" ) ) }
+        Birth::RoleGraft (r) if r . rolename () == "overridden" ) ) }

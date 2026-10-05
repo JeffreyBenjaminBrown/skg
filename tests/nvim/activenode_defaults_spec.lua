@@ -183,12 +183,12 @@ describe('skg.sexpr.activenode_defaults stripping', function ()
   it('keeps populated viewRequests', function ()
     assert.are.same(
       sexpr.read('(skg (node (id abc) (repo jeff)'
-                 .. ' (viewRequests (folder aliases) (path container))))'),
+                 .. ' (viewRequests (folder aliases) (roleTree container))))'),
       strip_to_sexp(table.concat({
         '* skg', '** node', '*** id', '**** abc',
         '*** repo', '**** jeff',
         '*** viewRequests', '**** folder', '***** aliases',
-        '**** path', '***** container' }, '\n')))
+        '**** roleTree', '***** container' }, '\n')))
   end)
 
   it('drops every childless editable field of the empty-node skeleton',

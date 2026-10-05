@@ -247,7 +247,7 @@ pub fn mark_view_roots_parent_na (
 /// the rendered herald then no longer misleads.
 ///
 /// Three kinds of claim are checked:
-/// - 'Birth::Backpath(role)' on child C with ActiveVognode parent P:
+/// - 'Birth::RoleGraft(role)' on child C with ActiveVognode parent P:
 ///   claim is "C plays 'role' toward P" (e.g. CONTAINER -> C contains
 ///   P; MENTIONER -> C's body/title links to P). Verified against the
 ///   in-Rust graph via 'relation_membership_is_real', keyed by the role.
@@ -305,7 +305,7 @@ pub fn validate_affectsParent_relationships (
         AffectsParent::NA => false, };
       if ! affects_parent_claim_ok { to_independent . push ( child_ref . id () ); }
       let birth_claim_ok : bool = match child_tn . birth {
-        Birth::Backpath (role) => {
+        Birth::RoleGraft (role) => {
           // The child plays 'role' toward the parent (the origin).
           // Resolve both through pid_of so extra_id aliasing (a
           // nodeMerge side-effect) doesn't produce a false mismatch.

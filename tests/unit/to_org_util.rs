@@ -81,7 +81,7 @@ fn linksto_false_claim_flipped_to_independent () {
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::Backpath (RelationRole::MENTIONER)) ) . id ();
+      AffectsParent::False, Birth::RoleGraft (RelationRole::MENTIONER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
@@ -105,11 +105,11 @@ fn linksto_true_claim_preserved () {
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::Backpath (RelationRole::MENTIONER)) ) . id ();
+      AffectsParent::False, Birth::RoleGraft (RelationRole::MENTIONER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::MENTIONER),
+  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::RoleGraft (RelationRole::MENTIONER),
     "LinksToParent claim with a backing link must be preserved");
 }
 
@@ -129,7 +129,7 @@ fn containerof_false_claim_flipped () {
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
+      AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
@@ -195,11 +195,11 @@ fn containerof_via_merged_extra_id_preserved () {
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
+      AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::CONTAINER),
+  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::RoleGraft (RelationRole::CONTAINER),
     "Extra_id-aliased parent pid should still satisfy the claim");
 }
 
@@ -221,11 +221,11 @@ fn containerof_view_affects_parent_acquiree_preserved () {
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
+      AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::CONTAINER),
+  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::RoleGraft (RelationRole::CONTAINER),
     "When view parent id is the acquiree pid, the claim should \
      still hold via pid_of resolution on the parent side");
 }
@@ -350,11 +350,11 @@ fn moved_containerof_relationship_holds_preserved () {
   let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
+      AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::CONTAINER),
+  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::RoleGraft (RelationRole::CONTAINER),
     "Moved content child still contains its new parent — keep");
 }
 
@@ -375,7 +375,7 @@ fn moved_containerof_relationship_broken_flipped () {
   let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
+      AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
@@ -451,11 +451,11 @@ fn moved_linksto_relationship_holds_preserved () {
   let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::Backpath (RelationRole::MENTIONER)) ) . id ();
+      AffectsParent::False, Birth::RoleGraft (RelationRole::MENTIONER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::MENTIONER),
+  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::RoleGraft (RelationRole::MENTIONER),
     "Moved linksToParent: C still links to p_new — keep");
 }
 
@@ -475,7 +475,7 @@ fn moved_linksto_relationship_broken_flipped () {
   let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::Backpath (RelationRole::MENTIONER)) ) . id ();
+      AffectsParent::False, Birth::RoleGraft (RelationRole::MENTIONER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 

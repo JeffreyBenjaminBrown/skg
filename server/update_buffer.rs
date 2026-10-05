@@ -24,7 +24,7 @@ use crate::serve::handlers::text_release::{
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::repo_sets::{ActiveRepoSet, apply_repo_set_to_viewforest};
-use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids_with_repo_set;
+use crate::to_org::expand::role_tree::attach_full_containerward_role_trees_at_nodeids_with_repo_set;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::git::{NodeAxes, RelationshipAxes, RepoDiff};
 use crate::types::views_state::ViewUri;
@@ -367,7 +367,7 @@ fn rerender_collateral_view (
 /// folders, and applies the TODO/DONE/local-view-update/plan_v2.org §5.5 node budget.
 /// When diff_mode, the git diff is computed inline by view completion (per node,
 /// at its BFS visit, via process_activeVognode_diff) -- the same path post-save uses.
-/// The caller (multi_root_view_via_env) then adds containerward ancestry and
+/// The caller (multi_root_view_via_env) then adds containerward role tree and
 /// stats.
 /// Returns the completed viewforest plus any warning strings the
 /// render itself produced -- today only compound-override-chain
@@ -390,7 +390,7 @@ pub fn render_initial_view (
   // De-novo (and ONLY de-novo) asks each view-root for its containerward
   // ancestry, as a self-consuming view request. The during-completion dispatch
   // leaves view-root Containerward alone (extract_view_requests); finish_viewforest
-  // fulfills it via the AncestryTree attach and drops it. So root containerward is
+  // fulfills it via the ContainerwardRoleTree attach and drops it. So root containerward is
   // generated once, here, and round-trips in the saved buffer as ordinary content
   // -- a later save never re-generates it. (Roots are already definitive by
   // construction -- first occurrence in the defmap -- so they need no
@@ -399,7 +399,7 @@ pub fn render_initial_view (
     if let Some (mut node_mut) = viewforest . get_mut (root_nid) {
       if let ViewnodeKind::Vognode (Vognode::Active (t)) =
         &mut node_mut . value () . kind
-      { t . view_requests . insert ( ViewRequest::Path (RelationRole::CONTAINER) ); }} }
+      { t . view_requests . insert ( ViewRequest::RoleTree (RelationRole::CONTAINER) ); }} }
   let graph_snap : Arc<InRustGraph> = runtime . graph . clone ();
   let mut defmap : DefinitiveMap = DefinitiveMap::new ();
   let mut errors : Vec<String> = Vec::new ();
@@ -499,12 +499,12 @@ pub fn rerender_view (
 /// view (multi_root_view_via_env, server/to_org/render/content_view.rs) and the
 /// post-save re-render (rerender_view, above). Given a viewforest whose ActiveVognode
 /// content + git diff have already been completed, it:
-///   - fulfills a ViewRequest::Path (RelationRole::CONTAINER) carried by a view-ROOT (only de-novo
+///   - fulfills a ViewRequest::RoleTree (RelationRole::CONTAINER) carried by a view-ROOT (only de-novo
 ///     sets it; see render_initial_view), building that root's
-///     containerward ancestry and dropping the request. This is data-driven:
+///     containerward role tree and dropping the request. This is data-driven:
 ///     post-save roots come from the saved buffer WITHOUT the request, so a save
 ///     never re-generates the containerward (it round-trips as ordinary content).
-///   - attaches containerward ancestry to every removed-here phantom,
+///   - attaches containerward role tree to every removed-here phantom,
 ///   - marks view-root and orphan affectsParent,
 ///   - validates affectsParent against the captured graph (the de-novo path could
 ///     skip it for speed, but running it in both keeps the tails one),
@@ -524,8 +524,8 @@ pub fn finish_viewforest (
     fulfill_root_containerward_requests (
       viewforest, graph, config, active_repo_set ) ? ; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "attach_containerward_ancestries_to_removedhere_phantoms" ). entered();
-    attach_containerward_ancestries_to_removedhere_phantoms (
+      "attach_full_containerward_role_trees_to_removedhere_phantoms" ). entered();
+    attach_full_containerward_role_trees_to_removedhere_phantoms (
       viewforest, graph, config, active_repo_set ) ? ; }
   mark_view_roots_parent_na ( viewforest );
   // §A (Jeff's invariant): an Active survivor left under a non-container parent
@@ -734,15 +734,15 @@ fn clear_diff_metadata (
         Ok (( )) } ) ?;
   Ok (( )) }
 
-/// Fulfill a ViewRequest::Path (RelationRole::CONTAINER) carried by a view-ROOT: attach that
-/// root's full containerward ancestry as its first children, then DROP the
+/// Fulfill a ViewRequest::RoleTree (RelationRole::CONTAINER) carried by a view-ROOT: attach that
+/// root's full containerward role tree as its first children, then DROP the
 /// request so it does not round-trip into the saved buffer (a later save must not
 /// re-generate the containerward -- it round-trips as ordinary content instead).
 ///
 /// Only the de-novo render sets this request (render_initial_view), so
 /// this is a no-op post-save. The during-completion view-request dispatch
 /// deliberately leaves view-root Containerward alone (extract_view_requests) so it
-/// reaches here: this AncestryTree-based attach builds a SEPARATE containerward
+/// reaches here: this ContainerwardRoleTree-based attach builds a SEPARATE containerward
 /// subtree and handles a cyclic root, whereas the dispatch's
 /// build_and_integrate_containerward would merge it into existing content and
 /// panic on a cyclic root (one whose containerward path cycles back to the root,
@@ -758,24 +758,24 @@ fn fulfill_root_containerward_requests (
       . filter ( |nid| viewforest . get (*nid)
           . map ( |n| match &n . value () . kind {
               ViewnodeKind::Vognode (Vognode::Active (t)) =>
-                t . view_requests . contains (& ViewRequest::Path (RelationRole::CONTAINER)),
+                t . view_requests . contains (& ViewRequest::RoleTree (RelationRole::CONTAINER)),
               _ => false } )
           . unwrap_or (false) )
       . collect ();
   if requesting_root_nodeids . is_empty () { return Ok (( )); }
-  attach_containerward_ancestries_at_nodeids_with_repo_set (
+  attach_full_containerward_role_trees_at_nodeids_with_repo_set (
     viewforest, &requesting_root_nodeids, graph, config, active ) ?;
   for nid in requesting_root_nodeids { // drop the now-fulfilled request
     if let Some (mut node_mut) = viewforest . get_mut (nid) {
       if let ViewnodeKind::Vognode (Vognode::Active (t)) =
         &mut node_mut . value () . kind
-      { t . view_requests . remove (& ViewRequest::Path (RelationRole::CONTAINER)); }} }
+      { t . view_requests . remove (& ViewRequest::RoleTree (RelationRole::CONTAINER)); }} }
   Ok (( )) }
 
 /// For every RemovedHere phantom in the viewforest, fetch its containerward
 /// ancestry from the captured graph and insert it as write-protected Content children.
 /// Short-circuits when no RemovedHere phantoms exist.
-fn attach_containerward_ancestries_to_removedhere_phantoms (
+fn attach_full_containerward_role_trees_to_removedhere_phantoms (
   viewforest    : &mut ViewForest,
   graph         : &InRustGraph,
   config        : &SkgConfig,
@@ -794,5 +794,5 @@ fn attach_containerward_ancestries_to_removedhere_phantoms (
         if is_removedhere
         { result . push ( node_ref . id () ); }} }
     result };
-  attach_containerward_ancestries_at_nodeids_with_repo_set (
+  attach_full_containerward_role_trees_at_nodeids_with_repo_set (
     viewforest, &phantom_nodeids, graph, config, active ) }

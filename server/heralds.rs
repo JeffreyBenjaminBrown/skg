@@ -350,7 +350,7 @@ pub fn herald_rule_table () -> HeraldRule {
             rule ("false", vec! [s ("request:search matching")]) ]) ]),
         crule (Nonstandard, "viewRequests", vec! [
           rule ("folder",  vec! [ any (vec! [ s ("req:folder:"),  RuleChild::It ]) ]),
-          rule ("path", vec! [ any (vec! [ s ("req:path:"), RuleChild::It ]) ]),
+          rule ("roleTree", vec! [ any (vec! [ s ("req:roleTree:"), RuleChild::It ]) ]),
           rule ("flags", vec! [ s ("req:flags") ]),
           rule ("definitiveView", vec! [ s ("req:definitive") ]) ]),
         interc (Some (Go), "", Some ("staged"), vec! [

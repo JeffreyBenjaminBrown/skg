@@ -77,8 +77,8 @@ print('Positioned on node 12 (line 3)')
 
 -- PHASE 3: request the containerward view for node 12.
 print('=== PHASE 3: Requesting containerward view for node 12 ===')
-print('Calling view_requests.show_paths_through_containers...')
-view_requests.show_paths_through_containers() -- this also saves the buffer
+print('Calling view_requests.show_containerward_tree...')
+view_requests.show_containerward_tree() -- this also saves the buffer
 T.wait_for_response()
 
 -- PHASE 4: verify the result structure.
@@ -88,7 +88,7 @@ local stripped_buffer_content = strip_all_metadata(buffer_content)
 local expected_without_metadata =
   '* 1\n'
   .. '** 11\n'
-  .. '** 12\n'  -- backpath was requested here
+  .. '** 12\n'  -- role tree was requested here
   .. '*** 1\n'  -- its first element
   .. '**** 0\n' -- its second element
   .. '*** 121\n'

@@ -1,9 +1,9 @@
-// cargo test --test rebuild -- mentionerward_ancestry
+// cargo test --test rebuild -- mentionerward_role_tree
 //
 // Tests that mentionerward view expansion inserts containerward
-// ancestry beneath each Birth::Backpath (RelationRole::MENTIONER) repo node.
+// ancestry beneath each Birth::RoleGraft (RelationRole::MENTIONER) repo node.
 //
-// Graph (see fixtures-mentionerward-ancestry/):
+// Graph (see fixtures-mentionerward-role-tree/):
 //   Links:        b -> a,  c -> b,  d -> a
 //     PITFALL: All IDs are single-character,
 //     but the titles for b, c and d must be longer than that,
@@ -27,7 +27,7 @@
 // and child counts without depending on order.
 
 use indoc::indoc;
-use skg::to_org::expand::backpath::build_and_integrate_mentionerward_path;
+use skg::to_org::expand::role_tree::build_and_integrate_mentionerward_role_tree;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::{graph_handle_from_config, run_with_test_stores};
@@ -69,17 +69,17 @@ fn find_child (
     . map ( |n| n . id () ) }
 
 #[test]
-fn test_mentionerward_ancestry (
+fn test_mentionerward_role_tree (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
-    "skg-test-mentionerward-ancestry",
-    "tests/rebuild/fixtures-mentionerward-ancestry",
-    "/tmp/tantivy-test-mentionerward-ancestry",
+    "skg-test-mentionerward-role-tree",
+    "tests/rebuild/fixtures-mentionerward-role-tree",
+    "/tmp/tantivy-test-mentionerward-role-tree",
     |config, _tantivy| Box::pin ( async move {
-      test_mentionerward_ancestry_impl (config) . await
+      test_mentionerward_role_tree_impl (config) . await
     } )) }
 
-async fn test_mentionerward_ancestry_impl (
+async fn test_mentionerward_role_tree_impl (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   // Start with a minimal tree containing just node "a".
@@ -94,7 +94,7 @@ async fn test_mentionerward_ancestry_impl (
     viewforest . root () . first_child () . unwrap () . id ();
 
   // Request mentionerward expansion from "a".
-  build_and_integrate_mentionerward_path (
+  build_and_integrate_mentionerward_role_tree (
     &mut viewforest, node_a,
     &graph_handle_from_config (config)? . load_full (), config
   ) ?;
@@ -102,10 +102,10 @@ async fn test_mentionerward_ancestry_impl (
   // --- a should have exactly 2 LinkTarget children: b and d ---
   let a_children = children_info (&viewforest, node_a);
   assert! ( a_children . contains (&("b" . into (),
-                                     Birth::Backpath (RelationRole::MENTIONER))),
+                                     Birth::RoleGraft (RelationRole::MENTIONER))),
             "a should have LinkTarget child b" );
   assert! ( a_children . contains (&("d" . into (),
-                                     Birth::Backpath (RelationRole::MENTIONER))),
+                                     Birth::RoleGraft (RelationRole::MENTIONER))),
             "a should have LinkTarget child d" );
   assert_eq! ( a_children . len (), 2,
                "a should have exactly 2 children" );
@@ -115,10 +115,10 @@ async fn test_mentionerward_ancestry_impl (
     . expect ("a should have child b");
   let b_children = children_info (&viewforest, node_b);
   assert! ( b_children . contains (&("bb" . into (),
-                                     Birth::Backpath (RelationRole::CONTAINER))),
+                                     Birth::RoleGraft (RelationRole::CONTAINER))),
             "b should have Content child bb" );
   assert! ( b_children . contains (&("c" . into (),
-                                     Birth::Backpath (RelationRole::MENTIONER))),
+                                     Birth::RoleGraft (RelationRole::MENTIONER))),
             "b should have LinkTarget child c" );
   assert_eq! ( b_children . len (), 2,
                "b should have exactly 2 children" );
@@ -134,7 +134,7 @@ async fn test_mentionerward_ancestry_impl (
     . expect ("b should have child c");
   let c_children = children_info (&viewforest, node_c);
   assert! ( c_children . contains (&("cc" . into (),
-                                 Birth::Backpath (RelationRole::CONTAINER))),
+                                 Birth::RoleGraft (RelationRole::CONTAINER))),
             "c should have Content child cc" );
   assert_eq! ( c_children . len (), 1,
                "c should have exactly 1 child" );
@@ -144,10 +144,10 @@ async fn test_mentionerward_ancestry_impl (
     . expect ("c should have child cc");
   let cc_children = children_info (&viewforest, node_cc);
   assert! ( cc_children . contains (&("ccc" . into (),
-                                      Birth::Backpath (RelationRole::CONTAINER))),
+                                      Birth::RoleGraft (RelationRole::CONTAINER))),
             "cc should have child ccc (Content)" );
   assert! ( cc_children . contains (&("d" . into (),
-                                      Birth::Backpath (RelationRole::CONTAINER))),
+                                      Birth::RoleGraft (RelationRole::CONTAINER))),
             "cc should have child d (Content)" );
   assert_eq! ( cc_children . len (), 2,
                "cc should have exactly 2 children" );
@@ -157,9 +157,9 @@ async fn test_mentionerward_ancestry_impl (
     . expect ("cc should have child ccc");
   assert_eq! ( children_info (&viewforest, node_ccc) . len (), 0,
                "ccc should have no children" );
-  let node_d_ancestry = find_child (&viewforest, node_cc, "d")
+  let node_d_role_graft = find_child (&viewforest, node_cc, "d")
     . expect ("cc should have child d");
-  assert_eq! ( children_info (&viewforest, node_d_ancestry) . len (), 0,
+  assert_eq! ( children_info (&viewforest, node_d_role_graft) . len (), 0,
                "d (ancestry) should have no children" );
 
   // --- d (LinkTarget, under a) should have no children ---

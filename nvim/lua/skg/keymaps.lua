@@ -67,23 +67,23 @@ M.commands = {
                                desc = 'Request the subscribe folders (auto-saves)' },
   ShowFolderOfFlags = { module = 'skg.view_requests', fn = 'show_folderOf_flags',
                              desc = 'Request the flags folder (auto-saves)' },
-  ShowPathsThroughContainers = { module = 'skg.view_requests', fn = 'show_paths_through_containers',
-                                 desc = 'Graft the containment ancestry (auto-saves)' },
-  ShowPathsThroughMentioners = { module = 'skg.view_requests', fn = 'show_paths_through_mentioners',
+  ShowContainerwardTree = { module = 'skg.view_requests', fn = 'show_containerward_tree',
+                                 desc = 'Graft the containerward role tree (auto-saves)' },
+  ShowMentionerwardTree = { module = 'skg.view_requests', fn = 'show_mentionerward_tree',
                                   desc = 'Graft the nodes that link here (auto-saves)' },
-  ShowPathsThroughMentioned = { module = 'skg.view_requests', fn = 'show_paths_through_mentioned',
+  ShowMentionedwardTree = { module = 'skg.view_requests', fn = 'show_mentionedward_tree',
                                 desc = 'Graft the nodes this links to (auto-saves)' },
-  ShowPathsThroughOverriders = { module = 'skg.view_requests', fn = 'show_paths_through_overriders',
+  ShowOverriderwardTree = { module = 'skg.view_requests', fn = 'show_overriderward_tree',
                                  desc = 'Graft the nodes overriding this (auto-saves)' },
-  ShowPathsThroughOverridden = { module = 'skg.view_requests', fn = 'show_paths_through_overridden',
+  ShowOverriddenwardTree = { module = 'skg.view_requests', fn = 'show_overriddenward_tree',
                                  desc = 'Graft the nodes this overrides (auto-saves)' },
-  ShowPathsThroughHiders = { module = 'skg.view_requests', fn = 'show_paths_through_hiders',
+  ShowHiderwardTree = { module = 'skg.view_requests', fn = 'show_hiderward_tree',
                              desc = 'Graft the nodes hiding this (auto-saves)' },
-  ShowPathsThroughHidden = { module = 'skg.view_requests', fn = 'show_paths_through_hidden',
+  ShowHiddenwardTree = { module = 'skg.view_requests', fn = 'show_hiddenward_tree',
                              desc = 'Graft the nodes this hides (auto-saves)' },
-  ShowPathsThroughSubscribers = { module = 'skg.view_requests', fn = 'show_paths_through_subscribers',
+  ShowSubscriberwardTree = { module = 'skg.view_requests', fn = 'show_subscriberward_tree',
                                   desc = 'Graft the subscribers (auto-saves)' },
-  ShowPathsThroughSubscribees = { module = 'skg.view_requests', fn = 'show_paths_through_subscribees',
+  ShowSubscribeewardTree = { module = 'skg.view_requests', fn = 'show_subscribeeward_tree',
                                   desc = 'Graft the subscribees (auto-saves)' },
   SetDefinitive = { module = 'skg.view_requests', fn = 'set_definitive',
                     desc = 'Make this the editable view of its node' },
@@ -229,15 +229,15 @@ M.content_view_bindings = {
   { 'ch', 'ShowFolderOfHidesFromItsSubscriptions' },
   { 'cs', 'ShowFolderOfSubscribesTo' },
   { 'cp', 'ShowFolderOfFlags' },
-  { 'pC', 'ShowPathsThroughContainers' }, -- C-c p C
-  { 'pL', 'ShowPathsThroughMentioners' }, -- C-c p L
-  { 'pl', 'ShowPathsThroughMentioned' }, -- C-c p l
-  { 'pO', 'ShowPathsThroughOverriders' }, -- C-c p O
-  { 'po', 'ShowPathsThroughOverridden' }, -- C-c p o
-  { 'pH', 'ShowPathsThroughHiders' },    -- C-c p H
-  { 'ph', 'ShowPathsThroughHidden' },    -- C-c p h
-  { 'pS', 'ShowPathsThroughSubscribers' }, -- C-c p S
-  { 'ps', 'ShowPathsThroughSubscribees' }, -- C-c p s
+  { 'pC', 'ShowContainerwardTree' }, -- C-c p C
+  { 'pL', 'ShowMentionerwardTree' }, -- C-c p L
+  { 'pl', 'ShowMentionedwardTree' }, -- C-c p l
+  { 'pO', 'ShowOverriderwardTree' }, -- C-c p O
+  { 'po', 'ShowOverriddenwardTree' }, -- C-c p o
+  { 'pH', 'ShowHiderwardTree' },    -- C-c p H
+  { 'ph', 'ShowHiddenwardTree' },    -- C-c p h
+  { 'pS', 'ShowSubscriberwardTree' }, -- C-c p S
+  { 'ps', 'ShowSubscribeewardTree' }, -- C-c p s
   { 'sd', 'SetDefinitive' },             -- C-c s d
   { 'sw', 'SetWriteProtected' },          -- C-c s w
   { 'sm', 'SetMergeRequest' },           -- C-c s m

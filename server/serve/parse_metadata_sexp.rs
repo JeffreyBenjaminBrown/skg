@@ -6,7 +6,7 @@
 ///                   (node [(id ID)]
 ///                         [(repo REPO)]
 ///                         [(affectsParent true|false|na)]
-///                         [(birth backpath ROLENAME)]
+///                         [(birth roleGraft ROLENAME)]
 ///                         [writeProtected]   ; marks the occurrence write-protected
 ///                         [cycle]
 ///                         [(stats [containsParent]
@@ -802,7 +802,7 @@ fn parse_editrequest_sexp (
 
 /// Parse the (viewRequests ...) s-expression and update viewRequests.
 /// Each request is either the bare atom 'definitiveView', or a nested
-/// '(folder RELNAME)' / '(path ROLENAME)' form.
+/// '(folder RELNAME)' / '(roleTree ROLENAME)' form.
 fn parse_viewrequests_sexp (
   items : &[Sexp],
   requests : &mut HashSet<ViewRequest>
@@ -824,7 +824,7 @@ fn parse_viewrequests_sexp (
             FolderRelation::from_relname (&arg)
               . ok_or_else ( || format! (
                 "Invalid folder relname: {}", arg )) ?),
-          "path" => ViewRequest::Path (
+          "roleTree" => ViewRequest::RoleTree (
             RelationRole::from_rolename (&arg)
               . ok_or_else ( || format! (
                 "Invalid path rolename: {}", arg )) ?),
@@ -832,6 +832,6 @@ fn parse_viewrequests_sexp (
             "Unknown view request form: ({} ...)", head )), } },
       _ => return Err (
         "Unexpected element in viewRequests (expected 'definitiveView' \
-         or '(folder ...)' / '(path ...)')" . to_string () ), };
+         or '(folder ...)' / '(roleTree ...)')" . to_string () ), };
     requests . insert (request); }
   Ok (( )) }

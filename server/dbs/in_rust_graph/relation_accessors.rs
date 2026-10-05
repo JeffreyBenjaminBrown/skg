@@ -107,13 +107,13 @@ impl RelationRole {
 }
 
 //
-// The partner-role vocabulary: ROLENAME <-> RelationRole <-> backpath
+// The partner-role vocabulary: ROLENAME <-> RelationRole <-> role tree
 // triple <-> glyph. The single source of truth shared by the request
-// layer ('(path ROLENAME)'), the backpath engine, and the birth herald.
+// layer ('(roleTree ROLENAME)'), the role-tree engine, and the birth herald.
 //
 
 impl RelationRole {
-  // The nine partner roles a backpath/path can graft, named for the
+  // The nine partner roles a role tree can graft, named for the
   // role the grafted partner plays toward the origin (= toward its
   // org-parent). 'Contains, Second' ("content") is intentionally
   // absent -- the recursive content view already serves it.
@@ -146,7 +146,7 @@ impl RelationRole {
                    position : BinaryRolePosition::Second };
 
   /// The single ROLENAME token naming this partner role in the wire
-  /// grammar ('(path ROLENAME)', '(birth backpath ROLENAME)').
+  /// grammar ('(roleTree ROLENAME)', '(birth roleGraft ROLENAME)').
   /// Panics for a role absent from PARTNER_ROLE_VOCAB (only
   /// 'Contains, Second' -- "content", never a path/birth role).
   pub fn rolename (
@@ -174,10 +174,10 @@ impl RelationRole {
       . map ( |(_, _, glyph)| *glyph )
       . expect ( "RelationRole::glyph: role absent from PARTNER_ROLE_VOCAB" ) }
 
-  /// The '(relation, input_role, output_role)' triple the backpath
+  /// The '(relation, input_role, output_role)' triple the role tree
   /// engine consumes: output_role is THIS (partner) role, input_role
   /// is the origin's (opposite) role.
-  pub fn backpath_triple (
+  pub fn role_tree_triple (
     self,
   ) -> (&'static str, &'static str, &'static str) {
     let (first, second) : (&'static str, &'static str) =
@@ -188,8 +188,8 @@ impl RelationRole {
       BinaryRolePosition::Second => (relation, first, second), } }
 }
 
-/// Each row is (ROLENAME, RelationRole, glyph). The backpath triple is
-/// DERIVED from the RelationRole ('RelationRole::backpath_triple'), so
+/// Each row is (ROLENAME, RelationRole, glyph). The role-tree triple is
+/// DERIVED from the RelationRole ('RelationRole::role_tree_triple'), so
 /// it is not stored here. A folder is named by its RELATION (spanning both
 /// roles); a path and a birth are named by the one ROLE the grafted
 /// partner plays. 'Contains, Second' is absent (see the consts above).
@@ -323,7 +323,7 @@ impl InRustGraph {
   /// exists. This is how INBOUND
   /// surfaces gate: an inbound partner P of X is visible at the
   /// active set iff relRepo(P, R, X) is active -- private
-  /// memberships must not surface through ancestry, backpaths, or
+  /// memberships must not surface through ancestry, role trees, or
   /// inbound folders when the content direction hides them
   /// (render-and-gating, 5_plan.org).
   pub fn relRepo (
@@ -587,7 +587,7 @@ mod tests {
     assert_eq! ( enum_names, file_names ); }
 
   /// Every PARTNER_ROLE_VOCAB row round-trips ROLENAME <-> RelationRole,
-  /// resolves a glyph, and yields the expected backpath triple.
+  /// resolves a glyph, and yields the expected role-tree triple.
   #[test]
   fn partner_role_vocab_round_trips_and_derives_triples () {
     // (rolename, RelationRole, glyph, (relation, input_role, output_role))
@@ -616,8 +616,8 @@ mod tests {
       assert_eq! ( role . rolename (), name );
       assert_eq! ( RelationRole::from_rolename (name), Some (role) );
       assert_eq! ( role . glyph (), glyph );
-      assert_eq! ( role . backpath_triple (), triple,
-        "wrong backpath triple for {}", name ); } }
+      assert_eq! ( role . role_tree_triple (), triple,
+        "wrong role-tree triple for {}", name ); } }
 
   #[test]
   fn from_rolename_rejects_unknown_and_the_absent_content_role () {

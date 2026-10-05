@@ -1,9 +1,9 @@
-// cargo test --test rebuild -- integrate_backpath
+// cargo test --test rebuild -- integrate_role_tree
 
 use indoc::indoc;
-use skg::to_org::expand::backpath::{
+use skg::to_org::expand::role_tree::{
   integrate_path_that_might_fork_or_cycle,
-  build_and_integrate_containerward_path};
+  build_and_integrate_containerward_role_tree};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
@@ -23,7 +23,7 @@ fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str = "tests/rebuild/fixtures";
   run_with_shared_test_stores (
-    "skg-test-rebuild-integrate-backpath",
+    "skg-test-rebuild-integrate-role-tree",
     |s| Box::pin ( async move {
       s . reset ("test_path_with_cycle", fixtures) ?;
       test_path_with_cycle (
@@ -66,7 +66,7 @@ async fn test_path_with_cycle_impl(
     viewforest . root () . first_child () . unwrap () . id ();
   let root_id = tree_root_id;
 
-  // Setup backpath data (origin-free: origin "1" is stripped)
+  // Setup role-tree data (origin-free: origin "1" is stripped)
   let path = vec![
     ID::from ("2"),
     ID::from ("3"),
@@ -80,7 +80,7 @@ async fn test_path_with_cycle_impl(
   integrate_path_that_might_fork_or_cycle(
     &mut viewforest, root_id, path, branches,
     cycle_nodes, &graph_handle_from_config (config)? . load_full (),
-    &config, Birth::Backpath (RelationRole::CONTAINER)
+    &config, Birth::RoleGraft (RelationRole::CONTAINER)
   )?;
 
   let expected: &str = indoc! {"
@@ -140,7 +140,7 @@ async fn test_path_with_branches_no_cycle_impl(
   let node_1_id : NodeId =
     node_1_id . expect ("Should find node with id 1");
 
-  // Setup backpath data (origin-free: origin "1" is stripped)
+  // Setup role-tree data (origin-free: origin "1" is stripped)
   let path = vec![
     ID::from ("2"),
     ID::from ("3"),
@@ -156,7 +156,7 @@ async fn test_path_with_branches_no_cycle_impl(
   integrate_path_that_might_fork_or_cycle(
     &mut viewforest, node_1_id, path, branches,
     cycle_nodes, &graph_handle_from_config (config)? . load_full (),
-    &config, Birth::Backpath (RelationRole::CONTAINER)
+    &config, Birth::RoleGraft (RelationRole::CONTAINER)
   )?;
 
   let expected: &str = indoc! {"
@@ -219,7 +219,7 @@ async fn test_path_with_branches_with_cycle_impl(
   let node_1_id : NodeId =
     node_1_id . expect ("Should find node with id 1");
 
-  // Setup backpath data (origin-free: origin "1" is stripped)
+  // Setup role-tree data (origin-free: origin "1" is stripped)
   let path = vec![
     ID::from ("2"),
     ID::from ("3"),
@@ -235,7 +235,7 @@ async fn test_path_with_branches_with_cycle_impl(
   integrate_path_that_might_fork_or_cycle(
     &mut viewforest, node_1_id, path, branches,
     cycle_nodes, &graph_handle_from_config (config)? . load_full (),
-    &config, Birth::Backpath (RelationRole::CONTAINER)
+    &config, Birth::RoleGraft (RelationRole::CONTAINER)
   )?;
 
   let expected: &str = indoc! {"
@@ -283,7 +283,7 @@ async fn test_fork_expansion_at_origin_impl(
   let node_a11_id : NodeId =
     viewforest . root () . first_child () . unwrap () . id ();
 
-  build_and_integrate_containerward_path (
+  build_and_integrate_containerward_role_tree (
     &mut viewforest, node_a11_id,
     &graph_handle_from_config (config)? . load_full (), &config
   ) ?;

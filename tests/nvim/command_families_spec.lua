@@ -201,9 +201,9 @@ describe('skg.view_requests', function ()
       '(viewRequests (folder aliases))', 1, true))
     assert.are.equal(1, saved_count)
     buffer_with('* (skg (node (id n2))) title')
-    view_requests.show_paths_through_containers()
+    view_requests.show_containerward_tree()
     assert.is_truthy(buffer_text():find(
-      '(viewRequests (path container))', 1, true))
+      '(viewRequests (roleTree container))', 1, true))
   end)
 
   it('set_definitive stamps without saving', function ()

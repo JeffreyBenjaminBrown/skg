@@ -1,7 +1,7 @@
 use crate::dbs::tantivy::title_and_repo_by_id;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::dbs::in_rust_graph::ancestry::AncestryTree;
+use crate::dbs::in_rust_graph::containerward_role_tree::ContainerwardRoleTree;
 use crate::repo_sets::ActiveRepoSet;
 use crate::types::misc::{ID, SkgConfig, RepoName, TantivyIndex};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
@@ -11,14 +11,14 @@ use crate::types::viewnode::Vognode;
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 
-/// Insert full containerward ancestry trees into the search viewforest,
+/// Insert full containerward role tree trees into the search viewforest,
 /// under each level-1 result ActiveVognode.
-/// Ancestry children are prepended (inserted first among siblings).
-pub(crate) fn insert_containerward_ancestries_into_search_view (
+/// Role tree children are prepended (inserted first among siblings).
+pub(crate) fn insert_full_containerward_role_trees_into_search_view (
   viewforest     : &mut Tree<Viewnode>,
   graph          : &InRustGraph,
   search_results : &[ID],
-  ancestry_by_id : &HashMap<ID, AncestryTree>,
+  containerward_role_trees_by_id : &HashMap<ID, ContainerwardRoleTree>,
   tantivy_index  : &TantivyIndex,
   config         : &SkgConfig,
   active         : &ActiveRepoSet,
@@ -35,23 +35,23 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
     . collect () };
   for (node_nid, node_id) in &level1_ids {
     if ! search_results . contains (node_id) { continue; }
-    if let Some (ancestry) = ancestry_by_id . get (node_id) {
-      // The ancestry root is the result node itself;
+    if let Some (role_tree) = containerward_role_trees_by_id . get (node_id) {
+      // The role tree root is the result node itself;
       // its children (containers) go under the level-1 node.
-      if let AncestryTree::Inner ( _, children ) = ancestry {
+      if let ContainerwardRoleTree::Inner ( _, children ) = role_tree {
         for child in children . iter () . rev () {
           // Insert in reverse so the first child in
-          // the ancestry ends up first among siblings.
-          insert_containerward_ancestry_tree (
+          // the role tree ends up first among siblings.
+          insert_full_containerward_role_tree (
             child, node_id, *node_nid,
             viewforest, graph, tantivy_index, config, active ); } } } } }
 
-/// Recursively insert an AncestryTree and its children
+/// Recursively insert an ContainerwardRoleTree and its children
 /// as write-protected non-content ActiveVognode children
-/// under the given parent. Ancestry nodes are prepended.
-fn insert_containerward_ancestry_tree(
-  node          : &AncestryTree,
-  contained_id  : &ID, // the node this ancestry step CONTAINS
+/// under the given parent. Role tree nodes are prepended.
+fn insert_full_containerward_role_tree(
+  node          : &ContainerwardRoleTree,
+  contained_id  : &ID, // the node this role-tree step CONTAINS
   parent_nid    : NodeId,
   viewforest        : &mut Tree<Viewnode>,
   graph          : &InRustGraph,
@@ -61,9 +61,9 @@ fn insert_containerward_ancestry_tree(
 ) {
   if ! active . is_all () {
     // relRepo gating (render-and-gating, 5_plan.org): a private
-    // MEMBERSHIP must not surface through enrichment ancestry even
+    // MEMBERSHIP must not surface through enrichment role tree even
     // when both nodes are public. The edge's owner is the
-    // container (this ancestry step).
+    // container (this role-tree step).
     let rel_is_visible : bool =
       graph . relRepo (
         node . id (), NodeRelation::Contains, contained_id )
@@ -77,14 +77,14 @@ fn insert_containerward_ancestry_tree(
       viewforest, tantivy_index, config, active ) {
         Some (child_nid) => child_nid,
         None => return, };
-  if let AncestryTree::Inner ( _, children ) = node {
+  if let ContainerwardRoleTree::Inner ( _, children ) = node {
     for child in children {
-      insert_containerward_ancestry_tree (
+      insert_full_containerward_role_tree (
         child, node . id (), child_nid,
         viewforest, graph, tantivy_index, config, active ); } } }
 
-/// Which way an override graft walks from a node, and the backpath
-/// birth role it stamps on each grafted relative.
+/// Which way an override role graft walks from a node, and the
+/// role-graft birth it stamps on each grafted relative.
 #[derive(Clone, Copy)]
 enum OverrideDir {
   /// The nodes this node OVERRIDES (outbound `overrides_view_of`).
@@ -130,11 +130,11 @@ pub fn insert_overrideward_view_subtrees (
 
 /// Every id that 'insert_overrideward_view_subtrees' would
 /// graft under the given results -- the override-relative closure in
-/// both directions, gated identically to the graft. The enrichment
+/// both directions, gated identically to the role graft. The enrichment
 /// thread unions these into the graphStats pre-fetch so the grafted
 /// nodes get their relationship heralds; without this they would render
 /// herald-less (their graphStats would never be fetched, since the
-/// grafts do not exist yet when the pre-fetch runs). MUST stay in sync
+/// role grafts do not exist yet when the pre-fetch runs). MUST stay in sync
 /// with 'graft_override_chain' (same directions, same gated accessors,
 /// same node-repo gate). Returns empty without a graph handle.
 pub fn collect_overrideward_view_subtree_ids (
@@ -195,7 +195,7 @@ fn graft_override_chain (
     if ! active . contains_repo (&node . home_repo) { continue; }
     let child : Viewnode = mk_writeProtected_viewnode_with_birth (
       rel . clone (), node . home_repo . clone (), node . title . clone (),
-      AffectsParent::False, Birth::Backpath (birth_role) );
+      AffectsParent::False, Birth::RoleGraft (birth_role) );
     let child_nid : NodeId = {
       let mut parent_mut : NodeMut<Viewnode> =
         viewforest . get_mut (parent_nid) . unwrap ();
@@ -225,12 +225,12 @@ fn prepend_containing_child_from_tantivy (
         } else {
           mk_writeProtected_viewnode_with_birth (
             node_id . clone (), repo, title,
-            AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER) ) }},
+            AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER) ) }},
       None =>
         mk_writeProtected_viewnode_with_birth (
           node_id . clone (), RepoName::from ("search"),
           node_id . as_str () . to_string (),
-          AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER) ) };
+          AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER) ) };
   let mut parent_mut : NodeMut<Viewnode> =
     viewforest . get_mut (parent_treeid) . unwrap ();
   Some (parent_mut . prepend (viewnode) . id ()) }

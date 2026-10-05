@@ -76,7 +76,7 @@ fn extract_view_requests (
         _ => HashSet::new() } )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   // A view-ROOT's Containerward request is NOT fulfilled here. finish_viewforest
-  // builds root containerward as a separate AncestryTree subtree (handling a
+  // builds root containerward as a separate ContainerwardRoleTree subtree (handling a
   // cyclic root) and drops the request; routing a root through
   // build_and_integrate_containerward here would instead merge the ancestry into
   // existing content and panic on a cyclic root (one whose containerward cycles
@@ -88,7 +88,7 @@ fn extract_view_requests (
       . map ( |p| matches! ( p . value () . kind, ViewnodeKind::BufferRoot ) )
       . unwrap_or (false);
   if is_view_root {
-    view_requests . remove (& ViewRequest::Path (RelationRole::CONTAINER)); }
+    view_requests . remove (& ViewRequest::RoleTree (RelationRole::CONTAINER)); }
   // A Fork request is consumed on the SAVE path (fork detection in
   // from_text), not during rendering; it must never reach the
   // render-time view-request pass.

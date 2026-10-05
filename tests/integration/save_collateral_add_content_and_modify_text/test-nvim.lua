@@ -37,11 +37,11 @@ local function child_named (list, name)
   return nil
 end
 
----A backpath graft's ROLENAME from its SEMANTIC relationship facts
----(RELS_BODY = the cdr of (rels ...)), or nil. A graft relates OUTBOUND
+---A role role graft's ROLENAME from its SEMANTIC relationship facts
+---(RELS_BODY = the cdr of (rels ...)), or nil. A role graft relates OUTBOUND
 ---to a tracked ancestor: a relation with an (out ... (ancestors ...))
----side, mapped to its role. Port of headline--graft-role-from-rels.
-local function graft_role_from_rels (rels_body)
+---side, mapped to its role. Port of headline--role-of-role-graft-from-rels.
+local function role_of_role_graft_from_rels (rels_body)
   if not rels_body then return nil end
   local roles = { { 'contains', 'container' }, { 'links_to', 'mentioner' },
                   { 'subscribes_to', 'subscribee' }, { 'overrides_view_of', 'overrider' },
@@ -56,8 +56,8 @@ local function graft_role_from_rels (rels_body)
   return nil
 end
 
----Classify a parsed metadata SEXP's headline relation: a backpath
----graft's rolename, else the explicit affectsParent, else 'true'. The
+---Classify a parsed metadata SEXP's headline relation: a
+---role graft's rolename, else the explicit affectsParent, else 'true'. The
 ---port of test-helpers.el's headline--relation-from-sexp.
 ---@param sexp any|nil
 ---@return string
@@ -66,12 +66,12 @@ local function relation_from_sexp (sexp)
     sexp, { 'skg', 'node', 'affectsParent' }) or nil
   local independent = affectsParent_list ~= nil
     and affectsParent_list[1] == sexpr.symbol('false')
-  local graft_role = nil
+  local role_graft_role = nil
   if independent then
-    graft_role = graft_role_from_rels(metadata.sexp_cdr_at_path(
+    role_graft_role = role_of_role_graft_from_rels(metadata.sexp_cdr_at_path(
       sexp, { 'skg', 'node', 'rels' }))
   end
-  if graft_role then return graft_role end
+  if role_graft_role then return role_graft_role end
   if affectsParent_list == nil
      or affectsParent_list[1] == sexpr.symbol('true') then
     return 'true'

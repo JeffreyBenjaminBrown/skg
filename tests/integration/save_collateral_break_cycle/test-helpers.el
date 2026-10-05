@@ -1,18 +1,18 @@
 ;;; Shared helpers for save_collateral integration tests.
 ;;; Load with (load-file "path/to/test-helpers.el").
 
-(defun headline--graft-role-from-rels (rels-body)
-  "Classify a graft from its SEMANTIC relationship facts, or nil.
+(defun headline--role-of-role-graft-from-rels (rels-body)
+  "Classify a role graft from its SEMANTIC relationship facts, or nil.
 RELS-BODY is the cdr of the (rels ...) form -- a list of relation
-sub-forms like (contains (in ...) (out ...)) and (birth ...). A backpath
+sub-forms like (contains (in ...) (out ...)) and (birth ...). A role
 graft relates OUTBOUND to a tracked ancestor: it has a relation with an
 (out ... (ancestors ...)) side. That relation names the role: contains
 -> container, links_to -> mentioner, subscribes_to -> subscribee,
 overrides_view_of -> overrider, hides_from_its_subscriptions -> hider. Only
 meaningful for a node
-already known to be a graft (affectsParent false); an ordinary content
+already known to be a role graft (affectsParent false); an ordinary content
 child can carry the same outbound ancestor (e.g. a cycle) yet is NOT a
-graft."
+role graft."
   (cl-loop for (rel . role) in '((contains    . container)
                                  (links_to . mentioner)
                                  (subscribes_to . subscribee)
@@ -26,7 +26,7 @@ graft."
 
 (defun headline--relation-from-sexp (sexp)
   "Classify a parsed metadata SEXP using current parent/provenance vocab.
-Birth provenance is more specific than affectsParent: a backpath graft (a node
+Birth provenance is more specific than affectsParent: a role graft (a node
 with (affectsParent false)) returns its ROLENAME from its (rels ...)
 facts (e.g. `container', `mentioner'); otherwise the result is the
 explicit affectsParent or the implicit `true'."
@@ -36,11 +36,11 @@ explicit affectsParent or the implicit `true'."
          (rels-body (when sexp
                       (skg-sexp-cdr-at-path sexp '(skg node rels))))
          (false (eq (car affectsParent-list) 'false))
-         (graft-role (when false
-                       (headline--graft-role-from-rels rels-body))))
+         (role-graft-role (when false
+                       (headline--role-of-role-graft-from-rels rels-body))))
     (cond
-     ;; A backpath graft: false, with an outbound-ancestor herald.
-     (graft-role graft-role)
+     ;; A role graft: false, with an outbound-ancestor herald.
+     (role-graft-role role-graft-role)
      ((or (not affectsParent-list)
           (eq (car affectsParent-list) 'true)) 'true)
      (t (car affectsParent-list)))))

@@ -10,7 +10,7 @@ use ego_tree::{NodeId, Tree};
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 use skg::dbs::filesystem::not_nodes::load_config;
-use skg::dbs::in_rust_graph::ancestry::AncestryTree;
+use skg::dbs::in_rust_graph::containerward_role_tree::ContainerwardRoleTree;
 use skg::dbs::in_rust_graph::stats::AllGraphnodeStats;
 use skg::serve::ViewsState;
 use skg::serve::handlers::repo_sets::handle_repo_set_request;
@@ -29,8 +29,8 @@ use skg::test_utils::run_with_shared_test_stores;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::org_to_text::viewforest_to_string;
-use skg::to_org::expand::backpath::{
-  build_and_integrate_containerward_path_with_repo_set,
+use skg::to_org::expand::role_tree::{
+  build_and_integrate_containerward_role_tree_with_repo_set,
   integrate_path_that_might_fork_or_cycle_with_repo_set};
 use skg::to_org::render::content_view::multi_root_view_with_repo_set;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
@@ -357,7 +357,7 @@ async fn repo_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
           runtime        : env . runtime_snapshot (),
           terms          : "shared ranking term" . to_string (),
           search_results : vec![ID::from ("active-search-hit")],
-          ancestry_by_id : HashMap::new (),
+          containerward_role_trees_by_id : HashMap::new (),
           graphnodestats : AllGraphnodeStats::empty (),
           include_overPrivateText_telescopes : false, })));
       let search_cancelled : Arc<AtomicBool> =
@@ -692,7 +692,7 @@ async fn containerward_expansion_truncates_before_inactive_container (
           * (skg (node (id child-for-backpath) (repo public))) child-for-backpath
         "})?;
       let child_id : NodeId = first_child_id (&viewforest);
-      build_and_integrate_containerward_path_with_repo_set (
+      build_and_integrate_containerward_role_tree_with_repo_set (
         &mut viewforest,
         child_id,
         &graph,
@@ -743,7 +743,7 @@ async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks 
         HashSet::new (),
         &graph,
         config,
-        Birth::Backpath (RelationRole::MENTIONER),
+        Birth::RoleGraft (RelationRole::MENTIONER),
         Some (&active)) ?;
       assert_eq! (
         true_child_ids (&viewforest, child_id),
@@ -767,7 +767,7 @@ async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks 
         HashSet::new (),
         &graph,
         config,
-        Birth::Backpath (RelationRole::MENTIONER),
+        Birth::RoleGraft (RelationRole::MENTIONER),
         Some (&active)) ?;
       assert! (
         true_child_ids (&empty_fork_viewforest, empty_fork_child_id)
@@ -777,7 +777,7 @@ async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks 
       Ok (( )) }
 
 #[test]
-fn search_enrichment_truncates_ancestry_before_inactive_container (
+fn search_enrichment_truncates_role_tree_before_inactive_container (
 ) -> Result<(), Box<dyn Error>> {
   let config =
     load_config ("tests/repo_sets/fixtures/skgconfig.toml")?;
@@ -819,14 +819,14 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
     ID::from ("active-search-hit"),
     ( RepoName::from ("public"),
       vec![(1.0, "active search hit" . to_string ())] ));
-  let ancestry_by_id : HashMap<ID, AncestryTree> =
+  let containerward_role_trees_by_id : HashMap<ID, ContainerwardRoleTree> =
     HashMap::from ([(
       ID::from ("active-search-hit"),
-      AncestryTree::Inner (
+      ContainerwardRoleTree::Inner (
         ID::from ("active-search-hit"),
-        vec![AncestryTree::Inner (
+        vec![ContainerwardRoleTree::Inner (
           ID::from ("active-container"),
-          vec![AncestryTree::Root (
+          vec![ContainerwardRoleTree::Root (
             ID::from ("private-container"))])]))]);
   let rendered : String =
     skg::serve::handlers::text_search
@@ -835,7 +835,7 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
         "search term",
         &matches_by_id,
         &[ID::from ("active-search-hit")],
-        &ancestry_by_id,
+        &containerward_role_trees_by_id,
         &tantivy,
         &config,
         &active)?;

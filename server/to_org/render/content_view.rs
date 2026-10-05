@@ -8,7 +8,7 @@
 /// at its BFS visit -- including, when diff_mode_enabled, that node's git diff
 /// inline (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3). After view completion, the shared finish_viewforest
 /// tail (server/update_buffer.rs, TODO/DONE/local-view-update/plan_v2.org §20.3)
-/// attaches containerward ancestry (roots + removed-here phantoms),
+/// attaches containerward role tree (roots + removed-here phantoms),
 /// marks/validates affectsParent, sets graph/view stats, applies the repo set,
 /// and renders to string.
 
@@ -91,7 +91,7 @@ fn multi_root_view_inner (
 /// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): the de-novo view, built through the ONE view completion path
 /// (render_initial_view). Takes a SkgEnv (carries
 /// config/driver/tantivy/graph), runs view completion over a stub forest of the
-/// requested roots, then attaches containerward ancestry and stats and renders.
+/// requested roots, then attaches containerward role tree and stats and renders.
 /// Warning strings the render produces (today only the
 /// compound-override-chain notice) are appended to 'warnings_out'.
 pub fn multi_root_view_via_env (

@@ -8,7 +8,7 @@
 //! per mutation) and atomically publish a new snapshot.
 
 pub mod complete_validation;
-pub mod ancestry;
+pub mod containerward_role_tree;
 pub mod id_resolution;
 pub mod paths;
 pub mod query;

@@ -29,7 +29,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nod
 use skg::org_to_text::viewforest_to_string;
 use skg::repo_sets::{ActiveRepoSet, RepoSetName, run_with_repo_set_test_db};
 use skg::test_utils::graph_handle_from_config;
-use skg::to_org::expand::backpath::build_and_integrate_containerward_path_with_repo_set;
+use skg::to_org::expand::role_tree::build_and_integrate_containerward_role_tree_with_repo_set;
 use skg::to_org::render::content_view::multi_root_view_with_repo_set;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::misc::ID;
@@ -138,7 +138,7 @@ fn inbound_containerward_data_hides_N_at_public (
         "under 'all' N's containment of C is visible inbound: {:?}",
         inbound_all );
 
-      // Rendered backpath: C's containerward path must truncate
+      // Rendered role tree: C's containerward path must truncate
       // before N at "public" (N is grafted at "all").
       let graph_handle = (
         graph_handle_from_config (config)? );
@@ -148,17 +148,17 @@ fn inbound_containerward_data_hides_N_at_public (
           viewforest_from_org (
             "* (skg (node (id C) (repo public))) leak-battery-C\n" )?;
         let c_id : NodeId = first_child_id (&viewforest);
-        build_and_integrate_containerward_path_with_repo_set (
+        build_and_integrate_containerward_role_tree_with_repo_set (
           &mut viewforest, c_id, &graph, config, Some (&public) ) ?;
         let ancestors : BTreeSet<ID> = true_child_ids (&viewforest, c_id);
         assert! (
           ! ancestors . contains (&ID::from ("N")),
-          "rendered containerward backpath must not graft N at \
+          "rendered containerward role tree must not graft N at \
            public: {:?}", ancestors );
         let rendered : String = viewforest_to_string (&viewforest, config)?;
         assert! (
           ! rendered . contains ("leak-battery-N"),
-          "N's title must not leak via the rendered backpath at \
+          "N's title must not leak via the rendered role tree at \
            public: {}", rendered );
       }
       {
@@ -166,12 +166,12 @@ fn inbound_containerward_data_hides_N_at_public (
           viewforest_from_org (
             "* (skg (node (id C) (repo public))) leak-battery-C\n" )?;
         let c_id : NodeId = first_child_id (&viewforest);
-        build_and_integrate_containerward_path_with_repo_set (
+        build_and_integrate_containerward_role_tree_with_repo_set (
           &mut viewforest, c_id, &graph, config, Some (&all) ) ?;
         let ancestors : BTreeSet<ID> = true_child_ids (&viewforest, c_id);
         assert! (
           ancestors . contains (&ID::from ("N")),
-          "under 'all' the rendered containerward backpath grafts \
+          "under 'all' the rendered containerward role grafts \
            N: {:?}", ancestors );
       }
       Ok (( )) } )) }

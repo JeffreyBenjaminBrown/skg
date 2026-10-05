@@ -165,7 +165,7 @@ node; relRepo belongs to an edge.
 Folder labels, =alias=, =ID= and the flag rows describe their view
 positions. The flags folder spells out =had ID before import=, =was
 overloaded during org-roam import=, and =no search matching= when true.
-=req:folder:...=, =req:path:...=, =req:flags= and =req:definitive=
+=req:folder:...=, =req:roleTree:...=, =req:flags= and =req:definitive=
 request a view. =delete=, =merge:...=, and =request:no search matching=
 or =request:search matching= are save requests.
 

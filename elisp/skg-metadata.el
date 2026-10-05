@@ -522,7 +522,7 @@ next save will do with the edge."
 
 (defconst skg--relationship-role-menu-prose
   '(("container" nil
-     "The node would CONTAIN its view-parent -- the shape of a containerward ancestry graft. The edge belongs to the graft's own contains list, wherever that list is drawn definitively; it cannot be set from the graft's position.")
+     "The node would CONTAIN its view-parent -- the shape of a containerward role graft. The edge belongs to the role role graft's own contains list, wherever that list is drawn definitively; it cannot be set from the role role graft's position.")
     ("contained" contained
      "The view-parent contains the node: ordinary content. Sets the repo of each parent-contains-child edge.")
     ("mentioner" nil

@@ -49,7 +49,7 @@ local function request_on_line (line_number)
   vim.api.nvim_win_set_cursor(0, { line_number + 1, 0 })
   print(string.format(
     'requesting-mentionerward-view-line-%d', line_number))
-  view_requests.show_paths_through_mentioners() -- auto-saves
+  view_requests.show_mentionerward_tree() -- auto-saves
   T.check(T.wait_for_response(),
           string.format('mentionerward view response arrived for line %d',
                         line_number))

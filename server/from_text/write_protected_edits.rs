@@ -239,7 +239,7 @@ fn flags_surface_errors (
       surface . owner_id == before . owner_id
       && surface . owner_path == before . owner_path)
     else { continue; };
-    // Like an aliases or backpath branch, this is an optional projection:
+    // Like an aliases or role tree branch, this is an optional projection:
     // deleting the whole folder dismisses it from the view and says nothing
     // about the owner's flags.  A retained folder is still
     // server-owned, so edits within it remain validation errors.

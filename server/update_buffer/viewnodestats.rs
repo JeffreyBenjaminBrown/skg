@@ -277,10 +277,10 @@ fn birth_facts (
   overridesHere : bool, // whether the node is drawn in place of a node it overrides
 ) -> Vec<BirthFact> {
   let mut facts : Vec<BirthFact> = {
-    // A backpath graft's birth is its role's relation, regardless of
-    // affectsParent (grafts are typically Independent/WriteProtected).
-    // The graft relates to its org-parent, one generation up.
-    if let Birth::Backpath (role) = birth {
+    // A role role graft's birth is its role's relation, regardless of
+    // affectsParent (role grafts are typically Independent/WriteProtected).
+    // The role graft relates to its org-parent, one generation up.
+    if let Birth::RoleGraft (role) = birth {
       vec![ BirthFact::new ( role . relation, side_of_role (role), Some (1) ) ]
     } else if affectsParent != AffectsParent::True { Vec::new ()
     } else {
@@ -373,7 +373,7 @@ fn set_hidden_body (
 /// (see 'RelationRole::is_first_role') -- then compares the edge's
 /// actual repo ('InRustGraph::relRepo') against its applicable
 /// relationship default. None on any of: no
-/// graph handle; affectsParent != Affected or a backpath graft (not a
+/// graph handle; affectsParent != Affected or a role graft (not a
 /// genuine member here); a compound filter folder
 /// (HiddenInSubscribee / HiddenOutsideOfSubscribee: no single
 /// 'relation_member_role'); no recorded edge; unresolvable homes;
@@ -395,7 +395,7 @@ fn set_relRepo (
     if affectsParent != AffectsParent::True
       || birth != Birth::Unremarkable {
       // Not a genuine member at this position (a
-      // self-writer parked under a folder, or a backpath graft): there
+      // self-writer parked under a folder, or a role graft): there
       // is no binding edge here to have a repo at all.
       break 'compute None; }
     let (owner_pid, relation, target_pid) : (ID, NodeRelation, ID) =

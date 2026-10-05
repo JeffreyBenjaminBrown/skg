@@ -127,13 +127,13 @@
 ---- text: req:folder:aliases
 ---- styles: nonstandard*18
 ==== view requests: a path
-(skg (node (id 2) (viewRequests (path container))))
----- text: req:path:container
----- styles: nonstandard*18
+(skg (node (id 2) (viewRequests (roleTree container))))
+---- text: req:roleTree:container
+---- styles: nonstandard*22
 ==== view requests: several
-(skg (node (id 4) (viewRequests (folder aliases) (path container) (path mentioner))))
----- text: req:folder:aliases req:path:container req:path:mentioner
----- styles: nonstandard*18 -*1 nonstandard*18 -*1 nonstandard*18
+(skg (node (id 4) (viewRequests (folder aliases) (roleTree container) (roleTree mentioner))))
+---- text: req:folder:aliases req:roleTree:container req:roleTree:mentioner
+---- styles: nonstandard*18 -*1 nonstandard*22 -*1 nonstandard*22
 ==== flags: had ID before import
 (skg (flag hadId))
 ---- text: ☮ had ID before import

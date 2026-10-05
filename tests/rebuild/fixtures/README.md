@@ -1,4 +1,4 @@
-# Test Fixtures for integrate_backpath tests
+# Test Fixtures for integrate_role_tree tests
 
 These are minimal fixtures used for testing the `integrate_path_that_might_fork_or_cycle` function.
 

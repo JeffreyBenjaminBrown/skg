@@ -34,7 +34,7 @@ use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::repo_sets::handle_repo_set_request;
 use crate::serve::handlers::stage_moves::handle_stage_moves_request;
 use crate::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
-use crate::serve::handlers::text_search::render_enriched_search_buffer::{insert_containerward_ancestries_into_search_view, insert_overrideward_view_subtrees};
+use crate::serve::handlers::text_search::render_enriched_search_buffer::{insert_full_containerward_role_trees_into_search_view, insert_overrideward_view_subtrees};
 use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
 use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request_with_repo_set;
 use crate::serve::handlers::link_statuses::handle_link_statuses_request;
@@ -350,9 +350,9 @@ fn handle_snapshot_response (
     Err (e) => {
       tracing::error! ("snapshot response: parse failed: {}", e);
       return; }};
-  insert_containerward_ancestries_into_search_view (
+  insert_full_containerward_role_trees_into_search_view (
     &mut viewforest, &runtime . graph, &payload . search_results,
-    &payload . ancestry_by_id, &runtime . tantivy_index,
+    &payload . containerward_role_trees_by_id, &runtime . tantivy_index,
     &runtime . config, active_repo_set );
   insert_overrideward_view_subtrees (
     &mut viewforest, &runtime . graph, &payload . search_results,

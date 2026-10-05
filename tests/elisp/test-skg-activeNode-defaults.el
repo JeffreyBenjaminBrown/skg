@@ -271,13 +271,13 @@
                            "*** viewRequests\n"
                            "**** folder\n"
                            "***** aliases\n"
-                           "**** path\n"
+                           "**** roleTree\n"
                            "***** container"))
          (stripped (skg-activeNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result
                    '(skg (node (id abc) (repo jeff)
-                               (viewRequests (folder aliases) (path container))))))))
+                               (viewRequests (folder aliases) (roleTree container))))))))
 
 ;;
 ;; Strip: the empty-node view skeleton (childless editable fields)

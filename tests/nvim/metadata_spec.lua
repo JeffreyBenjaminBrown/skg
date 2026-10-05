@@ -166,7 +166,7 @@ describe('skg.metadata commands', function ()
       '*** (skg (node (id content-grandchild) (repo public))) content grandchild',
       '** (skg (node (id mismatched-content) (repo foreign))) mismatched content',
       '*** (skg (node (id public-under-mismatch) (repo public))) public under mismatch',
-      '** (skg (node (id link-child) (repo public) (affectsParent false) (birth backpath mentioner))) link child',
+      '** (skg (node (id link-child) (repo public) (affectsParent false) (birth roleGraft mentioner))) link child',
       '*** (skg (node (id under-link) (repo public))) under link',
       '** (skg aliasFolder) aliases',
       '*** (skg (node (id under-non-vognode) (repo public))) under non-vognode' },
@@ -242,12 +242,12 @@ describe('skg.metadata keybinding surface', function ()
     assert.are.equal('ShowFolderOfSubscribesTo', by_lhs['cs'])
     assert.are.equal('ShowFolderOfFlags', by_lhs['cp'])
     assert.is_nil(by_lhs['cb'])
-    assert.are.equal('ShowPathsThroughContainers', by_lhs['pC'])
-    assert.are.equal('ShowPathsThroughMentioners', by_lhs['pL'])
-    assert.are.equal('ShowPathsThroughMentioned', by_lhs['pl'])
-    assert.are.equal('ShowPathsThroughOverriders', by_lhs['pO'])
-    assert.are.equal('ShowPathsThroughOverridden', by_lhs['po'])
-    assert.are.equal('ShowPathsThroughSubscribees', by_lhs['ps'])
+    assert.are.equal('ShowContainerwardTree', by_lhs['pC'])
+    assert.are.equal('ShowMentionerwardTree', by_lhs['pL'])
+    assert.are.equal('ShowMentionedwardTree', by_lhs['pl'])
+    assert.are.equal('ShowOverriderwardTree', by_lhs['pO'])
+    assert.are.equal('ShowOverriddenwardTree', by_lhs['po'])
+    assert.are.equal('ShowSubscribeewardTree', by_lhs['ps'])
     assert.are.equal('SetMergeRequest', by_lhs['sm'])
   end)
 end)

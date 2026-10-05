@@ -367,10 +367,10 @@ fn relationship_matrix
       fails . finish () } )) }
 
 //////////////////////////////////////////////////////////////
-// The Path view-request, '(viewRequests (path ROLENAME))': graft the
+// The Path view-request, '(viewRequests (roleTree ROLENAME))': graft the
 // partners playing ROLENAME toward the node as inverted write-protected
-// children with a '(birth backpath ROLENAME)' marker. One generic
-// backpath engine serves all nine roles; these cover the seven new
+// children with a '(birth roleGraft ROLENAME)' marker. One generic
+// role-tree engine serves all nine roles; these cover the seven new
 // ones (the container/mentioner roles keep their own golden tests).
 // An absent relation field stays MSV::Unspecified on save, so these
 // saves never disturb the graph the path then reads.
@@ -383,11 +383,11 @@ async fn path_request_scenarios (
 ) -> Result<(), Box<dyn Error>> {
   let req = | owner : &str, role : &str, title : &str | -> String {
     format! (
-      "* (skg (node (id {}) (repo public) (viewRequests (path {})))) {}\n",
+      "* (skg (node (id {}) (repo public) (viewRequests (roleTree {})))) {}\n",
       owner, role, title ) };
   // Each row: (scenario, owner, role, partner-id, birth-span-fragment).
   // Since uniform-heralds, the grafted partner no longer carries the
-  // old (birth backpath ROLE) marker nor a parent-relative viewStat;
+  // old (birth roleGraft ROLE) marker nor a parent-relative viewStat;
   // instead its relationship TO its org-parent (the origin) shows as the
   // birth (black-on-white) token inside its (rels ...) spans.
   // E.g. the 'overridden' partner is overridden BY the origin -> its
@@ -426,7 +426,7 @@ async fn path_request_scenarios (
           partner, birth_rel, line )); },
       None => {}, // already recorded by want_contains above
     } }
-  { // (path mentioned) on a node whose TITLE carries [[id:pathLink-dst]]:
+  { // (roleTree mentioned) on a node whose TITLE carries [[id:pathLink-dst]]:
     // the dest node is grafted. (mentioner is the existing mentionerward
     // golden; this is its mirror.)
     let s : &str = "path/mentioned";
@@ -437,8 +437,7 @@ async fn path_request_scenarios (
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(id pathLink-dst)");
     // The grafted dest is born of a single inbound link (from the
-    // origin), no outbound. (Replaces the gone "(birth backpath
-    // mentioned)" marker.)
+    // origin), no outbound.
     fails . want_contains (
       s, &resp . saved_view, "(links_to (in 1 (ancestors 1) (substantive 0)))" ); }
   { // Self-referential fixture: a node that links to ITSELF. A

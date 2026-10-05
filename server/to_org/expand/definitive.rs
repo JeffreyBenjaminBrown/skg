@@ -1,6 +1,6 @@
 use crate::repo_sets::ActiveRepoSet;
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
-use crate::to_org::expand::backpath::build_and_integrate_path_view_then_drop_request;
+use crate::to_org::expand::role_tree::build_and_integrate_role_tree_then_drop_request;
 use crate::to_org::expand::folder_request::build_and_integrate_folder_then_drop_request;
 use crate::to_org::expand::flags::build_and_integrate_flags_then_drop_request;
 use crate::to_org::util::{ DefinitiveMap, Finalizable, get_id_from_treenode, makeWriteProtectedAndClobber, activeVognode_in_tree_is_writeProtected };
@@ -36,12 +36,12 @@ pub fn execute_view_requests (
         build_and_integrate_folder_then_drop_request (
           viewforest, node_id, graph, rel, config, errors,
           active_repo_set, repo_diffs ) ?; },
-      ViewRequest::Path (role) => {
+      ViewRequest::RoleTree (role) => {
         // Relation-generic: every partner role routes through the one
-        // backpath engine (container, mentioner, and the seven new
+        // role-tree engine (container, mentioner, and the seven new
         // roles alike). A view-ROOT's container request is handled
         // separately (finish_viewforest) and removed before this pass.
-        build_and_integrate_path_view_then_drop_request (
+        build_and_integrate_role_tree_then_drop_request (
           viewforest, node_id, graph, role, config, errors,
           active_repo_set ) ?; },
       ViewRequest::Flags => {

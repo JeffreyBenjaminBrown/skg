@@ -43,7 +43,7 @@ LINE-NUMBER is zero-based."
       (forward-line line-number)
       (setq integration-test-phase
             (format "requesting-mentionerward-view-line-%d" line-number))
-      (skg-show-paths-through-mentioners) ;; this also saves the buffer
+      (skg-show-mentionerward-tree) ;; this also saves the buffer
       (skg-test-wait-for-response)
       (buffer-substring-no-properties (point-min) (point-max)))))
 

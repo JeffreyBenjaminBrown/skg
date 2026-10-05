@@ -36,8 +36,8 @@ pub enum AffectsParent {
 /// This is view history used for display and stale-relation validation,
 /// not save extraction.
 ///
-/// A 'Backpath(role)' node was grafted by the backpath engine as an
-/// ancestry partner; the RelationRole names the role that partner plays
+/// A 'RoleGraft(role)' node was grafted by the role-tree engine as an
+/// role-tree partner; the RelationRole names the role that partner plays
 /// toward its org-parent (the origin) -- e.g. 'CONTAINER' for a
 /// containerward ancestor, 'MENTIONER' for a node that links to the
 /// origin. The role determines the wire ROLENAME and the herald glyph
@@ -45,7 +45,7 @@ pub enum AffectsParent {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Birth {
   Unremarkable,
-  Backpath (RelationRole),
+  RoleGraft (RelationRole),
 }
 
 //
@@ -388,7 +388,7 @@ pub struct ViewnodeStats {
   /// TODO/user-owned_autofork_chain/5_plan.org) -- the herald marks
   /// exactly the deliberately privatized edges. Also None: without a
   /// graph handle; for a node that is not genuinely a member here
-  /// (affectsParent != Affected, or a backpath graft); and for the two
+  /// (affectsParent != Affected, or a role graft); and for the two
   /// compound filter folders (HiddenInSubscribee /
   /// HiddenOutsideOfSubscribee), which have no single
   /// 'relation_member_role' to read a repo from.
@@ -515,7 +515,7 @@ impl FolderRelation {
 /// Requests for additional views related to a node.
 /// Multiple view requests can be active simultaneously.
 /// - 'Folder(rel)' builds BOTH folders of the relation, populated from the graph.
-/// - 'Path(role)' builds the backpath for that one partner role.
+/// - 'RoleTree(role)' builds the role tree for that one partner role.
 /// - 'Definitive' makes the (write-protected) node editable.
 /// - 'Fork' is the explicit 'skg-fork-node' gesture: clone this (owned)
 ///   node into a private fork that overrides it. Consumed on the save
@@ -523,7 +523,7 @@ impl FolderRelation {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ViewRequest {
   Folder (FolderRelation),
-  Path (RelationRole),
+  RoleTree (RelationRole),
   Flags,
   Definitive,
   Fork,
@@ -741,12 +741,12 @@ impl Phantom {
 impl ViewRequest {
   /// The MATCH-position atoms the server can emit inside
   /// '(viewRequests ...)'. The RELNAME / ROLENAME arguments of the
-  /// '(folder ...)' / '(path ...)' forms are VALUE-position (echoed by the
+  /// '(folder ...)' / '(roleTree ...)' forms are VALUE-position (echoed by the
   /// herald's ANY/IT), so they are deliberately absent -- like IDs and
   /// counts elsewhere. Enumerated for the herald conformance test
   /// (server/heralds.rs).
   pub const EMITTABLE_MATCH_ATOMS : [&'static str; 4] =
-    [ "folder", "path", "flags", "definitiveView" ];
+    [ "folder", "roleTree", "flags", "definitiveView" ];
 }
 
 impl AsRef<Viewnode> for Viewnode {
@@ -890,7 +890,7 @@ impl fmt::Display for ViewRequest {
   ) -> fmt::Result {
     match self {
       ViewRequest::Folder  (rel)  => write! (f, "(folder {})",  rel  . relname  ()),
-      ViewRequest::Path (role) => write! (f, "(path {})", role . rolename ()),
+      ViewRequest::RoleTree (role) => write! (f, "(roleTree {})", role . rolename ()),
       ViewRequest::Flags   => write! (f, "flags"),
       ViewRequest::Definitive  => write! (f, "definitiveView"),
       ViewRequest::Fork        => write! (f, "fork"), } } }
