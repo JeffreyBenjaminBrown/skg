@@ -58,7 +58,7 @@ fn deleting_the_flags_folder_is_accepted_and_inert (
         graphnode_from_skgid (config, &ID::from ("brie"))?;
       assert! (flag_is_true (
         &saved . flags, Flag::NoSearchMatching),
-        "dismissing the projection must not clear the flag");
+        "dismissing the viewbranch must not clear the flag");
       Ok (( ))
     })) }
 

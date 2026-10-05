@@ -1,6 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; Commands that request additional views by adding a (viewRequests ...)
+;;; Commands that request viewbranches by adding a (viewRequests ...)
 ;;; atom to the headline at point and saving, letting Rust fulfill the
 ;;; request during completion. Two families, both auto-saving (Q10):
 ;;;   - FOLDERS, `skg-show-folder-*' : (folder RELNAME), builds

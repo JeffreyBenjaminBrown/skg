@@ -162,6 +162,11 @@ a content view or a search view, identified by its 'ViewUri'. A
 buffer). A view's *viewforest* is its tree of viewnodes, under a
 buffer root; say "viewforest" rather than "viewtree" or "forest".
 
+A *viewbranch* is any subtree of a viewforest: a viewnode with all its
+descendants. A view request asks the server to add viewbranches: a
+folder, a role tree, the flags folder. A viewbranch may be degenerate,
+with one viewchild or none; compare "branching viewnode".
+
 *** "child" and "parent"
 
 They are shorthand for 'viewchild' and 'viewparent' (likewise
@@ -432,7 +437,7 @@ display fact is =(overridesHere N)=; see "override substitution".
 
 Both are requests the client writes into metadata and the server
 consumes. A *view request* (=(viewRequests ...)=: =folder=, =roleTree=,
-=flags=, =definitiveView=) asks for more of the view; the server
+=flags=, =definitiveView=) asks for more of the view (viewbranches); the server
 fulfills it while completing the view and then drops it. (=fork= is
 also written as a view request, but the save consumes it.) An *edit
 request* (=(editRequest ...)=: =merge=, =toDelete=, =flag=, =relRepo=) asks
@@ -664,7 +669,7 @@ to the text-match score. Most nodes have no prominence source.
 order. Each leaf is titleless because its herald supplies the visible label.
 The folder stays visible when empty. Edits within a retained folder are
 rejected before save, but deleting the entire folder safely dismisses the
-optional projection and changes no flag. =noSearchMatching= is changed
+optional viewbranch and changes no flag. =noSearchMatching= is changed
 through the dedicated setter, while the two org-roam import provenance
 flags have no setter. A node with =n= true flags has the low-styled =Fn=
 herald; no flag herald is shown at zero.

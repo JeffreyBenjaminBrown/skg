@@ -745,7 +745,7 @@ reads =Oa=, an =overridden= role graft =aO=.
 
 ** View requests: (viewRequests ...)
 
-=(viewRequests ...)= carries client→server REQUESTS for extra views
+=(viewRequests ...)= carries client→server REQUESTS for viewbranches
 (unlike =birth= and the stats below, which are server→client). On save
 the server fulfills each request during view completion and then drops
 the atom, so a request is transient. Request forms:
@@ -775,7 +775,7 @@ node's heralds.
   Its true-only viewnodes use =(flag hadId)=, =(flag wasOverloaded)=, and
   =(flag noSearchMatching)= metadata in that order. Viewnodes have no Org title;
   their friendly visible label comes from the herald. Deleting the entire
-  folder dismisses this optional projection and has no persistence meaning;
+  folder dismisses this optional viewbranch and has no persistence meaning;
   edits within a retained folder are rejected rather than silently ignored.
 - =fork= — the explicit =skg-fork-node= gesture: clone this (owned)
   node into a private fork that overrides it. Consumed on the save path

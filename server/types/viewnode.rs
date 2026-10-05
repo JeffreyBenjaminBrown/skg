@@ -502,7 +502,7 @@ impl FolderRelation {
       . copied () }
 }
 
-/// Requests for additional views related to a node.
+/// Requests for viewbranches related to a node.
 /// Multiple view requests can be active simultaneously.
 /// - 'Folder(rel)' builds BOTH folders of the relation, populated from the graph.
 /// - 'RoleTree(role)' builds the role tree for that one partner role.

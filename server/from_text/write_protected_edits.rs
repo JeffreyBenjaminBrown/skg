@@ -239,7 +239,7 @@ fn flags_surface_errors (
       surface . recorder_skgid == before . recorder_skgid
       && surface . recorder_path == before . recorder_path)
     else { continue; };
-    // Like an aliases or role tree branch, this is an optional projection:
+    // Like an aliases or role tree branch, this is an optional viewbranch:
     // deleting the whole folder dismisses it from the view and says nothing
     // about the recorder's flags.  A retained folder is still
     // server-owned, so edits within it remain validation errors.
@@ -630,17 +630,17 @@ mod tests {
   }
 
   #[test]
-  fn deleting_the_flags_projection_is_inert () {
+  fn deleting_the_flags_viewbranch_is_inert () {
     let original = forest (indoc! {"
       * (skg (node (id recorder) (repo main))) Recorder title
       ** (skg flagsFolder)
       *** (skg (flag noSearchMatching))
     "});
-    let mut without_projection = forest (indoc! {"
+    let mut without_viewbranch = forest (indoc! {"
       * (skg (node (id recorder) (repo main))) Recorder title
     "});
     assert! (errors_and_normalize_new_writeProtected_occurrences (
-      &mut without_projection, &original) . is_empty ());
+      &mut without_viewbranch, &original) . is_empty ());
   }
 
   #[test]
@@ -652,12 +652,12 @@ mod tests {
       ** (skg flagsFolder)
       *** (skg (flag noSearchMatching))
     "});
-    let mut without_alias_projection = forest (indoc! {"
+    let mut without_alias_viewbranch = forest (indoc! {"
       * (skg (node (id recorder) (repo main))) Recorder title
       ** (skg flagsFolder)
       *** (skg (flag noSearchMatching))
     "});
     assert! (errors_and_normalize_new_writeProtected_occurrences (
-      &mut without_alias_projection, &original) . is_empty ());
+      &mut without_alias_viewbranch, &original) . is_empty ());
   }
 }

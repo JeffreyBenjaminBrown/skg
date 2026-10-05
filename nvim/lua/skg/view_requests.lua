@@ -1,4 +1,4 @@
--- PURPOSE: Commands that request additional views by adding a
+-- PURPOSE: Commands that request viewbranches by adding a
 -- (viewRequests ...) atom to the headline at point and saving,
 -- letting the server fulfill the request during completion. Two
 -- families, both auto-saving: FOLDERS (folder RELNAME), building
