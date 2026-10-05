@@ -14,7 +14,7 @@ pub const GIT_DIFF_VIEW: &str = "\
 * (skg (node (id new) (repo main))) new
 ";
 
-/// Create a git repo with head->worktree transition from content fixtures.
+/// Create a gitrepo with head->worktree transition from content fixtures.
 pub fn setup_gitrepo_with_fixtures(
   gitrepo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {
@@ -76,7 +76,7 @@ pub fn setup_gitrepo_with_removed_subscribee_fixtures_staged(
 
 /// The added direction: a subscriber whose subscribes_to GAINED node 22
 /// between HEAD and worktree, so the present member 22 must carry
-/// (unstaged addedR) (TODO/full-schema/12-2_diff-mode-policy_discussion.org,
+/// (unstaged addedR) (TODO/DONE/full-schema/DONE/12-2_diff-mode-policy_discussion.org,
 /// outbound folder completeness).
 pub fn setup_gitrepo_with_added_subscribee_fixtures(
   gitrepo_path: &Path,
@@ -91,7 +91,7 @@ pub fn setup_gitrepo_with_added_subscribee_fixtures(
 /// Expected when 11 is also a view root (TODO/fork-fixes.org, no git
 /// ghosts under write-protected nodes): the copy of 11 under 1 draws
 /// write-protected and so gets NO removed-member phantoms; the
-/// definitive root copy of 11 carries them.
+/// editable root copy of 11 carries them.
 pub const GIT_DIFF_VIEW_WRITE_PROTECTED_NO_GHOSTS: &str = "\
 * (skg (node (id 1) (repo main))) 1
 ** (skg (node (id 11) (repo main) writeProtected)) 11

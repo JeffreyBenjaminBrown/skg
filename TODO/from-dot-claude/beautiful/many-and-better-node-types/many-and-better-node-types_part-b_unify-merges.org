@@ -35,7 +35,7 @@ Two consequences:
 
 1. *No neighbor .skg file edits are required.* Neighbor 'contains' / 'subscribes_to' / 'hides_from_its_subscriptions' / 'overrides_view_of' vectors stay as they are, with 'acquiree_id' in place; resolution to acquirer happens at read time.
 
-2. *Neighbor SaveNodes are still needed — but only to close the temporal gap in TypeDB.* TypeDB cascade-deletes every relation involving the acquiree when the acquiree is deleted. Without something re-creating those relations immediately, TypeDB is inconsistent with FS until each affected neighbor happens to be saved again for unrelated reasons. Re-saving those neighbors /now/ (with their 'NodeComplete's unchanged) is enough: the save pipeline cascade-re-creates their outbound relations, extra_id resolution points them at the acquirer. FS and TypeDB end up identical post-merge.
+2. *Neighbor SaveNodes are still needed — but only to close the temporal gap in TypeDB.* TypeDB cascade-deletes every relation involving the acquiree when the acquiree is deleted. Without something re-creating those relations immediately, TypeDB is inconsistent with FS until each affected neighbor happens to be saved again for unrelated reasons. Re-saving those neighbors /now/ (with their 'Graphnode's unchanged) is enough: the save pipeline cascade-re-creates their outbound relations, extra_id resolution points them at the acquirer. FS and TypeDB end up identical post-merge.
 
 * Target state
 
@@ -66,13 +66,13 @@ Add a function ''affected_neighbors_of_merge'' (probably living in [[../../serve
   - Issues the five TypeDB queries above for a given acquiree_id, returning a deduplicated 'Vec<ID>' of PIDs.
   - Filters out any PIDs that are themselves acquiree_ids or acquirer_ids in /any/ merge in the current batch — those are already handled by the primary 3×N DefineNodes, and re-saving them would double-process.
 
-For each affected neighbor PID, load its current 'NodeComplete' from disk (via ''skgnode_from_id'' in [[../../server/dbs/filesystem/one_node.rs][server/dbs/filesystem/one_node.rs]]) and wrap it in 'SaveNode'. The NodeComplete's fields are /unchanged/ — acquiree_id stays in whatever vector it's in. Extra_id resolution does the work.
+For each affected neighbor PID, load its current 'Graphnode' from disk (via ''skgnode_from_id'' in [[../../server/dbs/filesystem/one_node.rs][server/dbs/filesystem/one_node.rs]]) and wrap it in 'SaveNode'. The Graphnode's fields are /unchanged/ — acquiree_id stays in whatever vector it's in. Extra_id resolution does the work.
 
 Concatenate: '[primary 3×N DefineNodes] ++ [neighbor SaveNodes]' → one 'Vec<DefineNode>'.
 
 *** PITFALL: cross-merge dedup
 
-Using R_i = acquirer of merge i, E_i = acquiree of merge i: suppose R2 contains E1 (so R2 plays 'container' in a contains relation with E1 as the object). The neighbor-of-merge-1 discovery step would pick up R2. But R2 is already in the primary 3×N DefineNodes as merge 2's 'updated_acquirer'; emitting a neighbor SaveNode for it would double-process. Dedup by subtracting the set '{all R_i} ∪ {all E_i}' from discovered neighbors before loading their NodeCompletes.
+Using R_i = acquirer of merge i, E_i = acquiree of merge i: suppose R2 contains E1 (so R2 plays 'container' in a contains relation with E1 as the object). The neighbor-of-merge-1 discovery step would pick up R2. But R2 is already in the primary 3×N DefineNodes as merge 2's 'updated_acquirer'; emitting a neighbor SaveNode for it would double-process. Dedup by subtracting the set '{all R_i} ∪ {all E_i}' from discovered neighbors before loading their Graphnodes.
 
 **** DONE Jeff speaking
 Huh? You wrote 'merge 2 acquires node B ... B itself is the acquirer ...' Which is B, acquirer or acquiree?
@@ -133,7 +133,7 @@ The new ''merge_nodes'' body:
   1. If 'merge_instructions' is empty, return Ok.
   2. For each Merge, call ''affected_neighbors_of_merge'' to find neighbor PIDs.
   3. Dedup neighbor PIDs across the batch; subtract all acquirer_ids and acquiree_ids.
-  4. Load neighbor NodeCompletes from disk; wrap in SaveNode.
+  4. Load neighbor Graphnodes from disk; wrap in SaveNode.
   5. Concatenate primary DefineNodes + neighbor SaveNodes.
   6. Call ''update_fs_from_saveinstructions'' with empty source_moves. On error, return.
   7. Call ''apply_definenodes'' on the graph handle.
@@ -197,9 +197,9 @@ Textlinks inbound cannot come from the graph — the graph stores NodeRust, whic
 *** Jeff : it's fine.
 Merges are very rare.
 
-** DONE Neighbor NodeComplete loads hit the disk
+** DONE Neighbor Graphnode loads hit the disk
 
-Step 1 loads N neighbor NodeCompletes from .skg files after discovering their PIDs. For typical merges (few neighbors), negligible. For pathological merges (thousands of neighbors), multi-second. Flagging because it scales with neighbor count.
+Step 1 loads N neighbor Graphnodes from .skg files after discovering their PIDs. For typical merges (few neighbors), negligible. For pathological merges (thousands of neighbors), multi-second. Flagging because it scales with neighbor count.
 
 If Plan C phase 3 has landed, these loads become in-memory graph lookups — free. Again, don't block Plan B on this; just note that Plan B gets faster when Plan C phase 3 lands.
 
@@ -215,7 +215,7 @@ Same story for FS: the neighbor SaveNodes re-write neighbor .skg files with unch
 
 This one might actually /matter/: dirtying mtimes on arbitrary neighbors affects git history and incremental-rebuild heuristics. A single merge could touch hundreds of files that "didn't really change." Jeff should probably filter for FS at least.
 
-Concrete filter: before calling ''update_fs_from_saveinstructions'', strip every SaveNode whose NodeComplete matches disk byte-for-byte (re-read and diff). Clunky but reliable; or, smarter, strip anything not in the primary 3×N set. The neighbor SaveNodes only exist to propagate the cascade+recreate through TypeDB.
+Concrete filter: before calling ''update_fs_from_saveinstructions'', strip every SaveNode whose Graphnode matches disk byte-for-byte (re-read and diff). Clunky but reliable; or, smarter, strip anything not in the primary 3×N set. The neighbor SaveNodes only exist to propagate the cascade+recreate through TypeDB.
 
 Decision: only send primary 3×N SaveNodes to FS and Tantivy. Send primary 3×N /plus/ neighbor SaveNodes to TypeDB (via a parameter split or two separate calls). The in-memory graph gets primary 3×N (graph stores NodeRust; neighbor NodeRust is unchanged so re-publishing is a waste — but applying them is also harmless and keeps the code path uniform; minor).
 

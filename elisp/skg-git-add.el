@@ -5,7 +5,7 @@
 ;;; the index). User commands:
 ;;;
 ;;; - `skg-git-add-if-new-recursive' (C-c t A): act on the node at
-;;;    point and every org-descendant.
+;;;    point and every viewdescendant.
 ;;; - `skg-git-add-if-new-recursive-preview' (C-c t a):
 ;;;    show a git-add command for all new (untracked) files,
 ;;;    in 'skg-readable-ids-mode'.
@@ -59,7 +59,7 @@ you might not want to review the command manually.)"
 
 (defun skg-git-add-if-new-recursive-preview ()
   "Show an executable buffer that stages new files in the current subtree.
-The current heading and its org-descendants are scanned for ActiveVognode
+The current headline and its viewdescendants are scanned for ActiveVognode
 metadata containing `(unstaged addedN)'. The generated form rechecks
 the git index before staging each file, so evaluating it will not
 stage later modifications to files that are already known to git."

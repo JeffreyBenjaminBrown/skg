@@ -1,8 +1,8 @@
 use crate::to_org::complete::partner_folder::{ maybe_add_hiddenInSubscribeeFolder_branch, type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::expand::definitive::execute_view_requests;
-use crate::repo_sets::ActiveRepoSet;
-use crate::types::git::RepoDiff;
-use crate::types::misc::{SkgConfig, RepoName};
+use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::types::git::SkgRepoDiff;
+use crate::types::misc::{SkgConfig, SkgRepoName};
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, ViewRequest};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
@@ -18,8 +18,8 @@ pub fn execute_activeVognode_view_requests (
   graph              : &crate::dbs::in_rust_graph::InRustGraph,
   config             : &SkgConfig,
   errors             : &mut Vec<String>,
-  active_repo_set  : Option<&ActiveRepoSet>,
-  repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
+  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_diffs      : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
     tree, node,
@@ -32,16 +32,16 @@ pub fn execute_activeVognode_view_requests (
   if ! requests . is_empty() {
     execute_view_requests(
       tree, requests, graph, config, errors,
-      active_repo_set, repo_diffs ) ?; }
+      active_skgrepo_set, skgrepo_diffs ) ?; }
   Ok(( )) }
 
-pub fn ensure_hiddenInFolder_under_definitive_subscribee (
-  tree   : &mut Tree<Viewnode>,
-  node   : NodeId,
-  graph  : &crate::dbs::in_rust_graph::InRustGraph,
-  config : &SkgConfig,
-  active_repo_set : Option<&ActiveRepoSet>,
-  repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
+pub fn ensure_hiddenInFolder_under_editable_subscribee (
+  tree               : &mut Tree<Viewnode>,
+  node               : NodeId,
+  graph              : &crate::dbs::in_rust_graph::InRustGraph,
+  config             : &SkgConfig,
+  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_diffs      : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
 ) -> Result<(), Box<dyn Error>> {
   let is_subscribee : bool =
     type_and_parent_type_consistent_with_subscribee (
@@ -57,13 +57,13 @@ pub fn ensure_hiddenInFolder_under_definitive_subscribee (
   if is_writeProtected { return Ok (( )); }
   maybe_add_hiddenInSubscribeeFolder_branch (
     tree, node, graph, config,
-    active_repo_set, repo_diffs ) }
+    active_skgrepo_set, skgrepo_diffs ) }
 
 /// Read the node's non-consumed view_requests as a Vec. View completion
 /// (dispatch_node_update) settles
-/// every Definitive request at the node's own visit (the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule), so
+/// every Editable request at the node's own visit (the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule), so
 /// only Folder/Path requests should remain here; execute_view_requests
-/// errors loudly if a Definitive one survives.
+/// errors loudly if a Editable one survives.
 fn extract_view_requests (
   tree : &Tree<Viewnode>,
   node : NodeId,

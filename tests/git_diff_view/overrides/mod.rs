@@ -1,8 +1,8 @@
 /// Git diff view tests for explicitly requested OUTBOUND sharing folders
 /// (overriddenFolder, hiddenFolder): members removed since HEAD appear as phantoms carrying
 /// per-stage 'removedR', and members added since HEAD carry per-stage
-/// 'addedR', all read from the owner's per-stage relation diff
-/// (TODO/full-schema/12-2_diff-mode-policy_discussion.org).
+/// 'addedR', all read from the recorder's per-stage relation diff
+/// (TODO/DONE/full-schema/DONE/12-2_diff-mode-policy_discussion.org).
 ///
 /// Fixture: R overrides [Z, W] and hides [ha, hb] at HEAD;
 /// in the worktree R overrides [Z, O] and hides [ha, hc].  Every
@@ -81,7 +81,7 @@ async fn run_overrides_view_test (
   let gitrepo_path : &Path = temp_dir . path ();
   if staged { setup_overrides_fixtures_staged (gitrepo_path)?; }
   else      { setup_overrides_fixtures        (gitrepo_path)?; }
-  s . reset_with_repo_path (subtest_name, gitrepo_path) ?;
+  s . reset_with_skgrepo_path (subtest_name, gitrepo_path) ?;
   let (config, tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
@@ -132,7 +132,7 @@ async fn emptied_requested_folders_still_render_in_diff_mode (
   let temp_dir : TempDir = TempDir::new ()?;
   let gitrepo_path : &Path = temp_dir . path ();
   setup_overrides_fixtures (gitrepo_path)?;
-  s . reset_with_repo_path (
+  s . reset_with_skgrepo_path (
     "emptied_requested_folders_still_render_in_diff_mode",
     gitrepo_path ) ?;
   let (config, tantivy)
@@ -206,7 +206,7 @@ async fn requested_outbound_folders_show_phantoms_and_addedR_staged (
 /// A diff-mode save of a buffer holding the worktree members is a
 /// no-op for the relations, regenerates the phantoms (idempotence:
 /// saving the rendered result changes nothing further), and never
-/// collects a phantom as a writable-folder member (saving the phantom
+/// collects a phantom as an editable-folder member (saving the phantom
 /// line must not re-add W to R's overrides_view_of).
 async fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
   s : &mut SharedStoreSession,
@@ -214,7 +214,7 @@ async fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
   let temp_dir : TempDir = TempDir::new ()?;
   let gitrepo_path : &Path = temp_dir . path ();
   setup_overrides_fixtures (gitrepo_path)?;
-  s . reset_with_repo_path (
+  s . reset_with_skgrepo_path (
     "diff_mode_save_is_noop_and_regenerates_outbound_phantoms",
     gitrepo_path ) ?;
   let (config, tantivy)

@@ -93,7 +93,7 @@ chronological progress ledger can record:
 - green tests with durations and log paths;
 - failures and their classification;
 - decisions, assumptions, and remaining risks; and
-- user-owned dirty files that must remain untouched.
+- owned dirty files that must remain untouched.
 
 Cycle plan headlines through =TODO=, =ONGOING=, and =DONE= as work advances.
 Update the resume pointer before a likely compaction and before stopping.  Keep

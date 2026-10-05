@@ -95,7 +95,7 @@ Dispatch is based on the parent headline text."
             (let ((id (read-string
                        "Enter merge target ID (or paste a link): ")))
               (org-edit-headline (concat "merge " id))))))
-       ;; repo with no config: prompt
+       ;; Skgrepo with no config: prompt
        ((string= parent "repo")
         (org-edit-headline (read-string "Repo: " field-value)))
        (t

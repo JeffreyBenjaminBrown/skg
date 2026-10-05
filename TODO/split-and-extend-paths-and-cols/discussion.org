@@ -5,7 +5,7 @@
   Anything you leave blank, I'll do per the "Recommend:" note.
 
   The headline finding: your two families map *cleanly* onto two
-  mechanisms that already exist in the code (scaffold-cols vs.
+  mechanisms that already exist in the code (non-vognode-folders vs.
   backpath-ancestries), so the bones are good. But three things in the
   spec are under- or mis-specified, and one is outright dangerous. The
   blockers are Q2, Q3, and Q8; everything else has a safe default.
@@ -25,7 +25,7 @@
     third way, in a child under your note.
   - Q2a follow-ups (link role-name vocabulary; whether to fold the two
     existing requests into the new '(path ...)' form): new TODO children.
-  - Q4 follow-up (do you want a read-only-col marker?): new TODO child,
+  - Q4 follow-up (do you want a read-only-folder marker?): new TODO child,
     after a fact-check correction.
   I did NOT write 'plan.org' yet — Q7 is a real type-design fork only
   you should settle. Once it closes I'll write the plan.
@@ -38,16 +38,16 @@
   fold-in (migrate, no legacy atoms), Q7 (parameterize 'Birth').
   ONE item left -- Q4: your "peace symbol" note rests on a misreading.
   "☮" is the per-node 'writeProtected' marker, NOT a read-only-collection mark,
-  and it is load-bearing on some WRITABLE-col members (a
+  and it is load-bearing on some WRITABLE-folder members (a
   subscribee-as-such MUST be write-protected), so it can't be removed from
-  them. I corrected this under Q4 and proposed a distinct read-only-col
+  them. I corrected this under Q4 and proposed a distinct read-only-folder
   marker. Close that one (pick a glyph) and I write 'plan.org'.
 
 * Round 4 — all settled; plan written (Claude)
   Q4 closed: I fact-checked that 'writeProtected'/☮ is emitted only on node-like
   vognodes/phantoms ('server/org_to_text.rs:344, 393'), never on a
-  scaffold, so your unified "cannot be changed from here" reading holds.
-  Decision: ☮ on the six read-only col scaffolds (a lock 🔒 stays a
+  non-vognode, so your unified "cannot be changed from here" reading holds.
+  Decision: ☮ on the six read-only folders (a lock 🔒 stays a
   one-line swap). NOTHING left open. Plan written:
   'TODO/split-and-extend-paths-and-cols/plan.org'.
 
@@ -60,14 +60,14 @@
     '(viewRequests TOKEN)' atom into the node's metadata; the server
     fulfills the request during view completion.
     - 'skg-reveal-aliases' inserts '(viewRequests aliases)' and does
-      NOT save. The server builds an 'AliasCol' scaffold, populated.
+      NOT save. The server builds an 'AliasFolder' non-vognode, populated.
     - 'skg-reveal-containerward' / 'skg-reveal-sourceward' insert
       'containerwardView' / 'sourcewardView' AND auto-save.
   - 'ViewRequest' ('server/types/viewnode.rs:433-441') has exactly four
     variants: Aliases, Containerward, Sourceward, Definitive. There is
-    NO request for any PartnerCol.
-  - "Collections" in your sense = scaffold cols: the 8 PartnerCols plus
-    AliasCol. "Paths" = the backpath engine
+    NO request for any PartnerFolder.
+  - "Collections" in your sense = non-vognode folders: the 8 PartnerFolders plus
+    AliasFolder. "Paths" = the backpath engine
     ('server/to_org/expand/backpath.rs'), which climbs a relation
     transitively (until a fork/cycle/root) and grafts the partners as
     inverted, write-protected, 'parentIs=independent' content children with
@@ -91,15 +91,15 @@
 ** Q1. Keybinding collision (easy, but I need the letters)
    You gave 'C-c c o' to overrides, hides, AND subscribes. Here is the
    full proposed map; eyeball it. Collections each create BOTH
-   direction-cols, so they need no case distinction. Paths reuse your
+   direction-folders, so they need no case distinction. Paths reuse your
    UPPER=inbound/active, lower=outbound/passive convention.
 
    Collections ('C-c c'):
-   | key     | command                        | cols created                  |
-   | C-c c a | skg-show-collection-aliases    | aliasCol                      |
-   | C-c c o | skg-show-collection-overrides  | overriddenCol + overriderCol  |
-   | C-c c h | skg-show-collection-hides      | hiderCol + hiddenCol          |
-   | C-c c s | skg-show-collection-subscribes | subscribeeCol + subscriberCol |
+   | key     | command                        | folders created                  |
+   | C-c c a | skg-show-collection-aliases    | aliasFolder                      |
+   | C-c c o | skg-show-collection-overrides  | overriddenFolder + overriderFolder  |
+   | C-c c h | skg-show-collection-hides      | hiderFolder + hiddenFolder          |
+   | C-c c s | skg-show-collection-subscribes | subscribeeFolder + subscriberFolder |
 
    Paths ('C-c p'):
    | key     | command                             | partners shown         | status |
@@ -117,68 +117,68 @@
    for paths).
    ANSWER: yes that's perfect
 
-** Q2. DANGEROUS: how a collection gets "put there" — request atom, NOT literal scaffold
+** Q2. DANGEROUS: how a collection gets "put there" — request atom, NOT literal non-vognode
    You wrote: "If it's missing, put it there -- even if it will be
    empty ... the view update subroutine of the save will complete it."
-   Taken literally — insert an empty col headline, then save — this is
-   unsafe for the two WRITABLE cols (overriddenCol, subscribeeCol):
+   Taken literally — insert an empty folder headline, then save — this is
+   unsafe for the two WRITABLE folders (overriddenFolder, subscribeeFolder):
 
    - Save EXTRACTION reads the buffer before completion runs. A present
-     but empty 'overriddenCol' emits 'SetOverrides(vec![])'
+     but empty 'overriddenFolder' emits 'SetOverrides(vec![])'
      ('from_text/local_instruction_collection/traverse.rs:307-323'),
      which lowers to 'MSV::Specified(vec![])' ('.../lower.rs:268-273')
      — i.e. "set this node's overrides to the empty set". If the node
-     HAD overrides on disk, saving the empty col WIPES them. The
-     reconcile that would have repopulated the col runs in the rerender
+     HAD overrides on disk, saving the empty folder WIPES them. The
+     reconcile that would have repopulated the folder runs in the rerender
      step, which is too late.
-   - (Same hazard for subscribeeCol -> 'subscribes_to', and even
-     aliasCol -> aliases.)
+   - (Same hazard for subscribeeFolder -> 'subscribes_to', and even
+     aliasFolder -> aliases.)
 
    The existing 'skg-reveal-aliases' is safe precisely because it does
-   NOT insert a literal empty col — it inserts a '(viewRequests
-   aliases)' atom, and the server builds the col already POPULATED from
+   NOT insert a literal empty folder — it inserts a '(viewRequests
+   aliases)' atom, and the server builds the folder already POPULATED from
    the graph. An empty result is then a true "this node has none",
    never a destructive overwrite.
 
    So I want to implement all collection commands the same way: insert a
-   request atom; the server builds each col populated from the graph.
-   That requires a new request mechanism for cols (none exists today).
+   request atom; the server builds each folder populated from the graph.
+   That requires a new request mechanism for folders (none exists today).
 
    Recommend: implement collections as requests, mirroring aliases —
-   never as hand-inserted empty scaffolds. (Mechanism in Q2a.)
+   never as hand-inserted empty non-vognodes. (Mechanism in Q2a.)
    ANSWER: That's perfect.
 
 *** Q2a. One parameterized request type, or many variants?
-    Collections need ~4 new request kinds (or 6 col-targets), and Paths
+    Collections need ~4 new request kinds (or 6 folder-targets), and Paths
     need ~9. Enumerating each as its own 'ViewRequest' variant means
     ~13 new variants, each with a 'REPRS_IN_CLIENT' entry and a herald
-    'req:' rule. Since the backpath engine and the col reconcilers are
+    'req:' rule. Since the backpath engine and the folder reconcilers are
     already relation-generic, I'd rather add TWO parameterized requests,
     e.g. (sketch)
-    : ViewRequest::Col  ( PartnerCol-or-QualCol )
+    : ViewRequest::Folder  ( PartnerFolder-or-QualFolder )
     : ViewRequest::Path ( relation , direction )
-    serialized like '(viewRequests (col overriddenCol))' /
+    serialized like '(viewRequests (folder overriddenFolder))' /
     '(viewRequests (path overrides overrider))'. The elisp side still
     gets 13 nicely-named commands for discoverability/keybindings; only
     the wire atom is parameterized. This keeps 'ViewRequest', the herald
     table, and the parser from sprouting 13 near-identical entries.
 
-    Recommend: two parameterized requests (Col, Path), with named elisp
+    Recommend: two parameterized requests (Folder, Path), with named elisp
     commands on top.
     ANSWER: That seems good. But rather than direction, let's use role name.
     And in the herald for the request, let's keep it as brief as is intelligible:
-    (viewrequest col relname), (viewrequest path rolename).
+    (viewrequest folder relname), (viewrequest path rolename).
     (The distinction relname v. rolename is intentional.)
 
 **** Claude: incorporating your answer (settled wire shapes)
-    : (viewRequests (col RELNAME))    ;; builds BOTH cols for the relation
+    : (viewRequests (folder RELNAME))    ;; builds BOTH folders for the relation
     : (viewRequests (path ROLENAME))  ;; builds the path for that one role
-    A col spans BOTH roles of a relation, so it's named by the relation
+    A folder spans BOTH roles of a relation, so it's named by the relation
     (relname); a path is single-direction, so it's named by the one role
     it follows (rolename) -- your distinction, captured.
-    - col RELNAME in: aliases, overrides, hides, subscribes. (aliases is
-      the odd one -- a QualCol, not a graph relation -- but reads fine as
-      a relname; the Col request must span QualCol + PartnerCol, per the
+    - folder RELNAME in: aliases, overrides, hides, subscribes. (aliases is
+      the odd one -- a QualFolder, not a graph relation -- but reads fine as
+      a relname; the Folder request must span QualFolder + PartnerFolder, per the
       AWKWARD-aliases problem.)
     - path ROLENAME = the role the grafted PARTNERS play (the output
       role): container, source, dest, overrider, overridden, hider,
@@ -206,12 +206,12 @@ because I think dest it's clearer than target.
       (code, tests, docs) as its own commit; 'schema.tql' already says
       'dest'.
 
-**** DONE Claude: fold the two existing requests into '(path ...)' / '(col ...)'?
+**** DONE Claude: fold the two existing requests into '(path ...)' / '(folder ...)'?
     With the parameterized form, the existing tokens become:
-    'aliases' -> '(col aliases)', 'containerwardView' -> '(path
+    'aliases' -> '(folder aliases)', 'containerwardView' -> '(path
     container)', 'sourcewardView' -> '(path source)'. ('definitiveView'
-    is neither col nor path -- it stays as-is.) Folding them in gives ONE
-    col mechanism and ONE path mechanism (cleaner, matches your generic
+    is neither folder nor path -- it stays as-is.) Folding them in gives ONE
+    folder mechanism and ONE path mechanism (cleaner, matches your generic
     instinct), but it changes the three existing commands' wire tokens
     and their integration golden fixtures
     ('tests/integration/aliases-view-request/',
@@ -222,51 +222,51 @@ because I think dest it's clearer than target.
 Remember that there's never any need to hold onto legacy syntax;
 I'm the only user and the only (human) dev.
 
-** Q3. BLOCKER: "even if empty" cannot hold for the read-only (inbound) cols
-   Of the cols your commands create, only THREE survive a completion
-   pass while empty: 'overriddenCol', 'subscribeeCol', and 'aliasCol'.
-   The other five — 'overriderCol', 'subscriberCol', 'hiderCol',
-   'hiddenCol', and the two filter cols — are pruned when empty by
+** Q3. BLOCKER: "even if empty" cannot hold for the read-only (inbound) folders
+   Of the folders your commands create, only THREE survive a completion
+   pass while empty: 'overriddenFolder', 'subscribeeFolder', and 'aliasFolder'.
+   The other five — 'overriderFolder', 'subscriberFolder', 'hiderFolder',
+   'hiddenFolder', and the two filter folders — are pruned when empty by
    'is_self_deletable_when_empty' ('server/update_buffer/complete.rs:325-337').
 
-   Concretely, of your two-col commands:
-   - overrides: overriddenCol persists empty; overriderCol VANISHES empty.
-   - subscribes: subscribeeCol persists empty; subscriberCol VANISHES empty.
-   - hides: BOTH hiderCol and hiddenCol VANISH empty (hides has no
+   Concretely, of your two-folder commands:
+   - overrides: overriddenFolder persists empty; overriderFolder VANISHES empty.
+   - subscribes: subscribeeFolder persists empty; subscriberFolder VANISHES empty.
+   - hides: BOTH hiderFolder and hiddenFolder VANISH empty (hides has no
      writable side at all).
 
    So "put it there even if empty" is currently impossible for the
    read-only halves. There's also a real question of whether you'd even
-   want it: a read-only col is informational and not user-extendable
+   want it: a read-only folder is informational and not user-extendable
    (inserting a node into it just relabels it 'independent'), so an
-   empty 'overriderCol' only ever says "nobody overrides this" — which
+   empty 'overriderFolder' only ever says "nobody overrides this" — which
    is arguably better conveyed by its absence.
 
    Options:
-   - (A) Accept the asymmetry: empty read-only cols simply don't appear;
-     the command shows them only when populated. Empty WRITABLE cols
-     (overriddenCol/subscribeeCol) and aliasCol do persist, giving you
+   - (A) Accept the asymmetry: empty read-only folders simply don't appear;
+     the command shows them only when populated. Empty WRITABLE folders
+     (overriddenFolder/subscribeeFolder) and aliasFolder do persist, giving you
      the editable "add here" surface. Zero code change to the prune rule.
-   - (B) Make a *requested* col sticky: carry a flag so a col the user
+   - (B) Make a *requested* folder sticky: carry a flag so a folder the user
      explicitly asked for survives empty even when read-only. Costs a
-     new bit on the col + a prune-rule exception, and an empty read-only
-     col that does nothing.
+     new bit on the folder + a prune-rule exception, and an empty read-only
+     folder that does nothing.
 
    Recommend: (A). It's safe, needs no prune change, and matches what
-   the cols mean.
+   the folders mean.
    ANSWER: Sure, (A).
 
-** Q4. Two cols with opposite editability under one command — confirm intent
+** Q4. Two folders with opposite editability under one command — confirm intent
    Your collection commands bundle both directions. Note the halves
-   behave oppositely: the WRITABLE col is where you *create* the
-   relation (type a node in, save), while the read-only col only
+   behave oppositely: the WRITABLE folder is where you *create* the
+   relation (type a node in, save), while the read-only folder only
    *reports* the inverse and respawns/relabels on edit. And 'hides' is
    special — neither direction is writable, because you hide by deleting
-   a subscribee-as-such's child, never by editing a 'hiderCol'
+   a subscribee-as-such's child, never by editing a 'hiderFolder'
    ('docs/sharing-model.md'). So 'skg-show-collection-hides' is
    purely informational on both sides.
 
-   Recommend: keep the two-col bundling as you specified, but I'll
+   Recommend: keep the two-folder bundling as you specified, but I'll
    document per command which side (if any) is editable, so the bundling
    doesn't imply you can add a hider/overrider from N's side.
    ANSWER (flag if you'd rather, say, drop the read-only half, or split
@@ -276,24 +276,24 @@ I'm the only user and the only (human) dev.
 I think it's not a problem -- there will be the peace symbol herald
 on each read-only collection, so the user will understand.
 I don't think you'll even need to document it, because somewhere,
-the set of writeable and readonly cols is already documented
+the set of writeable and readonly folders is already documented
 (but please fact-check me).
 
 **** Claude (fact-check): the peace symbol does NOT mark read-only
      I checked. "☮" is the herald for the 'writeProtected' (write-protected) atom,
-     and it sits on col MEMBERS -- but on WRITABLE cols' members too
-     (subscribeeCol/overriddenCol members are made write-protected exactly
-     like subscriberCol members; 'to_org/complete/partner_col/child_data.rs').
+     and it sits on folder MEMBERS -- but on WRITABLE folders' members too
+     (subscribeeFolder/overriddenFolder members are made write-protected exactly
+     like subscriberFolder members; 'to_org/complete/partner_col/child_data.rs').
      So "☮" does not distinguish read-only from writable. In fact NO
-     herald marks a col read-only: all 8 col scaffolds render as plain
+     herald marks a folder read-only: all 8 folders render as plain
      green labels ('server/heralds.rs:187-202'). What differs is the
      label TEXT ("it overrides the view of these" vs "these override the
      view of it") -- direction, not editability.
      Your other half is right: the writable/read-only split IS
-     documented -- 'glossary.md:21-54' ("PartnerCol, and the col-policy
-     vocabulary") and in code via 'PartnerCol::policy'
+     documented -- 'glossary.md:21-54' ("PartnerFolder, and the folder-policy
+     vocabulary") and in code via 'PartnerFolder::policy'
      ('server/types/viewnode.rs:537-551'). So no new doc is needed, and
-     the two-col bundling stands.
+     the two-folder bundling stands.
 
 ***** DONE oh geez that needs to change
 The only point of having the peace symbol on collections
@@ -302,20 +302,20 @@ It should not be on the writeable ones.
 
 ****** DONE Claude: ☮ can't be that marker — here's why, and the fix
 The catch: "☮" IS the 'writeProtected' (write-protected) marker, and the write-protected state is
-load-bearing on some WRITABLE-col members, so it cannot be removed
-from them without breaking save semantics. A subscribeeCol
+load-bearing on some WRITABLE-folder members, so it cannot be removed
+from them without breaking save semantics. A subscribeeFolder
 (writable) member is a subscribee-as-such, which MUST be
 write-protected -- title/body edits to it are rejected and its
 definition lives elsewhere ('docs/sharing-model.md'). So a
-writable col will ALWAYS carry ☮ on its members; ☮ therefore
+writable folder will ALWAYS carry ☮ on its members; ☮ therefore
 cannot mean "this collection is read-only."
-Also: ☮ marks the MEMBERS, never the col headline -- but the thing
+Also: ☮ marks the MEMBERS, never the folder headline -- but the thing
 that is read-only is the COLLECTION (its membership), not the
 individual member nodes.
-Fix (recommended): give the SIX read-only col scaffolds
-(subscriberCol, overriderCol, hiderCol, hiddenCol,
-hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol) their own
-read-only herald on the col HEADLINE -- a distinct glyph, NOT ☮
+Fix (recommended): give the SIX read-only folders
+(subscriberFolder, overriderFolder, hiderFolder, hiddenFolder,
+hiddenInSubscribeeFolder, hiddenOutsideOfSubscribeeFolder) their own
+read-only herald on the folder HEADLINE -- a distinct glyph, NOT ☮
 (which already means write-protected on members). That marks exactly the
 read-only collections, leaves write-protected semantics untouched, and is
 one new herald + rule rather than a per-member change.
@@ -332,15 +332,15 @@ will be clear. Its meaning in both cases is the same:
 ******** Claude: confirmed — your condition holds
          Fact-checked: 'writeProtected' is emitted in exactly two places, both
          node-like -- the 'node' form (vognodes) and the 'diffPhantom'
-         form ('server/org_to_text.rs:344, 393'); NO collection/scaffold
+         form ('server/org_to_text.rs:344, 393'); NO collection/non-vognode
          emits it, and the herald rule is nested under 'node'
          ('server/heralds.rs:245'). So your unified reading holds and ☮
-         on a read-only col scaffold is unambiguous.
-         SETTLED: ☮ marks the six read-only col scaffolds, meaning
+         on a read-only folder is unambiguous.
+         SETTLED: ☮ marks the six read-only folders, meaning
          "cannot be changed from here." Cleanest implementation: render ☮
-         straight from each read-only col's herald rule
+         straight from each read-only folder's herald rule
          ('server/heralds.rs:187-202') -- no new wire atom, no
-         parser/server change, since which cols are read-only is already
+         parser/server change, since which folders are read-only is already
          known from the atom. (Lock 🔒 stays a one-line swap; the
          conformance test pins atoms, not glyphs.)
 
@@ -505,11 +505,11 @@ Need your nod on this vs. flat-(A); then I can write the plan.
    *from X's subscriptions*". A bare parent-relative "this node hides its
    org-parent" (Hp) drops the "from which subscription" context. The
    edge IS stored binary, so the herald is computable, but it asserts
-   less than the col view ('hiderCol'/'hiddenCol') does.
+   less than the folder view ('hiderFolder'/'hiddenFolder') does.
 
    Recommend: emit Hp/pH as plain binary heralds (node has an outbound/
    inbound hide edge to/from its org-parent), matching how the other
-   parent-heralds work, and rely on the existing hide cols for the full
+   parent-heralds work, and rely on the existing hide folders for the full
    subscription context. Flag if you want hide heralds suppressed
    outside subscription contexts instead.
    ANSWER: Yes.
@@ -520,7 +520,7 @@ Need your nod on this vs. flat-(A); then I can write the plan.
    Today aliases does NOT auto-save, but containerward/sourceward DO
    (the only behavioral difference among the three). With the request-
    atom design (Q2), auto-saving is safe for everything (the server
-   builds cols populated).
+   builds folders populated).
    Recommend: every collection and path command inserts its request and
    auto-saves, and I bring aliases in line (auto-save too).
    ANSWER: Yes.
@@ -545,14 +545,14 @@ aside from the 'relationship to visible org-parent' item
 these are all resolved in this document already outside of this
 'problems' section, right?
 *** Claude: mapping (where each is resolved)
-    - DANGEROUS (empty-col wipe) -> Q2 (request atoms, never literal
-      empty scaffolds).
+    - DANGEROUS (empty-folder wipe) -> Q2 (request atoms, never literal
+      empty non-vognodes).
     - INCORRECT (3) -> Q1 ('C-c c o' collision), Q8 (reverse-link
       herald), Q6 ('docs/COMMANDS.org' -- now FIXED + moved to
       TODO/DONE/problems.org).
-    - AWKWARD (aliases is a QualCol, not a PartnerCol) -> Q2a (Col
-      request spans QualCol + PartnerCol).
-    - AWKWARD (two cols, opposite editability) -> Q4.
+    - AWKWARD (aliases is a QualFolder, not a PartnerFolder) -> Q2a (Folder
+      request spans QualFolder + PartnerFolder).
+    - AWKWARD (two folders, opposite editability) -> Q4.
     - MISSING ABSTRACTION (no parameterized request) -> Q2a.
     - LATENT BUG (pO emit-only / unparseable) -> Q8 (and tracked in
       TODO/problems.org until coded).
@@ -560,9 +560,9 @@ these are all resolved in this document already outside of this
     org-parent", encoded three ways) is deferred -> your TODO.org. The
     Q7 parameterized-Birth proposal is a first step toward it.
 
-** DANGEROUS — "put an empty col there, save completes it" can wipe data
+** DANGEROUS — "put an empty folder there, save completes it" can wipe data
    The literal reading of the collections spec wipes 'overrides_view_of'
-   / 'subscribes_to' / aliases when an empty writable col is saved
+   / 'subscribes_to' / aliases when an empty writable folder is saved
    before completion repopulates it (full mechanism in Q2). The
    request-atom design avoids it. This is the one thing in the spec I'd
    refuse to implement as literally written.
@@ -576,15 +576,15 @@ these are all resolved in this document already outside of this
      'sourceward' backwards (says "nodes the node links to"; the code
      surfaces nodes that link to it).
 
-** AWKWARD — "aliases" is a collection but not a PartnerCol
-   AliasCol is a 'QualCol', not one of the 8 PartnerCols, and aliases
-   alone behaves differently (no auto-save; QualCol vs PartnerCol prune
+** AWKWARD — "aliases" is a collection but not a PartnerFolder
+   AliasFolder is a 'QualFolder', not one of the 8 PartnerFolders, and aliases
+   alone behaves differently (no auto-save; QualFolder vs PartnerFolder prune
    rules). Bundling it under 'skg-show-collection-*' is fine for the
    user, but the implementation can't treat all "collections"
-   uniformly — the Col request (Q2a) must span QualCol + PartnerCol.
+   uniformly — the Folder request (Q2a) must span QualFolder + PartnerFolder.
 
-** AWKWARD — one command, two cols of opposite editability
-   See Q4. Bundling a writable col with a read-only one under a single
+** AWKWARD — one command, two folders of opposite editability
+   See Q4. Bundling a writable folder with a read-only one under a single
    verb ("show collection") risks implying symmetry that isn't there,
    especially for 'hides' (no writable side).
 
@@ -599,16 +599,16 @@ these are all resolved in this document already outside of this
    family, would cover all 5 relations x 2 directions uniformly and
    retire the birth/viewStats split. Recommended by Q7(B) + Q8.
 
-** MISSING ABSTRACTION — no parameterized Col/Path request
+** MISSING ABSTRACTION — no parameterized Folder/Path request
    Without Q2a's parameterized requests, this feature adds ~13 ViewRequest
    variants, 13 'REPRS_IN_CLIENT' rows, 13 herald 'req:' rules, and 13
    parser arms — all near-identical, when the engines beneath are already
    relation-generic. Two typed requests carrying '(relation, direction)'
-   and '(col)' collapse that to ~2.
+   and '(folder)' collapse that to ~2.
 
 ** LATENT BUG — pO is emit-only and not parseable
    'parentOverrides' is emitted ('fork.rs') but has no parser arm
    ('parse_metadata_sexp.rs:690-698') — it survives only because it lives
-   in a read-only buffer. Any path/col feature that puts pO (or a new
+   in a read-only buffer. Any path/folder feature that puts pO (or a new
    pS/pH) into a saveable buffer will hit the parser's error branch on
    round-trip. Must be fixed as part of Q8. (Logged in 'TODO/problems.org'.)

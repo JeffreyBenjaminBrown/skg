@@ -4,9 +4,9 @@ use indoc::indoc;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::errors::{SaveError, BufferValidationError};
-use skg::types::misc::{SkgConfig, ID, RepoName};
+use skg::types::misc::{SkgConfig, ID, SkgRepoName};
 
-use skg::types::save::{DefineNode, SaveNode, DeleteNode};
+use skg::types::save::{NodeInstruction, SaveNode, DeleteNode};
 use std::error::Error;
 
 const CONFIG_PATH: &str = "tests/save/validate_foreign_nodes/skgconfig.toml";
@@ -21,10 +21,10 @@ fn all_tests
       test_unmodified_foreign_node_allowed (
         &s . config ) . await ?;
       s . reset_from_config ("test_modified_foreign_node_forks_with_default_repo", CONFIG_PATH) ?;
-      test_modified_foreign_node_forks_with_default_repo (
+      test_modified_foreign_node_forks_with_default_skgrepo (
         &s . config ) . await ?;
       s . reset_from_config ("test_modified_foreign_node_body_forks_with_default_repo", CONFIG_PATH) ?;
-      test_modified_foreign_node_body_forks_with_default_repo (
+      test_modified_foreign_node_body_forks_with_default_skgrepo (
         &s . config ) . await ?;
       s . reset_from_config ("test_writeProtected_foreign_node_filtered", CONFIG_PATH) ?;
       test_writeProtected_foreign_node_filtered (
@@ -64,17 +64,17 @@ async fn test_unmodified_foreign_node_allowed (
       assert!(result . is_ok(), "Unmodified foreign node should be allowed");
       let ( _viewforest, save_plan, _warnings ) = result?;
       // Foreign nodes should be filtered out (no need to write)
-      assert_eq!(save_plan . define_nodes . len(), 0,
+      assert_eq!(save_plan . node_instructions . len(), 0,
                  "Unmodified foreign nodes should be filtered out");
       Ok(())
     }
 
-async fn test_modified_foreign_node_forks_with_default_repo (
+async fn test_modified_foreign_node_forks_with_default_skgrepo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       // Editing a foreign node FORKS it. The foreign node is a ROOT with
-      // no owned ancestor to infer a clone repo from, so the clone's
-      // repo DEFAULTS to the user's first owned repo ("main"). The
+      // no owned ancestor to infer a clone skgrepo from, so the clone's
+      // skgrepo DEFAULTS to the user's first owned skgrepo ("main"). The
       // fork rides in the plan's fork_specs (committed only on
       // confirmation); the foreign node itself is not written.
       let org_text: &str = indoc! {"
@@ -86,22 +86,22 @@ async fn test_modified_foreign_node_forks_with_default_repo (
           org_text, config, None )  ?;
       assert_eq! ( save_plan . fork_specs . len (), 1,
         "editing the foreign node should produce one fork" );
-      assert_eq! ( save_plan . fork_specs[0] . original_id, ID::from ("foreign2") );
-      assert_eq! ( save_plan . fork_specs[0] . clone . 0 . home_repo,
-                   RepoName::from ("main"),
+      assert_eq! ( save_plan . fork_specs[0] . original_skgid, ID::from ("foreign2") );
+      assert_eq! ( save_plan . fork_specs[0] . clone . 0 . home_skgrepo,
+                   SkgRepoName::from ("main"),
         "with no owned ancestor, the clone defaults to the first owned repo" );
-      assert! ( save_plan . define_nodes . iter () . all ( |d| ! matches! (
-                  d, DefineNode::Save (SaveNode (n))
+      assert! ( save_plan . node_instructions . iter () . all ( |d| ! matches! (
+                  d, NodeInstruction::Save (SaveNode (n))
                   if n . pid == ID::from ("foreign2") )),
         "the foreign node N itself must not be written" );
       Ok(())
     }
 
-async fn test_modified_foreign_node_body_forks_with_default_repo (
+async fn test_modified_foreign_node_body_forks_with_default_skgrepo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       // Editing a foreign node's body forks it too; same no-owned-ancestor
-      // situation -> the clone defaults to the first owned repo.
+      // situation -> the clone defaults to the first owned skgrepo.
       let org_text: &str = indoc! {"
         * (skg (node (id foreign2) (repo foreign))) Foreign node to modify
         MODIFIED BODY
@@ -111,8 +111,8 @@ async fn test_modified_foreign_node_body_forks_with_default_repo (
           org_text, config, None )  ?;
       assert_eq! ( save_plan . fork_specs . len (), 1,
         "editing the body should produce one fork" );
-      assert_eq! ( save_plan . fork_specs[0] . clone . 0 . home_repo,
-                   RepoName::from ("main"),
+      assert_eq! ( save_plan . fork_specs[0] . clone . 0 . home_skgrepo,
+                   SkgRepoName::from ("main"),
         "with no owned ancestor, the clone defaults to the first owned repo" );
       Ok(())
     }
@@ -130,7 +130,7 @@ async fn test_writeProtected_foreign_node_filtered (
       assert!(result . is_ok(), "WriteProtected foreign node should be allowed");
       let ( _viewforest, save_plan, _warnings ) = result?;
       // WriteProtected foreign nodes should be filtered out (no append)
-      assert_eq!(save_plan . define_nodes . len(), 0,
+      assert_eq!(save_plan . node_instructions . len(), 0,
                  "WriteProtected foreign nodes should be filtered out");
       Ok(())
     }
@@ -149,8 +149,8 @@ async fn test_owned_node_unchanged_behavior (
       // Should succeed - owned nodes can be modified
       assert!(result . is_ok(), "Owned node modification should be allowed");
       let ( _viewforest, save_plan, _warnings ) = result?;
-      // Owned node should be included in instructions
-      assert!(save_plan . define_nodes . len() > 0,
+      // Owned node should be included in nodeInstructions
+      assert!(save_plan . node_instructions . len() > 0,
               "Owned node should be included in save instructions");
       Ok(())
     }
@@ -179,7 +179,7 @@ async fn test_delete_foreign_node_rejected (
 async fn test_new_foreign_node_rejected (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-      // Try to create a new node in foreign repo
+      // Try to create a new node in foreign skgrepo
       let org_text: &str = indoc! {"
         * (skg (node (id new_foreign) (repo foreign))) New foreign node
         This should not be allowed
@@ -213,16 +213,16 @@ async fn test_mixed_owned_and_foreign_nodes (
       // Should succeed
       assert!(result . is_ok(), "Mixed owned and unmodified foreign should be allowed");
       let ( _viewforest, save_plan, _warnings ) = result?;
-      // Only owned node should be in instructions (foreign filtered out)
-      assert!(save_plan . define_nodes . len() > 0, "Should have owned node instructions");
-      // Verify no foreign nodes in instructions
-      for instr in &save_plan . define_nodes {
-        let repo: &str = match instr {
-          DefineNode::Save(SaveNode (node)) =>
-            node . home_repo . as_str(),
-          DefineNode::Delete(DeleteNode { home_repo: repo, .. }) =>
-            repo . as_str() };
-        assert_eq!( repo, "main", "Only owned (in this case from repo main) nodes should be in instructions"); }
+      // Only owned node should be in nodeInstructions (foreign filtered out)
+      assert!(save_plan . node_instructions . len() > 0, "Should have owned node instructions");
+      // Verify no foreign nodes in nodeInstructions
+      for instr in &save_plan . node_instructions {
+        let skgrepo: &str = match instr {
+          NodeInstruction::Save(SaveNode (node)) =>
+            node . home_skgrepo . as_str(),
+          NodeInstruction::Delete(DeleteNode { home_skgrepo: skgrepo, .. }) =>
+            skgrepo . as_str() };
+        assert_eq!( skgrepo, "main", "Only owned (in this case from repo main) nodes should be in instructions"); }
       Ok(())
     }
 

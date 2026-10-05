@@ -13,14 +13,14 @@
 //
 // Buffer (modeled on Jeff's actual scenario):
 //   * parent
-//   ** victim (editRequest delete)   <-- definitive, asks for delete
+//   ** victim (editRequest delete)   <-- editable, asks for delete
 //   ** via
 //   *** victim write-protected                 <-- write-protected view of the same node
 //
 // Expected: save succeeds and victim is deleted.
 // Currently: AmbiguousDeletion error -- the write-protected occurrence is
 // being treated as a "do not delete" stance, contradicting the
-// definitive editRequest-delete elsewhere.
+// editable editRequest-delete elsewhere.
 
 use indoc::indoc;
 use std::error::Error;

@@ -49,7 +49,7 @@
   ([[../../server/serve/handlers/title_matches.rs][title_matches.rs:265]]).
   Regex and body search do not exist. The Tantivy schema
   ([[../../server/dbs/tantivy.rs][tantivy.rs:63]]) has exactly one indexed field,
-  =title_or_alias=. 'SkgNode.body' ([[../../server/types/skgnode.rs][skgnode.rs:36]])
+  =title_or_alias=. 'Graphnode.body' ([[../../server/types/skgnode.rs][skgnode.rs:36]])
   is defined but unindexed. 'search_index'
   ([[../../server/dbs/tantivy.rs][tantivy.rs:84]]) passes the query string raw to Tantivy's
   'QueryParser' with no sanitization, so special-character titles
@@ -292,7 +292,7 @@
       'create_documents_from_node' when a new flag
       'SkipBody=true' is passed).
    2. /After init, in =main()/=: before 'serve' is called, spawn
-      a thread that walks all SkgNodes again and, for each,
+      a thread that walks all Graphnodes again and, for each,
       deletes the existing id-keyed docs and re-adds with body
       populated. Commit in chunks of e.g. 1000 nodes.
    3. /Readiness flag/: 'Arc<AtomicBool> body_index_ready',
@@ -386,7 +386,7 @@
      =.body_index_complete= as a fifth 'incremental_init_of_dbs'
      precondition; in 'full_init' and 'incremental_init_of_dbs' spawn
      the background body indexer. Thread signature
-     'fn background_body_indexer(nodes: Arc<[SkgNode]>, ti:
+     'fn background_body_indexer(nodes: Arc<[Graphnode]>, ti:
      TantivyIndex, ready: Arc<AtomicBool>, marker_path: PathBuf)'.
    - [[../../server/dbs/tantivy.rs][tantivy.rs]]: 'create_documents_from_node' takes a
      'skip_body: bool' parameter; two escape functions

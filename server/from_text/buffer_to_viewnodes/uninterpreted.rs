@@ -67,15 +67,15 @@ pub fn org_to_uninterpreted_viewforest(
   // treeid_stack[1] is the current view root, etc.
   let mut treeid_stack: Vec<NodeId> = vec![ {
     let viewforest_root_treeid: NodeId =
-      viewforest . internal_root_id ();
+      viewforest . internal_root_skgid ();
     viewforest_root_treeid } ];
-  for view_node_line_col in & {
-    let view_node_line_cols: Vec<ViewnodeLineCol> =
+  for viewnode_line_col in & {
+    let viewnode_line_cols: Vec<ViewnodeLineCol> =
       divide_into_viewNodeLineCols (input)?;
-    view_node_line_cols } {
+    viewnode_line_cols } {
     let (level, viewnode, error_opt, warning_opt)
       : (usize, MpViewnode, Option<BufferValidationError>, Option<String>)
-      = linecol_to_viewnode (view_node_line_col)?;
+      = linecol_to_viewnode (viewnode_line_col)?;
     if let Some (error) = error_opt {
       parsing_errors . push (error); }
     if let Some (warning) = warning_opt {
@@ -161,14 +161,14 @@ mod imported_body_tests {
 /// This helper extracts the node creation logic from the main parsing function.
 /// Returns (level, MpViewnode, error, warning).
 fn linecol_to_viewnode(
-  view_node_line_col: &ViewnodeLineCol
+  viewnode_line_col: &ViewnodeLineCol
 ) -> Result < ( usize, MpViewnode,
                 Option<BufferValidationError>,
                 Option<String> ),
               String > {
   let (level, metadata_option, title): HeadlineInfo =
-    view_node_line_col . headline . clone();
-  let body_lines: &[String] = &view_node_line_col . body;
+    viewnode_line_col . headline . clone();
+  let body_lines: &[String] = &viewnode_line_col . body;
   let body_text: Option<String> =
     if body_lines . is_empty() { None
     } else { Some(body_lines . join ("\n")) };
@@ -192,9 +192,9 @@ fn linecol_to_viewnode(
       . to_string () ); }
   let error_opt : Option<BufferValidationError> =
     error_opt . or_else ( || if body_on_writeProtected {
-      Some (match metadata . id . clone () {
-        Some (id) => BufferValidationError::EditedWriteProtectedOccurrence {
-          id,
+      Some (match metadata . skgid . clone () {
+        Some (skgid) => BufferValidationError::EditedWriteProtectedOccurrence {
+          skgid   : skgid,
           title   : title . clone (),
           changes : vec!["added body text" . to_string ()], },
         None => BufferValidationError::Other (

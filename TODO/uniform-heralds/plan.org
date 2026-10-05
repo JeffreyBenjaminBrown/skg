@@ -43,13 +43,13 @@ on the outer edges; ancestor letters hug the relationship letter.
 
 *** Ancestor letters
 
-Lowercase letters count generations up the VIEW tree, INCLUDING col
-scaffolds: =a= = first ancestor = the visible parent, =b= =
+Lowercase letters count generations up the VIEW tree, INCLUDING folder
+non-vognodes: =a= = first ancestor = the visible parent, =b= =
 grandparent, =c= = great-grandparent, =d= = fourth, and so on. A letter
-flags "this specific ancestor is a member on this side." A scaffold
+flags "this specific ancestor is a member on this side." A non-vognode
 counts toward the distance but never receives a flag (it is not a graph
 node), so an =a= flag appears only when the visible parent is a real
-node (ordinary content); a col member's nearest flaggable ancestor is
+node (ordinary content); a folder member's nearest flaggable ancestor is
 its owner, two-or-more generations up.
 
 (The literal lowercase =a b c …= are ancestor flags; the =a=, =b=, =c=
@@ -126,7 +126,7 @@ The birth herald is a LIST, usually of length 1:
 - a backpath-grafted partner: its 'Birth::Backpath(role)' relation,
   rendered in the new letter scheme as a directional token toward the
   immediate graft parent;
-- a writable / read-only partner-col member: the col's relation toward
+- a writable / read-only partner-folder member: the folder's relation toward
   its owning ancestor (subscribee-as-such → =bS=; overrider-as-such →
   =Ob=; etc.);
 - a 'HiddenInSubscribee' member: TWO heralds — the hides herald (to
@@ -151,8 +151,8 @@ LOAD-BEARING for save extraction — see [[../../server/types/viewnode.rs][viewn
 'sourceHerald' (⌂:label); 'parentIs' independent (⊥) / absent;
 'textChanged'; the staged/unstaged diff axes; 'notInGit'; 'editRequest'
 (delete / merge); 'viewRequests'; the deleted / unknown / inactive /
-deadScaffold placeholders; the read-only-col ☮ scaffold markers; and
-the col labels ("aliases", "subscribeeCol", ...). The node 'writeProtected' ☮
+deadScaffold placeholders; the read-only-folder ☮ non-vognode markers; and
+the folder labels ("aliases", "subscribeeFolder", ...). The node 'writeProtected' ☮
 stays, repositioned to lead so the birth herald sits right after it.
 
 * Implementation, in order
@@ -175,15 +175,15 @@ A prerequisite for the surprising-links =bodyless= test.
   round-tripping each file through a YAML parser (or a tiny Rust/Python
   helper invoked by the script) over raw sed.
 
-** Step 1 — locate col owners without a new table
+** Step 1 — locate folder owners without a new table
 
 Fact-checked (see [[file:discussion.org][discussion.org]]): the owning ancestor is always the
-LAST entry of the col's 'required_ancestry' chain
+LAST entry of the folder's 'required_ancestry' chain
 ([[../../server/update_buffer/ancestry.rs][ancestry.rs]]), so no owner-depth table is needed. What we need:
 
-- the member→owner relation/role: 'PartnerCol::relation_member_role'
-  ([[../../server/to_org/complete/partner_col/kind.rs][kind.rs]]) supplies it for the six edge-backed cols; assign the two
-  filter cols ('HiddenInSubscribee', 'HiddenOutsideOfSubscribee') an
+- the member→owner relation/role: 'PartnerFolder::relation_member_role'
+  ([[../../server/to_org/complete/partner_col/kind.rs][kind.rs]]) supplies it for the six edge-backed folders; assign the two
+  filter folders ('HiddenInSubscribee', 'HiddenOutsideOfSubscribee') an
   explicit HIDER role (their owner is the subscriber, who hides them);
 - the intervening vognodes (for deeper ancestor flags and for the
   HiddenInSubscribee contains herald): the chain's other real-node
@@ -216,15 +216,15 @@ In [[../../server/update_buffer/viewnodestats.rs][viewnodestats.rs]]:
 - generalize the per-relation ANCESTOR FLAGS. Replace the ad-hoc
   'grandparentOverrides' / 'grandparentSubscribes' (the only two
   owner-relative stats today, reachable one gnode-hop up via
-  'VisibleParent::Col') with a pass that, for every node, checks its
+  'VisibleParent::Folder') with a pass that, for every node, checks its
   relation to the immediate visible parent (the =a= flag) and, for a
-  col member, additionally to the owning ancestor (the LAST
+  folder member, additionally to the owning ancestor (the LAST
   'required_ancestry' entry) and the intervening vognodes — recording,
   per relation and direction, which tracked ancestors are members;
 - designate the birth relationship(s) — a list: contains for ordinary
   content (via 'parentIsContainer'); the 'Birth::Backpath' role for
-  grafted partners; the col relation for col members; and the
-  two-or-one-herald rule for the filter cols (step 1).
+  grafted partners; the folder relation for folder members; and the
+  two-or-one-herald rule for the filter folders (step 1).
 
 ** Step 4 — assemble tokens + serialize
 

@@ -7,13 +7,13 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::{
 use skg::from_text::buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest,
   na_affectsParent_under_visible_parent_becomes_isContainer};
-use skg::test_utils::{run_with_shared_test_stores, compare_viewnode_trees_modulo_id, compare_viewnode_trees};
+use skg::test_utils::{run_with_shared_test_stores, compare_viewnode_trees_modulo_skgid, compare_viewnode_trees};
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, MpViewnodeKind, MpVognode};
-use skg::types::misc::{SkgConfig, ID, RepoName, TantivyIndex};
+use skg::types::misc::{SkgConfig, ID, SkgRepoName, TantivyIndex};
 use skg::types::tree::forest::{
   MpViewForest,
-  tree_forest_root_ids};
+  tree_forest_root_skgids};
 use skg::types::viewnode::AffectsParent;
 
 use ego_tree::Tree;
@@ -32,31 +32,31 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_repo_inheritance_multi_level",
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
-      test_repo_inheritance_multi_level (
+      test_skgrepo_inheritance_multi_level (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_repoless_folder_member_gets_graph_repo",
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
-      test_repoless_folder_member_gets_graph_repo (
+      test_repoless_folder_member_gets_graph_skgrepo (
         &s . config ) . await ?;
       Ok (( )) } )) }
 
 /// Regression for TODO/DONE/BUG_reciprocal-subscribe.org: a subscribee
 /// pasted from the link stack arrives as a bare id under a
-/// 'subscribeeFolder' non-vognode, with no repo. Its org-parent is a
+/// 'subscribeeFolder' non-vognode, with no skgrepo. Its viewparent is a
 /// non-vognode, so 'inherit_parent_repo_if_possible' cannot supply a
-/// repo; enrichment must resolve it from the graph by id instead.
+/// skgrepo; enrichment must resolve it from the graph by id instead.
 /// Before the fix this node stayed repoless and the save was refused
 /// with "ActiveVognode must have a repo that exists in the config".
-async fn test_repoless_folder_member_gets_graph_repo (
+async fn test_repoless_folder_member_gets_graph_skgrepo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  // 'root' is an extra_id of fixture node 'root-pid', whose repo is
-  // 'main'. The subscribee reference below carries neither repo nor
+  // 'root' is an extra_id of fixture node 'root-pid', whose skgrepo is
+  // 'main'. The subscribee reference below carries neither skgrepo nor
   // the primary id, and is write-protected -- exactly the bare-paste shape
   // (a link-stack paste yields a write-protected node with only an id).
   let input : &str =
     indoc! {"
-            * (skg (node (id owner) (repo main))) owner
+            * (skg (node (id recorder) (repo main))) recorder
             ** (skg subscribeeFolder)
             *** (skg (node (id root) writeProtected)) subscribee reference
         "};
@@ -64,18 +64,18 @@ async fn test_repoless_folder_member_gets_graph_repo (
     org_to_uninterpreted_viewforest (input) . unwrap() . 0;
   add_missing_info_to_viewforest (
     &mut viewforest, &config) ?;
-  let owner = viewforest . root() . first_child() . unwrap();
-  let folder   = owner . first_child() . unwrap();
+  let recorder = viewforest . root() . first_child() . unwrap();
+  let folder   = recorder . first_child() . unwrap();
   let member = folder . first_child() . unwrap();
   match &member . value() . kind {
     MpViewnodeKind::Vognode (MpVognode::Active (t)) => {
       assert_eq! (
-        t . home_repo, Some (RepoName::from ("main")),
+        t . home_skgrepo, Some (SkgRepoName::from ("main")),
         "Repoless folder member should inherit its repo from the \
          graph (node root-pid lives in repo 'main'), not stay \
          repoless." );
       assert_eq! (
-        t . id . as_ref() . unwrap() . 0, "root-pid",
+        t . skgid . as_ref() . unwrap() . 0, "root-pid",
         "The referenced id 'root' should have resolved to its pid \
          'root-pid'." ); }
     _ => panic! ("expected an ActiveVognode subscribee member") }
@@ -95,7 +95,7 @@ async fn test_add_missing_info_logic (
   // Applying 'add_missing_info_to_viewforest' should make
   // 'with_missing_info' equivalent to 'without_missing_info',
   // modulo the specific ID values added.
-  // Also tests repo inheritance from parent to children.
+  // Also tests skgrepo inheritance from parent to children.
   let with_missing_info: &str =
     indoc! {"
             * (skg (node (id root) (repo main))) root
@@ -124,21 +124,21 @@ async fn test_add_missing_info_logic (
     org_to_uninterpreted_nodes(
       without_missing_info ) . unwrap() . 0;
   assert_eq!(
-    tree_forest_root_ids (&expected_viewforest) . len(),
+    tree_forest_root_skgids (&expected_viewforest) . len(),
     1,
     "Expected exactly one tree in the expected viewforest" );
   assert!(
-    compare_viewnode_trees_modulo_id(
+    compare_viewnode_trees_modulo_skgid(
       &after_adding_missing_info,
       &expected_viewforest),
     "add_missing_info_to_viewforest: Forests not equivalent modulo ID." );
 
   { let actual_root : &MpViewnode =
       after_adding_missing_info . root() . first_child() . unwrap() . value();
-    let actual_root_id : &ID =
-      actual_root . id_opt() . unwrap();
+    let actual_root_skgid : &ID =
+      actual_root . skgid_opt() . unwrap();
     assert_eq!(
-      actual_root_id . 0,
+      actual_root_skgid . 0,
       "root-pid",
       "Root ID 'root' should have changed to 'root-pid', based on the .skg file in fixtures/."
     ); }
@@ -175,19 +175,19 @@ fn test_na_affectsParent_under_visible_parent_becomes_isContainer () {
     _ => panic! ("expected moved ActiveVognode") }
 }
 
-async fn test_repo_inheritance_multi_level (
+async fn test_skgrepo_inheritance_multi_level (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      test_repo_inheritance_logic ( config ) . await ?;
+      test_skgrepo_inheritance_logic ( config ) . await ?;
       Ok (( )) }
 
-async fn test_repo_inheritance_logic (
+async fn test_skgrepo_inheritance_logic (
   config : &SkgConfig,
 
 ) -> Result<(), Box<dyn Error>> {
-  // Tests repo inheritance through multiple levels,
-  // with explicit repos overriding inheritance at various depths.
+  // Tests skgrepo inheritance through multiple levels,
+  // with explicit skgrepos overriding inheritance at various depths.
   let input: &str =
     indoc! {"
             * (skg (node (id 1) (repo main))) _

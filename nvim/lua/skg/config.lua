@@ -1,6 +1,6 @@
 -- PURPOSE: Read configuration from skgconfig.toml.
 -- The Lua port of elisp/skg-config.el's parsing half. The interactive
--- repo pickers that elisp kept in the same file (built on
+-- skgrepo pickers that elisp kept in the same file (built on
 -- completing-read with S-arrow cycling) live in skg.picker instead,
 -- since they are UI, not parsing. Like the elisp, this is a
 -- hand-rolled line scan of the narrow TOML subset skgconfig.toml
@@ -62,10 +62,10 @@ function M.owned_folder_from_toml (file)
   return 'owned'
 end
 
----Names of the OWNED repos in FILE, in declaration order. A repo
+---Names of the OWNED skgrepos in FILE, in declaration order. A skgrepo
 ---is owned iff its path (resolved against FILE's directory, the data
 ---root) sits under the data root's owned_folder (default 'owned') --
----the author-folder layout, mirroring the server's rule. A repo
+---the author-folder layout, mirroring the server's rule. A skgrepo
 ---with no 'name' key defaults its name to its path, also mirroring
 ---the server.
 ---@param file string
@@ -125,13 +125,13 @@ function M.table_names_from_toml (file, table_name)
 end
 
 ---@param file string
----@return string[] configured repo names
+---@return string[] configured skgrepo names
 function M.repo_names_from_toml (file)
   return M.table_names_from_toml(file, 'repos')
 end
 
 ---Pairs of {name, absolute dir} for each [[repos]] entry in FILE.
----Relative repo paths are resolved against the directory of FILE,
+---Relative skgrepo paths are resolved against the directory of FILE,
 ---matching what the server's 'make_paths_absolute' does at
 ---config-load time.
 ---@param file string
@@ -186,11 +186,11 @@ function M.repo_names ()
   return file and M.repo_names_from_toml(file) or nil
 end
 
----The repo-set choices, in privacy order, ending with 'all'.
----A repo-set is a prefix of the config's privacy order: each
+---The skgrepo-set choices, in privacy order, ending with 'all'.
+---A skgrepo-set is a prefix of the config's privacy order: each
 ---repo names the set of itself and everything more public;
----'all' means every repo.
----@return string[]|nil repo-set choices, 'all' last, or nil
+---'all' means every skgrepo.
+---@return string[]|nil skgrepo-set choices, 'all' last, or nil
 function M.repo_set_names ()
   local file = M.config_file()
   if not file then return nil end
@@ -199,7 +199,7 @@ function M.repo_set_names ()
   return names
 end
 
----@return string[]|nil owned repo names, or nil without config
+---@return string[]|nil owned skgrepo names, or nil without config
 function M.owned_repos ()
   local file = M.config_file()
   return file and M.owned_repos_from_toml(file) or nil

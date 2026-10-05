@@ -1,7 +1,7 @@
 /// Git diff view tests for the INBOUND folders (subscriberFolder,
-/// overriderFolder, hiderFolder): the edges live in the MEMBERS' files, so
+/// overriderFolder, hiderFolder): the relationships live in the MEMBERS' files, so
 /// the INVERSE SCAN supplies the per-stage signs
-/// (TODO/full-schema/12-2_diff-mode-policy_discussion.org).  Members
+/// (TODO/DONE/full-schema/DONE/12-2_diff-mode-policy_discussion.org).  Members
 /// removed since HEAD appear as phantoms appended after the real
 /// members; members added since HEAD carry per-stage 'addedR'.
 ///
@@ -14,7 +14,7 @@
 /// - newfile-r (a NEW file) overrides N4 -> member with addedN addedR.
 /// - del-s subscribed to SN; file deleted -> subscriberFolder analogue.
 /// - new-s newly subscribes to SN -> subscriberFolder addedR.
-/// - edge-h hid HN; edge removed -> hiderFolder analogue.
+/// - edge-h hid HN; relationship removed -> hiderFolder analogue.
 /// - new-h newly hides HN -> hiderFolder addedR.
 
 use super::common::*;
@@ -37,7 +37,7 @@ fn setup_inbound_fixtures_staged (
     "tests/git_diff_view/inbound/fixtures/head",
     "tests/git_diff_view/inbound/fixtures/worktree" ) }
 
-/// The buffer a user would save: each owner with its inbound folder
+/// The buffer a user would save: each recorder with its inbound folder
 /// holding the current (worktree) members.  N1's and N2's folders are
 /// present but empty -- their only members are gone from the
 /// worktree -- so everything those folders show must come from the
@@ -115,7 +115,7 @@ async fn run_inbound_save_test (
   let gitrepo_path : &Path = temp_dir . path ();
   if staged { setup_inbound_fixtures_staged (gitrepo_path)?; }
   else      { setup_inbound_fixtures        (gitrepo_path)?; }
-  s . reset_with_repo_path (subtest_name, gitrepo_path) ?;
+  s . reset_with_skgrepo_path (subtest_name, gitrepo_path) ?;
   let (config, tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
@@ -131,7 +131,7 @@ async fn run_inbound_save_test (
     assert_buffer_contains (&first . saved_view, expected);
     { // Write-protected-folder saves remain unaffected by phantoms: saving
       // the rendered result (phantoms included) resurrects no file
-      // and re-adds no edge, and the phantoms regenerate.
+      // and re-adds no relationship, and the phantoms regenerate.
       let second = {
         let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
         update_from_and_rerender_buffer (

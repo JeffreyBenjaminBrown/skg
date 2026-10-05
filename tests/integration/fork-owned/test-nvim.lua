@@ -105,12 +105,12 @@ vim.api.nvim_set_current_buf(confirm_buf)
 T.check(T.buffer_text(confirm_buf):find('(id M)', 1, true),
         'confirmation buffer does not list M')
 print('fork_node produced a fork-confirmation listing M')
--- Approving before picking a repo is refused.
+-- Approving before picking a skgrepo is refused.
 local approved_early_ok = pcall(save.approve_fork)
 T.check(not approved_early_ok,
         'approve must be refused until a repo is picked')
 print('approve refused until a repo is picked')
--- Pick the clone's repo, then approve.
+-- Pick the clone's skgrepo, then approve.
 local clone_line = goto_line_starting_with('* (skg (node (repo ',
   'could not find the clone-to-be headline')
 metadata.change_repo_at_line(clone_line, 'owned')
@@ -145,7 +145,7 @@ T.check(decline_confirm_buf, 'no fork-confirmation buffer for M2 appeared')
 vim.api.nvim_set_current_buf(decline_confirm_buf)
 save.decline_fork()
 
--- The origin buffer's M2 headline no longer carries a fork request.
+-- The source buffer's M2 headline no longer carries a fork request.
 T.check(vim.api.nvim_buf_is_valid(q2_buf),
         "Q2's buffer vanished after decline")
 T.check(not T.buffer_text(q2_buf):find('(viewRequests', 1, true),
@@ -164,7 +164,7 @@ T.check(not T.buffer_text(q2_buf):find('(overridesHere M2)', 1, true),
 print('decline committed nothing (no clone overrides M2)')
 
 -- 7. KILLING the confirmation buffer directly (not via approve/decline)
---    must also strip the lingering fork atom from the origin.
+--    must also strip the lingering fork atom from the source buffer.
 content_view.request_single_root_content_view_from_id('Q3')
 local q3_buf = T.wait_for(function () return buffer_showing('Q3') end, 10)
 T.check(q3_buf, "Q3's view never appeared")

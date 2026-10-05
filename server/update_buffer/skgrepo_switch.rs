@@ -1,22 +1,22 @@
 /// Applying a repo-set switch to an already-drawn view
-/// (TODO/full-schema/9-2_repo-set-safety.org).  Two passes:
-/// convert every Active viewnode from a now-inactive repo into an
+/// (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org).  Two passes:
+/// convert every Active viewnode from a now-inactive skgrepo into an
 /// InactiveVognode, then prune (DFS postorder, so emptied parents prune
 /// in the same sweep) every:
 /// - InactiveVognode leaf;
-/// - Property leaf whose owning gnode (grandparent) is inactive;
+/// - Property leaf whose owning vognode (grandparent) is inactive;
 /// - write-protected leaf partner (child of a PartnerFolder), active or
 ///   inactive: a write-protected partner defines nothing, and
 ///   completion regenerates current membership afterward;
 /// - empty PropertyFolder or PartnerFolder;
 /// - DeadViewnode leaf.
 /// What survives includes active nodes, inactive nodes with
-/// surviving children (the retained case), and definitive partners
+/// surviving children (the retained case), and editable partners
 /// (the user may be mid-edit inside them).  Completion (run with folder
 /// creation enabled) then rebuilds folders and members for the new
 /// active set.
 
-use crate::repo_sets::ActiveRepoSet;
+use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::viewnode::{
   mk_inactive_viewnode, PartnerFolder, PropertyFolder, Viewnode, ViewnodeKind,
   Vognode };
@@ -25,9 +25,9 @@ use crate::update_buffer::util::subtree_satisfies;
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::error::Error;
 
-pub fn convert_and_prune_for_repo_switch (
+pub fn convert_and_prune_for_skgrepo_switch (
   tree   : &mut Tree<Viewnode>,
-  active : &ActiveRepoSet,
+  active : &ActiveSkgRepoSet,
 ) -> Result<(), Box<dyn Error>> {
   convert_now_inactive_actives (tree, active);
   let root : NodeId = tree . root () . id ();
@@ -36,23 +36,23 @@ pub fn convert_and_prune_for_repo_switch (
 
 fn convert_now_inactive_actives (
   tree   : &mut Tree<Viewnode>,
-  active : &ActiveRepoSet,
+  active : &ActiveSkgRepoSet,
 ) {
   if active . is_all () { return; }
-  let ids : Vec<NodeId> =
+  let skgids : Vec<NodeId> =
     tree . root () . descendants ()
     . map ( |n| n . id () )
     . collect ();
-  for id in ids {
+  for skgid in skgids {
     let conversion : Option<ViewnodeKind> =
-      tree . get (id)
+      tree . get (skgid)
       . and_then ( |n| match &n . value () . kind {
           ViewnodeKind::Vognode (Vognode::Active (t))
-            if ! active . contains_repo (&t . home_repo)
+            if ! active . contains_skgrepo (&t . home_skgrepo)
             => Some ( mk_inactive_viewnode () . kind ),
           _ => None } );
     if let Some (kind) = conversion {
-      tree . get_mut (id) . unwrap () . value () . kind = kind; }}}
+      tree . get_mut (skgid) . unwrap () . value () . kind = kind; }}}
 
 /// Recursively prune 'node's descendants, then report whether 'node'
 /// itself should be detached (the parent's loop detaches it, so the
@@ -63,11 +63,11 @@ fn prune_children_postorder (
   tree : &mut Tree<Viewnode>,
   node : NodeId,
 ) -> Result<bool, Box<dyn Error>> {
-  let child_ids : Vec<NodeId> =
+  let child_skgids : Vec<NodeId> =
     tree . get (node)
     . ok_or ("prune_children_postorder: node not found") ?
     . children () . map ( |c| c . id () ) . collect ();
-  for child in child_ids {
+  for child in child_skgids {
     if prune_children_postorder (tree, child) ? {
       let had_focus : bool =
         subtree_satisfies (

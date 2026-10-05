@@ -5,9 +5,9 @@ use super::*;
 #[test]
 fn partnerFolder_policy_mapping () {
   assert_eq! ( PartnerFolder::Subscribee . policy (),
-               FolderPolicy::WritableSet );
+               FolderPolicy::EditableSet );
   assert_eq! ( PartnerFolder::Overridden . policy (),
-               FolderPolicy::WritableSet );
+               FolderPolicy::EditableSet );
   assert_eq! ( PartnerFolder::Subscriber . policy (),
                FolderPolicy::WriteProtectedSet );
   assert_eq! ( PartnerFolder::Overrider . policy (),
@@ -24,14 +24,14 @@ fn partnerFolder_policy_mapping () {
 #[test]
 fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   let mut active : Viewnode = mk_viewnode (
-    ID::from ("active"), RepoName::from ("public"), "active" . into (),
+    ID::from ("active"), SkgRepoName::from ("public"), "active" . into (),
     AffectsParent::True, Birth::Unremarkable,
-    Editability::Definitive {
+    Editability::Editable {
       body : None,
       edit_request : Some (NodeEditRequest::Delete) },
     [ViewRequest::Definitive] . into_iter () . collect () );
   if let ViewnodeKind::Vognode (Vognode::Active (node)) = &mut active . kind {
-    node . relRepo_request = Some (RepoName::from ("private")); }
+    node . relRepo_request = Some (SkgRepoName::from ("private")); }
   active . consume_edit_request_after_save ();
   let ViewnodeKind::Vognode (Vognode::Active (active)) = &active . kind
   else { panic! ("expected active node"); };
@@ -42,9 +42,9 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   let mut unknown : Viewnode = Viewnode {
     focused : false, folded : false, body_folded : false,
     kind : ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (PhantomUnknown {
-      id : ID::from ("unknown"),
+      skgid : ID::from ("unknown"),
       relRepo : None,
-      relRepo_request : Some (RepoName::from ("private")), }))) };
+      relRepo_request : Some (SkgRepoName::from ("private")), }))) };
   unknown . consume_edit_request_after_save ();
   let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) = &unknown . kind
   else { panic! ("expected unknown node"); };
@@ -55,7 +55,7 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
     kind : ViewnodeKind::Property (Property::Alias {
       text : "alias" . into (),
       relRepo : None,
-      relRepo_request : Some (RepoName::from ("private")),
+      relRepo_request : Some (SkgRepoName::from ("private")),
       relationship_axes : RelationshipAxes::default (), }) };
   alias . consume_edit_request_after_save ();
   let ViewnodeKind::Property (Property::Alias { relRepo_request, .. }) =

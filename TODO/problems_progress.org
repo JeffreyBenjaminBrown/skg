@@ -83,7 +83,7 @@
     handing the tag to a general-purpose edit helper with a "delete
     these nested fields" instruction. But that helper, when told to
     edit a part of the tag that wasn't there, would CREATE it. So a tag
-    that was not a real node -- a phantom, a scaffold, a search result
+    that was not a real node -- a phantom, a non-vognode, a search result
     -- came out with a freshly-invented '(node ...)' part bolted on,
     and a real node that simply had no statistics came out with
     nonsense '(graphStats (DELETE ...))' text inserted.
@@ -194,4 +194,4 @@
     display-only; the server discards them when reading a buffer back.
   - node (in a metadata sexp): the '(node ...)' part of a '(skg ...)'
     tag, present when the line stands for a real graph node (a
-    "TrueNode") rather than a display-only scaffold.
+    "ActiveVognode") rather than a display-only non-vognode.

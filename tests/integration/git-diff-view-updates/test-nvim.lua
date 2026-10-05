@@ -141,7 +141,7 @@ assert_headline_titles(buf_a,
   'phase 1: view-a initial')
 
 -- PHASE 2: open view-b. multi_root_view prepends b's containerward
--- ancestry (a) as b's first child before the definitive true
+-- ancestry (a) as b's first child before the editable true
 -- children (c, d, e).
 print('=== PHASE 2: Open view from b ===')
 require('skg.content_view').request_single_root_content_view_from_id('b')

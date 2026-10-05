@@ -3,11 +3,11 @@
 // When the completion pass repairs a write-protected PartnerFolder in the
 // view the user just saved, the save succeeds and
 // SaveResponse.warnings says what was repaired
-// (TODO/full-schema/8_readonly-set-ergonomics.org):
+// (TODO/DONE/full-schema/DONE/8_readonly-set-ergonomics.org):
 // - a deleted generated member is restored, with a warning that
 //   explains membership is edited from the other side;
-// - a non-member parked as Affected with a subtree is demoted to
-//   independent, with a warning.
+// - a non-member parked with affectsParent true and a subtree is
+//   demoted to affectsParent false, with a warning.
 //
 // Fixture: r and t subscribe to n; the test explicitly asks for n's
 // subscription folders. x is an unrelated node the test parks inside that
@@ -94,7 +94,7 @@ async fn write_protected_folder_repairs_warn_impl (
     let t_line : String =
       line_containing (&complete_buffer, "(id t)") . to_string ();
     let x_line : String = {
-      // x: a definitive Affected leaf parked inside the folder, with a
+      // x: an editable member leaf parked inside the folder, with a
       // (new) child so the repair is a demotion, not a removal.
       let mut l : String =
         r_line

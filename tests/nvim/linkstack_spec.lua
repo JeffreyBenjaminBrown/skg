@@ -32,7 +32,7 @@ local function cursor_on (needle, offset)
 end
 
 describe('skg.linkstack push', function ()
-  before_each(function () state.id_stack = {} end)
+  before_each(function () state.linkstack = {} end)
   after_each(function ()
     pcall(vim.api.nvim_buf_delete,
           vim.api.nvim_get_current_buf(), { force = true })
@@ -46,20 +46,20 @@ describe('skg.linkstack push', function ()
       '* (skg (node (id 6))) just a title' }, '\n'))
     for _, id in ipairs({ '1', '3', '6' }) do
       cursor_on(string.format('(id %s)', id), 2)
-      local before = #state.id_stack
+      local before = #state.linkstack
       linkstack.id_push()
-      assert.are.equal(before + 1, #state.id_stack)
-      assert.are.equal(id, state.id_stack[1][1])
+      assert.are.equal(before + 1, #state.linkstack)
+      assert.are.equal(id, state.linkstack[1][1])
     end
     -- From the title area, still finds the metadata id.
     cursor_on('just a title', 3)
     linkstack.id_push()
-    assert.are.same({ '6', 'just a title' }, state.id_stack[1])
+    assert.are.same({ '6', 'just a title' }, state.linkstack[1])
     -- Fake metadata must not push.
-    local before = #state.id_stack
+    local before = #state.linkstack
     cursor_on('fake metadata', 2)
     linkstack.id_push()
-    assert.are.equal(before, #state.id_stack)
+    assert.are.equal(before, #state.linkstack)
   end)
 
   it('pushes the inline link when point is on one', function ()
@@ -67,8 +67,8 @@ describe('skg.linkstack push', function ()
                 .. ' [[id:inner-id][inner label]] inside')
     cursor_on('inner label', 3)
     linkstack.id_push()
-    assert.are.equal(1, #state.id_stack)
-    assert.are.same({ 'inner-id', 'inner label' }, state.id_stack[1])
+    assert.are.equal(1, #state.linkstack)
+    assert.are.same({ 'inner-id', 'inner label' }, state.linkstack[1])
   end)
 
   it('stacks pushes most-recent-first', function ()
@@ -84,10 +84,10 @@ describe('skg.linkstack push', function ()
     -- inline link would win here.)
     vim.api.nvim_win_set_cursor(0, { 2, 24 })
     linkstack.id_push()
-    assert.are.equal(2, #state.id_stack)
+    assert.are.equal(2, #state.linkstack)
     assert.are.same({ 'b', 'b has a [[id:a][link to a]]' },
-                    state.id_stack[1])
-    assert.are.same({ 'a', 'a' }, state.id_stack[2])
+                    state.linkstack[1])
+    assert.are.same({ 'a', 'a' }, state.linkstack[2])
   end)
 end)
 
@@ -99,29 +99,29 @@ describe('skg.linkstack paste and pop', function ()
 
   it('paste_node inserts a write-protected node without popping',
      function ()
-    state.id_stack = { { 'id-1', 'Title from stack' } }
+    state.linkstack = { { 'id-1', 'Title from stack' } }
     buffer_with('')
     linkstack.paste_node()
     assert.are.equal(
       '* (skg (node (id id-1) writeProtected)) Title from stack\n',
       buffer_text())
     assert.are.same({ { 'id-1', 'Title from stack' } },
-                    state.id_stack)
+                    state.linkstack)
   end)
 
   it('pop_node inserts and pops', function ()
-    state.id_stack = { { 'id-2', 'Second' }, { 'id-1', 'First' } }
+    state.linkstack = { { 'id-2', 'Second' }, { 'id-1', 'First' } }
     buffer_with('')
     linkstack.pop_node()
     assert.are.equal('* (skg (node (id id-2) writeProtected)) Second\n',
                      buffer_text())
-    assert.are.same({ { 'id-1', 'First' } }, state.id_stack)
+    assert.are.same({ { 'id-1', 'First' } }, state.linkstack)
   end)
 
   ---Paste id-1 at the end of a view containing EXISTING_LINE.
   ---@return string buffer text, string|nil last notification
   local function paste_node_in_view (existing_line)
-    state.id_stack = { { 'id-1', 'Title from stack' } }
+    state.linkstack = { { 'id-1', 'Title from stack' } }
     buffer_with(existing_line .. '\n')
     vim.b.skg_view_uri = 'test-view'
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
@@ -144,20 +144,20 @@ describe('skg.linkstack paste and pop', function ()
     assert.is_nil(notified)
   end)
 
-  it('beside a writeable instance, paste_node stays write-protected',
+  it('beside a writable occurrence, paste_node stays write-protected',
      function ()
     local text, notified = paste_node_in_view(
-      '* (skg (node (id id-1) (repo main))) Writeable')
+      '* (skg (node (id id-1) (repo main))) Writable')
     assert.are.equal(
-      '* (skg (node (id id-1) (repo main))) Writeable\n'
+      '* (skg (node (id id-1) (repo main))) Writable\n'
       .. '* (skg (node (id id-1) writeProtected)) Title from stack\n',
       text)
-    assert.are.equal('NOTE: Pasting node write-protected because a writeable'
-                     .. ' instance is already present in this same buffer.',
+    assert.are.equal('NOTE: Pasting node write-protected because a writable'
+                     .. ' occurrence is already present in this same buffer.',
                      notified)
   end)
 
-  it('a pending definitive view request counts as writeable', function ()
+  it('a pending definitive view request counts as writable', function ()
     local text, notified = paste_node_in_view(
       '* (skg (node (id id-1) writeProtected'
       .. ' (viewRequests definitiveView))) First')
@@ -169,7 +169,7 @@ describe('skg.linkstack paste and pop', function ()
 
   it('paste_node after typed stars inserts only metadata and title',
      function ()
-    state.id_stack = { { 'id-1', 'Title from stack' } }
+    state.linkstack = { { 'id-1', 'Title from stack' } }
     buffer_with('** ')
     vim.api.nvim_win_set_cursor(0, { 1, 3 })
     linkstack.paste_node()
@@ -179,40 +179,40 @@ describe('skg.linkstack paste and pop', function ()
   end)
 
   it('paste_id and pop_id insert the bare id', function ()
-    state.id_stack = { { 'top-id', 'Top' }, { 'next-id', 'Next' } }
+    state.linkstack = { { 'top-id', 'Top' }, { 'next-id', 'Next' } }
     buffer_with('')
     linkstack.paste_id()
     assert.are.equal('top-id', buffer_text())
     linkstack.pop_id()
-    assert.are.same({ { 'next-id', 'Next' } }, state.id_stack)
+    assert.are.same({ { 'next-id', 'Next' } }, state.linkstack)
   end)
 end)
 
 describe('skg.linkstack stack buffer', function ()
   after_each(function ()
     for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-      if vim.api.nvim_buf_get_name(buf) == 'skg://id-stack' then
+      if vim.api.nvim_buf_get_name(buf) == 'skg://linkstack' then
         pcall(vim.api.nvim_buf_delete, buf, { force = true })
       end
     end
   end)
 
   it('formats the stack as org, head first', function ()
-    state.id_stack = {}
-    assert.are.equal('', linkstack.format_id_stack_as_org())
-    state.id_stack = { { 'id-1', 'label one' } }
+    state.linkstack = {}
+    assert.are.equal('', linkstack.format_linkstack_as_org())
+    state.linkstack = { { 'id-1', 'label one' } }
     assert.are.equal('* label one\nid-1',
-                     linkstack.format_id_stack_as_org())
-    state.id_stack = { { 'id-2', 'second' }, { 'id-1', 'first' } }
+                     linkstack.format_linkstack_as_org())
+    state.linkstack = { { 'id-2', 'second' }, { 'id-1', 'first' } }
     assert.are.equal('* second\nid-2\n* first\nid-1',
-                     linkstack.format_id_stack_as_org())
+                     linkstack.format_linkstack_as_org())
   end)
 
   it('validates good stack buffers', function ()
     local buf = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false,
       { '* the label', '  the-id', '* label 2', '  id-2' })
-    local ok, result = linkstack.validate_id_stack_buffer(buf)
+    local ok, result = linkstack.validate_linkstack_buffer(buf)
     assert.is_true(ok)
     assert.are.same({ { 'the-id', 'the label' },
                       { 'id-2', 'label 2' } }, result)
@@ -231,7 +231,7 @@ describe('skg.linkstack stack buffer', function ()
     for _, lines in ipairs(cases) do
       local buf = vim.api.nvim_create_buf(true, false)
       vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-      local ok = linkstack.validate_id_stack_buffer(buf)
+      local ok = linkstack.validate_linkstack_buffer(buf)
       assert.is_false(ok, vim.inspect(lines))
       vim.api.nvim_buf_delete(buf, { force = true })
     end
@@ -242,19 +242,19 @@ describe('skg.linkstack stack buffer', function ()
     for _, lines in ipairs({ { '' }, { ' ', '' }, { '', '' } }) do
       local buf = vim.api.nvim_create_buf(true, false)
       vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-      local ok, result = linkstack.validate_id_stack_buffer(buf)
+      local ok, result = linkstack.validate_linkstack_buffer(buf)
       assert.is_true(ok)
       assert.are.same({}, result)
       vim.api.nvim_buf_delete(buf, { force = true })
     end
   end)
 
-  it('view_id_stack opens the editable stack; :w updates the stack',
+  it('view_linkstack opens the editable stack; :w updates the stack',
      function ()
-    state.id_stack = { { 'uuid-123', 'My Node' } }
-    linkstack.view_id_stack()
+    state.linkstack = { { 'uuid-123', 'My Node' } }
+    linkstack.view_linkstack()
     local buf = vim.api.nvim_get_current_buf()
-    assert.are.equal('skg://id-stack',
+    assert.are.equal('skg://linkstack',
                      vim.api.nvim_buf_get_name(buf))
     assert.are.equal('* My Node\nuuid-123',
       table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false),
@@ -263,7 +263,7 @@ describe('skg.linkstack stack buffer', function ()
       { '* new label', 'new-id', '* another', 'another-id' })
     vim.cmd('write')
     assert.are.same({ { 'new-id', 'new label' },
-                      { 'another-id', 'another' } }, state.id_stack)
+                      { 'another-id', 'another' } }, state.linkstack)
     assert.is_false(vim.bo[buf].modified)
   end)
 end)

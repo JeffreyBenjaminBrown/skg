@@ -64,7 +64,7 @@ describe('skg.sexpr.activenode_defaults expansion', function ()
   it('inserts all default fields into a minimal ActiveVognode', function ()
     local headlines =
       expanded_headlines('(skg (node (id abc) (repo jeff)))')
-    -- skg, node, id/abc, repo/jeff, write-protected/false, affectsParent/true,
+    -- skg, node, id/abc, skgrepo/jeff, write-protected/false, affectsParent/true,
     -- birth/unremarkable, editRequest/none, viewRequests/none:
     -- each key AND each value is a separate headline.
     assert.are.equal(16, #headlines)

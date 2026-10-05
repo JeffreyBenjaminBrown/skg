@@ -1,4 +1,4 @@
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use crate::export_org::{
   export_candidate_pids, export_to_org, ExportReport};
 use crate::serve::handlers::text_release::{
@@ -12,14 +12,14 @@ use crate::serve::util::{
   send_response_with_length_prefix,
   tag_sexp_response,
   value_from_request_sexp};
-use crate::repo_sets::{ActiveRepoSet, RepoSetName};
+use crate::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
 use crate::types::misc::SkgConfig;
 use crate::types::nodes::complete::Graphnode;
 
 use std::net::TcpStream;
 use std::path::PathBuf;
 
-/// Export every export root, limited to the requested repo-set,
+/// Export every export root, limited to the requested skgrepo-set,
 /// into a chosen directory. Two REQUIRED request fields:
 /// `(repo-set . "NAME")` -- the set the client picked (with its
 /// circular selector) -- and `(output-dir . "PATH")` -- where to
@@ -36,14 +36,14 @@ pub fn handle_export_to_org_request (
   request : &str,
 ) {
   let prepared : Result<
-    (ActiveRepoSet, Vec<Graphnode>, PathBuf), String> = ( || {
+    (ActiveSkgRepoSet, Vec<Graphnode>, PathBuf), String> = ( || {
     let name : String =
       value_from_request_sexp ("repo-set", request) ?;
-    let active : ActiveRepoSet =
-      ActiveRepoSet::named (config, RepoSetName::from (name))
+    let active : ActiveSkgRepoSet =
+      ActiveSkgRepoSet::named (config, SkgRepoSetName::from (name))
       . map_err ( |e| e . to_string () ) ?;
     let nodes : Vec<Graphnode> =
-      read_all_skg_files_from_repos (config)
+      read_all_skg_files_from_skgrepos (config)
       . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
     let output_dir : String =
       value_from_request_sexp ("output-dir", request)

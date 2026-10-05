@@ -4,7 +4,7 @@
 # Tests: from a content view, skg-goto-in-magit opens magit-status
 # and navigates to the correct file with the right staging message.
 #
-# Setup: a git repo with two .skg files committed, then one modified.
+# Setup: a gitrepo with two .skg files committed, then one modified.
 
 set -e
 
@@ -32,7 +32,7 @@ title: "y"
 pid: "y"
 EOF
 
-    # Init git repo and commit
+    # Init gitrepo and commit
     cd "$SKG_DATA"
     rm -rf .git
     git init -q

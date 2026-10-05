@@ -2,8 +2,8 @@ use crate::context::{
   compute_and_store_context_types,
   content_maps_from_nodes,
   had_id_set_from_nodes,
-  mentioned_ids_from_nodes};
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos_collecting_violations;
+  mentioned_skgids_from_nodes};
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos_collecting_violations;
 use crate::dbs::filesystem::not_nodes::load_config;
 use crate::dbs::init::rebuild_tantivy_as_generation;
 use crate::telescope::invariants::{TelescopeViolation, report_telescope_violations};
@@ -63,7 +63,7 @@ pub fn rebuild_ephemeral_data_stores_in_place (
         "Reloading config from {}: {}", config_path, e) ) ?;
     let (nodes, load_violations)
       : (Vec<Graphnode>, Vec<(ID, TelescopeViolation)>) =
-      read_all_skg_files_from_repos_collecting_violations (&fresh_config)
+      read_all_skg_files_from_skgrepos_collecting_violations (&fresh_config)
       . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
     let (fresh_graph, mut graph_warnings) =
       validated_graph (&fresh_config, &nodes)
@@ -81,15 +81,15 @@ pub fn rebuild_ephemeral_data_stores_in_place (
       . map_err ( |e| format! ("Tantivy rebuild failed: {}", e) ) ?;
     tracing::info!("Ephemeral graph candidate and Tantivy rebuilt.");
     let had_id_set = had_id_set_from_nodes (&nodes);
-    let all_node_ids = nodes . iter ()
+    let all_node_skgids = nodes . iter ()
       . map ( |n| n . pid . clone () )
       . collect ();
-    let mentioned_ids = mentioned_ids_from_nodes (&nodes);
+    let mentioned_skgids = mentioned_skgids_from_nodes (&nodes);
     let (map_to_content, map_to_containers) =
       content_maps_from_nodes (&nodes);
     compute_and_store_context_types (
-      &new_tantivy, &had_id_set, &all_node_ids,
-      &mentioned_ids, &map_to_content, &map_to_containers )
+      &new_tantivy, &had_id_set, &all_node_skgids,
+      &mentioned_skgids, &map_to_content, &map_to_containers )
       . map_err ( |e| format! ("Context computation failed: {}", e) ) ?;
     tracing::info!("Context rankings recomputed.");
     { // Publish config, graph, and replacement index as one generation.

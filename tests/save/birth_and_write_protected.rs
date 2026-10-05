@@ -1,8 +1,8 @@
 // cargo test --test save birth_and_write_protected
 
-use skg::dbs::filesystem::one_node::graphnode_from_id;
+use skg::dbs::filesystem::one_node::graphnode_from_skgid;
 use skg::from_text::buffer_to_validated_saveplan;
-use skg::save::update_fs_from_saveinstructions;
+use skg::save::update_fs_from_nodeInstructions;
 use skg::test_utils::run_with_test_stores;
 use skg::types::misc::{ID, members_of};
 use skg::types::nodes::complete::Graphnode;
@@ -48,14 +48,14 @@ fn test_birth_and_write_protected(
           buffer_to_validated_saveplan(
             org_text,
             config, None ) ?;
-        update_fs_from_saveinstructions(
-          &save_plan . define_nodes,
+        update_fs_from_nodeInstructions(
+          &save_plan . node_instructions,
           &[],
           config . clone(), )?;
 
         { // verify writeProtected is treated correctly
           let node2 : Graphnode =
-            graphnode_from_id(
+            graphnode_from_skgid(
               config, &ID("2" . to_string() ))
 ?;
         assert_eq!(
@@ -65,7 +65,7 @@ fn test_birth_and_write_protected(
 
         { // verify affectsParent=false is treated correctly
           let node1 : Graphnode =
-            graphnode_from_id(
+            graphnode_from_skgid(
               config, &ID("1" . to_string() ))
 ?;
         assert!(

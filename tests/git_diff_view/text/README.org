@@ -1,6 +1,6 @@
 * what these tests do
 ** test scenario
-   For this test description, most orgnode metadata is omitted.
+   For this test description, most viewnode metadata is omitted.
    IDs are equal to titles unless otherwise indicated.
 *** head
     * 1
@@ -8,12 +8,12 @@
     11 has a body.
     ** 12
 *** worktree
-    * (skg (truenode (id 1) ..)..) 1 has a new title.
+    * (skg (node (id 1) ..)..) 1 has a new title.
     ** 11
     11 has a new body.
     ** 12
 ** expected git-diff view
-    * (skg (truenode (id 1) ..)..) 1 has a new title.
+    * (skg (node (id 1) ..)..) 1 has a new title.
     ** (skg textChanged) ;; or something; I'm not sure what the exact metadata syntax is for a TextChanged
     ** 11
     11 has a new body.

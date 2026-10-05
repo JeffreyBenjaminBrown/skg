@@ -1,12 +1,12 @@
 /// Pure merge functions letting a save under a restricted
-/// repo-set preserve relationship-list members the user could not
-/// see (TODO/full-schema/9-2_repo-set-safety.org).
+/// skgrepo-set preserve relationship-list members the user could not
+/// see (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org).
 ///
 /// VOCABULARY (shared by both functions):
 /// - A disk member is VISIBLE iff its relRepo is active
 ///   and, when it resolves, its node home is active too.  An
 ///   unresolvable raw member has no home, so an active relationship
-///   repo makes it visible as an Unknown and lets the user delete it.
+///   skgrepo makes it visible as an Unknown and lets the user delete it.
 /// - A disk member is POSITIONED iff it appears in the buffer list.
 ///   Only visible members ever do: save extraction never puts an
 ///   inactive (invisible) member into a container's list (see
@@ -19,47 +19,47 @@
 ///   by rendering and must survive.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::repo_sets::ActiveRepoSet;
-use crate::types::misc::{ID, RelPartner, SkgConfig, RepoName};
+use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::types::misc::{ID, RelPartner, SkgConfig, SkgRepoName};
 use crate::types::phantom::home_from_disk;
 
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
-/// Whether saving may treat this member as visible: its repo
+/// Whether saving may treat this member as visible: its skgrepo
 /// resolves (in-Rust graph first, then disk) and is in the active
 /// set.
 pub fn member_is_visible (
   graph  : &InRustGraph,
-  id     : &ID,
+  skgid  : &ID,
   config : &SkgConfig,
-  active : &ActiveRepoSet,
+  active : &ActiveSkgRepoSet,
 ) -> bool {
-  let repo : Option<RepoName> = {
-    let from_graph : Option<RepoName> =
-      graph . pid_and_repo (id)
+  let skgrepo : Option<SkgRepoName> = {
+    let from_graph : Option<SkgRepoName> =
+      graph . pid_and_skgrepo (skgid)
       . map ( |(_pid, src)| src );
-    from_graph . or_else ( || home_from_disk (id, config) ) };
-  match repo {
-    Some (src) => active . contains_repo (&src),
+    from_graph . or_else ( || home_from_disk (skgid, config) ) };
+  match skgrepo {
+    Some (src) => active . contains_skgrepo (&src),
     None       => false, }}
 
 /// Visibility of a structured relationship occurrence.  Its relRepo
 /// gates first.  A resolved member also needs an active home; an unresolved
 /// raw member has no home and is deliberately visible whenever its relationship
-/// repo is active, so the user can retain or remove the Unknown occurrence.
+/// skgrepo is active, so the user can retain or remove the Unknown occurrence.
 pub fn relationship_member_is_visible (
   graph  : &InRustGraph,
   member : &RelPartner<ID>,
   config : &SkgConfig,
-  active : &ActiveRepoSet,
+  active : &ActiveSkgRepoSet,
 ) -> bool {
-  if ! active . contains_repo (&member . relRepo) { return false; }
-  let home : Option<RepoName> = graph
-    . pid_and_repo (&member . member)
-    . map (|(_pid, repo)| repo)
+  if ! active . contains_skgrepo (&member . relRepo) { return false; }
+  let home : Option<SkgRepoName> = graph
+    . pid_and_skgrepo (&member . member)
+    . map (|(_pid, skgrepo)| skgrepo)
     . or_else (|| home_from_disk (&member . member, config));
-  home . map_or (true, |repo| active . contains_repo (&repo))
+  home . map_or (true, |skgrepo| active . contains_skgrepo (&skgrepo))
 }
 
 /// The anchored weave, for order-meaningful lists ('contains',

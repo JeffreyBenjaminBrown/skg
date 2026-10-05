@@ -109,7 +109,7 @@ It should be documented in tools/ sufficient for anyone,
 even a human, to understand.
 * The OVERVIEW merge, meanwhile
 The 'skg' copy lacks three headline links that the 'public' copy has (an
-old exporter flattened them): "revise [[*viewing the data]]", the OrgNode
+old exporter flattened them): "revise [[*viewing the data]]", the viewnode
 heading's link, and a GitHub link whose target ('rust/types.rs') no longer
 exists. This is small enough to do by editing a full view directly, once
 the question of where to edit real data is answered.

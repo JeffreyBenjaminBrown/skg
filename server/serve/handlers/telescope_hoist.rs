@@ -8,8 +8,8 @@
 
 use crate::dbs::filesystem::one_node::telescope_from_disk;
 use crate::telescope::fold::fold_telescope_collecting_warnings;
-use crate::types::misc::{ID, SkgConfig, RepoName};
-use crate::types::save::{DefineNode, NodeMerge, SaveNode};
+use crate::types::misc::{ID, SkgConfig, SkgRepoName};
+use crate::types::save::{NodeInstruction, NodeMerge, SaveNode};
 use crate::types::sexp::extract_string_list_from_sexp;
 
 use sexp::{Atom, Sexp};
@@ -19,7 +19,7 @@ use std::io;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HoistCandidate {
   pub pid  : ID,
-  pub home : RepoName,
+  pub home : SkgRepoName,
 }
 
 /// Exact approvals have their own field because permission to release overPrivateText
@@ -30,7 +30,7 @@ pub fn approved_pids_from_request (
   let values : Vec<String> = sexp::parse (request) . ok ()
     .and_then ( |parsed|
       extract_string_list_from_sexp (
-        &parsed, "hoist-approved-pids" ) . ok () )
+        &parsed, "approved-hoist-pids" ) . ok () )
     .unwrap_or_default ();
   // The sexp crate represents a dotted pair as [key, ".", value]. The
   // generic list helper therefore accepts it syntactically; reject that
@@ -46,25 +46,25 @@ pub fn approved_pids_from_request (
 /// Reread and classify every existing telescope that this save will write.
 /// New nodes have no disk telescope and therefore cannot be Hoist candidates.
 pub fn candidates_from_disk (
-  define_nodes : &[DefineNode],
-  node_merges  : &[NodeMerge],
-  config       : &SkgConfig,
+  node_instructions : &[NodeInstruction],
+  node_merges       : &[NodeMerge],
+  config            : &SkgConfig,
 ) -> io::Result<Vec<HoistCandidate>> {
   let mut touched : HashSet<ID> = HashSet::new ();
-  let mut note_save = |define_node : &DefineNode| {
-    if let DefineNode::Save (SaveNode (node)) = define_node {
+  let mut note_save = |node_instruction : &NodeInstruction| {
+    if let NodeInstruction::Save (SaveNode (node)) = node_instruction {
       touched . insert ( node . pid . clone () ); }};
-  for define_node in define_nodes {
-    note_save (define_node); }
-  for define_node in node_merges . iter ()
+  for node_instruction in node_instructions {
+    note_save (node_instruction); }
+  for node_instruction in node_merges . iter ()
       . flat_map ( |merge| merge . to_vec () ) {
-    note_save (&define_node); }
+    note_save (&node_instruction); }
   // A nodeMerge copies the acquiree's folded title/body into a fresh
   // preservation node before deleting the acquiree. That textual input is a
-  // touched telescope even though the primary instruction for its old PID is
+  // touched telescope even though the primary nodeInstruction for its old PID is
   // Delete, not Save.
   for node_merge in node_merges {
-    touched . insert ( node_merge . acquiree_id () . clone () ); }
+    touched . insert ( node_merge . acquiree_skgid () . clone () ); }
   let mut touched : Vec<ID> = touched . into_iter () . collect ();
   touched . sort_by ( |a, b| a . as_str () . cmp (b . as_str ()) );
 
@@ -72,15 +72,15 @@ pub fn candidates_from_disk (
   for pid in touched {
     let Some (telescope) = telescope_from_disk (config, &pid) ?
       else { continue; };
-    let home : RepoName = telescope . home () . clone ();
-    if ! config . user_owns_repo (&home) {
+    let home : SkgRepoName = telescope . home () . clone ();
+    if ! config . skgrepo_is_owned (&home) {
       return Err ( io::Error::new (
         io::ErrorKind::PermissionDenied,
         format! (
           "Refusing to offer Hoist for '{}': its selected home '{}' is not owned.",
           pid, home ))); }
     let (node, _warnings) = fold_telescope_collecting_warnings (
-      telescope, & |id : &ID| id . clone () ) ?;
+      telescope, & |skgid : &ID| skgid . clone () ) ?;
     if node . overPrivateText_telescope {
       candidates . push ( HoistCandidate { pid, home } ); }}
   Ok (candidates)
@@ -93,25 +93,25 @@ pub fn candidates_from_disk (
 /// before the operation consumes it. Existing buffer-authored Saves win; their
 /// edits, rather than the pre-save disk title/body text, must land at home.
 pub fn repair_saves_for_unwritten_candidates (
-  candidates   : &[HoistCandidate],
-  define_nodes : &[DefineNode],
-  config       : &SkgConfig,
-) -> io::Result<Vec<DefineNode>> {
-  let already_written : HashSet<ID> = define_nodes . iter ()
-    .filter_map ( |define_node| match define_node {
-      DefineNode::Save (SaveNode (node)) => Some (node . pid . clone ()),
-      DefineNode::Delete (_)             => None,
+  candidates        : &[HoistCandidate],
+  node_instructions : &[NodeInstruction],
+  config            : &SkgConfig,
+) -> io::Result<Vec<NodeInstruction>> {
+  let already_written : HashSet<ID> = node_instructions . iter ()
+    .filter_map ( |node_instruction| match node_instruction {
+      NodeInstruction::Save (SaveNode (node)) => Some (node . pid . clone ()),
+      NodeInstruction::Delete (_)             => None,
     } )
     .collect ();
-  let mut repairs : Vec<DefineNode> = Vec::new ();
+  let mut repairs : Vec<NodeInstruction> = Vec::new ();
   for candidate in candidates {
     if already_written . contains (&candidate . pid) { continue; }
     let Some (telescope) = telescope_from_disk (
         config, &candidate . pid) ? else { continue; };
     let (mut node, _warnings) = fold_telescope_collecting_warnings (
-      telescope, & |id : &ID| id . clone () ) ?;
+      telescope, & |skgid : &ID| skgid . clone () ) ?;
     node . overPrivateText_telescope = false;
-    repairs . push ( DefineNode::Save (SaveNode (node)) ); }
+    repairs . push ( NodeInstruction::Save (SaveNode (node)) ); }
   Ok (repairs)
 }
 
@@ -156,9 +156,9 @@ fn pair (key : &str, value : &str) -> Sexp {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::dbs::filesystem::one_node::graphnode_from_pid_and_repo;
-  use crate::save::update_fs_from_saveinstructions_with_hoist_approval;
-  use crate::types::misc::SkgfileRepo;
+  use crate::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo;
+  use crate::save::update_fs_from_nodeInstructions_with_hoist_approval;
+  use crate::types::misc::SkgRepo;
   use crate::types::nodes::fs::GraphnodeOnDisk;
   use std::collections::HashMap;
   use std::fs;
@@ -167,7 +167,7 @@ mod tests {
 
   fn config_and_paths () -> (TempDir, SkgConfig, HashMap<&'static str, PathBuf>) {
     let temp : TempDir = tempdir () . unwrap ();
-    let mut repos : HashMap<RepoName, SkgfileRepo> = HashMap::new ();
+    let mut skgrepos : HashMap<SkgRepoName, SkgRepo> = HashMap::new ();
     let mut paths : HashMap<&'static str, PathBuf> = HashMap::new ();
     for (name, owned) in [
         ("public", true), ("middle", true),
@@ -175,40 +175,40 @@ mod tests {
       let path : PathBuf = temp . path () . join (name);
       fs::create_dir_all (&path) . unwrap ();
       paths . insert (name, path . clone ());
-      repos . insert ( RepoName::from (name), SkgfileRepo {
-        name         : RepoName::from (name),
+      skgrepos . insert ( SkgRepoName::from (name), SkgRepo {
+        name         : SkgRepoName::from (name),
         abbreviation : None,
         path,
-        user_owns_it : owned,
+        owned : owned,
       } ); }
-    let mut config : SkgConfig = SkgConfig::dummyFromRepos (repos);
+    let mut config : SkgConfig = SkgConfig::dummyFromSkgRepos (skgrepos);
     config . data_root = temp . path () . to_path_buf ();
-    config . repo_order = ["public", "middle", "private", "foreign"]
-      . into_iter () . map (RepoName::from) . collect ();
+    config . skgrepo_order = ["public", "middle", "private", "foreign"]
+      . into_iter () . map (SkgRepoName::from) . collect ();
     (temp, config, paths)
   }
 
   fn save_from_disk (
     pid    : &str,
     config : &SkgConfig,
-  ) -> DefineNode {
-    let mut node = graphnode_from_pid_and_repo (
-      config, ID::from (pid), &RepoName::from ("public") ) . unwrap ();
+  ) -> NodeInstruction {
+    let mut node = graphnode_from_pid_and_skgrepo (
+      config, ID::from (pid), &SkgRepoName::from ("public") ) . unwrap ();
     // Buffer-authored nodes carry no disk overPrivateTextness authority. The save gate
     // has just rederived that fact from disk.
     node . overPrivateText_telescope = false;
-    DefineNode::Save (SaveNode (node))
+    NodeInstruction::Save (SaveNode (node))
   }
 
   #[test]
   fn approvals_are_exact_pids_and_malformed_authority_fails_closed () {
     assert_eq! (
       approved_pids_from_request (
-        "((request . \"save buffer\") (hoist-approved-pids \"A\" \"B\"))" ),
+        "((request . \"save buffer\") (approved-hoist-pids \"A\" \"B\"))" ),
       [ID::from ("A"), ID::from ("B")]
       . into_iter () . collect () );
     assert! ( approved_pids_from_request (
-      "((hoist-approved-pids . \"all\"))" ) . is_empty () );
+      "((approved-hoist-pids . \"all\"))" ) . is_empty () );
   }
 
   #[test]
@@ -216,7 +216,7 @@ mod tests {
     let response : String = confirmation_response (&[
       HoistCandidate {
         pid  : ID::from ("P"),
-        home : RepoName::from ("public"),
+        home : SkgRepoName::from ("public"),
       },
     ]);
     assert! (response . contains ("P"));
@@ -245,11 +245,11 @@ mod tests {
                 "title: body-only title\npid: B\n" ) . unwrap ();
     fs::write ( paths ["private"] . join ("B.skg"),
                 "pid: B\nbody: body only\n" ) . unwrap ();
-    let define_nodes : Vec<DefineNode> = ["P", "T", "B"]
+    let node_instructions : Vec<NodeInstruction> = ["P", "T", "B"]
       .into_iter () . map ( |pid| save_from_disk (pid, &config) )
       .collect ();
     let candidates : Vec<HoistCandidate> = candidates_from_disk (
-      &define_nodes, &[], &config ) . unwrap ();
+      &node_instructions, &[], &config ) . unwrap ();
     assert_eq! (
       candidates . iter () . map ( |candidate| candidate . pid . clone () )
       .collect::<Vec<ID>> (),
@@ -258,10 +258,10 @@ mod tests {
     let approved : HashSet<ID> =
       [ID::from ("P"), ID::from ("T"), ID::from ("B")]
       .into_iter () . collect ();
-    update_fs_from_saveinstructions_with_hoist_approval (
-      &define_nodes, &[], config . clone (), &approved ) . unwrap ();
-    let reread = graphnode_from_pid_and_repo (
-      &config, ID::from ("P"), &RepoName::from ("public") ) . unwrap ();
+    update_fs_from_nodeInstructions_with_hoist_approval (
+      &node_instructions, &[], config . clone (), &approved ) . unwrap ();
+    let reread = graphnode_from_pid_and_skgrepo (
+      &config, ID::from ("P"), &SkgRepoName::from ("public") ) . unwrap ();
     assert! (! reread . overPrivateText_telescope);
     assert_eq! (reread . title, "lower title");
     assert_eq! (reread . body . as_deref (), Some ("lower body"));
@@ -281,8 +281,8 @@ mod tests {
     assert_eq! (lower . body, None);
     assert! (lower . to_yaml () . unwrap () . contains ("private-child"));
     for pid in ["T", "B"] {
-      assert! (! graphnode_from_pid_and_repo (
-        &config, ID::from (pid), &RepoName::from ("public") )
+      assert! (! graphnode_from_pid_and_skgrepo (
+        &config, ID::from (pid), &SkgRepoName::from ("public") )
         .unwrap () . overPrivateText_telescope); }
   }
 
@@ -293,7 +293,7 @@ mod tests {
                 "pid: A\n" ) . unwrap ();
     fs::write ( paths ["private"] . join ("A.skg"),
                 "title: A lower\npid: A\n" ) . unwrap ();
-    let save_a : DefineNode = save_from_disk ("A", &config);
+    let save_a   : NodeInstruction = save_from_disk ("A", &config);
     let approved : HashSet<ID> =
       [ID::from ("A")] . into_iter () . collect ();
     let first : Vec<HoistCandidate> = candidates_from_disk (
@@ -305,7 +305,7 @@ mod tests {
                 "title: B home\npid: B\n" ) . unwrap ();
     fs::write ( paths ["private"] . join ("B.skg"),
                 "pid: B\nbody: B lower\n" ) . unwrap ();
-    let save_b : DefineNode = save_from_disk ("B", &config);
+    let save_b : NodeInstruction = save_from_disk ("B", &config);
     let second : Vec<HoistCandidate> = candidates_from_disk (
       &[save_a, save_b], &[], &config ) . unwrap ();
     assert_eq! (second . len (), 2);

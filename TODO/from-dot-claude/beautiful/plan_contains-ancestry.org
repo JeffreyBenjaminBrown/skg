@@ -12,7 +12,7 @@
      a ViewNode tree)
    - [[./server/context.rs][context.rs]]: 'climb_containerward_to_cycle' (in-memory,
      single-container only), 'contains_maps_from_nodes' (builds
-     MapToContainers / MapToContent from SkgNodes)
+     MapToContainers / MapToContent from Graphnodes)
 
    The PathToFirstNonlinearity struct records:
    - path: Vec<ID> (linear chain, not including origin)
@@ -221,11 +221,11 @@
     each Inner and Root node — the same function backpath.rs already
     uses.
 
-    Repeated nodes are also inserted as indefinitive children (so the
+    Repeated nodes are also inserted as write-protected children (so the
     user can see the ID), but are not expanded further. They could
     optionally carry a viewStats annotation to distinguish them
     visually. DepthTruncated nodes are likewise inserted as
-    indefinitive children.
+    write-protected children.
 
 *** Elisp: user-facing command and herald rules
 
@@ -245,7 +245,7 @@
     #+end_src
 
     Herald rules in [[./elisp/heralds-minor-mode.el][heralds-minor-mode.el]] should already
-    handle the new nodes (they're standard indefinitive TrueNodes).
+    handle the new nodes (they're standard write-protected ActiveVognodes).
     Add ~fullContainerwardView~ to the viewRequests herald rule:
 
     #+begin_src elisp

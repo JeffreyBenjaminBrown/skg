@@ -189,7 +189,7 @@
 
 ** D1. Server: new view-request
    - [[../../server/types/viewnode.rs][viewnode.rs]]: add 'ViewRequest::Fork'
-     to the enum (the existing variants are 'Col', 'Path', 'Definitive').
+     to the enum (the existing variants are 'Folder', 'Path', 'Definitive').
    - [[../../server/serve/parse_metadata_sexp.rs][parse_metadata_sexp.rs]]:
      in 'parse_viewrequests_sexp', map the atom ="fork"= to
      'ViewRequest::Fork', exactly as ="definitiveView"= maps to
@@ -209,7 +209,7 @@
 ** D3. Server: turn the request into a ForkSpec
    Collect, from the maybe-placed viewforest during the save-side validation
    pass, the pids whose nodes carry 'ViewRequest::Fork'. For each, fetch its
-   current 'NodeComplete' from the graph/disk
+   current 'Graphnode' from the graph/disk
    ('nodecomplete_rustFirst_by_pid_and_source') and build the clone with the
    existing 'build_fork_clone' (which already sets =subscribes_to=[N]=,
    =overrides_view_of=[N]=, a shallow =contains= copy, a fresh pid). Cloning

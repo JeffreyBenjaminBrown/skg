@@ -12,7 +12,7 @@ use std::error::Error;
 const CONFIG_PATH: &str = "tests/subscribee_folder/fixtures/skgconfig.toml";
 
 /// Helper to set up multi-repo test environment
-async fn setup_multi_repo_test(
+async fn setup_multi_skgrepo_test(
   test_name: &str,
 ) -> Result<SkgConfig, Box<dyn Error>> {
   let config: SkgConfig =
@@ -36,7 +36,7 @@ fn test_subscribee_folder_appears_for_subscribers(
   block_on(async {
     let test_name = "skg-test-subscribee-folder";
     let config =
-      setup_multi_repo_test (test_name) . await?;
+      setup_multi_skgrepo_test (test_name) . await?;
     let (result, _pids, _) : (String, Vec<ID>, _) =
       single_root_view( &config, None, &ID("1" . to_string()), false
                       )?;
@@ -45,10 +45,10 @@ fn test_subscribee_folder_appears_for_subscribers(
     // Nodes 11 and 12 subscribe to something, so they get SubscribeeFolder children.
     // Each SubscribeeFolder has Subscribee children showing what the node subscribes to.
     // Nodes 13 and 14 do not subscribe to anything, so no SubscribeeFolder.
-    // The 11/12 -> *-sees edges run from owned "home" nodes to foreign
-    // "away" nodes. Their default is the owner's home: that is writable
+    // The 11/12 -> *-sees relationships run from owned "home" nodes to foreign
+    // "away" nodes. Their default is the recorder's home: that is writable
     // and deliberately exposes the foreign ID/relationship there. Since
-    // the fixture records both edges at exactly that default, no
+    // the fixture records both relationships at exactly that default, no
     // (relRepo ...) override appears.
     let expected = indoc! {
       "* (skg (node (id 1) (repo home) (affectsParent na) (rels (contains (out 4))) (viewStats (homeRepoHerald ⌂:home)))) 1

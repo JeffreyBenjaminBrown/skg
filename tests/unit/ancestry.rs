@@ -5,7 +5,7 @@ use crate::types::viewnode::{
   Phantom, PhantomDeleted, Property, PropertyFolder };
 
 fn sid (s : &str) -> ID { ID::from (s) }
-fn src () -> RepoName { RepoName::from ("main") }
+fn src () -> SkgRepoName { SkgRepoName::from ("main") }
 
 fn normal (title : &str, pi : AffectsParent) -> Viewnode {
   mk_writeProtected_viewnode (sid (title), src (), title . to_string (), pi) }
@@ -13,7 +13,7 @@ fn normal (title : &str, pi : AffectsParent) -> Viewnode {
 fn deleted (title : &str) -> Viewnode {
   Viewnode { focused : false, folded : false, body_folded : false,
     kind : ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (PhantomDeleted {
-      id : sid (title), home_repo : src (),
+      skgid    : sid (title), home_skgrepo : src (),
       title : title . to_string (), body : None }))) } }
 
 fn role_folder (rc : PartnerFolder) -> Viewnode {
@@ -37,17 +37,17 @@ fn child (
 ) -> NodeId {
   tree . get_mut (parent) . unwrap () . append (vn) . id () }
 
-fn kind_at (tree : &Tree<Viewnode>, id : NodeId) -> ViewnodeKind {
-  tree . get (id) . unwrap () . value () . kind . clone () }
+fn kind_at (tree : &Tree<Viewnode>, skgid : NodeId) -> ViewnodeKind {
+  tree . get (skgid) . unwrap () . value () . kind . clone () }
 
-fn parentis_at (tree : &Tree<Viewnode>, id : NodeId) -> Option<AffectsParent> {
-  match &tree . get (id) . unwrap () . value () . kind {
+fn parentis_at (tree : &Tree<Viewnode>, skgid : NodeId) -> Option<AffectsParent> {
+  match &tree . get (skgid) . unwrap () . value () . kind {
     ViewnodeKind::Vognode (Vognode::Active (t)) => Some (t . affectsParent),
     _ => None } }
 
-fn is_detached (tree : &Tree<Viewnode>, parent : NodeId, id : NodeId) -> bool {
+fn is_detached (tree : &Tree<Viewnode>, parent : NodeId, skgid : NodeId) -> bool {
   ! tree . get (parent) . unwrap () . children ()
-    . any ( |c| c . id () == id ) }
+    . any ( |c| c . id () == skgid ) }
 
 // ---- folder_is_generalized_orphan ----
 
@@ -77,7 +77,7 @@ fn relation_folder_under_deadviewnode_is_orphan () {
   let rc : NodeId = child (&mut t, dead, role_folder (PartnerFolder::Subscriber));
   assert! ( folder_is_generalized_orphan (&t, rc) . unwrap () ); }
 
-// Multi-level: the immediate parent (subscribee) is a live Normal, but the
+// Multi-level: the immediate parent (subscribee) is a live Active, but the
 // FAR ancestor (subscriber, depth 3) is dead -- the generalized (not just
 // immediate-parent) check must catch it.
 fn build_subscribee_chain (
@@ -141,15 +141,15 @@ fn deaden_disposes_each_child_kind () {
   let root : NodeId = t . root () . id ();
   let d : NodeId = child (&mut t, root, deleted ("D"));
   let subscribee_folder : NodeId = child (&mut t, d, role_folder (PartnerFolder::Subscribee));
-  // Affected leaf -> delete.
+  // Member leaf -> delete.
   let leaf : NodeId = child (&mut t, subscribee_folder, normal ("L", AffectsParent::True));
-  // Affected branch (has a child) -> demote to Independent, keep.
+  // Member branch (has a child) -> demote to non-member, keep.
   let branch : NodeId = child (&mut t, subscribee_folder, normal ("B", AffectsParent::True));
   let _bchild : NodeId = child (&mut t, branch, normal ("Bc", AffectsParent::True));
   // Nested folder -> leave it (self-deadens at its own visit).
   let nested : NodeId = child (&mut t, subscribee_folder,
     role_folder (PartnerFolder::HiddenOutsideOfSubscribee));
-  // Non-Affected vognode -> keep untouched.
+  // Non-member vognode -> keep untouched.
   let indep : NodeId = child (&mut t, subscribee_folder, normal ("I", AffectsParent::False));
 
   deaden_generalized_orphan_folder (&mut t, subscribee_folder) . unwrap ();
@@ -157,15 +157,15 @@ fn deaden_disposes_each_child_kind () {
   assert! ( matches! ( kind_at (&t, subscribee_folder), ViewnodeKind::DeadViewnode ),
     "the orphan folder itself becomes a DeadViewnode" );
   assert! ( is_detached (&t, subscribee_folder, leaf),
-    "an Affected leaf is deleted" );
+    "a member leaf is deleted" );
   assert_eq! ( parentis_at (&t, branch), Some (AffectsParent::False),
-    "an Affected branch is demoted to Independent and kept" );
+    "a member branch is demoted to non-member and kept" );
   assert! ( ! is_detached (&t, subscribee_folder, branch) );
   assert! ( matches! ( kind_at (&t, nested),
                        ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) ),
     "a nested folder is left untouched to self-deaden at its visit" );
   assert_eq! ( parentis_at (&t, indep), Some (AffectsParent::False),
-    "a non-Affected vognode is kept untouched" ); }
+    "a non-member vognode is kept untouched" ); }
 
 #[test]
 fn deaden_converts_property_leaf_to_deadviewnode () {

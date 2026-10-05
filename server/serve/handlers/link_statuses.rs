@@ -1,10 +1,10 @@
 //! Batch existence and home-repo lookup from the published graph snapshot.
-//! It exposes no title or inactive node repo information.
+//! It exposes no title or inactive node skgrepo information.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, value_from_request_sexp};
-use crate::repo_sets::ActiveRepoSet;
+use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::sexp::extract_string_list_from_sexp;
 use sexp::Sexp;
@@ -12,35 +12,35 @@ use std::net::TcpStream;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum LinkStatus {
-  Resolved { pid : ID, repo_label : String },
+  Resolved { pid : ID, skgrepo_label : String },
   Inactive,
   Missing,
 }
 
-pub fn classify_link_ids (
+pub fn classify_link_skgids (
   graph  : &InRustGraph,
   config : &SkgConfig,
-  active : &ActiveRepoSet,
-  ids    : &[ID],
+  active : &ActiveSkgRepoSet,
+  skgids : &[ID],
 ) -> Vec<(ID, LinkStatus)> {
-  ids . iter () . map (|id| {
-    let status : LinkStatus = match graph . pid_and_repo (id) {
+  skgids . iter () . map (|skgid| {
+    let status : LinkStatus = match graph . pid_and_skgrepo (skgid) {
       None => LinkStatus::Missing,
-      Some ((_pid, repo)) if ! active . is_all ()
-        && ! active . contains_repo (&repo) => LinkStatus::Inactive,
-      Some ((pid, repo)) => {
-        let repo_label : String = config . repos . get (&repo)
+      Some ((_pid, skgrepo)) if ! active . is_all ()
+        && ! active . contains_skgrepo (&skgrepo) => LinkStatus::Inactive,
+      Some ((pid, skgrepo)) => {
+        let skgrepo_label : String = config . skgrepos . get (&skgrepo)
           .map (|s| s . herald_label () . to_string ())
-          .unwrap_or_else (|| repo . 0 . clone ());
-        LinkStatus::Resolved { pid, repo_label } } };
-    (id . clone (), status) }) . collect () }
+          .unwrap_or_else (|| skgrepo . 0 . clone ());
+        LinkStatus::Resolved { pid, skgrepo_label } } };
+    (skgid . clone (), status) }) . collect () }
 
 pub fn handle_link_statuses_request (
   stream  : &mut TcpStream,
   request : &str,
   graph   : &InRustGraph,
   config  : &SkgConfig,
-  active  : &ActiveRepoSet,
+  active  : &ActiveSkgRepoSet,
 ) {
   let response : String = match link_statuses_response (
     request, graph, config, active ) {
@@ -54,24 +54,24 @@ fn link_statuses_response (
   request : &str,
   graph   : &InRustGraph,
   config  : &SkgConfig,
-  active  : &ActiveRepoSet,
+  active  : &ActiveSkgRepoSet,
 ) -> Result<String, String> {
   let request_id : String = value_from_request_sexp (
     "request-id", request) ?;
   let parsed : Sexp = sexp::parse (request)
     .map_err (|e| format! ("invalid link-status request: {}", e)) ?;
-  let ids : Vec<ID> = extract_string_list_from_sexp (&parsed, "ids")
+  let skgids : Vec<ID> = extract_string_list_from_sexp (&parsed, "ids")
     .map_err (|e| e . to_string ()) ?
     . into_iter () . map (ID::from) . collect ();
-  let rows : Vec<String> = classify_link_ids (
-    graph, config, active, &ids)
+  let rows : Vec<String> = classify_link_skgids (
+    graph, config, active, &skgids)
     .into_iter ()
-    .map (|(id, status)| match status {
-      LinkStatus::Missing => format! ("({} missing)", quoted (&id . 0)),
-      LinkStatus::Inactive => format! ("({} inactive)", quoted (&id . 0)),
-      LinkStatus::Resolved { pid, repo_label } => format! (
+    .map (|(skgid, status)| match status {
+      LinkStatus::Missing => format! ("({} missing)", quoted (&skgid . 0)),
+      LinkStatus::Inactive => format! ("({} inactive)", quoted (&skgid . 0)),
+      LinkStatus::Resolved { pid, skgrepo_label } => format! (
         "({} resolved {} {})",
-        quoted (&id . 0), quoted (&pid . 0), quoted (&repo_label)), })
+        quoted (&skgid . 0), quoted (&pid . 0), quoted (&skgrepo_label)), })
     .collect ();
   Ok (format! ("(request-id {}) (results ({}))",
     quoted (&request_id), rows . join (" "))) }
@@ -93,39 +93,39 @@ fn quoted (s : &str) -> String {
 mod tests {
   use super::*;
   use crate::dbs::filesystem::not_nodes::load_config;
-  use crate::repo_sets::RepoSetName;
-  use crate::types::misc::RepoName;
-  use crate::types::nodes::complete::{Graphnode, empty_node_complete};
+  use crate::skgrepo_sets::SkgRepoSetName;
+  use crate::types::misc::SkgRepoName;
+  use crate::types::nodes::complete::{Graphnode, empty_graphnode};
   use crate::dbs::in_rust_graph::InRustGraphHandle;
   use arc_swap::ArcSwap;
   use std::sync::Arc;
 
   #[test]
-  fn statuses_use_the_published_graph_and_hide_inactive_repos () {
+  fn statuses_use_the_published_graph_and_hide_inactive_skgrepos () {
     let mut config : SkgConfig = load_config (
       "tests/repo_sets/fixtures/skgconfig.toml") . unwrap ();
-    config . repos . get_mut (&RepoName::from ("public"))
+    config . skgrepos . get_mut (&SkgRepoName::from ("public"))
       .unwrap () . abbreviation = Some ("pub" . to_string ());
-    let active : ActiveRepoSet = ActiveRepoSet::named (
-      &config, RepoSetName::from ("public")) . unwrap ();
+    let active : ActiveSkgRepoSet = ActiveSkgRepoSet::named (
+      &config, SkgRepoSetName::from ("public")) . unwrap ();
     let visible : Graphnode = Graphnode {
       pid : ID::from ("visible"),
       extra_ids : vec![ID::from ("old-visible")],
-      home_repo : RepoName::from ("public"),
+      home_skgrepo : SkgRepoName::from ("public"),
       title : "A title that must stay out of lookup results" .to_string (),
-      .. empty_node_complete () };
+      .. empty_graphnode () };
     let private : Graphnode = Graphnode {
       pid : ID::from ("private"),
-      home_repo : RepoName::from ("private"),
+      home_skgrepo : SkgRepoName::from ("private"),
       title : "Private title" .to_string (),
-      .. empty_node_complete () };
+      .. empty_graphnode () };
     let graph : InRustGraph = InRustGraph::from_graphnodes (
       &[visible, private]);
-    let ids : Vec<ID> = ["old-visible", "private", "unknown"]
+    let skgids : Vec<ID> = ["old-visible", "private", "unknown"]
       .into_iter () . map (ID::from) .collect ();
-    assert_eq! (classify_link_ids (&graph, &config, &active, &ids), vec![
+    assert_eq! (classify_link_skgids (&graph, &config, &active, &skgids), vec![
       (ID::from ("old-visible"), LinkStatus::Resolved {
-        pid : ID::from ("visible"), repo_label : "pub" .to_string () }),
+        pid : ID::from ("visible"), skgrepo_label : "pub" .to_string () }),
       (ID::from ("private"), LinkStatus::Inactive),
       (ID::from ("unknown"), LinkStatus::Missing) ]);
     let response : String = link_statuses_response (
@@ -142,12 +142,12 @@ mod tests {
   fn a_newly_published_graph_answers_before_any_title_index_update () {
     let config : SkgConfig = load_config (
       "tests/repo_sets/fixtures/skgconfig.toml") . unwrap ();
-    let active : ActiveRepoSet = ActiveRepoSet::named (
-      &config, RepoSetName::from ("public")) . unwrap ();
+    let active : ActiveSkgRepoSet = ActiveSkgRepoSet::named (
+      &config, SkgRepoSetName::from ("public")) . unwrap ();
     let handle : InRustGraphHandle = Arc::new (ArcSwap::from_pointee (
       InRustGraph::new ()));
     let requested : Vec<ID> = vec![ID::from ("old-new")];
-    assert_eq! (classify_link_ids (
+    assert_eq! (classify_link_skgids (
       &handle . load_full (), &config, &active, &requested),
       vec![(ID::from ("old-new"), LinkStatus::Missing)]);
 
@@ -155,16 +155,16 @@ mod tests {
       Graphnode {
         pid : ID::from ("new"),
         extra_ids : requested . clone (),
-        home_repo : RepoName::from ("public"),
-        .. empty_node_complete () } ]);
+        home_skgrepo : SkgRepoName::from ("public"),
+        .. empty_graphnode () } ]);
     handle . store (Arc::new (published));
-    let result = classify_link_ids (
+    let result = classify_link_skgids (
       &handle . load_full (), &config, &active, &requested);
     assert_eq! (result, vec![(ID::from ("old-new"),
       LinkStatus::Resolved {
         pid : ID::from ("new"),
-        repo_label : config . repos
-          [&RepoName::from ("public")] . herald_label () . to_string (),
+        skgrepo_label : config . skgrepos
+          [&SkgRepoName::from ("public")] . herald_label () . to_string (),
       })]);
   }
 }

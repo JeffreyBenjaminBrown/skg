@@ -21,16 +21,16 @@ async fn test_title_diff_shows_text_changed_property (
   let temp_dir = TempDir::new()?;
   let gitrepo_path = temp_dir . path();
   setup_gitrepo_with_fixtures (gitrepo_path)?;
-  s . reset_with_repo_path (
+  s . reset_with_skgrepo_path (
     "test_title_diff_shows_text_changed_property",
     gitrepo_path ) ?;
   let (config, _tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
 
-  let root_ids = vec![ID("1" . to_string())];
+  let root_skgids = vec![ID("1" . to_string())];
   let (actual, _pids, _) : (String, Vec<ID>, _) =
-    multi_root_view(&config, None, &root_ids, true)?;
+    multi_root_view(&config, None, &root_skgids, true)?;
 
   assert_buffer_contains(&actual, GIT_DIFF_VIEW);
 
@@ -49,16 +49,16 @@ async fn test_title_diff_staged_shows_staged_text_changed_property (
   let temp_dir = TempDir::new()?;
   let gitrepo_path = temp_dir . path();
   setup_gitrepo_with_fixtures_staged (gitrepo_path)?;
-  s . reset_with_repo_path (
+  s . reset_with_skgrepo_path (
     "test_title_diff_staged_shows_staged_text_changed_property",
     gitrepo_path ) ?;
   let (config, _tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
 
-  let root_ids = vec![ID("1" . to_string())];
+  let root_skgids = vec![ID("1" . to_string())];
   let (actual, _pids, _) : (String, Vec<ID>, _) =
-    multi_root_view(&config, None, &root_ids, true)?;
+    multi_root_view(&config, None, &root_skgids, true)?;
 
   assert_buffer_contains(&actual, GIT_DIFF_VIEW_STAGED);
 

@@ -1,7 +1,7 @@
 //! GraphnodeOnDisk: the on-disk shape of one telescope SECTION.
 //!
 //! One node = one ID = one privacy telescope: same-ID .skg files, at
-//! most one per repo, each an "telescope section" holding the
+//! most one per skgrepo, each an "telescope section" holding the
 //! slice of the node recorded at that privacy level. The most public
 //! section (the HOME) alone carries title and body. Ordered
 //! relations are ONE flat sequence of 'ListItem's -- members render
@@ -20,12 +20,12 @@
 //!   section as a whole node. Used only where a single FILE is the
 //!   honest unit: historical blobs (the vanished-node search) and
 //!   diff MODE's per-file reads (safe because diff mode requires
-//!   the active repo-set "all", so no fold is hidden).
+//!   the active skgrepo-set "all", so no fold is hidden).
 
 use serde::{Serialize, Deserialize};
 
 use crate::telescope::types::{ListItem, SectionSlices};
-use crate::types::misc::{ID, MSV, RepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
+use crate::types::misc::{ID, MSV, SkgRepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::complete::Flag;
 
@@ -71,7 +71,7 @@ impl GraphnodeOnDisk {
   ) -> SectionSlices {
     let nonempty_items = |v : Vec<ListItem>| -> Option<Vec<ListItem>> {
       if v . is_empty () { None } else { Some (v) }};
-    let nonempty_ids = |v : Vec<ID>| -> Option<Vec<ID>> {
+    let nonempty_skgids = |v : Vec<ID>| -> Option<Vec<ID>> {
       if v . is_empty () { None } else { Some (v) }};
     SectionSlices {
       title                        : self . title,
@@ -84,9 +84,9 @@ impl GraphnodeOnDisk {
       subscribes_to                :
         nonempty_items ( self . subscribes_to ),
       hides_from_its_subscriptions :
-        nonempty_ids ( self . hides_from_its_subscriptions ),
+        nonempty_skgids ( self . hides_from_its_subscriptions ),
       overrides_view_of            :
-        nonempty_ids ( self . overrides_view_of ), }}
+        nonempty_skgids ( self . overrides_view_of ), }}
 
   /// Treat ONE section as a whole node: exact for single-section
   /// telescopes; the per-file git/diff paths use it as interim
@@ -96,39 +96,39 @@ impl GraphnodeOnDisk {
   /// missing-title reporting.
   pub fn into_complete_as_single_section (
     self,
-    repo : RepoName,
+    skgrepo : SkgRepoName,
   ) -> Graphnode {
     let members_only = |items : Vec<ListItem>| -> Vec<ID> {
       items . into_iter ()
         . filter_map ( |i| match i {
-          ListItem::Member (id) => Some (id),
+          ListItem::Member (skgid) => Some (skgid),
           ListItem::Anchor { .. } => None } )
         . collect () };
-    let msv_ids = |ids : Vec<ID>| -> MSV<ID> {
-      if ids . is_empty () { MSV::Unspecified }
-      else { MSV::Specified (ids) }};
+    let msv_skgids = |skgids : Vec<ID>| -> MSV<ID> {
+      if skgids . is_empty () { MSV::Unspecified }
+      else { MSV::Specified (skgids) }};
     Graphnode {
       title                        :
         self . title . unwrap_or_default (),
       overPrivateText_telescope               : false,
       aliases                      : rel_partners_at_relRepo_msv (
-        &repo,
+        &skgrepo,
         if self . aliases . is_empty () { MSV::Unspecified }
         else { MSV::Specified ( self . aliases ) } ),
       pid                          : self . pid,
       extra_ids                    : self . extra_ids,
       body                         : self . body,
       contains                     : rel_partners_at_relRepo (
-        &repo, members_only ( self . contains ) ),
+        &skgrepo, members_only ( self . contains ) ),
       subscribes_to                : rel_partners_at_relRepo_msv (
-        &repo, msv_ids ( members_only ( self . subscribes_to ) ) ),
+        &skgrepo, msv_skgids ( members_only ( self . subscribes_to ) ) ),
       hides_from_its_subscriptions : rel_partners_at_relRepo_msv (
-        &repo,
-        msv_ids ( self . hides_from_its_subscriptions ) ),
+        &skgrepo,
+        msv_skgids ( self . hides_from_its_subscriptions ) ),
       overrides_view_of            : rel_partners_at_relRepo_msv (
-        &repo, msv_ids ( self . overrides_view_of ) ),
-      misc                         : self . misc,
-      home_repo: repo,
+        &skgrepo, msv_skgids ( self . overrides_view_of ) ),
+      flags                         : self . misc,
+      home_skgrepo: skgrepo,
     }}
 
   /// Serialize to YAML, emitting the 'body' field as a block literal

@@ -1,12 +1,12 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::resolve_override;
-use crate::types::misc::{ID, SkgConfig, RepoName, members_of};
+use crate::types::misc::{ID, SkgConfig, SkgRepoName, members_of};
 
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct OverrideCheckScope {
-  pub repos : HashSet<ID>,
+  pub skgrepos : HashSet<ID>,
   pub targets : HashSet<ID>,
 }
 
@@ -17,21 +17,21 @@ pub(crate) struct AffectedOverrideValidation {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OverrideInvariantViolation {
-  UnknownRepo {
+  UnknownSkgRepo {
     node: ID,
-    repo: RepoName },
-  MultipleUserOwnedOverriders {
+    skgrepo: SkgRepoName },
+  MultipleOwnedOverriders {
     overridden: ID,
     overriders: Vec<ID> },
-  UserOwnedOverrideCycle {
+  OwnedOverrideCycle {
     // The cycle's nodes in walk order, canonicalized (rotated to the
     // min pid) so the same cycle reached from different entry points
     // collapses to one violation.
     cycle: Vec<ID> }}
 
-/// User-owned data must adhere to two constraints:
-/// - monogamy: No node is overridden by more than one user-owned node.
-/// - no cycles: following the user-owned override edges out of a node
+/// Owned data must adhere to two constraints:
+/// - monogamy: No node is overridden by more than one owned node.
+/// - no cycles: following the owned override relationships out of a node
 ///   must never return to that node. Linear chains (D overrides C
 ///   overrides N, all owned) are allowed.
 pub fn validate_override_invariants (
@@ -41,59 +41,59 @@ pub fn validate_override_invariants (
   let mut violations : Vec<OverrideInvariantViolation> = Vec::new ();
 
   // First pass: collect automatic replacement candidates by the
-  // resolved node they replace.  Only user-owned overriders count for
-  // automatic replacement; foreign override edges remain graph facts
+  // resolved node they replace.  Only owned overriders count for
+  // automatic replacement; foreign override relationships remain graph facts
   // but do not participate in substitution.
-  let mut user_owned_overriders_by_overridden
+  let mut owned_overriders_by_overridden
     : HashMap<ID, Vec<ID>> =
       HashMap::new ();
 
   for (pid, node) in graph . nodes . iter () {
-    let Some (user_owns_node) = user_owns_node (
-      // A missing repo means we cannot know whether this node's override edges should be automatic. We record such an offense in 'violations' rather than guessing "foreign".
-      config, pid, &node . home_repo, &mut violations )
+    let Some (node_is_owned) = node_is_owned (
+      // A missing skgrepo means we cannot know whether this node's override relationships should be automatic. We record such an offense in 'violations' rather than guessing "foreign".
+      config, pid, &node . home_skgrepo, &mut violations )
     else { continue; };
-    if ! user_owns_node { continue; }
+    if ! node_is_owned { continue; }
     for target in members_of ( node . overrides_view_of . or_default () ) {
       // Override targets can be primary or extra IDs. Validate against the
       // effective primary PID, matching graph relationship resolution.
       let overridden : ID =
         graph . pid_of (&target)
         . unwrap_or_else ( || target . clone () );
-      user_owned_overriders_by_overridden
+      owned_overriders_by_overridden
         . entry (overridden)
         . or_default ()
         . push (pid . clone ()); }}
 
-  for (overridden, overriders) in user_owned_overriders_by_overridden {
+  for (overridden, overriders) in owned_overriders_by_overridden {
     // Monogamy constraint. Sorting keeps the error stable.
     if overriders . len () > 1 {
       let mut overriders : Vec<ID> = overriders;
       overriders . sort ();
       violations . push (
-        OverrideInvariantViolation::MultipleUserOwnedOverriders {
+        OverrideInvariantViolation::MultipleOwnedOverriders {
           overridden,
           overriders, } ); }}
 
-  { // No cycles constraint. For each user-owned node, walk its
-    // user-owned overrider edges (the shared 'resolve_override' walk,
+  { // No cycles constraint. For each owned node, walk its
+    // owned overrider relationships (the shared 'resolve_override' walk,
     // ungated so it is repo-set-independent); a returned cycle is a
     // violation. Different entry points into the same cycle yield
     // rotations of one trail, so canonicalizing collapses them.
     let mut seen_cycles : HashSet<Vec<ID>> = HashSet::new ();
     for (pid, node) in graph . nodes . iter () {
-      let user_owned : bool =
-        config . repos . get (&node . home_repo)
-        . map ( |sc| sc . user_owns_it )
-        . unwrap_or (false); // unknown repo reported by pass 1 above
-      if ! user_owned { continue; }
+      let owned : bool =
+        config . skgrepos . get (&node . home_skgrepo)
+        . map ( |sc| sc . owned )
+        . unwrap_or (false); // unknown skgrepo reported by pass 1 above
+      if ! owned { continue; }
       let resolution = resolve_override (config, graph, None, pid);
       if resolution . cycle_detected {
         let canonical : Vec<ID> =
           canonicalize_cycle (resolution . cycle);
         if seen_cycles . insert (canonical . clone ()) {
           violations . push (
-            OverrideInvariantViolation::UserOwnedOverrideCycle {
+            OverrideInvariantViolation::OwnedOverrideCycle {
               cycle : canonical } ); }}}}
   dedup_violations (violations) }
 
@@ -115,18 +115,18 @@ fn canonicalize_cycle (
   out . extend_from_slice ( &cycle [.. min_index] );
   out }
 
-/// Derive every override repo and target whose invariant truth can change
+/// Derive every override skgrepo and target whose invariant truth can change
 /// between two valid graph snapshots. Canonicalization changes pull in
 /// untouched inbound overriders, which is the case a touched-only check misses
 /// during node merge.
 pub fn derive_affected_override_scope (
-  base         : &InRustGraph,
-  candidate    : &InRustGraph,
-  touched_pids : &HashSet<ID>,
-  affected_ids : &HashSet<ID>,
+  base            : &InRustGraph,
+  candidate       : &InRustGraph,
+  touched_pids    : &HashSet<ID>,
+  affected_skgids : &HashSet<ID>,
 ) -> OverrideCheckScope {
-  let mut repos : HashSet<ID> = touched_pids . clone ();
-  for raw in affected_ids {
+  let mut skgrepos : HashSet<ID> = touched_pids . clone ();
+  for raw in affected_skgids {
     let old_key : ID = base . pid_of (raw)
       . unwrap_or_else (|| raw . clone ());
     let final_key : ID = candidate . pid_of (raw)
@@ -137,23 +137,23 @@ pub fn derive_affected_override_scope (
       (candidate, &old_key), (candidate, &final_key),
     ] {
       if let Some (overriders) = graph . overriders_of . get (key) {
-        repos . extend (overriders . iter () . cloned ()); }} }
+        skgrepos . extend (overriders . iter () . cloned ()); }} }
 
   let mut targets : HashSet<ID> = HashSet::new ();
-  for repo in &repos {
-    if let Some (node) = base . nodes . get (repo) {
+  for skgrepo in &skgrepos {
+    if let Some (node) = base . nodes . get (skgrepo) {
       targets . extend (
         members_of (node . overrides_view_of . or_default ()) . into_iter ()
           . map (|raw| base . pid_of (&raw) . unwrap_or (raw))); }
-    if let Some (node) = candidate . nodes . get (repo) {
+    if let Some (node) = candidate . nodes . get (skgrepo) {
       targets . extend (
         members_of (node . overrides_view_of . or_default ()) . into_iter ()
           . map (|raw| candidate . pid_of (&raw) . unwrap_or (raw))); }}
-  OverrideCheckScope { repos, targets }
+  OverrideCheckScope { skgrepos, targets }
 }
 
 /// Check monogamy at affected targets and acyclicity from affected owned
-/// repos. A valid base makes violations elsewhere irrelevant to this delta.
+/// skgrepos. A valid base makes violations elsewhere irrelevant to this delta.
 pub fn validate_affected_override_invariants (
   config : &SkgConfig,
   graph  : &InRustGraph,
@@ -172,21 +172,21 @@ pub(crate) fn validate_affected_override_invariants_with_counts (
   let mut chain_steps : usize = 0;
   for target in &scope . targets {
     let mut overriders : Vec<ID> =
-      user_owned_overriders_of (config, graph, target);
+      owned_overriders_of (config, graph, target);
     if overriders . len () > 1 {
       overriders . sort ();
       violations . push (
-        OverrideInvariantViolation::MultipleUserOwnedOverriders {
+        OverrideInvariantViolation::MultipleOwnedOverriders {
           overridden : target . clone (),
           overriders,
         }); }}
-  for repo in &scope . repos {
-    let Some (node) = graph . nodes . get (repo) else { continue; };
-    let Some (user_owned) = user_owns_node (
-      config, repo, &node . home_repo, &mut violations)
+  for skgrepo in &scope . skgrepos {
+    let Some (node) = graph . nodes . get (skgrepo) else { continue; };
+    let Some (owned) = node_is_owned (
+      config, skgrepo, &node . home_skgrepo, &mut violations)
       else { continue; };
-    if ! user_owned { continue; }
-    let resolution = resolve_override (config, graph, None, repo);
+    if ! owned { continue; }
+    let resolution = resolve_override (config, graph, None, skgrepo);
     chain_steps += if resolution . cycle_detected {
       resolution . cycle . len ()
     } else {
@@ -194,7 +194,7 @@ pub(crate) fn validate_affected_override_invariants_with_counts (
     };
     if resolution . cycle_detected {
       violations . push (
-        OverrideInvariantViolation::UserOwnedOverrideCycle {
+        OverrideInvariantViolation::OwnedOverrideCycle {
           cycle : canonicalize_cycle (resolution . cycle),
         }); }}
   AffectedOverrideValidation {
@@ -203,30 +203,30 @@ pub(crate) fn validate_affected_override_invariants_with_counts (
   }
 }
 
-/// The single user-owned node (by pid) that already overrides
+/// The single owned node (by pid) that already overrides
 /// 'overridden', if any -- the monogamy pre-check a fork runs before
 /// minting a new clone. Returns the first such overrider (monogamy
 /// guarantees at most one in a valid graph). 'overridden' may be a
 /// primary or extra id; it is resolved to a pid first, matching how the
-/// graph and override edges resolve. Read against the LIVE graph before
+/// graph and override relationships resolve. Read against the LIVE graph before
 /// the save, so a fork of an already-forked node is rejected with a
 /// helpful "you already forked this; your clone is X" rather than the
-/// raw MultipleUserOwnedOverriders crash at commit.
-pub fn existing_user_owned_overrider_of (
+/// raw MultipleOwnedOverriders crash at commit.
+pub fn existing_owned_overrider_of (
   config     : &SkgConfig,
   graph      : &InRustGraph,
   overridden : &ID,
 ) -> Option<ID> {
   let pid : ID =
     graph . pid_of (overridden) . unwrap_or_else ( || overridden . clone () );
-  user_owned_overriders_of (config, graph, &pid) . into_iter () . next () }
+  owned_overriders_of (config, graph, &pid) . into_iter () . next () }
 
-/// The user-owned nodes (by pid) that override 'overridden' (a pid), via
+/// The owned nodes (by pid) that override 'overridden' (a pid), via
 /// the in-Rust graph's 'overriders_of' inverse index. Overriders whose
-/// repo is unknown are treated as not-user-owned here: a touched
-/// node's own unknown repo is still reported by 'user_owns_node' at
+/// skgrepo is unknown are treated as not-owned here: a touched
+/// node's own unknown repo is still reported by 'node_is_owned' at
 /// the call site, and untouched neighbors are validated at init.
-fn user_owned_overriders_of (
+fn owned_overriders_of (
   config     : &SkgConfig,
   graph      : &InRustGraph,
   overridden : &ID,
@@ -235,27 +235,27 @@ fn user_owned_overriders_of (
   if let Some (overriders) = graph . overriders_of . get (overridden) {
     for overrider in overriders {
       if let Some (overrider_node) = graph . nodes . get (overrider) {
-        if config . repos . get (&overrider_node . home_repo)
-          . map ( |sc| sc . user_owns_it )
+        if config . skgrepos . get (&overrider_node . home_skgrepo)
+          . map ( |sc| sc . owned )
           . unwrap_or (false)
         { result . push (overrider . clone ()); } } } }
   result }
 
 /// Returns Some if it can determine the answer.
 /// If it can't, adds to 'violations' and returns None.
-fn user_owns_node (
+fn node_is_owned (
   config     : &SkgConfig,
   pid        : &ID,
-  repo     : &RepoName,
+  skgrepo    : &SkgRepoName,
   violations : &mut Vec<OverrideInvariantViolation>,
 ) -> Option<bool> {
-  match config . repos . get (repo) {
-    Some (repo_config) => Some (repo_config . user_owns_it),
+  match config . skgrepos . get (skgrepo) {
+    Some (skgrepo_config) => Some (skgrepo_config . owned),
     None => {
       violations . push (
-        OverrideInvariantViolation::UnknownRepo {
+        OverrideInvariantViolation::UnknownSkgRepo {
           node: pid . clone (),
-          repo: repo . clone (), } );
+          skgrepo: skgrepo . clone (), } );
       None }}}
 
 fn dedup_violations (
@@ -276,33 +276,33 @@ pub fn format_override_invariant_violations (
   ];
   for violation in violations {
     match violation {
-      OverrideInvariantViolation::UnknownRepo { node, repo } => {
+      OverrideInvariantViolation::UnknownSkgRepo { node, skgrepo } => {
         lines . push (format!(
-          "* node {} has unknown repo {}", node, repo ));
+          "* node {} has unknown repo {}", node, skgrepo ));
       }
-      OverrideInvariantViolation::MultipleUserOwnedOverriders {
+      OverrideInvariantViolation::MultipleOwnedOverriders {
         overridden,
         overriders,
       } => {
         let list : String =
           overriders . iter ()
-          . map ( |id| id . to_string () )
+          . map ( |skgid| skgid . to_string () )
           . collect::<Vec<String>> ()
           . join (", ");
         lines . push (format!(
-          "* node {} is overridden by user-owned nodes {}",
+          "* node {} is overridden by owned nodes {}",
           overridden, list ));
       }
-      OverrideInvariantViolation::UserOwnedOverrideCycle {
+      OverrideInvariantViolation::OwnedOverrideCycle {
         cycle,
       } => {
         let arrow : String = { // a -> b -> ... -> a
           let mut nodes : Vec<String> =
-            cycle . iter () . map ( |id| id . to_string () ) . collect ();
+            cycle . iter () . map ( |skgid| skgid . to_string () ) . collect ();
           if let Some (first) = cycle . first () {
             nodes . push ( first . to_string () ); }
           nodes . join (" -> ") };
         lines . push (format!(
-          "* user-owned override cycle: {}", arrow ));
+          "* owned override cycle: {}", arrow ));
       }}}
   lines . join ("\n") }

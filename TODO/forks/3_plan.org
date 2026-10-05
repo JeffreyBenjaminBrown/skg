@@ -36,7 +36,7 @@ clone must inherit from N's IMMEDIATE container context, not a distant
 owned node reached by skipping foreign ancestors.
 
 Correct rule: at N's NEAREST Active vognode ancestor (skipping only
-scaffolds such as cols), record that ancestor's source IFF it is owned,
+non-vognodes such as folders), record that ancestor's source IFF it is owned,
 then stop -- never walk past it. If that nearest vognode ancestor is
 foreign, infer nothing (the source then defaults or is user-set, below).
 

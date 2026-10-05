@@ -34,7 +34,7 @@
             (message "Content view received")
             (message "Content: %s" content)
 
-            ;; Verify exact content: should include repo metadata
+            ;; Verify exact content: should include skgrepo metadata
             (let ((expected-content "* (skg (node (id 1) (repo main) (affectsParent na))) 1\n"))
               (if (string= content expected-content)
                   (progn

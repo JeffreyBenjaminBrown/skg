@@ -23,9 +23,7 @@ and hide INTERNAL from M-x completion."
 (skg-alias skg-save                   skg-request-save-buffer)
 (skg-alias skg-set-definitive         skg-request-definitive-view)
 (skg-alias skg-fork                    skg-fork-node)
-(skg-alias skg-limit-repo-set       skg-set-active-repo-set)
 (skg-alias skg-view-heralds-mode      heralds-minor-mode)
-(skg-alias skg-view-metadata          skg-edit-metadata)
 
 ;;
 ;; Keymaps
@@ -39,7 +37,7 @@ and hide INTERNAL from M-x completion."
   (global-set-key (kbd "C-c v l")   #'skg-limit-repo-set))
 
 (with-eval-after-load 'magit ;; Magit
-  ;; Popping to the id stack would make no sense here,
+  ;; Popping to the linkstack would make no sense here,
   ;; because magit buffers cannot be written to.
   ;; Pushing to it could be done from magit, but would be tricky,
   ;; requiring extracting titles from overlays.
@@ -76,7 +74,7 @@ and hide INTERNAL from M-x completion."
 
 (defvar skg-file-minor-mode-map (make-sparse-keymap)
   ;; The minor mode itself is defined in skg-file-minor-mode.el.
-  ;; Ops to push to the id stack are omitted, like in magit,
+  ;; Ops to push to the linkstack are omitted, like in magit,
   ;; because associating a title with each ID is tricky.
   "Keymap for `skg-file-minor-mode'.")
 
@@ -161,12 +159,12 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c v o") #'skg-view-org-ancestry)
     (define-key map (kbd "C-c v r") #'skg-readable-ids-mode)
     (define-key map (kbd "C-c v R") #'skg-readable-ids-refresh)
-    (define-key map (kbd "C-c v s") #'skg-view-id-stack)
+    (define-key map (kbd "C-c v s") #'skg-view-linkstack)
     (define-key map (kbd "C-c v w") #'skg-view-without-metadata) )
   (progn;; id navigation (moving among IDs in the current buffer)
     (define-key map (kbd "C-c i n") #'skg-id-next)
     (define-key map (kbd "C-c i p") #'skg-id-prev)
-  (progn;; id stack operations (push and pop, u and o)
+  (progn;; linkstack operations (push and pop, u and o)
     (define-key map (kbd "C-c u") #'skg-id-push))
     (define-key map (kbd "C-c o i") #'skg-paste-id)
     (define-key map (kbd "C-c o l") #'skg-paste-link)
@@ -180,12 +178,12 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c t m") #'skg-stage-moves)
     (define-key map (kbd "C-c t r") #'skg-diff-report)))
 
-(defvar skg-id-stack-mode-map (make-sparse-keymap)
-  "Keymap for `skg-id-stack-mode'.")
+(defvar skg-linkstack-mode-map (make-sparse-keymap)
+  "Keymap for `skg-linkstack-mode'.")
 
-(let ((map skg-id-stack-mode-map))
+(let ((map skg-linkstack-mode-map))
   (setcdr map nil)
-  (define-key map (kbd "C-x C-s") #'skg--save-id-stack-buffer))
+  (define-key map (kbd "C-x C-s") #'skg--save-linkstack-buffer))
 
 (defvar skg-report-mode-map (make-sparse-keymap)
   "Keymap for `skg-report-mode'.")
@@ -208,11 +206,11 @@ and hide INTERNAL from M-x completion."
   (progn;; view
     (define-key map (kbd "C-c v e") #'skg-view-new-empty)
     (define-key map (kbd "C-c v l") #'skg-limit-repo-set)
-    (define-key map (kbd "C-c v s") #'skg-view-id-stack))
+    (define-key map (kbd "C-c v s") #'skg-view-linkstack))
   (progn;; id navigation
     (define-key map (kbd "C-c i n") #'skg-id-next)
     (define-key map (kbd "C-c i p") #'skg-id-prev))
-  (progn;; id stack operations
+  (progn;; linkstack operations
     (define-key map (kbd "C-c u")   #'skg-id-push)
     (define-key map (kbd "C-c o i") #'skg-paste-id)
     (define-key map (kbd "C-c o l") #'skg-paste-link)

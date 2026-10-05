@@ -1,10 +1,10 @@
 use super::*;
 use crate::types::git::GitDiffStatus;
 
-fn id (s : &str) -> ID { ID ( s . to_string () ) }
-fn ids (ss : &[&str]) -> Vec<ID> {
-  ss . iter () . map ( |s| id (s) ) . collect () }
-fn src (s : &str) -> RepoName { RepoName ( s . to_string () ) }
+fn skgid (s : &str) -> ID { ID ( s . to_string () ) }
+fn skgids (ss : &[&str]) -> Vec<ID> {
+  ss . iter () . map ( |s| skgid (s) ) . collect () }
+fn src (s : &str) -> SkgRepoName { SkgRepoName ( s . to_string () ) }
 
 fn modified_hides_entry (
   hides_diff : Vec<Diff_Item<ID>>,
@@ -18,11 +18,11 @@ fn modified_hides_entry (
     after_node : None } }
 
 fn diffs_with_one_entry (
-  skgrepo   : &RepoName,
+  skgrepo  : &SkgRepoName,
   staged   : Option<(PathBuf, GraphnodeDiff)>,
   unstaged : Option<(PathBuf, GraphnodeDiff)>,
-) -> Option<HashMap<RepoName, RepoDiff>> {
-  Some ( HashMap::from ([ ( skgrepo . clone (), RepoDiff {
+) -> Option<HashMap<SkgRepoName, SkgRepoDiff>> {
+  Some ( HashMap::from ([ ( skgrepo . clone (), SkgRepoDiff {
     is_gitrepo   : true,
     staged        : staged   . into_iter () . collect (),
     unstaged      : unstaged . into_iter () . collect (),
@@ -31,10 +31,10 @@ fn diffs_with_one_entry (
 
 #[test]
 fn snapshots_degenerate_when_the_file_is_unchanged () {
-  let worktree : Vec<ID> = ids (&["a", "b"]);
+  let worktree : Vec<ID> = skgids (&["a", "b"]);
   let [head, index, wt] =
     three_snapshots_of_relation_list (
-      &id ("S"), &src ("main"),
+      &skgid ("S"), &src ("main"),
       NodeRelation::HidesFromItsSubscriptions,
       &worktree,
       & diffs_with_one_entry (&src ("main"), None, None) );
@@ -53,16 +53,16 @@ fn unstaged_change_reconstructs_the_index_as_the_before_list () {
     &src ("main"),
     None,
     Some (( file, modified_hides_entry ( vec! [
-      Diff_Item::Unchanged (id ("a")),
-      Diff_Item::Removed   (id ("b")),
-      Diff_Item::New       (id ("c")) ] )) ));
+      Diff_Item::Unchanged (skgid ("a")),
+      Diff_Item::Removed   (skgid ("b")),
+      Diff_Item::New       (skgid ("c")) ] )) ));
   let [head, index, _wt] =
     three_snapshots_of_relation_list (
-      &id ("S"), &src ("main"),
+      &skgid ("S"), &src ("main"),
       NodeRelation::HidesFromItsSubscriptions,
-      & ids (&["a", "c"]), &diffs );
-  assert_eq! (index, ids (&["a", "b"]));
-  assert_eq! (head,  ids (&["a", "b"]));
+      & skgids (&["a", "c"]), &diffs );
+  assert_eq! (index, skgids (&["a", "b"]));
+  assert_eq! (head,  skgids (&["a", "b"]));
 }
 
 #[test]
@@ -73,17 +73,17 @@ fn staged_change_separates_head_from_index () {
   let diffs = diffs_with_one_entry (
     &src ("main"),
     Some (( file, modified_hides_entry ( vec! [
-      Diff_Item::Unchanged (id ("a")),
-      Diff_Item::Removed   (id ("b")) ] )) ),
+      Diff_Item::Unchanged (skgid ("a")),
+      Diff_Item::Removed   (skgid ("b")) ] )) ),
     None );
   let [head, index, wt] =
     three_snapshots_of_relation_list (
-      &id ("S"), &src ("main"),
+      &skgid ("S"), &src ("main"),
       NodeRelation::HidesFromItsSubscriptions,
-      & ids (&["a"]), &diffs );
-  assert_eq! (head,  ids (&["a", "b"]));
-  assert_eq! (index, ids (&["a"]));
-  assert_eq! (wt,    ids (&["a"]));
+      & skgids (&["a"]), &diffs );
+  assert_eq! (head,  skgids (&["a", "b"]));
+  assert_eq! (index, skgids (&["a"]));
+  assert_eq! (wt,    skgids (&["a"]));
 }
 
 #[test]
@@ -100,8 +100,8 @@ fn hiddenin_signs_come_from_either_input_list_with_exact_stages () {
       status : GitDiffStatus::Modified,
       node_changes : Some ( NodeChanges {
         contains_diff : vec! [
-          Diff_Item::Unchanged (id ("h1")),
-          Diff_Item::New       (id ("h2")) ],
+          Diff_Item::Unchanged (skgid ("h1")),
+          Diff_Item::New       (skgid ("h2")) ],
         .. NodeChanges::default () } ),
       before_node : None,
       after_node : None } )),
@@ -109,16 +109,16 @@ fn hiddenin_signs_come_from_either_input_list_with_exact_stages () {
   let (goal, removed, axes) =
     goal_list_for_hiddenInSubscribee_folder (
       &graph,
-      &id ("B"), &src ("main"),
-      &id ("S"), &src ("main"),
-      & ids (&["h1", "h2"]), // B's worktree contains
-      & ids (&["h1", "h2"]), // S's worktree hides
+      &skgid ("B"), &src ("main"),
+      &skgid ("S"), &src ("main"),
+      & skgids (&["h1", "h2"]), // B's worktree contains
+      & skgids (&["h1", "h2"]), // S's worktree hides
       &diffs );
-  assert_eq! (goal, ids (&["h1", "h2"]));
+  assert_eq! (goal, skgids (&["h1", "h2"]));
   assert! (removed . is_empty ());
-  assert_eq! ( axes [ &id ("h2") ],
+  assert_eq! ( axes [ &skgid ("h2") ],
     RelationshipAxes { staged : Some (Sign::Plus), unstaged : None } );
-  assert! ( ! axes . contains_key (&id ("h1")),
+  assert! ( ! axes . contains_key (&skgid ("h1")),
     "an unchanged member contributes no signs" );
 }
 
@@ -133,18 +133,18 @@ fn hiddenin_removed_member_gets_exact_stage_label () {
     &src ("main"),
     None,
     Some (( s_file, modified_hides_entry ( vec! [
-      Diff_Item::Removed (id ("h1")) ] )) ));
+      Diff_Item::Removed (skgid ("h1")) ] )) ));
   let (goal, removed, axes) =
     goal_list_for_hiddenInSubscribee_folder (
       &graph,
-      &id ("B"), &src ("main"),
-      &id ("S"), &src ("main"),
-      & ids (&["h1"]), // B's worktree contains
-      & ids (&[]),     // S's worktree hides
+      &skgid ("B"), &src ("main"),
+      &skgid ("S"), &src ("main"),
+      & skgids (&["h1"]), // B's worktree contains
+      & skgids (&[]),     // S's worktree hides
       &diffs );
-  assert_eq! (goal, ids (&["h1"]));
-  assert! (removed . contains (&id ("h1")));
-  assert_eq! ( axes [ &id ("h1") ],
+  assert_eq! (goal, skgids (&["h1"]));
+  assert! (removed . contains (&skgid ("h1")));
+  assert_eq! ( axes [ &skgid ("h1") ],
     RelationshipAxes { staged : None, unstaged : Some (Sign::Minus) } );
 }
 
@@ -154,12 +154,12 @@ fn no_diffs_means_no_signs_and_the_worktree_goal () {
   let (goal, removed, axes) =
     goal_list_for_hiddenInSubscribee_folder (
       &graph,
-      &id ("B"), &src ("main"),
-      &id ("S"), &src ("main"),
-      & ids (&["h1", "v"]),
-      & ids (&["h1"]),
+      &skgid ("B"), &src ("main"),
+      &skgid ("S"), &src ("main"),
+      & skgids (&["h1", "v"]),
+      & skgids (&["h1"]),
       &None );
-  assert_eq! (goal, ids (&["h1"]));
+  assert_eq! (goal, skgids (&["h1"]));
   assert! (removed . is_empty ());
   assert! (axes . is_empty ());
 }

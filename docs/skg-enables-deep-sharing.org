@@ -18,7 +18,7 @@ In a world of scarce attention overflowing with information, granular subscripti
 ** Share granularly.
 Granular sharing lets you integrate your private and public thinking while maintaining your privacy. That's because you can share not just whole documents, but selected parts of documents, while keeping the rest private. (Technically, each document is a tree, and each spot in the tree can be shared separately.)
 
-There are good reasons to keep data private: to protect the friends of the writer, to process an incomplete idea that does not yet deserve to be shared, to maintain a competitive edge, to avoid embarrassment, and probably others. But if you share your writing, others can (without even trying!) help you understand it, as described above. Thus, when you make an entire document private just to hide a small part of it, you and others are both worse off.
+There are good reasons to keep data private: to protect the friends of the writer, to process an incomplete idea that does not yet deserve to be shared, to maintain a competitive relationship, to avoid embarrassment, and probably others. But if you share your writing, others can (without even trying!) help you understand it, as described above. Thus, when you make an entire document private just to hide a small part of it, you and others are both worse off.
 
 As an example, suppose your notes on neurotransmitters include an idea for a drug, which you want to keep secret. Skg will let you view your secret drug idea in its natural context: your neurotransmitter notes. Sharing your neurotransmitter notes will let you learn from the people who use them, and vice-versa, without revealing your secret drug idea.
 

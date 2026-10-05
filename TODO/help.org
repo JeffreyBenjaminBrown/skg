@@ -24,7 +24,7 @@ not generated prose from a language model or a new graph exploration API.
 ** Invocation and buffer behavior
 From a headline or its body, inspect that owning headline. If point is on
 a Skg link, include its annotation/status explanation after the headline's
-heralds. Work with herald display enabled or disabled. A scaffold or
+heralds. Work with herald display enabled or disabled. A non-vognode or
 phantom gets an explanation of its own metadata, not a guessed explanation
 of the nearest real node. If there is no Skg headline, say so without
 selecting an unrelated nearby ID.
@@ -280,7 +280,7 @@ Editability documentation and view metadata
 This projection cannot be edited here
 **** More detail
 The appropriate folder/property documentation; do not suggest making a
-scaffold definitive
+non-vognode definitive
 
 *** B beside ☮
 **** Explain
@@ -311,7 +311,7 @@ The node is unavailable in the active source set
 Source-set documentation/selection; do not reveal a concealed
 identity, title or source
 
-*** DELETED node/scaffold
+*** DELETED node/non-vognode
 **** Explain
 This is a retained deleted placeholder, not a pending delete request
 **** More detail

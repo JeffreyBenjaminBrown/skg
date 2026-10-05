@@ -207,7 +207,7 @@ Returns a deduplicated Vec<ID>.
 File: [[../../server/to_org/expand/backpath.rs][backpath.rs]].
 
 Walks the subtree under node_id to find every
-TrueNode with birth == Birth::LinksTo.
+ActiveVognode with birth == Birth::LinksTo.
 For each, looks up its PID in the ancestry_map.
 If the ancestry is an AncestryTree::Inner,
 inserts the node's containers as org-subheadlines
@@ -237,8 +237,8 @@ For each AncestryTree node:
   recurse for each of its containers
 
 Reuses 'prepend_indef_indep_child' (backpath.rs line 238),
-which already handles fetching the SkgNode via TypeDB and
-creating an indefinitive ViewNode with the given Birth.
+which already handles fetching the Graphnode via TypeDB and
+creating a write-protected ViewNode with the given Birth.
 
 The containers are iterated in reverse order.
 Since 'prepend_indef_indep_child' prepends
@@ -286,8 +286,8 @@ This makes the graph:
 The expected output for sourceward-on-line-1 gains a new
 org-subheadline under the l-11 source node:
 #+begin_example
-  *** (skg (node (id l-11) ... (birth linksTo) indefinitive ...)) [[id:11][a link to 11]]
-  **** (skg (node (id c-l-11) ... (birth containerOf) indefinitive ...)) container of l-11
+  *** (skg (node (id l-11) ... (birth linksTo) writeProtected ...)) [[id:11][a link to 11]]
+  **** (skg (node (id c-l-11) ... (birth containerOf) writeProtected ...)) container of l-11
 #+end_example
 
 The stripped expected output changes from:

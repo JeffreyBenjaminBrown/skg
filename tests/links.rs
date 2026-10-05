@@ -8,7 +8,7 @@ use skg::types::links::{
 use skg::types::links::Link;
 use skg::types::errors::LinkParseError;
 use skg::types::misc::ID;
-use skg::types::nodes::complete::{Graphnode, empty_node_complete};
+use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 
 #[test]
 fn test_link_to_string() {
@@ -22,7 +22,7 @@ fn test_link_from_str_valid() {
   let text : &str =
     "[[id:abc123][My Link]]";
   let link: Link = text . parse() . unwrap();
-  assert_eq! ( link . id, "abc123" . into() );
+  assert_eq! ( link . skgid, "abc123" . into() );
   assert_eq! ( link . label, "My Link");
 }
 
@@ -71,7 +71,7 @@ fn test_links_from_text_single() {
   let links : Vec < Link > =
     links_from_text (text);
   assert_eq! ( links . len(), 1 ) ;
-  assert_eq! ( links[0] . id, "abc123" . into() );
+  assert_eq! ( links[0] . skgid, "abc123" . into() );
   assert_eq! ( links[0] . label, "My Link" ) ;
 }
 
@@ -82,9 +82,9 @@ fn test_links_from_text_multiple() {
   let links : Vec < Link > =
     links_from_text (text);
   assert_eq!(links . len(), 2);
-  assert_eq!(links[0] . id, "abc123" . into() );
+  assert_eq!(links[0] . skgid, "abc123" . into() );
   assert_eq!(links[0] . label, "First Link");
-  assert_eq!(links[1] . id, "def456" . into() );
+  assert_eq!(links[1] . skgid, "def456" . into() );
   assert_eq!(links[1] . label, "Second Link");
 }
 
@@ -96,7 +96,7 @@ fn test_links_from_text_with_uuid() {
     links_from_text (text);
   assert_eq!(links . len(), 1);
   assert_eq!(
-    links[0] . id,
+    links[0] . skgid,
     "846207ef-11d6-49e4-89b4-4558b2989a60" . into() );
   assert_eq!(links[0] . label, "My UUID Link");
 }
@@ -108,14 +108,14 @@ fn test_links_from_text_with_nested_brackets() {
   let links : Vec < Link > =
     links_from_text (text);
   assert_eq!(links . len(), 1);
-  assert_eq!(links[0] . id, "abc123" . into() );
+  assert_eq!(links[0] . skgid, "abc123" . into() );
   assert_eq!(links[0] . label, "Link [with] brackets");
 }
 
 #[test]
 fn test_links_from_node() {
   let mut test_node : Graphnode =
-    empty_node_complete ();
+    empty_graphnode ();
   { test_node . title = "Title with two links: [[id:link1][First Link]] and [[id:link2][Second Link]]" . to_string();
     test_node . pid = ID::new ("id");
     test_node . body = Some("Some text with a link [[id:link3][Third Link]] and another [[id:link4][Fourth Link]]" . to_string()); }
@@ -123,16 +123,16 @@ fn test_links_from_node() {
     links_from_node (&test_node);
   assert_eq!(links . len(), 4);
   assert!(links . iter()
-          . any(|link| link . id == "link1" . into() &&
+          . any(|link| link . skgid == "link1" . into() &&
                link . label == "First Link"));
   assert!(links . iter()
-          . any(|link| link . id == "link2" . into() &&
+          . any(|link| link . skgid == "link2" . into() &&
                link . label == "Second Link"));
   assert!(links . iter()
-          . any(|link| link . id == "link3" . into() &&
+          . any(|link| link . skgid == "link3" . into() &&
                link . label == "Third Link"));
   assert!(links . iter()
-          . any(|link| link . id == "link4" . into() &&
+          . any(|link| link . skgid == "link4" . into() &&
                link . label == "Fourth Link"));
 }
 
@@ -179,7 +179,7 @@ fn shared_literal_link_cases_hold () {
   assert! (cases . len () > 5, "too few cases parsed");
   for (name, text, live) in cases {
     let found : Vec<String> = links_from_text (&text) . into_iter ()
-      . map (|link| link . id . 0) . collect ();
+      . map (|link| link . skgid . 0) . collect ();
     assert_eq! (found, live, "case: {}", name); }
 }
 
@@ -194,7 +194,7 @@ fn label_replacement_skips_example_links () {
 fn node_body_first_line_is_a_line_start () {
   // Were title and body joined on one line, the body's opening
   // '#+begin_example' would not start a line, and its link would count.
-  let mut node : Graphnode = empty_node_complete ();
+  let mut node : Graphnode = empty_graphnode ();
   node . title = "title [[id:t][T]]" . to_string ();
   node . body = Some (
     "#+begin_example\n[[id:x][X]]\n#+end_example" . to_string () );

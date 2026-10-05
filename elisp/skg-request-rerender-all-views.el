@@ -35,7 +35,7 @@ streaming protocol: rerender-lock, rerender-view*, rerender-done."
               (append
                '((request . "rerender all views"))
                (when approved-pids
-                 `((allow-overPrivateText-telescopes ,@approved-pids)))))
+                 `((approved-overPrivateText-pids ,@approved-pids)))))
              "\n"))))
 
 (defun skg--register-rerender-overPrivateText-confirmation

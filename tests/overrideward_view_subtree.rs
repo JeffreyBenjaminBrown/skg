@@ -1,13 +1,13 @@
 // cargo nextest run --test grouped_overrides -E 'test(overrideward_view_subtree::)'
 //
 // Overrideward view-subtrees + suppression in search results
-// (TODO/override-ancestry-in-search-results.org).
+// (TODO/DONE/override-ancestry-in-search-results.org).
 //
-// Fixture (tests/overrideward_view_subtree/fixtures): owned repo
+// Fixture (tests/overrideward_view_subtree/fixtures): owned skgrepo
 // "main" holds U, which overrides foreign F, which overrides foreign
 // G; foreign M1 and M2 mutually override; foreign B overrides foreign
 // E. Ownership is by location -- "main" lives under owned/, so it is
-// user-owned; "foreign" is not.
+// owned; "foreign" is not.
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -16,18 +16,18 @@ use ego_tree::{NodeId, NodeRef, Tree};
 
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::stats::{
-  AllGraphnodeStats, fetch_all_graphnodestats_with_repo_set};
+  AllGraphnodeStats, fetch_all_graphnodestats_with_skgrepo_set};
 use skg::org_to_text::viewforest_to_string;
 use skg::serve::handlers::text_search::{
-  MatchGroups, build_search_viewforest, suppressed_result_ids};
+  MatchGroups, build_search_viewforest, suppressed_result_skgids};
 use skg::serve::handlers::text_search::render_enriched_search_buffer::{
-  collect_overrideward_view_subtree_ids,
+  collect_overrideward_view_subtree_skgids,
   insert_overrideward_view_subtrees};
-use skg::repo_sets::{
-  ActiveRepoSet, RepoSetName, apply_repo_set_to_viewforest};
+use skg::skgrepo_sets::{
+  ActiveSkgRepoSet, SkgRepoSetName, apply_skgrepo_set_to_viewforest};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::to_org::util::mark_view_roots_parent_na;
-use skg::types::misc::{ID, SkgConfig, RepoName};
+use skg::types::misc::{ID, SkgConfig, SkgRepoName};
 use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{Birth, Viewnode, ViewnodeKind, Vognode};
 use skg::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
@@ -35,10 +35,10 @@ use skg::update_buffer::set_viewnodestats_in_viewforest;
 
 /// One search hit, as a MatchGroups entry.
 fn hit (
-  id : &str, repo : &str, title : &str,
-) -> (ID, (RepoName, Vec<(f32, String)>)) {
-  ( ID::from (id),
-    ( RepoName::from (repo),
+  skgid : &str, skgrepo : &str, title : &str,
+) -> (ID, (SkgRepoName, Vec<(f32, String)>)) {
+  ( ID::from (skgid),
+    ( SkgRepoName::from (skgrepo),
       vec![ (1.0_f32, title . to_string ()) ] ) ) }
 
 #[test]
@@ -50,11 +50,11 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
         "overrideward_view_subtree",
         "tests/overrideward_view_subtree/fixtures/skgconfig.toml"
         ) ?;
-      let active : ActiveRepoSet =
-        ActiveRepoSet::named (
-          &s . config, RepoSetName::from ("all") ) ?;
+      let active : ActiveSkgRepoSet =
+        ActiveSkgRepoSet::named (
+          &s . config, SkgRepoSetName::from ("all") ) ?;
       let graph = graph_handle_from_config (&s . config) ? . load_full ();
-      suppression_anchors_at_user_owned (
+      suppression_anchors_at_owned (
         &graph, &s . config, &active ) ?;
       override_relatives_are_role_grafted_as_descendants ( &graph, &active ) ?;
       end_to_end_render_shows_suppressed_role_grafts_with_heralds (
@@ -73,7 +73,7 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
 async fn end_to_end_render_shows_suppressed_role_grafts_with_heralds (
   graph  : &InRustGraph,
   config : &SkgConfig,
-  active : &ActiveRepoSet,
+  active : &ActiveSkgRepoSet,
 ) -> Result<(), Box<dyn Error>> {
   let matches : MatchGroups = [
     hit ("U", "main",    "cooking the owned way"),
@@ -82,7 +82,7 @@ async fn end_to_end_render_shows_suppressed_role_grafts_with_heralds (
   ] . into_iter () . collect ();
   // Phase 1: suppression, then build the top-level viewforest.
   let suppressed : HashSet<ID> =
-    suppressed_result_ids ( &matches, &graph, config, active );
+    suppressed_result_skgids ( &matches, &graph, config, active );
   let (mut viewforest, search_results)
     : (ViewForest, Vec<ID>) =
     build_search_viewforest ( "cooking", &matches, &suppressed );
@@ -91,23 +91,23 @@ async fn end_to_end_render_shows_suppressed_role_grafts_with_heralds (
     "F and G are suppressed, so only U is a top-level result" );
   // Production's pre-fetch id-set: results + ancestry (none here) +
   // the override relatives the role graft will add.
-  let all_ids : Vec<ID> = {
-    let mut ids : HashSet<ID> =
+  let all_skgids : Vec<ID> = {
+    let mut skgids : HashSet<ID> =
       search_results . iter () . cloned () . collect ();
-    ids . extend (
-      collect_overrideward_view_subtree_ids (
+    skgids . extend (
+      collect_overrideward_view_subtree_skgids (
         &graph, &search_results, active ) );
-    ids . into_iter () . collect () };
+    skgids . into_iter () . collect () };
   let stats : AllGraphnodeStats =
-    fetch_all_graphnodestats_with_repo_set (
-      &graph, &all_ids, Some (active) ) ?;
+    fetch_all_graphnodestats_with_skgrepo_set (
+      &graph, &all_skgids, Some (active) ) ?;
   // Phase 2: graft, then the same stats/herald/render passes as
   // handle_snapshot_response.
   insert_overrideward_view_subtrees (
     &mut viewforest, &graph, &search_results, active );
-  let root_id : NodeId = viewforest . root () . id ();
+  let root_skgid : NodeId = viewforest . root () . id ();
   set_metadata_relationships_in_node_recursive (
-    &mut viewforest, root_id, &graph, &stats, config );
+    &mut viewforest, root_skgid, &graph, &stats, config );
   mark_view_roots_parent_na ( &mut viewforest );
   set_viewnodestats_in_viewforest (
     &mut viewforest,
@@ -115,7 +115,7 @@ async fn end_to_end_render_shows_suppressed_role_grafts_with_heralds (
     & stats . container_to_contents,
     & stats . content_to_containers,
     config, Some (active) );
-  apply_repo_set_to_viewforest ( &mut viewforest, active );
+  apply_skgrepo_set_to_viewforest ( &mut viewforest, active );
   let buffer : String = viewforest_to_string ( &viewforest, config ) ?;
 
   let level_of = |needle : &str| -> usize {
@@ -143,12 +143,12 @@ async fn end_to_end_render_shows_suppressed_role_grafts_with_heralds (
        fetched for it: {}", line ); }
   Ok (( )) }
 
-/// Only nodes recursively overridden by a USER-OWNED result are
+/// Only nodes recursively overridden by an OWNED result are
 /// suppressed. A foreign overrider suppresses nothing.
-fn suppression_anchors_at_user_owned (
+fn suppression_anchors_at_owned (
   graph  : &InRustGraph,
   config : &SkgConfig,
-  active : &ActiveRepoSet,
+  active : &ActiveSkgRepoSet,
 ) -> Result<(), Box<dyn Error>> {
   let matches : MatchGroups = [
     hit ("U",  "main",    "cooking the owned way"),
@@ -160,9 +160,9 @@ fn suppression_anchors_at_user_owned (
     hit ("E",  "foreign", "exciting original"),
   ] . into_iter () . collect ();
   let suppressed : HashSet<ID> =
-    suppressed_result_ids ( &matches, &graph, config, active );
+    suppressed_result_skgids ( &matches, &graph, config, active );
   let mut got : Vec<String> =
-    suppressed . iter () . map ( |id| id . 0 . clone () ) . collect ();
+    suppressed . iter () . map ( |skgid| skgid . 0 . clone () ) . collect ();
   got . sort ();
   assert_eq! (
     got, vec![ "F".to_string (), "G".to_string () ],
@@ -175,7 +175,7 @@ fn suppression_anchors_at_user_owned (
 /// marked with the OVERRIDDEN role-graft birth: U -> F -> G.
 fn override_relatives_are_role_grafted_as_descendants (
   graph : &InRustGraph,
-  active : &ActiveRepoSet,
+  active : &ActiveSkgRepoSet,
 ) -> Result<(), Box<dyn Error>> {
   let matches : MatchGroups =
     [ hit ("U", "main", "cooking the owned way") ]
@@ -204,24 +204,24 @@ fn override_relatives_are_role_grafted_as_descendants (
 
 fn find_result_root<'a> (
   tree : &'a Tree<Viewnode>,
-  id   : &str,
+  skgid   : &str,
 ) -> Option<NodeRef<'a, Viewnode>> {
   tree . root () . children ()
-    . find ( |c| active_id_is (*c, id) ) }
+    . find ( |c| active_skgid_is (*c, skgid) ) }
 
 fn find_child<'a> (
   parent : NodeRef<'a, Viewnode>,
-  id     : &str,
+  skgid     : &str,
 ) -> Option<NodeRef<'a, Viewnode>> {
-  parent . children () . find ( |c| active_id_is (*c, id) ) }
+  parent . children () . find ( |c| active_skgid_is (*c, skgid) ) }
 
-fn active_id_is (
+fn active_skgid_is (
   node : NodeRef<Viewnode>,
-  id   : &str,
+  skgid   : &str,
 ) -> bool {
   matches! ( &node . value () . kind,
     ViewnodeKind::Vognode (Vognode::Active (t))
-      if t . id == ID::from (id) ) }
+      if t . skgid == ID::from (skgid) ) }
 
 fn is_overriddenward_role_graft (
   node : NodeRef<Viewnode>,

@@ -313,7 +313,7 @@ In [[file:../../server/from_text/fork.rs][server/from_text/fork.rs]], initialize
 =NoSearchMatching= iff the origin has it.  Leave the clone's import-provenance
 flags empty.  Cover both true and false origins in the existing fork tests.
 
-** 5. Add properties to the existing scaffold families
+** 5. Add properties to the existing non-vognode families
 
 *** Extend the domain types, not =ViewNodeKind=
 
@@ -327,7 +327,7 @@ its request builds their active/passive folder pair, whereas this request
 builds one fact folder.
 
 Update parser, renderer, maybe-placed/placed conversion, =title()=,
-=repr_in_client()=, ancestry, source-switch cleanup, scaffold insertion,
+=repr_in_client()=, ancestry, source-switch cleanup, non-vognode insertion,
 local save traversal, and the herald vocabulary.  A final compiler-guided
 exhaustiveness pass must be followed by
 =rg 'QualFolder::|Qual::|ViewRequest::'=, since wildcard matches will not be
@@ -386,8 +386,8 @@ hidden graphnode.
 Cover render/parse round trip, all three wire atoms and labels, true-only
 rows, canonical ordering despite disk order, stable empty folder, idempotent
 show requests, post-save add/remove reconciliation, source-set reduction,
-source-set restoration, deletion/dead-scaffold cleanup, and absence of save
-intents from the scaffold.
+source-set restoration, deletion/dead-non-vognode cleanup, and absence of save
+intents from the non-vognode.
 
 ** 7. Make edits to read-only surfaces fail with useful evidence
 

@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_overrides -E 'test(collateral_repo_move::)'
 
 use futures::executor::block_on;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::dbs::in_rust_graph::{
@@ -30,7 +30,7 @@ use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 #[test]
-fn test_repo_move_updates_collateral_view_metadata (
+fn test_skgrepo_move_updates_collateral_view_metadata (
 ) -> Result<(), Box<dyn Error>> {
   let test_name : &str =
     "skg-test-collateral-repo-move";
@@ -53,14 +53,14 @@ fn test_repo_move_updates_collateral_view_metadata (
   let (_save_response, collateral_buffer)
     : (SaveResponse, String) =
     block_on ( async {
-      let root_ids : Vec<ID> =
+      let root_skgids : Vec<ID> =
         vec![ ID::new ("a") ];
       let (initial_buffer, pids, viewforest)
         : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view (
-          &config, None, &root_ids, false )?;
+          &config, None, &root_skgids, false )?;
       assert! (
-        buffer_has_repo_for_title (
+        buffer_has_skgrepo_for_title (
           &initial_buffer, "b", "public" ),
         "initial view should show b in public:\n{}",
         initial_buffer );
@@ -121,7 +121,7 @@ fn test_repo_move_updates_collateral_view_metadata (
         save_response, collateral_buffer )) } ) ?;
 
   assert! (
-    buffer_has_repo_for_title (
+    buffer_has_skgrepo_for_title (
       &collateral_buffer, "b", "private" ),
     "collateral view should show b's new repo:\n{}",
     collateral_buffer );
@@ -197,7 +197,7 @@ async fn setup_test_stores (
       tantivy_folder : tantivy_folder . to_path_buf(),
       .. config };
   let nodes : Vec<Graphnode> =
-    read_all_skg_files_from_repos (&config)?;
+    read_all_skg_files_from_skgrepos (&config)?;
   let tantivy_index : TantivyIndex =
     create_empty_tantivy_index (&config . tantivy_folder)?;
   Ok ((config, tantivy_index, nodes)) }
@@ -232,18 +232,18 @@ fn mk_test_tcp_stream_pair (
     listener . accept() . unwrap();
   (write_end, read_end) }
 
-fn buffer_has_repo_for_title (
-  buffer : &str,
-  title  : &str,
-  repo : &str,
+fn buffer_has_skgrepo_for_title (
+  buffer  : &str,
+  title   : &str,
+  skgrepo : &str,
 ) -> bool {
   let id_fragment : String =
     format! ("(id {})", title);
-  let repo_fragment : String =
-    format! ("(repo {})", repo);
+  let skgrepo_fragment : String =
+    format! ("(repo {})", skgrepo);
   let title_suffix : String =
     format! (") {}", title);
   buffer . lines() . any ( |line|
     line . contains (&id_fragment)
-    && line . contains (&repo_fragment)
+    && line . contains (&skgrepo_fragment)
     && line . ends_with (&title_suffix) ) }

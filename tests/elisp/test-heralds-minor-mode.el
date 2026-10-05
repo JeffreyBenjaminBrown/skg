@@ -137,7 +137,7 @@ at its floor (low), and the birth letter \"C\" (high)."
         ( should-not display-overlay )) )) )
 
 (ert-deftest test-heralds-inactive-node-display ()
-  "An anonymous inactive-node placeholder displays as a message herald.
+  "An anonymous inactive vognode displays as a message herald.
 The server emits the bare atom `inactiveNode' (like the other
 dataless non-vognode markers) -- it carries no id/repo, because those
 would leak content the user hid by restricting the repo-set."

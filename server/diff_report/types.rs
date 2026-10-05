@@ -1,4 +1,4 @@
-use crate::types::misc::{ID, RepoName};
+use crate::types::misc::{ID, SkgRepoName};
 use crate::types::nodes::complete::Graphnode;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -32,21 +32,21 @@ pub struct ChangedSnapshotPair {
 pub struct GraphSnapshot {
   /// One entry per TELESCOPE (keyed by pid, sections folded).
   pub nodes     : HashMap<ID, Graphnode>,
-  /// id -> claiming pid -> repos whose section for that pid
+  /// id -> claiming pid -> skgrepos whose section for that pid
   /// claims the id (as its pid or among its extra_ids). One pid
-  /// claiming an id from several repos is the normal telescope
+  /// claiming an id from several skgrepos is the normal telescope
   /// shape; TWO pids claiming one id is the duplicate-ID VIOLATION
   /// the report warns about.
-  pub id_claims : HashMap<ID, BTreeMap<ID, BTreeSet<RepoName>>>,
+  pub id_claims : HashMap<ID, BTreeMap<ID, BTreeSet<SkgRepoName>>>,
 }
 
 impl GraphSnapshot {
   /// Repos holding any claim on this id, across claiming pids.
-  pub fn repos_claiming_id (
+  pub fn skgrepos_claiming_skgid (
     &self,
-    id : &ID,
-  ) -> BTreeSet<RepoName> {
-    self . id_claims . get (id)
+    skgid : &ID,
+  ) -> BTreeSet<SkgRepoName> {
+    self . id_claims . get (skgid)
       . map ( |by_pid| by_pid . values () . flatten ()
               . cloned () . collect () )
       . unwrap_or_default () }
@@ -57,20 +57,20 @@ pub struct DiffReport {
   pub duplicate_ids : Vec<DuplicateIDReport>,
   pub titles        : HashMap<ID, String>,
   pub buckets       : Vec<NodeBucket>,
-  /// Ids the worktree references though they exist in no repo,
+  /// Ids the worktree references though they exist in no skgrepo,
   /// investigated in git history (diff_report/vanished.rs).
   pub vanished      : Vec<VanishedNodeReport>,
 }
 
 #[derive(Clone, Debug)]
 pub struct VanishedNodeReport {
-  pub id        : ID,
-  pub sightings : Vec<VanishedNodeSighting>, // empty means: never in any repo's git history
+  pub skgid        : ID,
+  pub sightings : Vec<VanishedNodeSighting>, // empty means: never in any skgrepo's git history
 }
 
 #[derive(Clone, Debug)]
 pub struct VanishedNodeSighting {
-  pub home_repo       : RepoName,
+  pub home_skgrepo : SkgRepoName,
   pub last_present : CommitStamp,
   pub vanished_at  : Option<CommitStamp>, // its first-parent descendant, which lacks the file
   pub title        : String,             // the node's title when last present
@@ -87,10 +87,10 @@ pub struct CommitStamp {
 
 #[derive(Clone, Debug)]
 pub struct DuplicateIDReport {
-  pub id             : ID,
-  pub before_repos : BTreeSet<RepoName>,
-  pub after_repos  : BTreeSet<RepoName>,
-  pub title          : String,
+  pub skgid           : ID,
+  pub before_skgrepos : BTreeSet<SkgRepoName>,
+  pub after_skgrepos  : BTreeSet<SkgRepoName>,
+  pub title           : String,
 }
 
 #[derive(Clone, Debug)]
@@ -102,11 +102,11 @@ pub struct NodeBucket {
 #[derive(Clone, Debug)]
 pub struct NodeDiffReport {
   pub pid                 : ID,
-  pub home_repo              : RepoForReport,
+  pub home_skgrepo        : RepoForReport,
   pub title               : String,
   pub title_diff          : Option<Vec<TextDiffLine>>,
   pub body_diff           : Option<Vec<TextDiffLine>>,
-  pub repo_change       : Option<(RepoName, RepoName)>,
+  pub skgrepo_change      : Option<(SkgRepoName, SkgRepoName)>,
   pub value_set_diffs     : Vec<ValueSetDiff>,
   pub relationship_diffs  : Vec<RelationshipDiff>,
   pub contained_list_diff : Option<Vec<ListDiffItem>>,
@@ -114,8 +114,8 @@ pub struct NodeDiffReport {
 
 #[derive(Clone, Debug)]
 pub enum RepoForReport {
-  Before (RepoName),
-  After  (RepoName),
+  Before (SkgRepoName),
+  After  (SkgRepoName),
 }
 
 #[derive(Clone, Debug)]

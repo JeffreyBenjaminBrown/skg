@@ -11,7 +11,7 @@ The problem with that approach
 is that other nodes might have linked to,
 or been in other relationships with,
 the node that you deleted. (You copied the content,
-but content is just one of many kinds of relationship.)
+but content is just one of many kinds of relations.)
 
 Merging two nodes solves this problem.
 Any relationship that either node was in,
@@ -46,7 +46,7 @@ go to the "None" under "editRequests",
 and use shift-left or shift-right to cycle through possible values,
 until reaching 'merge'. You will be prompted for a node.
 Paste a link to, or the raw ID of,
-the node at the top of the id stack --
+the node at the top of the linkstack --
 see 'skg-paste-link' and similar commands.
 *** Save the buffer.
 This causes the server to act on the merge request

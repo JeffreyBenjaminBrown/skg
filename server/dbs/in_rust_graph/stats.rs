@@ -1,4 +1,4 @@
-/// PURPOSE: Fetch all graph-node statistics for a set of PIDs from the
+/// PURPOSE: Fetch all graphnode statistics for a set of PIDs from the
 /// in-Rust graph: directional member counts for the five relations, the
 /// alias / extra-id / true-flag counts, and the substantive-mentioner subset.
 /// These feed the uniform-herald token grammar (server/herald_tokens.rs).
@@ -13,7 +13,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::repo_sets::ActiveRepoSet;
+use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::misc::ID;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{GraphnodeStats, RelationCounts};
@@ -37,7 +37,7 @@ impl AllGraphnodeStats {
     } } }
 
 /// Extract GraphnodeStats for a single PID from AllGraphnodeStats and
-/// an optional disk Graphnode (the repo of the alias / extra-id /
+/// an optional disk Graphnode (the skgrepo of the alias / extra-id /
 /// flag counts).
 pub fn graphnodestats_for_pid (
   pid          : &ID,
@@ -54,7 +54,7 @@ pub fn graphnodestats_for_pid (
     . unwrap_or (0);
   let flags : usize =
     graphnode
-    . map ( |n| n . misc . iter () . copied ()
+    . map ( |n| n . flags . iter () . copied ()
       . collect::<HashSet<_>> () . len () )
     . unwrap_or (0);
   GraphnodeStats {
@@ -63,18 +63,18 @@ pub fn graphnodestats_for_pid (
     flags,
     rels : stats . counts . get (pid) . cloned (), }}
 
-/// Compute graph-node statistics without I/O.
+/// Compute graphnode statistics without I/O.
 pub fn fetch_all_graphnodestats (
   graph : &InRustGraph,
   pids    : &[ID],
 ) -> Result < AllGraphnodeStats, Box<dyn Error> > {
-  fetch_all_graphnodestats_with_repo_set (
+  fetch_all_graphnodestats_with_skgrepo_set (
     graph, pids, None ) }
 
-pub fn fetch_all_graphnodestats_with_repo_set (
+pub fn fetch_all_graphnodestats_with_skgrepo_set (
   graph    : &InRustGraph,
   pids     : &[ID],
-  active   : Option<&ActiveRepoSet>,
+  active   : Option<&ActiveSkgRepoSet>,
 ) -> Result < AllGraphnodeStats, Box<dyn Error> > {
   if pids . is_empty () {
     return Ok ( AllGraphnodeStats::empty() ); }
@@ -90,7 +90,7 @@ pub fn fetch_all_graphnodestats_with_repo_set (
 /// container/content maps use the gated accessors
 /// ('outbound_pids_for_relation_gated' / 'inbound_pids_for_relation_gated'),
 /// not the raw GraphnodeInRust lists / inverse indexes -- a membership
-/// recorded at a repo outside 'active' must not inflate a count or
+/// recorded at a skgrepo outside 'active' must not inflate a count or
 /// appear in these maps, in either direction, even when the member
 /// NODE itself is active (still checked separately via
 /// 'pid_repo_is_active', matching every other render surface's
@@ -99,7 +99,7 @@ fn fetch_all_graphnodestats_in_rust (
   graph   : &InRustGraph,
   pids    : &[ID],
   pid_set : &HashSet<ID>,
-  active  : Option<&ActiveRepoSet>,
+  active  : Option<&ActiveSkgRepoSet>,
 ) -> AllGraphnodeStats {
   let mut counts : HashMap<ID, RelationCounts> = HashMap::new ();
   let mut mentioner_link_facts : HashMap<ID, (HashSet<ID>, bool)> = HashMap::new ();
@@ -112,13 +112,13 @@ fn fetch_all_graphnodestats_in_rust (
     let inbound_count = | relation : NodeRelation | -> usize {
       graph . inbound_pids_for_relation_gated (pid, relation, active)
       . iter ()
-      . filter ( |p| pid_repo_is_active (graph, active, p) )
+      . filter ( |p| pid_skgrepo_is_active (graph, active, p) )
       . collect::<HashSet<_>> () . len () };
     // Outbound counts: gated partners, further repo-filtered.
     let outbound_count = | relation : NodeRelation | -> usize {
       graph . outbound_pids_for_relation_gated (pid, relation, active)
       . iter ()
-      . filter ( |p| pid_repo_is_active (graph, active, p) )
+      . filter ( |p| pid_skgrepo_is_active (graph, active, p) )
       . collect::<HashSet<_>> () . len () };
     let containers : usize = inbound_count (NodeRelation::Contains);
     let contents : usize = outbound_count (NodeRelation::Contains);
@@ -135,7 +135,7 @@ fn fetch_all_graphnodestats_in_rust (
       graph . inbound_pids_for_relation_gated (
         pid, NodeRelation::LinksTo, active )
       . into_iter ()
-      . filter (|mentioner| pid_repo_is_active (graph, active, mentioner))
+      . filter (|mentioner| pid_skgrepo_is_active (graph, active, mentioner))
       . collect ();
     let link_total : usize = mentioners . len ();
     let link_substantive : usize = mentioners . iter ()
@@ -159,7 +159,7 @@ fn fetch_all_graphnodestats_in_rust (
           pid, NodeRelation::Contains, active )
         . into_iter ()
         . filter ( |p| pid_set . contains (p) )
-        . filter ( |p| pid_repo_is_active (graph, active, p) )
+        . filter ( |p| pid_skgrepo_is_active (graph, active, p) )
         . collect ();
       if ! intersected . is_empty () {
         container_to_contents . insert ( pid . clone (),
@@ -170,7 +170,7 @@ fn fetch_all_graphnodestats_in_rust (
           pid, NodeRelation::Contains, active )
         . into_iter ()
         . filter ( |p| pid_set . contains (p) )
-        . filter ( |p| pid_repo_is_active (graph, active, p) )
+        . filter ( |p| pid_skgrepo_is_active (graph, active, p) )
         . collect ();
       if ! intersected . is_empty () {
         content_to_containers . insert ( pid . clone (),
@@ -185,10 +185,10 @@ fn fetch_all_graphnodestats_in_rust (
 /// The graph already parsed title and body into links_to.
 fn link_facts_for_mentioner (
   graph  : &InRustGraph,
-  active : Option<&ActiveRepoSet>,
+  active : Option<&ActiveSkgRepoSet>,
   pid    : &ID,
 ) -> (HashSet<ID>, bool) {
-  if ! pid_repo_is_active (graph, active, pid) {
+  if ! pid_skgrepo_is_active (graph, active, pid) {
     return (HashSet::new (), false); }
   let Some (node) = graph . nodes . get (pid) else {
     return (HashSet::new (), false); };
@@ -196,27 +196,27 @@ fn link_facts_for_mentioner (
     graph . outbound_pids_for_relation_gated (
       pid, NodeRelation::LinksTo, active )
     . into_iter ()
-    . filter (|target| pid_repo_is_active (graph, active, target))
+    . filter (|target| pid_skgrepo_is_active (graph, active, target))
     . collect ();
   let has_body : bool = node . body . as_ref ()
     . is_some_and (|body| ! body . trim () . is_empty ());
   let has_content : bool = graph . outbound_pids_for_relation_gated (
       pid, NodeRelation::Contains, active )
     . iter ()
-    . any (|member| pid_repo_is_active (graph, active, member));
+    . any (|member| pid_skgrepo_is_active (graph, active, member));
   let substantive : bool = has_body || has_content || targets . len () > 1;
   (targets, substantive) }
 
 pub(crate) fn mentioner_is_substantive (
   graph  : &InRustGraph,
-  active : Option<&ActiveRepoSet>,
+  active : Option<&ActiveSkgRepoSet>,
   pid    : &ID,
 ) -> bool {
   link_facts_for_mentioner (graph, active, pid) . 1 }
 
-fn pid_repo_is_active (
+fn pid_skgrepo_is_active (
   graph  : &InRustGraph,
-  active : Option<&ActiveRepoSet>,
+  active : Option<&ActiveSkgRepoSet>,
   pid    : &ID,
 ) -> bool {
   match active {
@@ -224,27 +224,27 @@ fn pid_repo_is_active (
     Some (active) if active . is_all () => true,
     Some (active) =>
       graph . nodes . get (pid)
-      . map ( |node| active . contains_repo (&node . home_repo) )
+      . map ( |node| active . contains_skgrepo (&node . home_skgrepo) )
       . unwrap_or (false), } }
 
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::types::nodes::complete::{Flag, empty_node_complete};
-  use crate::types::misc::{RelPartner, RepoName};
+  use crate::types::nodes::complete::{Flag, empty_graphnode};
+  use crate::types::misc::{RelPartner, SkgRepoName};
   use crate::dbs::filesystem::not_nodes::load_config;
-  use crate::repo_sets::RepoSetName;
+  use crate::skgrepo_sets::SkgRepoSetName;
 
   fn node (
-    id    : &str,
+    skgid : &str,
     title : &str,
     body  : Option<&str>,
   ) -> Graphnode {
     Graphnode {
-      pid : ID::from (id),
+      pid : ID::from (skgid),
       title : title . to_string (),
       body : body . map (str::to_string),
-      .. empty_node_complete () } }
+      .. empty_graphnode () } }
 
   #[test]
   fn links_count_distinct_resolved_identities_and_substantive_mentioners () {
@@ -253,7 +253,7 @@ mod tests {
     let mut with_content : Graphnode =
       node ("with-content", "[[id:target][x]]", None);
     with_content . contains = vec![ RelPartner::at_relRepo (
-      RepoName::from ("main"), ID::from ("target")) ];
+      SkgRepoName::from ("main"), ID::from ("target")) ];
     let nodes : Vec<Graphnode> = vec![
       target,
       node ("other", "Another distinct target", None),
@@ -280,23 +280,23 @@ mod tests {
   fn inactive_content_and_targets_do_not_make_a_mentioner_substantive () {
     let config = load_config (
       "tests/repo_sets/fixtures/skgconfig.toml") . unwrap ();
-    let active : ActiveRepoSet = ActiveRepoSet::named (
-      &config, RepoSetName::from ("public")) . unwrap ();
+    let active : ActiveSkgRepoSet = ActiveSkgRepoSet::named (
+      &config, SkgRepoSetName::from ("public")) . unwrap ();
     let mut mentioner : Graphnode = node (
       "mentioner", "[[id:target][d]] [[id:private-target][p]]", None);
-    mentioner . home_repo = RepoName::from ("public");
+    mentioner . home_skgrepo = SkgRepoName::from ("public");
     mentioner . contains = vec![RelPartner::at_relRepo (
-      RepoName::from ("private"), ID::from ("visible-child"))];
+      SkgRepoName::from ("private"), ID::from ("visible-child"))];
     let mut target : Graphnode = node ("target", "destination", None);
-    target . home_repo = RepoName::from ("public");
+    target . home_skgrepo = SkgRepoName::from ("public");
     let mut child : Graphnode = node ("visible-child", "child", None);
-    child . home_repo = RepoName::from ("public");
+    child . home_skgrepo = SkgRepoName::from ("public");
     let mut private_target : Graphnode = node (
       "private-target", "private target", None);
-    private_target . home_repo = RepoName::from ("private");
+    private_target . home_skgrepo = SkgRepoName::from ("private");
     let graph : InRustGraph = InRustGraph::from_graphnodes (
       &[mentioner, target, child, private_target]);
-    let stats : AllGraphnodeStats = fetch_all_graphnodestats_with_repo_set (
+    let stats : AllGraphnodeStats = fetch_all_graphnodestats_with_skgrepo_set (
       &graph, &[ID::from ("mentioner"), ID::from ("target")],
       Some (&active)) . unwrap ();
     assert_eq! (stats . counts [&ID::from ("target")] . link_total, 1);
@@ -309,11 +309,11 @@ mod tests {
     let pid = ID::from ("node");
     let node = Graphnode {
       pid : pid . clone (),
-      misc : vec![
+      flags : vec![
         Flag::Had_ID_Before_Import,
         Flag::Had_ID_Before_Import,
         Flag::NoSearchMatching ],
-      .. empty_node_complete () };
+      .. empty_graphnode () };
     let result = graphnodestats_for_pid (
       &pid, &AllGraphnodeStats::empty (), Some (&node));
     assert_eq! (result . flags, 2);

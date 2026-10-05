@@ -2,7 +2,7 @@
 -- unstaged-new files, works from a body line, and touches no git
 -- state) and test-skg-readable-ids.el (stale-generation dropping;
 -- shortened ids without title annotations), plus goto_git's plain-diff
--- fallback against a real temporary git repo.
+-- fallback against a real temporary gitrepo.
 
 local helpers = dofile(
   debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')

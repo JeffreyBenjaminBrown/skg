@@ -11,7 +11,7 @@
 --
 -- Known limitation: collateral completion currently fails when the
 -- saved buffer introduced a brand-new node, because
--- build_child_creation_data can't find a repo for the new UUID. So
+-- build_child_creation_data can't find a skgrepo for the new UUID. So
 -- buffer A picks up the title change and the new child c anyway (per
 -- the elisp test's phase 5 -- the collateral update DOES succeed
 -- here).
@@ -207,7 +207,7 @@ assert_headline_titles(buf_b,
     { 3, 'true', 'b' } },
   'phase 3: buffer B before edit')
 vim.api.nvim_set_current_buf(buf_b)
-do -- Change a's title on line 4 (the definitive a): replace the
+do -- Change a's title on line 4 (the editable a): replace the
    -- trailing "a" with a longer title.
   local line4 = vim.api.nvim_buf_get_lines(buf_b, 3, 4, false)[1]
   local new_line4 = line4:sub(1, #line4 - 1)

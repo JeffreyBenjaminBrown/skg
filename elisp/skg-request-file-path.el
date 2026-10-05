@@ -77,7 +77,7 @@ or nil (with a user message) if no valid node metadata is found."
             nil)))))))
 
 (defun skg--magit-parent-info-at-point ()
-  "Return a cons (id . repo) for the node on the parent heading,
+  "Return a cons (id . repo) for the node on the parent headline,
 or nil (with a user message) if no valid parent metadata is found."
   (let (( parent-sexp nil ))
     (save-excursion
@@ -88,10 +88,10 @@ or nil (with a user message) if no valid parent metadata is found."
         (error nil)))
     (cond
      ((not parent-sexp)
-      (message "No parent heading found.")
+      (message "No parent headline found.")
       nil)
      ((not (skg--metadata-sexp-contains-id-p parent-sexp))
-      (message "Parent heading has no node metadata.")
+      (message "Parent headline has no node metadata.")
       nil)
      (t
       (let (( parent-id     (skg--extract-id-from-metadata-sexp parent-sexp) )
@@ -134,7 +134,7 @@ Returns nil (after a user message) on error or missing path."
       (unless (require 'magit nil t)
         (user-error "Magit is not installed or loadable"))
       (let* (( resolved-path    (expand-file-name path skg-config-dir) )
-             ( default-directory ;; PITFALL: magit reads this implicitly to find the git repo via magit-toplevel. The Skg repo's directory is its own Git repo, separate from the outer project repo.
+             ( default-directory ;; PITFALL: magit reads this implicitly to find the gitrepo via magit-toplevel. The skgrepo's directory is its own gitrepo, separate from the outer project gitrepo.
                (file-name-directory resolved-path) )
              ( repo-root (magit-toplevel default-directory) )
              ( rel-path  (file-relative-name resolved-path repo-root) ))

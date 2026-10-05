@@ -1,6 +1,6 @@
 -- PURPOSE: Bootstrap for the skg nvim test suites. Passed as
 -- minimal_init to PlenaryBustedDirectory (bash/nvim-tests.sh), so each
--- child nvim gets the repo's plugin on its runtimepath plus the baked-in
+-- child nvim gets the skgrepo's plugin on its runtimepath plus the baked-in
 -- image plugins (plenary, orgmode, ...), and nothing else.
 -- The analog of elisp/skg-test-utils.el's load-path setup.
 
@@ -14,7 +14,7 @@ vim.cmd('packloadall!')
 -- spurious E303s for their throwaway buffers.
 vim.o.swapfile = false
 
----Where the repo lives, for specs that need fixtures.
+---Where the skgrepo lives, for specs that need fixtures.
 ---@return string
 function _G.skg_test_repo_root ()
   return repo_root

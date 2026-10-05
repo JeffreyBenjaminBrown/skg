@@ -15,7 +15,7 @@ use crate::serve::util::{
   tag_text_response};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::misc::ID;
-use crate::repo_sets::ActiveRepoSet;
+use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::views_state::ViewUri;
 
 use futures::executor::block_on;
@@ -34,14 +34,14 @@ pub fn handle_single_root_view_request (
   request    : &str,
   env        : &SkgEnv,
   views_state : &mut ViewsState,
-  active_repo_set : &ActiveRepoSet,
+  active_skgrepo_set : &ActiveSkgRepoSet,
 ) {
   let runtime = env . runtime_snapshot ();
   let view_uri_result : Result<ViewUri, String> =
     view_uri_from_request (request);
-  match node_id_from_single_root_view_request (request) {
+  match node_skgid_from_single_root_view_request (request) {
     Ok (node_id) => {
-      match active_repo_set . id_repo_is_active (
+      match active_skgrepo_set . skgid_skgrepo_is_active (
         &runtime . graph, &runtime . config, &node_id ) {
         Ok (true) => {},
         Ok (false) => {
@@ -51,7 +51,7 @@ pub fn handle_single_root_view_request (
               &vec! [format! (
                 "Node {} is not in active repo-set {}",
                 node_id,
-                active_repo_set . name )],
+                active_skgrepo_set . name )],
               &[] );
           send_response_with_length_prefix (
             stream,
@@ -72,7 +72,7 @@ pub fn handle_single_root_view_request (
           return; }}
       if let Some (existing_uri)
         = views_state . open_views
-          . content_view_uri_for_root_id ( &node_id )
+          . content_view_uri_for_root_skgid ( &node_id )
         { // Following a link to a root that is already open lands in
           // that ordinary content buffer.
           let switch_sexp : String =
@@ -99,12 +99,12 @@ pub fn handle_single_root_view_request (
               &runtime,
               &[node_id . clone ()],
               views_state . diff_mode_enabled,
-              Some (active_repo_set),
+              Some (active_skgrepo_set),
               &mut render_warnings )
             { Ok ( (buffer_content, pids, viewforest) ) => {
                 let release = decide_text_release (
                   "single-root-view",
-                  active_repo_set,
+                  active_skgrepo_set,
                   &pids,
                   &runtime . graph,
                   &approved_overPrivateText_pids );
@@ -152,7 +152,7 @@ pub fn handle_single_root_view_request (
         & tag_text_response (
           TcpToClient::ContentView, &error_msg )); } } }
 
-pub fn node_id_from_single_root_view_request (
+pub fn node_skgid_from_single_root_view_request (
   request : &str
 ) -> Result<ID, String> {
   extract_v_from_kv_pair_in_sexp (

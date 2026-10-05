@@ -1,50 +1,50 @@
 /// These tests pin the instructionMerge insert rules of
 /// server/from_text/local_instruction_collection/types.rs
-/// (TODO/local-instruction-collection/3_plan.org).
+/// (TODO/DONE/local-instruction-collection/3_plan.org).
 
 use skg::from_text::local_instruction_collection::types::{
-  CollectedIntents, IntentsForOneId, NodeIntent_Local,
+  CollectedFieldIntents, FieldIntentsForOneId, FieldIntent,
   SubscribeeTextClaim, SubscribeeVisibility };
-use skg::types::misc::{ID, RepoName};
+use skg::types::misc::{ID, SkgRepoName};
 use skg::types::nodes::complete::Flag;
 
 fn title_intent (
   title : &str,
-) -> NodeIntent_Local {
-  NodeIntent_Local::SetTitleAndBody {
-    repo : RepoName::from ("main"),
-    title  : title . to_string(),
-    body   : None } }
+) -> FieldIntent {
+  FieldIntent::SetTitleAndBody {
+    skgrepo : SkgRepoName::from ("main"),
+    title   : title . to_string(),
+    body    : None } }
 
 fn delete_intent (
-) -> NodeIntent_Local {
-  NodeIntent_Local::Delete {
-    repo : RepoName::from ("main") } }
+) -> FieldIntent {
+  FieldIntent::Delete {
+    skgrepo : SkgRepoName::from ("main") } }
 
 #[test]
 fn exclusive_slot_rules () {
-  let mut acc : CollectedIntents =
-    CollectedIntents::new();
+  let mut acc : CollectedFieldIntents =
+    CollectedFieldIntents::new();
   // An empty slot fills.
-  acc . instructionMerge_intent (
+  acc . instructionMerge_fieldIntent (
     ID::from ("a"), title_intent ("t") ) . unwrap();
   // Re-inserting an equal payload is a silent no-op.
-  acc . instructionMerge_intent (
+  acc . instructionMerge_fieldIntent (
     ID::from ("a"), title_intent ("t") ) . unwrap();
   // A differing payload errors.
-  assert!( acc . instructionMerge_intent (
+  assert!( acc . instructionMerge_fieldIntent (
     ID::from ("a"), title_intent ("different") ) . is_err() );
   // Different variants for one ID coexist.
-  acc . instructionMerge_intent (
+  acc . instructionMerge_fieldIntent (
     ID::from ("a"),
-    NodeIntent_Local::SetContains (vec![(ID::from ("c"), None)]) ) . unwrap();
-  acc . instructionMerge_intent (
+    FieldIntent::SetContains (vec![(ID::from ("c"), None)]) ) . unwrap();
+  acc . instructionMerge_fieldIntent (
     ID::from ("a"),
-    NodeIntent_Local::SetAliases (vec![("x" . to_string(), None)]) ) . unwrap();
-  acc . instructionMerge_intent (
+    FieldIntent::SetAliases (vec![("x" . to_string(), None)]) ) . unwrap();
+  acc . instructionMerge_fieldIntent (
     ID::from ("a"),
-    NodeIntent_Local::NodeMerge { acquiree : ID::from ("b") } ) . unwrap();
-  let entry : &IntentsForOneId =
+    FieldIntent::NodeMerge { acquiree : ID::from ("b") } ) . unwrap();
+  let entry : &FieldIntentsForOneId =
     acc . by_pid . get (&ID::from ("a")) . unwrap();
   assert_eq!( entry . title_and_body,
               Some (("t" . to_string(), None)) );
@@ -54,90 +54,90 @@ fn exclusive_slot_rules () {
 #[test]
 fn delete_excludes_other_exclusive_slots () {
   { // Delete after a Set* errors.
-    let mut acc : CollectedIntents =
-      CollectedIntents::new();
-    acc . instructionMerge_intent (
+    let mut acc : CollectedFieldIntents =
+      CollectedFieldIntents::new();
+    acc . instructionMerge_fieldIntent (
       ID::from ("a"), title_intent ("t") ) . unwrap();
-    assert!( acc . instructionMerge_intent (
+    assert!( acc . instructionMerge_fieldIntent (
       ID::from ("a"), delete_intent () ) . is_err() ); }
   { // A Set* after Delete errors.
-    let mut acc : CollectedIntents =
-      CollectedIntents::new();
-    acc . instructionMerge_intent (
+    let mut acc : CollectedFieldIntents =
+      CollectedFieldIntents::new();
+    acc . instructionMerge_fieldIntent (
       ID::from ("a"), delete_intent () ) . unwrap();
-    assert!( acc . instructionMerge_intent (
+    assert!( acc . instructionMerge_fieldIntent (
       ID::from ("a"), title_intent ("t") ) . is_err() );
-    assert!( acc . instructionMerge_intent (
+    assert!( acc . instructionMerge_fieldIntent (
       ID::from ("a"),
-      NodeIntent_Local::NodeMerge { acquiree : ID::from ("b") }
+      FieldIntent::NodeMerge { acquiree : ID::from ("b") }
     ) . is_err() ); }
   { // Delete plus Delete collapses silently.
-    let mut acc : CollectedIntents =
-      CollectedIntents::new();
-    acc . instructionMerge_intent (
+    let mut acc : CollectedFieldIntents =
+      CollectedFieldIntents::new();
+    acc . instructionMerge_fieldIntent (
       ID::from ("a"), delete_intent () ) . unwrap();
-    acc . instructionMerge_intent (
+    acc . instructionMerge_fieldIntent (
       ID::from ("a"), delete_intent () ) . unwrap();
     assert!( acc . by_pid . get (&ID::from ("a")) . unwrap()
              . delete ); }}
 
 #[test]
 fn flag_and_node_merge_are_mutually_exclusive () {
-  let flag : NodeIntent_Local =
-    NodeIntent_Local::SetFlag {
+  let flag : FieldIntent =
+    FieldIntent::SetFlag {
       flag : Flag::NoSearchMatching,
       value    : true };
-  let node_merge : NodeIntent_Local =
-    NodeIntent_Local::NodeMerge {
+  let node_merge : FieldIntent =
+    FieldIntent::NodeMerge {
       acquiree : ID::from ("b") };
   for (first, second) in [
     (flag . clone(), node_merge . clone()),
     (node_merge . clone(), flag . clone()) ] {
-    let mut acc : CollectedIntents =
-      CollectedIntents::new();
-    acc . instructionMerge_intent (
+    let mut acc : CollectedFieldIntents =
+      CollectedFieldIntents::new();
+    acc . instructionMerge_fieldIntent (
       ID::from ("a"), first ) . unwrap();
-    let error : String = acc . instructionMerge_intent (
+    let error : String = acc . instructionMerge_fieldIntent (
       ID::from ("a"), second ) . unwrap_err();
     assert!( error . contains (
       "Cannot combine nodeMerge and flag requests") ); }}
 
 #[test]
 fn combineable_intents_always_combine () {
-  let mut acc : CollectedIntents =
-    CollectedIntents::new();
-  acc . instructionMerge_intent (
+  let mut acc : CollectedFieldIntents =
+    CollectedFieldIntents::new();
+  acc . instructionMerge_fieldIntent (
     ID::from ("subscriber"), delete_intent () ) . unwrap();
   // Visibility and text claims coexist with anything, even delete,
   // and several may accumulate per ID.
   for subscribee in ["e1", "e2", "e1"] {
-    acc . instructionMerge_intent (
+    acc . instructionMerge_fieldIntent (
       ID::from ("subscriber"),
-      NodeIntent_Local::SubscribeeVisibility (
+      FieldIntent::SubscribeeVisibility (
         SubscribeeVisibility {
           subscribee : ID::from (subscribee),
           visible    : vec![] } )) . unwrap(); }
-  acc . instructionMerge_intent (
+  acc . instructionMerge_fieldIntent (
     ID::from ("subscriber"),
-    NodeIntent_Local::SubscribeeTextClaim (
+    FieldIntent::SubscribeeTextClaim (
       SubscribeeTextClaim {
         title : "t" . to_string(),
         body  : None } )) . unwrap();
-  let entry : &IntentsForOneId =
+  let entry : &FieldIntentsForOneId =
     acc . by_pid . get (&ID::from ("subscriber")) . unwrap();
   assert_eq!( entry . visibility . len(), 3 );
   assert_eq!( entry . text_claims . len(), 1 ); }
 
 #[test]
-fn order_records_first_emission_per_id () {
-  let mut acc : CollectedIntents =
-    CollectedIntents::new();
-  acc . instructionMerge_intent (
+fn order_records_first_emission_per_skgid () {
+  let mut acc : CollectedFieldIntents =
+    CollectedFieldIntents::new();
+  acc . instructionMerge_fieldIntent (
     ID::from ("b"), title_intent ("tb") ) . unwrap();
-  acc . instructionMerge_intent (
+  acc . instructionMerge_fieldIntent (
     ID::from ("a"), title_intent ("ta") ) . unwrap();
-  acc . instructionMerge_intent (
+  acc . instructionMerge_fieldIntent (
     ID::from ("b"),
-    NodeIntent_Local::SetContains (vec![]) ) . unwrap();
+    FieldIntent::SetContains (vec![]) ) . unwrap();
   assert_eq!( acc . order,
               vec![ID::from ("b"), ID::from ("a")] ); }

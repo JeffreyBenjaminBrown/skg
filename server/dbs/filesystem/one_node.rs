@@ -5,44 +5,44 @@ use crate::telescope::types::{
 use crate::telescope::unfold::{
   UnfoldInput, UnfoldedTelescope, unfold_node,
 };
-use crate::types::misc::{ID, SkgConfig, RepoName, members_msv};
+use crate::types::misc::{ID, SkgConfig, SkgRepoName, members_msv};
 use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::nodes::complete::Graphnode;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
-use crate::util::path_from_pid_and_repo;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
+use crate::util::path_from_pid_and_skgrepo;
 use std::error::Error;
 use std::io;
 use std::path::Path;
 use std::fs;
 use serde_yaml;
 
-pub fn graphnode_from_id (
+pub fn graphnode_from_skgid (
   config : &SkgConfig,
   skgid  : &ID
 ) -> Result<Graphnode, Box<dyn Error>> {
-  let nodes = read_all_skg_files_from_repos (config)?;
+  let nodes = read_all_skg_files_from_skgrepos (config)?;
   let graph = InRustGraph::from_graphnodes (&nodes);
-  let (pid, repo) : (ID, RepoName) =
-    graph . pid_and_repo (skgid)
+  let (pid, skgrepo) : (ID, SkgRepoName) =
+    graph . pid_and_skgrepo (skgid)
     . ok_or_else ( || format! (
       "ID '{}' not found in graph", skgid ) ) ?;
-  Ok ( graphnode_from_pid_and_repo (
-    config, pid, &repo )? ) }
+  Ok ( graphnode_from_pid_and_skgrepo (
+    config, pid, &skgrepo )? ) }
 
 
 /// Reads a Graphnode from disk given its PID: the whole
 /// TELESCOPE -- every same-pid section file across the configured
-/// repos, folded. The 'repo' parameter survives only as the
+/// skgrepos, folded. The 'repo' parameter survives only as the
 /// caller's belief about the home; the fold derives the true home
 /// (the most public section), so a stale belief cannot corrupt the
 /// read. Extra-id anchor resolution here is
 /// identity-only (this telescope's own extra_ids are unknown until
 /// read; cross-node merges resolve at the graph layer).
-pub fn graphnode_from_pid_and_repo (
-  config : &SkgConfig,
-  pid    : ID,
-  repo : &RepoName,
+pub fn graphnode_from_pid_and_skgrepo (
+  config  : &SkgConfig,
+  pid     : ID,
+  skgrepo : &SkgRepoName,
 ) -> io::Result<Graphnode> {
   let Some (telescope) : Option<Telescope> =
     telescope_from_disk (config, &pid) ?
@@ -50,27 +50,27 @@ pub fn graphnode_from_pid_and_repo (
     return Err ( io::Error::new (
       io::ErrorKind::NotFound,
       format! ("No .skg file for '{}' in any repo (caller expected one in '{}')",
-               pid, repo ))); };
-  fold_telescope ( telescope, & |id : &ID| id . clone () ) }
+               pid, skgrepo ))); };
+  fold_telescope ( telescope, & |skgid : &ID| skgid . clone () ) }
 
 /// PID's telescope as it sits on disk, in privacy order: for each
-/// configured repo (most public first), pid.skg if present. The
+/// configured skgrepo (most public first), pid.skg if present. The
 /// order is what makes the first section the home, so it comes from
 /// 'ordered_repos' and nowhere else.
 pub(crate) fn telescope_from_disk (
   config : &SkgConfig,
   pid    : &ID,
 ) -> io::Result<Option<Telescope>> {
-  let mut sections : Vec<(RepoName, GraphnodeOnDisk)> = Vec::new ();
-  for repo_name in config . ordered_repos () {
+  let mut sections : Vec<(SkgRepoName, GraphnodeOnDisk)> = Vec::new ();
+  for skgrepo_name in config . ordered_skgrepos () {
     let path : String =
-      match path_from_pid_and_repo (
-        config, &repo_name, pid . clone () ) {
+      match path_from_pid_and_skgrepo (
+        config, &skgrepo_name, pid . clone () ) {
         Ok (p) => p,
         Err (_) => continue, };
     if ! Path::new (&path) . is_file () { continue; }
     let node_fs : GraphnodeOnDisk = read_graphnode (&path) ?;
-    sections . push (( repo_name, node_fs )); }
+    sections . push (( skgrepo_name, node_fs )); }
   if sections . is_empty () {
     return Ok (None); }
   let (sections, collision) =
@@ -78,7 +78,7 @@ pub(crate) fn telescope_from_disk (
   if let Some (collision) = collision {
     tracing::warn! (
       pid = %pid,
-      ignored_repos = ?collision . ignored_repos,
+      ignored_skgrepos = ?collision . ignored_skgrepos,
       "owned telescope won a collision with non-owned files" ); }
   Telescope::try_new ( pid . clone (), sections, config )
     . map (Some)
@@ -88,11 +88,11 @@ pub(crate) fn telescope_from_disk (
 /// Reads a node from disk, returning None if not found
 /// (either in DB or on filesystem).
 /// ERRORS are propagated only if they are not of the 'not found' kind.
-pub fn optgraphnode_from_id (
+pub fn optgraphnode_from_skgid (
   config : &SkgConfig,
   skgid  : &ID
 ) -> Result<Option<Graphnode>, Box<dyn Error>> {
-  match graphnode_from_id(
+  match graphnode_from_skgid(
     config, skgid
   ) {
     Ok (graphnode) => Ok(Some (graphnode)),
@@ -111,7 +111,7 @@ pub fn fetch_aliases_from_file (
   config : &SkgConfig,
   skgid  : ID,
 ) -> Vec<String> {
-  match optgraphnode_from_id(
+  match optgraphnode_from_skgid(
     config, &skgid
   ) {
     Ok ( Some (graphnode)) =>
@@ -121,12 +121,12 @@ pub fn fetch_aliases_from_file (
 /// Write a node as its telescope: unfold into per-repo sections,
 /// write each section file only when its bytes changed
 /// (no-cosmetic-rewrites), and delete OWNED section files whose
-/// repo lost its last member. Foreign repos are never written or
+/// skgrepo lost its last member. Foreign skgrepos are never written or
 /// deleted -- 'error_unless_home_is_writable' refuses rather than
 /// skipping, so a foreign home cannot silently lose the title, and
 /// same-pid non-owned files are ignored when an owned telescope
 /// exists, so writes cannot absorb or delete their contents.
-pub fn write_graphnode_to_repo (
+pub fn write_graphnode_to_skgrepo (
   graphnode : &Graphnode,
   config  : &SkgConfig,
 ) -> io::Result<()> {
@@ -147,8 +147,8 @@ pub fn write_graphnode_telescope (
 /// applying it is the filesystem-mutation phase.
 pub(crate) struct PreparedTelescopeWrite {
   pid             : ID,
-  home            : RepoName,
-  writes          : Vec<(RepoName, String, String)>,
+  home            : SkgRepoName,
+  writes          : Vec<(SkgRepoName, String, String)>,
   deletions       : Vec<String>,
   verify_as_hoist : bool,
 }
@@ -169,9 +169,9 @@ impl PreparedTelescopeWrite {
     &self,
     config : &SkgConfig,
   ) -> io::Result<()> {
-    for (repo, path, yaml) in &self . writes {
-      assert! ( config . user_owns_repo (repo),
-                "write preflight admitted non-owned repo '{}'", repo );
+    for (skgrepo, path, yaml) in &self . writes {
+      assert! ( config . skgrepo_is_owned (skgrepo),
+                "write preflight admitted non-owned repo '{}'", skgrepo );
       if let Some (parent) = Path::new (path) . parent () {
         fs::create_dir_all (parent) ?; }
       let unchanged : bool = // byte-stability
@@ -198,7 +198,7 @@ impl PreparedTelescopeWrite {
   ) -> io::Result<()> {
     if ! self . verify_as_hoist { return Ok (( )); }
     let reread : Graphnode =
-      graphnode_from_pid_and_repo (
+      graphnode_from_pid_and_skgrepo (
         config, self . pid . clone (), &self . home ) ?;
     if reread . overPrivateText_telescope {
       return Err ( io::Error::new (
@@ -228,10 +228,10 @@ pub(crate) fn prepare_graphnode_telescope (
       & UnfoldInput {
         pid      : pid,
         extra_ids : & graphnode . extra_ids,
-        misc      : & graphnode . misc,
+        flags    : & graphnode . flags,
         title    : Some ( & graphnode . title ),
         body     : graphnode . body . as_deref (),
-        home     : & graphnode . home_repo,
+        home     : & graphnode . home_skgrepo,
         aliases  : graphnode . aliases . or_default (),
         contains : & graphnode . contains,
         subscribes_to :
@@ -244,52 +244,52 @@ pub(crate) fn prepare_graphnode_telescope (
     . map_err ( |e| io::Error::new (
       io::ErrorKind::InvalidData, e ) ) ?;
 
-  let mut offending_repos : Vec<RepoName> = unfolded . sections ()
+  let mut offending_skgrepos : Vec<SkgRepoName> = unfolded . sections ()
     . iter ()
-    .map ( |(repo, _)| repo )
-    . filter ( |repo| ! config . user_owns_repo (repo) )
+    .map ( |(skgrepo, _)| skgrepo )
+    . filter ( |skgrepo| ! config . skgrepo_is_owned (skgrepo) )
     . cloned ()
     . collect ();
-  offending_repos . sort ();
-  offending_repos . dedup ();
-  if ! offending_repos . is_empty () {
+  offending_skgrepos . sort ();
+  offending_skgrepos . dedup ();
+  if ! offending_skgrepos . is_empty () {
     return Err ( io::Error::new (
       io::ErrorKind::PermissionDenied,
       format! (
         "Refusing to write '{}': proposed telescope section(s) belong to non-owned repo(s) [{}]. No files were changed.",
         pid,
-        offending_repos . iter ()
-          . map ( |repo| format! ("'{}'", repo) )
+        offending_skgrepos . iter ()
+          . map ( |skgrepo| format! ("'{}'", skgrepo) )
           . collect::<Vec<String>> () . join (", ") ))); }
 
-  let mut prepared_writes : Vec<(RepoName, String, String)> =
+  let mut prepared_writes : Vec<(SkgRepoName, String, String)> =
     Vec::new ();
-  for (repo, node_fs) in unfolded . sections () {
+  for (skgrepo, node_fs) in unfolded . sections () {
     let path : String =
-      path_from_pid_and_repo ( config, repo, pid . clone () )
+      path_from_pid_and_skgrepo ( config, skgrepo, pid . clone () )
       . map_err ( |e| io::Error::new (
         io::ErrorKind::NotFound, e) ) ?;
     let yaml : String =
       node_fs . to_yaml ()
       . map_err ( |e| io::Error::new (
         io::ErrorKind::InvalidData, e . to_string () )) ?;
-    prepared_writes . push (( repo . clone (), path, yaml )); }
-  let written_repos : Vec<RepoName> = prepared_writes . iter ()
-    . map ( |(repo, _, _)| repo . clone () )
+    prepared_writes . push (( skgrepo . clone (), path, yaml )); }
+  let written_skgrepos : Vec<SkgRepoName> = prepared_writes . iter ()
+    . map ( |(skgrepo, _, _)| skgrepo . clone () )
     . collect ();
   let mut prepared_deletions : Vec<String> = Vec::new ();
-  for repo in config . ordered_repos () {
-    if written_repos . contains (&repo) { continue; }
-    if ! config . user_owns_repo (&repo) { continue; }
-    let path : String = path_from_pid_and_repo (
-      config, &repo, pid . clone () )
+  for skgrepo in config . ordered_skgrepos () {
+    if written_skgrepos . contains (&skgrepo) { continue; }
+    if ! config . skgrepo_is_owned (&skgrepo) { continue; }
+    let path : String = path_from_pid_and_skgrepo (
+      config, &skgrepo, pid . clone () )
       . map_err ( |e| io::Error::new (
         io::ErrorKind::NotFound, e) ) ?;
     prepared_deletions . push (path); }
 
   Ok ( PreparedTelescopeWrite {
     pid             : pid . clone (),
-    home            : graphnode . home_repo . clone (),
+    home            : graphnode . home_skgrepo . clone (),
     writes          : prepared_writes,
     deletions       : prepared_deletions,
     verify_as_hoist,
@@ -299,7 +299,7 @@ pub(crate) fn prepare_graphnode_telescope (
 /// The two shapes 'write_graphnode_telescope' refuses, because
 /// writing either would publish or destroy the node's text. Both
 /// are unreachable through skg's own saves -- 'apply_sticky_relRepos'
-/// clamps every relRepo to at least the owner's home, so no save
+/// clamps every relRepo to at least the recorder's home, so no save
 /// creates a section more public than the home -- and arrive only
 /// from hand-edited files, a pull, or a foreign overlay.
 ///
@@ -310,8 +310,8 @@ fn error_unless_home_is_writable (
   config       : &SkgConfig,
   allow_hoist  : bool,
 ) -> io::Result<bool> {
-  let home : &RepoName = &graphnode . home_repo;
-  if ! config . user_owns_repo (home) {
+  let home : &SkgRepoName = &graphnode . home_skgrepo;
+  if ! config . skgrepo_is_owned (home) {
     // FOREIGN HOME. Foreign sections are never written. Skipping
     // the home silently would drop the title on the floor, so
     // refuse instead. (This function is what makes the promise in
@@ -329,7 +329,7 @@ fn error_unless_home_is_writable (
     match telescope_from_disk (config, &graphnode . pid) ? {
       None => false,
       Some (telescope) => match
-        fold_telescope ( telescope, & |id : &ID| id . clone () ) {
+        fold_telescope ( telescope, & |skgid : &ID| skgid . clone () ) {
           Ok (disk_node) => disk_node . overPrivateText_telescope,
           Err (error) => return Err ( io::Error::new (
             io::ErrorKind::InvalidData,
@@ -368,8 +368,8 @@ pub(super) fn validate_pid_matches_filename (
 
 /// Effectively private.
 ///
-/// Returns a GraphnodeOnDisk (on-disk shape, no repo). Callers attach
-/// repo via 'GraphnodeOnDisk::into_complete' based on file location.
+/// Returns a GraphnodeOnDisk (on-disk shape, no skgrepo). Callers attach
+/// skgrepo via 'GraphnodeOnDisk::into_complete' based on file location.
 pub(super) fn read_graphnode
   <P : AsRef <Path>> // any type that can be converted to an &Path
   (file_path : P

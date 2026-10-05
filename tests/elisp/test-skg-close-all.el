@@ -11,7 +11,7 @@
 ;;; instead, preserving each buffer's mode and view-uri. Those two
 ;;; signals are all `skg-buffer-p' relies on, so a user's own
 ;;; .skg.org file (org-mode, no view-uri) is never reaped, even
-;;; when its first heading begins with `(skg'.
+;;; when its first headline begins with `(skg'.
 
 (defconst test-skg-close-all--this-dir
   (file-name-directory load-file-name)
@@ -108,7 +108,7 @@ module was not unloaded and therefore `require' declined to load it again."
 
 (ert-deftest test-skg-close-all-spares-org-buffer-with-skg-heading ()
   "A real file the user is editing must survive `skg-close-all-skg-buffers',
-even when it is an org file whose first heading begins with `(skg'
+even when it is an org file whose first headline begins with `(skg'
 \(e.g. a .skg.org export). Such a buffer has no skg-view-uri and is
 in plain `org-mode', so `skg-buffer-p' must not claim it."
   (let* ((tmp (make-temp-file "skg-spare-" nil ".skg.org"))

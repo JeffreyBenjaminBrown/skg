@@ -272,11 +272,11 @@ C-c p o must bind to distinct commands."
                    result
                    '(skg (node (editRequest delete))))))))
 
-(ert-deftest test-skg-install-id-stack-minibuffer-bindings ()
-  "Test merge-request prompts install ID-stack bindings."
+(ert-deftest test-skg-install-linkstack-minibuffer-bindings ()
+  "Test merge-request prompts install linkstack bindings."
   (with-temp-buffer
     (use-local-map (make-sparse-keymap))
-    (skg--install-id-stack-minibuffer-bindings)
+    (skg--install-linkstack-minibuffer-bindings)
     (should (eq (key-binding (kbd "C-c o i") t) 'skg-paste-id))
     (should (eq (key-binding (kbd "C-c o l") t) 'skg-paste-link))
     (should (eq (key-binding (kbd "C-c O i") t) 'skg-pop-id))
@@ -285,7 +285,7 @@ C-c p o must bind to distinct commands."
 (ert-deftest test-skg-pop-link-in-minibuffer-uses-stack-title ()
   "Test popping a link in a minibuffer does not prompt for a label."
   (with-temp-buffer
-    (let ((skg-id-stack '(("acquiree" "Acquiree title"))))
+    (let ((skg-linkstack '(("acquiree" "Acquiree title"))))
       (cl-letf (((symbol-function 'minibufferp)
                  (lambda (&optional _buffer) t))
                 ((symbol-function 'read-string)
@@ -294,7 +294,7 @@ C-c p o must bind to distinct commands."
         (skg-pop-link))
       (should (equal (buffer-string)
                      "[[id:acquiree][Acquiree title]]"))
-      (should (null skg-id-stack)))))
+      (should (null skg-linkstack)))))
 
 (ert-deftest test-skg-set-repo-recursive-prunes-non-content-affectsParent ()
   "Test recursive repo change follows only container org relationships."

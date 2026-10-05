@@ -19,23 +19,23 @@ derived text links.
 |-------+------+---------------------|
 | =pid= | =ID= | Immutable primary identity.  It determines the home filename and is the key in =InRustGraph.nodes= and Tantivy. |
 | =extra_ids= | =Vec<ID>= | Former identities acquired by node merge.  They are normalized in stable first-occurrence order, excluding the node's own PID.  Any primary or extra ID resolves to the node's =pid=. |
-| =repo= | =RepoName= | The node's home: the most public Skg repo with a retained telescope section.  It is inferred from file location and never serialized inside YAML. |
+| =home_repo= | =RepoName= | The node's home: the most public skgrepo with a retained telescope section.  It is inferred from file location and never serialized inside YAML. |
 | =title= | =String= | Folded node title. |
 | =body= | =Option<String>= | Folded body text.  Leading and trailing whitespace-only lines are normalized away; a body with no remaining content is =None=. |
-| =overPrivateText_telescope= | =bool= | True when the selected title or body came from a section below the home repo.  Release decisions use this conservative folded fact. |
-| =aliases= | =MSV<RelPartner<String>>= | Search aliases and the Skg repo at which each is recorded. |
-| =contains= | =Vec<RelPartner<ID>>= | Ordered content children and each edge's relRepo. |
+| =overPrivateText_telescope= | =bool= | True when the selected title or body came from a section below the home skgrepo.  Release decisions use this conservative folded fact. |
+| =aliases= | =MSV<RelPartner<String>>= | Search aliases and the skgrepo at which each is recorded. |
+| =contains= | =Vec<RelPartner<ID>>= | Ordered content children and each relationship's relRepo. |
 | =subscribes_to= | =MSV<RelPartner<ID>>= | Nodes whose content this node follows, with relRepos. |
 | =hides_from_its_subscriptions= | =MSV<RelPartner<ID>>= | Nodes suppressed when reached through this node's subscriptions, with relRepos. |
 | =overrides_view_of= | =MSV<RelPartner<ID>>= | Nodes for which this node may substitute during recursive rendering, with relRepos. |
-| =misc= | =Vec<Flag>= | Node flags: import provenance (=Had_ID_Before_Import=, =Was_Overloaded=) and behavior settings such as =NoSearchMatching=. |
+| =flags= | =Vec<Flag>= | Node flags: import provenance (=Had_ID_Before_Import=, =Was_Overloaded=) and behavior settings such as =NoSearchMatching=.  Stored in YAML under the key =misc=. |
 | =links_to= | =Vec<ID>= on =GraphnodeInRust= | Outbound Org =id:= links parsed from title/body text.  Derived rather than serialized as a graph field. |
 
 =MSV<T>= means “maybe specified vector.”  =Unspecified= says a file or edit
 has no opinion about the field; =Specified([])= explicitly supplies an empty
 value.  This distinction is load-bearing while telescope sections and partial
-save instructions are reconciled.  =RelPartner<T>= attaches the privacy
-Skg repo where an alias or edge is recorded.  The order of list-valued fields is
+nodeIntents are reconciled.  =RelPartner<T>= attaches the privacy
+skgrepo where an alias or relationship is recorded.  The order of list-valued fields is
 preserved.
 
 ** Relationships
@@ -48,14 +48,14 @@ that hand-authored or temporarily incomplete graphs remain representable.
 | Relationship | First role | Second role | Semantics |
 |--------------+------------+-------------+-----------|
 | =contains= | container | contained | Ordered document/content nesting. |
-| =subscribes_to= | subscriber | subscribee | The subscriber incorporates later content from the subscribee.  A fork initially creates both a subscription and an override edge to the original. |
+| =subscribes_to= | subscriber | subscribee | The subscriber incorporates later content from the subscribee.  A fork initially creates both a subscription and an override relationship to the original. |
 | =hides_from_its_subscriptions= | hider | hidden | Suppresses the hidden node only when it would be reached through the hider's subscriptions. |
 | =overrides_view_of= | overrider | overridden | Replaces the overridden node in recursive content rendering when the eligible owned override chain resolves to it. |
 | =links_to= | mentioner | mentioned | Plain Org ID links derived from text. |
 
-Home repo and extra-ID ownership are node properties, not separate runtime
-relationship entities.  Edge relRepo remains part of every stored
-=RelPartner= and participates in repo-set/privacy gating.
+Home skgrepo and extra-ID ownership are node properties, not separate runtime
+relationship entities.  Relationship relRepo remains part of every stored
+=RelPartner= and participates in skgrepo-set/privacy gating.
 
 ** Hard validation constraints
 
@@ -69,16 +69,16 @@ rejected when any of these conditions holds:
 1. A primary ID identifies more than one folded node.
 2. An extra ID belongs to more than one node.
 3. An ID is both a primary ID and an extra ID.
-4. A node's home repo is absent from the current configuration.
-5. User-owned override edges give one target more than one user-owned
+4. A node's home skgrepo is absent from the current configuration.
+5. Owned override relationships give one target more than one owned
    overrider (override monogamy).
-6. User-owned override edges contain a cycle.  Linear override chains are
+6. Owned override relationships contain a cycle.  Linear override chains are
    allowed; foreign override facts are display-only and do not substitute.
 7. Any stored derived graph index differs from an independently recomputed
    index.
 
 Relationship roles are enforced by distinct Rust fields.  A node has exactly
-one home =repo= in its folded representation.  Telescope validation also
+one =home_repo= in its folded representation.  Telescope validation also
 checks privacy/provenance rules.  Telescope violations are deterministic
 warnings rather than hard graph-construction errors; callers surface them for
 repair while retaining readable data.
@@ -86,7 +86,7 @@ repair while retaining readable data.
 The incremental proof relies on induction: startup or rebuild establishes a
 valid base, and each serialized save proves that its delta preserves validity.
 Identity ownership is evaluated as one simultaneous final-state overlay;
-override checks include touched Skg repos, changed canonical targets, and
+override checks include touched skgrepos, changed canonical targets, and
 untouched inbound overriders affected by either.  Local index checks compare
 only keys that could change.  The complete validator remains an independent
 startup/rebuild gate and test oracle.
@@ -115,9 +115,9 @@ Construction is two-pass: first collect every extra-ID mapping, then insert
 nodes and build inverse indexes.  This makes results independent of file read
 order.  Incremental mutation instead installs the batch's complete final
 identity state first, then reindexes each touched node and every untouched
-owner whose raw relationship can resolve differently under the final identity
+recorder whose raw relationship can resolve differently under the final identity
 map.  All five inverse indexes use that same final resolver.  Deletion is
-supported: references to a deleted PID remain raw and surviving owners are
+supported: references to a deleted PID remain raw and surviving recorders are
 rekeyed where canonical resolution changed.  Writers clone the persistent
 graph and publish one new =Arc= atomically; readers retain the immutable
 generation they captured at operation start.
@@ -125,15 +125,15 @@ generation they captured at operation start.
 Managed saves support monotonic acquisition of extra IDs during node merge,
 but reject arbitrary extra-ID revocation.  An apparently unused alias may be
 how someone else's data links to the node, and Skg cannot infer that even the
-most private Skg repo was never shared with a trusted person.  Raw-file editing
+most private skgrepo was never shared with a trusted person.  Raw-file editing
 and rebuild remain an escape hatch, but spending effort to remove such tiny
 identity metadata is usually a poor trade.
 
 Telescope warnings use the target's home as the privacy ceiling when the
 target exists.  For a dangling relationship there is no target home, so the
-extant owner's home is the conservative ceiling.  Saves recompute warnings for
-saved owners plus untouched inbound owners affected by identity, existence, or
-home changes; startup and rebuild still audit every owner.
+extant recorder's home is the conservative ceiling.  Saves recompute warnings for
+saved recorders plus untouched inbound recorders affected by identity, existence, or
+home changes; startup and rebuild still audit every recorder.
 
 ** Runtime generations and rebuilding
 

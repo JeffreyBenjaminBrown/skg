@@ -6,7 +6,7 @@
 *** I asked
 THe OVERVIEW-old.org file is getting treated strangely -- I see only one copy in docs/, but when I export to export/ I see a second near-copy, under a docs/ subfolder. What's up with that?
 *** Claude explains
-  Found it, at least in this workspace's copy of your data. Your public source still has export markers left over from before the import:
+  Found it, at least in this workspace's copy of your data. Your public skgrepo still has export markers left over from before the import:
 
   target_filepath = docs/OVERVIEW-old
   target_filepath = docs/setup
@@ -29,7 +29,7 @@ THe OVERVIEW-old.org file is getting treated strangely -- I see only one copy in
   - docs/setup would likewise produce a stray export/docs/setup.org.
   - org_export_is_partial is the old broken-link note. It's harmless, but no longer needed for docs/.
 
-  A workaround in the meantime: export with the source-set skg alone. You list skg as your most public source, so that set excludes public entirely.
+  A workaround in the meantime: export with the skgrepo-set skg alone. You list skg as your most public skgrepo, so that set excludes public entirely.
 
   I didn't change any data. This workspace's copy is stale anyway, and the fix belongs in the data you actually use.
 ** data/skg-system/ should not need mention in the config
@@ -84,8 +84,8 @@ but also to mentioners.
 *** "follower subscribes-to followed"
 *** source -> repository
 SkgRepo (Rust), skg-repo (Emacs), "Skg repository" (English).
-Specify skg to avoid confusion with a git repo.
-Mention at each definition that a skg repo can be a git repo,
+Specify skg to avoid confusion with a gitrepo.
+Mention at each definition that a skgrepo can be a gitrepo,
 and indeed skg is written to make that convenient.
 *** dubious
 **** ? graphnode -> atom
@@ -95,20 +95,20 @@ But only the graph has atoms.
 Better to just explain to the user that 'contains' means 'presents'.
 ** TODO CRITICAL : workflow for committing changes to repositories
 *** A relationship's commit status should be cycleable from either member.
-*** 'readonly leaf'
-This is a readonly viewnode
+*** 'write-protected leaf'
+This is a write-protected viewnode
   without its body or content
   but with a containerward viewtree.
-A readonly leaf can be decorated with view-descendents,
+A write-protected leaf can be decorated with view-descendents,
   e.g. (as is common) a containerward tree.
   Now it is not a leaf.
-It can also be made writeable,
-  which causes its content to be among its view-children
+It can also be made writable,
+  which causes its content to be among its viewchildren
   if they are not already.
 *** 'deleted atom'
 **** what it is
-If an atom from a repo
-has been deleted since that repo's latest commit,
+If an atom from a skgrepo
+has been deleted since that skgrepo's latest commit,
 a 'resurrected deletion' can still show
 its title, body and content.
 Those data could be part of the ephemeral data store,
@@ -135,8 +135,8 @@ This seems most easily shown via an intermediary folder:
 **** changed an atom's set of aliases
 **** deleted an atom
 **** added IDs to an atom
-**** changed an atom's source
-**** changed a relationship's source
+**** changed an atom's skgrepo
+**** changed a relationship's skgrepo
 **** deleted a relationship
 **** created a relationship
 *** how to collect all edits in one buffer
@@ -168,7 +168,7 @@ An automatic way to unwind the merger would be nice but seems not critical.
 
 New IDs have a commit status.
 **** changes to a graphnode's text
-The graphnode might be represented by a readonly leaf,
+The graphnode might be represented by a write-protected leaf,
 in which case its body is not shown.
 Therefore an "its text was changed" viewchild
 should contain two children "old" and "new":
@@ -185,7 +185,7 @@ The text in quotations shows in a system font.
 The commit status of each member content here is cycleable.
 **** show changes to the container set
 The commit status of each member content here is cycleable.
-**** show a readonly collection of changes to the link sources set
+**** show a write-protected collection of changes to the link sources set
 **** Show changes to the subscribee list.
 Under a subscriber in the edit commit view,
 the commit status of each member content here is cycleable.
@@ -242,16 +242,16 @@ from every rootish node R
 for which E is in R's recursive content.
 Every atom in the spanning forest that is unedited
 *and* whose recursive content is unedited
-is rendered as a readonly leaf.
+is rendered as a write-protected leaf.
 ***** edited nodes are work-cycleable
 **** a 'merges' branch
 Each merge has the following descendents.
 Quotation marks indicate verbatim text;
 angle brackets indicate substitution of graph data.
 ***** work-cycleable : "the acquirer, which persists"
-****** <the acquirer, initially readonly and without its content>
+****** <the acquirer, initially write-protected and without its content>
 Since the git report v2  is an ordinary view,
-the user can summon its content and make it writeable.
+the user can summon its content and make it writable.
 ***** "this aquiree was deleted"
 ****** "the ids it had"
 ******* <an id>
@@ -264,24 +264,24 @@ the user can summon its content and make it writeable.
 Each child of this is a resurrected deletion
 that used to be presented as content of the acquiree.
 ****** "content it presented that the acquirer now presents"
-Each child of this is born as a readonly leaf
+Each child of this is born as a write-protected leaf
 representing something the acquiree used to present
 that the acquirer now presents.
 ****** "content it presented that nothing now presents"
-Each child of folder is a readonly viewnode
+Each child of folder is a write-protected viewnode
 without its body or content
 but with a containerward viewtree.
-**** a 'source changes of atoms'
-Show an atom's source changed with an
-AtomSourceChanged child, which reads 'its source changed from <source> to <source>', where the sources and 'its source changed' are all in a system font but the 'from' and 'to' are ordinary white text. It has no title, it is not a graphnode, just a viewnode.
-*** Include all sources (skg repositories).
-Refuse the view if that conflicts with the source set
+**** a 'repo changes of atoms'
+Show an atom's skgrepo changed with an
+AtomRepoChanged child, which reads 'its repo changed from <repo> to <repo>', where the skgrepos and 'its repo changed' are all in a system font but the 'from' and 'to' are ordinary white text. It has no title, it is not a graphnode, just a viewnode.
+*** Include all skgrepos.
+Refuse the view if that conflicts with the skgrepo-set
 (the current maximum privacy level shown --
 what's the term used in the code for that?)
-*** Show source changes for relationships.
-Show that an atom's rel to its parent changed source
-with a RelSourceChanged child,
-which reads 'its (a's) rel to its parent (b) changed from <source> to <source>',
+*** Show skgrepo changes for relationships.
+Show that an atom's rel to its parent changed skgrepo
+with a RelRepoChanged child,
+which reads 'its (a's) rel to its parent (b) changed from <skgrepo> to <skgrepo>',
 again with all text except the 'from' and the 'to'
 in a system font, and those two sybmols looking ordinary.
 *** Show deletions.
@@ -313,7 +313,7 @@ minimizing redundancy, maximizing informativity
 e.g. weird b/c it has a link
 *** ingest into skg
 ** embarrasssments
-*** the org-export and docs nodes should be in another repo
+*** the org-export and docs nodes should be in another skgrepo
 ** bugs
 *** heralds temporarily lose the overlay
 If I save a big buffer, and then quickly move a node
@@ -361,7 +361,7 @@ There are likely other viewnode kinds for which this happens.
 Would like to be able to see them all at a glance for a given ID.
 *** text search across containment paths
 *** making a link into content
-**** should rewrite edges, including text links, that pointed to the node with the link
+**** should rewrite relationships, including text links, that pointed to the node with the link
 That is, suppose node C (container)
 contains node L (link)
 which is just a link to node T (target),
@@ -389,7 +389,7 @@ Yes—these rules are user-facing documented in docs/COMMANDS.org:51.
   - Ranking formula and graph-role multipliers (docs/COMMANDS.org:183): BM25 × text-term coverage × context-origin multiplier.
   - The graph roles are explicitly listed: Root 100×, CycleMember ~32×, Dest 10×, HadID 10×, MultiContained ~3.2×; everything else 1×. It also says these only rerank—every match is returned.
 
-  The Neovim-facing equivalent is docs/COMMANDS-nvim.org:63. The API-level synopsis is docs/api-and-formats.md:26.
+  The Neovim-facing equivalent is docs/COMMANDS-nvim.org:63. The API-level synopsis is docs/api-and-formats.org.
 
   For implementation authority, see server/context.rs:1 (how graph-origin types are assigned) and server/serve/handlers/text_search.rs:448 (the combined ranking calculation).
 *** matching all words should be much more highly valued
@@ -397,7 +397,7 @@ In fact maybe they should all require presence,
 barring an OR statement.
 *** staging should refresh views
 be it via magit, or via C-c t (a|A)
-*** sort backpaths most-public first
+*** sort role trees most-public first
 *** BUG cycling TODO | DONE etc. hides text
 e.g. go to c02b9d3d-8857-4cf0-84b2-244b127160fc
 and try toggling that for one of its intermediate children.
@@ -454,7 +454,7 @@ as the source of documentation truth.
 I made that change around <2026-09-11 Fri>,
 but now <2026-09-14 Mon> it's not warning me.
 * TODO handle the Oa test failure
-* TODO show containment ancestries under removed-here phantoms
+* TODO show containerward role trees under removed-here phantoms
 * TODO BUG ? Shouldn't skg-rebuild sound the choir when it completes?
 Did my audio app steal it?
 * TODO obsolete elisp macros
@@ -474,7 +474,7 @@ should not come upon save, but upon modifying the second
 * backpaths are no longer packpaths; they're just non-contentward trees
 C-c M-t _
 It would be principled if C-c M-t c
-switched a node to definitive.
+switched a node to editable.
 * a way to exclude org-ancestry when inserting a forest at a viewnode
 probably a non-conetnt forest
 * I might like the neovim client better.
@@ -499,18 +499,18 @@ for big low-stakes nodes, like my notes from the CA driver's manual
 * magit takes too long to reload overlays after each staging event
 * would like to be able to see what a deleted (in magit) node's containers, other relatives were
 * Saving is bumping point in collateral buffers to top of buffer.
-* Backpaths should be foldable to their endpoints.
+* Role trees should be foldable to their endpoints.
 => they should be reversed.
 That way they could be folded and their ends easily read.
 Maybe group them under a collector.
-* Option to make backlinks more public than the active source set.
+* Option to make backlinks more public than the active skgrepo-set.
 alternatives
 ** in skg : [[id:7212b375-3f7e-4371-80f9-7d7dd7ded7d9][Why build a note on my ex?]]
 ** Advantage: I could exclude links from my note on my ex.
 * The parent-independent herald should be purple.
 * In magit, discarding changes should reload that node.
 At least if they are text or outlink chnages.
-* The 'unknown node' scaffold can't always say 'parent references'.
+* The 'unknown node' phantom can't always say 'parent references'.
 If it was arrived at by followiing a link,
 it should say 'link source targets unknown node'.
 Etc. for the other relationships --
@@ -522,8 +522,8 @@ already bork the save?
 * When staging a change in magit, should update any view with that node.
 Might be hard in the containment direction but at least
 when updating the file corresponding to that node.
-* Source sets should be concentric privacy supersets.
-I would like to be able to say 'these note sources are [public]', 'these, a superset of those, are [more private]," etc.
+* Skgrepo-sets should be concentric privacy supersets.
+I would like to be able to say 'these note repos are [public]', 'these, a superset of those, are [more private]," etc.
 
 Then, when forking my own note, I can
 * DONE ? C-a is failing when point is after a folded text symbol.
@@ -544,8 +544,8 @@ Identical to how other birth-rels are frontloaded.
 Skip the Oh herald.
 * ONGOING override chains
 ** skg3  --resume 25126e37-d0ef-4790-a58b-2f6da928478e
-** dogfood : User-owned forks are all kinds of wrong.
-* AWAITS better user-owned forks : [[./TODO/user-owned_autofork_chain/]]
+** dogfood : Owned forks are all kinds of wrong.
+* AWAITS better owned forks : [[./TODO/DONE/privacy-telescope/]]
 * Play two roles, communicate through git.
 ** order in which to introduce features
 *** The content relationship.
@@ -584,9 +584,9 @@ do this, now there are staged changes and they correspond.
 ** correctness
 *** DONE don't complain if point is before first headline on save
 just put it at the first headline
-*** No two forks in a user-owned chain of forks should share a source.
+*** No two forks in an owned chain of forks should share a source.
 regardless of whether the chain is manual or,
-in the future per [[./TODO/user-owned_autofork_chain.org]], automated
+in the future per [[./TODO/DONE/privacy-telescope/]], automated
 *** I want this todo list in Skg.
 Git review after reshaping it is hell.
 **** merge & export these notes
@@ -616,7 +616,7 @@ and are already caught by the umbrella heralds A, I, O, S, etc.
 ** convenience to user
 *** Warn the user when any change is discarded on save.
 This should in particular cover (it currently doesn't)
-whether a source was changed on an write-protected node.
+whether a skgrepo was changed on an write-protected node.
 *** rewrite docs/COMMANDS.org
 Some new Claude-written passages assume too much of the reade
 *** a function to relabel link labels
@@ -658,7 +658,7 @@ Continue to apply foldedness leafward from the root as before.
 The incoming tree would have to be compared to the outgoing one.
 Although they usually don't, things can shift around dramatically.
 ** usage mysteries
-*** must (?) stage them separately, but commit all repos at once
+*** must (?) stage them separately, but commit all skgrepos at once
 ** usage, to document
 *** the link stack should not be expected to be cleared
 Someone can if they find a way to use it.
@@ -747,11 +747,11 @@ if the quotation is represented as leading whitespace.
 ** TODO how|what to dogfood
 *** spots to patrol
 **** git : view changes to
-***** a source move
+***** a skgrepo move
 ***** merge
 ***** delete
 ***** aliases
-**** move something to a different repo
+**** move something to a different skgrepo
 **** merge, delete
 **** multi-contain
 **** views : id stack, metadata, diff, heralds
@@ -774,7 +774,7 @@ Should prompt for the acquiree node (ID or link).
 ** TODO legibility to user
 *** independent of parent /= contained in nothing
 so decouple these two heralds
-*** ? Have only be one definitive view across all buffers.
+*** ? Have only be one editable view across all buffers.
 **** why
 When going from magit-view to a modified node,
 it's very nice if that one jump goes directly to
@@ -815,7 +815,7 @@ on <2026-04-22 Wed> and before and maybe after
 **** ? "any rel" ought to be what a single backward view shows
 link sources, containers, subscribers
 (but not overriders or hiders -- those should be more obscure)
-**** absorb a link source org-child into a herald
+**** absorb a link source viewchild into a herald
 if it has text identical to the target's,
 i.e. is just a link to the target with the target's title as label
 *** in making links
@@ -844,7 +844,7 @@ A new content is fine if _.
 Changes to text are reported.
 
 To test, compute this two ways: From disk and from dbs.
-**** TODO be able to visit ghost nodes
+**** TODO be able to visit phantoms
 **** view all changes in one buffer
 **** theoretically faster : auto-stage some nodes for code
 ***** not sure much of the user experience is here
@@ -909,7 +909,7 @@ That is, the save should still succeed.
 ** Don't refactor something without reading its comments.
    Even if it's as 'simple' as a type --
    non-obvious decisions often go into those brief definitions.
-** Awkward or good ? Exactly some OrgNodes can have diffs.
+** Awkward or good ? Exactly some viewnodes can have diffs.
    That makes some invalid state unrepresentable.
 ** how to prompt
 *** when asking for a refactor
@@ -950,7 +950,7 @@ That is, the save should still succeed.
 ** 'timed' and 'timed_async' are noisy
    Maybe, rather than using them at the function call,
    use them at the function's definition.
-** Can I download my git repo and read it ony phone with goto definition, find uses, etc?
+** Can I download my gitrepo and read it ony phone with goto definition, find uses, etc?
 ** 'content' count is wrong in Subsribees if any are hidden
 ** add 'numSubscribees' near 'numLinksIn'
 ** Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
@@ -1038,10 +1038,10 @@ fold-preservation
    Linear paths seem unlikely backward anyway.
 * document
 ** content is like "what is this idea looking at", and links sources are "what are looking at this idea"
-** strategy for moving source
-Commit all uncommitted changes from both sources.
+** strategy for moving skgrepo
+Commit all uncommitted changes from both skgrepos.
 Do the move.
-Compare the state of both sources.
+Compare the state of both skgrepos.
 ** that filenames must correspond to PIDs
 ** the dangers of repeated nodes to the user
    The original data model was that each node would have only one container. That proved infeasible, because the user can copy data at will. So skg accepts such data. But bear in mind that it is dangerous. The danger is this: If a node has branches, and is copied somewhere earlier in the same document, then that new copy will take precedence. Edits to it will be treated as *the* edits. If all you did was copy the node but not its branches, its branches will be lost when you save.
@@ -1051,7 +1051,7 @@ Compare the state of both sources.
  // was equal to its label, thanks to replace_each_link_with_its_label.
 ** change graph -> web
 ** Didactically, concept maps > knowledge graph.
-** [[../docs/data-model.md][The data model]] and [[../docs/sharing-model.md][The sharing model]] overlap
+** [[./docs/data-model_friendly.org][The data model]] and [[./docs/sharing-model.org][The sharing model]] overlap
    as documents.
 ** "point" seems a better name than "node"
    But it conflicts with the Emacs 'point'.

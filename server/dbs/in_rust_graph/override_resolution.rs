@@ -1,26 +1,26 @@
 //! The override resolver: given an ID, which node should be DRAWN
-//! in its place? Follows user-owned 'overrides_view_of' edges from
+//! in its place? Follows owned 'overrides_view_of' relationships from
 //! overridden to overrider, transitively, with a seen-set cycle
-//! guard. Foreign override edges never participate in substitution;
+//! guard. Foreign override relationships never participate in substitution;
 //! they are display-only facts (search enrichment, folders, heralds,
 //! and paths).
 //!
-//! Two gates, applied per edge:
-//! - OWNERSHIP is set-independent: an edge is followed only if its
-//!   overrider's repo has 'user_owns_it = true', regardless of the
-//!   active repo-set.
-//! - VISIBILITY: when an 'ActiveRepoSet' is supplied, an edge is
-//!   followed only if both its relRepo and its overrider's home repo
+//! Two gates, applied per relationship:
+//! - OWNERSHIP is set-independent: a relationship is followed only if its
+//!   overrider's skgrepo is owned, regardless of the
+//!   active skgrepo-set.
+//! - VISIBILITY: when an 'ActiveRepoSet' is supplied, a relationship is
+//!   followed only if both its relRepo and its overrider's home skgrepo
 //!   are active. An inactive relationship cannot affect visible topology,
 //!   and an inactive overrider cannot be drawn; either one stops the walk
 //!   at the last visible node. Callers that ask "what marker would the
 //!   server have written, ever?" (the tamper check) pass None, i.e.
 //!   visibility-ungated.
 //!
-//! A path of any length is normal: a user-owned override chain
+//! A path of any length is normal: an owned override chain
 //! (D overrides C overrides N, all owned) resolves to the end of the
 //! chain, and any node on the path is a node the server could
-//! legitimately draw (see 'carrier_on_user_owned_chain'). Only a
+//! legitimately draw (see 'carrier_on_owned_chain'). Only a
 //! cycle is anomalous — forbidden upstream by the invariant validators
 //! (see [[./override_invariants.rs]]) at save and init/rebuild, and
 //! handled here as a backstop: the resolver still terminates and
@@ -30,7 +30,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use crate::repo_sets::ActiveRepoSet;
+use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::misc::{ID, SkgConfig};
 
 use std::collections::HashSet;
@@ -38,13 +38,13 @@ use std::collections::HashSet;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OverrideResolution {
   /// The PID to draw. Equal to the (resolved) input when no
-  /// user-owned, visible overrider exists.
+  /// owned, visible overrider exists.
   pub effective      : ID,
   /// The chain of overriders traversed, in order. Empty = no
-  /// substitution. A path of any length is normal: a user-owned
+  /// substitution. A path of any length is normal: an owned
   /// override chain (D overrides C overrides N) resolves to the end
   /// of the chain, and middle carriers are honest (see
-  /// 'carrier_on_user_owned_chain').
+  /// 'carrier_on_owned_chain').
   pub path           : Vec<ID>,
   /// True iff the walk met an already-seen PID. In that case no
   /// substitution is performed ('effective' = the input, 'path'
@@ -55,19 +55,19 @@ pub struct OverrideResolution {
   pub cycle_detected : bool,
   /// The nodes of the detected cycle (the trail from the first repeat
   /// back to it), in walk order; empty when no cycle. The invariant
-  /// validators report it as 'UserOwnedOverrideCycle'.
+  /// validators report it as 'OwnedOverrideCycle'.
   pub cycle          : Vec<ID>,
 }
 
 pub fn resolve_override (
   config : &SkgConfig,
   graph  : &InRustGraph,
-  active : Option<&ActiveRepoSet>,
-  id     : &ID,
+  active : Option<&ActiveSkgRepoSet>,
+  skgid  : &ID,
 ) -> OverrideResolution {
   let input_pid : ID = // extra-ID safety: resolve before walking
-    graph . pid_of (id)
-    . unwrap_or_else ( || id . clone () );
+    graph . pid_of (skgid)
+    . unwrap_or_else ( || skgid . clone () );
   let mut seen : HashSet<ID> =
     HashSet::from ( [ input_pid . clone () ] );
   let mut current : ID = input_pid . clone ();
@@ -76,7 +76,7 @@ pub fn resolve_override (
     let candidates : Vec<ID> =
       followable_overriders_of (config, graph, active, &current);
     if candidates . len () != 1 {
-      // 0: nothing (visible, user-owned) overrides 'current'.
+      // 0: nothing (visible, owned) overrides 'current'.
       // >1: monogamy-violating data; refuse to choose a branch.
       // Either way 'current' is the destination.
       return OverrideResolution {
@@ -107,17 +107,17 @@ pub fn resolve_override (
     path . push ( next . clone () );
     current = next; }}
 
-/// Whether 'carrier' is a node ON 'original''s user-owned override
+/// Whether 'carrier' is a node ON 'original''s owned override
 /// chain — i.e. a node the server could legitimately draw, marked
 /// '(overridesHere original)', wherever 'original' would appear as
 /// content. The tamper check at save uses this: with chains the drawn
 /// node can be any link of the chain (a MIDDLE carrier, when a later
-/// link's repo is hidden), not only the end, so it must accept any
+/// link's skgrepo is hidden), not only the end, so it must accept any
 /// honest carrier and reject only an off-chain (faked/stale) marker.
 /// VISIBILITY-UNGATED ('active' = None) so a marker that was honest
-/// when rendered does not start failing after a repo-set switch;
-/// 'path' is the full user-owned chain (ownership still gates).
-pub fn carrier_on_user_owned_chain (
+/// when rendered does not start failing after a skgrepo-set switch;
+/// 'path' is the full owned chain (ownership still gates).
+pub fn carrier_on_owned_chain (
   config   : &SkgConfig,
   graph    : &InRustGraph,
   original : &ID,   // the marker's N
@@ -126,32 +126,32 @@ pub fn carrier_on_user_owned_chain (
   resolve_override (config, graph, None, original)
     . path . contains (carrier) }
 
-/// The overriders of 'pid' that substitution may follow: the edge's
-/// relRepo is active, and the overrider is both user-owned and at an
-/// active home repo. Relationship visibility comes from the same
+/// The overriders of 'pid' that substitution may follow: the relationship's
+/// relRepo is active, and the overrider is both owned and at an
+/// active home skgrepo. Relationship visibility comes from the same
 /// directional gated accessor used by folders, paths, and counts.
-/// Ownership is modeled on 'user_owned_overriders_of' in
+/// Ownership is modeled on 'owned_overriders_of' in
 /// [[./override_invariants.rs]], which serves validation and so applies no
 /// visibility filter.
 fn followable_overriders_of (
   config : &SkgConfig,
   graph  : &InRustGraph,
-  active : Option<&ActiveRepoSet>,
+  active : Option<&ActiveSkgRepoSet>,
   pid    : &ID,
 ) -> Vec<ID> {
   let mut result : Vec<ID> = Vec::new ();
   for overrider in graph . other_member_pids_gated (
     pid, RelationRole::OVERRIDDEN, active ) {
     if let Some (overrider_node) = graph . nodes . get (&overrider) {
-      let user_owned : bool =
-        config . repos . get (&overrider_node . home_repo)
-        . map ( |sc| sc . user_owns_it )
+      let owned : bool =
+        config . skgrepos . get (&overrider_node . home_skgrepo)
+        . map ( |sc| sc . owned )
         . unwrap_or (false);
       let home_visible : bool =
         active
         . map ( |a| a . is_all ()
-                || a . contains_repo (&overrider_node . home_repo) )
+                || a . contains_skgrepo (&overrider_node . home_skgrepo) )
         . unwrap_or (true);
-      if user_owned && home_visible {
+      if owned && home_visible {
         result . push (overrider); }} }
   result }

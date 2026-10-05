@@ -592,7 +592,7 @@ Please define 'unfold', 'relation partner', and 'survive'.
 
 - To fold is to read all of one node's section files and combine them into
   one in-memory node. For example, U/u.pid.skg plus R/u.pid.skg become one
-  'NodeComplete' for u.
+  'Graphnode' for u.
 - To unfold is the reverse operation used when saving: take that one
   in-memory node and split its data by privacy source, producing the
   section contents to write back to U/u.pid.skg, R/u.pid.skg, and so on.
@@ -746,7 +746,7 @@ boundary.
 
 On the load side, the named type makes the operation look roughly like:
 
-  'fold_telescope(Telescope) -> NodeComplete'
+  'fold_telescope(Telescope) -> Graphnode'
 
 Even before we strengthen its private fields and constructor, the type
 communicates that the input is one pid's complete collection of sections,

@@ -10,7 +10,7 @@
    with 'birth: Birth' (a 4-variant enum).
 
    Key files:
-   - Types: [[../server/types/viewnode.rs][viewnode.rs]] — TrueNode, Birth enum, GraphNodeStats, ViewNodeStats
+   - Types: [[../server/types/viewnode.rs][viewnode.rs]] — ActiveVognode, Birth enum, GraphNodeStats, ViewNodeStats
    - Rendering: [[../server/org_to_text.rs][org_to_text.rs]] — 'true_node_metadata_to_string', 'graphnodestats_to_sexp'
    - ViewStats: [[../server/update_buffer/viewnodestats.rs][viewnodestats.rs]] — 'set_viewnodestats_in_forest'
    - Backpaths: [[../server/to_org/expand/backpath.rs][backpath.rs]] — 'prepend_indef_indep_child'
@@ -22,7 +22,7 @@
    Commit 57762e38: "Replace parentIgnores with an enum"
 
 *** Design
-    Replaced 'parent_ignores: bool' on TrueNode with 'birth: Birth'.
+    Replaced 'parent_ignores: bool' on ActiveVognode with 'birth: Birth'.
 
     The enum (current names):
       #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -53,14 +53,14 @@
     - bare 'parentIgnores' atom → '(relToParent unrelated)' → '(birth independent)'
 
 *** What was done
-    - Added Birth enum, replaced bool field on TrueNode
+    - Added Birth enum, replaced bool field on ActiveVognode
     - Updated s-exp rendering: '(birth independent)', '(birth containerOf)', '(birth linksTo)'
     - Updated s-exp parsing to match
     - Updated backpath.rs: derives Birth from relation type
       ("contains" → ContainerOf, "textlinks_to" → LinksTo)
     - Updated all tree completion code: assignments use Birth::Independent
     - Updated all callers: bool checks → parent_ignores_it()
-    - Updated Elisp transform rules, cycling values, truenode defaults
+    - Updated Elisp transform rules, cycling values, active vognode defaults
     - Purged 'parentIgnores' string from all code, comments, test data, org files
     - Renamed parent_ignores variables/functions to non_content equivalents
       (e.g. skip_parent_ignores → skip_non_content,

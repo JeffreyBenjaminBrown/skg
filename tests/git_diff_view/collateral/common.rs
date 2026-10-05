@@ -25,7 +25,7 @@ new body
 *** (skg (textChanged staged))
 ";
 
-/// Create a git repo with head->worktree transition from collateral fixtures.
+/// Create a gitrepo with head->worktree transition from collateral fixtures.
 pub fn setup_gitrepo_with_fixtures(
   gitrepo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {

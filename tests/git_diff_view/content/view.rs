@@ -22,26 +22,26 @@ async fn test_content_diff_with_moved_and_deleted_nodes (
   let temp_dir = TempDir::new()?;
   let gitrepo_path = temp_dir . path();
   setup_gitrepo_with_fixtures (gitrepo_path)?;
-  s . reset_with_repo_path (
+  s . reset_with_skgrepo_path (
     "test_content_diff_with_moved_and_deleted_nodes",
     gitrepo_path ) ?;
   let (config, _tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
 
-  let root_ids = vec![ID("1" . to_string()), ID("new" . to_string())];
+  let root_skgids = vec![ID("1" . to_string()), ID("new" . to_string())];
   let (actual, _pids, _) : (String, Vec<ID>, _) =
-    multi_root_view(&config, None, &root_ids, true)?;
+    multi_root_view(&config, None, &root_skgids, true)?;
 
   assert_buffer_contains(&actual, GIT_DIFF_VIEW);
 
   Ok(())
 }
 
-/// TODO/fork-fixes.org: no git ghosts under write-protected nodes. The
+/// TODO/fork-fixes.org: no git phantoms under write-protected nodes. The
 /// same transition as above, but with 11 also a view ROOT, so the
 /// copy of 11 under 1 draws write-protected. The removed-member
-/// phantoms of 11 must appear only under its definitive (root) copy;
+/// phantoms of 11 must appear only under its editable (root) copy;
 /// the write-protected copy gets none.
 async fn test_no_ghosts_under_writeProtected_occurrence (
   s : &mut SharedStoreSession,
@@ -50,20 +50,20 @@ async fn test_no_ghosts_under_writeProtected_occurrence (
   let temp_dir = TempDir::new()?;
   let gitrepo_path = temp_dir . path();
   setup_gitrepo_with_fixtures (gitrepo_path)?;
-  s . reset_with_repo_path (
+  s . reset_with_skgrepo_path (
     "test_no_ghosts_under_writeProtected_occurrence",
     gitrepo_path ) ?;
   let (config, _tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
 
-  let root_ids = vec![ID("1" . to_string()), ID("11" . to_string())];
+  let root_skgids = vec![ID("1" . to_string()), ID("11" . to_string())];
   let (actual, _pids, _) : (String, Vec<ID>, _) =
-    multi_root_view(&config, None, &root_ids, true)?;
+    multi_root_view(&config, None, &root_skgids, true)?;
 
   assert_buffer_contains(&actual, GIT_DIFF_VIEW_WRITE_PROTECTED_NO_GHOSTS);
   assert_eq!(
-    // The removed child appears exactly once: under the definitive copy.
+    // The removed child appears exactly once: under the editable copy.
     actual . matches ("(id gets-removed)") . count (), 1,
     "expected exactly one occurrence of the removed-member phantom, got:\n{}",
     actual );
@@ -81,16 +81,16 @@ async fn test_content_diff_staged (
   let temp_dir = TempDir::new()?;
   let gitrepo_path = temp_dir . path();
   setup_gitrepo_with_fixtures_staged (gitrepo_path)?;
-  s . reset_with_repo_path (
+  s . reset_with_skgrepo_path (
     "test_content_diff_staged",
     gitrepo_path ) ?;
   let (config, _tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
 
-  let root_ids = vec![ID("1" . to_string()), ID("new" . to_string())];
+  let root_skgids = vec![ID("1" . to_string()), ID("new" . to_string())];
   let (actual, _pids, _) : (String, Vec<ID>, _) =
-    multi_root_view(&config, None, &root_ids, true)?;
+    multi_root_view(&config, None, &root_skgids, true)?;
 
   assert_buffer_contains(&actual, GIT_DIFF_VIEW_STAGED);
 

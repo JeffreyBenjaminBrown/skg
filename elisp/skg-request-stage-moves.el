@@ -2,7 +2,7 @@
 ;;;
 ;;; PURPOSE: Ask the server for a shell script that stages every
 ;;; detected node "move" -- a node whose .skg file vanished from one
-;;; Skg repo's Git repo and appeared in another -- and display it.
+;;; skgrepo's gitrepo and appeared in another -- and display it.
 
 (require 'skg-length-prefix)
 

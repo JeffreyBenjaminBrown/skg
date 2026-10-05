@@ -8,7 +8,7 @@ use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use skg::types::tree::generations::{
   first_in_generation,
   next_in_generation,
-  collect_generation_ids,
+  collect_generation_skgids,
 };
 use std::error::Error;
 
@@ -105,9 +105,9 @@ fn test_first_in_generation_skips_childless_nodes(
   let mut tree: Tree<i32> =
     Tree::new (1);
   tree . root_mut() . append (2);
-  let child2_id: NodeId =
+  let child2_skgid: NodeId =
     tree . root_mut() . append (3) . id();
-  tree . get_mut (child2_id) . unwrap() . append (4);
+  tree . get_mut (child2_skgid) . unwrap() . append (4);
 
   // Generation 2 exists.
   // Algorithm should skip node 2 (no children) and find 4 via node 3
@@ -127,18 +127,18 @@ fn test_first_in_generation_with_deleted_subtrees(
     build_binary_tree (5);
 
   { // Find and delete all children of node "11"
-    let node_11_id: NodeId =
+    let node_11_skgid: NodeId =
       find_node_by_label(&tree, "11") . unwrap() . id();
     let mut node_11_mut: NodeMut<String> =
-      tree . get_mut (node_11_id) . unwrap();
+      tree . get_mut (node_11_skgid) . unwrap();
     while node_11_mut . first_child() . is_some() {
       node_11_mut . first_child() . unwrap() . detach(); }}
 
   { // Find and delete all children of node "121"
-    let node_121_id: NodeId =
+    let node_121_skgid: NodeId =
       find_node_by_label(&tree, "121") . unwrap() . id();
     let mut node_121_mut: NodeMut<String> =
-      tree . get_mut (node_121_id) . unwrap();
+      tree . get_mut (node_121_skgid) . unwrap();
     while node_121_mut . first_child() . is_some() {
       node_121_mut . first_child() . unwrap() . detach(); }}
 
@@ -261,9 +261,9 @@ fn test_next_in_generation_with_deleted_node() {
     build_binary_tree (5);
 
   { // Find and delete node "1122" (and all its descendants)
-    let node_1122_id: NodeId =
+    let node_1122_skgid: NodeId =
       find_node_by_label(&tree, "1122") . unwrap() . id();
-    tree . get_mut (node_1122_id) . unwrap() . detach(); }
+    tree . get_mut (node_1122_skgid) . unwrap() . detach(); }
 
   // Test from 1121: next should be 1211 (skipping deleted 1122)
   let node_1121: NodeRef<String> =
@@ -290,26 +290,26 @@ fn test_next_in_generation_across_viewforest_roots() {
     Tree::new("BufferRoot" . to_string());
 
   // Add "tree" A with children A1, A2
-  let a_id: NodeId =
+  let a_skgid: NodeId =
     viewforest . root_mut() . append("A" . to_string()) . id();
-  viewforest . get_mut (a_id) . unwrap() . append("A1" . to_string());
-  viewforest . get_mut (a_id) . unwrap() . append("A2" . to_string());
+  viewforest . get_mut (a_skgid) . unwrap() . append("A1" . to_string());
+  viewforest . get_mut (a_skgid) . unwrap() . append("A2" . to_string());
 
   // Add "tree" B with children B1, B2 and grandchildren B11, B21
-  let b_id: NodeId =
+  let b_skgid: NodeId =
     viewforest . root_mut() . append("B" . to_string()) . id();
-  let b1_id: NodeId =
-    viewforest . get_mut (b_id) . unwrap() . append("B1" . to_string()) . id();
-  let b2_id: NodeId =
-    viewforest . get_mut (b_id) . unwrap() . append("B2" . to_string()) . id();
-  viewforest . get_mut (b1_id) . unwrap() . append("B11" . to_string());
-  viewforest . get_mut (b2_id) . unwrap() . append("B21" . to_string());
+  let b1_skgid: NodeId =
+    viewforest . get_mut (b_skgid) . unwrap() . append("B1" . to_string()) . id();
+  let b2_skgid: NodeId =
+    viewforest . get_mut (b_skgid) . unwrap() . append("B2" . to_string()) . id();
+  viewforest . get_mut (b1_skgid) . unwrap() . append("B11" . to_string());
+  viewforest . get_mut (b2_skgid) . unwrap() . append("B21" . to_string());
 
   // Add "tree" C with children C1, C2
-  let c_id: NodeId =
+  let c_skgid: NodeId =
     viewforest . root_mut() . append("C" . to_string()) . id();
-  viewforest . get_mut (c_id) . unwrap() . append("C1" . to_string());
-  viewforest . get_mut (c_id) . unwrap() . append("C2" . to_string());
+  viewforest . get_mut (c_skgid) . unwrap() . append("C1" . to_string());
+  viewforest . get_mut (c_skgid) . unwrap() . append("C2" . to_string());
 
   // Test: from A2 (generation 2 from BufferRoot), next should be B1
   // A2 is at depth 2: BufferRoot -> A -> A2
@@ -344,25 +344,25 @@ fn test_first_in_generation_across_viewforest_roots() -> Result<(), Box<dyn Erro
     Tree::new("BufferRoot" . to_string());
 
   // Add "tree" A with child A1
-  let a_id: NodeId =
+  let a_skgid: NodeId =
     viewforest . root_mut() . append("A" . to_string()) . id();
-  viewforest . get_mut (a_id) . unwrap() . append("A1" . to_string());
+  viewforest . get_mut (a_skgid) . unwrap() . append("A1" . to_string());
 
   // Add "tree" B with deeper nesting: B -> B1 -> B11 -> B111
-  let b_id: NodeId =
+  let b_skgid: NodeId =
     viewforest . root_mut() . append("B" . to_string()) . id();
-  let b1_id: NodeId =
-    viewforest . get_mut (b_id) . unwrap() . append("B1" . to_string()) . id();
-  let b11_id: NodeId =
-    viewforest . get_mut (b1_id) . unwrap() . append("B11" . to_string()) . id();
-  viewforest . get_mut (b11_id) . unwrap() . append("B111" . to_string());
+  let b1_skgid: NodeId =
+    viewforest . get_mut (b_skgid) . unwrap() . append("B1" . to_string()) . id();
+  let b11_skgid: NodeId =
+    viewforest . get_mut (b1_skgid) . unwrap() . append("B11" . to_string()) . id();
+  viewforest . get_mut (b11_skgid) . unwrap() . append("B111" . to_string());
 
   // Add "tree" C: C -> C1 -> C11
-  let c_id: NodeId =
+  let c_skgid: NodeId =
     viewforest . root_mut() . append("C" . to_string()) . id();
-  let c1_id: NodeId =
-    viewforest . get_mut (c_id) . unwrap() . append("C1" . to_string()) . id();
-  viewforest . get_mut (c1_id) . unwrap() . append("C11" . to_string());
+  let c1_skgid: NodeId =
+    viewforest . get_mut (c_skgid) . unwrap() . append("C1" . to_string()) . id();
+  viewforest . get_mut (c1_skgid) . unwrap() . append("C11" . to_string());
 
   // Generation 0 = BufferRoot
   let result: Option<NodeRef<String>> =
@@ -408,63 +408,63 @@ fn test_first_in_generation_across_viewforest_roots() -> Result<(), Box<dyn Erro
   Ok(()) }
 
 #[test]
-fn test_collect_generation_ids_zero_is_valid() {
+fn test_collect_generation_skgids_zero_is_valid() {
   // Generation 0 is valid and returns the root
   let tree: Tree<i32> = Tree::new (1);
-  let result = collect_generation_ids(&tree, 0, None);
+  let result = collect_generation_skgids(&tree, 0, None);
   assert!(result . is_ok());
-  let ids = result . unwrap();
-  assert_eq!(ids . len(), 1);
-  assert_eq!(tree . get(ids[0]) . unwrap() . value(), &1);
+  let skgids = result . unwrap();
+  assert_eq!(skgids . len(), 1);
+  assert_eq!(tree . get(skgids[0]) . unwrap() . value(), &1);
 }
 
 #[test]
-fn test_collect_generation_ids_success() {
+fn test_collect_generation_skgids_success() {
   let tree: Tree<i32> = Tree::new (1);
-  let result = collect_generation_ids(&tree, 0, None);
+  let result = collect_generation_skgids(&tree, 0, None);
   assert!(result . is_ok());
-  let ids = result . unwrap();
-  assert_eq!(ids . len(), 1);
+  let skgids = result . unwrap();
+  assert_eq!(skgids . len(), 1);
 }
 
 #[test]
-fn test_collect_generation_ids_with_effective_root()
+fn test_collect_generation_skgids_with_effective_root()
   -> Result<(), Box<dyn std::error::Error>> {
   // Generations are counted from the effective root, not the true root.
   let tree: Tree<String> = build_binary_tree (3);
   let node_11: NodeId = // an interior node, one level below the root
     find_node_by_label (&tree, "11") . unwrap() . id();
   { // Generation 0 relative to node "11" is node "11" itself.
-    let ids: Vec<NodeId> =
-      collect_generation_ids (&tree, 0, Some (node_11))?;
-    assert_eq!(ids . len(), 1);
-    assert_eq!(tree . get (ids[0]) . unwrap() . value(), "11"); }
+    let skgids: Vec<NodeId> =
+      collect_generation_skgids (&tree, 0, Some (node_11))?;
+    assert_eq!(skgids . len(), 1);
+    assert_eq!(tree . get (skgids[0]) . unwrap() . value(), "11"); }
   { // Generation 1 relative to node "11" is its two children,
     // excluding its cousins of the same absolute depth.
-    let ids: Vec<NodeId> =
-      collect_generation_ids (&tree, 1, Some (node_11))?;
+    let skgids: Vec<NodeId> =
+      collect_generation_skgids (&tree, 1, Some (node_11))?;
     let labels: Vec<&String> =
-      ids . iter()
-      . map (|id| tree . get (*id) . unwrap() . value()) . collect();
+      skgids . iter()
+      . map (|skgid| tree . get (*skgid) . unwrap() . value()) . collect();
     assert_eq!(labels, vec!["111", "112"]); }
   { // A generation deeper than the subtree is empty, not an error.
-    let ids: Vec<NodeId> =
-      collect_generation_ids (&tree, 5, Some (node_11))?;
-    assert!(ids . is_empty()); }
+    let skgids: Vec<NodeId> =
+      collect_generation_skgids (&tree, 5, Some (node_11))?;
+    assert!(skgids . is_empty()); }
   Ok(()) }
 
 #[test]
-fn test_collect_generation_ids_effective_root_not_in_tree() {
+fn test_collect_generation_skgids_effective_root_not_in_tree() {
   // An effective root from a different tree is an error.
   let tree: Tree<i32> = Tree::new (1);
   let other_tree: Tree<i32> = Tree::new (2);
-  let foreign_id: NodeId = other_tree . root() . id();
-  let result = collect_generation_ids (&tree, 0, Some (foreign_id));
+  let foreign_skgid: NodeId = other_tree . root() . id();
+  let result = collect_generation_skgids (&tree, 0, Some (foreign_skgid));
   // PITFALL: ego_tree NodeIds are indices, so a foreign id can
   // coincidentally be valid here. Only assert an error if this one
   // does not resolve in 'tree'; the guard we're testing is the
   // .ok_or in collect_generation_ids.
-  if tree . get (foreign_id) . is_none() {
+  if tree . get (foreign_skgid) . is_none() {
     assert!(result . is_err()); }
   else {
     assert!(result . is_ok()); }}
@@ -513,8 +513,8 @@ fn build_binary_tree(
   let mut tree: Tree<String> =
     Tree::new("1" . to_string());
   if generations > 1 {
-    let root_id: NodeId =
+    let root_skgid: NodeId =
       tree . root() . id();
-    build_subtree ( &mut tree, root_id, "1" . to_string(),
+    build_subtree ( &mut tree, root_skgid, "1" . to_string(),
                      1, generations); }
   tree }

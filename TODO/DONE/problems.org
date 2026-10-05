@@ -1,3 +1,27 @@
+* Problems noticed during the language-homogenization audit (2026-10-05)
+All four fixed on 2026-10-05 in the same effort; see
+'TODO/homogenize-language/1_reconnaissance.org'.
+** 'docs/api-and-formats.org' documents two wire keys as "Skg repo"
+The get-file-path request is documented as '(Skg repo . "THE_REPO")' and
+the flag-state response as '(Skg repo "REPO")'. The code
+('server/serve/handlers/get_file_path.rs', 'flag_state.rs') and the
+Emacs client use 'repo'. A prose rename of "source" to "Skg repo"
+reached inside code spans.
+** 'docs/api-and-formats.org' gives short relation names the server rejects
+'(folder RELNAME)' is documented as taking 'overrides', 'hides' or
+'subscribes', but 'FolderRelation::from_relname' accepts only the stored
+names ('overrides_view_of', 'hides_from_its_subscriptions',
+'subscribes_to'). The '(rels ...)' section likewise lists short relation
+keys while its own example and birth table use the long ones.
+** Several files cite documents that no longer exist
+'api.md' (elisp request files, 'server/serve.rs'), 'elisp/USAGE.md'
+('elisp/skg-client.el'), and the old content of
+'coding-advice/claude-to-claude.org' ('docs/glossary.org',
+'tests/USAGE.md', 'TODO/DONE/typedb-performance-research.org').
+** 'ContainerwardPathStats' is defined but never used
+'server/types/viewnode.rs'. 'graphnode_graphFirst_by_pid_and_repo' is
+likewise a pure alias of 'graphnode_graphFirst_by_pid_and_repo'
+('server/dbs/node_lookup.rs'), whose 'repo' argument is ignored.
 * A search that never gets enriched wedges every later search (fixed 2026-10-05)
   Symptom: "skg: search enrichment blocked -- search enrichment already in
   progress", even with no skg buffers open. It persists until the TCP

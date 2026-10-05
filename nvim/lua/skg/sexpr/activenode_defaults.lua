@@ -65,7 +65,7 @@ end
 ---reorder the '** node' section's fields to canonical order, insert
 ---missing editable fields with defaults, and expand bare boolean
 ---atoms to have a value child. If DEFAULT_REPO is given, insert it
----as the repo default and mark a matching existing repo value
+---as the skgrepo default and mark a matching existing skgrepo value
 ---with '(default)'. If DISPLAY_TITLE is given and non-empty, prepend
 ---a display-only title group.
 ---@param org_text string
@@ -198,7 +198,7 @@ function M.expand_and_reorder (children, child_level, default_repo)
 end
 
 ---Expand GROUP for display: a bare 'writeProtected' boolean gains a 'true'
----child; a repo value matching DEFAULT_REPO gains ' (default)'.
+---child; a skgrepo value matching DEFAULT_REPO gains ' (default)'.
 ---@param group table[]
 ---@param child_level integer
 ---@param field_name string

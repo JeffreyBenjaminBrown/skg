@@ -11,11 +11,11 @@ use crate::to_org::complete::partner_folder::goal_list::{
 };
 use crate::to_org::complete::partner_folder::inverse_scan::inverse_scan_for_inbound_folder;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::types::git::{NodeAxes, RelationshipAxes, Sign, RepoDiff, file_node_axes_from_repo_diff};
-use crate::types::misc::{ID, RelPartner, RepoName};
-use crate::repo_sets::ActiveRepoSet;
+use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgRepoDiff, file_node_axes_from_skgrepo_diff};
+use crate::types::misc::{ID, RelPartner, SkgRepoName};
+use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::phantom::{phantom_axes, home_from_disk};
-use crate::update_buffer::ancestry::pid_and_repo_from_required_ancestor;
+use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::{CompletionWarning, RepairKind};
@@ -27,7 +27,7 @@ use std::error::Error;
 use std::sync::Arc;
 
 /// Reconciles one PartnerFolder (TODO/DONE/local-view-update/plan_v2.org §19 terminology: a folder = a collecting non-vognode)
-/// from a node in the view tree with the current in-Rust graph snapshot's data
+/// from a node in the viewforest with the current in-Rust graph snapshot's data
 /// about that node.
 /// Makes the folder's ActiveVognode children marked affectsParent=true match a goal list,
 /// preserving reusable children and creating missing ones,
@@ -36,53 +36,53 @@ pub fn reconcile_partnerFolder_children (
   node         : NodeId, // The PartnerFolder. Its parent is an ActiveVognode.
   tree         : &mut Tree<Viewnode>,
   kind         : PartnerFolder,
-  repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
+  skgrepo_diffs : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
   runtime      : &RuntimeGeneration,
   graph_snap   : &Arc<InRustGraph>,
-  deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
-  active_repo_set : Option<&ActiveRepoSet>,
+  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
   warning_sink : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
   kind . error_unless_node_is_this_kind (tree, node) ?;
-  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the owner Active vognode *through* the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
+  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the recorder Active vognode *through* the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
   // (index 0 = the parent), so this can never read an ancestor the table
   // does not list, and the death-check and this read share one spec.
-  let (owner_pid, owner_repo) : (ID, RepoName) =
-    pid_and_repo_from_required_ancestor (
+  let (recorder_pid, recorder_skgrepo) : (ID, SkgRepoName) =
+    pid_and_skgrepo_from_required_ancestor (
       tree, node, 0, kind . caller_label () ) ?;
   let Some (member_role) = kind . relation_member_role () else {
     return Err (format!(
       "{} called for PartnerFolder {:?}, which has no relation member role",
       kind . caller_label (), kind) . into ()); };
-  let owner_role =
+  let recorder_role =
     member_role . opposite_role ();
-  let repo_resolver = |id : &ID| -> Option<RepoName> {
-    graph_snap . pid_and_repo (id)
+  let skgrepo_resolver = |skgid : &ID| -> Option<SkgRepoName> {
+    graph_snap . pid_and_skgrepo (skgid)
       . map ( |(_pid, src)| src )
-      . or_else ( || home_from_disk (id, &runtime . config) ) };
-  let outbound : bool = // the folder shows a list in the OWNER's file
-    owner_role . is_first_role ();
+      . or_else ( || home_from_disk (skgid, &runtime . config) ) };
+  let outbound : bool = // the folder shows a list in the RECORDER's file
+    recorder_role . is_first_role ();
   let raw_outbound_members : Vec<RelPartner<ID>> = if outbound {
     // Preserve an unresolved ID through this outbound surface.  The old
     // canonical-PID accessor is still right for inverse/write-protected folders, but
     // would erase an Unknown from the writable OverriddenFolder.
     graph_snap . outbound_rel_partners_for_relation_gated (
-      &owner_pid, member_role . relation, active_repo_set )
+      &recorder_pid, member_role . relation, active_skgrepo_set )
   } else { Vec::new () };
   let inbound_scan : HashMap<ID, RelationshipAxes> =
-    // Inbound folders' edges live in the MEMBERS' files; the inverse
+    // Inbound folders' relationships live in the MEMBERS' files; the inverse
     // scan reads those files' diffs (Modified relation diffs,
     // Deleted before_node lists, Added after_node lists). Empty
     // outside diff mode and for outbound folders.
-    if ! outbound && repo_diffs . is_some () {
+    if ! outbound && skgrepo_diffs . is_some () {
       inverse_scan_for_inbound_folder (
-        &owner_pid, member_role . relation, repo_diffs,
-        active_repo_set )
+        &recorder_pid, member_role . relation, skgrepo_diffs,
+        active_skgrepo_set )
     } else { HashMap::new () };
-  let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) = {
+  let (goal_list, removed_skgids) : (Vec<ID>, HashSet<ID>) = {
     let graph_members : Vec<ID> =
-      // TODO/full-schema/9-2_repo-set-safety.org: these folders omit
+      // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: these folders omit
       // inactive members, with no retention (a stale InactiveVognode
       // child gets the reconciler's delete-leaf / deaden-branch rule).
       omit_inactive_members (
@@ -92,11 +92,11 @@ pub fn reconcile_partnerFolder_children (
                    . unwrap_or_else ( || member . member . clone () ) )
             . collect ()
         } else { graph_snap . other_member_pids_gated (
-          &owner_pid, owner_role, active_repo_set ) },
-        active_repo_set,
-        repo_resolver );
-    if outbound && repo_diffs . is_some () {
-      // Diff mode, outbound folder: the owner's per-stage relation diff
+          &recorder_pid, recorder_role, active_skgrepo_set ) },
+        active_skgrepo_set,
+        skgrepo_resolver );
+    if outbound && skgrepo_diffs . is_some () {
+      // Diff mode, outbound folder: the recorder's per-stage relation diff
       // interleaves members removed since HEAD (phantom positions)
       // into the worktree list. This diff-derived order supersedes
       // the WriteProtectedSet view-local order (the hiddenFolder) while diff
@@ -104,15 +104,15 @@ pub fn reconcile_partnerFolder_children (
       // view-local reordering cannot express.
       let (goal, removed) : (Vec<ID>, HashSet<ID>) =
         goal_list_for_outbound_folder (
-          &owner_pid, &owner_repo, member_role . relation,
-          repo_diffs, &graph_members );
+          &recorder_pid, &recorder_skgrepo, member_role . relation,
+          skgrepo_diffs, &graph_members );
       let goal : Vec<ID> = // phantoms can be inactive too
         omit_inactive_members (
-          goal, active_repo_set, repo_resolver );
+          goal, active_skgrepo_set, skgrepo_resolver );
       (goal, removed)
     } else {
       let mut goal : Vec<ID> = match kind . policy () {
-        FolderPolicy::WritableSet =>
+        FolderPolicy::EditableSet =>
           // Graph (disk) order is meaningful here: the user's own
           // save defines it.
           graph_members,
@@ -142,54 +142,54 @@ pub fn reconcile_partnerFolder_children (
             goal . iter () . collect ();
           inbound_scan . iter ()
             . filter ( |(_, axes)| ! axes . net_is_present () )
-            . map ( |(id, _)| id . clone () )
-            . filter ( |id| ! goal_set . contains (id) )
+            . map ( |(skgid, _)| skgid . clone () )
+            . filter ( |skgid| ! goal_set . contains (skgid) )
             . collect () };
         tail = // phantoms of inactive members are omitted too
           omit_inactive_members (
-            tail, active_repo_set,
-            |id : &ID| SkgEnv::find_repo_in_generation (
-              runtime, id, deleted_since_head_pid_src_map ));
+            tail, active_skgrepo_set,
+            |skgid : &ID| SkgEnv::find_skgrepo_in_generation (
+              runtime, skgid, deleted_since_head_pid_src_map ));
         tail . sort_by ( |a, b| a . 0 . cmp (&b . 0) );
         let removed : HashSet<ID> =
           tail . iter () . cloned () . collect ();
         goal . extend (tail);
         removed };
       (goal, removed) }};
-  let outbound_axes = // the owner's own relation diff
-    |child : &ID, child_src : &RepoName|
+  let outbound_axes = // the recorder's own relation diff
+    |child : &ID, child_src : &SkgRepoName|
     -> (NodeAxes, RelationshipAxes) {
     phantom_axes ( child, child_src,
-                   &owner_pid, &owner_repo,
+                   &recorder_pid, &recorder_skgrepo,
                    member_role . relation,
-                   repo_diffs . as_ref () ) };
+                   skgrepo_diffs . as_ref () ) };
   let inbound_axes = // relationship axes from the inverse scan; node
                      // axes from the member's own file statuses
-    |child : &ID, child_src : &RepoName|
+    |child : &ID, child_src : &SkgRepoName|
     -> (NodeAxes, RelationshipAxes) {
-    ( file_node_axes_from_repo_diff (
-        repo_diffs, child, child_src ),
+    ( file_node_axes_from_skgrepo_diff (
+        skgrepo_diffs, child, child_src ),
       inbound_scan . get (child) . copied ()
         . unwrap_or ( RelationshipAxes {
             staged : None, unstaged : Some (Sign::Minus) } )) };
   let axes_for_removed // the relation this folder represents
-    : &dyn Fn (&ID, &RepoName) -> (NodeAxes, RelationshipAxes) =
+    : &dyn Fn (&ID, &SkgRepoName) -> (NodeAxes, RelationshipAxes) =
     if outbound { &outbound_axes } else { &inbound_axes };
   // TODO/DONE/local-view-update/plan_v2.org §5.5: a folder fills its members WHOLE and is budget-neutral -- the owning
   // vognode already spent its budget unit when it expanded, so drawing all the
   // relation members here costs nothing and never truncates the group. (The
   // budget bounds how many vognodes EXPAND, not how big one group is.)
-  let relRepos : HashMap<ID, RepoName> =
+  let relRepos : HashMap<ID, SkgRepoName> =
     raw_outbound_members . iter ()
       . filter (|member| graph_snap . pid_of (&member . member) . is_none ())
-      . filter (|member| member . relRepo != owner_repo)
+      . filter (|member| member . relRepo != recorder_skgrepo)
       . map (|member| (member . member . clone (), member . relRepo . clone ()))
       . collect ();
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
       tree, node,
-      &goal_list, &removed_ids, axes_for_removed,
-      repo_diffs, deleted_since_head_pid_src_map,
+      &goal_list, &removed_skgids, axes_for_removed,
+      skgrepo_diffs, deleted_since_head_pid_src_map,
       &relRepos, runtime ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §6.0/§16: the reconciler deletes a stale member that is a view-leaf and
   // demotes one that is a branch, so a write-protected PartnerFolder
@@ -198,23 +198,23 @@ pub fn reconcile_partnerFolder_children (
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       tree, node, kind, &goal_list, &child_data,
       deleted_by_this_save_extra_ids ) ?;
-  if repo_diffs . is_some () {
-    // Present members whose edge is New in some stage get that
+  if skgrepo_diffs . is_some () {
+    // Present members whose relationship is New in some stage get that
     // stage's 'addedR'; removed members are the phantoms above.
-    let axes_by_id : HashMap<ID, RelationshipAxes> =
+    let axes_by_skgid : HashMap<ID, RelationshipAxes> =
       if outbound {
         outbound_member_axes (
-          &owner_pid, &owner_repo, member_role . relation,
-          repo_diffs )
+          &recorder_pid, &recorder_skgrepo, member_role . relation,
+          skgrepo_diffs )
       } else { inbound_scan . clone () };
     apply_relationship_axes_to_folder_members (
-      tree, node, &axes_by_id ) ?; }
-  if kind . policy () != FolderPolicy::WritableSet {
-    // Repairs to a writable folder are not repairs: its membership IS
+      tree, node, &axes_by_skgid ) ?; }
+  if kind . policy () != FolderPolicy::EditableSet {
+    // Repairs to an editable folder are not repairs: its membership IS
     // whatever the user saved. Write-protected folders warn (when there is a
     // sink, i.e. when this completion serves the just-saved view).
     if let Some (sink) = warning_sink {
-      push_repair_warnings (sink, kind, &owner_pid, summary); }}
+      push_repair_warnings (sink, kind, &recorder_pid, summary); }}
   Ok (( )) }
 
 /// Translate a RepairSummary into per-repair-kind CompletionWarnings.
@@ -222,7 +222,7 @@ pub fn reconcile_partnerFolder_children (
 pub fn push_repair_warnings (
   sink    : &mut Vec<CompletionWarning>,
   folder     : PartnerFolder,
-  owner   : &ID,
+  recorder   : &ID,
   summary : RepairSummary<ID>,
 ) {
   let categories : [ (RepairKind, Vec<ID>); 4 ] = [
@@ -234,12 +234,12 @@ pub fn push_repair_warnings (
     if ! children . is_empty () {
       sink . push ( CompletionWarning::FolderRepair {
         folder,
-        owner : owner . clone (),
+        recorder : recorder . clone (),
         repair,
         children } ); }}}
 
 /// The effective goal list for a FolderPolicy::WriteProtectedSet folder:
-/// the folder's existing Active affectsParent=Affected children, in their
+/// the folder's existing Active affectsParent=true children, in their
 /// current view order, filtered to graph-real members (first
 /// occurrence of a duplicate wins; the reconciler detaches the
 /// duplicates themselves), then every graph member not yet listed,
@@ -263,9 +263,9 @@ fn view_order_preserving_goal_list (
       if let ViewnodeKind::Vognode (Vognode::Active (t))
         = & child . value () . kind
       { if t . affectsParent == AffectsParent::True
-          && member_set . contains (&t . id)
-          && seen . insert (t . id . clone ())
-        { goal . push (t . id . clone ()); }}}}
+          && member_set . contains (&t . skgid)
+          && seen . insert (t . skgid . clone ())
+        { goal . push (t . skgid . clone ()); }}}}
   for member in graph_members {
     if seen . insert (member . clone ()) {
       goal . push (member . clone ()); }}

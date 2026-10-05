@@ -8,7 +8,7 @@ use crate::serve::util::{
   send_response_with_length_prefix,
   tag_sexp_response,
   value_from_request_sexp};
-use crate::repo_sets::{ActiveRepoSet, RepoSetName};
+use crate::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
 use crate::types::misc::SkgConfig;
 
 use std::net::TcpStream;
@@ -19,10 +19,10 @@ pub fn handle_diff_report_request (
   request : &str,
   config  : &SkgConfig,
 ) {
-  let active : ActiveRepoSet =
-    ActiveRepoSet::named (
+  let active : ActiveSkgRepoSet =
+    ActiveSkgRepoSet::named (
       config,
-      RepoSetName::from ("all"))
+      SkgRepoSetName::from ("all"))
     . expect ("reserved repo-set all should always resolve");
   handle_diff_report_request_with_repo_set (
     stream, request, config, &active ) }
@@ -31,7 +31,7 @@ pub fn handle_diff_report_request_with_repo_set (
   stream  : &mut TcpStream,
   request : &str,
   config  : &SkgConfig,
-  active  : &ActiveRepoSet,
+  active  : &ActiveSkgRepoSet,
 ) {
   let result : Result<(String, Vec<String>), String> =
     if active . is_all () {

@@ -12,14 +12,14 @@
 /// Phantoms are inserted wherever some stage's parent.contains had the
 /// child but the worktree's parent.contains lacks it.
 
-use crate::types::env::find_repo_with_optional_tantivy;
-use crate::types::git::{NodeAxes, RelationshipAxes, Sign, RepoDiff, GraphnodeDiff, GitDiffStatus, NodeChanges, added_relationship_axes_from_per_stage_diffs, node_axes_in_repo_diff, net_diff_from_per_stage, removed_relationship_axes_from_per_stage_diffs};
+use crate::types::env::find_skgrepo_with_optional_tantivy;
+use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgRepoDiff, GraphnodeDiff, GitDiffStatus, NodeChanges, added_relationship_axes_from_per_stage_diffs, node_axes_in_skgrepo_diff, net_diff_from_per_stage, removed_relationship_axes_from_per_stage_diffs};
 use crate::types::list::Diff_Item;
-use crate::types::misc::{ID, SkgConfig, RepoName, TantivyIndex};
+use crate::types::misc::{ID, SkgConfig, SkgRepoName, TantivyIndex};
 use crate::types::phantom::title_for_phantom;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, mk_phantom_viewnode };
 use crate::types::viewnode::{Vognode, Phantom, PropertyFolder, Property};
-use crate::types::tree::viewnode_graphnode::pid_and_repo_from_treenode;
+use crate::types::tree::viewnode_graphnode::pid_and_skgrepo_from_treenode;
 use crate::dbs::in_rust_graph::InRustGraph;
 
 use ego_tree::{NodeMut, NodeRef, NodeId};
@@ -27,29 +27,29 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Decorate a active vognode and generate any diff-only children
-/// implied by staged and unstaged GraphnodeDiffs. Called inline per Normal
+/// implied by staged and unstaged GraphnodeDiffs. Called inline per Active
 /// node at its own BFS visit (for both de-novo and post-save), TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3:
 /// the node flips to a phantom here and its folders then self-deaden via their own
 /// generalized-orphan check at their later visits.
 pub(crate) fn process_activeVognode_diff (
   mut node_mut                   : NodeMut<Viewnode>,
   graph                          : &InRustGraph,
-  repo_diffs                   : &HashMap<RepoName, RepoDiff>,
-  deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
+  skgrepo_diffs                  : &HashMap<SkgRepoName, SkgRepoDiff>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
   tantivy_index                  : Option<&TantivyIndex>,
   config                         : &SkgConfig,
 ) -> Result<(), String> {
-  let tree_node_id : NodeId =
+  let treeid : NodeId =
     node_mut . id();
-  let (pid, skgrepo) : (ID, RepoName) =
-    pid_and_repo_from_treenode (
-      node_mut . tree(), tree_node_id, "process_activeVognode_diff"
+  let (pid, skgrepo) : (ID, SkgRepoName) =
+    pid_and_skgrepo_from_treenode (
+      node_mut . tree(), treeid, "process_activeVognode_diff"
     ) . map_err ( |e| e . to_string() ) ?;
-  let repo_diff : &RepoDiff =
-    match repo_diffs . get (&skgrepo) {
+  let skgrepo_diff : &SkgRepoDiff =
+    match skgrepo_diffs . get (&skgrepo) {
       Some (d) => d,
       None => return Ok (( )) };
-  if ! repo_diff . is_gitrepo {
+  if ! skgrepo_diff . is_gitrepo {
     if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
       = node_mut . value() . kind
       { t . not_in_git = true; }
@@ -57,9 +57,9 @@ pub(crate) fn process_activeVognode_diff (
   let file_path : PathBuf =
     PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
   let staged   : Option<&GraphnodeDiff> =
-    repo_diff . staged   . get (&file_path);
+    skgrepo_diff . staged   . get (&file_path);
   let unstaged : Option<&GraphnodeDiff> =
-    repo_diff . unstaged . get (&file_path);
+    skgrepo_diff . unstaged . get (&file_path);
   if staged . is_none () && unstaged . is_none ()
     { return Ok (( )); }
   // Stamp the node's N axes from the per-stage file statuses.
@@ -121,12 +121,12 @@ pub(crate) fn process_activeVognode_diff (
     if list_diff_has_change (
          staged_changes   . map ( |c| c . ids_diff . as_slice () ),
          unstaged_changes . map ( |c| c . ids_diff . as_slice () ) )
-      && ! has_propertyFolder_child ( &mut node_mut, tree_node_id, PropertyFolder::ID ) {
+      && ! has_propertyFolder_child ( &mut node_mut, treeid, PropertyFolder::ID ) {
       prepend_empty_diff_folder ( &mut node_mut, PropertyFolder::ID ); }
     if list_diff_has_change (
          staged_changes   . map ( |c| c . aliases_diff . as_slice () ),
          unstaged_changes . map ( |c| c . aliases_diff . as_slice () ) )
-      && ! has_propertyFolder_child ( &mut node_mut, tree_node_id, PropertyFolder::Alias ) {
+      && ! has_propertyFolder_child ( &mut node_mut, treeid, PropertyFolder::Alias ) {
       prepend_empty_diff_folder ( &mut node_mut, PropertyFolder::Alias ); } }
   // Per-stage contains diff for the parent, split into position-specific
   // relationship axes. A REORDERED id appears in one stage as both Removed (its
@@ -137,19 +137,19 @@ pub(crate) fn process_activeVognode_diff (
   // worktree child render 'addedR' at its new slot and the phantom 'removedR' at
   // its old slot -- a git-style move that round-trips (the old slot, carrying a
   // Minus, re-parses as a phantom, not a duplicate live vognode).
-  let added_relationship_axes_by_id : HashMap<ID, RelationshipAxes> =
+  let added_relationship_axes_by_skgid : HashMap<ID, RelationshipAxes> =
     added_relationship_axes_from_per_stage_diffs (
       staged_changes   . map ( |c| c . contains_diff . as_slice () ),
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
   mark_relationship_axes_on_existing_children (
-    &mut node_mut, tree_node_id, &added_relationship_axes_by_id );
+    &mut node_mut, treeid, &added_relationship_axes_by_skgid );
   if matches! ( & node_mut . value () . kind,
                 ViewnodeKind::Vognode (Vognode::Active (t))
                   if t . is_writeProtected () ) {
-    // TODO/fork-fixes.org: no git ghosts under a write-protected node.
+    // TODO/fork-fixes.org: no git phantoms under a write-protected node.
     // It draws none of its worktree children, so a removed-member
     // phantom under it would show the node's DELETED children while
-    // its kept children go unshown. Its definitive occurrence (or a
+    // its kept children go unshown. Its editable occurrence (or a
     // wider view) carries the contains diff.
     return Ok (( )); }
   // Net HEAD->worktree contains order (an LCS of the reconstructed HEAD and
@@ -160,13 +160,13 @@ pub(crate) fn process_activeVognode_diff (
     net_diff_from_per_stage (
       staged_changes   . map ( |c| c . contains_diff . as_slice () ),
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
-  let removed_relationship_axes_by_id : HashMap<ID, RelationshipAxes> =
+  let removed_relationship_axes_by_skgid : HashMap<ID, RelationshipAxes> =
     removed_relationship_axes_from_per_stage_diffs (
       staged_changes   . map ( |c| c . contains_diff . as_slice () ),
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
   insert_phantoms_for_missing_contains (
-    &mut node_mut, graph, tree_node_id, &net_contains, &removed_relationship_axes_by_id,
-    repo_diff, repo_diffs,
+    &mut node_mut, graph, treeid, &net_contains, &removed_relationship_axes_by_skgid,
+    skgrepo_diff, skgrepo_diffs,
     deleted_since_head_pid_src_map, tantivy_index, config ) ?;
   Ok (( )) }
 
@@ -183,10 +183,10 @@ fn phantom_insertion_plan (
   let mut next_survivor : Option<ID> = None;
   for item in net_contains . iter () . rev () {
     match item {
-      Diff_Item::Unchanged (id) | Diff_Item::New (id)
-        => { next_survivor = Some ( id . clone () ); },
-      Diff_Item::Removed (id)
-        => { plan . push ( ( id . clone (), next_survivor . clone () )); }, }}
+      Diff_Item::Unchanged (skgid) | Diff_Item::New (skgid)
+        => { next_survivor = Some ( skgid . clone () ); },
+      Diff_Item::Removed (skgid)
+        => { plan . push ( ( skgid . clone (), next_survivor . clone () )); }, }}
   plan . reverse ();
   plan }
 
@@ -207,11 +207,11 @@ fn list_diff_has_change<T> (
 /// True iff the node already has a child PropertyFolder of KIND.
 fn has_propertyFolder_child (
   node_mut     : &mut NodeMut<Viewnode>,
-  tree_node_id : NodeId,
+  treeid       : NodeId,
   kind         : PropertyFolder,
 ) -> bool {
   let node_ref : NodeRef<Viewnode> =
-    node_mut . tree () . get (tree_node_id) . unwrap ();
+    node_mut . tree () . get (treeid) . unwrap ();
   node_ref . children () . any ( |c| matches! (
     & c . value () . kind,
     ViewnodeKind::PropertyFolder (k) if *k == kind )) }
@@ -235,27 +235,27 @@ fn prepend_empty_diff_folder (
 /// added (or moved to a new slot) since HEAD renders 'addedR'.
 fn mark_relationship_axes_on_existing_children (
   node_mut     : &mut NodeMut<Viewnode>,
-  tree_node_id : NodeId,
-  by_id        : &HashMap<ID, RelationshipAxes>,
+  treeid       : NodeId,
+  by_skgid     : &HashMap<ID, RelationshipAxes>,
 ) {
-  let child_ids : Vec<NodeId> = {
+  let child_skgids : Vec<NodeId> = {
     let node_ref : NodeRef<Viewnode> =
-      node_mut . tree() . get (tree_node_id) . unwrap();
+      node_mut . tree() . get (treeid) . unwrap();
     node_ref . children() . map ( |c| c . id() ) . collect() };
-  for child_id in child_ids {
+  for child_skgid in child_skgids {
     let mut child : NodeMut<Viewnode> =
-      node_mut . tree() . get_mut (child_id) . unwrap();
+      node_mut . tree() . get_mut (child_skgid) . unwrap();
     let child_id_and_relationship_axes : Option<(ID, &mut RelationshipAxes)> =
       match &mut child . value() . kind {
         ViewnodeKind::Vognode (Vognode::Active (t)) =>
-          Some ((t . id . clone (), &mut t . relationship_axes)),
-        // No Inactive arm: diff mode requires the "all" Skg repo set
+          Some ((t . skgid . clone (), &mut t . relationship_axes)),
+        // No Inactive arm: diff mode requires the "all" skgrepo set
         // (diff_report.rs and repo_sets.rs refuse otherwise), under
-        // which no node is inactive, so inactive placeholders never
+        // which no node is inactive, so inactive vognodes never
         // reach diff rendering.
         _ => None };
-    if let Some ((id, relationship_axes)) = child_id_and_relationship_axes {
-      if let Some (m) = by_id . get (&id) {
+    if let Some ((skgid, relationship_axes)) = child_id_and_relationship_axes {
+      if let Some (m) = by_skgid . get (&skgid) {
         // Only Plus signs are meaningful here (the child appears in
         // worktree.contains; '-' positions are phantoms, handled separately).
         if m . staged   == Some (Sign::Plus)
@@ -271,12 +271,12 @@ fn mark_relationship_axes_on_existing_children (
 fn insert_phantoms_for_missing_contains (
   node_mut                       : &mut NodeMut<Viewnode>,
   graph                          : &InRustGraph,
-  parent_node_id                 : NodeId,
+  parent_treeid                  : NodeId,
   net_contains                   : &[Diff_Item<ID>],
-  relationship_axes_by_id               : &HashMap<ID, RelationshipAxes>,
-  repo_diff                    : &RepoDiff,
-  repo_diffs                   : &HashMap<RepoName, RepoDiff>,
-  deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
+  relationship_axes_by_skgid     : &HashMap<ID, RelationshipAxes>,
+  skgrepo_diff                   : &SkgRepoDiff,
+  skgrepo_diffs                  : &HashMap<SkgRepoName, SkgRepoDiff>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
   tantivy_index                  : Option<&TantivyIndex>,
   config                         : &SkgConfig,
 ) -> Result<(), String> {
@@ -285,50 +285,50 @@ fn insert_phantoms_for_missing_contains (
   if plan . is_empty () { return Ok (( )); }
   // Map each surviving child's id to its NodeId, so an anchor id resolves
   // to the tree node we insert the phantom before.
-  let child_node_by_id : HashMap<ID, NodeId> = {
+  let child_node_by_skgid : HashMap<ID, NodeId> = {
     let node_ref : NodeRef<Viewnode> =
-      node_mut . tree () . get (parent_node_id) . unwrap ();
+      node_mut . tree () . get (parent_treeid) . unwrap ();
     let mut m : HashMap<ID, NodeId> = HashMap::new ();
     for c in node_ref . children () {
       match &c . value () . kind {
         ViewnodeKind::Vognode (Vognode::Active (t))
-          => { m . insert ( t . id . clone (), c . id () ); },
+          => { m . insert ( t . skgid . clone (), c . id () ); },
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
-          => { m . insert ( p . id . clone (), c . id () ); },
-        // No Inactive arm: inactive placeholders never reach diff
-        // rendering (diff mode requires the "all" Skg repo set).
+          => { m . insert ( p . skgid . clone (), c . id () ); },
+        // No Inactive arm: inactive vognodes never reach diff
+        // rendering (diff mode requires the "all" skgrepo set).
         _ => {}, }}
     m };
-  for (id, anchor) in plan {
+  for (skgid, anchor) in plan {
     let relationship_axes : RelationshipAxes =
-      relationship_axes_by_id . get (&id) . copied () . unwrap_or_default ();
+      relationship_axes_by_skgid . get (&skgid) . copied () . unwrap_or_default ();
     // A removed-member diff-phantom is a *non-Active* viewnode. If its
-    // Skg repo can't be determined -- e.g. a contains pointer at HEAD to a
+    // skgrepo can't be determined -- e.g. a contains pointer at HEAD to a
     // node whose .skg file was deleted by an earlier commit and so exists
-    // in no Skg repo -- fall back to the NOT_FOUND sentinel rather than
+    // in no skgrepo -- fall back to the NOT_FOUND sentinel rather than
     // aborting the whole render (matching the PartnerFolder removed-member
     // path; TODO/DONE/local-view-update/plan_v2.org §7.6).
-    let child_repo : RepoName =
-      find_repo_with_optional_tantivy (
-        graph, &id, deleted_since_head_pid_src_map,
+    let child_skgrepo : SkgRepoName =
+      find_skgrepo_with_optional_tantivy (
+        graph, &skgid, deleted_since_head_pid_src_map,
         tantivy_index, config )
-        . unwrap_or_else ( RepoName::not_found );
+        . unwrap_or_else ( SkgRepoName::not_found );
     let child_node_axes : NodeAxes =
-      node_axes_for_phantom (&id, &child_repo, repo_diff, repo_diffs);
+      node_axes_for_phantom (&skgid, &child_skgrepo, skgrepo_diff, skgrepo_diffs);
     let child_title : String =
       title_for_phantom (
-        graph, &id, &child_repo,
-        Some (repo_diffs), config );
+        graph, &skgid, &child_skgrepo,
+        Some (skgrepo_diffs), config );
     let phantom : Viewnode =
       mk_phantom_viewnode (
-        id . clone (), child_repo, child_title,
+        skgid . clone (), child_skgrepo, child_title,
         child_node_axes, relationship_axes );
-    match anchor . and_then ( |a| child_node_by_id . get (&a) . copied () ) {
-      Some (anchor_nid) =>
-        { node_mut . tree () . get_mut (anchor_nid) . unwrap ()
+    match anchor . and_then ( |a| child_node_by_skgid . get (&a) . copied () ) {
+      Some (anchor_treeid) =>
+        { node_mut . tree () . get_mut (anchor_treeid) . unwrap ()
             . insert_before (phantom); },
       None =>
-        { node_mut . tree () . get_mut (parent_node_id) . unwrap ()
+        { node_mut . tree () . get_mut (parent_treeid) . unwrap ()
             . append (phantom); }, }}
   Ok (( )) }
 
@@ -336,18 +336,18 @@ fn insert_phantoms_for_missing_contains (
 /// Compute node axes for a phantom: derived from whether the
 /// child's '.skg' file shows up as Deleted in either stage.
 fn node_axes_for_phantom (
-  id           : &ID,
-  skgrepo       : &RepoName,
-  repo_diff  : &RepoDiff,
-  repo_diffs : &HashMap<RepoName, RepoDiff>,
+  skgid            : &ID,
+  skgrepo       : &SkgRepoName,
+  skgrepo_diff  : &SkgRepoDiff,
+  skgrepo_diffs : &HashMap<SkgRepoName, SkgRepoDiff>,
 ) -> NodeAxes {
   let file_path : PathBuf =
-    PathBuf::from ( format! ( "{}.skg", id . 0 ));
-  // Prefer the repo_diff for the phantom's own Skg repo if available,
+    PathBuf::from ( format! ( "{}.skg", skgid . 0 ));
+  // Prefer the repo_diff for the phantom's own skgrepo if available,
   // otherwise fall back to the parent's repo_diff.
-  let resolved : &RepoDiff =
-    repo_diffs . get (skgrepo) . unwrap_or (repo_diff);
-  node_axes_in_repo_diff ( Some (resolved), &file_path ) }
+  let resolved : &SkgRepoDiff =
+    skgrepo_diffs . get (skgrepo) . unwrap_or (skgrepo_diff);
+  node_axes_in_skgrepo_diff ( Some (resolved), &file_path ) }
 
 #[cfg(test)]
 #[path = "../../../tests/unit/render_diff.rs"]

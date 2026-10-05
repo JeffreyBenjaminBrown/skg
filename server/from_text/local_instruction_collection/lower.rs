@@ -1,4 +1,4 @@
-/// This file defines lowering, which converts 'CollectedIntents'
+/// This file defines lowering, which converts 'CollectedFieldIntents'
 /// (the traversal's output) into ordered 'NodeIntent's -- the shape
 /// that the downstream stages (visibility resolution, disk
 /// supplementation, and the noop filter) consume. Lowering is pure
@@ -7,55 +7,55 @@
 /// Entries lower as follows:
 /// - A delete entry lowers to 'NodeIntent::Delete'.
 /// - An entry with a title/body (that is, one owned by a
-///   save-eligible definitive instance) lowers to
+///   save-eligible editable occurrence) lowers to
 ///   'NodeIntent::Save', with its empty slots lowering to
 ///   'MSV::Unspecified'.
-/// - An entry holding only unresolved signals (visibility intents
+/// - An entry holding only unresolved signals (visibility fieldIntents
 ///   and text claims) lowers to no NodeIntent; the signals are
-///   returned beside the intents, for the downstream stages that
+///   returned beside the nodeIntents, for the downstream stages that
 ///   consume them. ('node_merge' slots are likewise not lowered
 ///   here: nodeMerge extraction reads them via 'nodeMerge_pairs'
 ///   before lowering consumes the map.)
 
 use crate::from_text::local_instruction_collection::types::{
-  CollectedIntents, HiddenOutsideEdit, IntentsForOneId, SubscribeeVisibility };
+  CollectedFieldIntents, HiddenOutsideEdit, FieldIntentsForOneId, SubscribeeVisibility };
 use crate::types::misc::{
-  ID, MSV, RelPartner, RepoName, members_msv, members_of,
+  ID, MSV, RelPartner, SkgRepoName, members_msv, members_of,
   rel_partners_at_relRepo, rel_partners_at_relRepo_msv };
 use crate::types::nodes::complete::{Flag, Graphnode};
-use crate::types::save::{DefineNode, SaveNode, DeleteNode};
+use crate::types::save::{NodeInstruction, SaveNode, DeleteNode};
 
 use std::collections::{HashMap, HashSet};
 
 /// What the user appears to intend for this node.
-/// Might eventually become a DefineNode.
-/// Uses MSV values in the Save variant (whereas DefineNode uses
+/// Might eventually become a NodeInstruction.
+/// Uses MSV values in the Save variant (whereas NodeInstruction uses
 /// SaveNode, which uses Graphnode, which specifies all values).
 pub enum NodeIntent {
   Save   (NodeSaveIntent),
-  Delete (DeleteNode), // DefineNode uses the same DeleteNode type
+  Delete (DeleteNode), // NodeInstruction uses the same DeleteNode type
 }
 
 pub struct NodeSaveIntent {
   pub pid               : ID,
-  pub home_repo            : RepoName,
+  pub home_skgrepo      : SkgRepoName,
   pub title             : String,
   pub body              : Option<String>,
   // contains / subscribes_to / overrides_view_of pair each member
   // with an Option<RepoName>: Some when the buffer's headline
   // carried an '(editRequest (relRepo NAME))' request (see
-  // 'ActiveVognode_Generic::relRepo_request', 'NodeIntent_Local'); None means
+  // 'ActiveVognode_Generic::relRepo_request', 'FieldIntent'); None means
   // "derive" (sticky-else-default). 'requested_relRepos' extracts the
   // Some entries into a side-channel BEFORE 'into_graphnode'
   // discards them, for 'apply_sticky_relRepos' to validate against
-  // each edge's floor.
-  pub contains          : MSV<(ID, Option<RepoName>)>,
+  // each relationship's floor.
+  pub contains          : MSV<(ID, Option<SkgRepoName>)>,
   pub extra_ids         : Vec<ID>,
-  pub aliases           : MSV<(String, Option<RepoName>)>,
-  pub subscribes_to     : MSV<(ID, Option<RepoName>)>,
+  pub aliases           : MSV<(String, Option<SkgRepoName>)>,
+  pub subscribes_to     : MSV<(ID, Option<SkgRepoName>)>,
   pub hides_from_its_subscriptions : MSV<ID>,
-  pub overrides_view_of : MSV<(ID, Option<RepoName>)>,
-  pub misc              : Vec<Flag>,
+  pub overrides_view_of : MSV<(ID, Option<SkgRepoName>)>,
+  pub flags              : Vec<Flag>,
   pub flag_request  : Option<(Flag, bool)>,
 }
 
@@ -65,46 +65,46 @@ pub struct NodeSaveIntent {
 /// absent: it is inferred, and the folder that shows it is write-protected --
 /// the set-relRepo gesture refuses there). Threaded
 /// separately from
-/// Graphnode because Graphnode's 'RelPartner::repo' is a
+/// Graphnode because Graphnode's 'RelPartner::skgrepo' is a
 /// plain RepoName with no "was this explicit" flag, and gets
 /// unconditionally resolved by 'apply_sticky_relRepos' -- this is the
 /// side-channel that tells that pass which members carry a real,
-/// user-requested repo to validate against the default
+/// user-requested skgrepo to validate against the default
 /// floor, rather than deriving normally (render-and-gating,
-/// TODO/user-owned_autofork_chain/5_plan.org).
+/// TODO/DONE/privacy-telescope/5_plan.org).
 #[derive(Clone, Debug, Default)]
 pub struct RequestedRelRepos {
-  pub contains          : HashMap<ID, RepoName>,
-  pub aliases           : HashMap<String, RepoName>,
-  pub subscribes_to     : HashMap<ID, RepoName>,
-  pub overrides_view_of : HashMap<ID, RepoName>,
+  pub contains          : HashMap<ID, SkgRepoName>,
+  pub aliases           : HashMap<String, SkgRepoName>,
+  pub subscribes_to     : HashMap<ID, SkgRepoName>,
+  pub overrides_view_of : HashMap<ID, SkgRepoName>,
 }
 
 /// Strip the per-member explicit-repo payload down to plain IDs, by
 /// reference (read-only consumers, e.g.
-/// 'save_intents_with_specified_contains').
-fn ids_only_msv_ref (
-  msv : &MSV<(ID, Option<RepoName>)>,
+/// 'nodeSaveIntents_with_specified_contains').
+fn skgids_only_msv_ref (
+  msv : &MSV<(ID, Option<SkgRepoName>)>,
 ) -> MSV<ID> {
   match msv {
     MSV::Unspecified   => MSV::Unspecified,
     MSV::Specified (v) => MSV::Specified (
-      v . iter () . map ( |(id, _)| id . clone () ) . collect () ), }}
+      v . iter () . map ( |(skgid, _)| skgid . clone () ) . collect () ), }}
 
 /// As 'ids_only_msv_ref', consuming.
-fn ids_only_msv (
-  msv : MSV<(ID, Option<RepoName>)>,
+fn skgids_only_msv (
+  msv : MSV<(ID, Option<SkgRepoName>)>,
 ) -> MSV<ID> {
   match msv {
     MSV::Unspecified   => MSV::Unspecified,
     MSV::Specified (v) => MSV::Specified (
-      v . into_iter () . map ( |(id, _)| id ) . collect () ), }}
+      v . into_iter () . map ( |(skgid, _)| skgid ) . collect () ), }}
 
 /// As above, for the non-MSV 'contains' slice.
-fn ids_only (
-  list : &[(ID, Option<RepoName>)],
+fn skgids_only (
+  list : &[(ID, Option<SkgRepoName>)],
 ) -> Vec<ID> {
-  list . iter () . map ( |(id, _)| id . clone () ) . collect () }
+  list . iter () . map ( |(skgid, _)| skgid . clone () ) . collect () }
 
 impl NodeIntent {
   pub fn pid (
@@ -112,7 +112,7 @@ impl NodeIntent {
   ) -> &ID {
     match self {
       NodeIntent::Save (intent) => &intent . pid,
-      NodeIntent::Delete (intent) => &intent . id, }}
+      NodeIntent::Delete (intent) => &intent . skgid, }}
 
   pub fn apply_hiderel_delta (
     &mut self,
@@ -129,21 +129,21 @@ impl NodeIntent {
   pub fn graph_save_from_graphnode (
     node : Graphnode,
   ) -> NodeIntent {
-    // No explicit repos: this seeds an intent straight from disk
-    // (a definitive rebuild for hide-delta application), not from a
+    // No explicit skgrepos: this seeds a nodeIntent straight from disk
+    // (an editable rebuild for hide-delta application), not from a
     // buffer headline that could carry a '(relRepo ...)' atom.
     // Preserves the MSV Unspecified/Specified distinction, unlike a
     // plain 'or_default()' round-trip.
     fn no_explicit_msv (
       msv : &MSV<RelPartner<ID>>,
-    ) -> MSV<(ID, Option<RepoName>)> {
+    ) -> MSV<(ID, Option<SkgRepoName>)> {
       match msv {
         MSV::Unspecified   => MSV::Unspecified,
         MSV::Specified (v) => MSV::Specified (
           v . iter () . map ( |m| (m . member . clone (), None) ) . collect () ), }}
     NodeIntent::Save (NodeSaveIntent {
       pid                          : node . pid,
-      home_repo                       : node . home_repo,
+      home_skgrepo                 : node . home_skgrepo,
       title                        : node . title,
       body                         : node . body,
       contains                     : MSV::Specified (
@@ -160,7 +160,7 @@ impl NodeIntent {
       hides_from_its_subscriptions :
         members_msv (&node . hides_from_its_subscriptions),
       overrides_view_of            : no_explicit_msv (&node . overrides_view_of),
-      misc                         : node . misc,
+      flags                         : node . flags,
       flag_request             : None,
     }) }
 
@@ -174,14 +174,14 @@ impl NodeIntent {
         Err ("Delete intent does not contain a SaveNode" . to_string()),
     }}
 
-  pub fn into_define_node (
+  pub fn into_node_instruction (
     self,
-  ) -> Result<DefineNode, String> {
+  ) -> Result<NodeInstruction, String> {
     match self {
       NodeIntent::Delete (intent)
-        => Ok (DefineNode::Delete (intent)),
+        => Ok (NodeInstruction::Delete (intent)),
       NodeIntent::Save (intent)
-        => Ok (DefineNode::Save (SaveNode (
+        => Ok (NodeInstruction::Save (SaveNode (
           intent . into_graphnode() ))) }}
 }
 
@@ -191,30 +191,30 @@ impl NodeSaveIntent {
     contains : &[ID],
   ) {
     if self . contains . is_unspecified() {
-      // Disk-derived filler: no per-member explicit repo (that only
+      // Disk-derived filler: no per-member explicit skgrepo (that only
       // ever comes from a buffer headline's own '(relRepo ...)').
       self . contains =
         MSV::Specified ( contains . iter () . cloned ()
-                          . map ( |id| (id, None) ) . collect () ); }}
+                          . map ( |skgid| (skgid, None) ) . collect () ); }}
 
-  /// The repos the buffer explicitly requested (its headlines'
+  /// The skgrepos the buffer explicitly requested (its headlines'
   /// '(relRepo NAME)' atoms), read out BEFORE 'into_graphnode'
   /// discards the Option<RepoName> payload. See 'RequestedRelRepos'.
   pub fn requested_relRepos (
     &self,
   ) -> RequestedRelRepos {
     fn collect (
-      list : &[(ID, Option<RepoName>)],
-    ) -> HashMap<ID, RepoName> {
+      list : &[(ID, Option<SkgRepoName>)],
+    ) -> HashMap<ID, SkgRepoName> {
       list . iter ()
-        . filter_map ( |(id, repo)| repo . clone ()
-                       . map ( |s| (id . clone (), s) ) )
+        . filter_map ( |(skgid, skgrepo)| skgrepo . clone ()
+                       . map ( |s| (skgid . clone (), s) ) )
         . collect () }
     RequestedRelRepos {
       contains          : collect (self . contains . or_default ()),
       aliases           : self . aliases . or_default () . iter ()
-        . filter_map ( |(text, repo)| repo . clone ()
-          . map ( |repo| (text . clone (), repo) ) )
+        . filter_map ( |(text, skgrepo)| skgrepo . clone ()
+          . map ( |skgrepo| (text . clone (), skgrepo) ) )
         . collect (),
       subscribes_to     : collect (self . subscribes_to . or_default ()),
       overrides_view_of : collect (self . overrides_view_of . or_default ()),
@@ -223,35 +223,35 @@ impl NodeSaveIntent {
   pub fn into_graphnode (
     self,
   ) -> Graphnode {
-    let repo : RepoName = self . home_repo . clone();
+    let skgrepo  : SkgRepoName = self . home_skgrepo . clone();
     let mut node : Graphnode = Graphnode {
       title                        : self . title,
       overPrivateText_telescope               : false,
       aliases                      :
         rel_partners_at_relRepo_msv (
-          &repo,
+          &skgrepo,
           match self . aliases {
             MSV::Unspecified => MSV::Unspecified,
             MSV::Specified (aliases) => MSV::Specified (
               aliases . into_iter ()
               . map ( |(text, _)| text ) . collect () ), } ),
-      home_repo                       : self . home_repo,
+      home_skgrepo                 : self . home_skgrepo,
       pid                          : self . pid,
       extra_ids                    : self . extra_ids,
       body                         :
         crate::types::nodes::complete::normalize_body ( self . body ),
       contains                     :
         rel_partners_at_relRepo (
-          &repo, ids_only (self . contains . or_default ()) ),
+          &skgrepo, skgids_only (self . contains . or_default ()) ),
       subscribes_to                :
-        rel_partners_at_relRepo_msv (&repo, ids_only_msv (self . subscribes_to)),
+        rel_partners_at_relRepo_msv (&skgrepo, skgids_only_msv (self . subscribes_to)),
       hides_from_its_subscriptions :
-        rel_partners_at_relRepo_msv (&repo, self . hides_from_its_subscriptions),
+        rel_partners_at_relRepo_msv (&skgrepo, self . hides_from_its_subscriptions),
       overrides_view_of            :
-        rel_partners_at_relRepo_msv (&repo, ids_only_msv (self . overrides_view_of)),
-      misc                         : self . misc,
+        rel_partners_at_relRepo_msv (&skgrepo, skgids_only_msv (self . overrides_view_of)),
+      flags                         : self . flags,
     };
-    node . normalize_ids ();
+    node . normalize_skgids ();
     node }
 
   fn apply_hiderel_delta (
@@ -266,23 +266,23 @@ impl NodeSaveIntent {
       } else {
         self . hides_from_its_subscriptions . or_default() . to_vec()
       };
-    hides . retain ( |id| ! inferred_unhides . contains (id) );
-    for id in inferred_hides {
-      if ! hides . contains (id) {
-        hides . push (id . clone()); }}
+    hides . retain ( |skgid| ! inferred_unhides . contains (skgid) );
+    for skgid in inferred_hides {
+      if ! hides . contains (skgid) {
+        hides . push (skgid . clone()); }}
     self . hides_from_its_subscriptions =
       MSV::Specified (hides); }}
 
 /// This is an ordered map of one NodeIntent per PID; lowering
 /// produces it, and visibility resolution mutates it. Its 'order'
 /// field holds the PIDs in first save-or-delete-emission order.
-pub struct LoweredIntents {
+pub struct LoweredNodeIntents {
   order  : Vec<ID>,
   by_pid : HashMap<ID, NodeIntent>,
 }
 
 pub struct LoweringOutput {
-  pub intents        : LoweredIntents,
+  pub intents        : LoweredNodeIntents,
   pub visibility     : Vec<(ID, SubscribeeVisibility)>, // Each pair is (subscriber, signal); the list is in subscriber first-emission order.
   pub hidden_outside : Vec<(ID, HiddenOutsideEdit)>,
 }
@@ -292,7 +292,7 @@ pub struct LoweringOutput {
 /// must read this before lowering consumes the map.
 #[allow(non_snake_case)]
 pub fn nodeMerge_pairs (
-  collected : &CollectedIntents,
+  collected : &CollectedFieldIntents,
 ) -> Vec<(ID, ID)> {
   let mut pairs : Vec<(ID, ID)> = Vec::new();
   for pid in &collected . order {
@@ -302,10 +302,10 @@ pub fn nodeMerge_pairs (
     { pairs . push (( pid . clone(), acquiree . clone() )); }}
   pairs }
 
-pub fn lower_collected_intents (
-  collected : CollectedIntents,
+pub fn lower_collected_fieldIntents (
+  collected : CollectedFieldIntents,
 ) -> Result<LoweringOutput, String> {
-  let CollectedIntents { order, lowerable_order, mut by_pid }
+  let CollectedFieldIntents { order, lowerable_order, mut by_pid }
     = collected;
   let visibility : Vec<(ID, SubscribeeVisibility)> = {
     // The signals are extracted across ALL entries, in
@@ -314,36 +314,36 @@ pub fn lower_collected_intents (
     let mut visibility : Vec<(ID, SubscribeeVisibility)> =
       Vec::new();
     for pid in &order {
-      let entry : &IntentsForOneId =
+      let entry : &FieldIntentsForOneId =
         by_pid . get (pid)
-        . ok_or ( "lower_collected_intents: order names a PID missing from the map" . to_string() ) ?;
+        . ok_or ( "lower_collected_fieldIntents: order names a PID missing from the map" . to_string() ) ?;
       for signal in &entry . visibility {
         visibility . push (( pid . clone(), signal . clone() )); }}
     visibility };
   let hidden_outside : Vec<(ID, HiddenOutsideEdit)> = {
     let mut edits : Vec<(ID, HiddenOutsideEdit)> = Vec::new ();
     for pid in &order {
-      let entry : &IntentsForOneId = by_pid . get (pid)
-        . ok_or ( "lower_collected_intents: order names a PID missing from the map" . to_string () ) ?;
+      let entry : &FieldIntentsForOneId = by_pid . get (pid)
+        . ok_or ( "lower_collected_fieldIntents: order names a PID missing from the map" . to_string () ) ?;
       for edit in &entry . hidden_outside {
         edits . push ((pid . clone (), edit . clone ())); }}
     edits };
-  let mut intents : LoweredIntents =
-    LoweredIntents {
+  let mut intents : LoweredNodeIntents =
+    LoweredNodeIntents {
       order  : Vec::with_capacity (lowerable_order . len()),
       by_pid : HashMap::with_capacity (lowerable_order . len()) };
   for pid in lowerable_order {
-    let entry : IntentsForOneId =
+    let entry : FieldIntentsForOneId =
       by_pid . remove (&pid)
-      . ok_or ( "lower_collected_intents: lowerable_order names a PID missing from the map" . to_string() ) ?;
+      . ok_or ( "lower_collected_fieldIntents: lowerable_order names a PID missing from the map" . to_string() ) ?;
     let intent : NodeIntent =
       lower_one_entry (&pid, entry) ?;
     intents . order . push (pid . clone());
     intents . by_pid . insert (pid, intent); }
   for (pid, leftover) in &by_pid {
-    // Whatever remains holds only signals. Field intents can only
-    // come from folders under a save-eligible owner, and a
-    // save-eligible owner emits a title/body, putting its entry in
+    // Whatever remains holds only signals. FieldIntents can only
+    // come from folders under a save-eligible recorder, and a
+    // save-eligible recorder emits a title/body, putting its entry in
     // 'lowerable_order'; so anything else here is a collection bug.
     if leftover . contains . is_some()
       || leftover . aliases       . is_some()
@@ -352,7 +352,7 @@ pub fn lower_collected_intents (
       || leftover . node_merge    . is_some()
       || leftover . flag      . is_some()
     { return Err ( format!(
-        "lower_collected_intents: entry for {} has field intents but no title/body",
+        "lower_collected_fieldIntents: entry for {} has field intents but no title/body",
         pid )); }}
   Ok (LoweringOutput { intents, visibility, hidden_outside }) }
 
@@ -360,24 +360,24 @@ pub fn lower_collected_intents (
 /// title/body, having been named by 'lowerable_order'.
 fn lower_one_entry (
   pid   : &ID,
-  entry : IntentsForOneId,
+  entry : FieldIntentsForOneId,
 ) -> Result<NodeIntent, String> {
   if entry . delete {
     return Ok (NodeIntent::Delete (DeleteNode {
-      id     : pid . clone(),
-      home_repo : entry . home_repo . ok_or_else ( || format!(
-        "lower_collected_intents: delete entry for {} lacks a repo",
+      skgid           : pid . clone(),
+      home_skgrepo : entry . home_skgrepo . ok_or_else ( || format!(
+        "lower_collected_fieldIntents: delete entry for {} lacks a repo",
         pid )) ?, } )); }
   match entry . title_and_body {
     None =>
       Err ( format!(
-        "lower_collected_intents: lowerable entry for {} has neither delete nor title/body",
+        "lower_collected_fieldIntents: lowerable entry for {} has neither delete nor title/body",
         pid )),
     Some (( title, body )) => {
       Ok (NodeIntent::Save (NodeSaveIntent {
-        pid    : pid . clone(),
-        home_repo : entry . home_repo . ok_or_else ( || format!(
-          "lower_collected_intents: save entry for {} lacks a repo",
+        pid          : pid . clone(),
+        home_skgrepo : entry . home_skgrepo . ok_or_else ( || format!(
+          "lower_collected_fieldIntents: save entry for {} lacks a repo",
           pid )) ?,
         title,
         body,
@@ -391,7 +391,7 @@ fn lower_one_entry (
         hides_from_its_subscriptions : MSV::Unspecified,
         overrides_view_of            :
           msv_from_slot (entry . overrides),
-        misc                         : Vec::new(),
+        flags                    : Vec::new(),
         flag_request             : entry . flag,
       })) }} }
 
@@ -402,39 +402,39 @@ fn msv_from_slot<T> (
     None      => MSV::Unspecified,
     Some (vs) => MSV::Specified (vs), }}
 
-impl LoweredIntents {
+impl LoweredNodeIntents {
   pub fn into_ordered_intents (
     self,
   ) -> Vec<NodeIntent> {
-    let LoweredIntents { order, mut by_pid } = self;
+    let LoweredNodeIntents { order, mut by_pid } = self;
     order . into_iter()
       . filter_map ( |pid| by_pid . remove (&pid) )
       . collect() }
 
-  /// One (pid, repo, contains, subscribes_to) tuple per Save
-  /// intent whose contains is Specified -- the candidates for
+  /// One (pid, skgrepo, contains, subscribes_to) tuple per Save
+  /// nodeIntent whose contains is Specified -- the candidates for
   /// inferring hides from contains removals (see
   /// 'infer_hides_from_contains_removals'). Cloned out so the caller
   /// can mutate self (via 'apply_hiderel_delta_to_subscriber') while
   /// iterating.
-  pub fn save_intents_with_specified_contains (
+  pub fn nodeSaveIntents_with_specified_contains (
     &self,
-  ) -> Vec<(ID, RepoName, Vec<ID>, MSV<ID>)> {
+  ) -> Vec<(ID, SkgRepoName, Vec<ID>, MSV<ID>)> {
     self . order . iter ()
       . filter_map ( |pid| match self . by_pid . get (pid) {
           Some (NodeIntent::Save (intent)) =>
             match & intent . contains {
               MSV::Specified (contains) => Some ((
                 pid . clone (),
-                intent . home_repo . clone (),
-                ids_only (contains),
-                ids_only_msv_ref (&intent . subscribes_to) )),
+                intent . home_skgrepo . clone (),
+                skgids_only (contains),
+                skgids_only_msv_ref (&intent . subscribes_to) )),
               _ => None },
           _ => None })
       . collect () }
 
   /// This returns the subscriber's contains as it will stand after
-  /// this save: from its Save intent if it has one, and otherwise
+  /// this save: from its Save nodeIntent if it has one, and otherwise
   /// from disk.
   pub fn subscriber_contains_after_save (
     &self,
@@ -443,7 +443,7 @@ impl LoweredIntents {
     match self . by_pid . get (&subscriber_from_disk . pid) {
       Some (NodeIntent::Save (intent)) =>
         intent . contains . or_default () . iter ()
-        . map ( |(id, _)| id . clone () ) . collect (),
+        . map ( |(skgid, _)| skgid . clone () ) . collect (),
       _ =>
         members_of (&subscriber_from_disk . contains)
         . into_iter() . collect(),
@@ -459,7 +459,7 @@ impl LoweredIntents {
     match self . by_pid . get (&subscriber_from_disk . pid) {
       Some (NodeIntent::Save (intent))
         if ! intent . subscribes_to . is_unspecified () =>
-          ids_only (intent . subscribes_to . or_default ()),
+          skgids_only (intent . subscribes_to . or_default ()),
       _ =>
         members_of (
           subscriber_from_disk . subscribes_to . or_default () ),
@@ -481,8 +481,8 @@ impl LoweredIntents {
     }}
 
   /// This applies inferred hides/unhides to the subscriber's
-  /// intent, creating a Save intent from its disk state if it has
-  /// none. A Delete intent is left untouched, because deleting wins.
+  /// nodeIntent, creating a Save nodeIntent from its disk state if it has
+  /// none. A Delete nodeIntent is left untouched, because deleting wins.
   pub fn apply_hiderel_delta_to_subscriber (
     &mut self,
     subscriber       : Graphnode,

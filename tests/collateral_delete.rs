@@ -77,7 +77,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
           &graph . load_full (),
           ViewUri::SearchView ("to X" . into ()), vf3, &pids3 ); }
 
-      { // An indefinitive image is not search-specific. A normal
+      { // A write-protected image is not search-specific. A normal
         // multi-root content view can contain the same PID more than
         // once; the later occurrence is write-protected. Every image
         // of a node deleted by this save must become Deleted before
@@ -87,12 +87,12 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
             config, Some (tantivy),
             &[ID::from ("L"), ID::from ("L")], false ) ?;
         assert! ( view . contains ("writeProtected"),
-          "duplicate-root content view should contain an indefinitive L:\n{}",
+          "duplicate-root content view should contain a write-protected L:\n{}",
           view );
         views_state . open_views . register_view (
           &graph . load_full (),
           ViewUri::ContentView (
-            "collat-del-indefinitive-L" . into ()), vf, &pids ); }
+            "collat-del-write-protected-L" . into ()), vf, &pids ); }
 
       // A second view of L alone; register it, then save it with L
       // marked for deletion.
@@ -116,17 +116,17 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       assert! ( response . errors . is_empty (),
         "deleting L must not error, even with L visible in P's open view; got {:?}\ncollateral stream: {:?}",
         response . errors, msgs );
-      let indefinitive_update : &String = msgs . iter ()
+      let write_protected_update : &String = msgs . iter ()
         . find ( |msg| msg . contains ("response-type collateral-view")
-                       && msg . contains ("collat-del-indefinitive-L") )
-        . expect ("indefinitive collateral view should be rerendered");
+                       && msg . contains ("collat-del-write-protected-L") )
+        . expect ("write-protected collateral view should be rerendered");
       assert_eq! (
-        indefinitive_update . matches ("(deleted (id L)") . count (), 2,
-        "both the definitive and indefinitive images must become DeletedNode: {}",
-        indefinitive_update );
+        write_protected_update . matches ("(deleted (id L)") . count (), 2,
+        "both the definitive and write-protected images must become DeletedNode: {}",
+        write_protected_update );
       Ok (( )) } )) }
 
-/// TODO/more.org, "Warn the user when they make dead links": a saved
+/// TODO/more.org, "Warn the user when they make dangling links": a saved
 /// title/body linking to an id that is neither in the graph nor
 /// created by the same save earns a nonfatal warning; a live link
 /// earns none. (Reuses this file's fixtures: X exists, L's title
@@ -145,11 +145,11 @@ fn dead_links_warn_on_save
         buffer_to_validated_saveplan (
           buffer, config, None )  ?;
       assert! ( warnings . iter () . any ( |w|
-          w . contains ("Dead link")
+          w . contains ("Dangling link")
           && w . contains ("does-not-exist") ),
         "a link to a nonexistent id must warn: {:?}", warnings );
       assert! ( ! warnings . iter () . any ( |w|
-          w . contains ("Dead link")
+          w . contains ("Dangling link")
           && w . contains ("id X") ),
         "a live link must not warn: {:?}", warnings );
       Ok (( )) } )) }

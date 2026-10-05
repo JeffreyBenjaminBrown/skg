@@ -21,8 +21,8 @@ arc):
 
 - the relations 'subscribes', 'hides_from_its_subscriptions',
   'overrides_view_of' ('schema.tql'), persisted across FS/Rust/TypeDB;
-- all eight PartnerCols, including the writable 'subscribeeCol' (writes
-  'subscribes_to' via 'subscribeeCol_members') and 'overriddenCol'
+- all eight PartnerFolders, including the writable 'subscribeeFolder' (writes
+  'subscribes_to' via 'subscribeeCol_members') and 'overriddenFolder'
   (writes 'overrides_view_of' via the 'SetOverrides' intent,
   'local_instruction_collection/traverse.rs:307-323');
 - override substitution with the round-trip 'overridesHere' marker
@@ -53,7 +53,7 @@ N; from then on the user sees and edits C wherever N appeared, and N's
 later additions show up under C as unintegrated subscribed content.
 
 forks.md's auto-generated "<skg< unintegrated subscribed content >>"
-branch is NOT built: the 'subscribeeCol' already shows exactly that, once
+branch is NOT built: the 'subscribeeFolder' already shows exactly that, once
 the prerequisite below lands.
 
 * Prerequisite: a subscribee-as-such shows only the unintegrated remainder
@@ -173,7 +173,7 @@ at the confirmation buffer stage.
 'owned_ancestor_sources_for_foreign_vognodes' (server/from_text/fork.rs)
 walks rootward and keeps going PAST foreign vognode ancestors until it
 hits an owned one. Per your rule it must instead STOP at the nearest
-VOGNODE ancestor (skipping only scaffolds like cols) and use that
+VOGNODE ancestor (skipping only non-vognodes like folders) and use that
 ancestor's source ONLY if it is owned; if that nearest vognode ancestor
 is foreign, infer nothing and leave the source for the user to set.
 
@@ -227,7 +227,7 @@ rewritten to C) needs dedicated coverage. The inactive-source fallback
 already coded; it needs a test, not new logic.
 
 * Collateral-rerender staleness fix (in scope)
-A definitive subscriber's 'subscribeeCol' is not refreshed from the graph
+A definitive subscriber's 'subscribeeFolder' is not refreshed from the graph
 during a collateral rerender. 'reconcile_subscribee_col_children'
 ('update_buffer/reconcile/subscribee_col.rs') computes the fresh goal
 list but only applies it under 'if parent_is_writeProtected ||
@@ -255,7 +255,7 @@ and then restate the idea in plainer English.
   "unintegrated subscribed content". (Forking uses this: a clone
   subscribes to its original. So once forks exist, subscribers become
   common.)
-- *subscribeeCol* :: an auto-generated scaffold listed under a
+- *subscribeeFolder* :: an auto-generated non-vognode listed under a
   subscriber, holding the nodes it subscribes to. skg GENERATES it
   from the graph; the user does not type its membership. Its
   "children" are those subscribed nodes.
@@ -279,10 +279,10 @@ and then restate the idea in plainer English.
 Picture the same subscriber node S open in two windows, A and B.
 In window A you change S's subscriptions and save. skg updates the
 graph and re-renders A correctly. Window B is collateral -- it should
-also refresh so ITS subscribeeCol shows the new subscription list. But
+also refresh so ITS subscribeeFolder shows the new subscription list. But
 it doesn't: B keeps the OLD list on screen. That stale list is the bug.
 
-Why: the function that refreshes a subscribeeCol
+Why: the function that refreshes a subscribeeFolder
 ('reconcile_subscribee_col_children') always computes the fresh list
 from the graph, but only APPLIES it when the guard holds -- i.e. when
 the subscriber is read-only (write-protected) OR we're in git-diff mode.
@@ -300,7 +300,7 @@ view of the same node" (do refresh).
 
 The fix: thread one extra boolean down the render path meaning "this
 is a COLLATERAL re-render, not the view that was just saved." When it's
-true, refresh the subscribeeCol from the graph regardless of
+true, refresh the subscribeeFolder from the graph regardless of
 definitiveness. The saved view stays byte-stable; collateral views
 catch up. (Forks make this matter because forking mints subscribers,
 so you'll often have a subscriber open in two windows -- exactly when
@@ -314,22 +314,22 @@ If so we will have to correct them too.
 Whether there are source diffs is irrelevant; rerender should always
 correct containers to match what their owning vognode (in this case,
 the subscriber) actually shows on disk. Whether the owning vognode
-is write-protected is also (for the children of Col scaffolds,
+is write-protected is also (for the children of Folder non-vognodes,
 not for the owning vognode itself) irrelevant -- the collection
 says "these things are in this relationship to the ownig vognode",
 and it should not lie.
 ****** Claude : you're right. Removed the gate entirely; details:
 - *Other collections?* No. The GENERIC reconciler
-  'reconcile_partnerCol_children' -- which serves the OTHER writable col
-  ('overriddenCol') and every inbound read-only col (subscriberCol,
-  overriderCol, hiderCol, hiddenCol) -- already reconciles
+  'reconcile_partnerCol_children' -- which serves the OTHER writable folder
+  ('overriddenFolder') and every inbound read-only folder (subscriberFolder,
+  overriderFolder, hiderFolder, hiddenFolder) -- already reconciles
   UNCONDITIONALLY: it never looks at definitiveness or diff mode; it
-  only consults 'policy()' to choose member ORDER. So 'subscribeeCol'
+  only consults 'policy()' to choose member ORDER. So 'subscribeeFolder'
   was the ONLY collection with this gate. Nothing else to correct.
-- *Why subscribeeCol alone had it:* it has its own reconciler
+- *Why subscribeeFolder alone had it:* it has its own reconciler
   ('reconcile_subscribee_col_children', separate because its members are
   subscribees-as-such with special content + a trailing
-  HiddenOutsideOfSubscribeeCol), and that reconciler carried a stale
+  HiddenOutsideOfSubscribeeFolder), and that reconciler carried a stale
   gate the generic one never had. 'subscribeecol-maybe-todo.org' had
   already flagged it as "suspicious" and asked for a focused test before
   changing it.
@@ -337,14 +337,14 @@ and it should not lie.
   collateral views. Safe even there: reconciliation runs strictly AFTER
   extraction and the graph update, so by the time it runs the graph
   already holds the subscriptions the user just saved; reconciling
-  reproduces them rather than clobbering them (exactly how overriddenCol
+  reproduces them rather than clobbering them (exactly how overriddenFolder
   already behaves in the saved view). The whole view/save/override/diff
   test surface (139 tests) passes with the gate gone, including
   idempotence and the save round-trip.
 - *The focused test the note asked for:*
   'tests/collateral_subscribee_staleness.rs' -- two views of a
   DEFINITIVE subscriber S; drop a subscription in one and save; assert
-  the other view's subscribeeCol refreshes. Verified to FAIL under the
+  the other view's subscribeeFolder refreshes. Verified to FAIL under the
   old gate and pass now.
 Marked DONE since it landed cleanly; reopen if you disagree.
 * Types and helpers to add
@@ -396,7 +396,7 @@ with an owned source and a 'user_owns_it=false' foreign source).
 - confirmation flow: a foreign edit returns the fork-confirmation buffer;
   approve commits, decline aborts the whole save and leaves the buffer;
 - round-trip: save C, close, reopen a view that contained N; assert C is
-  drawn in N's place with '(overridesHere N)' and C's subscribeeCol shows
+  drawn in N's place with '(overridesHere N)' and C's subscribeeFolder shows
   N with empty unintegrated content; add a child to N on disk + rebuild,
   assert it appears as unintegrated;
 - monogamy: forking an already-forked N is rejected with the naming
@@ -409,7 +409,7 @@ with an owned source and a 'user_owns_it=false' foreign source).
   drive the edit -> confirm -> fork flow end to end.
 
 * Docs to update (at execution time)
-- 'docs/forks.md': rewrite to the subscribeeCol mechanism and the fork
+- 'docs/forks.md': rewrite to the subscribeeFolder mechanism and the fork
   gesture; drop the "<skg<...>>" branch; replace the provisional examples;
 - 'docs/sharing-model.md': document the fork gesture and that a
   subscribee-as-such shows only what the subscriber neither hides nor
@@ -517,10 +517,10 @@ the child "your parent overrides you" I see three options:
       intent exactly; cost is a viewStats field + a heralds.rs leaf + the
       conformance test + emitting it on the child. Small but real.
   (b) Reuse the existing OVERRIDDEN-AS-SUCH idiom: put the child under an
-      'overriddenCol' of the clone-to-be (C -> overriddenCol -> N). N is
+      'overriddenFolder' of the clone-to-be (C -> overriddenFolder -> N). N is
       then a normal overridden-as-such and AUTO-gets the 'gS' herald
       (since C also subscribes to N). No new herald, but THREE levels
-      (a col scaffold between), not the two you asked for.
+      (a folder between), not the two you asked for.
   (c) No herald: rely on the two-level shape + the buffer's preamble
       ("each top entry is a clone you'll create; its child is the
       original it forks"). Simplest; least explicit.

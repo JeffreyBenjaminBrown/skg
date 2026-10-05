@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Integration test for repo cycling in the metadata edit buffer.
-# Verifies that S-left / S-right cycle through owned repos only.
+# Integration test for skgrepo cycling in the metadata edit buffer.
+# Verifies that S-left / S-right cycle through owned skgrepos only.
 
 set -e
 

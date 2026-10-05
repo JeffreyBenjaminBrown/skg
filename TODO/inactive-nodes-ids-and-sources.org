@@ -8,7 +8,7 @@
    My first pass cited "the inactive node's collected_id is contributed
    to its parent's saved contains" as a load-bearing use of the id.
    Jeff's model is that an inactive node emits NO save intention for its
-   parent (or, in a col, for whichever ancestor claims the list). He is
+   parent (or, in a folder, for whichever ancestor claims the list). He is
    right, and that citation described a DRIFT, not a justification:
    'content_members' and 'subscribeeCol_members' (traverse.rs) do push
    retained inactive ids into the container's SetContains / owner's
@@ -55,7 +55,7 @@
    - Collateral re-render: pids_from_viewforest (types/views_state.rs:178)
      registers an inactive vognode's *id* so a save elsewhere that
      touches that node re-renders this view.
-   - View completion / col reconciliation: complete_relevant_children
+   - View completion / folder reconciliation: complete_relevant_children
      keys its goal list on the id (reconcile/content.rs:471,
      child_data.rs:156, reconcile/mod.rs retained_inactive_children),
      and ContentReality::Inactive materializes a disk member by id.

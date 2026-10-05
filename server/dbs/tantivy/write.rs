@@ -5,7 +5,7 @@
 
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::dbs::tantivy::background_writer::lock_tantivy_writes;
-use crate::types::misc::{ID, RepoName, TantivyIndex};
+use crate::types::misc::{ID, SkgRepoName, TantivyIndex};
 use crate::types::nodes::complete::{Flag, flag_is_true};
 use crate::types::nodes::tantivy::GraphnodeInTantivy;
 use crate::types::links::replace_each_link_with_its_label;
@@ -45,22 +45,22 @@ pub fn delete_nodes_from_index<'a, I>(
 ) -> Result<(), Box<dyn Error>>
 where I: Iterator<Item = &'a GraphnodeInTantivy>, {
   for node in nodes_iter {
-    { let primary_id : &ID = &node . pid;
+    { let primary_skgid : &ID = &node . pid;
       writer . delete_term (
         Term::from_field_text( tantivy_index . id_field,
-                               primary_id . as_str() ) ); }}
+                               primary_skgid . as_str() ) ); }}
   Ok (( )) }
 
-pub fn delete_nodes_by_id_from_index<'a, I>(
+pub fn delete_nodes_by_skgid_from_index<'a, I>(
   ids_iter: I,
   writer: &mut IndexWriter,
   tantivy_index: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>>
 where I: Iterator<Item = &'a ID>, {
-  for id in ids_iter {
+  for skgid in ids_iter {
     writer . delete_term (
       Term::from_field_text( tantivy_index . id_field,
-                             id . as_str() ) ); }
+                             skgid . as_str() ) ); }
   Ok (( )) }
 
 pub fn add_documents_to_tantivy_writer<'a, I> (
@@ -87,12 +87,12 @@ fn create_documents_from_node (
   context_types : &HashMap<ID, String>,
 ) -> Result < Vec < TantivyDocument >,
               Box < dyn Error >> {
-  let primary_id : &ID = &node . pid;
+  let primary_skgid : &ID = &node . pid;
   let context_origin_type : &str =
-    context_types . get (primary_id)
+    context_types . get (primary_skgid)
     . map ( |s| s . as_str () ) . unwrap_or ("");
   let had_id : &str =
-    if node . misc . contains (
+    if node . flags . contains (
       &Flag::Had_ID_Before_Import )
     { "true" } else { "false" };
   // Only the primary-title doc carries the body.
@@ -104,18 +104,18 @@ fn create_documents_from_node (
       |b| replace_each_link_with_its_label (b) );
   let mut documents: Vec<TantivyDocument> =
     Vec::new();
-  let mut titles_and_aliases: Vec<(String, RepoName)> =
+  let mut titles_and_aliases: Vec<(String, SkgRepoName)> =
     // Each entry with the REPO its document will carry: the home
     // for the title, the alias's own privacy LEVEL for an alias --
     // so restricted search filtering excludes private aliases of
     // public nodes (dbs-and-search, 5_plan.org).
     vec![ ( node . title . clone(),
-            node . home_repo . clone() ) ];
+            node . home_skgrepo . clone() ) ];
   titles_and_aliases . extend (
     node . aliases . or_default () . iter ()
     . map ( |a| ( a . member . clone (),
                   a . relRepo . clone () )));
-  for (i, (title_or_alias, doc_repo)) in
+  for (i, (title_or_alias, doc_skgrepo)) in
     titles_and_aliases . iter() . enumerate()
   { let is_title : bool = i == 0;
     let is_title_str : &str =
@@ -129,7 +129,7 @@ fn create_documents_from_node (
     documents . push (
       doc!(
         tantivy_index . id_field =>
-          primary_id . as_str (),
+          primary_skgid . as_str (),
         tantivy_index . title_or_alias_field =>
           replace_each_link_with_its_label (
             title_or_alias ),
@@ -139,10 +139,10 @@ fn create_documents_from_node (
           if node . overPrivateText_telescope { "true" } else { "false" },
         tantivy_index . no_search_matching_field =>
           if flag_is_true (
-            &node . misc, Flag::NoSearchMatching )
+            &node . flags, Flag::NoSearchMatching )
           { "true" } else { "false" },
-        tantivy_index . repo_field =>
-          doc_repo . as_str(),
+        tantivy_index . skgrepo_field =>
+          doc_skgrepo . as_str(),
         tantivy_index . context_origin_type_field =>
           context_origin_type,
         tantivy_index . is_title_field =>

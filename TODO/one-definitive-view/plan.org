@@ -17,7 +17,7 @@ Consequence: the same node can be definitive in multiple buffers simultaneously,
 'OpenViews' ([[../../server/types/memory.rs][memory.rs]]) already tracks state across views:
 
 - ~views: HashMap<ViewUri, ViewState>~ — every open view's forest and PID set
-- ~pool: HashMap<ID, NodeComplete>~ — shared NodeComplete cache
+- ~pool: HashMap<ID, Graphnode>~ — shared Graphnode cache
 - ~root_ids: ManyToMany<ID, ViewUri>~ — maps root IDs to their view URIs (many-to-many)
 - 'views_containing(pid)' — returns all ViewUris whose forest contains a given PID
 - 'content_view_uri_for_root_id(id)' — returns the ViewUri where an ID is a root (used by 'skg-view' to jump to existing views instead of opening duplicates)
@@ -64,7 +64,7 @@ Suppose buffer A saves and contains ~(viewRequests definitiveView)~ for node X. 
 
 1. 'execute_definitive_view_request' runs for buffer A. It checks the global 'definitive_ids' registry: X -> ViewUri(B).
 
-2. We need to write-protect X in B's forest. B's forest is in 'conn_state.memory.views'. We extract it, mutate it, and reinsert it: call 'write-protect_content_subtree' on B's forest at the node where X is definitive. (To find that node, walk B's forest for the TrueNode with id == X and editability == Definitive.) Then reinsert B's forest.
+2. We need to write-protect X in B's forest. B's forest is in 'conn_state.memory.views'. We extract it, mutate it, and reinsert it: call 'write-protect_content_subtree' on B's forest at the node where X is definitive. (To find that node, walk B's forest for the ActiveVognode with id == X and editability == Definitive.) Then reinsert B's forest.
 
 3. Update the global registry: remove X -> ViewUri(B), insert X -> ViewUri(A).
 
@@ -73,7 +73,7 @@ Suppose buffer A saves and contains ~(viewRequests definitiveView)~ for node X. 
 5. Later in 'update_views_after_save', B is identified as a collateral view (because it contains X). B gets rerendered via the normal collateral pipeline. Its forest already reflects the write-protection from step 2, so the rerender produces a correct result with X shown write-protected.
 
 **** Elaboration on why a pre-pass is needed
-The problem: when buffer B is rerendered as a collateral view, 'rerender_view' creates a fresh 'DefinitiveMap'. Then 'make_writeProtected_if_repeat_then_extend_defmap' runs for each TrueNode during the preorder pass. But X only appears /once/ in buffer B. So the repeat-detection logic sees X for the first time, sees the defmap is empty, and happily marks X as definitive — undoing the write-protection we need.
+The problem: when buffer B is rerendered as a collateral view, 'rerender_view' creates a fresh 'DefinitiveMap'. Then 'make_writeProtected_if_repeat_then_extend_defmap' runs for each ActiveVognode during the preorder pass. But X only appears /once/ in buffer B. So the repeat-detection logic sees X for the first time, sees the defmap is empty, and happily marks X as definitive — undoing the write-protection we need.
 
 That's why we can't rely on the normal rerender to do the write-protection. We must explicitly patch B's forest /before/ the rerender, so that when 'make_writeProtected_if_repeat_then_extend_defmap' encounters X, it's already write-protected and stays that way.
 

@@ -18,7 +18,7 @@ function M.view_org_ancestry ()
   while current do
     table.insert(ancestry, 1, metadata.line_text(current))
     local level = metadata.outline_level(current)
-    current = metadata.parent_heading_line(current, level)
+    current = metadata.parent_headline_line(current, level)
   end
   local title = metadata.split_as_stars_metadata_title(
     metadata.line_text(line)).title

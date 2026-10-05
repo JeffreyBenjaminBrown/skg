@@ -382,7 +382,7 @@
      manipulation that can preserve or edit the atom. A client that cannot
      offer a gesture must at least round-trip the load-bearing metadata.
 
-   Tests belong at every boundary: Org render/parse round-trip, alias-col
+   Tests belong at every boundary: Org render/parse round-trip, alias-folder
    extraction, explicit beats sticky, no override preserves sticky, new
    alias defaults home, explicit more-private move, more-public refusal,
    foreign-source refusal, Emacs gesture, and a full save/reload round trip.
@@ -402,7 +402,7 @@
      the later-title/body warnings so they say whether a more-public title/body text
      won; do not claim "home's won" when the selected title/body text was itself
      below home.
-   - Add 'overPrivateText_telescope' to 'NodeComplete', 'NodeRust', and 'NodeTantivy'.
+   - Add 'overPrivateText_telescope' to 'Graphnode', 'NodeRust', and 'NodeTantivy'.
      New/buffer-authored nodes default false. 'NodeTypedb' deliberately
      omits the flag while receiving the same folded title, body, and graph
      data as today.
@@ -447,7 +447,7 @@
      aliases, or text diffs;
    - server and command-line Org export;
    - any remaining request found by tracing every use of 'title', 'body',
-     'NodeComplete', 'NodeRust', and stored Tantivy text to a
+     'Graphnode', 'NodeRust', and stored Tantivy text to a
      'TcpToClient' response or output file.
 
    Pure path, source-set, source-list, connection, and relSource
@@ -732,7 +732,7 @@
    loaded snapshot, use the same snapshot for release decisions, and put
    enough information in Tantivy to exclude overPrivateText documents before search.
 
-   Supplied here: put 'overPrivateText_telescope' directly on 'NodeComplete',
+   Supplied here: put 'overPrivateText_telescope' directly on 'Graphnode',
    'NodeRust', and 'NodeTantivy'; add one indexed and stored field to every
    Tantivy title/alias document; omit it from 'NodeTypedb'. That makes the
    classifier travel with the existing projections instead of creating a

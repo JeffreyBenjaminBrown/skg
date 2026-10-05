@@ -1,5 +1,5 @@
 -- Coverage for the rerender stream and its consumers (diff mode,
--- repo sets), plus the report-shaped requests (diff report, stage
+-- skgrepo sets), plus the report-shaped requests (diff report, stage
 -- moves, export). Mirrors tests/elisp/test-skg-diff-report.el's
 -- wiring cases and test-skg-warning-channel.el's rerender-done
 -- channel, end-to-end through the loopback fake server.

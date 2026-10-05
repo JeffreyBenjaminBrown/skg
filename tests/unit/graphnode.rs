@@ -1,16 +1,16 @@
 use super::{
-  Flag, Graphnode, empty_node_complete,
+  Flag, Graphnode, empty_graphnode,
   flag_is_true, set_flag};
 use crate::types::misc::ID;
 
-fn node_with_ids (
+fn node_with_skgids (
   pid : &str,
   extra_ids : &[&str],
 ) -> Graphnode {
-  let mut node : Graphnode = empty_node_complete ();
+  let mut node : Graphnode = empty_graphnode ();
   node . pid = ID::from (pid);
   node . extra_ids = extra_ids . iter ()
-    . map ( |id| ID::from (*id) )
+    . map ( |skgid| ID::from (*skgid) )
     . collect ();
   node
 }
@@ -18,29 +18,29 @@ fn node_with_ids (
 #[test]
 fn normalize_ids_treats_the_pid_as_first_and_keeps_first_extra_order () {
   let mut node : Graphnode =
-    node_with_ids ("P", &["B", "P", "A", "B", "C", "A"]);
-  node . normalize_ids ();
+    node_with_skgids ("P", &["B", "P", "A", "B", "C", "A"]);
+  node . normalize_skgids ();
   assert_eq! (
     node . extra_ids,
     vec![ID::from ("B"), ID::from ("A"), ID::from ("C")]);
 }
 
 #[test]
-fn normalize_ids_is_idempotent () {
+fn normalize_skgids_is_idempotent () {
   let mut node : Graphnode =
-    node_with_ids ("P", &["A", "A", "P", "B"]);
-  node . normalize_ids ();
+    node_with_skgids ("P", &["A", "A", "P", "B"]);
+  node . normalize_skgids ();
   let once : Vec<ID> = node . extra_ids . clone ();
-  node . normalize_ids ();
+  node . normalize_skgids ();
   assert_eq! (node . extra_ids, once);
 }
 
 #[test]
-fn normalize_ids_leaves_an_already_normal_list_alone () {
+fn normalize_skgids_leaves_an_already_normal_list_alone () {
   let mut node : Graphnode =
-    node_with_ids ("P", &["A", "B", "C"]);
+    node_with_skgids ("P", &["A", "B", "C"]);
   let before : Vec<ID> = node . extra_ids . clone ();
-  node . normalize_ids ();
+  node . normalize_skgids ();
   assert_eq! (node . extra_ids, before);
 }
 

@@ -1,5 +1,5 @@
 /// This file defines the pure traversal at the heart of local
-/// instruction collection (TODO/local-instruction-collection/3_plan.org).
+/// instruction collection (TODO/DONE/local-instruction-collection/3_plan.org).
 /// .
 /// The traversal is one recursive DFS preorder over the placed
 /// viewforest. Recursion is UNCONDITIONAL: every node's children are
@@ -7,15 +7,15 @@
 /// independent nodes anywhere. Only emission is conditional, on the
 /// pair (kind, context). Each visit reads the node and its direct
 /// children, nothing deeper, nothing upward; everything an
-/// intent emission needs from above arrives in its
+/// fieldIntent emission needs from above arrives in its
 /// 'LocalContext'.
 /// .
 /// The traversal ASSUMES that 'find_buffer_errors_for_saving' has
 /// passed. In particular it assumes that:
-/// - every vognode has a PID and a config-valid repo;
-/// - each ID has at most one definitive instance
+/// - every vognode has a PID and a config-valid skgrepo;
+/// - each ID has at most one editable instance
 ///   ('Multiple_Defining_Viewnodes');
-/// - same-ID instances have consistent toDelete values and repos;
+/// - same-ID instances have consistent toDelete values and skgrepos;
 /// - folder shapes are valid: each folder holds only the child kinds it
 ///   permits, each folder is unique among its siblings, content members
 ///   have distinct IDs per
@@ -29,14 +29,14 @@
 /// than erroring.
 /// .
 /// DEFINITION: a vognode is *save-eligible* iff it is Active,
-/// definitive, lacks a Delete edit request, and is not in
+/// editable, lacks a Delete edit request, and is not in
 /// subscribee-as-such position. (Its position may be anywhere else --
 /// including as a member of a write-protected folder, where it is
-/// save-eligible for itself but invisible to the folder's owner.)
+/// save-eligible for itself but invisible to the folder's recorder.)
 /// .
 /// DEFINITION: a vognode is *in subscribee-as-such position* iff it
-/// is an Active, affectsParent=Affected direct child of a SubscribeeFolder.
-/// A non-Affected child of a SubscribeeFolder is not a member of the
+/// is an Active, affectsParent=true direct child of a SubscribeeFolder.
+/// A non-member child of a SubscribeeFolder is not a member of the
 /// folder, hence not shown *as* a subscribee: it is an ordinary
 /// self-writer parked there.
 
@@ -45,9 +45,9 @@ use crate::from_text::local_instruction_collection::predicates::{
   active_child_counts_as_visible_content,
   member_counts_for_partnerFolder };
 use crate::from_text::local_instruction_collection::types::{
-  CollectedIntents, DefiningFolderOwner, LocalContext, NodeIntent_Local,
+  CollectedFieldIntents, DefiningFolderRecorder, LocalContext, FieldIntent,
   HiddenOutsideEdit, SubscribeeTextClaim, SubscribeeVisibility };
-use crate::types::misc::{ID, RepoName};
+use crate::types::misc::{ID, SkgRepoName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   NodeEditRequest, AffectsParent, Property, PropertyFolder, PartnerFolder, ActiveVognode, Viewnode,
@@ -58,42 +58,42 @@ use std::collections::HashSet;
 
 pub fn collect_instructions_locally (
   forest : &ViewForest,
-) -> Result<CollectedIntents, String> {
-  let mut collected : CollectedIntents =
-    CollectedIntents::new();
+) -> Result<CollectedFieldIntents, String> {
+  let mut collected : CollectedFieldIntents =
+    CollectedFieldIntents::new();
   for root in forest . roots() {
     visit (root, &LocalContext::TopLevel, &mut collected) ?; }
   Ok (collected) }
 
 fn visit (
-  node_ref : NodeRef<Viewnode>,
-  context  : &LocalContext,
-  collected : &mut CollectedIntents,
+  node_ref  : NodeRef<Viewnode>,
+  context   : &LocalContext,
+  collected : &mut CollectedFieldIntents,
 ) -> Result<(), String> {
   match &node_ref . value() . kind {
     ViewnodeKind::Vognode (Vognode::Active (t)) =>
       visit_active_vognode (node_ref, t, context, collected),
     ViewnodeKind::Vognode (Vognode::Inactive (_)) =>
       // An Inactive vognode is anonymous and emits nothing; its
-      // membership is owned by the disk weave, not extraction. With no
+      // membership is owned by disk supplementation, not extraction. With no
       // identity it owns no defining folder, so (like a DeadViewnode) any
       // folder found under it stays silent.
-      recurse_under_gnode (node_ref, None, None, collected),
+      recurse_under_vognode (node_ref, None, None, collected),
     ViewnodeKind::Vognode (Vognode::Phantom (p)) =>
-      recurse_under_gnode (
+      recurse_under_vognode (
         node_ref,
-        Some ( DefiningFolderOwner {
+        Some ( DefiningFolderRecorder {
           // Carrying the phantom's identity (write-protected, not
           // save-eligible) keeps a SubscribeeFolder found under a diff
           // phantom meaningful: its children stay in
           // subscribee-as-such position, so their title edits bounce
           // via text claims instead of silently becoming real edits.
-          id               : p . id() . clone(),
-          is_definitive    : false,
+          skgid               : p . skgid() . clone(),
+          is_editable    : false,
           is_saveEligible : false } ),
         None, collected),
     ViewnodeKind::DeadViewnode =>
-      recurse_under_gnode (node_ref, None, None, collected),
+      recurse_under_vognode (node_ref, None, None, collected),
     ViewnodeKind::BufferRoot =>
       // A BufferRoot is unreachable as a child, but the traversal
       // stays total anyway.
@@ -101,7 +101,7 @@ fn visit (
         node_ref, &LocalContext::TopLevel, collected),
     ViewnodeKind::PropertyFolder (PropertyFolder::Alias) =>
       visit_aliasFolder (node_ref, context, collected),
-    // The two arms below are exactly the FolderPolicy::WritableSet
+    // The two arms below are exactly the FolderPolicy::EditableSet
     // PartnerFolders; the catch-all PartnerFolder arm after them covers the
     // WriteProtectedSet and WriteProtectedFilter policies. If a new PartnerFolder is
     // added, 'PartnerFolder::policy' says which group it joins.
@@ -125,47 +125,47 @@ fn visit_active_vognode (
   node_ref  : NodeRef<Viewnode>,
   t         : &ActiveVognode,
   context   : &LocalContext,
-  collected : &mut CollectedIntents,
+  collected : &mut CollectedFieldIntents,
 ) -> Result<(), String> {
   let subscribee_as_such_context : Option<(&ID, bool)> =
     match context {
       LocalContext::SubscribeeAsSuchPosition {
-        subscriber, subscriber_is_definitive }
+        subscriber, subscriber_is_editable }
         if t . affectsParent == AffectsParent::True =>
-        Some (( subscriber, *subscriber_is_definitive )),
+        Some (( subscriber, *subscriber_is_editable )),
       _ => None };
-  let is_definitive : bool =
+  let is_editable : bool =
     ! t . is_writeProtected();
   let has_delete_request : bool =
     matches!( t . edit_request(),
               Some (&NodeEditRequest::Delete));
   let is_saveEligible : bool =
-    is_definitive
+    is_editable
     && ! has_delete_request
     && subscribee_as_such_context . is_none();
-  if is_definitive {
+  if is_editable {
     // Emission happens only inside this block, because an
     // write-protected vognode emits nothing.
     match subscribee_as_such_context {
-      Some (( subscriber, subscriber_is_definitive )) => {
-        collected . instructionMerge_intent (
-          t . id . clone(),
-          NodeIntent_Local::SubscribeeTextClaim (
+      Some (( subscriber, subscriber_is_editable )) => {
+        collected . instructionMerge_fieldIntent (
+          t . skgid . clone(),
+          FieldIntent::SubscribeeTextClaim (
             SubscribeeTextClaim {
               title : t . title . clone(),
               body  : t . body() . cloned() } )) ?;
-        if subscriber_is_definitive {
+        if subscriber_is_editable {
           // The at-most-one-writer-per-ID guard: only the
-          // SubscribeeFolder under the definitive instance of a
+          // SubscribeeFolder under the editable instance of a
           // subscriber may write its hide edits. The same subscriber
           // can recur write-protected elsewhere with its own
           // SubscribeeFolder; without this guard those could emit
           // contradictory hide edits for one ID.
-          collected . instructionMerge_intent (
+          collected . instructionMerge_fieldIntent (
             subscriber . clone(),
-            NodeIntent_Local::SubscribeeVisibility (
+            FieldIntent::SubscribeeVisibility (
               SubscribeeVisibility {
-                subscribee : t . id . clone(),
+                subscribee : t . skgid . clone(),
                 visible    : visible_content_members (node_ref) } )) ?; }
         // Delete and NodeMerge edit requests here are ignored: a
         // subscribee-as-such can affect only what its subscriber
@@ -173,71 +173,71 @@ fn visit_active_vognode (
       },
       None => {
         if has_delete_request {
-          collected . instructionMerge_intent (
-            t . id . clone(),
-            NodeIntent_Local::Delete {
-              repo : t . home_repo . clone() } ) ?;
+          collected . instructionMerge_fieldIntent (
+            t . skgid . clone(),
+            FieldIntent::Delete {
+              skgrepo : t . home_skgrepo . clone() } ) ?;
         } else {
-          collected . instructionMerge_intent (
-            t . id . clone(),
-            NodeIntent_Local::SetTitleAndBody {
-              repo : t . home_repo . clone(),
-              title  : t . title . clone(),
-              body   : t . body() . cloned() } ) ?;
-          collected . instructionMerge_intent (
-            t . id . clone(),
-            // This is always emitted, even if empty: a definitive
+          collected . instructionMerge_fieldIntent (
+            t . skgid . clone(),
+            FieldIntent::SetTitleAndBody {
+              skgrepo : t . home_skgrepo . clone(),
+              title   : t . title . clone(),
+              body    : t . body() . cloned() } ) ?;
+          collected . instructionMerge_fieldIntent (
+            t . skgid . clone(),
+            // This is always emitted, even if empty: an editable
             // node's content is always Specified.
-            NodeIntent_Local::SetContains (
+            FieldIntent::SetContains (
               content_members (node_ref) )) ?;
           if let Some (NodeEditRequest::NodeMerge (acquiree)) =
             t . edit_request()
-          { collected . instructionMerge_intent (
-              t . id . clone(),
-              NodeIntent_Local::NodeMerge {
+          { collected . instructionMerge_fieldIntent (
+              t . skgid . clone(),
+              FieldIntent::NodeMerge {
                 acquiree : acquiree . clone() } ) ?; }
           if let Some (NodeEditRequest::SetFlag { flag, value }) =
             t . edit_request()
-          { collected . instructionMerge_intent (
-              t . id . clone(),
-              NodeIntent_Local::SetFlag {
+          { collected . instructionMerge_fieldIntent (
+              t . skgid . clone(),
+              FieldIntent::SetFlag {
                 flag : *flag, value : *value } ) ?; }}},}}
-  recurse_under_gnode (
+  recurse_under_vognode (
     node_ref,
-    Some ( DefiningFolderOwner {
-      id               : t . id . clone(),
-      is_definitive,
+    Some ( DefiningFolderRecorder {
+      skgid               : t . skgid . clone(),
+      is_editable,
       is_saveEligible } ),
-    if is_saveEligible { Some (t . id . clone()) } else { None },
+    if is_saveEligible { Some (t . skgid . clone()) } else { None },
     collected) }
 
-/// This recurses into a gnode-ish node's children. Vognode-ish
+/// This recurses into a vognode's children. Vognode
 /// children get 'UnderVognode'; defining-folder children get
-/// 'UnderDefiningFolder', carrying the owner's identity (when it has
+/// 'UnderDefiningFolder', carrying the recorder's identity (when it has
 /// one); and write-protected folders and Properties get 'UnderWriteProtectedFolder'.
-fn recurse_under_gnode (
+fn recurse_under_vognode (
   node_ref            : NodeRef<Viewnode>,
-  owner               : Option<DefiningFolderOwner>,
-  parent_if_writeable : Option<ID>,
-  collected           : &mut CollectedIntents,
+  recorder            : Option<DefiningFolderRecorder>,
+  parent_if_editable  : Option<ID>,
+  collected           : &mut CollectedFieldIntents,
 ) -> Result<(), String> {
   for child in node_ref . children() {
     let child_context : LocalContext =
       match &child . value() . kind {
         ViewnodeKind::PropertyFolder (PropertyFolder::Alias)
           // The two PartnerFolders here are exactly the
-          // FolderPolicy::WritableSet ones; the write-protected policies fall
+          // FolderPolicy::EditableSet ones; the write-protected policies fall
           // to the UnderWriteProtectedFolder arm below.
           | ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)
           | ViewnodeKind::PartnerFolder (PartnerFolder::Overridden) =>
-          match &owner {
+          match &recorder {
             Some (o) =>
               LocalContext::UnderDefiningFolder (o . clone()),
             None =>
-              // The owner has no identity (it is a DeadViewnode), so
+              // The recorder has no identity (it is a DeadViewnode), so
               // the folder will stay silent.
               LocalContext::UnderVognode {
-                parent_if_writeable : None } },
+                parent_if_editable : None } },
         ViewnodeKind::PropertyFolder (
           PropertyFolder::ID | PropertyFolder::Flags { .. })
           | ViewnodeKind::Property (_)
@@ -245,14 +245,14 @@ fn recurse_under_gnode (
           LocalContext::UnderWriteProtectedFolder,
         _ =>
           LocalContext::UnderVognode {
-            parent_if_writeable : parent_if_writeable . clone() } };
+            parent_if_editable : parent_if_editable . clone() } };
     visit (child, &child_context, collected) ?; }
   Ok (( )) }
 
 fn recurse_with_uniform_context (
   node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
-  collected : &mut CollectedIntents,
+  collected : &mut CollectedFieldIntents,
 ) -> Result<(), String> {
   for child in node_ref . children() {
     visit (child, context, collected) ?; }
@@ -261,12 +261,12 @@ fn recurse_with_uniform_context (
 fn visit_aliasFolder (
   node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
-  collected : &mut CollectedIntents,
+  collected : &mut CollectedFieldIntents,
 ) -> Result<(), String> {
-  if let LocalContext::UnderDefiningFolder (owner) = context {
-    if owner . is_saveEligible {
-      let aliases : Vec<(String, Option<RepoName>)> = {
-        let mut aliases : Vec<(String, Option<RepoName>)> = Vec::new();
+  if let LocalContext::UnderDefiningFolder (recorder) = context {
+    if recorder . is_saveEligible {
+      let aliases : Vec<(String, Option<SkgRepoName>)> = {
+        let mut aliases : Vec<(String, Option<SkgRepoName>)> = Vec::new();
         let mut seen : HashSet<String> = HashSet::new ();
         for child in node_ref . children() {
           if let ViewnodeKind::Property (Property::Alias {
@@ -276,49 +276,49 @@ fn visit_aliasFolder (
               aliases . push (( text . clone (),
                                 relRepo_request . clone () )); }} }
         aliases };
-      // The MSV semantics are: an absent folder emits no intent, which
+      // The MSV semantics are: an absent folder emits no fieldIntent, which
       // lowers to Unspecified, while a present-but-empty folder emits
       // Specified(vec![]).
-      collected . instructionMerge_intent (
-        owner . id . clone(),
-        NodeIntent_Local::SetAliases (aliases) ) ?; }}
+      collected . instructionMerge_fieldIntent (
+        recorder . skgid . clone(),
+        FieldIntent::SetAliases (aliases) ) ?; }}
   recurse_with_uniform_context (
     node_ref, &LocalContext::UnderWriteProtectedFolder, collected) }
 
 fn visit_subscribee_folder (
   node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
-  collected : &mut CollectedIntents,
+  collected : &mut CollectedFieldIntents,
 ) -> Result<(), String> {
   match context {
-    LocalContext::UnderDefiningFolder (owner) => {
-      if owner . is_saveEligible {
-        collected . instructionMerge_intent (
-          owner . id . clone(),
-          NodeIntent_Local::SetSubscribesTo (
+    LocalContext::UnderDefiningFolder (recorder) => {
+      if recorder . is_saveEligible {
+        collected . instructionMerge_fieldIntent (
+          recorder . skgid . clone(),
+          FieldIntent::SetSubscribesTo (
             subscribeeFolder_members (node_ref) )) ?; }
       for child in node_ref . children() {
         let child_context : LocalContext =
           match &child . value() . kind {
             ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
               LocalContext::HiddenOutsidePosition {
-                subscriber      : owner . id . clone(),
-                is_saveEligible : owner . is_saveEligible },
+                subscriber      : recorder . skgid . clone(),
+                is_saveEligible : recorder . is_saveEligible },
             _ =>
-              // The subscriber's identity is passed even when the owner is
+              // The subscriber's identity is passed even when the recorder is
               // not save-eligible, because text claims outlive the
               // visibility guard.
               LocalContext::SubscribeeAsSuchPosition {
-                subscriber               : owner . id . clone(),
-                subscriber_is_definitive : owner . is_definitive }, };
+                subscriber               : recorder . skgid . clone(),
+                subscriber_is_editable : recorder . is_editable }, };
         visit (child, &child_context, collected) ?; }
       Ok (( )) },
     _ =>
-      // The folder has no identifiable owner. Validation precludes this
+      // The folder has no identifiable recorder. Validation precludes this
       // shape; the traversal stays total and silent.
       recurse_with_uniform_context (
         node_ref,
-        &LocalContext::UnderVognode { parent_if_writeable : None },
+        &LocalContext::UnderVognode { parent_if_editable : None },
         collected), }}
 
 /// Collect the explicitly submitted visible-outside subset.  This folder is a
@@ -327,7 +327,7 @@ fn visit_subscribee_folder (
 fn visit_hiddenOutside_folder (
   node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
-  collected : &mut CollectedIntents,
+  collected : &mut CollectedFieldIntents,
 ) -> Result<(), String> {
   if let LocalContext::HiddenOutsidePosition {
     subscriber, is_saveEligible } = context
@@ -340,15 +340,15 @@ fn visit_hiddenOutside_folder (
             if member_counts_for_partnerFolder (t) => {
               if t . relRepo_request . is_some () {
                 return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
-              members . push (t . id . clone ()); },
+              members . push (t . skgid . clone ()); },
           ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
             if unknown . relRepo_request . is_some () {
               return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
-            members . push (unknown . id . clone ()); },
+            members . push (unknown . skgid . clone ()); },
           _ => {}, }}
-      collected . instructionMerge_intent (
+      collected . instructionMerge_fieldIntent (
         subscriber . clone(),
-        NodeIntent_Local::HiddenOutsideEdit (HiddenOutsideEdit { members }) ) ?; }}
+        FieldIntent::HiddenOutsideEdit (HiddenOutsideEdit { members }) ) ?; }}
   recurse_with_uniform_context (
     node_ref, &LocalContext::UnderWriteProtectedFolder, collected)
 }
@@ -356,34 +356,34 @@ fn visit_hiddenOutside_folder (
 fn visit_overridden_folder (
   node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
-  collected : &mut CollectedIntents,
+  collected : &mut CollectedFieldIntents,
 ) -> Result<(), String> {
-  if let LocalContext::UnderDefiningFolder (owner) = context {
-    if owner . is_saveEligible {
-      collected . instructionMerge_intent (
-        owner . id . clone(),
-        NodeIntent_Local::SetOverrides (
+  if let LocalContext::UnderDefiningFolder (recorder) = context {
+    if recorder . is_saveEligible {
+      collected . instructionMerge_fieldIntent (
+        recorder . skgid . clone(),
+        FieldIntent::SetOverrides (
           partnerFolder_members (node_ref) )) ?; }}
   recurse_with_uniform_context (
     node_ref,
     // The members are self-writers; their membership was read just
     // above, and they form no one's contains.
-    &LocalContext::UnderVognode { parent_if_writeable : None },
+    &LocalContext::UnderVognode { parent_if_editable : None },
     collected) }
 
-/// As 'dedup_vector', but dedups members carrying repos by ID ALONE
-/// (first occurrence wins) rather than by the full (ID, repo) pair: a
-/// duplicate ID with a DIFFERENT repo request must still
+/// As 'dedup_vector', but dedups members carrying skgrepos by ID ALONE
+/// (first occurrence wins) rather than by the full (ID, skgrepo) pair: a
+/// duplicate ID with a DIFFERENT skgrepo request must still
 /// be silently dropped, matching the existing defining-folder dedup
 /// policy ("duplicate defining-folder members are silently deduped").
-fn dedup_members_by_id (
-  members : Vec<(ID, Option<RepoName>)>,
-) -> Vec<(ID, Option<RepoName>)> {
+fn dedup_members_by_skgid (
+  members : Vec<(ID, Option<SkgRepoName>)>,
+) -> Vec<(ID, Option<SkgRepoName>)> {
   let mut seen   : std::collections::HashSet<ID> = std::collections::HashSet::new();
-  let mut result : Vec<(ID, Option<RepoName>)> = Vec::new();
-  for (id, repo) in members {
-    if seen . insert (id . clone()) {
-      result . push ((id, repo)); }}
+  let mut result : Vec<(ID, Option<SkgRepoName>)> = Vec::new();
+  for (skgid, skgrepo) in members {
+    if seen . insert (skgid . clone()) {
+      result . push ((skgid, skgrepo)); }}
   result }
 
 /// This returns the members of an OverriddenFolder: its Active
@@ -391,62 +391,62 @@ fn dedup_members_by_id (
 /// deduplicated (by ID; see 'dedup_members_by_id'), preserving
 /// first-occurrence order. Each member is paired with its headline's
 /// explicit '(editRequest (relRepo NAME))' request, if any (see
-/// 'NodeIntent_Local').  (Inactive
+/// 'FieldIntent').  (Inactive
 /// children are NOT members here: the overriddenFolder omits inactive
 /// members from display, and the set-difference merge preserves
-/// them at save.  TODO/full-schema/9-2_repo-set-safety.org.)
+/// them at save.  TODO/DONE/full-schema/DONE/9-2_source-set-safety.org.)
 fn partnerFolder_members (
   node_ref : NodeRef<Viewnode>,
-) -> Vec<(ID, Option<RepoName>)> {
-  let mut members : Vec<(ID, Option<RepoName>)> = Vec::new();
+) -> Vec<(ID, Option<SkgRepoName>)> {
+  let mut members : Vec<(ID, Option<SkgRepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
       ViewnodeKind::Vognode (Vognode::Active (t))
         if member_counts_for_partnerFolder (t) =>
-          members . push ((t . id . clone(),
+          members . push ((t . skgid . clone(),
                            t . relRepo_request . clone())),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
-          members . push ((unknown . id . clone(),
+          members . push ((unknown . skgid . clone(),
                            unknown . relRepo_request . clone())),
       _ => {}, }}
-  dedup_members_by_id (members) }
+  dedup_members_by_skgid (members) }
 
 /// This returns the members of a SubscribeeFolder: its Active children
 /// that pass the PartnerFolder membership predicate, deduplicated (by
 /// ID; see 'dedup_members_by_id'). Like 'content_members' (and for
 /// the same reason), inactive children contribute nothing:
-/// 'subscribes_to' is order-meaningful, but the disk merge ('weave')
+/// 'subscribes_to' is order-meaningful, but disk supplementation (its weave)
 /// already restores invisible subscribees at their disk position, so
-/// a buffer-present inactive placeholder must not feed this list.
+/// a buffer-present inactive vognode must not feed this list.
 /// Each member is paired with its headline's explicit
 /// '(editRequest (relRepo NAME))' request, if any.
 #[allow(non_snake_case)]
 fn subscribeeFolder_members (
   node_ref : NodeRef<Viewnode>,
-) -> Vec<(ID, Option<RepoName>)> {
-  let mut members : Vec<(ID, Option<RepoName>)> = Vec::new();
+) -> Vec<(ID, Option<SkgRepoName>)> {
+  let mut members : Vec<(ID, Option<SkgRepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
       ViewnodeKind::Vognode (Vognode::Active (t))
         if member_counts_for_partnerFolder (t) =>
-          members . push ((t . id . clone(),
+          members . push ((t . skgid . clone(),
                            t . relRepo_request . clone())),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
-          members . push ((unknown . id . clone(),
+          members . push ((unknown . skgid . clone(),
                            unknown . relRepo_request . clone())),
       _ => {}, }}
-  dedup_members_by_id (members) }
+  dedup_members_by_skgid (members) }
 
-/// This returns the content of a definitive vognode: its Active
+/// This returns the content of an editable vognode: its Active
 /// children that pass the contains predicate. It does not dedup,
 /// because validation ('nonignored_children_have_distinct_ids')
 /// already guarantees distinctness. Each member is paired with its
 /// headline's explicit '(editRequest (relRepo NAME))' request, if any (see
-/// 'NodeIntent_Local').
+/// 'FieldIntent').
 ///
 /// Inactive children contribute NOTHING here: an inactive node emits
 /// no save intention for its container. Its membership in the
-/// container's contains is owned entirely by the disk merge
+/// container's contains is owned entirely by disk supplementation
 /// ('preserve_invisible_members' -> weave in from_text/weave.rs),
 /// which restores invisible members from disk at their disk position.
 /// Including a buffer-present inactive child would let a stale or
@@ -456,8 +456,8 @@ fn subscribeeFolder_members (
 /// nodes emit positional save intentions for their container".)
 fn content_members (
   node_ref : NodeRef<Viewnode>,
-) -> Vec<(ID, Option<RepoName>)> {
-  let mut contents : Vec<(ID, Option<RepoName>)> = Vec::new();
+) -> Vec<(ID, Option<SkgRepoName>)> {
+  let mut contents : Vec<(ID, Option<SkgRepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
       ViewnodeKind::Vognode (Vognode::Active (t)) => {
@@ -465,13 +465,13 @@ fn content_members (
           contents . push ((
             // collected_id, not id: a drawn overrider stands for
             // the original member it was drawn in place of.
-            t . collected_id (),
+            t . collected_skgid (),
             t . relRepo_request . clone() )); }},
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
-        // An Unknown is inert as a node, but its raw ID is load-bearing
+        // An Unknown is save-inert as a node, but its raw ID is load-bearing
         // membership data at a structured relationship position. `None` asks
-        // disk supplementation to keep an existing destination repo sticky.
-        contents . push (( unknown . id . clone(),
+        // disk supplementation to keep an existing destination skgrepo sticky.
+        contents . push (( unknown . skgid . clone(),
                            unknown . relRepo_request . clone() )),
       _ => {}, }}
   contents }
@@ -492,8 +492,8 @@ fn visible_content_members (
         visible . push (
           // collected_id: a drawn overrider presents the original,
           // so hide/unhide inference must speak of the original.
-          t . collected_id ()); },
+          t . collected_skgid ()); },
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
-        visible . push (unknown . id . clone ()),
+        visible . push (unknown . skgid . clone ()),
       _ => {}, }}
   visible }

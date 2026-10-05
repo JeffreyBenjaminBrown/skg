@@ -1,13 +1,13 @@
 //! The single release policy for textual data from overPrivateText telescopes.
 //!
-//! Folding may select a title or body below the node's home repo. That is
-//! safe to hold internally, but a restricted repo-set must not release it
+//! Folding may select a title or body below the node's home skgrepo. That is
+//! safe to hold internally, but a restricted skgrepo-set must not release it
 //! without an explicit approval for the affected PID. The reserved 'all'
-//! repo-set may release it, with a warning.
+//! skgrepo-set may release it, with a warning.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::protocol::TcpToClient;
-use crate::repo_sets::ActiveRepoSet;
+use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::misc::ID;
 use crate::types::sexp::extract_string_list_from_sexp;
 use crate::types::viewnode::{
@@ -38,7 +38,7 @@ pub enum SearchOverPrivateTextChoice {
 
 /// Parse the optional per-request approval list.
 ///
-/// Its wire shape is '(allow-overPrivateText-telescopes "PID" ...)'. Absence means no
+/// Its wire shape is '(approved-overPrivateText-pids "PID" ...)'. Absence means no
 /// approval. A malformed list is also treated as no approval: malformed
 /// authority must fail closed, and the resulting challenge is actionable.
 pub fn approved_pids_from_request (
@@ -47,7 +47,7 @@ pub fn approved_pids_from_request (
   sexp::parse (request) . ok ()
     . and_then ( |parsed|
       extract_string_list_from_sexp (
-        &parsed, "allow-overPrivateText-telescopes" ) . ok () )
+        &parsed, "approved-overPrivateText-pids" ) . ok () )
     . unwrap_or_default ()
     . into_iter ()
     . map (ID)
@@ -89,7 +89,7 @@ pub fn search_challenge_response () -> String {
 /// extra ID cannot evade the telescope-coarse policy.
 pub fn decide (
   operation      : &str,
-  active         : &ActiveRepoSet,
+  active         : &ActiveSkgRepoSet,
   candidate_pids : &[ID],
   graph          : &InRustGraph,
   approved_pids  : &HashSet<ID>,
@@ -101,10 +101,10 @@ pub fn decide (
 }
 
 /// Apply the shared policy when a caller has classified overPrivateTextness from a
-/// repo other than the live graph, such as deleted-node diff data.
+/// skgrepo other than the live graph, such as deleted-node diff data.
 pub fn decide_for_overPrivateText_pids (
   operation     : &str,
-  active        : &ActiveRepoSet,
+  active        : &ActiveSkgRepoSet,
   mut overPrivateText_pids : Vec<ID>,
   approved_pids : &HashSet<ID>,
 ) -> TextReleaseDecision {
@@ -148,30 +148,30 @@ pub fn challenge_response (
   ] ) . to_string () )
 }
 
-/// Replace overPrivateText active nodes with text-free inactive placeholders. Search
-/// exclusion uses this after enrichment so ancestry and override grafting
+/// Replace overPrivateText active nodes with text-free inactive vognodes. Search
+/// exclusion uses this after enrichment so role-tree and override grafting
 /// cannot broaden the choice made before the Tantivy query.
 pub fn exclude_overPrivateText_nodes_from_viewforest (
   viewforest : &mut Tree<Viewnode>,
   graph      : &InRustGraph,
 ) {
-  let node_ids : Vec<NodeId> =
+  let treeids : Vec<NodeId> =
     viewforest . root () . descendants ()
     . map ( |node| node . id () )
     . collect ();
-  for node_id in node_ids {
+  for treeid in treeids {
     let should_convert : bool =
-      viewforest . get (node_id)
+      viewforest . get (treeid)
       . and_then ( |node| match &node . value () . kind {
         ViewnodeKind::Vognode (Vognode::Active (active_node)) =>
-          graph . pid_of (&active_node . id),
+          graph . pid_of (&active_node . skgid),
         _ => None, } )
       . and_then ( |pid| graph . get (&pid) )
       . map ( |node| node . overPrivateText_telescope )
       . unwrap_or (false);
     if should_convert {
       let mut node : NodeMut<crate::types::viewnode::Viewnode> =
-        viewforest . get_mut (node_id) . unwrap ();
+        viewforest . get_mut (treeid) . unwrap ();
       node . value () . kind = mk_inactive_viewnode () . kind; }}
 }
 
@@ -238,25 +238,25 @@ fn pair (
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::repo_sets::RepoSetName;
-  use crate::types::misc::RepoName;
+  use crate::skgrepo_sets::SkgRepoSetName;
+  use crate::types::misc::SkgRepoName;
   use crate::types::nodes::complete::{
-    Graphnode, empty_node_complete};
+    Graphnode, empty_graphnode};
 
   fn graph_with_overPrivateText_node () -> InRustGraph {
-    let mut node : Graphnode = empty_node_complete ();
+    let mut node : Graphnode = empty_graphnode ();
     node . pid = ID::from ("overPrivateText-pid");
-    node . home_repo = RepoName::from ("home");
+    node . home_skgrepo = SkgRepoName::from ("home");
     node . title = "SECRET title" . to_string ();
     node . extra_ids = vec! [ID::from ("extra-id")];
     node . overPrivateText_telescope = true;
     InRustGraph::from_graphnodes (&[node])
   }
 
-  fn restricted () -> ActiveRepoSet {
-    ActiveRepoSet {
-      name    : RepoSetName::from ("public"),
-      repos : [RepoName::from ("home")]
+  fn restricted () -> ActiveSkgRepoSet {
+    ActiveSkgRepoSet {
+      name    : SkgRepoSetName::from ("public"),
+      skgrepos : [SkgRepoName::from ("home")]
                 . into_iter () . collect (),
     }
   }

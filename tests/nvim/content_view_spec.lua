@@ -22,7 +22,7 @@ describe('skg.content_view request strings', function ()
     assert.are.equal(
       '((request . "single root content view") (id . "abc")'
       .. ' (view-uri . "uri-1")'
-      .. ' (allow-overPrivateText-telescopes "pid-a" "pid-b"))\n',
+      .. ' (approved-overPrivateText-pids "pid-a" "pid-b"))\n',
       content_view.request_string(
         'abc', 'uri-1', { 'pid-a', 'pid-b' }))
   end)

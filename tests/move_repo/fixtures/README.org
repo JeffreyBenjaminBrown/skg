@@ -1,6 +1,6 @@
 * Fixtures for move_repo tests
 
-Three repos: public (owned), private (owned), foreign (write-protected).
+Three repos: public (owned), private (owned), foreign.
 
 ** Containment graph
 ```

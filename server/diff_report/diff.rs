@@ -4,7 +4,7 @@ use crate::diff_report::types::{
   TextDiffLine, ValueSetDiff};
 use crate::types::list::{Diff_Item, compute_interleaved_diff};
 use crate::types::misc::{
-  ID, MSV, RelPartner, RepoName, members_of, members_msv};
+  ID, MSV, RelPartner, SkgRepoName, members_of, members_msv};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::links::links_from_node;
 
@@ -32,12 +32,12 @@ fn diff_snapshots_with_pid_filter (
 ) -> DiffReport {
   let total_start : Instant =
     Instant::now ();
-  let duplicate_ids : Vec<DuplicateIDReport> =
+  let duplicate_skgids : Vec<DuplicateIDReport> =
     profile_step ("duplicate_id_reports", || {
-      duplicate_id_reports (&pair . before, &pair . after) });
+      duplicate_skgid_reports (&pair . before, &pair . after) });
   let ambiguous_pids : BTreeSet<ID> =
     profile_step ("ambiguous_pids", || {
-      ambiguous_pids (&pair . before, &pair . after, &duplicate_ids) });
+      ambiguous_pids (&pair . before, &pair . after, &duplicate_skgids) });
   let (before_facts, after_facts) : (GraphFacts, GraphFacts) =
     graph_facts_for_diff (pair, &ambiguous_pids, only_pids);
   let mut reports : Vec<NodeDiffReport> =
@@ -56,7 +56,7 @@ fn diff_snapshots_with_pid_filter (
     "diff_snapshots total",
     total_start . elapsed ());
   DiffReport {
-    duplicate_ids,
+    duplicate_ids : duplicate_skgids,
     titles,
     buckets,
     vanished : Vec::new () } // filled by the caller (mod.rs), which has the config
@@ -112,34 +112,34 @@ fn profile_log (
     duration . subsec_millis ()); }
 
 /// Shape-aware: an id present in several REPOS is the normal
-/// telescope shape (one pid, sections at several repos), not a
+/// telescope shape (one pid, sections at several skgrepos), not a
 /// duplicate. The VIOLATION is one id claimed by two distinct pids
 /// at either endpoint.
-fn duplicate_id_reports (
+fn duplicate_skgid_reports (
   before : &GraphSnapshot,
   after  : &GraphSnapshot,
 ) -> Vec<DuplicateIDReport> {
-  let ids : BTreeSet<ID> =
+  let skgids : BTreeSet<ID> =
     before . id_claims . keys () . cloned ()
       . chain (after . id_claims . keys () . cloned ())
       . collect ();
   let mut reports : Vec<DuplicateIDReport> =
     Vec::new ();
-  for id in ids {
+  for skgid in skgids {
     let claiming_pids = |snapshot : &GraphSnapshot| -> usize {
-      snapshot . id_claims . get (&id)
+      snapshot . id_claims . get (&skgid)
         . map ( |by_pid| by_pid . len () )
         . unwrap_or (0) };
     if claiming_pids (before) <= 1 && claiming_pids (after) <= 1 {
       continue; }
     let title : String =
-      title_for_id (&id, before, after);
+      title_for_skgid (&skgid, before, after);
     reports . push ( DuplicateIDReport {
-      id : id . clone (),
-      before_repos : before . repos_claiming_id (&id),
-      after_repos  : after . repos_claiming_id (&id),
+      skgid : skgid . clone (),
+      before_skgrepos : before . skgrepos_claiming_skgid (&skgid),
+      after_skgrepos  : after . skgrepos_claiming_skgid (&skgid),
       title }); }
-  reports . sort_by_key ( |r| r . id . clone () );
+  reports . sort_by_key ( |r| r . skgid . clone () );
   reports
 }
 
@@ -148,12 +148,12 @@ fn ambiguous_pids (
   after      : &GraphSnapshot,
   duplicates : &[DuplicateIDReport],
 ) -> BTreeSet<ID> {
-  let duplicate_ids : BTreeSet<ID> =
-    duplicates . iter () . map ( |d| d . id . clone () ) . collect ();
+  let duplicate_skgids : BTreeSet<ID> =
+    duplicates . iter () . map ( |d| d . skgid . clone () ) . collect ();
   before . nodes . values ()
     . chain (after . nodes . values ())
-    . filter ( |node| node . all_ids () . any ( |id|
-      duplicate_ids . contains (id) ) )
+    . filter ( |node| node . all_skgids () . any ( |skgid|
+      duplicate_skgids . contains (skgid) ) )
     . map ( |node| node . pid . clone () )
     . collect ()
 }
@@ -191,10 +191,10 @@ fn node_reports (
       text_diff_option (
         before_node . and_then ( |n| n . body . as_deref () ) . unwrap_or (""),
         after_node  . and_then ( |n| n . body . as_deref () ) . unwrap_or (""));
-    let repo_change : Option<(RepoName, RepoName)> =
+    let skgrepo_change : Option<(SkgRepoName, SkgRepoName)> =
       match (before_node, after_node) {
-        (Some (b), Some (a)) if b . home_repo != a . home_repo =>
-          Some ((b . home_repo . clone (), a . home_repo . clone ())),
+        (Some (b), Some (a)) if b . home_skgrepo != a . home_skgrepo =>
+          Some ((b . home_skgrepo . clone (), a . home_skgrepo . clone ())),
         _ => None, };
     let value_set_diffs : Vec<ValueSetDiff> =
       value_set_diffs (before_node, after_node);
@@ -206,7 +206,7 @@ fn node_reports (
       before_node . is_none () || after_node . is_none () ||
       title_diff . is_some () ||
       body_diff . is_some () ||
-      repo_change . is_some () ||
+      skgrepo_change . is_some () ||
       value_set_diffs . iter () . any ( |d|
         ! d . lost . is_empty () || ! d . gained . is_empty () ) ||
       relationship_diffs . iter () . any ( |d|
@@ -214,10 +214,10 @@ fn node_reports (
       contained_list_diff . is_some ();
     if ! changed {
       continue; }
-    let repo : RepoForReport =
+    let skgrepo : RepoForReport =
       match (before_node, after_node) {
-        (_, Some (a)) => RepoForReport::After (a . home_repo . clone ()),
-        (Some (b), None) => RepoForReport::Before (b . home_repo . clone ()),
+        (_, Some (a)) => RepoForReport::After (a . home_skgrepo . clone ()),
+        (Some (b), None) => RepoForReport::Before (b . home_skgrepo . clone ()),
         (None, None) => continue, };
     let title : String =
       after_node . or (before_node)
@@ -225,11 +225,11 @@ fn node_reports (
         . unwrap_or_else ( || "[missing title]" . to_string () );
     reports . push ( NodeDiffReport {
       pid,
-      home_repo: repo,
+      home_skgrepo: skgrepo,
       title,
       title_diff,
       body_diff,
-      repo_change,
+      skgrepo_change,
       value_set_diffs,
       relationship_diffs,
       contained_list_diff }); }
@@ -248,8 +248,8 @@ fn value_set_diffs (
     strings_from_msv (after_node  . map ( |n| &n . aliases ))));
   result . push ( string_set_diff (
     "extra_id",
-    ids_to_strings (before_node . map ( |n| n . extra_ids . as_slice () )),
-    ids_to_strings (after_node  . map ( |n| n . extra_ids . as_slice () ))));
+    skgids_to_strings (before_node . map ( |n| n . extra_ids . as_slice () )),
+    skgids_to_strings (after_node  . map ( |n| n . extra_ids . as_slice () ))));
   result . into_iter () . filter ( |d|
     ! d . lost . is_empty () || ! d . gained . is_empty () )
     . collect ()
@@ -262,12 +262,12 @@ fn strings_from_msv (
     . unwrap_or_default ()
 }
 
-fn ids_to_strings (
-  ids : Option<&[ID]>,
+fn skgids_to_strings (
+  skgids : Option<&[ID]>,
 ) -> Vec<String> {
-  ids . unwrap_or (&[])
+  skgids . unwrap_or (&[])
     . iter ()
-    . map ( |id| id . to_string () )
+    . map ( |skgid| skgid . to_string () )
     . collect ()
 }
 
@@ -344,9 +344,9 @@ fn contained_list_diff_for_pid (
   if ! changed {
     return None; }
   Some ( diff . into_iter () . map ( |item| match item {
-    Diff_Item::Unchanged (id) => ListDiffItem::Unchanged (id),
-    Diff_Item::Removed   (id) => ListDiffItem::Removed   (id),
-    Diff_Item::New       (id) => ListDiffItem::Added     (id), } )
+    Diff_Item::Unchanged (skgid) => ListDiffItem::Unchanged (skgid),
+    Diff_Item::Removed   (skgid) => ListDiffItem::Removed   (skgid),
+    Diff_Item::New       (skgid) => ListDiffItem::Added     (skgid), } )
     . collect () )
 }
 
@@ -392,12 +392,12 @@ fn bucket_reports (
       ! after_facts . role_sets ["container"] . contains_key (&report . pid);
     let pid_preserved_as_extra_id : bool =
       after_facts . extra_ids . contains (&report . pid);
-    let moved_across_repos : bool =
-      report . repo_change . is_some ();
+    let moved_across_skgrepos : bool =
+      report . skgrepo_change . is_some ();
     let bucket : &'static str =
       match (existed_before, exists_after, root_before, root_after) {
         (true, true, false, true) => "modified, newly orphaned",
-        (true, true, _,     _) if moved_across_repos =>
+        (true, true, _,     _) if moved_across_skgrepos =>
           "modified, moved across repos",
         (true, true, _,     _)    => "modified, other",
         (false, true, _,    true) => "new roots",
@@ -416,14 +416,14 @@ fn bucket_reports (
     . collect ()
 }
 
-fn title_for_id (
-  id     : &ID,
+fn title_for_skgid (
+  skgid  : &ID,
   before : &GraphSnapshot,
   after  : &GraphSnapshot,
 ) -> String {
   after . nodes . values ()
     . chain (before . nodes . values ())
-    . find ( |node| node . all_ids () . any ( |x| x == id ) )
+    . find ( |node| node . all_skgids () . any ( |x| x == skgid ) )
     . map ( |node| node . title . clone () )
     . unwrap_or_else ( || "[missing title]" . to_string () )
 }
@@ -435,11 +435,11 @@ fn title_map (
   let mut map : HashMap<ID, String> =
     HashMap::new ();
   for node in before . nodes . values () {
-    for id in node . all_ids () {
-      map . insert (id . clone (), node . title . clone ()); }}
+    for skgid in node . all_skgids () {
+      map . insert (skgid . clone (), node . title . clone ()); }}
   for node in after . nodes . values () {
-    for id in node . all_ids () {
-      map . insert (id . clone (), node . title . clone ()); }}
+    for skgid in node . all_skgids () {
+      map . insert (skgid . clone (), node . title . clone ()); }}
   map
 }
 
@@ -482,16 +482,16 @@ impl GraphFacts {
         continue; }
       facts . extra_ids . extend (
         node . extra_ids . iter ()
-          . filter ( |id| ! ambiguous_pids . contains (*id) )
+          . filter ( |skgid| ! ambiguous_pids . contains (*skgid) )
           . cloned () );
-      let contains_ids : Vec<ID> =
+      let contains_skgids : Vec<ID> =
         members_of (&node . contains);
       facts . contained_order . insert (
         node . pid . clone (),
-        contains_ids . iter ()
-          . filter ( |id| ! ambiguous_pids . contains (*id) )
+        contains_skgids . iter ()
+          . filter ( |skgid| ! ambiguous_pids . contains (*skgid) )
           . cloned () . collect () );
-      for contained in &contains_ids {
+      for contained in &contains_skgids {
         if ambiguous_pids . contains (contained) {
           continue; }
         facts . add_edge ("contained", &node . pid, contained);
@@ -512,10 +512,10 @@ impl GraphFacts {
         facts . add_edge ("overrider", &node . pid, overridden);
         facts . add_edge ("overridden", overridden, &node . pid); }
       for link in links_from_node (node) {
-        if ambiguous_pids . contains (&link . id) {
+        if ambiguous_pids . contains (&link . skgid) {
           continue; }
-        facts . add_edge ("mentioner", &node . pid, &link . id);
-        facts . add_edge ("mentioned", &link . id, &node . pid); } }
+        facts . add_edge ("mentioner", &node . pid, &link . skgid);
+        facts . add_edge ("mentioned", &link . skgid, &node . pid); } }
     facts
   }
 
@@ -541,23 +541,23 @@ impl GraphFacts {
         continue; }
       let track_outbound : bool =
         tracked_pids . contains (&node . pid);
-      let contains_ids : Vec<ID> =
+      let contains_skgids : Vec<ID> =
         members_of (&node . contains);
       if track_outbound {
         facts . extra_ids . extend (
           node . extra_ids . iter ()
-            . filter ( |id| ! ambiguous_pids . contains (*id) )
+            . filter ( |skgid| ! ambiguous_pids . contains (*skgid) )
             . cloned () );
         facts . contained_order . insert (
           node . pid . clone (),
-          contains_ids . iter ()
-            . filter ( |id| ! ambiguous_pids . contains (*id) )
+          contains_skgids . iter ()
+            . filter ( |skgid| ! ambiguous_pids . contains (*skgid) )
             . cloned () . collect () ); }
       facts . extra_ids . extend (
         node . extra_ids . iter ()
-          . filter ( |id| tracked_pids . contains (*id) )
+          . filter ( |skgid| tracked_pids . contains (*skgid) )
           . cloned () );
-      for contained in &contains_ids {
+      for contained in &contains_skgids {
         if ambiguous_pids . contains (contained) {
           continue; }
         if track_outbound {
@@ -586,12 +586,12 @@ impl GraphFacts {
         if tracked_pids . contains (overridden) {
           facts . add_edge ("overridden", overridden, &node . pid); }}
       for link in links_from_node (node) {
-        if ambiguous_pids . contains (&link . id) {
+        if ambiguous_pids . contains (&link . skgid) {
           continue; }
         if track_outbound {
-          facts . add_edge ("mentioner", &node . pid, &link . id); }
-        if tracked_pids . contains (&link . id) {
-          facts . add_edge ("mentioned", &link . id, &node . pid); }}}
+          facts . add_edge ("mentioner", &node . pid, &link . skgid); }
+        if tracked_pids . contains (&link . skgid) {
+          facts . add_edge ("mentioned", &link . skgid, &node . pid); }}}
     facts
   }
 

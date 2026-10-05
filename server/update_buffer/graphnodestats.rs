@@ -1,12 +1,12 @@
 use crate::dbs::in_rust_graph::stats::{
   fetch_all_graphnodestats,
-  fetch_all_graphnodestats_with_repo_set,
+  fetch_all_graphnodestats_with_skgrepo_set,
   graphnodestats_for_pid,
   AllGraphnodeStats};
-use crate::repo_sets::ActiveRepoSet;
-use crate::to_org::util::ids_that_can_have_graphnodestats;
+use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::to_org::util::skgids_that_can_have_graphnodestats;
 use crate::types::misc::{ID, SkgConfig};
-use crate::dbs::node_lookup::graphnode_rustFirst_by_pid_and_repo;
+use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{GraphnodeStats, Viewnode, ViewnodeKind};
@@ -29,11 +29,11 @@ pub fn set_graphnodestats_in_viewforest (
   set_graphnodestats_in_viewforest_inner (
     viewforest, graph, config, None ) }
 
-pub fn set_graphnodestats_in_viewforest_with_repo_set (
+pub fn set_graphnodestats_in_viewforest_with_skgrepo_set (
   viewforest : &mut Tree<Viewnode>,
   graph : &InRustGraph,
   config : &SkgConfig,
-  active : &ActiveRepoSet,
+  active : &ActiveSkgRepoSet,
 ) -> Result < ( HashMap < ID, HashSet < ID > >,
 	               HashMap < ID, HashSet < ID > > ),
 	             Box<dyn Error> > {
@@ -44,20 +44,20 @@ fn set_graphnodestats_in_viewforest_inner (
   viewforest : &mut Tree<Viewnode>,
   graph : &InRustGraph,
   config : &SkgConfig,
-  active : Option<&ActiveRepoSet>,
+  active : Option<&ActiveSkgRepoSet>,
 ) -> Result < ( HashMap < ID, HashSet < ID > >,
 	               HashMap < ID, HashSet < ID > > ),
 	             Box<dyn Error> > {
   let pids : Vec < ID > =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "ids_that_can_have_graphnodestats" ). entered();
-      ids_that_can_have_graphnodestats (viewforest) };
+      skgids_that_can_have_graphnodestats (viewforest) };
   let stats : AllGraphnodeStats =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "fetch_all_graphnodestats" ). entered();
       match active {
         Some (active) =>
-          fetch_all_graphnodestats_with_repo_set (
+          fetch_all_graphnodestats_with_skgrepo_set (
             graph, & pids, Some (active) ),
         None =>
           fetch_all_graphnodestats (
@@ -90,18 +90,18 @@ pub fn set_metadata_relationships_in_node_recursive (
       match & tree . get (treeid) . unwrap () . value () . kind {
         ViewnodeKind::Vognode (Vognode::Active (t))
           => { let graphnode_opt : Option<Graphnode>
-                 = graphnode_rustFirst_by_pid_and_repo (
-                     graph, config, &t . id, &t . home_repo
+                 = graphnode_graphFirst_by_pid_and_skgrepo (
+                     graph, config, &t . skgid, &t . home_skgrepo
                    ). ok ();
                Some ( graphnodestats_for_pid (
-                 &t . id, stats, graphnode_opt . as_ref () )) },
+                 &t . skgid, stats, graphnode_opt . as_ref () )) },
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
           => { let graphnode_opt : Option<Graphnode>
-                 = graphnode_rustFirst_by_pid_and_repo (
-                     graph, config, &p . id, &p . home_repo
+                 = graphnode_graphFirst_by_pid_and_skgrepo (
+                     graph, config, &p . skgid, &p . home_skgrepo
                    ). ok ();
                Some ( graphnodestats_for_pid (
-                 &p . id, stats, graphnode_opt . as_ref () )) },
+                 &p . skgid, stats, graphnode_opt . as_ref () )) },
         _ => None }};
   match new_stats {
     Some (gs) =>

@@ -11,8 +11,8 @@ pub fn find_related_nodes (
   output_role : &str,
 ) -> HashSet<ID> {
   let mut out : HashSet<ID> = HashSet::new ();
-  for input_id in nodes {
-    let pid : ID = match graph . pid_of (input_id) {
+  for input_skgid in nodes {
+    let pid : ID = match graph . pid_of (input_skgid) {
       Some (p) => p,
       None     => continue };
     // Forward fields on GraphnodeInRust mirror disk and thus carry raw IDs;
@@ -20,8 +20,8 @@ pub fn find_related_nodes (
     // would return after its has_extra_id lookups). Map the ID of
     // each second member (see docs/data-model_technical.org) to its corresponding PID
     // (which might be itself) before inserting.
-    let pid_or_self = |id: &ID| -> ID {
-      graph . pid_of (id) . unwrap_or_else ( || id . clone () ) };
+    let pid_or_self = |skgid: &ID| -> ID {
+      graph . pid_of (skgid) . unwrap_or_else ( || skgid . clone () ) };
     match (relation, input_role, output_role) {
       // Forward lookups: read the field on the node.
       ("contains",                     "container",   "contained")  =>

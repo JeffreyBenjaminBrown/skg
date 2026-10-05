@@ -1,5 +1,5 @@
 -- PURPOSE: Export Skg data to plain .org files. All the logic is in
--- Rust; this command picks a repo-set (client-side, with the
+-- Rust; this command picks a skgrepo-set (client-side, with the
 -- cycling selector) and an output dir, sends the request, and shows
 -- the server's report. The Lua port of elisp/skg-request-export-org.el.
 
@@ -56,7 +56,7 @@ function M.export_some_to_org (repo_set, output_dir, approved_pids)
     sexpr.pair(sexpr.symbol('repo-set'), repo_set),
     sexpr.pair(sexpr.symbol('output-dir'), output_dir) }
   if approved_pids and #approved_pids > 0 then
-    local approval = { sexpr.symbol('allow-overPrivateText-telescopes') }
+    local approval = { sexpr.symbol('approved-overPrivateText-pids') }
     for _, pid in ipairs(approved_pids) do table.insert(approval, pid) end
     table.insert(request, approval) end
   client.send_string(sexpr.to_string(request) .. '\n')

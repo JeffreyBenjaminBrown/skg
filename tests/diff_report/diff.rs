@@ -2,21 +2,21 @@ use skg::diff_report::diff::diff_snapshots;
 use skg::diff_report::types::{
   DiffReport, GraphSnapshot, NodeBucket, NodeDiffReport, RelationshipDiff,
   SnapshotPair, ValueSetDiff};
-use skg::types::misc::{ID, MSV, RepoName, rel_partners_at_relRepo};
-use skg::types::nodes::complete::{Graphnode, empty_node_complete};
+use skg::types::misc::{ID, MSV, SkgRepoName, rel_partners_at_relRepo};
+use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 
 use std::collections::{BTreeSet, HashMap};
 
-fn id (
+fn skgid (
   s : &str,
 ) -> ID {
   ID::new (s)
 }
 
-fn repo (
+fn skgrepo (
   s : &str,
-) -> RepoName {
-  RepoName::from (s)
+) -> SkgRepoName {
+  SkgRepoName::from (s)
 }
 
 fn node (
@@ -25,14 +25,14 @@ fn node (
   contains : &[&str],
 ) -> Graphnode {
   let mut node : Graphnode =
-    empty_node_complete ();
-  node . pid = id (pid);
+    empty_graphnode ();
+  node . pid = skgid (pid);
   node . title = title . to_string ();
-  node . home_repo = repo ("main");
+  node . home_skgrepo = skgrepo ("main");
   node . contains =
     rel_partners_at_relRepo (
-      &node . home_repo,
-      contains . iter () . map ( |x| id (x) ) . collect () );
+      &node . home_skgrepo,
+      contains . iter () . map ( |x| skgid (x) ) . collect () );
   node
 }
 
@@ -42,12 +42,12 @@ fn snapshot (
   let mut snapshot : GraphSnapshot =
     GraphSnapshot::default ();
   for node in nodes {
-    for id in node . all_ids () {
-      snapshot . id_claims . entry (id . clone ())
+    for skgid in node . all_skgids () {
+      snapshot . id_claims . entry (skgid . clone ())
         . or_insert_with (std::collections::BTreeMap::new)
         . entry (node . pid . clone ())
         . or_insert_with (BTreeSet::new)
-        . insert (node . home_repo . clone ()); }
+        . insert (node . home_skgrepo . clone ()); }
     snapshot . nodes . insert (node . pid . clone (), node); }
   snapshot
 }
@@ -91,12 +91,12 @@ fn gained_container_affects_child () {
   let reports : HashMap<ID, &NodeDiffReport> =
     reports_by_pid (&report);
   let b_report : &NodeDiffReport =
-    reports . get (&id ("b")) . unwrap ();
+    reports . get (&skgid ("b")) . unwrap ();
   let container_diff : &RelationshipDiff =
     b_report . relationship_diffs . iter ()
       . find ( |diff| diff . role == "container" )
       . unwrap ();
-  assert_eq! (container_diff . gained, vec! [id ("a")]);
+  assert_eq! (container_diff . gained, vec! [skgid ("a")]);
   assert! (container_diff . lost . is_empty ());
   assert! (container_diff . unchanged . is_empty ());
 }
@@ -117,30 +117,30 @@ fn lost_container_reports_current_existing_containers () {
   let reports : HashMap<ID, &NodeDiffReport> =
     reports_by_pid (&report);
   let child_report : &NodeDiffReport =
-    reports . get (&id ("child")) . unwrap ();
+    reports . get (&skgid ("child")) . unwrap ();
   let container_diff : &RelationshipDiff =
     child_report . relationship_diffs . iter ()
       . find ( |diff| diff . role == "container" )
       . unwrap ();
-  assert_eq! (container_diff . lost, vec! [id ("old")]);
-  assert_eq! (container_diff . gained, vec! [id ("new")]);
-  assert_eq! (container_diff . unchanged, vec! [id ("stay")]);
+  assert_eq! (container_diff . lost, vec! [skgid ("old")]);
+  assert_eq! (container_diff . gained, vec! [skgid ("new")]);
+  assert_eq! (container_diff . unchanged, vec! [skgid ("stay")]);
 }
 
 #[test]
 fn backward_subscribee_reports_current_existing_related_nodes () {
   let mut old : Graphnode =
     node ("old", "Old", &[]);
-  old . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&old . home_repo, vec! [id ("target")]));
+  old . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&old . home_skgrepo, vec! [skgid ("target")]));
   let mut stay : Graphnode =
     node ("stay", "Stay", &[]);
-  stay . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&stay . home_repo, vec! [id ("target")]));
+  stay . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&stay . home_skgrepo, vec! [skgid ("target")]));
   let mut stay_after : Graphnode =
     node ("stay", "Stay", &[]);
-  stay_after . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&stay_after . home_repo, vec! [id ("target")]));
+  stay_after . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&stay_after . home_skgrepo, vec! [skgid ("target")]));
   let mut new : Graphnode =
     node ("new", "New", &[]);
-  new . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&new . home_repo, vec! [id ("target")]));
+  new . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&new . home_skgrepo, vec! [skgid ("target")]));
   let report : DiffReport =
     report_for (
       vec! [ old, stay, node ("target", "Target", &[]) ],
@@ -148,14 +148,14 @@ fn backward_subscribee_reports_current_existing_related_nodes () {
   let reports : HashMap<ID, &NodeDiffReport> =
     reports_by_pid (&report);
   let target_report : &NodeDiffReport =
-    reports . get (&id ("target")) . unwrap ();
+    reports . get (&skgid ("target")) . unwrap ();
   let subscribee_diff : &RelationshipDiff =
     target_report . relationship_diffs . iter ()
       . find ( |diff| diff . role == "subscribee" )
       . unwrap ();
-  assert_eq! (subscribee_diff . lost, vec! [id ("old")]);
-  assert_eq! (subscribee_diff . gained, vec! [id ("new")]);
-  assert_eq! (subscribee_diff . unchanged, vec! [id ("stay")]);
+  assert_eq! (subscribee_diff . lost, vec! [skgid ("old")]);
+  assert_eq! (subscribee_diff . gained, vec! [skgid ("new")]);
+  assert_eq! (subscribee_diff . unchanged, vec! [skgid ("stay")]);
 }
 
 #[test]
@@ -173,7 +173,7 @@ fn contained_order_change_gets_list_diff () {
   let reports : HashMap<ID, &NodeDiffReport> =
     reports_by_pid (&report);
   assert! (
-    reports . get (&id ("a")) . unwrap ()
+    reports . get (&skgid ("a")) . unwrap ()
       . contained_list_diff . is_some () );
 }
 
@@ -191,31 +191,31 @@ fn links_are_reported_in_both_directions () {
     report_for (before, after);
   let reports : HashMap<ID, &NodeDiffReport> =
     reports_by_pid (&report);
-  let a_repo : &RelationshipDiff =
-    reports . get (&id ("a")) . unwrap ()
+  let a_skgrepo : &RelationshipDiff =
+    reports . get (&skgid ("a")) . unwrap ()
       . relationship_diffs . iter ()
       . find ( |diff| diff . role == "mentioner" )
       . unwrap ();
   let b_dest : &RelationshipDiff =
-    reports . get (&id ("b")) . unwrap ()
+    reports . get (&skgid ("b")) . unwrap ()
       . relationship_diffs . iter ()
       . find ( |diff| diff . role == "mentioned" )
       . unwrap ();
-  assert_eq! (a_repo . gained, vec! [id ("b")]);
-  assert_eq! (b_dest . gained, vec! [id ("a")]);
+  assert_eq! (a_skgrepo . gained, vec! [skgid ("b")]);
+  assert_eq! (b_dest . gained, vec! [skgid ("a")]);
 }
 
 #[test]
-fn duplicate_ids_across_repos_are_omitted_from_node_buckets () {
+fn duplicate_skgids_across_skgrepos_are_omitted_from_node_buckets () {
   let before : Vec<Graphnode> =
     vec! [];
   let mut left : Graphnode =
     node ("a", "A left", &[]);
-  left . home_repo = repo ("left");
+  left . home_skgrepo = skgrepo ("left");
   let mut right : Graphnode =
     node ("b", "B right", &[]);
-  right . home_repo = repo ("right");
-  right . extra_ids = vec! [id ("a")];
+  right . home_skgrepo = skgrepo ("right");
+  right . extra_ids = vec! [skgid ("a")];
   let report : DiffReport =
     report_for (before, vec! [left, right]);
   assert_eq! (report . duplicate_ids . len (), 1);
@@ -230,12 +230,12 @@ fn telescope_shape_is_not_a_duplicate () {
   // (sections at two privacy levels), not a duplicate-ID violation.
   let mut telescope : Graphnode =
     node ("a", "A", &[]);
-  telescope . home_repo = repo ("public");
+  telescope . home_skgrepo = skgrepo ("public");
   let mut snap_after : GraphSnapshot =
     snapshot (vec! [telescope]);
-  snap_after . id_claims . get_mut (&id ("a")) . unwrap ()
-    . get_mut (&id ("a")) . unwrap ()
-    . insert (repo ("private"));
+  snap_after . id_claims . get_mut (&skgid ("a")) . unwrap ()
+    . get_mut (&skgid ("a")) . unwrap ()
+    . insert (skgrepo ("private"));
   let report : DiffReport =
     diff_snapshots (&SnapshotPair {
       before: snapshot (vec! []),
@@ -271,7 +271,7 @@ fn deleted_pid_preserved_as_extra_id_is_probably_merged () {
     vec! [ node ("old", "Old", &[]) ];
   let mut merged : Graphnode =
     node ("merged", "Merged", &[]);
-  merged . extra_ids = vec! [id ("old")];
+  merged . extra_ids = vec! [skgid ("old")];
   let report : DiffReport =
     report_for (before, vec! [merged]);
   let merge_bucket : &NodeBucket =
@@ -281,14 +281,14 @@ fn deleted_pid_preserved_as_extra_id_is_probably_merged () {
       . unwrap ();
   assert! (
     merge_bucket . nodes . iter ()
-      . any ( |node_report| node_report . pid == id ("old") ));
+      . any ( |node_report| node_report . pid == skgid ("old") ));
   let deleted_roots : &NodeBucket =
     report . buckets . iter ()
       . find ( |bucket| bucket . name == "deleted roots" )
       . unwrap ();
   assert! (
     deleted_roots . nodes . iter ()
-      . all ( |node_report| node_report . pid != id ("old") ));
+      . all ( |node_report| node_report . pid != skgid ("old") ));
 }
 
 #[test]
@@ -296,17 +296,17 @@ fn aliases_use_set_diff () {
   let mut before_node : Graphnode =
     node ("a", "A", &[]);
   before_node . aliases =
-    MSV::Specified (rel_partners_at_relRepo (&before_node . home_repo, vec! ["old".to_string ()]));
+    MSV::Specified (rel_partners_at_relRepo (&before_node . home_skgrepo, vec! ["old".to_string ()]));
   let mut after_node : Graphnode =
     node ("a", "A", &[]);
   after_node . aliases =
-    MSV::Specified (rel_partners_at_relRepo (&after_node . home_repo, vec! ["new".to_string ()]));
+    MSV::Specified (rel_partners_at_relRepo (&after_node . home_skgrepo, vec! ["new".to_string ()]));
   let report : DiffReport =
     report_for (vec! [before_node], vec! [after_node]);
   let reports : HashMap<ID, &NodeDiffReport> =
     reports_by_pid (&report);
   let alias_diff : &ValueSetDiff =
-    reports . get (&id ("a")) . unwrap ()
+    reports . get (&skgid ("a")) . unwrap ()
       . value_set_diffs . iter ()
       . find ( |diff| diff . name == "aliases" )
       . unwrap ();
@@ -318,27 +318,27 @@ fn aliases_use_set_diff () {
 fn repo_move_is_reported () {
   let mut before_node : Graphnode =
     node ("a", "A", &[]);
-  before_node . home_repo = repo ("left");
+  before_node . home_skgrepo = skgrepo ("left");
   let mut after_node : Graphnode =
     node ("a", "A", &[]);
-  after_node . home_repo = repo ("right");
+  after_node . home_skgrepo = skgrepo ("right");
   let report : DiffReport =
     report_for (vec! [before_node], vec! [after_node]);
   let reports : HashMap<ID, &NodeDiffReport> =
     reports_by_pid (&report);
   assert_eq! (
-    reports . get (&id ("a")) . unwrap () . repo_change,
-    Some ((repo ("left"), repo ("right"))) );
+    reports . get (&skgid ("a")) . unwrap () . skgrepo_change,
+    Some ((skgrepo ("left"), skgrepo ("right"))) );
 }
 
 #[test]
-fn repo_move_uses_its_own_bucket () {
+fn skgrepo_move_uses_its_own_bucket () {
   let mut before_node : Graphnode =
     node ("a", "A", &[]);
-  before_node . home_repo = repo ("left");
+  before_node . home_skgrepo = skgrepo ("left");
   let mut after_node : Graphnode =
     node ("a", "A", &[]);
-  after_node . home_repo = repo ("right");
+  after_node . home_skgrepo = skgrepo ("right");
   let report : DiffReport =
     report_for (vec! [before_node], vec! [after_node]);
   let move_bucket : &NodeBucket =
@@ -348,14 +348,14 @@ fn repo_move_uses_its_own_bucket () {
       . unwrap ();
   assert! (
     move_bucket . nodes . iter ()
-      . any ( |node_report| node_report . pid == id ("a") ));
+      . any ( |node_report| node_report . pid == skgid ("a") ));
   let modified_other : &NodeBucket =
     report . buckets . iter ()
       . find ( |bucket| bucket . name == "modified, other" )
       . unwrap ();
   assert! (
     modified_other . nodes . iter ()
-      . all ( |node_report| node_report . pid != id ("a") ));
+      . all ( |node_report| node_report . pid != skgid ("a") ));
 }
 
 #[test]
@@ -374,7 +374,7 @@ fn root_classification_detects_newly_orphaned_nodes () {
       . unwrap ();
   assert! (
     newly_orphaned . nodes . iter ()
-      . any ( |node_report| node_report . pid == id ("child") ));
+      . any ( |node_report| node_report . pid == skgid ("child") ));
 }
 
 #[test]
@@ -392,7 +392,7 @@ fn pure_contained_reorder_has_list_diff_without_set_diff () {
   let reports : HashMap<ID, &NodeDiffReport> =
     reports_by_pid (&report);
   let a_report : &NodeDiffReport =
-    reports . get (&id ("a")) . unwrap ();
+    reports . get (&skgid ("a")) . unwrap ();
   let contained_set_diff : Option<&RelationshipDiff> =
     a_report . relationship_diffs . iter ()
       . find ( |diff| diff . role == "contained" );

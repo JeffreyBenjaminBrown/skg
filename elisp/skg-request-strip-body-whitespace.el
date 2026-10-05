@@ -5,7 +5,7 @@
 (defun skg-strip-trailing-whitespace-from-bodies ()
   "Strip trailing whitespace from every line of every body,
 in every repo the user owns.
-Foreign repos are write-protected and left untouched.
+Foreign skgrepos are never written, so they are left untouched.
 Rewrites exactly the .skg files whose bodies change;
 the derived caches are refreshed to match."
   (interactive)

@@ -158,7 +158,7 @@ character."
           (overlay-put overlay 'skg-link-annotation t)
           (overlay-put overlay 'face
                        '(:inherit heralds-yucky-face :underline t))))
-      ;; A broken link's label is styled above and gets no suffix.
+      ;; A dangling link's label is styled above and gets no suffix.
       (when (and skg-link-annotations--repo-suffix-enabled
                  (not (eq kind 'missing)))
         (let* ((label (pcase kind

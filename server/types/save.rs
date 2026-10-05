@@ -1,4 +1,4 @@
-use super::misc::{ID, RepoName};
+use super::misc::{ID, SkgRepoName};
 use super::nodes::complete::Graphnode;
 use super::errors::{SaveError, BufferValidationError};
 
@@ -7,14 +7,14 @@ use super::errors::{SaveError, BufferValidationError};
 /// Types
 /////////////////
 
-/// When a user changes a node's repo,
+/// When a user changes a node's skgrepo,
 /// one of these is generated
-/// (in addition to the usual DefineNode).
+/// (in addition to the usual NodeInstruction).
 #[derive(Debug)]
-pub struct RepoMove {
-  pub pid        : ID,
-  pub old_repo : RepoName,
-  pub new_repo : RepoName,
+pub struct SkgRepoMove {
+  pub pid         : ID,
+  pub old_skgrepo : SkgRepoName,
+  pub new_skgrepo : SkgRepoName,
 }
 
 /// Defines what to do with a single node: save it or delete it.
@@ -26,39 +26,39 @@ pub struct RepoMove {
 /// two Saves and a Delete, neither of which it is reasonable
 /// to represent with a NodeMerge.)
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum DefineNode {
+pub enum NodeInstruction {
   // PITFALL: Save(SaveNode) might smell funny, but consider that
   // some functions and type fields require specifically a SaveNode,
-  // not a DefineNode.
+  // not a NodeInstruction.
   Save (SaveNode),
   Delete (DeleteNode),
 }
 
-/// A Save instruction.
+/// A Save nodeInstruction.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SaveNode(pub Graphnode);
 
-/// A Delete instruction.
+/// A Delete nodeInstruction.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct DeleteNode {
-  pub id: ID,
-  pub home_repo: RepoName,
+  pub skgid: ID,
+  pub home_skgrepo: SkgRepoName,
 }
 
 /// The whole plan a save applies to the graph, with no view attached: the
 /// graph-mutation step consumes only this. (Named 'SavePlan', not e.g.
-/// 'SaveInstructions', because the plan is whole -- a bare list of instructions
+/// 'SaveInstructions', because the plan is whole -- a bare list of nodeInstructions
 /// might not be.) The rerender step consumes the ViewForest -- returned
 /// alongside this as the other half of 'buffer_to_validated_saveplan's pair,
 /// not stored here -- plus this plan's PIDs, for collateral selection.
 /// (TODO/DONE/local-view-update/plan_v2.org §11.)
 #[derive(Debug)]
 pub struct SavePlan {
-  pub define_nodes       : Vec<DefineNode>,
+  pub node_instructions      : Vec<NodeInstruction>,
   pub nodeMerge_instructions : Vec<NodeMerge>,
-  pub repo_moves       : Vec<RepoMove>,
+  pub skgrepo_moves          : Vec<SkgRepoMove>,
   /// Forks detected this save: editing a foreign node N is read as a
-  /// request to clone it. Held SEPARATE from 'define_nodes' because a
+  /// request to clone it. Held SEPARATE from 'node_instructions' because a
   /// save carrying forks is gated on the user's confirmation -- the
   /// clones commit only on approval (see ForkSpec, the save handler's
   /// fork-confirmation stage). Empty for an ordinary save.
@@ -74,27 +74,27 @@ pub enum PostCommitNoticeCandidate {
   HiddenOutsideAdded { subscriber : ID, member : ID },
 }
 
-/// One fork: the user made a foreign node N (write-protected, in a repo
-/// they do not own) definitive and edited it; that edit is read as a
+/// One fork: the user made a foreign node N (write-protected, in a skgrepo
+/// they do not own) editable and edited it; that edit is read as a
 /// request to clone N. 'clone' is the new OWNED node C, built from the
-/// edited buffer node -- a fresh pid, an owned repo, the edited
+/// edited buffer node -- a fresh pid, an owned skgrepo, the edited
 /// title/body/contains, 'subscribes_to = [N]' and
 /// 'overrides_view_of = [N]', no hides. N itself is left untouched on
 /// disk (its foreign SaveNode is dropped). The 'original_*' fields name
 /// N, for the monogamy pre-check and the confirmation buffer's display.
 #[derive(Debug, Clone)]
 pub struct ForkSpec {
-  pub clone           : SaveNode,
-  pub original_id     : ID,
-  pub original_title  : String,
-  pub original_repo : RepoName,
-  /// True iff the clone's repo was SPECIFIED by the user (in the
-  /// confirmation buffer, or via explicit repos on N's new children
+  pub clone            : SaveNode,
+  pub original_skgid   : ID,
+  pub original_title   : String,
+  pub original_skgrepo : SkgRepoName,
+  /// True iff the clone's skgrepo was SPECIFIED by the user (in the
+  /// confirmation buffer, or via explicit skgrepos on N's new children
   /// in the saved metadata), as opposed to inferred or defaulted. A
-  /// confirmed repo renders as settled in the confirmation buffer;
+  /// confirmed skgrepo renders as settled in the confirmation buffer;
   /// an unconfirmed one renders as the PICK-A-REPO placeholder plus
   /// a suggestion, and the client asks before approving.
-  pub repo_confirmed : bool,
+  pub skgrepo_confirmed : bool,
 }
 
 /// When an 'acquiree' merges into an 'acquirer',
@@ -166,160 +166,160 @@ fn format_buffer_validation_error (
     BufferValidationError::Body_of_NonVognode(title, kind) => {
       format!("{} node has a body (not allowed):\n- Title: {}\n",
               kind, title) },
-    BufferValidationError::IDFolder_Edited(owner, buffer_ids, real_ids) => {
-      let fmt_ids = |ids : &Vec<ID>| -> String {
-        ids . iter() . map(|i| i . 0 . as_str())
+    BufferValidationError::IDFolder_Edited(recorder, buffer_skgids, real_skgids) => {
+      let fmt_skgids = |skgids : &Vec<ID>| -> String {
+        skgids . iter() . map(|i| i . 0 . as_str())
           . collect::<Vec<&str>>() . join(", ") };
-      if real_ids . is_empty() {
+      if real_skgids . is_empty() {
         format!("Node {} is not in the graph, so it cannot carry an idFolder:\n- ids claimed by the buffer: {}\n- IDs cannot be created through the buffer. To edit a node's ID list, edit its .skg file directly.\n",
-                owner . 0, fmt_ids(buffer_ids))
+                recorder . 0, fmt_skgids(buffer_skgids))
       } else {
         format!("The idFolder under node {} was edited; saving would not honor that, so the save was aborted:\n- ids claimed by the buffer: {}\n- the node's real ids: {}\n- Reordering is fine, but IDs cannot be added, removed or edited through the buffer. To edit a node's ID list, edit its .skg file directly.\n",
-                owner . 0, fmt_ids(buffer_ids), fmt_ids(real_ids)) }},
+                recorder . 0, fmt_skgids(buffer_skgids), fmt_skgids(real_skgids)) }},
     BufferValidationError::OverridesHere_Mismatch(carrier, original, effective) => {
-      let fmt_opt = |id : &Option<ID>| -> String {
-        id . as_ref () . map ( |i| i . 0 . clone () )
+      let fmt_opt = |skgid : &Option<ID>| -> String {
+        skgid . as_ref () . map ( |i| i . 0 . clone () )
           . unwrap_or_else ( || "<none>" . to_string () ) };
       format!("Invalid (overridesHere ...) marker; saving it would rewrite a contains list, so the save was aborted:\n- the node carrying the marker: {}\n- the original the marker claims it stands for: {}\n- what the server would draw in place of that original: {}\n- The marker looks hand-edited or stale. Re-render the view (close and reopen, or C-c g RET) and retry.\n",
               fmt_opt (carrier), original . 0, fmt_opt (effective)) },
-    BufferValidationError::Multiple_Defining_Viewnodes (id) => {
+    BufferValidationError::Multiple_Defining_Viewnodes (skgid) => {
       format!("ID has multiple defining containers:\n- ID: {}\n",
-              id . 0) },
-    BufferValidationError::AmbiguousDeletion (id) => {
+              skgid . 0) },
+    BufferValidationError::AmbiguousDeletion (skgid) => {
       format!("ID has ambiguous deletion instructions:\n- ID: {}\n",
-              id . 0) },
-    BufferValidationError::DuplicatedContent (id) => {
+              skgid . 0) },
+    BufferValidationError::DuplicatedContent (skgid) => {
       format!("Node has multiple Content children with the same ID:\n- ID: {}\n",
-              id . 0) },
-    BufferValidationError::InconsistentRepos(id, repos) => {
-      let repo_list: Vec<String> =
-        repos . iter() . map(|s| s . 0 . clone()) . collect();
-      format!( "Multiple viewnodes with ID {} have inconsistent repos:\n- Repos: {:?}\n- All instances of the same ID must have the same repo.\n",
-              id . 0, repo_list) },
-    BufferValidationError::ModifiedForeignNode(id, repo) => {
-      format!("Cannot modify node from foreign (write-protected) repo:\n- ID: {}\n- Repo: {}\n- Foreign repos can only be viewed, not modified.\n",
-              id . 0, repo) },
-    BufferValidationError::CreatedForeignNode(id, repo) => {
-      format!("Cannot create node in foreign (write-protected) repo:\n- ID: {}\n- Repo: {}\n- Foreign repos can only be viewed, not modified.\n",
-              id . 0, repo) },
-    BufferValidationError::CannotMoveToOrFromForeignRepo(id, disk_repo, buffer_repo) => {
-      format!("Cannot move node between repos:\n- ID: {}\n- Repo on disk: {}\n- Repo from buffer: {}\n- One or both repos are foreign (write-protected).\n",
-              id . 0, disk_repo, buffer_repo) },
-    BufferValidationError::CannotMoveAndMergeSimultaneously(id) => {
+              skgid . 0) },
+    BufferValidationError::InconsistentSkgRepos(skgid, skgrepos) => {
+      let skgrepo_list: Vec<String> =
+        skgrepos . iter() . map(|s| s . 0 . clone()) . collect();
+      format!( "Multiple viewnodes with ID {} have inconsistent repos:\n- Repos: {:?}\n- All occurrences of the same ID must have the same repo.\n",
+              skgid . 0, skgrepo_list) },
+    BufferValidationError::ModifiedForeignNode(skgid, skgrepo) => {
+      format!("Cannot modify node from foreign repo:\n- ID: {}\n- Repo: {}\n- Foreign repos can only be viewed, not modified.\n",
+              skgid . 0, skgrepo) },
+    BufferValidationError::CreatedForeignNode(skgid, skgrepo) => {
+      format!("Cannot create node in foreign repo:\n- ID: {}\n- Repo: {}\n- Foreign repos can only be viewed, not modified.\n",
+              skgid . 0, skgrepo) },
+    BufferValidationError::CannotMoveToOrFromForeignSkgRepo(skgid, disk_skgrepo, buffer_skgrepo) => {
+      format!("Cannot move node between repos:\n- ID: {}\n- Repo on disk: {}\n- Repo from buffer: {}\n- One or both repos are foreign.\n",
+              skgid . 0, disk_skgrepo, buffer_skgrepo) },
+    BufferValidationError::CannotMoveAndMergeSimultaneously(skgid) => {
       format!("Cannot move and merge a node simultaneously:\n- ID: {}\n- Please save the move and merge in separate operations.\n",
-              id . 0) },
-    BufferValidationError::RepoNotInConfig(id, repo) => {
+              skgid . 0) },
+    BufferValidationError::SkgRepoNotInConfig(skgid, skgrepo) => {
       format!("Node references a repo that does not exist in config:\n- ID: {}\n- Repo: {}\n- Please check your config file and ensure this repo is defined.\n",
-              id . 0, repo) },
-    BufferValidationError::ForkRepoUnresolved(id) => {
+              skgid . 0, skgrepo) },
+    BufferValidationError::ForkSkgRepoUnresolved(skgid) => {
       format!("Cannot fork a foreign node -- no owned repo for the clone:\n- Foreign node: {}\n- It has no owned ancestor in the view to inherit a repo from.\n- Set the clone's repo in the fork-confirmation buffer (C-c s s), then approve.\n",
-              id . 0) },
+              skgid . 0) },
     BufferValidationError::ForkAlreadyExists(original, existing) => {
-      format!("Cannot fork a node you have already forked:\n- Foreign node: {}\n- Your existing clone: {}\n- A node may have at most one user-owned override. Edit the existing clone instead.\n",
+      format!("Cannot fork a node you have already forked:\n- Foreign node: {}\n- Your existing clone: {}\n- A node may have at most one owned override. Edit the existing clone instead.\n",
               original . 0, existing . 0) },
-    BufferValidationError::ForkRepoInactive(id, repo) => {
+    BufferValidationError::ForkSkgRepoInactive(skgid, skgrepo) => {
       format!("Cannot fork into an inactive repo:\n- Foreign node: {}\n- Clone's resolved repo: {}\n- That repo is not in the active repo-set. Activate it first; an invisible clone is never created silently.\n",
-              id . 0, repo) },
-    BufferValidationError::ForkRepoNotOwned(id, repo) => {
+              skgid . 0, skgrepo) },
+    BufferValidationError::ForkSkgRepoNotOwned(skgid, skgrepo) => {
       format!("Cannot fork into a repo you do not own:\n- Foreign node: {}\n- Clone's chosen repo: {}\n- Pick an owned repo for the clone (C-c s s in the confirmation buffer).\n",
-              id . 0, repo) },
-    BufferValidationError::ForkRequestOnUnknownNode(id) => {
+              skgid . 0, skgrepo) },
+    BufferValidationError::ForkRequestOnUnknownNode(skgid) => {
       format!("Cannot fork an unsaved node:\n- Node: {}\n- It is not in the graph. Only a saved node can be forked; save it first, then fork.\n",
-              id . 0) },
-    BufferValidationError::ForkRequestMultiple(id) => {
+              skgid . 0) },
+    BufferValidationError::ForkRequestMultiple(skgid) => {
       format!("Multiple fork requests for the same node:\n- Node: {}\n- At most one fork request per node is allowed.\n",
-              id . 0) },
+              skgid . 0) },
     BufferValidationError::OverrideInvariantViolation(msg) => {
       format!("{}\n", msg) },
-    BufferValidationError::DefinitiveRequestOnDefinitiveNode (id) => {
+    BufferValidationError::DefinitiveRequestOnEditableNode (skgid) => {
       format!("Definitive view request on a node that is already definitive:\n- ID: {}\n- The node already shows its content; no expansion needed.\n",
-              id . 0) },
-    BufferValidationError::DefinitiveRequestOnNodeWithContentChildren (id) => {
+              skgid . 0) },
+    BufferValidationError::DefinitiveRequestOnNodeWithContentChildren (skgid) => {
       format!("Definitive view request on a node with content children:\n- ID: {}\n- The expansion would clobber those children.\n- Save without the request first, then delete children and retry.\n",
-              id . 0) },
-    BufferValidationError::MultipleDefinitiveRequestsForSameId (id) => {
+              skgid . 0) },
+    BufferValidationError::MultipleDefinitiveRequestsForSameId (skgid) => {
       format!("Multiple definitive view requests for the same ID:\n- ID: {}\n- At most one definitive view request per ID is allowed.\n",
-              id . 0) },
-    BufferValidationError::EmptyTitle(id) => {
+              skgid . 0) },
+    BufferValidationError::EmptyTitle(skgid) => {
       format!("Node has an empty title:\n- ID: {}\n- Every definitive node must have a non-empty title.\n",
-              id . 0) },
-    BufferValidationError::LocalStructureViolation(msg, id) => {
+              skgid . 0) },
+    BufferValidationError::LocalStructureViolation(msg, skgid) => {
       format!("Local structure violation:\n- ID: {}\n- {}\n",
-              id . 0, msg) },
-    BufferValidationError::EditRequestOnWriteProtectedOccurrence (id) => {
+              skgid . 0, msg) },
+    BufferValidationError::EditRequestOnWriteProtectedOccurrence (skgid) => {
       format!("Edit request on a write-protected (possibly a phantom) node:\n- ID: {}\n- Write-protected nodes cannot carry write instructions.\n- To delete or merge this node, visit a definitive view of it first (C-c g RET).\n",
-              id . 0) },
+              skgid . 0) },
     BufferValidationError::EditedWriteProtectedOccurrence {
-      id, title, changes } => {
+      skgid, title, changes } => {
       format!("Edited write-protected occurrence:\n- ID: {}\n- Title: {}\n- Changes: {}\n- This occurrence is write-protected; no changes were saved.\n- Re-render, then edit a definitive occurrence instead.\n",
-              id . 0, title, changes . join ("; ")) },
+              skgid . 0, title, changes . join ("; ")) },
     BufferValidationError::FlagsSurfaceEdited {
-      owner_id, owner_title, changes } => {
-      format!("Edited server-owned flags surface:\n- Owner ID: {}\n- Owner title: {}\n- Changes: {}\n- No changes were saved. Use skg-set-flag-search-matching for noSearchMatching. HadId and WasOverloaded are provenance and have no setter.\n",
-              owner_id . 0, owner_title, changes . join ("; ")) },
-    BufferValidationError::FlagEditOnForeignNode (id, repo) => {
+      recorder_skgid, recorder_title, changes } => {
+      format!("Edited server-owned flags surface:\n- Recorder ID: {}\n- Recorder title: {}\n- Changes: {}\n- No changes were saved. Use skg-set-flag-search-matching for noSearchMatching. HadId and WasOverloaded are provenance and have no setter.\n",
+              recorder_skgid . 0, recorder_title, changes . join ("; ")) },
+    BufferValidationError::FlagEditOnForeignNode (skgid, skgrepo) => {
       format!("Cannot change a flag on a foreign node:\n- ID: {}\n- Repo: {}\n- Flag changes never create an implicit fork. Visit an owned node instead.\n",
-              id . 0, repo) },
-    BufferValidationError::FlagEditOnUnknownNode (id) => {
+              skgid . 0, skgrepo) },
+    BufferValidationError::FlagEditOnUnknownNode (skgid) => {
       format!("Cannot change a flag on an unsaved or unknown node:\n- ID: {}\n- Save the node first, then run the flag setter.\n",
-              id . 0) },
+              skgid . 0) },
     BufferValidationError::Other (msg) => {
       format!("{}\n", msg) }, }}
 
-impl DefineNode {
+impl NodeInstruction {
   pub fn is_delete (&self) -> bool {
-    matches!(self, DefineNode::Delete (_))
+    matches!(self, NodeInstruction::Delete (_))
   }
 
   pub fn is_save (&self) -> bool {
-    matches!(self, DefineNode::Save (_))
+    matches!(self, NodeInstruction::Save (_))
   }
 
-  /// Split a slice of DefineNodes into (deletes, saves),
+  /// Split a slice of NodeInstructions into (deletes, saves),
   /// cloning each item.
   pub fn partition_save_and_delete (
-    node_defs : &[DefineNode]
+    node_defs : &[NodeInstruction]
   ) -> ( Vec<DeleteNode>, Vec<SaveNode> ) {
     use itertools::{Itertools, Either};
     node_defs . iter () . cloned () . partition_map (
       |instr| match instr {
-        DefineNode::Delete (d) => Either::Left (d),
-        DefineNode::Save (s)   => Either::Right (s) } )
+        NodeInstruction::Delete (d) => Either::Left (d),
+        NodeInstruction::Save (s)   => Either::Right (s) } )
   }
 }
 
-impl From<SaveNode> for DefineNode {
+impl From<SaveNode> for NodeInstruction {
   fn from(save: SaveNode) -> Self {
-    DefineNode::Save (save)
+    NodeInstruction::Save (save)
   }
 }
 
-impl From<DeleteNode> for DefineNode {
+impl From<DeleteNode> for NodeInstruction {
   fn from(del: DeleteNode) -> Self {
-    DefineNode::Delete (del)
+    NodeInstruction::Delete (del)
   }
 }
 
 impl NodeMerge {
   pub fn to_vec (
     &self
-  ) -> Vec<DefineNode> {
+  ) -> Vec<NodeInstruction> {
     vec![
       self . acquiree_text_preserver . clone() . into(),
       self . updated_acquirer . clone() . into(),
       self . acquiree_to_delete . clone() . into(),
     ] }
 
-  pub fn acquirer_id (
+  pub fn acquirer_skgid (
     &self
   ) -> &ID {
     &self . updated_acquirer . 0 . pid
   }
 
-  pub fn acquiree_id (
+  pub fn acquiree_skgid (
     &self
   ) -> &ID {
-    &self . acquiree_to_delete . id
+    &self . acquiree_to_delete . skgid
   }
 
   /// Extracts the three targets from a NodeMerge:
@@ -328,9 +328,9 @@ impl NodeMerge {
   /// - acquiree_to_delete -> (&ID, &RepoName)
   pub fn targets_from_nodeMerge (
     &self
-  ) -> (&Graphnode, &Graphnode, (&ID, &RepoName)) {
+  ) -> (&Graphnode, &Graphnode, (&ID, &SkgRepoName)) {
     ( &self . acquiree_text_preserver . 0,
       &self . updated_acquirer . 0,
-      (&self . acquiree_to_delete . id, &self . acquiree_to_delete . home_repo) )
+      (&self . acquiree_to_delete . skgid, &self . acquiree_to_delete . home_skgrepo) )
   }
 }

@@ -10,9 +10,9 @@ use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::types::viewnode::Viewnode;
 use skg::types::misc::SkgConfig;
-use skg::types::misc::RepoName;
+use skg::types::misc::SkgRepoName;
 use skg::types::misc::TantivyIndex;
-use skg::types::git::RepoDiff;
+use skg::types::git::SkgRepoDiff;
 
 use ego_tree::{Tree, NodeId};
 
@@ -43,7 +43,7 @@ async fn test_reconcile_alias_folder_children_logic (
 
 ) -> Result < (), Box<dyn Error> > {
 
-  let repo_diffs : Option<HashMap<RepoName, RepoDiff>> = None;
+  let skgrepo_diffs : Option<HashMap<SkgRepoName, SkgRepoDiff>> = None;
   let graph = graph_handle_from_config (config)? . load_full ();
 
   // Create org text with three AliasFolder scenarios
@@ -68,17 +68,17 @@ async fn test_reconcile_alias_folder_children_logic (
     maybePlaced_to_placed_tree (unchecked_viewforest) ?;
 
   // Get the first "tree root" (node "a" and its children)
-  let tree_a_id : NodeId =
+  let tree_a_skgid : NodeId =
     viewforest . root () . first_child () . unwrap () . id ();
 
   // Find the NodeIds for the AliasFolder nodes
-  let aliasfolder_1_id : NodeId = {
-    viewforest . get (tree_a_id) . unwrap ()
+  let aliasfolder_1_skgid : NodeId = {
+    viewforest . get (tree_a_skgid) . unwrap ()
       . first_child () . unwrap ()
       . id ()
   };
-  let aliasfolder_2_id : NodeId = {
-    viewforest . get (tree_a_id) . unwrap ()
+  let aliasfolder_2_skgid : NodeId = {
+    viewforest . get (tree_a_skgid) . unwrap ()
       . first_child () . unwrap ()
       . next_sibling () . unwrap ()
       . id ()
@@ -86,11 +86,11 @@ async fn test_reconcile_alias_folder_children_logic (
 
   // Test 1: First AliasFolder should have b and c (deduped, valid only, disk order)
   reconcile_aliasFolder_children (
-    &mut viewforest, aliasfolder_1_id, &graph, &repo_diffs, config )?;
+    &mut viewforest, aliasfolder_1_skgid, &graph, &skgrepo_diffs, config )?;
 
   {
     let aliasfolder_1_ref =
-      viewforest . get (aliasfolder_1_id) . unwrap ();
+      viewforest . get (aliasfolder_1_skgid) . unwrap ();
     let children : Vec < String > =
       aliasfolder_1_ref . children () . map (
         |n| n . value() . title() . to_string() )
@@ -115,11 +115,11 @@ async fn test_reconcile_alias_folder_children_logic (
 
   // Test 2: Second AliasFolder should have b and c, and gain focus
   reconcile_aliasFolder_children (
-    &mut viewforest, aliasfolder_2_id, &graph, &repo_diffs, config )?;
+    &mut viewforest, aliasfolder_2_skgid, &graph, &skgrepo_diffs, config )?;
 
   {
     let aliasfolder_2_ref =
-      viewforest . get (aliasfolder_2_id) . unwrap ();
+      viewforest . get (aliasfolder_2_skgid) . unwrap ();
     let aliasfolder_2_new : &Viewnode = aliasfolder_2_ref . value ();
     let children : Vec < String > =
       aliasfolder_2_ref . children () . map (
@@ -149,7 +149,7 @@ async fn test_reconcile_alias_folder_children_logic (
 
   // Test 3: Third AliasFolder should error (no parent or parent has no ID)
   // Get the second "tree root" (AliasFolder 3)
-  let aliasfolder_3_id : NodeId =
+  let aliasfolder_3_skgid : NodeId =
     viewforest . root () . first_child () . unwrap ()
     . next_sibling () . unwrap ()
     . id ();
@@ -157,9 +157,9 @@ async fn test_reconcile_alias_folder_children_logic (
   let result : Result < (), Box<dyn Error> > =
     reconcile_aliasFolder_children (
       &mut viewforest,
-      aliasfolder_3_id,
+      aliasfolder_3_skgid,
       &graph,
-      &repo_diffs,
+      &skgrepo_diffs,
       config
     );
 
@@ -182,7 +182,7 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
 
 ) -> Result < (), Box<dyn Error> > {
 
-  let repo_diffs : Option<HashMap<RepoName, RepoDiff>> = None;
+  let skgrepo_diffs : Option<HashMap<SkgRepoName, SkgRepoDiff>> = None;
   let graph = graph_handle_from_config (config)? . load_full ();
 
   let org_text : &str =
@@ -201,17 +201,17 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
   let mut viewforest : Tree < Viewnode > =
     maybePlaced_to_placed_tree (unchecked_viewforest) ?;
 
-  let tree_root_id : NodeId =
+  let tree_root_skgid : NodeId =
     viewforest . root () . first_child () . unwrap () . id ();
 
   // Find the NodeIds for both AliasFolder nodes
-  let first_aliasfolder_id : NodeId = {
-    viewforest . get (tree_root_id) . unwrap ()
+  let first_aliasfolder_skgid : NodeId = {
+    viewforest . get (tree_root_skgid) . unwrap ()
       . first_child () . unwrap ()
       . id ()
   };
-  let second_aliasfolder_id : NodeId = {
-    viewforest . get (tree_root_id) . unwrap ()
+  let second_aliasfolder_skgid : NodeId = {
+    viewforest . get (tree_root_skgid) . unwrap ()
       . first_child () . unwrap ()
       . next_sibling () . unwrap ()
       . id ()
@@ -220,15 +220,15 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
   // Test first AliasFolder
   reconcile_aliasFolder_children (
     &mut viewforest,
-    first_aliasfolder_id,
+    first_aliasfolder_skgid,
     &graph,
-    &repo_diffs,
+    &skgrepo_diffs,
     config
   )?;
 
   {
     let aliasfolder_ref =
-      viewforest . get (first_aliasfolder_id) . unwrap ();
+      viewforest . get (first_aliasfolder_skgid) . unwrap ();
     let aliasfolder_vn : &Viewnode = aliasfolder_ref . value ();
     let children_new : Vec < &Viewnode > =
       aliasfolder_ref . children ()
@@ -267,15 +267,15 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
   // Test second AliasFolder
   reconcile_aliasFolder_children (
     &mut viewforest,
-    second_aliasfolder_id,
+    second_aliasfolder_skgid,
     &graph,
-    &repo_diffs,
+    &skgrepo_diffs,
     config
   )?;
 
   {
     let aliasfolder_ref =
-      viewforest . get (second_aliasfolder_id) . unwrap ();
+      viewforest . get (second_aliasfolder_skgid) . unwrap ();
     let children : Vec < &Viewnode > =
       aliasfolder_ref . children ()
       . map ( |n| n . value () )

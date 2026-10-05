@@ -1,11 +1,11 @@
-use crate::from_text::fork::{CloneRepoInputs, fork_spec_from_buffer_node};
-use crate::repo_sets::ActiveRepoSet;
-use crate::dbs::node_lookup::opt_graphnode_by_id;
+use crate::from_text::fork::{CloneSkgRepoInputs, fork_spec_from_buffer_node};
+use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::dbs::node_lookup::opt_graphnode_by_skgid;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, RepoName, members_of};
-use crate::types::save::{DefineNode, SaveNode, DeleteNode, ForkSpec, NodeMerge, RepoMove};
+  ID, MSV, RelPartner, SkgConfig, SkgRepoName, members_of};
+use crate::types::save::{NodeInstruction, SaveNode, DeleteNode, ForkSpec, NodeMerge, SkgRepoMove};
 use crate::types::nodes::complete::Graphnode;
 
 use std::collections::{HashMap, HashSet};
@@ -13,36 +13,36 @@ use std::collections::{HashMap, HashSet};
 /// Applies the foreign-node write policy, and -- this is where forking
 /// begins -- turns an edit of a foreign node into a fork.
 ///
-/// Returns the kept (owned) DefineNodes plus the forks the buffer
+/// Returns the kept (owned) NodeInstructions plus the forks the buffer
 /// requested. Editing a foreign node N is read as a request to clone
 /// it: N's own foreign SaveNode is DROPPED (N stays untouched on disk)
 /// and a ForkSpec for the clone C is collected instead. The clone is
-/// NOT folded into the returned DefineNodes here -- a save carrying
+/// NOT folded into the returned NodeInstructions here -- a save carrying
 /// forks is gated on the user's confirmation, so the handler commits
 /// the clones only on approval.
 ///
-/// ERRORS: if an instruction
+/// ERRORS: if an nodeInstruction
 /// - Would DELETE a foreign node (deleting, unlike editing, is not a fork)
-/// - Would create a node in a foreign repo
-/// - Requests a fork whose clone repo cannot be resolved
+/// - Would create a node in a foreign skgrepo
+/// - Requests a fork whose clone skgrepo cannot be resolved
 ///
 /// Filters out foreign nodes without modifications (no need to write).
 ///
-/// Requires disk-supplemented DefineNodes: unchanged foreign saves are
+/// Requires disk-supplemented NodeInstructions: unchanged foreign saves are
 /// harmless only after unspecified fields have been filled from disk,
 /// and foreign creates are recognized by checking disk for the pid.
 pub fn validate_and_filter_foreign_instructions(
-  instructions       : Vec<DefineNode>,
+  instructions       : Vec<NodeInstruction>,
   nodeMerge_instructions : &[NodeMerge],
   graph              : &InRustGraph,
-  clone_repo_inputs : &CloneRepoInputs, // everything clone-repo resolution can draw on, in priority order
-  adopt_clone_repo : &HashMap<ID, ID>, // new node -> forked N whose clone's repo it adopts (see 'new_foreign_nodes_adopting_clone_repos')
+  clone_skgrepo_inputs : &CloneSkgRepoInputs, // everything clone-repo resolution can draw on, in priority order
+  adopt_clone_skgrepo : &HashMap<ID, ID>, // new node -> forked N whose clone's repo it adopts (see 'new_foreign_nodes_adopting_clone_repos')
   config             : &SkgConfig,
-) -> Result<(Vec<DefineNode>, Vec<ForkSpec>),
+) -> Result<(Vec<NodeInstruction>, Vec<ForkSpec>),
             Vec<BufferValidationError>> {
   let mut outcomes : Vec<ForeignPolicyOutcome> =
     Vec::new();
-  let nodeMerge_definenodes : Vec<DefineNode> =
+  let nodeMerge_nodeInstructions : Vec<NodeInstruction> =
     nodeMerge_instructions . iter ()
     . flat_map ( |nodeMerge| nodeMerge . to_vec () )
     . collect ();
@@ -53,10 +53,10 @@ pub fn validate_and_filter_foreign_instructions(
     outcomes . push (
       apply_foreign_policy(
         instruction, /* fork_eligible = */ true,
-        adopt_clone_repo, graph, config
+        adopt_clone_skgrepo, graph, config
       )? ); }
   { let no_adoptions : HashMap<ID, ID> = HashMap::new ();
-    for instruction in nodeMerge_definenodes . iter () {
+    for instruction in nodeMerge_nodeInstructions . iter () {
       outcomes . push (
         apply_foreign_policy(
           instruction, /* fork_eligible = */ false,
@@ -76,11 +76,11 @@ pub fn validate_and_filter_foreign_instructions(
       match fork_spec_from_buffer_node (
         buffer_node, & disk_node . title,
         & members_of (& disk_node . contains),
-        clone_repo_inputs )
+        clone_skgrepo_inputs )
       { Ok (spec)  => fork_specs . push (spec),
         Err (e)    => fork_errors . push (e), }}}
   if ! fork_errors . is_empty () { return Err (fork_errors); }
-  let kept : Vec<DefineNode> =
+  let kept : Vec<NodeInstruction> =
     finalize_foreign_policy_instructions (
       instructions, &outcomes, &fork_specs ) ?;
   Ok (( kept, fork_specs )) }
@@ -89,34 +89,34 @@ pub fn validate_and_filter_foreign_instructions(
 enum ForeignPolicyOutcome {
   Keep, // Safe to pass through to persistence.
   DropUnchangedForeignSave, // Safe to drop because the buffer expresses no change from disk.
-  ForkCandidate(Graphnode, // An edited foreign node: clone it (the buffer node N becomes the clone's template). Dropped from the DefineNodes; a ForkSpec is collected instead.
+  ForkCandidate(Graphnode, // An edited foreign node: clone it (the buffer node N becomes the clone's template). Dropped from the NodeInstructions; a ForkSpec is collected instead.
                Graphnode), // N's DISK node -- the original, before the user's edit. Its title feeds the confirmation buffer's child line (which shows the original honestly, distinct from the clone's edited title); its contains feed the clone's creation-time hides (children the forking edit deleted).
-  AdoptCloneRepo(ID), // A NEW node (bare headline) whose foreign repo was inherited from the named forked node N: kept, but rewritten to N's clone's repo once the ForkSpecs exist ('finalize_foreign_policy_instructions').
+  AdoptCloneSkgRepo(ID), // A NEW node (bare headline) whose foreign skgrepo was inherited from the named forked node N: kept, but rewritten to N's clone's skgrepo once the ForkSpecs exist ('finalize_foreign_policy_instructions').
   Reject(BufferValidationError), // Must reject before persistence.
 }
 
 fn apply_foreign_policy(
-  instr: &DefineNode,
+  instr: &NodeInstruction,
   fork_eligible: bool, // true for a direct buffer edit (which forks a changed foreign node); false for a nodeMerge-derived save (which still rejects).
-  adopt_clone_repo: &HashMap<ID, ID>, // new node -> forked N (empty for nodeMerge-derived saves)
+  adopt_clone_skgrepo: &HashMap<ID, ID>, // new node -> forked N (empty for nodeMerge-derived saves)
   graph: &InRustGraph,
   config: &SkgConfig,
 ) -> Result<ForeignPolicyOutcome,
             Vec<BufferValidationError>> {
   match instr {
-    DefineNode::Delete(DeleteNode { id, home_repo: repo }) => {
-      if repo_is_foreign (config, repo) {
+    NodeInstruction::Delete(DeleteNode { skgid, home_skgrepo: skgrepo }) => {
+      if skgrepo_is_foreign (config, skgrepo) {
         // can't delete foreign nodes
         Ok (ForeignPolicyOutcome::Reject(
           BufferValidationError::ModifiedForeignNode(
-            id . clone(),
-            repo . clone() )))
+            skgid . clone(),
+            skgrepo . clone() )))
       } else { Ok (ForeignPolicyOutcome::Keep) }}
-    DefineNode::Save(SaveNode (node)) => {
-      if !repo_is_foreign (config, &node . home_repo) {
+    NodeInstruction::Save(SaveNode (node)) => {
+      if !skgrepo_is_foreign (config, &node . home_skgrepo) {
         // not foreign, so keep
         return Ok (ForeignPolicyOutcome::Keep); }
-      match opt_graphnode_by_id(
+      match opt_graphnode_by_skgid(
         graph, config, &node . pid
       ) {
         Ok(Some (disk_node)) => {
@@ -133,25 +133,25 @@ fn apply_foreign_policy(
               Ok (ForeignPolicyOutcome::Reject(
                 BufferValidationError::ModifiedForeignNode(
                   node . pid . clone(),
-                  node . home_repo . clone() )))
+                  node . home_skgrepo . clone() )))
             }
           } else {
             // drop a non-edit to a foreign node
             Ok (ForeignPolicyOutcome::DropUnchangedForeignSave)
           }}
         Ok (None) => {
-          // Foreign repo & PID not found => trying to create a
+          // Foreign skgrepo & PID not found => trying to create a
           // foreign node. Not allowed -- EXCEPT for a bare new
-          // headline whose foreign repo was merely inherited from a
-          // forked parent: that one adopts the parent's clone's repo.
-          if let Some (forked) = adopt_clone_repo . get (&node . pid) {
-            Ok (ForeignPolicyOutcome::AdoptCloneRepo(
+          // headline whose foreign skgrepo was merely inherited from a
+          // forked parent: that one adopts the parent's clone's skgrepo.
+          if let Some (forked) = adopt_clone_skgrepo . get (&node . pid) {
+            Ok (ForeignPolicyOutcome::AdoptCloneSkgRepo(
               forked . clone() ))
           } else {
             Ok (ForeignPolicyOutcome::Reject(
               BufferValidationError::CreatedForeignNode(
                 node . pid . clone(),
-                node . home_repo . clone() ))) }},
+                node . home_skgrepo . clone() ))) }},
         Err (e) =>
           Err (vec![BufferValidationError::Other(
             format!("Error reading foreign node {}: {}",
@@ -169,19 +169,19 @@ fn collect_foreign_policy_outcomes(
   if errors . is_empty() { Ok (())
   } else { Err (errors) }}
 
-/// Drop any DefineNode that defines a foreign node to be unchanged,
+/// Drop any NodeInstruction that defines a foreign node to be unchanged,
 /// and any that is a fork candidate (N's own save is never written --
 /// N stays untouched on disk; the clone C is committed separately,
-/// gated on confirmation). A new node adopting a clone's repo is
-/// KEPT, rewritten into that repo -- its fork must exist among the
+/// gated on confirmation). A new node adopting a clone's skgrepo is
+/// KEPT, rewritten into that skgrepo -- its fork must exist among the
 /// specs, else it degrades to the foreign-creation rejection it would
 /// otherwise have been.
 fn finalize_foreign_policy_instructions(
-  instructions: Vec<DefineNode>,
+  instructions: Vec<NodeInstruction>,
   outcomes: &[ForeignPolicyOutcome],
   fork_specs: &[ForkSpec],
-) -> Result<Vec<DefineNode>, Vec<BufferValidationError>> {
-  let mut kept : Vec<DefineNode> = Vec::new();
+) -> Result<Vec<NodeInstruction>, Vec<BufferValidationError>> {
+  let mut kept   : Vec<NodeInstruction> = Vec::new();
   let mut errors : Vec<BufferValidationError> = Vec::new();
   for (instruction, outcome) in
     instructions . into_iter() . zip (outcomes) {
@@ -189,83 +189,83 @@ fn finalize_foreign_policy_instructions(
       ForeignPolicyOutcome::DropUnchangedForeignSave
         | ForeignPolicyOutcome::ForkCandidate (..) =>
         {},
-      ForeignPolicyOutcome::AdoptCloneRepo (forked) => {
-        let clone_repo : Option<&RepoName> =
+      ForeignPolicyOutcome::AdoptCloneSkgRepo (forked) => {
+        let clone_skgrepo : Option<&SkgRepoName> =
           fork_specs . iter()
-          . find ( |spec| spec . original_id == *forked )
-          . map ( |spec| & spec . clone . 0 . home_repo );
-        match (instruction, clone_repo) {
-          ( DefineNode::Save (SaveNode (mut node)),
-            Some (clone_repo) ) => {
-            rehome_inherited_new_node (&mut node, clone_repo);
-            kept . push (DefineNode::Save (SaveNode (node))); }
-          ( DefineNode::Save (SaveNode (node)), None ) =>
+          . find ( |spec| spec . original_skgid == *forked )
+          . map ( |spec| & spec . clone . 0 . home_skgrepo );
+        match (instruction, clone_skgrepo) {
+          ( NodeInstruction::Save (SaveNode (mut node)),
+            Some (clone_skgrepo) ) => {
+            rehome_inherited_new_node (&mut node, clone_skgrepo);
+            kept . push (NodeInstruction::Save (SaveNode (node))); }
+          ( NodeInstruction::Save (SaveNode (node)), None ) =>
             errors . push (
               BufferValidationError::CreatedForeignNode(
                 node . pid . clone(),
-                node . home_repo . clone() )),
-          ( DefineNode::Delete (d), _ ) =>
+                node . home_skgrepo . clone() )),
+          ( NodeInstruction::Delete (d), _ ) =>
             // Unreachable: only a Save earns AdoptCloneRepo.
             errors . push (
               BufferValidationError::ModifiedForeignNode(
-                d . id . clone(),
-                d . home_repo . clone() )), }},
+                d . skgid . clone(),
+                d . home_skgrepo . clone() )), }},
       _ => kept . push (instruction), }}
   if errors . is_empty() { Ok (kept) } else { Err (errors) }}
 
 /// A bare new node beneath a foreign node initially inherits that foreign
-/// repo everywhere: as its home and as the default recording repo of its
+/// skgrepo everywhere: as its home and as the default recording skgrepo of its
 /// relationship members. When the node rides the parent's fork, adoption must
 /// therefore rehome both. Changing only `node.repo` manufactures a mixed
 /// telescope whose old-home section is foreign (or can sort before the new
 /// home), and the checked writer correctly rejects it.
 ///
-/// Preserve members explicitly recorded at any OTHER repo. Only facts whose
+/// Preserve members explicitly recorded at any OTHER skgrepo. Only facts whose
 /// relRepo equals the inherited home are part of this implicit adoption.
 fn rehome_inherited_new_node (
-  node       : &mut Graphnode,
-  new_repo : &RepoName,
+  node        : &mut Graphnode,
+  new_skgrepo : &SkgRepoName,
 ) {
   fn retag<T> (
-    members    : &mut [RelPartner<T>],
-    old_repo : &RepoName,
-    new_repo : &RepoName,
+    members     : &mut [RelPartner<T>],
+    old_skgrepo : &SkgRepoName,
+    new_skgrepo : &SkgRepoName,
   ) {
     for member in members {
-      if member . relRepo == *old_repo {
-        member . relRepo = new_repo . clone (); }} }
+      if member . relRepo == *old_skgrepo {
+        member . relRepo = new_skgrepo . clone (); }} }
 
   fn retag_msv<T> (
-    members    : &mut MSV<RelPartner<T>>,
-    old_repo : &RepoName,
-    new_repo : &RepoName,
+    members     : &mut MSV<RelPartner<T>>,
+    old_skgrepo : &SkgRepoName,
+    new_skgrepo : &SkgRepoName,
   ) {
     if let MSV::Specified (members) = members {
-      retag (members, old_repo, new_repo); }}
+      retag (members, old_skgrepo, new_skgrepo); }}
 
-  let old_repo : RepoName = node . home_repo . clone ();
-  node . home_repo = new_repo . clone ();
-  retag (&mut node . contains, &old_repo, new_repo);
-  retag_msv (&mut node . aliases, &old_repo, new_repo);
-  retag_msv (&mut node . subscribes_to, &old_repo, new_repo);
+  let old_skgrepo : SkgRepoName = node . home_skgrepo . clone ();
+  node . home_skgrepo = new_skgrepo . clone ();
+  retag (&mut node . contains, &old_skgrepo, new_skgrepo);
+  retag_msv (&mut node . aliases, &old_skgrepo, new_skgrepo);
+  retag_msv (&mut node . subscribes_to, &old_skgrepo, new_skgrepo);
   retag_msv (
-    &mut node . hides_from_its_subscriptions, &old_repo, new_repo);
-  retag_msv (&mut node . overrides_view_of, &old_repo, new_repo);
+    &mut node . hides_from_its_subscriptions, &old_skgrepo, new_skgrepo);
+  retag_msv (&mut node . overrides_view_of, &old_skgrepo, new_skgrepo);
 }
 
-fn repo_is_foreign(
+fn skgrepo_is_foreign(
   config: &SkgConfig,
-  repo: &RepoName,
+  skgrepo: &SkgRepoName,
 ) -> bool {
-  config . repos . get (repo)
-    . map(|s| !s . user_owns_it)
+  config . skgrepos . get (skgrepo)
+    . map(|s| !s . owned)
     . unwrap_or (false)}
 
 /// Returns true if the buffer node differs from the disk node
-/// in any definitive field (title, body, contains), any flag, or
+/// in any editable field (title, body, contains), any flag, or
 /// any non-definitive field that the buffer expresses an opinion on.
 ///
-/// For *definitive* fields (title, body, contains):
+/// For *editable* fields (title, body, contains):
 /// Some([]) and None are equivalent, so we normalize them for comparison.
 ///
 /// For *non-definitive* fields (aliases, overrides_view_of,
@@ -285,13 +285,13 @@ pub(crate) fn buffernode_differs_from_disknode(
 
   let title_matches: bool = buffer_node . title == disk_node . title;
   let body_matches: bool = buffer_node . body == disk_node . body;
-  let repo_matches: bool = buffer_node . home_repo == disk_node . home_repo;
+  let skgrepo_matches: bool = buffer_node . home_skgrepo == disk_node . home_skgrepo;
   let contains_matches: bool =
     buffer_node . contains == disk_node . contains;
-  let flags_match: bool = buffer_node . misc == disk_node . misc;
+  let flags_match: bool = buffer_node . flags == disk_node . flags;
   !( title_matches
      && body_matches
-     && repo_matches
+     && skgrepo_matches
      && contains_matches
      && flags_match
      && fields_match( &buffer_node . aliases,
@@ -315,67 +315,67 @@ pub(crate) fn flatten_ms<T: Clone>(
 /// Validates that no node is both moved and merged in the same save.
 ///
 /// Requires both completed non-nodeMerge extraction and nodeMerge extraction:
-/// repo moves are detected during disk supplementation of
-/// DefineNodes, while merge acquiree/acquirer ids come from merge
+/// Skgrepo moves are detected during disk supplementation of
+/// NodeInstructions, while merge acquiree/acquirer ids come from merge
 /// requests in the "placed" (i.e. no longer "maybePlaced") viewforest.
 pub(super) fn validate_no_simultaneous_move_and_nodeMerge (
-  repo_moves       : &[RepoMove],
+  skgrepo_moves          : &[SkgRepoMove],
   nodeMerge_instructions : &[NodeMerge],
 ) -> Result<(), Vec<BufferValidationError>> {
-  if repo_moves . is_empty() || nodeMerge_instructions . is_empty() {
+  if skgrepo_moves . is_empty() || nodeMerge_instructions . is_empty() {
     return Ok (()); }
-  let move_ids : HashSet<&ID> =
-    repo_moves . iter() . map(|sm| &sm . pid) . collect();
+  let move_skgids : HashSet<&ID> =
+    skgrepo_moves . iter() . map(|sm| &sm . pid) . collect();
   let mut errors : Vec<BufferValidationError> = Vec::new();
   for nodeMerge in nodeMerge_instructions {
-    if move_ids . contains (nodeMerge . acquirer_id()) {
+    if move_skgids . contains (nodeMerge . acquirer_skgid()) {
       errors . push (
         BufferValidationError::CannotMoveAndMergeSimultaneously(
-          nodeMerge . acquirer_id() . clone() )); }
-    if move_ids . contains (nodeMerge . acquiree_id()) {
+          nodeMerge . acquirer_skgid() . clone() )); }
+    if move_skgids . contains (nodeMerge . acquiree_skgid()) {
       errors . push (
         BufferValidationError::CannotMoveAndMergeSimultaneously(
-          nodeMerge . acquiree_id() . clone() )); }}
+          nodeMerge . acquiree_skgid() . clone() )); }}
   if errors . is_empty() { Ok (())
   } else { Err (errors) }}
 
-/// TODO/full-schema/9-2_repo-set-safety.org, inactive-node rewrite
-/// suppression: under a restricted repo-set, any instruction that
+/// TODO/DONE/full-schema/DONE/9-2_source-set-safety.org, inactive-node rewrite
+/// suppression: under a restricted skgrepo-set, any nodeInstruction that
 /// would modify an inactive node is DROPPED rather than executed or
-/// fatal.  A stale buffer (rendered before a repo-set switch) can
+/// fatal.  A stale buffer (rendered before a skgrepo-set switch) can
 /// legitimately hold whole now-inactive subtrees; aborting would
 /// force the user to delete them from view, which would itself be
 /// destructive.  Runs after the noop filter, so an untouched stale
-/// node (whose identical-to-disk instruction the noop filter already
+/// node (whose identical-to-disk nodeInstruction the noop filter already
 /// discarded) does not count as suppressed.  Returns whether
 /// anything was dropped, so the caller can attach the warning
 /// "Inactive nodes present in saved buffer remain unchanged in
 /// graph."
 pub fn suppress_writes_to_inactive_nodes (
-  define_nodes : Vec<DefineNode>,
-  repo_moves : Vec<RepoMove>,
-  restricted_repo_set : Option<&ActiveRepoSet>,
-) -> (Vec<DefineNode>, Vec<RepoMove>, bool) {
-  let Some (active) = restricted_repo_set else {
-    return (define_nodes, repo_moves, false); };
+  node_instructions : Vec<NodeInstruction>,
+  skgrepo_moves : Vec<SkgRepoMove>,
+  restricted_skgrepo_set : Option<&ActiveSkgRepoSet>,
+) -> (Vec<NodeInstruction>, Vec<SkgRepoMove>, bool) {
+  let Some (active) = restricted_skgrepo_set else {
+    return (node_instructions, skgrepo_moves, false); };
   let mut suppressed : bool = false;
-  let define_nodes : Vec<DefineNode> =
-    define_nodes . into_iter ()
+  let node_instructions : Vec<NodeInstruction> =
+    node_instructions . into_iter ()
     . filter ( |instruction| {
-        let repo : &RepoName = match instruction {
-          DefineNode::Save (SaveNode (node)) => &node . home_repo,
-          DefineNode::Delete (d)             => &d . home_repo };
-        let keep : bool = active . contains_repo (repo);
+        let skgrepo : &SkgRepoName = match instruction {
+          NodeInstruction::Save (SaveNode (node)) => &node . home_skgrepo,
+          NodeInstruction::Delete (d)             => &d . home_skgrepo };
+        let keep : bool = active . contains_skgrepo (skgrepo);
         if ! keep { suppressed = true; }
         keep } )
     . collect ();
-  let repo_moves : Vec<RepoMove> =
-    repo_moves . into_iter ()
+  let skgrepo_moves : Vec<SkgRepoMove> =
+    skgrepo_moves . into_iter ()
     . filter ( |mv| {
         let keep : bool =
-          active . contains_repo (&mv . old_repo)
-          && active . contains_repo (&mv . new_repo);
+          active . contains_skgrepo (&mv . old_skgrepo)
+          && active . contains_skgrepo (&mv . new_skgrepo);
         if ! keep { suppressed = true; }
         keep } )
     . collect ();
-  (define_nodes, repo_moves, suppressed) }
+  (node_instructions, skgrepo_moves, suppressed) }

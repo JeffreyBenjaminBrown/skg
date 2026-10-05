@@ -1,7 +1,7 @@
 mod guard;
 pub use guard::TestStoreGuard;
 
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
 use crate::dbs::init::create_empty_tantivy_index;
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
@@ -16,8 +16,8 @@ use crate::serve::handlers::save_buffer::{
 };
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
 use crate::types::views_state::ViewUri;
-use crate::types::misc::{MSV, SkgConfig, SkgfileRepo, ID, TantivyIndex, RepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
-use crate::types::save::{DefineNode, SaveNode};
+use crate::types::misc::{MSV, SkgConfig, SkgRepo, ID, TantivyIndex, SkgRepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
+use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::maybe_placed_viewnode::{ MpViewnode, MpViewnodeKind };
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
@@ -177,7 +177,7 @@ impl SharedStoreSession {
   /// Like 'reset', but runs `prep` on the temp fixture copy BEFORE
   /// the config is loaded and the graph snapshot populated -- for
   /// sub-tests whose fixtures need mutation that the snapshot must
-  /// reflect (e.g. git-initializing a repo and leaving a
+  /// reflect (e.g. git-initializing a skgrepo and leaving a
   /// worktree-vs-HEAD diff).
   pub fn reset_with_fixture_prep<P> (
     &mut self,
@@ -205,41 +205,41 @@ impl SharedStoreSession {
         config . tantivy_folder = self . tantivy_folder . clone ();
         config
       } else {
-        let mut repos : HashMap<RepoName, SkgfileRepo> =
+        let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
           HashMap::new ();
-        repos . insert (
-          RepoName::from ("main"),
-          SkgfileRepo {
-            name         : RepoName::from ("main"),
+        skgrepos . insert (
+          SkgRepoName::from ("main"),
+          SkgRepo {
+            name         : SkgRepoName::from ("main"),
             abbreviation : None,
             path         : self . temp_fixtures . clone (),
-            user_owns_it : true, });
-        SkgConfig::fromReposAndTantivyFolder (
-          repos,
+            owned        : true, });
+        SkgConfig::fromSkgReposAndTantivyFolder (
+          skgrepos,
           self . tantivy_folder . to_str () . unwrap () ) }};
     self . wipe_then_repopulate () }
 
-  /// Like 'reset', but for sub-tests that prepare their own repo
-  /// directory (e.g. a git repo in a TempDir): no fixture copy; the
+  /// Like 'reset', but for sub-tests that prepare their own skgrepo
+  /// directory (e.g. a gitrepo in a TempDir): no fixture copy; the
   /// single-repo ("main") config points at `repo_path` directly.
-  pub fn reset_with_repo_path (
+  pub fn reset_with_skgrepo_path (
     &mut self,
     subtest_name : &str,
-    repo_path  : &Path,
+    skgrepo_path : &Path,
   ) -> Result<(), Box<dyn Error>> {
     println! ("-- sub-test: {}", subtest_name);
     self . config = {
-      let mut repos : HashMap<RepoName, SkgfileRepo> =
+      let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
         HashMap::new ();
-      repos . insert (
-        RepoName::from ("main"),
-        SkgfileRepo {
-          name         : RepoName::from ("main"),
+      skgrepos . insert (
+        SkgRepoName::from ("main"),
+        SkgRepo {
+          name         : SkgRepoName::from ("main"),
           abbreviation : None,
-          path         : repo_path . to_path_buf (),
-          user_owns_it : true, });
-      SkgConfig::fromReposAndTantivyFolder (
-        repos,
+          path         : skgrepo_path . to_path_buf (),
+          owned        : true, });
+      SkgConfig::fromSkgReposAndTantivyFolder (
+        skgrepos,
         self . tantivy_folder . to_str () . unwrap () ) };
     self . wipe_then_repopulate () }
 
@@ -295,7 +295,7 @@ where
       temp_fixtures  : temp_fixtures . clone (),
       tantivy_folder : tantivy_folder . clone (),
       config         : // placeholder; every sub-test runs after a reset, which overwrites it
-        SkgConfig::fromReposAndTantivyFolder (
+        SkgConfig::fromSkgReposAndTantivyFolder (
           HashMap::new (),
           tantivy_folder . to_str () . unwrap () ),
       tantivy        : create_empty_tantivy_index (&tantivy_folder) ?, };
@@ -369,7 +369,7 @@ pub fn graph_handle_from_config (
   config : &SkgConfig,
 ) -> Result<InRustGraphHandle, Box<dyn Error>> {
   let nodes : Vec<Graphnode> =
-    read_all_skg_files_from_repos (config) ?;
+    read_all_skg_files_from_skgrepos (config) ?;
   Ok ( new_handle ( InRustGraph::from_graphnodes (&nodes) )) }
 
 /// Bundle a test's existing handles into a 'SkgEnv'.
@@ -407,7 +407,7 @@ pub async fn update_from_and_rerender_buffer_test (
   update_from_and_rerender_buffer_with_fork_approval_test (
     stream, org_buffer_text, config, tantivy_index, graph,
     diff_mode_enabled, viewuri_from_request_result, views_state,
-    /* fork_approved = */ true ) . await }
+    /* approved_forks = */ true ) . await }
 
 /// Drive the full prepared-save conflict path with explicit client snapshots.
 pub async fn update_from_and_rerender_buffer_with_snapshots_test (
@@ -442,20 +442,20 @@ pub async fn update_from_and_rerender_buffer_with_fork_approval_test (
   diff_mode_enabled           : bool,
   viewuri_from_request_result : &Result<ViewUri, String>,
   views_state                 : &mut ViewsState,
-  fork_approved               : bool,
+  approved_forks              : bool,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  // No user-set clone repos: every fork's repo resolves by
+  // No user-set clone skgrepos: every fork's skgrepo resolves by
   // inference-else-default.
-  update_from_and_rerender_buffer_with_fork_repos_test (
+  update_from_and_rerender_buffer_with_fork_skgrepos_test (
     stream, org_buffer_text, config, tantivy_index, graph,
     diff_mode_enabled, viewuri_from_request_result, views_state,
-    fork_approved, &HashMap::new () ) . await }
+    approved_forks, &HashMap::new () ) . await }
 
 /// As 'update_from_and_rerender_buffer_with_fork_approval_test', but also
-/// lets the test supply the per-fork clone repos (keyed by N's pid)
+/// lets the test supply the per-fork clone skgrepos (keyed by N's pid)
 /// the user would have chosen in the confirmation buffer -- exercising
 /// the 'fork-repos' transport without an Emacs client.
-pub async fn update_from_and_rerender_buffer_with_fork_repos_test (
+pub async fn update_from_and_rerender_buffer_with_fork_skgrepos_test (
   stream                      : &mut std::net::TcpStream,
   org_buffer_text             : &str,
   config                      : &SkgConfig,
@@ -464,8 +464,8 @@ pub async fn update_from_and_rerender_buffer_with_fork_repos_test (
   diff_mode_enabled           : bool,
   viewuri_from_request_result : &Result<ViewUri, String>,
   views_state                 : &mut ViewsState,
-  fork_approved               : bool,
-  fork_repos                : &HashMap<ID, RepoName>,
+  approved_forks              : bool,
+  fork_skgrepos               : &HashMap<ID, SkgRepoName>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut env : SkgEnv =
     skg_env_from_parts (config, tantivy_index, graph);
@@ -477,33 +477,33 @@ pub async fn update_from_and_rerender_buffer_with_fork_repos_test (
     viewuri_from_request_result,
     views_state,
     None,
-    fork_approved,
-    fork_repos ) . await }
+    approved_forks,
+    fork_skgrepos ) . await }
 
 /// Move NODE to REPO: set its home AND retag every relationship
-/// member and alias to that repo. Under the historical
+/// member and alias to that skgrepo. Under the historical
 /// relation-partner work, the invariant was relRepo == home, so any
-/// test that reassigns a node's repo must go through this, or the
-/// telescope write would emit sections at the old repo. The real
+/// test that reassigns a node's skgrepo must go through this, or the
+/// telescope write would emit sections at the old skgrepo. The real
 /// repo-move rule (which member relRepos follow a home move) is owned by
 /// work item save-leveling.
-pub fn set_repo_retagging_relRepos (
-  node  : &mut Graphnode,
-  repo : &RepoName,
+pub fn set_skgrepo_retagging_relRepos (
+  node    : &mut Graphnode,
+  skgrepo : &SkgRepoName,
 ) {
-  node . home_repo = repo . clone ();
+  node . home_skgrepo = skgrepo . clone ();
   for m in node . contains . iter_mut () {
-    m . relRepo = repo . clone (); }
+    m . relRepo = skgrepo . clone (); }
   let retag_msv = |msv : &mut MSV<RelPartner<ID>>| {
     if let MSV::Specified (v) = msv {
       for m in v . iter_mut () {
-        m . relRepo = repo . clone (); }} };
+        m . relRepo = skgrepo . clone (); }} };
   retag_msv ( &mut node . subscribes_to );
   retag_msv ( &mut node . hides_from_its_subscriptions );
   retag_msv ( &mut node . overrides_view_of );
   if let MSV::Specified (v) = &mut node . aliases {
     for m in v . iter_mut () {
-      m . relRepo = repo . clone (); }} }
+      m . relRepo = skgrepo . clone (); }} }
 
 /// Verify the published graph's inverse indexes after a mutation.
 pub fn audit_inrustgraph_or_panic (
@@ -518,7 +518,7 @@ pub fn audit_inrustgraph_or_panic (
 
 /// A converted fixture (author-folder layout) keeps its .skg files
 /// under owned/; a flat fixture keeps them at the root. The
-/// test-config synthesizers point their single "main" repo at
+/// test-config synthesizers point their single "main" skgrepo at
 /// whichever the fixture uses.
 pub fn prefer_owned_subdir (
   root : &Path,
@@ -533,16 +533,16 @@ pub fn setup_test_tantivy (
   fixtures_folder: &str,
   tantivy_folder: &str,
 ) -> Result<(SkgConfig, TantivyIndex), Box<dyn Error>> {
-  let mut repos : HashMap<RepoName, SkgfileRepo> = HashMap::new();
-  repos . insert (
-    RepoName::from ("main"),
-    SkgfileRepo {
-      name         : RepoName::from ("main"),
+  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> = HashMap::new();
+  skgrepos . insert (
+    SkgRepoName::from ("main"),
+    SkgRepo {
+      name         : SkgRepoName::from ("main"),
       abbreviation : None,
       path         : prefer_owned_subdir (Path::new (fixtures_folder)),
-      user_owns_it : true, });
-  let config : SkgConfig = SkgConfig::fromReposAndTantivyFolder (
-    repos, tantivy_folder );
+      owned        : true, });
+  let config : SkgConfig = SkgConfig::fromSkgReposAndTantivyFolder (
+    skgrepos, tantivy_folder );
   let tantivy_index : TantivyIndex =
     create_empty_tantivy_index (&config . tantivy_folder) ?;
   Ok ((config, tantivy_index)) }
@@ -568,7 +568,7 @@ pub fn cleanup_test_tantivy (
 
 /// Compare two org-mode headlines ignoring ID differences.
 /// Converts each headline to HeadlineInfo and strips ID from metadata.
-pub fn compare_headlines_modulo_id(
+pub fn compare_headlines_modulo_skgid(
   headline1: &str,
   headline2: &str
 ) -> bool {
@@ -581,9 +581,9 @@ pub fn compare_headlines_modulo_id(
     (Ok((level1, metadata1, title1)),
      Ok((level2, metadata2, title2))) => {
       let has_id1: bool =
-        metadata1 . as_ref() . map_or(false, |m| m . id . is_some());
+        metadata1 . as_ref() . map_or(false, |m| m . skgid . is_some());
       let has_id2: bool =
-        metadata2 . as_ref() . map_or(false, |m| m . id . is_some());
+        metadata2 . as_ref() . map_or(false, |m| m . skgid . is_some());
       if has_id1 != has_id2 {
         // One has an ID and the other doesn't, so they are unequal.
         return false; }
@@ -624,7 +624,7 @@ pub fn compare_viewnode_trees (
               compare_viewnode_trees ( *c1, *c2 )) }}
 
 /// Compares ignoring ID value but not ID presence/absence.
-pub fn compare_viewnode_trees_modulo_id(
+pub fn compare_viewnode_trees_modulo_skgid(
   viewforest1: &Tree<MpViewnode>,
   viewforest2: &Tree<MpViewnode>
 ) -> bool {
@@ -635,13 +635,13 @@ pub fn compare_viewnode_trees_modulo_id(
   if root1 . len() != root2 . len() {
     return false; }
   for (tree1, tree2) in root1 . iter() . zip(root2 . iter()) {
-    if !compare_two_viewnode_branches_recursively_modulo_id(
+    if !compare_two_viewnode_branches_recursively_modulo_skgid(
       *tree1, *tree2 )
     { return false; }}
   true }
 
 /// Compare two MpViewnode subtrees, ignoring ID values.
-fn compare_two_viewnode_branches_recursively_modulo_id (
+fn compare_two_viewnode_branches_recursively_modulo_skgid (
   node1: NodeRef<MpViewnode>,
   node2: NodeRef<MpViewnode>
 ) -> bool {
@@ -652,15 +652,15 @@ fn compare_two_viewnode_branches_recursively_modulo_id (
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_))),
       MpViewnodeKind::Vognode (MpVognode::Active (_))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_)))) =>
-    { // Copy the ID from one to the other, then compare. TODO/DONE/local-view-update/plan_v2.org §11: Normal and
+    { // Copy the ID from one to the other, then compare. TODO/DONE/local-view-update/plan_v2.org §11: Active and
       // Diff phantom payloads are now different types, so read n2's id via the
       // shared accessor and write n1_copy's per variant.
-      let id2 : Option<ID> = n2 . id_opt () . cloned ();
+      let id2 : Option<ID> = n2 . skgid_opt () . cloned ();
       let mut n1_copy : MpViewnode =
         n1 . clone();
       match &mut n1_copy . kind {
-        MpViewnodeKind::Vognode (MpVognode::Active (t)) => t . id = id2,
-        MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) => p . id = id2,
+        MpViewnodeKind::Vognode (MpVognode::Active (t)) => t . skgid = id2,
+        MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) => p . skgid = id2,
         _ => {} }
       if n1_copy != *n2 { return false; }}
     ( MpViewnodeKind::PropertyFolder (_)
@@ -688,7 +688,7 @@ fn compare_two_viewnode_branches_recursively_modulo_id (
     ( children1 . len() == children2 . len() &&
       children1 . iter() . zip(children2 . iter())
       . all (|(c1, c2)|
-             compare_two_viewnode_branches_recursively_modulo_id(
+             compare_two_viewnode_branches_recursively_modulo_skgid(
                *c1, *c2)) ) }}
 
 /// Remove ID from metadata struct while preserving other metadata
@@ -696,17 +696,17 @@ fn strip_id_from_metadata_struct(
   metadata: Option<ViewnodeMetadata>
 ) -> Option<ViewnodeMetadata> {
   metadata . map(|mut meta| {
-    meta . id = None;
+    meta . skgid = None;
     meta
   } ) }
 
 
 /// Check if a specific ID exists in Tantivy search results.
 /// Searches for the given query and checks if any result has the exact ID.
-pub fn tantivy_contains_id(
+pub fn tantivy_contains_skgid(
   tantivy_index: &TantivyIndex,
   query: &str,
-  expected_id: &str,
+  expected_skgid: &str,
 ) -> Result<bool, Box<dyn Error>> {
   let (matches, searcher)
     : (Vec<(f32, DocAddress)>, Searcher)
@@ -717,7 +717,7 @@ pub fn tantivy_contains_id(
     let id_value: Option<String> =
       doc . get_first(tantivy_index . id_field)
       . and_then(|v| v . as_str() . map (String::from));
-    if id_value == Some(expected_id . to_string()) {
+    if id_value == Some(expected_skgid . to_string()) {
       return Ok (true); }}
   Ok (false) }
 
@@ -745,35 +745,35 @@ pub fn strip_org_comments(s: &str) -> String {
 
 /// Example Graphnode for use in tests.
 pub fn graphnode_example () -> Graphnode {
-  let repo : RepoName = RepoName::from ("main");
+  let skgrepo : SkgRepoName = SkgRepoName::from ("main");
   Graphnode {
     title: "This text gets indexed." . to_string(),
     overPrivateText_telescope: false,
     aliases: MSV::Unspecified,
-    home_repo: repo . clone (),
+    home_skgrepo: skgrepo . clone (),
     pid: ID::new ("example"),
     extra_ids: vec![],
     body: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),
-    contains: rel_partners_at_relRepo ( &repo,
+    contains: rel_partners_at_relRepo ( &skgrepo,
                     vec![ ID::new ("1"),
                           ID::new ("2"),
                           ID::new ("3")] ),
-    subscribes_to: rel_partners_at_relRepo_msv ( &repo,
+    subscribes_to: rel_partners_at_relRepo_msv ( &skgrepo,
                     MSV::Specified(vec![ID::new ("11"),
                              ID::new ("12"),
                              ID::new ("13")])),
     hides_from_its_subscriptions: MSV::Unspecified,
     overrides_view_of: MSV::Unspecified,
-    misc: Vec::new (), }}
+    flags: Vec::new (), }}
 
 /// Extract Graphnode from Save variant; panics on Delete.
 pub fn extract_graphnode_if_save_else_error(
-  instr: &DefineNode
+  instr: &NodeInstruction
 ) -> &Graphnode {
   match instr {
-    DefineNode::Save(SaveNode (node)) => node,
-    DefineNode::Delete (_) => panic!("Expected Save, got Delete") }}
+    NodeInstruction::Save(SaveNode (node)) => node,
+    NodeInstruction::Delete (_) => panic!("Expected Save, got Delete") }}
 
 /// Read one length-prefixed message from a TCP stream.
 /// Returns the body as a String.

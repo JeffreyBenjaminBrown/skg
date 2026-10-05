@@ -16,13 +16,13 @@
 ;; root, and `skg-edit-metadata-at-point' calls
 ;; `skg-replace-current-line', which issues a
 ;; `delete-region' on (line-beginning-position . line-end-position).
-;; Because that region starts at the beginning of a folded heading,
+;; Because that region starts at the beginning of a folded headline,
 ;; org-fold's `org-fold-core--fix-folded-region' expands the delete
 ;; to cover the entire hidden subtree. The root line (and its
 ;; children's text) is clobbered, and only the reformatted line is
 ;; re-inserted at point. The test that has `focused' on the root
 ;; FAILS; the test without `focused' PASSES — confirming the trigger
-;; is the focus-removal step operating on a folded heading.
+;; is the focus-removal step operating on a folded headline.
 
 (load-file (expand-file-name "../../elisp/skg-test-utils.el"
                              (file-name-directory load-file-name)))

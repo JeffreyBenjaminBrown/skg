@@ -21,9 +21,9 @@ fn test_aliases_diff_shows_alias_folder()
     let (config, _tantivy) =
       setup_test_stores(test_name, gitrepo_path . to_str() . unwrap(), tantivy_folder) . await?;
 
-    let root_ids = vec![ID("1" . to_string())];
+    let root_skgids = vec![ID("1" . to_string())];
     let (actual, _pids, _) : (String, Vec<ID>, _) =
-      multi_root_view(&config, None, &root_ids, true)?;
+      multi_root_view(&config, None, &root_skgids, true)?;
 
     assert_buffer_contains(&actual, GIT_DIFF_VIEW);
 
@@ -54,9 +54,9 @@ fn test_saving_a_diff_view_with_aliases_shown_does_not_duplicate_them()
     let (config, mut tantivy) =
       setup_test_stores(test_name, gitrepo_path . to_str() . unwrap(), tantivy_folder) . await?;
 
-    let root_ids = vec![ID("1" . to_string())];
+    let root_skgids = vec![ID("1" . to_string())];
     let (rendered, _pids, _) : (String, Vec<ID>, _) =
-      multi_root_view(&config, None, &root_ids, true)?;
+      multi_root_view(&config, None, &root_skgids, true)?;
 
     let graph : InRustGraphHandle = graph_handle_from_config (&config)?;
     let mut views_state : ViewsState = ViewsState {

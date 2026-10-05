@@ -1,7 +1,7 @@
 -- Mirrors tests/elisp/test-skg-save-response-folded-root.el (point
 -- and fold restoration, warning channels) and the client-side halves
 -- of test-skg-fork-confirmation.el (request fields, the confirmation
--- buffer's repo walk, approve/decline behavior), driven end-to-end
+-- buffer's skgrepo walk, approve/decline behavior), driven end-to-end
 -- through the loopback fake server. The live-server counterparts live
 -- in tests/integration/.
 
@@ -37,27 +37,27 @@ describe('skg.save request strings', function ()
       line)
   end)
 
-  it('adds fork-approved and fork-repos when given', function ()
+  it('adds approved-forks and fork-repos when given', function ()
     -- Mirrors test-skg-fork-confirmation's request-field cases.
     local line = save.save_request_string('uri-1', {
       lines_below_focused_headline = 0,
       column = 0,
       screen_lines_below_window_start = 0 },
       true, { { 'id-a', 'src-1' }, { 'id-b', 'src-2' } })
-    assert.is_truthy(line:find('(fork-approved . "true")', 1, true))
+    assert.is_truthy(line:find('(approved-forks . "true")', 1, true))
     assert.is_truthy(line:find(
       '(fork-repos (("id-a" . "src-1") ("id-b" . "src-2")))',
       1, true))
   end)
 
-  it('adds exact hoist-approved pids when given', function ()
+  it('adds exact approved-hoist pids when given', function ()
     local line = save.save_request_string('uri-1', {
       lines_below_focused_headline = 0,
       column = 0,
       screen_lines_below_window_start = 0 },
       nil, nil, { 'pid-a', 'pid-b' })
     assert.is_truthy(line:find(
-      '(hoist-approved-pids "pid-a" "pid-b")', 1, true))
+      '(approved-hoist-pids "pid-a" "pid-b")', 1, true))
     assert.is_falsy(line:find('hoist-approved . "true"', 1, true))
   end)
 
@@ -68,7 +68,7 @@ describe('skg.save request strings', function ()
       screen_lines_below_window_start = 0 },
       nil, nil, nil, { 'overPrivateText-a', 'overPrivateText-b' })
     assert.is_truthy(line:find(
-      '(allow-overPrivateText-telescopes "overPrivateText-a" "overPrivateText-b")', 1, true))
+      '(approved-overPrivateText-pids "overPrivateText-a" "overPrivateText-b")', 1, true))
   end)
 end)
 
@@ -362,21 +362,21 @@ describe('skg.save fork confirmation', function ()
         end
       end
     end)
-    local origin = open_view(
+    local source = open_view(
       '* (skg (node (id foreign-1)'
       .. ' (viewRequests fork))) the original edited',
-      'skg://origin', 'uri-origin')
+      'skg://source', 'uri-origin')
     save.request_save_buffer()
     vim.wait(3000, function ()
       return vim.api.nvim_buf_get_name(
         vim.api.nvim_get_current_buf()) == 'skg://fork-confirmation'
     end, 10)
-    return origin, requests
+    return source, requests
   end
 
   it('walks the confirmation buffer for {id, repo} pairs',
      function ()
-    -- Mirrors the two-level repo walk (+ no leak across parents).
+    -- Mirrors the two-level skgrepo walk (+ no leak across parents).
     local buf = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
       '* (skg (node (repo src-one))) clone one',
@@ -393,12 +393,12 @@ describe('skg.save fork confirmation', function ()
 
   it('shows the confirmation buffer, unlocked and navigable',
      function ()
-    local origin = save_and_get_confirmation()
+    local source = save_and_get_confirmation()
     local confirm = vim.api.nvim_get_current_buf()
     assert.are.equal('skg://fork-confirmation',
                      vim.api.nvim_buf_get_name(confirm))
     assert.is_true(vim.bo[confirm].modifiable)
-    assert.is_true(vim.bo[origin].modifiable) -- everything unlocked
+    assert.is_true(vim.bo[source].modifiable) -- everything unlocked
     assert.is_nil(vim.b[confirm].skg_view_uri)
     assert.are.equal(0, state.lp_pending_count) -- balanced
   end)
@@ -413,7 +413,7 @@ describe('skg.save fork confirmation', function ()
 
   it('approves after a repo is chosen, re-saving with the pairs',
      function ()
-    local origin, requests = save_and_get_confirmation()
+    local source, requests = save_and_get_confirmation()
     local confirm = vim.api.nvim_get_current_buf()
     vim.api.nvim_win_set_cursor(0, { 1, 0 })
     metadata.change_repo_at_line(1, 'my-repo')
@@ -421,21 +421,21 @@ describe('skg.save fork confirmation', function ()
     vim.wait(3000, function () return #requests >= 2 end, 10)
     assert.are.equal(2, #requests)
     assert.is_truthy(requests[2]:find(
-      '(fork-approved . "true")', 1, true))
+      '(approved-forks . "true")', 1, true))
     assert.is_truthy(requests[2]:find(
       '(fork-repos (("foreign-1" . "my-repo")))', 1, true))
     assert.is_false(vim.api.nvim_buf_is_valid(confirm))
-    -- The origin's fork atom survived to the re-save.
+    -- The source buffer's fork atom survived to the re-save.
     vim.wait(3000, function ()
       return lock.stream_in_progress == nil end, 10)
-    assert.are.equal(origin, vim.api.nvim_get_current_buf())
+    assert.are.equal(source, vim.api.nvim_get_current_buf())
   end)
 
-  it('declining strips the fork atom from the origin', function ()
-    local origin = save_and_get_confirmation()
+  it('declining strips the fork atom from the source buffer', function ()
+    local source = save_and_get_confirmation()
     save.decline_fork()
     local text = table.concat(
-      vim.api.nvim_buf_get_lines(origin, 0, -1, false), '\n')
+      vim.api.nvim_buf_get_lines(source, 0, -1, false), '\n')
     assert.is_falsy(text:find('fork', 1, true))
     -- The confirmation buffer stays open for reference.
     assert.are.equal('skg://fork-confirmation',

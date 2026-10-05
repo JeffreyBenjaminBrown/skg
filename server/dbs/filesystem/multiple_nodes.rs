@@ -7,7 +7,7 @@ use crate::dbs::filesystem::one_node::{
   PreparedTelescopeWrite, prepare_graphnode_telescope,
   read_graphnode, validate_pid_matches_filename,
 };
-use crate::types::misc::{SkgConfig, SkgfileRepo, ID, RepoName};
+use crate::types::misc::{SkgConfig, SkgRepo, ID, SkgRepoName};
 use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::nodes::complete::Graphnode;
 
@@ -16,20 +16,20 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::fs::{self, DirEntry, ReadDir};
 
-/// Reads all .skg files from all configured repos.
-/// Sets each node's repo field to the appropriate repo name.
+/// Reads all .skg files from all configured skgrepos.
+/// Sets each node's skgrepo field to the appropriate skgrepo name.
 /// If any files fail to load, writes a detailed report to an
 /// org file in the config's data_root and returns a summary error.
 ///
 /// Load-time telescope violations are LOGGED here and dropped.
 /// Callers that report them to the user (init and rebuild) take
 /// 'read_all_skg_files_from_repos_collecting_violations' instead.
-pub fn read_all_skg_files_from_repos (
+pub fn read_all_skg_files_from_skgrepos (
   config: &SkgConfig
 ) -> io::Result<Vec<Graphnode>> {
   let (nodes, violations)
     : (Vec<Graphnode>, Vec<(ID, TelescopeViolation)>) =
-    read_all_skg_files_from_repos_collecting_violations (config) ?;
+    read_all_skg_files_from_skgrepos_collecting_violations (config) ?;
   for (pid, v) in &violations {
     tracing::warn! ( pid = %pid, violation = %v,
                      "telescope violation found at load" ); }
@@ -37,11 +37,11 @@ pub fn read_all_skg_files_from_repos (
 
 /// Import preflight must inspect authoritative export claims without
 /// creating or removing the loader's diagnostic reports.
-pub(crate) fn read_all_skg_files_from_repos_read_only (
+pub(crate) fn read_all_skg_files_from_skgrepos_read_only (
   config : &SkgConfig,
 ) -> io::Result<Vec<Graphnode>> {
   let (nodes, violations) =
-    read_all_skg_files_from_repos_impl (config, false)?;
+    read_all_skg_files_from_skgrepos_impl (config, false)?;
   if ! violations . is_empty () {
     return Err (io::Error::new (io::ErrorKind::InvalidData,
       "Configured repos have telescope violations; resolve them before import")); }
@@ -58,39 +58,39 @@ pub(crate) fn read_all_skg_files_from_repos_read_only (
 /// - every 'FoldWarning' (wrapped as 'TelescopeViolation::Fold'),
 /// - 'IgnoredForeignPidFolderlision', where owned and non-owned files
 ///   use the same pid. The owned telescope wins before folding.
-pub fn read_all_skg_files_from_repos_collecting_violations (
+pub fn read_all_skg_files_from_skgrepos_collecting_violations (
   config: &SkgConfig
 ) -> io::Result<(Vec<Graphnode>, Vec<(ID, TelescopeViolation)>)> {
-  read_all_skg_files_from_repos_impl (config, true)
+  read_all_skg_files_from_skgrepos_impl (config, true)
 }
 
-fn read_all_skg_files_from_repos_impl (
+fn read_all_skg_files_from_skgrepos_impl (
   config : &SkgConfig,
   report_errors : bool,
 ) -> io::Result<(Vec<Graphnode>, Vec<(ID, TelescopeViolation)>)> {
   let mut sections_by_pid
-    : HashMap<ID, Vec<(RepoName, GraphnodeOnDisk)>> = HashMap::new();
+    : HashMap<ID, Vec<(SkgRepoName, GraphnodeOnDisk)>> = HashMap::new();
   let mut pid_order : Vec<ID> = Vec::new(); // deterministic output
-  let mut load_errors: Vec<(String, // repo name
+  let mut load_errors: Vec<(String, // skgrepo name
                             String, // filename
                             String)> // error message
     = Vec::new();
-  for repo_name in config . ordered_repos () {
-    let Some (repo) : Option<&SkgfileRepo> =
-      config . repos . get (&repo_name) else { continue; };
-    match read_skg_sections_from_folder (&repo_name, config) {
+  for skgrepo_name in config . ordered_skgrepos () {
+    let Some (skgrepo) : Option<&SkgRepo> =
+      config . skgrepos . get (&skgrepo_name) else { continue; };
+    match read_skg_sections_from_folder (&skgrepo_name, config) {
       Ok (sections) => {
-        for (repo, node_fs) in sections {
+        for (skgrepo, node_fs) in sections {
           let pid : ID = node_fs . pid . clone ();
           if ! sections_by_pid . contains_key (&pid) {
             pid_order . push ( pid . clone () ); }
           sections_by_pid . entry (pid)
             . or_insert_with (Vec::new)
-            . push ((repo, node_fs)); }}
+            . push ((skgrepo, node_fs)); }}
       Err (e) => {
         load_errors . push ((
-          repo_name . to_string(),
-          repo . path . display() . to_string(),
+          skgrepo_name . to_string(),
+          skgrepo . path . display() . to_string(),
           e . to_string()
         )); }} }
   if report_errors {
@@ -117,7 +117,7 @@ fn read_all_skg_files_from_repos_impl (
 /// owned files before folding or building the extra-id map. A pid
 /// represented entirely by non-owned files remains readable.
 fn retain_owned_telescopes (
-  sections_by_pid : &mut HashMap<ID, Vec<(RepoName, GraphnodeOnDisk)>>,
+  sections_by_pid : &mut HashMap<ID, Vec<(SkgRepoName, GraphnodeOnDisk)>>,
   pid_order       : &[ID],
   config          : &SkgConfig,
 ) -> Vec<(ID, TelescopeViolation)> {
@@ -132,7 +132,7 @@ fn retain_owned_telescopes (
       violations . push ((
         pid . clone (),
         TelescopeViolation::IgnoredForeignPidFolderlision {
-          ignored_repos : collision . ignored_repos,
+          ignored_skgrepos : collision . ignored_skgrepos,
         } )); }}
   violations }
 
@@ -142,9 +142,9 @@ pub fn graphnode_from_telescope_on_disk (
   config : &SkgConfig,
   pid    : &ID,
 ) -> io::Result<Graphnode> {
-  crate::dbs::filesystem::one_node::graphnode_from_pid_and_repo (
+  crate::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo (
     config, pid . clone (),
-    & RepoName::from ("(any)") ) }
+    & SkgRepoName::from ("(any)") ) }
 
 /// Fold each telescope (already grouped by pid; sections arrive in
 /// privacy order because the caller iterated 'ordered_repos').
@@ -154,7 +154,7 @@ pub fn graphnode_from_telescope_on_disk (
 /// fold complaint comes back as a violation for the caller to
 /// report.
 fn fold_grouped_sections (
-  mut sections_by_pid : HashMap<ID, Vec<(RepoName, GraphnodeOnDisk)>>,
+  mut sections_by_pid : HashMap<ID, Vec<(SkgRepoName, GraphnodeOnDisk)>>,
   pid_order           : Vec<ID>,
   config              : &SkgConfig,
 ) -> io::Result<(Vec<Graphnode>, Vec<(ID, TelescopeViolation)>)> {
@@ -165,9 +165,9 @@ fn fold_grouped_sections (
         for extra in &node_fs . extra_ids {
           m . insert ( extra . clone (), pid . clone () ); }} }
     m };
-  let resolve = |id : &ID| -> ID {
-    pid_of . get (id) . cloned ()
-      . unwrap_or_else ( || id . clone () ) };
+  let resolve = |skgid : &ID| -> ID {
+    pid_of . get (skgid) . cloned ()
+      . unwrap_or_else ( || skgid . clone () ) };
   let mut all_nodes : Vec<Graphnode> = Vec::new ();
   let mut all_violations : Vec<(ID, TelescopeViolation)> = Vec::new ();
   for pid in pid_order {
@@ -186,7 +186,7 @@ fn fold_grouped_sections (
         ( pid . clone (), TelescopeViolation::Fold (w) )); }}
   Ok (( all_nodes, all_violations )) }
 
-/// NOT AN ERROR: same-id files across repos. Those are the
+/// NOT AN ERROR: same-id files across skgrepos. Those are the
 /// SECTIONS of one privacy telescope, grouped and folded at load,
 /// and they are the feature -- see docs/telescopes.org. Sections of
 /// one telescope share a pid, so they can never trip this check.
@@ -194,37 +194,37 @@ fn fold_grouped_sections (
 /// THE ERROR: one id claimed by two DIFFERENT nodes -- an id
 /// (primary or extra) appearing among the all_ids() of two nodes
 /// with distinct pids. Nothing about it is cross-repo; both
-/// claimants can sit in one repo. If any exists, writes a detailed
+/// claimants can sit in one skgrepo. If any exists, writes a detailed
 /// report (to stderr for ≤10, to an org file otherwise) and returns
 /// a summary error. (Callers pass post-fold nodes, one per
 /// telescope.)
-pub fn error_unless_each_id_names_one_node (
+pub fn error_unless_each_skgid_names_one_node (
   nodes     : &[Graphnode],
   data_root : &Path,
 ) -> io::Result<()> {
-  let mut claimants: HashMap < ID, Vec<(ID, RepoName)> > =
+  let mut claimants: HashMap < ID, Vec<(ID, SkgRepoName)> > =
     // Maps each ID to the (pid, home) of every node claiming it
     HashMap::new();
   for node in nodes {
-    for id in node . all_ids() {
-      claimants . entry (id . clone())
+    for skgid in node . all_skgids() {
+      claimants . entry (skgid . clone())
         . or_insert_with (Vec::new)
-        . push ((node . pid . clone(), node . home_repo . clone())); }}
-  let contested: HashMap<ID, Vec<(ID, RepoName)>> =
+        . push ((node . pid . clone(), node . home_skgrepo . clone())); }}
+  let contested: HashMap<ID, Vec<(ID, SkgRepoName)>> =
     claimants . into_iter()
-    . filter ( |(_, owners)| {
+    . filter ( |(_, recorders)| {
       let distinct_pids : HashSet<&ID> =
-        owners . iter() . map ( |(pid, _)| pid ) . collect();
+        recorders . iter() . map ( |(pid, _)| pid ) . collect();
       distinct_pids . len() > 1 } )
     . collect();
-  report_ids_claimed_by_two_nodes (&contested, data_root) ?;
+  report_skgids_claimed_by_two_nodes (&contested, data_root) ?;
   if contested . is_empty() {
     return Ok (( )); }
   let msg: String =
     if contested . len() <= 10 {
       // Include details in error message for small numbers
       let ids_list: Vec<String> = contested . keys()
-        . map ( |id| format! ("'{}'", id) )
+        . map ( |skgid| format! ("'{}'", skgid) )
         . collect();
       format! ("{} id(s) claimed by more than one node: {}",
                contested . len(),
@@ -236,17 +236,17 @@ pub fn error_unless_each_id_names_one_node (
     io::ErrorKind::InvalidData, msg )) }
 
 pub fn read_skg_sections_from_folder (
-  repo_name : &RepoName,
-  config      : &SkgConfig,
-) -> io::Result < Vec<(RepoName, GraphnodeOnDisk)> > {
-  let repo : &SkgfileRepo =
-    config . repos . get (repo_name)
+  skgrepo_name : &SkgRepoName,
+  config       : &SkgConfig,
+) -> io::Result < Vec<(SkgRepoName, GraphnodeOnDisk)> > {
+  let skgrepo : &SkgRepo =
+    config . skgrepos . get (skgrepo_name)
     . ok_or_else(|| io::Error::new(
       io::ErrorKind::NotFound,
-      format!("Repo '{}' not found in config", repo_name)))?;
-  let mut sections : Vec<(RepoName, GraphnodeOnDisk)> = Vec::new ();
+      format!("Repo '{}' not found in config", skgrepo_name)))?;
+  let mut sections : Vec<(SkgRepoName, GraphnodeOnDisk)> = Vec::new ();
   let entries : ReadDir = // an iterator
-    fs::read_dir (&repo . path) ?;
+    fs::read_dir (&skgrepo . path) ?;
   for entry in entries {
     let entry : DirEntry = entry ?;
     let path : PathBuf = entry . path () ;
@@ -257,22 +257,22 @@ pub fn read_skg_sections_from_folder (
       let node_fs : GraphnodeOnDisk =
         read_graphnode (&path) ?;
       validate_pid_matches_filename (&node_fs, &path) ?;
-      sections . push (( repo_name . clone (), node_fs )); }}
+      sections . push (( skgrepo_name . clone (), node_fs )); }}
   Ok (sections) }
 
 /// Like `read_all_skg_files_from_repos` but only for telescopes
 /// with at least one section file whose mtime is more recent than
 /// `since`. A touched SECTION reloads its WHOLE telescope (all its
-/// sections, however old), since the fold needs every repo.
-pub fn read_recently_modified_skgfiles_from_repos (
+/// sections, however old), since the fold needs every skgrepo.
+pub fn read_recently_modified_skgfiles_from_skgrepos (
   config : &SkgConfig,
   since  : std::time::SystemTime,
 ) -> io::Result<Vec<Graphnode>> {
   let mut modified_pids : Vec<ID> = Vec::new();
-  let mut seen_ids      : HashSet<ID> = HashSet::new();
-  for (_repo_name, repo) in config . repos . iter() {
+  let mut seen_skgids      : HashSet<ID> = HashSet::new();
+  for (_skgrepo_name, skgrepo) in config . skgrepos . iter() {
     let entries : ReadDir =
-      fs::read_dir (&repo . path) ?;
+      fs::read_dir (&skgrepo . path) ?;
     for entry in entries {
       let entry : DirEntry = entry ?;
       let path  : PathBuf  = entry . path();
@@ -288,7 +288,7 @@ pub fn read_recently_modified_skgfiles_from_repos (
       validate_pid_matches_filename (&node_fs, &path) ?;
       let pid : ID =
         node_fs . pid . clone();
-      if seen_ids . insert (pid . clone()) {
+      if seen_skgids . insert (pid . clone()) {
         modified_pids . push (pid); }} }
   let mut all_nodes : Vec<Graphnode> = Vec::new();
   for pid in modified_pids {
@@ -305,8 +305,8 @@ pub fn read_recently_modified_skgfiles_from_repos (
 /// Otherwise writes a detailed report to an org file, and for ≤10
 /// also lists each conflict on stderr; for >10, logs the count and
 /// the file path.
-fn report_ids_claimed_by_two_nodes(
-  contested : &HashMap<ID, Vec<(ID, RepoName)>>,
+fn report_skgids_claimed_by_two_nodes(
+  contested : &HashMap<ID, Vec<(ID, SkgRepoName)>>,
   data_root : &Path,
 ) -> io::Result<()> {
   let count: usize = contested . len();
@@ -315,7 +315,7 @@ fn report_ids_claimed_by_two_nodes(
     "initialization-error_ids-claimed-by-two-nodes.org");
   if count == 0 {
     return remove_stale_report (&report_path); }
-  let claimant_lines = | claimants : &Vec<(ID, RepoName)> |
+  let claimant_lines = | claimants : &Vec<(ID, SkgRepoName)> |
                        -> Vec<String> {
     let mut lines : Vec<String> = // for deterministic output
       claimants . iter ()
@@ -331,12 +331,12 @@ fn report_ids_claimed_by_two_nodes(
     content . push_str( &format!(
       "{} id(s) claimed by more than one node. Same-id files ACROSS REPOS are not this: those are the sections of one privacy telescope (docs/telescopes.org). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n",
       count));
-    let mut sorted_ids: Vec<(&ID, &Vec<(ID, RepoName)>)> =
+    let mut sorted_skgids: Vec<(&ID, &Vec<(ID, SkgRepoName)>)> =
       // for deterministic output
       contested . iter() . collect();
-    sorted_ids . sort_by_key(|(id, _)| *id);
-    for (id, claimants) in sorted_ids {
-      content . push_str(&format!("* {}\n", id));
+    sorted_skgids . sort_by_key(|(skgid, _)| *skgid);
+    for (skgid, claimants) in sorted_skgids {
+      content . push_str(&format!("* {}\n", skgid));
       for line in claimant_lines (claimants) {
         content . push_str(&format!("** {}\n", line)); }}
     content };
@@ -344,9 +344,9 @@ fn report_ids_claimed_by_two_nodes(
   if count <= 10 {
     tracing::error!("{} id(s) claimed by more than one node:",
               count);
-    for (id, claimants) in contested . iter() {
+    for (skgid, claimants) in contested . iter() {
       tracing::error!("  - ID '{}' claimed by: {}",
-                id, claimant_lines (claimants) . join (", ")); }
+                skgid, claimant_lines (claimants) . join (", ")); }
   } else {
     tracing::error!("{} id(s) claimed by more than one node.",
               count);
@@ -391,9 +391,9 @@ fn report_load_errors(
     errors . to_vec();
   sorted_errors . sort_by(|a, b| a . 1 . cmp(&b . 1));
 
-  for (repo, filename_or_path, error_msg) in sorted_errors {
+  for (skgrepo, filename_or_path, error_msg) in sorted_errors {
     content . push_str(&format!("* {}\n", filename_or_path));
-    content . push_str(&format!("** {}\n", repo));
+    content . push_str(&format!("** {}\n", skgrepo));
     content . push_str(&format!("*** Error: {}\n", error_msg));
   }
 
@@ -405,7 +405,7 @@ fn report_load_errors(
 }
 
 /// Writes all given `Graphnode`s to disk as telescopes: each
-/// node's sections land in their repo directories, named
+/// node's sections land in their skgrepo directories, named
 /// by the primary ID followed by `.skg`.
 pub fn write_all_nodes_to_fs (
   nodes  : Vec<Graphnode>,
@@ -423,22 +423,22 @@ pub fn write_all_nodes_to_fs (
   Ok (prepared . len ()) }
 
 /// Deleting a node deletes its whole TELESCOPE: every owned
-/// section file of that pid, in whatever repo. (The RepoName in
+/// section file of that pid, in whatever skgrepo. (The RepoName in
 /// each target is the caller's belief about the home; kept in the
-/// signature for its callers, but every owned repo is swept.)
+/// signature for its callers, but every owned skgrepo is swept.)
 pub fn delete_all_nodes_from_fs (
-  delete_targets : Vec<(ID, RepoName)>,
+  delete_targets : Vec<(ID, SkgRepoName)>,
   config         : SkgConfig,
 ) -> io::Result<usize> { // number of nodes deleted
 
   let mut deleted : usize = 0;
-  for (pid, _repo) in delete_targets {
+  for (pid, _skgrepo) in delete_targets {
     let mut any_removed : bool = false;
-    for repo_name in config . ordered_repos () {
-      if ! config . user_owns_repo (&repo_name) { continue; }
+    for skgrepo_name in config . ordered_skgrepos () {
+      if ! config . skgrepo_is_owned (&skgrepo_name) { continue; }
       let path : String =
-        match crate::util::path_from_pid_and_repo (
-          & config, & repo_name, pid . clone () ) {
+        match crate::util::path_from_pid_and_skgrepo (
+          & config, & skgrepo_name, pid . clone () ) {
           Ok (p) => p,
           Err (_) => continue, };
       match fs::remove_file ( &path )

@@ -1,7 +1,7 @@
 tantivy_folder = "/tmp/placeholder"
 
-# owned/ is the default owned_folder, so "main" is user-owned and
-# "foreign" is write-protected. See TODO/override-ancestry-in-search-results.org.
+# owned/ is the default owned_folder, so "main" is owned and
+# "foreign" is write-protected. See TODO/DONE/override-ancestry-in-search-results.org.
 [[repos]]
 name = "main"
 path = "owned/main"

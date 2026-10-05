@@ -14,7 +14,7 @@ pub use skg::dbs::init::create_empty_tantivy_index;
 pub use skg::to_org::render::content_view::multi_root_view;
 pub use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 pub use skg::test_utils::graph_handle_from_config;
-pub use skg::types::misc::{ID, SkgConfig, SkgfileRepo, TantivyIndex, RepoName};
+pub use skg::types::misc::{ID, SkgConfig, SkgRepo, TantivyIndex, SkgRepoName};
 pub use skg::dbs::in_rust_graph::InRustGraphHandle;
 pub use skg::types::nodes::fs::GraphnodeOnDisk;
 pub use skg::types::nodes::complete::Graphnode;
@@ -70,17 +70,17 @@ pub fn commit_all(gitrepo: &Repository, message: &str) {
 
 pub async fn setup_test_stores(
   _test_name: &str,
-  repo_path: &str,
+  skgrepo_path: &str,
   tantivy_folder: &str,
 ) -> Result<(SkgConfig, TantivyIndex), Box<dyn Error>> {
-  let mut repos : HashMap<RepoName, SkgfileRepo> = HashMap::new();
-  repos . insert (RepoName::from ("main"), SkgfileRepo {
-    name: RepoName::from ("main"),
+  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> = HashMap::new();
+  skgrepos . insert (SkgRepoName::from ("main"), SkgRepo {
+    name: SkgRepoName::from ("main"),
     abbreviation: None,
-    path: PathBuf::from (repo_path),
-    user_owns_it: true, });
-  let config = SkgConfig::fromReposAndTantivyFolder (
-    repos, tantivy_folder );
+    path: PathBuf::from (skgrepo_path),
+    owned: true, });
+  let config = SkgConfig::fromSkgReposAndTantivyFolder (
+    skgrepos, tantivy_folder );
   let tantivy_index =
     create_empty_tantivy_index (&config . tantivy_folder) ?;
   Ok ((config, tantivy_index)) }
@@ -104,13 +104,13 @@ pub async fn cleanup_test_stores(
 // Disk verification helpers
 //
 
-pub fn read_graphnode(gitrepo_path: &Path, id: &str) -> Result<Graphnode, Box<dyn Error>> {
-  // Read YAML as GraphnodeOnDisk, then attach Skg repo.
-  // Tests in this module use Skg repo "main".
-  let path = gitrepo_path . join(format!("{}.skg", id));
+pub fn read_graphnode(gitrepo_path: &Path, skgid: &str) -> Result<Graphnode, Box<dyn Error>> {
+  // Read YAML as GraphnodeOnDisk, then attach skgrepo.
+  // Tests in this module use skgrepo "main".
+  let path = gitrepo_path . join(format!("{}.skg", skgid));
   let content = fs::read_to_string (&path)?;
   let node_fs: GraphnodeOnDisk = serde_yaml::from_str (&content)?;
-  Ok ( node_fs . into_complete_as_single_section ( RepoName::from ("main") ))
+  Ok ( node_fs . into_complete_as_single_section ( SkgRepoName::from ("main") ))
 }
 
 //
@@ -250,7 +250,7 @@ pub fn insert_after(buffer: &str, after_substring: &str, new_line: &str) -> Stri
 // Test setup helper
 //
 
-/// Create a git repo with head->worktree transition from fixture directories.
+/// Create a gitrepo with head->worktree transition from fixture directories.
 /// The worktree changes land unstaged (index == HEAD).
 pub fn setup_gitrepo_with_fixtures(
   gitrepo_path: &Path,

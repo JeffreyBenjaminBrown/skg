@@ -44,7 +44,7 @@ one we have stopped arguing about; none of them are coded yet.
   Its own doc comment (line 136) says so in as many words.
 
   I checked every call site. All nine pass POST-FOLD nodes -- one
-  NodeComplete per telescope, never one per file:
+  Graphnode per telescope, never one per file:
 
   - server/main.rs:140 (from 'initialize_dbs')
   - server/save.rs:132 (TypeDB-rebuild fallback)

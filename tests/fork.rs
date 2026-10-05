@@ -1,8 +1,8 @@
 // cargo nextest run --test grouped_overrides -E 'test(fork::)'
 //
 // The fork/clone feature: editing a foreign node N (write-protected, in a
-// repo the user does not own) is read as a request to clone it. The
-// clone C lives in an owned repo, copies N's edited title/body/
+// skgrepo the user does not own) is read as a request to clone it. The
+// clone C lives in an owned skgrepo, copies N's edited title/body/
 // contains, subscribes to N and overrides N; N itself is untouched.
 //
 // Installs the explicit graph handle (override substitution and
@@ -15,27 +15,27 @@ use indoc::indoc;
 
 use std::collections::{BTreeSet, HashMap};
 
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::{
   InRustGraphHandle};
 use skg::from_text::buffer_to_validated_saveplan;
-use skg::from_text::buffer_to_validated_saveplan_with_fork_repos;
+use skg::from_text::buffer_to_validated_saveplan_with_fork_skgrepos;
 use skg::org_to_text::viewforest_to_string;
 use skg::serve::ViewsState;
-use skg::repo_sets::{ActiveRepoSet, RepoSetName};
+use skg::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_approval_test;
-use skg::test_utils::update_from_and_rerender_buffer_with_fork_repos_test;
+use skg::test_utils::update_from_and_rerender_buffer_with_fork_skgrepos_test;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::errors::{BufferValidationError, SaveError};
-use skg::types::misc::{ID, SkgConfig, RepoName, TantivyIndex, members_of};
+use skg::types::misc::{ID, SkgConfig, SkgRepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
-use skg::types::save::{DefineNode, ForkSpec, SaveNode};
+use skg::types::save::{NodeInstruction, ForkSpec, SaveNode};
 use skg::types::views_state::{OpenViews, ViewUri};
 
 /// A foreign node N (title "N-original", contains [N1, N2]) lives under
-/// an OWNED container P. The buffer makes N definitive and edits its
+/// an OWNED container P. The buffer makes N editable and edits its
 /// title to "N-edited" -- a real change, so saving forks N. (N's
 /// children stay write-protected foreign content.)
 const FORK_BUFFER : &str = indoc! {"
@@ -46,8 +46,8 @@ const FORK_BUFFER : &str = indoc! {"
   "};
 
 /// A foreign node N opened as a bare ROOT -- no owned ancestor to infer
-/// a clone repo from. Editing its title forks it; the clone's repo
-/// must then default to the user's first owned repo.
+/// a clone skgrepo from. Editing its title forks it; the clone's skgrepo
+/// must then default to the user's first owned skgrepo.
 const FORK_ROOT_BUFFER : &str = indoc! {"
   * (skg (node (id N) (repo foreign))) N-edited
   ** (skg (node (id N1) (repo foreign) writeProtected)) N1
@@ -56,9 +56,9 @@ const FORK_ROOT_BUFFER : &str = indoc! {"
 
 /// Case 1 of TODO/fork-fixes.org: a BARE new headline (no metadata at
 /// all) appended under a foreign root. Enrichment mints it an id and
-/// inherits the foreign repo; that must NOT be a foreign-creation
+/// inherits the foreign skgrepo; that must NOT be a foreign-creation
 /// error -- appending it edits N's contains, which forks N, and the
-/// new node rides that fork, adopting the clone's repo.
+/// new node rides that fork, adopting the clone's skgrepo.
 const FORK_WITH_BARE_NEW_CHILD_BUFFER : &str = indoc! {"
   * (skg (node (id N) (repo foreign))) N-original
   ** (skg (node (id N1) (repo foreign) writeProtected)) N1
@@ -68,7 +68,7 @@ const FORK_WITH_BARE_NEW_CHILD_BUFFER : &str = indoc! {"
 
 /// The structural fork gesture: insert a bare new parent under foreign N,
 /// then move old content N1 beneath it. The new node and its inherited
-/// `contains N1` edge must both adopt the clone's owned repo.
+/// `contains N1` relationship must both adopt the clone's owned skgrepo.
 const FORK_WITH_NEW_PARENT_FOR_OLD_CHILD_BUFFER : &str = indoc! {"
   * (skg (node (id N) (repo foreign))) N-original
   ** New parent
@@ -76,8 +76,8 @@ const FORK_WITH_NEW_PARENT_FOR_OLD_CHILD_BUFFER : &str = indoc! {"
   ** (skg (node (id N2) (repo foreign) writeProtected)) N2
   "};
 
-/// Same shape, but the new node EXPLICITLY claims the foreign repo:
-/// a deliberate attempt to create a node in a write-protected repo, which
+/// Same shape, but the new node EXPLICITLY claims the foreign skgrepo:
+/// a deliberate attempt to create a node in a write-protected skgrepo, which
 /// must stay rejected.
 const FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER : &str = indoc! {"
   * (skg (node (id N) (repo foreign))) N-original
@@ -105,7 +105,7 @@ fn clone_overriding_on_disk (
   config : &SkgConfig,
   target : &str,
 ) -> Result<Graphnode, Box<dyn Error>> {
-  read_all_skg_files_from_repos (config) ?
+  read_all_skg_files_from_skgrepos (config) ?
     . into_iter ()
     . find ( |node| node . overrides_view_of . or_default () . iter ()
              . any ( |m| m . member == ID::from (target) ) )
@@ -129,10 +129,10 @@ fn node_from_disk (
   config : &SkgConfig,
   pid    : &str,
 ) -> Result<Graphnode, Box<dyn Error>> {
-  let id : ID = ID::from (pid);
-  read_all_skg_files_from_repos (config) ?
+  let skgid : ID = ID::from (pid);
+  read_all_skg_files_from_skgrepos (config) ?
     . into_iter ()
-    . find ( |node| node . pid == id )
+    . find ( |node| node . pid == skgid )
     . ok_or_else ( || format! ("node not found on disk: {}", pid) . into () ) }
 
 /// The single clone produced by saving the FORK_BUFFER -- the owned
@@ -141,7 +141,7 @@ fn node_from_disk (
 fn clone_on_disk (
   config : &SkgConfig,
 ) -> Result<Graphnode, Box<dyn Error>> {
-  read_all_skg_files_from_repos (config) ?
+  read_all_skg_files_from_skgrepos (config) ?
     . into_iter ()
     . find ( |node|
       node . overrides_view_of . or_default () . iter ()
@@ -171,7 +171,7 @@ fn all_tests
       fork_monogamy (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("fork_repo_inactive", fixtures) ?;
-      fork_repo_inactive (
+      fork_skgrepo_inactive (
         &s . config ) . await ?;
       s . reset ("fork_confirmation_gates_commit", fixtures) ?;
       fork_confirmation_gates_commit (
@@ -180,7 +180,7 @@ fn all_tests
       fork_from_bare_new_child_plan (
         &s . config ) . await ?;
       s . reset ("fork_new_parent_adopts_relationship_repos", fixtures) ?;
-      fork_new_parent_adopts_relationship_repos (
+      fork_new_parent_adopts_relationship_skgrepos (
         &s . config ) . await ?;
       s . reset ("fork_from_bare_new_child_commits", fixtures) ?;
       fork_from_bare_new_child_commits (
@@ -193,19 +193,19 @@ fn all_tests
       fork_no_owned_ancestor_defaults (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("fork_user_set_repo_overrides", two_owned) ?;
-      fork_user_set_repo_overrides (
+      fork_user_set_skgrepo_overrides (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("fork_default_prefers_active_owned_repo", two_owned) ?;
-      fork_default_prefers_active_owned_repo (
+      fork_default_prefers_active_owned_skgrepo (
         &s . config ) . await ?;
       s . reset ("fork_user_set_repo_not_owned_rejected", two_owned) ?;
-      fork_user_set_repo_not_owned_rejected (
+      fork_user_set_skgrepo_not_owned_rejected (
         &s . config ) . await ?;
       s . reset ("explicit_new_child_repo_confirms_clone_repo", two_owned) ?;
-      explicit_new_child_repo_confirms_clone_repo (
+      explicit_new_child_skgrepo_confirms_clone_skgrepo (
         &s . config ) . await ?;
       s . reset ("disagreeing_new_child_repos_leave_clone_repo_unconfirmed", two_owned) ?;
-      disagreeing_new_child_repos_leave_clone_repo_unconfirmed (
+      disagreeing_new_child_skgrepos_leave_clone_skgrepo_unconfirmed (
         &s . config ) . await ?;
       s . reset ("explicit_fork_save_instruction", fixtures) ?;
       explicit_fork_save_instruction (
@@ -221,7 +221,7 @@ fn all_tests
 /// The explicit fork of an OWNED node P: the SavePlan carries one
 /// ForkSpec whose clone copies P's DISK snapshot (title/contains),
 /// subscribes_to=[P], overrides_view_of=[P], in the config-first owned
-/// repo. P itself keeps its own (owned) save -- it is not dropped like
+/// skgrepo. P itself keeps its own (owned) save -- it is not dropped like
 /// a foreign fork's original.
 async fn explicit_fork_save_instruction (
   config : &SkgConfig,
@@ -231,7 +231,7 @@ async fn explicit_fork_save_instruction (
   assert_eq! ( fork_specs . len (), 1,
     "exactly one explicit fork (of P): {:?}", fork_specs );
   let spec : &ForkSpec = &fork_specs[0];
-  assert_eq! ( spec . original_id, ID::from ("P") );
+  assert_eq! ( spec . original_skgid, ID::from ("P") );
   let c : &Graphnode = &spec . clone . 0;
   assert_eq! ( c . title, "P-container",
     "clone copies P's disk title (not a buffer edit)" );
@@ -241,9 +241,9 @@ async fn explicit_fork_save_instruction (
     "clone subscribes to P" );
   assert_eq! ( members_of ( c . overrides_view_of . or_default () ), vec! [ ID::from ("P") ],
     "clone overrides P" );
-  assert_eq! ( c . home_repo, RepoName::from ("owned"),
+  assert_eq! ( c . home_skgrepo, SkgRepoName::from ("owned"),
     "clone defaults to the config-first owned repo; got {:?}",
-    c . home_repo );
+    c . home_skgrepo );
   assert_ne! ( c . pid, ID::from ("P"),
     "clone has a fresh pid, not P's" );
   Ok (( )) }
@@ -280,20 +280,20 @@ async fn explicit_fork_round_trip_and_monogamy (
   let response = update_from_and_rerender_buffer_with_fork_approval_test (
     &mut stream, EXPLICIT_FORK_BUFFER, config, tantivy, &graph,
     false, &Err ( String::new () ), &mut views_state,
-    /* fork_approved = */ true ) . await ?;
+    /* approved_forks = */ true ) . await ?;
   assert! ( response . errors . is_empty (),
     "the approved explicit fork must commit: {:?}", response . errors );
   let clone : Graphnode = clone_overriding_on_disk (config, "P") ?;
   assert_eq! ( members_of ( clone . subscribes_to . or_default () ), vec! [ ID::from ("P") ],
     "the clone subscribes to P" );
-  assert! ( config . user_owns_repo (& clone . home_repo),
+  assert! ( config . skgrepo_is_owned (& clone . home_skgrepo),
     "the clone lives in an owned repo" );
   // P is untouched (still owns its container role).
   assert_eq! ( members_of (& node_from_disk (config, "P") ? . contains),
                vec! [ ID::from ("N") ],
     "P keeps its own contains; the explicit fork does not rewrite it" );
 
-  // Forking P again is rejected: it now has a user-owned overrider.
+  // Forking P again is rejected: it now has an owned overrider.
   let result = buffer_to_validated_saveplan (
     EXPLICIT_FORK_BUFFER, config, None ) ;
   match result {
@@ -308,44 +308,44 @@ async fn explicit_fork_round_trip_and_monogamy (
       other ), }
   Ok (( )) }
 
-/// Under a restricted repo-set, the clone-repo DEFAULT must prefer an
-/// owned repo that is ACTIVE. Here "owned" (alphabetically first owned)
-/// is inactive and "owned2" is the only active owned repo; a foreign
+/// Under a restricted skgrepo-set, the clone-repo DEFAULT must prefer an
+/// owned skgrepo that is ACTIVE. Here "owned" (alphabetically first owned)
+/// is inactive and "owned2" is the only active owned skgrepo; a foreign
 /// node with no owned ancestor must default to "owned2" and reach the
 /// confirmation stage, not dead-end on ForkRepoInactive.
-async fn fork_default_prefers_active_owned_repo (
+async fn fork_default_prefers_active_owned_skgrepo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  let active : ActiveRepoSet = ActiveRepoSet {
-    name    : RepoSetName ("only-owned2" . to_string ()),
-    repos : BTreeSet::from ([ RepoName::from ("owned2"),
-                               RepoName::from ("foreign") ]), };
+  let active : ActiveSkgRepoSet = ActiveSkgRepoSet {
+    name    : SkgRepoSetName ("only-owned2" . to_string ()),
+    skgrepos : BTreeSet::from ([ SkgRepoName::from ("owned2"),
+                               SkgRepoName::from ("foreign") ]), };
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
     FORK_ROOT_BUFFER, config, Some (&active) )  ?;
   assert_eq! ( save_plan . fork_specs . len (), 1,
     "the fork must resolve, not dead-end on an inactive default repo" );
-  assert_eq! ( save_plan . fork_specs[0] . clone . 0 . home_repo,
-               RepoName::from ("owned2"),
+  assert_eq! ( save_plan . fork_specs[0] . clone . 0 . home_skgrepo,
+               SkgRepoName::from ("owned2"),
     "with 'owned' inactive, the default must prefer the active owned 'owned2'; got {:?}",
-    save_plan . fork_specs[0] . clone . 0 . home_repo );
+    save_plan . fork_specs[0] . clone . 0 . home_skgrepo );
   Ok (( )) }
 
-/// A user-set clone repo that the user does NOT own (a configured but
-/// foreign repo, which the C-c s s prompt would let one type) is
+/// A user-set clone skgrepo that the user does NOT own (a configured but
+/// foreign skgrepo, which the C-c s s prompt would let one type) is
 /// rejected with ForkRepoNotOwned.
-async fn fork_user_set_repo_not_owned_rejected (
+async fn fork_user_set_skgrepo_not_owned_rejected (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  let fork_repos : HashMap<ID, RepoName> =
-    HashMap::from ([ ( ID::from ("N"), RepoName::from ("foreign") ) ]);
-  let result = buffer_to_validated_saveplan_with_fork_repos (
-    FORK_BUFFER, config, None, &fork_repos ) ;
+  let fork_skgrepos : HashMap<ID, SkgRepoName> =
+    HashMap::from ([ ( ID::from ("N"), SkgRepoName::from ("foreign") ) ]);
+  let result = buffer_to_validated_saveplan_with_fork_skgrepos (
+    FORK_BUFFER, config, None, &fork_skgrepos ) ;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
-        BufferValidationError::ForkRepoNotOwned (orig, repo)
+        BufferValidationError::ForkSkgRepoNotOwned (orig, skgrepo)
           if *orig == ID::from ("N")
-             && *repo == RepoName::from ("foreign") )),
+             && *skgrepo == SkgRepoName::from ("foreign") )),
         "expected ForkRepoNotOwned(N, foreign), got {:?}", errors ); }
     other => panic! (
       "expected ForkRepoNotOwned rejecting a non-owned chosen repo, got {:?}",
@@ -353,8 +353,8 @@ async fn fork_user_set_repo_not_owned_rejected (
   Ok (( )) }
 
 /// A foreign node with NO owned ancestor still forks: with no user-set
-/// repo and nothing to infer, the clone's repo defaults to the
-/// user's first owned repo (alphabetically "owned", here). No more
+/// skgrepo and nothing to infer, the clone's skgrepo defaults to the
+/// user's first owned skgrepo (alphabetically "owned", here). No more
 /// 'ForkRepoUnresolved' hard-fail.
 async fn fork_no_owned_ancestor_defaults (
   config : &SkgConfig,
@@ -371,9 +371,9 @@ async fn fork_no_owned_ancestor_defaults (
   assert! ( response . errors . is_empty (),
     "a fork with no owned ancestor must complete: {:?}", response . errors );
   let c : Graphnode = clone_on_disk (config) ?;
-  assert_eq! ( c . home_repo, RepoName::from ("owned"),
+  assert_eq! ( c . home_skgrepo, SkgRepoName::from ("owned"),
     "with no owned ancestor and no user-set repo, the clone defaults to \
-     the first owned repo (alphabetically 'owned'); got {:?}", c . home_repo );
+     the first owned repo (alphabetically 'owned'); got {:?}", c . home_skgrepo );
   let root_line : &str = response . saved_view . lines () . next ()
     . ok_or ("the saved root view must not be empty") ?;
   assert! ( root_line . contains (&format! ("(id {})", c . pid . 0))
@@ -385,10 +385,10 @@ async fn fork_no_owned_ancestor_defaults (
     response . saved_view );
   Ok (( )) }
 
-/// The user-set clone repo (the 'fork-repos' transport) overrides
+/// The user-set clone skgrepo (the 'fork-repos' transport) overrides
 /// the inferred one. FORK_BUFFER infers "owned" from the owned ancestor
 /// P; passing N -> "owned2" lands the clone in "owned2" instead.
-async fn fork_user_set_repo_overrides (
+async fn fork_user_set_skgrepo_overrides (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -396,26 +396,26 @@ async fn fork_user_set_repo_overrides (
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false, open_views : OpenViews::new () };
-  let fork_repos : HashMap<ID, RepoName> =
-    HashMap::from ([ ( ID::from ("N"), RepoName::from ("owned2") ) ]);
+  let fork_skgrepos : HashMap<ID, SkgRepoName> =
+    HashMap::from ([ ( ID::from ("N"), SkgRepoName::from ("owned2") ) ]);
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
-  let response = update_from_and_rerender_buffer_with_fork_repos_test (
+  let response = update_from_and_rerender_buffer_with_fork_skgrepos_test (
     &mut stream, FORK_BUFFER, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state,
-    /* fork_approved = */ true, &fork_repos ) . await ?;
+    /* approved_forks = */ true, &fork_skgrepos ) . await ?;
   assert! ( response . errors . is_empty (),
     "the user-set fork must commit: {:?}", response . errors );
   let c : Graphnode = clone_on_disk (config) ?;
-  assert_eq! ( c . home_repo, RepoName::from ("owned2"),
+  assert_eq! ( c . home_skgrepo, SkgRepoName::from ("owned2"),
     "the user-set repo 'owned2' must override the inferred 'owned'; \
-     got {:?}", c . home_repo );
+     got {:?}", c . home_skgrepo );
   Ok (( )) }
 
 /// TODO/fork-fixes.org Case 2: appending a new child that EXPLICITLY
-/// names an owned repo specifies the clone's repo. The spec must
-/// resolve to that repo, CONFIRMED, and the confirmation buffer must
+/// names an owned skgrepo specifies the clone's skgrepo. The spec must
+/// resolve to that skgrepo, CONFIRMED, and the confirmation buffer must
 /// show it as settled -- no PICK-A-REPO, no suggestion comment.
-async fn explicit_new_child_repo_confirms_clone_repo (
+async fn explicit_new_child_skgrepo_confirms_clone_skgrepo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let buffer : &str = indoc! {"
@@ -428,9 +428,9 @@ async fn explicit_new_child_repo_confirms_clone_repo (
     buffer, config, None )  ?;
   assert_eq! ( save_plan . fork_specs . len (), 1 );
   let spec : &ForkSpec = & save_plan . fork_specs[0];
-  assert_eq! ( spec . clone . 0 . home_repo, RepoName::from ("owned2"),
+  assert_eq! ( spec . clone . 0 . home_skgrepo, SkgRepoName::from ("owned2"),
     "the clone's repo must be the new child's explicit repo" );
-  assert! ( spec . repo_confirmed,
+  assert! ( spec . skgrepo_confirmed,
     "an explicitly-specified repo must be confirmed" );
   let confirmation : String =
     skg::from_text::fork::build_fork_confirmation_buffer (
@@ -445,10 +445,10 @@ async fn explicit_new_child_repo_confirms_clone_repo (
     confirmation );
   Ok (( )) }
 
-/// New children naming DIFFERENT owned repos are ambiguous: the
-/// clone's repo falls back to inference/default, UNCONFIRMED, so
+/// New children naming DIFFERENT owned skgrepos are ambiguous: the
+/// clone's skgrepo falls back to inference/default, UNCONFIRMED, so
 /// the flow asks.
-async fn disagreeing_new_child_repos_leave_clone_repo_unconfirmed (
+async fn disagreeing_new_child_skgrepos_leave_clone_skgrepo_unconfirmed (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let buffer : &str = indoc! {"
@@ -459,7 +459,7 @@ async fn disagreeing_new_child_repos_leave_clone_repo_unconfirmed (
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
     buffer, config, None )  ?;
   assert_eq! ( save_plan . fork_specs . len (), 1 );
-  assert! ( ! save_plan . fork_specs[0] . repo_confirmed,
+  assert! ( ! save_plan . fork_specs[0] . skgrepo_confirmed,
     "disagreeing explicit child repos must not confirm a clone repo" );
   Ok (( )) }
 
@@ -480,7 +480,7 @@ async fn fork_confirmation_gates_commit (
   let response = update_from_and_rerender_buffer_with_fork_approval_test (
     &mut stream, FORK_BUFFER, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state,
-    /* fork_approved = */ false ) . await ?;
+    /* approved_forks = */ false ) . await ?;
   assert! ( response . fork_confirmation . is_some (),
     "an unapproved save with forks must return a fork-confirmation" );
   assert! ( response . saved_view . contains ("* Fork confirmation")
@@ -496,7 +496,7 @@ async fn fork_confirmation_gates_commit (
   let response2 = update_from_and_rerender_buffer_with_fork_approval_test (
     &mut stream2, FORK_BUFFER, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state,
-    /* fork_approved = */ true ) . await ?;
+    /* approved_forks = */ true ) . await ?;
   assert! ( response2 . fork_confirmation . is_none (),
     "an approved save commits and returns a normal save-result" );
   assert! ( clone_on_disk (config) . is_ok (),
@@ -507,8 +507,8 @@ async fn fork_confirmation_gates_commit (
 /// (metadata-less) new headline under a foreign root forks the root
 /// rather than dying with "Cannot create node in foreign repo". The
 /// SavePlan must hold one ForkSpec for N, whose clone's contains end
-/// with the new node's minted id, and a kept Save instruction for the
-/// new node REWRITTEN into the clone's repo.
+/// with the new node's minted id, and a kept Save nodeInstruction for the
+/// new node REWRITTEN into the clone's skgrepo.
 async fn fork_from_bare_new_child_plan (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
@@ -518,51 +518,51 @@ async fn fork_from_bare_new_child_plan (
     "appending a bare new child must fork N: {:?}",
     save_plan . fork_specs );
   let clone : &Graphnode = & save_plan . fork_specs[0] . clone . 0;
-  assert_eq! ( save_plan . fork_specs[0] . original_id, ID::from ("N") );
+  assert_eq! ( save_plan . fork_specs[0] . original_skgid, ID::from ("N") );
   assert_eq! ( clone . contains . len (), 3,
     "the clone's contains must be N1, N2 and the new node: {:?}",
     clone . contains );
   assert_eq! ( members_of (& clone . contains [..2]),
                vec! [ ID::from ("N1"), ID::from ("N2") ] );
   let new_node : &Graphnode =
-    save_plan . define_nodes . iter ()
+    save_plan . node_instructions . iter ()
     . find_map ( |dn| match dn {
-        DefineNode::Save ( SaveNode (n) )
+        NodeInstruction::Save ( SaveNode (n) )
           if n . title == "Can I add to this?" => Some (n),
         _ => None } )
     . expect ("the new node must survive as a Save instruction");
-  assert_eq! ( new_node . home_repo, clone . home_repo,
+  assert_eq! ( new_node . home_skgrepo, clone . home_skgrepo,
     "the new node must adopt the clone's repo" );
   assert_eq! ( new_node . pid, clone . contains [2] . member,
     "the clone's last child must be the new node" );
   Ok (( )) }
 
-async fn fork_new_parent_adopts_relationship_repos (
+async fn fork_new_parent_adopts_relationship_skgrepos (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let ( _vf, save_plan, _warnings ) = buffer_to_validated_saveplan (
     FORK_WITH_NEW_PARENT_FOR_OLD_CHILD_BUFFER, config, None ) ?;
-  let clone_repo : RepoName =
+  let clone_skgrepo : SkgRepoName =
     save_plan . fork_specs . first ()
     . expect ("structural edit must fork N")
-    . clone . 0 . home_repo . clone ();
+    . clone . 0 . home_skgrepo . clone ();
   let new_parent : &Graphnode =
-    save_plan . define_nodes . iter ()
+    save_plan . node_instructions . iter ()
     . find_map ( |dn| match dn {
-        DefineNode::Save (SaveNode (n)) if n . title == "New parent" => Some (n),
+        NodeInstruction::Save (SaveNode (n)) if n . title == "New parent" => Some (n),
         _ => None } )
     . expect ("the new parent must survive as a Save instruction");
-  assert_eq! (new_parent . home_repo, clone_repo,
+  assert_eq! (new_parent . home_skgrepo, clone_skgrepo,
     "the new parent must adopt the clone's repo");
   assert_eq! (members_of (&new_parent . contains), vec![ID::from ("N1")]);
   assert! (new_parent . contains . iter ()
-           . all (|member| member . relRepo == clone_repo),
+           . all (|member| member . relRepo == clone_skgrepo),
     "the new parent's inherited relationships must adopt the clone repo: {:?}",
     new_parent . contains);
   Ok (( )) }
 
 /// TODO/fork-fixes.org Case 1, committed: the approved save creates
-/// the clone AND the new node, both in the owned repo; N's foreign
+/// the clone AND the new node, both in the owned skgrepo; N's foreign
 /// .skg is untouched.
 async fn fork_from_bare_new_child_commits (
   config : &SkgConfig,
@@ -576,19 +576,19 @@ async fn fork_from_bare_new_child_commits (
   let response = update_from_and_rerender_buffer_with_fork_approval_test (
     &mut stream, FORK_WITH_BARE_NEW_CHILD_BUFFER, config, tantivy,
     &graph, false, &Err ( String::new () ), &mut views_state,
-    /* fork_approved = */ true ) . await ?;
+    /* approved_forks = */ true ) . await ?;
   assert! ( response . errors . is_empty (),
     "the approved bare-new-child fork must commit: {:?}",
     response . errors );
   let clone : Graphnode = clone_on_disk (config) ?;
   let new_node : Graphnode =
-    read_all_skg_files_from_repos (config) ?
+    read_all_skg_files_from_skgrepos (config) ?
     . into_iter ()
     . find ( |node| node . title == "Can I add to this?" )
     . ok_or ("the new node must be on disk") ?;
-  assert_eq! ( new_node . home_repo, clone . home_repo,
+  assert_eq! ( new_node . home_skgrepo, clone . home_skgrepo,
     "the new node must land in the clone's repo" );
-  assert_eq! ( clone . home_repo, RepoName::from ("owned") );
+  assert_eq! ( clone . home_skgrepo, SkgRepoName::from ("owned") );
   assert! ( clone . contains . iter () . any ( |m| m . member == new_node . pid ),
     "the clone must contain the new node: {:?}", clone . contains );
   assert_eq! ( members_of (& node_from_disk (config, "N") ? . contains),
@@ -597,7 +597,7 @@ async fn fork_from_bare_new_child_commits (
   Ok (( )) }
 
 /// An EXPLICITLY foreign-repo new node stays a rejection: only an
-/// inherited (guessed) foreign repo rides the fork.
+/// inherited (guessed) foreign skgrepo rides the fork.
 async fn explicitly_foreign_new_child_still_rejected (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
@@ -614,10 +614,10 @@ async fn explicitly_foreign_new_child_still_rejected (
       other ), }
   Ok (( )) }
 
-/// Monogamy: a node may have at most one user-owned overrider. Forking
+/// Monogamy: a node may have at most one owned overrider. Forking
 /// N once creates a clone; forking it again is rejected with
 /// 'ForkAlreadyExists' naming the existing clone -- not the raw
-/// MultipleUserOwnedOverriders crash.
+/// MultipleOwnedOverriders crash.
 async fn fork_monogamy (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -645,25 +645,25 @@ async fn fork_monogamy (
       "expected ForkAlreadyExists rejecting the re-fork, got {:?}", other ), }
   Ok (( )) }
 
-/// Repo-set: a fork whose resolved owned repo is inactive under the
-/// active repo-set is forbidden ('ForkRepoInactive'), so an
+/// Skgrepo-set: a fork whose resolved owned skgrepo is inactive under the
+/// active skgrepo-set is forbidden ('ForkRepoInactive'), so an
 /// invisible clone is never created silently. Here the active set is
-/// {foreign} only, so the clone's inferred repo "owned" is inactive.
-async fn fork_repo_inactive (
+/// {foreign} only, so the clone's inferred skgrepo "owned" is inactive.
+async fn fork_skgrepo_inactive (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   // Save planning reloads the freshly reset fixture graph.
-  let active : ActiveRepoSet = ActiveRepoSet {
-    name    : RepoSetName ("only-foreign" . to_string ()),
-    repos : BTreeSet::from ([ RepoName::from ("foreign") ]), };
+  let active : ActiveSkgRepoSet = ActiveSkgRepoSet {
+    name    : SkgRepoSetName ("only-foreign" . to_string ()),
+    skgrepos : BTreeSet::from ([ SkgRepoName::from ("foreign") ]), };
   let result = buffer_to_validated_saveplan (
     FORK_BUFFER, config, Some (&active) ) ;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
-        BufferValidationError::ForkRepoInactive (orig, repo)
+        BufferValidationError::ForkSkgRepoInactive (orig, skgrepo)
           if *orig == ID::from ("N")
-             && *repo == RepoName::from ("owned") )),
+             && *skgrepo == SkgRepoName::from ("owned") )),
         "expected ForkRepoInactive(N, owned), got {:?}", errors ); }
     other => panic! (
       "expected ForkRepoInactive, got {:?}", other ), }
@@ -672,7 +672,7 @@ async fn fork_repo_inactive (
 /// The SavePlan a foreign edit produces carries one ForkSpec whose
 /// clone copies N's title/body/contains (SHALLOW -- the child IDs only,
 /// no descendants), subscribes_to=[N], overrides_view_of=[N], and no
-/// hides; in an OWNED repo inferred from the owned ancestor P.
+/// hides; in an OWNED skgrepo inferred from the owned ancestor P.
 async fn fork_save_instruction (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
@@ -681,7 +681,7 @@ async fn fork_save_instruction (
   assert_eq! ( fork_specs . len (), 1,
     "exactly one fork (of N): {:?}", fork_specs );
   let spec : &ForkSpec = &fork_specs[0];
-  assert_eq! ( spec . original_id, ID::from ("N") );
+  assert_eq! ( spec . original_skgid, ID::from ("N") );
   let c : &Graphnode = &spec . clone . 0;
   assert_eq! ( c . title, "N-edited",
     "clone copies the edited title" );
@@ -693,22 +693,22 @@ async fn fork_save_instruction (
     "clone overrides N" );
   assert! ( c . hides_from_its_subscriptions . or_default () . is_empty (),
     "clone records no hides" );
-  assert! ( config . user_owns_repo (& c . home_repo),
-    "clone lives in an owned repo, got {:?}", c . home_repo );
-  assert_eq! ( c . home_repo, RepoName::from ("owned"),
+  assert! ( config . skgrepo_is_owned (& c . home_skgrepo),
+    "clone lives in an owned repo, got {:?}", c . home_skgrepo );
+  assert_eq! ( c . home_skgrepo, SkgRepoName::from ("owned"),
     "clone's repo is inferred from the owned ancestor P" );
   assert_ne! ( c . pid, ID::from ("N"),
     "clone has a fresh pid, not N's" );
   Ok (( )) }
 
-/// After saving the fork: a clone .skg appears in the OWNED repo with
+/// After saving the fork: a clone .skg appears in the OWNED skgrepo with
 /// the four fields, and N's foreign .skg is byte-unchanged.
 async fn fork_fixture_files (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let n_path : std::path::PathBuf =
-    config . repos . get (& RepoName::from ("foreign")) . unwrap ()
+    config . skgrepos . get (& SkgRepoName::from ("foreign")) . unwrap ()
     . path . join ("N.skg");
   let n_before : String = std::fs::read_to_string (&n_path) ?;
 
@@ -728,7 +728,7 @@ async fn fork_fixture_files (
   assert_eq! ( c . title, "N-edited" );
   assert_eq! ( members_of (& c . contains), vec! [ ID::from ("N1"), ID::from ("N2") ] );
   assert_eq! ( members_of ( c . subscribes_to . or_default () ), vec! [ ID::from ("N") ] );
-  assert_eq! ( c . home_repo, RepoName::from ("owned") );
+  assert_eq! ( c . home_skgrepo, SkgRepoName::from ("owned") );
 
   let n_after : String = std::fs::read_to_string (&n_path) ?;
   assert_eq! ( n_before, n_after,
@@ -760,7 +760,7 @@ async fn fork_round_trip (
     &mut stream, FORK_BUFFER, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state ) . await ?;
 
-  let clone_id : ID = clone_on_disk (config) ? . pid;
+  let clone_skgid : ID = clone_on_disk (config) ? . pid;
 
   // Reopen P de-novo. N is P's content; override substitution draws the
   // clone in its place with (overridesHere N).
@@ -770,8 +770,8 @@ async fn fork_round_trip (
   assert! ( p_view . contains ("(overridesHere N)"),
     "the clone must be drawn in N's place with (overridesHere N):\n{}",
     p_view );
-  assert! ( p_view . contains (& format! ("(id {})", clone_id . 0)),
-    "the drawn substitute must be the clone {}:\n{}", clone_id . 0, p_view );
+  assert! ( p_view . contains (& format! ("(id {})", clone_skgid . 0)),
+    "the drawn substitute must be the clone {}:\n{}", clone_skgid . 0, p_view );
   assert! ( p_view . contains ("subscribeeFolder"),
     "the clone (a subscriber of N) shows a subscribeeFolder:\n{}", p_view );
   assert! ( ! p_view . contains ("overriddenFolder"),
@@ -782,7 +782,7 @@ async fn fork_round_trip (
   // to the clone; it still lists N (the marker collected N, not C).
   let p_disk : Graphnode = node_from_disk (config, "P") ?;
   assert_eq! ( members_of (& p_disk . contains), vec! [ ID::from ("N") ],
-    "P's contains must still point at N, not the clone {}", clone_id . 0 );
+    "P's contains must still point at N, not the clone {}", clone_skgid . 0 );
   Ok (( )) }
 
 /// An ordinary collateral rerender retains a raw original while refreshing

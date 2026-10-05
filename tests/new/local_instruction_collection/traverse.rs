@@ -2,7 +2,7 @@
 /// traversal
 /// (server/from_text/local_instruction_collection/traverse.rs).
 /// They cover the explicit case list in
-/// TODO/local-instruction-collection/3_plan.org, "testing".
+/// TODO/DONE/local-instruction-collection/3_plan.org, "testing".
 /// The traversal is pure and synchronous, so these tests need no db.
 
 use ego_tree::Tree;
@@ -10,7 +10,7 @@ use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::local_instruction_collection::traverse::collect_instructions_locally;
 use skg::from_text::local_instruction_collection::types::{
-  CollectedIntents, IntentsForOneId, SubscribeeTextClaim,
+  CollectedFieldIntents, FieldIntentsForOneId, SubscribeeTextClaim,
   SubscribeeVisibility };
 use skg::types::git::Sign;
 use skg::types::maybe_placed_viewnode::{
@@ -22,7 +22,7 @@ use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
 
 fn collected_from_org (
   input : &str,
-) -> CollectedIntents {
+) -> CollectedFieldIntents {
   collect_instructions_locally (
     &forest_from_org (input) ) . unwrap() }
 
@@ -35,15 +35,15 @@ fn forest_from_org (
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap() ) }
 
 fn entry<'a> (
-  collected : &'a CollectedIntents,
-  id        : &str,
-) -> &'a IntentsForOneId {
-  collected . by_pid . get (&ID::from (id))
-    . unwrap_or_else ( || panic! ("no entry for {}", id) ) }
+  collected : &'a CollectedFieldIntents,
+  skgid        : &str,
+) -> &'a FieldIntentsForOneId {
+  collected . by_pid . get (&ID::from (skgid))
+    . unwrap_or_else ( || panic! ("no entry for {}", skgid) ) }
 
 #[test]
-fn ordinary_definitive_emissions () {
-  let collected : CollectedIntents =
+fn ordinary_editable_emissions () {
+  let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id root) (repo main) (editRequest (flag noSearchMatching true)))) root
       Root body
@@ -58,7 +58,7 @@ fn ordinary_definitive_emissions () {
       * (skg (node (id doomed) (repo main) (editRequest delete))) doomed
       * (skg (node (id acquirer) (repo main) (editRequest (merge acquiree)))) acquirer
       "} );
-  { let root : &IntentsForOneId = entry (&collected, "root");
+  { let root : &FieldIntentsForOneId = entry (&collected, "root");
     assert_eq!( root . title_and_body,
                 Some (( "root" . to_string(),
                         Some ("Root body" . to_string()) )) );
@@ -70,15 +70,15 @@ fn ordinary_definitive_emissions () {
     assert_eq!( root . flag,
                 Some ((Flag::NoSearchMatching, true)) );
     assert!( ! root . delete ); }
-  { let child : &IntentsForOneId = entry (&collected, "child");
-    // A definitive leaf's contains is Specified and empty;
+  { let child : &FieldIntentsForOneId = entry (&collected, "child");
+    // An editable leaf's contains is Specified and empty;
     // unmentioned fields stay unfilled (lowering to Unspecified).
     assert_eq!( child . contains, Some (vec![]) );
     assert_eq!( child . aliases, None ); }
-  { let doomed : &IntentsForOneId = entry (&collected, "doomed");
+  { let doomed : &FieldIntentsForOneId = entry (&collected, "doomed");
     assert!( doomed . delete );
     assert_eq!( doomed . title_and_body, None ); }
-  { let acquirer : &IntentsForOneId = entry (&collected, "acquirer");
+  { let acquirer : &FieldIntentsForOneId = entry (&collected, "acquirer");
     assert_eq!( acquirer . node_merge, Some (ID::from ("acquiree")) ); }
   assert_eq!(
     collected . order,
@@ -88,7 +88,7 @@ fn ordinary_definitive_emissions () {
 
 #[test]
 fn subscribee_as_such_emits_claim_and_visibility () {
-  let collected : CollectedIntents =
+  let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id subscriber) (repo main))) subscriber
       ** (skg subscribeeFolder)
@@ -98,7 +98,7 @@ fn subscribee_as_such_emits_claim_and_visibility () {
       **** (skg (node (id parked) (repo main) (affectsParent false))) parked
       **** (skg (node (id leaving) (repo main) (editRequest delete))) leaving
       "} );
-  { let e : &IntentsForOneId = entry (&collected, "e");
+  { let e : &FieldIntentsForOneId = entry (&collected, "e");
     // The subscribee-as-such emits no Set* intents, only a text
     // claim.
     assert_eq!( e . title_and_body, None );
@@ -108,7 +108,7 @@ fn subscribee_as_such_emits_claim_and_visibility () {
       vec![ SubscribeeTextClaim {
         title : "e" . to_string(),
         body  : Some ("Subscribee body" . to_string()) } ]); }
-  { let subscriber : &IntentsForOneId = entry (&collected, "subscriber");
+  { let subscriber : &FieldIntentsForOneId = entry (&collected, "subscriber");
     assert_eq!(
       subscriber . visibility,
       vec![ SubscribeeVisibility {
@@ -116,16 +116,16 @@ fn subscribee_as_such_emits_claim_and_visibility () {
         visible    : vec![ID::from ("visible")] } ]);
     assert_eq!( subscriber . subscribes_to,
                 Some (vec![(ID::from ("e"), None)]) ); }
-  { // Ordinary definitive children of a subscribee-as-such still
+  { // Ordinary editable children of a subscribee-as-such still
     // emit their own instructions, but form no one's contains.
-    let visible : &IntentsForOneId = entry (&collected, "visible");
+    let visible : &FieldIntentsForOneId = entry (&collected, "visible");
     assert!( visible . title_and_body . is_some() ); }}
 
 #[test]
 fn aliasfolder_under_subscribee_as_such_emits_nothing () {
   // This is the trap from the discussion: a naive implementation
   // would write the subscribee's aliases.
-  let collected : CollectedIntents =
+  let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id subscriber) (repo main))) subscriber
       ** (skg subscribeeFolder)
@@ -136,8 +136,8 @@ fn aliasfolder_under_subscribee_as_such_emits_nothing () {
   assert_eq!( entry (&collected, "e") . aliases, None ); }
 
 #[test]
-fn folders_under_toDelete_or_writeProtected_owners_emit_nothing () {
-  let collected : CollectedIntents =
+fn folders_under_toDelete_or_writeProtected_recorders_emit_nothing () {
+  let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id doomed) (repo main) (editRequest delete))) doomed
       ** (skg aliasFolder) aliases
@@ -150,7 +150,7 @@ fn folders_under_toDelete_or_writeProtected_owners_emit_nothing () {
       ** (skg overriddenFolder)
       *** (skg (node (id o) (repo main) writeProtected)) o
       "} );
-  { let doomed : &IntentsForOneId = entry (&collected, "doomed");
+  { let doomed : &FieldIntentsForOneId = entry (&collected, "doomed");
     assert!( doomed . delete );
     assert_eq!( doomed . aliases, None );
     assert_eq!( doomed . subscribes_to, None ); }
@@ -159,34 +159,34 @@ fn folders_under_toDelete_or_writeProtected_owners_emit_nothing () {
 
 #[test]
 fn definitive_member_of_write_protected_folder_emits_for_itself_only () {
-  let collected : CollectedIntents =
+  let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id owner) (repo main))) owner
+      * (skg (node (id recorder) (repo main))) recorder
       ** (skg subscriberFolder)
       *** (skg (node (id intruder) (repo main))) intruder
       Intruder body
       **** (skg (node (id intruder-child) (repo main))) intruder child
       "} );
-  { let intruder : &IntentsForOneId = entry (&collected, "intruder");
+  { let intruder : &FieldIntentsForOneId = entry (&collected, "intruder");
     assert_eq!( intruder . title_and_body,
                 Some (( "intruder" . to_string(),
                         Some ("Intruder body" . to_string()) )) );
     assert_eq!( intruder . contains,
                 Some (vec![(ID::from ("intruder-child"), None)]) ); }
-  { // The folder's owner is unaffected by the folder's membership.
-    let owner : &IntentsForOneId = entry (&collected, "owner");
-    assert_eq!( owner . contains, Some (vec![]) );
-    assert_eq!( owner . subscribes_to, None ); }}
+  { // The folder's recorder is unaffected by the folder's membership.
+    let recorder : &FieldIntentsForOneId = entry (&collected, "recorder");
+    assert_eq!( recorder . contains, Some (vec![]) );
+    assert_eq!( recorder . subscribes_to, None ); }}
 
 #[test]
 fn definitive_child_of_inactive_vognode_emits () {
-  let collected : CollectedIntents =
+  let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id root) (repo main))) root
       ** (skg (inactiveNode (id hidden) (repo private)))
       *** (skg (node (id stowaway) (repo main))) stowaway
       "} );
-  { let stowaway : &IntentsForOneId = entry (&collected, "stowaway");
+  { let stowaway : &FieldIntentsForOneId = entry (&collected, "stowaway");
     assert!( stowaway . title_and_body . is_some() ); }
   assert!( collected . by_pid . get (&ID::from ("hidden")) . is_none(),
            "the inactive node itself emits nothing" );
@@ -210,7 +210,7 @@ fn definitive_node_inside_diff_phantom_subtree_emits () {
       . find ( |n| matches!(
           &n . value() . kind,
           ViewnodeKind::Vognode (Vognode::Active (t))
-            if t . id == ID::from ("fading") ))
+            if t . skgid == ID::from ("fading") ))
       . map ( |n| n . id() )
       . expect ("fading node not found");
     { let tree : &mut Tree<Viewnode> =
@@ -221,11 +221,11 @@ fn definitive_node_inside_diff_phantom_subtree_emits () {
       tree . get_mut (fading_treeid) . unwrap()
         . value() . normal_to_phantom (); }
     forest };
-  let collected : CollectedIntents =
+  let collected : CollectedFieldIntents =
     collect_instructions_locally (&forest) . unwrap();
   assert!( collected . by_pid . get (&ID::from ("fading")) . is_none(),
            "the phantom itself emits nothing" );
-  { let survivor : &IntentsForOneId = entry (&collected, "survivor");
+  { let survivor : &FieldIntentsForOneId = entry (&collected, "survivor");
     assert!( survivor . title_and_body . is_some(),
              "a definitive node beneath a phantom emits for itself" ); }
   assert_eq!( entry (&collected, "root") . contains, Some (vec![]),
@@ -233,7 +233,7 @@ fn definitive_node_inside_diff_phantom_subtree_emits () {
 
 #[test]
 fn writeProtected_subscribee_as_such_emits_nothing () {
-  let collected : CollectedIntents =
+  let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id subscriber) (repo main))) subscriber
       ** (skg subscribeeFolder)
@@ -245,7 +245,7 @@ fn writeProtected_subscribee_as_such_emits_nothing () {
 
 #[test]
 fn definitive_subscribee_under_writeProtected_subscriber_claims_without_visibility () {
-  let collected : CollectedIntents =
+  let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id subscriber) (repo main) writeProtected)) subscriber
       ** (skg subscribeeFolder)
@@ -262,7 +262,7 @@ fn definitive_subscribee_under_writeProtected_subscriber_claims_without_visibili
 
 #[test]
 fn present_but_empty_folders_differ_from_absent_folders () {
-  let collected : CollectedIntents =
+  let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id explicit) (repo main))) explicit
       ** (skg aliasFolder) aliases
@@ -270,12 +270,12 @@ fn present_but_empty_folders_differ_from_absent_folders () {
       ** (skg overriddenFolder)
       * (skg (node (id silent) (repo main))) silent
       "} );
-  { let explicit : &IntentsForOneId = entry (&collected, "explicit");
+  { let explicit : &FieldIntentsForOneId = entry (&collected, "explicit");
     // A present-but-empty folder is an explicitly empty field.
     assert_eq!( explicit . aliases, Some (vec![]) );
     assert_eq!( explicit . subscribes_to, Some (vec![]) );
     assert_eq!( explicit . overrides, Some (vec![]) ); }
-  { let silent : &IntentsForOneId = entry (&collected, "silent");
+  { let silent : &FieldIntentsForOneId = entry (&collected, "silent");
     // An absent folder expresses no opinion.
     assert_eq!( silent . aliases, None );
     assert_eq!( silent . subscribes_to, None );
@@ -283,9 +283,9 @@ fn present_but_empty_folders_differ_from_absent_folders () {
 
 #[test]
 fn duplicate_defining_folder_members_dedup_preserving_order () {
-  let collected : CollectedIntents =
+  let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id owner) (repo main))) owner
+      * (skg (node (id recorder) (repo main))) recorder
       ** (skg aliasFolder) aliases
       *** (skg alias) echo
       *** (skg alias) other
@@ -299,11 +299,11 @@ fn duplicate_defining_folder_members_dedup_preserving_order () {
       *** (skg (node (id o2) (repo main) writeProtected)) o2
       *** (skg (node (id o1) (repo main) writeProtected)) o1
       "} );
-  let owner : &IntentsForOneId = entry (&collected, "owner");
-  assert_eq!( owner . aliases,
+  let recorder : &FieldIntentsForOneId = entry (&collected, "recorder");
+  assert_eq!( recorder . aliases,
               Some (vec![("echo" . to_string(), None),
                           ("other" . to_string(), None)]) );
-  assert_eq!( owner . subscribes_to,
+  assert_eq!( recorder . subscribes_to,
               Some (vec![(ID::from ("s1"), None), (ID::from ("s2"), None)]) );
-  assert_eq!( owner . overrides,
+  assert_eq!( recorder . overrides,
               Some (vec![(ID::from ("o1"), None), (ID::from ("o2"), None)]) ); }

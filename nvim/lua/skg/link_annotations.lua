@@ -1,4 +1,4 @@
--- Display-only repo suffixes and confirmed broken-link styling in views.
+-- Display-only skgrepo suffixes and confirmed broken-link styling in views.
 
 local client = require('skg.client')
 require('skg.heralds') -- defines the SkgHerald* highlight groups used here
@@ -152,7 +152,7 @@ function M.paint (buf, positions)
           end_row = position.row, end_col = position.label_end,
           hl_group = 'SkgBrokenLink', priority = 150 })
     end
-    -- A broken link's label is styled above and gets no suffix.
+    -- A dangling link's label is styled above and gets no suffix.
     if suffix_enabled and kind ~= 'missing' then
       local label = ({ inactive = '⌂:inactive',
                        lookup_failed = '⌂:lookup failed', pending = '⌂:…' })[kind]

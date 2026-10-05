@@ -10,7 +10,7 @@ use std::hash::Hash;
 /// Apply treatment to each child that should be treated.
 pub fn treat_certain_children<Node, Treated, Treatment> (
   tree          : &mut Tree<Node>,
-  parent_id     : NodeId,
+  parent_skgid  : NodeId,
   treated       : Treated,
   mut treatment : Treatment,
 ) -> Result<(), String>
@@ -18,13 +18,13 @@ where
   Treated   : Fn (&Node) -> bool,
   Treatment : FnMut (&mut Node),
 {
-  let child_ids : Vec<NodeId> =
+  let child_skgids : Vec<NodeId> =
     { let node_ref : NodeRef<Node> =
-        tree . get (parent_id)
+        tree . get (parent_skgid)
         . ok_or ("treat_certain_children: node not found")?;
       node_ref . children() . map( |c| c . id() ) . collect() };
-  for child_id in child_ids {
-    with_node_mut( tree, child_id,
+  for child_skgid in child_skgids {
+    with_node_mut( tree, child_skgid,
                    |mut n| { if treated( n . value() )
                              { treatment( n . value() ); }
     } ) . map_err( |e| -> String { e . into() } )?; }
@@ -79,12 +79,12 @@ where F: Fn (&Node) -> i32 {
 /// Returns true if this node or any descendant satisfies the predicate.
 pub fn subtree_satisfies<Node, Predicate> (
   tree      : &Tree<Node>,
-  node_id   : NodeId,
+  treeid     : NodeId,
   predicate : &Predicate,
 ) -> Result<bool, String>
 where Predicate: Fn (&Node) -> bool {
   let node_ref : NodeRef<Node> =
-    tree . get (node_id)
+    tree . get (treeid)
     . ok_or ("subtree_satisfies: node not found")?;
   if predicate( node_ref . value() ) {
     return Ok (true); }
@@ -116,20 +116,20 @@ pub fn detach_viewnode_transferring_focus (
 /// Move an existing child to the end of its parent's children list.
 /// Uses detach() + append_id() to move without cloning.
 pub fn move_child_to_end<Node> (
-  tree      : &mut Tree<Node>,
-  parent_id : NodeId,
-  child_id  : NodeId,
+  tree         : &mut Tree<Node>,
+  parent_skgid : NodeId,
+  child_skgid  : NodeId,
 ) -> Result<(), Box<dyn Error>> {
-  with_node_mut( tree, child_id,
+  with_node_mut( tree, child_skgid,
                  |mut n| { n . detach(); } )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
-  with_node_mut( tree, parent_id,
-                 |mut p| { p . append_id (child_id); } )
+  with_node_mut( tree, parent_skgid,
+                 |mut p| { p . append_id (child_skgid); } )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   Ok( () ) }
 
 /// What 'complete_relevant_children' changed while reconciling: the
-/// orderkeys it created, demoted to Independent (stale branches),
+/// orderkeys it created, demoted to non-member (stale branches),
 /// detached as stale leaves, and detached as duplicates. Callers
 /// that warn about repairs to write-protected folders consume this
 /// ('CompletionWarning'); other callers ignore it.
@@ -155,7 +155,7 @@ impl<Orderkey> RepairSummary<Orderkey> {
 /// This one specializes it so that:
 /// - problem discards are those that would discard the focused node.
 /// - if any discard is problematic, transfer focus to 'treeid'
-pub fn complete_relevant_children_in_viewnodetree
+pub fn complete_relevant_children_in_viewforest
 <Orderkey, Relevant, View> (
   tree                : &mut Tree<Viewnode>,
   treeid              : NodeId,
@@ -169,24 +169,24 @@ where Relevant : Fn (&Viewnode) -> bool,
       Orderkey : Eq + Hash + Clone,
 {
   let problem_discard =
-    |tree: &Tree<Viewnode>, node_id: NodeId| -> Result<bool, String> {
-      subtree_satisfies( tree, node_id, &|n: &Viewnode| n . focused ) };
+    |tree: &Tree<Viewnode>, stale_treeid: NodeId| -> Result<bool, String> {
+      subtree_satisfies( tree, stale_treeid, &|n: &Viewnode| n . focused ) };
   let problem_discard_response =
     |n: &mut Viewnode| { n . focused = true; };
   // TODO/DONE/local-view-update/plan_v2.org §6.0 stale-member rule: a stale member (relevant child not in the goal)
-  // that is a Normal, affectsParent=true *branch* (has children) is demoted to
-  // Independent so the user's subtree survives; a stale InactiveVognode
+  // that is an Active, affectsParent=true *branch* (has children) is demoted to
+  // non-member so the user's subtree survives; a stale InactiveVognode
   // *branch* is deadened to a DeadViewnode instead (it has no
   // affectsParent to demote; the orphan handling then preserves its
-  // subtree as independent -- TODO/full-schema/9-2_repo-set-safety.org);
+  // subtree as independent -- TODO/DONE/full-schema/DONE/9-2_source-set-safety.org);
   // everything else stale -- a leaf, a diff-phantom, a property -- is
   // deleted by the reconciler. Returns true iff it kept the node.
   let demote_invalid =
-    |tree: &mut Tree<Viewnode>, node_id: NodeId|
+    |tree: &mut Tree<Viewnode>, stale_treeid: NodeId|
       -> Result<bool, Box<dyn Error>> {
       enum StaleTreatment { Demote, Deaden, Detach }
       let treatment : StaleTreatment = {
-        let n : NodeRef<Viewnode> = tree . get (node_id)
+        let n : NodeRef<Viewnode> = tree . get (stale_treeid)
           . ok_or ("demote_invalid: node not found") ?;
         let has_children : bool = n . children () . next () . is_some ();
         match &n . value () . kind {
@@ -200,14 +200,14 @@ where Relevant : Fn (&Viewnode) -> bool,
       match treatment {
         StaleTreatment::Detach => Ok (false),
         StaleTreatment::Demote => {
-          with_node_mut ( tree, node_id, |mut n| {
+          with_node_mut ( tree, stale_treeid, |mut n| {
             if let ViewnodeKind::Vognode (Vognode::Active (t))
               = &mut n . value () . kind
               { t . affectsParent = AffectsParent::False; } } )
             . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
           Ok (true) },
         StaleTreatment::Deaden => {
-          with_node_mut ( tree, node_id, |mut n| {
+          with_node_mut ( tree, stale_treeid, |mut n| {
             n . value () . kind = ViewnodeKind::DeadViewnode; } )
             . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
           Ok (true) }, }};
@@ -234,13 +234,13 @@ where Relevant : Fn (&Viewnode) -> bool,
 ///   whose orderkey is not in goal_list).
 ///   - Duplicates are always detached.
 ///   - A stale member is offered to 'demote_invalid'; if that keeps it (returns
-///     true, e.g. TODO/DONE/local-view-update/plan_v2.org §6.0 demote-a-branch-to-Independent) it survives, otherwise it
+///     true, e.g. TODO/DONE/local-view-update/plan_v2.org §6.0 demote-a-branch-to-non-member) it survives, otherwise it
 ///     is detached.
 ///   Runs problem_discard on each node that is actually detached; if any returns
 ///   true, runs problem_discard_response on the parent afterward.
 /// - Reorders remaining children: irrelevant first, then relevant in goal_list order.
 ///   Creates new children for any orderkeys missing from the original children.
-///   USER-FACING CONSEQUENCE for PartnerFolders: an Independent (non-member)
+///   USER-FACING CONSEQUENCE for PartnerFolders: a non-member
 ///   child a user parks inside a folder is "irrelevant" here, so it is moved
 ///   ABOVE the generated members on save. This is deliberate -- the
 ///   membership is generated and ordered, so a parked note stays but is
@@ -250,7 +250,7 @@ where Relevant : Fn (&Viewnode) -> bool,
 pub fn complete_relevant_children
 <Node, Orderkey, Relevant, View, ProblemDiscard, ProblemResponse, DemoteInvalid> (
   tree                     : &mut Tree<Node>,
-  parent_id                : NodeId,
+  parent_skgid             : NodeId,
   relevant                 : Relevant,
   view_child_orderkey      : View,
   goal_list                : &[Orderkey],
@@ -272,70 +272,70 @@ where
 {
   let groups : HashMap<i32, Vec<NodeId>> =
     partition_children (
-      tree, parent_id,
+      tree, parent_skgid,
       |n| if relevant (n) { 1 } else { 0 } )
         . map_err( |e| -> Box<dyn Error> { e . into() } )?;
-  let relevant_ids   : Vec<NodeId> =
+  let relevant_skgids   : Vec<NodeId> =
     groups . get( &1 ) . cloned() . unwrap_or_default();
-  let irrelevant_ids : Vec<NodeId> =
+  let irrelevant_skgids : Vec<NodeId> =
     groups . get( &0 ) . cloned() . unwrap_or_default();
   let goal_list_as_set : HashSet<Orderkey> =
     goal_list . iter() . cloned() . collect();
 
   let mut orderkey_to_treeid
     : HashMap<Orderkey, NodeId> = HashMap::new();
-  let mut duplicate_ids : Vec<( NodeId, Orderkey )> = Vec::new();
-  let mut invalid_ids : Vec<( NodeId, Orderkey )> = Vec::new();
-  for &node_id in &relevant_ids { // populate the above three variables
+  let mut duplicate_skgids : Vec<( NodeId, Orderkey )> = Vec::new();
+  let mut invalid_skgids : Vec<( NodeId, Orderkey )> = Vec::new();
+  for &treeid in &relevant_skgids { // populate the above three variables
     let node_ref : NodeRef<Node> =
-      tree . get (node_id)
+    tree . get (treeid)
       . ok_or ("complete_relevant_children: node not found")?;
     let orderkey : Orderkey =
       view_child_orderkey( node_ref . value() ) ?;
     if !goal_list_as_set . contains (&orderkey) {
-      invalid_ids . push( ( node_id, orderkey ) ); // hopefully none
+      invalid_skgids . push( ( treeid, orderkey ) ); // hopefully none
     } else if orderkey_to_treeid . contains_key (&orderkey) {
-      duplicate_ids . push( ( node_id, orderkey ) ); // hopefully none
+      duplicate_skgids . push( ( treeid, orderkey ) ); // hopefully none
     } else {
-      orderkey_to_treeid . insert( orderkey, node_id ); } }
+      orderkey_to_treeid . insert( orderkey, treeid ); } }
   let mut summary : RepairSummary<Orderkey> = RepairSummary::new();
   let mut discard_has_problem : bool = false;
   // Duplicates are redundant: always detach (recording focus loss).
-  for ( node_id, orderkey ) in &duplicate_ids {
-    if problem_discard( tree, *node_id )? { discard_has_problem = true; }
-    with_node_mut( tree, *node_id,
+  for ( treeid, orderkey ) in &duplicate_skgids {
+    if problem_discard( tree, *treeid )? { discard_has_problem = true; }
+    with_node_mut( tree, *treeid,
                    |mut n| { n . detach(); } )
       . map_err( |e| -> Box<dyn Error> { e . into() } )?;
     summary . deleted_duplicates . push( orderkey . clone() ); }
   // Stale members: demote_invalid may keep one (TODO/DONE/local-view-update/plan_v2.org §6.0 demote-a-branch); only a
   // node it does NOT keep is detached, and only that detach can lose focus.
-  for ( node_id, orderkey ) in &invalid_ids {
-    if demote_invalid( tree, *node_id )? {
+  for ( treeid, orderkey ) in &invalid_skgids {
+    if demote_invalid( tree, *treeid )? {
       summary . demoted . push( orderkey . clone() );
       continue; }
-    if problem_discard( tree, *node_id )? { discard_has_problem = true; }
-    with_node_mut( tree, *node_id,
+    if problem_discard( tree, *treeid )? { discard_has_problem = true; }
+    with_node_mut( tree, *treeid,
                    |mut n| { n . detach(); } )
       . map_err( |e| -> Box<dyn Error> { e . into() } )?;
     summary . deleted_stale . push( orderkey . clone() ); }
   if discard_has_problem {
     // Respond to problem if any discard was problematic
     with_node_mut(
-        tree, parent_id,
+        tree, parent_skgid,
         |mut n| { problem_discard_response( n . value() ); }
       ) . map_err( |e| -> Box<dyn Error> { e . into() } )?; }
-  for &child_id in &irrelevant_ids {
+  for &child_skgid in &irrelevant_skgids {
     // Move irrelevant children to end. (They will precede the relevant ones.)
-    move_child_to_end( tree, parent_id, child_id )?; }
+    move_child_to_end( tree, parent_skgid, child_skgid )?; }
   for orderkey in goal_list {
     // Move/create relevant children in desired order
     match orderkey_to_treeid . get (orderkey) {
-      Some (&child_id) => {
-        move_child_to_end( tree, parent_id, child_id )?; },
+      Some (&child_skgid) => {
+        move_child_to_end( tree, parent_skgid, child_skgid )?; },
       None => {
         let node : Node = create_child (orderkey) ?;
         with_node_mut(
-            tree, parent_id,
+            tree, parent_skgid,
             |mut p| { p . append (node); }
           ) . map_err( |e| -> Box<dyn Error>
                       { e . into() } )?;

@@ -9,7 +9,7 @@
 /// inline (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3). After view completion, the shared finish_viewforest
 /// tail (server/update_buffer.rs, TODO/DONE/local-view-update/plan_v2.org §20.3)
 /// attaches containerward role tree (roots + removed-here phantoms),
-/// marks/validates affectsParent, sets graph/view stats, applies the repo set,
+/// marks/validates affectsParent, sets graph/view stats, applies the skgrepo set,
 /// and renders to string.
 
 use crate::types::tree::forest::ViewForest;
@@ -17,11 +17,11 @@ use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::Viewnode;
 use crate::types::views_state::pids_from_viewforest;
-use crate::repo_sets::ActiveRepoSet;
+use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::env::SkgEnv;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::init::empty_in_ram_tantivy_index;
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use crate::update_buffer::{finish_viewforest, render_initial_view};
 use std::sync::Arc;
 
@@ -32,26 +32,26 @@ use std::error::Error;
 pub fn single_root_view (
   config            : &SkgConfig,
   tantivy_index     : Option<&TantivyIndex>,
-  root_id           : &ID,
+  root_skgid        : &ID,
   diff_mode_enabled : bool,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   multi_root_view (
     config,
     tantivy_index,
-    & [ root_id . clone () ],
+    & [ root_skgid . clone () ],
     diff_mode_enabled ) }
 
 /// See file header comment.
 pub fn multi_root_view (
   config            : &SkgConfig,
   tantivy_index     : Option<&TantivyIndex>,
-  root_ids          : &[ID],
+  root_skgids       : &[ID],
   diff_mode_enabled : bool,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   multi_root_view_inner (
-    config, tantivy_index, root_ids,
+    config, tantivy_index, root_skgids,
     diff_mode_enabled, None )
 }
 
@@ -61,29 +61,29 @@ pub fn multi_root_view (
 /// The shim builds a fixture-local graph from disk and, when Tantivy is not
 /// supplied, uses an empty in-RAM index.
 fn multi_root_view_inner (
-  config            : &SkgConfig,
-  tantivy_index     : Option<&TantivyIndex>,
-  root_ids          : &[ID],
-  diff_mode_enabled : bool,
-  active_repo_set : Option<&ActiveRepoSet>,
+  config             : &SkgConfig,
+  tantivy_index      : Option<&TantivyIndex>,
+  root_skgids        : &[ID],
+  diff_mode_enabled  : bool,
+  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   let tantivy_owned : TantivyIndex = match tantivy_index {
     Some (t) => t . clone (),
     None     => empty_in_ram_tantivy_index () ?, };
-  // Build the in-Rust graph from the repo .skg files so view completion's content
+  // Build the in-Rust graph from the skgrepo .skg files so view completion's content
   // reconcile can resolve extra_ids (graph_snap.pid_of) -- a node's contains may
   // reference another node by an extra_id. Production's env carries the real
   // graph already; this shim is test-only, so a per-call file read is
   // fine.
   let nodes : Vec<Graphnode> =
-    read_all_skg_files_from_repos (config) ?;
+    read_all_skg_files_from_skgrepos (config) ?;
   let env : SkgEnv = SkgEnv::new (
     config . clone (),
     Arc::new (InRustGraph::from_graphnodes (&nodes)),
     tantivy_owned);
   multi_root_view_via_env (
-    &env, root_ids, diff_mode_enabled, active_repo_set,
+    &env, root_skgids, diff_mode_enabled, active_skgrepo_set,
     // The test shims discard render warnings; the production
     // caller (the single-root handler) surfaces them.
     &mut Vec::new () ) }
@@ -95,25 +95,25 @@ fn multi_root_view_inner (
 /// Warning strings the render produces (today only the
 /// compound-override-chain notice) are appended to 'warnings_out'.
 pub fn multi_root_view_via_env (
-  env               : &SkgEnv,
-  root_ids          : &[ID],
-  diff_mode_enabled : bool,
-  active_repo_set : Option<&ActiveRepoSet>,
-  warnings_out      : &mut Vec<String>,
+  env                : &SkgEnv,
+  root_skgids        : &[ID],
+  diff_mode_enabled  : bool,
+  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  warnings_out       : &mut Vec<String>,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   let runtime = env . runtime_snapshot ();
   multi_root_view_via_runtime (
-    &runtime, root_ids, diff_mode_enabled, active_repo_set, warnings_out)
+    &runtime, root_skgids, diff_mode_enabled, active_skgrepo_set, warnings_out)
 
 }
 
 pub(crate) fn multi_root_view_via_runtime (
-  runtime           : &crate::types::env::RuntimeGeneration,
-  root_ids          : &[ID],
-  diff_mode_enabled : bool,
-  active_repo_set : Option<&ActiveRepoSet>,
-  warnings_out      : &mut Vec<String>,
+  runtime            : &crate::types::env::RuntimeGeneration,
+  root_skgids        : &[ID],
+  diff_mode_enabled  : bool,
+  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  warnings_out       : &mut Vec<String>,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>), Box<dyn Error> > {
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the diff (when diff_mode_enabled) is computed inline by
   // view completion, per Active node at its BFS visit.
@@ -121,7 +121,7 @@ pub(crate) fn multi_root_view_via_runtime (
     { let (viewforest, render_warnings)
         : (ViewForest, Vec<String>) =
         render_initial_view (
-          runtime, root_ids, active_repo_set,
+          runtime, root_skgids, active_skgrepo_set,
           diff_mode_enabled ) ?;
       warnings_out . extend (render_warnings);
       viewforest };
@@ -132,25 +132,25 @@ pub(crate) fn multi_root_view_via_runtime (
   let buffer_content : String =
     finish_viewforest (
       &mut viewforest, &runtime . graph, &runtime . config,
-      active_repo_set ) ?;
-  // TODO/DONE/local-view-update/plan_v2.org §20.5: the pids the caller registers for this view -- the {Normal, Inactive}
-  // set, via the one shared repo of which-kinds-count
+      active_skgrepo_set ) ?;
+  // TODO/DONE/local-view-update/plan_v2.org §20.5: the pids the caller registers for this view -- the {Active, Inactive}
+  // set, via the one shared skgrepo of which-kinds-count
   // (views_state::pids_from_viewforest), the same helper update_view uses post-save.
   let pids : Vec<ID> =
     pids_from_viewforest (&viewforest)
       . into_iter () . collect ();
   Ok ((buffer_content, pids, viewforest . into_internal_tree ())) }
 
-pub fn multi_root_view_with_repo_set (
-  config            : &SkgConfig,
-  tantivy_index     : Option<&TantivyIndex>,
-  root_ids          : &[ID],
-  diff_mode_enabled : bool,
-  active_repo_set : &ActiveRepoSet,
+pub fn multi_root_view_with_skgrepo_set (
+  config             : &SkgConfig,
+  tantivy_index      : Option<&TantivyIndex>,
+  root_skgids        : &[ID],
+  diff_mode_enabled  : bool,
+  active_skgrepo_set : &ActiveSkgRepoSet,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
-  // multi_root_view_inner applies the repo set during rendering (inside
+  // multi_root_view_inner applies the skgrepo set during rendering (inside
   // multi_root_view_via_env), so this wrapper just forwards it.
   multi_root_view_inner (
-    config, tantivy_index, root_ids,
-    diff_mode_enabled, Some (active_repo_set) ) }
+    config, tantivy_index, root_skgids,
+    diff_mode_enabled, Some (active_skgrepo_set) ) }

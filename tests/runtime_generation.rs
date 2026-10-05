@@ -5,17 +5,17 @@ use skg::dbs::init::{
 };
 use skg::types::env::SharedRuntime;
 use skg::types::misc::{ID, SkgConfig};
-use skg::types::nodes::complete::empty_node_complete;
+use skg::types::nodes::complete::empty_graphnode;
 
 use std::sync::Arc;
 use std::collections::HashMap;
 
 fn config () -> SkgConfig {
-  SkgConfig::dummyFromRepos (HashMap::new ())
+  SkgConfig::dummyFromSkgRepos (HashMap::new ())
 }
 
 fn graph_with (pid : &str) -> InRustGraph {
-  let mut node = empty_node_complete ();
+  let mut node = empty_graphnode ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
   InRustGraph::from_graphnodes (&[node])
@@ -81,7 +81,7 @@ fn rebuild_candidate_uses_a_sibling_directory_without_wiping_live_index () {
 }
 
 fn node_for_generation (pid : &str) -> skg::types::nodes::complete::Graphnode {
-  let mut node = empty_node_complete ();
+  let mut node = empty_graphnode ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
   node

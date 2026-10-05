@@ -1,6 +1,6 @@
 use skg::diff_report::snapshot::read_snapshot_pair;
 use skg::diff_report::types::{DiffSelection, SnapshotPair};
-use skg::types::misc::{ID, SkgConfig, SkgfileRepo, RepoName};
+use skg::types::misc::{ID, SkgConfig, SkgRepo, SkgRepoName};
 
 use git2::Repository;
 use std::collections::HashMap;
@@ -9,12 +9,12 @@ use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 fn write_node (
-  repo_dir : &Path,
-  pid        : &str,
-  title      : &str,
+  skgrepo_dir : &Path,
+  pid         : &str,
+  title       : &str,
 ) {
   fs::write (
-    repo_dir . join (format! ("{}.skg", pid)),
+    skgrepo_dir . join (format! ("{}.skg", pid)),
     format! ("title: {}\npid: {}\n", title, pid) )
     . unwrap ();
 }
@@ -58,22 +58,22 @@ fn stage_all (
 }
 
 fn config_for (
-  data_root  : &Path,
-  repo_dir : &Path,
+  data_root   : &Path,
+  skgrepo_dir : &Path,
 ) -> SkgConfig {
-  let repo_name : RepoName =
-    RepoName::from ("main");
-  let mut repos : HashMap<RepoName, SkgfileRepo> =
+  let skgrepo_name : SkgRepoName =
+    SkgRepoName::from ("main");
+  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
     HashMap::new ();
-  repos . insert (
-    repo_name . clone (),
-    SkgfileRepo {
-      name: repo_name,
+  skgrepos . insert (
+    skgrepo_name . clone (),
+    SkgRepo {
+      name: skgrepo_name,
       abbreviation: None,
-      path: repo_dir . to_path_buf (),
-      user_owns_it: true });
+      path: skgrepo_dir . to_path_buf (),
+      owned: true });
   let mut config : SkgConfig =
-    SkgConfig::dummyFromRepos (repos);
+    SkgConfig::dummyFromSkgRepos (skgrepos);
   config . data_root = data_root . to_path_buf ();
   config
 }
@@ -84,16 +84,16 @@ fn selected_snapshots_distinguish_head_index_and_worktree () {
     tempfile::tempdir () . unwrap ();
   let gitrepo : Repository =
     Repository::init (tmp . path ()) . unwrap ();
-  let repo_dir : PathBuf =
+  let skgrepo_dir : PathBuf =
     tmp . path () . join ("repo");
-  fs::create_dir (&repo_dir) . unwrap ();
-  write_node (&repo_dir, "a", "head");
+  fs::create_dir (&skgrepo_dir) . unwrap ();
+  write_node (&skgrepo_dir, "a", "head");
   commit_all (&gitrepo, "head");
-  write_node (&repo_dir, "a", "index");
+  write_node (&skgrepo_dir, "a", "index");
   stage_all (&gitrepo);
-  write_node (&repo_dir, "a", "worktree");
+  write_node (&skgrepo_dir, "a", "worktree");
   let config : SkgConfig =
-    config_for (tmp . path (), &repo_dir);
+    config_for (tmp . path (), &skgrepo_dir);
   let staged_only : SnapshotPair =
     read_snapshot_pair (
       &config,

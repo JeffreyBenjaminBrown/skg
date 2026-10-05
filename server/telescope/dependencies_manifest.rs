@@ -5,43 +5,43 @@
 //! dependencies-manifest; decided in 4_discussion, "lets Skg
 //! automatically generate a DEPENDENCIES.toml").
 //!
-//! PUBLISHER half: at init, every OWNED Skg repo directory gets a
+//! PUBLISHER half: at init, every OWNED skgrepo directory gets a
 //! DEPENDENCIES.toml whose `dependencies` is a list of pairs, one per
-//! Skg repo its telescope sections may reference -- itself and
-//! everything more public, in privacy order, the Skg repo itself last.
-//! Each pair says where a receiver can fetch that Skg repo: `path`
+//! Skgrepo its telescope sections may reference -- itself and
+//! everything more public, in privacy order, the skgrepo itself last.
+//! Each pair says where a receiver can fetch that skgrepo: `path`
 //! (data-root-relative, author-namespaced, which is what a receiver
-//! actually downloads) and `git-remote` (the Skg repo's fetch URL,
+//! actually downloads) and `git-remote` (the skgrepo's fetch URL,
 //! `origin` preferred, else the first remote with its name recorded
-//! in `git-remote-name`; omitted when the Skg repo is not a git repo or
-//! has no remote). The last pair is the manifest's own Skg repo, so its
+//! in `git-remote-name`; omitted when the skgrepo is not a gitrepo or
+//! has no remote). The last pair is the manifest's own skgrepo, so its
 //! own remote falls out for free. skg makes no use of the git-remote
 //! values itself. Clobbering a preexisting manifest is a feature;
 //! writes are byte-stable.
 //!
-//! RECEIVER half: at config validation, a FOREIGN Skg repo carrying a
-//! manifest is read, its entries matched to the receiver's repos
-//! by final path component (the repo name -- the receiver's author
+//! RECEIVER half: at config validation, a FOREIGN skgrepo carrying a
+//! manifest is read, its entries matched to the receiver's skgrepos
+//! by final path component (the skgrepo name -- the receiver's author
 //! folder for the publisher differs from the publisher's "owned").
 //! When the receiver's privacy order contradicts the manifest's
 //! relative order, warn and suggest the fix; never reorder
 //! automatically.
 
-use crate::git_ops::read_gitrepo::repo_git_remote;
-use crate::types::misc::{SkgConfig, RepoName};
+use crate::git_ops::read_gitrepo::skgrepo_git_remote;
+use crate::types::misc::{SkgConfig, SkgRepoName};
 
 use std::io;
 use std::path::PathBuf;
 
 /// Quote a value as a TOML basic string, escaping the two characters
 /// that would otherwise break out of the quotes. Enough for git
-/// remote URLs and Skg repo paths, which carry no control characters.
+/// remote URLs and skgrepo paths, which carry no control characters.
 fn toml_basic_string (s : &str) -> String {
   let escaped : String =
     s . replace ('\\', "\\\\") . replace ('"', "\\\"");
   format! ("\"{}\"", escaped) }
 
-/// One `dependencies` entry: a Skg repo a manifest's telescope sections
+/// One `dependencies` entry: a skgrepo a manifest's telescope sections
 /// may reference, and where a receiver can fetch it.
 struct DependencyEntry {
   path   : String,                    // data-root-relative directory
@@ -50,7 +50,7 @@ struct DependencyEntry {
 
 /// Render a `DependencyEntry` as one inline-table line of the
 /// `dependencies` list: `{ path = "...", git-remote = "..." },`.
-/// `git-remote` is omitted when the Skg repo has no remote;
+/// `git-remote` is omitted when the skgrepo has no remote;
 /// `git-remote-name` appears only for a non-`origin` remote.
 fn render_dependency_entry (entry : &DependencyEntry) -> String {
   let mut fields : String =
@@ -64,32 +64,32 @@ fn render_dependency_entry (entry : &DependencyEntry) -> String {
         toml_basic_string (remote_name) )); }}
   format! ("  {{ {} }},\n", fields) }
 
-/// The publisher half. Call after config load; returns the repos
+/// The publisher half. Call after config load; returns the skgrepos
 /// whose manifests were (re)written.
 pub fn write_dependencies_manifests (
   config : &SkgConfig,
-) -> io::Result<Vec<RepoName>> {
-  let ordered : Vec<RepoName> = config . ordered_repos ();
-  let mut written : Vec<RepoName> = Vec::new ();
+) -> io::Result<Vec<SkgRepoName>> {
+  let ordered : Vec<SkgRepoName> = config . ordered_skgrepos ();
+  let mut written : Vec<SkgRepoName> = Vec::new ();
   for (position, name) in ordered . iter () . enumerate () {
-    if ! config . user_owns_repo (name) { continue; }
-    let Some (skgrepo) = config . repos . get (name) else {
+    if ! config . skgrepo_is_owned (name) { continue; }
+    let Some (skgrepo) = config . skgrepos . get (name) else {
       continue; };
     if ! skgrepo . path . is_dir () { continue; }
     let dependencies : Vec<DependencyEntry> =
       ordered [..= position] . iter ()
       . filter_map ( |n| {
-          let dep_repo = config . repos . get (n) ?;
+          let dep_skgrepo = config . skgrepos . get (n) ?;
           let path : String =
-            dep_repo . path
+            dep_skgrepo . path
             . strip_prefix ( &config . data_root )
             . map ( |p| p . to_string_lossy () . into_owned () )
             . unwrap_or_else (
-              |_| dep_repo . path
+              |_| dep_skgrepo . path
                   . to_string_lossy () . into_owned () );
           Some ( DependencyEntry {
             path,
-            remote : repo_git_remote (&dep_repo . path), } ) } )
+            remote : skgrepo_git_remote (&dep_skgrepo . path), } ) } )
       . collect ();
     let content : String = {
       let mut c : String = String::new ();
@@ -141,23 +141,23 @@ fn dependency_entry_path (e : &toml::Value) -> Option<String> {
 pub fn foreign_manifest_order_warnings (
   config : &SkgConfig,
 ) -> Vec<String> {
-  let ordered : Vec<RepoName> = config . ordered_repos ();
+  let ordered : Vec<SkgRepoName> = config . ordered_skgrepos ();
   let final_component = |p : &std::path::Path| -> Option<String> {
     p . components () . next_back ()
       . and_then ( |c| match c {
         std::path::Component::Normal (s) =>
           Some ( s . to_string_lossy () . into_owned () ),
         _ => None } ) };
-  // receiver position by repo name (final path component)
+  // receiver position by skgrepo name (final path component)
   let receiver_position_of = |gitrepo : &str| -> Option<usize> {
     ordered . iter () . position ( |n|
-      config . repos . get (n)
+      config . skgrepos . get (n)
       . and_then ( |s| final_component ( &s . path ))
       . as_deref () == Some (gitrepo) ) };
   let mut warnings : Vec<String> = Vec::new ();
   for name in &ordered {
-    if config . user_owns_repo (name) { continue; }
-    let Some (skgrepo) = config . repos . get (name) else {
+    if config . skgrepo_is_owned (name) { continue; }
+    let Some (skgrepo) = config . skgrepos . get (name) else {
       continue; };
     let manifest_path : PathBuf =
       skgrepo . path . join ("DEPENDENCIES.toml");
@@ -172,7 +172,7 @@ pub fn foreign_manifest_order_warnings (
               . filter_map ( dependency_entry_path )
               . collect () )
       . unwrap_or_default ();
-    // The manifest's entries, restricted to repos the receiver also
+    // The manifest's entries, restricted to skgrepos the receiver also
     // has, must appear in the receiver's order.
     let mut last : Option<(String, usize)> = None;
     for entry in &entries {

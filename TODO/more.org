@@ -19,12 +19,12 @@ It might be called correction, or completion.
 Your suspicion was right that the merging code exists -- the alias
 reconciler ('reconcile_alias_col_children') dedups fine. The bug was
 upstream: in diff mode, 'process_activeNode_diff'
-(server/to_org/render/diff.rs) prepended an EMPTY AliasCol whenever
+(server/to_org/render/diff.rs) prepended an EMPTY AliasFolder whenever
 the alias list changed in git, without checking whether the node
 already carried one (a saved diff-mode buffer always does). Both
-cols then each reconciled to the full alias list, so every alias
-appeared twice. Now the existing col is reused; same guard added for
-the IDCol, which had the identical latent bug. Regression test:
+folders then each reconciled to the full alias list, so every alias
+appeared twice. Now the existing folder is reused; same guard added for
+the IDFolder, which had the identical latent bug. Regression test:
 tests/git_diff_view/aliases/view.rs,
 'test_saving_a_diff_view_with_aliases_shown_does_not_duplicate_them'
 (verified to fail without the fix).

@@ -87,7 +87,7 @@ pub fn next_in_generation<T>(
 /// If effective_root is None, uses the true tree root.
 /// Returns an empty Vec if the generation doesn't exist.
 /// Returns an error if effective_root is not in the tree.
-pub fn collect_generation_ids<T>(
+pub fn collect_generation_skgids<T>(
   tree           : &Tree<T>,
   generation     : usize,
   effective_root : Option<NodeId>,
@@ -95,7 +95,7 @@ pub fn collect_generation_ids<T>(
   let effective_root_noderef : NodeRef<'_, T> =
     match effective_root {
       None => tree . root(),
-      Some (nid) => tree . get (nid)
+      Some (treeid) => tree . get (treeid)
         . ok_or ("collect_generation_ids: effective_root not in tree")? };
   let mut result : Vec<NodeId> = Vec::new();
   fn collect_at_depth<T>(

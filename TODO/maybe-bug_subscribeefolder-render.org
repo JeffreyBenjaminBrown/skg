@@ -1,6 +1,6 @@
-* Possible collateral rerender bug in SubscribeeCol
+* Possible collateral rerender bug in SubscribeeFolder
 
-There might be a stale-view danger in how SubscribeeCol children are
+There might be a stale-view danger in how SubscribeeFolder children are
 reconciled during collateral rerender.
 
 Suppose two buffers are open.
@@ -9,7 +9,7 @@ Buffer 1 is the one the user saves:
 
 #+begin_src org
   * subscriber {id: S, source: main}
-  ** subscribee collection {kind: subscribeeCol}
+  ** subscribee collection {kind: subscribeeFolder}
   *** old target {id: A, source: main, definitive: false}
   *** new target {id: B, source: main, definitive: false}
 #+end_src
@@ -18,7 +18,7 @@ Buffer 2 is another open view containing the same subscriber:
 
 #+begin_src org
   * subscriber {id: S, source: main}
-  ** subscribee collection {kind: subscribeeCol}
+  ** subscribee collection {kind: subscribeeFolder}
   *** old target {id: A, source: main, definitive: false}
 #+end_src
 
@@ -32,13 +32,13 @@ The collateral rerender of Buffer 2 should become:
 
 #+begin_src org
   * subscriber {id: S, source: main}
-  ** subscribee collection {kind: subscribeeCol}
+  ** subscribee collection {kind: subscribeeFolder}
   *** new target {id: B, source: main, definitive: false}
 #+end_src
 
 The concern is in 'complete_subscribee_col_preorder'. It reads the
 fresh 'subscribes_to' list and computes a goal list, but in non-diff
-mode it only reconciles the SubscribeeCol's children when the
+mode it only reconciles the SubscribeeFolder's children when the
 subscriber is write-protected:
 
 #+begin_src text
@@ -47,16 +47,16 @@ if parent_is_writeProtected || source_diffs.is_some() { reconcile children }
 
 That condition makes sense for the saved view: a definitive subscriber
 in the saved buffer is the user's source of truth, so the children
-under its SubscribeeCol define what should be saved.
+under its SubscribeeFolder define what should be saved.
 
 It is suspicious for collateral views. A definitive subscriber in a
 collateral buffer is not defining the current save. It is stale UI
 that should be refreshed from the graph, just like title, body, source,
 and content children. If the condition is applied unchanged during a
-collateral rerender, a definitive subscriber's SubscribeeCol might keep
+collateral rerender, a definitive subscriber's SubscribeeFolder might keep
 old children even though the graph's 'subscribes_to' field has changed.
 
 This needs a focused test before changing behavior. The test should
 open two views containing the same subscriber, change its subscriptions
-in one view, save, and assert that the other view's SubscribeeCol
+in one view, save, and assert that the other view's SubscribeeFolder
 matches the saved graph.

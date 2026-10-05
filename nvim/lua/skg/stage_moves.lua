@@ -1,6 +1,6 @@
 -- PURPOSE: Ask the server for a shell script that stages every
--- detected node "move" (a .skg file that vanished from one repo's
--- git repo and appeared in another) and display it for review. The
+-- detected node "move" (a .skg file that vanished from one skgrepo's
+-- gitrepo and appeared in another) and display it for review. The
 -- Lua port of elisp/skg-request-stage-moves.el.
 
 local client = require('skg.client')

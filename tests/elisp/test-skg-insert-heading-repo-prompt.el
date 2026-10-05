@@ -1,9 +1,9 @@
-;;; test-skg-insert-heading-repo-prompt.el --- Test C-return repo prompt
+;;; test-skg-insert-heading-repo-prompt.el --- Test C-return skgrepo prompt
 ;;;
 ;;; When org-insert-heading-respect-content is called on a root headline
 ;;; in a content-view buffer, and the new headline has no metadata,
-;;; skg-edit-metadata should prompt for a repo in the minibuffer
-;;; (not open the sexp-edit buffer) and insert the chosen repo
+;;; skg-view-metadata should prompt for a skgrepo in the minibuffer
+;;; (not open the sexp-edit buffer) and insert the chosen skgrepo
 ;;; as metadata on the new headline.
 
 (load-file (expand-file-name "../../elisp/skg-test-utils.el"
@@ -70,7 +70,7 @@ skg-config-dir is set and skg--owned-repos works."
       (delete-file config-file)
       (delete-directory config-dir))))
 
-;; Test 1: C-return inserts metadata with chosen repo via minibuffer,
+;; Test 1: C-return inserts metadata with chosen skgrepo via minibuffer,
 ;;         does NOT open a sexp-edit buffer.
 
 (ert-deftest test-insert-heading-prompts-for-repo ()
@@ -97,7 +97,7 @@ insert metadata with chosen repo, and not open the sexp-edit buffer."
                 "^\\* (skg (node (id x) (repo public))) x$"
                 content))
 
-       ;; New headline has metadata with chosen repo "private".
+       ;; New headline has metadata with chosen skgrepo "private".
        (should (string-match-p
                 "^\\* (skg (node (repo private))) $"
                 content))
@@ -112,7 +112,7 @@ insert metadata with chosen repo, and not open the sexp-edit buffer."
          (buffer-local-value 'skg-sexp-edit--source-buffer b))
        (buffer-list))))))
 
-;; Test 2: Single owned repo skips the prompt entirely.
+;; Test 2: Single owned skgrepo skips the prompt entirely.
 
 (ert-deftest test-insert-heading-single-repo-no-prompt ()
   "When there is only one owned repo, C-return should use it
@@ -155,7 +155,7 @@ without prompting."
     (unwind-protect
         (let ((repos (skg--owned-repos))
               results)
-          ;; Verify we have two repos in expected order.
+          ;; Verify we have two skgrepos in expected order.
           (should (equal repos '("public" "private")))
 
           ;; Mock completing-read to simulate cycling:
@@ -166,8 +166,8 @@ without prompting."
                      (lambda (_prompt coll &rest _)
                        ;; Simulate: start empty, cycle right once.
                        ;; The cycle closure does:
-                       ;;   idx = (cl-position cur repos) or 0
-                       ;;   new = (nth (mod (+ idx dir) len) repos)
+                       ;;   idx = (cl-position cur skgrepos) or 0
+                       ;;   new = (nth (mod (+ idx dir) len) skgrepos)
                        ;; Starting from "" (not in list) -> idx=0 ("public"),
                        ;; cycling right: (mod (+ 0 1) 2) = 1 -> "private"
                        (let* ((idx 0)
@@ -191,14 +191,14 @@ without prompting."
 ;; Test 4: Existing metadata still opens the sexp-edit buffer.
 
 (ert-deftest test-edit-existing-metadata-opens-edit-buffer ()
-  "When a headline already has metadata, skg-edit-metadata should
+  "When a headline already has metadata, skg-view-metadata should
 open the sexp-edit buffer (not prompt in minibuffer)."
   (test--with-skg-content-view
    "* (skg (node (id x) (repo public))) x\n"
    test--config-public-and-private
    (lambda ()
      (should (org-at-heading-p))
-     (skg-edit-metadata)
+     (skg-view-metadata)
 
      ;; A sexp-edit buffer should have been opened.
      (let ((edit-buf
@@ -315,12 +315,12 @@ the repos in privacy order, then \"all\"."
      (buffer-local-value 'skg-sexp-edit--source-buffer b))
    (buffer-list)))
 
-;; Builder: repo pre-filled, other editable fields childless, title group.
+;; Builder: skgrepo pre-filled, other editable fields childless, title group.
 
 (ert-deftest test-empty-node-org-text-with-title ()
   "The skeleton pre-fills repo, leaves other fields childless,
 and shows the title under a `title' group."
-  (let* ((org-text (skg-edit-metadata--empty-node-org-text
+  (let* ((org-text (skg-view-metadata--empty-node-org-text
                     "only" "my title"))
          (headlines (org-to-sexp--extract-headlines
                      (split-string org-text "\n"))))
@@ -339,14 +339,14 @@ and shows the title under a `title' group."
 
 (ert-deftest test-empty-node-org-text-blank-title ()
   "With a blank title, `title' is shown childless (nothing under it)."
-  (let* ((org-text (skg-edit-metadata--empty-node-org-text "only" ""))
+  (let* ((org-text (skg-view-metadata--empty-node-org-text "only" ""))
          (headlines (org-to-sexp--extract-headlines
                      (split-string org-text "\n"))))
     (should (equal (car headlines) '(1 . "title")))
     (should (equal (cadr headlines) '(1 . "skg")))))
 
 ;; Opening: C-c v m on a metadata-less headline drops minimal metadata
-;; in place and opens the view with repo pre-filled.
+;; in place and opens the view with skgrepo pre-filled.
 
 (ert-deftest test-edit-metadata-empty-opens-view ()
   "C-c v m on a metadata-less headline populates (skg (node (repo only)))
@@ -356,8 +356,8 @@ in place and opens the empty-node view: repo pre-filled, others childless."
    test--config-one-repo
    (lambda ()
      (let ((source-buffer (current-buffer)))
-       (skg-edit-metadata)
-       ;; The repo headline now carries minimal metadata.
+       (skg-view-metadata)
+       ;; The source headline now carries minimal metadata.
        (with-current-buffer source-buffer
          (should (string-match-p
                   "^\\* (skg (node (repo only))) a new node$"
@@ -382,7 +382,7 @@ in place and opens the empty-node view: repo pre-filled, others childless."
                  (should (string-match-p "^\\*\\* a new node$" content))))
            (kill-buffer edit-buf)))))))
 
-;; Round-trip: committing the untouched view yields just the repo.
+;; Round-trip: committing the untouched view yields just the skgrepo.
 
 (ert-deftest test-edit-metadata-empty-commit-untouched ()
   "Committing the untouched empty-node view yields (skg (node (repo only)))."
@@ -391,7 +391,7 @@ in place and opens the empty-node view: repo pre-filled, others childless."
    test--config-one-repo
    (lambda ()
      (let ((source-buffer (current-buffer)))
-       (skg-edit-metadata)
+       (skg-view-metadata)
        (with-current-buffer (test--skg-edit-buffer)
          (skg-sexp-edit--commit))
        (with-current-buffer source-buffer
@@ -410,7 +410,7 @@ while the untouched fields contribute no keys."
    test--config-one-repo
    (lambda ()
      (let ((source-buffer (current-buffer)))
-       (skg-edit-metadata)
+       (skg-view-metadata)
        (with-current-buffer (test--skg-edit-buffer)
          ;; Simulate the user adding a level-4 child under write-protected and
          ;; cycling it to true.

@@ -2,11 +2,11 @@
 ;;;
 ;;; skg-set-relRepo (C-c s r; formerly
 ;;; skg-privatize-relationship, see
-;;; BUG-and-fix_make-edge-more-public.org) classifies the edge the
-;;; headline at point represents, asks the server for that edge's
-;;; (default, current) relRepos, and offers the repos at least
+;;; BUG-and-fix_make-edge-more-public.org) classifies the relationship the
+;;; headline at point represents, asks the server for that relationship's
+;;; (default, current) relRepos, and offers the skgrepos at least
 ;;; as private as the default plus a no-override choice. These tests
-;;; cover the pure pieces (edge classification, menu slicing, choice
+;;; cover the pure pieces (relationship classification, menu slicing, choice
 ;;; application) and the response handler with the network and
 ;;; minibuffer stubbed out.
 
@@ -64,13 +64,13 @@ skg-config-dir is set and `skg--repo-names' works."
     (buffer-substring-no-properties
      (line-beginning-position) (line-end-position))))
 
-;; --- Edge classification: skg--rel-at-point ---
+;; --- Relationship classification: skg--rel-at-point ---
 
 (ert-deftest test-rel-content-child ()
-  "A content child's edge: owner = org-parent, relation = contains."
+  "A content child's edge: recorder = viewparent, relation = contains."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (repo public))) owner\n"
+    "* (skg (node (id recorder) (repo public))) recorder\n"
     "** (skg (node (id kid) (repo public))) kid\n")
    test--config-public-private-trusted
    (lambda ()
@@ -78,12 +78,12 @@ skg-config-dir is set and `skg--repo-names' works."
      (search-forward "(id kid)" nil t)
      (beginning-of-line)
      (should (equal (skg--rel-at-point)
-                    '(:owner "owner" :member "kid"
+                    '(:recorder "recorder" :member "kid"
                       :relation "contains"))))))
 
 (ert-deftest test-rel-writable-folder-member ()
-  "A subscribeeFolder member's edge: owner = the folder's ANCHOR (its
-org-parent), relation = the folder's relation."
+  "A subscribeeFolder member's edge: recorder = the folder's ANCHOR (its
+viewparent), relation = the folder's relation."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id anchor) (repo public))) anchor\n"
@@ -95,14 +95,14 @@ org-parent), relation = the folder's relation."
      (search-forward "(id seen)" nil t)
      (beginning-of-line)
      (should (equal (skg--rel-at-point)
-                    '(:owner "anchor" :member "seen"
+                    '(:recorder "anchor" :member "seen"
                       :relation "subscribes_to"))))))
 
 (ert-deftest test-rel-refuses-on-write-protected-folder-member ()
   "Refuses (user-error) on a member of a write-protected folder."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (repo public))) owner\n"
+    "* (skg (node (id recorder) (repo public))) recorder\n"
     "** (skg subscriberFolder)\n"
     "*** (skg (node (id sub) (repo public))) sub\n")
    test--config-public-private-trusted
@@ -116,7 +116,7 @@ org-parent), relation = the folder's relation."
        (should (string-match-p "subscriberFolder" (cadr err)))))))
 
 (ert-deftest test-rel-refuses-on-root ()
-  "Refuses on a root headline: with no org-parent there is no edge."
+  "Refuses on a root headline: with no viewparent there is no edge."
   (test--with-skg-content-view
    "* (skg (node (id x) (repo public))) x\n"
    test--config-public-private-trusted
@@ -130,7 +130,7 @@ org-parent), relation = the folder's relation."
   "Refuses on a non-vognode headline (no (node ...) form)."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (repo public))) owner\n"
+    "* (skg (node (id recorder) (repo public))) recorder\n"
     "** (skg aliasFolder) aliases\n")
    test--config-public-private-trusted
    (lambda ()
@@ -191,7 +191,7 @@ is offered; the server's save-time floor check backstops."
 
 (ert-deftest test-apply-relRepo-removes-override ()
   "The no-override choice removes only a pending request, preserving
-the displayed relRepo fact; its message says the SAVED repo survives
+the displayed relRepo fact; its message says the SAVED skgrepo survives
 (sticky), not that anything resets to the default."
   (test--with-skg-content-view
    "* (skg (node (id x) (repo public) (viewStats (relRepo private)) (editRequest (relRepo trusted)))) x\n"
@@ -222,7 +222,7 @@ the displayed relRepo fact; its message says the SAVED repo survives
   "Alias relRepo intent is a flat non-vognode editRequest, not node viewStats."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (repo public))) owner\n"
+    "* (skg (node (id recorder) (repo public))) recorder\n"
     "** (skg aliasFolder)\n"
     "*** (skg alias) nickname\n")
    test--config-public-private-trusted
@@ -244,7 +244,7 @@ the displayed relRepo fact; its message says the SAVED repo survives
   "An Unknown content member stores intent under its own editRequest."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (repo public))) owner\n"
+    "* (skg (node (id recorder) (repo public))) recorder\n"
     "** (skg (unknown (id na) (viewStats (relRepo private))))\n")
    test--config-public-private-trusted
    (lambda ()
@@ -264,7 +264,7 @@ the displayed relRepo fact; its message says the SAVED repo survives
   "A delete/merge target aborts the recursive operation before any write."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (repo public))) owner\n"
+    "* (skg (node (id recorder) (repo public))) recorder\n"
     "** (skg (node (id a) (repo public))) a\n"
     "** (skg (node (id b) (repo public) (editRequest delete))) b\n")
    test--config-public-private-trusted
@@ -278,7 +278,7 @@ the displayed relRepo fact; its message says the SAVED repo survives
   "The alias gesture uses its owning node's home without an edge-info request."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (repo private))) owner\n"
+    "* (skg (node (id recorder) (repo private))) recorder\n"
     "** (skg aliasFolder)\n"
     "*** (skg alias) nickname\n")
    test--config-public-private-trusted
@@ -327,7 +327,7 @@ the no-override entry, pre-fills the minibuffer with the current
 repo, and applies the selection."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (repo public))) owner\n"
+    "* (skg (node (id recorder) (repo public))) recorder\n"
     "** (skg (node (id kid) (repo public))) kid\n")
    test--config-public-private-trusted
    (lambda ()
@@ -353,7 +353,7 @@ repo, and applies the selection."
 choices, so the prompt pre-fills with the default instead."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (repo public))) owner\n"
+    "* (skg (node (id recorder) (repo public))) recorder\n"
     "** (skg (node (id kid) (repo public))) kid\n")
    test--config-public-private-trusted
    (lambda ()
@@ -372,7 +372,7 @@ choices, so the prompt pre-fills with the default instead."
   "An error reply falls back to the full ladder (plus no-override)."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (repo public))) owner\n"
+    "* (skg (node (id recorder) (repo public))) recorder\n"
     "** (skg (node (id kid) (repo public))) kid\n")
    test--config-public-private-trusted
    (lambda ()
@@ -510,7 +510,7 @@ own content children (the member being definitive) match kind
 member's content children are not reached."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id owner) (repo public))) owner\n"
+    "* (skg (node (id recorder) (repo public))) recorder\n"
     "** (skg subscriberFolder)\n"
     "*** (skg (node (id s) (repo public))) s\n"
     "**** (skg (node (id sc) (repo public))) sc\n")
@@ -804,7 +804,7 @@ rises. A child still more private than the new repo is left alone."
                   t)))
        (test--messages-during (lambda () (skg-set-repo))))
      (should (string-match-p "(repo public)" (test--line-of-id "r")))
-     ;; a's edge default rose private->public; c's stayed trusted.
+     ;; a's relationship default rose private->public; c's stayed trusted.
      (should (string-match-p "(relRepo public)" (test--line-of-id "a")))
      (should-not (string-match-p "relRepo" (test--line-of-id "c")))
      (should (string-match-p "(repo trusted)" (test--line-of-id "c"))))))

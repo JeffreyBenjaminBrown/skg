@@ -17,7 +17,7 @@
 ///                         [(viewRequests REQUEST...)]))
 
 use crate::types::sexp::atom_to_string;
-use crate::types::misc::{ID, RepoName};
+use crate::types::misc::{ID, SkgRepoName};
 use crate::types::errors::BufferValidationError;
 use crate::types::nodes::complete::Flag;
 use crate::types::git::{NodeAxes, RelationshipAxes, Sign};
@@ -48,33 +48,33 @@ pub struct ViewnodeMetadata {
   // None means vognode, Some means non-vognode.
   pub non_vognode: Option<MpViewnodeKind>,
   // ActiveVognode fields (ignored if non-vognode is Some)
-  pub id: Option<ID>,
-  pub home_repo: Option<RepoName>,
+  pub skgid: Option<ID>,
+  pub home_skgrepo: Option<SkgRepoName>,
   pub affectsParent: AffectsParent,
   pub birth: Birth,
   pub writeProtected: bool,
   pub graphStats: GraphnodeStats,
   pub viewStats: ViewnodeStats,
   pub edit_request: Option<NodeEditRequest>,
-  pub relRepo_request: Option<RepoName>,
+  pub relRepo_request: Option<SkgRepoName>,
   pub view_requests: HashSet<ViewRequest>,
   pub activeVognode_node_axes  : NodeAxes,
   pub activeVognode_relationship_axes : RelationshipAxes,
   pub activeVognode_not_in_git : bool,
   pub property_relationship_axes : RelationshipAxes,
-  pub property_relRepo : Option<RepoName>,
-  pub property_relRepo_request : Option<RepoName>,
+  pub property_relRepo : Option<SkgRepoName>,
+  pub property_relRepo_request : Option<SkgRepoName>,
   pub textchanged_staged   : bool,
   pub textchanged_unstaged : bool,
-  // When true, this is a PhantomDeleted (id and repo are used).
+  // When true, this is a PhantomDeleted (id and skgrepo are used).
   pub is_deleted_node: bool,
-  // When true, this is a deleted non-vognode placeholder.
+  // When true, this is a DeadViewnode.
   pub is_dead_viewnode: bool,
-  // When Some, this is an PhantomUnknown (a placeholder for a missing
-  // referent). Carries only the id; no repo/title/body apply.
-  pub unknown_node_id: Option<ID>,
-  pub unknown_relRepo : Option<RepoName>,
-  pub unknown_relRepo_request : Option<RepoName>,
+  // When Some, this is a PhantomUnknown (a phantom for a missing
+  // referent). Carries only the id; no skgrepo/title/body apply.
+  pub unknown_node_skgid: Option<ID>,
+  pub unknown_relRepo : Option<SkgRepoName>,
+  pub unknown_relRepo_request : Option<SkgRepoName>,
   // When true, this is an inactive-repo placeholder: an anonymous,
   // dataless marker (see InactiveVognode). It carries no id/repo/etc.
   pub is_inactive_node : bool,
@@ -91,8 +91,8 @@ pub fn default_metadata() -> ViewnodeMetadata {
     folded: false,
     body_folded: false,
     non_vognode: None,
-    id: None,
-    home_repo: None,
+    skgid: None,
+    home_skgrepo: None,
     affectsParent: AffectsParent::True,
     birth: Birth::Unremarkable,
     writeProtected: false,
@@ -111,7 +111,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     textchanged_unstaged : false,
     is_deleted_node: false,
     is_dead_viewnode: false,
-    unknown_node_id: None,
+    unknown_node_skgid: None,
     unknown_relRepo: None,
     unknown_relRepo_request: None,
     is_inactive_node: false,
@@ -133,17 +133,17 @@ pub fn viewnode_from_metadata (
 ) -> ( MpViewnode, Option < BufferValidationError >, Option < String > ) {
   let (kind, error, warning)
     : (MpViewnodeKind, Option<BufferValidationError>, Option<String>)
-    = if let Some (ref uid) = metadata . unknown_node_id {
+    = if let Some (ref uid) = metadata . unknown_node_skgid {
         ( MpViewnodeKind::Vognode (MpVognode::Phantom (
             MpPhantom::Unknown (
               PhantomUnknown {
-                id                 : uid . clone (),
+                skgid           : uid . clone (),
                 relRepo         : metadata . unknown_relRepo . clone (),
                 relRepo_request : metadata . unknown_relRepo_request . clone (),
               } ) )),
           if body . is_some () || ! title . is_empty () {
             Some ( BufferValidationError::Other (
-              "Unknown placeholder content cannot be edited" . to_string () ))
+              "Unknown phantom content cannot be edited" . to_string () ))
           } else { None },
           None )
       } else if metadata . is_inactive_node {
@@ -151,7 +151,7 @@ pub fn viewnode_from_metadata (
           if body . is_some ()
           || ! title . is_empty () {
             Some ( BufferValidationError::Other (
-              "Inactive placeholder content cannot be edited"
+              "Inactive vognode content cannot be edited"
               . to_string () ))
           } else { None };
         ( MpViewnodeKind::Vognode (
@@ -162,10 +162,10 @@ pub fn viewnode_from_metadata (
       } else if metadata . is_deleted_node {
         ( MpViewnodeKind::Vognode (MpVognode::Phantom (
             MpPhantom::Deleted ( PhantomDeleted {
-            id     : metadata . id . clone ()
+            skgid     : metadata . skgid . clone ()
                        . unwrap_or_else ( || ID::from ("")),
-            home_repo : metadata . home_repo . clone ()
-                       . unwrap_or_else ( || RepoName::from ("")),
+            home_skgrepo : metadata . home_skgrepo . clone ()
+                       . unwrap_or_else ( || SkgRepoName::from ("")),
             title,
             body,
           } ) )), None, None )
@@ -203,7 +203,7 @@ pub fn viewnode_from_metadata (
                               relationship_axes: metadata . property_relationship_axes }),
           MpViewnodeKind::Property (Property::ID { .. }) =>
             MpViewnodeKind::Property (Property::ID {
-                              id: title . clone () . into (),
+                              skgid: title . clone () . into (),
                               relationship_axes: metadata . property_relationship_axes }),
           MpViewnodeKind::Property (Property::Flag { flag, .. }) =>
             MpViewnodeKind::Property (Property::Flag {
@@ -225,7 +225,7 @@ pub fn viewnode_from_metadata (
           if metadata . writeProtected
           { Editability::WriteProtected }
           else
-          { Editability::Definitive {
+          { Editability::Editable {
               body,
               edit_request : metadata . edit_request . clone () } };
         // An edit_request on a write-protected node has nowhere to live
@@ -238,7 +238,7 @@ pub fn viewnode_from_metadata (
         let error : Option<BufferValidationError> =
           if     metadata . writeProtected
               && metadata . edit_request . is_some ()
-          { metadata . id . clone ()
+          { metadata . skgid . clone ()
             . map ( BufferValidationError::EditRequestOnWriteProtectedOccurrence ) }
           else if metadata . writeProtected
                && metadata . relRepo_request . is_some ()
@@ -248,8 +248,8 @@ pub fn viewnode_from_metadata (
           else { None };
         let t : MpActiveVognode = MpActiveVognode {
             title,
-            id               : metadata . id . clone (),
-            home_repo           : metadata . home_repo . clone (),
+            skgid            : metadata . skgid . clone (),
+            home_skgrepo     : metadata . home_skgrepo . clone (),
             affectsParent         : metadata . affectsParent,
             birth            : metadata . birth,
             graphStats       : metadata . graphStats . clone (),
@@ -351,7 +351,7 @@ pub fn parse_metadata_to_viewnodemd (
             parse_deleted_sexp ( &items[1..], &mut result ) ?; },
           "unknown" => {
             // (unknown (id X)) -- placeholder for a referenced
-            // node with no record anywhere. No repo/title/body.
+            // node with no record anywhere. No skgrepo/title/body.
             parse_unknownnode_sexp ( &items[1..], &mut result ) ?; },
           "inactiveNode" => {
             parse_inactivenode_sexp ( &items[1..], &mut result ) ?; },
@@ -374,7 +374,7 @@ pub fn parse_metadata_to_viewnodemd (
             if result . property_relRepo . is_some () {
               return Err ( "Alias relRepo may appear only once"
                            . to_string () ); }
-            result . property_relRepo = Some ( RepoName::from (
+            result . property_relRepo = Some ( SkgRepoName::from (
               atom_to_string (&items [1]) ? )); },
           "editRequest" => {
             let mut request_metadata : ViewnodeMetadata = default_metadata ();
@@ -428,7 +428,7 @@ pub fn parse_metadata_to_viewnodemd (
           "focused"  => result . focused = true,
           "folded"   => result . folded = true,
           "bodyFolded" => result . body_folded = true,
-          // An inactive placeholder is a dataless bare-atom marker
+          // An inactive vognode is a dataless bare-atom marker
           // (see InactiveVognode). The legacy field-bearing list form
           // '(inactiveNode ...)' is still tolerated by the List arm
           // above so a stale buffer round-trips.
@@ -462,7 +462,7 @@ pub fn parse_metadata_to_viewnodemd (
           "idFolder" =>
             result . non_vognode = Some (MpViewnodeKind::PropertyFolder (PropertyFolder::ID)),
           "id" =>
-            result . non_vognode = Some ( MpViewnodeKind::Property ( Property::ID { id: ID::default(), relationship_axes: RelationshipAxes::default() } ) ),
+            result . non_vognode = Some ( MpViewnodeKind::Property ( Property::ID { skgid: ID::default(), relationship_axes: RelationshipAxes::default() } ) ),
           "deadViewnode" => result . is_dead_viewnode = true,
           _ => {
             return Err ( format! ( "Unknown top-level value: {}",
@@ -495,13 +495,13 @@ fn parse_node_sexp (
               return Err ( "id requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
-            metadata . id = Some ( ID::from (value)); },
+            metadata . skgid = Some ( ID::from (value)); },
           "repo" => {
             if subitems . len () != 2 {
               return Err ( "repo requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
-            metadata . home_repo = Some ( RepoName::from (value) ); },
+            metadata . home_skgrepo = Some ( SkgRepoName::from (value) ); },
           // Semantic relationship / birth facts are display-only.
           // The client strips them before save; the view regenerates them.
           "rels" => {},
@@ -622,11 +622,11 @@ fn parse_unknownnode_sexp (
           "id" => {
             if subitems . len () != 2 {
               return Err ( "unknown id requires exactly one value" . to_string () ); }
-            if metadata . unknown_node_id . is_some () {
+            if metadata . unknown_node_skgid . is_some () {
               return Err ( "unknown id may appear only once" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
-            metadata . unknown_node_id =
+            metadata . unknown_node_skgid =
               Some ( ID::from (value)); },
           "viewStats" => {
             if metadata . unknown_relRepo . is_some () {
@@ -660,7 +660,7 @@ fn parse_unknownnode_sexp (
 /// emits the bare atom 'inactiveNode' (handled in the atom arm), but an
 /// older server's field-bearing list form is tolerated here -- its
 /// children (id/repo/membership/overridesHere) are discarded -- so a
-/// stale buffer still round-trips. An inactive placeholder is an
+/// stale buffer still round-trips. An inactive vognode is an
 /// anonymous, dataless marker (see InactiveVognode).
 fn parse_inactivenode_sexp (
   _items   : &[Sexp],
@@ -685,13 +685,13 @@ fn parse_deleted_sexp (
               return Err ( "deleted id requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
-            metadata . id = Some ( ID::from (value)); },
+            metadata . skgid = Some ( ID::from (value)); },
           "repo" => {
             if subitems . len () != 2 {
               return Err ( "deleted repo requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
-            metadata . home_repo = Some ( RepoName::from (value)); },
+            metadata . home_skgrepo = Some ( SkgRepoName::from (value)); },
           _ => { return Err ( format! ( "Unknown deleted key: {}",
                                          key )); }} },
       _ => { return Err ( "Unexpected element in deleted sexp"
@@ -728,11 +728,11 @@ fn parse_viewstats_sexp (
               atom_to_string ( &kv_pair[1] ) ?;
             stats . overridesHere = Some ( ID::from (value)); },
           "relRepo" => {
-            // Display-only repo fact.  A save request must instead
+            // Display-only skgrepo fact.  A save request must instead
             // appear as (editRequest (relRepo REPO)).
             let value : String =
               atom_to_string ( &kv_pair[1] ) ?;
-            stats . relRepo = Some ( RepoName::from (value)); },
+            stats . relRepo = Some ( SkgRepoName::from (value)); },
           _ => { return Err ( format! (
             "Unknown viewStats key: {}", key )); }} },
       _ => { return Err ( "Unexpected element in viewStats"
@@ -758,9 +758,9 @@ fn parse_editrequest_sexp (
           metadata . edit_request = Some (
             NodeEditRequest::NodeMerge ( ID::from (id_str)));
         } else if key == "relRepo" {
-          let repo : String = atom_to_string ( &subitems[1] ) ?;
+          let skgrepo : String = atom_to_string ( &subitems[1] ) ?;
           metadata . relRepo_request =
-            Some ( RepoName::from (repo) );
+            Some ( SkgRepoName::from (skgrepo) );
         } else {
           return Err ( format! ( "Unknown editRequest key: {}", key )); }
       },

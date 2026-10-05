@@ -1,7 +1,7 @@
 /// Git-related types for diff view functionality.
 
 use crate::types::list::{Diff_Item, compute_interleaved_diff};
-use crate::types::misc::{ID, RepoName};
+use crate::types::misc::{ID, SkgRepoName};
 use crate::types::nodes::complete::Graphnode;
 
 use std::collections::HashMap;
@@ -39,12 +39,12 @@ pub struct RelationshipAxes {
   pub unstaged : Option<Sign>,
 }
 
-/// Represents the per-stage diff for an entire Skg repo directory.
+/// Represents the per-stage diff for an entire skgrepo directory.
 /// 'staged'   maps each changed '.skg' file to its HEAD-vs-index diff.
 /// 'unstaged' maps each changed '.skg' file to its index-vs-worktree diff.
 /// A file may appear in either, both, or neither.
 #[derive(Debug, Clone)]
-pub struct RepoDiff {
+pub struct SkgRepoDiff {
   pub is_gitrepo: bool,
   pub staged   : HashMap<PathBuf, GraphnodeDiff>,
   pub unstaged : HashMap<PathBuf, GraphnodeDiff>,
@@ -101,7 +101,7 @@ pub struct NodeChanges {
   /// relationship axis (staged vs unstaged) instead of only the
   /// net-removal fallback.  Each relationship-axis consumer names which
   /// relation its folder represents and reads exactly that diff
-  /// ('NodeRelation::diff_in_nodechanges'): one owner can bear the
+  /// ('NodeRelation::diff_in_nodechanges'): one recorder can bear the
   /// same ID in two relations, changed in different stages, and a
   /// phantom's stage label must come from its own folder's relation.
   pub subscribes_to_diff      : Vec<Diff_Item<ID>>,
@@ -180,9 +180,9 @@ impl RelationshipAxes {
       _                          => true, } }
 }
 
-impl RepoDiff {
+impl SkgRepoDiff {
   pub fn new_not_gitrepo () -> Self {
-    RepoDiff {
+    SkgRepoDiff {
       is_gitrepo  : false,
       staged       : HashMap::new(),
       unstaged     : HashMap::new(),
@@ -210,13 +210,13 @@ impl GitDiffStatus {
 /// stages via 'net_diff_from_per_stage'. Consumers that need
 /// per-stage signs use 'axes_from_per_stage_diffs'.
 pub fn per_stage_node_changes_for_activeVognode<'a> (
-  repo_diffs : &'a Option<HashMap<RepoName, RepoDiff>>,
-  pid          : &ID,
-  skgrepo       : &RepoName,
+  skgrepo_diffs : &'a Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  pid           : &ID,
+  skgrepo       : &SkgRepoName,
 ) -> (Option<&'a NodeChanges>, Option<&'a NodeChanges>) {
-  let sd : Option<&RepoDiff> =
-    repo_diffs . as_ref () . and_then ( |d| d . get (skgrepo) );
-  let sd : Option<&RepoDiff> =
+  let sd : Option<&SkgRepoDiff> =
+    skgrepo_diffs . as_ref () . and_then ( |d| d . get (skgrepo) );
+  let sd : Option<&SkgRepoDiff> =
     sd . filter ( |sd| sd . is_gitrepo );
   let file_path : PathBuf =
     PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
@@ -337,29 +337,29 @@ pub fn added_relationship_axes_from_per_stage_diffs<T: Clone + Eq + std::hash::H
 /// Used by the definitive-expand path (extendDefinitiveSubtree_fromGit, for the
 /// ActiveVognode's own node axes and for phantoms of a removed parent's
 /// children).
-pub fn file_node_axes_from_repo_diff (
-  repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
-  pid          : &ID,
-  skgrepo       : &RepoName,
+pub fn file_node_axes_from_skgrepo_diff (
+  skgrepo_diffs : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
+  pid           : &ID,
+  skgrepo       : &SkgRepoName,
 ) -> NodeAxes {
   let file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-  node_axes_in_repo_diff (
-    repo_diffs . as_ref () . and_then ( |d| d . get (skgrepo) ),
+  node_axes_in_skgrepo_diff (
+    skgrepo_diffs . as_ref () . and_then ( |d| d . get (skgrepo) ),
     &file ) }
 
 /// The staged (HEAD->index) and unstaged (index->worktree) NODE-axis signs for a
-/// `.skg` file within a single Skg repo's diff. The one place that reads a file's
+/// `.skg` file within a single skgrepo's diff. The one place that reads a file's
 /// per-stage status; the callers differ only in how they pick the RepoDiff to
-/// read (by the node's own Skg repo, or with a fallback).
-pub fn node_axes_in_repo_diff (
-  repo_diff : Option<&RepoDiff>,
-  file        : &PathBuf,
+/// read (by the node's own skgrepo, or with a fallback).
+pub fn node_axes_in_skgrepo_diff (
+  skgrepo_diff : Option<&SkgRepoDiff>,
+  file         : &PathBuf,
 ) -> NodeAxes {
-  let staged : Option<Sign> = repo_diff
+  let staged : Option<Sign> = skgrepo_diff
     . and_then ( |sd| sd . staged . get (file) )
     . and_then ( |d| d . status . to_node_axis_sign () );
-  let unstaged : Option<Sign> = repo_diff
+  let unstaged : Option<Sign> = skgrepo_diff
     . and_then ( |sd| sd . unstaged . get (file) )
     . and_then ( |d| d . status . to_node_axis_sign () );
   NodeAxes { staged, unstaged } }

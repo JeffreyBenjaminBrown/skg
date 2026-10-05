@@ -12,13 +12,13 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::tantivy::write::update_index_with_nodes;
 use skg::serve::ViewsState;
 use skg::serve::handlers::text_search::{
   SearchEnrichmentPayload, abandon_search_enrichment,
   handle_text_search_request};
-use skg::repo_sets::{ActiveRepoSet, RepoSetName};
+use skg::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
 use skg::test_utils::{graph_handle_from_config, read_lp_message,
                       skg_env_from_parts};
 use skg::test_utils::run_with_shared_test_stores;
@@ -87,8 +87,8 @@ async fn no_match_search_ends_with_contentless_enrichment (
     ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (), };
-  let all : ActiveRepoSet =
-    ActiveRepoSet::named (config, RepoSetName::from ("all"))?;
+  let all : ActiveSkgRepoSet =
+    ActiveSkgRepoSet::named (config, SkgRepoSetName::from ("all"))?;
   let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::new (Mutex::new (None));
   let search_cancelled : Arc<AtomicBool> =
@@ -117,7 +117,7 @@ async fn abandoned_enrichment_ends_with_contentless_enrichment (
 ) -> Result<(), Box<dyn Error>> {
   { // The session's index starts empty.
     let tantivy_nodes : Vec<GraphnodeInTantivy> =
-      read_all_skg_files_from_repos (config)?
+      read_all_skg_files_from_skgrepos (config)?
       . iter () . map (GraphnodeInTantivy::from) . collect ();
     update_index_with_nodes (&tantivy_nodes, tantivy)?; }
   let graph = graph_handle_from_config (config)?;
@@ -127,8 +127,8 @@ async fn abandoned_enrichment_ends_with_contentless_enrichment (
     ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (), };
-  let all : ActiveRepoSet =
-    ActiveRepoSet::named (config, RepoSetName::from ("all"))?;
+  let all : ActiveSkgRepoSet =
+    ActiveSkgRepoSet::named (config, SkgRepoSetName::from ("all"))?;
   let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::new (Mutex::new (None));
   let search_cancelled : Arc<AtomicBool> =

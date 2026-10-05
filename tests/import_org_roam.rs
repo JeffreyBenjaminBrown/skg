@@ -202,7 +202,7 @@ fn test_empty_file () {
   assert! (nodes . is_empty()); }
 
 #[test]
-fn test_file_without_id () {
+fn test_file_without_skgid () {
   let content : &str = "\
 #+title: No ID here
 Some text.
@@ -383,13 +383,13 @@ fn test_had_id_before_import () {
     parse_org_file (f . path());
   assert_eq! (nodes . len(), 3);
   // File-level node had :ID: → Had_ID_Before_Import.
-  assert_eq! (nodes[0] . misc,
+  assert_eq! (nodes[0] . flags,
               vec![Flag::Had_ID_Before_Import]);
   // Child with :ID: → Had_ID_Before_Import.
-  assert_eq! (nodes[1] . misc,
+  assert_eq! (nodes[1] . flags,
               vec![Flag::Had_ID_Before_Import]);
   // Child without :ID: → empty misc.
-  assert! (nodes[2] . misc . is_empty()); }
+  assert! (nodes[2] . flags . is_empty()); }
 
 #[test]
 fn test_body_whitespace_normalization () {
@@ -460,21 +460,21 @@ fn test_body_whitespace_mixed_indent_with_false_headline () {
 /// Render a tree of Graphnodes as org text (no metadata),
 /// starting from the given root ID, for test comparison.
 fn render_graphnodes_as_org (
-  nodes   : &[Graphnode],
-  root_id : &ID,
+  nodes      : &[Graphnode],
+  root_skgid : &ID,
 ) -> String {
-  let by_id : HashMap<&ID, &Graphnode> =
+  let by_skgid : HashMap<&ID, &Graphnode> =
     nodes . iter() . map (|n| (&n . pid, n)) . collect();
   let mut out : String = String::new();
-  if let Some (root) = by_id . get (root_id) {
-    render_node_recursive (&by_id, root, 1, &mut out); }
+  if let Some (root) = by_skgid . get (root_skgid) {
+    render_node_recursive (&by_skgid, root, 1, &mut out); }
   out . trim_end() . to_string() }
 
 fn render_node_recursive (
-  by_id : &HashMap<&ID, &Graphnode>,
-  node  : &Graphnode,
-  level : usize,
-  out   : &mut String,
+  by_skgid : &HashMap<&ID, &Graphnode>,
+  node     : &Graphnode,
+  level    : usize,
+  out      : &mut String,
 ) {
   for _ in 0 .. level { out . push ('*'); }
   out . push (' ');
@@ -483,9 +483,9 @@ fn render_node_recursive (
   if let Some (ref body) = node . body {
     out . push_str (body);
     out . push ('\n'); }
-  for child_id in &node . contains {
-    if let Some (child) = by_id . get (&child_id . member) {
-      render_node_recursive (by_id, child, level + 1, out); } } }
+  for child_skgid in &node . contains {
+    if let Some (child) = by_skgid . get (&child_skgid . member) {
+      render_node_recursive (by_skgid, child, level + 1, out); } } }
 
 #[test]
 fn test_super_indentation_creates_grouping_nodes () {
@@ -549,7 +549,7 @@ fn headline_inside_a_block_refuses_the_import_and_wipes_nothing () {
   std::fs::write (&existing, "existing") . unwrap();
   let error : String = skg::import_org_roam::import_org_roam_directory (
     input . path(), output . path(),
-    &skg::types::misc::RepoName::from ("main") )
+    &skg::types::misc::SkgRepoName::from ("main") )
     . err() . unwrap() . to_string();
   assert! (error . starts_with ("Nothing was imported."), "{}", error);
   assert! (error . contains ("bad.org:6: \"* inside\""), "{}", error);

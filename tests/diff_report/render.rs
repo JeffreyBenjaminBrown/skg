@@ -2,11 +2,11 @@ use skg::diff_report::render::render_report;
 use skg::diff_report::types::{
   DiffReport, ListDiffItem, NodeBucket, NodeDiffReport, RelationshipDiff,
   RepoForReport};
-use skg::types::misc::{ID, RepoName};
+use skg::types::misc::{ID, SkgRepoName};
 
 use std::collections::HashMap;
 
-fn id (
+fn skgid (
   s : &str,
 ) -> ID {
   ID::from (s)
@@ -17,19 +17,19 @@ fn node_report (
   title : &str,
 ) -> NodeDiffReport {
   NodeDiffReport {
-    pid: id (pid),
-    home_repo: RepoForReport::After (RepoName::from ("main")),
+    pid: skgid (pid),
+    home_skgrepo: RepoForReport::After (SkgRepoName::from ("main")),
     title: title . to_string (),
     title_diff: None,
     body_diff: None,
-    repo_change: None,
+    skgrepo_change: None,
     value_set_diffs: Vec::new (),
     relationship_diffs: Vec::new (),
     contained_list_diff: None }
 }
 
 #[test]
-fn abbreviations_use_enough_id_prefix_to_disambiguate () {
+fn abbreviations_use_enough_skgid_prefix_to_disambiguate () {
   let report : DiffReport =
     DiffReport {
       vanished: Vec::new (),
@@ -59,17 +59,17 @@ fn unchanged_contained_diff_lines_align_with_changed_lines () {
     node_report ("parent", "Parent");
   node . contained_list_diff =
     Some (vec! [
-      ListDiffItem::Unchanged (id ("keep")),
-      ListDiffItem::Removed (id ("gone")),
-      ListDiffItem::Added (id ("new")) ]);
+      ListDiffItem::Unchanged (skgid ("keep")),
+      ListDiffItem::Removed (skgid ("gone")),
+      ListDiffItem::Added (skgid ("new")) ]);
   let report : DiffReport =
     DiffReport {
       vanished: Vec::new (),
       duplicate_ids: Vec::new (),
       titles: HashMap::from ([
-        (id ("keep"), "Keep".to_string ()),
-        (id ("gone"), "Gone".to_string ()),
-        (id ("new"), "New".to_string ()) ]),
+        (skgid ("keep"), "Keep".to_string ()),
+        (skgid ("gone"), "Gone".to_string ()),
+        (skgid ("new"), "New".to_string ()) ]),
       buckets: vec! [
         NodeBucket {
           name: "modified, other",
@@ -91,17 +91,17 @@ fn container_relationship_renders_existing_containers_not_gained () {
     vec! [
       RelationshipDiff {
         role: "container",
-        lost: vec! [id ("old")],
-        gained: vec! [id ("new")],
-        unchanged: vec! [id ("stay")] } ];
+        lost: vec! [skgid ("old")],
+        gained: vec! [skgid ("new")],
+        unchanged: vec! [skgid ("stay")] } ];
   let report : DiffReport =
     DiffReport {
       vanished: Vec::new (),
       duplicate_ids: Vec::new (),
       titles: HashMap::from ([
-        (id ("old"), "Old".to_string ()),
-        (id ("new"), "New".to_string ()),
-        (id ("stay"), "Stay".to_string ()) ]),
+        (skgid ("old"), "Old".to_string ()),
+        (skgid ("new"), "New".to_string ()),
+        (skgid ("stay"), "Stay".to_string ()) ]),
       buckets: vec! [
         NodeBucket {
           name: "modified, other",
@@ -140,13 +140,13 @@ fn unchanged_container_relationship_heading_is_explicit () {
         role: "container",
         lost: Vec::new (),
         gained: Vec::new (),
-        unchanged: vec! [id ("stay")] } ];
+        unchanged: vec! [skgid ("stay")] } ];
   let report : DiffReport =
     DiffReport {
       vanished: Vec::new (),
       duplicate_ids: Vec::new (),
       titles: HashMap::from ([
-        (id ("stay"), "Stay".to_string ()) ]),
+        (skgid ("stay"), "Stay".to_string ()) ]),
       buckets: vec! [
         NodeBucket {
           name: "modified, other",
@@ -167,17 +167,17 @@ fn non_container_backward_relationships_render_as_signed_sets () {
     vec! [
       RelationshipDiff {
         role: "mentioned",
-        lost: vec! [id ("old")],
-        gained: vec! [id ("new")],
-        unchanged: vec! [id ("stay")] } ];
+        lost: vec! [skgid ("old")],
+        gained: vec! [skgid ("new")],
+        unchanged: vec! [skgid ("stay")] } ];
   let report : DiffReport =
     DiffReport {
       vanished: Vec::new (),
       duplicate_ids: Vec::new (),
       titles: HashMap::from ([
-        (id ("old"), "Old".to_string ()),
-        (id ("new"), "New".to_string ()),
-        (id ("stay"), "Stay".to_string ()) ]),
+        (skgid ("old"), "Old".to_string ()),
+        (skgid ("new"), "New".to_string ()),
+        (skgid ("stay"), "Stay".to_string ()) ]),
       buckets: vec! [
         NodeBucket {
           name: "modified, other",

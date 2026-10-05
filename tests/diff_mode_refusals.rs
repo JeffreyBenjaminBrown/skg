@@ -1,9 +1,9 @@
 // cargo nextest run --test grouped_repos -E 'test(diff_mode_refusals::)'
 //
 // The two refusals of
-// TODO/full-schema/12-2_diff-mode-policy_discussion.org: enabling
-// diff mode under a restricted repo-set, and switching to a
-// restricted repo-set while diff mode is on.  Each refusal takes
+// TODO/DONE/full-schema/DONE/12-2_diff-mode-policy_discussion.org: enabling
+// diff mode under a restricted skgrepo-set, and switching to a
+// restricted skgrepo-set while diff mode is on.  Each refusal takes
 // the quiet shape: the endpoint's normal first message carries the
 // refusal text, then an EMPTY rerender stream (a "rerender-lock"
 // naming no views, then "rerender-done") unwinds Emacs's preemptive
@@ -20,10 +20,10 @@ use std::sync::{Arc, Mutex};
 use skg::dbs::in_rust_graph::stats::AllGraphnodeStats;
 use skg::serve::ViewsState;
 use skg::serve::handlers::rerender_all_views::handle_git_diff_toggle_and_rerender;
-use skg::serve::handlers::repo_sets::handle_repo_set_request;
+use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
 use skg::serve::handlers::text_search::SearchEnrichmentPayload;
-use skg::repo_sets::{
-  ActiveRepoSet, RepoSetName};
+use skg::skgrepo_sets::{
+  ActiveSkgRepoSet, SkgRepoSetName};
 use skg::test_utils::{graph_handle_from_config, read_lp_message,
                       skg_env_from_parts};
 use skg::test_utils::run_with_shared_test_stores;
@@ -93,7 +93,7 @@ async fn toggle_refused_under_restricted_set_and_allowed_at_all (
           diff_mode_enabled : false,
           open_views        : OpenViews::new (), };
       let toggle = |views_state : &mut ViewsState,
-                    active : &ActiveRepoSet| -> Vec<String> {
+                    active : &ActiveSkgRepoSet| -> Vec<String> {
         let (mut server, client) =
           connected_tcp_stream_pair () . unwrap ();
         std::thread::scope ( |scope| {
@@ -109,12 +109,12 @@ async fn toggle_refused_under_restricted_set_and_allowed_at_all (
         while let Ok (m) = read_lp_message (&mut reader) {
           messages . push (m); }
         messages };
-      let restricted : ActiveRepoSet =
-        ActiveRepoSet::named (
-          config, RepoSetName::from ("public"))?;
-      let all : ActiveRepoSet =
-        ActiveRepoSet::named (
-          config, RepoSetName::from ("all"))?;
+      let restricted : ActiveSkgRepoSet =
+        ActiveSkgRepoSet::named (
+          config, SkgRepoSetName::from ("public"))?;
+      let all : ActiveSkgRepoSet =
+        ActiveSkgRepoSet::named (
+          config, SkgRepoSetName::from ("all"))?;
       { // Enabling under a restricted set is refused: refusal text
         // in the normal first message, the empty stream after, and
         // the flag unchanged.
@@ -164,7 +164,7 @@ async fn switch_refusals_take_the_unwinding_shape (
         format! ( "((request . \"set active repo set\") \
                     (name . \"{}\"))", name ) };
       let switch = |views_state : &mut ViewsState,
-                    active : &mut ActiveRepoSet,
+                    active : &mut ActiveSkgRepoSet,
                     enrichment_slot : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
                     search_cancelled : &Arc<AtomicBool>,
                     request : &str| -> Vec<String> {
@@ -172,7 +172,7 @@ async fn switch_refusals_take_the_unwinding_shape (
           connected_tcp_stream_pair () . unwrap ();
         std::thread::scope ( |scope| {
           scope . spawn ( || {
-            handle_repo_set_request (
+            handle_skgrepo_set_request (
               &mut server, request, &env, views_state,
               active, enrichment_slot, search_cancelled ); } ); } );
         drop (server);
@@ -186,15 +186,15 @@ async fn switch_refusals_take_the_unwinding_shape (
         ViewsState {
           diff_mode_enabled : true,
           open_views        : OpenViews::new (), };
-      let mut active : ActiveRepoSet =
-        ActiveRepoSet::named (
-          config, RepoSetName::from ("all"))?;
+      let mut active : ActiveSkgRepoSet =
+        ActiveSkgRepoSet::named (
+          config, SkgRepoSetName::from ("all"))?;
       let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
         Arc::new (Mutex::new (Some (SearchEnrichmentPayload {
           runtime        : env . runtime_snapshot (),
           terms          : "untouched by a refusal" . to_string (),
           search_results : vec![],
-          containerward_role_trees_by_id : HashMap::new (),
+          containerward_role_trees_by_skgid : HashMap::new (),
           graphnodestats : AllGraphnodeStats::empty (),
           include_overPrivateText_telescopes : true, })));
       let search_cancelled : Arc<AtomicBool> =
@@ -219,7 +219,7 @@ async fn switch_refusals_take_the_unwinding_shape (
                   "{}", messages [1] );
         assert! ( messages [2] . contains ("rerender-done"),
                   "{}", messages [2] );
-        assert_eq! ( active . name, RepoSetName::from ("all"),
+        assert_eq! ( active . name, SkgRepoSetName::from ("all"),
           "a refused switch changes nothing" );
         assert! ( enrichment_slot . lock () . unwrap () . is_some (),
           "a refused switch does not cancel search enrichment" );
@@ -232,7 +232,7 @@ async fn switch_refusals_take_the_unwinding_shape (
                   &request_to ("all"));
         assert! ( messages [0] . contains ("Active repo-set: all"),
                   "{}", messages [0] );
-        assert_eq! ( active . name, RepoSetName::from ("all") ); }
+        assert_eq! ( active . name, SkgRepoSetName::from ("all") ); }
       { // The ride-along: an unknown set name answers in the same
         // unwinding shape (the old response-type "error" reply left
         // Emacs wedged: guard set, all buffers locked, no handler).
@@ -251,14 +251,14 @@ async fn switch_refusals_take_the_unwinding_shape (
                   "{}", messages [1] );
         assert! ( messages [2] . contains ("rerender-done"),
                   "{}", messages [2] );
-        assert_eq! ( active . name, RepoSetName::from ("all") ); }
+        assert_eq! ( active . name, SkgRepoSetName::from ("all") ); }
       { // Restricted-to-restricted switching with diff mode off is
         // unaffected by the refusals.
         let _ : Vec<String> =
           switch (&mut views_state, &mut active,
                   &enrichment_slot, &search_cancelled,
                   &request_to ("public"));
-        assert_eq! ( active . name, RepoSetName::from ("public") );
+        assert_eq! ( active . name, SkgRepoSetName::from ("public") );
         let messages : Vec<String> =
           switch (&mut views_state, &mut active,
                   &enrichment_slot, &search_cancelled,
@@ -267,7 +267,7 @@ async fn switch_refusals_take_the_unwinding_shape (
                     "Active repo-set: private"),
                   "{}", messages [0] );
         assert_eq! ( active . name,
-                     RepoSetName::from ("private") ); }
+                     SkgRepoSetName::from ("private") ); }
       Ok (( )) }
 
 async fn refusal_first_messages_parse_and_read_as_documented (
@@ -285,9 +285,9 @@ async fn refusal_first_messages_parse_and_read_as_documented (
         ViewsState {
           diff_mode_enabled : false,
           open_views        : OpenViews::new (), };
-      let restricted : ActiveRepoSet =
-        ActiveRepoSet::named (
-          config, RepoSetName::from ("public"))?;
+      let restricted : ActiveSkgRepoSet =
+        ActiveSkgRepoSet::named (
+          config, SkgRepoSetName::from ("public"))?;
       let (mut server, client) =
         connected_tcp_stream_pair ()?;
       std::thread::scope ( |scope| {

@@ -1,9 +1,9 @@
-use crate::types::misc::{ID, SkgConfig, RepoName};
+use crate::types::misc::{ID, SkgConfig, SkgRepoName};
 use crate::types::nodes::complete::Graphnode;
-use crate::dbs::node_lookup::graphnode_rustFirst_by_pid_and_repo;
+use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::viewnode::Viewnode;
-use crate::types::tree::viewnode_graphnode::{ pid_and_repo_from_treenode, write_at_activeVognode_in_tree };
+use crate::types::tree::viewnode_graphnode::{ pid_and_skgrepo_from_treenode, write_at_activeVognode_in_tree };
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
@@ -11,7 +11,7 @@ use std::error::Error;
 /// PURPOSE: Given a write-protected node N,
 /// reads in-Rust-graph-or-disk to:
 /// - Reset title.
-/// - Reset repo.
+/// - Reset skgrepo.
 ///
 /// EXPECTS: The input node is write-protected.
 pub fn clobberWriteProtectedViewnode (
@@ -21,17 +21,17 @@ pub fn clobberWriteProtectedViewnode (
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
 
-  let (node_id, repo) : (ID, RepoName) =
-    pid_and_repo_from_treenode (
+  let (node_id, skgrepo) : (ID, SkgRepoName) =
+    pid_and_skgrepo_from_treenode (
       tree, treeid, "clobberWriteProtectedViewnode" ) ?;
   let graphnode : Graphnode =
-    graphnode_rustFirst_by_pid_and_repo (
-      graph, config, &node_id, &repo ) ?;
+    graphnode_graphFirst_by_pid_and_skgrepo (
+      graph, config, &node_id, &skgrepo ) ?;
   let title : String = graphnode . title . clone();
-  let repo : RepoName = graphnode . home_repo . clone();
+  let skgrepo : SkgRepoName = graphnode . home_skgrepo . clone();
   write_at_activeVognode_in_tree (
     tree, treeid,
     |t| { t . title = title;
-          t . home_repo = repo; }
+          t . home_skgrepo = skgrepo; }
   ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (( )) }

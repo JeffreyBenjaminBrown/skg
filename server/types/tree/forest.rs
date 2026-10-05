@@ -40,7 +40,7 @@ impl Forest<MpViewnode> {
 /// The 'internal' functions expose the awkward internal representation
 /// that Forest is designed to hide when possible.
 impl<T> Forest<T> {
-  pub fn internal_root_id (
+  pub fn internal_root_skgid (
     &self,
   ) -> NodeId {
     self . tree . root () . id () }
@@ -71,10 +71,10 @@ impl<T> Forest<T> {
   ) -> impl Iterator<Item = NodeRef<'a, T>> + 'a {
     self . tree . root () . children () }
 
-  pub fn root_ids (
+  pub fn root_skgids (
     &self,
   ) -> Vec<NodeId> {
-    tree_forest_root_ids (&self . tree) }
+    tree_forest_root_skgids (&self . tree) }
 
   pub fn nodes<'a> (
     &'a self,
@@ -95,15 +95,15 @@ impl<T> Forest<T> {
 
   pub fn get<'a> (
     &'a self,
-    id : NodeId,
+    skgid : NodeId,
   ) -> Option<NodeRef<'a, T>> {
-    self . tree . get (id) }
+    self . tree . get (skgid) }
 
   pub fn get_mut<'a> (
     &'a mut self,
-    id : NodeId,
+    skgid : NodeId,
   ) -> Option<NodeMut<'a, T>> {
-    self . tree . get_mut (id) }}
+    self . tree . get_mut (skgid) }}
 
 impl<T> From<Tree<T>> for Forest<T> {
   fn from (
@@ -133,7 +133,7 @@ impl<T> DerefMut for Forest<T> {
 
 /// Compatibility helper for code that still holds the old
 /// single-tree forest representation directly.
-pub fn tree_forest_root_ids<T> (
+pub fn tree_forest_root_skgids<T> (
   tree : &Tree<T>,
 ) -> Vec<NodeId> {
   tree . root () . children ()

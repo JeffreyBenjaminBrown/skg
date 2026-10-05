@@ -1,19 +1,19 @@
 //! TODO/more.org, "The skg diff report should report what vanished
 //! nodes used to be": a node id that the worktree still REFERENCES
 //! (in some contains / subscribes_to / hides_from_its_subscriptions /
-//! overrides_view_of list) but that exists in NO Skg repo -- the kind
+//! overrides_view_of list) but that exists in NO skgrepo -- the kind
 //! that renders as "Parent references unknown node." -- is
-//! investigated in the git history of every Skg repo. If it was never
+//! investigated in the git history of every skgrepo. If it was never
 //! there, the report says that; otherwise it names the commit at
 //! which it vanished and what it was connected to (in every possible
 //! way, links included) when last present.
 
 use crate::diff_report::snapshot::{
-  parse_blob_node, path_is_repo_skg, repo_prefix_in_gitrepo};
+  parse_blob_node, path_is_skgrepo_skg, repo_prefix_in_gitrepo};
 use crate::diff_report::types::{
   CommitStamp, GraphSnapshot, VanishedNodeReport, VanishedNodeSighting};
 use crate::git_ops::read_gitrepo::open_gitrepo;
-use crate::types::misc::{ID, MSV, SkgConfig, RepoName, members_msv, members_of};
+use crate::types::misc::{ID, MSV, SkgConfig, SkgRepoName, members_msv, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::links::links_from_node;
 
@@ -25,64 +25,64 @@ use std::path::{Path, PathBuf};
 /// (contains, subscribes_to, hides_from_its_subscriptions,
 /// overrides_view_of) that no node of 'snapshot' answers to (as
 /// primary or extra id). Link targets are NOT collected here:
-/// a dead link degrades to text, not to an unknown-node phantom.
-pub fn dangling_ids_in_snapshot (
+/// a dangling link degrades to text, not to an unknown-node phantom.
+pub fn dangling_skgids_in_snapshot (
   snapshot : &GraphSnapshot,
 ) -> BTreeSet<ID> {
   let resolvable : HashSet<&ID> = {
-    let mut ids : HashSet<&ID> = HashSet::new ();
+    let mut skgids : HashSet<&ID> = HashSet::new ();
     for node in snapshot . nodes . values () {
-      ids . insert (& node . pid);
-      ids . extend ( node . extra_ids . iter () ); }
-    ids };
+      skgids . insert (& node . pid);
+      skgids . extend ( node . extra_ids . iter () ); }
+    skgids };
   let mut dangling : BTreeSet<ID> = BTreeSet::new ();
   for node in snapshot . nodes . values () {
-    let contains_ids   : Vec<ID> = members_of (& node . contains);
-    let subscribes_ids : MSV<ID> = members_msv (& node . subscribes_to);
-    let hides_ids       : MSV<ID> = members_msv (
+    let contains_skgids   : Vec<ID> = members_of (& node . contains);
+    let subscribes_skgids : MSV<ID> = members_msv (& node . subscribes_to);
+    let hides_skgids       : MSV<ID> = members_msv (
       & node . hides_from_its_subscriptions);
-    let overrides_ids   : MSV<ID> = members_msv (& node . overrides_view_of);
+    let overrides_skgids   : MSV<ID> = members_msv (& node . overrides_view_of);
     let referenced =
-      contains_ids . iter ()
-      . chain ( subscribes_ids . or_default () . iter () )
-      . chain ( hides_ids . or_default () . iter () )
-      . chain ( overrides_ids . or_default () . iter () );
-    for id in referenced {
-      if ! resolvable . contains (id) {
-        dangling . insert ( id . clone () ); }} }
+      contains_skgids . iter ()
+      . chain ( subscribes_skgids . or_default () . iter () )
+      . chain ( hides_skgids . or_default () . iter () )
+      . chain ( overrides_skgids . or_default () . iter () );
+    for skgid in referenced {
+      if ! resolvable . contains (skgid) {
+        dangling . insert ( skgid . clone () ); }} }
   dangling }
 
-/// Investigate each id of 'ids' in the git history of every Skg repo:
-/// walk each repo's FIRST-PARENT chain from HEAD looking for the most
-/// recent commit whose tree holds '<id>.skg'. A Skg repo that cannot be
+/// Investigate each id of 'ids' in the git history of every skgrepo:
+/// walk each skgrepo's FIRST-PARENT chain from HEAD looking for the most
+/// recent commit whose tree holds '<id>.skg'. A skgrepo that cannot be
 /// opened or walked contributes nothing (the ordinary diff-report
-/// refusals have already vetted the repos the selection needs).
-/// One walk per Skg repo covers all ids.
-pub fn investigate_vanished_ids (
+/// refusals have already vetted the skgrepos the selection needs).
+/// One walk per skgrepo covers all ids.
+pub fn investigate_vanished_skgids (
   config : &SkgConfig,
-  ids    : &BTreeSet<ID>,
+  skgids    : &BTreeSet<ID>,
 ) -> Vec<VanishedNodeReport> {
-  if ids . is_empty () { return Vec::new (); }
+  if skgids . is_empty () { return Vec::new (); }
   let mut reports : Vec<VanishedNodeReport> =
-    ids . iter ()
-    . map ( |id| VanishedNodeReport {
-        id : id . clone (), sightings : Vec::new () } )
+    skgids . iter ()
+    . map ( |skgid| VanishedNodeReport {
+        skgid : skgid . clone (), sightings : Vec::new () } )
     . collect ();
-  let repo_names : Vec<&RepoName> = {
-    let mut names : Vec<&RepoName> =
-      config . repos . keys () . collect ();
+  let skgrepo_names : Vec<&SkgRepoName> = {
+    let mut names : Vec<&SkgRepoName> =
+      config . skgrepos . keys () . collect ();
     names . sort (); // deterministic report order
     names };
-  for repo_name in repo_names {
-    let Some (skgrepo) = config . repos . get (repo_name)
+  for skgrepo_name in skgrepo_names {
+    let Some (skgrepo) = config . skgrepos . get (skgrepo_name)
       else { continue; };
     let Some (gitrepo) = open_gitrepo ( Path::new (& skgrepo . path) )
       else { continue; };
     let Ok (prefix) =
       repo_prefix_in_gitrepo (&gitrepo, Path::new (& skgrepo . path))
       else { continue; };
-    sight_ids_in_gitrepo (
-      &gitrepo, &prefix, repo_name, ids, &mut reports ); }
+    sight_skgids_in_gitrepo (
+      &gitrepo, &prefix, skgrepo_name, skgids, &mut reports ); }
   reports }
 
 /// One first-parent walk from HEAD. The first commit (i.e. the most
@@ -91,31 +91,31 @@ pub fn investigate_vanished_ids (
 /// first-parent descendant, which lacks the file -- is 'vanished_at'
 /// (None if the file is present at HEAD itself, which cannot happen
 /// for a genuinely dangling id).
-fn sight_ids_in_gitrepo (
+fn sight_skgids_in_gitrepo (
   gitrepo        : &Repository,
   prefix      : &Path,
-  repo_name : &RepoName,
-  ids         : &BTreeSet<ID>,
+  skgrepo_name : &SkgRepoName,
+  skgids         : &BTreeSet<ID>,
   reports     : &mut [VanishedNodeReport],
 ) {
   let mut walk = match gitrepo . revwalk () {
     Ok (w) => w, Err (_) => return, };
   if walk . push_head () . is_err () { return; }
   walk . simplify_first_parent () . ok ();
-  let mut remaining : BTreeSet<ID> = ids . clone ();
+  let mut remaining : BTreeSet<ID> = skgids . clone ();
   let mut descendant : Option<git2::Oid> = None;
   for oid in walk . flatten () {
     let Ok (commit) = gitrepo . find_commit (oid) else { break; };
     let Ok (tree) = commit . tree () else { break; };
-    for id in remaining . clone () {
+    for skgid in remaining . clone () {
       let file : PathBuf =
-        prefix . join ( format! ("{}.skg", id . 0) );
+        prefix . join ( format! ("{}.skg", skgid . 0) );
       if tree . get_path (&file) . is_ok () {
-        remaining . remove (&id);
+        remaining . remove (&skgid);
         if let Some (sighting) = sighting_at_commit (
-          gitrepo, prefix, repo_name, &id, &commit, descendant )
+          gitrepo, prefix, skgrepo_name, &skgid, &commit, descendant )
         { if let Some (report) =
-            reports . iter_mut () . find ( |r| r . id == id )
+            reports . iter_mut () . find ( |r| r . skgid == skgid )
           { report . sightings . push (sighting); }} }}
     if remaining . is_empty () { break; }
     descendant = Some (oid); } }
@@ -134,37 +134,37 @@ fn commit_stamp (
 fn sighting_at_commit (
   gitrepo        : &Repository,
   prefix      : &Path,
-  repo_name : &RepoName,
-  id          : &ID,
+  skgrepo_name : &SkgRepoName,
+  skgid          : &ID,
   commit      : &Commit,
   descendant  : Option<git2::Oid>,
 ) -> Option<VanishedNodeSighting> {
   let tree = commit . tree () . ok () ?;
   let own : Graphnode = {
     let file : PathBuf =
-      prefix . join ( format! ("{}.skg", id . 0) );
+      prefix . join ( format! ("{}.skg", skgid . 0) );
     let entry = tree . get_path (&file) . ok () ?;
     let blob = gitrepo . find_blob ( entry . id () ) . ok () ?;
-    parse_blob_node ( blob . content (), repo_name, &file ) . ok () ? };
+    parse_blob_node ( blob . content (), skgrepo_name, &file ) . ok () ? };
   let outbound : Vec<(&'static str, Vec<ID>)> = {
     let mut outbound : Vec<(&'static str, Vec<ID>)> = Vec::new ();
     let mut keep = |name : &'static str, members : &[ID]| {
       if ! members . is_empty () {
         outbound . push ( (name, members . to_vec ()) ); }};
-    let contains_ids   : Vec<ID> = members_of (& own . contains);
-    let subscribes_ids : MSV<ID> = members_msv (& own . subscribes_to);
-    let hides_ids       : MSV<ID> = members_msv (
+    let contains_skgids   : Vec<ID> = members_of (& own . contains);
+    let subscribes_skgids : MSV<ID> = members_msv (& own . subscribes_to);
+    let hides_skgids       : MSV<ID> = members_msv (
       & own . hides_from_its_subscriptions);
-    let overrides_ids   : MSV<ID> = members_msv (& own . overrides_view_of);
-    keep ("contains",                     & contains_ids);
-    keep ("subscribes_to",                subscribes_ids . or_default ());
-    keep ("hides_from_its_subscriptions", hides_ids . or_default ());
-    keep ("overrides_view_of",            overrides_ids . or_default ());
+    let overrides_skgids   : MSV<ID> = members_msv (& own . overrides_view_of);
+    keep ("contains",                     & contains_skgids);
+    keep ("subscribes_to",                subscribes_skgids . or_default ());
+    keep ("hides_from_its_subscriptions", hides_skgids . or_default ());
+    keep ("overrides_view_of",            overrides_skgids . or_default ());
     outbound };
   let inbound : Vec<(ID, &'static str)> =
-    inbound_references_in_tree (gitrepo, prefix, repo_name, id, &tree);
+    inbound_references_in_tree (gitrepo, prefix, skgrepo_name, skgid, &tree);
   Some ( VanishedNodeSighting {
-    home_repo       : repo_name . clone (),
+    home_skgrepo : skgrepo_name . clone (),
     last_present : commit_stamp (commit),
     vanished_at  : descendant
       . and_then ( |oid| gitrepo . find_commit (oid) . ok () )
@@ -178,8 +178,8 @@ fn sighting_at_commit (
 fn inbound_references_in_tree (
   gitrepo        : &Repository,
   prefix      : &Path,
-  repo_name : &RepoName,
-  id          : &ID,
+  skgrepo_name : &SkgRepoName,
+  skgid          : &ID,
   tree        : &git2::Tree,
 ) -> Vec<(ID, &'static str)> {
   let mut inbound : Vec<(ID, &'static str)> = Vec::new ();
@@ -188,31 +188,31 @@ fn inbound_references_in_tree (
       return TreeWalkResult::Ok; }
     let rel_path : PathBuf =
       PathBuf::from (root) . join ( entry . name () . unwrap_or ("") );
-    if ! path_is_repo_skg (&rel_path, prefix) {
+    if ! path_is_skgrepo_skg (&rel_path, prefix) {
       return TreeWalkResult::Ok; }
     let Ok (blob) = gitrepo . find_blob ( entry . id () )
       else { return TreeWalkResult::Ok; };
     let Ok (node) = parse_blob_node (
-      blob . content (), repo_name, &rel_path )
+      blob . content (), skgrepo_name, &rel_path )
       else { return TreeWalkResult::Ok; }; // an unparseable neighbor cannot hide the parseable ones
-    if node . pid == *id {
+    if node . pid == *skgid {
       return TreeWalkResult::Ok; }
     let mut note = |name : &'static str, hit : bool| {
       if hit { inbound . push ( (node . pid . clone (), name) ); }};
     note ("contains",
-          node . contains . iter () . any ( |m| &m . member == id ));
+          node . contains . iter () . any ( |m| &m . member == skgid ));
     note ("subscribes_to",
           node . subscribes_to . or_default () . iter ()
-            . any ( |m| &m . member == id ));
+            . any ( |m| &m . member == skgid ));
     note ("hides_from_its_subscriptions",
           node . hides_from_its_subscriptions . or_default () . iter ()
-            . any ( |m| &m . member == id ));
+            . any ( |m| &m . member == skgid ));
     note ("overrides_view_of",
           node . overrides_view_of . or_default () . iter ()
-            . any ( |m| &m . member == id ));
+            . any ( |m| &m . member == skgid ));
     note ("link",
           links_from_node (&node) . iter ()
-            . any ( |l| l . id == *id ));
+            . any ( |l| l . skgid == *skgid ));
     TreeWalkResult::Ok
   }) . ok ();
   inbound }

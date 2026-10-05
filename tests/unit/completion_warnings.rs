@@ -1,33 +1,33 @@
 use super::*;
 
 #[test]
-fn warnings_batch_per_folder_and_owner () {
+fn warnings_batch_per_folder_and_recorder () {
   let warnings : Vec<CompletionWarning> = vec! [
     CompletionWarning::FolderRepair {
       folder      : PartnerFolder::Subscriber,
-      owner    : ID::from ("n"),
+      recorder : ID::from ("n"),
       repair   : RepairKind::RestoredMember,
       children : vec! [ ID::from ("r"), ID::from ("t") ] },
     CompletionWarning::FolderRepair {
       folder      : PartnerFolder::Subscriber,
-      owner    : ID::from ("n"),
+      recorder : ID::from ("n"),
       repair   : RepairKind::DemotedNonMember,
       children : vec! [ ID::from ("x") ] },
     CompletionWarning::FolderRepair {
       folder      : PartnerFolder::Hider,
-      owner    : ID::from ("m"),
+      recorder : ID::from ("m"),
       repair   : RepairKind::RemovedDuplicate,
       children : vec! [ ID::from ("d") ] },
     CompletionWarning::FolderRepair { // empty children: contributes nothing
       folder      : PartnerFolder::Hider,
-      owner    : ID::from ("m"),
+      recorder : ID::from ("m"),
       repair   : RepairKind::RestoredMember,
       children : vec! [] },
   ];
   let rendered : Vec<String> =
     render_completion_warnings (&warnings);
   assert_eq! ( rendered . len (), 2,
-    "one string per (folder, owner) pair: {:?}", rendered );
+    "one string per (folder, recorder) pair: {:?}", rendered );
   assert! ( rendered [0] . contains ("subscriberFolder") );
   assert! ( rendered [0] . contains ("under node n") );
   assert! ( rendered [0] . contains ("restored 2 member(s): r, t") );

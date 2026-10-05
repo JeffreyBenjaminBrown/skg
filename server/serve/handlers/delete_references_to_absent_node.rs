@@ -8,7 +8,7 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   send_response_with_length_prefix, tag_sexp_response, tag_text_response,
   value_from_request_sexp };
-use crate::repo_sets::ActiveRepoSet;
+use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::env::SkgEnv;
 use crate::types::misc::ID;
 use crate::serve::ViewsState;
@@ -22,10 +22,10 @@ pub fn handle_delete_references_to_absent_node_request (
   request : &str,
   env : &mut SkgEnv,
   views_state : &mut ViewsState,
-  active_repo_set : &ActiveRepoSet,
+  active_skgrepo_set : &ActiveSkgRepoSet,
 ) {
-  let raw_id = match value_from_request_sexp ("id", request) {
-    Ok (id) => ID::from (id),
+  let raw_skgid = match value_from_request_sexp ("id", request) {
+    Ok (skgid) => ID::from (skgid),
     Err (e) => return refuse (stream, &e), };
   // Preview validation and the resulting rewrite are one mutation.  Taking
   // the gate before the preview prevents an approved token from becoming
@@ -35,7 +35,7 @@ pub fn handle_delete_references_to_absent_node_request (
   let runtime = env . runtime_snapshot ();
   let working_graph = new_handle ((*runtime . graph) . clone ());
   let graph = working_graph . load_full ();
-  let current = match preview (&graph, &runtime . config, &raw_id) {
+  let current = match preview (&graph, &runtime . config, &raw_skgid) {
     Ok (preview) => preview,
     Err (e) => return refuse (stream, &e), };
   let approved = value_from_request_sexp ("approved-preview", request) . ok ();
@@ -46,7 +46,7 @@ pub fn handle_delete_references_to_absent_node_request (
     let content = preview_warning_org (&current);
     let response = format! (
       "((id \"{}\") (approved-preview \"{}\") (content \"{}\") (prompt \"Remove the structured references?\"))",
-      escape (&raw_id . 0), escape (&current . opaque_approval ()), escape (&content));
+      escape (&raw_skgid . 0), escape (&current . opaque_approval ()), escape (&content));
     send_response_with_length_prefix (
       stream, &tag_sexp_response (
         TcpToClient::DeleteReferencesConfirmation, &response));
@@ -70,10 +70,10 @@ pub fn handle_delete_references_to_absent_node_request (
     escape (&result), current . changed_nodes (), current . structural . len ());
   send_response_with_length_prefix (
     stream, &tag_sexp_response (TcpToClient::DeleteReferencesResult, &response));
-  let affected_owner_pids : HashSet<ID> = current . structural . iter ()
-    . map (|occurrence| occurrence . owner_pid . clone ()) . collect ();
+  let affected_recorder_pids : HashSet<ID> = current . structural . iter ()
+    . map (|occurrence| occurrence . recorder_pid . clone ()) . collect ();
   stream_rerender_views_after_absent_reference_cleanup (
-    stream, env, views_state, active_repo_set, &raw_id, &affected_owner_pids );
+    stream, env, views_state, active_skgrepo_set, &raw_skgid, &affected_recorder_pids );
 }
 
 fn refuse (stream : &mut TcpStream, error : &str) {

@@ -3,81 +3,81 @@ use skg::dbs::in_rust_graph::override_resolution::{
   OverrideResolution,
   resolve_override,
 };
-use skg::repo_sets::{ActiveRepoSet, RepoSetName};
+use skg::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
 use skg::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, SkgfileRepo, RepoName,
+  ID, MSV, RelPartner, SkgConfig, SkgRepo, SkgRepoName,
   rel_partners_at_relRepo};
-use skg::types::nodes::complete::{Graphnode, empty_node_complete};
+use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 fn config () -> SkgConfig {
-  SkgConfig::dummyFromRepos (HashMap::from ([
-    ( RepoName::from ("owned"),
-      SkgfileRepo {
-        name: RepoName::from ("owned"),
+  SkgConfig::dummyFromSkgRepos (HashMap::from ([
+    ( SkgRepoName::from ("owned"),
+      SkgRepo {
+        name: SkgRepoName::from ("owned"),
         abbreviation: None,
         path: PathBuf::from ("/tmp/owned"),
-        user_owns_it: true,
+        owned: true,
       }),
-    ( RepoName::from ("owned2"),
-      SkgfileRepo {
-        name: RepoName::from ("owned2"),
+    ( SkgRepoName::from ("owned2"),
+      SkgRepo {
+        name: SkgRepoName::from ("owned2"),
         abbreviation: None,
         path: PathBuf::from ("/tmp/owned2"),
-        user_owns_it: true,
+        owned: true,
       }),
-    ( RepoName::from ("foreign"),
-      SkgfileRepo {
-        name: RepoName::from ("foreign"),
+    ( SkgRepoName::from ("foreign"),
+      SkgRepo {
+        name: SkgRepoName::from ("foreign"),
         abbreviation: None,
         path: PathBuf::from ("/tmp/foreign"),
-        user_owns_it: false,
+        owned: false,
       }),
   ])) }
 
 fn node (
   pid       : &str,
-  repo    : &str,
+  skgrepo   : &str,
   overrides : &[&str],
 ) -> Graphnode {
   let mut node : Graphnode =
-    empty_node_complete ();
+    empty_graphnode ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
-  node . home_repo = RepoName::from (repo);
+  node . home_skgrepo = SkgRepoName::from (skgrepo);
   node . overrides_view_of =
     if overrides . is_empty () {
       MSV::Unspecified
     } else {
       MSV::Specified (
         rel_partners_at_relRepo (
-          &node . home_repo,
+          &node . home_skgrepo,
           overrides . iter ()
-          . map ( |id| ID::from (*id) )
+          . map ( |skgid| ID::from (*skgid) )
           . collect () ) )
     };
   node }
 
 fn restricted_to (
-  repos : &[&str],
-) -> ActiveRepoSet {
-  ActiveRepoSet {
-    name    : RepoSetName ( "restricted" . to_string () ),
-    repos : repos . iter ()
-      . map ( |s| RepoName::from (*s) )
+  skgrepos : &[&str],
+) -> ActiveSkgRepoSet {
+  ActiveSkgRepoSet {
+    name    : SkgRepoSetName ( "restricted" . to_string () ),
+    skgrepos : skgrepos . iter ()
+      . map ( |s| SkgRepoName::from (*s) )
       . collect (),
   }}
 
 fn resolve (
   nodes  : Vec<Graphnode>,
-  active : Option<&ActiveRepoSet>,
-  id     : &str,
+  active : Option<&ActiveSkgRepoSet>,
+  skgid  : &str,
 ) -> OverrideResolution {
   let graph : InRustGraph =
     InRustGraph::from_graphnodes (&nodes);
-  resolve_override (&config (), &graph, active, &ID::from (id)) }
+  resolve_override (&config (), &graph, active, &ID::from (skgid)) }
 
 #[test]
 fn no_overrider_resolves_to_self () {
@@ -123,8 +123,8 @@ fn a_single_owned_overrider_substitutes () {
 
 #[test]
 fn an_inactive_owned_overrider_does_not_substitute () {
-  let active : ActiveRepoSet =
-    // 'owned2' (the overrider's repo) is not in the active set.
+  let active : ActiveSkgRepoSet =
+    // 'owned2' (the overrider's skgrepo) is not in the active set.
     restricted_to ( &["owned", "foreign"] );
   assert_eq! (
     resolve (
@@ -141,7 +141,7 @@ fn an_inactive_owned_overrider_does_not_substitute () {
 
 #[test]
 fn an_active_owned_overrider_substitutes_under_a_restricted_set () {
-  let active : ActiveRepoSet =
+  let active : ActiveSkgRepoSet =
     restricted_to ( &["owned", "owned2"] );
   assert_eq! (
     resolve (
@@ -158,13 +158,13 @@ fn an_active_owned_overrider_substitutes_under_a_restricted_set () {
 
 #[test]
 fn an_inactive_override_edge_between_active_nodes_does_not_substitute () {
-  let active : ActiveRepoSet =
+  let active : ActiveSkgRepoSet =
     restricted_to ( &["owned", "foreign"] );
   let mut overrider : Graphnode =
     node ("overrider", "owned", &[]);
   overrider . overrides_view_of = MSV::Specified (vec![
     RelPartner::at_relRepo (
-      RepoName::from ("owned2"), ID::from ("target")) ]);
+      SkgRepoName::from ("owned2"), ID::from ("target")) ]);
   assert_eq! (
     resolve (
       vec![ node ("target", "owned", &[]), overrider ],
@@ -177,7 +177,7 @@ fn an_inactive_override_edge_between_active_nodes_does_not_substitute () {
 
 #[test]
 fn a_chain_of_two_resolves_transitively_with_path () {
-  // A user-owned chain X overrides Y overrides Z; resolves to the end
+  // An owned chain X overrides Y overrides Z; resolves to the end
   // of the chain, carrying the full path. Linear chains are legal.
   assert_eq! (
     resolve (
@@ -195,8 +195,8 @@ fn a_chain_of_two_resolves_transitively_with_path () {
 
 #[test]
 fn inactive_overrider_home_stops_a_chain_at_that_edge () {
-  let active : ActiveRepoSet =
-    // y's repo 'owned2' is inactive; x's repo 'owned' is active.
+  let active : ActiveSkgRepoSet =
+    // y's repo 'owned2' is inactive; x's skgrepo 'owned' is active.
     restricted_to ( &["owned", "foreign"] );
   assert_eq! (
     resolve (
@@ -234,7 +234,7 @@ fn extra_id_input_and_extra_id_edge_both_resolve () {
   target . extra_ids = vec![ ID::from ("target-extra") ];
   let nodes : Vec<Graphnode> = vec![
     target,
-    // The override edge is written to the extra ID.
+    // The override relationship is written to the extra ID.
     node ("overrider", "owned", &["target-extra"]),
   ];
   let graph : InRustGraph =
@@ -272,7 +272,7 @@ fn multiple_owned_overriders_substitute_nothing () {
       cycle          : vec![], } ); }
 
 #[test]
-fn an_unknown_id_resolves_to_itself () {
+fn an_unknown_skgid_resolves_to_itself () {
   assert_eq! (
     resolve ( vec![], None, "never-heard-of-it" ),
     OverrideResolution {

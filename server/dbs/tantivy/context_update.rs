@@ -9,7 +9,7 @@
 use crate::consts::{TANTIVY_PER_ID_LOOKUP_LIMIT, TANTIVY_WRITER_BUFFER_BYTES};
 use crate::dbs::tantivy::background_writer::lock_tantivy_writes;
 use crate::dbs::tantivy::write::commit_with_status;
-use crate::types::misc::{ID, RepoName, TantivyIndex};
+use crate::types::misc::{ID, SkgRepoName, TantivyIndex};
 
 use tantivy::{IndexWriter, Searcher, Term, TantivyDocument, doc};
 use tantivy::collector::TopDocs;
@@ -22,8 +22,8 @@ use std::error::Error;
 /// Updates context_origin_type for all documents matching each ID.
 /// Deletes and re-adds each document with the new context_origin_type.
 pub fn update_context_origin_types (
-  tantivy_index       : &TantivyIndex,
-  context_types_by_id : &HashMap<ID, String>,
+  tantivy_index          : &TantivyIndex,
+  context_types_by_skgid : &HashMap<ID, String>,
 ) -> Result<usize, Box<dyn Error>> {
   let searcher : Searcher =
     tantivy_index . reader . searcher ();
@@ -33,7 +33,7 @@ pub fn update_context_origin_types (
     tantivy_index . index . writer (
       TANTIVY_WRITER_BUFFER_BYTES) ?;
   let mut updated_count : usize = 0;
-  for (pid, context_type) in context_types_by_id {
+  for (pid, context_type) in context_types_by_skgid {
     let query : Box < dyn Query > =
       // Find all documents with this ID.
       Box::new ( tantivy::query::TermQuery::new (
@@ -63,9 +63,9 @@ pub fn update_context_origin_types (
           . get_first ( tantivy_index . raw_title_field )
           . and_then ( |v| v . as_str () )
           . unwrap_or ("") . to_string ();
-      let repo : RepoName =
+      let skgrepo : SkgRepoName =
         retrieved_doc
-          . get_first ( tantivy_index . repo_field )
+          . get_first ( tantivy_index . skgrepo_field )
           . and_then ( |v| v . as_str () )
           . unwrap_or ("") . into ();
       let overPrivateText_telescope : String =
@@ -104,8 +104,8 @@ pub fn update_context_origin_types (
           overPrivateText_telescope . as_str (),
         tantivy_index . no_search_matching_field =>
           no_search_matching . as_str (),
-        tantivy_index . repo_field =>
-          repo . as_str (),
+        tantivy_index . skgrepo_field =>
+          skgrepo . as_str (),
         tantivy_index . context_origin_type_field =>
           context_type . as_str (),
         tantivy_index . is_title_field =>

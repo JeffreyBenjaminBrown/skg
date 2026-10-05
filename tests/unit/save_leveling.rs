@@ -3,18 +3,18 @@
 //! restricted-set deletion refusal. Each test builds the exact graph fixture
 //! it passes to the repo-resolution function.
 
-use super::{apply_sticky_relRepos_in_graph, build_diskSupplemented_defineNodes,
+use super::{apply_sticky_relRepos_in_graph, build_diskSupplemented_nodeInstructions,
             refuse_delete_with_inactive_sections};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::from_text::local_instruction_collection::lower::{
   NodeIntent, RequestedRelRepos};
-use crate::repo_sets::ActiveRepoSet;
+use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, SkgfileRepo, RepoName,
-  RepoSetName};
+  ID, MSV, RelPartner, SkgConfig, SkgRepo, SkgRepoName,
+  SkgRepoSetName};
 use crate::types::nodes::complete::{
-  Flag, Graphnode, empty_node_complete};
-use crate::types::save::{DefineNode, SaveNode};
+  Flag, Graphnode, empty_graphnode};
+use crate::types::save::{NodeInstruction, SaveNode};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -22,30 +22,30 @@ use std::path::PathBuf;
 fn config_with_order (
   names : &[&str],
 ) -> SkgConfig {
-  let mut repos : HashMap<RepoName, SkgfileRepo> =
+  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
     HashMap::new ();
   for name in names {
-    repos . insert (
-      RepoName::from (*name),
-      SkgfileRepo {
-        name         : RepoName::from (*name),
+    skgrepos . insert (
+      SkgRepoName::from (*name),
+      SkgRepo {
+        name         : SkgRepoName::from (*name),
         abbreviation : None,
         path         : PathBuf::from ( format! ("owned/{}", name) ),
-        user_owns_it : true, } ); }
+        owned        : true, } ); }
   let mut config : SkgConfig =
-    SkgConfig::dummyFromRepos (repos);
-  config . repo_order =
-    names . iter () . map ( |n| RepoName::from (*n) ) . collect ();
+    SkgConfig::dummyFromSkgRepos (skgrepos);
+  config . skgrepo_order =
+    names . iter () . map ( |n| SkgRepoName::from (*n) ) . collect ();
   config }
 
 fn node_at (
-  pid    : &str,
-  repo : &str,
+  pid     : &str,
+  skgrepo : &str,
 ) -> Graphnode {
-  let mut n : Graphnode = empty_node_complete ();
+  let mut n : Graphnode = empty_graphnode ();
   n . pid = ID::new (pid);
   n . title = pid . to_string ();
-  n . home_repo = RepoName::from (repo);
+  n . home_skgrepo = SkgRepoName::from (skgrepo);
   n }
 
 fn graph_from (
@@ -54,28 +54,28 @@ fn graph_from (
   InRustGraph::from_graphnodes (nodes) }
 
 fn pm (
-  repo : &str,
+  skgrepo : &str,
   member : &str,
 ) -> RelPartner<ID> {
   RelPartner::at_relRepo (
-    RepoName::from (repo), ID::new (member) ) }
+    SkgRepoName::from (skgrepo), ID::new (member) ) }
 
 #[test]
-fn sticky_preserves_disk_repos_and_default_takes_more_private_home (
+fn sticky_preserves_disk_skgrepos_and_default_takes_more_private_home (
 ) {
   let config : SkgConfig =
     config_with_order ( & ["public", "private"] );
   let old_target : Graphnode = node_at ("old", "public");
   let new_target : Graphnode = node_at ("fresh", "private");
-  let owner      : Graphnode = node_at ("owner", "public");
-  let graph : InRustGraph = graph_from ( & [ owner . clone (), old_target, new_target ] );
-  let mut disk : Graphnode = owner . clone ();
+  let recorder   : Graphnode = node_at ("recorder", "public");
+  let graph      : InRustGraph = graph_from ( & [ recorder . clone (), old_target, new_target ] );
+  let mut disk   : Graphnode = recorder . clone ();
   disk . contains = vec! [
     pm ("private", "old") ]; // privatized on disk
-  let mut buffer : Graphnode = owner;
+  let mut buffer : Graphnode = recorder;
   buffer . contains = vec! [
     pm ("public", "old"),    // degenerate intent tag
-    pm ("public", "fresh") ]; // new edge to a private-homed target
+    pm ("public", "fresh") ]; // new relationship to a private-homed target
   let resolved : Graphnode =
     apply_sticky_relRepos_in_graph (
       buffer, &disk, &RequestedRelRepos::default (), &graph, &config) . unwrap ();
@@ -85,7 +85,7 @@ fn sticky_preserves_disk_repos_and_default_takes_more_private_home (
 }
 
 #[test]
-fn flag_requests_apply_after_disk_misc_restore_and_survive_repo_moves (
+fn flag_requests_apply_after_disk_misc_restore_and_survive_skgrepo_moves (
 ) {
   let config : SkgConfig = config_with_order (&["public", "private"]);
   for (disk_no_search, request, expected) in [
@@ -102,27 +102,27 @@ fn flag_requests_apply_after_disk_misc_restore_and_survive_repo_moves (
       Flag::NoSearchMatching]),
   ] {
     let mut disk : Graphnode = node_at ("node", "public");
-    disk . misc = vec![
+    disk . flags = vec![
       Flag::Had_ID_Before_Import,
       Flag::Was_Overloaded];
     if disk_no_search {
-      disk . misc . push (Flag::NoSearchMatching); }
+      disk . flags . push (Flag::NoSearchMatching); }
     let graph : InRustGraph = graph_from (&[disk . clone ()]);
     let mut buffer = disk;
-    buffer . home_repo = RepoName::from ("private");
+    buffer . home_skgrepo = SkgRepoName::from ("private");
     buffer . title = "edited" . to_string ();
     let mut intent = NodeIntent::graph_save_from_graphnode (buffer);
     if let NodeIntent::Save (save) = &mut intent {
       // This is the production buffer shape: misc is not textually carried.
-      save . misc = Vec::new ();
+      save . flags = Vec::new ();
       save . flag_request = request . map (|value|
         (Flag::NoSearchMatching, value)); }
-    let planned = build_diskSupplemented_defineNodes (
+    let planned = build_diskSupplemented_nodeInstructions (
       vec![intent], &graph, &config, None) . unwrap ();
-    let DefineNode::Save (SaveNode (saved)) = &planned . instructions [0]
+    let NodeInstruction::Save (SaveNode (saved)) = &planned . instructions [0]
       else { panic! ("expected SaveNode"); };
-    assert_eq! (&saved . misc, &expected);
-    assert_eq! (planned . repo_moves . len (), 1);
+    assert_eq! (&saved . flags, &expected);
+    assert_eq! (planned . skgrepo_moves . len (), 1);
   }
 }
 
@@ -131,11 +131,11 @@ fn sticky_round_trip_restores_a_resolved_extra_ids_raw_disk_spelling () {
   let config : SkgConfig = config_with_order (&["public"]);
   let mut target : Graphnode = node_at ("target", "public");
   target . extra_ids = vec![ID::new ("target-extra")];
-  let owner : Graphnode = node_at ("owner", "public");
-  let graph : InRustGraph = graph_from (&[owner . clone (), target]);
-  let mut disk : Graphnode = owner . clone ();
+  let recorder : Graphnode = node_at ("recorder", "public");
+  let graph : InRustGraph = graph_from (&[recorder . clone (), target]);
+  let mut disk : Graphnode = recorder . clone ();
   disk . contains = vec![pm ("public", "target-extra")];
-  let mut buffer : Graphnode = owner;
+  let mut buffer : Graphnode = recorder;
   // Rendering names the resolved node by PID, but the relationship on disk
   // names its extra ID.  A no-op save must preserve the raw stored value.
   buffer . contains = vec![pm ("public", "target")];
@@ -150,11 +150,11 @@ fn home_move_to_more_private_clamps_relRepos_up (
   let config : SkgConfig =
     config_with_order ( & ["public", "private"] );
   let child : Graphnode = node_at ("child", "public");
-  let owner_before : Graphnode = node_at ("owner", "public");
-  let graph : InRustGraph = graph_from ( & [ owner_before . clone (), child ] );
-  let mut disk : Graphnode = owner_before;
+  let recorder_before : Graphnode = node_at ("recorder", "public");
+  let graph           : InRustGraph = graph_from ( & [ recorder_before . clone (), child ] );
+  let mut disk        : Graphnode = recorder_before;
   disk . contains = vec! [ pm ("public", "child") ];
-  let mut buffer : Graphnode = node_at ("owner", "private");
+  let mut buffer : Graphnode = node_at ("recorder", "private");
   // the buffer moved the node's home to private
   buffer . contains = vec! [ pm ("private", "child") ];
   let resolved : Graphnode =
@@ -175,19 +175,19 @@ fn hide_floor_is_the_most_public_explaining_subscription (
   container_a . contains = vec! [ pm ("public", "victim") ];
   let mut container_b : Graphnode = node_at ("expl-b", "public");
   container_b . contains = vec! [ pm ("public", "victim") ];
-  let owner : Graphnode = node_at ("owner", "public");
+  let recorder : Graphnode = node_at ("recorder", "public");
   let graph : InRustGraph = graph_from ( & [
-    owner . clone (), hidden, container_a, container_b ] );
+    recorder . clone (), hidden, container_a, container_b ] );
   { // Only a PRIVATE subscription explains the hide: the hide must
     // be private, else it leaks the inference that the private
     // subscription exists. The privatized subscription is a DISK
     // fact (sticky preserves it); raising its privacy from the
     // buffer would come through the (relRepo ...) atom (see the
     // explicit_repo_* tests below), landed with render-and-gating.
-    let mut disk : Graphnode = owner . clone ();
+    let mut disk : Graphnode = recorder . clone ();
     disk . subscribes_to = MSV::Specified ( vec! [
       pm ("private", "expl-a") ] );
-    let mut buffer : Graphnode = owner . clone ();
+    let mut buffer : Graphnode = recorder . clone ();
     buffer . subscribes_to = MSV::Specified ( vec! [
       pm ("public", "expl-a") ] ); // degenerate tag; sticky restores
     buffer . hides_from_its_subscriptions = MSV::Specified ( vec! [
@@ -203,11 +203,11 @@ fn hide_floor_is_the_most_public_explaining_subscription (
       & [ pm ("private", "victim") ] ); }
   { // A PUBLIC explanation exists too: the inference is innocent,
     // so the hide may stay public.
-    let mut disk : Graphnode = owner . clone ();
+    let mut disk : Graphnode = recorder . clone ();
     disk . subscribes_to = MSV::Specified ( vec! [
       pm ("private", "expl-a"),
       pm ("public",  "expl-b") ] );
-    let mut buffer : Graphnode = owner;
+    let mut buffer : Graphnode = recorder;
     buffer . subscribes_to = MSV::Specified ( vec! [
       pm ("public", "expl-a"),
       pm ("public", "expl-b") ] );
@@ -222,23 +222,23 @@ fn hide_floor_is_the_most_public_explaining_subscription (
 }
 
 #[test]
-fn explicit_repo_at_or_more_private_than_floor_is_honored (
+fn explicit_skgrepo_at_or_more_private_than_floor_is_honored (
 ) {
   // Allowed-side acceptance (render-and-gating, 5_plan.org): an
-  // explicit '(editRequest (relRepo ...))' repo that is at least as private as
+  // explicit '(editRequest (relRepo ...))' skgrepo that is at least as private as
   // the default floor wins outright.
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
   let child : Graphnode = node_at ("child", "public");
-  let owner_before : Graphnode = node_at ("owner", "public");
-  let graph : InRustGraph = graph_from ( & [ owner_before . clone (), child ] );
-  let mut disk : Graphnode = owner_before;
+  let recorder_before : Graphnode = node_at ("recorder", "public");
+  let graph           : InRustGraph = graph_from ( & [ recorder_before . clone (), child ] );
+  let mut disk        : Graphnode = recorder_before;
   disk . contains = vec! [ pm ("public", "child") ];
-  let mut buffer : Graphnode = node_at ("owner", "public");
+  let mut buffer : Graphnode = node_at ("recorder", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
   let explicit : RequestedRelRepos = RequestedRelRepos {
     contains : HashMap::from ([
-      ( ID::new ("child"), RepoName::from ("trusted") ) ]),
+      ( ID::new ("child"), SkgRepoName::from ("trusted") ) ]),
     .. RequestedRelRepos::default () };
   let resolved : Graphnode =
     apply_sticky_relRepos_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
@@ -248,22 +248,22 @@ fn explicit_repo_at_or_more_private_than_floor_is_honored (
 }
 
 #[test]
-fn explicit_repo_more_public_than_floor_is_rejected (
+fn explicit_skgrepo_more_public_than_floor_is_rejected (
 ) {
   // More-public-than-floor rejection (render-and-gating, 5_plan.org): an
-  // explicit repo more PUBLIC than the DEFAULT floor is a save
-  // error naming the member, the offered repo, and the floor.
+  // explicit skgrepo more PUBLIC than the DEFAULT floor is a save
+  // error naming the member, the offered skgrepo, and the floor.
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
   let child : Graphnode = node_at ("child", "private"); // forces the default floor to "private"
-  let owner_before : Graphnode = node_at ("owner", "public");
-  let graph : InRustGraph = graph_from ( & [ owner_before . clone (), child ] );
-  let disk : Graphnode = owner_before; // no sticky entry for "child"
-  let mut buffer : Graphnode = node_at ("owner", "public");
+  let recorder_before : Graphnode = node_at ("recorder", "public");
+  let graph           : InRustGraph = graph_from ( & [ recorder_before . clone (), child ] );
+  let disk            : Graphnode = recorder_before; // no sticky entry for "child"
+  let mut buffer      : Graphnode = node_at ("recorder", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
   let explicit : RequestedRelRepos = RequestedRelRepos {
     contains : HashMap::from ([
-      ( ID::new ("child"), RepoName::from ("public") ) ]), // more public than the "private" floor
+      ( ID::new ("child"), SkgRepoName::from ("public") ) ]), // more public than the "private" floor
     .. RequestedRelRepos::default () };
   let err : String =
     apply_sticky_relRepos_in_graph (buffer, &disk, &explicit, &graph, &config)
@@ -278,20 +278,20 @@ fn explicit_relRepo_moves_a_sticky_edge_to_its_default (
 ) {
   // The BUG-and-fix_make-edge-more-public.org fix: an explicit
   // relRepo validates against the DEFAULT floor, not the disk relRepo,
-  // so it can lower a stuck edge's privacy back to the default.
+  // so it can lower a stuck relationship's privacy back to the default.
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
   let child : Graphnode = node_at ("child", "public");
-  let owner_before : Graphnode = node_at ("owner", "public");
-  let graph : InRustGraph = graph_from ( & [ owner_before . clone (), child ] );
-  let mut disk : Graphnode = owner_before;
+  let recorder_before : Graphnode = node_at ("recorder", "public");
+  let graph           : InRustGraph = graph_from ( & [ recorder_before . clone (), child ] );
+  let mut disk        : Graphnode = recorder_before;
   disk . contains = vec! [
     pm ("private", "child") ]; // stuck more private than its default
-  let mut buffer : Graphnode = node_at ("owner", "public");
+  let mut buffer : Graphnode = node_at ("recorder", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
   let explicit : RequestedRelRepos = RequestedRelRepos {
     contains : HashMap::from ([
-      ( ID::new ("child"), RepoName::from ("public") ) ]), // = default
+      ( ID::new ("child"), SkgRepoName::from ("public") ) ]), // = default
     .. RequestedRelRepos::default () };
   let resolved : Graphnode =
     apply_sticky_relRepos_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
@@ -301,20 +301,20 @@ fn explicit_relRepo_moves_a_sticky_edge_to_its_default (
 }
 
 #[test]
-fn explicit_repo_between_default_and_sticky_is_accepted (
+fn explicit_skgrepo_between_default_and_sticky_is_accepted (
 ) {
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
   let child : Graphnode = node_at ("child", "public");
-  let owner_before : Graphnode = node_at ("owner", "public");
-  let graph : InRustGraph = graph_from ( & [ owner_before . clone (), child ] );
-  let mut disk : Graphnode = owner_before;
+  let recorder_before : Graphnode = node_at ("recorder", "public");
+  let graph           : InRustGraph = graph_from ( & [ recorder_before . clone (), child ] );
+  let mut disk        : Graphnode = recorder_before;
   disk . contains = vec! [ pm ("private", "child") ];
-  let mut buffer : Graphnode = node_at ("owner", "public");
+  let mut buffer : Graphnode = node_at ("recorder", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
   let explicit : RequestedRelRepos = RequestedRelRepos {
     contains : HashMap::from ([
-      ( ID::new ("child"), RepoName::from ("trusted") ) ]),
+      ( ID::new ("child"), SkgRepoName::from ("trusted") ) ]),
     .. RequestedRelRepos::default () };
   let resolved : Graphnode =
     apply_sticky_relRepos_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
@@ -331,16 +331,16 @@ fn explicit_more_public_than_default_is_rejected_and_names_the_default (
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
   let child : Graphnode = node_at ("child", "trusted"); // default floor: trusted
-  let owner_before : Graphnode = node_at ("owner", "public");
-  let graph : InRustGraph = graph_from ( & [ owner_before . clone (), child ] );
-  let mut disk : Graphnode = owner_before;
+  let recorder_before : Graphnode = node_at ("recorder", "public");
+  let graph           : InRustGraph = graph_from ( & [ recorder_before . clone (), child ] );
+  let mut disk        : Graphnode = recorder_before;
   disk . contains = vec! [
     pm ("private", "child") ]; // sticky sits more private than the default
-  let mut buffer : Graphnode = node_at ("owner", "public");
+  let mut buffer : Graphnode = node_at ("recorder", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
   let explicit : RequestedRelRepos = RequestedRelRepos {
     contains : HashMap::from ([
-      ( ID::new ("child"), RepoName::from ("public") ) ]), // more public than default
+      ( ID::new ("child"), SkgRepoName::from ("public") ) ]), // more public than default
     .. RequestedRelRepos::default () };
   let err : String =
     apply_sticky_relRepos_in_graph (buffer, &disk, &explicit, &graph, &config)
@@ -352,27 +352,27 @@ fn explicit_more_public_than_default_is_rejected_and_names_the_default (
 }
 
 #[test]
-fn explicit_at_a_more_public_than_default_disk_repo_round_trips (
+fn explicit_at_a_more_public_than_default_disk_skgrepo_round_trips (
 ) {
-  // Legacy or hand-authored data can put an owned-to-owned edge at a
-  // repo more public than its default. Render emits '(relRepo ...)'
-  // for every off-default edge, so that atom must save back unchanged
+  // Legacy or hand-authored data can put an owned-to-owned relationship at a
+  // skgrepo more public than its default. Render emits '(relRepo ...)'
+  // for every off-default relationship, so that atom must save back unchanged
   // (explicit == disk relRepo), and moving it partway toward the
   // default is fine; moving it still more public is forbidden.
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
   let child : Graphnode = node_at ("child", "private");
-  let owner_before : Graphnode = node_at ("owner", "public");
-  let graph : InRustGraph = graph_from ( & [ owner_before . clone (), child ] );
-  let mut disk : Graphnode = owner_before;
+  let recorder_before : Graphnode = node_at ("recorder", "public");
+  let graph           : InRustGraph = graph_from ( & [ recorder_before . clone (), child ] );
+  let mut disk        : Graphnode = recorder_before;
   disk . contains = vec! [
     pm ("public", "child") ]; // more public than the "private" default
   { // Holding the disk relRepo round-trips.
-    let mut buffer : Graphnode = node_at ("owner", "public");
+    let mut buffer : Graphnode = node_at ("recorder", "public");
     buffer . contains = vec! [ pm ("public", "child") ];
     let explicit : RequestedRelRepos = RequestedRelRepos {
       contains : HashMap::from ([
-        ( ID::new ("child"), RepoName::from ("public") ) ]),
+        ( ID::new ("child"), SkgRepoName::from ("public") ) ]),
       .. RequestedRelRepos::default () };
     let resolved : Graphnode =
       apply_sticky_relRepos_in_graph (
@@ -380,11 +380,11 @@ fn explicit_at_a_more_public_than_default_disk_repo_round_trips (
     assert_eq! ( resolved . contains, vec! [ pm ("public", "child") ],
       "the rendered atom saves back unchanged" ); }
   { // Moving it partway toward the default is accepted.
-    let mut buffer : Graphnode = node_at ("owner", "public");
+    let mut buffer : Graphnode = node_at ("recorder", "public");
     buffer . contains = vec! [ pm ("public", "child") ];
     let explicit : RequestedRelRepos = RequestedRelRepos {
       contains : HashMap::from ([
-        ( ID::new ("child"), RepoName::from ("trusted") ) ]),
+        ( ID::new ("child"), SkgRepoName::from ("trusted") ) ]),
       .. RequestedRelRepos::default () };
     let resolved : Graphnode =
       apply_sticky_relRepos_in_graph (
@@ -398,9 +398,9 @@ fn explicit_lowering_moves_the_edge_between_section_files (
 ) {
   // The repro from BUG-and-fix_make-edge-more-public.org, as files:
   // a child once homed in "private" was moved home to "trusted",
-  // but the containment edge stayed stuck at "private" (sticky).
-  // Explicitly lowering the edge's privacy to its new default moves
-  // the membership line from the owner's private section file to a
+  // but the containment relation stayed stuck at "private" (sticky).
+  // Explicitly lowering the relationship's privacy to its new default moves
+  // the membership line from the recorder's private section file to a
   // trusted one, deleting the emptied private file.
   use crate::dbs::filesystem::one_node::write_graphnode_telescope;
   let tmp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
@@ -409,28 +409,28 @@ fn explicit_lowering_moves_the_edge_between_section_files (
   for name in ["public", "trusted", "private"] {
     let path : PathBuf = tmp . path () . join (name);
     std::fs::create_dir_all (&path) . unwrap ();
-    config . repos . get_mut ( &RepoName::from (name) )
+    config . skgrepos . get_mut ( &SkgRepoName::from (name) )
       . unwrap () . path = path; }
   let child : Graphnode = node_at ("child", "trusted"); // home already moved
-  let owner : Graphnode = node_at ("owner", "public");
-  let graph : InRustGraph = graph_from ( & [ owner . clone (), child ] );
-  let mut disk : Graphnode = owner;
+  let recorder : Graphnode = node_at ("recorder", "public");
+  let graph    : InRustGraph = graph_from ( & [ recorder . clone (), child ] );
+  let mut disk : Graphnode = recorder;
   disk . contains = vec! [ pm ("private", "child") ];
   write_graphnode_telescope ( &disk, &config ) . unwrap ();
-  let private_file = tmp . path () . join ("private/owner.skg");
-  let trusted_file = tmp . path () . join ("trusted/owner.skg");
-  let public_file  = tmp . path () . join ("public/owner.skg");
+  let private_file = tmp . path () . join ("private/recorder.skg");
+  let trusted_file = tmp . path () . join ("trusted/recorder.skg");
+  let public_file  = tmp . path () . join ("public/recorder.skg");
   assert! ( private_file . is_file (),
             "before: the stuck edge lives in the private section" );
   assert! ( public_file . is_file (),
             "before: the home section exists" );
   assert! ( ! trusted_file . is_file (),
             "before: no trusted section yet" );
-  let mut buffer : Graphnode = node_at ("owner", "public");
+  let mut buffer : Graphnode = node_at ("recorder", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
   let explicit : RequestedRelRepos = RequestedRelRepos {
     contains : HashMap::from ([
-      ( ID::new ("child"), RepoName::from ("trusted") ) ]), // the new default
+      ( ID::new ("child"), SkgRepoName::from ("trusted") ) ]), // the new default
     .. RequestedRelRepos::default () };
   let resolved : Graphnode =
     apply_sticky_relRepos_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
@@ -451,8 +451,8 @@ fn explicit_lowering_moves_the_edge_between_section_files (
 #[test]
 fn same_save_child_home_move_allows_publicizing_its_parent_edge (
 ) {
-  // A repo move and its parent's explicit relRepo request occur in one
-  // save. The parent must calculate the edge default from the child's NEW
+  // A skgrepo move and its parent's explicit relRepo request occur in one
+  // save. The parent must calculate the relationship default from the child's NEW
   // home, not the pre-save graph's old home.
   let config : SkgConfig = config_with_order ( & ["public", "pers-p"] );
   let mut parent : Graphnode = node_at ("parent", "public");
@@ -464,26 +464,26 @@ fn same_save_child_home_move_allows_publicizing_its_parent_edge (
     NodeIntent::graph_save_from_graphnode (parent);
   if let NodeIntent::Save (intent) = &mut parent_intent {
     intent . contains = MSV::Specified (vec! [(
-      ID::new ("child"), Some (RepoName::from ("public"))) ]); }
+      ID::new ("child"), Some (SkgRepoName::from ("public"))) ]); }
   let child_intent : NodeIntent = NodeIntent::graph_save_from_graphnode (
     node_at ("child", "public"));
 
-  let planned = build_diskSupplemented_defineNodes (
+  let planned = build_diskSupplemented_nodeInstructions (
     vec! [ parent_intent, child_intent ], &graph, &config, None )
     . expect ("the same-save home move makes public the edge's default");
   let parent = planned . instructions . into_iter ()
     .find_map ( |instruction| match instruction {
-      DefineNode::Save (SaveNode (node)) if node . pid == ID::new ("parent")
+      NodeInstruction::Save (SaveNode (node)) if node . pid == ID::new ("parent")
         => Some (node),
       _ => None })
     .expect ("parent save instruction");
   assert_eq! ( parent . contains, vec! [ pm ("public", "child") ] );
-  assert_eq! ( planned . repo_moves . len (), 1 );
-  assert_eq! ( planned . repo_moves [0] . pid, ID::new ("child") );
+  assert_eq! ( planned . skgrepo_moves . len (), 1 );
+  assert_eq! ( planned . skgrepo_moves [0] . pid, ID::new ("child") );
 }
 
 #[test]
-fn same_save_hidden_node_home_move_sets_the_new_hide_repo (
+fn same_save_hidden_node_home_move_sets_the_new_hide_skgrepo (
 ) {
   // Hides have an inferred relRepo rather than an explicit
   // relRepo request, but their endpoint floor must use the same pending
@@ -501,12 +501,12 @@ fn same_save_hidden_node_home_move_sets_the_new_hide_repo (
   let hidden_intent : NodeIntent = NodeIntent::graph_save_from_graphnode (
     node_at ("hidden", "public"));
 
-  let planned = build_diskSupplemented_defineNodes (
+  let planned = build_diskSupplemented_nodeInstructions (
     vec! [ hider_intent, hidden_intent ], &graph, &config, None )
     . expect ("the pending hidden-node home participates in the hide floor");
   let hider = planned . instructions . into_iter ()
     .find_map ( |instruction| match instruction {
-      DefineNode::Save (SaveNode (node)) if node . pid == ID::new ("hider")
+      NodeInstruction::Save (SaveNode (node)) if node . pid == ID::new ("hider")
         => Some (node),
       _ => None })
     .expect ("hider save instruction");
@@ -519,7 +519,7 @@ fn same_save_hidden_node_home_move_sets_the_new_hide_repo (
 fn new_private_child_in_the_same_save_gets_a_private_edge (
 ) {
   // The child is absent from the pre-save graph, so its Save intent is the
-  // only available repo of its home. Falling back to the public parent's
+  // only available skgrepo of its home. Falling back to the public parent's
   // home here would create exactly the leak shape the endpoint floor forbids.
   let config : SkgConfig = config_with_order ( & ["public", "pers-p"] );
   let parent : Graphnode = node_at ("parent", "public");
@@ -533,12 +533,12 @@ fn new_private_child_in_the_same_save_gets_a_private_edge (
   let child_intent : NodeIntent = NodeIntent::graph_save_from_graphnode (
     node_at ("new-child", "pers-p"));
 
-  let planned = build_diskSupplemented_defineNodes (
+  let planned = build_diskSupplemented_nodeInstructions (
     vec! [ parent_intent, child_intent ], &graph, &config, None )
     . expect ("same-save new nodes supply their relationship endpoint homes");
   let parent = planned . instructions . into_iter ()
     .find_map ( |instruction| match instruction {
-      DefineNode::Save (SaveNode (node)) if node . pid == ID::new ("parent")
+      NodeInstruction::Save (SaveNode (node)) if node . pid == ID::new ("parent")
         => Some (node),
       _ => None })
     .expect ("parent save instruction");
@@ -546,70 +546,70 @@ fn new_private_child_in_the_same_save_gets_a_private_edge (
 }
 
 #[test]
-fn owned_to_foreign_new_edges_default_to_the_owner_home (
+fn owned_to_foreign_new_edges_default_to_the_recorder_home (
 ) {
   for relation in ["contains", "subscribes_to", "overrides_view_of"] {
-    for (owner_home, member_home) in
+    for (recorder_home, member_home) in
         [("public", "private"), ("private", "public")] {
       let mut config : SkgConfig =
         config_with_order (&["public", "private"]);
-      config . repos . get_mut (&RepoName::from (member_home))
-        . unwrap () . user_owns_it = false;
-      config . repos . get_mut (&RepoName::from (owner_home))
-        . unwrap () . user_owns_it = true;
-      let owner : Graphnode = node_at ("owner", owner_home);
+      config . skgrepos . get_mut (&SkgRepoName::from (member_home))
+        . unwrap () . owned = false;
+      config . skgrepos . get_mut (&SkgRepoName::from (recorder_home))
+        . unwrap () . owned = true;
+      let recorder   : Graphnode = node_at ("recorder", recorder_home);
       let member : Graphnode = node_at ("member", member_home);
-      let graph : InRustGraph = graph_from (&[owner . clone (), member]);
-      let disk : Graphnode = owner;
-      let mut buffer : Graphnode = node_at ("owner", owner_home);
+      let graph      : InRustGraph = graph_from (&[recorder . clone (), member]);
+      let disk       : Graphnode = recorder;
+      let mut buffer : Graphnode = node_at ("recorder", recorder_home);
       match relation {
-        "contains" => buffer . contains = vec! [pm (owner_home, "member")],
+        "contains" => buffer . contains = vec! [pm (recorder_home, "member")],
         "subscribes_to" => buffer . subscribes_to =
-          MSV::Specified (vec! [pm (owner_home, "member")]),
+          MSV::Specified (vec! [pm (recorder_home, "member")]),
         "overrides_view_of" => buffer . overrides_view_of =
-          MSV::Specified (vec! [pm (owner_home, "member")]),
+          MSV::Specified (vec! [pm (recorder_home, "member")]),
         _ => unreachable! (), }
       let resolved : Graphnode = apply_sticky_relRepos_in_graph (
         buffer, &disk, &RequestedRelRepos::default (), &graph, &config ) . unwrap ();
-      let repo : &RepoName = match relation {
+      let skgrepo : &SkgRepoName = match relation {
         "contains" => &resolved . contains [0] . relRepo,
         "subscribes_to" =>
           &resolved . subscribes_to . or_default () [0] . relRepo,
         "overrides_view_of" =>
           &resolved . overrides_view_of . or_default () [0] . relRepo,
         _ => unreachable! (), };
-      assert_eq! (repo, &RepoName::from (owner_home),
+      assert_eq! (skgrepo, &SkgRepoName::from (recorder_home),
                   "relation {}", relation); }}
 }
 
 #[test]
-fn owned_to_foreign_explicit_owned_repo_is_allowed_and_foreign_refused (
+fn owned_to_foreign_explicit_owned_skgrepo_is_allowed_and_foreign_refused (
 ) {
   let mut config : SkgConfig =
     config_with_order (&["public", "foreign", "private"]);
-  config . repos . get_mut (&RepoName::from ("foreign"))
-    . unwrap () . user_owns_it = false;
-  let mut owner : Graphnode = node_at ("owner", "public");
+  config . skgrepos . get_mut (&SkgRepoName::from ("foreign"))
+    . unwrap () . owned = false;
+  let mut recorder : Graphnode = node_at ("recorder", "public");
   let member : Graphnode = node_at ("member", "foreign");
-  let graph : InRustGraph = graph_from (&[owner . clone (), member]);
+  let graph        : InRustGraph = graph_from (&[recorder . clone (), member]);
 
-  let disk : Graphnode = owner . clone ();
-  owner . contains = vec! [pm ("public", "member")];
+  let disk : Graphnode = recorder . clone ();
+  recorder . contains = vec! [pm ("public", "member")];
   let allowed : RequestedRelRepos = RequestedRelRepos {
     contains : HashMap::from ([
-      (ID::new ("member"), RepoName::from ("private")) ]),
+      (ID::new ("member"), SkgRepoName::from ("private")) ]),
     .. RequestedRelRepos::default () };
   let resolved : Graphnode = apply_sticky_relRepos_in_graph (
-    owner . clone (), &disk, &allowed, &graph, &config ) . unwrap ();
+    recorder . clone (), &disk, &allowed, &graph, &config ) . unwrap ();
   assert_eq! (resolved . contains [0] . relRepo,
-              RepoName::from ("private"));
+              SkgRepoName::from ("private"));
 
   let refused : RequestedRelRepos = RequestedRelRepos {
     contains : HashMap::from ([
-      (ID::new ("member"), RepoName::from ("foreign")) ]),
+      (ID::new ("member"), SkgRepoName::from ("foreign")) ]),
     .. RequestedRelRepos::default () };
   let error : String = apply_sticky_relRepos_in_graph (
-    owner, &disk, &refused, &graph, &config ) . unwrap_err ();
+    recorder, &disk, &refused, &graph, &config ) . unwrap_err ();
   assert! (error . contains ("non-owned repo 'foreign'"), "{}", error);
 }
 
@@ -619,28 +619,28 @@ fn explicit_alias_relRepo_is_load_bearing_and_validated (
   let config : SkgConfig =
     config_with_order (&["public", "trusted", "private"]);
   let graph : InRustGraph = InRustGraph::new ();
-  let disk : Graphnode = node_at ("owner", "public");
+  let disk : Graphnode = node_at ("recorder", "public");
   let mut buffer : Graphnode = disk . clone ();
   buffer . aliases = MSV::Specified (vec! [
     crate::types::misc::RelPartner::at_relRepo (
-      RepoName::from ("public"), "nickname" . to_string ()) ]);
+      SkgRepoName::from ("public"), "nickname" . to_string ()) ]);
   let explicit : RequestedRelRepos = RequestedRelRepos {
     aliases : HashMap::from ([
-      ("nickname" . to_string (), RepoName::from ("private")) ]),
+      ("nickname" . to_string (), SkgRepoName::from ("private")) ]),
     .. RequestedRelRepos::default () };
   let resolved : Graphnode = apply_sticky_relRepos_in_graph (
     buffer, &disk, &explicit, &graph, &config ) . unwrap ();
   assert_eq! (
     resolved . aliases . or_default () [0] . relRepo,
-    RepoName::from ("private") );
+    SkgRepoName::from ("private") );
 
   let mut foreign_config : SkgConfig = config;
-  foreign_config . repos . get_mut (&RepoName::from ("private"))
-    . unwrap () . user_owns_it = false;
+  foreign_config . skgrepos . get_mut (&SkgRepoName::from ("private"))
+    . unwrap () . owned = false;
   let mut buffer : Graphnode = disk . clone ();
   buffer . aliases = MSV::Specified (vec! [
     crate::types::misc::RelPartner::at_relRepo (
-      RepoName::from ("public"), "nickname" . to_string ()) ]);
+      SkgRepoName::from ("public"), "nickname" . to_string ()) ]);
   let error : String = apply_sticky_relRepos_in_graph (
     buffer, &disk, &explicit, &graph, &foreign_config ) . unwrap_err ();
   assert! (error . contains ("non-owned relRepo 'private'"), "{}", error);
@@ -655,14 +655,14 @@ fn restricted_delete_refusal_sees_inactive_sections (
   for (name, dir) in [("public", "public"), ("private", "private")] {
     let path : PathBuf = tmp . path () . join (dir);
     std::fs::create_dir_all (&path) . unwrap ();
-    config . repos . get_mut ( &RepoName::from (name) )
+    config . skgrepos . get_mut ( &SkgRepoName::from (name) )
       . unwrap () . path = path; }
   std::fs::write (
     tmp . path () . join ("private/n.skg"),
     "pid: n\n" ) . unwrap ();
-  let active : ActiveRepoSet = ActiveRepoSet {
-    name    : RepoSetName::from ("public"),
-    repos : [ RepoName::from ("public") ]
+  let active : ActiveSkgRepoSet = ActiveSkgRepoSet {
+    name    : SkgRepoSetName::from ("public"),
+    skgrepos : [ SkgRepoName::from ("public") ]
       . into_iter () . collect (), };
   let refusal : Result<(), String> =
     refuse_delete_with_inactive_sections (
@@ -678,7 +678,7 @@ fn restricted_delete_refusal_sees_inactive_sections (
 #[test]
 fn relrepo_fact_and_request_round_trip_separately (
 ) {
-  // The rendered fact and a requested repo are distinct: the fact
+  // The rendered fact and a requested skgrepo are distinct: the fact
   // remains under viewStats, while only editRequest carries write intent.
   use crate::org_to_text::viewnode_to_string;
   use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
@@ -687,9 +687,9 @@ fn relrepo_fact_and_request_round_trip_separately (
 
   let mut t : ActiveVognode =
     default_activeVognode (
-      ID::new ("n"), RepoName::from ("public"), "N" . to_string () );
-  t . viewStats . relRepo = Some ( RepoName::from ("private") );
-  t . relRepo_request = Some ( RepoName::from ("secret") );
+      ID::new ("n"), SkgRepoName::from ("public"), "N" . to_string () );
+  t . viewStats . relRepo = Some ( SkgRepoName::from ("private") );
+  t . relRepo_request = Some ( SkgRepoName::from ("secret") );
   let viewnode : Viewnode = Viewnode {
     focused     : false,
     folded      : false,
@@ -707,10 +707,10 @@ fn relrepo_fact_and_request_round_trip_separately (
   let full_sexp : String = format! ("(skg {})", rendered);
   let parsed = parse_metadata_to_viewnodemd (&full_sexp) . unwrap ();
   assert_eq! ( parsed . viewStats . relRepo,
-               Some ( RepoName::from ("private") ),
+               Some ( SkgRepoName::from ("private") ),
                "relRepo did not round-trip through render+parse" );
   assert_eq! ( parsed . relRepo_request,
-               Some ( RepoName::from ("secret") ),
+               Some ( SkgRepoName::from ("secret") ),
                "relRepo request did not round-trip" );
 }
 
@@ -754,8 +754,8 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
 
   for value in [false, true] {
     let mut active : ActiveVognode = default_activeVognode (
-      ID::new ("n"), RepoName::from ("public"), "N" . to_string () );
-    if let crate::types::viewnode::Editability::Definitive {
+      ID::new ("n"), SkgRepoName::from ("public"), "N" . to_string () );
+    if let crate::types::viewnode::Editability::Editable {
       edit_request, .. } = &mut active . editability
     { *edit_request = Some (NodeEditRequest::SetFlag {
         flag : Flag::NoSearchMatching,
@@ -800,8 +800,8 @@ fn unknown_relrepo_fact_and_request_round_trip_separately (
 
   let mut unknown = mk_unknown_viewnode ( ID::new ("absent-raw") );
   if let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) = &mut unknown . kind {
-    u . relRepo = Some ( RepoName::from ("private") );
-    u . relRepo_request = Some ( RepoName::from ("secret") );
+    u . relRepo = Some ( SkgRepoName::from ("private") );
+    u . relRepo_request = Some ( SkgRepoName::from ("secret") );
   } else { unreachable! (); }
   let config : SkgConfig = config_with_order ( & ["public", "private"] );
   let rendered : String = viewnode_to_string (&unknown, &config) . unwrap ();
@@ -811,7 +811,7 @@ fn unknown_relrepo_fact_and_request_round_trip_separately (
   let parsed = parse_metadata_to_viewnodemd (
     &format! ("(skg {})", rendered) ) . unwrap ();
   assert_eq! ( parsed . unknown_relRepo,
-               Some (RepoName::from ("private")) );
+               Some (SkgRepoName::from ("private")) );
   assert_eq! ( parsed . unknown_relRepo_request,
-               Some (RepoName::from ("secret")) );
+               Some (SkgRepoName::from ("secret")) );
 }

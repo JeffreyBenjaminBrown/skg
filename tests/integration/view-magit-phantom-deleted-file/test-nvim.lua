@@ -9,7 +9,7 @@
 -- Phase 2: Toggle diff mode on. b appears as a phantom under a.
 -- Phase 3: Resolve b's on-disk path and open its plain diff.
 -- Phase 4: Verify the resolved path is exactly skg-data/b.skg (NOT
---          the outer skg project repo, and NOT a double-prefixed
+--          the outer skg project skgrepo, and NOT a double-prefixed
 --          nonexistent directory), and that point is on the buffer
 --          for b.skg.
 --
@@ -21,7 +21,7 @@
 -- path -- which the client then expands against its own config
 -- directory (also absolute), producing a double-prefixed nonexistent
 -- directory. The elisp test caught this via magit-toplevel landing on
--- the wrong repo; see run-test.sh for why this test launches the
+-- the wrong skgrepo; see run-test.sh for why this test launches the
 -- server from a relative config path to reproduce the condition.
 --
 -- DEVIATION: the nvim client has no magit. skg.goto_git.goto_in_git
@@ -31,7 +31,7 @@
 -- calling it directly. This lets the test assert the resolved path
 -- ITSELF, which is strictly more precise for this regression than
 -- inspecting magit's toplevel afterward: a wrong/double-prefixed path
--- fails the comparison directly at its repo, rather than via
+-- fails the comparison directly at its skgrepo, rather than via
 -- magit's directory walk landing somewhere unexpected. b's own id is
 -- not searched for within its own diff (there is no meaningful
 -- "which file" ambiguity to resolve, unlike the parent-diff case in

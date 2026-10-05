@@ -9,7 +9,7 @@ list for"), enabling git diff mode, running C-c t A
 (skg-git-add-if-new-recursive), then saving to refresh, fails with:
 
 - Error 1: node 47d54e87 ("last minute") --
-"TrueNode's non-ignored content children must be unique (no two
+"ActiveVognode's non-ignored content children must be unique (no two
 sharing the same ID)."
 - Error 2: node 8c24623a --
 "Phantom must have a source that exists in the config."
@@ -50,21 +50,21 @@ SourceName::not_found exists PRECISELY so an unresolvable reference
 renders instead of aborting (its doc: "so that one unresolvable
 reference does not abort an entire render"). The render side honors
 that; validate_phantom was never taught about the sentinel. The same
-latent gap exists for the PartnerCol removed-member path
+latent gap exists for the PartnerFolder removed-member path
 (server/to_org/complete/partner_col/child_data.rs:90-92), which also
-emits NOT_FOUND phantoms -- saving a col buffer holding one would
+emits NOT_FOUND phantoms -- saving a folder buffer holding one would
 fail validate_phantom identically. So this is not unique to the
 contains path.
 
 *** Why does validate_phantom check the source at all? (investigated)
-Answer: it is INCIDENTAL, copied from the TrueNode validator, not a
+Answer: it is INCIDENTAL, copied from the ActiveVognode validator, not a
 purpose-built phantom rule.
 - Provenance: the source-in-config check on phantoms predates the
   dedup commit a2c2973c ("dedup the phantom/truenode validators"),
   whose own message says "validate_phantom was a near-copy of
   validate_truenode" and lists "source-in-config" as one of the four
-  checks copied across. For a TrueNode the check is load-bearing --
-  source determines the .skg file PATH, so a TrueNode with no valid
+  checks copied across. For a ActiveVognode the check is load-bearing --
+  source determines the .skg file PATH, so a ActiveVognode with no valid
   source cannot be written. A phantom writes nothing, so the same
   check has no corresponding purpose; it rode along in the copy.
 - Nothing consumes a phantom's source at save (confirmed):
@@ -95,12 +95,12 @@ sentinel. A phantom "defines nothing" and is ignored at save
 ignores them"), so its source is non-load-bearing; an unresolvable
 source is harmless. Change the phantom source check to
 "in config OR == SourceName::not_found()", or simply skip the
-source-validity check for phantoms (keep it for TrueNodes, where a
+source-validity check for phantoms (keep it for ActiveVognodes, where a
 bad source IS an error caught pre-save). This fixes the contains
-AND the col case uniformly, in one place.
+AND the folder case uniformly, in one place.
 - (2b) Make the renderer skip the phantom for a dangling-at-HEAD
 member instead of drawing NOT_FOUND. Loses the "member removed
-since HEAD" signal, diverges from the col path, and leaves the col
+since HEAD" signal, diverges from the folder path, and leaves the folder
 path's latent bug. Not recommended.
 
 ** Error 1 -- a reordered contains member is drawn twice
@@ -240,7 +240,7 @@ shared-state races (each passes in isolation), not regressions.
 'validate_gnode_identity_and_structure'
 (server/from_text/buffer_to_viewnodes/local.rs) dropped the
 source-in-config check; 'validate_truenode' now adds it (source is
-load-bearing only for a TrueNode -- its .skg path), and
+load-bearing only for a ActiveVognode -- its .skg path), and
 'validate_phantom' no longer takes 'config'. A NOT_FOUND-sourced phantom
 round-trips.
 

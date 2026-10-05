@@ -8,7 +8,7 @@
 ;;;
 ;;; Known limitation: collateral completion currently fails when the saved
 ;;; buffer introduced a brand-new node, because build_child_creation_data
-;;; can't find a repo for the new UUID. So buffer A is NOT updated.
+;;; can't find a skgrepo for the new UUID. So buffer A is NOT updated.
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
@@ -72,7 +72,7 @@
        (3 true       "b"))
      "phase 3: buffer B before edit")
     (with-current-buffer buf
-      ;; Change a's title on line 4 (the definitive a):
+      ;; Change a's title on line 4 (the editable a):
       ;; replace trailing "a" with new title.
       (goto-char (point-min))
       (forward-line 3)

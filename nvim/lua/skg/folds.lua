@@ -72,7 +72,7 @@ end
 ---@param lnum integer
 ---@return boolean is the line hidden inside a closed fold?
 ---(A closed fold's own first line still displays, so it does not
----count as hidden -- matching org, where a folded subtree's heading
+---count as hidden -- matching org, where a folded subtree's headline
 ---stays visible.)
 function M.line_invisible_p (lnum)
   local fold_start = vim.fn.foldclosed(lnum)
@@ -88,11 +88,11 @@ end
 function M.headline_body_hidden_p (lnum)
   local next_line = lnum + 1
   if next_line > vim.api.nvim_buf_line_count(0) then return false end
-  if metadata.at_heading_p(next_line) then return false end
+  if metadata.at_headline_p(next_line) then return false end
   if vim.fn.foldclosed(next_line) == -1 then return false end
-  local next_heading = metadata.next_heading_line(lnum)
-  return next_heading == nil
-         or not M.line_invisible_p(next_heading)
+  local next_headline = metadata.next_headline_line(lnum)
+  return next_headline == nil
+         or not M.line_invisible_p(next_headline)
 end
 
 -- ── marker predicates ──────────────────────────────────────────────
@@ -101,7 +101,7 @@ end
 ---@param marker string 'folded' or 'bodyFolded'
 ---@return boolean
 function M.headline_has_bare_marker_p (line_number, marker)
-  if not metadata.at_heading_p(line_number) then return false end
+  if not metadata.at_headline_p(line_number) then return false end
   local sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
   return sexp ~= nil
          and compare.subtree_p(sexp, { sexpr.symbol('skg'),
@@ -130,7 +130,7 @@ end
 function M.add_folded_markers ()
   local last = vim.api.nvim_buf_line_count(0)
   for line = 1, last do
-    if metadata.at_heading_p(line) then
+    if metadata.at_headline_p(line) then
       if M.line_invisible_p(line) then
         metadata.edit_metadata_at_line(line,
                                        sexpr.read('(skg folded)'))
@@ -156,7 +156,7 @@ function M.fold_marked_headlines ()
     local found = nil
     local last = vim.api.nvim_buf_line_count(0)
     for line = 1, last do
-      if metadata.at_heading_p(line)
+      if metadata.at_headline_p(line)
          and not M.line_invisible_p(line)
          and M.headline_has_folded_p(line) then
         found = line
@@ -170,7 +170,7 @@ function M.fold_marked_headlines ()
       return end
     previous_found = found
     local level = metadata.outline_level(found)
-    local parent = metadata.parent_heading_line(found, level)
+    local parent = metadata.parent_headline_line(found, level)
     if not parent then return end
     M.close_fold_at(parent)
   end
@@ -181,7 +181,7 @@ end
 function M.fold_bodies_of_bodyfolded_headlines ()
   local last = vim.api.nvim_buf_line_count(0)
   for line = 1, last do
-    if metadata.at_heading_p(line)
+    if metadata.at_headline_p(line)
        and M.headline_has_bodyfolded_p(line) then
       M.hide_entry(line)
     end
@@ -194,7 +194,7 @@ end
 function M.hide_entry (lnum)
   local body_line = lnum + 1
   if body_line <= vim.api.nvim_buf_line_count(0)
-     and not metadata.at_heading_p(body_line) then
+     and not metadata.at_headline_p(body_line) then
     M.close_fold_at(body_line)
   end
 end
@@ -220,10 +220,10 @@ function M.remove_folded_markers ()
   local bodyfolded_lines = {}
   local last = vim.api.nvim_buf_line_count(0)
   for line = 1, last do
-    if metadata.at_heading_p(line) then
+    if metadata.at_headline_p(line) then
       if M.headline_has_folded_p(line) then
         local level = metadata.outline_level(line)
-        local parent = metadata.parent_heading_line(line, level)
+        local parent = metadata.parent_headline_line(line, level)
         if parent and not parent_seen[parent] then
           parent_seen[parent] = true
           table.insert(parent_lines, parent) end
@@ -234,7 +234,7 @@ function M.remove_folded_markers ()
   end
   M.show_all()
   for line = 1, last do
-    if metadata.at_heading_p(line) then
+    if metadata.at_headline_p(line) then
       if M.headline_has_folded_p(line) then
         metadata.edit_metadata_at_line(line,
           sexpr.read('(skg (DELETE folded))')) end
@@ -244,10 +244,10 @@ function M.remove_folded_markers ()
     end
   end
   for _, line in ipairs(bodyfolded_lines) do
-    if metadata.at_heading_p(line) then M.hide_entry(line) end
+    if metadata.at_headline_p(line) then M.hide_entry(line) end
   end
   for _, line in ipairs(parent_lines) do
-    if metadata.at_heading_p(line) then M.close_fold_at(line) end
+    if metadata.at_headline_p(line) then M.close_fold_at(line) end
   end
 end
 

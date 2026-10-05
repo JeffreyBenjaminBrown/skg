@@ -53,7 +53,7 @@
      through the content path (expand_true_content_at_activeNode,
      reconcile_content_children, complete_content_children,
      build_child_creation_data) — the ColRepair sink still flows
-     through the col reconcilers, untouched. De-novo renders now return
+     through the folder reconcilers, untouched. De-novo renders now return
      no completion warnings (they repaired silently; the compound
      notice was the only kind they surfaced). Deleted
      tests/override_chain_notice.rs (+ its fixtures) and its registration

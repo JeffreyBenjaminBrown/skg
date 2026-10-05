@@ -1,5 +1,5 @@
 -- PURPOSE: The rerender stream (rerender-lock -> rerender-view* ->
--- rerender-done), shared by the diff-mode toggle, the repo-set
+-- rerender-done), shared by the diff-mode toggle, the skgrepo-set
 -- switch, and the explicit rerender-all request. The Lua port of
 -- elisp/skg-request-rerender-all-views.el.
 
@@ -55,7 +55,7 @@ function M.request_rerender_all_views_with_approval (approved_pids,
     table.insert(request, excluded)
   end
   if approved_pids and #approved_pids > 0 then
-    local approval = { sexpr.symbol('allow-overPrivateText-telescopes') }
+    local approval = { sexpr.symbol('approved-overPrivateText-pids') }
     for _, pid in ipairs(approved_pids) do table.insert(approval, pid) end
     table.insert(request, approval) end
   local ok, err = pcall(client.send_string, sexpr.to_string(request) .. '\n')

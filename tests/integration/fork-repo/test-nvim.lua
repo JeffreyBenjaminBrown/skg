@@ -1,10 +1,10 @@
 -- Integration test for the fork-confirmation buffer's EDITABLE clone
--- repo, nvim client. The Lua mirror of test-emacs.el in this
+-- skgrepo, nvim client. The Lua mirror of test-emacs.el in this
 -- directory: open owned P (whose content is foreign N); make N
--- definitive and edit its title; save -> a fork-confirmation buffer.
--- The clone's repo is inferred as "owned"; rotate it to "owned2" in
+-- editable and edit its title; save -> a fork-confirmation buffer.
+-- The clone's skgrepo is inferred as "owned"; rotate it to "owned2" in
 -- the confirmation buffer, then approve. The clone must land in
--- "owned2" (the rotated repo), not in "owned".
+-- "owned2" (the rotated skgrepo), not in "owned".
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(40)
@@ -71,7 +71,7 @@ local p_buf = T.wait_for(function () return buffer_showing('P') end, 10)
 T.check(p_buf, "P's view never appeared")
 vim.api.nvim_set_current_buf(p_buf)
 
--- 2. Make N definitive and edit its title -- the fork gesture.
+-- 2. Make N editable and edit its title -- the fork gesture.
 local n_line = goto_line_containing('(id N) (repo foreign)',
   "could not find N's headline")
 local n_line_text =
@@ -84,14 +84,14 @@ vim.api.nvim_buf_set_lines(p_buf, n_line - 1, n_line, false,
 -- 3. Save -> fork-confirmation (nothing committed).
 save.request_save_buffer()
 
--- 4. The confirmation buffer appears. Rotate the clone-to-be's repo
+-- 4. The confirmation buffer appears. Rotate the clone-to-be's skgrepo
 --    from the inferred "owned" to "owned2", then approve.
 local confirm_buf = T.wait_for_buffer('skg://fork-confirmation', 10)
 T.check(confirm_buf, 'no fork-confirmation buffer appeared')
 vim.api.nvim_set_current_buf(confirm_buf)
 -- The elisp original asserts '(repo owned)' here, which is STALE:
 -- the server always pre-fills the PICK-A-REPO placeholder and only
--- SUGGESTS the inferred repo in a comment line (fork.rs; documented
+-- SUGGESTS the inferred skgrepo in a comment line (fork.rs; documented
 -- in COMMANDS.org and glossary.org). The emacs test fails on this
 -- today -- see the problems.org entry filed with the vim-client port.
 -- This mirror asserts the documented behavior instead.
@@ -102,7 +102,7 @@ T.check(confirmation_text:find('Suggested repo for the clone'
                                .. ' below: owned', 1, true),
         "the inferred repo 'owned' is suggested in the comment")
 -- Move to the clone-to-be parent (the first, level-1 headline) and
--- rotate its repo -- what <localleader>ss does interactively.
+-- rotate its skgrepo -- what <localleader>ss does interactively.
 local clone_line = goto_line_starting_with('* (skg',
   'could not find the clone-to-be headline')
 metadata.change_repo_at_line(clone_line, 'owned2')
@@ -110,7 +110,7 @@ T.check(T.buffer_text(confirm_buf):find('(repo owned2)', 1, true),
         'rotation did not set repo owned2')
 print("rotated the clone's repo to owned2")
 
--- 5. Approve: re-save the origin with the chosen repo.
+-- 5. Approve: re-save the source buffer with the chosen skgrepo.
 save.approve_fork()
 
 -- 6. The clone must land in owned2 (rotated), NOT owned (inferred).

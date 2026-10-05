@@ -1,6 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; DATA USED/ASSUMED: See /api.md.
+;;; DATA USED/ASSUMED: See docs/api-and-formats.org.
 
 (require 'skg-log)
 (require 'skg-length-prefix)
@@ -16,7 +16,7 @@
               (id . ,clean-id)
               (view-uri . ,view-uri))
             (when approved-pids
-              `((allow-overPrivateText-telescopes ,@approved-pids)))))
+              `((approved-overPrivateText-pids ,@approved-pids)))))
           "\n"))
 
 (defun skg-request-single-root-content-view-from-id

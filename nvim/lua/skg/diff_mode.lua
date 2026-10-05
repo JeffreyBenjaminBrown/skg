@@ -43,7 +43,7 @@ function M.toggle (approved_pids)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'git diff mode toggle') }
   if approved_pids and #approved_pids > 0 then
-    local approval = { sexpr.symbol('allow-overPrivateText-telescopes') }
+    local approval = { sexpr.symbol('approved-overPrivateText-pids') }
     for _, pid in ipairs(approved_pids) do table.insert(approval, pid) end
     table.insert(request, approval) end
   client.send_string(sexpr.to_string(request) .. '\n')

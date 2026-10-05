@@ -9,7 +9,7 @@ use crate::save::enqueue_tantivy_delta;
 use crate::types::env::SkgEnv;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::nodes::complete::Graphnode;
-use crate::types::save::{DefineNode, SaveNode};
+use crate::types::save::{NodeInstruction, SaveNode};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
@@ -33,22 +33,22 @@ pub(crate) fn prepare_import_publication (
   let config : &SkgConfig = &runtime . config;
   let mut claims : HashMap<ID, ID> = HashMap::new ();
   for node in nodes {
-    if ! config . user_owns_repo (&node . home_repo) {
+    if ! config . skgrepo_is_owned (&node . home_skgrepo) {
       return Err (format! ("Destination repo {:?} is not owned",
-        node . home_repo)); }
-    for id in node . all_ids () {
-      validate_safe_id (id)?;
-      if let Some (owner) = claims . insert (id . clone (), node . pid . clone ()) {
+        node . home_skgrepo)); }
+    for skgid in node . all_skgids () {
+      validate_safe_skgid (skgid)?;
+      if let Some (owner) = claims . insert (skgid . clone (), node . pid . clone ()) {
         return Err (format! ("ID {} is claimed by both {} and {} in this import",
-          id, owner, node . pid)); }
-      if let Some ((owner, repo)) = runtime . graph . pid_and_repo (id) {
+          skgid, owner, node . pid)); }
+      if let Some ((owner, skgrepo)) = runtime . graph . pid_and_skgrepo (skgid) {
         return Err (format! ("ID {} already belongs to {} in repo {}",
-          id, owner, repo)); } } }
+          skgid, owner, skgrepo)); } } }
   check_authoritative_disk_claims (&claims, config)?;
-  let definitions : Vec<DefineNode> = nodes . iter () . cloned ()
-    .map (|node| DefineNode::Save (SaveNode (node))) . collect ();
+  let nodeInstructions : Vec<NodeInstruction> = nodes . iter () . cloned ()
+    .map (|node| NodeInstruction::Save (SaveNode (node))) . collect ();
   let graph : PreparedGraphUpdate = prepare_graph_update (
-    config, runtime . graph . clone (), definitions)
+    config, runtime . graph . clone (), nodeInstructions)
     . map_err (|error| error . to_string ())?;
   let mut files : Vec<(PathBuf, String)> = Vec::new ();
   for node in nodes {
@@ -74,26 +74,26 @@ impl PreparedImportPublication {
     let count : usize = self . files . len ();
     write_creation_files (&self . files, &mut |_, handle, yaml|
       handle . write_all (yaml . as_bytes ()))?;
-    let definitions : Vec<DefineNode> = self . graph . definitions () . to_vec ();
+    let nodeInstructions : Vec<NodeInstruction> = self . graph . nodeInstructions () . to_vec ();
     let candidate = self . graph . candidate () . clone ();
     env . runtime . publish (
       runtime . config . clone (), candidate . clone (),
       runtime . tantivy_index . clone ());
-    enqueue_tantivy_delta (&candidate, &runtime . tantivy_index, definitions);
+    enqueue_tantivy_delta (&candidate, &runtime . tantivy_index, nodeInstructions);
     Ok (count)
   }
 }
 
-fn validate_safe_id (
-  id : &ID,
+fn validate_safe_skgid (
+  skgid : &ID,
 ) -> Result<(), String> {
-  let path : &Path = Path::new (&id . 0);
+  let path : &Path = Path::new (&skgid . 0);
   let components : Vec<Component<'_>> = path . components () . collect ();
-  if id . 0 . is_empty () || id . 0 . contains ('.') ||
-    id . 0 . contains ('\\') || id . 0 . contains ('\0') ||
+  if skgid . 0 . is_empty () || skgid . 0 . contains ('.') ||
+    skgid . 0 . contains ('\\') || skgid . 0 . contains ('\0') ||
     components . len () != 1 ||
     ! matches! (components [0], Component::Normal (_)) {
-    return Err (format! ("ID {:?} is unsafe as a .skg filename", id . 0)); }
+    return Err (format! ("ID {:?} is unsafe as a .skg filename", skgid . 0)); }
   Ok (())
 }
 
@@ -101,19 +101,19 @@ fn check_authoritative_disk_claims (
   claims : &HashMap<ID, ID>,
   config : &SkgConfig,
 ) -> Result<(), String> {
-  for repo in config . ordered_repos () {
-    let sections = read_skg_sections_from_folder (&repo, config)
-      .map_err (|error| format! ("Reading repo {}: {}", repo, error))?;
+  for skgrepo in config . ordered_skgrepos () {
+    let sections = read_skg_sections_from_folder (&skgrepo, config)
+      .map_err (|error| format! ("Reading repo {}: {}", skgrepo, error))?;
     for (_, section) in sections {
-      for id in std::iter::once (&section . pid)
+      for skgid in std::iter::once (&section . pid)
         .chain (section . extra_ids . iter ()) {
-        if let Some (new_owner) = claims . get (id) {
+        if let Some (new_owner) = claims . get (skgid) {
           return Err (format! (
             "ID {} for imported node {} is already claimed on disk by {} in repo {}",
-            id, new_owner, section . pid, repo)); } } }
+            skgid, new_owner, section . pid, skgrepo)); } } }
     for pid in claims . values () {
-      let path : String = crate::util::path_from_pid_and_repo (
-        config, &repo, pid . clone ())?;
+      let path : String = crate::util::path_from_pid_and_skgrepo (
+        config, &skgrepo, pid . clone ())?;
       check_path_absent (Path::new (&path))?; } }
   Ok (())
 }

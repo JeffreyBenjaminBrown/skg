@@ -4,7 +4,7 @@
 -- The Lua port of elisp/skg-metadata.el.
 --
 -- The elisp file's biggest hazard -- org-fold's fragility check
--- crashing on programmatic edits to folded heading lines, worked
+-- crashing on programmatic edits to folded headline lines, worked
 -- around by 'skg-replace-current-line' -- does not exist here:
 -- replacing a line with nvim_buf_set_lines is always safe, and vim
 -- folds recompute from the foldexpr. The helper survives as
@@ -39,7 +39,7 @@ end
 
 ---@param line_number integer|nil defaults to the cursor line
 ---@return boolean is that line an org headline?
-function M.at_heading_p (line_number)
+function M.at_headline_p (line_number)
   return M.line_text(line_number):match('^%*+%s') ~= nil
 end
 
@@ -75,10 +75,10 @@ end
 ---The stand-in for outline-next-heading.
 ---@param line_number integer
 ---@return integer|nil
-function M.next_heading_line (line_number)
+function M.next_headline_line (line_number)
   local last = vim.api.nvim_buf_line_count(0)
   for candidate = line_number + 1, last do
-    if M.at_heading_p(candidate) then return candidate end
+    if M.at_headline_p(candidate) then return candidate end
   end
   return nil
 end
@@ -89,7 +89,7 @@ end
 ---@param line_number integer
 ---@param level integer
 ---@return integer|nil
-function M.parent_heading_line (line_number, level)
+function M.parent_headline_line (line_number, level)
   for candidate = line_number - 1, 1, -1 do
     local candidate_level = M.outline_level(candidate)
     if candidate_level and candidate_level < level then
@@ -100,15 +100,15 @@ end
 
 ---The line after the subtree rooted at LINE_NUMBER (exclusive scan by
 ---level), or nil at buffer end. The stand-in for
----skg--goto-next-heading-after-subtree.
+---skg--goto-next-headline-after-subtree.
 ---@param line_number integer
 ---@return integer|nil
-function M.next_heading_after_subtree (line_number)
+function M.next_headline_after_subtree (line_number)
   local prune_level = M.outline_level(line_number)
-  local candidate = M.next_heading_line(line_number)
+  local candidate = M.next_headline_line(line_number)
   while candidate
         and (M.outline_level(candidate) or 0) > prune_level do
-    candidate = M.next_heading_line(candidate)
+    candidate = M.next_headline_line(candidate)
   end
   return candidate
 end
@@ -215,7 +215,7 @@ end
 ---@param line_number integer|nil
 ---@return any|nil
 function M.metadata_sexp_at_line_or_nil (line_number)
-  if not M.at_heading_p(line_number) then return nil end
+  if not M.at_headline_p(line_number) then return nil end
   local split = M.split_as_stars_metadata_title(
     M.line_text(line_number))
   if not split or split.metadata == '' then return nil end
@@ -226,7 +226,7 @@ end
 ---The parsed metadata of the headline at point; errors if na.
 ---@return any
 function M.current_headline_metadata_sexp ()
-  if not M.at_heading_p() then error('Not on a headline') end
+  if not M.at_headline_p() then error('Not on a headline') end
   local sexp = M.metadata_sexp_at_line_or_nil(nil)
   if not sexp then error('Headline has no skg metadata') end
   return sexp
@@ -265,7 +265,7 @@ function M.sexp_cdr_at_path (sexp, path)
 end
 
 ---@param metadata_sexp any
----@return string|nil the node's repo
+---@return string|nil the node's skgrepo
 function M.node_repo (metadata_sexp)
   local values = M.sexp_cdr_at_path(metadata_sexp,
                                     { 'skg', 'node', 'repo' })
@@ -294,7 +294,7 @@ function M.node_affectsParent_content_of_p (metadata_sexp)
 end
 
 ---@param metadata_sexp any
----@return boolean does it request a definitive view?
+---@return boolean does it request an editable view?
 function M.node_requests_definitive_view_p (metadata_sexp)
   return compare.subtree_p(metadata_sexp,
     { SKG, { NODE, { sexpr.symbol('viewRequests'),
@@ -328,7 +328,7 @@ end
 ---@param line_number integer
 ---@param edits any
 function M.edit_metadata_at_line (line_number, edits)
-  if not M.at_heading_p(line_number) then return end
+  if not M.at_headline_p(line_number) then return end
   local headline_text = M.line_text(line_number)
   local split = M.split_as_stars_metadata_title(headline_text)
   if split and split.metadata ~= '' then
@@ -357,21 +357,21 @@ function M.delete ()
     'This change will only be applied when you save the buffer.')
 end
 
----Mark the headline at point, and every activeNode org-descendant,
+---Mark the headline at point, and every activeNode viewdescendant,
 ---for deletion. Non-activeNode descendants (phantoms, folders, ...) are
 ---skipped. Does NOT save.
 function M.delete_recursive ()
-  if not M.at_heading_p() then error('Not on a headline') end
+  if not M.at_headline_p() then error('Not on a headline') end
   local edits = sexpr.read('(skg (node (editRequest delete)))')
   local start_line = M.current_line_number()
   local start_level = M.outline_level(start_line)
   M.edit_metadata_at_line(start_line, edits)
-  local line = M.next_heading_line(start_line)
+  local line = M.next_headline_line(start_line)
   while line and (M.outline_level(line) or 0) > start_level do
     local meta = M.metadata_sexp_at_line_or_nil(line)
     if meta and M.activeNode_sexp_p(meta) then
       M.edit_metadata_at_line(line, edits) end
-    line = M.next_heading_line(line)
+    line = M.next_headline_line(line)
   end
   vim.notify(
     'This change will only be applied when you save the buffer.')
@@ -424,8 +424,8 @@ function M.strip_metadata_from_org_text (org_text)
 end
 
 ---Write minimal ActiveVognode metadata onto the metadata-less headline
----at point, prompting for an owned repo (no prompt when only one).
----@return string|nil the chosen repo
+---at point, prompting for an owned skgrepo (no prompt when only one).
+---@return string|nil the chosen skgrepo
 function M.populate_minimal_node_metadata ()
   local repo = picker.prompt_for_owned_repo()
   if not repo then return nil end
@@ -434,9 +434,9 @@ function M.populate_minimal_node_metadata ()
   return repo
 end
 
----Prompt for and change the repo of the node at point (S-arrows
----cycle owned repos; typed names accepted). With RECURSIVE, also
----changes every true content descendant whose repo matches. On
+---Prompt for and change the skgrepo of the node at point (S-arrows
+---cycle owned skgrepos; typed names accepted). With RECURSIVE, also
+---changes every true content descendant whose skgrepo matches. On
 ---a metadata-less headline, populates it minimally instead. Does NOT
 ---save.
 ---@param recursive boolean|nil
@@ -484,22 +484,22 @@ function M.change_repo_recursive (old_repo, new_repo)
   local start_level = M.outline_level(start_line)
   local changed_count =
     M.change_repo_at_line(start_line, new_repo)
-  local line = M.next_heading_line(start_line)
+  local line = M.next_headline_line(start_line)
   while line and (M.outline_level(line) or 0) > start_level do
     local metadata = M.metadata_sexp_at_line_or_nil(line)
     if not (M.activeNode_sexp_p(metadata)
             and M.node_affectsParent_content_of_p(metadata)) then
-      line = M.next_heading_after_subtree(line)
+      line = M.next_headline_after_subtree(line)
     else
       if M.node_repo(metadata) == old_repo then
         changed_count = changed_count
           + M.change_repo_at_line(line, new_repo) end
-      line = M.next_heading_line(line) end
+      line = M.next_headline_line(line) end
   end
   return changed_count
 end
 
----Set the repo at LINE_NUMBER to NEW_REPO (and refresh the
+---Set the skgrepo at LINE_NUMBER to NEW_REPO (and refresh the
 ---homeRepoHerald so the display keeps pace).
 ---@param line_number integer
 ---@param new_repo string
@@ -545,7 +545,7 @@ end
 ---point. No effect off a headline or without metadata.
 ---@param key string
 function M.delete_kv_pair_from_metadata_by_key (key)
-  if not M.at_heading_p() then return end
+  if not M.at_headline_p() then return end
   local split = M.split_as_stars_metadata_title(
     M.get_current_headline_text())
   if not split or split.metadata == '' then return end
@@ -563,7 +563,7 @@ end
 ---headline at point.
 ---@param value string
 function M.delete_value_from_metadata (value)
-  if not M.at_heading_p() then return end
+  if not M.at_headline_p() then return end
   local split = M.split_as_stars_metadata_title(
     M.get_current_headline_text())
   if not split or split.metadata == '' then return end
@@ -616,7 +616,7 @@ end
 function M.strip_fork_requests_in_buffer ()
   local last = vim.api.nvim_buf_line_count(0)
   for line_number = 1, last do
-    if M.at_heading_p(line_number) then
+    if M.at_headline_p(line_number) then
       local split = M.split_as_stars_metadata_title(
         M.line_text(line_number))
       if split and split.metadata ~= '' then
@@ -637,7 +637,7 @@ end
 ---the title (the text after stars and metadata). On a non-headline,
 ---just move to the beginning of the line.
 function M.beginning_of_line ()
-  local split = M.at_heading_p()
+  local split = M.at_headline_p()
     and M.split_as_stars_metadata_title(M.get_current_headline_text())
     or nil
   if split then
@@ -657,11 +657,11 @@ end
 
 ---Cycle the TODO keyword of the headline at point without corrupting
 ---its metadata: strip the (skg ...) metadata so the org plugin sees a
----plain heading, cycle, then re-insert the metadata after the stars
+---plain headline, cycle, then re-insert the metadata after the stars
 ---(before the new keyword). The analog of the elisp org-todo advice.
 ---@param direction integer 1 or -1
 function M.todo_cycle (direction)
-  if not M.at_heading_p() then return end
+  if not M.at_headline_p() then return end
   local line_number = M.current_line_number()
   local split = M.split_as_stars_metadata_title(
     M.line_text(line_number))

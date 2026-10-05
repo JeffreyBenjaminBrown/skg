@@ -281,7 +281,7 @@
 
 ;;
 ;; Strip: the empty-node view skeleton (childless editable fields)
-;; drops every unpopulated field, keeping only the pre-filled repo.
+;; drops every unpopulated field, keeping only the pre-filled skgrepo.
 ;;
 
 (ert-deftest test-strip-empty-node-skeleton ()
@@ -390,7 +390,7 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
     (should (equal result '(skg (node (repo jeff)))))))
 
 ;;
-;; Bug: skg-edit-metadata was passing hardcoded "* skg\n** node"
+;; Bug: skg-view-metadata was passing hardcoded "* skg\n** node"
 ;; instead of the actual sexp-to-org output, discarding all fields.
 ;; These tests verify expand works correctly on real metadata sexps.
 ;;

@@ -139,7 +139,7 @@
    both need to reach that file.
 
    Add 'read_all_skg_files_from_sources_collecting_fold_warnings',
-   returning '(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)'.
+   returning '(Vec<Graphnode>, Vec<(ID, TelescopeViolation)>)'.
    'read_all_skg_files_from_sources' keeps its signature and
    delegates, logging the warnings as today, so its seven other
    callers are untouched. Only 'full_init', the incremental init path

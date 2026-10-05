@@ -1,6 +1,6 @@
 -- Integration test for the fork gesture and its confirmation stage,
 -- nvim client. The Lua mirror of test-emacs.el in this directory:
--- open owned P (whose content is foreign N); make N definitive and
+-- open owned P (whose content is foreign N); make N editable and
 -- edit its title; save -> a fork-confirmation buffer appears and
 -- nothing commits; approve -> the clone is created (overriding N) and
 -- immediately drawn in N's place when P re-renders.
@@ -61,7 +61,7 @@ vim.api.nvim_set_current_buf(p_buf)
 T.check(T.buffer_text(p_buf):find('(id N)', 1, true),
         "P's view does not show its foreign content N")
 
--- 2. Make N definitive (drop its 'writeProtected' marker) and edit its title
+-- 2. Make N editable (drop its 'writeProtected' marker) and edit its title
 --    -- the fork gesture.
 local n_line = goto_line_containing('(id N) (repo foreign)',
   "could not find N's headline")
@@ -86,7 +86,7 @@ T.check(confirm_text:find('Fork confirmation', 1, true),
         'confirmation buffer lacks its header')
 print('fork-confirmation buffer lists N')
 
--- 5. Pick the clone's repo (required), then approve.
+-- 5. Pick the clone's skgrepo (required), then approve.
 local clone_line = goto_line_starting_with('* (skg (node (repo ',
   'could not find the clone-to-be headline')
 metadata.change_repo_at_line(clone_line, 'owned')

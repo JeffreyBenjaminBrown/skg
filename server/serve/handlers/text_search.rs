@@ -14,12 +14,12 @@ use crate::context::ContextOriginType;
 use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
 use crate::dbs::tantivy::search::{
   SearchOptions, has_overPrivateText_telescope, search_index};
-use crate::dbs::in_rust_graph::containerward_role_tree::{ ContainerwardRoleTree, containerward_role_trees_by_id_from_ids};
+use crate::dbs::in_rust_graph::containerward_role_tree::{ ContainerwardRoleTree, containerward_role_trees_by_skgid_from_skgids};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::in_rust_graph::stats::{
   AllGraphnodeStats,
-  fetch_all_graphnodestats_with_repo_set};
+  fetch_all_graphnodestats_with_skgrepo_set};
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
 use crate::update_buffer::set_viewnodestats_in_viewforest;
@@ -34,8 +34,8 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::git::RelationshipAxes;
 use crate::types::views_state::ViewUri;
-use crate::types::misc::{TantivyIndex, SkgConfig, ID, RepoName};
-use crate::repo_sets::{ActiveRepoSet, search_ids_for_repo_set_for_test as search_ids_for_repo_set_for_test_impl};
+use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgRepoName};
+use crate::skgrepo_sets::{ActiveSkgRepoSet, search_skgids_for_skgrepo_set_for_test as search_ids_for_skgrepo_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, AffectsParent, mk_writeProtected_viewnode};
@@ -57,37 +57,37 @@ use tantivy::schema::document::Value;
 /// the multiplier corresponding to its context_origin_type.
 /// Non-origins keep their raw score (multiplier = 1).
 pub type MatchGroups =
-  HashMap < ID, ( RepoName,
+  HashMap < ID, ( SkgRepoName,
                   Vec < ( f32,           // score (after multiplier)
                           String ) >) >; // title or alias
 
-pub fn search_ids_for_repo_set_for_test (
+pub fn search_skgids_for_skgrepo_set_for_test (
   tantivy_index : &TantivyIndex,
   config        : &SkgConfig,
-  active        : &ActiveRepoSet,
+  active        : &ActiveSkgRepoSet,
   terms         : &str,
   limit         : usize,
 ) -> Result<Vec<ID>, Box<dyn std::error::Error>> {
-  search_ids_for_repo_set_for_test_impl (
+  search_ids_for_skgrepo_set_for_test_impl (
     tantivy_index, config, active, terms, limit ) }
 
-pub fn enriched_search_buffer_for_repo_set_for_test (
-  graph          : &InRustGraph,
-  terms          : &str,
-  matches_by_id  : &MatchGroups,
-  search_results : &[ID],
-  containerward_role_trees_by_id : &HashMap<ID, ContainerwardRoleTree>,
-  tantivy_index  : &TantivyIndex,
-  config         : &SkgConfig,
-  active         : &ActiveRepoSet,
+pub fn enriched_search_buffer_for_skgrepo_set_for_test (
+  graph                             : &InRustGraph,
+  terms                             : &str,
+  matches_by_skgid                  : &MatchGroups,
+  search_results                    : &[ID],
+  containerward_role_trees_by_skgid : &HashMap<ID, ContainerwardRoleTree>,
+  tantivy_index                     : &TantivyIndex,
+  config                            : &SkgConfig,
+  active                            : &ActiveSkgRepoSet,
 ) -> Result<String, Box<dyn std::error::Error>> {
   let (mut viewforest, _ids) : (ViewForest, Vec<ID>) =
-    build_search_viewforest (terms, matches_by_id, &HashSet::new ());
+    build_search_viewforest (terms, matches_by_skgid, &HashSet::new ());
   render_enriched_search_buffer::insert_full_containerward_role_trees_into_search_view (
     &mut viewforest,
     graph,
     search_results,
-    containerward_role_trees_by_id,
+    containerward_role_trees_by_skgid,
     tantivy_index,
     config,
     active );
@@ -99,7 +99,7 @@ pub fn enriched_search_buffer_for_repo_set_for_test (
   set_viewnodestats_in_viewforest (
     // Mirror the production enrichment path (handle_snapshot_response):
     // compute view-relative stats so the rendered buffer carries the
-    // homeRepoHerald at repo boundaries. Empty containment maps suffice
+    // homeRepoHerald at skgrepo boundaries. Empty containment maps suffice
     // here -- homeRepoAtBoundary is derived from the tree alone; the maps
     // only feed the containsParent stat, which this test does not assert.
     &mut viewforest,
@@ -113,11 +113,11 @@ pub fn enriched_search_buffer_for_repo_set_for_test (
 /// Structured enrichment data passed through the slot,
 /// replacing the raw rendered String.
 pub struct SearchEnrichmentPayload {
-  pub runtime        : Arc<RuntimeGeneration>,
-  pub terms          : String,
-  pub search_results : Vec<ID>,
-  pub containerward_role_trees_by_id : HashMap<ID, ContainerwardRoleTree>,
-  pub graphnodestats : AllGraphnodeStats,
+  pub runtime                           : Arc<RuntimeGeneration>,
+  pub terms                             : String,
+  pub search_results                    : Vec<ID>,
+  pub containerward_role_trees_by_skgid : HashMap<ID, ContainerwardRoleTree>,
+  pub graphnodestats                    : AllGraphnodeStats,
   /// Load-bearing across the asynchronous snapshot exchange: enrichment
   /// must not broaden a preflight decision to exclude overPrivateText telescopes.
   pub include_overPrivateText_telescopes : bool,
@@ -125,7 +125,7 @@ pub struct SearchEnrichmentPayload {
 
 /// Provides two responses, one fast and one slow.
 /// The slower one is 'enriched'
-/// with containerward paths and graphnodestats at each search hit,
+/// with containerward role trees and graphnodestats at each search hit,
 /// and is processed in the background -- the user need not await it.
 ///
 /// Every 'search-results' is eventually followed by exactly one
@@ -143,7 +143,7 @@ pub fn handle_text_search_request (
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
   views_state       : &mut ViewsState,
-  active            : &ActiveRepoSet,
+  active           : &ActiveSkgRepoSet,
 ) -> Option<String> {
   let parsed_sexp : Result < Sexp, String > =
     sexp::parse (request)
@@ -205,9 +205,9 @@ pub fn handle_text_search_request (
             send_search_results_without_enrichment (
               stream, &search_terms, "No matches found." );
             return None; }
-          let matches_by_id : MatchGroups =
-            filter_match_groups_to_active_repos (
-              group_matches_by_id (
+          let matches_by_skgid : MatchGroups =
+            filter_match_groups_to_active_skgrepos (
+              group_matches_by_skgid (
               best_matches,
               searcher,
               &runtime . tantivy_index,
@@ -215,20 +215,20 @@ pub fn handle_text_search_request (
               &search_opts,
               Some (active) ),
               active );
-          if matches_by_id . is_empty () {
+          if matches_by_skgid . is_empty () {
             send_search_results_without_enrichment (
               stream, &search_terms, "No matches found." );
             return None; }
           let suppressed : HashSet<ID> =
-            suppressed_result_ids (
-              &matches_by_id,
+            suppressed_result_skgids (
+              &matches_by_skgid,
               &runtime . graph,
               &runtime . config,
               active );
           let (viewforest, search_results) : (ViewForest, Vec<ID>) =
             build_search_viewforest (
               &search_terms,
-              &matches_by_id,
+              &matches_by_skgid,
               &suppressed );
           let approved : HashSet<ID> =
             if include_overPrivateText_telescopes {
@@ -334,15 +334,15 @@ fn bool_key (
     . unwrap_or_default ()
     == "true" }
 
-fn filter_match_groups_to_active_repos (
-  matches_by_id : MatchGroups,
-  active        : &ActiveRepoSet,
+fn filter_match_groups_to_active_skgrepos (
+  matches_by_skgid : MatchGroups,
+  active        : &ActiveSkgRepoSet,
 ) -> MatchGroups {
   if active . is_all () {
-    return matches_by_id; }
-  matches_by_id . into_iter ()
-    . filter ( |(_, (repo, _))|
-      active . contains_repo (repo) )
+    return matches_by_skgid; }
+  matches_by_skgid . into_iter ()
+    . filter ( |(_, (skgrepo, _))|
+      active . contains_skgrepo (skgrepo) )
     . collect () }
 
 /// Spawn a background thread to compute containerward acnestries
@@ -355,7 +355,7 @@ fn spawn_enrichment_thread (
   runtime          : Arc<RuntimeGeneration>,
   search_terms     : &str,
   search_results   : &[ID],
-  active           : &ActiveRepoSet,
+  active           : &ActiveSkgRepoSet,
   include_overPrivateText_telescopes : bool,
 ) {
   { // Clear stale enrichment before spawning.
@@ -367,7 +367,7 @@ fn spawn_enrichment_thread (
   let slot_clone    : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::clone (enrichment_slot);
   let cancel_clone  : Arc<AtomicBool>   = Arc::clone (search_cancelled);
-  let active_clone  : ActiveRepoSet   = active . clone ();
+  let active_clone  : ActiveSkgRepoSet   = active . clone ();
   let terms_clone   : String            = search_terms . to_string ();
   let ids_clone     : Vec<ID>           = search_results . to_vec ();
   let max_depth : usize = runtime . config . max_role_tree_depth;
@@ -376,37 +376,37 @@ fn spawn_enrichment_thread (
       generation = runtime . generation,
       result_count = ids_clone . len (),
       "search enrichment thread started");
-    let containerward_role_trees_by_id : HashMap<ID, ContainerwardRoleTree> =
-      containerward_role_trees_by_id_from_ids (
+    let containerward_role_trees_by_skgid : HashMap<ID, ContainerwardRoleTree> =
+      containerward_role_trees_by_skgid_from_skgids (
         &runtime . graph, &ids_clone, max_depth );
     tracing::info! ("search enrichment: role tree computed ({} entries)",
-              containerward_role_trees_by_id . len ());
+              containerward_role_trees_by_skgid . len ());
     if cancel_clone . load (Ordering::SeqCst) {
       tracing::info! ("search enrichment: cancelled after role tree");
       return; }
-    let all_enriched_ids : Vec<ID> = {
+    let all_enriched_skgids : Vec<ID> = {
       // Collect result IDs + every ID from role trees + every
       // override relative the enrichment will graft (so those grafted
       // nodes get their graphStats, hence their override heralds).
-      let mut id_set : HashSet<ID> = HashSet::new ();
-      for id in &ids_clone {
-        id_set . insert ( id . clone () ); }
-      for tree in containerward_role_trees_by_id . values () {
-        collect_ids_from_role_tree_node ( tree, &mut id_set ); }
-      id_set . extend (
-        render_enriched_search_buffer::collect_overrideward_view_subtree_ids (
+      let mut skgid_set : HashSet<ID> = HashSet::new ();
+      for skgid in &ids_clone {
+        skgid_set . insert ( skgid . clone () ); }
+      for tree in containerward_role_trees_by_skgid . values () {
+        collect_skgids_from_role_tree_node ( tree, &mut skgid_set ); }
+      skgid_set . extend (
+        render_enriched_search_buffer::collect_overrideward_view_subtree_skgids (
           &runtime . graph, &ids_clone, &active_clone ) );
-      id_set . into_iter () . collect () };
+      skgid_set . into_iter () . collect () };
     let graphnodestats : AllGraphnodeStats =
-      fetch_all_graphnodestats_with_repo_set (
+      fetch_all_graphnodestats_with_skgrepo_set (
         &runtime . graph,
-        &all_enriched_ids,
+        &all_enriched_skgids,
         Some (&active_clone) )
       . unwrap_or_else ( |e| {
         tracing::warn! ("search enrichment: graphnodestats failed: {}", e);
         AllGraphnodeStats::empty () } );
     tracing::info! ("search enrichment: graphnodestats fetched for {} IDs",
-              all_enriched_ids . len ());
+              all_enriched_skgids . len ());
     let mut guard : MutexGuard<Option<SearchEnrichmentPayload>> =
       slot_clone . lock () . unwrap ();
     if cancel_clone . load (Ordering::SeqCst) {
@@ -419,18 +419,18 @@ fn spawn_enrichment_thread (
       runtime,
       terms          : terms_clone,
       search_results : ids_clone,
-      containerward_role_trees_by_id,
+      containerward_role_trees_by_skgid,
       graphnodestats,
       include_overPrivateText_telescopes } ); } ); }
 
-fn collect_ids_from_role_tree_node(
-  node   : &ContainerwardRoleTree,
-  id_set : &mut HashSet<ID>,
+fn collect_skgids_from_role_tree_node(
+  node      : &ContainerwardRoleTree,
+  skgid_set : &mut HashSet<ID>,
 ) {
-  id_set . insert ( node . id () . clone () );
+  skgid_set . insert ( node . skgid () . clone () );
   if let ContainerwardRoleTree::Inner ( _, children ) = node {
     for child in children {
-      collect_ids_from_role_tree_node ( child, id_set ); }}}
+      collect_skgids_from_role_tree_node ( child, skgid_set ); }}}
 
 /// Build the tagged s-exp for a search enrichment payload.
 /// Format: (("response-type" "search-enrichment")
@@ -508,13 +508,13 @@ fn mk_search_results_sexp (
 ///   MultiContained, or 1.0 for none).
 ///
 /// adjusted_score = bm25_score * coverage * context_multiplier
-pub fn group_matches_by_id (
+pub fn group_matches_by_skgid (
   best_matches  : Vec < (f32, tantivy::DocAddress) >,
   searcher      : Searcher,
   tantivy_index : &TantivyIndex,
   search_terms  : &str,
   search_opts   : &SearchOptions,
-  active        : Option<&ActiveRepoSet>,
+  active        : Option<&ActiveSkgRepoSet>,
 ) -> MatchGroups {
   let matcher : CoverageMatcher = // pre-build once
     build_coverage_matcher (search_terms, search_opts);
@@ -524,7 +524,7 @@ pub fn group_matches_by_id (
     match searcher . doc (doc_address) {
       Ok (retrieved_doc) => {
         let retrieved_doc : TantivyDocument = retrieved_doc;
-        let id_opt : Option < ID > =
+        let skgid_opt : Option < ID > =
           retrieved_doc
             . get_first ( tantivy_index . id_field )
             . and_then ( |v| v . as_str() )
@@ -553,21 +553,21 @@ pub fn group_matches_by_id (
             . and_then ( |v| v . as_str () )
             . map ( |s| s . to_string () )
             . unwrap_or_default ();
-        let repo : RepoName =
-          RepoName::from (
+        let skgrepo : SkgRepoName =
+          SkgRepoName::from (
             retrieved_doc
-              . get_first ( tantivy_index . repo_field )
+              . get_first ( tantivy_index . skgrepo_field )
               . and_then ( |v| v . as_str () )
               . unwrap_or ("") );
         if let Some (a) = active {
-          // Per-DOCUMENT repo filtering, BEFORE grouping: an
+          // Per-DOCUMENT skgrepo filtering, BEFORE grouping: an
           // alias document carries the ALIAS's relRepo as
-          // its repo, so a restricted search must drop it here
+          // its skgrepo, so a restricted search must drop it here
           // -- a private alias of a public node must neither match
           // nor shift ranking (dbs-and-search, 5_plan.org). The
           // group-level filter below survives as a backstop.
           if ! a . is_all ()
-          && ! a . contains_repo (&repo) {
+          && ! a . contains_skgrepo (&skgrepo) {
             continue; }}
         let origin_type : Option < ContextOriginType > =
           retrieved_doc
@@ -579,11 +579,11 @@ pub fn group_matches_by_id (
         let coverage : f32 =
           coverage_factor (&matcher, &searchable_title);
         let adjusted_score : f32 = score * coverage * multiplier;
-        if let (Some (id), Some (title)) = (id_opt, title_opt) {
+        if let (Some (skgid), Some (title)) = (skgid_opt, title_opt) {
           result_acc
-            . entry (id)
+            . entry (skgid)
             . or_insert_with ( || (
-              repo,
+              skgrepo,
               Vec::new () ))
             . 1
             . push (( adjusted_score, title )); }},
@@ -596,33 +596,33 @@ pub fn group_matches_by_id (
 ///
 /// Forest structure: each root is a search result, with AliasFolder +
 /// Alias children if aliases matched.
-/// The result ids to drop from the top level because a USER-OWNED
+/// The result ids to drop from the top level because an OWNED
 /// result recursively overrides them: they will reappear as
 /// overriddenward role-graft descendants of that owned result
-/// (TODO/override-ancestry-in-search-results.org, "Suppression"). A
+/// (TODO/DONE/override-ancestry-in-search-results.org, "Suppression"). A
 /// FOREIGN overrider never suppresses -- so a pure-foreign mutual
 /// override shows both, and a "boring" foreign overrider does not hide
 /// the node it overrides. Reachability follows relRepo-visible
 /// outbound overrides, matching what the role graft will actually draw.
 /// Only search hits ('matches_by_id' keys) are ever suppressed. A
-/// user-owned overrider that matched the query but ranks past the
+/// owned overrider that matched the query but ranks past the
 /// display limit could suppress its target without itself being shown
 /// (rare; suppression frees slots, so the anchor usually fits).
-pub fn suppressed_result_ids (
-  matches_by_id : &MatchGroups,
-  graph         : &InRustGraph,
-  config        : &SkgConfig,
-  active         : &ActiveRepoSet,
+pub fn suppressed_result_skgids (
+  matches_by_skgid : &MatchGroups,
+  graph            : &InRustGraph,
+  config           : &SkgConfig,
+  active           : &ActiveSkgRepoSet,
 ) -> HashSet<ID> {
   let candidates : HashSet<ID> =
-    matches_by_id . keys () . cloned () . collect ();
+    matches_by_skgid . keys () . cloned () . collect ();
   let mut suppressed : HashSet<ID> = HashSet::new ();
-  for owned in candidates . iter () . filter ( |id|
-    graph . nodes . get (*id)
-      . map_or ( false, |n| config . user_owns_repo (&n . home_repo) ) )
+  for owned in candidates . iter () . filter ( |skgid|
+    graph . nodes . get (*skgid)
+      . map_or ( false, |n| config . skgrepo_is_owned (&n . home_skgrepo) ) )
   { // Walk owned's overriddenward closure; any HIT in it is suppressed
-    // (it will hang under 'owned'). Cycle-guarded: foreign edges in the
-    // chain can form cycles even though user-owned ones cannot.
+    // (it will hang under 'owned'). Cycle-guarded: foreign relationships in the
+    // chain can form cycles even though owned ones cannot.
     let mut stack : Vec<ID> = vec![ owned . clone () ];
     let mut seen  : HashSet<ID> = HashSet::from ([ owned . clone () ]);
     while let Some (cur) = stack . pop () {
@@ -635,18 +635,18 @@ pub fn suppressed_result_ids (
   suppressed }
 
 pub fn build_search_viewforest (
-  _search_terms : &str,
-  matches_by_id : &MatchGroups,
-  suppressed    : &HashSet<ID>,
+  _search_terms    : &str,
+  matches_by_skgid : &MatchGroups,
+  suppressed       : &HashSet<ID>,
 ) -> (ViewForest, Vec<ID>) {
   let mut viewforest : ViewForest =
     ViewForest::new ();
   let mut id_entries : Vec < ( &ID,
-                               &RepoName,
+                               &SkgRepoName,
                                &Vec < ( f32, String ) > ) > =
-    matches_by_id . iter ()
-    . map ( |(id, (repo, matches))| // flatten
-             (id, repo, matches) )
+    matches_by_skgid . iter ()
+    . map ( |(skgid, (skgrepo, matches))| // flatten
+             (skgid, skgrepo, matches) )
     . collect ();
   id_entries . sort_by ( |a, b| { // sort by best score (descending)
     let score_a : f32 =
@@ -656,12 +656,12 @@ pub fn build_search_viewforest (
     score_b . partial_cmp (& score_a)
     . unwrap_or (std::cmp::Ordering::Equal) } );
   let mut search_results : Vec < ID > = Vec::new ();
-  for (id, repo, matches) in id_entries . iter ()
+  for (skgid, skgrepo, matches) in id_entries . iter ()
         // Suppress before truncation, so a dropped result frees a slot
         // for the next-ranked hit (design corner O2).
         . filter ( |entry| ! suppressed . contains (entry . 0) )
         . take (SEARCH_DISPLAY_LIMIT)
-    { search_results . push ( (*id) . clone () );
+    { search_results . push ( (*skgid) . clone () );
       let mut sorted_matches : Vec < &(f32, String) > =
         // We borrow from matches_by_id.
         // Sort matches by score descending for display.
@@ -672,15 +672,15 @@ pub fn build_search_viewforest (
       let result_treeid : NodeId =
         viewforest . append_root (
           mk_writeProtected_viewnode (
-            (*id) . clone (),
-            (*repo) . clone (),
+            (*skgid) . clone (),
+            (*skgrepo) . clone (),
             title . clone (),
             AffectsParent::NA ) );
       if sorted_matches . len () > 1 {
         // We bury all but the best match in an AliasFolder.
         // PITFALL: The title might not be the best match,
         // in which case this makes it look like an alias.
-        let aliasfolder_id : NodeId = {
+        let aliasfolder_skgid : NodeId = {
           let mut result_mut : NodeMut<Viewnode> =
             viewforest . get_mut (result_treeid) . unwrap ();
           result_mut . append ( Viewnode {
@@ -692,7 +692,7 @@ pub fn build_search_viewforest (
           . id () };
         for (_score, title) in sorted_matches . iter () . skip (1) {
           let mut aliasfolder_mut : NodeMut<Viewnode> =
-            viewforest . get_mut (aliasfolder_id) . unwrap ();
+            viewforest . get_mut (aliasfolder_skgid) . unwrap ();
           aliasfolder_mut . append ( Viewnode {
             focused     : false,
             folded      : false,

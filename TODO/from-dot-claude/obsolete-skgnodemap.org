@@ -13,23 +13,23 @@ without modifying the question
 (because I might not remember it).
 * Context
 
-'SkgNodeMap = HashMap<ID, NodeComplete>' is threaded as '&mut SkgNodeMap' through the render, complete-viewtree, and save pipelines as a per-request transactional shadow. Pre-Plan-C (from .claude/plans/beautiful/many-and-better-node-types/many-and-better-node-types_part-c_use-in-rust-memory.org) it had two jobs:
+'SkgNodeMap = HashMap<ID, Graphnode>' is threaded as '&mut SkgNodeMap' through the render, complete-viewtree, and save pipelines as a per-request transactional shadow. Pre-Plan-C (from .claude/plans/beautiful/many-and-better-node-types/many-and-better-node-types_part-c_use-in-rust-memory.org) it had two jobs:
 
-  1. /Read cache/: accumulate NodeComplete lookups so a pipeline stage doesn't re-read the same node twice (from disk, TypeDB, or pool).
+  1. /Read cache/: accumulate Graphnode lookups so a pipeline stage doesn't re-read the same node twice (from disk, TypeDB, or pool).
   2. /In-progress save state/: built from 'Vec<DefineNode>' via 'skgnode_map_from_save_instructions', passed into rerender so the post-save view reflects the new state /before/ any store other than FS committed.
 
 After Plan C, both are redundant. The in-Rust memory ([[../../server/dbs/memory.rs][server/dbs/memory.rs]]) is updated by 'apply_definenodes' during the save pipeline ([[../../server/save.rs][save.rs]]:63, [[../../server/merge.rs][merge.rs]]:63) /before/ any rerender runs, so memory carries the post-save state by the time rendering happens. Memory reads are effectively free: 'snapshot_global' is an 'ArcSwap' load (one atomic), and 'im::HashMap::get' is O(1). The SkgNodeMap just duplicates a snapshot memory already holds.
 
-Removing it collapses ~60 call-site signatures and drops one conceptual layer from the "where does this NodeComplete live?" model. Most of the diff is mechanical (deleting '&mut map' parameters and arguments); the interesting work is choosing the right /replacement helper/ at each read site — and in particular, avoiding an async-contamination cascade through sync tree walkers.
+Removing it collapses ~60 call-site signatures and drops one conceptual layer from the "where does this Graphnode live?" model. Most of the diff is mechanical (deleting '&mut map' parameters and arguments); the interesting work is choosing the right /replacement helper/ at each read site — and in particular, avoiding an async-contamination cascade through sync tree walkers.
 
 * Key call sites
 
 Type alias and helpers ([[../../server/types/memory.rs][server/types/memory.rs]]):
 
-  - 'type SkgNodeMap = HashMap<ID, NodeComplete>' at [[../../server/types/memory.rs][memory.rs]]:26.
-  - 'skgnode_from_map_or_disk' at [[../../server/types/memory.rs][memory.rs]]:263 — sync, returns '&'a NodeComplete' into the map. Memory-first (since c5a25851), then disk given '(pid, source)'.
-  - 'skgnode_from_memory_or_disk' at [[../../server/types/memory.rs][memory.rs]]:254 — async, returns owned 'NodeComplete'. Memory-first, then 'skgnode_from_id' (which resolves id→(pid,source) via memory/TypeDB, then reads disk). Intended replacement for async call sites.
-  - 'nodecomplete_from_memory' at [[../../server/types/memory.rs][memory.rs]]:285 — sync, returns 'Option<NodeComplete>'. Synthesizes 'NodeComplete { misc: Vec::new(), .. }' from 'NodeRust'. The load-bearing primitive.
+  - 'type SkgNodeMap = HashMap<ID, Graphnode>' at [[../../server/types/memory.rs][memory.rs]]:26.
+  - 'skgnode_from_map_or_disk' at [[../../server/types/memory.rs][memory.rs]]:263 — sync, returns '&'a Graphnode' into the map. Memory-first (since c5a25851), then disk given '(pid, source)'.
+  - 'skgnode_from_memory_or_disk' at [[../../server/types/memory.rs][memory.rs]]:254 — async, returns owned 'Graphnode'. Memory-first, then 'skgnode_from_id' (which resolves id→(pid,source) via memory/TypeDB, then reads disk). Intended replacement for async call sites.
+  - 'nodecomplete_from_memory' at [[../../server/types/memory.rs][memory.rs]]:285 — sync, returns 'Option<Graphnode>'. Synthesizes 'Graphnode { misc: Vec::new(), .. }' from 'NodeRust'. The load-bearing primitive.
   - 'skgnode_map_from_save_instructions' at [[../../server/types/memory.rs][memory.rs]]:211 — builds a map from a 'Vec<DefineNode>' for the obsolete "mirror in-flight save" path.
   - 'skgnode_map_from_forest' at [[../../server/types/memory.rs][memory.rs]]:223 — async batch-load for a forest. Used only by [[../../tests/rebuild/complete_aliascol.rs][tests/rebuild/complete_aliascol.rs]].
   - 'skgnode_for_viewnode' at [[../../server/types/memory.rs][memory.rs]]:191 — single-node helper that returns 'None' for non-True 'ViewNodeKind' and otherwise delegates to 'skgnode_from_map_or_disk'. The "Scaffold filtering" is just this 'match'.
@@ -62,7 +62,7 @@ The sketch's plan routes every read through the async 'skgnode_from_memory_or_di
 The fix: expose a /sync/ memory-or-disk helper in [[../../server/types/memory.rs][server/types/memory.rs]] that requires '(pid, source)' (so no id→source resolution is needed) and never reaches TypeDB. The sync helper takes the short name 'skgnode_from_memory_or_disk'; the existing async helper (which takes an id and does id→source resolution) is renamed to 'skgnode_from_memory_or_disk_async':
 
 #+begin_src rust
-/// Memory-first NodeComplete read, disk fallback, given an
+/// Memory-first Graphnode read, disk fallback, given an
 /// already-resolved '(pid, source)'. Sync — never consults TypeDB,
 /// so callers in sync contexts don't have to become async. For the
 /// id-only path (id→(pid,source) resolution plus lookup) use the
@@ -71,7 +71,7 @@ pub fn skgnode_from_memory_or_disk (
   config : &SkgConfig,
   pid    : &ID,
   source : &SourceName,
-) -> Result<NodeComplete, Box<dyn Error>> {
+) -> Result<Graphnode, Box<dyn Error>> {
   if let Some (n) = nodecomplete_from_memory (pid)
     { return Ok (n); }
   Ok ( skgnode_from_pid_and_source (
@@ -107,11 +107,11 @@ Impelled changes to the plan:
 
 ** Drop the in-flight-save mirror from 'update_views_after_save'
 
-[[../../server/update_buffer.rs][update_buffer.rs]]:59-72 currently builds 'skgnode_map' from three sources: 'skgnode_map_from_save_instructions' (Save instructions' NodeCompletes), 'saveview_skgnodes_pre_save' (populated lazily by the earlier pipeline), and a merge-acquirer reload from disk. This block becomes a no-op:
+[[../../server/update_buffer.rs][update_buffer.rs]]:59-72 currently builds 'skgnode_map' from three sources: 'skgnode_map_from_save_instructions' (Save instructions' Graphnodes), 'saveview_skgnodes_pre_save' (populated lazily by the earlier pipeline), and a merge-acquirer reload from disk. This block becomes a no-op:
 
-  - Save instructions: 'apply_definenodes' at [[../../server/save.rs][save.rs]]:63 has already written the post-save NodeRust to in-Rust memory by the time 'update_views_after_save' runs. A memory read gives the same NodeComplete (minus 'misc', which no downstream reader in this path consumes — see PITFALL on 'nodecomplete_from_memory').
+  - Save instructions: 'apply_definenodes' at [[../../server/save.rs][save.rs]]:63 has already written the post-save NodeRust to in-Rust memory by the time 'update_views_after_save' runs. A memory read gives the same Graphnode (minus 'misc', which no downstream reader in this path consumes — see PITFALL on 'nodecomplete_from_memory').
   - 'saveview_skgnodes_pre_save': populated lazily during 'buffer_to_viewnode_forest_and_save_instructions' (pre-save). Since the save has already landed in memory by rerender time, the pre-save snapshot is stale anyway — the post-save memory read is strictly more correct.
-  - Merge-acquirer reload at lines 67-72: 'merge_nodes' at [[../../server/merge.rs][merge.rs]]:63 calls 'apply_definenodes' for the primary (acquirer) save, so the post-merge acquirer is already in memory. The explicit disk reload is redundant — and arguably wrong under the extra_id canonicalization plan, where memory has /more/ accurate canonical-key state than a fresh NodeComplete from disk.
+  - Merge-acquirer reload at lines 67-72: 'merge_nodes' at [[../../server/merge.rs][merge.rs]]:63 calls 'apply_definenodes' for the primary (acquirer) save, so the post-merge acquirer is already in memory. The explicit disk reload is redundant — and arguably wrong under the extra_id canonicalization plan, where memory has /more/ accurate canonical-key state than a fresh Graphnode from disk.
 
 So the 'saveview_skgnodes_pre_save' parameter is deleted from 'update_views_after_save' and 'update_from_and_rerender_buffer' ([[../../server/serve/handlers/save_buffer.rs][save_buffer.rs]]:69,72,92,157,218) along with the allocation site at [[../../server/serve/handlers/save_buffer.rs][save_buffer.rs]]:69-72.
 
@@ -134,15 +134,15 @@ pub fn find_source_many_ways (
 
 ** Step 0 — Add 'misc' to NodeRust
 
-[[../../server/types/nodes/rust.rs][nodes/rust.rs]]: add 'pub misc: Vec<FileProperty>' to 'NodeRust' after the other data fields. Update the 'From<&NodeComplete>' impl to copy 'misc: c.misc.clone ()' (currently it drops 'misc'). Update the module-level comment and the 'From' impl's doc comment to no longer claim 'misc' is dropped.
+[[../../server/types/nodes/rust.rs][nodes/rust.rs]]: add 'pub misc: Vec<FileProperty>' to 'NodeRust' after the other data fields. Update the 'From<&Graphnode>' impl to copy 'misc: c.misc.clone ()' (currently it drops 'misc'). Update the module-level comment and the 'From' impl's doc comment to no longer claim 'misc' is dropped.
 
 [[../../server/types/memory.rs][memory.rs]] 'nodecomplete_from_memory': replace 'misc: Vec::new ()' with 'misc: rust.misc.clone ()'. Delete the PITFALL block at lines 244-249 describing the 'misc' drop — it's no longer accurate.
 
-Rationale (see Problems § ONGOING 'misc' loss in NodeComplete synthesis): 'supplement_none_fields_from_disk_if_save' at [[../../server/from_text/supplement_from_disk.rs][supplement_from_disk.rs]]:74-75 reads 'misc' from the disk/memory-resolved NodeComplete and writes it back into the buffer-derived one. With the old synthesis, memory's answer has empty 'misc' and this silently wipes FileProperty markers. Putting 'misc' in NodeRust makes the memory answer correct for free — cheaper and simpler than a per-save disk roundtrip.
+Rationale (see Problems § ONGOING 'misc' loss in Graphnode synthesis): 'supplement_none_fields_from_disk_if_save' at [[../../server/from_text/supplement_from_disk.rs][supplement_from_disk.rs]]:74-75 reads 'misc' from the disk/memory-resolved Graphnode and writes it back into the buffer-derived one. With the old synthesis, memory's answer has empty 'misc' and this silently wipes FileProperty markers. Putting 'misc' in NodeRust makes the memory answer correct for free — cheaper and simpler than a per-save disk roundtrip.
 
 ** Step 1 — Add sync 'skgnode_from_memory_or_disk'; rename existing async
 
-In [[../../server/types/memory.rs][memory.rs]], add the sync helper described in Design § "Two replacement helpers" (signature: 'fn skgnode_from_memory_or_disk (config: &SkgConfig, pid: &ID, source: &SourceName) -> Result<NodeComplete, Box<dyn Error>>'). Rename the existing async 'skgnode_from_memory_or_disk' to 'skgnode_from_memory_or_disk_async' and update its ~3 call sites: [[../../server/to_org/util.rs][to_org/util.rs]]:41,50 ('skgnode_and_viewnode_from_id'), anywhere else 'git grep' turns up. Doc-comments contrast the two helpers (sync takes '(pid, source)', async takes id-only and does id→source resolution).
+In [[../../server/types/memory.rs][memory.rs]], add the sync helper described in Design § "Two replacement helpers" (signature: 'fn skgnode_from_memory_or_disk (config: &SkgConfig, pid: &ID, source: &SourceName) -> Result<Graphnode, Box<dyn Error>>'). Rename the existing async 'skgnode_from_memory_or_disk' to 'skgnode_from_memory_or_disk_async' and update its ~3 call sites: [[../../server/to_org/util.rs][to_org/util.rs]]:41,50 ('skgnode_and_viewnode_from_id'), anywhere else 'git grep' turns up. Doc-comments contrast the two helpers (sync takes '(pid, source)', async takes id-only and does id→source resolution).
 
 ** Step 2 — Replace 'skgnode_from_map_or_disk' calls, keeping sync/async context
 
@@ -151,7 +151,7 @@ Each call site swaps to one of the two helpers. Inventory ('skgnode_from_map_or_
   - [[../../server/to_org/util.rs][to_org/util.rs]]:67 ('skgnode_and_viewnode_from_pid_and_source') — sync, has '(pid, source)' → sync helper.
   - [[../../server/to_org/complete/contents.rs][to_org/complete/contents.rs]]:26 ('clobberIndefinitiveViewnode') — sync, has '(pid, source)' → sync helper.
   - [[../../server/to_org/expand/definitive.rs][to_org/expand/definitive.rs]]:308 — sync context, has '(pid, source)' → sync helper.
-  - [[../../server/update_buffer/graphnodestats.rs][graphnodestats.rs]]:61 ('set_metadata_relationships_in_node_recursive') — sync recursive, has '(id, source)' on the TrueNode → sync helper.
+  - [[../../server/update_buffer/graphnodestats.rs][graphnodestats.rs]]:61 ('set_metadata_relationships_in_node_recursive') — sync recursive, has '(id, source)' on the ActiveVognode → sync helper.
   - [[../../server/update_buffer/complete_parent_first/truenode.rs][complete_parent_first/truenode.rs]]:116,126,214,481 — sync context, has '(pid, source)' → sync helper.
   - [[../../server/serve/handlers/text_search/render_enriched_search_buffer.rs][render_enriched_search_buffer.rs]]:85 — currently called only to populate the map (side-effect: "// updates the map"). After map removal this entire call deletes.
   - [[../../server/types/memory.rs][memory.rs]]:342 inside 'find_source_many_ways' — same side-effect-only pattern; deletes.
@@ -207,7 +207,7 @@ Follow Design § "The 'find_source_many_ways' shrink". Add a 'snapshot_global' r
 
 ** Step 7 — Delete dead helpers, the alias, and the helper-direct tests
 
-Delete from [[../../server/types/memory.rs][memory.rs]]: 'skgnode_from_map_or_disk', 'skgnode_map_from_save_instructions', 'skgnode_map_from_forest', 'skgnode_for_viewnode', and 'type SkgNodeMap = HashMap<ID, NodeComplete>'. Delete 'use crate::types::memory::SkgNodeMap' from every file that no longer references it.
+Delete from [[../../server/types/memory.rs][memory.rs]]: 'skgnode_from_map_or_disk', 'skgnode_map_from_save_instructions', 'skgnode_map_from_forest', 'skgnode_for_viewnode', and 'type SkgNodeMap = HashMap<ID, Graphnode>'. Delete 'use crate::types::memory::SkgNodeMap' from every file that no longer references it.
 
 Delete the five tests in [[../../tests/types/skgnode.rs][tests/types/skgnode.rs]] and consider deleting the file itself (check if anything else is there — if not, rm). The two 'skgnode_map_from_forest' call sites in [[../../tests/rebuild/complete_aliascol.rs][tests/rebuild/complete_aliascol.rs]]:58,204 delete and are replaced by local batch pre-loading — but it's worth checking whether those tests still need the batch step at all under the new signatures. Likely the whole preamble collapses.
 
@@ -222,7 +222,7 @@ Delete the five tests in [[../../tests/types/skgnode.rs][tests/types/skgnode.rs]
 
 Three commits, each independently green:
 
-  1. /Foundational: add 'misc' to NodeRust; add sync helper; rename async/: Steps 0-2. Adds 'misc: Vec<FileProperty>' to 'NodeRust' and updates the 'From<&NodeComplete>' impl + 'nodecomplete_from_memory' to preserve 'misc'. Introduces sync 'skgnode_from_memory_or_disk'; renames existing async to 'skgnode_from_memory_or_disk_async'. Converts the 7 'skgnode_from_map_or_disk' readers. Signatures still carry '&mut map' but the callers no longer need the map. Likely 150-line diff.
+  1. /Foundational: add 'misc' to NodeRust; add sync helper; rename async/: Steps 0-2. Adds 'misc: Vec<FileProperty>' to 'NodeRust' and updates the 'From<&Graphnode>' impl + 'nodecomplete_from_memory' to preserve 'misc'. Introduces sync 'skgnode_from_memory_or_disk'; renames existing async to 'skgnode_from_memory_or_disk_async'. Converts the 7 'skgnode_from_map_or_disk' readers. Signatures still carry '&mut map' but the callers no longer need the map. Likely 150-line diff.
   2. /Drop the parameter and the in-flight mirror/: Steps 3-6. The large mechanical diff (~30 files). Also drops the 4-tuple, 'find_source_many_ways' shrink, 'update_views_after_save' mirror, and adds the 'memory_coherent_with_save_instructions' coherence assert. This is the "SkgNodeMap removal" commit.
   3. /Delete dead code and tests/: Step 7. Small, confined to [[../../server/types/memory.rs][memory.rs]] and [[../../tests/types/skgnode.rs][tests/types/skgnode.rs]].
 
@@ -324,9 +324,9 @@ You're right, and I apologize — I've been describing impelled changes but not 
 
 Plan-body edits coming, in the same session as my response to your next TODO so the full diff is coherent. Going forward I'll apply each impelled change inline with the response that names it, not just describe it.
 
-** DONE 'misc' loss in NodeComplete synthesis
+** DONE 'misc' loss in Graphnode synthesis
 
-'nodecomplete_from_memory' synthesizes 'misc: Vec::new()' because 'NodeRust' drops 'misc'. Comment at [[../../server/types/memory.rs][memory.rs]]:244-249 asserts no in-memory consumer reads 'misc' — only Tantivy indexing and the org-roam importer, neither of which goes through SkgNodeMap. This is a load-bearing invariant. Re-grep for '.misc' usage on NodeComplete values reached through these call chains to confirm it still holds. If any new consumer has snuck in, either (a) it should read from the FS for 'misc' specifically, or (b) 'NodeRust' needs a 'misc' field — the first is probably right, since 'misc' is a catch-all for arbitrary extension fields that shouldn't participate in the hot graph read path.
+'nodecomplete_from_memory' synthesizes 'misc: Vec::new()' because 'NodeRust' drops 'misc'. Comment at [[../../server/types/memory.rs][memory.rs]]:244-249 asserts no in-memory consumer reads 'misc' — only Tantivy indexing and the org-roam importer, neither of which goes through SkgNodeMap. This is a load-bearing invariant. Re-grep for '.misc' usage on Graphnode values reached through these call chains to confirm it still holds. If any new consumer has snuck in, either (a) it should read from the FS for 'misc' specifically, or (b) 'NodeRust' needs a 'misc' field — the first is probably right, since 'misc' is a catch-all for arbitrary extension fields that shouldn't participate in the hot graph read path.
 
 *** DONE When you say "Re-grep for '.misc' usage"
 do you mean that should be part of the plan?
@@ -338,8 +338,8 @@ Yes, it should be part of the plan, not left as a "worth doing" aside. Impelled 
 Specifically, under Step 1 (since that's where the 'misc'-dropping sync helper lands), add the check:
 
   - Run 'git grep -n "\.misc" server/ tests/' and inspect every hit.
-  - Expected categories of hits: (a) construction — initializing 'NodeComplete { ..., misc: ... }'; (b) Tantivy indexing — acceptable, never goes through the memory path; (c) org-roam import — acceptable, never goes through the memory path; (d) disk (de)serialization in [[../../server/types/nodes/fs.rs][nodes/fs.rs]] — acceptable.
-  - /Not/ acceptable: a read of 'nc.misc' on a 'NodeComplete' reached through a render or save pipeline. If any exists, that site must either be refactored to go to disk for 'misc' specifically, or 'NodeRust' needs a 'misc' field (which I'd resist — 'misc' is a catch-all and shouldn't ride in the hot read path).
+  - Expected categories of hits: (a) construction — initializing 'Graphnode { ..., misc: ... }'; (b) Tantivy indexing — acceptable, never goes through the memory path; (c) org-roam import — acceptable, never goes through the memory path; (d) disk (de)serialization in [[../../server/types/nodes/fs.rs][nodes/fs.rs]] — acceptable.
+  - /Not/ acceptable: a read of 'nc.misc' on a 'Graphnode' reached through a render or save pipeline. If any exists, that site must either be refactored to go to disk for 'misc' specifically, or 'NodeRust' needs a 'misc' field (which I'd resist — 'misc' is a catch-all and shouldn't ride in the hot read path).
 
 If the grep comes back clean (my expectation), nothing to do besides note the result in the commit message. If it comes back with an unexpected hit, that's a blocker: fix it before landing Step 3 (parameter removal), because Step 3 is what makes the memory path the only source.
 
@@ -355,9 +355,9 @@ You're right — no reason to wait. Ran 'git grep -n "\.misc\b"' across server/ 
 /Benign (expected) categories:/
 
   - Construction: [[../../server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][to_naive_instructions.rs]]:108, [[../../server/merge/mergeInstructionTriple.rs][mergeInstructionTriple.rs]]:220, [[../../server/test_utils.rs][test_utils.rs]]:564, [[../../server/types/memory.rs][memory.rs]]:300 (the synthesis site itself). Build sites; not reads.
-  - Tantivy path: [[../../server/types/nodes/tantivy.rs][nodes/tantivy.rs]]:30 copies 'misc' into 'NodeTantivy' at indexing time. Indexing operates on NodeCompletes loaded directly from disk in the init pipeline (not via 'SkgNodeMap', not via memory), so this is fine.
-  - Context-type computation: [[../../server/context.rs][context.rs]]:473 reads 'n.misc.contains (&FileProperty::Had_ID_Before_Import)'. Runs in 'initialize_dbs' and consumes NodeCompletes from 'read_all_skg_files_from_sources_AND_check_for_dup_ids' (full-disk read, not memory), so fine.
-  - Org-roam import: [[../../server/import_org_roam.rs][import_org_roam.rs]]:99-128 mutates 'misc' during import. Import builds fresh NodeCompletes from org files; no memory path involved.
+  - Tantivy path: [[../../server/types/nodes/tantivy.rs][nodes/tantivy.rs]]:30 copies 'misc' into 'NodeTantivy' at indexing time. Indexing operates on Graphnodes loaded directly from disk in the init pipeline (not via 'SkgNodeMap', not via memory), so this is fine.
+  - Context-type computation: [[../../server/context.rs][context.rs]]:473 reads 'n.misc.contains (&FileProperty::Had_ID_Before_Import)'. Runs in 'initialize_dbs' and consumes Graphnodes from 'read_all_skg_files_from_sources_AND_check_for_dup_ids' (full-disk read, not memory), so fine.
+  - Org-roam import: [[../../server/import_org_roam.rs][import_org_roam.rs]]:99-128 mutates 'misc' during import. Import builds fresh Graphnodes from org files; no memory path involved.
   - Test fixtures and test-only constructors: [[../../tests/contexts.rs][contexts.rs]]:47, [[../../tests/file_io.rs][file_io.rs]]:145, [[../../tests/new/viewnodes_to_instructions/reconcile_same_id_instructions/by_claude.rs][reconcile_same_id_instructions/by_claude.rs]]:32, [[../../tests/import_org_roam.rs][import_org_roam.rs]]:386-392. Test scaffolding.
 
 /One blocker:/
@@ -376,7 +376,7 @@ Under the plan as written, 'misc' would silently reset to 'Vec::new ()' on every
 /Impelled change/: add a Step 2a to the plan before the main migration:
 
   - In 'supplement_none_fields_from_disk_if_save' at [[../../server/from_text/supplement_from_disk.rs][supplement_from_disk.rs]]:24, replace the pool+async fallback with a /disk-only/ read: 'skgnode_from_pid_and_source (config, pid.clone (), &from_buffer.source)'. The buffer always has a source (user-provided), and this is the save path — we /want/ disk's truth, not memory's distilled shape, specifically to preserve 'misc'. This bypasses both the SkgNodeMap (already going away) and the memory path (which drops 'misc').
-  - Add a comment at the new disk read naming the invariant: "Disk-only read: do NOT go through the in-Rust memory here. Memory drops 'misc' at [[../../server/types/nodes/rust.rs][nodes/rust.rs]] by design; this site is the only memory-path-reachable consumer of 'misc' on NodeComplete. Going to disk preserves it."
+  - Add a comment at the new disk read naming the invariant: "Disk-only read: do NOT go through the in-Rust memory here. Memory drops 'misc' at [[../../server/types/nodes/rust.rs][nodes/rust.rs]] by design; this site is the only memory-path-reachable consumer of 'misc' on Graphnode. Going to disk preserves it."
   - Also add an integration test: save a node with 'misc: [Had_ID_Before_Import]' set; re-save it via the save pipeline with a buffer that omits 'misc'; assert the resulting disk file still has 'Had_ID_Before_Import'. Without the disk-only read, this test fails.
 
 With this step, the 'misc-loss' Problem is fully resolved, not merely "likely solved".
@@ -398,16 +398,16 @@ Your proposal — move 'misc' into 'NodeRust' — is cleaner than the disk-detou
   - It unblocks the pool removal without a special-case disk roundtrip, so Step 2a (the disk-only read) disappears.
   - It lets the 'supplement_none_fields_from_disk_if_save' site keep using the new async 'skgnode_from_memory_or_disk_async' without regressing the misc-preservation invariant.
 
-Context-type computation at [[../../server/context.rs][context.rs]]:473 stays as-is — it reads NodeCompletes straight from 'read_all_skg_files_from_sources_AND_check_for_dup_ids' during init, doesn't care where misc lives. Tantivy indexing at [[../../server/types/nodes/tantivy.rs][nodes/tantivy.rs]]:30 also unchanged. The only consumer that benefits is 'supplement_none_fields_from_disk_if_save'.
+Context-type computation at [[../../server/context.rs][context.rs]]:473 stays as-is — it reads Graphnodes straight from 'read_all_skg_files_from_sources_AND_check_for_dup_ids' during init, doesn't care where misc lives. Tantivy indexing at [[../../server/types/nodes/tantivy.rs][nodes/tantivy.rs]]:30 also unchanged. The only consumer that benefits is 'supplement_none_fields_from_disk_if_save'.
 
 /Impelled change applied to the plan body/:
 
   - Add a new Step at the top, "Step 0 — Add 'misc' to NodeRust", describing the three touch-points:
-    - [[../../server/types/nodes/rust.rs][nodes/rust.rs]]: add 'pub misc: Vec<FileProperty>' field; update 'From<&NodeComplete>' impl to copy 'misc' instead of dropping; update the module-level doc comment and the 'From' impl's doc comment to no longer mention the 'misc' drop.
+    - [[../../server/types/nodes/rust.rs][nodes/rust.rs]]: add 'pub misc: Vec<FileProperty>' field; update 'From<&Graphnode>' impl to copy 'misc' instead of dropping; update the module-level doc comment and the 'From' impl's doc comment to no longer mention the 'misc' drop.
     - [[../../server/types/memory.rs][memory.rs]] 'nodecomplete_from_memory': replace 'misc: Vec::new ()' with 'misc: rust.misc.clone ()'; delete the PITFALL block at lines 244-249 (the 'misc' drop is no longer a thing).
     - Doc comment on the new sync helper (in Step 1) no longer needs the "memory drops 'misc'" caveat — because it doesn't anymore.
   - Delete the previously-planned Step 2a (disk-only read at 'supplement_from_disk.rs'); 'supplement_none_fields_from_disk_if_save' remains untouched.
-  - Update the "ONGOING 'misc' loss in NodeComplete synthesis" Problems entry's status: no longer an issue; entry becomes historical.
+  - Update the "ONGOING 'misc' loss in Graphnode synthesis" Problems entry's status: no longer an issue; entry becomes historical.
   - Step 0 lands in commit 1 alongside the helper addition — small, self-contained, low-risk change that touches two files (+ the doc comment on a third).
 
 ** DONE Test file churn
@@ -441,9 +441,9 @@ Yes, nanoseconds. 'ArcSwap::load' is a handle copy: it atomically reads an 'Arc'
 
 Agreed — not worth flagging as an inefficiency at a knowledge-graph scale. Impelled change: delete the "INEFFICIENCY: Repeated 'snapshot_global' per lookup" entry from Problems, out of scope. The cleaner follow-up that /would/ matter (threading one snapshot per request so readers share a consistent view across a long render) is about consistency, not performance — I'll note that if it ever comes up as a correctness question; for now it's nothing.
 
-** ARCHITECTURE: 'NodeComplete' as a wire/ingest type but not a read type
+** ARCHITECTURE: 'Graphnode' as a wire/ingest type but not a read type
 
-After this change, no read path in the render/save pipeline returns 'NodeComplete' fundamentally — every reader ends up synthesizing one from 'NodeRust'. With Step 0 moving 'misc' into 'NodeRust', the synthesis is now lossless (no dropped fields), but the /shape translation/ remains: NodeRust is the native in-memory type, NodeComplete is a wire/disk type, and we pay a clone + restructure on every read. A cleaner model: readers take 'NodeRust' directly and only construct 'NodeComplete' when serializing (to disk on save, to Tantivy on index). Significant refactor, larger than this plan's scope; flag as a follow-up if the synthesis cost becomes noticeable or if adding another NodeComplete field requires another round-trip through NodeRust.
+After this change, no read path in the render/save pipeline returns 'Graphnode' fundamentally — every reader ends up synthesizing one from 'NodeRust'. With Step 0 moving 'misc' into 'NodeRust', the synthesis is now lossless (no dropped fields), but the /shape translation/ remains: NodeRust is the native in-memory type, Graphnode is a wire/disk type, and we pay a clone + restructure on every read. A cleaner model: readers take 'NodeRust' directly and only construct 'Graphnode' when serializing (to disk on save, to Tantivy on index). Significant refactor, larger than this plan's scope; flag as a follow-up if the synthesis cost becomes noticeable or if adding another Graphnode field requires another round-trip through NodeRust.
 
 ** INEFFICIENCY: Redundant pid-and-source resolution in async readers
 
@@ -451,4 +451,4 @@ Several async readers ([[../../server/to_org/expand/backpath.rs][backpath.rs]], 
 
 ** NAMING: 'skgnode_*' vs 'nodecomplete_*'
 
-The code uses both prefixes inconsistently for functions operating on 'NodeComplete'. The pre-existing style was 'skgnode_*' (matching the old 'SkgNode' type name); the post-rename convention seems to prefer 'nodecomplete_*' but migration is partial. This plan keeps the 'skgnode_*' prefix for the new sync helper ('skgnode_from_memory_or_disk') and the renamed async one ('skgnode_from_memory_or_disk_async'), matching their neighbors rather than introducing another naming convention locally. A full 'skgnode_* → nodecomplete_*' rename pass would touch 'skgnode_from_id', 'skgnode_from_pid_and_source', 'skgnodes_from_ids', the two helpers introduced here, etc. — large, orthogonal, out of scope here.
+The code uses both prefixes inconsistently for functions operating on 'Graphnode'. The pre-existing style was 'skgnode_*' (matching the old 'Graphnode' type name); the post-rename convention seems to prefer 'nodecomplete_*' but migration is partial. This plan keeps the 'skgnode_*' prefix for the new sync helper ('skgnode_from_memory_or_disk') and the renamed async one ('skgnode_from_memory_or_disk_async'), matching their neighbors rather than introducing another naming convention locally. A full 'skgnode_* → nodecomplete_*' rename pass would touch 'skgnode_from_id', 'skgnode_from_pid_and_source', 'skgnodes_from_ids', the two helpers introduced here, etc. — large, orthogonal, out of scope here.

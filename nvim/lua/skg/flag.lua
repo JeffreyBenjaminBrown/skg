@@ -40,15 +40,15 @@ end
 local function recursive_targets (root_line)
   local result = { root_line }
   local root_level = metadata.outline_level(root_line)
-  local line = metadata.next_heading_line(root_line)
+  local line = metadata.next_headline_line(root_line)
   while line and (metadata.outline_level(line) or 0) > root_level do
     local meta = metadata.metadata_sexp_at_line_or_nil(line)
     if metadata.activeNode_sexp_p(meta)
        and metadata.node_affectsParent_content_of_p(meta) then
       table.insert(result, line)
-      line = metadata.next_heading_line(line)
+      line = metadata.next_headline_line(line)
     else
-      line = metadata.next_heading_after_subtree(line)
+      line = metadata.next_headline_after_subtree(line)
     end
   end
   return result
@@ -111,8 +111,8 @@ local function request (recursive)
       if err then vim.notify('flag state: ' .. err) return end
       local canonical_id = payload.field_text(response, 'id')
       local value = payload.field_text(response, 'value')
-      local user_owned = payload.field_text(response, 'user-owned')
-      if user_owned ~= 'true' then
+      local owned = payload.field_text(response, 'user-owned')
+      if owned ~= 'true' then
         vim.notify('Cannot set search matching on a foreign node') return end
       if not vim.api.nvim_buf_is_loaded(buf) then return end
       vim.api.nvim_buf_call(buf, function ()

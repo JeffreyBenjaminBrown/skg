@@ -29,7 +29,7 @@
 
    Commit '41e82de8' folds title and body independently, records their
    source levels, and persists the resulting coarse 'overPrivateText_telescope' bit in
-   'NodeComplete', 'NodeRust', and 'NodeTantivy'. Tantivy stores and indexes
+   'Graphnode', 'NodeRust', and 'NodeTantivy'. Tantivy stores and indexes
    the bit so restricted search can exclude overPrivateText documents before matching.
 
    Four commits put one release policy in front of all textual outputs:

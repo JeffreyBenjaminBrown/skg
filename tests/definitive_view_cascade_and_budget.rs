@@ -1,6 +1,6 @@
 // cargo nextest run --test grouped_views -E 'test(definitive_view_cascade_and_budget::)'
 //
-// Tests for definitive view request expansion.
+// Tests for editable view request expansion.
 // These tests verify that when a node has a "Definitive" view request,
 // its content children are expanded from disk using BFS with truncation.
 
@@ -65,7 +65,7 @@ fn all_tests
       Ok (( )) } )) }
 
 // ===================================================
-// Test: Definitive view with an ample budget -> everything expands.
+// Test: Editable view with an ample budget -> everything expands.
 // §5.5 budget counts vognode EXPANSIONS (cost 1 each); the full subtree here is
 // 12 expansions (1,2,11,12,13,121,122,123,124,1211,1212,1221), so a budget of
 // 20 is ample and nothing is left write-protected.
@@ -131,7 +131,7 @@ async fn test_definitive_view_ample_budget (
       Ok (( )) }
 
 // ===================================================
-// Test: Definitive view with limit=5 vs limit=6
+// Test: Editable view with limit=5 vs limit=6
 // ===================================================
 // §5.5 budget is granular: limit=5 spends its last unit on 1211 (1212 not
 // created); limit=6 affords both 1211 and 1212. Nodes whose DVR is reached
@@ -234,7 +234,7 @@ async fn test_definitive_view_limit_5_or_6 (
       Ok (( )) }
 
 // ===================================================
-// Test: Definitive view with limit=1 or limit=4
+// Test: Editable view with limit=1 or limit=4
 // ===================================================
 // Gen 2 has 4 children (121, 122, 123, 124).
 // Any limit from 1 to 4 hits the limit on the first generation,
@@ -303,7 +303,7 @@ async fn test_definitive_view_limit_1_to_4 (
         * (skg (node (id 2) (repo main) (affectsParent na))) 2
       "};
       // hiddenBody marks only 12: the saved buffer drew 11 and 13
-      // definitive with no body text, WIPING their bodies, while
+      // editable with no body text, WIPING their bodies, while
       // write-protected 12 kept its body -- which this render hides.
       // limit=4: expansions 1, 2, 11, 12 spend the budget. 12 (the 4th) drew its
       // whole group 121..124, all write-protected (budget spent); 13 is reached
@@ -329,10 +329,10 @@ async fn test_definitive_view_limit_1_to_4 (
       Ok (( )) }
 
 // ===================================================
-// Test: Definitive view on node that conflicts with existing definitive
+// Test: Editable view on node that conflicts with existing editable
 // ===================================================
-// If node X is already definitive in the tree, and we request
-// definitive view on a second instance of X, the first should become
+// If node X is already editable in the tree, and we request
+// editable view on a second occurrence of X, the first should become
 // write-protected.
 
 async fn test_definitive_view_conflicting (
@@ -340,8 +340,8 @@ async fn test_definitive_view_conflicting (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       // Node 12 appears twice:
-      // - First as a regular child of 1 (will be definitive after completion)
-      // - Second with a definitive view request
+      // - First as a regular child of 1 (will be editable after completion)
+      // - Second with an editable view request
       let input_org_text = indoc! {"
         * (skg (node (id 1) (repo main))) 1
         ** (skg (node (id 12))) 12
@@ -383,12 +383,12 @@ async fn test_definitive_view_conflicting (
       "};
 
       assert_metadata_eq!(result, expected,
-        "First definitive instance should become write-protected when second requests definitive");
+        "First definitive occurrence should become write-protected when second requests definitive");
 
       Ok (( )) }
 
 // ===================================================
-// Test: Definitive view expansion detects cycles
+// Test: Editable view expansion detects cycles
 // ===================================================
 // Create fixtures for a cycle: a contains b contains a
 
@@ -396,7 +396,7 @@ async fn test_definitive_view_with_cycle (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      // Node a has definitive request
+      // Node a has editable request
       // a contains b contains a (cycle)
       let input_org_text = indoc! {"
         * (skg (node (id cyc-a) (repo main) writeProtected (viewRequests definitiveView))) cyc-a
@@ -435,9 +435,9 @@ async fn test_definitive_view_with_cycle (
       Ok (( )) }
 
 // ===================================================
-// Test: Definitive view expansion detects repeats
+// Test: Editable view expansion detects repeats
 // ===================================================
-// If a node is already visited (definitive elsewhere), it should be
+// If a node is already visited (editable elsewhere), it should be
 // marked write-protected when encountered again during expansion.
 
 async fn test_definitive_view_with_repeat (
@@ -469,11 +469,11 @@ async fn test_definitive_view_with_repeat (
 
       let expected = indoc! {
         // Upon saving, the write-protected view of node 12 had no effect, but the
-        // definitive view of 121 (definitive in the *buffer*) deleted its
+        // editable view of 121 (editable in the *buffer*) deleted its
         // children at extraction. In the rerender, node 12's definitiveView
         // cascades (§5.3) a DVR onto its content child 121, which is Final
         // and so clobbers the Tentative bare root 121 (§5.2). So the bare
-        // root 121 is now write-protected and 12's child 121 is the definitive
+        // root 121 is now write-protected and 12's child 121 is the editable
         // occurrence (childless, since the save emptied 121's contains).
         "* (skg (node (id 121) (repo main) (affectsParent na) writeProtected (rels (contains (in 1))))) 121
          * (skg (node (id 12) (repo main) (affectsParent na) (rels (contains (in 1) (out 4))))) 12
@@ -495,7 +495,7 @@ async fn test_definitive_view_with_repeat (
       Ok (( )) }
 
 // =====================================================
-// Test: Definitive view request clears after processing
+// Test: Editable view request clears after processing
 // =====================================================
 
 async fn test_definitive_view_request_cleared (
@@ -543,11 +543,11 @@ async fn test_definitive_view_request_cleared (
 //
 // Fixture: root r contains the chain c1 -> c2, and r has two aliases. The budget
 // counts vognode EXPANSIONS (cost 1), so the whole content here is exactly 3
-// expansions: r, c1, c2. With limit=3 the chain fully expands (c2 definitive)
+// expansions: r, c1, c2. With limit=3 the chain fully expands (c2 editable)
 // AND the AliasFolder shows BOTH aliases. The alias members are non-vognodes, so they
 // cost nothing: were they charged, the 3 units could not also cover c2, which
 // would then be left write-protected (verified: at limit=2 c2 *is* write-protected
-// while the AliasFolder stays whole). That c2 is definitive here is the guarantee
+// while the AliasFolder stays whole). That c2 is editable here is the guarantee
 // this test pins.
 async fn test_budget_aliasfolder_is_neutral (
   config : &SkgConfig,

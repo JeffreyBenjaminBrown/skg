@@ -128,7 +128,7 @@ privacy for every imported node.  No input file is changed."
             `((request . "rerender all views")
               (exclude-view-uris ,@dirty-uris))
             (when approved-pids
-              `((allow-overPrivateText-telescopes ,@approved-pids)))))
+              `((approved-overPrivateText-pids ,@approved-pids)))))
           "\n"))
       (error
        (dolist (type '(rerender-lock rerender-view rerender-done

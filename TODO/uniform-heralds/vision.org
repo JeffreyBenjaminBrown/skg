@@ -51,7 +51,7 @@ Instead, for most nodes, let's only check relationships one hopp away --
 e.g. for content we check parent and children, no further.
 
 Exceptions, though, must arise for certain kinds of nodes.
-For each kind of col, there is an 'owning ancestor'.
+For each kind of folder, there is an 'owning ancestor'.
 (A table somewhere in the rust code defines them all --
 e.g. a subscribee-as-such's owning ancestor is its grandparent,
 and that of a member of a hiddeninsubscribeecol is its great-grandparent.)

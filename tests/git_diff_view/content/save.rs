@@ -432,7 +432,7 @@ where
   let temp_dir = TempDir::new()?;
   let gitrepo_path = temp_dir . path();
   setup (gitrepo_path)?;
-  s . reset_with_repo_path (subtest_name, gitrepo_path) ?;
+  s . reset_with_skgrepo_path (subtest_name, gitrepo_path) ?;
 
   test_fn(&s . config, &mut s . tantivy, gitrepo_path) . await
 }

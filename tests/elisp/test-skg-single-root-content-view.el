@@ -17,7 +17,7 @@
                    "some-id" "some-uri"))
         (approved (skg--single-root-view-request-string
                    "some-id" "some-uri" '("pid-a" "pid-b"))))
-    (should-not (string-match-p "allow-overPrivateText-telescopes" ordinary))
+    (should-not (string-match-p "approved-overPrivateText-pids" ordinary))
     (should (equal
              '("pid-a" "pid-b")
-             (cdr (assoc 'allow-overPrivateText-telescopes (read approved)))))))
+             (cdr (assoc 'approved-overPrivateText-pids (read approved)))))))

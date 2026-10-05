@@ -12,77 +12,77 @@ use crate::serve::util::{
   request_type_from_request,
   send_response_with_length_prefix,
   value_from_request_sexp};
-use crate::repo_sets::ActiveRepoSet;
+use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::types::misc::RepoSetName;
+use crate::types::misc::SkgRepoSetName;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
-use crate::update_buffer::repo_switch::convert_and_prune_for_repo_switch;
+use crate::update_buffer::skgrepo_switch::convert_and_prune_for_skgrepo_switch;
 
 use std::net::TcpStream;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
-pub fn handle_repo_set_request (
+pub fn handle_skgrepo_set_request (
   stream           : &mut TcpStream,
   request          : &str,
   env              : &SkgEnv,
   views_state      : &mut ViewsState,
-  active_repo_set : &mut ActiveRepoSet,
+  active_skgrepo_set : &mut ActiveSkgRepoSet,
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
 ) {
   let runtime = env . runtime_snapshot ();
   match request_type_from_request (request) {
-    Ok (RequestType::ListRepoSets) =>
-      send_repo_sets_response (stream, &runtime . config, active_repo_set),
-    Ok (RequestType::ActiveRepoSet) =>
-      send_active_repo_set_response (stream, active_repo_set),
-    Ok (RequestType::SetActiveRepoSet) =>
-      set_active_repo_set (
+    Ok (RequestType::ListSkgRepoSets) =>
+      send_skgrepo_sets_response (stream, &runtime . config, active_skgrepo_set),
+    Ok (RequestType::ActiveSkgRepoSet) =>
+      send_active_skgrepo_set_response (stream, active_skgrepo_set),
+    Ok (RequestType::SetActiveSkgRepoSet) =>
+      set_active_skgrepo_set (
         stream, request, env, runtime, views_state,
-        active_repo_set, enrichment_slot, search_cancelled ),
+        active_skgrepo_set, enrichment_slot, search_cancelled ),
     Ok (_) =>
       // Reachable only from malformed requests no current client
       // sends, but Emacs may have locked buffers and set its stream
       // guard before any repo-set request, so even these paths
       // answer in the unwinding shape.
       refuse_unwinding (
-        stream, active_repo_set, "not a repo-set request"),
+        stream, active_skgrepo_set, "not a repo-set request"),
     Err (e) =>
-      refuse_unwinding (stream, active_repo_set, &e), }}
+      refuse_unwinding (stream, active_skgrepo_set, &e), }}
 
-/// TODO/full-schema/9-2_repo-set-safety.org: a repo-set switch
+/// TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: a repo-set switch
 /// RE-RENDERS open views in place rather than closing them.  Each
 /// view gets the convert-and-prune prepass (now-inactive Actives
 /// become InactiveVognodes; childless inactive branches, properties of
-/// inactive owners, write-protected partners, emptied folders and dead
+/// inactive recorders, write-protected partners, emptied folders and dead
 /// non-vognodes are pruned), then completion with PartnerFolder creation
-/// enabled, because a switch can also ACTIVATE repos, revealing
+/// enabled, because a switch can also ACTIVATE skgrepos, revealing
 /// members and folders.  Results stream via the rerender-all message
 /// flow (lock, per-view, done).
-fn set_active_repo_set (
+fn set_active_skgrepo_set (
   stream           : &mut TcpStream,
   request          : &str,
   env              : &SkgEnv,
   runtime          : Arc<RuntimeGeneration>,
   views_state      : &mut ViewsState,
-  active_repo_set : &mut ActiveRepoSet,
+  active_skgrepo_set : &mut ActiveSkgRepoSet,
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
 ) {
-  let name : RepoSetName =
+  let name : SkgRepoSetName =
     match value_from_request_sexp ("name", request) {
-      Ok (name) => RepoSetName::from (name),
+      Ok (name) => SkgRepoSetName::from (name),
       Err (e) => {
-        refuse_unwinding (stream, active_repo_set, &e);
+        refuse_unwinding (stream, active_skgrepo_set, &e);
         return; }};
-  let active : ActiveRepoSet =
-    match ActiveRepoSet::named (&runtime . config, name) {
+  let active : ActiveSkgRepoSet =
+    match ActiveSkgRepoSet::named (&runtime . config, name) {
       Ok (active) => active,
       Err (e) => {
         refuse_unwinding (
-          stream, active_repo_set, &e . to_string ());
+          stream, active_skgrepo_set, &e . to_string ());
         return; }};
   if views_state . diff_mode_enabled
      && ! active . is_all () {
@@ -94,13 +94,13 @@ fn set_active_repo_set (
         "Cannot switch to repo-set {}: git diff mode is on, and it requires active repo-set all. Disable diff mode first.",
         active . name . 0 );
       tracing::info! ( msg = %msg, "Repo-set switch refused" );
-      refuse_unwinding (stream, active_repo_set, &msg);
+      refuse_unwinding (stream, active_skgrepo_set, &msg);
       return; }}
   let mut prepared =
-  { let target : ActiveRepoSet = active . clone ();
+  { let target : ActiveSkgRepoSet = active . clone ();
     let prepass = |viewforest : &mut ViewForest|
       -> Result<(), Box<dyn std::error::Error>> {
-      convert_and_prune_for_repo_switch (
+      convert_and_prune_for_skgrepo_switch (
         viewforest . as_internal_tree_mut (), &target ) };
     prepare_rerender_views_with_runtime (
       env, runtime, views_state, views_state . diff_mode_enabled,
@@ -111,21 +111,21 @@ fn set_active_repo_set (
     &approved_pids_from_request (request) ) {
     return; }
   cancel_search_enrichment (enrichment_slot, search_cancelled);
-  *active_repo_set = active;
-  send_active_repo_set_response (stream, active_repo_set);
+  *active_skgrepo_set = active;
+  send_active_skgrepo_set_response (stream, active_skgrepo_set);
   stream_prepared_rerenders (stream, views_state, prepared); }
 
-fn send_repo_sets_response (
+fn send_skgrepo_sets_response (
   stream      : &mut TcpStream,
   config      : &SkgConfig,
-  active      : &ActiveRepoSet,
+  active      : &ActiveSkgRepoSet,
 ) {
   // Repo-sets are the prefixes of the privacy order, so the
-  // choices are the repos themselves, in that order (each meaning
+  // choices are the skgrepos themselves, in that order (each meaning
   // "this repo and everything more public"), plus "all" last (the
   // longest prefix). Order is meaningful; do not sort.
   let mut names : Vec<String> =
-    config . ordered_repos () . iter ()
+    config . ordered_skgrepos () . iter ()
     . map ( |name| name . 0 . clone () )
     . collect ();
   names . push ("all" . to_string ());
@@ -137,21 +137,21 @@ fn send_repo_sets_response (
   let response : String =
     format! (
       "((response-type {}) (active \"{}\") (sets ({})))",
-      TcpToClient::RepoSets . repr_in_client (),
+      TcpToClient::SkgRepoSets . repr_in_client (),
       escape_string (&active . name . 0),
       names_sexp );
   send_response_with_length_prefix (stream, &response); }
 
-fn send_active_repo_set_response (
+fn send_active_skgrepo_set_response (
   stream : &mut TcpStream,
-  active : &ActiveRepoSet,
+  active : &ActiveSkgRepoSet,
 ) {
   let name : &str =
     &active . name . 0;
   let response : String =
     format! (
       "((response-type {}) (active \"{}\") (content \"Active repo-set: {}\"))",
-      TcpToClient::ActiveRepoSet . repr_in_client (),
+      TcpToClient::ActiveSkgRepoSet . repr_in_client (),
       escape_string (name),
       escape_string (name));
   send_response_with_length_prefix (stream, &response); }
@@ -165,13 +165,13 @@ fn send_active_repo_set_response (
 /// must answer in this shape.
 fn refuse_unwinding (
   stream : &mut TcpStream,
-  active : &ActiveRepoSet,
+  active : &ActiveSkgRepoSet,
   msg    : &str,
 ) {
   let response : String =
     format! (
       "((response-type {}) (active \"{}\") (content \"{}\"))",
-      TcpToClient::ActiveRepoSet . repr_in_client (),
+      TcpToClient::ActiveSkgRepoSet . repr_in_client (),
       escape_string (&active . name . 0),
       escape_string (msg));
   send_response_with_length_prefix (stream, &response);

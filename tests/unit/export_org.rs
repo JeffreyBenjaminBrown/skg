@@ -3,9 +3,9 @@
 //! so `super::*` reaches the module's private items.
 
 use super::*;
-use crate::repo_sets::{ActiveRepoSet, RepoSetName};
-use crate::types::misc::{ID, RepoName, rel_partners_at_relRepo};
-use crate::types::nodes::complete::empty_node_complete;
+use crate::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
+use crate::types::misc::{ID, SkgRepoName, rel_partners_at_relRepo};
+use crate::types::nodes::complete::empty_graphnode;
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -18,19 +18,19 @@ fn node (
   body     : Option<&str>,
   contains : &[&str],
 ) -> Graphnode {
-  let mut n : Graphnode = empty_node_complete ();
+  let mut n : Graphnode = empty_graphnode ();
   n . pid      = ID::from (pid);
   n . title    = title . to_string ();
   n . body     = body . map ( |s| s . to_string () );
-  n . home_repo   = RepoName::from ("main");
+  n . home_skgrepo   = SkgRepoName::from ("main");
   n . contains = rel_partners_at_relRepo (
-    & n . home_repo,
+    & n . home_skgrepo,
     contains . iter () . map ( |c| ID::from (*c) ) . collect () );
   n }
 
-fn active_all () -> ActiveRepoSet {
-  ActiveRepoSet { name    : RepoSetName::from ("all"),
-                    repos : BTreeSet::new () } }
+fn active_all () -> ActiveSkgRepoSet {
+  ActiveSkgRepoSet { name    : SkgRepoSetName::from ("all"),
+                    skgrepos : BTreeSet::new () } }
 
 //
 // relpath
@@ -312,17 +312,17 @@ fn marker_child_is_excluded_from_content () {
 //
 
 #[test]
-fn private_repo_edge_is_omitted_from_restricted_export () {
-  // Root and both children live in "main", but the edge to "priv"
-  // is RECORDED in repo "private". A main-only export renders the
+fn private_skgrepo_edge_is_omitted_from_restricted_export () {
+  // Root and both children live in "main", but the relationship to "priv"
+  // is RECORDED in skgrepo "private". A main-only export renders the
   // visible fold: "pub" appears, "priv" does not -- even though
   // priv's home is active.
   let mut root : Graphnode =
     node ("r", "Root", None, &["ma"]);
   root . contains . push ( RelPartner::at_relRepo (
-    RepoName::from ("main"), ID::from ("pub") ));
+    SkgRepoName::from ("main"), ID::from ("pub") ));
   root . contains . push ( RelPartner::at_relRepo (
-    RepoName::from ("private"), ID::from ("priv") ));
+    SkgRepoName::from ("private"), ID::from ("priv") ));
   let nodes : Vec<Graphnode> = vec! [
     root,
     node ("ma", &format! ("[[id:{}][how]]", MAGIC),
@@ -330,9 +330,9 @@ fn private_repo_edge_is_omitted_from_restricted_export () {
     node ("pub",  "Public child",  None, &[]),
     node ("priv", "Private child", None, &[]),
   ];
-  let main_only : ActiveRepoSet = ActiveRepoSet {
-    name    : RepoSetName::from ("main"),
-    repos : [ RepoName::from ("main") ]
+  let main_only : ActiveSkgRepoSet = ActiveSkgRepoSet {
+    name    : SkgRepoSetName::from ("main"),
+    skgrepos : [ SkgRepoName::from ("main") ]
       . into_iter () . collect () };
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
   export_to_org (&main_only, &nodes, dir . path ()) . unwrap ();

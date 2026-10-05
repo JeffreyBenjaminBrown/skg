@@ -157,7 +157,7 @@ end
 ---@param start integer a headline
 ---@return integer the subtree's last line
 function M.subtree_last_line (start)
-  local after = metadata.next_heading_after_subtree(start)
+  local after = metadata.next_headline_after_subtree(start)
   if after then return after - 1 end
   return vim.api.nvim_buf_line_count(0)
 end

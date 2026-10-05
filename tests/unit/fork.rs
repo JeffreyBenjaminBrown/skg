@@ -2,39 +2,39 @@
 // build from server/from_text/fork.rs via #[path].
 //
 // The rule under test ('owned_ancestor_repos_for_foreign_vognodes'):
-// a foreign node's clone inherits the repo of its NEAREST vognode
+// a foreign node's clone inherits the skgrepo of its NEAREST vognode
 // ancestor, recorded only if that ancestor is an owned Active vognode.
 // The walk skips non-vognodes (folders) but STOPS at the first vognode -- it
 // never passes a foreign or inactive ancestor to reach a distant owned
 // one.
 
 use super::*;
-use crate::types::misc::{SkgfileRepo, members_of, rel_partners_at_relRepo};
+use crate::types::misc::{SkgRepo, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
-  Flag, empty_node_complete};
+  Flag, empty_graphnode};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder,
-                             mk_definitive_viewnode};
+                             mk_editable_viewnode};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 fn config_two_owned_one_foreign () -> SkgConfig {
-  let mut repos : HashMap<RepoName, SkgfileRepo> = HashMap::new ();
+  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> = HashMap::new ();
   for (name, owns) in [ ("owned1", true),
                         ("owned2", true),
                         ("foreign", false) ] {
-    repos . insert (
-      RepoName::from (name),
-      SkgfileRepo {
-        name         : RepoName::from (name),
+    skgrepos . insert (
+      SkgRepoName::from (name),
+      SkgRepo {
+        name         : SkgRepoName::from (name),
         abbreviation : None,
         path         : PathBuf::from (name),
-        user_owns_it : owns, } ); }
-  SkgConfig::fromReposAndTantivyFolder ( repos, "/tmp/none" ) }
+        owned        : owns, } ); }
+  SkgConfig::fromSkgReposAndTantivyFolder ( skgrepos, "/tmp/none" ) }
 
-fn active (id : &str, repo : &str) -> Viewnode {
-  mk_definitive_viewnode (
-    ID::from (id), RepoName::from (repo), id . to_string (), None ) }
+fn active (skgid : &str, skgrepo : &str) -> Viewnode {
+  mk_editable_viewnode (
+    ID::from (skgid), SkgRepoName::from (skgrepo), skgid . to_string (), None ) }
 
 fn subscribee_folder () -> Viewnode {
   Viewnode { focused : false, folded : false, body_folded : false,
@@ -66,20 +66,20 @@ fn owned_foreign_N_infers_nothing () {
   // The bug: walking PAST the foreign ancestor F to the owned P. The
   // corrected rule stops at F (foreign) and infers nothing for N.
   let config : SkgConfig = config_two_owned_one_foreign ();
-  let map = owned_ancestor_repos_for_foreign_vognodes (
+  let map = owned_ancestor_skgrepos_for_foreign_vognodes (
     & build_forest (), & config );
   assert! ( ! map . contains_key (& ID::from ("N")),
     "owned -> foreign -> N must infer no repo; got {:?}",
     map . get (& ID::from ("N")) ); }
 
 #[test]
-fn owned_N_still_infers_the_owned_repo () {
+fn owned_N_still_infers_the_owned_skgrepo () {
   // owned2 Q directly contains foreign M: M inherits owned2.
   let config : SkgConfig = config_two_owned_one_foreign ();
-  let map = owned_ancestor_repos_for_foreign_vognodes (
+  let map = owned_ancestor_skgrepos_for_foreign_vognodes (
     & build_forest (), & config );
   assert_eq! ( map . get (& ID::from ("M")),
-               Some (& RepoName::from ("owned2")),
+               Some (& SkgRepoName::from ("owned2")),
     "owned -> M must infer the owned ancestor's repo" ); }
 
 #[test]
@@ -87,25 +87,25 @@ fn non_vognode_ancestor_is_skipped () {
   // owned1 R -> subscribeeFolder -> foreign S: the folder is a non-vognode, so
   // S's nearest VOGNODE ancestor is the owned R.
   let config : SkgConfig = config_two_owned_one_foreign ();
-  let map = owned_ancestor_repos_for_foreign_vognodes (
+  let map = owned_ancestor_skgrepos_for_foreign_vognodes (
     & build_forest (), & config );
   assert_eq! ( map . get (& ID::from ("S")),
-               Some (& RepoName::from ("owned1")),
+               Some (& SkgRepoName::from ("owned1")),
     "a non-vognode between an owned ancestor and a foreign node is skipped" ); }
 
 /// A fork-to-be (clone) with an edited title over the original N it
 /// overrides, in N's foreign repo. (original_title is N's disk title.)
 fn fork_spec_n_edited (
-  repo_confirmed : bool,
+  skgrepo_confirmed : bool,
 ) -> ForkSpec {
   let buffer_node : Graphnode = Graphnode {
-    title  : "N-edited" . to_string (),
-    home_repo : RepoName::from ("foreign"),
-    pid    : ID::from ("N"),
-    .. empty_node_complete () };
+    title        : "N-edited" . to_string (),
+    home_skgrepo : SkgRepoName::from ("foreign"),
+    pid          : ID::from ("N"),
+    .. empty_graphnode () };
   build_fork_clone (
-    & buffer_node, "N-original", &[], RepoName::from ("owned2"),
-    repo_confirmed ) }
+    & buffer_node, "N-original", &[], SkgRepoName::from ("owned2"),
+    skgrepo_confirmed ) }
 
 #[test]
 fn fork_clone_hides_children_the_edit_deleted () {
@@ -113,17 +113,17 @@ fn fork_clone_hides_children_the_edit_deleted () {
   // must hide N2, or it would reappear under the clone as
   // unintegrated subscribed content the user just dismissed.
   let buffer_node : Graphnode = Graphnode {
-    title    : "N-edited" . to_string (),
-    home_repo   : RepoName::from ("foreign"),
-    pid      : ID::from ("N"),
-    contains : rel_partners_at_relRepo (
-      & RepoName::from ("foreign"),
+    title        : "N-edited" . to_string (),
+    home_skgrepo : SkgRepoName::from ("foreign"),
+    pid          : ID::from ("N"),
+    contains     : rel_partners_at_relRepo (
+      & SkgRepoName::from ("foreign"),
       vec! [ ID::from ("N1") ] ),
-    .. empty_node_complete () };
+    .. empty_graphnode () };
   let spec : ForkSpec = build_fork_clone (
     & buffer_node, "N-original",
     & [ ID::from ("N1"), ID::from ("N2") ],
-    RepoName::from ("owned2"), false );
+    SkgRepoName::from ("owned2"), false );
   assert_eq! (
     members_of (
       spec . clone . 0 . hides_from_its_subscriptions . or_default () ),
@@ -141,15 +141,15 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
       l . starts_with ("* Fork confirmation") ),
     "the buffer must open with the instructions headline:\n{}", buf );
   // The clone-to-be parent: a LEVEL-1 headline ("* "), edited title, and
-  // the PICK-A-REPO placeholder repo the user must replace (NO id).
+  // the PICK-A-REPO placeholder skgrepo the user must replace (NO id).
   // (starts_with pins the level marker so a "* " -> "** " drift is caught
   // -- the elisp walk keys off the level.)
   assert! ( lines . iter () . any ( |l|
       l . starts_with (
-        & format! ("* (skg (node (repo {})", FORK_REPO_PLACEHOLDER) )
+        & format! ("* (skg (node (repo {})", FORK_SKGREPO_PLACEHOLDER) )
       && l . ends_with ("N-edited") ),
     "clone-to-be parent (level-1, edited title, placeholder repo) missing:\n{}", buf );
-  // The computed repo is shown only as a SUGGESTION comment,
+  // The computed skgrepo is shown only as a SUGGESTION comment,
   // DIRECTLY above the clone-to-be (the client parses that adjacency
   // for the prompt's default).
   assert! ( lines . windows (2) . any ( |w|
@@ -160,7 +160,7 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
   assert! ( ! buf . contains ("(id N) (repo owned2)"),
     "the clone-to-be must carry no id:\n{}", buf );
   // The original child: a LEVEL-2 headline ("** "), real id, foreign
-  // repo, write-protected, independent, pO, original title.
+  // skgrepo, write-protected, independent, pO, original title.
   assert! ( lines . iter () . any ( |l|
       l . starts_with ("** (skg (node (id N) (repo foreign)")
       && l . contains ("(affectsParent false)")
@@ -170,10 +170,10 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
     "original child (level-2, id/foreign/writeProtected/independent/pO) missing:\n{}", buf ); }
 
 #[test]
-fn confirmation_buffer_shows_a_confirmed_repo_as_settled () {
-  // When the user already specified the clone's repo (explicitly in
+fn confirmation_buffer_shows_a_confirmed_skgrepo_as_settled () {
+  // When the user already specified the clone's skgrepo (explicitly in
   // the saved metadata, or in a prior confirmation round), the buffer
-  // shows THAT repo -- no placeholder, no suggestion comment.
+  // shows THAT skgrepo -- no placeholder, no suggestion comment.
   let buf : String =
     build_fork_confirmation_buffer ( & [ fork_spec_n_edited (true) ] );
   let lines : Vec<&str> = buf . lines () . collect ();
@@ -182,7 +182,7 @@ fn confirmation_buffer_shows_a_confirmed_repo_as_settled () {
       && l . ends_with ("N-edited") ),
     "a confirmed clone must show its real repo:\n{}", buf );
   assert! ( ! buf . contains (
-      & format! ("(repo {})", FORK_REPO_PLACEHOLDER) ),
+      & format! ("(repo {})", FORK_SKGREPO_PLACEHOLDER) ),
     // (The instructions body may MENTION the placeholder; only the
     // metadata form matters.)
     "no placeholder repo when every repo is confirmed:\n{}", buf );
@@ -192,20 +192,20 @@ fn confirmation_buffer_shows_a_confirmed_repo_as_settled () {
 #[test]
 fn fork_clone_preserves_only_the_search_matching_flag () {
   for no_search_matching in [false, true] {
-    let mut misc = vec![
+    let mut flags = vec![
       Flag::Had_ID_Before_Import,
       Flag::Was_Overloaded];
     if no_search_matching {
-      misc . insert (1, Flag::NoSearchMatching); }
+      flags . insert (1, Flag::NoSearchMatching); }
     let buffer_node : Graphnode = Graphnode {
-      home_repo : RepoName::from ("foreign"),
-      pid    : ID::from ("N"),
-      misc,
-      .. empty_node_complete () };
+      home_skgrepo : SkgRepoName::from ("foreign"),
+      pid          : ID::from ("N"),
+      flags,
+      .. empty_graphnode () };
     let spec : ForkSpec = build_fork_clone (
-      &buffer_node, "N", &[], RepoName::from ("owned2"), false );
+      &buffer_node, "N", &[], SkgRepoName::from ("owned2"), false );
     assert_eq! (
-      spec . clone . 0 . misc,
+      spec . clone . 0 . flags,
       if no_search_matching { vec![Flag::NoSearchMatching] }
       else { Vec::new () } ); }
 }

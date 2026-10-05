@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_saves -E 'test(save::write_protected_edits::)'
 
 use indoc::indoc;
-use skg::dbs::filesystem::one_node::graphnode_from_id;
+use skg::dbs::filesystem::one_node::graphnode_from_skgid;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::from_text::buffer_to_viewnodes::uninterpreted
   ::org_to_uninterpreted_viewforest;
@@ -55,9 +55,9 @@ fn deleting_the_flags_folder_is_accepted_and_inert (
       assert! (second . errors . is_empty ());
       assert! (! second . saved_view . contains ("flagsFolder"));
       let saved : Graphnode =
-        graphnode_from_id (config, &ID::from ("brie"))?;
+        graphnode_from_skgid (config, &ID::from ("brie"))?;
       assert! (flag_is_true (
-        &saved . misc, Flag::NoSearchMatching),
+        &saved . flags, Flag::NoSearchMatching),
         "dismissing the projection must not clear the flag");
       Ok (( ))
     })) }
@@ -120,7 +120,7 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
   assert! (second . errors . is_empty (),
     "the new self occurrence should be accepted: {:?}", second . errors);
   let saved_root : Graphnode =
-    graphnode_from_id (config, &ID::from ("1"))?;
+    graphnode_from_skgid (config, &ID::from ("1"))?;
   assert! (members_of (&saved_root . contains) . contains (&ID::from ("1")),
     "the accepted new occurrence should make node 1 content of itself");
 
@@ -145,7 +145,7 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
     panic! ("expected BufferValidationErrors, got {:?}", save_error); };
   assert! (matches! (&errors[..],
     [BufferValidationError::EditedWriteProtectedOccurrence {
-      id, title, changes }] if id == &ID::from ("2")
+      skgid, title, changes }] if skgid == &ID::from ("2")
         && title == "2" && changes . iter () . any (|c| c . contains ("title"))));
   Ok (( ))
 }

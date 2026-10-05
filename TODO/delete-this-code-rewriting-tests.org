@@ -65,7 +65,7 @@
    make_and_append_child_pair_with_source_set; make_and_append_child_pair;
    ManyToMany::{get_left,remove_pair}; placed_to_maybePlaced_tree;
    Forest::as_internal_tree; NodeContainRels::{herald_for_non_content,herald_for_content};
-   {PartnerCol,QualCol}::origin_depth; ViewUri::is_search.
+   {PartnerFolder,QualFolder}::origin_depth; ViewUri::is_search.
    Plus the emptied =impl NodeContainRels= block and 5 orphaned imports.
 ** Elisp (7) — no production reference
    skg--default-source; skg--metadata-is-removed-here-phantom-p;

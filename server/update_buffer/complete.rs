@@ -5,12 +5,12 @@
 // `FnMut` closure which cannot ``.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::repo_sets::ActiveRepoSet;
-use crate::to_org::expand::definitive::{ apply_definitive_draw_rule, DrawOutcome};
-use crate::to_org::util::DefinitiveMap;
+use crate::skgrepo_sets::ActiveSkgRepoSet;
+use crate::to_org::expand::definitive::{ apply_editable_draw_rule, DrawOutcome};
+use crate::to_org::util::EditableMap;
 use crate::types::env::RuntimeGeneration;
-use crate::types::git::RepoDiff;
-use crate::types::misc::{ID, RepoName, TantivyIndex};
+use crate::types::git::SkgRepoDiff;
+use crate::types::misc::{ID, SkgRepoName, TantivyIndex};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, read_at_ancestor_in_tree};
 use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_branches;
 use crate::update_buffer::ancestry::{ folder_is_generalized_orphan, deaden_generalized_orphan_folder, is_folder_kind};
@@ -18,7 +18,7 @@ use crate::update_buffer::util::detach_viewnode_transferring_focus;
 use crate::update_buffer::warnings::CompletionWarning;
 use crate::to_org::render::diff::process_activeVognode_diff;
 use crate::types::tree::viewnode_graphnode::{
-  pid_and_repo_from_treenode, write_at_activeVognode_in_tree};
+  pid_and_skgrepo_from_treenode, write_at_activeVognode_in_tree};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder, ViewRequest, Editability};
 use crate::types::viewnode::{Vognode, Phantom, PropertyFolder};
 use super::reconcile::hiddeninsubscribee_folder::reconcile_hiddenInSubscribeeFolder_children;
@@ -34,7 +34,7 @@ use std::error::Error;
 use std::sync::Arc;
 
 pub(super) struct CompletionContext<'a> {
-  pub(super) defmap                         : &'a mut DefinitiveMap,
+  pub(super) editable_map                         : &'a mut EditableMap,
   /// The per-repo git diffs (Some in diff mode, None otherwise). This is the
   /// single diff handle: it drives the per-node process_activeVognode_diff (content
   /// axes, the phantom flip, TextChanged/IDFolder/AliasFolder), the diff-aware PropertyFolder
@@ -42,14 +42,14 @@ pub(super) struct CompletionContext<'a> {
   /// reconcile itself produces only the pure worktree view; process_activeVognode_diff
   /// applies every content diff effect afterward at the node's own visit (TODO/DONE/local-view-update/plan_v2.org §9
   /// reversal / #3).
-  pub(super) repo_diffs                   : &'a Option<HashMap<RepoName, RepoDiff>>,
+  pub(super) skgrepo_diffs                  : &'a Option<HashMap<SkgRepoName, SkgRepoDiff>>,
   pub(super) runtime                        : &'a RuntimeGeneration,
   pub(super) graph_snap                     : &'a Arc<InRustGraph>,
   pub(super) errors                         : &'a mut Vec<String>,
-  pub(super) deleted_since_head_pid_src_map : &'a HashMap<ID, RepoName>,
+  pub(super) deleted_since_head_pid_src_map : &'a HashMap<ID, SkgRepoName>,
   pub(super) deleted_by_this_save_pids      : &'a HashSet<ID>,
   pub(super) deleted_by_this_save_extra_ids : &'a HashMap<ID, HashSet<ID>>,
-  pub(super) active_repo_set              : Option<&'a ActiveRepoSet>,
+  pub(super) active_skgrepo_set             : Option<&'a ActiveSkgRepoSet>,
   /// TODO/DONE/local-view-update/plan_v2.org §5.5 per-buffer node limit: the remaining budget of *new* Viewnodes
   /// the ordinary update pass may create. Initialized once per rerender to
   /// `config.initial_node_limit` and decremented as content children are
@@ -58,11 +58,11 @@ pub(super) struct CompletionContext<'a> {
   /// diff-only property is created regardless of the budget.
   pub(super) node_budget                    : usize,
   /// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): true only for a DE-NOVO (initial) render driven through
-  /// view completion. When set, each fresh definitive node gets its default
+  /// view completion. When set, each fresh editable node gets its default
   /// PartnerFolders created at its visit, the way
   /// build_node_branch_minus_content does at node birth.
   /// FALSE for post-save rerender, where existing PartnerFolders round-trip
-  /// from the saved buffer. A node made definitive by a request still gets its
+  /// from the saved buffer. A node made editable by a request still gets its
   /// defaults independently of this flag.
   pub(super) create_partnerFolders_for_fresh_nodes : bool,
   /// TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the tantivy index for the inline diff's phantom-repo
@@ -89,7 +89,7 @@ pub(super) fn complete_viewforest (
   // The single TODO/DONE/local-view-update/plan_v2.org §3 level-order BFS: each node's visit
   // (dispatch_node_update) does ALL of its own update -- content
   // reconcile, the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule + TODO/DONE/local-view-update/plan_v2.org §5.3 cascade for definitive-view
-  // requests, the inline diff, the other view requests, ensuring a definitive
+  // requests, the inline diff, the other view requests, ensuring an editable
   // subscribee's HiddenInSubscribeeFolder, and per-folder reconciliation. Folders and
   // content children created during a node's visit are reached later in the
   // same BFS.
@@ -101,7 +101,7 @@ pub(super) fn complete_viewforest (
 /// Visit every node in *level order* (BFS), completing each at its own visit.
 ///
 /// This is the core of view completion: a single top-down level-order traversal
-/// (TODO/DONE/local-view-update/plan_v2.org §3) in which each node, when visited, may create view-descendants
+/// (TODO/DONE/local-view-update/plan_v2.org §3) in which each node, when visited, may create viewdescendants
 /// (content children, subscribee/relation members) that are then visited later
 /// in the same traversal. A FIFO queue (not depth-first recursion) is what makes
 /// the TODO/DONE/local-view-update/plan_v2.org §5.5 node-limit and TODO/DONE/local-view-update/plan_v2.org §5.2 draw-rule semantics order-correct: the first
@@ -129,7 +129,7 @@ fn complete_nodes_in_level_order (
 
 /// One BFS visit: dispatch on (kind, parent-kind) to the node's update rule
 /// (TODO/DONE/local-view-update/plan_v2.org §3/§4). Folders are reconciled at their own visit (the BFS reaches a
-/// folder after its Normal parent created it).
+/// folder after its Active parent created it).
 fn dispatch_node_update (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
@@ -156,67 +156,67 @@ fn dispatch_node_update (
       // vognode already spent its 1 budget unit when it expanded, so drawing all
       // the members here costs nothing more and never truncates a group.
       reconcile_subscribeeFolder_children (
-        treeid, tree, context . repo_diffs, context . runtime,
+        treeid, tree, context . skgrepo_diffs, context . runtime,
         context . deleted_since_head_pid_src_map,
         context . deleted_by_this_save_extra_ids,
-        context . active_repo_set ) ?,
+        context . active_skgrepo_set ) ?,
     ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee) =>
       reconcile_hiddenInSubscribeeFolder_children (
-        treeid, tree, context . repo_diffs, context . runtime,
+        treeid, tree, context . skgrepo_diffs, context . runtime,
         context . deleted_since_head_pid_src_map,
         context . deleted_by_this_save_extra_ids,
-        context . active_repo_set,
+        context . active_skgrepo_set,
         context . warning_sink . as_deref_mut () ) ?,
     ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutsideSubscribeeFolder_children (
-        treeid, tree, context . repo_diffs, context . runtime,
+        treeid, tree, context . skgrepo_diffs, context . runtime,
         context . deleted_since_head_pid_src_map,
         context . deleted_by_this_save_extra_ids,
-        context . active_repo_set,
+        context . active_skgrepo_set,
         context . warning_sink . as_deref_mut () ) ?,
     ViewnodeKind::PartnerFolder (role)
-      // This arm serves one FolderPolicy::WritableSet folder (Overridden;
+      // This arm serves one FolderPolicy::EditableSet folder (Overridden;
       // Subscribee has its own completer above) and every
       // FolderPolicy::WriteProtectedSet folder. The reconciler branches on
       // 'PartnerFolder::policy' where their treatment differs.
       if role . relation_member_role () . is_some () =>
       reconcile_partnerFolder_children (
-        treeid, tree, *role, context . repo_diffs,
+        treeid, tree, *role, context . skgrepo_diffs,
         context . runtime, context . graph_snap,
         context . deleted_since_head_pid_src_map,
         context . deleted_by_this_save_extra_ids,
-        context . active_repo_set,
+        context . active_skgrepo_set,
         context . warning_sink . as_deref_mut () ) ?,
     // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the IDFolder/AliasFolder diff-only properties are created inline by
-    // process_activeVognode_diff at the owner's BFS visit, so their reconcilers must
+    // process_activeVognode_diff at the recorder's BFS visit, so their reconcilers must
     // see the real diffs (repo_diffs) or they would clobber the just-created
     // diff entries. Diffs flow inline for both de-novo and post-save.
     ViewnodeKind::PropertyFolder (PropertyFolder::Alias) =>
       super::reconcile::aliasfolder::reconcile_aliasFolder_children (
         tree, treeid, &context . runtime . graph,
-        context . repo_diffs, &context . runtime . config ) ?,
+        context . skgrepo_diffs, &context . runtime . config ) ?,
     ViewnodeKind::PropertyFolder (PropertyFolder::ID) =>
       super::reconcile::id_folder::reconcile_idFolder_children (
         treeid, tree, &context . runtime . graph,
-        context . repo_diffs, &context . runtime . config ) ?,
+        context . skgrepo_diffs, &context . runtime . config ) ?,
     ViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }) =>
       super::reconcile::flags_folder::reconcile_flags_folder_children (
         tree, treeid, &context . runtime . graph,
         &context . runtime . config ) ?,
     _ => {
-      // No-op for: Inactive (an anonymous placeholder -- it carries no
+      // No-op for: Inactive (an anonymous inactive vognode -- it carries no
       // identity, and flipping it to a "DELETED" marker would leak that
       // a hidden node vanished; it just lingers until the next full
       // rerender drops it), Unknown (unresolvable-id placeholder),
       // Deleted, DeadViewnode, Property leaves, BufferRoot, and Diff phantom
-      // (a diff-only placeholder, inert here, TODO/DONE/local-view-update/plan_v2.org §6.3). The prune sweep handles empty/dead nodes.
+      // (a diff-only placeholder, save-inert here, TODO/DONE/local-view-update/plan_v2.org §6.3). The prune sweep handles empty/dead nodes.
     } }
   Ok(( )) }
 
-/// The Normal-node visit (TODO/DONE/local-view-update/plan_v2.org §6.1/§6.2): settle the Finalizable state
+/// The Active-node visit (TODO/DONE/local-view-update/plan_v2.org §6.1/§6.2): settle the Finalizable state
 /// for a definitive-view request *before* drawing content (so a Final node
 /// can cascade), reconcile content, run the remaining (non-Definitive) view
-/// requests, ensure a definitive subscribee's HiddenInSubscribeeFolder, and
+/// requests, ensure an editable subscribee's HiddenInSubscribeeFolder, and
 /// finally (in diff mode) compute this node's diff inline. The BFS reaches
 /// every folder/child this creates and reconciles it in turn.
 fn visit_normal_node (
@@ -225,16 +225,16 @@ fn visit_normal_node (
   context : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
   // Same-save deletion is an occurrence-wide state transition, not content
-  // reconciliation. Do it before definitive arbitration, budget handling, or
+  // reconciliation. Do it before editable arbitration, budget handling, or
   // write-protected refresh: all of those paths may consult the post-save
   // graph, where the node is necessarily absent. This also ensures every
-  // indefinitive/write-protected image becomes Deleted rather than Unknown.
-  let (pid, repo) : (ID, RepoName) =
-    pid_and_repo_from_treenode (
+  // write-protected image becomes Deleted rather than Unknown.
+  let (pid, skgrepo) : (ID, SkgRepoName) =
+    pid_and_skgrepo_from_treenode (
       tree, treeid, "visit_normal_node deletion preflight" ) ?;
   if context . deleted_by_this_save_pids . contains (&pid) {
     mutate_activeVognode_to_deletednode (
-      tree, treeid, &pid, &repo ) ?;
+      tree, treeid, &pid, &skgrepo ) ?;
     return Ok (( )); }
   let had_dvr : bool =
     read_at_node_in_tree ( tree, treeid,
@@ -265,9 +265,9 @@ fn visit_normal_node (
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
     settled = true;
   } else if had_dvr {
-    match apply_definitive_draw_rule (
+    match apply_editable_draw_rule (
       tree, treeid, &context . runtime . graph,
-      &context . runtime . config, context . defmap ) ? {
+      &context . runtime . config, context . editable_map ) ? {
       DrawOutcome::Deferred => {
         // Deferred to an existing Final occurrence: the node is now
         // write-protected; the content engine (settled) will clobber+return.
@@ -275,13 +275,13 @@ fn visit_normal_node (
       DrawOutcome::MadeFinal => {
         settled = true; cascade = true; } } }
   expand_true_content_at_activeVognode (
-    treeid, tree, context . defmap,
+    treeid, tree, context . editable_map,
     &context . runtime . config, context . graph_snap,
     context . deleted_since_head_pid_src_map,
     context . deleted_by_this_save_extra_ids,
-    context . active_repo_set,
+    context . active_skgrepo_set,
     settled, cascade, &mut context . node_budget,
-    context . repo_diffs . is_none (), // substitution is off in diff mode: diff surfaces show raw graph facts
+    context . skgrepo_diffs . is_none (), // substitution is off in diff mode: diff surfaces show raw graph facts
     context . substitute_existing_content_overrides ) ?;
   // The steps below apply only while the node is still an Active vognode.
   // The flip to a Diff phantom happens at the END of this visit
@@ -292,7 +292,7 @@ fn visit_normal_node (
         ViewnodeKind::Vognode (Vognode::Active (_)) ) ) ?;
   if ! still_normal { return Ok (( )); }
   // Create the default folders when this node is first presented as
-  // definitive: on a de-novo render, or when a definitive-view request has
+  // editable: on a de-novo render, or when a definitive-view request has
   // just expanded an existing occurrence.  Folder members are included;
   // hid*/overrid*-as-such nodes get the same defaults as ordinary nodes, and
   // the subscribee-specific HiddenIn folder is added by the pass below.
@@ -300,22 +300,22 @@ fn visit_normal_node (
     maybe_add_default_partnerFolder_branches (
       tree, treeid, &context . runtime . graph,
       &context . runtime . config,
-      context . active_repo_set,
-      context . repo_diffs ) ?; }
+      context . active_skgrepo_set,
+      context . skgrepo_diffs ) ?; }
   // Remaining view requests (Aliases / Containerward / Mentionerward); the
-  // Definitive request was already consumed by apply_definitive_draw_rule.
+  // Editable request was already consumed by apply_editable_draw_rule.
   super::reconcile::view_requests::execute_activeVognode_view_requests (
     treeid, tree, &context . runtime . graph,
     &context . runtime . config,
-    context . errors, context . active_repo_set,
-    context . repo_diffs ) ?;
-  // Ensure a definitive subscribee's HiddenInSubscribeeFolder exists; the BFS
+    context . errors, context . active_skgrepo_set,
+    context . skgrepo_diffs ) ?;
+  // Ensure an editable subscribee's HiddenInSubscribeeFolder exists; the BFS
   // reconciles it on reaching it.
-  super::reconcile::view_requests::ensure_hiddenInFolder_under_definitive_subscribee (
+  super::reconcile::view_requests::ensure_hiddenInFolder_under_editable_subscribee (
     tree, treeid, &context . runtime . graph,
     &context . runtime . config,
-    context . active_repo_set,
-    context . repo_diffs ) ?;
+    context . active_skgrepo_set,
+    context . skgrepo_diffs ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3 / Jeff): compute this node's content+non-vognode diff LOCALLY,
   // at its own BFS visit. Runs last, after the node is fully completed as a
   // worktree Active node (content, folders, view requests), so process_activeVognode_diff
@@ -323,7 +323,7 @@ fn visit_normal_node (
   // (visited later, level-order) self-deaden via their own generalized-orphan
   // check. Gated on diff mode (repo_diffs = Some); both de-novo and post-save
   // feed the real diffs here, so the diff is computed inline for both.
-  if let Some (real_diffs) = context . repo_diffs {
+  if let Some (real_diffs) = context . skgrepo_diffs {
     let node_mut : NodeMut<Viewnode> =
       tree . get_mut (treeid) . unwrap ();
     process_activeVognode_diff (
@@ -374,7 +374,7 @@ fn prune_self_deletable_when_empty (
   tree : &mut Tree<Viewnode>,
 ) -> Result<(), Box<dyn Error>> {
   let nodes : Vec<NodeId> =
-    collect_matching_nodeids (
+    collect_matching_treeids (
       tree,
       |vn| is_self_deletable_when_empty (&vn . kind) ) ?;
   for treeid in nodes {
@@ -393,7 +393,7 @@ fn prune_self_deletable_when_empty (
   }
   Ok (( )) }
 
-fn collect_matching_nodeids<Predicate> (
+fn collect_matching_treeids<Predicate> (
   tree      : &Tree<Viewnode>,
   predicate : Predicate,
 ) -> Result<Vec<NodeId>, Box<dyn Error>>

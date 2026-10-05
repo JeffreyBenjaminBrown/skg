@@ -1,55 +1,55 @@
-use skg::dbs::in_rust_graph::{InRustGraph, apply_definenodes_to_inRustGraph};
+use skg::dbs::in_rust_graph::{InRustGraph, apply_nodeInstructions_to_inRustGraph};
 use skg::dbs::in_rust_graph::override_invariants::{
   OverrideInvariantViolation,
   derive_affected_override_scope,
   validate_affected_override_invariants,
   validate_override_invariants,
 };
-use skg::types::misc::{ID, MSV, SkgConfig, SkgfileRepo, RepoName, rel_partners_at_relRepo};
-use skg::types::nodes::complete::{Graphnode, empty_node_complete};
-use skg::types::save::{DefineNode, DeleteNode, SaveNode};
+use skg::types::misc::{ID, MSV, SkgConfig, SkgRepo, SkgRepoName, rel_partners_at_relRepo};
+use skg::types::nodes::complete::{Graphnode, empty_graphnode};
+use skg::types::save::{NodeInstruction, DeleteNode, SaveNode};
 
 use proptest::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 fn config () -> SkgConfig {
-  SkgConfig::dummyFromRepos (HashMap::from ([
-    ( RepoName::from ("owned"),
-      SkgfileRepo {
-        name: RepoName::from ("owned"),
+  SkgConfig::dummyFromSkgRepos (HashMap::from ([
+    ( SkgRepoName::from ("owned"),
+      SkgRepo {
+        name: SkgRepoName::from ("owned"),
         abbreviation: None,
         path: PathBuf::from ("/tmp/owned"),
-        user_owns_it: true,
+        owned: true,
       }),
-    ( RepoName::from ("foreign"),
-      SkgfileRepo {
-        name: RepoName::from ("foreign"),
+    ( SkgRepoName::from ("foreign"),
+      SkgRepo {
+        name: SkgRepoName::from ("foreign"),
         abbreviation: None,
         path: PathBuf::from ("/tmp/foreign"),
-        user_owns_it: false,
+        owned: false,
       }),
   ])) }
 
 fn node (
   pid       : &str,
-  repo    : &str,
+  skgrepo   : &str,
   overrides : &[&str],
 ) -> Graphnode {
   let mut node : Graphnode =
-    empty_node_complete ();
+    empty_graphnode ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
-  node . home_repo = RepoName::from (repo);
+  node . home_skgrepo = SkgRepoName::from (skgrepo);
   node . overrides_view_of =
     if overrides . is_empty () {
       MSV::Unspecified
     } else {
       MSV::Specified (
         rel_partners_at_relRepo (
-          &node . home_repo,
+          &node . home_skgrepo,
           overrides . iter ()
-          . map ( |id| ID::from (*id) )
+          . map ( |skgid| ID::from (*skgid) )
           . collect () ) )
     };
   node }
@@ -62,32 +62,32 @@ fn violations_for (
   validate_override_invariants (&config (), &graph) }
 
 fn affected_and_full (
-  base_nodes  : Vec<Graphnode>,
-  definitions : Vec<DefineNode>,
+  base_nodes       : Vec<Graphnode>,
+  nodeInstructions : Vec<NodeInstruction>,
 ) -> (Vec<OverrideInvariantViolation>, Vec<OverrideInvariantViolation>) {
   let base : InRustGraph = InRustGraph::from_graphnodes (&base_nodes);
   assert_eq! (validate_override_invariants (&config (), &base), vec![]);
   let mut candidate : InRustGraph = base . clone ();
-  apply_definenodes_to_inRustGraph (&mut candidate, &definitions);
-  let touched : HashSet<ID> = definitions . iter () . map (|definition|
-    match definition {
-      DefineNode::Save (SaveNode (node)) => node . pid . clone (),
-      DefineNode::Delete (DeleteNode { id, .. }) => id . clone (),
+  apply_nodeInstructions_to_inRustGraph (&mut candidate, &nodeInstructions);
+  let touched : HashSet<ID> = nodeInstructions . iter () . map (|nodeInstruction|
+    match nodeInstruction {
+      NodeInstruction::Save (SaveNode (node)) => node . pid . clone (),
+      NodeInstruction::Delete (DeleteNode { skgid, .. }) => skgid . clone (),
     }) . collect ();
-  let mut affected_ids : HashSet<ID> = touched . clone ();
+  let mut affected_skgids : HashSet<ID> = touched . clone ();
   for pid in &touched {
     if let Some (old) = base . nodes . get (pid) {
-      affected_ids . extend (old . extra_ids . iter () . cloned ()); }
+      affected_skgids . extend (old . extra_ids . iter () . cloned ()); }
     if let Some (final_node) = candidate . nodes . get (pid) {
-      affected_ids . extend (final_node . extra_ids . iter () . cloned ()); }}
+      affected_skgids . extend (final_node . extra_ids . iter () . cloned ()); }}
   let scope = derive_affected_override_scope (
-    &base, &candidate, &touched, &affected_ids);
+    &base, &candidate, &touched, &affected_skgids);
   (validate_affected_override_invariants (&config (), &candidate, &scope),
    validate_override_invariants (&config (), &candidate))
 }
 
 #[test]
-fn one_user_owned_overrider_is_valid () {
+fn one_owned_overrider_is_valid () {
   assert_eq! (
     violations_for (vec![
       node ("target", "owned", &[]),
@@ -96,7 +96,7 @@ fn one_user_owned_overrider_is_valid () {
     vec![] ); }
 
 #[test]
-fn two_user_owned_overriders_of_same_target_are_invalid () {
+fn two_owned_overriders_of_same_target_are_invalid () {
   let violations : Vec<OverrideInvariantViolation> =
     violations_for (vec![
       node ("target", "owned", &[]),
@@ -106,7 +106,7 @@ fn two_user_owned_overriders_of_same_target_are_invalid () {
   assert_eq! (violations . len (), 1);
   assert! (matches!(
     &violations[0],
-    OverrideInvariantViolation::MultipleUserOwnedOverriders {
+    OverrideInvariantViolation::MultipleOwnedOverriders {
       overridden,
       overriders,
     } if overridden == &ID::from ("target")
@@ -137,14 +137,14 @@ fn extra_id_targets_are_resolved_before_monogamy_check () {
     ]);
   assert! (matches!(
     &violations[0],
-    OverrideInvariantViolation::MultipleUserOwnedOverriders {
+    OverrideInvariantViolation::MultipleOwnedOverriders {
       overridden,
       ..
     } if overridden == &ID::from ("target")
   )); }
 
 #[test]
-fn user_owned_override_chain_is_valid () {
+fn owned_override_chain_is_valid () {
   // x overrides y overrides z, all owned -- a linear chain, now legal.
   assert_eq! (
     violations_for (vec![
@@ -166,7 +166,7 @@ fn one_overrider_two_targets_is_valid () {
     ]),
     vec![] ); }
 
-/// True iff some violation is a user-owned cycle whose member set
+/// True iff some violation is an owned cycle whose member set
 /// equals 'members'.
 fn has_cycle_over (
   violations : &[OverrideInvariantViolation],
@@ -175,12 +175,12 @@ fn has_cycle_over (
   let wanted : HashSet<ID> =
     members . iter () . map ( |s| ID::from (*s) ) . collect ();
   violations . iter () . any ( |v| match v {
-    OverrideInvariantViolation::UserOwnedOverrideCycle { cycle } =>
+    OverrideInvariantViolation::OwnedOverrideCycle { cycle } =>
       cycle . iter () . cloned () . collect::<HashSet<ID>> () == wanted,
     _ => false } ) }
 
 #[test]
-fn two_node_user_owned_cycle_is_invalid () {
+fn two_node_owned_cycle_is_invalid () {
   // a overrides b, b overrides a, both owned.
   let nodes = vec![
     node ("a", "owned", &["b"]),
@@ -191,7 +191,7 @@ fn two_node_user_owned_cycle_is_invalid () {
 }
 
 #[test]
-fn three_node_user_owned_cycle_is_invalid () {
+fn three_node_owned_cycle_is_invalid () {
   // a overrides b, b overrides c, c overrides a, all owned.
   let nodes = vec![
     node ("a", "owned", &["b"]),
@@ -205,7 +205,7 @@ fn three_node_user_owned_cycle_is_invalid () {
 #[test]
 fn cycle_through_foreign_link_is_valid () {
   // a(owned) overrides b(foreign) overrides c(owned) overrides a:
-  // the foreign link breaks the user-owned walk, so no user-owned
+  // the foreign link breaks the owned walk, so no owned
   // cycle exists.
   let nodes = vec![
     node ("a", "owned",   &["b"]),
@@ -244,7 +244,7 @@ fn alias_redirection_that_closes_a_cycle_is_affected () {
       node ("A", "owned", &["future"]),
       node ("B", "owned", &["A"]),
     ],
-    vec![DefineNode::Save (SaveNode (acquirer))]);
+    vec![NodeInstruction::Save (SaveNode (acquirer))]);
   assert_eq! (affected, full);
   assert! (has_cycle_over (&affected, &["A", "B"]));
 }
@@ -257,12 +257,12 @@ fn ownership_class_change_can_create_monogamy_violation () {
       node ("changed", "foreign", &["target"]),
       node ("existing", "owned", &["target"]),
     ],
-    vec![DefineNode::Save (SaveNode (
+    vec![NodeInstruction::Save (SaveNode (
       node ("changed", "owned", &["target"]))) ]);
   assert_eq! (affected, full);
   assert! (matches! (
     affected . first (),
-    Some (OverrideInvariantViolation::MultipleUserOwnedOverriders {
+    Some (OverrideInvariantViolation::MultipleOwnedOverriders {
       overridden, ..
     }) if overridden == &ID::from ("target")));
 }
@@ -274,7 +274,7 @@ fn edge_and_target_deletions_do_not_create_override_errors () {
       node ("target", "owned", &[]),
       node ("repo", "owned", &["target"]),
     ],
-    vec![DefineNode::Save (SaveNode (
+    vec![NodeInstruction::Save (SaveNode (
       node ("repo", "owned", &[]))) ]);
   assert_eq! (edge_affected, edge_full);
   assert! (edge_affected . is_empty ());
@@ -284,8 +284,8 @@ fn edge_and_target_deletions_do_not_create_override_errors () {
       node ("target", "owned", &[]),
       node ("repo", "owned", &["target"]),
     ],
-    vec![DefineNode::Delete (DeleteNode {
-      id : ID::from ("target"), home_repo : RepoName::from ("owned"),
+    vec![NodeInstruction::Delete (DeleteNode {
+      skgid : ID::from ("target"), home_skgrepo : SkgRepoName::from ("owned"),
     })]);
   assert_eq! (delete_affected, delete_full);
   assert! (delete_affected . is_empty ());
@@ -299,7 +299,7 @@ fn adding_a_linear_override_chain_remains_valid () {
       node ("B", "owned", &["C"]),
       node ("C", "owned", &[]),
     ],
-    vec![DefineNode::Save (SaveNode (
+    vec![NodeInstruction::Save (SaveNode (
       node ("A", "owned", &["B"]))) ]);
   assert_eq! (affected, full);
   assert! (affected . is_empty ());
@@ -314,7 +314,7 @@ proptest! {
     target_index in 0usize..5,
     owned in any::<bool> (),
   ) {
-    let ids : [&str; 4] = ["A", "B", "C", "D"];
+    let skgids : [&str; 4] = ["A", "B", "C", "D"];
     let base : Vec<Graphnode> = vec![
       node ("A", "owned", &["B"]),
       node ("B", "owned", &["C"]),
@@ -323,13 +323,13 @@ proptest! {
     ];
     let targets : Vec<&str> =
       if target_index == 4 { Vec::new () }
-      else { vec![ids [target_index]] };
+      else { vec![skgids [target_index]] };
     let changed : Graphnode = node (
-      ids [changed_index],
+      skgids [changed_index],
       if owned { "owned" } else { "foreign" },
       &targets);
     let (affected, full) = affected_and_full (
-      base, vec![DefineNode::Save (SaveNode (changed))]);
+      base, vec![NodeInstruction::Save (SaveNode (changed))]);
     prop_assert_eq! (affected, full);
   }
 }

@@ -5,7 +5,7 @@
 //! the instruction node EXPORT_MARKER_ID and whose body yields a
 //! `target_filepath` -- is written to
 //! `<output_base>/<target_filepath>.org` as a recursive content
-//! view, limited to a chosen repo-set, stripped of skg metadata,
+//! view, limited to a chosen skgrepo-set, stripped of skg metadata,
 //! with `[[id:..][label]]` links rewritten to relative org links.
 //!
 //! The core (`export_to_org`) takes nodes + an ActiveRepoSet + an
@@ -13,7 +13,7 @@
 //! unit-testable. The server handler and the `export-org`
 //! subcommand both call it.
 
-use crate::repo_sets::{ActiveRepoSet, RepoSetName};
+use crate::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
 use crate::types::misc::SkgConfig;
 use crate::types::misc::{ID, RelPartner};
 use crate::types::nodes::complete::Graphnode;
@@ -70,7 +70,7 @@ pub fn export_header_length (
   length }
 
 /// Broken links (whose target is not exported under the chosen
-/// repo-set) point at the export of this node.
+/// skgrepo-set) point at the export of this node.
 pub const BROKEN_LINK_SINK_ID : &str =
   "9ff04e25-01e8-4634-8aa5-f5849bc1eb81";
 
@@ -164,7 +164,7 @@ struct Ev {
 /// `active`, into `output_base`. Independent of the live graph and Tantivy; does
 /// filesystem writes only under `output_base`.
 pub fn export_to_org (
-  active      : &ActiveRepoSet,
+  active      : &ActiveSkgRepoSet,
   nodes       : &[Graphnode],
   output_base : &Path,
 ) -> Result<ExportReport, Box<dyn Error>> {
@@ -235,7 +235,7 @@ pub fn export_to_org (
 /// where its file is written. This performs discovery only; it writes no
 /// files and is therefore safe to use at the release preflight.
 pub fn export_candidate_pids (
-  active : &ActiveRepoSet,
+  active : &ActiveSkgRepoSet,
   nodes  : &[Graphnode],
 ) -> Vec<ID> {
   let by_pid : HashMap<ID, &Graphnode> =
@@ -264,15 +264,15 @@ pub fn export_candidate_pids (
   candidates
 }
 
-/// All currently valid export-root claims across configured repos. Import
+/// All currently valid export-root claims across configured skgrepos. Import
 /// uses this read-only view to reject a new automatic target that would
 /// compete with an existing export root.
 pub(crate) fn claimed_export_targets (
   nodes : &[Graphnode],
   config : &SkgConfig,
 ) -> Result<Vec<(ID, String)>, String> {
-  let active : ActiveRepoSet = ActiveRepoSet::named (
-    config, RepoSetName::from ("all"))
+  let active : ActiveSkgRepoSet = ActiveSkgRepoSet::named (
+    config, SkgRepoSetName::from ("all"))
     .map_err (|error| error . to_string ())?;
   let aliases : HashMap<ID, ID> = nodes . iter ()
     .flat_map (|node| node . extra_ids . iter ()
@@ -314,10 +314,10 @@ fn write_export_file (
 fn discover_roots (
   nodes        : &[Graphnode],
   alias_to_pid : &HashMap<ID, ID>,
-  active       : &ActiveRepoSet,
+  active       : &ActiveSkgRepoSet,
   warnings     : &mut Vec<String>,
 ) -> (HashMap<ID, ExportRoot>, HashSet<ID>) {
-  let marker_id : ID = ID::from (EXPORT_MARKER_ID);
+  let marker_skgid : ID = ID::from (EXPORT_MARKER_ID);
   // Sorted, so warnings and "first wins" are deterministic.
   let mut sorted : Vec<&Graphnode> = nodes . iter () . collect ();
   sorted . sort_by ( |a, b| a . pid . cmp (&b . pid) );
@@ -325,7 +325,7 @@ fn discover_roots (
   let mut marker_pids   : HashSet<ID> = HashSet::new ();
   let mut marker_target : HashMap<ID, String> = HashMap::new ();
   for n in &sorted {
-    if ! title_links_to (n, &marker_id, alias_to_pid) { continue; }
+    if ! title_links_to (n, &marker_skgid, alias_to_pid) { continue; }
     match parse_target_filepath (n . body . as_deref ()) {
       Ok (Some (t)) => {
         marker_pids . insert (n . pid . clone ());
@@ -362,7 +362,7 @@ fn discover_roots (
       warnings . push ( format! (
         "export root {} is in repo {} which is inactive under \
          repo-set {}; skipping",
-        parent . pid, parent . home_repo, active . name ) );
+        parent . pid, parent . home_skgrepo, active . name ) );
       continue; }
     if let Some (owner) = target_owner . get (&target) {
       warnings . push ( format! (
@@ -384,11 +384,11 @@ fn discover_roots (
 /// still recognized.
 fn title_links_to (
   node         : &Graphnode,
-  id           : &ID,
+  skgid        : &ID,
   alias_to_pid : &HashMap<ID, ID>,
 ) -> bool {
   LINK_PATTERN . captures_iter (&node . title)
-    . any ( |c| resolve_pid (&ID::from (&c[1]), alias_to_pid) == *id ) }
+    . any ( |c| resolve_pid (&ID::from (&c[1]), alias_to_pid) == *skgid ) }
 
 /// Tolerant parse of a marker body. Accepts `target_filepath = X`
 /// where X is bare or quoted. A bare value with whitespace is
@@ -454,7 +454,7 @@ fn collect_events (
   alias_to_pid : &HashMap<ID, ID>,
   roots_by_pid : &HashMap<ID, ExportRoot>,
   marker_pids  : &HashSet<ID>,
-  active       : &ActiveRepoSet,
+  active       : &ActiveSkgRepoSet,
 ) -> Vec<Ev> {
   let mut out : Vec<Ev> = Vec::new ();
   let mut rendered : HashSet<ID> = HashSet::new ();
@@ -476,7 +476,7 @@ fn collect_events (
     let mut kids : Vec<ID> = Vec::new ();
     for member in node . contains . iter () {
       if ! relRepo_is_active (member, active) { continue; } // the EDGE's
-        // repo is inactive: the visible fold omits it, even when
+        // skgrepo is inactive: the visible fold omits it, even when
         // the child's home is active.
       let cpid : ID = resolve_pid (&member . member, alias_to_pid);
       if marker_pids . contains (&cpid) { continue; } // markers never render
@@ -559,7 +559,7 @@ fn custom_id_link_targets (
             [ &node . title, node . body . as_deref () . unwrap_or ("") ];
           for text in texts {
             for link in links_from_text (text) {
-              let pid : ID = resolve_pid (&link . id, alias_to_pid);
+              let pid : ID = resolve_pid (&link . skgid, alias_to_pid);
               linked . push (
                 if homes . contains_key (&pid) { pid }
                 else { sink_pid . clone () } ); }} }, }}
@@ -626,7 +626,7 @@ fn rewrite_links (
   for (range, link) in links_with_ranges_from_text (text) {
     out . push_str (&text [copied_up_to .. range . start]);
     copied_up_to = range . end;
-    let uid : ID = link . id;
+    let uid : ID = link . skgid;
     let label : &str = &link . label;
     let pid : ID =
       alias_to_pid . get (&uid) . cloned () . unwrap_or (uid);
@@ -680,7 +680,7 @@ fn link_uses_custom_id (
 /// Relative path from the file at `from_target` to the file at
 /// `to_target` (both extension-less, '/'-separated, under the same
 /// export base). Result carries the `.org` extension and a leading
-/// `./` or `../`, matching the repo's link style.
+/// `./` or `../`, matching the skgrepo's link style.
 fn relpath (
   from_target : &str,
   to_target   : &str,
@@ -735,25 +735,25 @@ fn defuse_headline_lines (
 //
 
 fn resolve_pid (
-  id           : &ID,
+  skgid           : &ID,
   alias_to_pid : &HashMap<ID, ID>,
 ) -> ID {
-  alias_to_pid . get (id) . cloned () . unwrap_or_else (|| id . clone ()) }
+  alias_to_pid . get (skgid) . cloned () . unwrap_or_else (|| skgid . clone ()) }
 
 fn node_active (
   node   : &Graphnode,
-  active : &ActiveRepoSet,
+  active : &ActiveSkgRepoSet,
 ) -> bool {
-  active . is_all () || active . contains_repo (&node . home_repo) }
+  active . is_all () || active . contains_skgrepo (&node . home_skgrepo) }
 
 /// Whether an EDGE is visible under the active set: its recorded
 /// relRepo must be active. (The visible fold = active
 /// sections' lists only.)
 fn relRepo_is_active (
   member : &RelPartner<ID>,
-  active : &ActiveRepoSet,
+  active : &ActiveSkgRepoSet,
 ) -> bool {
-  active . is_all () || active . contains_repo (&member . relRepo) }
+  active . is_all () || active . contains_skgrepo (&member . relRepo) }
 
 fn title_has_link (
   node : &Graphnode,

@@ -13,7 +13,7 @@
 ;;; [[id:X][LABEL]] link there.
 ;;;
 ;;; The user may save the source buffer afterwards (C-x C-s).
-;;; PITFALL: an earlier version of this command saved the repo
+;;; PITFALL: an earlier version of this command saved the skgrepo
 ;;; buffer eagerly (before the search), to make later "detours"
 ;;; through the search results' links feel safer. That eager save
 ;;; turned out to break the workflow: the server's rerender of the
@@ -21,7 +21,7 @@
 ;;; nothing, leaving the recorded integer point dangling on the
 ;;; next headline — so the inserted link glued itself to the wrong
 ;;; spot. We now skip the eager save entirely; nothing forbids
-;;; detours, they just operate against an unsaved repo.
+;;; detours, they just operate against an unsaved skgrepo.
 ;;;
 ;;; Aside from its C-c C-c behavior,
 ;;; the search results buffer is just like any other.

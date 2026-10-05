@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Migrate a config (and its data tree) to the author-folder layout:
-# every OWNED repo's directory moves under the owned folder
+# every OWNED skgrepo's directory moves under the owned folder
 # (default "owned"), its 'path' in the config is updated, and the
-# retired 'user_owns_it' lines are deleted. Foreign repos are left
+# retired 'user_owns_it' lines are deleted. Foreign skgrepos are left
 # where they are (anything not under the owned folder is foreign).
 #
 # USAGE:
 #   bash/migrate-to-author-folders.sh path/to/skgconfig.toml [owned_folder]
 #
 # Idempotent: a config with no 'user_owns_it' lines is left untouched.
-# See TODO/user-owned_autofork_chain/5_plan.org, work item
+# See TODO/DONE/privacy-telescope/5_plan.org, work item
 # privacy-order.
 
 set -euo pipefail
@@ -42,7 +42,7 @@ for block in blocks[1:]:
             new_dir = data_root / new_rel
             if old_dir.exists():
                 if str(new_dir).startswith(str(old_dir) + "/"):
-                    # e.g. a repo whose path IS the owned folder's
+                    # e.g. a skgrepo whose path IS the owned folder's
                     # name: "owned" -> "owned/owned" needs a hop.
                     tmp = data_root / (old_rel + ".migrating")
                     shutil.move(str(old_dir), str(tmp))

@@ -1,6 +1,6 @@
 # Running Tests
 
-There are three kinds of tests. The authoritative description lives in `coding-advice/claude-to-claude.org`, section "Running Tests".
+There are three kinds of tests.
 
 1. **Emacs Lisp tests**: `bash/emacs-tests.sh`
    - Runs the ERT tests in `tests/elisp/` in Emacs batch mode

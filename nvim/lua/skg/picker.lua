@@ -1,4 +1,4 @@
--- PURPOSE: The interactive repo/repo-set pickers.
+-- PURPOSE: The interactive skgrepo/skgrepo-set pickers.
 -- The Lua port of the prompt half of elisp/skg-config.el
 -- ('skg--completing-read-with-cycle' and friends). The elisp built
 -- them on completing-read with S-left/S-right cycling in the
@@ -85,8 +85,8 @@ function M.completing_read_with_cycle (prompt, collection, opts)
   return answer
 end
 
----Choose an owned repo, cycling with S-arrows; no prompt when only
----one repo is owned. Nil when none are configured or user aborts.
+---Choose an owned skgrepo, cycling with S-arrows; no prompt when only
+---one skgrepo is owned. Nil when none are configured or user aborts.
 ---@param prompt string|nil defaults to 'Repo: '
 ---@return string|nil
 function M.prompt_for_owned_repo (prompt)
@@ -99,8 +99,8 @@ function M.prompt_for_owned_repo (prompt)
     require_match = true, cycle_values = owned })
 end
 
----Choose a repo to replace CURRENT_REPO: free-typed names are
----accepted, S-arrows cycle owned repos, TAB completes all names.
+---Choose a skgrepo to replace CURRENT_REPO: free-typed names are
+---accepted, S-arrows cycle owned skgrepos, TAB completes all names.
 ---@param current_repo string
 ---@return string|nil
 function M.prompt_for_repo_change (current_repo)
@@ -111,7 +111,7 @@ function M.prompt_for_repo_change (current_repo)
       initial_input = current_repo, cycle_values = owned })
 end
 
----Choose a repo-set name, with completion and cycling.
+---Choose a skgrepo-set name, with completion and cycling.
 ---@return string|nil
 function M.prompt_for_repo_set ()
   local repo_sets = config.repo_set_names()
@@ -124,7 +124,7 @@ function M.prompt_for_repo_set ()
       initial_input = 'all' })
 end
 
----Display an org buffer listing configured repos and their paths.
+---Display an org buffer listing configured skgrepos and their paths.
 function M.view_repo_list ()
   local repo_paths = config.repo_paths()
   if not repo_paths or #repo_paths == 0 then

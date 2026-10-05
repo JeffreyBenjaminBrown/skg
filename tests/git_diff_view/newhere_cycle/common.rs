@@ -9,7 +9,7 @@ pub const GIT_DIFF_VIEW: &str = "\
 ** (skg (node (id 1) (unstaged addedR))) 1
 ";
 
-/// Create a git repo with head->worktree transition from newhere_cycle fixtures.
+/// Create a gitrepo with head->worktree transition from newhere_cycle fixtures.
 pub fn setup_gitrepo_with_fixtures(
   gitrepo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {

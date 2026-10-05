@@ -64,7 +64,7 @@ T.check(current_line:find('(id 2)', 1, true) ~= nil, 'on headline 2')
 -- Debug: check invisibility of each headline.
 print('=== Checking invisibility status ===')
 for line = 1, vim.api.nvim_buf_line_count(buf) do
-  if metadata.at_heading_p(line) then
+  if metadata.at_headline_p(line) then
     print(string.format('Line: %s | Invisible: %s',
       metadata.line_text(line), tostring(folds.line_invisible_p(line))))
   end

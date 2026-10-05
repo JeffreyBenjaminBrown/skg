@@ -16,9 +16,9 @@ local M = {}
 ---@return table|nil the {id, title} top of the stack, messaging when
 ---empty
 function M.stack_top_or_message ()
-  local top = state.id_stack[1]
+  local top = state.linkstack[1]
   if not top then
-    vim.notify('ID stack is empty')
+    vim.notify('linkstack is empty')
     return nil end
   return top
 end
@@ -29,7 +29,7 @@ end
 function M.id_push ()
   local link_hit = id_search.point_in_link_p()
   if link_hit then
-    table.insert(state.id_stack, 1, { link_hit.id, link_hit.label })
+    table.insert(state.linkstack, 1, { link_hit.id, link_hit.label })
     vim.notify('pushed to stack: ' .. link_hit.label)
     return end
   local split = metadata.split_as_stars_metadata_title(
@@ -42,7 +42,7 @@ function M.id_push ()
   if not id then
     vim.notify('No ID in metadata on this line')
     return end
-  table.insert(state.id_stack, 1, { id, split.title })
+  table.insert(state.linkstack, 1, { id, split.title })
   vim.notify('pushed to stack: ' .. split.title)
 end
 
@@ -107,9 +107,9 @@ function M.org_stars_for_node_insertion ()
 end
 
 ---Insert a write-protected ActiveVognode headline from ENTRY. In a view
----whose buffer has no writeable instance of the node, the headline
----also requests a definitive view, so the next save makes it writeable
----with its real title, body and content. (Saving a bare writeable
+---whose buffer has no editable occurrence of the node, the headline
+---also requests an editable view, so the next save makes it writable
+---with its real title, body and content. (Saving a bare writable
 ---headline would instead erase that body and content.) If point is
 ---already just after headline stars at the start of a line, insert
 ---only the metadata and title; otherwise insert a full same-level
@@ -118,9 +118,9 @@ end
 function M.insert_node_from_entry (entry)
   local request_definitive_view = false
   if vim.b.skg_view_uri ~= nil then
-    if M.buffer_has_writeable_instance_p(entry[1]) then
-      vim.notify('NOTE: Pasting node write-protected because a writeable'
-                 .. ' instance is already present in this same buffer.')
+    if M.buffer_has_editable_occurrence_p(entry[1]) then
+      vim.notify('NOTE: Pasting node write-protected because a writable'
+                 .. ' occurrence is already present in this same buffer.')
     else
       request_definitive_view = true end
   end
@@ -142,11 +142,11 @@ function M.insert_node_from_entry (entry)
 end
 
 ---Does the current buffer have a headline for node ID that is
----writeable, or that will become writeable at the next save because it
----requests a definitive view? The server allows only one of those per ID.
+---writable, or that will become writable at the next save because it
+---requests an editable view? The server allows only one of those per ID.
 ---@param id string
 ---@return boolean
-function M.buffer_has_writeable_instance_p (id)
+function M.buffer_has_editable_occurrence_p (id)
   for line = 1, vim.api.nvim_buf_line_count(0) do
     local sexp = metadata.metadata_sexp_at_line_or_nil(line)
     if metadata.activeNode_sexp_p(sexp)
@@ -176,21 +176,21 @@ end
 function M.pop_id ()
   local entry = M.stack_top_or_message()
   if entry then
-    table.remove(state.id_stack, 1)
+    table.remove(state.linkstack, 1)
     M.insert_text(entry[1]) end
 end
 
 function M.pop_link ()
   local entry = M.stack_top_or_message()
   if entry then
-    table.remove(state.id_stack, 1)
+    table.remove(state.linkstack, 1)
     M.insert_link_from_entry(entry) end
 end
 
 function M.pop_node ()
   local entry = M.stack_top_or_message()
   if entry then
-    table.remove(state.id_stack, 1)
+    table.remove(state.linkstack, 1)
     M.insert_node_from_entry(entry) end
 end
 
@@ -199,16 +199,16 @@ end
 ---The stack as org text: each {id, label} becomes a headline (label)
 ---with the id as its body; the head of the stack is at the top.
 ---@return string
-function M.format_id_stack_as_org ()
+function M.format_linkstack_as_org ()
   local blocks = {}
-  for _, entry in ipairs(state.id_stack) do
+  for _, entry in ipairs(state.linkstack) do
     table.insert(blocks,
                  string.format('* %s\n%s', entry[2], entry[1]))
   end
   return table.concat(blocks, '\n')
 end
 
----Validate BUF as an id-stack buffer. Each headline must have a
+---Validate BUF as an linkstack buffer. Each headline must have a
 ---non-empty title and exactly one non-blank body line (the id); no
 ---content may precede the first headline. Returns ok, result-or-error
 ---where result lists {id, label} pairs in buffer order (first
@@ -216,7 +216,7 @@ end
 ---@param buf integer
 ---@return boolean ok
 ---@return any
-function M.validate_id_stack_buffer (buf)
+function M.validate_linkstack_buffer (buf)
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   local result = {}
   local index = 1
@@ -249,12 +249,12 @@ end
 
 ---Replace the stack from BUF's contents, or report why not.
 ---@param buf integer
-function M.save_id_stack_buffer (buf)
-  local ok, result = M.validate_id_stack_buffer(buf)
+function M.save_linkstack_buffer (buf)
+  local ok, result = M.validate_linkstack_buffer(buf)
   if ok then
-    state.id_stack = result
+    state.linkstack = result
     vim.bo[buf].modified = false
-    vim.notify(string.format('ID stack updated (%d items)', #result))
+    vim.notify(string.format('linkstack updated (%d items)', #result))
   else
     vim.notify('Invalid ID buffer: ' .. tostring(result))
   end
@@ -262,8 +262,8 @@ end
 
 ---Open a buffer to view and edit the stack; ':w' validates and
 ---updates it without touching disk.
-function M.view_id_stack ()
-  local name = 'skg://id-stack'
+function M.view_linkstack ()
+  local name = 'skg://linkstack'
   local buf = nil
   for _, existing in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(existing)
@@ -276,20 +276,20 @@ function M.view_id_stack ()
   end
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
-    vim.split(M.format_id_stack_as_org(), '\n'))
+    vim.split(M.format_linkstack_as_org(), '\n'))
   vim.bo[buf].buftype = 'acwrite'
   vim.bo[buf].swapfile = false
   vim.bo[buf].filetype = 'org'
   vim.bo[buf].modified = false
-  if not vim.b[buf].skg_id_stack_autocmd then
-    vim.b[buf].skg_id_stack_autocmd = true
+  if not vim.b[buf].skg_linkstack_autocmd then
+    vim.b[buf].skg_linkstack_autocmd = true
     vim.api.nvim_create_autocmd('BufWriteCmd', {
       buffer = buf,
-      callback = function () M.save_id_stack_buffer(buf) end })
+      callback = function () M.save_linkstack_buffer(buf) end })
   end
   vim.api.nvim_set_current_buf(buf)
   vim.api.nvim_win_set_cursor(0, { 1, 0 })
-  vim.notify('Edit ID stack. :w to save changes.')
+  vim.notify('Edit linkstack. :w to save changes.')
 end
 
 return M

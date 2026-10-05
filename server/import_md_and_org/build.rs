@@ -1,8 +1,8 @@
-//! Convert parsed document outlines into additive graph nodes.
+//! Convert parsed document outlines into additive graphnodes.
 
 use crate::export_org::EXPORT_MARKER_ID;
 use crate::types::misc::{
-  ID, MSV, RepoName, rel_partners_at_relRepo,
+  ID, MSV, SkgRepoName, rel_partners_at_relRepo,
   rel_partners_at_relRepo_msv,
 };
 use crate::types::nodes::complete::{
@@ -21,20 +21,20 @@ struct OutlineNode {
 
 pub struct BuiltDocument {
   pub nodes : Vec<Graphnode>,
-  pub root_id : ID,
+  pub root_skgid : ID,
   pub export_target : String,
   pub footnote_node_indices : HashMap<String, usize>,
 }
 
 pub fn build_document (
   document : &ParsedDocument,
-  repo : &RepoName,
+  skgrepo : &SkgRepoName,
   new_id : &mut impl FnMut () -> ID,
 ) -> Result<BuiltDocument, String> {
   let export_target : String = export_target (&document . path)?;
   let mut outline : Vec<OutlineNode> = document . sections . iter ()
     . map (|section| OutlineNode {
-      node : node_for_section (document, section, repo, new_id),
+      node : node_for_section (document, section, skgrepo, new_id),
       original_level : section . level,
       children : Vec::new (),
     }) . collect ();
@@ -47,8 +47,8 @@ pub fn build_document (
     let parent : usize = *ancestors . last () . unwrap ();
     outline [parent] . children . push (index);
     ancestors . push (index); }
-  group_super_indentation (0, &mut outline, repo, new_id);
-  let marker : Graphnode = export_marker (&export_target, repo, new_id)?;
+  group_super_indentation (0, &mut outline, skgrepo, new_id);
+  let marker       : Graphnode = export_marker (&export_target, skgrepo, new_id)?;
   let marker_index : usize = outline . len ();
   outline . push (OutlineNode {
     node : marker,
@@ -62,7 +62,7 @@ pub fn build_document (
   if ! definitions . is_empty () {
     let footnotes_index : usize = outline . len ();
     outline . push (OutlineNode {
-      node : synthetic_node ("Footnotes", "", repo, new_id),
+      node : synthetic_node ("Footnotes", "", skgrepo, new_id),
       original_level : 0,
       children : Vec::new (),
     });
@@ -71,49 +71,49 @@ pub fn build_document (
       let child_index : usize = outline . len ();
       outline . push (OutlineNode {
         node : synthetic_node (&format! ("Footnote {}", definition . name),
-          &document . text [definition . range . clone ()], repo, new_id),
+          &document . text [definition . range . clone ()], skgrepo, new_id),
         original_level : 0,
         children : Vec::new (),
       });
       footnote_node_indices . insert (definition . name . clone (), child_index);
       outline [footnotes_index] . children . push (child_index); }
     outline [0] . children . push (footnotes_index); }
-  let ids : Vec<ID> = outline . iter () . map (|entry| entry . node . pid . clone ())
+  let skgids : Vec<ID> = outline . iter () . map (|entry| entry . node . pid . clone ())
     . collect ();
   for entry in &mut outline {
     entry . node . contains = rel_partners_at_relRepo (
-      repo,
-      entry . children . iter () . map (|index| ids [*index] . clone ())
+      skgrepo,
+      entry . children . iter () . map (|index| skgids [*index] . clone ())
         . collect ()); }
-  let root_id : ID = ids [0] . clone ();
+  let root_skgid : ID = skgids [0] . clone ();
   let nodes : Vec<Graphnode> = outline . into_iter () . map (|entry| entry . node)
     . collect ();
-  Ok (BuiltDocument { nodes, root_id, export_target, footnote_node_indices })
+  Ok (BuiltDocument { nodes, root_skgid, export_target, footnote_node_indices })
 }
 
 fn node_for_section (
   document : &ParsedDocument,
   section : &ParsedSection,
-  repo : &RepoName,
+  skgrepo : &SkgRepoName,
   new_id : &mut impl FnMut () -> ID,
 ) -> Graphnode {
-  let id : ID = section . explicit_id . as_ref ()
+  let skgid : ID = section . explicit_id . as_ref ()
     . map (|value| ID::new (value)) . unwrap_or_else (new_id);
   let body : String = rendered_range (document, section . body . clone ());
   Graphnode {
     title : section . title . clone (),
     overPrivateText_telescope : false,
     aliases : rel_partners_at_relRepo_msv (
-      repo, MSV::Specified (section . aliases . clone ())),
-    home_repo : repo . clone (),
-    pid : id,
+      skgrepo, MSV::Specified (section . aliases . clone ())),
+    home_skgrepo : skgrepo . clone (),
+    pid : skgid,
     extra_ids : Vec::new (),
     body : normalize_body (Some (body)),
     contains : Vec::new (),
     subscribes_to : MSV::Unspecified,
     hides_from_its_subscriptions : MSV::Unspecified,
     overrides_view_of : MSV::Unspecified,
-    misc : if section . explicit_id . is_some () {
+    flags : if section . explicit_id . is_some () {
       vec![Flag::Had_ID_Before_Import]
     } else { Vec::new () },
   }
@@ -122,21 +122,21 @@ fn node_for_section (
 fn group_super_indentation (
   index : usize,
   outline : &mut Vec<OutlineNode>,
-  repo : &RepoName,
+  skgrepo : &SkgRepoName,
   new_id : &mut impl FnMut () -> ID,
 ) {
   let children : Vec<usize> = outline [index] . children . clone ();
   for child in children {
-    group_super_indentation (child, outline, repo, new_id); }
+    group_super_indentation (child, outline, skgrepo, new_id); }
   let children : Vec<usize> = outline [index] . children . clone ();
   outline [index] . children =
-    group_children (children, outline, repo, new_id);
+    group_children (children, outline, skgrepo, new_id);
 }
 
 fn group_children (
   children : Vec<usize>,
   outline : &mut Vec<OutlineNode>,
-  repo : &RepoName,
+  skgrepo : &SkgRepoName,
   new_id : &mut impl FnMut () -> ID,
 ) -> Vec<usize> {
   let mut levels : Vec<usize> = children . iter ()
@@ -152,17 +152,17 @@ fn group_children (
     node : synthetic_node (
       "These are special!",
       "They were super-indented in the original document.",
-      repo, new_id),
+      skgrepo, new_id),
     original_level : 0,
     children : special,
   });
-  let normal : Vec<usize> = group_children (normal, outline, repo, new_id);
+  let normal       : Vec<usize> = group_children (normal, outline, skgrepo, new_id);
   let normal_index : usize = outline . len ();
   outline . push (OutlineNode {
     node : synthetic_node (
       "These are normal.",
       "They have been buried to encourage reading the nodes that were super-indented in the original document.",
-      repo, new_id),
+      skgrepo, new_id),
     original_level : 0,
     children : normal,
   });
@@ -172,32 +172,32 @@ fn group_children (
 fn synthetic_node (
   title : &str,
   body : &str,
-  repo : &RepoName,
+  skgrepo : &SkgRepoName,
   new_id : &mut impl FnMut () -> ID,
 ) -> Graphnode {
   let mut node : Graphnode =
-    crate::types::nodes::complete::empty_node_complete ();
+    crate::types::nodes::complete::empty_graphnode ();
   node . pid = new_id ();
   node . title = title . to_string ();
   node . body = Some (body . to_string ());
-  node . home_repo = repo . clone ();
+  node . home_skgrepo = skgrepo . clone ();
   node
 }
 
 fn export_marker (
   target : &str,
-  repo : &RepoName,
+  skgrepo : &SkgRepoName,
   new_id : &mut impl FnMut () -> ID,
 ) -> Result<Graphnode, String> {
   let quote : char = if ! target . contains ('"') { '"' }
     else if ! target . contains ('\'') { '\'' }
     else { return Err (format! (
       "Export target {:?} contains both quote styles", target)); };
-  let mut node : Graphnode = crate::types::nodes::complete::empty_node_complete ();
+  let mut node : Graphnode = crate::types::nodes::complete::empty_graphnode ();
   node . pid = new_id ();
   node . title = format! ("[[id:{}][Skg exports this document to org.]]", EXPORT_MARKER_ID);
   node . body = Some (format! ("target_filepath = {}{}{}", quote, target, quote));
-  node . home_repo = repo . clone ();
+  node . home_skgrepo = skgrepo . clone ();
   Ok (node)
 }
 
@@ -227,10 +227,10 @@ mod tests {
     let document : ParsedDocument = parse_document (
       Path::new ("tutorials/start.md"),
       "Introduction\n# A\nA body\n### Deep\nDeep body\n## Normal\nNormal body\n" . to_string ());
-    let repo : RepoName = RepoName::from ("owned");
+    let skgrepo     : SkgRepoName = SkgRepoName::from ("owned");
     let mut counter : usize = 0;
     let mut next = || { counter += 1; ID::new (&format! ("generated-{}", counter)) };
-    let built : BuiltDocument = build_document (&document, &repo, &mut next) . unwrap ();
+    let built : BuiltDocument = build_document (&document, &skgrepo, &mut next) . unwrap ();
     assert_eq! (built . export_target, "tutorials/start");
     assert_eq! (built . nodes [0] . title, "start");
     assert_eq! (built . nodes [1] . body . as_deref (), Some ("A body"));
@@ -248,9 +248,9 @@ mod tests {
     let document : ParsedDocument = parse_document (
       Path::new ("line-breaks.md"),
       "First  \nSecond\\\nThird\n\n```\nLiteral  \n```\n" . to_string ());
-    let repo : RepoName = RepoName::from ("owned");
+    let skgrepo : SkgRepoName = SkgRepoName::from ("owned");
     let mut next = || ID::new (&uuid::Uuid::new_v4 () . to_string ());
-    let built : BuiltDocument = build_document (&document, &repo, &mut next) . unwrap ();
+    let built : BuiltDocument = build_document (&document, &skgrepo, &mut next) . unwrap ();
     let body : &str = built . nodes [0] . body . as_deref () . unwrap ();
     assert_eq! (body, "First\\\\\nSecond\\\\\nThird\n\n```\nLiteral  \n```");
   }

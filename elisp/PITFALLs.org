@@ -1,6 +1,6 @@
 * Programmatic metadata edits must be performed ignoring fragility checks
 
-Naïvely replacing an org heading line via =delete-region= + =insert=
+Naïvely replacing an org headline line via =delete-region= + =insert=
 crashes (or silently clobbers text) when the line's body or subtree
 is folded right beneath it.
 
@@ -13,7 +13,7 @@ check (=org-fold-core--fix-folded-region= →
 - expands the deletion to cover the entire hidden subtree,
   clobbering its contents.
 
-Either way, the visible behavior is "the heading vanishes and the
+Either way, the visible behavior is "the headline vanishes and the
 fold's text is destroyed." This is extra dangerous because the
 error can fire during the OUTBOUND save (=skg-add-focused-marker=
 editing the root before any TCP round-trip), leaving the buffer
@@ -21,7 +21,7 @@ in a corrupted state that the user cannot recover from.
 
 ** What to use instead
 
-Route every per-line heading rewrite through
+Route every per-line headline rewrite through
 =skg-replace-current-line= in =skg-metadata.el=. It wraps the
 =delete-region= + =insert= in =org-fold-core-ignore-fragility-checks=,
 which tells org-fold "the caller is aware of the fold and is
@@ -30,12 +30,12 @@ Suppressing the check is safe there because the stars and title
 round-trip unchanged, only the metadata s-expr is updated, and the
 fold overlays around the line remain intact.
 
-Do NOT call =delete-region= + =insert= directly on a heading line
+Do NOT call =delete-region= + =insert= directly on a headline line
 whose fold state you do not control.
 
 ** Where this matters
 
-Any code that rewrites a heading line in place while keeping the
+Any code that rewrites a headline line in place while keeping the
 surrounding fold state. Currently, every such call site in the
 skg client goes through =skg-replace-current-line=:
 

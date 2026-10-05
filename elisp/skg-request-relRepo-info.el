@@ -1,7 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; PURPOSE: `skg-set-relRepo' -- request the relRepo
-;;; of one relationship edge, informed by the server's
+;;; of one relationship, informed by the server's
 ;;; 'relRepo info' endpoint
 ;;; (BUG-and-fix_make-edge-more-public.org). The buffer-local
 ;;; helpers it drives live in skg-metadata.el.

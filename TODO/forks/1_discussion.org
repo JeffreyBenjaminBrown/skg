@@ -20,7 +20,7 @@ from you); the discussion state lives there, visible in the markers.
 * TL;DR
 The forks vision is *almost entirely already built*. The relations
 ('subscribes', 'hides_from_its_subscriptions', 'overrides_view_of'),
-all eight PartnerCols, override substitution, the override-choice
+all eight PartnerFolders, override substitution, the override-choice
 menu, and the save-time hide/unhide interpretation of subscribee-as-
 such edits all exist and are tested (the whole 'TODO/DONE/sharing/'
 arc). The single missing piece -- the lone unresolved item in
@@ -40,20 +40,20 @@ would redundantly re-show everything it just integrated as
 Grounded in code and the 'TODO/DONE/sharing/' arc:
 
 - The three relations are in 'schema.tql' and fully persisted across
-  FS/Rust/TypeDB (NodeFS/NodeRust/NodeComplete fields; YAML
+  FS/Rust/TypeDB (NodeFS/NodeRust/Graphnode fields; YAML
   'subscribes_to:', 'hides_from_its_subscriptions:',
   'overrides_view_of:').
-- All eight PartnerCols render (glossary "PartnerCol"): the writable
-  'subscribeeCol' and 'overriddenCol', the read-only inbound
-  'subscriberCol'/'overriderCol'/'hiderCol'/'hiddenCol', and the
-  read-only filter 'hiddenInSubscribeeCol'/'hiddenOutsideOfSubscribeeCol'.
+- All eight PartnerFolders render (glossary "PartnerFolder"): the writable
+  'subscribeeFolder' and 'overriddenFolder', the read-only inbound
+  'subscriberFolder'/'overriderFolder'/'hiderFolder'/'hiddenFolder', and the
+  read-only filter 'hiddenInSubscribeeFolder'/'hiddenOutsideOfSubscribeeFolder'.
 - 'overrides_view_of' is now *writable* from a buffer via the
-  'overriddenCol' (the 'SetOverrides' intent,
+  'overriddenFolder' (the 'SetOverrides' intent,
   'server/from_text/local_instruction_collection/traverse.rs:307-323').
   ('TODO/DONE/sharing/status-before-plan.org' says it is "dead weight"
   with no write path -- that doc predates the override work and is
   stale on this point.)
-- 'subscribes_to' is writable from a buffer via the 'subscribeeCol'
+- 'subscribes_to' is writable from a buffer via the 'subscribeeFolder'
   ('subscribeeCol_members', 'traverse.rs:350-359').
 - Override substitution draws an owned overrider in place of the
   overridden node wherever it would appear as recursive content,
@@ -99,11 +99,11 @@ alternative to that rejection.
 single auto-generated branch titled
 '<skg< unintegrated subscribed content from ... >>' hung under the
 clone. *That branch should not be built.* As you noted: the existing
-'subscribeeCol' under C already serves this exact role -- it shows N
+'subscribeeFolder' under C already serves this exact role -- it shows N
 as a subscribee-as-such, and the content under it is precisely what C
 has not yet integrated (assuming the prerequisite fix below). So this
 plan treats forks.md's '<skg<...>>' branch as obsolete narrative;
-['docs/forks.md' must be rewritten] to describe the subscribeeCol
+['docs/forks.md' must be rewritten] to describe the subscribeeFolder
 mechanism instead. (forks.md itself flags its examples as provisional:
 "TODO: These examples are goofy.")
 
@@ -143,7 +143,7 @@ appears *twice*: once as R's integrated content and once as
 "unintegrated" subscribed content. This contradicts
 'docs/data-model.org'/'vision.org' example 2 (which expects it to drop
 out of the subscribee view) and contradicts your statement that "the
-subscribeeCol displays precisely its unintegrated content".
+subscribeeFolder displays precisely its unintegrated content".
 
 Evidence it is genuinely unhandled:
 'tests/hidden_from_subscriptions.rs::test_moving_foreign_subscribee_content_to_subscriber_does_not_hide'
@@ -207,7 +207,7 @@ confirmation buffer). Rewrite this section to the gesture model once the
 gesture sub-questions in that discussion are answered. Kept below only
 for the reasoning it records.
 The original N is shown as read-only/write-protected content (under a
-subscribeeCol, via override substitution, or as a foreign view root).
+subscribeeFolder, via override substitution, or as a foreign view root).
 'EditRequestOnWriteProtectedOccurrence' ('parse_metadata_sexp.rs:188-200') forbids
 attaching an edit request to a write-protected node, and structurally a
 'Editability::WriteProtected' has nowhere to store one. So the request
@@ -224,15 +224,15 @@ cannot ride on N. Two viable shapes:
   already does an async disk fetch of the referenced node -- fetches N
   and fills C's save intent (title, body, contains copied;
   subscribes_to=[N]; overrides_view_of=[N]). Stays entirely within the
-  save pipeline (the sole graph-mutation path), reuses the writable-col
+  save pipeline (the sole graph-mutation path), reuses the writable-folder
   persistence for the two relations, and matches a known precedent.
 
 - *Alternative -- a dedicated "fork node" request that returns a
   pre-populated buffer.* Like single-root-view/override-menu: the
   server (no mutation) builds a buffer for a new C with title/body/
-  contains copied and a subscribeeCol+overriddenCol already holding N;
+  contains copied and a subscribeeFolder+overriddenFolder already holding N;
   the user reviews/edits and saves through the normal pipeline. More
-  "preview", but it needs speculative col construction for an unsaved
+  "preview", but it needs speculative folder construction for an unsaved
   node, which is new and fiddly.
 
 Both keep the copy server-side (the client must never reconstruct N's
@@ -337,7 +337,7 @@ still survive.
    the existing foreign-policy validation must let C (owned) through
    while N stays untouched.
 7. *Round-trip*: confirm post-save rerender draws C in N's place
-   (override substitution + 'overridesHere'), and that C's subscribeeCol
+   (override substitution + 'overridesHere'), and that C's subscribeeFolder
    shows empty unintegrated content given fix B. This exercises the
    override *write* path for the first time ever (it has only ever been
    read before -- see Problems P6), so test it hard.
@@ -373,7 +373,7 @@ an owned source and a 'user_owns_it=false' foreign source).
   'foreign/N.skg' is byte-unchanged.
 - Round-trip: save C, close, reopen a view that contained N; assert C
   is drawn in N's place with '(overridesHere N)'; assert C's
-  subscribeeCol shows N with *empty* unintegrated content; then add a
+  subscribeeFolder shows N with *empty* unintegrated content; then add a
   child to N on disk + rebuild and assert it now appears as
   unintegrated.
 - Monogamy: forking an already-forked N is rejected/redirected, not a
@@ -386,7 +386,7 @@ an owned source and a 'user_owns_it=false' foreign source).
   drive 'skg-fork-node' end to end.
 
 ** Docs to update
-- 'docs/forks.md': rewrite to the subscribeeCol mechanism; drop the
+- 'docs/forks.md': rewrite to the subscribeeFolder mechanism; drop the
   '<skg<...>>' branch; de-goofy the examples.
 - 'docs/sharing-model.md': add the fork command and that integrated
   content is excluded from the subscribee-as-such view (the implicit-
@@ -434,15 +434,15 @@ is the intended source.
 ** DONE *forks.md is partly obsolete
 and its examples are self-described as
 "goofy".* The '<skg<...>>' generated branch it describes duplicates the
-subscribeeCol that already exists. Following forks.md literally would
-build a redundant scaffold. This plan instead reuses the subscribeeCol
+subscribeeFolder that already exists. Following forks.md literally would
+build a redundant non-vognode. This plan instead reuses the subscribeeFolder
 (your nonobvious point). forks.md needs rewriting either way.
 *** DONE agreed, please do
 **** Claude : queued as an execution-time task (it is in "Docs to
 update"). I'll rewrite forks.md once the gesture + Option-A design is
 locked, so it describes the mechanism that actually ships rather than
 being rewritten twice.
-** DONE *The "unintegrated content is what the subscribeeCol shows" claim
+** DONE *The "unintegrated content is what the subscribeeFolder shows" claim
 is not actually true in code yet for the move-into-graph path.* The
 display subtracts only 'subscriber.hides', not 'subscriber.contains'
 ('content_goal_list', 'content.rs:398-419'); 'resolve_visibility'
@@ -595,7 +595,7 @@ triggers a fork; "n" aborts the whole save; the confirmation buffer
 stays open and supports the ID-stack-push/search command.
 ** DONE *The 'overrides_view_of' write path is brand new and untested.*
 The override edge from C to N can now be written from a saved buffer
-(via the generated 'overriddenCol' scaffold), but no save has ever
+(via the generated 'overriddenFolder' non-vognode), but no save has ever
 actually created one -- per 'status-before-plan.org' it has only ever
 been read, so a fork would be its first real writer. The marker that
 lets a drawn substitute round-trip on save ('overridesHere') is
@@ -665,7 +665,7 @@ The implementation-steps list is marked stale to match.
 'subscribeecol-maybe-todo.org' flags a latent bug: when a node that
 subscribes to others is open in two views at once and one view is
 saved, the OTHER view's generated list of subscribed nodes (its
-'subscribeeCol') can keep stale entries instead of refreshing from the
+'subscribeeFolder') can keep stale entries instead of refreshing from the
 saved graph. Forking creates subscribers, so this becomes easier to
 hit. Worth resolving (with its own test) alongside the fork work, or at
 least noting.
@@ -681,9 +681,9 @@ is gone, but its replacement, 'reconcile_subscribee_col_children'
 goal-list from the graph (line ~52) and then only *applies* it inside
 'if context.parent_is_writeProtected || source_diffs.is_some()' (line ~74).
 So a DEFINITIVE subscriber in a NON-diff collateral rerender never
-reconciles its subscribeeCol children against the fresh list -- stale
+reconciles its subscribeeFolder children against the fresh list -- stale
 entries persist. Repro: open two views of a definitive subscriber S;
-change S's subscriptions in one and save; the other view's subscribeeCol
+change S's subscriptions in one and save; the other view's subscribeeFolder
 is not refreshed. The guard is right for the SAVED view (a definitive
 subscriber there IS the source of truth for that save) but wrong for a
 COLLATERAL rerender (which should refresh from the graph). Fix: pass a
@@ -693,7 +693,7 @@ of definitiveness in that case; the original note in
 out? (This is independent of forks but forking makes it easier to hit.)
 ***** DONE in scope here
 ****** Claude : folded into plan.org as an in-scope step (fix the
-collateral rerender so a definitive subscriber's subscribeeCol
+collateral rerender so a definitive subscriber's subscribeeFolder
 reconciles from the graph).
 ** DONE *Inactive-source clones.*
 If C's source is not in the active

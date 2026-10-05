@@ -178,7 +178,7 @@ repo field defaults. Returns a flat list of headlines."
                             (list (cons child-level field-name)
                                   (cons (1+ child-level)
                                         default-val))))))
-           ;; Insert default repo if missing and default-repo given
+           ;; Insert default skgrepo if missing and default-repo given
            ((and (string= field-name "repo") default-repo)
             (push field-name seen)
             (setq ordered

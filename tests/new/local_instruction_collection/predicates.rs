@@ -1,14 +1,14 @@
 /// These tests pin the membership predicates of
 /// server/from_text/local_instruction_collection/predicates.rs.
 /// There is one test per condition each predicate encodes
-/// (TODO/local-instruction-collection/3_plan.org, "testing").
+/// (TODO/DONE/local-instruction-collection/3_plan.org, "testing").
 
 use skg::from_text::local_instruction_collection::predicates::{
   active_child_counts_as_content,
   active_child_counts_as_visible_content,
   member_counts_for_partnerFolder };
 use skg::types::git::Sign;
-use skg::types::misc::{ID, RepoName};
+use skg::types::misc::{ID, SkgRepoName};
 use skg::types::viewnode::{
   default_activeVognode, NodeEditRequest, Editability, AffectsParent,
   ActiveVognode };
@@ -17,7 +17,7 @@ fn base_activeVognode (
 ) -> ActiveVognode {
   default_activeVognode (
     ID::from ("n"),
-    RepoName::from ("main"),
+    SkgRepoName::from ("main"),
     "n" . to_string() ) }
 
 fn with_edit_request (
@@ -25,7 +25,7 @@ fn with_edit_request (
 ) -> ActiveVognode {
   let mut t : ActiveVognode =
     base_activeVognode ();
-  t . editability = Editability::Definitive {
+  t . editability = Editability::Editable {
     body         : None,
     edit_request : Some (edit_request) };
   t }
@@ -34,7 +34,7 @@ fn with_edit_request (
 fn relation_folder_membership_conditions () {
   assert!( member_counts_for_partnerFolder (
     &base_activeVognode () ));
-  { // affectsParent != Affected excludes.
+  { // affectsParent != True excludes.
     let mut t : ActiveVognode = base_activeVognode ();
     t . affectsParent = AffectsParent::False;
     assert!( ! member_counts_for_partnerFolder (&t) ); }
@@ -87,7 +87,7 @@ fn content_membership_coincides_with_relation_folder_membership () {
 fn visible_content_membership_conditions () {
   assert!( active_child_counts_as_visible_content (
     &base_activeVognode () ));
-  { // affectsParent != Affected excludes.
+  { // affectsParent != True excludes.
     let mut t : ActiveVognode = base_activeVognode ();
     t . affectsParent = AffectsParent::False;
     assert!( ! active_child_counts_as_visible_content (&t) ); }

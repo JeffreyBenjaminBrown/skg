@@ -5,7 +5,7 @@ use crate::serve::util::{
   send_response_with_length_prefix, tag_sexp_response,
   value_from_request_sexp};
 use crate::types::env::SkgEnv;
-use crate::types::misc::RepoName;
+use crate::types::misc::SkgRepoName;
 use futures::executor::block_on;
 use sexp::{Atom, Sexp};
 use std::net::TcpStream;
@@ -56,15 +56,15 @@ pub fn handle_import_md_and_org_request (
       let input : String = match value_from_request_sexp ("input-directory", request) {
         Ok (input) => input,
         Err (error) => return refuse (stream, &error), };
-      let repo : String = match value_from_request_sexp ("destination-repo", request) {
-        Ok (repo) => repo,
+      let skgrepo : String = match value_from_request_sexp ("destination-repo", request) {
+        Ok (skgrepo) => skgrepo,
         Err (error) => return refuse (stream, &error), };
       let host_answer : Option<String> =
         value_from_request_sexp ("host-root", request) . ok ();
       let host_root : Option<PathBuf> = host_answer . as_deref ()
         .filter (|value| ! value . is_empty ()) . map (PathBuf::from);
       match prepare_import_batch (
-        Path::new (&input), &RepoName::from (repo),
+        Path::new (&input), &SkgRepoName::from (skgrepo),
         host_root . as_deref (), host_answer . is_some (), env) {
         Ok (ImportPreparation::HostMappingNeeded) => send_import_response (
           stream, TcpToClient::ImportMdAndOrgHostMappingNeeded,
@@ -147,7 +147,7 @@ mod tests {
   use crate::dbs::init::empty_in_ram_tantivy_index;
   use crate::dbs::in_rust_graph::InRustGraph;
   use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
-  use crate::types::misc::{SkgConfig, SkgfileRepo};
+  use crate::types::misc::{SkgConfig, SkgRepo};
   use std::collections::HashMap;
   use std::fs;
   use std::io::{BufRead, BufReader, Read};
@@ -181,15 +181,15 @@ mod tests {
   fn approval_is_session_bound_single_use_and_replaced_by_new_preview () {
     let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
     let input : PathBuf = temp . path () . join ("input");
-    let repo : PathBuf = temp . path () . join ("repo");
+    let skgrepo : PathBuf = temp . path () . join ("repo");
     fs::create_dir (&input) . unwrap ();
-    fs::create_dir (&repo) . unwrap ();
+    fs::create_dir (&skgrepo) . unwrap ();
     fs::write (input . join ("note.md"), "# Note\nBody\n") . unwrap ();
-    let repo_name : RepoName = RepoName::from ("notes");
-    let config : SkgConfig = SkgConfig::dummyFromRepos (HashMap::from ([
-      (repo_name . clone (), SkgfileRepo {
-        name : repo_name . clone (), abbreviation : None,
-        path : repo . clone (), user_owns_it : true, }),
+    let skgrepo_name : SkgRepoName = SkgRepoName::from ("notes");
+    let config : SkgConfig = SkgConfig::dummyFromSkgRepos (HashMap::from ([
+      (skgrepo_name . clone (), SkgRepo {
+        name : skgrepo_name . clone (), abbreviation : None,
+        path : skgrepo . clone (), owned : true, }),
     ]));
     let env : SkgEnv = SkgEnv::new (config, Arc::new (InRustGraph::new ()),
       empty_in_ram_tantivy_index () . unwrap ());

@@ -1,16 +1,16 @@
 use crate::dbs::in_rust_graph::{
-  in_rust_graph_coherent_with_save_instructions_in, new_handle };
+  in_rust_graph_coherent_with_nodeInstructions_in, new_handle };
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::from_text
-  ::buffer_to_validated_saveplan_with_fork_repos_and_previous_view_in_graph;
-use crate::git_ops::diff::compute_diff_for_repo;
+  ::buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_graph;
+use crate::git_ops::diff::compute_diff_for_skgrepo;
 use crate::git_ops::read_gitrepo::{open_gitrepo, head_is_merge_commit};
 use crate::save::{
   apply_delete_propagation_cleanup,
   PreparedSave, prepare_save_under_mutation_gate,
 };
 use crate::serve::ViewsState;
-use crate::repo_sets::ActiveRepoSet;
+use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::handlers::telescope_hoist::{
   HoistCandidate,
@@ -38,10 +38,10 @@ use crate::serve::util::{
 use crate::from_text::fork::build_fork_confirmation_buffer;
 use crate::types::env::SkgEnv;
 use crate::types::errors::SaveError;
-use crate::types::git::{RepoDiff, GitDiffStatus};
-use crate::types::misc::{ID, RepoName, SkgConfig};
+use crate::types::git::{SkgRepoDiff, GitDiffStatus};
+use crate::types::misc::{ID, SkgRepoName, SkgConfig};
 use crate::types::save::{
-  DefineNode, PostCommitNoticeCandidate, SavePlan, format_save_error_as_org };
+  NodeInstruction, PostCommitNoticeCandidate, SavePlan, format_save_error_as_org };
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::ViewUri;
 use crate::update_buffer::update_views_after_save;
@@ -129,23 +129,23 @@ pub fn handle_save_buffer_request (
   request    : &str,
   env        : &mut SkgEnv,
   views_state : &mut ViewsState,
-  active_repo_set : &ActiveRepoSet,
+  active_skgrepo_set : &ActiveSkgRepoSet,
 ) {
   let viewuri_from_request_result : Result<ViewUri, String> =
     view_uri_from_request (request);
   let save_point_position : Option<SavePointPosition> =
     save_point_position_from_request (request);
-  let fork_approved : bool =
+  let approved_forks : bool =
     // Forking is gated on confirmation: the first save returns a
     // fork-confirmation buffer, and the client re-issues the save with
     // this field once the user approves (the same retry shape used by
     // other request-scoped confirmations).
     fork_approved_from_request (request);
-  let fork_repos : HashMap<ID, RepoName> =
-    // The per-fork clone repos the user chose in the confirmation
+  let fork_skgrepos : HashMap<ID, SkgRepoName> =
+    // The per-fork clone skgrepos the user chose in the confirmation
     // buffer, riding back on the approve re-save. Empty otherwise.
-    fork_repos_from_request (request);
-  let hoist_approved_pids : HashSet<ID> =
+    fork_skgrepos_from_request (request);
+  let approved_hoist_pids : HashSet<ID> =
     hoist_approved_pids_from_request (request);
   let text_approved_pids : HashSet<ID> =
     text_approved_pids_from_request (request);
@@ -178,10 +178,10 @@ pub fn handle_save_buffer_request (
             views_state . diff_mode_enabled,
             &viewuri_from_request_result,
             views_state,
-            Some (active_repo_set),
-            fork_approved,
-            &fork_repos,
-            &hoist_approved_pids,
+            Some (active_skgrepo_set),
+            approved_forks,
+            &fork_skgrepos,
+            &approved_hoist_pids,
             &text_approved_pids,
             &envelope . other_views ))
         { Ok (mut save_response) => {
@@ -488,27 +488,27 @@ fn nat_from_request (
 ) -> Option<usize> {
   value_from_request_sexp (key, request) . ok () ? . parse () . ok () }
 
-/// Whether this save request carries '(fork-approved . "true")', set by
+/// Whether this save request carries '(approved-forks . "true")', set by
 /// the client when the user approves a fork-confirmation. Absent or any
 /// other value means not approved.
 fn fork_approved_from_request (
   request : &str,
 ) -> bool {
-  value_from_request_sexp ("fork-approved", request)
+  value_from_request_sexp ("approved-forks", request)
     . map ( |v| v == "true" )
     . unwrap_or (false) }
 
 /// Parse the optional '(fork-repos ((N . REPO) ...))' field of a
 /// save request into a map from each forked node's id N to the OWNED
-/// Skg repo the user chose for its clone (rotated, or left at the default,
+/// skgrepo the user chose for its clone (rotated, or left at the default,
 /// in the fork-confirmation buffer). Absent on an ordinary save and on
-/// the first (unapproved) save -- then every clone Skg repo resolves by
-/// inference-else-default. The chosen Skg repo is validated owned + active
+/// the first (unapproved) save -- then every clone skgrepo resolves by
+/// inference-else-default. The chosen skgrepo is validated owned + active
 /// downstream in 'validate_fork_specs'.
-fn fork_repos_from_request (
+fn fork_skgrepos_from_request (
   request : &str,
-) -> HashMap<ID, RepoName> {
-  let mut map : HashMap<ID, RepoName> = HashMap::new ();
+) -> HashMap<ID, SkgRepoName> {
+  let mut map : HashMap<ID, SkgRepoName> = HashMap::new ();
   let Ok (sexp) = sexp::parse (request) else { return map; };
   let Sexp::List (items) = sexp else { return map; };
   for item in & items {
@@ -522,12 +522,12 @@ fn fork_repos_from_request (
       // Each entry is a dotted pair (N . REPO), which the sexp crate
       // parses as the 3-element list [N, ".", REPO].
       if let Sexp::List (kv) = entry {
-        if let [ Sexp::Atom ( Atom::S (id) ),
+        if let [ Sexp::Atom ( Atom::S (skgid) ),
                  Sexp::Atom ( Atom::S (dot) ),
                  Sexp::Atom ( Atom::S (skgrepo) ) ] = & kv [..]
         { if dot == "." {
-            map . insert ( ID ( id . clone () ),
-                           RepoName::from ( skgrepo . as_str () )); }} }} }
+            map . insert ( ID ( skgid . clone () ),
+                           SkgRepoName::from ( skgrepo . as_str () )); }} }} }
   map }
 
 /// If 'err' is a buffer-validation SaveError that carries no warnings
@@ -555,7 +555,7 @@ fn backfill_parse_warnings (
 /// ERRORS: If the buffer is invalid.
 /// COMPLEX:
 /// - Validation must happen at many stages.
-/// - NodeMerges must follow the execution of other save instructions, because the user may have updated one of the nodes to be merged.
+/// - NodeMerges must follow the execution of other nodeInstructions, because the user may have updated one of the nodes to be merged.
 /// - complete_viewforest is complex: it is one level-order BFS in which each node is completed at its own visit (content, folders, view requests, inline diff), then a postorder prune sweep removes the empty self-deletable nodes.
 pub async fn update_from_and_rerender_buffer (
   stream                      : &mut TcpStream,
@@ -564,15 +564,15 @@ pub async fn update_from_and_rerender_buffer (
   diff_mode_enabled           : bool,
   viewuri_from_request_result : &Result<ViewUri, String>,
   views_state                  : &mut ViewsState,
-  active_repo_set            : Option<&ActiveRepoSet>,
-  fork_approved                : bool, // true once the user has approved the forks (a re-issued save); false on the first save, which returns a fork-confirmation instead of committing.
-  fork_repos                 : &HashMap<ID, RepoName>, // per-fork clone repos the user chose in the confirmation buffer (keyed by N's pid); empty otherwise.
+  active_skgrepo_set          : Option<&ActiveSkgRepoSet>,
+  approved_forks              : bool, // true once the user has approved the forks (a re-issued save); false on the first save, which returns a fork-confirmation instead of committing.
+  fork_skgrepos               : &HashMap<ID, SkgRepoName>, // per-fork clone skgrepos the user chose in the confirmation buffer (keyed by N's pid); empty otherwise.
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let no_hoist_approvals : HashSet<ID> = HashSet::new ();
   update_from_and_rerender_buffer_with_hoist_approval (
     stream, org_buffer_text, env, diff_mode_enabled,
-    viewuri_from_request_result, views_state, active_repo_set,
-    fork_approved, fork_repos, &no_hoist_approvals ) . await
+    viewuri_from_request_result, views_state, active_skgrepo_set,
+    approved_forks, fork_skgrepos, &no_hoist_approvals ) . await
 }
 
 pub async fn update_from_and_rerender_buffer_with_hoist_approval (
@@ -582,15 +582,15 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
   diff_mode_enabled           : bool,
   viewuri_from_request_result : &Result<ViewUri, String>,
   views_state                  : &mut ViewsState,
-  active_repo_set            : Option<&ActiveRepoSet>,
-  fork_approved                : bool,
-  fork_repos                 : &HashMap<ID, RepoName>,
-  hoist_approved_pids         : &HashSet<ID>,
+  active_skgrepo_set          : Option<&ActiveSkgRepoSet>,
+  approved_forks              : bool,
+  fork_skgrepos               : &HashMap<ID, SkgRepoName>,
+  approved_hoist_pids         : &HashSet<ID>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   update_from_and_rerender_buffer_with_approvals (
     stream, org_buffer_text, env, diff_mode_enabled,
-    viewuri_from_request_result, views_state, active_repo_set,
-    fork_approved, fork_repos, hoist_approved_pids,
+    viewuri_from_request_result, views_state, active_skgrepo_set,
+    approved_forks, fork_skgrepos, approved_hoist_pids,
     &HashSet::new (), &[] ) . await
 }
 
@@ -601,10 +601,10 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   diff_mode_enabled           : bool,
   viewuri_from_request_result : &Result<ViewUri, String>,
   views_state                  : &mut ViewsState,
-  active_repo_set            : Option<&ActiveRepoSet>,
-  fork_approved                : bool,
-  fork_repos                 : &HashMap<ID, RepoName>,
-  hoist_approved_pids         : &HashSet<ID>,
+  active_skgrepo_set          : Option<&ActiveSkgRepoSet>,
+  approved_forks              : bool,
+  fork_skgrepos               : &HashMap<ID, SkgRepoName>,
+  approved_hoist_pids         : &HashSet<ID>,
   text_approved_pids        : &HashSet<ID>,
   other_views               : &[ClientViewSnapshot],
 ) -> Result<SaveResponse, Box<dyn Error>> {
@@ -617,9 +617,9 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   let working_graph = new_handle ((*runtime . graph) . clone ());
   let mut working_tantivy = runtime . tantivy_index . clone ();
   if diff_mode_enabled { // diff mode is undefined for merge commits
-    let repos : Vec<RepoName> =
-      runtime . config . repos . keys() . cloned() . collect();
-    validate_no_merge_commits ( &repos, &runtime . config )
+    let skgrepos : Vec<SkgRepoName> =
+      runtime . config . skgrepos . keys() . cloned() . collect();
+    validate_no_merge_commits ( &skgrepos, &runtime . config )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
 
   let ( viewforest, save_plan, parse_warnings )
@@ -627,9 +627,9 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
             "buffer_to_validated_saveplan"
           ) . entered();
-        buffer_to_validated_saveplan_with_fork_repos_and_previous_view_in_graph (
+        buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_graph (
           org_buffer_text, &runtime . graph, &runtime . config,
-          active_repo_set, fork_repos,
+          active_skgrepo_set, fork_skgrepos,
           viewuri_from_request_result . as_ref () . ok ()
             . and_then ( |uri| views_state . open_views
               . viewuri_to_view (uri) ) )
@@ -639,9 +639,9 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     { return Err ( "Nothing to save found in org_buffer_text"
                    . into() ); }
   let SavePlan {
-    define_nodes       : mut nonmerge_defineNodes,
+    node_instructions      : mut nonmerge_nodeInstructions,
     nodeMerge_instructions : nodeMerges,
-    repo_moves,
+    skgrepo_moves,
     fork_specs,
     post_commit_notice_candidates }
     = save_plan;
@@ -650,12 +650,12 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     // this save will actually rewrite, not only what appeared in the buffer.
     let graph_snap = working_graph . load_full ();
     apply_delete_propagation_cleanup (
-      &mut nonmerge_defineNodes, &graph_snap, &runtime . config ); }
+      &mut nonmerge_nodeInstructions, &graph_snap, &runtime . config ); }
   let hoist_candidates : Vec<HoistCandidate> =
     hoist_candidates_from_disk (
-      &nonmerge_defineNodes, &nodeMerges, &runtime . config ) ?;
+      &nonmerge_nodeInstructions, &nodeMerges, &runtime . config ) ?;
   if hoist_needs_confirmation (
-      &hoist_candidates, hoist_approved_pids ) {
+      &hoist_candidates, approved_hoist_pids ) {
     return Ok ( SaveResponse {
       saved_view          : String::new (),
       errors              : Vec::new (),
@@ -667,14 +667,14 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     } ); }
   // In particular, make a dirty nodeMerge acquiree clean before the merge
   // copies its text into a fresh preservation node and deletes it.
-  nonmerge_defineNodes . extend (
+  nonmerge_nodeInstructions . extend (
     repair_saves_for_unwritten_candidates (
-      &hoist_candidates, &nonmerge_defineNodes, &runtime . config ) ? );
-  if ! fork_specs . is_empty () && ! fork_approved {
+      &hoist_candidates, &nonmerge_nodeInstructions, &runtime . config ) ? );
+  if ! fork_specs . is_empty () && ! approved_forks {
     // A save that found forks but was not pre-approved commits NOTHING.
     // Return a write-protected fork-confirmation buffer; the client shows it,
-    // and on approval re-issues the save with (fork-approved . "true").
-    // (Monogamy and Skg repo validation already ran in
+    // and on approval re-issues the save with (approved-forks . "true").
+    // (Monogamy and skgrepo validation already ran in
     // buffer_to_validated_saveplan, so every fork here is admissible.)
     return Ok ( SaveResponse {
       saved_view          : build_fork_confirmation_buffer (&fork_specs),
@@ -689,19 +689,19 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       text_release_confirmation : None, } ); }
   // Forks detected this save (approved, or none): editing a foreign node
   // N is a request to clone it. The clone C commits with the rest of the
-  // save -- its 'overrides_view_of = [N]' edge rides in the same
-  // DefineNodes, so the touched-override-invariant check (which reads the
+  // save -- its 'overrides_view_of = [N]' relationship rides in the same
+  // NodeInstructions, so the touched-override-invariant check (which reads the
   // simulated post-save graph) sees C before validating.
-  let nonmerge_defineNodes : Vec<DefineNode> = {
-    let mut nodes : Vec<DefineNode> = nonmerge_defineNodes;
+  let nonmerge_nodeInstructions : Vec<NodeInstruction> = {
+    let mut nodes : Vec<NodeInstruction> = nonmerge_nodeInstructions;
     for spec in &fork_specs {
-      nodes . push ( DefineNode::Save ( spec . clone . clone () )); }
+      nodes . push ( NodeInstruction::Save ( spec . clone . clone () )); }
     nodes };
 
-  let define_nodes : Vec<DefineNode> = // includes the nodeMerges
+  let node_instructions : Vec<NodeInstruction> = // includes the nodeMerges
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "define_nodes_build" ). entered();
-      nonmerge_defineNodes . iter () . cloned ()
+        "node_instructions_build" ). entered();
+      nonmerge_nodeInstructions . iter () . cloned ()
       . chain ( nodeMerges . iter ()
                 . flat_map ( |nodeMerge| nodeMerge . to_vec () ))
     . collect () };
@@ -710,20 +710,20 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "prepare_save" ). entered();
     prepare_save_under_mutation_gate (
-      nonmerge_defineNodes . clone(),
+      nonmerge_nodeInstructions . clone(),
       &nodeMerges,
-      &repo_moves,
+      &skgrepo_moves,
       &runtime . config,
       &working_graph,
-      hoist_approved_pids )
+      approved_hoist_pids )
     // Warnings always accompany errors: a post-parse validation
     // failure (e.g. the override-invariant check) back-fills the
     // save's parse-time warnings, which the error itself did not see.
     . map_err ( |e| backfill_parse_warnings (e, &parse_warnings) ) ? };
-  let affected_ids : SaveAffectedIds =
+  let affected_skgids : SaveAffectedIds =
     SaveAffectedIds::from_prepared (&prepared_save);
   let dirty_conflicts = dirty_view_conflicts (
-    other_views, views_state, &affected_ids,
+    other_views, views_state, &affected_skgids,
     prepared_save . graph_before_save (),
     prepared_save . final_candidate ())
     .map_err (|message| -> Box<dyn Error> {
@@ -737,7 +737,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         format_conflict_error (&dirty_conflicts))],
       warnings : parse_warnings, })); }
   let collateral_uris : Vec<ViewUri> = viewuri_from_request_result . as_ref ()
-    .map (|saved_uri| affected_ids . collateral_view_uris (
+    .map (|saved_uri| affected_skgids . collateral_view_uris (
       saved_uri, views_state,
       prepared_save . graph_before_save (),
       prepared_save . final_candidate ()))
@@ -783,11 +783,11 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       "coherence_debug_assert" ). entered();
     debug_assert! (
       // TODO | PITFALL: This is quite a weak assertion.
-      // PURPOSE: The in-Rust graph must already reflect every Save and Delete in 'define_nodes' by the time this function runs. Violating this invariant (e.g. by reordering the save pipeline so that 'update_views_after_save' runs before prepared graph publication) would let the rerender read stale Graphnodes from the in-Rust graph.
-      in_rust_graph_coherent_with_save_instructions_in (
-          &published . graph, &define_nodes
+      // PURPOSE: The in-Rust graph must already reflect every Save and Delete in 'node_instructions' by the time this function runs. Violating this invariant (e.g. by reordering the save pipeline so that 'update_views_after_save' runs before prepared graph publication) would let the rerender read stale Graphnodes from the in-Rust graph.
+      in_rust_graph_coherent_with_nodeInstructions_in (
+          &published . graph, &node_instructions
         ) . is_ok (),
-      "update_views_after_save: in-Rust graph not coherent with define_nodes" ); }
+      "update_views_after_save: in-Rust graph not coherent with node_instructions" ); }
 
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "update_views_after_save" ). entered();
@@ -795,14 +795,14 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       update_views_after_save (
         stream,
         viewforest,
-        define_nodes,
+        node_instructions,
         collateral_uris,
         diff_mode_enabled,
         env,
         published . clone (),
         viewuri_from_request_result,
         views_state,
-        active_repo_set,
+        active_skgrepo_set,
         deleted_by_this_save_extra_ids,
         text_approved_pids,
         &fork_specs ) ?;
@@ -824,13 +824,13 @@ fn post_commit_hiddenoutside_warnings (
   graph      : &crate::dbs::in_rust_graph::InRustGraph,
   candidates : &[PostCommitNoticeCandidate],
 ) -> Vec<String> {
-  let key = |id : &ID| -> ID {
-    graph . pid_of (id)
-      . unwrap_or_else (|| id . clone ()) };
-  let label = |id : &ID| -> String {
-    match graphnode_from_graph (graph, id) {
+  let key = |skgid : &ID| -> ID {
+    graph . pid_of (skgid)
+      . unwrap_or_else (|| skgid . clone ()) };
+  let label = |skgid : &ID| -> String {
+    match graphnode_from_graph (graph, skgid) {
       Some (node) => format! ("{} ({})", node . title, node . pid),
-      None => id . to_string (), } };
+      None => skgid . to_string (), } };
   let mut warnings : Vec<String> = Vec::new ();
   for candidate in candidates {
     let PostCommitNoticeCandidate::HiddenOutsideAdded {
@@ -853,18 +853,18 @@ fn post_commit_hiddenoutside_warnings (
   warnings
 }
 
-/// Check if any Skg repo's HEAD is a merge commit.
+/// Check if any skgrepo's HEAD is a merge commit.
 /// Returns an error message if so,
 /// as diff computation is ambiguous for merge commits.
 pub fn validate_no_merge_commits (
-  repos : &[RepoName],
-  config  : &SkgConfig,
+  skgrepos : &[SkgRepoName],
+  config   : &SkgConfig,
 ) -> Result<(), String> {
-  for skgrepo in repos { // Get the Skg repo path from config
-    if let Some (repo_config) = config . repos . get (skgrepo) {
-      let repo_path : &Path =
-        Path::new ( &repo_config . path );
-      if let Some (gitrepo) = open_gitrepo (repo_path) {
+  for skgrepo in skgrepos { // Get the skgrepo path from config
+    if let Some (skgrepo_config) = config . skgrepos . get (skgrepo) {
+      let skgrepo_path : &Path =
+        Path::new ( &skgrepo_config . path );
+      if let Some (gitrepo) = open_gitrepo (skgrepo_path) {
         match head_is_merge_commit (&gitrepo) {
           Ok (true) => {
             return Err ( format! (
@@ -876,51 +876,51 @@ pub fn validate_no_merge_commits (
                         skgrepo, e ); }} }} }
   Ok (( )) }
 
-pub fn compute_diff_for_every_repo (
+pub fn compute_diff_for_every_skgrepo (
   config : &SkgConfig
-) -> HashMap<RepoName, RepoDiff> {
-  let mut repo_diffs : HashMap<RepoName, RepoDiff> =
+) -> HashMap<SkgRepoName, SkgRepoDiff> {
+  let mut skgrepo_diffs : HashMap<SkgRepoName, SkgRepoDiff> =
     HashMap::new();
-  for (repo_name, repo_config) in &config . repos {
-    let repo_path : &Path =
-      Path::new ( &repo_config . path );
-    match compute_diff_for_repo (repo_path) {
+  for (skgrepo_name, skgrepo_config) in &config . skgrepos {
+    let skgrepo_path : &Path =
+      Path::new ( &skgrepo_config . path );
+    match compute_diff_for_skgrepo (skgrepo_path) {
       Ok (diff) => {
-        repo_diffs . insert ( repo_name . clone(), diff ); },
-      Err (e) => { // Log error but continue with other repos
+        skgrepo_diffs . insert ( skgrepo_name . clone(), diff ); },
+      Err (e) => { // Log error but continue with other skgrepos
         tracing::warn! (
           "Failed to compute diff for repo '{}': {}",
-          repo_name, e ); }} }
-  repo_diffs }
+          skgrepo_name, e ); }} }
+  skgrepo_diffs }
 
-/// Build a map from ID to HOME for all deleted files: the Skg repo of
+/// Build a map from ID to HOME for all deleted files: the skgrepo of
 /// nodes that exist in git HEAD but not in the worktree.
 ///
-/// Walks the repos in privacy order and keeps the FIRST (most
+/// Walks the skgrepos in privacy order and keeps the FIRST (most
 /// public) hit, because deleting a node deletes its whole
-/// TELESCOPE -- every owned section, in as many repos as hold one
+/// TELESCOPE -- every owned section, in as many skgrepos as hold one
 /// ('delete_all_nodes_from_fs') -- so one id routinely appears as
-/// deleted in several repos at once. Iterating 'repo_diffs'
+/// deleted in several skgrepos at once. Iterating 'repo_diffs'
 /// (a HashMap) and letting the last writer win answered that
 /// arbitrarily, per process.
-pub fn deleted_ids_to_repo (
-  repo_diffs : &HashMap<RepoName, RepoDiff>,
-  config       : &SkgConfig,
-) -> HashMap<ID, RepoName> {
-  let mut result : HashMap<ID, RepoName> =
+pub fn deleted_skgids_to_skgrepo (
+  skgrepo_diffs : &HashMap<SkgRepoName, SkgRepoDiff>,
+  config        : &SkgConfig,
+) -> HashMap<ID, SkgRepoName> {
+  let mut result : HashMap<ID, SkgRepoName> =
     HashMap::new();
-  for repo_name in config . ordered_repos () {
-    let Some (repo_diff) : Option<&RepoDiff> =
-      repo_diffs . get (&repo_name) else { continue; };
-    for diffs in [ &repo_diff . staged,
-                   &repo_diff . unstaged ] {
+  for skgrepo_name in config . ordered_skgrepos () {
+    let Some (skgrepo_diff) : Option<&SkgRepoDiff> =
+      skgrepo_diffs . get (&skgrepo_name) else { continue; };
+    for diffs in [ &skgrepo_diff . staged,
+                   &skgrepo_diff . unstaged ] {
       for (path, graphnode_diff) in diffs {
         if graphnode_diff . status == GitDiffStatus::Deleted {
           if let Some (stem) = path . file_stem() {
-            let id : ID = ID ( stem . to_string_lossy()
+            let skgid : ID = ID ( stem . to_string_lossy()
                                . into_owned() );
-            result . entry (id) // most public wins
-              . or_insert_with ( || repo_name . clone() ); }} }} }
+            result . entry (skgid) // most public wins
+              . or_insert_with ( || skgrepo_name . clone() ); }} }} }
   result }
 
 /// Every other open view sharing at least one PID with the saved view.

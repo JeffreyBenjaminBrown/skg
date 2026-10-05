@@ -55,12 +55,12 @@
                  (not skg-link-annotations--repo-suffix-enabled))
       (error "Initial annotations changed state"))
     (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest _) t)))
-      (skg-set-active-repo-set "all"))
+      (skg-limit-repo-set "all"))
     (link-test-wait
      (lambda () (and (link-test-status "private-node" 'resolved)
                      (= skg-lp--pending-count 0))))
     (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest _) t)))
-      (skg-set-active-repo-set "public"))
+      (skg-limit-repo-set "public"))
     (link-test-wait
      (lambda () (and (link-test-status "private-node" 'inactive)
                      (= skg-lp--pending-count 0))))

@@ -1,5 +1,5 @@
 use crate::types::git::PathDiffStatus;
-use crate::types::misc::{ID, SkgConfig, SkgfileRepo, RepoName};
+use crate::types::misc::{ID, SkgConfig, SkgRepo, SkgRepoName};
 use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::nodes::complete::Graphnode;
 
@@ -17,22 +17,22 @@ use super::misc::{diff_delta_to_entry, path_relative_to_gitrepo};
 /// Returns Err if neither location has the file.
 pub fn graphnode_from_index_or_head (
   pid    : &ID,
-  src    : &RepoName,
+  src    : &SkgRepoName,
   config : &SkgConfig,
 ) -> Result<Graphnode, Box<dyn StdError>> {
-  let repo_config : &SkgfileRepo =
-    config . repos . get (src)
+  let skgrepo_config : &SkgRepo =
+    config . skgrepos . get (src)
     . ok_or_else ( || format! ( "Repo '{}' not found in config",
                                 src )) ?;
-  let repo_path : &Path =
-    Path::new ( &repo_config . path );
+  let skgrepo_path : &Path =
+    Path::new ( &skgrepo_config . path );
   let gitrepo : git2::Repository =
-    open_gitrepo (repo_path) . ok_or_else ( || format! (
-      "Could not open git repo at {:?}", repo_path )) ?;
+    open_gitrepo (skgrepo_path) . ok_or_else ( || format! (
+      "Could not open git repo at {:?}", skgrepo_path )) ?;
   let file_path : PathBuf =
     PathBuf::from ( format! ( "{}.skg", pid . 0 ));
   let rel_path : PathBuf =
-    path_relative_to_gitrepo ( &gitrepo, &repo_path . join (&file_path) )
+    path_relative_to_gitrepo ( &gitrepo, &skgrepo_path . join (&file_path) )
     . unwrap_or (file_path . clone ());
   // Index first.
   if let Some (content) = get_file_content_at_index (&gitrepo, &rel_path) ? {
@@ -94,30 +94,30 @@ fn diff_to_entries (
   Ok (entries) }
 
 /// Open the repository containing the given path.
-/// Returns None if the path is not in a git repository.
+/// Returns None if the path is not in a gitrepo.
 pub fn open_gitrepo (
-  repo_path : &Path
+  skgrepo_path : &Path
 ) -> Option<Repository> {
-  Repository::discover (repo_path) . ok () }
+  Repository::discover (skgrepo_path) . ok () }
 
-/// The git remote a receiver would fetch this Skg repo from, as
+/// The git remote a receiver would fetch this skgrepo from, as
 /// `(remote_name, fetch_url)`: the remote named `origin` when one
 /// exists, else the first remote listed (whose name is reported
 /// alongside, precisely because it is not the conventional
 /// `origin`). The URL is the fetch URL -- the string `git remote -v`
 /// prints between the remote name and `(fetch)`.
 ///
-/// `None` when the Skg repo directory is not itself a git repository,
+/// `None` when the skgrepo directory is not itself a gitrepo,
 /// has no remotes, or the chosen remote carries no (utf-8) URL. The
 /// path is opened EXACTLY, without searching parent directories, so a
-/// bare Skg repo directory that merely sits inside some unrelated
-/// enclosing repository is never mistaken for a repo of its own (and
-/// its enclosing repo's remote never misreported as the Skg repo's).
-pub fn repo_git_remote (
-  repo_path : &Path
+/// bare skgrepo directory that merely sits inside some unrelated
+/// enclosing gitrepo is never mistaken for a gitrepo of its own (and
+/// its enclosing gitrepo's remote never misreported as the skgrepo's).
+pub fn skgrepo_git_remote (
+  skgrepo_path : &Path
 ) -> Option<(String, String)> {
   let gitrepo : Repository =
-    Repository::open (repo_path) . ok () ?;
+    Repository::open (skgrepo_path) . ok () ?;
   let remotes : git2::string_array::StringArray =
     gitrepo . remotes () . ok () ?;
   let names : Vec<&str> =

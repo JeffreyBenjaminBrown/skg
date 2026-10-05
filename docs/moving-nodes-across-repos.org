@@ -1,15 +1,15 @@
-* moving nodes across Skg repos
+* moving nodes across skgrepos
 
-** what "moving nodes across Skg repos" means
+** what "moving nodes across skgrepos" means
 
-The user's 'skgconfig.toml' file should list some 'Skg repos'.
-A Skg repo is just a folder on disk.
-Skg lets you keep multiple Skg repos so you can treat them differently
+The user's 'skgconfig.toml' file should list some 'skgrepos'.
+A skgrepo is just a folder on disk.
+Skg lets you keep multiple skgrepos so you can treat them differently
 -- e.g. some of yours might be public, and others private.
-(All of mine are git repositories, for safety.)
+(All of mine are gitrepos, for safety.)
 
-Moving a node across repos just means
-changing which Skg repo directory holds its file.
+Moving a node across skgrepos just means
+changing which skgrepo directory holds its file.
 It has to be done *from within the app*.
 If you just move the file, Skg won't know that you did that,
 and its databases will now contain the lie
@@ -17,49 +17,49 @@ that the moved node is in the old place.
 
 ** how to do it
 Open a metadata buffer view of the node ('skg-view-metadata').
-Go to the node that specifies its Skg repo --
-it's the only child of a node that says simply 'Skg repo'.
+Go to the node that specifies its skgrepo --
+it's the only child of a node that says simply 'skgrepo'.
 "Rotate" the value, using shift-left or shift-right,
-until it shows the Skg repo where you want the node to be.
+until it shows the skgrepo where you want the node to be.
 Save that work and exit the metadata view (C-c C-c).
 Now save the buffer.
 The buffer will be rebuilt,
-and the Skg repo change will now be visible.
+and the skgrepo change will now be visible.
 
 ** pitfalls
 
-*** Foreign Skg repos are rejected on either end
-Foreign Skg repos (repos outside your =owned/= folder, forked in via
+*** Foreign skgrepos are rejected on either end
+Foreign skgrepos (repos outside your =owned/= folder, forked in via
 subscriptions) are write-protected. Trying to move a node *into* or *out
-of* a foreign Skg repo produces
+of* a foreign skgrepo produces
 =BufferValidationError::CannotMoveToOrFromForeignRepo=
 (=server/from_text/supplement_from_disk.rs:56=). The buffer save
 fails entirely, and nothing is written. If you need data from a
-foreign Skg repo in a Skg repo you own, the model is to subscribe and
+foreign skgrepo in a skgrepo you own, the model is to subscribe and
 override, not move.
 
 *** Cannot move and merge a node in the same save
-If a single save tries both to move a node's Skg repo *and* to merge
+If a single save tries both to move a node's skgrepo *and* to merge
 it (acquirer or acquiree), skg refuses with
 =CannotMoveAndMergeSimultaneously=
 (=server/from_text/validate.rs:151=,
 =tests/move_repo.rs::test_move_and_merge_simultaneously_rejected=).
 Do them in two separate saves.
 
-*** Both Skg repo names must already exist in =skgconfig.toml=
-The move uses the Skg repo name to look up the directory. If the new
-Skg repo name isn't in =[[repos]]=, you'll get a "Skg repo not found"
+*** Both skgrepo names must already exist in =skgconfig.toml=
+The move uses the skgrepo name to look up the directory. If the new
+skgrepo name isn't in =[[repos]]=, you'll get a "Skg repo not found"
 error, not a "move failed" error, and no =.skg= file will be moved.
-Add the Skg repo first and restart the server before doing the move.
+Add the skgrepo first and restart the server before doing the move.
 
 *** Containment, subscriptions, links: all unaffected
 All graph relationships are by ID, not =(ID, repo)=. The set of
-edges to/from the moved node is invariant under a Skg repo move.
+relationships to/from the moved node is invariant under a skgrepo move.
 Don't expect anything related to graph topology to change.
 
-*** Foreign Skg repo files are never written by skg
+*** Foreign skgrepo files are never written by skg
 This is more general but bears repeating in the move context: skg
-will never write to a foreign Skg repo dir (one outside =owned/=). If
+will never write to a foreign skgrepo dir (one outside =owned/=). If
 you accidentally try to move a foreign node *out* by editing it
 locally, the save fails before any FS change. The original foreign
 file stays put.
@@ -86,16 +86,16 @@ the value on disk. If they differ, skg generates a =RepoMove= and
 applies it. (See =server/from_text/supplement_from_disk.rs:23=,
 =supplement_none_fields_from_disk_if_save=.)
 
-Both =public= and =private= must be Skg repos defined in your
+Both =public= and =private= must be skgrepos defined in your
 =skgconfig.toml=, and both must be owned (under the config's
-=owned_folder=). A move to or from a foreign Skg repo is rejected
+=owned_folder=). A move to or from a foreign skgrepo is rejected
 (see Pitfalls below).
 
 Under privacy telescopes (see =telescopes.org=), what moves is the
 node's HOME: its title, body and extra ids relocate to the new
-Skg repo's section. Sections of the node at other privacy levels stay
-where they are, and each relationship edge keeps its relRepo
-(edges are clamped to be at least as private as the new home).
+skgrepo's section. Sections of the node at other privacy levels stay
+where they are, and each relationship keeps its relRepo
+(relationships are clamped to be at least as private as the new home).
 
 The buffer can reference a node by any of its IDs — primary or
 extra — and the move still works correctly. The repo-move's =pid=
@@ -104,11 +104,11 @@ is always resolved to the primary ID before the move is applied
 
 *** how derived stores are updated
 The save pipeline collects =RepoMove= records alongside the
-ordinary =DefineNode= save and delete instructions. The applied
+ordinary =NodeInstruction= saves and deletes. The applied
 order is:
 
 **** 1. FS (=server/save.rs::update_fs_from_saveinstructions=)
-The new =.skg= file is written to the new Skg repo directory first
+The new =.skg= file is written to the new skgrepo directory first
 (via =write_all_nodes_to_fs=). Then, for each =RepoMove=, the
 *old* file is removed via =std::fs::remove_file=. "Write first,
 then delete" is intentional: if the process crashes between these
@@ -119,15 +119,15 @@ If the old file is already missing (=ErrorKind::NotFound=), the
 removal is a silent no-op rather than an error.
 
 **** 2. In-memory graph (=apply_definenodes=)
-The new Skg repo is reflected in the in-memory =GraphnodeInRust= via the
-ordinary =SaveNode=, which carries the new Skg repo field. There is
+The new skgrepo is reflected in the in-memory =GraphnodeInRust= via the
+ordinary =SaveNode=, which carries the new skgrepo field. There is
 no separate move step in memory — the save is sufficient.
 
 **** 3. Tantivy
-Tantivy is not given the =RepoMove= list at all. Skg repo moves are
+Tantivy is not given the =RepoMove= list at all. Skgrepo moves are
 applied implicitly: the index update is "delete every doc by ID,
 then re-add docs for every save," and the =SaveNode= carries the
-new =repo= field, so the re-added document has the correct Skg repo.
+new =repo= field, so the re-added document has the correct skgrepo.
 
 *** how 'extra_id's are handled
 If another node references the moved node by an extra_id, that

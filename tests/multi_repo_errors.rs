@@ -17,7 +17,7 @@ use std::path::PathBuf;
 use futures::executor::block_on;
 
 #[test]
-fn test_multi_repo_errors() -> Result<(), Box<dyn Error>> {
+fn test_multi_skgrepo_errors() -> Result<(), Box<dyn Error>> {
   block_on(async {
     // Load the multi-repo fixture config.
     let mut config: SkgConfig =
@@ -45,25 +45,25 @@ fn test_multi_repo_errors() -> Result<(), Box<dyn Error>> {
       find_buffer_errors_for_saving(
         &viewforest, &config)?;
 
-    { // Repo validation errors: one for dub-1 (nonexistent repo "dub")
-      // and one for pub-1 (no repo at all).
-      let repo_re = Regex::new(r"(?i)activevognode.*must.*repo") . unwrap();
-      let repo_errors: Vec<&BufferValidationError>
+    { // Repo validation errors: one for dub-1 (nonexistent skgrepo "dub")
+      // and one for pub-1 (no skgrepo at all).
+      let skgrepo_re = Regex::new(r"(?i)activevognode.*must.*repo") . unwrap();
+      let skgrepo_errors: Vec<&BufferValidationError>
       = ( errors . iter()
           . filter(
             |e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
-                         if repo_re . is_match (msg)))
+                         if skgrepo_re . is_match (msg)))
           . collect() );
-      assert_eq!(repo_errors . len(), 2,
+      assert_eq!(skgrepo_errors . len(), 2,
                  "Expected 2 repo validation errors (pub-1 and dub-1)");
-      let ids: Vec<&str> = repo_errors . iter()
+      let skgids: Vec<&str> = skgrepo_errors . iter()
         . filter_map(|e| {
-          if let BufferValidationError::LocalStructureViolation(_, id) = e {
-            Some(id . 0 . as_str())
+          if let BufferValidationError::LocalStructureViolation(_, skgid) = e {
+            Some(skgid . 0 . as_str())
           } else { None } })
         . collect();
-      assert!(ids . contains(&"dub-1"), "Repo error should include dub-1");
-      assert!(ids . contains(&"pub-1"), "Repo error should include pub-1"); }
+      assert!(skgids . contains(&"dub-1"), "Repo error should include dub-1");
+      assert!(skgids . contains(&"pub-1"), "Repo error should include pub-1"); }
 
     { let multiple_defining_errors: Vec<&BufferValidationError>
       = ( errors . iter()
@@ -72,19 +72,19 @@ fn test_multi_repo_errors() -> Result<(), Box<dyn Error>> {
           . collect() );
       assert_eq!(multiple_defining_errors . len(), 1,
                  "Expected exactly 1 Multiple_Defining_Viewnodes error for priv-1");
-      if let BufferValidationError::Multiple_Defining_Viewnodes (id) = multiple_defining_errors[0] {
-        assert_eq!(id . 0, "priv-1", "Multiple_Defining_Viewnodes should be for priv-1"); }}
+      if let BufferValidationError::Multiple_Defining_Viewnodes (skgid) = multiple_defining_errors[0] {
+        assert_eq!(skgid . 0, "priv-1", "Multiple_Defining_Viewnodes should be for priv-1"); }}
 
-    { let inconsistent_repo_errors: Vec<&BufferValidationError>
+    { let inconsistent_skgrepo_errors: Vec<&BufferValidationError>
       = ( errors . iter()
           . filter(
-            |e| matches!(e, BufferValidationError::InconsistentRepos(_, _)))
+            |e| matches!(e, BufferValidationError::InconsistentSkgRepos(_, _)))
           . collect() );
-      assert_eq!(inconsistent_repo_errors . len(), 1,
+      assert_eq!(inconsistent_skgrepo_errors . len(), 1,
                  "Expected exactly 1 InconsistentRepos error for priv-1");
-      if let BufferValidationError::InconsistentRepos(id, repos) = inconsistent_repo_errors[0] {
-        assert_eq!(id . 0, "priv-1", "InconsistentRepos should be for priv-1");
-        assert_eq!(repos . len(), 2, "Should have 2 different repos for priv-1"); }}
+      if let BufferValidationError::InconsistentSkgRepos(skgid, skgrepos) = inconsistent_skgrepo_errors[0] {
+        assert_eq!(skgid . 0, "priv-1", "InconsistentRepos should be for priv-1");
+        assert_eq!(skgrepos . len(), 2, "Should have 2 different repos for priv-1"); }}
 
     assert_eq!(errors . len(), 4,
                "Expected exactly 4 errors: 2 LocalStructureViolation (repo errors), 1 Multiple_Defining_Viewnodes, 1 InconsistentRepos");
@@ -166,20 +166,20 @@ fn test_foreign_node_modification_errors(
           assert_eq!(created_foreign_errors . len(), 1,
                      "Expected exactly 1 CreatedForeignNode error");
 
-          let error_ids: Vec<String> = modified_foreign_errors . iter()
+          let error_skgids: Vec<String> = modified_foreign_errors . iter()
             . filter_map(|e| {
-              if let BufferValidationError::ModifiedForeignNode(id, _) = e {
-                Some(id . 0 . clone())
+              if let BufferValidationError::ModifiedForeignNode(skgid, _) = e {
+                Some(skgid . 0 . clone())
               } else { None }
             } ) . collect();
 
-          println!("Errors for IDs: {:?}", error_ids);
+          println!("Errors for IDs: {:?}", error_skgids);
 
-          assert!(error_ids . contains(&"ext-6" . to_string()), "Expected error for ext-6 (deletion)");
-          assert!(error_ids . contains(&"ext-7" . to_string()), "Expected error for ext-7 (deletion)");
+          assert!(error_skgids . contains(&"ext-6" . to_string()), "Expected error for ext-6 (deletion)");
+          assert!(error_skgids . contains(&"ext-7" . to_string()), "Expected error for ext-7 (deletion)");
           assert!(created_foreign_errors . iter() . any (|e| matches!(
-            e, BufferValidationError::CreatedForeignNode(id, _)
-              if id . 0 == "ext-new")),
+            e, BufferValidationError::CreatedForeignNode(skgid, _)
+              if skgid . 0 == "ext-new")),
             "Expected error for ext-new (new node)");
         } else {
           panic!("Expected SaveError::BufferValidationErrors, got: {:?}", e);
@@ -221,17 +221,17 @@ fn test_foreign_node_modification_errors(
           assert_eq!(merge_foreign_errors . len(), 2,
                      "Expected exactly 2 ModifiedForeignNode errors for merges");
 
-          let error_ids: Vec<String> = merge_foreign_errors . iter()
+          let error_skgids: Vec<String> = merge_foreign_errors . iter()
             . filter_map(|e| {
-              if let BufferValidationError::ModifiedForeignNode(id, _) = e {
-                Some(id . 0 . clone())
+              if let BufferValidationError::ModifiedForeignNode(skgid, _) = e {
+                Some(skgid . 0 . clone())
               } else { None }
             } ) . collect();
 
-          println!("NodeMerge errors for IDs: {:?}", error_ids);
+          println!("NodeMerge errors for IDs: {:?}", error_skgids);
 
-          assert!(error_ids . contains(&"ext-8" . to_string()), "Expected error for ext-8 (foreign acquirer)");
-          assert!(error_ids . contains(&"ext-9" . to_string()), "Expected error for ext-9 (foreign acquiree)");
+          assert!(error_skgids . contains(&"ext-8" . to_string()), "Expected error for ext-8 (foreign acquirer)");
+          assert!(error_skgids . contains(&"ext-9" . to_string()), "Expected error for ext-9 (foreign acquiree)");
         } else {
           panic!("Expected SaveError::BufferValidationErrors, got: {:?}", e);
         }
@@ -256,9 +256,9 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-repo-errors-3");
 
 
-    // Test 1: Repo move between owned repos is now allowed
-    // priv-1 exists on disk in "private" repo, but buffer specifies "public"
-    // Both repos are owned, so this should succeed (producing a RepoMove).
+    // Test 1: Repo move between owned skgrepos is now allowed
+    // priv-1 exists on disk in "private" skgrepo, but buffer specifies "public"
+    // Both skgrepos are owned, so this should succeed (producing a RepoMove).
     {
       let buffer_with_move: &str = indoc! {"
         * (skg (node (id priv-1) (repo public))) priv-1  # disk has 'private', buffer says 'public'
@@ -277,23 +277,23 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
               result . err());
 
       let ( _viewforest, save_plan, _warnings ) = result?;
-      assert_eq!(save_plan . repo_moves . len(), 1,
+      assert_eq!(save_plan . skgrepo_moves . len(), 1,
                  "Expected exactly 1 repo move");
-      assert_eq!(save_plan . repo_moves[0] . pid . 0, "priv-1");
-      assert_eq!(save_plan . repo_moves[0] . old_repo . as_str(), "private");
-      assert_eq!(save_plan . repo_moves[0] . new_repo . as_str(), "public");
+      assert_eq!(save_plan . skgrepo_moves[0] . pid . 0, "priv-1");
+      assert_eq!(save_plan . skgrepo_moves[0] . old_skgrepo . as_str(), "private");
+      assert_eq!(save_plan . skgrepo_moves[0] . new_skgrepo . as_str(), "public");
     }
 
     // Test 2: InconsistentRepos
-    // Two instances of pub-1 with different repos (validation should catch this)
+    // Two instances of pub-1 with different skgrepos (validation should catch this)
     {
-      let buffer_with_inconsistent_repos: &str = indoc! {"
+      let buffer_with_inconsistent_skgrepos: &str = indoc! {"
         * (skg (node (id pub-1) (repo public))) pub-1                # definitive instance with 'public'
         * (skg (node (id pub-1) (repo private) writeProtected)) pub-1  # write-protected instance with 'private'
       "};
 
       let buffer_text: String =
-        strip_org_comments (buffer_with_inconsistent_repos);
+        strip_org_comments (buffer_with_inconsistent_skgrepos);
 
       // This should fail during validation (before write-protected_occurrences are filtered)
       let result = buffer_to_validated_saveplan(
@@ -311,10 +311,10 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         match e {
           SaveError::BufferValidationErrors { errors, .. } => {
             // Should contain InconsistentRepos error
-            let repo_errors: Vec<&BufferValidationError> = errors . iter()
-              . filter(|e| matches!(e, BufferValidationError::InconsistentRepos(_, _)))
+            let skgrepo_errors: Vec<&BufferValidationError> = errors . iter()
+              . filter(|e| matches!(e, BufferValidationError::InconsistentSkgRepos(_, _)))
               . collect();
-            assert!(!repo_errors . is_empty(),
+            assert!(!skgrepo_errors . is_empty(),
                     "Expected InconsistentRepos error in validation");
             println!("Successfully caught InconsistentRepos error during validation");
           }

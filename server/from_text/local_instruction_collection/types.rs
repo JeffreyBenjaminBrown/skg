@@ -1,60 +1,60 @@
 /// This file defines the types of local instruction collection
-/// (TODO/local-instruction-collection/3_plan.org), plus the
+/// (TODO/DONE/local-instruction-collection/3_plan.org), plus the
 /// instructionMerge insert function that accumulates emissions.
 /// .
 /// TERMINOLOGY: 'merge' is always qualified. 'nodeMerge' is the
-/// acquirer/acquiree operation on graph nodes; 'instructionMerge' is
-/// the combining of emitted intents into the accumulator map. What
-/// collection emits are *intents* -- some are unresolved signals --
-/// and they become DefineNode *instructions* only after downstream
+/// acquirer/acquiree operation on graphnodes; 'instructionMerge' is
+/// the combining of emitted fieldIntents into the accumulator map. What
+/// collection emits are *fieldIntents* -- some are unresolved signals --
+/// and they become NodeInstruction *instructions* only after downstream
 /// resolution and disk supplementation.
 
-use crate::types::misc::{ID, RepoName};
+use crate::types::misc::{ID, SkgRepoName};
 use crate::types::nodes::complete::Flag;
 use std::collections::HashMap;
 
 /// A LocalContext is what flows down the traversal: each node
 /// computes one of these for each of its children, and it carries
-/// everything an intent emission needs to know about its ancestors.
+/// everything an fieldIntent emission needs to know about its ancestors.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LocalContext {
   TopLevel, // The node is a child of the BufferRoot.
   UnderVognode { // The node's parent is a vognode, a phantom, or a DeadViewnode.
-    parent_if_writeable : Option<ID>, }, // This is Some iff the parent is save-eligible.
+    parent_if_editable : Option<ID>, }, // This is Some iff the parent is save-eligible.
   UnderDefiningFolder ( // The node is inside an AliasFolder, a SubscribeeFolder, or an OverriddenFolder.
-    DefiningFolderOwner ),
+    DefiningFolderRecorder ),
   SubscribeeAsSuchPosition { // The node is a direct child of a SubscribeeFolder.
     subscriber               : ID,
-    subscriber_is_definitive : bool, },
+    subscriber_is_editable   : bool, },
   HiddenOutsidePosition { // The one derived-but-editable filter under a SubscribeeFolder.
     subscriber       : ID,
     is_saveEligible  : bool, },
   UnderWriteProtectedFolder, // The node is inside one of the six write-protected RoleFolders, an IDFolder, or a Property.
 }
 
-/// A DefiningFolderOwner is what a defining folder knows about its owner
-/// (the folder's parent). The id and definitiveness are carried even
-/// when the owner is not save-eligible, because a SubscribeeFolder's
+/// A DefiningFolderRecorder is what a defining folder knows about its recorder
+/// (the folder's parent). The id and editability are carried even
+/// when the recorder is not save-eligible, because a SubscribeeFolder's
 /// children need them for text claims, which outlive the visibility
 /// guard.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DefiningFolderOwner {
-  pub id              : ID,
-  pub is_definitive   : bool, // True iff the owner is Active and definitive.
-  pub is_saveEligible : bool, // True iff the owner is definitive, Active, carries no Delete request, and is not in subscribee-as-such position.
+pub struct DefiningFolderRecorder {
+  pub skgid              : ID,
+  pub is_editable     : bool, // True iff the recorder is Active and editable.
+  pub is_saveEligible : bool, // True iff the recorder is editable, Active, carries no Delete request, and is not in subscribee-as-such position.
 }
 
-/// A NodeIntent_Local is what one visit can emit. Each emission
+/// A FieldIntent is what one visit can emit. Each emission
 /// pairs one of these with a target ID, and the pair is
 /// instructionMerged into the accumulator.
 /// The first eight kinds are exclusive (at most one per ID); the
 /// last three are combineable (any number per ID). That distinction is
-/// the shape of 'IntentsForOneId': each exclusive kind gets an
+/// the shape of 'FieldIntentsForOneId': each exclusive kind gets an
 /// Option slot there, and each combineable kind gets a Vec slot.
 /// .
-/// 'SetTitleAndBody' and 'Delete' carry the emitting node's repo.
+/// 'SetTitleAndBody' and 'Delete' carry the emitting node's skgrepo.
 /// They are the self-emissions, and lowering a map entry to a
-/// DefineNode needs to know which repo's file it concerns.
+/// NodeInstruction needs to know which skgrepo's file it concerns.
 /// .
 /// 'SetContains' / 'SetSubscribesTo' / 'SetOverrides' pair each
 /// member with an Option<RepoName>: Some when the position's
@@ -62,20 +62,20 @@ pub struct DefiningFolderOwner {
 /// request (the 'skg-set-relRepo' gesture), None meaning
 /// "derive" (the usual
 /// sticky-else-default rule). 'server/from_text/supplement_from_disk.rs'
-/// validates the explicit repos against each edge's DEFAULT floor
+/// validates the explicit skgrepos against each relationship's DEFAULT floor
 /// at save time (render-and-gating, 5_plan.org;
 /// BUG-and-fix_make-edge-more-public.org).
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
-pub enum NodeIntent_Local {
-  SetTitleAndBody { repo : RepoName,
+pub enum FieldIntent {
+  SetTitleAndBody { skgrepo : SkgRepoName,
                     title  : String,
                     body   : Option<String>, },
-  SetContains     (Vec<(ID, Option<RepoName>)>),
-  SetAliases      (Vec<(String, Option<RepoName>)>),
-  SetSubscribesTo (Vec<(ID, Option<RepoName>)>),
-  SetOverrides    (Vec<(ID, Option<RepoName>)>),
-  Delete          { repo : RepoName },
+  SetContains     (Vec<(ID, Option<SkgRepoName>)>),
+  SetAliases      (Vec<(String, Option<SkgRepoName>)>),
+  SetSubscribesTo (Vec<(ID, Option<SkgRepoName>)>),
+  SetOverrides    (Vec<(ID, Option<SkgRepoName>)>),
+  Delete          { skgrepo : SkgRepoName },
   NodeMerge       { acquiree : ID },
   SetFlag     { flag : Flag, value : bool },
   // The remaining kinds are combineable.
@@ -96,8 +96,8 @@ pub struct SubscribeeVisibility {
 }
 
 /// The explicitly submitted visible-outside subset for one subscriber.
-/// Unlike direct relationship sets it carries no repo request: hide
-/// repos are derived after subscriptions and visibility are resolved.
+/// Unlike direct relationship sets it carries no skgrepo request: hide
+/// skgrepos are derived after subscriptions and visibility are resolved.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HiddenOutsideEdit {
   pub members : Vec<ID>,
@@ -113,20 +113,20 @@ pub struct SubscribeeTextClaim {
   pub body  : Option<String>,
 }
 
-/// This accumulates the intents aimed at one ID. It is a slot
-/// struct: "at most one of each exclusive intent kind" is the shape
+/// This accumulates the fieldIntents aimed at one ID. It is a slot
+/// struct: "at most one of each exclusive fieldIntent kind" is the shape
 /// of the type (the Option slots), and combineability is visible as
 /// the Vec slots. One cross-slot rule stays procedural, in
-/// 'instructionMerge_intent': 'delete' excludes the other exclusive
+/// 'instructionMerge_fieldIntent': 'delete' excludes the other exclusive
 /// slots, and 'nodeMerge' excludes 'flag'.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct IntentsForOneId {
-  pub home_repo         : Option<RepoName>, // This is filled by the self-emissions (SetTitleAndBody and Delete).
+pub struct FieldIntentsForOneId {
+  pub home_skgrepo   : Option<SkgRepoName>, // This is filled by the self-emissions (SetTitleAndBody and Delete).
   pub title_and_body : Option<(String, Option<String>)>,
-  pub contains       : Option<Vec<(ID, Option<RepoName>)>>,
-  pub aliases        : Option<Vec<(String, Option<RepoName>)>>,
-  pub subscribes_to  : Option<Vec<(ID, Option<RepoName>)>>,
-  pub overrides      : Option<Vec<(ID, Option<RepoName>)>>,
+  pub contains       : Option<Vec<(ID, Option<SkgRepoName>)>>,
+  pub aliases        : Option<Vec<(String, Option<SkgRepoName>)>>,
+  pub subscribes_to  : Option<Vec<(ID, Option<SkgRepoName>)>>,
+  pub overrides      : Option<Vec<(ID, Option<SkgRepoName>)>>,
   pub delete         : bool,
   pub node_merge     : Option<ID>, // This holds the acquiree.
   pub flag       : Option<(Flag, bool)>,
@@ -137,13 +137,13 @@ pub struct IntentsForOneId {
 
 /// This is the traversal's output.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct CollectedIntents {
+pub struct CollectedFieldIntents {
   pub order           : Vec<ID>, // This holds the IDs in first-emission order.
-  pub lowerable_order : Vec<ID>, // This holds the IDs in first save-or-delete-emission order. It is a subset of 'order': an ID whose entry holds only signals appears in 'order' alone. Lowering uses this, so that an ID first seen as (say) a subscribee-as-such is saved at the position of its definitive instance.
-  pub by_pid : HashMap<ID, IntentsForOneId>,
+  pub lowerable_order : Vec<ID>, // This holds the IDs in first save-or-delete-emission order. It is a subset of 'order': an ID whose entry holds only signals appears in 'order' alone. Lowering uses this, so that an ID first seen as (say) a subscribee-as-such is saved at the position of its editable instance.
+  pub by_pid          : HashMap<ID, FieldIntentsForOneId>,
 }
 
-impl IntentsForOneId {
+impl FieldIntentsForOneId {
   /// True iff some exclusive slot other than 'delete' (and other than
   /// 'repo', which 'delete' itself fills) is occupied.
   fn some_nondelete_exclusive_slot_is_filled (
@@ -157,20 +157,20 @@ impl IntentsForOneId {
       || self . node_merge    . is_some()
       || self . flag      . is_some() }}
 
-impl CollectedIntents {
+impl CollectedFieldIntents {
   pub fn new (
-  ) -> CollectedIntents {
-    CollectedIntents::default() }
+  ) -> CollectedFieldIntents {
+    CollectedFieldIntents::default() }
 
-  /// This instructionMerges one emitted intent into the map.
-  /// The rules (from TODO/local-instruction-collection/3_plan.org) are:
-  /// - a combineable intent always pushes;
-  /// - an exclusive intent into an empty slot fills it;
-  /// - an exclusive intent into an occupied slot with an EQUAL
+  /// This instructionMerges one emitted fieldIntent into the map.
+  /// The rules (from TODO/DONE/local-instruction-collection/3_plan.org) are:
+  /// - a combineable fieldIntent always pushes;
+  /// - an exclusive fieldIntent into an empty slot fills it;
+  /// - an exclusive fieldIntent into an occupied slot with an EQUAL
   ///   payload is a silent no-op;
-  /// - an exclusive intent into an occupied slot with a different
+  /// - an exclusive fieldIntent into an occupied slot with a different
   ///   payload is an error. Upstream validation should preclude this
-  ///   (at most one definitive instance per ID), so hitting it means
+  ///   (at most one editable instance per ID), so hitting it means
   ///   an upstream regression -- kept as a real error, not a panic;
   /// - 'Delete' alongside any other filled exclusive slot (or vice
   ///   versa) is an error, matching the old "Cannot have both Delete
@@ -180,33 +180,33 @@ impl CollectedIntents {
   /// - 'visibility' and 'text_claims' coexist with anything,
   ///   including 'delete' (resolution ignores deleted subscribers).
   #[allow(non_snake_case)]
-  pub fn instructionMerge_intent (
+  pub fn instructionMerge_fieldIntent (
     &mut self,
     target : ID,
-    intent : NodeIntent_Local,
+    intent : FieldIntent,
   ) -> Result<(), String> {
-    let entry : &mut IntentsForOneId = {
+    let entry : &mut FieldIntentsForOneId = {
       if ! self . by_pid . contains_key (&target) {
         self . order . push (target . clone()); }
       self . by_pid . entry (target . clone())
         . or_default() };
     match intent {
-      NodeIntent_Local::SubscribeeVisibility (v) => {
+      FieldIntent::SubscribeeVisibility (v) => {
         entry . visibility . push (v);
         Ok (( )) },
-      NodeIntent_Local::HiddenOutsideEdit (edit) => {
+      FieldIntent::HiddenOutsideEdit (edit) => {
         entry . hidden_outside . push (edit);
         Ok (( )) },
-      NodeIntent_Local::SubscribeeTextClaim (c) => {
+      FieldIntent::SubscribeeTextClaim (c) => {
         entry . text_claims . push (c);
         Ok (( )) },
-      NodeIntent_Local::Delete { repo } => {
+      FieldIntent::Delete { skgrepo } => {
         if entry . some_nondelete_exclusive_slot_is_filled() {
           return Err ( format!(
             "Cannot have both Delete and Save for same ID: {}",
             target )); }
         fill_exclusive_slot (
-          &mut entry . home_repo, repo, "repo", &target) ?;
+          &mut entry . home_skgrepo, skgrepo, "repo", &target) ?;
         if ! entry . delete {
           entry . delete = true;
           self . lowerable_order . push (target); }
@@ -217,9 +217,9 @@ impl CollectedIntents {
             "Cannot have both Delete and Save for same ID: {}",
             target )); }
         match intent {
-          NodeIntent_Local::SetTitleAndBody { repo, title, body } => {
+          FieldIntent::SetTitleAndBody { skgrepo, title, body } => {
             fill_exclusive_slot (
-              &mut entry . home_repo, repo, "repo", &target) ?;
+              &mut entry . home_skgrepo, skgrepo, "repo", &target) ?;
             let was_empty : bool =
               entry . title_and_body . is_none();
             fill_exclusive_slot (
@@ -228,21 +228,21 @@ impl CollectedIntents {
             if was_empty {
               self . lowerable_order . push (target); }
             Ok (( )) },
-          NodeIntent_Local::SetContains (members) =>
+          FieldIntent::SetContains (members) =>
             fill_exclusive_slot (
               &mut entry . contains, members, "contains", &target),
-          NodeIntent_Local::SetAliases (texts) =>
+          FieldIntent::SetAliases (texts) =>
             fill_exclusive_slot (
               &mut entry . aliases, texts, "aliases", &target),
-          NodeIntent_Local::SetSubscribesTo (members) =>
+          FieldIntent::SetSubscribesTo (members) =>
             fill_exclusive_slot (
               &mut entry . subscribes_to, members,
               "subscribes_to", &target),
-          NodeIntent_Local::SetOverrides (members) =>
+          FieldIntent::SetOverrides (members) =>
             fill_exclusive_slot (
               &mut entry . overrides, members,
               "overrides_view_of", &target),
-          NodeIntent_Local::NodeMerge { acquiree } => {
+          FieldIntent::NodeMerge { acquiree } => {
             if entry . flag . is_some() {
               return Err ( format!(
                 "Cannot combine nodeMerge and flag requests for ID {}",
@@ -250,7 +250,7 @@ impl CollectedIntents {
             fill_exclusive_slot (
               &mut entry . node_merge, acquiree,
               "nodeMerge acquiree", &target) },
-          NodeIntent_Local::SetFlag { flag, value } => {
+          FieldIntent::SetFlag { flag, value } => {
             if entry . node_merge . is_some() {
               return Err ( format!(
                 "Cannot combine nodeMerge and flag requests for ID {}",
@@ -258,14 +258,14 @@ impl CollectedIntents {
             fill_exclusive_slot (
               &mut entry . flag, (flag, value),
               "flag", &target) },
-          NodeIntent_Local::Delete { .. }
-            | NodeIntent_Local::SubscribeeVisibility (_)
-            | NodeIntent_Local::HiddenOutsideEdit (_)
-            | NodeIntent_Local::SubscribeeTextClaim (_) =>
+          FieldIntent::Delete { .. }
+            | FieldIntent::SubscribeeVisibility (_)
+            | FieldIntent::HiddenOutsideEdit (_)
+            | FieldIntent::SubscribeeTextClaim (_) =>
             unreachable! ("handled by the outer match"), }}}}
 }
 
-/// See 'instructionMerge_intent' for the rules this enforces.
+/// See 'instructionMerge_fieldIntent' for the rules this enforces.
 fn fill_exclusive_slot<T : PartialEq + std::fmt::Debug> (
   slot    : &mut Option<T>,
   payload : T,

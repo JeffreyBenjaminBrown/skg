@@ -9,8 +9,8 @@
 (require 'skg-buffer)
 (require 'skg-lock-buffers)
 
-(defun skg-request-save-buffer (&optional fork-approved fork-repos
-                                          hoist-approved-pids
+(defun skg-request-save-buffer (&optional approved-forks fork-repos
+                                          approved-hoist-pids
                                           text-approved-pids)
   "Send the current buffer contents to Rust for processing.
 Before sending, adds 'folded' markers to folded headlines and 'focused' marker to current headline.
@@ -37,13 +37,13 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
   (skg--lock-all-skg-buffers)
   (condition-case err
       (skg--send-save-buffer
-       fork-approved fork-repos hoist-approved-pids text-approved-pids)
+       approved-forks fork-repos approved-hoist-pids text-approved-pids)
     (error
      (skg--cancel-locally-failed-save)
      (signal (car err) (cdr err)))))
 
-(defun skg--send-save-buffer (fork-approved fork-repos
-                                            hoist-approved-pids
+(defun skg--send-save-buffer (approved-forks fork-repos
+                                            approved-hoist-pids
                                             text-approved-pids)
   "Serialize and send a save after the stream guard and locks are held."
   (when (org-before-first-heading-p)
@@ -70,9 +70,9 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
                                    (skg--save-request-sexp
                                     skg-view-uri
                                     save-point-position
-                                    fork-approved
+                                    approved-forks
                                     fork-repos
-                                    hoist-approved-pids
+                                    approved-hoist-pids
                                     text-approved-pids))
                                   "\n"))
            (content-bytes (encode-coding-string wire-content 'utf-8))
@@ -125,15 +125,15 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
        'telescope-hoist-confirmation
        (lambda (_tcp-proc payload)
          (skg--telescope-hoist-confirmation-handler
-          save-buffer payload fork-approved fork-repos
+          save-buffer payload approved-forks fork-repos
           text-approved-pids))
        nil)
       (skg-register-response-handler
        'overPrivateText-telescope-confirmation
        (lambda (_tcp-proc payload)
          (skg--save-text-release-confirmation-handler
-          save-buffer payload fork-approved fork-repos
-          hoist-approved-pids))
+          save-buffer payload approved-forks fork-repos
+          approved-hoist-pids))
        nil)
 
       (skg-lp-reset)
@@ -224,11 +224,11 @@ internal edit; it is restored before any request is sent."
   (skg--unlock-all-save-locked))
 
 (defun skg--save-request-sexp (view-uri save-point-position
-                                        &optional fork-approved fork-repos
-                                        hoist-approved-pids
+                                        &optional approved-forks fork-repos
+                                        approved-hoist-pids
                                         text-approved-pids)
   "Build the save-buffer request sexp. When FORK-APPROVED is non-nil,
-include (fork-approved . \"true\") so the server commits any forks it
+include (approved-forks . \"true\") so the server commits any forks it
 finds instead of returning a fork-confirmation. FORK-REPOS, when
 non-nil, is an alist ((N . REPO) ...) pairing each forked node's id
 with the owned repo the user chose for its clone; it rides out as the
@@ -248,14 +248,14 @@ field (fork-repos ((N . REPO) ...))."
       . ,(number-to-string
           (plist-get save-point-position
                      :point-screen-lines-below-window-start))))
-   (when fork-approved
-     '((fork-approved . "true")))
+   (when approved-forks
+     '((approved-forks . "true")))
    (when fork-repos
      (list (list 'fork-repos fork-repos)))
-   (when hoist-approved-pids
-     `((hoist-approved-pids ,@hoist-approved-pids)))
+   (when approved-hoist-pids
+     `((approved-hoist-pids ,@approved-hoist-pids)))
    (when text-approved-pids
-     `((allow-overPrivateText-telescopes ,@text-approved-pids)))))
+     `((approved-overPrivateText-pids ,@text-approved-pids)))))
 
 (defun skg--current-save-point-position ()
   "WHAT IT DOES: Return point position data that should survive the save redraw:
@@ -379,32 +379,32 @@ carrying clone (the user can also set one with C-c s s);
 `skg-approve-fork' refuses while any remains. Must match
 FORK_REPO_PLACEHOLDER in server/from_text/fork.rs.")
 
-(defvar-local skg--fork-origin-buffer nil
+(defvar-local skg--fork-source-buffer nil
   "In a fork-confirmation buffer, the source buffer whose save raised the
 forks. `skg-approve-fork' re-saves it (approved); `skg-decline-fork'
 leaves things untouched.")
 
 (defvar-local skg--fork-suppress-strip-on-kill nil
   "When non-nil, `skg--fork-confirmation-on-kill' does NOT strip the
-origin's fork atom. `skg-approve-fork' sets it before killing this
+source's fork atom. `skg-approve-fork' sets it before killing this
 buffer, because its re-save still needs the atom to commit the fork.")
 
 (defvar-local skg--pending-fork-result nil
-  "On a fork's origin buffer, (RESULT-BUFFER . FORK-COUNT) while the
+  "On a fork's source buffer, (RESULT-BUFFER . FORK-COUNT) while the
 approved re-save is pending.  The save-result handler turns that buffer
 into a durable success/failure message.")
 
 (defun skg--fork-confirmation-on-kill ()
   "`kill-buffer-hook' for a fork-confirmation buffer: dismissing it
 WITHOUT approving strips the lingering (viewRequests fork) atom from the
-origin buffer, so the next save does not silently re-fork. This covers
+source buffer, so the next save does not silently re-fork. This covers
 killing the buffer directly (C-x k, q, etc.); `skg-decline-fork' already
 strips explicitly, and `skg-approve-fork' suppresses this (its re-save
 needs the atom, and the server drops it on re-render). Stripping is
 idempotent, so a redundant call after a decline is a harmless no-op."
   (unless skg--fork-suppress-strip-on-kill
-    (when (buffer-live-p skg--fork-origin-buffer)
-      (with-current-buffer skg--fork-origin-buffer
+    (when (buffer-live-p skg--fork-source-buffer)
+      (with-current-buffer skg--fork-source-buffer
         (skg-strip-fork-requests-in-buffer)))))
 
 (defun skg--write-fork-result (buffer headline &optional details)
@@ -423,7 +423,7 @@ idempotent, so a redundant call after a decline is a harmless no-op."
         (read-only-mode 1)))))
 
 (defun skg--replace-fork-confirmation-with-result
-    (confirmation origin fork-count)
+    (confirmation source fork-count)
   "Replace every window showing CONFIRMATION with a pending result buffer.
 Record that buffer and FORK-COUNT on ORIGIN, then kill CONFIRMATION."
   (let* ((result (get-buffer-create "*SKG Fork Result*"))
@@ -434,7 +434,7 @@ Record that buffer and FORK-COUNT on ORIGIN, then kill CONFIRMATION."
     (dolist (window windows)
       (when (window-live-p window)
         (set-window-buffer window result)))
-    (with-current-buffer origin
+    (with-current-buffer source
       (setq skg--pending-fork-result (cons result fork-count)))
     (let ((kill-buffer-query-functions nil))
       (kill-buffer confirmation))
@@ -515,7 +515,7 @@ it), end the stream, and unlock."
          ;; (user-error) from `skg-approve-fork' must reach the user,
          ;; not the log -- nesting it here used to swallow the
          ;; \"pick a repo first\" refusal, so approving with a
-         ;; placeholder repo silently did nothing.
+         ;; placeholder skgrepo silently did nothing.
          (condition-case err
              (let* ((response (read payload))
                     (content (cadr (assoc 'content response)))
@@ -530,7 +530,7 @@ it), end the stream, and unlock."
       ;; In batch (tests) the caller drives skg-approve-fork /
       ;; skg-decline-fork directly; interactively, ask now. Quitting
       ;; (C-g) any prompt leaves the confirmation buffer open: set
-      ;; repos with C-c s s and approve with C-c C-c, or decline
+      ;; skgrepos with C-c s s and approve with C-c C-c, or decline
       ;; with C-c C-k.
       (with-current-buffer confirm-buf
         (skg--fork-choose-placeholder-repos)
@@ -539,7 +539,7 @@ it), end the stream, and unlock."
           (skg-decline-fork))))))
 
 (defun skg--telescope-hoist-confirmation-handler
-    (save-buffer payload fork-approved fork-repos
+    (save-buffer payload approved-forks fork-repos
                  &optional text-approved-pids)
   "Handle the text-free terminal Hoist challenge for SAVE-BUFFER.
 The server has committed nothing.  On approval, reissue the same save with
@@ -579,7 +579,7 @@ on a retry that had already received fork authority."
           (if (yes-or-no-p prompt)
               (with-current-buffer save-buffer
                 (skg-request-save-buffer
-                 fork-approved fork-repos approved-pids
+                 approved-forks fork-repos approved-pids
                  text-approved-pids))
             (message
              "Hoist aborted; nothing was saved. Repair the .skg sections manually."))))
@@ -588,7 +588,7 @@ on a retry that had already received fork authority."
               "telescope-hoist-confirmation handler error: %S" err))))
 
 (defun skg--save-text-release-confirmation-handler
-    (save-buffer payload fork-approved fork-repos hoist-approved-pids)
+    (save-buffer payload approved-forks fork-repos approved-hoist-pids)
   "Handle a save-rerender text release challenge.
 The filesystem save has succeeded, but the server has not released the
 staged saved/collateral text or changed its open-view registry.  Approval
@@ -618,7 +618,7 @@ unchanged."
           (if (yes-or-no-p prompt)
               (with-current-buffer save-buffer
                 (skg-request-save-buffer
-                 fork-approved fork-repos hoist-approved-pids
+                 approved-forks fork-repos approved-hoist-pids
                  approved-pids))
             (message
              "Save succeeded; protected rerender text remains withheld and buffers are unchanged."))))
@@ -668,7 +668,7 @@ placeholder), per TODO/fork-fixes.org: no redundant ask."
 
 (defun skg--show-fork-confirmation (content save-buffer)
   "Show CONTENT in the *SKG Fork Confirmation* buffer, recording
-SAVE-BUFFER as its origin, and return the buffer. The buffer is a
+SAVE-BUFFER as its source, and return the buffer. The buffer is a
 navigable content view (so id-push / search work). It is editable so
 each clone's repo can be set (the handler's minibuffer prompts write
 into it; C-c s s on a clone-to-be works too), but it is NOT an ordinary
@@ -689,10 +689,10 @@ its id-less clone-to-be parents would create bare nodes. Only C-c C-c
       ;; nil view-uri: not a registered view, and the ordinary-save guard
       ;; rejects M-x skg-request-save-buffer on it.
       (setq skg-view-uri nil)
-      (setq skg--fork-origin-buffer save-buffer)
+      (setq skg--fork-source-buffer save-buffer)
       (setq skg--fork-suppress-strip-on-kill nil)
       ;; Dismissing this buffer without approving (killing it directly,
-      ;; not via C-c C-k) must still strip the origin's fork atom.
+      ;; not via C-c C-k) must still strip the source's fork atom.
       (add-hook 'kill-buffer-hook #'skg--fork-confirmation-on-kill nil t)
       ;; Copy the mode map first so these overrides stay buffer-local --
       ;; local-set-key mutates (current-local-map) in place, which is the
@@ -746,7 +746,7 @@ child's id N -- the key by which the server applies the chosen repo."
 
 (defun skg-approve-fork ()
   "Approve the forks listed in this *SKG Fork Confirmation* buffer:
-extract each clone's chosen repo, re-save the originating buffer with
+extract each clone's chosen repo, re-save the source buffer with
 the forks approved (carrying those repos), and replace the confirmation
 pane with a result buffer.  The result changes from \"saving\" to the
 server-confirmed success or failure when the approved save finishes.
@@ -760,9 +760,9 @@ hand (C-c s s)."
   (interactive)
   (unless noninteractive
     (skg--fork-choose-placeholder-repos))
-  (let ((origin skg--fork-origin-buffer)
+  (let ((source skg--fork-source-buffer)
         (fork-repos (skg--fork-repos-from-confirmation-buffer)))
-    (unless (buffer-live-p origin)
+    (unless (buffer-live-p source)
       (error "The buffer that requested these forks is no longer open"))
     (when (seq-some (lambda (pair)
                       (string= (cdr pair) skg-fork-repo-placeholder))
@@ -773,21 +773,21 @@ hand (C-c s s)."
     ;; server then drops it on re-render), so suppress the kill-hook strip.
     (setq skg--fork-suppress-strip-on-kill t)
     (skg--replace-fork-confirmation-with-result
-     (current-buffer) origin (length fork-repos))
-    (with-current-buffer origin
+     (current-buffer) source (length fork-repos))
+    (with-current-buffer source
       (skg-request-save-buffer t fork-repos))))
 
 (defun skg-decline-fork ()
   "Decline the forks; nothing was written. Strip any lingering explicit
-\(viewRequests fork) atom from the origin buffer -- otherwise the next save
+\(viewRequests fork) atom from the source buffer -- otherwise the next save
 of that buffer would silently re-fork -- then leave this confirmation
 buffer open (it is navigable -- search it for relevant IDs).
 
-Stripping is a no-op for an implicit (foreign) fork, whose origin headline
+Stripping is a no-op for an implicit (foreign) fork, whose source headline
 carries no fork atom."
   (interactive)
-  (when (buffer-live-p skg--fork-origin-buffer)
-    (with-current-buffer skg--fork-origin-buffer
+  (when (buffer-live-p skg--fork-source-buffer)
+    (with-current-buffer skg--fork-source-buffer
       (skg-strip-fork-requests-in-buffer)))
   (message
    "Fork declined; nothing was saved. This buffer is left open for reference."))
@@ -879,9 +879,9 @@ moves point to focused headline, and removes focus marker."
     (;; PITFALL: `erase-buffer' does NOT remove overlays — they collapse
      ;; but persist at the buffer boundaries. Fold overlays left over
      ;; from the previous save cycle will re-expand over freshly inserted
-     ;; text, making some headings already folded here. We MUST unfold
+     ;; text, making some headlines already folded here. We MUST unfold
      ;; before any metadata edit, or `skg-edit-metadata-at-point' will
-     ;; call `delete-region' on a folded heading line, and org-fold's
+     ;; call `delete-region' on a folded headline line, and org-fold's
      ;; `org-fold-core--fix-folded-region' will expand the deletion to
      ;; cover the hidden subtree — clobbering the root.
      org-fold-show-all)

@@ -9,7 +9,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::prepared_update::GraphChangeSet;
 use crate::types::misc::{ID, members_of};
 use crate::types::nodes::rust::GraphnodeInRust;
-use crate::types::save::{DefineNode, DeleteNode, SaveNode};
+use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -36,22 +36,22 @@ pub(crate) struct LocalIndexValidation {
 /// prepared batch. Unlike `validate_internal_indexes`, this is bounded by the
 /// delta and is suitable as an always-on save guard.
 pub(crate) fn validate_local_internal_indexes (
-  base        : &InRustGraph,
-  candidate   : &InRustGraph,
-  definitions : &[DefineNode],
-  changes     : &GraphChangeSet,
+  base             : &InRustGraph,
+  candidate        : &InRustGraph,
+  nodeInstructions : &[NodeInstruction],
+  changes          : &GraphChangeSet,
 ) -> LocalIndexValidation {
   let mut result : Vec<InternalIndexMismatch> = Vec::new ();
   let mut relationship_membership_checks : usize = 0;
-  validate_local_nodes (candidate, definitions, &mut result);
+  validate_local_nodes (candidate, nodeInstructions, &mut result);
   validate_local_identity (base, candidate, changes, &mut result);
-  for owner in &changes . owners_to_reindex {
+  for recorder in &changes . recorders_to_reindex {
     let old_keys : BTreeMap<&'static str, BTreeSet<ID>> = base . nodes
-      . get (owner)
+      . get (recorder)
       . map (|node| relationship_keys (base, node))
       . unwrap_or_default ();
     let final_keys : BTreeMap<&'static str, BTreeSet<ID>> = candidate . nodes
-      . get (owner)
+      . get (recorder)
       . map (|node| relationship_keys (candidate, node))
       . unwrap_or_default ();
     for index_name in [
@@ -69,10 +69,10 @@ pub(crate) fn validate_local_internal_indexes (
         let actual_set : Option<&im::HashSet<ID>> =
           relationship_index (candidate, index_name) . get (&key);
         let actual : bool = actual_set
-          . is_some_and (|set| set . contains (owner));
+          . is_some_and (|set| set . contains (recorder));
         if expected != actual {
           result . push (membership_mismatch (
-            index_name, key . clone (), owner, expected, actual)); }
+            index_name, key . clone (), recorder, expected, actual)); }
         if actual_set . is_some_and (|set| set . is_empty ()) {
           result . push (InternalIndexMismatch {
             index    : index_name,
@@ -87,20 +87,20 @@ pub(crate) fn validate_local_internal_indexes (
       . then_with (|| left . actual . cmp (&right . actual)));
   LocalIndexValidation {
     errors : result,
-    node_checks : definitions . len (),
-    identity_checks : changes . affected_ids . len (),
+    node_checks : nodeInstructions . len (),
+    identity_checks : changes . affected_skgids . len (),
     relationship_membership_checks,
   }
 }
 
 fn validate_local_nodes (
-  candidate   : &InRustGraph,
-  definitions : &[DefineNode],
-  result      : &mut Vec<InternalIndexMismatch>,
+  candidate        : &InRustGraph,
+  nodeInstructions : &[NodeInstruction],
+  result           : &mut Vec<InternalIndexMismatch>,
 ) {
-  for definition in definitions {
-    match definition {
-      DefineNode::Save (SaveNode (node)) => {
+  for nodeInstruction in nodeInstructions {
+    match nodeInstruction {
+      NodeInstruction::Save (SaveNode (node)) => {
         let expected : GraphnodeInRust = GraphnodeInRust::from (node);
         if candidate . nodes . get (&node . pid) != Some (&expected) {
           result . push (InternalIndexMismatch {
@@ -111,13 +111,13 @@ fn validate_local_nodes (
               . map (|actual| vec![actual . pid . clone ()])
               . unwrap_or_default (),
           }); }}
-      DefineNode::Delete (DeleteNode { id, .. }) => {
-        if candidate . nodes . contains_key (id) {
+      NodeInstruction::Delete (DeleteNode { skgid, .. }) => {
+        if candidate . nodes . contains_key (skgid) {
           result . push (InternalIndexMismatch {
             index    : "nodes",
-            key      : id . clone (),
+            key      : skgid . clone (),
             expected : Vec::new (),
-            actual   : vec![id . clone ()],
+            actual   : vec![skgid . clone ()],
           }); }} }
   }
 }
@@ -128,23 +128,23 @@ fn validate_local_identity (
   changes   : &GraphChangeSet,
   result    : &mut Vec<InternalIndexMismatch>,
 ) {
-  for id in &changes . affected_ids {
+  for skgid in &changes . affected_skgids {
     let final_owner : Option<ID> =
       match changes . canonicalization_changes . iter ()
-        . find (|change| &change . id == id) {
+        . find (|change| &change . skgid == skgid) {
         Some (change) => change . new_owner . clone (),
-        None          => base . pid_of (id),
+        None          => base . pid_of (skgid),
       };
     let expected_extra_owner : Option<ID> = match &final_owner {
-      Some (owner) if owner != id => Some (owner . clone ()),
+      Some (owner) if owner != skgid => Some (owner . clone ()),
       _                           => None,
     };
     let actual_extra_owner : Option<ID> =
-      candidate . extra_id_to_pid . get (id) . cloned ();
+      candidate . extra_id_to_pid . get (skgid) . cloned ();
     if expected_extra_owner != actual_extra_owner {
       result . push (InternalIndexMismatch {
         index    : "extra_id_to_pid",
-        key      : id . clone (),
+        key      : skgid . clone (),
         expected : expected_extra_owner . into_iter () . collect (),
         actual   : actual_extra_owner . into_iter () . collect (),
       }); }
@@ -188,15 +188,15 @@ fn relationship_index<'a> (
 fn membership_mismatch (
   index    : &'static str,
   key      : ID,
-  owner    : &ID,
+  recorder : &ID,
   expected : bool,
   actual   : bool,
 ) -> InternalIndexMismatch {
   InternalIndexMismatch {
     index,
     key,
-    expected : if expected { vec![owner . clone ()] } else { Vec::new () },
-    actual   : if actual { vec![owner . clone ()] } else { Vec::new () },
+    expected : if expected { vec![recorder . clone ()] } else { Vec::new () },
+    actual   : if actual { vec![recorder . clone ()] } else { Vec::new () },
   }
 }
 
@@ -221,9 +221,9 @@ pub fn validate_internal_indexes (
   let mut hiders_of : ExpectedIndex = BTreeMap::new ();
   let mut overriders_of : ExpectedIndex = BTreeMap::new ();
   let mut mentioners_of : ExpectedIndex = BTreeMap::new ();
-  let record = |index : &mut ExpectedIndex, member : &ID, owner : &ID| {
+  let record = |index : &mut ExpectedIndex, member : &ID, recorder : &ID| {
     index . entry (canonical (member)) . or_default ()
-      . insert (owner . clone ()); };
+      . insert (recorder . clone ()); };
   for node in graph . nodes . values () {
     for member in members_of (&node . contains) {
       record (&mut contained_by, &member, &node . pid); }

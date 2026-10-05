@@ -101,7 +101,7 @@ contains to [], overwriting subee.skg on disk."
 (defun phase-3-open-buffer-2 ()
   "Create buffer 2 manually with two roots: writeProtected 11 and subee.
 subee-1 must be supplied explicitly: the save pipeline's in-memory
-node map (built from save_instructions) gives subee empty contains,
+node map (built from nodeInstructions) gives subee empty contains,
 which takes priority over subee.skg on disk."
   (message "=== PHASE 3: Create and save buffer 2 ===")
   (setq integration-test-phase "phase-3-open-buffer-2")

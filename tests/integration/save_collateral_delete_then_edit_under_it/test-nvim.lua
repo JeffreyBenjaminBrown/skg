@@ -157,7 +157,7 @@ print('Buffer 1 initial content:\n' .. T.buffer_text(buf1))
 print('=== PHASE 2: Extend buffer 1 with second root and alias ===')
 -- Add an aliases view request to node 11, append a standalone subee
 -- root with its child subee-1, and save. The child must be supplied
--- explicitly: the standalone subee root is definitive, so the save
+-- explicitly: the standalone subee root is editable, so the save
 -- pipeline generates a save instruction for it. Without subee-1 in
 -- the buffer, that instruction would set contains to [], overwriting
 -- subee.skg on disk.
@@ -190,7 +190,7 @@ assert_headline_types_and_titles(buf1,
 print('=== PHASE 3: Create and save buffer 2 ===')
 -- Create buffer 2 manually with two roots: write-protected 11 and subee.
 -- subee-1 must be supplied explicitly: the save pipeline's in-memory
--- node map (built from save_instructions) gives subee empty contains,
+-- node map (built from nodeInstructions) gives subee empty contains,
 -- which takes priority over subee.skg on disk.
 local buf2 = vim.api.nvim_create_buf(true, false)
 vim.api.nvim_buf_set_name(buf2, 'skg://skg-test-buf2')
@@ -284,7 +284,7 @@ print('=== PHASE 8: Add new-root under deadViewnode in buffer 1 ===')
 -- after the delete pipeline started cleaning up references to the
 -- deleted node, buffer 1 no longer contains a DeadViewnode, so this
 -- phase now exercises adding a top-level root via metadata-only
--- insertion (the BufferRoot, like a DeadViewnode, supplies no repo
+-- insertion (the BufferRoot, like a DeadViewnode, supplies no skgrepo
 -- to inherit, so explicit (repo main) is still required).
 vim.api.nvim_set_current_buf(buf1)
 do

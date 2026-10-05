@@ -1,6 +1,6 @@
 -- PURPOSE: Edit a headline's metadata sexp as an org tree in a
 -- temporary buffer: ':w' (or <localleader>cc) commits the edited tree
--- back into the repo headline; killing the buffer cancels;
+-- back into the source headline; killing the buffer cancels;
 -- S-left/S-right cycle field values. The Lua port of
 -- elisp/skg-sexpr-edit.el and skg-sexpr-edit/skg-sexpr-cycling.el.
 --
@@ -10,7 +10,7 @@
 -- the title group whatever it holds).
 --
 -- DEVIATION: the elisp advised org-insert-heading-respect-content so
--- a fresh level-1 heading prompted for a repo. vim users type
+-- a fresh level-1 headline prompted for a skgrepo. vim users type
 -- headlines rather than calling an insert-heading command, so there
 -- is no equivalent seam; the quick path is <localleader>ss on the new
 -- headline (which populates minimal metadata), or <localleader>vm for
@@ -30,10 +30,10 @@ M.help_text =
 
 ---Edit the metadata sexp on the current headline. With no metadata,
 ---populates a minimal (skg (node (repo X))) in place and opens the
----empty-node view over it: repo pre-filled, the other editable
----fields childless, so an untouched commit yields just the repo.
+---empty-node view over it: skgrepo pre-filled, the other editable
+---fields childless, so an untouched commit yields just the skgrepo.
 function M.edit_metadata ()
-  if not metadata.at_heading_p() then error('Not on a headline') end
+  if not metadata.at_headline_p() then error('Not on a headline') end
   local source_buf = vim.api.nvim_get_current_buf()
   local line_number = metadata.current_line_number()
   local split = metadata.split_as_stars_metadata_title(
@@ -54,7 +54,7 @@ function M.edit_metadata ()
 end
 
 ---Populate minimal metadata on the metadata-less headline, then open
----its metadata view with the chosen repo pre-filled and every other
+---its metadata view with the chosen skgrepo pre-filled and every other
 ---editable field childless.
 ---@param source_buf integer
 ---@param line_number integer
@@ -94,7 +94,7 @@ function M.empty_node_org_text (repo, title)
 end
 
 ---Open the edit buffer over ORG_TEXT, remembering where the metadata
----lives in the repo (line + byte range) so commit can splice it.
+---lives in the source buffer (line + byte range) so commit can splice it.
 ---@param org_text string
 ---@param source_buf integer
 ---@param line_number integer
@@ -140,15 +140,15 @@ function M.goto_field_value (field_name)
   for line = 1, vim.api.nvim_buf_line_count(0) do
     local text = metadata.line_text(line)
     if text:match('^%*+ ' .. field_name .. '$') then
-      local child = metadata.next_heading_line(line)
+      local child = metadata.next_headline_line(line)
       vim.api.nvim_win_set_cursor(0, { child or line, 0 })
       return
     end
   end
 end
 
----Commit the edit buffer back into the repo headline's metadata,
----then kill the edit buffer and return to the repo.
+---Commit the edit buffer back into the source headline's metadata,
+---then kill the edit buffer and return to the source buffer.
 ---@param buf integer
 function M.commit (buf)
   local source_buf = vim.b[buf].skg_edit_source_buf
@@ -175,7 +175,7 @@ end
 -- ── value cycling ──────────────────────────────────────────────────
 
 ---The values to cycle through for FIELD_NAME, or nil when the field
----is not cycleable. FIELD_VALUE matters for repo defaulting.
+---is not cycleable. FIELD_VALUE matters for skgrepo defaulting.
 ---@param field_name string
 ---@param field_value string
 ---@return string[]|nil
@@ -195,7 +195,7 @@ function M.cycle_values_for_field (field_name, field_value)
   return nil
 end
 
----Owned repo names as a cycle list; a ' (default)'-suffixed current
+---Owned skgrepo names as a cycle list; a ' (default)'-suffixed current
 ---value leads, so cycling starts there.
 ---@param field_value string
 ---@return string[]|nil
@@ -218,14 +218,14 @@ end
 ---the target id.
 ---@param direction integer
 function M.cycle (direction)
-  if not metadata.at_heading_p() then error('Not on a headline') end
+  if not metadata.at_headline_p() then error('Not on a headline') end
   local line = metadata.current_line_number()
   local split = metadata.split_as_stars_metadata_title(
     metadata.line_text(line))
   local field_value = vim.trim(split.title ~= '' and split.title
                                or split.metadata)
   local level = metadata.outline_level(line)
-  local parent_line = metadata.parent_heading_line(line, level)
+  local parent_line = metadata.parent_headline_line(line, level)
   if not parent_line then error('Cannot determine parent field') end
   local parent = vim.trim(metadata.split_as_stars_metadata_title(
     metadata.line_text(parent_line)).title)

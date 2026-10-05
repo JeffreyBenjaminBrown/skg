@@ -4,8 +4,8 @@ use skg::dbs::in_rust_graph::relation_accessors::{
   NodeRelation,
   RelationRole,
 };
-use skg::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, RepoName, rel_partners_at_relRepo};
-use skg::types::nodes::complete::{Graphnode, empty_node_complete};
+use skg::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgRepoName, rel_partners_at_relRepo};
+use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 
 fn node (
   pid       : &str,
@@ -15,27 +15,27 @@ fn node (
   overrides : &[&str],
 ) -> Graphnode {
   let mut node : Graphnode =
-    empty_node_complete ();
+    empty_graphnode ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
-  node . home_repo = RepoName::from ("main");
+  node . home_skgrepo = SkgRepoName::from ("main");
   node . extra_ids =
-    extra_ids . iter () . map ( |id| ID::from (*id) ) . collect ();
+    extra_ids . iter () . map ( |skgid| ID::from (*skgid) ) . collect ();
   node . subscribes_to =
     if subscribes . is_empty () { MSV::Unspecified }
     else { MSV::Specified ( rel_partners_at_relRepo (
-      &node . home_repo,
-      subscribes . iter () . map ( |id| ID::from (*id) ) . collect ())) };
+      &node . home_skgrepo,
+      subscribes . iter () . map ( |skgid| ID::from (*skgid) ) . collect ())) };
   node . hides_from_its_subscriptions =
     if hides . is_empty () { MSV::Unspecified }
     else { MSV::Specified ( rel_partners_at_relRepo (
-      &node . home_repo,
-      hides . iter () . map ( |id| ID::from (*id) ) . collect ())) };
+      &node . home_skgrepo,
+      hides . iter () . map ( |skgid| ID::from (*skgid) ) . collect ())) };
   node . overrides_view_of =
     if overrides . is_empty () { MSV::Unspecified }
     else { MSV::Specified ( rel_partners_at_relRepo (
-      &node . home_repo,
-      overrides . iter () . map ( |id| ID::from (*id) ) . collect ())) };
+      &node . home_skgrepo,
+      overrides . iter () . map ( |skgid| ID::from (*skgid) ) . collect ())) };
   node }
 
 fn node_with_all_relations (
@@ -49,105 +49,105 @@ fn node_with_all_relations (
   let mut result : Graphnode =
     node (pid, &[], subscribes, hides, overrides);
   result . contains = rel_partners_at_relRepo (
-    &result . home_repo,
-    contains . iter () . map (|id| ID::from (*id)) . collect ());
+    &result . home_skgrepo,
+    contains . iter () . map (|skgid| ID::from (*skgid)) . collect ());
   if ! links . is_empty () {
     result . body = Some (links . iter ()
-      . map (|id| format! ("[[id:{}][{}]]", id, id))
+      . map (|skgid| format! ("[[id:{}][{}]]", skgid, skgid))
       . collect::<Vec<String>> () . join (" ")); }
   result
 }
 
-fn id_set (
-  ids : &[&str],
+fn skgid_set (
+  skgids : &[&str],
 ) -> std::collections::HashSet<ID> {
-  ids . iter () . map (|id| ID::from (*id)) . collect ()
+  skgids . iter () . map (|skgid| ID::from (*skgid)) . collect ()
 }
 
 #[test]
 fn relation_accessors_return_both_membership_directions () {
   let graph : InRustGraph =
     InRustGraph::from_graphnodes (&[
-      node ("owner", &[], &["subscribee-alias"], &["hidden"], &["overridden"]),
+      node ("recorder", &[], &["subscribee-alias"], &["hidden"], &["overridden"]),
       node ("subscribee", &["subscribee-alias"], &[], &[], &[]),
-      node ("subscriber", &[], &["owner"], &[], &[]),
+      node ("subscriber", &[], &["recorder"], &[], &[]),
       node ("hidden", &[], &[], &[], &[]),
-      node ("hider", &[], &[], &["owner"], &[]),
+      node ("hider", &[], &[], &["recorder"], &[]),
       node ("overridden", &[], &[], &[], &[]),
-      node ("overrider", &[], &[], &[], &["owner"]),
+      node ("overrider", &[], &[], &[], &["recorder"]),
     ]);
 
   assert_eq!(
     graph . other_member_pids (
-      &ID::from ("owner"),
+      &ID::from ("recorder"),
       RelationRole::new (NodeRelation::SubscribesTo, BinaryRolePosition::First)),
     vec![ID::from ("subscribee")] );
   assert_eq!(
     graph . other_member_pids (
-      &ID::from ("owner"),
+      &ID::from ("recorder"),
       RelationRole::new (NodeRelation::SubscribesTo, BinaryRolePosition::Second)),
     vec![ID::from ("subscriber")] );
   assert_eq!(
     graph . other_member_pids (
-      &ID::from ("owner"),
+      &ID::from ("recorder"),
       RelationRole::new (
         NodeRelation::HidesFromItsSubscriptions, BinaryRolePosition::First)),
     vec![ID::from ("hidden")] );
   assert_eq!(
     graph . other_member_pids (
-      &ID::from ("owner"),
+      &ID::from ("recorder"),
       RelationRole::new (
         NodeRelation::HidesFromItsSubscriptions, BinaryRolePosition::Second)),
     vec![ID::from ("hider")] );
   assert_eq!(
     graph . other_member_pids (
-      &ID::from ("owner"),
+      &ID::from ("recorder"),
       RelationRole::new (NodeRelation::OverridesViewOf, BinaryRolePosition::First)),
     vec![ID::from ("overridden")] );
   assert_eq!(
     graph . other_member_pids (
-      &ID::from ("owner"),
+      &ID::from ("recorder"),
       RelationRole::new (NodeRelation::OverridesViewOf, BinaryRolePosition::Second)),
     vec![ID::from ("overrider")] ); }
 
 #[test]
 fn stored_outbound_accessor_retains_unresolved_raw_members () {
-  let mut owner : Graphnode = node (
-    "owner", &[], &[], &[], &[]);
-  owner . contains = vec! [
+  let mut recorder : Graphnode = node (
+    "recorder", &[], &[], &[], &[]);
+  recorder . contains = vec! [
     RelPartner {
       member : ID::from ("known-extra"),
-      relRepo : RepoName::from ("main"), },
+      relRepo : SkgRepoName::from ("main"), },
     RelPartner {
       member : ID::from ("absent-raw"),
-      relRepo : RepoName::from ("main"), },
+      relRepo : SkgRepoName::from ("main"), },
   ];
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
-    owner,
+    recorder,
     node ("known", &["known-extra"], &[], &[], &[]),
   ]);
   assert_eq! (
     graph . outbound_rel_partners_for_relation_gated (
-      &ID::from ("owner"), NodeRelation::Contains, None ),
+      &ID::from ("recorder"), NodeRelation::Contains, None ),
     vec! [
       RelPartner {
         member : ID::from ("known-extra"),
-        relRepo : RepoName::from ("main"), },
+        relRepo : SkgRepoName::from ("main"), },
       RelPartner {
         member : ID::from ("absent-raw"),
-        relRepo : RepoName::from ("main"), },
+        relRepo : SkgRepoName::from ("main"), },
     ] );
   assert_eq! (
-    graph . outbound_ids_for_relation_gated (
-      &ID::from ("owner"), NodeRelation::Contains, None ),
+    graph . outbound_skgids_for_relation_gated (
+      &ID::from ("recorder"), NodeRelation::Contains, None ),
     vec![ ID::from ("known-extra"), ID::from ("absent-raw") ] );
   assert_eq! (
     graph . outbound_pids_for_relation_gated (
-      &ID::from ("owner"), NodeRelation::Contains, None ),
+      &ID::from ("recorder"), NodeRelation::Contains, None ),
     vec![ID::from ("known")] ); }
 
 #[test]
-fn relationship_member_key_canonicalizes_only_resolved_ids () {
+fn relationship_member_key_canonicalizes_only_resolved_skgids () {
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
     node ("known", &["known-extra"], &[], &[], &[]),
   ]);
@@ -175,7 +175,7 @@ fn update_relevant_neighborhood_includes_each_ordinary_relation_both_ways () {
   ]);
   assert_eq! (
     graph . update_relevant_neighborhood ([ID::from ("seed")]),
-    id_set (&[
+    skgid_set (&[
       "seed", "contained", "container", "subscribee", "subscriber",
       "hidden", "hider", "link-dest", "link-source", "dangling-link",
     ]));
@@ -193,7 +193,7 @@ fn update_relevant_neighborhood_walks_override_directions_independently () {
   ]);
   assert_eq! (
     graph . update_relevant_neighborhood ([ID::from ("seed")]),
-    id_set (&[
+    skgid_set (&[
       "seed", "above-2", "above-3", "above-branch", "below-1", "below-2",
     ]));
 }
@@ -212,7 +212,7 @@ fn update_relevant_neighborhood_neither_reverses_nor_mixes_paths () {
   ]);
   assert_eq! (
     graph . update_relevant_neighborhood ([ID::from ("seed")]),
-    id_set (&["seed", "above", "ordinary", "below"]));
+    skgid_set (&["seed", "above", "ordinary", "below"]));
 }
 
 #[test]
@@ -225,5 +225,5 @@ fn update_relevant_neighborhood_canonicalizes_aliases_and_retains_unknowns () {
   assert_eq! (
     graph . update_relevant_neighborhood (
       [ID::from ("alias"), ID::from ("unknown")]),
-    id_set (&["known", "unknown", "points-at-unknown"]));
+    skgid_set (&["known", "unknown", "points-at-unknown"]));
 }

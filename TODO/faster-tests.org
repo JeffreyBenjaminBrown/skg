@@ -346,7 +346,7 @@
   use skg::dbs::typedb::sources::create_all_sources;
   use skg::test_utils::cleanup_test_tantivy_and_typedb_dbs;
   use skg::types::misc::{SkgConfig, SkgfileSource, SourceName, TantivyIndex};
-  use skg::types::nodes::complete::NodeComplete;
+  use skg::types::nodes::complete::Graphnode;
   use skg::types::nodes::typedb::NodeTypedb;
 
   use futures::executor::block_on;
@@ -384,7 +384,7 @@
         ) . await ?;
         println! ("driver connect      : {:?}", t . elapsed ());
         let t : Instant = Instant::now ();
-        let nodes : Vec<NodeComplete> =
+        let nodes : Vec<Graphnode> =
           read_all_skg_files_from_sources (&config) ?;
         println! ("read fixtures ({:2}) : {:?}", nodes . len (), t . elapsed ());
         let t : Instant = Instant::now ();

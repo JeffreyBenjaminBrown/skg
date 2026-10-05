@@ -46,7 +46,7 @@ for _, row in ipairs(command_rows) do
   M[name] = function () M.request_view_and_save(form) end
 end
 
----Request a definitive view for the headline at point (the node must
+---Request an editable view for the headline at point (the node must
 ---be write-protected and childless). Does NOT auto-save.
 function M.set_definitive ()
   local line = focus.owning_headline_line()

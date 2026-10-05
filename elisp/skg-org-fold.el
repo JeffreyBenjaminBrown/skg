@@ -187,12 +187,12 @@ Operationally:
     (and (not (eobp))
          (not (org-at-heading-p))
          (invisible-p (point))
-         (let ((next-heading
+         (let ((next-headline
                 (save-excursion
                   (when (outline-next-heading)
                     (point)))))
-           (or (null next-heading)
-               (not (invisible-p next-heading)))))))
+           (or (null next-headline)
+               (not (invisible-p next-headline)))))))
 
 (defun skg-collect-parent-markers-of-folded-headlines ()
   "Collect markers for parent headlines of all headlines with folded markers.

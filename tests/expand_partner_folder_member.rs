@@ -1,9 +1,9 @@
 // cargo nextest run --test grouped_overrides -E 'test(expand_partner_folder_member::)'
 //
-// Default folders on ordinary definitive nodes and on definitive
+// Default folders on ordinary editable nodes and on editable
 // PartnerFolder members.  The initial presentation contains only a nonempty
 // subscribeeFolder.  The other relation folders require explicit requests;
-// after one of their members is expanded definitively, that member gets the
+// after one of their members is expanded as editable, that member gets the
 // same default subscribeeFolder.  A subscribee-as-such additionally gets its
 // nonempty HiddenInSubscribeeFolder.
 
@@ -41,10 +41,10 @@ async fn save (
 
 fn subtree_for_node_in_folder (
   buf : &str,
-  id : &str,
+  skgid : &str,
   enclosing_folder : &str,
 ) -> String {
-  let needle : String = format! ("(id {})", id);
+  let needle : String = format! ("(id {})", skgid);
   let lines : Vec<&str> = buf . lines () . collect ();
   let mut folder_stack : Vec<(usize, &str)> = Vec::new ();
   let mut matches : Vec<usize> = Vec::new ();
@@ -97,9 +97,9 @@ fn add_definitive_requests_to_folder_members (
       { folder_stack . pop (); }}
     let enclosing : Option<&str> =
       folder_stack . last () . map ( |(_, folder)| *folder );
-    if members . iter () . any ( |(id, folder)| {
+    if members . iter () . any ( |(skgid, folder)| {
       enclosing == Some (*folder)
-      && line . contains (&format! ("(id {})", id)) } )
+      && line . contains (&format! ("(id {})", skgid)) } )
     { output . push ( line . replace (
         " writeProtected ",
         " writeProtected (viewRequests definitiveView) " ) ); }
@@ -114,7 +114,7 @@ fn add_definitive_requests_to_folder_members (
 }
 
 #[test]
-fn initial_and_as_such_definitive_nodes_get_only_the_default_folders
+fn initial_and_as_such_editable_nodes_get_only_the_default_folders
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
     "skg-test-expand-partner-folder-member",
@@ -162,17 +162,17 @@ fn initial_and_as_such_definitive_nodes_get_only_the_default_folders
       let saved : String =
         save (&expanded_request, config, tantivy, &graph)
         . await ? . saved_view;
-      for (id, folder) in members {
+      for (skgid, folder) in members {
         let subtree : String =
-          subtree_for_node_in_folder (&saved, id, folder);
+          subtree_for_node_in_folder (&saved, skgid, folder);
         assert! ( subtree . contains ("subscribeeFolder"),
           "definitive PartnerFolder member {} should get its nonempty \
-           subscribeeFolder:\n{}", id, saved );
+           subscribeeFolder:\n{}", skgid, saved );
         for exotic in [ "subscriberFolder", "overriddenFolder",
                          "overriderFolder", "hiderFolder", "hiddenFolder" ] {
           assert! ( ! subtree . contains (exotic),
             "definitive PartnerFolder member {} should not get {} by \
-             default:\n{}", id, exotic, saved ); }}
+             default:\n{}", skgid, exotic, saved ); }}
       let subscribee_subtree : String =
         subtree_for_node_in_folder (
           &saved, "Subscribee", "subscribeeFolder");

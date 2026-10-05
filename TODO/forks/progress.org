@@ -59,15 +59,15 @@ The plan said "thread a 'this is a collateral rerender' signal and
 reconcile children regardless of definitiveness in that case." I first
 implemented exactly that (a 'reconcile_definitive_subscribee_cols' bool
 through CompletionContext / rerender_view). Jeff pushed back in plan.org
-("that guard sounds totally wrong") and asked whether other cols share
+("that guard sounds totally wrong") and asked whether other folders share
 the issue.
 
 Investigation: the GENERIC reconcile_partnerCol_children (used by the
-other writable col 'overriddenCol' and every inbound read-only col)
+other writable folder 'overriddenFolder' and every inbound read-only folder)
 reconciles UNCONDITIONALLY -- no definitive/diff gate. subscribee_col
-was the ONLY col with the gate. So nothing else needs correcting, and
+was the ONLY folder with the gate. So nothing else needs correcting, and
 the gate was anomalous, not load-bearing. Removing it entirely (always
-reconcile, like every other col) passed the whole view/save/override/
+reconcile, like every other folder) passed the whole view/save/override/
 diff surface (139 tests) plus a new collateral regression
 ('tests/collateral_subscribee_staleness.rs', verified to fail under the
 old gate). So I dropped the threaded-bool machinery and just removed the
@@ -95,10 +95,10 @@ post-graph-update, so the graph already holds the user's edit).
 - *Step 1* (prereq display): content_goal_list subtracts the subscriber's
   own contains. ONE function changed (the de-novo and rerender paths
   share it; the to_org/complete partition's 'visible' output is dead --
-  only its 'hidden' feeds the HiddenIn col, so no second site to touch).
+  only its 'hidden' feeds the HiddenIn folder, so no second site to touch).
   Regression extends the move-into-self test; verified to fail without it.
 - *Step 2* (collateral staleness): removed the gate outright (Jeff's
-  call), so subscribeeCol reconciles like every other col. New
+  call), so subscribeeFolder reconciles like every other folder. New
   collateral regression. See the decision note above.
 - *Steps 3-4* (detect + extract + commit): editing a foreign node forks
   it. The clone copies the EDITED buffer node (no disk fetch -- it is
@@ -111,7 +111,7 @@ post-graph-update, so the graph already holds the user's edit).
   not worth a shared abstraction.
 
 ** TODO Round-trip test: rendered "unintegrated content" check deferred
-The plan's round-trip wanted: clone's subscribeeCol shows N with EMPTY
+The plan's round-trip wanted: clone's subscribeeFolder shows N with EMPTY
 unintegrated content, then a new child of N appears as unintegrated. A
 subscribee-as-such only EXPANDS its content when made definitive (a
 viewRequest + save round-trip), so verifying this through the rendered
@@ -252,7 +252,7 @@ the (re-titled) clone, and proposed a TWO-LEVEL confirmation buffer
 reiterated it in plan.org under your TODO and updated the build steps.
 ONE sub-question remains there (the override herald on the child): no
 'pO'/"parent overrides" herald exists today, so (a) add it, (b) reuse the
-overriddenCol idiom (3 levels, auto 'gS', no new herald), or (c) no
+overriddenFolder idiom (3 levels, auto 'gS', no new herald), or (c) no
 herald (rely on shape + preamble). I lean (a). Answer that and I build:
 source-inference bugfix first, then the two-level writeable-source.
 ** DONE Monogamy reject: error message alone (no client auto-open)
@@ -309,7 +309,7 @@ All five plan steps landed in order, one (or two) commits each:
   vognodes' now stops at N's NEAREST vognode ancestor, recording its
   source iff that ancestor is an owned Active vognode -- never walking
   past a foreign or inactive ancestor. Unit tests in tests/unit/fork.rs
-  (owned->foreign->N infers nothing; owned->N infers; scaffold skipped).
+  (owned->foreign->N infers nothing; owned->N infers; non-vognode skipped).
 - *Step 2* (resolution): clone source = user-set > inferred > default,
   where the default is 'SkgConfig::first_owned_source'. The
   '(fork-sources ((N . X) ...))' field is parsed in save_buffer.rs and

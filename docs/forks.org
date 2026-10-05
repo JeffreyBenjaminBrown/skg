@@ -1,7 +1,7 @@
 * Forks
 
-A *fork* turns a /foreign/ node — one in a Skg repo you do *not* own,
-hence write-protected — into an editable *clone* in a Skg repo you /do/ own.
+A *fork* turns a /foreign/ node — one in a skgrepo you do *not* own,
+hence write-protected — into an editable *clone* in a skgrepo you /do/ own.
 The clone keeps a live link to the original, so the original's later
 additions still reach you, but your edits never touch the original.
 
@@ -14,40 +14,40 @@ relations (=subscribes=, =overrides_view_of=,
 
 You do not run a special command. You just *edit the foreign node*:
 
-1. Make the foreign node /definitive/ (editable) with the definitive-view
+1. Make the foreign node /editable/ with the definitive-view
    request, =C-c s d=. (A foreign node is write-protected until you do this.)
 2. Edit it however you like — its title, its body, add / remove / reorder
    its children, at any depth.
 3. Save.
 
 Any real change to a foreign node is read as a request to fork it. (An
-unchanged definitive foreign node forks nothing; saving it is a no-op.)
+unchanged editable foreign node forks nothing; saving it is a no-op.)
 
 The save does not commit blindly. The server first returns a
 *fork-confirmation buffer* and asks you to approve. The buffer opens
 with a foldable instructions headline, then two levels per fork: each
 top headline is the *clone-to-be* (your edited title), and under it
-is the *original* it forks (its real id and foreign Skg repo, marked
+is the *original* it forks (its real id and foreign skgrepo, marked
 =pO= — "its parent overrides it"). One headline cannot honestly stand
 for both, since you may have re-titled the clone and the two live in
-different Skg repos.
+different skgrepos.
 
-Each clone needs a Skg repo you own. If your edit already *specified*
+Each clone needs a skgrepo you own. If your edit already *specified*
 one — the fork was forced by new children whose metadata explicitly
-names one owned Skg repo (see "Adding new content", below) — the
-clone-to-be shows that Skg repo, settled, and you are not asked again.
-Otherwise its Skg repo starts as the placeholder =PICK-A-REPO=, with a
-suggested Skg repo noted just above it (the inferred Skg repo for a
-foreign fork, or your config-first owned Skg repo otherwise), and the
+names one owned skgrepo (see "Adding new content", below) — the
+clone-to-be shows that skgrepo, settled, and you are not asked again.
+Otherwise its skgrepo starts as the placeholder =PICK-A-REPO=, with a
+suggested skgrepo noted just above it (the inferred skgrepo for a
+foreign fork, or your config-first owned skgrepo otherwise), and the
 client *prompts you to choose* for each such clone — the suggestion
-is the prompt's default; =S-left= / =S-right= cycle the Skg repos you own.
-You can also set a Skg repo by hand: point on the clone-to-be headline,
+is the prompt's default; =S-left= / =S-right= cycle the skgrepos you own.
+You can also set a skgrepo by hand: point on the clone-to-be headline,
 then =C-c s s=. Approving while any placeholder remains is refused,
 loudly; a deliberate choice keeps a fork from silently landing in a
-default Skg repo.
+default skgrepo.
 
 - *Approve* (=C-c C-c= in that buffer, or answering the prompt)
-  commits the forks into the Skg repos you chose and completes the save.
+  commits the forks into the skgrepos you chose and completes the save.
 - *Decline* (=C-c C-k=, or just leave the buffer) aborts the /whole/
   save — nothing is written. The confirmation buffer stays open, so you
   can still search it for the IDs involved.
@@ -56,22 +56,22 @@ default Skg repo.
 
 Appending a *new* headline under a foreign node is also just an
 edit: it changes the foreign node's child list, so it forks it. The
-new node itself needs an owned Skg repo too:
+new node itself needs an owned skgrepo too:
 
 - A *bare* new headline (no metadata) rides the fork: it lands in
-  the same Skg repo as the clone — whatever the confirmation flow
+  the same skgrepo as the clone — whatever the confirmation flow
   settles on — just as a new node under an owned parent lands in that
-  parent's Skg repo.
-- A new headline whose metadata *names an owned Skg repo* (e.g.
+  parent's skgrepo.
+- A new headline whose metadata *names an owned skgrepo* (e.g.
   =(skg (node (repo my-notes)))=) both places the new node there and
-  /specifies/ the clone's Skg repo (when all such new children agree),
+  /specifies/ the clone's skgrepo (when all such new children agree),
   so the confirmation flow asks nothing beyond the approve.
-- A new headline that explicitly names a *foreign* Skg repo is an
-  error, as ever: foreign Skg repos cannot be written.
+- A new headline that explicitly names a *foreign* skgrepo is an
+  error, as ever: foreign skgrepos cannot be written.
 
 ** What the clone is
 
-When you fork a foreign node =N=, the clone =C= is a new node in a Skg repo
+When you fork a foreign node =N=, the clone =C= is a new node in a skgrepo
 you own. =C=:
 
 - copies =N='s title, body, and *child list* — the child IDs only, a
@@ -88,13 +88,13 @@ you own. =C=:
   content (below). Later deletions from =C= hide likewise — see
   "Editing the clone", below.
 
-=C='s Skg repo is the one the confirmation flow settles on: specified by
+=C='s skgrepo is the one the confirmation flow settles on: specified by
 your edit, or picked at the prompt (see above). When nothing specified
-it, the /suggestion/ is the Skg repo *inferred* from =N='s nearest
+it, the /suggestion/ is the skgrepo *inferred* from =N='s nearest
 owned ancestor in the view, or, with no owned ancestor, your
-config-first owned Skg repo. So a foreign node with no owned ancestor
+config-first owned skgrepo. So a foreign node with no owned ancestor
 still forks — it just suggests a default you confirm or change. The
-fork can only fail for lack of a Skg repo if you own *no* Skg repo at
+fork can only fail for lack of a skgrepo if you own *no* skgrepo at
 all. (The inference takes =N='s /immediate/ owned container, never a
 distant owned node reached by skipping a foreign ancestor.)
 
@@ -111,8 +111,8 @@ Put point on the node's headline and run it. It refuses if the buffer has
 unsaved changes ("Save the buffer before forking.") — so the clone is
 built from the node's saved snapshot, exactly what you see. Otherwise it
 marks the node and auto-saves, and you get the *same fork-confirmation
-buffer* as the implicit fork: pick the clone's Skg repo at the prompt —
-e.g. your /private/ Skg repo — (or set it with =C-c s s=), then approve
+buffer* as the implicit fork: pick the clone's skgrepo at the prompt —
+e.g. your /private/ skgrepo — (or set it with =C-c s s=), then approve
 with =C-c C-c=, or decline with =C-c C-k= (which here also strips the
 fork request so the next save does not re-fork).
 
@@ -121,15 +121,15 @@ Two differences from the implicit fork:
 - The original is *yours*, so it is /not/ dropped — your edits to it
   still save normally; the gesture only /adds/ the clone that overrides
   it.
-- The *suggested* Skg repo is your *config-first* owned Skg repo (the
+- The *suggested* skgrepo is your *config-first* owned skgrepo (the
   first =[[repos]]= you own in =skgconfig.toml=), since there is no
   foreign ancestor to infer from.
 
 The result is an *override chain*: =D overrides C overrides N=. Chains
 of any length are legal (only a /cycle/ is forbidden — see
-[[file:./sharing-model.org][the sharing model]]). When all Skg repos are active,
+[[file:./sharing-model.org][the sharing model]]). When all skgrepos are active,
 viewing =N='s container draws the chain's end =D=; restrict the
-repo-set to hide =D='s Skg repo and the same view draws the middle =C=
+skgrepo-set to hide =D='s skgrepo and the same view draws the middle =C=
 instead — either way =N= stays in the container's contents. If you point
 =skg-fork-node= at a node that is /itself/ a drawn substitute (one
 carrying an =overridesHere= marker), it forks the node on screen — the
@@ -152,7 +152,7 @@ new children you have not pulled in, they appear here.
 *** An example
 
 Suppose this document, =mysticism=, is yours, and =eggs= belongs to your
-friend Egg Man (a Skg repo you do not own):
+friend Egg Man (a skgrepo you do not own):
 
 #+begin_example
 ,* eggs                              (Egg Man's, write-protected to you)
@@ -162,7 +162,7 @@ friend Egg Man (a Skg repo you do not own):
 ,*** Which came first, the chicken or the egg?
 #+end_example
 
-You make =mystical= definitive, edit it (say you rename it to
+You make =mystical= editable, edit it (say you rename it to
 =eggy mysticism=), and save. The confirmation buffer lists =mystical=;
 you approve. Now your graph has a clone of =mystical= that you can file
 under =mysticism=. Wherever =mystical= would be drawn, you see your clone

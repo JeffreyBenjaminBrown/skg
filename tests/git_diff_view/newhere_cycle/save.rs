@@ -22,9 +22,9 @@ fn test_newhere_cycle_survives_save()
       setup_test_stores(test_name, gitrepo_path . to_str() . unwrap(), tantivy_folder) . await?;
 
     // First render the initial view (view pipeline — known to work).
-    let root_ids = vec![ID("1" . to_string())];
+    let root_skgids = vec![ID("1" . to_string())];
     let (initial_view, _pids, _) : (String, Vec<ID>, _) =
-      multi_root_view(&config, None, &root_ids, true)?;
+      multi_root_view(&config, None, &root_skgids, true)?;
 
     // Round-trip through the save pipeline.
     let graph : InRustGraphHandle =
@@ -68,9 +68,9 @@ fn test_newhere_cycle_survives_save_staged()
       setup_test_stores(test_name, gitrepo_path . to_str() . unwrap(), tantivy_folder) . await?;
 
     // First render the initial view (view pipeline — known to work).
-    let root_ids = vec![ID("1" . to_string())];
+    let root_skgids = vec![ID("1" . to_string())];
     let (initial_view, _pids, _) : (String, Vec<ID>, _) =
-      multi_root_view(&config, None, &root_ids, true)?;
+      multi_root_view(&config, None, &root_skgids, true)?;
 
     // Round-trip through the save pipeline.
     let graph : InRustGraphHandle =

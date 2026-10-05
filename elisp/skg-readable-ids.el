@@ -148,7 +148,7 @@ GENERATION and BUF are captured for the response handler."
                    `((request . "titles by ids")
                      (ids ,@ids))
                    (when approved-pids
-                     `((allow-overPrivateText-telescopes ,@approved-pids)))))
+                     `((approved-overPrivateText-pids ,@approved-pids)))))
                  "\n")))
           (setq skg-readable-ids--pending-title-requests
                 (append skg-readable-ids--pending-title-requests

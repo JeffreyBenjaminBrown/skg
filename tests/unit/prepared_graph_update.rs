@@ -1,19 +1,19 @@
 use super::{GraphChangeSet, GraphUpdatePreparationError, PreparedGraphUpdate,
-            normalize_and_coalesce_definitions, prepare_graph_update,
+            normalize_and_coalesce_nodeInstructions, prepare_graph_update,
             validate_identity_and_derive_changes};
 use crate::dbs::in_rust_graph::complete_validation::{
   CompleteGraphError, validate_complete_graph_candidate,
 };
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
-use crate::dbs::in_rust_graph::apply_definenodes_to_inRustGraph;
+use crate::dbs::in_rust_graph::apply_nodeInstructions_to_inRustGraph;
 use crate::dbs::in_rust_graph::internal_index_validation::{
   LocalIndexValidation, validate_local_internal_indexes,
 };
 use crate::types::misc::{
-  ID, MSV, SkgConfig, SkgfileRepo, RepoName, rel_partners_at_relRepo,
+  ID, MSV, SkgConfig, SkgRepo, SkgRepoName, rel_partners_at_relRepo,
 };
-use crate::types::nodes::complete::{Graphnode, empty_node_complete};
-use crate::types::save::{DefineNode, DeleteNode, SaveNode};
+use crate::types::nodes::complete::{Graphnode, empty_graphnode};
+use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -22,13 +22,13 @@ use std::sync::Arc;
 use proptest::prelude::*;
 
 fn config () -> SkgConfig {
-  let repo : RepoName = RepoName::from ("main");
-  SkgConfig::dummyFromRepos (HashMap::from ([
-    (repo . clone (), SkgfileRepo {
-      name         : repo,
+  let skgrepo : SkgRepoName = SkgRepoName::from ("main");
+  SkgConfig::dummyFromSkgRepos (HashMap::from ([
+    (skgrepo . clone (), SkgRepo {
+      name         : skgrepo,
       abbreviation : None,
       path         : PathBuf::from ("unused"),
-      user_owns_it : true,
+      owned        : true,
     }),
   ]))
 }
@@ -36,7 +36,7 @@ fn config () -> SkgConfig {
 fn node (
   pid : &str,
 ) -> Graphnode {
-  let mut node : Graphnode = empty_node_complete ();
+  let mut node : Graphnode = empty_graphnode ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
   node
@@ -44,27 +44,27 @@ fn node (
 
 fn changed_edge_fixture (
   unrelated_count : usize,
-) -> (InRustGraph, InRustGraph, Vec<DefineNode>, GraphChangeSet) {
+) -> (InRustGraph, InRustGraph, Vec<NodeInstruction>, GraphChangeSet) {
   let mut old_owner : Graphnode = node ("owner");
   old_owner . contains = rel_partners_at_relRepo (
-    &RepoName::from ("main"), vec![ID::from ("old")]);
+    &SkgRepoName::from ("main"), vec![ID::from ("old")]);
   let mut base_nodes : Vec<Graphnode> = vec![old_owner];
   base_nodes . extend ((0..unrelated_count)
     . map (|i| node (&format! ("unrelated-{i}"))));
   let base : InRustGraph = InRustGraph::from_graphnodes (&base_nodes);
   let mut final_owner : Graphnode = node ("owner");
   final_owner . contains = rel_partners_at_relRepo (
-    &RepoName::from ("main"), vec![ID::from ("new")]);
-  let definitions : Vec<DefineNode> =
-    vec![DefineNode::Save (SaveNode (final_owner))];
+    &SkgRepoName::from ("main"), vec![ID::from ("new")]);
+  let nodeInstructions : Vec<NodeInstruction> =
+    vec![NodeInstruction::Save (SaveNode (final_owner))];
   let (changes, errors, revocations)
     : (GraphChangeSet, Vec<CompleteGraphError>, Vec<super::ExtraIdRevocation>) =
-    validate_identity_and_derive_changes (&config (), &base, &definitions);
+    validate_identity_and_derive_changes (&config (), &base, &nodeInstructions);
   assert! (errors . is_empty ());
   assert! (revocations . is_empty ());
   let mut candidate : InRustGraph = base . clone ();
-  apply_definenodes_to_inRustGraph (&mut candidate, &definitions);
-  (base, candidate, definitions, changes)
+  apply_nodeInstructions_to_inRustGraph (&mut candidate, &nodeInstructions);
+  (base, candidate, nodeInstructions, changes)
 }
 
 fn add_membership (
@@ -85,10 +85,10 @@ fn publication_uses_the_exact_prepared_candidate () {
   let graph : InRustGraphHandle = new_handle ((*base) . clone ());
   let actual_base : Arc<InRustGraph> = graph . load_full ();
   let prepared : PreparedGraphUpdate = prepare_graph_update (
-    &config (), actual_base, vec![DefineNode::Save (SaveNode (node ("new")))])
+    &config (), actual_base, vec![NodeInstruction::Save (SaveNode (node ("new")))])
     . unwrap ();
   let expected : Arc<InRustGraph> = prepared . candidate () . clone ();
-  let (_published, _definitions) : (Arc<InRustGraph>, Vec<DefineNode>) =
+  let (_published, _nodeInstructions) : (Arc<InRustGraph>, Vec<NodeInstruction>) =
     prepared . publish (&graph) . unwrap ();
   let visible : Arc<InRustGraph> = graph . load_full ();
   assert! (Arc::ptr_eq (&visible, &expected));
@@ -100,7 +100,7 @@ fn a_prepared_update_refuses_a_different_base () {
     InRustGraph::from_graphnodes (&[node ("base")]));
   let base : Arc<InRustGraph> = graph . load_full ();
   let prepared : PreparedGraphUpdate = prepare_graph_update (
-    &config (), base, vec![DefineNode::Save (SaveNode (node ("new")))])
+    &config (), base, vec![NodeInstruction::Save (SaveNode (node ("new")))])
     . unwrap ();
   let replacement : Arc<InRustGraph> = Arc::new (
     InRustGraph::from_graphnodes (&[node ("replacement")]));
@@ -110,7 +110,7 @@ fn a_prepared_update_refuses_a_different_base () {
 }
 
 #[test]
-fn preparation_owns_normalized_definitions () {
+fn preparation_owns_normalized_nodeInstructions () {
   let graph : InRustGraphHandle = new_handle (
     InRustGraph::from_graphnodes (&[node ("base")]));
   let mut saved : Graphnode = node ("new");
@@ -118,9 +118,9 @@ fn preparation_owns_normalized_definitions () {
     ID::from ("E"), ID::from ("new"), ID::from ("E")];
   let prepared : PreparedGraphUpdate = prepare_graph_update (
     &config (), graph . load_full (),
-    vec![DefineNode::Save (SaveNode (saved))])
+    vec![NodeInstruction::Save (SaveNode (saved))])
     . unwrap ();
-  let DefineNode::Save (SaveNode (saved)) = &prepared . definitions () [0]
+  let NodeInstruction::Save (SaveNode (saved)) = &prepared . nodeInstructions () [0]
     else { panic! ("expected Save"); };
   assert_eq! (saved . extra_ids, vec![ID::from ("E")]);
 }
@@ -136,33 +136,33 @@ fn identity_overlay_rejects_untouched_primary_and_extra_owners () {
   claimant . extra_ids = vec![
     ID::from ("primary-owner"), ID::from ("owned-extra")];
   let error : GraphUpdatePreparationError = prepare_graph_update (
-    &config (), base, vec![DefineNode::Save (SaveNode (claimant))])
+    &config (), base, vec![NodeInstruction::Save (SaveNode (claimant))])
     . expect_err ("both untouched claims must be protected");
   assert! (error . complete_graph_errors . iter () . any (|error| matches! (
     error,
-    CompleteGraphError::PrimaryExtraCollision { id, .. }
-      if id == &ID::from ("primary-owner"))));
+    CompleteGraphError::PrimaryExtraCollision { skgid, .. }
+      if skgid == &ID::from ("primary-owner"))));
   assert! (error . complete_graph_errors . iter () . any (|error| matches! (
     error,
-    CompleteGraphError::DuplicateExtraId { id, .. }
-      if id == &ID::from ("owned-extra"))));
+    CompleteGraphError::DuplicateExtraId { skgid, .. }
+      if skgid == &ID::from ("owned-extra"))));
 }
 
 #[test]
-fn identity_overlay_rejects_two_saves_claiming_one_new_id () {
+fn identity_overlay_rejects_two_saves_claiming_one_new_skgid () {
   let mut first : Graphnode = node ("first");
   first . extra_ids = vec![ID::from ("shared")];
   let mut second : Graphnode = node ("second");
   second . extra_ids = vec![ID::from ("shared")];
   let error : GraphUpdatePreparationError = prepare_graph_update (
     &config (), Arc::new (InRustGraph::new ()), vec![
-      DefineNode::Save (SaveNode (first)),
-      DefineNode::Save (SaveNode (second)),
+      NodeInstruction::Save (SaveNode (first)),
+      NodeInstruction::Save (SaveNode (second)),
     ]) . expect_err ("two final owners must conflict");
   assert! (matches! (
     error . complete_graph_errors . first (),
-    Some (CompleteGraphError::DuplicateExtraId { id, owners })
-      if id == &ID::from ("shared") && owners == &vec![
+    Some (CompleteGraphError::DuplicateExtraId { skgid, owners })
+      if skgid == &ID::from ("shared") && owners == &vec![
         ID::from ("first"), ID::from ("second")]
   ));
 }
@@ -176,17 +176,17 @@ fn simultaneous_overlay_accepts_merge_style_primary_transfer () {
   acquirer . extra_ids = vec![ID::from ("N2")];
   let prepared : PreparedGraphUpdate = prepare_graph_update (
     &config (), base, vec![
-      DefineNode::Save (SaveNode (acquirer)),
-      DefineNode::Delete (DeleteNode {
-        id     : ID::from ("N2"),
-        home_repo : RepoName::from ("main"),
+      NodeInstruction::Save (SaveNode (acquirer)),
+      NodeInstruction::Delete (DeleteNode {
+        skgid           : ID::from ("N2"),
+        home_skgrepo : SkgRepoName::from ("main"),
       }),
     ]) . unwrap ();
   assert_eq! (
     prepared . candidate () . pid_of (&ID::from ("N2")),
     Some (ID::from ("N1")));
   assert! (prepared . changes . canonicalization_changes . iter () . any (
-    |change| change . id == ID::from ("N2")
+    |change| change . skgid == ID::from ("N2")
       && change . old_owner == Some (ID::from ("N2"))
       && change . new_owner == Some (ID::from ("N1"))));
 }
@@ -199,14 +199,14 @@ fn repeated_definitions_use_the_last_graph_state () {
   last . title = "last" . to_string ();
   let prepared : PreparedGraphUpdate = prepare_graph_update (
     &config (), Arc::new (InRustGraph::new ()), vec![
-      DefineNode::Save (SaveNode (first)),
-      DefineNode::Delete (DeleteNode {
-        id     : ID::from ("P"),
-        home_repo : RepoName::from ("main"),
+      NodeInstruction::Save (SaveNode (first)),
+      NodeInstruction::Delete (DeleteNode {
+        skgid           : ID::from ("P"),
+        home_skgrepo : SkgRepoName::from ("main"),
       }),
-      DefineNode::Save (SaveNode (last)),
+      NodeInstruction::Save (SaveNode (last)),
     ]) . unwrap ();
-  assert_eq! (prepared . definitions () . len (), 3);
+  assert_eq! (prepared . nodeInstructions () . len (), 3);
   assert_eq! (
     prepared . candidate () . get (&ID::from ("P")) . unwrap () . title,
     "last");
@@ -216,10 +216,10 @@ fn repeated_definitions_use_the_last_graph_state () {
 fn repeated_save_then_delete_leaves_no_graph_node () {
   let prepared : PreparedGraphUpdate = prepare_graph_update (
     &config (), Arc::new (InRustGraph::new ()), vec![
-      DefineNode::Save (SaveNode (node ("P"))),
-      DefineNode::Delete (DeleteNode {
-        id     : ID::from ("P"),
-        home_repo : RepoName::from ("main"),
+      NodeInstruction::Save (SaveNode (node ("P"))),
+      NodeInstruction::Delete (DeleteNode {
+        skgid           : ID::from ("P"),
+        home_skgrepo : SkgRepoName::from ("main"),
       }),
     ]) . unwrap ();
   assert! (prepared . candidate () . get (&ID::from ("P")) . is_none ());
@@ -233,11 +233,11 @@ fn repeated_delete_then_save_leaves_the_saved_graph_node () {
   saved . title = "final" . to_string ();
   let prepared : PreparedGraphUpdate = prepare_graph_update (
     &config (), base, vec![
-      DefineNode::Delete (DeleteNode {
-        id     : ID::from ("P"),
-        home_repo : RepoName::from ("main"),
+      NodeInstruction::Delete (DeleteNode {
+        skgid           : ID::from ("P"),
+        home_skgrepo : SkgRepoName::from ("main"),
       }),
-      DefineNode::Save (SaveNode (saved)),
+      NodeInstruction::Save (SaveNode (saved)),
     ]) . unwrap ();
   assert_eq! (
     prepared . candidate () . get (&ID::from ("P")) . unwrap () . title,
@@ -253,11 +253,11 @@ fn arbitrary_extra_id_revocation_is_actionably_rejected () {
   let mut saved : Graphnode = node ("P");
   saved . title = "A titled node" . to_string ();
   let error : GraphUpdatePreparationError = prepare_graph_update (
-    &config (), base, vec![DefineNode::Save (SaveNode (saved))])
+    &config (), base, vec![NodeInstruction::Save (SaveNode (saved))])
     . expect_err ("managed Save must not revoke aliases");
   assert_eq! (error . extra_id_revocations . len (), 1);
   assert_eq! (
-    error . extra_id_revocations [0] . dropped_ids,
+    error . extra_id_revocations [0] . dropped_skgids,
     vec![ID::from ("E1"), ID::from ("E2")]);
   let message : String = error . to_string ();
   for expected in ["P", "A titled node", "E1", "E2", "another dataset"] {
@@ -271,7 +271,7 @@ fn adding_an_extra_id_remains_valid () {
   let mut saved : Graphnode = node ("P");
   saved . extra_ids = vec![ID::from ("E")];
   let prepared : PreparedGraphUpdate = prepare_graph_update (
-    &config (), base, vec![DefineNode::Save (SaveNode (saved))])
+    &config (), base, vec![NodeInstruction::Save (SaveNode (saved))])
     . unwrap ();
   assert_eq! (
     prepared . candidate () . pid_of (&ID::from ("E")),
@@ -280,19 +280,19 @@ fn adding_an_extra_id_remains_valid () {
 
 #[test]
 fn identity_lookup_work_does_not_grow_with_the_base_graph () {
-  let definitions : Vec<DefineNode> = vec![DefineNode::Save (SaveNode ({
+  let nodeInstructions : Vec<NodeInstruction> = vec![NodeInstruction::Save (SaveNode ({
     let mut saved : Graphnode = node ("new");
     saved . extra_ids = vec![ID::from ("new-extra")];
     saved
   }))];
   let small : PreparedGraphUpdate = prepare_graph_update (
     &config (), Arc::new (InRustGraph::from_graphnodes (&[node ("old")])),
-    definitions . clone ()) . unwrap ();
+    nodeInstructions . clone ()) . unwrap ();
   let many : Vec<Graphnode> = (0..1_000)
     . map (|i| node (&format! ("old-{i}")))
     . collect ();
   let large : PreparedGraphUpdate = prepare_graph_update (
-    &config (), Arc::new (InRustGraph::from_graphnodes (&many)), definitions)
+    &config (), Arc::new (InRustGraph::from_graphnodes (&many)), nodeInstructions)
     . unwrap ();
   assert_eq! (
     small . changes . identity_base_lookup_bound,
@@ -301,20 +301,20 @@ fn identity_lookup_work_does_not_grow_with_the_base_graph () {
 
 #[test]
 fn local_index_check_catches_an_omitted_removal () {
-  let (base, mut candidate, definitions, changes) = changed_edge_fixture (0);
+  let (base, mut candidate, nodeInstructions, changes) = changed_edge_fixture (0);
   add_membership (&mut candidate . contained_by, "old", "owner");
   let report : LocalIndexValidation = validate_local_internal_indexes (
-    &base, &candidate, &definitions, &changes);
+    &base, &candidate, &nodeInstructions, &changes);
   assert! (report . errors . iter () . any (|error|
     error . index == "contained_by" && error . key == ID::from ("old")));
 }
 
 #[test]
 fn local_index_check_catches_an_omitted_insertion () {
-  let (base, mut candidate, definitions, changes) = changed_edge_fixture (0);
+  let (base, mut candidate, nodeInstructions, changes) = changed_edge_fixture (0);
   candidate . contained_by . remove (&ID::from ("new"));
   let report : LocalIndexValidation = validate_local_internal_indexes (
-    &base, &candidate, &definitions, &changes);
+    &base, &candidate, &nodeInstructions, &changes);
   assert! (report . errors . iter () . any (|error|
     error . index == "contained_by" && error . key == ID::from ("new")));
 }
@@ -323,22 +323,22 @@ fn local_index_check_catches_an_omitted_insertion () {
 fn local_index_check_catches_an_omitted_canonical_migration () {
   let mut owner : Graphnode = node ("owner");
   owner . contains = rel_partners_at_relRepo (
-    &RepoName::from ("main"), vec![ID::from ("future")]);
+    &SkgRepoName::from ("main"), vec![ID::from ("future")]);
   let base : InRustGraph = InRustGraph::from_graphnodes (&[owner]);
   let mut target : Graphnode = node ("target");
   target . extra_ids = vec![ID::from ("future")];
-  let definitions : Vec<DefineNode> =
-    vec![DefineNode::Save (SaveNode (target))];
+  let nodeInstructions : Vec<NodeInstruction> =
+    vec![NodeInstruction::Save (SaveNode (target))];
   let (changes, errors, revocations)
     : (GraphChangeSet, Vec<CompleteGraphError>, Vec<super::ExtraIdRevocation>) =
-    validate_identity_and_derive_changes (&config (), &base, &definitions);
+    validate_identity_and_derive_changes (&config (), &base, &nodeInstructions);
   assert! (errors . is_empty () && revocations . is_empty ());
   let mut candidate : InRustGraph = base . clone ();
-  apply_definenodes_to_inRustGraph (&mut candidate, &definitions);
+  apply_nodeInstructions_to_inRustGraph (&mut candidate, &nodeInstructions);
   candidate . contained_by . remove (&ID::from ("target"));
   add_membership (&mut candidate . contained_by, "future", "owner");
   let report : LocalIndexValidation = validate_local_internal_indexes (
-    &base, &candidate, &definitions, &changes);
+    &base, &candidate, &nodeInstructions, &changes);
   assert_eq! (
     report . errors . iter ()
       . filter (|error| error . index == "contained_by") . count (),
@@ -347,25 +347,25 @@ fn local_index_check_catches_an_omitted_canonical_migration () {
 
 #[test]
 fn local_index_check_catches_an_empty_key_left_behind () {
-  let (base, mut candidate, definitions, changes) = changed_edge_fixture (0);
+  let (base, mut candidate, nodeInstructions, changes) = changed_edge_fixture (0);
   candidate . contained_by . insert (
     ID::from ("old"), im::HashSet::new ());
   let report : LocalIndexValidation = validate_local_internal_indexes (
-    &base, &candidate, &definitions, &changes);
+    &base, &candidate, &nodeInstructions, &changes);
   assert! (report . errors . iter () . any (|error|
     error . index == "contained_by" && error . key == ID::from ("old")));
 }
 
 #[test]
 fn local_index_check_work_does_not_grow_with_unrelated_nodes () {
-  let (small_base, small_candidate, small_definitions, small_changes) =
+  let (small_base, small_candidate, small_nodeInstructions, small_changes) =
     changed_edge_fixture (0);
-  let (large_base, large_candidate, large_definitions, large_changes) =
+  let (large_base, large_candidate, large_nodeInstructions, large_changes) =
     changed_edge_fixture (1_000);
   let small : LocalIndexValidation = validate_local_internal_indexes (
-    &small_base, &small_candidate, &small_definitions, &small_changes);
+    &small_base, &small_candidate, &small_nodeInstructions, &small_changes);
   let large : LocalIndexValidation = validate_local_internal_indexes (
-    &large_base, &large_candidate, &large_definitions, &large_changes);
+    &large_base, &large_candidate, &large_nodeInstructions, &large_changes);
   assert! (small . errors . is_empty () && large . errors . is_empty ());
   assert_eq! (small . node_checks, large . node_checks);
   assert_eq! (small . identity_checks, large . identity_checks);
@@ -376,7 +376,7 @@ fn local_index_check_work_does_not_grow_with_unrelated_nodes () {
 
 #[test]
 fn merge_override_collision_names_participants_and_both_repairs () {
-  let repo : RepoName = RepoName::from ("main");
+  let skgrepo : SkgRepoName = SkgRepoName::from ("main");
   let mut n1 : Graphnode = node ("N1");
   n1 . title = "Acquirer title" . to_string ();
   let mut n2 : Graphnode = node ("N2");
@@ -384,19 +384,19 @@ fn merge_override_collision_names_participants_and_both_repairs () {
   let mut r1 : Graphnode = node ("R1");
   r1 . title = "Existing overrider title" . to_string ();
   r1 . overrides_view_of = MSV::Specified (rel_partners_at_relRepo (
-    &repo, vec![ID::from ("N1")]));
+    &skgrepo, vec![ID::from ("N1")]));
   let mut r2 : Graphnode = node ("R2");
   r2 . title = "Redirected overrider title" . to_string ();
   r2 . overrides_view_of = MSV::Specified (rel_partners_at_relRepo (
-    &repo, vec![ID::from ("N2")]));
+    &skgrepo, vec![ID::from ("N2")]));
   let base : Arc<InRustGraph> = Arc::new (
     InRustGraph::from_graphnodes (&[n1 . clone (), n2, r1, r2]));
   n1 . extra_ids = vec![ID::from ("N2")];
   let error : GraphUpdatePreparationError = prepare_graph_update (
     &config (), base, vec![
-      DefineNode::Save (SaveNode (n1)),
-      DefineNode::Delete (DeleteNode {
-        id : ID::from ("N2"), home_repo: repo,
+      NodeInstruction::Save (SaveNode (n1)),
+      NodeInstruction::Delete (DeleteNode {
+        skgid : ID::from ("N2"), home_skgrepo: skgrepo,
       }),
     ]) . expect_err ("merge redirection must violate monogamy");
   assert_eq! (error . merge_override_collisions . len (), 1);
@@ -422,26 +422,26 @@ proptest! {
     ]);
     let id_universe : [&str; 7] = [
       "P0", "P1", "P2", "N0", "N1", "X0", "X1"];
-    let definitions : Vec<DefineNode> = extra_indexes . into_iter ()
+    let nodeInstructions : Vec<NodeInstruction> = extra_indexes . into_iter ()
       . enumerate ()
       . map (|(owner_index, indexes)| {
         let mut saved : Graphnode = node (&format! ("N{owner_index}"));
         saved . extra_ids = indexes . into_iter ()
           . map (|index| ID::from (id_universe [index]))
           . collect ();
-        DefineNode::Save (SaveNode (saved))
+        NodeInstruction::Save (SaveNode (saved))
       })
       . collect ();
-    let batch = normalize_and_coalesce_definitions (definitions);
+    let batch = normalize_and_coalesce_nodeInstructions (nodeInstructions);
     let (_, local_errors, revocations) =
       validate_identity_and_derive_changes (
-        &config (), &base, &batch . final_graph_definitions);
+        &config (), &base, &batch . final_graph_nodeInstructions);
     prop_assert! (revocations . is_empty ());
     let full = validate_complete_graph_candidate (
-      &config (), &base, &batch . final_graph_definitions);
+      &config (), &base, &batch . final_graph_nodeInstructions);
     let prepared = prepare_graph_update (
       &config (), Arc::new (base . clone ()),
-      batch . filesystem_definitions . clone ());
+      batch . filesystem_nodeInstructions . clone ());
     let mut local : Vec<String> = local_errors . iter ()
       . map (|error| format! ("{error:?}"))
       . collect ();

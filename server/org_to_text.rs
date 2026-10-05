@@ -12,7 +12,7 @@ use ego_tree::{NodeRef, Tree};
 use sexp::{Atom, Sexp};
 use std::error::Error;
 
-/// Render a metadata value as one S-expression atom. Most IDs and repo
+/// Render a metadata value as one S-expression atom. Most IDs and skgrepo
 /// names print in the familiar bare form; values containing whitespace or
 /// other S-expression syntax are quoted and escaped by the `sexp` crate.
 pub(crate) fn metadata_value_atom (
@@ -221,13 +221,13 @@ fn property_metadata_to_string (
   match property {
     Property::Alias { relRepo, relRepo_request, relationship_axes, .. } => {
       parts . push ( "alias" . to_string () );
-      if let Some (repo) = relRepo {
+      if let Some (skgrepo) = relRepo {
         parts . push ( format! (
-          "(relRepo {})", metadata_value_atom (repo) ) ); }
-      if let Some (repo) = relRepo_request {
+          "(relRepo {})", metadata_value_atom (skgrepo) ) ); }
+      if let Some (skgrepo) = relRepo_request {
         parts . push ( format! (
           "(editRequest (relRepo {}))",
-          metadata_value_atom (repo) ) ); }
+          metadata_value_atom (skgrepo) ) ); }
       append_relationship_axes_stage_forms (&mut parts, relationship_axes); }
     Property::TextChanged { staged, unstaged } => {
       let mut tags : Vec<&'static str> = Vec::new ();
@@ -284,13 +284,13 @@ fn activeVognode_metadata_to_string (
         activeVognode . viewStats . overridesHere {
         parts . push ( format! ("(overridesHere {})",
                                  original . 0 )); }
-      if let Some (ref repo) =
+      if let Some (ref skgrepo) =
         activeVognode . viewStats . relRepo {
         parts . push ( format! (
-          "(relRepo {})", metadata_value_atom (repo) )); }
-      if activeVognode . viewStats . homeRepoAtBoundary {
+          "(relRepo {})", metadata_value_atom (skgrepo) )); }
+      if activeVognode . viewStats . homeSkgRepoAtBoundary {
         if let Some (src_config)
-        = config . repos . get ( &activeVognode . home_repo )
+        = config . skgrepos . get ( &activeVognode . home_skgrepo )
         { parts . push ( format! (
             "(homeRepoHerald {})",
             metadata_value_atom (
@@ -300,13 +300,13 @@ fn activeVognode_metadata_to_string (
                "(viewStats {})", parts . join (" ") )) }}
     fn edit_request ( activeVognode : & ActiveVognode
                     ) -> Option < String > {
-      if let Some (repo) = &activeVognode . relRepo_request {
+      if let Some (skgrepo) = &activeVognode . relRepo_request {
         return Some ( format! (
           "(editRequest (relRepo {}))",
-          metadata_value_atom (repo) ) ); }
+          metadata_value_atom (skgrepo) ) ); }
       activeVognode . edit_request () . map ( | edit_req | {
         let edit_str : String = match edit_req {
-          NodeEditRequest::NodeMerge (id) => format! ( "(merge {})", id . 0 ),
+          NodeEditRequest::NodeMerge (skgid) => format! ( "(merge {})", skgid . 0 ),
           NodeEditRequest::Delete => "delete" . to_string (),
           NodeEditRequest::SetFlag { flag, value } =>
             format! ( "(flag {} {})",
@@ -343,9 +343,9 @@ fn activeVognode_metadata_to_string (
       else                      { None } }
     let mut parts : Vec < String > =
       vec! [ "node" . to_string () ];
-    parts . push ( format! ( "(id {})", activeVognode . id . 0 ));
+    parts . push ( format! ( "(id {})", activeVognode . skgid . 0 ));
     parts . push ( format! (
-      "(repo {})", metadata_value_atom (&activeVognode . home_repo) ));
+      "(repo {})", metadata_value_atom (&activeVognode . home_skgrepo) ));
     // AffectsParent::True is left implicit because it is the default
     // membership relation.
     match activeVognode . affectsParent {
@@ -389,8 +389,8 @@ fn activeVognode_metadata_to_string (
 /// client can tell a moved/removed phantom apart from a live node without
 /// inferring it from the diff axes. A phantom is always write-protected (so always
 /// emits `writeProtected` and never a body, editRequest, or viewRequests) and its
-/// affectsParent is implicit Affected and birth Unremarkable (so neither atom
-/// appears, and graphStats is rendered as if Affected / Unremarkable). It
+/// affectsParent is implicitly true and birth Unremarkable (so neither atom
+/// appears, and graphStats is rendered as if affectsParent true / birth Unremarkable). It
 /// carries no viewStats. What remains: id, repo, write-protected, graphStats, the
 /// staged/unstaged diff axes, and notInGit.
 fn phantomDiff_metadata_to_string (
@@ -406,10 +406,10 @@ fn phantomDiff_metadata_to_string (
   ) -> String {
     let mut parts : Vec < String > =
       vec! [ "diffPhantom" . to_string () ];
-    parts . push ( format! ( "(id {})", phantom . id . 0 ));
+    parts . push ( format! ( "(id {})", phantom . skgid . 0 ));
     parts . push ( format! (
-      "(repo {})", metadata_value_atom (&phantom . home_repo) ));
-    // affectsParent is implicit Affected and birth Unremarkable on a phantom, so
+      "(repo {})", metadata_value_atom (&phantom . home_skgrepo) ));
+    // affectsParent is implicitly true and birth Unremarkable on a phantom, so
     // neither atom is emitted; both are passed as such to graphnodestats.
     parts . push ( "writeProtected" . to_string () );
     if let Some (s) = phantom_rels_atom (& phantom . graphStats)
@@ -449,11 +449,11 @@ fn phantomDeleted_metadata_to_string (
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   parts . push ( format! (
     "(deleted (id {}) (repo {}))",
-    deleted_node . id . 0,
-    metadata_value_atom (&deleted_node . home_repo) ));
+    deleted_node . skgid . 0,
+    metadata_value_atom (&deleted_node . home_skgrepo) ));
   parts . join (" ") }
 
-/// Render metadata for an PhantomUnknown:
+/// Render metadata for a PhantomUnknown:
 ///   (skg [focused] [folded] (unknown (id X)))
 /// Triggered when a referenced ID resolved to nothing in any db.
 fn phantomUnknown_metadata_to_string (
@@ -467,20 +467,20 @@ fn phantomUnknown_metadata_to_string (
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   let mut unknown_parts : Vec<String> = vec! [
-    format! ("(id {})", unknown_node . id . 0) ];
-  if let Some (repo) = &unknown_node . relRepo {
+    format! ("(id {})", unknown_node . skgid . 0) ];
+  if let Some (skgrepo) = &unknown_node . relRepo {
     unknown_parts . push ( format! (
-      "(viewStats (relRepo {}))", metadata_value_atom (repo)) ); }
-  if let Some (repo) = &unknown_node . relRepo_request {
+      "(viewStats (relRepo {}))", metadata_value_atom (skgrepo)) ); }
+  if let Some (skgrepo) = &unknown_node . relRepo_request {
     unknown_parts . push ( format! (
-      "(editRequest (relRepo {}))", metadata_value_atom (repo)) ); }
+      "(editRequest (relRepo {}))", metadata_value_atom (skgrepo)) ); }
   parts . push ( format! ( "(unknown {})", unknown_parts . join (" ") ) );
   parts . join (" ") }
 
-/// Render an inactive placeholder as the bare atom 'inactiveNode',
+/// Render an inactive vognode as the bare atom 'inactiveNode',
 /// like the other dataless non-vognode markers (aliasFolder, subscribeeFolder,
 /// ...). It carries no id/repo/etc. -- those describe content the
-/// user hid by restricting the repo-set, so emitting them would leak
+/// user hid by restricting the skgrepo-set, so emitting them would leak
 /// (see InactiveVognode).
 fn inactive_node_metadata_to_string (
   focused       : bool,

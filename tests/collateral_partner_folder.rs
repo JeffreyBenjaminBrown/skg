@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_overrides -E 'test(collateral_partner_folder::)'
 //
 // Two cells of the relationship matrix
-// (TODO/full-schema/13_test-rel-matrix.org) that need an open
+// (TODO/DONE/full-schema/DONE/13_test-rel-matrix.org) that need an open
 // COLLATERAL view and the collateral rerender stream:
 //
 // 1. collateral folder-membership update: a view of N shows a

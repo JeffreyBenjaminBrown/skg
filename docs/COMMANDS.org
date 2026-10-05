@@ -22,7 +22,7 @@ save proceeds. Abort leaves every file byte-for-byte unchanged. Scripts
 and maintenance writers have no prompt and refuse this repair.
 
 That disk-publication choice is separate from displaying the result. If
-a successful save under a restricted repo-set would rerender text from
+a successful save under a restricted skgrepo-set would rerender text from
 an overPrivateText telescope, Skg asks for a second, request-scoped approval. Decline
 leaves the save committed but sends no new view text and changes no
 open-view registry entry.
@@ -45,14 +45,14 @@ Marks the node at point for deletion from the graph.
 Upon saving the view, it will vanish not just from this view,
 but from the graph itself.
 *** C-u C-c <backspace> : skg-delete-recursive
-Same as skg-delete, but also marks every activeNode org-descendent
+Same as skg-delete, but also marks every activeNode viewdescendant
 of the node at point. Descendent headlines that are not activeNodes
 (phantoms, aliasFolder, id-folder, etc.) are skipped.
 
 Prefix-arg variant of skg-delete; callable directly via M-x
 as skg-delete-recursive.
 *** C-c d a : skg-delete-references-to-absent-node
-On an Unknown placeholder, removes that exact raw ID from every owned
+On an Unknown phantom, removes that exact raw ID from every owned
 structured relationship in every retained telescope.  It never edits
 foreign telescopes or text links.  If owned title/body text links point at
 the same absent ID, Skg shows a retained warning buffer and asks before the
@@ -60,7 +60,7 @@ structural cleanup; otherwise it runs immediately.  The confirmation is
 bound to the scanned relationships and text links: if they change before
 confirmation, Skg refuses the stale approval and requires a rescan.  Before
 running, save or revert every open skg view.  Afterward, Skg refreshes only
-views which show a changed owner or the exact absent raw ID.
+views which show a changed recorder or the exact absent raw ID.
 ** C-c f : text search
 The 'f' is for 'find'.
 *** how search works
@@ -68,12 +68,12 @@ The 'f' is for 'find'.
 "Rooty" nodes (roots, cycle members,
 mentioned nodes, and nodes that had an org-roam ID before import)
 are bumped in the ranking via their context-origin multiplier.
-**** how search treats Skg repo restrictions
-If the repo-set is restricted, if the search index contains any overPrivateText
+**** how search treats skgrepo restrictions
+If the skgrepo-set is restricted, if the search index contains any overPrivateText
 telescope (one whose selected title or body lies below home), Skg asks
 whether to include or exclude overPrivateText telescopes before running the query.
 Exclude filters them in Tantivy before matching; Include is permission
-for this search only. Under repo-set =all= they are included without a
+for this search only. Under skgrepo-set =all= they are included without a
 prompt and the result carries a warning.
 *** C-c f RET : skg-search
 Text search across titles and aliases, returning every
@@ -250,7 +250,7 @@ to identify where those are.
 Like skg-goto, but also closes the buffer it was called from.
 *** C-c g b   : skg-goto-biggest-branch
 Go to the branch near point with the most recursive content,
-estimated by counting org-descendents in the current buffer.
+estimated by counting viewdescendants in the current buffer.
 
 If the node at point has siblings, this considers that sibling
 set. If it has no siblings, it considers the node's immediate
@@ -299,42 +299,42 @@ These four commands are described elsewhere in this document.
 Asks whether to include staged changes and, if so,
 whether to include unstaged changes.
 Then opens an org report summarizing semantic graph changes
-across all configured Skg repos.
+across all configured skgrepos.
 
 The report is based on git/index/worktree state,
 so the command refuses to run while any Skg view buffer
 has unsaved edits.
 *** C-c t m         : skg-stage-moves
-Scans the git status of every configured Skg repo and finds each
-node whose .skg file "moved": it vanished from exactly one Skg repo
-(committed there in git HEAD, now gone from that Skg repo's worktree)
-and appeared in exactly one other Skg repo (present in that Skg repo's
+Scans the git status of every configured skgrepo and finds each
+node whose .skg file "moved": it vanished from exactly one skgrepo
+(committed there in git HEAD, now gone from that skgrepo's worktree)
+and appeared in exactly one other skgrepo (present in that skgrepo's
 worktree, not yet committed). A node that vanished from, or appeared
-in, more than one Skg repo is ambiguous and is skipped.
+in, more than one skgrepo is ambiguous and is skipped.
 
 Opens a buffer holding a bash script: a list of the moves followed by
-one loop that 'git rm's each file in its old Skg repo and 'git add's it
+one loop that 'git rm's each file in its old skgrepo and 'git add's it
 in the new one. Before removing, the loop checks that the file is
-already gone from the old Skg repo's worktree (that is how the move was
+already gone from the old skgrepo's worktree (that is how the move was
 detected); a file still present there is skipped, not deleted, since
 'git rm' would silently remove it. Review the script, then run it from
 the skg data root. Unlike most commands here, this one does not depend
-on the node at point; it reports moves across all Skg repos.
+on the node at point; it reports moves across all skgrepos.
 ** C-c l : show a folder (both folders of a relation)
 These commands don't edit the graph. Each inserts a request into the
 metadata of the node at point that, on save, causes the server to
 render the relation's folder viewnodes into the view, POPULATED from
 the graph. Each builds BOTH folders of its relation. The write-protected folder ☮
 marks a folder you cannot change from here. Every command auto-saves.
-Without such a request, a definitive node shows only its nonempty
-subscribeeFolder (plus the nonempty hiddenInSubscribeeFolder on a definitive
+Without such a request, an editable node shows only its nonempty
+subscribeeFolder (plus the nonempty hiddenInSubscribeeFolder on an editable
 subscribee-as-such); the heralds advertise other nonempty relations.
 *** C-c l a : skg-show-folderOf-aliases
 The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:
 type an alias in and save.
 *** C-c l o : skg-show-folderOf-overridesViewOf
-The overriddenFolder (the nodes this node overrides -- WRITABLE, shown
+The overriddenFolder (the nodes this node overrides -- EDITABLE, shown
 even when empty as an "add an override here" surface) and the
 overriderFolder (the nodes that override this one -- write-protected, ☮).
 *** C-c l h : skg-show-folderOf-hidesFromItsSubscriptions
@@ -342,7 +342,7 @@ The hiderFolder and hiddenFolder -- BOTH write-protected (☮). Hiding is edited
 a subscribee-as-such, never from these folders. On a node that neither
 hides nor is hidden, nothing appears.
 *** C-c l s : skg-show-folderOf-subscribesTo
-The subscribeeFolder (the nodes this node subscribes to -- WRITABLE, shown
+The subscribeeFolder (the nodes this node subscribes to -- EDITABLE, shown
 even when empty) and the subscriberFolder (the nodes that subscribe to
 this one -- write-protected, ☮).
 *** C-c l p : skg-show-folderOf-flags
@@ -378,31 +378,31 @@ The nodes that subscribe to this node.
 *** C-c p s : skg-show-subscribeeward-tree
 The nodes this node subscribes to.
 ** C-c s : setting node properties
-*** first some vocab: 'definitive' and 'write-protected'
-A view of a node can be definitive or write-protected.
+*** first some vocab: 'editable' and 'write-protected'
+A view of a node can be editable or write-protected.
 Typically the first place in the buffer that depicts a node
-is the definitive view of it. So that other views of that node
+is the editable view of it. So that other views of that node
 cannot contradict it, they are 'write-protected': Edits to them
 cannot affect the node they depict. They are also truncated --
 that is, shown without content --
 in order to prevent the view from becoming redundant and huge.
-*** PITFALL: Don't make something 'definitive' by directly editing its metadata.
+*** PITFALL: Don't make something 'editable' by directly editing its metadata.
 Instead, use skg-set-definitive, below.
-That's because Skg has to make other instances of it
+That's because Skg has to make other occurrences of it
 (in this same buffer -- and maybe in the future other buffers too)
 write-protected. That's because a buffer can only be saved
-if it has at most one definitive instance of a node.
-Otherwise, two definitive nodes could contradict each other.
+if it has at most one editable occurrence of a node.
+Otherwise, two editable nodes could contradict each other.
 
 This same caveat does not apply to making a node write-protected.
 While there does exist a command for that (skg-set-write-protected)
 you can also 'do it yourself'
 by visiting a metadata buffer for the node (skg-view-metadata).
 *** C-c s d : skg-set-definitive
-If you want to see the definitive view of that node
+If you want to see the editable view of that node
 from a place where it is currently shown in a write-protected form,
-call this function. It will make the current definitive view
-(if it exists) write-protected, and then draw a definitive view here.
+call this function. It will make the current editable view
+(if it exists) write-protected, and then draw an editable view here.
 *** C-c s w : skg-set-write-protected
 This marks a node as 'write-protected',
 as described above.
@@ -412,13 +412,13 @@ will not affect it
   (although edits to its children will affect those children,
   unless they are also write-protected).
 *** C-c s s : skg-set-repo
-Changes the Skg repo of the node at point.
-The prompt starts with the current Skg repo as editable minibuffer text.
-You can type the new Skg repo name directly,
-or use shift-left / shift-right to cycle through owned Skg repos.
+Changes the skgrepo of the node at point.
+The prompt starts with the current skgrepo as editable minibuffer text.
+You can type the new skgrepo name directly,
+or use shift-left / shift-right to cycle through owned skgrepos.
 Press C-? from the prompt to open an org buffer listing every
-configured Skg repo name as a headline,
-with that Skg repo's path as the headline body.
+configured skgrepo name as a headline,
+with that skgrepo's path as the headline body.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the move.
@@ -426,20 +426,20 @@ Save the view afterward to apply the move.
 Two safeguards, shared with the recursive form below:
 
 - If the move would leave content relationships stuck at their old,
-  more-private Skg repos (the sticky rule never moves an edge's
+  more-private skgrepos (the sticky rule never moves a relationship's
   privacy without an explicit gesture), the command says so and
   offers to publicize them in the same go, by writing the same
   =(editRequest (relRepo ...))= requests 'skg-set-relRepo' would.
   Declining leaves them and notes that =C-c s R= can publicize them
-  later. Edges already carrying an explicit Skg repo request
+  later. Relationships already carrying an explicit skgrepo request
   already have a deliberate relRepo and are never touched.
-- A write-protected instance is NOT changed -- the save would
-  silently ignore its Skg repo edit -- and produces a loud WARNING,
+- A write-protected occurrence is NOT changed -- the save would
+  silently ignore its skgrepo edit -- and produces a loud WARNING,
   with the full ID list written to =*Messages*=.
 *** C-c s S : skg-set-repo-recursive
 Like 'skg-set-repo', but it also
-changes the Skg repo of every content descendent of the node at point
-whose Skg repo matches the original Skg repo of the node at point.
+changes the skgrepo of every content descendent of the node at point
+whose skgrepo matches the original skgrepo of the node at point.
 Only descendents for which AffectsParent=True are traversed.
 The stuck-relationship offer and the write-protected warning described
 under =C-c s s= apply here too, across the whole subtree.
@@ -450,7 +450,7 @@ It refuses foreign and write-protected nodes and conflicts with another
 =editRequest=. It does not save; save the view to apply it.
 
 With =C-u=, the selected value is applied uniformly to the true-content
-subtree only. Non-vognodes, role trees, independent children, inactive nodes, and
+subtree only. Non-vognodes, role trees, non-member children, inactive nodes, and
 phantoms are pruned. Repeated PIDs are changed once; ineligible descendants
 are skipped and reported in =*Messages*=.
 *** C-c s m : skg-set-merge-request
@@ -468,51 +468,51 @@ Save the view afterward to apply the merge.
 Sets the relRepo of the relationship instance the headline at
 point represents -- =contains= for a content child, the folder's
 relation for a writable PartnerFolder member, or the alias membership
-for an alias headline. An Unknown placeholder in one of those writable
+for an alias headline. An Unknown phantom in one of those writable
 positions is supported too: it carries only its raw relationship member ID,
 never a node edit. (Formerly
 =skg-privatize-relationship=; renamed because the gesture now moves
 privacy in both directions, see
 =BUG-and-fix_make-edge-more-public.org=.)
 
-For a node-to-node edge, the command asks the server for its default
+For a node-to-node relationship, the command asks the server for its default
 relRepo and current relRepo (the
 "relRepo info" endpoint), then prompts -- with both
-tab-completion and S-left/S-right cycling, like the other Skg repo
-dialogs -- over the Skg repos at least as private as the default (more
+tab-completion and S-left/S-right cycling, like the other skgrepo
+dialogs -- over the skgrepos at least as private as the default (more
 public ones could leak an endpoint's ID and would be rejected at
 save), plus a no-override choice. The minibuffer starts pre-filled
 with a pending request when it is offerable, else the current relRepo
-or default, so RET keeps the most specific available choice. If the server cannot resolve the edge
-(e.g. a node not yet saved), every Skg repo is offered and the save's
-floor check backstops. For an alias, its default is its owner's home
+or default, so RET keeps the most specific available choice. If the server cannot resolve the relationship
+(e.g. a node not yet saved), every skgrepo is offered and the save's
+floor check backstops. For an alias, its default is its recorder's home
 and the current relRepo is read directly from the alias metadata, so
-no synthetic graph edge or broader endpoint is needed.
+no synthetic graph relationship or broader endpoint is needed.
 
-For an edge from an owned owner to a foreign member, the default is
-the owner's home regardless of privacy order. That choice deliberately
+For a relationship from an owned recorder to a foreign member, the default is
+the recorder's home regardless of privacy order. That choice deliberately
 shares the foreign ID and relationship with readers of the owned
-Skg repo; Skg never offers the foreign Skg repo as a write destination.
+skgrepo; Skg never offers the foreign skgrepo as a write destination.
 
-Choosing a Skg repo writes an =(editRequest (relRepo REPO))= metadata
+Choosing a skgrepo writes an =(editRequest (relRepo REPO))= metadata
 request. This
 both raises privacy above the default and lowers it back down to
-(never below) the default -- the way to publicize an edge stuck at
-an old, more private Skg repo after its endpoint's home moved. An edge
+(never below) the default -- the way to publicize a relationship stuck at
+an old, more private skgrepo after its endpoint's home moved. A relationship
 sitting more private than its default is marked with a red =~NAME= herald
-immediately before the ⌂ Skg repo herald; once saved at its default,
+immediately before the ⌂ skgrepo herald; once saved at its default,
 request and display herald disappear.
 
 The no-override choice removes the request, which means "no opinion":
-a saved edge keeps its saved Skg repo (sticky). It does NOT reset the
-edge to its default -- to reach the default, choose it.
+a saved relationship keeps its saved skgrepo (sticky). It does NOT reset the
+relationship to its default -- to reach the default, choose it.
 
 Refuses with an error when point is on a member of a write-protected folder
 (subscriberFolder, overriderFolder, hiderFolder, hiddenFolder,
 hiddenInSubscribeeFolder, hiddenOutsideOfSubscribeeFolder): the
-relationship belongs to the other end there, so setting its Skg repo
+relationship belongs to the other end there, so setting its skgrepo
 from this side would be meaningless. Also refuses on a root
-headline, which represents no edge.
+headline, which represents no relationship.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the change.
@@ -528,40 +528,40 @@ With a prefix argument (=C-u C-c s r=) it instead runs
 'skg-set-relRepo-recursive', described next.
 *** C-c s R : skg-set-relRepo-recursive
 Like 'skg-set-relRepo', but applied throughout the
-subtree at point (the node at point's own edge to its view-parent
+subtree at point (the node at point's own relationship to its viewparent
 included). Also reachable as =C-u C-c s r=.
 
-It first presents an org-menu asking what kind of relationships to
-the view-parent should qualify: the schema's five node-node
+It first presents an org-menu asking what kinds of relations to
+the viewparent should qualify: the schema's five node-node
 relations are the level-1 headlines, and each level-2 headline is a
 role the view-CHILD would play in that relation toward its
-view-parent. Only three roles are settable from the child's
+viewparent. Only three roles are settable from the child's
 position -- =contained= (ordinary content), =subscribee= (a
 subscribeeFolder member) and =overridden= (an overriddenFolder member);
-RET on any other role explains why its edge cannot be set from
+RET on any other role explains why its relationship cannot be set from
 there (write-protected folders belong to the other end; links carry no
-independent Skg repo; hide Skg repos are derived at save). RET picks a
+independent skgrepo; hide skgrepos are derived at save). RET picks a
 role; q aborts.
 
-It then prompts for a Skg repo over the whole ladder, plus the
-no-override choice, which instead REMOVES existing Skg repo requests
-throughout the subtree. Unlike the single-edge command, no
-per-edge default is fetched -- the subtree's edges have different
-defaults -- so every Skg repo is offered and the save's floor check
-validates each edge (an offered Skg repo more public than some edge's
-default makes the save fail, naming that edge).
+It then prompts for a skgrepo over the whole ladder, plus the
+no-override choice, which instead REMOVES existing skgrepo requests
+throughout the subtree. Unlike the single-relationship command, no
+per-relationship default is fetched -- the subtree's relationships have different
+defaults -- so every skgrepo is offered and the save's floor check
+validates each relationship (an offered skgrepo more public than some relationship's
+default makes the save fail, naming that relationship).
 
 The walk applies to, and recurses on, only viewchildren that affect
 their viewparents: affectsParent=true activeNodes, through the two
-writable folders. It prunes below write-protected nodes and
-subscribee-as-such members (their org-children's edges are not
+editable folders. It prunes below write-protected nodes and
+subscribee-as-such members (their viewchildren's relationships are not
 collected at save), and prunes write-protected folders and other non-vognodes
 entirely.
 
 This is the gesture for republicizing a subtree's relationship
-edges after 'skg-set-repo-recursive' moved its nodes to a more
-public Skg repo: the sticky rule keeps each edge at its old, more
-private Skg repo, so the contains edges stay behind until explicitly
+relationships after 'skg-set-repo-recursive' moved its nodes to a more
+public skgrepo: the sticky rule keeps each relationship at its old, more
+private skgrepo, so the contains relationships stay behind until explicitly
 moved to the new default (see
 =MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org=).
 
@@ -578,12 +578,12 @@ ID, the command warns that the old node might become an orphan.
 
 The headline title plus body must contain exactly one org bracket
 link, and that link must be an =id:= link. The node must have no
-org-descendents. Its org-parent must be a definitive activeNode
-whose Skg repo is owned in =skgconfig.toml=.
+viewdescendants. Its viewparent must be an editable activeNode
+whose skgrepo is owned in =skgconfig.toml=.
 
 The command replaces the whole leaf with a same-level
 write-protected activeNode for the link target. The parent is
-definitive, so saving records the dest as content of the
+editable, so saving records the dest as content of the
 parent; the replacement child is write-protected, so its own text is
 not rewritten from the link label.
 *** C-c m f : skg-fork-node
@@ -597,8 +597,8 @@ Refuses if the buffer has unsaved changes ("Save the buffer
 before forking."), so the clone's snapshot matches what you see.
 Otherwise it stamps the node and auto-saves; the server returns
 the usual fork-confirmation buffer. There you MUST set the clone's
-Skg repo with =C-c s s= (it starts as the placeholder PICK-A-REPO,
-with your config-first owned Skg repo suggested above it), then
+skgrepo with =C-c s s= (it starts as the placeholder PICK-A-REPO,
+with your config-first owned skgrepo suggested above it), then
 approve with =C-c C-c=; or decline with =C-c C-k= (which also
 strips the fork request so the next save does not re-fork).
 
@@ -614,10 +614,10 @@ Point can be on the headline or in the node body.
 The command uses the headline either way.
 
 The node being replaced must be an existing activeNode with an ID,
-and an org-child of a definitive activeNode whose Skg repo is
+and a viewchild of an editable activeNode whose skgrepo is
 owned in =skgconfig.toml=. The command acts locally,
 replacing only this occurrence in the current buffer:
-the headline at point and all of its org-descendents,
+the headline at point and all of its viewdescendants,
 including non-vognodes and phantoms,
 are removed from the view and replaced by a same-level headline
 whose title is an =[[id:...][...]]= link to the original node.
@@ -654,14 +654,14 @@ enable this view to see what you've changed since your last commit,
 i.e. how your worktree differs from HEAD.
 
 If toggling the mode would rerender overPrivateText telescope text under a
-restricted repo-set, Skg asks before changing the mode or any view.
+restricted skgrepo-set, Skg asks before changing the mode or any view.
 Declining leaves the mode and buffers unchanged; the protocol still sends
 an empty rerender stream so preemptive client locks are released.
 *** C-c v e : skg-view-new-empty
 Opens a blank Skg content view in which to create new nodes.
 **** why
-Creating a headline through Skg's commands prompts for any Skg repo it
-cannot inherit.  Save validation also catches a root whose Skg repo was
+Creating a headline through Skg's commands prompts for any skgrepo it
+cannot inherit.  Save validation also catches a root whose skgrepo was
 omitted when the headline was entered as plain text.
 *** C-c v h : skg-view-heralds-mode
 This command toggles it.
@@ -671,18 +671,18 @@ or is instead summarized via brief 'heralds'.
 It is turned on at every view by default.
 See [[file:heralds.org][the herald legend]] for the tokens and styles.
 *** C-c v L : skg-toggle-repo-overlay-on-links
-Toggle display-only home repo suffixes on Skg links in this buffer.
+Toggle display-only home skgrepo suffixes on Skg links in this buffer.
 The suffixes start off. Links confirmed missing are yucky and underlined
 even with suffixes off. See [[file:heralds.org::*Link annotations][link annotations]].
 *** C-c v l : skg-limit-repo-set
-Limits display and search to one repo-set for this Emacs
-connection. Repo-sets are the prefixes of the config's privacy
+Limits display and search to one skgrepo-set for this Emacs
+connection. Skgrepo-sets are the prefixes of the config's privacy
 order, so the question the command asks is really "what is the most
-private Skg repo to make available?" -- choosing a Skg repo activates it
+private skgrepo to make available?" -- choosing a skgrepo activates it
 and everything more public. Tab completion and shift-left /
 shift-right cycling walk the ladder in privacy order. The command
 then re-renders open Skg buffers after confirmation, and tells the
-server to use that repo-set for subsequent requests. Choose =all=
+server to use that skgrepo-set for subsequent requests. Choose =all=
 (the whole ladder) to remove the limit.
 
 If the proposed set would rerender overPrivateText telescope text, Skg asks before
@@ -706,9 +706,9 @@ server round-trip at all. See =C-c v R= for when it goes stale.
 Empties the session's ID-to-title cache (see =C-c v r=) and
 re-annotates the current buffer. Use it after anything that changes
 what titles the server would answer with: a node retitled, or the
-active repo-set widened (IDs inactive under the old set were
+active skgrepo-set widened (IDs inactive under the old set were
 cached as unresolvable).
-*** C-c v s : skg-view-id-stack
+*** C-c v s : skg-view-linkstack
 View and maybe edit the set of links you've stored.
 (See "the linkstack" below.)
 *** C-c v w : skg-view-without-metadata
@@ -743,20 +743,20 @@ Every node has an ID,
 but a title can include multiple or no links.
 *** C-c i p : skg-id-prev
 See skg-id-next, above.
-*** the stack of links/ids
+*** the linkstack
 C-c u for push, C-c o _ for paste, C-c O _ for pop
 **** C-c u : skg-id-push
-Stores, in the id stack,
+Stores, in the linkstack,
 a link to the node the cursor is on.
 **** C-c o i : skg-paste-id
-Inserts the ID at the top of the id stack at the cursor.
+Inserts the ID at the top of the linkstack at the cursor.
 Does not modify the stack.
 **** C-c O i : skg-pop-id
 Like skg-paste-id,
 but also removes the node from the stack.
 **** C-c o l : skg-paste-link
 Inserts, at the cursor, a link to the node
-whose ID is at the top of the id stack.
+whose ID is at the top of the linkstack.
 Does not modify the stack.
 **** C-c O l : skg-pop-link
 Like skg-paste-link,
@@ -766,23 +766,23 @@ This is the easiest way to give a node multiple containers --
 push it to the stack, then paste it as a node somewhere else.
 
 Inserts, at the cursor, a write-protected view
-of the node whose ID is at the top of the id stack.
+of the node whose ID is at the top of the linkstack.
 Its metadata includes only the ID, =writeProtected=,
-and (usually) a definitive view request;
+and (usually) an editable view request;
 its title comes from the stack.
 Does not modify the stack or save.
 Saving will provide the rest of its metadata,
-and fulfill the definitive view request,
-making the node writeable with its real title, body and content.
+and fulfill the editable view request,
+making the node writable with its real title, body and content.
 
 The view request is omitted if the buffer already has
-a writeable instance of the node (or one requesting a definitive view),
-because a buffer can hold only one writeable instance of each node.
+an editable occurrence of the node (or one requesting an editable view),
+because a buffer can hold only one editable occurrence of each node.
 Then the pasted node stays write-protected, and Emacs says so.
 **** C-c O n : skg-pop-node
 Like skg-paste-node,
 but also removes the node from the stack.
-**** C-c v s : skg-view-id-stack
+**** C-c v s : skg-view-linkstack
 repeated here; described earlier in this doc
 ** import and export
 *** skg-import-md-and-org : additive mixed-document import
@@ -791,8 +791,8 @@ repeated here; described earlier in this doc
 :END:
 **** ordinary usage
 Run =M-x skg-import-md-and-org= with the server running. Choose an absolute
-directory in the server/container filesystem and an existing owned Skg repo.
-That Skg repo determines where every new node will be written. The importer scans
+directory in the server/container filesystem and an existing owned skgrepo.
+That skgrepo determines where every new node will be written. The importer scans
 exact =.md= and =.org= files recursively, skips symlinks and =.git=, and
 leaves the originals untouched.
 
@@ -800,10 +800,10 @@ Review the preview of files, generated =.org= export paths, and warnings,
 then explicitly approve or decline. Approval applies only to that preview;
 another run requires a new one.
 
-The operation creates file-root and heading nodes,
+The operation creates file-root and headline nodes,
 which correspond 1-to-1 to sections of the imported data.
-A document whose only top-level heading has nothing before it
-is that heading, so the heading is its file root;
+A document whose only top-level headline has nothing before it
+is that headline, so the headline is its file root;
 otherwise the file root is titled after the document.
 It also creates two kinds of nodes that do not so correspond:
 - a single import-record node with links to all file roots,
@@ -833,7 +833,7 @@ Subsequent Org export is for reading, not
 a round-trip backup: it does not preserve Markdown syntax or all Skg graph
 semantics. Exporting to the original input directory would overwrite matching
 =.org= files, while leaving =.md= files alone. There is no dedicated undo or
-crash-recovery transaction; keep the originals and back up the owned Skg repo.
+crash-recovery transaction; keep the originals and back up the owned skgrepo.
 
 **** Skg asks for a host-root mapping if it finds absolute links to documents.
 Skg runs in a Docker container.
@@ -859,11 +859,11 @@ Use =verbatim= or ~code~ instead.
 The rest of Skg (saving, link statistics, link annotations, export)
 treats links in literal text the same way.
 
-**** An Org heading inside a block or fence stops the import.
-If a line of an Org file looks like a heading (asterisks at the start of
+**** An Org headline inside a block or fence stops the import.
+If a line of an Org file looks like a headline (asterisks at the start of
 the line, then a space) but is inside a =#+begin_...= block or a =```= fence,
 nothing is imported, and the preview explains which lines are the problem.
-Org would read the line as a heading and end the block there,
+Org would read the line as a headline and end the block there,
 so Skg cannot tell what was meant.
 Often the block was never closed.
 If the line belongs inside the block, escape it with a leading comma
@@ -894,7 +894,7 @@ cargo run --bin skg -- import-org-roam ORG_DIR OUTPUT_DIR REPO_NAME
 
 All three arguments are required. 'ORG_DIR' contains your Org-roam notes;
 'OUTPUT_DIR' receives the '.skg' files; 'REPO_NAME' names the destination
-Skg Skg repo. For example, using a fresh staging directory:
+Skg skgrepo. For example, using a fresh staging directory:
 
 #+begin_src sh
 cargo run --bin skg -- import-org-roam /imports/org-roam /tmp/skg-import-review imported-notes
@@ -904,10 +904,10 @@ Paths are relative to the process's working directory unless absolute.
 Inside Docker, supply container-visible paths. There is no host-path
 mapping argument or interactive prompt.
 **** Before running: the destination is replaced
-First, if any input file has a line that looks like a heading inside a
+First, if any input file has a line that looks like a headline inside a
 '#+begin_' block or a fence, the command stops, naming those lines, and
 nothing is deleted or written; see
-[[*An Org heading inside a block or fence stops the import.][the same check in the interactive importer]].
+[[*An Org headline inside a block or fence stops the import.][the same check in the interactive importer]].
 Otherwise the importer creates 'OUTPUT_DIR' if necessary, then deletes every
 immediate '.skg' file already in it, before importing the input. There is no confirmation,
 dry run, merge-with-destination mode, or automatic backup. Other files and
@@ -923,13 +923,13 @@ was imported. Check the output against your originals.
 The scan recurses for the exact extension '.org', skipping '.git' directories.
 Each file must begin with a ':PROPERTIES:' drawer containing ':ID:'.
 Indentation on that first drawer line is accepted; blank lines before it
-are not. Files without this file-level ID are skipped even if headings have IDs.
+are not. Files without this file-level ID are skipped even if headlines have IDs.
 
 Each accepted file becomes a node, titled from '#+title:' or, if absent,
-the filename without its extension. Each heading becomes a node, with
+the filename without its extension. Each headline becomes a node, with
 ordered 'contains' relationships representing the outline. Existing IDs are
-retained; headings without IDs get fresh UUIDs on every run. Some skipped
-heading levels introduce grouping nodes titled 'These are special!' and
+retained; headlines without IDs get fresh UUIDs on every run. Some skipped
+headline levels introduce grouping nodes titled 'These are special!' and
 'These are normal.' rather than reproducing the outline literally.
 
 'ROAM_ALIASES' becomes Skg aliases. Nodes with an original ID receive the
@@ -937,39 +937,39 @@ heading levels introduce grouping nodes titled 'These are special!' and
 are merged: children and aliases are combined, and additional titles and
 bodies are appended with a separator. Such nodes receive 'Was overloaded
 during org-roam import'. This does not compare or merge with existing
-nodes in your configured Skg Skg repos.
+nodes in your configured Skg skgrepos.
 ***** Text and links
 Bodies are copied with whitespace normalization. Parsed property drawers
 are consumed; properties other than 'ID' and 'ROAM_ALIASES' are not retained
-from those drawers. The parser uses line-based heading detection, so this
+from those drawers. The parser uses line-based headline detection, so this
 is not a lossless general-purpose Org conversion.
 
-Existing =[[id:ID][label]]= links retain their targets. File links and heading
+Existing =[[id:ID][label]]= links retain their targets. File links and headline
 search links are not converted to Skg ID links, and attachments are not copied.
 Relative file links may no longer resolve after import. The importer does not
 validate that linked IDs exist. It creates no subscriptions, hides, or overrides.
 **** Making the imported data available in Skg
 The command writes one 'ID.skg' file per resulting node. It does not edit
 configuration, start the server, or refresh a running server's graph and
-search index. 'REPO_NAME' labels the Skg repo during conversion; the permanent
-Skg repo association comes from the configured directory, not a Skg repo field
+search index. 'REPO_NAME' labels the skgrepo during conversion; the permanent
+skgrepo association comes from the configured directory, not a skgrepo field
 inside each file.
 
-After reviewing the output, place it in the intended owned Skg repo directory
-and configure that Skg repo with the intended name and privacy order. See
-[[file:api-and-formats.org][the configuration reference]]. Check for ID collisions with existing Skg repos
+After reviewing the output, place it in the intended owned skgrepo directory
+and configure that skgrepo with the intended name and privacy order. See
+[[file:api-and-formats.org][the configuration reference]]. Check for ID collisions with existing skgrepos
 before loading: the importer itself does not check them.
 
-For a first setup, configure the Skg repo before starting Skg. When replacing
+For a first setup, configure the skgrepo before starting Skg. When replacing
 existing data, save and close affected views and stop the server before
-changing the files in its Skg repos, then restart it. If files in an already configured
-Skg repo changed while the server remained running,
+changing the files in its skgrepos, then restart it. If files in an already configured
+skgrepo changed while the server remained running,
 'M-x skg-rebuild-ephemeral-data-stores' reloads them; close stale views and
 open fresh ones before editing. Configuration changes require a restart.
 
 The Cargo command prints a reminder to commit the imported files so Git
 diff views have a baseline; it does not run Git. Reimporting replaces the
-destination and gives ID-less headings new IDs, so it is not an incremental
+destination and gives ID-less headlines new IDs, so it is not an incremental
 update workflow. Keep your originals and a backup of Skg edits you want to
 retain. [[file:undoing-import.org][Exporting back to Org]] does not restore the original files or all graph
 semantics.
@@ -994,9 +994,9 @@ Exports Skg data to plain =.org= files, so the data can be read
 (and navigated on GitHub) without running Skg. No keybinding.
 
 It asks two things:
-- the most private Skg repo to include. The export includes
-  that Skg repo and every Skg repo more public than it.
-  Choose all to include every Skg repo.
+- the most private skgrepo to include. The export includes
+  that skgrepo and every skgrepo more public than it.
+  Choose all to include every skgrepo.
 - which directory to write to (default =org-exports=). This path
   is interpreted *by the server*, relative to the project root the
   server runs from. Because the server may run inside a Docker
@@ -1020,7 +1020,7 @@ make N contain a child node, called an /export marker/, such that:
   =3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f=.
   That ID is a fixed constant that the exporter looks for.
   The node it names only documents this feature.
-  The link works even if your Skg repos do not contain that node.
+  The link works even if your skgrepos do not contain that node.
   The link's label is up to you, for example:
   : [[id:3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f][Skg exports this document to org.]]
 - The marker's body contains a line saying where to write the file,
@@ -1036,7 +1036,7 @@ each of its content nodes' titles and bodies,
 each of *their* content nodes' titles and bodies, etc.,
 stripped of Skg metadata. The export marker itself is left out of the file.
 N's position does not matter; it can be anywhere in the graph.
-But N must belong to a Skg repo included in the export;
+But N must belong to a skgrepo included in the export;
 otherwise it is skipped, with a warning.
 If N has several markers, the first one is used, with a warning.
 If two nodes claim the same path, only one of them is exported, with a warning.
@@ -1056,7 +1056,7 @@ literally (in =verbatim= or ~code~, a fixed-width =:= line, or a
 =#+begin_...= block or code fence) is an example, and is left alone. A link to another
 exported file's root points at that file; a link to a non-root
 node points deep, to the relevant headline of the document,
-via =[[./file.org::*Heading][label]]=.
+via =[[./file.org::*Headline][label]]=.
 Links in headlines are kept. Org cannot find a headline containing
 a link by its text, and finds only the first of several headlines
 with the same text. So a link to either kind of headline uses its
@@ -1067,18 +1067,18 @@ get one.
 if an exported node contains another export root,
 the second root’s contents go in its own file,
 and are not duplicated into the first.
-The first instead gets a heading linking to the second file.
+The first instead gets a headline linking to the second file.
 
 A link whose dest
 is not exported under the chosen set points to a "some links
 might be broken" note.
 **** privacy
 If a restricted export would include overPrivateText telescope text, Skg asks for
-approval for each such ID before writing any file. Repo-set =all= exports
+approval for each such ID before writing any file. Skgrepo-set =all= exports
 it with a warning. The noninteractive form "fails closed" (fails before writing any files) unless passed
 =--include-overPrivateText-telescopes=:
 
-: cargo run --bin skg -- export-org [config-path] [repo-set] [output-dir] [--include-overPrivateText-telescopes]
+: cargo run --bin skg -- export-org [config-path] [skgrepo-set] [output-dir] [--include-overPrivateText-telescopes]
 ** connection, reload, rebuild ephemeral data stores
 Unless you're coding or troubleshooting,
 you probably won't need these.
@@ -1096,8 +1096,8 @@ they belong to the previous runtime generation.
 *** skg-strip-trailing-whitespace-from-bodies
 Strips trailing whitespace from every line of every body,
 and trailing blank lines from each body's tail,
-in every Skg repo you own.
-Foreign Skg repos are write-protected and left untouched.
+in every skgrepo you own.
+Foreign skgrepos are never written, so they are left untouched.
 Rewrites exactly the .skg files whose bodies change;
 the derived caches are refreshed to match.
 Review the result with 'git diff --ignore-all-space',

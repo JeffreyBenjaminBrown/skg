@@ -56,7 +56,7 @@ rerender-done."
               (append
                '((request . "git diff mode toggle"))
                (when approved-pids
-                 `((allow-overPrivateText-telescopes ,@approved-pids)))))
+                 `((approved-overPrivateText-pids ,@approved-pids)))))
              "\n"))))
 
 (provide 'skg-request-git-diff-mode)

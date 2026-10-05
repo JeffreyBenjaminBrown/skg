@@ -65,7 +65,7 @@ exist. That would be bad. So skg has to guard against invalid discards."
 
 But that is not bad in skg -- it is a supported, rendered state. A
 =contains= (or textlink) edge whose target is absent renders as an
-*unknown-node scaffold*, "Parent references unknown node."
+*unknown-node phantom*, "Parent references unknown node."
 (=server/heralds.rs:240=; =parse_metadata_sexp.rs= =unknown_node_id=;
 =server/diff_analysis/vanished.rs=). The graph stores edges by ID and
 never requires the target to exist. Deletion in the SAVE path even

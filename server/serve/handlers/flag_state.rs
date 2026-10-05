@@ -6,7 +6,7 @@ use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, value_from_request_sexp};
 use crate::types::env::SkgEnv;
-use crate::types::misc::{ID, SkgConfig, RepoName};
+use crate::types::misc::{ID, SkgConfig, SkgRepoName};
 use crate::types::nodes::complete::{
   Flag, flag_is_true};
 
@@ -30,32 +30,32 @@ fn flag_state_response_body (
   env     : &SkgEnv,
 ) -> Result<String, String> {
   let runtime = env . runtime_snapshot ();
-  let id : ID = ID::from (value_from_request_sexp ("id", request) ?);
+  let skgid : ID = ID::from (value_from_request_sexp ("id", request) ?);
   let flag_name : String = value_from_request_sexp ("flag", request) ?;
   let flag : Flag = Flag::from_wire_name (&flag_name)
     . ok_or_else (|| format! ("unknown flag '{}'", flag_name)) ?;
-  let (pid, repo, value, owned) = flag_state (
-    &runtime . graph, &runtime . config, &id, flag) ?;
+  let (pid, skgrepo, value, owned) = flag_state (
+    &runtime . graph, &runtime . config, &skgid, flag) ?;
   Ok (format! (
     "(id {}) (flag {}) (value {}) (repo {}) (user-owned {})",
     quoted (&pid . 0), quoted (flag . wire_name ()),
     quoted (if value { "true" } else { "false" }),
-    quoted (&repo . 0), quoted (if owned { "true" } else { "false" })))
+    quoted (&skgrepo . 0), quoted (if owned { "true" } else { "false" })))
 }
 
 pub fn flag_state (
   graph    : &InRustGraph,
   config   : &SkgConfig,
-  id       : &ID,
+  skgid    : &ID,
   flag : Flag,
-) -> Result<(ID, RepoName, bool, bool), String> {
-  let (pid, repo) : (ID, RepoName) = graph . pid_and_repo (id)
-    . ok_or_else (|| format! ("id '{}' is not in the graph", id)) ?;
+) -> Result<(ID, SkgRepoName, bool, bool), String> {
+  let (pid, skgrepo) : (ID, SkgRepoName) = graph . pid_and_skgrepo (skgid)
+    . ok_or_else (|| format! ("id '{}' is not in the graph", skgid)) ?;
   let node = graphnode_from_graph (graph, &pid)
     . ok_or_else (|| format! ("canonical id '{}' is not in the graph", pid)) ?;
-  let value : bool = flag_is_true (&node . misc, flag);
-  let user_owned : bool = config . user_owns_repo (&repo);
-  Ok ((pid, repo, value, user_owned))
+  let value : bool = flag_is_true (&node . flags, flag);
+  let owned : bool = config . skgrepo_is_owned (&skgrepo);
+  Ok ((pid, skgrepo, value, owned))
 }
 
 fn quoted (s : &str) -> String {

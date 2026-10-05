@@ -1,7 +1,7 @@
 ;;; test-skg-git-add.el --- Tests for recursive skg git-add commands.
 
-;;; Sets up a throwaway git repo and skgconfig.toml in /tmp, runs the
-;;; two user commands, then asserts against the repo's state.
+;;; Sets up a throwaway gitrepo and skgconfig.toml in /tmp, runs the
+;;; two user commands, then asserts against the skgrepo's state.
 
 (defconst test-skg-git-add--this-dir
   (file-name-directory load-file-name)

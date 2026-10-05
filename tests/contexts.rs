@@ -8,16 +8,16 @@ use skg::context::{
   content_maps_from_nodes,
   context_origin_types_for_saved_from_in_rust_graph,
   had_id_set_from_nodes,
-  mentioned_ids_from_nodes,
+  mentioned_skgids_from_nodes,
   find_roots_and_multiply_contained,
   extend_context,
   extend_contexts_for_cycles,
 };
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::InRustGraph;
-use skg::types::misc::{ID, SkgConfig, SkgfileRepo, RepoName, rel_partners_at_relRepo};
-use skg::types::nodes::complete::{Flag, Graphnode, empty_node_complete};
-use skg::types::save::{DefineNode, SaveNode};
+use skg::types::misc::{ID, SkgConfig, SkgRepo, SkgRepoName, rel_partners_at_relRepo};
+use skg::types::nodes::complete::{Flag, Graphnode, empty_graphnode};
+use skg::types::save::{NodeInstruction, SaveNode};
 
 #[test]
 fn test_from_label_unknown () {
@@ -45,10 +45,10 @@ fn test_had_id_set_from_nodes_empty () {
 
 #[test]
 fn test_had_id_set_from_nodes_mixed () {
-  let mut node_with : Graphnode = empty_node_complete ();
+  let mut node_with : Graphnode = empty_graphnode ();
   node_with . pid = ID::new ("has-id");
-  node_with . misc = vec![Flag::Had_ID_Before_Import];
-  let mut node_without : Graphnode = empty_node_complete ();
+  node_with . flags = vec![Flag::Had_ID_Before_Import];
+  let mut node_without : Graphnode = empty_graphnode ();
   node_without . pid = ID::new ("no-id");
   let nodes : Vec<Graphnode> = vec![node_with, node_without];
   let result : HashSet<ID> = had_id_set_from_nodes (&nodes);
@@ -56,22 +56,22 @@ fn test_had_id_set_from_nodes_mixed () {
   assert! (result . contains (&ID::new ("has-id"))); }
 
 #[test]
-fn test_mentioned_ids_from_nodes () {
-  let mut node1 : Graphnode = empty_node_complete ();
+fn test_mentioned_skgids_from_nodes () {
+  let mut node1 : Graphnode = empty_graphnode ();
   node1 . pid = ID::new ("src");
   node1 . title =
     "see [[id:tgt1][target one]]" . to_string ();
   node1 . body = Some (
     "also [[id:tgt2][target two]]" . to_string () );
-  let mut node2 : Graphnode = empty_node_complete ();
+  let mut node2 : Graphnode = empty_graphnode ();
   node2 . pid = ID::new ("other");
   node2 . title = "no links here" . to_string ();
   let nodes : Vec<Graphnode> = vec![node1, node2];
-  let mentioned_ids : HashSet<ID> =
-    mentioned_ids_from_nodes (&nodes);
-  assert_eq! (mentioned_ids . len (), 2);
-  assert! (mentioned_ids . contains (&ID::new ("tgt1")));
-  assert! (mentioned_ids . contains (&ID::new ("tgt2"))); }
+  let mentioned_skgids : HashSet<ID> =
+    mentioned_skgids_from_nodes (&nodes);
+  assert_eq! (mentioned_skgids . len (), 2);
+  assert! (mentioned_skgids . contains (&ID::new ("tgt1")));
+  assert! (mentioned_skgids . contains (&ID::new ("tgt2"))); }
 
 #[test]
 fn test_origin_type_priority () {
@@ -98,14 +98,14 @@ fn in_rust_context_types_for_saved_nodes () {
   // each kind, plus an ordinary (untyped) node and a 2-node cycle.
   let mk = | pid : &str, title : &str,
             contains : &[&str], had_id : bool | -> Graphnode {
-    let mut n : Graphnode = empty_node_complete ();
+    let mut n : Graphnode = empty_graphnode ();
     n . pid = ID::new (pid);
     n . title = title . to_string ();
-    n . home_repo = RepoName::from ("main");
+    n . home_skgrepo = SkgRepoName::from ("main");
     n . contains = rel_partners_at_relRepo (
-      &n . home_repo,
+      &n . home_skgrepo,
       contains . iter () . map ( |c| ID::new (*c) ) . collect () );
-    if had_id { n . misc = vec![Flag::Had_ID_Before_Import]; }
+    if had_id { n . flags = vec![Flag::Had_ID_Before_Import]; }
     n };
   let nodes : Vec<Graphnode> = vec![
     mk ("root",   "root",                &["ord","multi","hadid","tgt"], false),
@@ -119,12 +119,12 @@ fn in_rust_context_types_for_saved_nodes () {
     mk ("cyc2",   "cyc2",                &["cyc1"],                      false), ];
   let graph : InRustGraph =
     InRustGraph::from_graphnodes (&nodes);
-  let defs : Vec<DefineNode> =
+  let defs : Vec<NodeInstruction> =
     nodes . iter () . cloned ()
-    . map ( |n| DefineNode::Save ( SaveNode (n) )) . collect ();
+    . map ( |n| NodeInstruction::Save ( SaveNode (n) )) . collect ();
   let types : HashMap<ID, String> =
     context_origin_types_for_saved_from_in_rust_graph (&graph, &defs);
-  let got = |id : &str| types . get (&ID::new (id)) . map ( |s| s . as_str () );
+  let got = |skgid : &str| types . get (&ID::new (skgid)) . map ( |s| s . as_str () );
   assert_eq! (got ("root"),   Some ("Root"));
   assert_eq! (got ("other"),  Some ("Root"));
   assert_eq! (got ("linker"), Some ("Root"));
@@ -140,7 +140,7 @@ fn in_rust_context_types_for_saved_nodes () {
 fn test_find_roots_and_multiply_contained () {
   // a → b, a → c, e → b. d is a root (not contained).
   // b is multiply-contained (by a and e).
-  let all_ids : HashSet<ID> =
+  let all_skgids : HashSet<ID> =
     HashSet::from ([
       ID::new ("a"), ID::new ("b"),
       ID::new ("c"), ID::new ("d"),
@@ -151,7 +151,7 @@ fn test_find_roots_and_multiply_contained () {
   reverse . insert (
     ID::new ("c"), vec![ID::new ("a")] );
   let ( roots, multi ) : ( HashSet<ID>, HashSet<ID> ) =
-    find_roots_and_multiply_contained (&all_ids, &reverse);
+    find_roots_and_multiply_contained (&all_skgids, &reverse);
   assert_eq! (roots . len (), 3);
   assert! (roots . contains (&ID::new ("a")));
   assert! (roots . contains (&ID::new ("d")));
@@ -231,7 +231,7 @@ fn test_extend_contexts_for_cycles_detects_cycle () {
     ID::new ("c"), vec![ID::new ("b")] );
   reverse_map . insert (
     ID::new ("a"), vec![ID::new ("c")] );
-  let all_node_ids : HashSet<ID> =
+  let all_node_skgids : HashSet<ID> =
     HashSet::from ([
       ID::new ("a"), ID::new ("b"),
       ID::new ("c"), ID::new ("d") ]);
@@ -242,7 +242,7 @@ fn test_extend_contexts_for_cycles_detects_cycle () {
   let mut all_contexts : Vec<HashSet<ID>> =
     vec![HashSet::from ([ID::new ("d")])];
   extend_contexts_for_cycles (
-    &all_node_ids,
+    &all_node_skgids,
     &contains_map,
     &reverse_map,
     &mut origin_types,
@@ -272,39 +272,39 @@ fn test_extend_contexts_for_cycles_detects_cycle () {
 fn test_full_context_pipeline () {
   // Load Graphnodes from fixture files.
   let config : SkgConfig =
-    SkgConfig::dummyFromRepos (
+    SkgConfig::dummyFromSkgRepos (
       HashMap::from ([(
-        RepoName::from ("test"),
-        SkgfileRepo {
-          name         : RepoName::from ("test"),
+        SkgRepoName::from ("test"),
+        SkgRepo {
+          name         : SkgRepoName::from ("test"),
           abbreviation : None,
           path         : PathBuf::from ("tests/contexts/fixtures"),
-          user_owns_it : true } )]) );
+          owned        : true } )]) );
   let nodes : Vec<Graphnode> =
-    read_all_skg_files_from_repos (&config)
+    read_all_skg_files_from_skgrepos (&config)
     . expect ("failed to read fixture .skg files");
   // Extract data from Graphnodes.
   let ( map_to_content, map_to_containers )
     : ( MapToContent, MapToContainers )
     = content_maps_from_nodes (&nodes);
-  let mentioned_ids : HashSet<ID> =
-    mentioned_ids_from_nodes (&nodes);
+  let mentioned_skgids : HashSet<ID> =
+    mentioned_skgids_from_nodes (&nodes);
   let had_id_set : HashSet<ID> =
     had_id_set_from_nodes (&nodes);
-  let all_node_ids : HashSet<ID> =
+  let all_node_skgids : HashSet<ID> =
     nodes . iter ()
     . map ( |n| n . pid . clone () )
     . collect ();
-  assert_eq! (all_node_ids . len (), 15);
-  assert_eq! (mentioned_ids . len (), 1);
-  assert! (mentioned_ids . contains (&ID::new ("link-target")));
+  assert_eq! (all_node_skgids . len (), 15);
+  assert_eq! (mentioned_skgids . len (), 1);
+  assert! (mentioned_skgids . contains (&ID::new ("link-target")));
   assert_eq! (had_id_set . len (), 1);
   assert! (had_id_set . contains (&ID::new ("had-id")));
   // Step 1: identify origins.
   // (identify_origins is private, so we replicate its logic.)
   let ( roots, multicontained ) : ( HashSet<ID>, HashSet<ID> ) =
     find_roots_and_multiply_contained (
-      &all_node_ids, &map_to_containers );
+      &all_node_skgids, &map_to_containers );
   assert_eq! (roots . len (), 3);
   assert! (roots . contains (&ID::new ("root-1")));
   assert! (roots . contains (&ID::new ("root-2")));
@@ -314,18 +314,18 @@ fn test_full_context_pipeline () {
   let mut origin_types : HashMap<ID, ContextOriginType> =
     HashMap::new ();
   // Priority order: MC, HadID, Target, Root (lowest first).
-  for id in &multicontained {
+  for skgid in &multicontained {
     origin_types . insert (
-      id . clone (), ContextOriginType::MultiContained ); }
-  for id in &had_id_set {
+      skgid . clone (), ContextOriginType::MultiContained ); }
+  for skgid in &had_id_set {
     origin_types . insert (
-      id . clone (), ContextOriginType::HadID ); }
-  for id in &mentioned_ids {
+      skgid . clone (), ContextOriginType::HadID ); }
+  for skgid in &mentioned_skgids {
     origin_types . insert (
-      id . clone (), ContextOriginType::Mentioned ); }
-  for id in &roots {
+      skgid . clone (), ContextOriginType::Mentioned ); }
+  for skgid in &roots {
     origin_types . insert (
-      id . clone (), ContextOriginType::Root ); }
+      skgid . clone (), ContextOriginType::Root ); }
   assert_eq! (origin_types . len (), 6);
   assert_eq! (origin_types [&ID::new ("root-1")],
               ContextOriginType::Root);
@@ -383,7 +383,7 @@ fn test_full_context_pipeline () {
     &ID::new ("cycle-1") ));
   // Step 3: handle cycles.
   extend_contexts_for_cycles (
-    &all_node_ids,
+    &all_node_skgids,
     &map_to_content,
     &map_to_containers,
     &mut origin_types,
@@ -409,12 +409,12 @@ fn test_full_context_pipeline () {
 
 /// Find the context containing the given node ID.
 fn ctx_containing (
-  id       : &str,
+  skgid       : &str,
   contexts : &[HashSet<ID>],
 ) -> HashSet<ID> {
-  let target : ID = ID::new (id);
+  let target : ID = ID::new (skgid);
   contexts . iter ()
   . find ( |ctx| ctx . contains (&target) )
   . unwrap_or_else ( || panic! (
-    "{} not in any context", id ) )
+    "{} not in any context", skgid ) )
   . clone () }

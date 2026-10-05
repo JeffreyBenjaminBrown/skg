@@ -17,7 +17,7 @@ mod collateral_delete;
 mod fork;
 
 #[path = "collateral_repo_move.rs"]
-mod collateral_repo_move;
+mod collateral_skgrepo_move;
 
 #[path = "expand_partner_folder_member.rs"]
 mod expand_partner_folder_member;

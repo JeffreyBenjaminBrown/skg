@@ -8,8 +8,8 @@
 #
 # The test opens a content view from a, toggles diff mode, verifies
 # b shows up as a phantom, and calls skg-goto-in-magit on it. It
-# then checks that the magit buffer is rooted at the skg-data repo
-# (NOT the outer skg project repo, which is the failure mode when
+# then checks that the magit buffer is rooted at the skg-data skgrepo
+# (NOT the outer skg project skgrepo, which is the failure mode when
 # the server returns a mis-prefixed path) and that point is on the
 # b.skg entry.
 #
@@ -21,7 +21,7 @@
 # path -- which the client then expands against skg-config-dir (also
 # the absolute config dir), producing a double-prefixed nonexistent
 # directory. magit's toplevel-walk then lands on the outer project
-# repo. To reproduce that, this test launches the server with a
+# skgrepo. To reproduce that, this test launches the server with a
 # relative config path from $TEST_DIR.
 
 set -e
@@ -97,7 +97,7 @@ backup_and_reset_test_data
 AVAILABLE_PORT=$(find_available_port)
 echo "Using port $AVAILABLE_PORT for test server..."
 
-# NOTE: repo path is relative ("skg-data"), and the config itself
+# NOTE: skgrepo path is relative ("skg-data"), and the config itself
 # lives one directory below $TEST_DIR so that a relative-config-path
 # launch yields config.data_root = "data" (also relative) -- the
 # scenario this test is designed to exercise.

@@ -2,9 +2,9 @@ pub mod contradictory_instructions;
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::{
-  carrier_on_user_owned_chain, resolve_override};
-use crate::dbs::in_rust_graph::override_invariants::existing_user_owned_overrider_of;
-use crate::dbs::node_lookup::opt_graphnode_by_id;
+  carrier_on_owned_chain, resolve_override};
+use crate::dbs::in_rust_graph::override_invariants::existing_owned_overrider_of;
+use crate::dbs::node_lookup::opt_graphnode_by_skgid;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{AffectsParent, Property, PropertyFolder, ViewRequest};
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
@@ -32,7 +32,7 @@ use std::collections::HashSet;
 /// - IDs have been replaced with PIDs, per
 ///   'assign_pids_throughout_viewforest'. (Otherwise two org nodes
 ///   might refer to the same skg node, yet appear not to.)
-/// - All nodes have repos, per 'inherit_parent_repo_if_possible'.
+/// - All nodes have skgrepos, per 'inherit_parent_repo_if_possible'.
 ///
 /// This is the maybePlaced tree validation stage: metadata is complete,
 /// but role classification, save-intent extraction, and disk
@@ -50,21 +50,21 @@ pub fn find_buffer_errors_for_saving_in_graph (
   // performs only local structural verifications:
   // each ID belongs to an IDFolder, etc.
   let mut errors: Vec<BufferValidationError> = Vec::new();
-  { // inconsistent instructions (deletion, defining containers, and repos)
-    let (ambiguous_deletion_ids,
-         problematic_defining_ids,
-         inconsistent_repo_ids) =
+  { // inconsistent instructions (deletion, defining containers, and skgrepos)
+    let (ambiguous_deletion_skgids,
+         problematic_defining_skgids,
+         inconsistent_skgrepo_skgids) =
       find_inconsistent_instructions (viewforest);
     { // transfer the relevant IDs, in the appropriate constructors.
-      for id in ambiguous_deletion_ids {
+      for skgid in ambiguous_deletion_skgids {
         errors . push (
-          BufferValidationError::AmbiguousDeletion (id)); }
-      for id in problematic_defining_ids {
+          BufferValidationError::AmbiguousDeletion (skgid)); }
+      for skgid in problematic_defining_skgids {
         errors . push(
-          BufferValidationError::Multiple_Defining_Viewnodes (id)); }
-      for (id, repos) in inconsistent_repo_ids {
+          BufferValidationError::Multiple_Defining_Viewnodes (skgid)); }
+      for (skgid, skgrepos) in inconsistent_skgrepo_skgids {
         errors . push(
-          BufferValidationError::InconsistentRepos(id, repos));
+          BufferValidationError::InconsistentSkgRepos(skgid, skgrepos));
       }} }
   { // merge validation
     for error_msg in {
@@ -84,17 +84,17 @@ pub fn find_buffer_errors_for_saving_in_graph (
   validate_view_roots (
       viewforest, &mut errors);
   { // local structure validation
-    let root_ids : Vec<NodeId> =
-      viewforest . root_ids ();
-    for root_id in root_ids {
+    let root_skgids : Vec<NodeId> =
+      viewforest . root_skgids ();
+    for root_skgid in root_skgids {
       let _ = do_everywhere_in_tree_dfs_readonly(
-        viewforest, root_id, true,
+        viewforest, root_skgid, true,
         &mut |node_ref| {
           if let Err (e) = local::validate_local_structure(
                  viewforest, node_ref . id(), config) {
             errors . push(
               BufferValidationError::LocalStructureViolation(
-                e . message, e . id )); }
+                e . message, e . skgid )); }
           Ok(( )) }); }}
   Ok (errors) }
 
@@ -104,16 +104,16 @@ pub fn find_buffer_errors_for_saving (
   config     : &SkgConfig,
 ) -> Result<Vec<BufferValidationError>, Box<dyn std::error::Error>> {
   let nodes = crate::dbs::filesystem::multiple_nodes
-    ::read_all_skg_files_from_repos (config)?;
+    ::read_all_skg_files_from_skgrepos (config)?;
   let graph = InRustGraph::from_graphnodes (&nodes);
   find_buffer_errors_for_saving_in_graph (
     viewforest, &graph, config ) }
 
 /// Edits to an idFolder's membership abort the save (decision from
 /// vision.org, via metaplan_2.org and
-/// TODO/full-schema/8_readonly-set-ergonomics.org): for each present
+/// TODO/DONE/full-schema/DONE/8_readonly-set-ergonomics.org): for each present
 /// idFolder whose parent is an ActiveVognode with an ID, the multiset of ID
-/// non-vognodes beneath it must equal the owner's real ID list (pid
+/// non-vognodes beneath it must equal the recorder's real ID list (pid
 /// plus extra_ids). Reordering passes (the rerender re-sorts
 /// anyway); adding, deleting or text-editing an ID property fails,
 /// with a message naming the escape hatch (edit the .skg file
@@ -137,37 +137,37 @@ fn idFolder_membership_errors (
                       MpViewnodeKind::PropertyFolder (PropertyFolder::ID) )
         => node_ref,
       _ => continue };
-    let owner : ID =
+    let recorder : ID =
       match node_ref . parent ()
         . map ( |p| &p . value () . kind ) {
         Some (MpViewnodeKind::Vognode (MpVognode::Active (t)))
-          => match &t . id {
-              Some (id) => id . clone (),
+          => match &t . skgid {
+              Some (skgid) => skgid . clone (),
               None      => continue },
         _ => continue };
-    let mut buffer_ids : Vec<ID> =
+    let mut buffer_skgids : Vec<ID> =
       node_ref . children ()
       . filter_map ( |child| match &child . value () . kind {
-          MpViewnodeKind::Property (Property::ID { id, relationship_axes })
+          MpViewnodeKind::Property (Property::ID { skgid, relationship_axes })
             if relationship_axes . net_is_present ()
-            => Some ( id . clone () ),
+            => Some ( skgid . clone () ),
           _ => None } )
       . collect ();
-    let real_ids : Option<Vec<ID>> =
-      opt_graphnode_by_id (graph, config, &owner)
+    let real_skgids : Option<Vec<ID>> =
+      opt_graphnode_by_skgid (graph, config, &recorder)
  ?
-      . map ( |nc| nc . all_ids () . cloned () . collect () );
-    match real_ids {
+      . map ( |nc| nc . all_skgids () . cloned () . collect () );
+    match real_skgids {
       None =>
         errors . push ( BufferValidationError::IDFolder_Edited (
-          owner, buffer_ids, Vec::new () )),
+          recorder, buffer_skgids, Vec::new () )),
       Some (real) => {
         let mut real_sorted : Vec<ID> = real . clone ();
         real_sorted . sort ();
-        buffer_ids . sort ();
-        if buffer_ids != real_sorted {
+        buffer_skgids . sort ();
+        if buffer_skgids != real_sorted {
           errors . push ( BufferValidationError::IDFolder_Edited (
-            owner, buffer_ids, real )); }}, }}
+            recorder, buffer_skgids, real )); }}, }}
   Ok (( )) }
 
 /// Tamper validation for the '(overridesHere N)' marker (plan 11).
@@ -176,10 +176,10 @@ fn idFolder_membership_errors (
 /// marker the server would not have drawn must abort the save --
 /// otherwise hand-edited (or yanked, or stale) metadata could
 /// rewrite arbitrary contains members. The check: the carrier's ID
-/// must be ON N's user-owned override chain
-/// ('carrier_on_user_owned_chain', VISIBILITY-UNGATED so ownership
+/// must be ON N's owned override chain
+/// ('carrier_on_owned_chain', VISIBILITY-UNGATED so ownership
 /// still gates but a marker honest when rendered does not start
-/// failing after a repo-set switch). With chains the drawn node can
+/// failing after a skgrepo-set switch). With chains the drawn node can
 /// be a MIDDLE link (when a later link's mentioner is hidden), so the
 /// check accepts any honest carrier and rejects only an off-chain
 /// marker. Markers on retained InactiveVognodes are checked identically.
@@ -199,16 +199,16 @@ fn overridesHere_marker_errors (
         MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
           match &t . viewStats . overridesHere {
             Some (original) =>
-              ( t . id . clone (), original . clone () ),
+              ( t . skgid . clone (), original . clone () ),
             None => continue },
-        // An inactive placeholder is anonymous: it carries no override
+        // An inactive vognode is anonymous: it carries no override
         // marker, so it can never mismatch.
         MpViewnodeKind::Vognode (MpVognode::Inactive (_)) => continue,
         _ => continue };
     let chain_ok : bool =
       match &carrier {
         Some (c) =>
-          carrier_on_user_owned_chain (config, graph, &original, c),
+          carrier_on_owned_chain (config, graph, &original, c),
         // An id-less carrier is never a node the server legitimately drew as
         // a substitute, so fail closed.
         _ => false };
@@ -225,7 +225,7 @@ fn overridesHere_marker_errors (
 /// - the id must exist in the graph -- you cannot fork an unsaved
 ///   headline ('ForkRequestOnUnknownNode'); a new headline got a fresh
 ///   pid from enrichment, which is not in the graph;
-/// - if the node already has a user-owned overrider, fail early with
+/// - if the node already has an owned overrider, fail early with
 ///   'ForkAlreadyExists' (the helpful message) rather than a later
 ///   monogamy abort at commit.
 /// These checks use the explicit save-planning graph; the commit-time
@@ -243,21 +243,21 @@ fn validate_fork_view_requests (
     let MpViewnodeKind::Vognode (MpVognode::Active (t)) =
       & node_ref . value () . kind else { continue; };
     if ! t . view_requests . contains (& ViewRequest::Fork) { continue; }
-    let Some (id) = & t . id else { continue; }; // enrichment gives every node a pid
-    if ! ids_with_requests . insert (id . clone ()) {
+    let Some (skgid) = & t . skgid else { continue; }; // enrichment gives every node a pid
+    if ! ids_with_requests . insert (skgid . clone ()) {
       errors . push (
-        BufferValidationError::ForkRequestMultiple (id . clone ()) );
+        BufferValidationError::ForkRequestMultiple (skgid . clone ()) );
       continue; }
-    if graph . pid_of (id) . is_none () {
+    if graph . pid_of (skgid) . is_none () {
         // Not in the graph: an unsaved headline cannot be forked.
         errors . push (
-          BufferValidationError::ForkRequestOnUnknownNode (id . clone ()) );
+          BufferValidationError::ForkRequestOnUnknownNode (skgid . clone ()) );
         continue; }
       if let Some (existing) =
-        existing_user_owned_overrider_of (config, graph, id) {
+        existing_owned_overrider_of (config, graph, skgid) {
         errors . push (
           BufferValidationError::ForkAlreadyExists (
-            id . clone (), existing )); }} }
+            skgid . clone (), existing )); }} }
 
 fn validate_view_roots (
   viewforest : &MpViewForest,
@@ -267,23 +267,23 @@ fn validate_view_roots (
     if ! matches! (
       &root . value () . kind,
         MpViewnodeKind::Vognode (MpVognode::Active (_))
-        | MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive root (TODO/full-schema/9-2_repo-set-safety.org)
+        | MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive root (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org)
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_)))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))))
     { errors . push (
         BufferValidationError::Other (
-          "View roots must be ActiveVognodes, inactive placeholders, deleted nodes or Unknown placeholders."
+          "View roots must be ActiveVognodes, inactive vognodes, deleted nodes or Unknown phantoms."
           . to_string () )); }}}
 
-/// For each node in the viewforest, if it has a definitive view request,
+/// For each node in the viewforest, if it has an editable view request,
 /// verify that:
 /// - The node is write-protected.
 /// - It has no content children (ActiveVognode children with affectsParent ==
 ///   Container). Non-content children — containerward role tree stubs,
 ///   mentioners, non-vognodes, etc. — don't block expansion:
 ///   they won't be clobbered by it.
-/// - No other node with the same ID has a definitive view request,
-///   because there can only be one definitive view.
+/// - No other node with the same ID has an editable view request,
+///   because there can only be one editable view.
 fn validate_definitive_view_requests (
   viewforest : &MpViewForest,
   errors : &mut Vec<BufferValidationError>,
@@ -295,16 +295,16 @@ fn validate_definitive_view_requests (
     { let viewnode : &MpViewnode =
         node_ref . value();
       // TODO/DONE/local-view-update/plan_v2.org §11: only an Active node carries view_requests; a phantom never can,
-      // so the Definitive-request validations below apply to Normal only.
+      // so the Definitive-request validations below apply to Active only.
       if let MpViewnodeKind::Vognode (
         MpVognode::Active (t))
       = &viewnode . kind
       { if t . view_requests . contains (&ViewRequest::Definitive)
-        { if let Some (id) = &t . id {
+        { if let Some (skgid) = &t . skgid {
           { // Must be write-protected
             if ! t . is_writeProtected ()
-            { errors . push( BufferValidationError::DefinitiveRequestOnDefinitiveNode(
-              id . clone() )); }}
+            { errors . push( BufferValidationError::DefinitiveRequestOnEditableNode(
+              skgid . clone() )); }}
           { // Must have no content children.
             let has_content_children : bool =
               node_ref . children () . any ( |child| matches! (
@@ -314,8 +314,8 @@ fn validate_definitive_view_requests (
             if has_content_children
             { errors . push(
               BufferValidationError::DefinitiveRequestOnNodeWithContentChildren(
-                id . clone() )); }}
+                skgid . clone() )); }}
           { // At most one request per ID
-            if ! ids_with_requests . insert(id . clone())
+            if ! ids_with_requests . insert(skgid . clone())
             { errors . push( BufferValidationError::MultipleDefinitiveRequestsForSameId(
-              id . clone() )); }} }}} }}}
+              skgid . clone() )); }} }}} }}}

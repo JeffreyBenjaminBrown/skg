@@ -1,21 +1,21 @@
 //! The "strip body whitespace" request (TODO/fork-fixes.org): strips
 //! trailing whitespace from every line of every body (and trailing
-//! blank lines from the body's tail), in every OWNED repo in the
-//! config -- foreign repos are write-protected, and stripping them would
+//! blank lines from the body's tail), in every OWNED skgrepo in the
+//! config -- foreign skgrepos are never written, and stripping them would
 //! make them diverge from their upstreams (Jeff settled on owned
 //! only) -- rewriting only the .skg files whose bodies changed. Bodies also live in two derived stores, the in-Rust graph
 //! and the Tantivy index; both are refreshed here. The graph is
 //! untouched: it stores no body text, and the links it derives
 //! from bodies cannot be changed by stripping trailing whitespace.
 
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
-use crate::dbs::filesystem::one_node::write_graphnode_to_repo;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
+use crate::dbs::filesystem::one_node::write_graphnode_to_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::tantivy::write::update_index_with_nodes;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_text_response};
 use crate::types::env::SkgEnv;
-use crate::types::misc::{SkgConfig, RepoName};
+use crate::types::misc::{SkgConfig, SkgRepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::tantivy::GraphnodeInTantivy;
 
@@ -53,7 +53,7 @@ fn strip_body_whitespace_and_refresh_caches (
     strip_body_whitespace_on_disk (&runtime . config) ?;
   let owned_checked : usize =
     all_nodes . iter ()
-    . filter ( |n| runtime . config . user_owns_repo (& n . home_repo) )
+    . filter ( |n| runtime . config . skgrepo_is_owned (& n . home_skgrepo) )
     . count ();
   if changed . is_empty () {
     return Ok ( format! (
@@ -67,23 +67,23 @@ fn strip_body_whitespace_and_refresh_caches (
   env . runtime . publish (
     runtime . config . clone (), new_graph, runtime . tantivy_index . clone ());
   let breakdown : String = {
-    // BTreeMap so the report lists repos in a stable order.
-    let mut counts : BTreeMap<RepoName, usize> = BTreeMap::new ();
+    // BTreeMap so the report lists skgrepos in a stable order.
+    let mut counts : BTreeMap<SkgRepoName, usize> = BTreeMap::new ();
     for node in &changed {
-      * counts . entry ( node . home_repo . clone () ) . or_insert (0)
+      * counts . entry ( node . home_skgrepo . clone () ) . or_insert (0)
         += 1; }
     counts . iter ()
-      . map ( |(repo, n)| format! ("{}: {}", repo, n) )
+      . map ( |(skgrepo, n)| format! ("{}: {}", skgrepo, n) )
       . collect::<Vec<String>> ()
       . join (", ") };
   Ok ( format! (
     "Stripped trailing whitespace from {} of {} files in owned repos ({}).",
     changed . len (), owned_checked, breakdown )) }
 
-/// Reads every node from every repo in the config, then strips
+/// Reads every node from every skgrepo in the config, then strips
 /// trailing whitespace from each line of each OWNED node's body,
 /// rewriting exactly the files whose bodies changed (a file with a
-/// clean body is left byte-identical). Foreign repos are read (the
+/// clean body is left byte-identical). Foreign skgrepos are read (the
 /// caller rebuilds whole-graph caches from the returned nodes) but
 /// never written: they are write-protected, and local edits would make
 /// them diverge from their upstreams. A body that strips to the
@@ -95,11 +95,11 @@ pub fn strip_body_whitespace_on_disk (
   config : &SkgConfig,
 ) -> Result<(Vec<Graphnode>, Vec<Graphnode>), String> {
   let mut all_nodes : Vec<Graphnode> =
-    read_all_skg_files_from_repos (config)
+    read_all_skg_files_from_skgrepos (config)
     . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
   let mut changed : Vec<Graphnode> = Vec::new ();
   for node in all_nodes . iter_mut () {
-    if ! config . user_owns_repo (& node . home_repo) { continue; }
+    if ! config . skgrepo_is_owned (& node . home_skgrepo) { continue; }
     let Some (body) = & node . body else { continue; };
     let stripped : String =
       strip_trailing_whitespace_from_body (body);
@@ -107,10 +107,10 @@ pub fn strip_body_whitespace_on_disk (
     node . body =
       if stripped . is_empty () { None }
       else { Some (stripped) };
-    write_graphnode_to_repo (node, config)
+    write_graphnode_to_skgrepo (node, config)
       . map_err ( |e| format! (
         "Writing node {} to repo {}: {}",
-        node . pid . as_str (), node . home_repo, e) ) ?;
+        node . pid . as_str (), node . home_skgrepo, e) ) ?;
     changed . push ( node . clone () ); }
   Ok (( all_nodes, changed )) }
 

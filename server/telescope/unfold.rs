@@ -14,7 +14,7 @@ use crate::telescope::types::{
   ListItem, SectionSlices, Telescope, TelescopeConstructionError,
 };
 use crate::types::misc::{
-  ID, RelPartner, SkgConfig, RepoName,
+  ID, RelPartner, SkgConfig, SkgRepoName,
 };
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::fs::{GraphnodeOnDisk, graphnode_on_disk_from_section};
@@ -26,10 +26,10 @@ use std::fmt;
 pub struct UnfoldInput<'a> {
   pub pid                          : &'a ID,
   pub extra_ids                    : &'a [ID],
-  pub misc                         : &'a [Flag],
+  pub flags                        : &'a [Flag],
   pub title                        : Option<&'a str>,
   pub body                         : Option<&'a str>,
-  pub home                         : &'a RepoName,
+  pub home                         : &'a SkgRepoName,
   pub aliases                      : &'a [RelPartner<String>],
   pub contains                     : &'a [RelPartner<ID>],
   pub subscribes_to                : &'a [RelPartner<ID>],
@@ -39,22 +39,22 @@ pub struct UnfoldInput<'a> {
 
 /// A complete on-disk telescope prepared by the unfold boundary.
 /// Construction proves that it is nonempty, starts at HOME, and
-/// contains same-pid sections at configured unique repos in
+/// contains same-pid sections at configured unique skgrepos in
 /// privacy order. Ownership is deliberately not part of this type;
 /// the filesystem writer checks it before mutation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UnfoldedTelescope {
   pid      : ID,
-  home     : RepoName,
-  sections : Vec<(RepoName, GraphnodeOnDisk)>,
+  home     : SkgRepoName,
+  sections : Vec<(SkgRepoName, GraphnodeOnDisk)>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum UnfoldedTelescopeConstructionError {
   InvalidTelescope (TelescopeConstructionError),
   HomeMismatch {
-    expected : RepoName,
-    actual   : RepoName,
+    expected : SkgRepoName,
+    actual   : SkgRepoName,
   },
 }
 
@@ -78,8 +78,8 @@ impl std::error::Error for UnfoldedTelescopeConstructionError {
 impl UnfoldedTelescope {
   pub fn try_new (
     pid      : ID,
-    home     : RepoName,
-    sections : Vec<(RepoName, GraphnodeOnDisk)>,
+    home     : SkgRepoName,
+    sections : Vec<(SkgRepoName, GraphnodeOnDisk)>,
     config   : &SkgConfig,
   ) -> Result<UnfoldedTelescope, UnfoldedTelescopeConstructionError> {
     let telescope : Telescope = Telescope::try_new (
@@ -95,12 +95,12 @@ impl UnfoldedTelescope {
 
   pub fn pid (&self) -> &ID { &self . pid }
 
-  pub fn home (&self) -> &RepoName { &self . home }
+  pub fn home (&self) -> &SkgRepoName { &self . home }
 
-  pub fn sections (&self) -> &[(RepoName, GraphnodeOnDisk)] {
+  pub fn sections (&self) -> &[(SkgRepoName, GraphnodeOnDisk)] {
     &self . sections }
 
-  pub fn into_sections (self) -> Vec<(RepoName, GraphnodeOnDisk)> {
+  pub fn into_sections (self) -> Vec<(SkgRepoName, GraphnodeOnDisk)> {
     self . sections }
 }
 
@@ -108,14 +108,14 @@ pub fn unfold_node (
   input  : &UnfoldInput,
   config : &SkgConfig,
 ) -> Result<UnfoldedTelescope, UnfoldedTelescopeConstructionError> {
-  let mut sections : HashMap<RepoName, SectionSlices> =
+  let mut sections : HashMap<SkgRepoName, SectionSlices> =
     HashMap::new ();
-  let mut repo_names : Vec<RepoName> = Vec::new ();
-  { let mut note = |repo : &RepoName| {
-      if ! sections . contains_key (repo) {
-        repo_names . push ( repo . clone () );
+  let mut skgrepo_names : Vec<SkgRepoName> = Vec::new ();
+  { let mut note = |skgrepo : &SkgRepoName| {
+      if ! sections . contains_key (skgrepo) {
+        skgrepo_names . push ( skgrepo . clone () );
         sections . insert (
-          repo . clone (), SectionSlices::default () ); }};
+          skgrepo . clone (), SectionSlices::default () ); }};
     note ( input . home );
     for m in input . contains          { note ( &m . relRepo ); }
     for m in input . subscribes_to     { note ( &m . relRepo ); }
@@ -129,29 +129,29 @@ pub fn unfold_node (
       . expect ("home section was just noted");
     home . title = input . title . map ( str::to_string );
     home . body  = input . body  . map ( str::to_string ); }
-  let rank = |repo : &RepoName| -> usize {
-    config . repo_position (repo) . unwrap_or (usize::MAX) };
-  for (repo, section) in sections . iter_mut () {
-    let is_more_public = |a : &RepoName, b : &RepoName| -> bool {
+  let rank = |skgrepo : &SkgRepoName| -> usize {
+    config . skgrepo_position (skgrepo) . unwrap_or (usize::MAX) };
+  for (skgrepo, section) in sections . iter_mut () {
+    let is_more_public = |a : &SkgRepoName, b : &SkgRepoName| -> bool {
       rank (a) < rank (b) };
     section . contains = unfold_ordered (
-      input . contains, repo, &is_more_public );
+      input . contains, skgrepo, &is_more_public );
     section . subscribes_to = unfold_ordered (
-      input . subscribes_to, repo, &is_more_public );
+      input . subscribes_to, skgrepo, &is_more_public );
     section . hides_from_its_subscriptions = unfold_unordered (
-      input . hides_from_its_subscriptions, repo );
+      input . hides_from_its_subscriptions, skgrepo );
     section . overrides_view_of = unfold_unordered (
-      input . overrides_view_of, repo );
+      input . overrides_view_of, skgrepo );
     section . aliases = {
       let mine : Vec<String> =
         input . aliases . iter ()
-        . filter ( |m| &m . relRepo == repo )
+        . filter ( |m| &m . relRepo == skgrepo )
         . map ( |m| m . member . clone () )
         . collect ();
       if mine . is_empty () { None } else { Some (mine) }}; }
-  { // Drop empty sections (a repo with nothing left ceases to be),
+  { // Drop empty sections (a skgrepo with nothing left ceases to be),
     // except the home, which persists while the node exists.
-    repo_names . retain ( |l| {
+    skgrepo_names . retain ( |l| {
       l == input . home
       || sections . get (l)
          . map ( |s| s . title . is_some ()
@@ -162,17 +162,17 @@ pub fn unfold_node (
                  || s . hides_from_its_subscriptions . is_some ()
                  || s . overrides_view_of . is_some () )
          . unwrap_or (false) } ); }
-  repo_names . sort_by_key ( |repo| rank (repo) );
-  let complete_sections : Vec<(RepoName, GraphnodeOnDisk)> =
-    repo_names . into_iter ()
-    . map ( |repo| {
-      let slices : SectionSlices = sections . remove (&repo)
+  skgrepo_names . sort_by_key ( |skgrepo| rank (skgrepo) );
+  let complete_sections : Vec<(SkgRepoName, GraphnodeOnDisk)> =
+    skgrepo_names . into_iter ()
+    . map ( |skgrepo| {
+      let slices : SectionSlices = sections . remove (&skgrepo)
         . expect ("section exists");
-      let is_home : bool = repo == * input . home;
+      let is_home : bool = skgrepo == * input . home;
       let node_fs : GraphnodeOnDisk = graphnode_on_disk_from_section (
-        input . pid, input . extra_ids, input . misc,
+        input . pid, input . extra_ids, input . flags,
         is_home, slices );
-      (repo, node_fs) } )
+      (skgrepo, node_fs) } )
     . collect ();
   UnfoldedTelescope::try_new (
     input . pid . clone (), input . home . clone (),
@@ -181,31 +181,31 @@ pub fn unfold_node (
 /// One ordered relation's slice for REPO: maximal streaks of
 /// partners with that relRepo, each anchored to the nearest preceding strictly
 /// more public member; a streak with none joins the prepend. The
-/// most public repo mentioning the relation yields an anchor-free base by
+/// most public skgrepo mentioning the relation yields an anchor-free base by
 /// construction (nothing precedes its members more publicly ONLY
-/// when it is first -- middle repos can and do anchor). Returns
-/// None when the repo has no members of this relation.
+/// when it is first -- middle skgrepos can and do anchor). Returns
+/// None when the skgrepo has no members of this relation.
 fn unfold_ordered (
   effective      : &[RelPartner<ID>],
-  repo         : &RepoName,
-  is_more_public : &dyn Fn (&RepoName, &RepoName) -> bool,
+  skgrepo        : &SkgRepoName,
+  is_more_public : &dyn Fn (&SkgRepoName, &SkgRepoName) -> bool,
 ) -> Option<Vec<ListItem>> {
-  if ! effective . iter () . any ( |m| &m . relRepo == repo ) {
+  if ! effective . iter () . any ( |m| &m . relRepo == skgrepo ) {
     return None; }
-  let is_base : bool = { // the most public repo mentioning the relation?
-    let mut most_public : Option<&RepoName> = None;
+  let is_base : bool = { // the most public skgrepo mentioning the relation?
+    let mut most_public : Option<&SkgRepoName> = None;
     for m in effective {
       match most_public {
         None => { most_public = Some ( &m . relRepo ); }
         Some (mp) => {
           if is_more_public ( &m . relRepo, mp ) {
             most_public = Some ( &m . relRepo ); }} }}
-    most_public == Some (repo) };
+    most_public == Some (skgrepo) };
   let mut items : Vec<ListItem> = Vec::new ();
   let mut last_anchor_emitted : Option<ID> = None;
   let mut last_more_public : Option<ID> = None;
   for m in effective {
-    if &m . relRepo == repo {
+    if &m . relRepo == skgrepo {
       match &last_more_public {
         None => {} // prepend: emit the member with no anchor first
         Some (a) => {
@@ -214,7 +214,7 @@ fn unfold_ordered (
             items . push ( ListItem::Anchor { anchor : a . clone () });
             last_anchor_emitted = Some ( a . clone () ); }} }
       items . push ( ListItem::Member ( m . member . clone () ));
-    } else if is_more_public ( &m . relRepo, repo ) {
+    } else if is_more_public ( &m . relRepo, skgrepo ) {
       last_more_public = Some ( m . member . clone () ); }}
   Some (items) }
 
@@ -222,11 +222,11 @@ fn unfold_ordered (
 /// effective order. None when empty.
 fn unfold_unordered (
   effective : &[RelPartner<ID>],
-  repo    : &RepoName,
+  skgrepo   : &SkgRepoName,
 ) -> Option<Vec<ID>> {
   let mine : Vec<ID> =
     effective . iter ()
-    . filter ( |m| &m . relRepo == repo )
+    . filter ( |m| &m . relRepo == skgrepo )
     . map ( |m| m . member . clone () )
     . collect ();
   if mine . is_empty () { None } else { Some (mine) }}

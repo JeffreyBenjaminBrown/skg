@@ -1,7 +1,7 @@
 // cargo test --test rebuild -- mentionerward_role_tree
 //
 // Tests that mentionerward view expansion inserts containerward
-// ancestry beneath each Birth::RoleGraft (RelationRole::MENTIONER) repo node.
+// ancestry beneath each Birth::RoleGraft (RelationRole::MENTIONER) skgrepo node.
 //
 // Graph (see fixtures-mentionerward-role-tree/):
 //   Links:        b -> a,  c -> b,  d -> a
@@ -42,14 +42,14 @@ use std::error::Error;
 /// Collect (pid, affectsParent) pairs for all ActiveVognode children of a node.
 fn children_info (
   tree : &Tree<Viewnode>,
-  node_id : NodeId,
+  treeid : NodeId,
 ) -> Vec<(String, Birth)> {
-  tree . get (node_id) . unwrap () . children ()
+  tree . get (treeid) . unwrap () . children ()
     . filter_map ( |child| {
       if let ViewnodeKind::Vognode (
         Vognode::Active (t)) =
         &child . value () . kind {
-        Some (( t.id.0 . clone (), t.birth ))
+        Some (( t.skgid.0 . clone (), t.birth ))
       } else { None } } )
     . collect () }
 
@@ -64,7 +64,7 @@ fn find_child (
       if let ViewnodeKind::Vognode (
         Vognode::Active (t)) =
         &child . value () . kind {
-        t.id.0 == pid
+        t.skgid.0 == pid
       } else { false } } )
     . map ( |n| n . id () ) }
 

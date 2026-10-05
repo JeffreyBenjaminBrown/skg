@@ -73,7 +73,7 @@
 
 ** (b) One overrider, many targets: already legal (verified, no change)
    =overrides_view_of= is an =MSV<ID>= (a list) from disk through
-   'NodeComplete', the inverse index =overriders_of= is keyed per target,
+   'Graphnode', the inverse index =overriders_of= is keyed per target,
    the resolver imposes monogamy /per target/ (not per overrider), save
    lowering serializes the whole list, stats count every target, and the
    round-trip is per-container via the =overridesHere= marker. Drawing the
@@ -84,7 +84,7 @@
 ** (c) Chains: permitted; cycles: forbidden
    Drop the "no chains" prohibition. Add a no-cycle invariant in its place,
    enforced at the same two gates (save, init/rebuild). A user-owned cycle
-   is now /reachable/ (see [[*Danger: a cycle is reachable via the writable overriddenCol][the danger note]]), so this is mandatory, not
+   is now /reachable/ (see [[*Danger: a cycle is reachable via the writable overriddenFolder][the danger note]]), so this is mandatory, not
    decorative.
 
 * tentative plan
@@ -223,7 +223,7 @@
    - Fork detection: in the save pipeline, a node carrying
      'ViewRequest::Fork' becomes a fork candidate /regardless of ownership
      or whether its text changed/. Build its 'ForkSpec' from the node's
-     current graph/disk 'NodeComplete' (not from buffer text — the node may
+     current graph/disk 'Graphnode' (not from buffer text — the node may
      be write-protected in the view), via the existing 'build_fork_clone',
      which already sets =subscribes_to=[N]=, =overrides_view_of=[N]=, a
      shallow =contains= copy, a fresh pid, and an owned source. For an owned
@@ -315,7 +315,7 @@ substitution). Hard error is recommended: a cycle is meaningless data,
 a soft bail leaves a silently broken graph (confirmed: nothing else
 would catch it once "no chains" is gone), and the resolver guard is a
 backstop, not a gatekeeper. But it /is/ a new failure mode the user can
-hit through the writable overriddenCol — confirm you want the save to
+hit through the writable overriddenFolder — confirm you want the save to
 refuse rather than to quietly drop the offending edge.
 
 **** DONE agreed, hard error
@@ -335,7 +335,7 @@ refuse rather than to quietly drop the offending edge.
 
 *** DONE Should 'skg-fork-node' auto-save, or just stamp the atom?
     Definitive does /not/ auto-save (you make it definitive, then edit,
-    then save). Col/path requests /do/ auto-save. Fork has nothing to
+    then save). Folder/path requests /do/ auto-save. Fork has nothing to
     pre-edit, so the plan auto-saves (immediately surfacing the
     confirmation buffer). The only argument for not auto-saving is letting
     the user stack a fork request with other edits before saving. I lean
@@ -489,13 +489,13 @@ If that's clear, the only code consequence is the one-line helper
 ******* TODO clear and agreed
 ** Dangerous things
 
-*** Danger: a cycle is reachable via the writable overriddenCol
-    *Confirmed* end to end: the writable overriddenCol lowers to
+*** Danger: a cycle is reachable via the writable overriddenFolder
+    *Confirmed* end to end: the writable overriddenFolder lowers to
     =overrides_view_of= graph edges with no ownership/target restriction
     ('visit_overriddencol' -> =SetOverrides= -> 'msv_from_slot' ->
-    'NodeComplete.overrides_view_of', in
+    'Graphnode.overrides_view_of', in
     [[../../server/from_text/local_instruction_collection/traverse.rs][traverse.rs]] and lower.rs). So a user can add an entry to a
-    node's overriddenCol that closes a loop (=N='s overriddenCol gains =D=
+    node's overriddenFolder that closes a loop (=N='s overriddenFolder gains =D=
     while =D -> C -> N= exists). Today "no chains" blocks this; once it is
     gone, *only* the new cycle invariant stands between the user and a
     broken graph. This is why the cycle check is mandatory, not optional
@@ -582,7 +582,7 @@ work but matches the paranoiac use case better. Which did you mean?
 ** DONE P2. Fork-node clones disk state, or unsaved buffer edits?
 The implicit fork clones the *edited* foreign node. 'skg-fork-node' fires
 on a node that may be unexpanded, so D3 fetches the node's *saved*
-'NodeComplete' from the graph/disk — i.e. it clones the node *as last
+'Graphnode' from the graph/disk — i.e. it clones the node *as last
 saved*, ignoring any unsaved edits to that node in the current buffer.
 That is simpler and predictable, but if you had just edited =C= in the
 buffer and then forked it, you might expect the edit in =D=. Confirm

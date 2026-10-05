@@ -71,7 +71,7 @@ item also appears. Two items are not code-complete by design:
 - 'new_foreign_nodes_adopting_clone_sources' (from_text/fork.rs) maps
   each new-with-inherited-foreign-source node to the foreign ancestor
   whose fork it rides (climbing chains of new headlines, skipping
-  scaffolds).
+  non-vognodes).
 - 'apply_foreign_policy' returns a new outcome, AdoptCloneSource;
   'finalize_foreign_policy_instructions' (nee
   filter_unchanged_foreign_saves) rewrites such a Save into the

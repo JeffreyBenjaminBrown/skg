@@ -4,22 +4,22 @@ use std::error::Error;
 use crate::dbs::in_rust_graph::query::find_related_nodes;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::repo_sets::ActiveRepoSet;
+use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::misc::ID;
 
-/// Most paths probably end without a fork or a cycle, but the same path can actually end in both: If it ends in a fork, any of the nodes in that fork might be cycles.
+/// Most paths probably end without a branch point or a cycle, but the same path can actually end in both: If it ends in a branch point, any of its branches might be cycles.
 pub struct PathToFirstNonlinearity {
   pub path        : Vec<ID>,     // Does not include the origin.
-  pub cycle_nodes : HashSet<ID>, // Nodes already in the path, if any. Unless there's a fork, there can be at most one of these.
-  pub branches    : HashSet<ID>, // If the path ends in a fork, these are its's branches.
+  pub cycle_nodes : HashSet<ID>, // Nodes already in the path, if any. Unless there is a branch point, there can be at most one of these.
+  pub branches    : HashSet<ID>, // If the path ends in a branch point, these are its branches.
 }
 
 /// Graph-native path traversal. Visibility is applied before topology is
-/// classified, so private edges and private targets cannot create apparent
-/// forks, cycles, or extra path length.
+/// classified, so private relationships and private targets cannot create apparent
+/// branch points, cycles, or extra path length.
 pub fn paths_to_first_nonlinearities_in_graph (
   graph       : &InRustGraph,
-  active      : Option<&ActiveRepoSet>,
+  active      : Option<&ActiveSkgRepoSet>,
   node        : &ID,
   relation    : &str,
   input_role  : &str,
@@ -51,7 +51,7 @@ pub fn path_containerward_to_first_nonlinearity_in_graph (
 
 fn path_to_first_nonlinearity_in_graph (
   graph       : &InRustGraph,
-  active      : Option<&ActiveRepoSet>,
+  active      : Option<&ActiveSkgRepoSet>,
   node        : &ID,
   relation    : &str,
   input_role  : &str,
@@ -77,7 +77,7 @@ fn path_to_first_nonlinearity_in_graph (
       return Ok (PathToFirstNonlinearity {
         path, cycle_nodes : HashSet::new (), branches : HashSet::new () }); }
     let cycle_nodes : HashSet<ID> = related . iter ()
-      . filter (|id| path_set . contains (*id)) . cloned () . collect ();
+      . filter (|skgid| path_set . contains (*skgid)) . cloned () . collect ();
     if related . len () == 1 && cycle_nodes . is_empty () {
       let next = related . into_iter () . next () . unwrap ();
       path . push (next . clone ());
@@ -94,7 +94,7 @@ fn path_to_first_nonlinearity_in_graph (
 
 fn related_nodes_from_graph_gated (
   graph       : &InRustGraph,
-  active      : Option<&ActiveRepoSet>,
+  active      : Option<&ActiveSkgRepoSet>,
   origin      : &ID,
   relation    : NodeRelation,
   origin_is_first_role : bool,
@@ -109,15 +109,15 @@ fn related_nodes_from_graph_gated (
       None => true,
       Some (set) if set . is_all () => true,
       Some (set) => {
-        let target_is_active = graph . pid_and_repo (partner)
-          . map (|(_, repo)| set . contains_repo (&repo))
+        let target_is_active = graph . pid_and_skgrepo (partner)
+          . map (|(_, skgrepo)| set . contains_skgrepo (&skgrepo))
           . unwrap_or (false);
         let relRepo = if origin_is_first_role {
           graph . relRepo (origin, relation, partner)
         } else {
           graph . relRepo (partner, relation, origin) };
         target_is_active && relRepo
-          . map (|repo| set . contains_repo (&repo))
+          . map (|skgrepo| set . contains_skgrepo (&skgrepo))
           . unwrap_or (false) } })
     . collect ()
 }

@@ -9,7 +9,7 @@ use tempfile::TempDir;
 use skg::git_ops::find_and_stage_moves::stage_moves_script;
 use skg::git_ops::read_gitrepo::{ head_is_merge_commit, get_file_content_at_head };
 use skg::types::list::{compute_interleaved_diff, Diff_Item};
-use skg::types::misc::{ SkgConfig, SkgfileRepo, RepoName };
+use skg::types::misc::{ SkgConfig, SkgRepo, SkgRepoName };
 
 fn setup_gitrepo() -> (TempDir, Repository) {
   let dir : TempDir =
@@ -84,7 +84,7 @@ fn init_gitrepo_with_user (
     config . set_str ( "user.name", "Test" ) . unwrap(); }
   gitrepo }
 
-/// Write 'filename' into the repo and commit it. Works for the first
+/// Write 'filename' into the gitrepo and commit it. Works for the first
 /// commit and for later ones (parents = current HEAD if any).
 fn commit_file (
   gitrepo     : &Repository,
@@ -113,31 +113,31 @@ fn commit_file (
     &tree,
     &parents ) . unwrap(); }
 
-fn mk_repo (
+fn mk_skgrepo (
   name : &str,
   path : PathBuf,
-) -> SkgfileRepo {
-  SkgfileRepo {
-    name         : RepoName::from (name),
+) -> SkgRepo {
+  SkgRepo {
+    name         : SkgRepoName::from (name),
     abbreviation : None,
     path,
-    user_owns_it : true } }
+    owned : true } }
 
-/// Build a config whose data_root is 'root' and whose repos are the
+/// Build a config whose data_root is 'root' and whose skgrepos are the
 /// named subdirectories of it, mirroring how 'make_paths_absolute'
-/// leaves Skg repo paths at load time (absolute, data_root-rooted).
+/// leaves skgrepo paths at load time (absolute, data_root-rooted).
 fn config_from_subdirs (
   root : &Path,
   names : &[&str],
 ) -> SkgConfig {
-  let mut repos : HashMap<RepoName, SkgfileRepo> =
+  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
     HashMap::new();
   for name in names {
-    repos . insert (
-      RepoName::from (*name),
-      mk_repo ( name, root . join (name) ) ); }
+    skgrepos . insert (
+      SkgRepoName::from (*name),
+      mk_skgrepo ( name, root . join (name) ) ); }
   let mut config : SkgConfig =
-    SkgConfig::dummyFromRepos (repos);
+    SkgConfig::dummyFromSkgRepos (skgrepos);
   config . data_root = root . to_path_buf();
   config }
 

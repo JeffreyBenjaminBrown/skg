@@ -10,7 +10,7 @@ use crate::diff_report::snapshot::{read_changed_snapshot_pair, read_snapshot_pai
 use crate::diff_report::types::{
   ChangedSnapshotPair, DiffReport, DiffSelection, GraphSnapshot, SnapshotPair};
 use crate::diff_report::vanished::{
-  dangling_ids_in_snapshot, investigate_vanished_ids};
+  dangling_skgids_in_snapshot, investigate_vanished_skgids};
 use crate::types::misc::SkgConfig;
 
 pub fn diff_report_as_org (
@@ -44,8 +44,8 @@ pub fn diff_report_as_org_with_overPrivateText_pids (
   overPrivateText_pids . sort ();
   overPrivateText_pids . dedup ();
   report . vanished =
-    investigate_vanished_ids (
-      config, & dangling_ids_in_snapshot (&after) );
+    investigate_vanished_skgids (
+      config, & dangling_skgids_in_snapshot (&after) );
   Ok (( render_report (&report), overPrivateText_pids ))
 }
 

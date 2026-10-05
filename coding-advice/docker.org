@@ -21,7 +21,7 @@
     image only takes effect in a NEWLY started container -- the running
     container keeps whatever it launched with.
   - *You can't attr-check Nix yourself.* nixpkgs attribute names are
-    easy to get wrong (they follow the plugin/package *repo* name, not
+    easy to get wrong (they follow the plugin/package *skgrepo* name, not
     the upstream project name). Before a ~10-min build, have Jeff run a
     =nix-instantiate --eval= one-liner (seconds) to confirm every new
     attribute/expression exists in his pin. A typo fails fast at eval
@@ -75,7 +75,7 @@
     block for Neovim. (That Neovim block wires nvim-orgmode's tree-sitter
     parser in a non-obvious way; if you need to touch it, read
     =../other-projects/docker-typedb-rust/docker-travails.org= first.)
-  - That directory is its own git repo, untracked by the skg repo. Its
+  - That directory is its own gitrepo, untracked by the skgrepo. Its
     =PITFALLS.org= holds the deeper build/maintenance facts needed for
     non-trivial edits, including the FHS loader shim that lets the
     npm-installed =claude=/=codex= run and how agent state persists across

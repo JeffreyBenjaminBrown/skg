@@ -190,7 +190,7 @@ write-protected: a write-protected node draws none of its worktree
 children, so a ghost under it would show the node's DELETED
 children while its kept children go unshown. Its definitive
 occurrence (or a wider view) still carries them. The node's own
-decorations (existence axes, textChanged, id/alias diff cols) are
+decorations (existence axes, textChanged, id/alias diff folders) are
 unchanged. Pinned by 'test_no_ghosts_under_writeProtected_occurrence'
 (tests/git_diff_view/content/view.rs), verified to fail without the
 fix.
@@ -273,17 +273,17 @@ make sure that docs/COMMANDS.org explains all these weird search capabilities.
   documented and are unchanged.
 * DONE Any new 'hiddenInSubscribee' or 'hiddenOutOfSubscribee' (I've mangled those names a little) collection should begin folded.
 ** Claude: done 2026-07-08.
-(The real names: 'hiddenInSubscribeeCol' and
-'hiddenOutsideOfSubscribeeCol'.) A newly created col of either kind
+(The real names: 'hiddenInSubscribeeFolder' and
+'hiddenOutsideOfSubscribeeFolder'.) A newly created folder of either kind
 now begins folded. The encoding is member-side, because that is the
 client's convention: a 'folded' marker on a headline means "this
 headline is hidden inside its folded parent"
-(elisp/skg-org-fold.el), so a col's collapse lives on its MEMBERS,
-and a marker left on the col itself would instead fold the col's
-parent. The three creation sites stamp the newborn col; at the
-col's own BFS visit, once its members are reconciled in,
+(elisp/skg-org-fold.el), so a folder's collapse lives on its MEMBERS,
+and a marker left on the folder itself would instead fold the folder's
+parent. The three creation sites stamp the newborn folder; at the
+folder's own BFS visit, once its members are reconciled in,
 'fold_members_of_newborn_col' (server/update_buffer/util.rs) moves
-the stamp onto every member. A col already present in the saved
+the stamp onto every member. A folder already present in the saved
 buffer is untouched, so your manual fold state round-trips exactly
 as before. Existing view tests now pin the markers
 (tests/hidden_from_subscriptions.rs); full Rust suite 484/484 and

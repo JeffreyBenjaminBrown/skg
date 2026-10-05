@@ -16,7 +16,7 @@ use crate::consts::{
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::tantivy::context_update::update_context_origin_types;
 use crate::types::misc::{ID, TantivyIndex};
-use crate::types::save::{DefineNode, SaveNode};
+use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::links::links_from_node;
 
@@ -79,8 +79,8 @@ pub type MapToContainers = HashMap<ID, Vec<ID>>;
 pub fn compute_and_store_context_types (
   tantivy_index : &TantivyIndex,
   had_id_set    : &HashSet<ID>,
-  all_node_ids  : &HashSet<ID>,
-  mentioned_ids  : &HashSet<ID>,
+  all_node_skgids  : &HashSet<ID>,
+  mentioned_skgids  : &HashSet<ID>,
   map_to_content  : &MapToContent,
   map_to_containers   : &MapToContainers,
 ) -> Result<HashMap<ID, String>, Box<dyn Error>> {
@@ -88,34 +88,34 @@ pub fn compute_and_store_context_types (
   let edge_count : usize =
     map_to_content . values () . map ( |v| v . len () ) . sum ();
   tracing::info! ("  {} nodes, {} edges, {} mentioned nodes.",
-            all_node_ids . len (), edge_count, mentioned_ids . len ());
+            all_node_skgids . len (), edge_count, mentioned_skgids . len ());
   let mut origin_types : HashMap<ID, ContextOriginType> =
     identify_origins (
-      all_node_ids, map_to_containers, mentioned_ids, had_id_set );
+      all_node_skgids, map_to_containers, mentioned_skgids, had_id_set );
   tracing::info! ("  {} origins identified.", origin_types . len ());
   let mut all_contexts : Vec<HashSet<ID>> =
     grow_all_contexts (&origin_types, map_to_content);
   tracing::info! ("  {} treelike contexts grown.", all_contexts . len ());
   extend_contexts_for_cycles (
-    all_node_ids,
+    all_node_skgids,
     map_to_content,
     map_to_containers,
     &mut origin_types,
     &mut all_contexts );
   tracing::info! ("  {} total contexts after cycle detection.",
             all_contexts . len ());
-  let context_types_by_id : HashMap<ID, String> =
+  let context_types_by_skgid : HashMap<ID, String> =
     // Converts ContextOriginType too String for Tantivy.
     origin_types . iter ()
-    . map ( |(id, ct)| (id . clone (),
+    . map ( |(skgid, ct)| (skgid . clone (),
                         ct . label () . to_string ()) )
     . collect ();
   let updated : usize = // update Tantivy
     update_context_origin_types (
-      tantivy_index, &context_types_by_id ) ?;
+      tantivy_index, &context_types_by_skgid ) ?;
   tracing::info! ("  {} Tantivy documents updated with context types.",
             updated);
-  Ok (context_types_by_id) }
+  Ok (context_types_by_skgid) }
 
 /// Context origin types (used to rank search results) for the nodes a save
 /// touched, read straight from the post-save graph. Returns a pid ->
@@ -129,50 +129,50 @@ pub fn compute_and_store_context_types (
 /// init/rebuild ('compute_and_store_context_types').
 pub fn context_origin_types_for_saved_from_in_rust_graph (
   graph     : &InRustGraph,
-  node_defs : &[DefineNode],
+  node_defs : &[NodeInstruction],
 ) -> HashMap<ID, String> {
   let saved : Vec<&Graphnode> =
     node_defs . iter ()
     . filter_map ( |instr| match instr {
-      DefineNode::Save (SaveNode (node)) => Some (node),
-      DefineNode::Delete (_) => None } )
+      NodeInstruction::Save (SaveNode (node)) => Some (node),
+      NodeInstruction::Delete (_) => None } )
     . collect ();
   if saved . is_empty () { return HashMap::new (); }
-  let saved_ids : HashSet<ID> =
+  let saved_skgids : HashSet<ID> =
     saved . iter () . map ( |n| n . pid . clone () ) . collect ();
   let map_to_containers : MapToContainers = // each saved pid -> its containers
-    saved_ids . iter ()
-    . filter_map ( |id| graph . contained_by . get (id)
-      . map ( |cs| ( id . clone (),
+    saved_skgids . iter ()
+    . filter_map ( |skgid| graph . contained_by . get (skgid)
+      . map ( |cs| ( skgid . clone (),
                      cs . iter () . cloned () . collect () )) )
     . collect ();
-  let mentioned_ids : HashSet<ID> = // saved nodes that anything links to
-    saved_ids . iter ()
-    . filter ( |id| graph . mentioners_of . get (id)
+  let mentioned_skgids : HashSet<ID> = // saved nodes that anything links to
+    saved_skgids . iter ()
+    . filter ( |skgid| graph . mentioners_of . get (skgid)
                . map ( |s| ! s . is_empty () ) . unwrap_or (false) )
     . cloned () . collect ();
   let had_id_set : HashSet<ID> = // from each node's own flags
     saved . iter ()
-    . filter ( |n| n . misc . contains (
+    . filter ( |n| n . flags . contains (
         &Flag::Had_ID_Before_Import ) )
     . map ( |n| n . pid . clone () )
     . collect ();
   let mut origin_types : HashMap<ID, ContextOriginType> =
     identify_origins (
-      &saved_ids, &map_to_containers, &mentioned_ids, &had_id_set );
-  for id in &saved_ids {
+      &saved_skgids, &map_to_containers, &mentioned_skgids, &had_id_set );
+  for skgid in &saved_skgids {
     // CycleMember, only for nodes not already a higher-priority origin.
-    if ! origin_types . contains_key (id)
-       && node_is_in_containerward_cycle (graph, id) {
+    if ! origin_types . contains_key (skgid)
+       && node_is_in_containerward_cycle (graph, skgid) {
       origin_types . insert (
-        id . clone (), ContextOriginType::CycleMember ); } }
+        skgid . clone (), ContextOriginType::CycleMember ); } }
   origin_types . iter ()
-    . map ( |(id, ct)| (id . clone (),
+    . map ( |(skgid, ct)| (skgid . clone (),
                         ct . label () . to_string ()) )
     . collect () }
 
 /// True when 'start' lies on a containerward cycle: following
-/// 'contained_by' edges from 'start' can return to 'start'. The in-Rust
+/// 'contained_by' relationships from 'start' can return to 'start'. The in-Rust
 /// analogue of the 'cycles' flag from 'containerward_path_stats_bulk'.
 fn node_is_in_containerward_cycle (
   graph : &InRustGraph,
@@ -202,47 +202,47 @@ fn node_is_in_containerward_cycle (
 /// (That's safe because the only higher-priority thing is a Root,
 /// and a Root cannot be a CycleMember.)
 fn identify_origins (
-  all_node_ids : &HashSet<ID>,
+  all_node_skgids : &HashSet<ID>,
   map_to_containers  : &MapToContainers,
-  mentioned_ids : &HashSet<ID>,
+  mentioned_skgids : &HashSet<ID>,
   had_id_set   : &HashSet<ID>,
 ) -> HashMap<ID, ContextOriginType> {
   let ( roots, multicontained ) : ( HashSet<ID>, HashSet<ID> ) =
-    find_roots_and_multiply_contained (all_node_ids, map_to_containers);
+    find_roots_and_multiply_contained (all_node_skgids, map_to_containers);
   let mut origin_types : HashMap<ID, ContextOriginType> =
     HashMap::new ();
   { // Important: Start at least priority, work up to highest.
-    for id in &multicontained {
+    for skgid in &multicontained {
       origin_types . insert (
-        id . clone (), ContextOriginType::MultiContained ); }
-    for id in had_id_set {
+        skgid . clone (), ContextOriginType::MultiContained ); }
+    for skgid in had_id_set {
       origin_types . insert (
-        id . clone (), ContextOriginType::HadID ); }
-    for id in mentioned_ids {
+        skgid . clone (), ContextOriginType::HadID ); }
+    for skgid in mentioned_skgids {
       origin_types . insert (
-        id . clone (), ContextOriginType::Mentioned ); }
-    for id in &roots {
+        skgid . clone (), ContextOriginType::Mentioned ); }
+    for skgid in &roots {
       origin_types . insert (
-        id . clone (), ContextOriginType::Root ); }}
+        skgid . clone (), ContextOriginType::Root ); }}
   origin_types }
 
 /// Partition nodes into roots and multiply-contained
 /// based on how many distinct containers each has:
 /// Roots have none, multiply-contained have more than one.
 pub fn find_roots_and_multiply_contained (
-  all_node_ids : &HashSet<ID>,
+  all_node_skgids    : &HashSet<ID>,
   map_to_containers  : &MapToContainers,
 ) -> ( HashSet<ID>, HashSet<ID> ) {
   let mut roots : HashSet<ID> = HashSet::new();
   let mut multi : HashSet<ID> = HashSet::new();
-  for id in all_node_ids {
-    match map_to_containers . get (id) {
-      None => { roots . insert (id . clone()); },
+  for skgid in all_node_skgids {
+    match map_to_containers . get (skgid) {
+      None => { roots . insert (skgid . clone()); },
       Some (containers) => {
         let unique_containers : HashSet<&ID> =
           containers . iter () . collect ();
         if unique_containers . len () > 1 {
-          multi . insert (id . clone() ); }}, }}
+          multi . insert (skgid . clone() ); }}, }}
   ( roots, multi ) }
 
 //
@@ -272,7 +272,7 @@ fn grow_all_contexts (
 /// this will climb containerward to find a cycle,
 /// mark cycle members as origins, and grow their tails.
 pub fn extend_contexts_for_cycles (
-  all_node_ids      : &HashSet<ID>,
+  all_node_skgids   : &HashSet<ID>,
   map_to_content    : &MapToContent,
   map_to_containers : &MapToContainers,
   origins  : &mut HashMap<ID, ContextOriginType>, // we grow this
@@ -283,7 +283,7 @@ pub fn extend_contexts_for_cycles (
     . flat_map ( |ctx| ctx . iter () . cloned () )
     . collect ();
   let mut uncovered : HashSet<ID> =
-    all_node_ids . difference (&covered) . cloned () . collect ();
+    all_node_skgids . difference (&covered) . cloned () . collect ();
   while ! uncovered . is_empty () { // consume some of 'uncovered'
     let start : ID = // picks a random node
       uncovered . iter () . next () . unwrap () . clone ();
@@ -357,7 +357,7 @@ fn climb_containerward_to_cycle (
       let cycle_start_idx : usize =
         path . iter ()
         . position ( // returns the first match
-          |id| id == container )
+          |skgid| skgid == container )
         . unwrap ();
       let cycle_members : HashSet<ID> =
         path [cycle_start_idx ..] . iter ()
@@ -382,34 +382,34 @@ pub fn content_maps_from_nodes (
   let mut to_containers : MapToContainers = HashMap::new ();
   for node in nodes {
     { let pid : &ID = &node . pid;
-      for child_id in node . contains . iter () . map ( |m| &m . member ) {
+      for child_skgid in node . contains . iter () . map ( |m| &m . member ) {
         to_content . entry (pid . clone ())
           . or_insert_with (Vec::new)
-          . push (child_id . clone ());
-        to_containers . entry (child_id . clone ())
+          . push (child_skgid . clone ());
+        to_containers . entry (child_skgid . clone ())
           . or_insert_with (Vec::new)
           . push (pid . clone ()); } }}
   ( to_content, to_containers ) }
 
 /// Collect all link dest IDs from titles and bodies.
 /// This is a single linear pass over the already-loaded nodes.
-pub fn mentioned_ids_from_nodes (
+pub fn mentioned_skgids_from_nodes (
   nodes : &[Graphnode],
 ) -> HashSet<ID> {
   nodes . iter ()
   . flat_map ( |node| {
     links_from_node (node)
     . into_iter ()
-    . map ( |tl| tl . id ) } )
+    . map ( |tl| tl . skgid ) } )
   . collect () }
 
-/// Collect the set of IDs of nodes whose misc field
+/// Collect the set of IDs of nodes whose flags field
 /// contains Had_ID_Before_Import.
 pub fn had_id_set_from_nodes (
   nodes : &[Graphnode],
 ) -> HashSet<ID> {
   nodes . iter ()
   . filter ( |n|
-    n . misc . contains (&Flag::Had_ID_Before_Import) )
+    n . flags . contains (&Flag::Had_ID_Before_Import) )
   . map ( |n| n . pid . clone () )
   . collect () }

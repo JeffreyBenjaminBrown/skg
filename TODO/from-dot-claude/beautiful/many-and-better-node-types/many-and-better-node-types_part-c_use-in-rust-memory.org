@@ -33,7 +33,7 @@ Terminology: "in-Rust memory" (or "memory") is the concept. The Rust type is 'Gr
 
 Widen NodeRust (in [[../../server/types/nodes/rust.rs][server/types/nodes/rust.rs]]):
 
-  - Add 'textlinks_to: Vec<ID>'. Derived at load / save / merge time by parsing body text — mirrors the existing derivation in 'NodeTypedb::from_complete_parsing_textlinks' ([[../../server/types/nodes/typedb.rs][nodes/typedb.rs]]). This breaks Plan A's earlier invariant "NodeRust = NodeComplete minus misc"; the new invariant is "NodeRust = NodeTypedb plus title + aliases + body" (i.e. what a render-time consumer might need, derivations included).
+  - Add 'textlinks_to: Vec<ID>'. Derived at load / save / merge time by parsing body text — mirrors the existing derivation in 'NodeTypedb::from_complete_parsing_textlinks' ([[../../server/types/nodes/typedb.rs][nodes/typedb.rs]]). This breaks Plan A's earlier invariant "NodeRust = Graphnode minus misc"; the new invariant is "NodeRust = NodeTypedb plus title + aliases + body" (i.e. what a render-time consumer might need, derivations included).
 
 Add six fields on 'Graph':
 
@@ -58,11 +58,11 @@ Eliminates one TypeDB call per node in the render path.
 
 ** Step 3: route 'skgnode_from_map_or_disk' through memory
 
-'skgnode_from_map_or_disk' in [[../../server/types/memory.rs][types/memory.rs]] currently returns '&NodeComplete' from the per-request 'SkgNodeMap' (with disk fallback). Change the fallback order to 'SkgNodeMap' → memory → disk.
+'skgnode_from_map_or_disk' in [[../../server/types/memory.rs][types/memory.rs]] currently returns '&Graphnode' from the per-request 'SkgNodeMap' (with disk fallback). Change the fallback order to 'SkgNodeMap' → memory → disk.
 
-Plan A established that no in-memory consumer reads 'NodeComplete.misc' (only Tantivy indexing and the org-roam importer do). With Step 1's widening, NodeRust also carries 'textlinks_to'. So a NodeRust looked up in memory has everything render / save / merge need. The caller receives a NodeRust (not NodeComplete) — this is a type change that ripples through the callers in [[../../server/to_org/][to_org/]] and [[../../server/update_buffer/][update_buffer/]], but they don't use the missing field.
+Plan A established that no in-memory consumer reads 'Graphnode.misc' (only Tantivy indexing and the org-roam importer do). With Step 1's widening, NodeRust also carries 'textlinks_to'. So a NodeRust looked up in memory has everything render / save / merge need. The caller receives a NodeRust (not Graphnode) — this is a type change that ripples through the callers in [[../../server/to_org/][to_org/]] and [[../../server/update_buffer/][update_buffer/]], but they don't use the missing field.
 
-Save-pipeline exception: during the in-flight portion of a save, 'SkgNodeMap' holds the /in-progress/ NodeCompletes (the save that's being built). The in-Rust memory doesn't have those yet (memory is updated only /after/ the FS write). Keep the 'SkgNodeMap' fallback ordering as written: SkgNodeMap first (captures in-progress edits), memory second (captures everything else), disk last (final fallback, which should rarely fire once memory is always-current).
+Save-pipeline exception: during the in-flight portion of a save, 'SkgNodeMap' holds the /in-progress/ Graphnodes (the save that's being built). The in-Rust memory doesn't have those yet (memory is updated only /after/ the FS write). Keep the 'SkgNodeMap' fallback ordering as written: SkgNodeMap first (captures in-progress edits), memory second (captures everything else), disk last (final fallback, which should rarely fire once memory is always-current).
 
 ** Step 4: migrate containerward recursive queries
 
@@ -92,7 +92,7 @@ Nothing stays on TypeDB for this function. The entire 'fetch_all_graphnodestats_
 
 Once Steps 2-3 land, 'SkgnodesInViews.pool' is strictly redundant with memory. Remove:
 
-  - 'pool: HashMap<ID, NodeComplete>'
+  - 'pool: HashMap<ID, Graphnode>'
   - 'id_resolver: HashMap<ID, (ID, SourceName)>' — its role is now covered by 'extra_id_to_pid' plus 'NodeRust.source'.
 
 Remaining fields — 'views', 'root_ids' — are genuinely per-connection view state. Keep the struct, consider renaming to reflect its new scope ('ViewRegistry' or similar). Out of scope for this plan; flag as follow-up.
@@ -170,7 +170,7 @@ Add a warning to [[../../coding-advice/formatting.org][coding-advice/formatting.
 
 * Files likely touched
 
-- [[../../server/types/nodes/rust.rs][server/types/nodes/rust.rs]] — add 'textlinks_to' field; update the 'From<&NodeComplete>' impl to parse textlinks.
+- [[../../server/types/nodes/rust.rs][server/types/nodes/rust.rs]] — add 'textlinks_to' field; update the 'From<&Graphnode>' impl to parse textlinks.
 - [[../../server/dbs/memory.rs][server/dbs/memory.rs]] — add six inverse indexes; update 'apply_definenodes' and 'from_nodecompletes' to maintain them.
 - [[../../server/dbs/typedb/search.rs][server/dbs/typedb/search.rs]] — 'pid_and_source_from_id' routed through memory.
 - [[../../server/types/memory.rs][server/types/memory.rs]] — 'skgnode_from_map_or_disk' routes through memory; 'SkgnodesInViews' shrinks.

@@ -200,7 +200,7 @@ async fn test_bfs_limit_8_two_branches (
 // §5.5: content wins the budget race; a folder (here a SubscribeeFolder) fills WHOLE
 // and is budget-NEUTRAL. Fixture: root r -> content chain c1 -> c2, and r also
 // subscribes to s1, s2. With budget = 3 (exactly the content chain r, c1, c2):
-// the chain fully expands (c2 is definitive, body and all), AND both subscribers
+// the chain fully expands (c2 is editable, body and all), AND both subscribers
 // are shown (the folder is whole), write-protected. If the folder had spent the budget,
 // s1 and s2 would have eaten two of the three units and c2 would be left
 // write-protected -- it is not, which is the guarantee this test pins. Subscribers

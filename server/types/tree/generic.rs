@@ -1,22 +1,22 @@
-use crate::types::misc::{ID, RepoName};
+use crate::types::misc::{ID, SkgRepoName};
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
 
 use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
 use std::error::Error;
 
-/// ERRORS if the ancestor is not found or cannot provide both PID and repo.
-pub fn pid_and_repo_from_ancestor (
+/// ERRORS if the ancestor is not found or cannot provide both PID and skgrepo.
+pub fn pid_and_skgrepo_from_ancestor (
   tree       : &Tree<Viewnode>,
   node       : NodeId,
   generation : usize,
   caller     : &str,
-) -> Result<(ID, RepoName), Box<dyn Error>> {
+) -> Result<(ID, SkgRepoName), Box<dyn Error>> {
   read_at_ancestor_in_tree(
     tree, node, generation,
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (v) =>
-        v . pid_and_repo ()
-        . map ( |(pid, repo)| (pid . clone (), repo . clone ()) )
+        v . pid_and_skgrepo ()
+        . map ( |(pid, skgrepo)| (pid . clone (), skgrepo . clone ()) )
         . ok_or_else (|| format!(
           "{}: ancestor {} has no repo",
           caller, generation )),
@@ -47,7 +47,7 @@ where F: FnOnce (&T) -> R, {
 /// Find the unique child that matches `target_kind`.
 pub fn unique_non_vognode_child<T, F> (
   tree          : &Tree<T>,
-  node_id       : NodeId,
+  treeid    : NodeId,
   target_kind   : &ViewnodeKind,
   kind_from_node : F,
 ) -> Result<Option<NodeId>, String>
@@ -55,7 +55,7 @@ where
   F : for<'a> Fn (&'a T) -> Option<&'a ViewnodeKind>,
 {
   let node_ref : NodeRef<T> =
-    tree . get (node_id) . ok_or (
+    tree . get (treeid) . ok_or (
       "unique_non_vognode_child: node not found")?;
   let matches : Vec<NodeId> =
     node_ref . children()
@@ -84,7 +84,7 @@ pub fn write_at_ancestor_in_tree<T, F, R>(
   f: F
 ) -> Result<R, String>
 where F: FnOnce (&mut T) -> R, {
-  let target_id : NodeId = {
+  let target_skgid : NodeId = {
     // Climb to target node via immutable reference
     let mut node_ref : NodeRef<T> = tree . get (treeid)
       . ok_or ("node not found")?;
@@ -92,7 +92,7 @@ where F: FnOnce (&mut T) -> R, {
       node_ref = node_ref . parent()
         . ok_or ("cannot climb that many generations")?; }
     node_ref . id() };
-  let mut node_mut : NodeMut<T> = tree . get_mut (target_id)
+  let mut node_mut : NodeMut<T> = tree . get_mut (target_skgid)
     . ok_or ("target node not found")?;
   Ok(f(node_mut . value() )) }
 
@@ -137,16 +137,16 @@ where F: FnOnce (&mut T) -> R, {
 /// Returns an error if the node is not found.
 pub fn with_node_mut<T, F, R>(
   tree    : &mut Tree<T>,
-  node_id : NodeId,
+  treeid    : NodeId,
   f       : F
 ) -> Result<R, String>
 where F: FnOnce(NodeMut<T>) -> R {
-  let node_mut : NodeMut<T> = tree . get_mut (node_id)
+  let node_mut : NodeMut<T> = tree . get_mut (treeid)
     . ok_or ("with_node_mut: node not found") ?;
   Ok ( f (node_mut) ) }
 
 /// Apply a function to every node in a subtree, DFS traversal.
-/// Starts at `start_node_id` and recursively visits all descendants.
+/// Starts at `start_treeid` and recursively visits all descendants.
 /// The function receives `NodeMut<T>`, which allows:
 /// - Mutating the node's value via `.value()`
 /// - Navigating to parent via `.parent()` (immutable)
@@ -169,27 +169,27 @@ where F: FnOnce(NodeMut<T>) -> R {
 /// ```
 pub fn do_everywhere_in_tree_dfs<T, F>(
   tree          : &mut Tree<T>,
-  start_node_id : NodeId,
+  start_treeid  : NodeId,
   preorder      : bool,
   f             : &mut F
 ) -> Result<(), String>
 where F: FnMut(NodeMut<T>) -> Result<(), String> {
-  let child_ids : Vec<NodeId> = {
+  let child_skgids : Vec<NodeId> = {
     // Collect early so no borrow conflicts
     let node_ref : NodeRef<T> =
-      tree . get (start_node_id) . ok_or ("do_everywhere_in_tree_dfs: start node not found") ?;
+      tree . get (start_treeid) . ok_or ("do_everywhere_in_tree_dfs: start node not found") ?;
     node_ref . children ()
       . map ( |c| c . id( ))
       . collect () };
   if preorder {
-    let node_mut : NodeMut<T> = tree . get_mut (start_node_id)
+    let node_mut : NodeMut<T> = tree . get_mut (start_treeid)
       . ok_or ("do_everywhere_in_tree_dfs: node not found") ?;
     f (node_mut) ?; }
-  for child_id in child_ids { // recurse
+  for child_skgid in child_skgids { // recurse
     do_everywhere_in_tree_dfs (
-      tree, child_id, preorder, f ) ?; }
+      tree, child_skgid, preorder, f ) ?; }
   if !preorder {
-    let node_mut : NodeMut<T> = tree . get_mut (start_node_id)
+    let node_mut : NodeMut<T> = tree . get_mut (start_treeid)
       . ok_or ("do_everywhere_in_tree_dfs: node not found") ?;
     f (node_mut) ?; }
   Ok (( ))}
@@ -199,13 +199,13 @@ where F: FnMut(NodeMut<T>) -> Result<(), String> {
 /// and provides `NodeRef<T>` instead of `NodeMut<T>`.
 pub fn do_everywhere_in_tree_dfs_readonly<T, F>(
   tree          : &Tree<T>,
-  start_node_id : NodeId,
+  start_treeid  : NodeId,
   preorder      : bool,
   f             : &mut F
 ) -> Result<(), String>
 where F: FnMut(NodeRef<T>) -> Result<(), String> {
   let node_ref : NodeRef<T> =
-    tree . get (start_node_id) . ok_or (
+    tree . get (start_treeid) . ok_or (
       "do_everywhere_in_tree_dfs_readonly: start node not found" ) ?;
   if preorder { f (node_ref) ?; }
   for child in node_ref . children() {
@@ -213,7 +213,7 @@ where F: FnMut(NodeRef<T>) -> Result<(), String> {
       tree, child . id(), preorder, f ) ?; }
   if !preorder {
     let node_ref : NodeRef<T> =
-      tree . get (start_node_id) . ok_or (
+      tree . get (start_treeid) . ok_or (
         "do_everywhere_in_tree_dfs_readonly: start node not found" ) ?;
     f (node_ref) ?; }
   Ok (( ))}
@@ -223,27 +223,27 @@ where F: FnMut(NodeRef<T>) -> Result<(), String> {
 /// - Ok(false) to stop (prune) at this node.
 pub fn do_everywhere_in_tree_dfs_prunable<T, F>(
   tree          : &mut Tree<T>,
-  start_node_id : NodeId,
+  start_treeid  : NodeId,
   f             : &mut F
 ) -> Result<(), String>
 where F: FnMut(NodeMut<T>
               ) -> Result<bool, String> {
-  let child_ids : Vec<NodeId> = {
+  let child_skgids : Vec<NodeId> = {
     let node_ref : NodeRef<T> =
-      tree . get (start_node_id) . ok_or (
+      tree . get (start_treeid) . ok_or (
         "do_everywhere_in_tree_dfs_prunable: start node not found" )?;
     node_ref . children ()
       . map ( |c| c . id() )
       . collect () };
   let should_continue : bool = {
     let node_mut : NodeMut<T> =
-      tree . get_mut (start_node_id) . ok_or (
+      tree . get_mut (start_treeid) . ok_or (
         "do_everywhere_in_tree_dfs_prunable: node not found" )?;
     f (node_mut)? };
   if should_continue {
-    for child_id in child_ids {
+    for child_skgid in child_skgids {
       do_everywhere_in_tree_dfs_prunable (
-        tree, child_id, f )?; }}
+        tree, child_skgid, f )?; }}
   Ok (( )) }
 
 /// Compare two trees for structural and value equality.

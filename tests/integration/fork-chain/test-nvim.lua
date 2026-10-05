@@ -2,7 +2,7 @@
 -- client. The Lua mirror of test-emacs.el in this directory: fork a
 -- foreign N into a public clone C (implicit fork), then run
 -- skg.view_requests.fork_node on the DRAWN SUBSTITUTE C and rotate
--- its clone to a PRIVATE repo, forming the chain D overrides C
+-- its clone to a PRIVATE skgrepo, forming the chain D overrides C
 -- overrides N. Viewing N's container then draws the chain end D,
 -- marked (overridesHere N), and the save accepts that chain-end
 -- carrier.
@@ -73,7 +73,7 @@ vim.api.nvim_set_current_buf(p_buf)
 T.check(T.buffer_text(p_buf):find('(id N)', 1, true),
         "P's view does not show foreign N")
 
--- 2. Implicit fork: make N definitive and edit its title.
+-- 2. Implicit fork: make N editable and edit its title.
 local n_line = goto_line_containing('(id N) (repo foreign)',
   "could not find N's headline")
 local n_line_text =
@@ -107,7 +107,7 @@ goto_line_containing('(overridesHere N)',
   'could not find the drawn substitute')
 view_requests.fork_node()
 
--- 6. In the confirmation buffer, rotate the clone-to-be's repo to
+-- 6. In the confirmation buffer, rotate the clone-to-be's skgrepo to
 --    PRIVATE, then approve -> private D overrides C.
 local confirm_buf_2 = T.wait_for_buffer('skg://fork-confirmation', 10)
 T.check(confirm_buf_2, 'no fork-confirmation for the clone appeared')
@@ -118,7 +118,7 @@ metadata.change_repo_at_line(clone_line_2, 'private')
 save.approve_fork()
 print('the public clone was forked into a private clone (repo rotated)')
 
--- 7. Reopen P (all repos active): the chain end D -- a PRIVATE-repo
+-- 7. Reopen P (all skgrepos active): the chain end D -- a PRIVATE-repo
 --    node -- is now drawn in N's place, still marked (overridesHere N).
 p_buf = reopen_P()
 local function chain_end_drawn ()

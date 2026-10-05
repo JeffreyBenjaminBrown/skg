@@ -69,13 +69,13 @@ Fails the test if it is not found."
       (unless (string-match-p "(id M)" (buffer-string))
         (test-fail "confirmation buffer does not list M:\n%s" (buffer-string)))
       (message "✓ skg-fork-node produced a fork-confirmation listing M")
-      ;; Approving before picking a repo is refused.
+      ;; Approving before picking a skgrepo is refused.
       (condition-case nil
           (progn (skg-approve-fork)
                  (test-fail "approve must be refused until a repo is picked"))
         (error nil))
       (message "✓ approve refused until a repo is picked")
-      ;; Pick the clone's repo, then approve.
+      ;; Pick the clone's skgrepo, then approve.
       (goto-char (point-min))
       (re-search-forward "^\\* (skg (node (repo ")
       (beginning-of-line)
@@ -114,7 +114,7 @@ Fails the test if it is not found."
     (unless confirm-buf (test-fail "no fork-confirmation buffer for M2 appeared"))
     (with-current-buffer confirm-buf
       (skg-decline-fork)))
-  ;; The origin buffer's M2 headline no longer carries a fork request.
+  ;; The source buffer's M2 headline no longer carries a fork request.
   (let ((q2-buf (fork-test--buffer-showing "Q2")))
     (unless (buffer-live-p q2-buf) (test-fail "Q2's buffer vanished after decline"))
     (with-current-buffer q2-buf
@@ -137,7 +137,7 @@ Fails the test if it is not found."
     (message "✓ decline committed nothing (no clone overrides M2)"))
 
   ;; 7. KILLING the confirmation buffer directly (not via C-c C-k) must
-  ;;    also strip the lingering fork atom from the origin.
+  ;;    also strip the lingering fork atom from the source buffer.
   (skg-request-single-root-content-view-from-id "Q3")
   (let ((q3-buf (skg-test-wait-for (lambda () (fork-test--buffer-showing "Q3")) 10)))
     (unless q3-buf (test-fail "Q3's view never appeared"))

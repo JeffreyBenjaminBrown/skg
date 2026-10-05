@@ -6,8 +6,8 @@
  */
 
 use skg::dbs::filesystem::not_nodes::load_config;
-use skg::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
+use skg::dbs::filesystem::multiple_nodes::error_unless_each_skgid_names_one_node;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::types::misc::SkgConfig;
 use skg::types::nodes::complete::Graphnode;
 
@@ -24,8 +24,8 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
     else { 20 };
   let config : SkgConfig = load_config (config_path) ?;
   let nodes : Vec<Graphnode> =
-    read_all_skg_files_from_repos (&config) ?;
-  error_unless_each_id_names_one_node (
+    read_all_skg_files_from_skgrepos (&config) ?;
+  error_unless_each_skgid_names_one_node (
     &nodes, &config . data_root) ?;
   let mut by_contents_len : Vec<(usize, &Graphnode)> =
     nodes . iter ()

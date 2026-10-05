@@ -3,7 +3,7 @@ use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_view
 use skg::types::tree::forest::ViewForest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::{run_with_test_stores, graph_handle_from_config};
-use skg::types::misc::{ID, MSV, RepoName, members_msv};
+use skg::types::misc::{ID, MSV, SkgRepoName, members_msv};
 use skg::types::save::SaveNode;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use std::error::Error;
@@ -12,7 +12,7 @@ use std::error::Error;
 fn test_single_merge() -> Result<(), Box<dyn Error>> {
   run_with_test_stores(
     "skg-test-merge-single",
-    "tests/merge/saveinstructions_from_the_merges_in_an_viewforest/fixtures",
+    "tests/merge/nodeInstructions_from_the_merges_in_a_viewforest/fixtures",
     "/tmp/tantivy-test-merge-single",
     |config, _tantivy| {
       Box::pin(async move {
@@ -40,7 +40,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
         let merge = &nodeMerge_instructions[0];
         let ( acquiree_text_preserver,
               node1,
-              (node2_id, node2_repo) )
+              (node2_skgid, node2_skgrepo) )
           = merge . targets_from_nodeMerge();
 
         // Verify acquiree_text_preserver properties
@@ -102,21 +102,21 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
 
         // Verify node 1's contents: [acquiree_text_preserver ID, original node 1 contents, node 2 contents]
         // In this case: [acquiree_text_preserver ID] (since both started with empty contents)
-        let acquiree_text_preserver_id = &acquiree_text_preserver . pid;
+        let acquiree_text_preserver_skgid = &acquiree_text_preserver . pid;
         assert_eq!(
           node1 . contains . len(),
           1,
           "Node 1 should contain exactly the acquiree_text_preserver"
         );
         assert_eq!(
-          &node1 . contains[0] . member, acquiree_text_preserver_id,
+          &node1 . contains[0] . member, acquiree_text_preserver_skgid,
           "Node 1's first content should be the acquiree_text_preserver"
         );
 
         // Verify node 2 (acquiree) deletion instruction
-        assert_eq!( node2_id, &ID::from ("2"),
+        assert_eq!( node2_skgid, &ID::from ("2"),
                     "Node 2 should have ID '2'" );
-        assert_eq!( node2_repo, &RepoName::from ("main"),
+        assert_eq!( node2_skgrepo, &SkgRepoName::from ("main"),
                     "Node 2 should have repo 'main'" );
         Ok(())
       })

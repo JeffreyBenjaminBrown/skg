@@ -9,11 +9,11 @@
   - 'cargo nextest run' : 462 passed.
   - 'bash/emacs-tests.sh' : 250 passed.
   - 'bash/integration-tests.sh' : all passed.
-  Two command families now exist: COLLECTIONS ('C-c c', both cols of a
-  relation, writable col forced even when empty) and PATHS ('C-c p', the
+  Two command families now exist: COLLECTIONS ('C-c c', both folders of a
+  relation, writable folder forced even when empty) and PATHS ('C-c p', the
   relation-generic backpath for any of nine partner roles), with Birth
   and ViewRequest parameterized, the full parent-relative viewStats
-  matrix (Sp/pS/Hp/pH + the pO fix), and the read-only-col ☮.
+  matrix (Sp/pS/Hp/pH + the pO fix), and the read-only-folder ☮.
 
   FOLLOW-UP (done 2026-06-21, at your request): the search-ranking
   subsystem is now renamed too -- 'ContextOriginType::Target' -> 'Dest'
@@ -67,21 +67,21 @@
      integration tests (containerward/sourceward/content-view-from-non-root/
      search-enrichment).
 
-** Step 3 — parameterize ViewRequest (Col + Path); fold in the three (commit pending)
-   - 'ViewRequest' is now '{ Col(ColRelation), Path(RelationRole),
+** Step 3 — parameterize ViewRequest (Folder + Path); fold in the three (commit pending)
+   - 'ViewRequest' is now '{ Folder(ColRelation), Path(RelationRole),
      Definitive }', with 'ColRelation { Aliases, Overrides, Hides,
      Subscribes }' (relname/from_relname). Dropped the flat
      'REPRS_IN_CLIENT'/'from_client_string'/'FromStr'; Display now emits
-     '(col RELNAME)' / '(path ROLENAME)' / 'definitiveView'.
+     '(folder RELNAME)' / '(path ROLENAME)' / 'definitiveView'.
    - Parser rewritten ('parse_viewrequests_sexp') to accept the nested
-     '(col ...)' / '(path ...)' forms and the bare 'definitiveView'.
-   - viewRequests herald rule now matches 'col'/'path'/'definitiveView'
+     '(folder ...)' / '(path ...)' forms and the bare 'definitiveView'.
+   - viewRequests herald rule now matches 'folder'/'path'/'definitiveView'
      (the RELNAME/ROLENAME are value-position, echoed by ANY/IT ->
-     "req:col:NAME" / "req:path:NAME"). 'EMITTABLE_MATCH_ATOMS'
-     = ["col","path","definitiveView"] feeds the conformance test.
-   - Dispatch ('execute_view_requests'): Col(Aliases) -> existing aliases
+     "req:folder:NAME" / "req:path:NAME"). 'EMITTABLE_MATCH_ATOMS'
+     = ["folder","path","definitiveView"] feeds the conformance test.
+   - Dispatch ('execute_view_requests'): Folder(Aliases) -> existing aliases
      builder; Path(CONTAINER)/Path(LINK_SOURCE) -> existing containerward/
-     sourceward engines; the other Col/Path arms return a clear "not yet
+     sourceward engines; the other Folder/Path arms return a clear "not yet
      implemented" error (steps 4/5; no client requests them yet). The
      view-root containerward special-case now keys on Path(CONTAINER).
    - Folded the three old tokens (aliases/containerwardView/sourcewardView)
@@ -91,25 +91,25 @@
      aliases/containerward/sourceward/save_collateral_delete integration
      tests.
 
-** Step 4 — fulfill the Col request (both cols, populated) (commit pending)
+** Step 4 — fulfill the Folder request (both folders, populated) (commit pending)
    - New 'to_org/expand/col_request.rs' ::
      'build_and_integrate_col_then_drop_request' routes each ColRelation
-     to the existing de-novo generators: overrides -> overriddenCol
-     (writable, forced-empty) + overriderCol; hides -> hiderCol +
-     hiddenCol (both read-only); subscribes -> subscribeeCol (writable,
-     forced-empty) + subscriberCol. aliases keeps using the AliasCol
-     builder (already creates an empty col). The dispatch's Col(rel) arm
+     to the existing de-novo generators: overrides -> overriddenFolder
+     (writable, forced-empty) + overriderFolder; hides -> hiderFolder +
+     hiddenFolder (both read-only); subscribes -> subscribeeFolder (writable,
+     forced-empty) + subscriberFolder. aliases keeps using the AliasFolder
+     builder (already creates an empty folder). The dispatch's Folder(rel) arm
      now calls it.
    - Added 'force_create_when_empty' to 'maybe_add_one_partnerCol' (now
      pub) and 'maybe_add_subscribeeCol_branch'; the content-completion
-     caller passes 'false'. The writable col is materialized empty (the
+     caller passes 'false'. The writable folder is materialized empty (the
      "add here" surface); 'is_self_deletable_when_empty' already spares
      empty Subscribee/Overridden/Alias, so the prune keeps it. No wipe:
-     an absent writable col is MSV::Unspecified (from disk), and the col
+     an absent writable folder is MSV::Unspecified (from disk), and the folder
      is built AFTER extraction, so the relation is never silently emptied.
    - Test: a 'col_request_scenarios' block in 'partner_col_matrix.rs'
      (which installs the global graph handle the generators read) covers
-     overrides-empty (forced empty overriddenCol, no overriderCol),
+     overrides-empty (forced empty overriddenFolder, no overriderFolder),
      overrides-populated, subscribes-populated, and hides-empty (nothing).
    - All 460 Rust tests pass.
 
@@ -147,12 +147,12 @@
    - Moved the pO latent-bug entry from 'TODO/problems.org' to
      'TODO/DONE/problems.org'.
 
-** Step 7 — read-only col scaffold ☮ herald (commit pending)
+** Step 7 — read-only folder ☮ herald (commit pending)
    Added a 'leaf_ro' herald helper (label text + "☮") and applied it to
-   the SIX read-only col scaffolds (subscriberCol, overriderCol,
-   hiderCol, hiddenCol, hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol),
-   meaning "cannot be changed from here". The writable cols
-   (subscribeeCol, overriddenCol, aliasCol) keep their plain green
+   the SIX read-only folders (subscriberFolder, overriderFolder,
+   hiderFolder, hiddenFolder, hiddenInSubscribeeFolder, hiddenOutsideOfSubscribeeFolder),
+   meaning "cannot be changed from here". The writable folders
+   (subscribeeFolder, overriddenFolder, aliasFolder) keep their plain green
    label. Pure herald-table change -- no wire atom, no parser, no server
    logic; the conformance test is unaffected (☮ is a string child, not a
    label). Regenerated the elisp fixture. All 462 Rust + 249 elisp tests
@@ -163,7 +163,7 @@
      macro generates the thirteen commands ('skg-show-collection-{aliases,
      overrides,hides,subscribes}' and 'skg-show-paths-through-*') from
      (name request-form docstring) rows; each inserts its '(viewRequests
-     (col ...))' / '(... (path ...))' atom and AUTO-SAVES (aliases too,
+     (folder ...))' / '(... (path ...))' atom and AUTO-SAVES (aliases too,
      Q10). 'skg-request-definitive-view' kept (no auto-save).
    - 'skg-keymaps-and-aliases.el': bound 'C-c c {a,o,h,s}' and 'C-c p
      {C,L,l,O,o,H,h,S,s}'; removed the three 'C-c r' bindings and the
@@ -179,13 +179,13 @@
 ** Step 9 — docs, fixtures, conformance, full suite (commit pending)
    - 'docs/COMMANDS.org': replaced the 'C-c r' section with the full
      'C-c c' (collections) and 'C-c p' (paths) families, noting per
-     command which col side (if any) is editable and the read-only ☮.
+     command which folder side (if any) is editable and the read-only ☮.
    - 'api-and-formats.md': updated the '(birth backpath ROLENAME)'
      grammar, added a '(viewRequests ...)' request-grammar subsection
-     ((col ...)/(path ...)/definitiveView), and added the new viewStats
+     ((folder ...)/(path ...)/definitiveView), and added the new viewStats
      (Sp/pS/Hp/pH) + the now-general pO.
-   - 'glossary.md': documented the read-only-col ☮ on the six read-only
-     cols.
+   - 'glossary.md': documented the read-only-folder ☮ on the six read-only
+     folders.
    - Regenerated 'tests/elisp/herald-rules.sexp' (unchanged since step 7
      -- it has been kept current per-commit).
    - FULL SUITE GREEN: 462 Rust ('cargo nextest run'), 250 elisp
@@ -225,14 +225,14 @@
     widened the visibility of an internal helper.
   - Step 3 needed a SMALL client change earlier than step 8: the three
     existing request commands ('skg-request-{aliases,containerward,
-    sourceward}-view') had to emit the new '(col aliases)'/'(path
+    sourceward}-view') had to emit the new '(folder aliases)'/'(path
     container)'/'(path linkSource)' atoms, else the integration tests
     (which invoke those commands) would send atoms the new server
     rejects. The full client rework (rename to 'skg-show-*', the ten new
     commands, keybindings, auto-save) is still step 8.
   - Step 3 also trimmed the sexpr-editor's viewRequests field-cycling
     list ('skg-sexpr-cycling.el') to just 'definitiveView' (the only
-    bare-atom request). The col/path requests are structured forms made
+    bare-atom request). The folder/path requests are structured forms made
     via commands, not flat-cycleable values. Untested helper; left a
     comment. A fuller cycling UX for the structured requests, if wanted,
     belongs with the step-8 client work.

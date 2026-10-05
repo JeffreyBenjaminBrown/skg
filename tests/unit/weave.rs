@@ -25,17 +25,17 @@ fn sdm (disk : &[&str], buffer : &[&str]) -> Vec<&'static str> {
 
 #[test]
 fn active_relRepo_makes_an_unknown_member_visible () {
-  use crate::repo_sets::{ActiveRepoSet, RepoSetName};
-  use crate::types::misc::{ID, RelPartner, SkgConfig, RepoName};
+  use crate::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
+  use crate::types::misc::{ID, RelPartner, SkgConfig, SkgRepoName};
   use std::collections::{BTreeSet, HashMap};
-  let active = ActiveRepoSet {
-    name: RepoSetName::from ("main"),
-    repos: BTreeSet::from ([RepoName::from ("main")]) };
-  let config = SkgConfig::dummyFromRepos (HashMap::new ());
+  let active = ActiveSkgRepoSet {
+    name: SkgRepoSetName::from ("main"),
+    skgrepos: BTreeSet::from ([SkgRepoName::from ("main")]) };
+  let config = SkgConfig::dummyFromSkgRepos (HashMap::new ());
   let unknown_at_main = RelPartner::at_relRepo (
-    RepoName::from ("main"), ID::from ("absent"));
+    SkgRepoName::from ("main"), ID::from ("absent"));
   let unknown_at_private = RelPartner::at_relRepo (
-    RepoName::from ("private"), ID::from ("absent"));
+    SkgRepoName::from ("private"), ID::from ("absent"));
   assert! (relationship_member_is_visible (
     &crate::dbs::in_rust_graph::InRustGraph::new (),
     &unknown_at_main, &config, &active));

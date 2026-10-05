@@ -1,7 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; PURPOSE: Read, edit and act on
-;;; (by moving point to the focused heading) 'focus' metadata.
+;;; (by moving point to the focused headline) 'focus' metadata.
 
 (require 'org)
 (require 'skg-metadata)

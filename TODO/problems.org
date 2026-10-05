@@ -37,11 +37,11 @@
   Research and proposed slices: [[file:astra-cleans-up.org][Making Skg easier to change]].
   These are source-inspection findings; no application changes or runtime
   reproduction were performed during the review.
-** Neovim source moves omit Emacs's write-protection and stuck-edge handling
-   'elisp/skg-metadata.el::skg--set-source-and-handle-stuck-edges' skips
-   write-protected occurrences and offers to publicize content edges left
-   at their old, more-private sources by a home move.
-   'nvim/lua/skg/metadata.lua::set_source' instead calls direct source
+** Neovim skgrepo moves omit Emacs's write-protection and stuck-edge handling
+   'elisp/skg-metadata.el::skg--set-repo-and-handle-stuck-edges' skips
+   write-protected occurrences and offers to publicize content relationships left
+   at their old, more-private skgrepos by a home move.
+   'nvim/lua/skg/metadata.lua::set_repo' instead calls direct skgrepo
    rewriting helpers, including on write-protected occurrences, without
    that analysis. Its success message can therefore describe an edit the
    save will not honor as expected. This is client-policy drift, not a
@@ -49,20 +49,20 @@
    and align the commands; consider server-owned preview logic if such
    graph-dependent policies continue to multiply. The Emacs-only policy
    tables ('skg--writable-folder-relations',
-   'skg--relSource-unsupported-folder-atoms' in 'elisp/skg-metadata.el')
+   'skg--relRepo-unsupported-folder-atoms' in 'elisp/skg-metadata.el')
    should then be served or shared, not copied into Neovim (noted from
    [[file:herald-colors/2_plan.org][the herald-colors plan]], 2026-10-04).
 ** New relationship folders are populated before their completion visit
    'server/to_org/complete/partner_folder/mod.rs' eagerly builds child data
    and reconciles newly created folders. 'complete_viewforest' subsequently
    visits those folders and invokes their reconcilers again. Candidate
-   simplification: creation owns scaffold existence/order/folding, and the
-   completion visit owns members. Preserve forced empty writable folders,
+   simplification: creation owns non-vognode existence/order/folding, and the
+   completion visit owns members. Preserve forced empty editable folders,
    HEAD-only diff membership, hidden-folder folding, and Unknown members.
 ** Graph updates rediscover identity-change facts across several consumers
    'GraphChangeSet' in 'server/dbs/in_rust_graph/prepared_update.rs' and
    'apply_definenodes_to_inRustGraph' independently compute affected IDs
-   and owners. Override/telescope scope builders perform related old/new
+   and recorders. Override/telescope scope builders perform related old/new
    identity walks. Share immutable identity-transition facts while retaining
    distinct index, validation, write, and view dependency scopes and an
    independent full reconstruction oracle.
@@ -71,7 +71,7 @@
    'nodecomplete_from_noderust' in 'server/save.rs', and
    'complete_from_rust' in 'server/dbs/in_rust_graph/complete_validation.rs'
    repeat the same field projection. Share it next to the node types.
-   The rustFirst/graphFirst lookup wrappers also ignore source/config
+   The rustFirst/graphFirst lookup wrappers also ignore skgrepo/config
    arguments and perform only graph lookup; their names and fallible
    wrappers obscure the captured-generation contract.
 ** Ordinary saves and node merges have different index application policies
@@ -97,13 +97,13 @@
   files or files without a file-level ID. An unusable input can therefore
   erase an earlier import without a corresponding parse error in the report.
   This is also a barrier to reusing the entry point for import into a
-  populated configured source. Preflight input and stage replacement before
+  populated configured skgrepo. Preflight input and stage replacement before
   modifying existing files; make replacement an explicit operation.
   See [[file:import-md-and-org/1_discussion.org][the mixed-format import discussion]]. No implementation changed here.
 * Dead-link warnings miss targets deleted by the same save (2026-09-13)
   =dead_link_warnings= regards every ID present in the pre-save graph as
   live. Therefore, when one buffer both saves a text link and deletes that
-  link's target, the final graph contains a dead link but no warning is
+  link's target, the final graph contains a dangling link but no warning is
   emitted. Computing final ID existence must account for Save, Delete,
   fork, and nodeMerge outcomes together; merely subtracting Delete intents
   would mishandle IDs retained by a merge.
@@ -139,7 +139,7 @@
   sat idle -- so the symptom was "port 1730 dead", which looks exactly
   like a TypeDB problem. Diagnosis cost was almost entirely in the two
   entries below.
-** The unreadable-files report names the SOURCE FOLDER, not the file
+** The unreadable-files report names the REPO FOLDER, not the file
    This is the big one: it is the difference between a 30-second fix
    and a manual scan of 54,566 files.
    'read_skg_sections_from_folder'
@@ -159,7 +159,7 @@
    Suggested fix: at line 203, '. map_err' the error to attach
    'path . display ()' before propagating; and either collect per-file
    errors instead of aborting the folder, or rename the count to say
-   "source" so it stops lying.
+   "repo" so it stops lying.
 ** A titleless single-section node makes the whole server unbootable
    After the empty file got a valid 'pid', init failed again, further
    in, with "Telescope '...' has no home: no section carries a title."
@@ -185,26 +185,26 @@
    294 MB. server.jsonl in particular grows without bound and made
    grepping for one node ID slow enough to notice. Suggested fix:
    rotate or truncate on startup, or cap by size.
-* Problems noted while building recursive set-relSource (2026-07-22)
+* Problems noted while building recursive set-relRepo (2026-07-22)
   Context: the investigation written up in
-  TODO/MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org.
+  TODO/DONE/MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org.
 ** skg--rel-at-point misclassifies some positions
    It classifies "activeNode child of an activeNode parent" as the
-   parent-contains-child edge, without checking:
-   - 'birth': a backpath graft (e.g. '(birth backpath container)')
+   parent-contains-child relationship, without checking:
+   - 'birth': a role graft (e.g. a containerward one)
      represents the INVERTED relation -- the child contains the
      parent -- so the command queries and offers to set a
-     nonexistent parent->child contains edge;
+     nonexistent parent->child contains relationship;
    - 'parentIs': a parked (independent) child is not a member of the
-     parent's collection, so the written '(relSource ...)' atom is
-     inert (extraction only reads the atom off collected members);
-   - the parent's definitiveness: under a write-protected parent the
-     contains list is not collected, so the atom is inert there too.
+     parent's collection, so the written '(relRepo ...)' atom is
+     save-inert (extraction only reads the atom off collected members);
+   - the parent's editability: under a write-protected parent the
+     contains list is not collected, so the atom is save-inert there too.
    Inert atoms are harmless to the data but lie to the user: the
    command reports "Save to apply" and the save applies nothing.
    (The recursive walker added 2026-07-22,
-   'skg--set-relSource-recursive-walk', checks parentIs and
-   parent definitiveness; the single-edge command still does not.)
+   'skg--set-relRepo-recursive-walk', checks parentIs and
+   parent editability; the single-relationship command still does not.)
   Context: Jeff's machine overheated and cut power mid-'cargo build',
   truncating 3 of 501 rlibs in target/. Servers then refused to start,
   permanently and identically, on unchanged code and unchanged data.
@@ -242,76 +242,76 @@
    invisible to it, in both directions: an expected atom missing
    from the actual line, or a stray atom appearing in it, cannot
    fail these tests. Found 2026-07-08 while adding the
-   begin-folded rule for hidden cols: a probe atom inserted into an
+   begin-folded rule for hidden folders: a probe atom inserted into an
    expected line still passed. Regressions in fold/focus/writeProtected
    marking on diff views are therefore unpinned by that suite
    (tests elsewhere, e.g. tests/hidden_from_subscriptions.rs, use
    exact assert_eq! and do pin them). Suggested fix: also compare
    the bare-atom sets of the two lines in 'line_matches'.
-** Subscribee-as-such hides may misfire under a restricted source-set
+** Subscribee-as-such hides may misfire under a restricted skgrepo-set
    The signal loop in 'resolve_visibility'
    (server/from_text/local_instruction_collection/resolve_visibility.rs)
    infers hides as: subscribee's disk contains, minus the children the
    buffer shows, minus the subscriber's post-save contains. Under a
-   RESTRICTED source-set, rendering omits a subscribee's
-   inactive-source members from the view, so they are absent from the
+   RESTRICTED skgrepo-set, rendering omits a subscribee's
+   inactive-repo members from the view, so they are absent from the
    signal's 'visible' list for a reason other than deletion -- yet the
    loop would infer hides for them, silently writing
    hides_from_its_subscriptions entries for members the user never
    saw. The new sibling pass 'infer_hides_from_contains_removals'
    guards exactly this with 'member_is_visible'; the older signal loop
-   does not. Narrow trigger (needs a definitive subscribee-as-such
+   does not. Narrow trigger (needs an editable subscribee-as-such
    saved under a restricted set, with the subscribee containing
-   inactive-source members); not fixed in the fork-fixes arc because
+   inactive-repo members); not fixed in the fork-fixes arc because
    it is prior, separate behavior. Suggested fix: apply the same
    member_is_visible filter to that loop's 'inferred_hides'.
 * Problems noted while writing forking-and-privacy.org
 ** Fork deliberate-pick rule is enforced only client-side
-   docs/forks.md promises "approving before you have set every
-   clone's source is refused", to keep a fork from silently landing
-   in a default source. The refusal lives in 'skg-approve-fork'
-   (checks for the PICK-A-SOURCE placeholder); the server's only
-   backstop is that the placeholder is not a configured source. A
+   docs/forks.org promises "approving before you have set every
+   clone's skgrepo is refused", to keep a fork from silently landing
+   in a default skgrepo. The refusal lives in 'skg-approve-fork'
+   (checks for the PICK-A-REPO placeholder); the server's only
+   backstop is that the placeholder is not a configured skgrepo. A
    client that re-sends the save with (fork-approved . "true") and NO
-   (fork-sources ...) field commits the clones into the
-   inferred-or-default source ('fork_spec_from_buffer_node' falls
+   (fork-repos ...) field commits the clones into the
+   inferred-or-default skgrepo ('fork_spec_from_buffer_node' falls
    through user-set -> inferred -> default) -- exactly the silent
    default the docs rule out. Immaterial while Emacs is the only
    client; if other clients appear (nvim/), consider having the
-   server refuse an approved save whose fork_sources map does not
+   server refuse an approved save whose fork_repos map does not
    cover every fork spec.
-** Cosmetic: api-and-formats.md says search filters "before grouping"
-   The text-search section says the active source-set is applied
+** Cosmetic: api-and-formats.org says search filters "before grouping"
+   The text-search section says the active skgrepo-set is applied
    "before grouping, ranking, alias/title selection, and display
    truncation". In code, 'group_matches_by_id' runs first and
-   'filter_match_groups_to_active_sources' then filters the groups,
+   'filter_match_groups_to_active_repos' then filters the groups,
    before ranking and truncation. Behaviorally identical (groups are
-   per-ID and source is a function of ID), so this is a doc wording
+   per-ID and skgrepo is a function of ID), so this is a doc wording
    nit only.
 * Problems noted during the forks arc (TODO/forks/)
-** Quasi-duplication: "Source '...' not found in config" across ~9 sites
-   The plan asked to consolidate the duplicated "source not found"
-   error into one 'SourceValidationError'. The recon found the
+** Quasi-duplication: "Repo '...' not found in config" across ~9 sites
+   The plan asked to consolidate the duplicated "repo not found"
+   error into one 'RepoValidationError'. The recon found the
    duplication is wider than the three sites named (server/util.rs,
    dbs/filesystem/multiple_nodes.rs x2, plus copies in not_nodes.rs,
    git_ops/read_repo.rs, diff_analysis/snapshot.rs) -- ~9 literals of
    the same format string -- across three carrier types (io::Error,
    Result<_, String>, BufferValidationError). A clean consolidation
-   needs an enum with both an ID-less 'NotInConfig(SourceName)' shape
+   needs an enum with both an ID-less 'NotInConfig(RepoName)' shape
    (the fs layer has no node id) and ID-bearing shapes, plus
    From-impls bridging to io::Error / Box<dyn Error>. I added typed
-   fork-specific errors (ForkSourceUnresolved / ForkAlreadyExists /
-   ForkSourceInactive on BufferValidationError) but DEFERRED the broad
+   fork-specific errors (ForkRepoUnresolved / ForkAlreadyExists /
+   ForkRepoInactive on BufferValidationError) but DEFERRED the broad
    string consolidation -- it is a nice-to-have touching fs/git/diff
    layers, out of proportion to the fork work. Worth doing on its own.
-** Minor: confirmation-buffer sourceHerald shows the raw source name
-   'build_fork_confirmation_buffer' emits the clone's '(sourceHerald
-   ⌂:NAME)' with the raw SourceName, not the configured abbreviation
-   ('SkgfileSource::herald_label') that every other rendered view uses.
+** Minor: confirmation-buffer homeRepoHerald shows the raw skgrepo name
+   'build_fork_confirmation_buffer' emits the clone's '(homeRepoHerald
+   ⌂:NAME)' with the raw RepoName, not the configured abbreviation
+   ('SkgRepo::herald_label') that every other rendered view uses.
    Left raw deliberately: the client's C-c s s rotation also writes
    '⌂:<raw-name>', so the confirmation flow is self-consistent; fixing
    only the server side would make the initial display disagree with the
-   post-rotation display. Cosmetic; the load-bearing '(source X)' atom is
+   post-rotation display. Cosmetic; the load-bearing '(repo X)' atom is
    unaffected. (Noted in case a future change routes BOTH sides through
    herald_label.)
 * Problems found during herald overhaul research
@@ -322,14 +322,14 @@
    merge validation and contradictory instruction collection.
 
    That can make validation and execution disagree for edit metadata
-   placed under display/scaffold positions: validation may see it even
+   placed under display/non-vognode positions: validation may see it even
    when extraction ignores it, or vice versa if the candidate policy
    changes. The cleaner fix is probably to validate write-intent
    metadata through the same candidate/role policy used by extraction,
    and explicitly reject edit requests outside that surface.
 
    Mostly fixed 2026-06-10 by local instruction collection: extraction
-   now recurses into every position, so a definitive node's self-edits
+   now recurses into every position, so an editable node's self-edits
    (including edit requests) are honored wherever validation can see
    them. The residual gap is positions where edit requests are
    deliberately ignored rather than rejected: a Delete or nodeMerge
@@ -356,17 +356,17 @@
    axis (if parent removed staged, children are 'removed from
    contains' staged too), which is a bit more nuanced than the pure
    contains_diff lookup used in phantom_axes.
-** Three NodeComplete parses per changed file in 'compute_diff_for_source'
+** Three Graphnode parses per changed file in 'compute_diff_for_repo'
    server/git_ops/diff.rs.
    For each changed file we now load HEAD, index, and worktree YAML
-   blobs and parse them into NodeCompletes. A small repo with N changed
+   blobs and parse them into Graphnodes. A small skgrepo with N changed
    files does 3N parses. At current sizes this is fine but worth
    measuring on a larger garden.
-** 'NotInGit' is per-source but stamped per-truenode
+** 'NotInGit' is per-repo but stamped per-vognode
    server/to_org/render/diff.rs / process_truenode_diff.
-   Every truenode in a non-git source gets 'not_in_git = true'. The
-   wire-level emission is a per-truenode 'notInGit' atom too. A
-   per-source banner / source-herald prefix would scale better.
+   Every active vognode in a non-gitrepo gets 'not_in_git = true'. The
+   wire-level emission is a per-vognode 'notInGit' atom too. A
+   per-repo banner / repo-herald prefix would scale better.
 * Other problems
 ** Windows packaging request names scripts as top-level =bash/= scripts, but they live in =data/bash/=
    The requested files =pull-all.sh=, =push-all.sh=, =remote-all.sh=,
@@ -429,13 +429,13 @@
    - initialization-error_duplicate-ids.org: duplicate id
      0a6dcf44-6c2c-432a-90a7-babfbb3e0b7d in pers-deprecated and public.
    - initialization-error_unreadable-skg-files.org: unreadable
-     /home/ubuntu/data/private for source private.
+     /home/ubuntu/data/private for skgrepo private.
 
    These did not block connection verification, but they are important
    enough that the client should probably surface them after init.
    NOTE (2026-07-28): the duplicate-id example above predates the
-   privacy telescope. One id in two sources is now the normal shape of
-   any node with a privatized edge, not a defect. The entry's point --
+   privacy telescope. One id in two skgrepos is now the normal shape of
+   any node with a privatized relationship, not a defect. The entry's point --
    init warning files are easy to miss -- still stands; only the
    illustration is stale. See [[../dup-ids-maybe-bad.org]].
 ** Replacing data/skgconfig.toml can leave server and client on different ports
@@ -452,7 +452,7 @@
    Possible fixes: watch the config file too, log the active port and
    config path in a user-visible way, or add a client diagnostic that
    explicitly says "config wants port X but no server is listening".
-** Diff analysis still does whole-source work for tiny diffs
+** Diff analysis still does whole-repo work for tiny diffs
    Investigated on 2026-05-22;
    see 'faster-diff-analysis.org'.
 
@@ -463,8 +463,8 @@
 ** GraphStats rendering still lacks parent-kind context
    Observed on 2026-05-31 while splitting 'ParentIs' from 'Birth'.
 
-   'server/org_to_text.rs' renders a TrueNode's graphStats from only
-   the TrueNode metadata. After 'Container' and 'Collector' collapsed
+   'server/org_to_text.rs' renders an active vognode's graphStats from only
+   the active vognode metadata. After 'Container' and 'Collector' collapsed
    to 'ParentIs::Affected', relation collection children and ordinary
    content children can no longer be distinguished there.
 
@@ -472,11 +472,11 @@
    it is 0 or 1, which preserves the old rendered behavior for relation
    collection members and ordinary one-container content. A more exact
    implementation would pass parent tree context into metadata
-   rendering, so a scaffold child and a normal Vognode child can use
+   rendering, so a non-vognode child and a normal Vognode child can use
    different graphStats suppression rules.
 * Problems found while taking over the local-view-update dialog (2026-06-02)
   Found while answering the open questions in
-  TODO/local-view-update/problems.org. Each is cross-referenced there.
+  TODO/DONE/local-view-update/problems.org. Each is cross-referenced there.
 ** (not a bug, but a simplification) Lock over-approximates the rerender set
    server/serve/handlers/save_buffer.rs, elisp/skg-request-save.el.
    The early lock message ('uris_of_views_to_lock') locks every open view
@@ -491,7 +491,7 @@
    It is therefore only an opportunity to simplify: narrowing the lock to
    the changed-PID set would make lock and rerender coincide, removing the
    transient lock on buffers that won't change. See the collateral
-   resolution in TODO/local-view-update/problems.org.
+   resolution in TODO/DONE/local-view-update/problems.org.
 * Performance: the save-buffer pathway (see profiling-save.org)
   Profiling the save of an insert-a-child edit (node 846207ef, 'doing')
   found four inefficiencies, in impact order. Full evidence, numbers,
@@ -507,13 +507,13 @@
    'reader.reload()' in production.
 * Problems found during full-schema metaplan 2 research (2026-06-10)
 ** Architecture note: "drawn in place of another node" is override-specific data
-   Override substitution (TODO/full-schema/
+   Override substitution (TODO/DONE/full-schema/
    11_override-rendering-and-navigation.org, executed 2026-06-11)
-   lets a viewnode stand in for a different graph node than the one
+   lets a viewnode stand in for a different graphnode than the one
    whose ID it carries: the buffer draws overrider R where the
    container's contains list says N. The representation is
    'ViewNodeStats.overridesHere : Option<ID>' (and a parallel field
-   on 'InactiveNode', for substitutes a source-set switch retains),
+   on 'InactiveNode', for substitutes a skgrepo-set switch retains),
    carrying the original's ID -- data, not the earlier-planned
    bool-plus-convention, which was rejected 2026-06-11 because
    inverting the resolution at save time is ambiguous when one
@@ -583,19 +583,19 @@
 * Problems found while adding skg-stage-moves (2026-06-13)
 ** (latent, by-design-dependent) Diff helpers use a repo-wide pathspec
    'get_staged_changed_skg_files' and 'get_unstaged_changed_skg_files'
-   (server/git_ops/read_repo.rs) diff the WHOLE repo with
-   'pathspec("*.skg")', not the source's own subdirectory. So if two
-   configured sources ever live inside one git repo (e.g. as sibling
-   subdirectories of a single repo root), 'compute_diff_for_source'
-   would attribute that repo's entire set of changed .skg files to
-   each such source, double-counting them across sources. This is
-   harmless under the apparent deployment model (one git repo per
-   source) and only bites if a repo spans multiple sources.
+   (server/git_ops/read_repo.rs) diff the WHOLE skgrepo with
+   'pathspec("*.skg")', not the skgrepo's own subdirectory. So if two
+   configured skgrepos ever live inside one gitrepo (e.g. as sibling
+   subdirectories of a single skgrepo root), 'compute_diff_for_repo'
+   would attribute that skgrepo's entire set of changed .skg files to
+   each such skgrepo, double-counting them across skgrepos. This is
+   harmless under the apparent deployment model (one gitrepo per
+   skgrepo) and only bites if a gitrepo spans multiple skgrepos.
    'find_and_stage_moves.rs' avoids the issue by scoping its HEAD
-   scan to each source's own subtree ('head_skg_ids' /
-   'path_relative_to_repo'); the older diff path does not. If
-   multi-source repos are to be supported, the diff helpers should
-   take a source-relative pathspec too.
+   scan to each skgrepo's own subtree ('head_skg_ids' /
+   'path_relative_to_gitrepo'); the older diff path does not. If
+   multi-Skg-repo gitrepos are to be supported, the diff helpers should
+   take a Skg-repo-relative pathspec too.
 * Problems found during the org-export feature (2026-06-13)
 ** heading-anchor links rely on heading-text uniqueness
    Deep links use org's =[[./file.org::*Heading][label]]= search,
@@ -645,8 +645,8 @@
    TypeDB only and DELIBERATELY does not report dangling outbound
    references; it never compares against the filesystem.
 
-   A scan of all sources (this session) found the state IS reachable in
-   real data: at HEAD, 3 ids are referenced but exist in no source
+   A scan of all skgrepos (this session) found the state IS reachable in
+   real data: at HEAD, 3 ids are referenced but exist in no skgrepo
    (01545418..., 8c24623a..., f0a77ca4...); in the worktree, 1 still is
    (01545418...). 8c24623a / f0a77ca4 are HEAD-only (already scrubbed in
    the worktree, like the case here) -- they are partial-commit
@@ -665,23 +665,23 @@
    until the fix above.
 
    Policy qualification found while researching
-   TODO/delete-shared-node.org (2026-09-10): a dangling structured
+   TODO/DONE/delete-shared-node/ (2026-09-10): a dangling structured
    reference in a wholly foreign telescope must become an intentional
-   supported state when its target's owner deletes the target. Therefore
+   supported state when its target's recorder deletes the target. Therefore
    a future consistency check cannot classify every unresolved outbound
    ID as corrupt or auto-repair it globally. At minimum it must preserve
    the retained telescope's ownership distinction; warning about a
    removable unresolved relationship is different from claiming the
    filesystem is invalid.
 * Problems found while researching cross-owner deletion (2026-09-10)
-  Found while writing TODO/delete-shared-node.org.  The first is the
+  Found while writing TODO/DONE/delete-shared-node/.  The first is the
   reported bug; the others are pre-existing gaps exposed by making
   foreign dangling relationships an intentional state.
 ** PhantomUnknown is rendered but silently omitted from content saves
    Content reconciliation can render a raw unresolved 'contains' member
    as '(skg (unknown (id ...)))'. Save traversal then ignores the phantom
    and 'content_members()' collects only affected Active children. Thus
-   an unchanged definitive save can remove the dangling membership even
+   an unchanged editable save can remove the dangling membership even
    though the Unknown remains visibly present in the submitted buffer.
 
    The existing test
@@ -690,17 +690,17 @@
    whether the member survived. This needs an explicit round-trip
    contract and a test of the resulting relationship, not merely the
    response's error list.
-** Outbound PartnerCols discard unresolved raw members
+** Outbound PartnerFolders discard unresolved raw members
    The outbound accessors in
    server/dbs/in_rust_graph/relation_accessors.rs enumerate relationship
    members through 'filter_map(pid_of)'. A raw subscribe, override, or
-   hide member therefore disappears before PartnerCol rendering whenever
+   hide member therefore disappears before PartnerFolder rendering whenever
    its target is unresolved. The initial renderer's nominal fallback
    produces empty Active child data rather than 'Phantom::Unknown', and
    the rerender path can instead fail because no member relSource exists.
 
    Consequently the UI has no coherent representation from which an
-   owner could remove most non-content dangling relationships. These
+   recorder could remove most non-content dangling relationships. These
    paths need raw-ID-aware enumeration and a true Unknown case if the
    deletion policy covers all four structured outbound fields.
 * Problems noted during override-chains planning (TODO/override-chains/)
@@ -711,7 +711,7 @@
    full O(V) scan) and 'validate_touched_override_invariants' (an
    incremental O(touched) scan), in
    server/dbs/in_rust_graph/override_invariants.rs. They already hand-roll
-   the same "follow user-owned overrider edges, resolving extra-ids via
+   the same "follow owned overrider relationships, resolving extra-ids via
    'pid_of'" logic twice; adding cycle detection duplicates it a third and
    fourth time. A divergence (e.g. one resolves extra-ids, the other
    forgets) would let bad data through the fast save path and only catch it
@@ -721,15 +721,15 @@
    init/rebuild gates cannot disagree. Pre-existing (monogamy is already
    duplicated); surfaced while planning override chains.
 * Problems noted while writing the autofork discussion (2026-07-11)
-  Found while researching TODO/user-owned_autofork_chain/2_discussion.org.
+  Found while researching TODO/DONE/privacy-telescope/2_discussion.org.
   Both are documentation defects, not code bugs.
-** glossary.md's read-only-set example mislabels the subscriberCol
+** glossary.md's read-only-set example mislabels the subscriberFolder
    In the "read-only set" entry, the example view shows R and T (the
-   subscribers of N) under a =subscriberCol=, but the prose then says
-   'The subscriberCol ("collection of subscribees") is a read-only
+   subscribers of N) under a =subscriberFolder=, but the prose then says
+   'The subscriberFolder ("collection of subscribees") is a read-only
    set' -- it is a collection of SUBSCRIBERS -- and continues "the
-   user could flip the order of R and T in the subscribeeCol", naming
-   the wrong col. Two-word fix ("subscribers", "subscriberCol").
+   user could flip the order of R and T in the subscribeeFolder", naming
+   the wrong folder. Two-word fix ("subscribers", "subscriberFolder").
    Adjacent cosmetic typos in the same region: "if nodes R and T
    subscribe to nodes N" (should be "node N"), and "subsribee1" /
    "subsribee2" in the earlier "subscribee as such" diagram.
@@ -737,14 +737,14 @@
   Context: the uniform-herald refactor (server/herald_tokens.rs) folded
   the old per-atom graphStats counts and the per-relation viewStats
   flags into two assembled token strings, (birthHerald ...) and
-  (rels ...). api-and-formats.md's "Stats metadata" section still
+  (rels ...). api-and-formats.org's "Stats metadata" section still
   described the retired atoms ("Op"/"pO"/"gO"/"Sp"/... and the
   (graphStats ...) sexp); that section is now REWRITTEN to match, so it
   is not the open problem. These residuals are:
 ** PARTNER_ROLE_VOCAB's glyph column and RelationRole::glyph() are vestigial
    server/dbs/in_rust_graph/relation_accessors.rs: the third column of
    PARTNER_ROLE_VOCAB ("}", "Op", "pO", "Sp", ...) and the 'glyph()'
-   accessor no longer drive any rendering -- a backpath graft's herald
+   accessor no longer drive any rendering -- a role graft's herald
    is the ancestor-lettered token the uniform grammar assembles, not a
    fixed glyph. 'glyph()' is called only by its own self-consistency
    test (relation_accessors.rs:449). The "Op"/"pO" strings actively
@@ -765,17 +765,17 @@
    decision on whether that cue is still wanted.
 
 * Herald rule-table retirement remains separate (reviewed 2026-09-23)
-  The September herald audit rewrote 'api-and-formats.md' to document
+  The September herald audit rewrote 'api-and-formats.org' to document
   semantic '(rels ...)' facts and linked the user legend in
   'docs/heralds.org'. The former assembled-string and birth-color claims
   are resolved. The served rule table still positions and colors
   non-relationship tokens. Its eventual retirement is tracked by
-  'TODO/semantic-heralds-wire/retire-rule-table' and is outside the
+  'TODO/DONE/semantic-heralds-wire/retire-rule-table.org' and is outside the
   September plan; that future work must update this protocol section.
 * Problems confirmed while planning TypeDB removal (2026-09-12)
-** Hidden edges participate in path and ancestry topology
+** Hidden relationships participate in path and ancestry topology
    'path_to_first_nonlinearity' calls the legacy, stringly typed
-   'find_related_nodes', which has no active-source-set argument.
+   'find_related_nodes', which has no active-repo-set argument.
    'full_containerward_ancestry_from_in_rust_graph' reads 'contained_by'
    directly, likewise ungated.  Their rendering callers pass the active
    set only later while inserting nodes.
@@ -786,13 +786,13 @@
    containerward case between two public endpoint nodes.  No direct leak
    is demonstrated here.
 
-   The hidden edge still shapes the traversal before being discarded.  It
+   The hidden relationship still shapes the traversal before being discarded.  It
    can create a false fork that truncates an otherwise linear visible
    path; in full ancestry, hidden branches share the 'visited' set and can
    cause a node on a visible branch to be classified as 'Repeated'.  A
    post-traversal render gate cannot recover the omitted visible suffix.
    Fix by making the graph-native path and ancestry APIs accept
-   'RelationRole' plus the active source-set and use the gated directional
-   accessors during traversal.  Retain insertion-time edge gating as
+   'RelationRole' plus the active skgrepo-set and use the gated directional
+   accessors during traversal.  Retain insertion-time relationship gating as
    defence-in-depth, and add hidden-sibling-fork and mixed-visibility
    diamond regressions.

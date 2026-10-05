@@ -2,7 +2,7 @@
 /// Deleting the whole idFolder is a no-op (absence means no opinion),
 /// but editing an idFolder's membership -- deleting, adding, editing or
 /// relocating id properties -- aborts the save with IDFolder_Edited
-/// (TODO/full-schema/8_readonly-set-ergonomics.org). Net-removed
+/// (TODO/DONE/full-schema/DONE/8_readonly-set-ergonomics.org). Net-removed
 /// diff entries (removedR) are git history, not membership claims,
 /// and do not trip the check.
 
@@ -50,13 +50,13 @@ async fn test_delete_id_folder_respawns (
 
       // DISK: 1.skg should still have the worktree ids
       let node_1 = read_graphnode(gitrepo_path, "1")?;
-      assert!(node_1 . all_ids () . any(|id| id == &ID("1" . to_string())),
+      assert!(node_1 . all_skgids () . any(|skgid| skgid == &ID("1" . to_string())),
         "1.skg should still have id '1'");
-      assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
+      assert!(node_1 . all_skgids () . any(|skgid| skgid == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
-      assert!(node_1 . all_ids () . any(|id| id == &ID("3" . to_string())),
+      assert!(node_1 . all_skgids () . any(|skgid| skgid == &ID("3" . to_string())),
         "1.skg should still have id '3'");
-      assert!(!node_1 . all_ids () . any(|id| id == &ID("2" . to_string())),
+      assert!(!node_1 . all_skgids () . any(|skgid| skgid == &ID("2" . to_string())),
         "1.skg should not have id '2'");
 
       // BUFFER: idFolder should respawn
@@ -99,7 +99,7 @@ async fn test_delete_id_properties_aborts (
 
       // DISK: 1.skg should still have the worktree ids
       let node_1 = read_graphnode(gitrepo_path, "1")?;
-      assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
+      assert!(node_1 . all_skgids () . any(|skgid| skgid == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
       Ok(()) }) }) . await
 }
@@ -138,9 +138,9 @@ async fn test_edit_id_property_aborts (
 
       // DISK: 1.skg should still have the original worktree ids
       let node_1 = read_graphnode(gitrepo_path, "1")?;
-      assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
+      assert!(node_1 . all_skgids () . any(|skgid| skgid == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
-      assert!(!node_1 . all_ids () . any(|id| id == &ID("2-modified" . to_string())),
+      assert!(!node_1 . all_skgids () . any(|skgid| skgid == &ID("2-modified" . to_string())),
         "1.skg should not have the modified id");
       Ok(()) }) }) . await
 }
@@ -224,7 +224,7 @@ async fn test_move_id_properties_to_child_aborts (
 
       // DISK: 1.skg should still have its ids
       let node_1 = read_graphnode(gitrepo_path, "1")?;
-      assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
+      assert!(node_1 . all_skgids () . any(|skgid| skgid == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
       Ok(()) }) }) . await
 }
@@ -318,7 +318,7 @@ where
   let temp_dir = TempDir::new()?;
   let gitrepo_path = temp_dir . path();
   setup (gitrepo_path)?;
-  s . reset_with_repo_path (subtest_name, gitrepo_path) ?;
+  s . reset_with_skgrepo_path (subtest_name, gitrepo_path) ?;
 
   test_fn(&s . config, &mut s . tantivy, gitrepo_path) . await
 }

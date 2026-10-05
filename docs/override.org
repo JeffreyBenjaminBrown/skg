@@ -13,15 +13,15 @@ R.overrides_view_of = [N]
 
 The stored value is a =RelPartner<ID>=.  Its =member= is =N= and its
 =relRepo= says which telescope section records the relationship.
-The relRepo is independent of either endpoint's home repo: two
+The relRepo is independent of either endpoint's home skgrepo: two
 public nodes can be connected by an override relationship recorded only
 in =private=.
 
 An overrider may override any number of nodes.  Owned override data has
 two invariants in the opposite direction:
 
-1. A target has at most one user-owned overrider.
-2. User-owned override chains are acyclic.
+1. A target has at most one owned overrider.
+2. Owned override chains are acyclic.
 
 Thus =R -> N1= and =R -> N2= are legal, as is the linear chain
 =D -> C -> N=.  Two owned nodes overriding the same target are not
@@ -34,8 +34,8 @@ automatic substitution.
 Visiting an ID opens that exact node as the raw root of a content view.
 It does not redirect to an overrider and does not stop at a choice
 buffer.  Re-visiting an ID that is already a root switches to its open
-content view.  A node whose home repo is inactive in the current
-repo-set cannot be visited.
+content view.  A node whose home skgrepo is inactive in the current
+skgrepo-set cannot be visited.
 
 This makes every viewnode used for navigation a stable destination.  In
 particular, selecting a node in search results, an override folder, or
@@ -60,10 +60,10 @@ containing visible override relatives in both directions:
 Each direction is recursive and cycle-guarded.  The inserted viewnodes are
 write-protected non-content descendants with an override birth reason,
 so their highlighted =O= herald explains why they occur at that
-position.  Node visibility and the override relationship's relRepo
+position.  Node visibility and the override relation's relRepo
 both gate the subtree.
 
-Search also groups matching owned override chains.  If a user-owned
+Search also groups matching owned override chains.  If an owned
 search hit recursively overrides another matching hit, the overridden
 hit is suppressed at the top level and reappears under the owned hit.
 A foreign overrider never suppresses another top-level result, although
@@ -81,7 +81,7 @@ Under overrider =R=, =overriddenFolder= is the editable projection of
 list.  This is the direct way to create or remove an override
 relationship without forking.
 
-The folder is a writable set, so an explicit request creates it even
+The folder is an editable set, so an explicit request creates it even
 when it is empty.  Absence means that the buffer expresses no opinion
 about the stored list; a present empty folder means to set the visible
 list empty.  The folder's members are /overridden-as-such/: they show
@@ -98,24 +98,24 @@ nonmember does not create an override relationship.  An empty
 =overriderFolder= is pruned.
 
 The viewnodes are initially write-protected because the folder membership
-is an inverse view.  A viewnode can still be visited, or made definitive as
+is an inverse view.  A viewnode can still be visited, or made editable as
 the node itself, without making the inverse membership editable.
 
 *** Initial folder presentation
 
-An ordinary definitive node automatically includes only a nonempty
+An ordinary editable node automatically includes only a nonempty
 =subscribeeFolder=.  Override folders are never part of its initial
 content merely because they would be nonempty; the herald advertises
 their existence and the folder command asks for them.
 
 The same narrow rule applies when a hidden-as-such, hider-as-such,
-overridden-as-such, or overrider-as-such viewnode becomes definitive.  A
+overridden-as-such, or overrider-as-such viewnode becomes editable.  A
 subscribee-as-such is the exception: in addition to its ordinary
 content, it automatically includes a nonempty folder for content hidden
 there.
 
-Under a restricted repo-set, both override folders omit relationships
-whose relRepo is inactive and partners whose home repo is inactive.
+Under a restricted skgrepo-set, both override folders omit relationships
+whose relRepo is inactive and partners whose home skgrepo is inactive.
 Saving the visible subset preserves memberships stored in hidden
 telescope sections.
 
@@ -131,14 +131,14 @@ targets.
 
 Substitution is a recursive-content rendering rule, not a navigation
 rule.  When completion is about to create a content viewnode for =N=,
-the resolver walks toward user-owned nodes that override it.  For
+the resolver walks toward owned nodes that override it.  For
 
 #+begin_example
 D overrides C overrides N
 #+end_example
 
 a full-repo content view draws =D= where =N= occurs.  If =D='s home
-Skg repo is inactive but =C='s is active, it draws =C=.  If no user-owned
+skgrepo is inactive but =C='s is active, it draws =C=.  If no owned
 overrider is drawable, it draws =N=.  A monogamy violation makes the
 resolver refuse to choose a branch; a cycle makes it abandon
 substitution and return the originally requested node.
@@ -154,16 +154,16 @@ node rather than an automatic substitute:
 - content-view roots;
 - search-result roots and enrichment role grafts;
 - PartnerFolder members and role grafts;
-- ancestry viewnodes and diff phantoms.
+- role-tree viewnodes and diff phantoms.
 
-When a node with a user-owned overrider is deliberately drawn raw, its
+When a node with an owned overrider is deliberately drawn raw, its
 immediate content children are also drawn raw.  Substitution resumes at
 the grandchildren.  This one-level rule makes the raw node show its own
 children rather than its overrider's interpretation of them.
 
 *** The just-saved fork buffer
 
-Once an approved save creates fork =K= from origin =F=, the buffer that made
+Once an approved save creates fork =K= from original =F=, the buffer that made
 the edit must not continue to show editable =F=: editing it again would request
 another fork.  The post-save update therefore makes two saved-view-only
 exceptions to the usual preservation of existing raw viewnodes:
@@ -193,9 +193,9 @@ stored relationship list rather than the carrier's ID.  Editing the
 carrier's title, body, or folders still edits the carrier itself.
 
 The server rejects a forged or stale marker whose carrier is not on
-=N='s user-owned override chain.  The validation walk is intentionally
+=N='s owned override chain.  The validation walk is intentionally
 visibility-ungated so that a marker which was honest when rendered does
-not become invalid merely because the active repo-set changed.
+not become invalid merely because the active skgrepo-set changed.
 
 ** Heralds and reasons for placement
 
@@ -217,7 +217,7 @@ its placement comes from some other relationship.
 
 *** Forking
 
-Editing a definitive foreign node and saving requests an implicit fork.
+Editing an editable foreign node and saving requests an implicit fork.
 After confirmation, Skg creates an owned clone which subscribes to and
 overrides the foreign original.  It shallow-copies the edited content
 IDs and hides original children removed by the edit.  The original is
@@ -226,7 +226,7 @@ unchanged.
 =skg-fork-node= (=C-c m f=) explicitly forks an owned node, commonly to
 add a more-private layer such as =D= over =C=.  Forking a substituted
 viewnode forks the carrier on screen and therefore deepens the chain.
-Creating a second user-owned overrider for the same target is refused.
+Creating a second owned overrider for the same target is refused.
 
 The subscription and override are paired by the fork operation, not by
 the data model.  Removing either relationship later does not
@@ -264,15 +264,15 @@ from owned data.
 An unknown override target can otherwise remain visible as an unknown
 folder member.  It cannot substitute because there is no node to draw.
 
-** Repo-set behavior
+** Skgrepo-set behavior
 
 Override folders, role trees, search grouping, search overrideward
 view-subtrees, =O= relationship counts, and automatic substitution all
 derive their topology from relRepo-gated relationship accessors.
 
 For automatic substitution, an override hop is followable only when the
-edge's relRepo and the overrider node's home repo are active and the
-overrider is user-owned.  A relationship outside the active repo-set
+relationship's relRepo and the overrider node's home skgrepo are active and the
+overrider is owned.  A relationship outside the active skgrepo-set
 therefore cannot silently select a node which the corresponding folders, role trees, heralds, and search subtree omit.
 
 *** Other relationships
@@ -281,7 +281,7 @@ Initial construction of the default =subscribeeFolder= also obtains its
 members through the generic directional, relRepo-gated accessor before
 deciding whether the folder would be empty.  A private subscription between
 two public nodes therefore creates neither a member nor an empty default
-folder in a public-only view.  An explicitly requested writable folder may
+folder in a public-only view.  An explicitly requested editable folder may
 still be created empty, as intended.
 
 The other relationship-driven presentation paths do not have the same
@@ -295,12 +295,12 @@ problem:
 - ordinary relationship folders, role trees, herald counts, and
   ancestor heralds use the generic gated accessors for every stored
   node-to-node relationship;
-- =links_to= has no independently movable relationship Skg repo: it is
-  derived from the Skg repo node's title and body, so its effective relRepo is
-  that node's home repo.
+- =links_to= has no independently movable relationship skgrepo: it is
+  derived from the skgrepo node's title and body, so its effective relRepo is
+  that node's home skgrepo.
 
 Raw relationship reads in save, merge, deletion, and invariant-checking code
-are intentionally full-graph operations rather than repo-set presentation.
+are intentionally full-graph operations rather than skgrepo-set presentation.
 
 ** Org export
 

@@ -1,19 +1,19 @@
 // cargo nextest run --test grouped_overrides -E 'test(override_substitution::)'
 //
-// Override substitution (TODO/full-schema/11_override-rendering-and-navigation.org):
+// Override substitution (TODO/DONE/full-schema/DONE/11_override-rendering-and-navigation.org):
 // when completion would CREATE a viewnode for node N as recursive
-// content, and a user-owned, visible R overrides N, it draws R
+// content, and an owned, visible R overrides N, it draws R
 // instead, marked '(overridesHere N)' -- and saving such a view
 // round-trips to the ORIGINAL IDs, so a container's contains list is
 // never silently rewritten from N to R.
 //
-// Fixture (tests/override_substitution/fixtures, single Skg repo
-// "main", user-owned): Q contains P and P2; P contains N and M;
+// Fixture (tests/override_substitution/fixtures, single skgrepo
+// "main", owned): Q contains P and P2; P contains N and M;
 // R overrides N and contains W; S subscribes to E; E contains N.
 //
 // The multi-repo fixture (fixtures-multi) adds the ownership and
-// visibility gates: FR (Skg repo "foreign", not user-owned) overrides
-// N1; R2 (Skg repo "other", user-owned) overrides N2; N3 lives in
+// visibility gates: FR (skgrepo "foreign", not owned) overrides
+// N1; R2 (skgrepo "other", owned) overrides N2; N3 lives in
 // "other" while P3 and its overrider R3 live in "main".
 
 use indoc::indoc;
@@ -23,17 +23,17 @@ use std::net::TcpStream;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::assert_metadata_eq;
 use skg::serve::ViewsState;
-use skg::repo_sets::{ActiveRepoSet, RepoSetName};
+use skg::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
 use skg::test_utils::{
   run_with_shared_test_stores,
   graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::{
-  multi_root_view, multi_root_view_with_repo_set};
+  multi_root_view, multi_root_view_with_skgrepo_set};
 use skg::types::errors::{BufferValidationError, SaveError};
-use skg::types::misc::{ID, SkgConfig, RepoName, TantivyIndex, members_of};
+use skg::types::misc::{ID, SkgConfig, SkgRepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
-use skg::types::save::{DefineNode, SaveNode};
+use skg::types::save::{NodeInstruction, SaveNode};
 use skg::types::views_state::OpenViews;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
@@ -80,30 +80,30 @@ fn marked_lines<'a> (
     . filter ( |l| l . contains (&marker) )
     . collect () }
 
-fn saved_node_by_id<'a> (
-  instructions : &'a [DefineNode],
-  id           : &str,
+fn saved_node_by_skgid<'a> (
+  instructions : &'a [NodeInstruction],
+  skgid           : &str,
 ) -> &'a Graphnode {
-  opt_saved_node_by_id (instructions, id)
-    . unwrap_or_else ( || panic! ("SaveNode not found: {}", id) ) }
+  opt_saved_node_by_skgid (instructions, skgid)
+    . unwrap_or_else ( || panic! ("SaveNode not found: {}", skgid) ) }
 
-fn opt_saved_node_by_id<'a> (
-  instructions : &'a [DefineNode],
-  id           : &str,
+fn opt_saved_node_by_skgid<'a> (
+  instructions : &'a [NodeInstruction],
+  skgid           : &str,
 ) -> Option<&'a Graphnode> {
   for instruction in instructions {
-    if let DefineNode::Save (SaveNode (node)) = instruction {
-      if node . pid == ID::from (id) {
+    if let NodeInstruction::Save (SaveNode (node)) = instruction {
+      if node . pid == ID::from (skgid) {
         return Some (node); }}}
   None }
 
-async fn define_nodes_from (
+async fn node_instructions_from (
   buffer : &str,
   config : &SkgConfig,
-) -> Result<Vec<DefineNode>, SaveError> {
+) -> Result<Vec<NodeInstruction>, SaveError> {
   Ok ( buffer_to_validated_saveplan (
          buffer, config, None )  ?
-       . 1 . define_nodes ) }
+       . 1 . node_instructions ) }
 
 async fn save_and_rerender (
   buf     : &str,
@@ -133,7 +133,7 @@ fn read_fixture_file (
   pid    : &str,
 ) -> String {
   let path : std::path::PathBuf =
-    config . repos . values () . next () . unwrap ()
+    config . skgrepos . values () . next () . unwrap ()
     . path . join ( format! ("{}.skg", pid) );
   std::fs::read_to_string (&path)
     . unwrap_or_else ( |e| panic! ("reading {:?}: {}", path, e) ) }
@@ -203,7 +203,7 @@ async fn extraction_honors_the_marker (
         graph_handle_from_config (config) ? );
       { // A marked child collects its original: P's collected
         // contains equals disk ([N, M]), so the noop filter drops
-        // P's instruction entirely -- the round-trip in its
+        // P's nodeInstruction entirely -- the round-trip in its
         // strongest form.
         let buffer = indoc! {"
           * (skg (node (id P) (repo main))) P
@@ -211,8 +211,8 @@ async fn extraction_honors_the_marker (
           ** (skg (node (id M) (repo main) writeProtected)) M
         "};
         assert! (
-          opt_saved_node_by_id (
-            & define_nodes_from (buffer, config) . await ?,
+          opt_saved_node_by_skgid (
+            & node_instructions_from (buffer, config) . await ?,
             "P" ) . is_none (),
           "P's contains is unchanged (N, M), so no instruction \
            touches P" ); }
@@ -222,8 +222,8 @@ async fn extraction_honors_the_marker (
           ** (skg (node (id M) (repo main) writeProtected)) M
         "};
         assert_eq! (
-          members_of ( & saved_node_by_id (
-            & define_nodes_from (buffer, config) . await ?,
+          members_of ( & saved_node_by_skgid (
+            & node_instructions_from (buffer, config) . await ?,
             "P" ) . contains ),
           vec![ ID::from ("M") ] ); }
       { // Reordering the drawn child positions the original.
@@ -233,8 +233,8 @@ async fn extraction_honors_the_marker (
           ** (skg (node (id R) (repo main) (viewStats (overridesHere N)) writeProtected)) R
         "};
         assert_eq! (
-          members_of ( & saved_node_by_id (
-            & define_nodes_from (buffer, config) . await ?,
+          members_of ( & saved_node_by_skgid (
+            & node_instructions_from (buffer, config) . await ?,
             "P" ) . contains ),
           vec![ ID::from ("M"), ID::from ("N") ] ); }
       { // Moving the drawn child to another parent moves the original.
@@ -245,13 +245,13 @@ async fn extraction_honors_the_marker (
           ** (skg (node (id P2) (repo main))) P2
           *** (skg (node (id R) (repo main) (viewStats (overridesHere N)) writeProtected)) R
         "};
-        let instructions : Vec<DefineNode> =
-          define_nodes_from (buffer, config) . await ?;
+        let instructions : Vec<NodeInstruction> =
+          node_instructions_from (buffer, config) . await ?;
         assert_eq! (
-          members_of ( & saved_node_by_id (&instructions, "P") . contains ),
+          members_of ( & saved_node_by_skgid (&instructions, "P") . contains ),
           vec![ ID::from ("M") ] );
         assert_eq! (
-          members_of ( & saved_node_by_id (&instructions, "P2") . contains ),
+          members_of ( & saved_node_by_skgid (&instructions, "P2") . contains ),
           vec![ ID::from ("N") ] ); }
       { // Edits to the drawn R save to R; N is untouched.
         let buffer = indoc! {"
@@ -260,16 +260,16 @@ async fn extraction_honors_the_marker (
           *** (skg (node (id W) (repo main) writeProtected)) W
           ** (skg (node (id M) (repo main) writeProtected)) M
         "};
-        let instructions : Vec<DefineNode> =
-          define_nodes_from (buffer, config) . await ?;
+        let instructions : Vec<NodeInstruction> =
+          node_instructions_from (buffer, config) . await ?;
         assert_eq! (
-          saved_node_by_id (&instructions, "R") . title,
+          saved_node_by_skgid (&instructions, "R") . title,
           "R-edited" );
         assert! (
-          opt_saved_node_by_id (&instructions, "N") . is_none (),
+          opt_saved_node_by_skgid (&instructions, "N") . is_none (),
           "no instruction touches N" );
         assert! (
-          opt_saved_node_by_id (&instructions, "P") . is_none (),
+          opt_saved_node_by_skgid (&instructions, "P") . is_none (),
           "P's contains is unchanged, so P noops" ); }
       { // A legacy buffer drawing N raw still saves identically
         // (a noop, like the marked equivalent above).
@@ -279,15 +279,15 @@ async fn extraction_honors_the_marker (
           ** (skg (node (id M) (repo main) writeProtected)) M
         "};
         assert! (
-          opt_saved_node_by_id (
-            & define_nodes_from (buffer, config) . await ?,
+          opt_saved_node_by_skgid (
+            & node_instructions_from (buffer, config) . await ?,
             "P" ) . is_none () ); }
       { // Tamper: a marker the server would not have drawn aborts.
         let buffer = indoc! {"
           * (skg (node (id P) (repo main))) P
           ** (skg (node (id M) (repo main) (viewStats (overridesHere W)) writeProtected)) M
         "};
-        match define_nodes_from (buffer, config) . await {
+        match node_instructions_from (buffer, config) . await {
           Err (SaveError::BufferValidationErrors { errors, .. }) => {
             assert! ( errors . iter () . any ( |e| matches! (
               e, BufferValidationError::OverridesHere_Mismatch (..) )),
@@ -303,9 +303,9 @@ async fn extraction_honors_the_marker (
           *** (skg (node (id E) (repo main))) E
           **** (skg (node (id R) (repo main) (viewStats (overridesHere N)) writeProtected)) R
         "};
-        let instructions : Vec<DefineNode> =
-          define_nodes_from (buffer, config) . await ?;
-        if let Some (s_node) = opt_saved_node_by_id (&instructions, "S") {
+        let instructions : Vec<NodeInstruction> =
+          node_instructions_from (buffer, config) . await ?;
+        if let Some (s_node) = opt_saved_node_by_skgid (&instructions, "S") {
           assert! (
             ! s_node . hides_from_its_subscriptions . or_default ()
               . iter () . any ( |m| &m . member == &ID::from ("N") ),
@@ -335,7 +335,7 @@ async fn diff_mode_disables_substitution (
 /// the rerender keeps the marked child (creation-only substitution;
 /// the reconciler matches by collected ID), creates no duplicate raw
 /// N and no phantom for N
-/// (TODO/full-schema/12-2_diff-mode-policy_discussion.org).
+/// (TODO/DONE/full-schema/DONE/12-2_diff-mode-policy_discussion.org).
 async fn marked_view_is_shape_stable_across_diff_toggle (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -344,10 +344,10 @@ async fn marked_view_is_shape_stable_across_diff_toggle (
         graph_handle_from_config (config) ? );
       { // git-init the temp fixture copy, so the toggle's diff is
         // real (and clean: HEAD == worktree).
-        let repo_path : &std::path::Path =
-          & config . repos . values () . next () . unwrap () . path;
+        let skgrepo_path : &std::path::Path =
+          & config . skgrepos . values () . next () . unwrap () . path;
         let gitrepo : git2::Repository =
-          git2::Repository::init (repo_path) ?;
+          git2::Repository::init (skgrepo_path) ?;
         { let mut git_config : git2::Config = gitrepo . config () ?;
           git_config . set_str ("user.email", "test@test.invalid") ?;
           git_config . set_str ("user.name", "skg tests") ?; }
@@ -399,8 +399,8 @@ async fn marked_view_is_shape_stable_across_diff_toggle (
               &mut server,
               "((request . \"git diff mode toggle\"))",
               &env, views_state,
-              & ActiveRepoSet::named (
-                  config, RepoSetName ("all" . to_string ()))
+              & ActiveSkgRepoSet::named (
+                  config, SkgRepoSetName ("all" . to_string ()))
                 . expect ("set all resolves") ); } ); } );
         drop (server);
         let mut reader : std::io::BufReader<TcpStream> =
@@ -467,18 +467,18 @@ async fn ownership_and_visibility_gate_substitution (
         assert! ( marked_lines (&view, "N1") . is_empty (),
           "FR is foreign; N1 draws raw:\n{}", view );
         assert! ( view . contains ("(id N1)"), "{}", view ); }
-      let active : ActiveRepoSet =
-        ActiveRepoSet::named (
-          config, RepoSetName ("main" . to_string ())) ?;
+      let active : ActiveSkgRepoSet =
+        ActiveSkgRepoSet::named (
+          config, SkgRepoSetName ("main" . to_string ())) ?;
       { // An inactive owned overrider does not substitute.
         let (view, _pids, _tree) =
-          multi_root_view_with_repo_set (
+          multi_root_view_with_skgrepo_set (
             config, None,
             &[ ID::from ("P2") ], false, &active ) ?;
         assert! ( marked_lines (&view, "N2") . is_empty (),
           "R2's repo is inactive; N2 draws raw:\n{}", view );
         assert! ( view . contains ("(id N2)"), "{}", view ); }
-      { // The same overrider substitutes when its Skg repo is active.
+      { // The same overrider substitutes when its skgrepo is active.
         let (view, _pids, _tree) =
           multi_root_view (
             config, None,
@@ -489,7 +489,7 @@ async fn ownership_and_visibility_gate_substitution (
       { // Omission beats substitution: inactive original, active
         // overrider -> neither is drawn.
         let (view, _pids, _tree) =
-          multi_root_view_with_repo_set (
+          multi_root_view_with_skgrepo_set (
             config, None,
             &[ ID::from ("P3") ], false, &active ) ?;
         assert! ( ! view . contains ("(id N3)"),
@@ -499,14 +499,14 @@ async fn ownership_and_visibility_gate_substitution (
            marker would name an inactive node):\n{}", view ); }
       Ok (( )) }
 
-/// Save 'buf' under a specific active repo-set (the test shims save
+/// Save 'buf' under a specific active skgrepo-set (the test shims save
 /// under 'all'). Asserts no save errors and returns the rerendered
 /// view.
 async fn save_under_set (
   buf     : &str,
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
-  set     : &ActiveRepoSet,
+  set     : &ActiveSkgRepoSet,
 ) -> Result<String, Box<dyn Error>> {
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
@@ -530,8 +530,8 @@ async fn save_under_set (
     "save must not error; got: {:?}", response . errors );
   Ok ( response . saved_view ) }
 
-/// A half-visible user-owned chain: D overrides C overrides N, with the
-/// end D in Skg repo 'other'. Under 'all' the END D substitutes for N;
+/// A half-visible owned chain: D overrides C overrides N, with the
+/// end D in skgrepo 'other'. Under 'all' the END D substitutes for N;
 /// under 'main' (hiding 'other') the MIDDLE C substitutes. Saving the
 /// half-visible view accepts the middle carrier (it is on N's chain)
 /// and keeps N in P's contains; an off-chain marker is rejected.
@@ -551,14 +551,14 @@ async fn chain_half_visible_keeps_the_original (
           "one substitute for N under all:\n{}", view );
         assert! ( marked [0] . contains ("(id D)"),
           "the chain end D is drawn under all:\n{}", view ); }
-      let main_set : ActiveRepoSet =
-        ActiveRepoSet::named (
-          config, RepoSetName ("main" . to_string ())) ?;
+      let main_set : ActiveSkgRepoSet =
+        ActiveSkgRepoSet::named (
+          config, SkgRepoSetName ("main" . to_string ())) ?;
       let view_main : String = {
-        // Under 'main', D's Skg repo 'other' is inactive, so the MIDDLE
+        // Under 'main', D's skgrepo 'other' is inactive, so the MIDDLE
         // C is drawn instead.
         let (view, _p, _t) =
-          multi_root_view_with_repo_set (
+          multi_root_view_with_skgrepo_set (
             config, Some (tantivy),
             &[ ID::from ("P") ], false, &main_set ) ?;
         let marked : Vec<&str> = marked_lines (&view, "N");
@@ -577,8 +577,8 @@ async fn chain_half_visible_keeps_the_original (
            for N:\n{}", saved );
         let p_file : String = {
           let main_path : &std::path::Path =
-            & config . repos
-              . get ( &RepoName::from ("main") ) . unwrap () . path;
+            & config . skgrepos
+              . get ( &SkgRepoName::from ("main") ) . unwrap () . path;
           std::fs::read_to_string ( main_path . join ("P.skg") )
             . unwrap () };
         assert! ( p_file . contains ("- N"),
@@ -591,7 +591,7 @@ async fn chain_half_visible_keeps_the_original (
           * (skg (node (id P) (repo main))) P
           ** (skg (node (id D) (repo other) (viewStats (overridesHere P)) writeProtected)) D
         "};
-        match define_nodes_from (buffer, config) . await {
+        match node_instructions_from (buffer, config) . await {
           Err (SaveError::BufferValidationErrors { errors, .. }) =>
             assert! ( errors . iter () . any ( |e| matches! (
               e, BufferValidationError::OverridesHere_Mismatch (..) )),

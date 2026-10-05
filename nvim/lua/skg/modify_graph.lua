@@ -15,7 +15,7 @@ M.headline_org_link_pattern = '%[%[([^%]]+)%]%[?([^%]]*)%]?%]'
 
 -- ── goto-biggest-branch ────────────────────────────────────────────
 
----Go to the sibling, or child, with the most org-descendants: if the
+---Go to the sibling, or child, with the most viewdescendants: if the
 ---node at point has siblings, consider the node and its siblings;
 ---otherwise its immediate children. Intentionally an org outline
 ---heuristic, not a precise graph-content query.
@@ -28,7 +28,7 @@ function M.goto_biggest_branch ()
       best_line, best_count = line, count end
   end
   vim.api.nvim_win_set_cursor(0, { best_line, 0 })
-  vim.notify(string.format('Biggest branch has %d org-descendent(s).',
+  vim.notify(string.format('Biggest branch has %d viewdescendant(s).',
                            best_count))
 end
 
@@ -50,7 +50,7 @@ end
 ---@param line integer
 ---@return integer
 function M.subtree_end (line)
-  local after = metadata.next_heading_after_subtree(line)
+  local after = metadata.next_headline_after_subtree(line)
   if after then return after - 1 end
   return vim.api.nvim_buf_line_count(0)
 end
@@ -60,7 +60,7 @@ end
 ---@return integer[] headlines of LEVEL within the parent's subtree
 ---(or the whole buffer when there is no parent)
 function M.same_level_headlines_in_parent_subtree (line, level)
-  local parent = metadata.parent_heading_line(line, level)
+  local parent = metadata.parent_headline_line(line, level)
   local first, last
   if parent then
     first = parent
@@ -85,24 +85,24 @@ function M.headlines_with_level_between (level, first, last)
 end
 
 ---@param line integer a headline
----@return integer how many org-descendant headlines sit under it
+---@return integer how many viewdescendant headlines sit under it
 function M.org_descendant_count (line)
   local count = 0
   for candidate = line + 1, M.subtree_end(line) do
-    if metadata.at_heading_p(candidate) then count = count + 1 end
+    if metadata.at_headline_p(candidate) then count = count + 1 end
   end
   return count
 end
 
 -- ── shared guards for the two replacements ─────────────────────────
 
----Metadata of the org-parent of the headline at LINE; errors when
+---Metadata of the viewparent of the headline at LINE; errors when
 ---there is none or it is not an activeNode.
 ---@param line integer
 ---@return any
 function M.container_data (line)
   local level = metadata.outline_level(line)
-  local parent = metadata.parent_heading_line(line, level)
+  local parent = metadata.parent_headline_line(line, level)
   if not parent then
     error('Cannot replace this branch with a link:'
           .. ' node has no container') end
@@ -113,8 +113,8 @@ function M.container_data (line)
   return sexp
 end
 
----Error unless CONTAINER_SEXP is an editable container: it has a repo,
----is owned, and is definitive.
+---Error unless CONTAINER_SEXP is an editable container: it has a skgrepo,
+---is owned, and is editable.
 ---@param container_sexp any
 function M.check_container (container_sexp)
   local repo = metadata.node_repo(container_sexp)
@@ -138,7 +138,7 @@ end
 
 ---Replace the branch at point with a link to its former root, then
 ---save. The root must be an existing ActiveVognode with an ID; its
----org-parent must be a definitive, owned ActiveVognode. Asks before
+---viewparent must be an editable, owned ActiveVognode. Asks before
 ---proceeding when the title already contains a link.
 function M.replace_content_with_link ()
   local line = focus.owning_headline_line()
@@ -193,8 +193,8 @@ end
 
 ---Replace the leaf at point with content linked from that leaf, then
 ---save. The leaf must have exactly one org bracket link in its title
----plus body, no org-descendants, and a definitive, owned ActiveVognode
----org-parent; the link must be an id link. Warns when the leaf
+---plus body, no viewdescendants, and an editable, owned ActiveVognode
+---viewparent; the link must be an id link. Warns when the leaf
 ---already had an ID (the old node may become an orphan).
 function M.replace_link_with_content ()
   local line = focus.owning_headline_line()
@@ -226,11 +226,11 @@ end
 ---@return table {id, label}
 function M.single_link_in_leaf (line)
   local level = metadata.outline_level(line)
-  local next_heading = metadata.next_heading_line(line)
-  if next_heading and next_heading <= M.subtree_end(line)
-     and (metadata.outline_level(next_heading) or 0) > level then
+  local next_headline = metadata.next_headline_line(line)
+  if next_headline and next_headline <= M.subtree_end(line)
+     and (metadata.outline_level(next_headline) or 0) > level then
     error('Cannot replace link with content:'
-          .. ' node has org-descendents') end
+          .. ' node has viewdescendants') end
   local split = metadata.split_as_stars_metadata_title(
     metadata.line_text(line))
   local body_lines = vim.api.nvim_buf_get_lines(

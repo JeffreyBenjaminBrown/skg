@@ -13,7 +13,7 @@ pub const GIT_DIFF_VIEW: &str = "\
 ** (skg (node (id 12) (repo main))) 12
 ";
 
-/// Create a git repo with head->worktree transition from text fixtures.
+/// Create a gitrepo with head->worktree transition from text fixtures.
 pub fn setup_gitrepo_with_fixtures(
   gitrepo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {

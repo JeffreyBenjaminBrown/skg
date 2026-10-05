@@ -1,7 +1,7 @@
 ;;; Regression test: an ordinary visit to overridden Z opens Z raw.
 ;;; It must not inject overrider R as an independent sibling. Z and R
 ;;; deliberately share the title "cooking", come from different
-;;; repos, and subscribe to each other.
+;;; skgrepos, and subscribe to each other.
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")

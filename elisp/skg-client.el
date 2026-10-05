@@ -1,6 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; For instructions see USAGE.md, in this same folder.
+;;; For instructions see docs/usage.org.
 
 (require 'cl-lib)
 

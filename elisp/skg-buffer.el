@@ -333,7 +333,7 @@ or derives from `skg-content-view-mode'. Both are set solely by
 skg's own view code (`skg-open-org-buffer-from-text') and both
 survive `skg-reload' (which deliberately leaves `skg-buffer'
 loaded), so they never match a file the user merely opened --
-e.g. a real .skg.org file whose first heading begins with
+e.g. a real .skg.org file whose first headline begins with
 `(skg', which must never be reaped by
 `skg-close-all-skg-buffers'."
   (and (buffer-live-p buf)

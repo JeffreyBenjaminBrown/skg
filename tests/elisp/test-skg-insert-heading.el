@@ -49,7 +49,7 @@ and inserts metadata with the chosen repo on the new headline."
        (should (org-at-heading-p))
        (should (= (org-outline-level) 1))
 
-       ;; C-return: inserts a new heading and prompts for repo.
+       ;; C-return: inserts a new headline and prompts for skgrepo.
        (cl-letf (((symbol-function 'completing-read)
                   (lambda (_prompt _coll &rest _) "private")))
          (org-insert-heading-respect-content))
@@ -62,7 +62,7 @@ and inserts metadata with the chosen repo on the new headline."
            (should (string-match-p
                     "^\\* (skg (node (id a) (repo public))) a$"
                     content))
-           ;; New headline has metadata with chosen repo.
+           ;; New headline has metadata with chosen skgrepo.
            (should (string-match-p
                     "^\\* (skg (node (repo private))) $"
                     content))

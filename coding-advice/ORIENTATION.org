@@ -3,10 +3,6 @@ Read this file and [[file:to-save-tokens.org][the default token-conservation adv
 start of a task. Then use the reading guide below for the work actually in
 scope. Do not reread unchanged advice for every follow-up in the same task.
 Do not load the whole folder or 'maybe-obsolete/' as routine onboarding.
-** Pending one-time task: [[file:claude-to-claude.org]]
-If that file exists, read it before other work. It asks the agent in each
-skg workspace to unify its Claude skills; once the last one has,
-Jeff intends to delete it.
 
 * How to work
 ** Conserve tokens

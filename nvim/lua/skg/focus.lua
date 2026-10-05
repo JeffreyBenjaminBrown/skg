@@ -1,5 +1,5 @@
 -- PURPOSE: Read, edit and act on (by moving the cursor to the focused
--- heading) 'focused' metadata. This is how point survives the
+-- headline) 'focused' metadata. This is how point survives the
 -- save/rerender round-trip. The Lua port of elisp/skg-focus.el.
 
 local compare = require('skg.sexpr.compare')
@@ -24,7 +24,7 @@ end
 ---@return integer|nil
 function M.owning_headline_line ()
   for line = metadata.current_line_number(), 1, -1 do
-    if metadata.at_heading_p(line) then return line end
+    if metadata.at_headline_p(line) then return line end
   end
   return nil
 end
@@ -43,7 +43,7 @@ end
 function M.focused_headline_line ()
   local last = vim.api.nvim_buf_line_count(0)
   for line = 1, last do
-    if metadata.at_heading_p(line)
+    if metadata.at_headline_p(line)
        and metadata.line_text(line):find('focused', 1, true)
        and M.headline_has_focused_p(line) then
       return line end

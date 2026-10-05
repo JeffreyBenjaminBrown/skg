@@ -1,6 +1,6 @@
 //! The telescope invariant validator: ONE shared primitive
 //! ('telescope_violations_of') consulted at both gates -- init /
-//! rebuild (whole graph, aggregated report) and save (affected owners)
+//! rebuild (whole graph, aggregated report) and save (affected recorders)
 //! -- per the override-invariants lesson in TODO/problems.org (two
 //! divergent validators nearly let bad data through).
 //!
@@ -8,14 +8,14 @@
 //! fate of today's validations"): cross-file violations are
 //! WARNINGS with repair guidance, never load refusals -- they can
 //! arise from two perfectly correct saves on different machines, so
-//! a pull must never brick a repo. Only single-file malformations
+//! a pull must never brick a skgrepo. Only single-file malformations
 //! (unparseable YAML, empty-string title, pid/filename mismatch,
 //! anchors in unordered relations -- unrepresentable in the format)
 //! hard-error, and those live in the parser, not here.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::telescope::types::FoldWarning;
-use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, RepoName};
+use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgRepoName};
 use crate::types::nodes::rust::GraphnodeInRust;
 
 use std::collections::HashSet;
@@ -35,32 +35,32 @@ pub enum TelescopeViolation {
   /// bleeding.
   LeakShapedMember {
     relation    : &'static str,
-    relRepo   : RepoName,
+    relRepo     : SkgRepoName,
     member      : ID,
-    member_home : RepoName,
+    member_home : SkgRepoName,
   },
-  /// A dangling relationship recorded more publicly than its extant owner.
-  /// With no target home to consult, the owner's home is the conservative
+  /// A dangling relationship recorded more publicly than its extant recorder.
+  /// With no target home to consult, the recorder's home is the conservative
   /// privacy ceiling.
   AbsentTargetLeakShapedMember {
-    relation   : &'static str,
-    relRepo  : RepoName,
-    member     : ID,
-    owner_home : RepoName,
+    relation      : &'static str,
+    relRepo       : SkgRepoName,
+    member        : ID,
+    recorder_home : SkgRepoName,
   },
-  /// An edge whose relRepo names no configured repo: its section
+  /// A relationship whose relRepo names no configured skgrepo: its section
   /// could never be written. Arises only from junk or a config
-  /// that lost a repo.
+  /// that lost a skgrepo.
   UnconfiguredRelRepo {
     relation : &'static str,
-    relRepo: RepoName,
+    relRepo: SkgRepoName,
     member   : ID,
   },
   /// Non-owned sections used the same pid as at least one owned
-  /// section. The owned telescope won and these repos were
+  /// section. The owned telescope won and these skgrepos were
   /// ignored before folding or id-claim collection.
   IgnoredForeignPidFolderlision {
-    ignored_repos : Vec<RepoName>,
+    ignored_skgrepos : Vec<SkgRepoName>,
   },
   /// Anything the FOLD noticed while combining a node's sections
   /// (a dangling anchor, a title below the home, a stray second
@@ -86,16 +86,16 @@ impl fmt::Display for TelescopeViolation {
           "{} member '{}' carries relRepo '{}', which is not configured",
           relation, member, relRepo ),
       TelescopeViolation::AbsentTargetLeakShapedMember {
-        relation, relRepo, member, owner_home } =>
+        relation, relRepo, member, recorder_home } =>
         write! ( f,
-          "leak-shaped {} member with absent target: relationship at relRepo '{}' names '{}'; because the target is absent, privacy is judged against the extant owner's home '{}'. Move the membership with skg-set-relRepo (C-c s r).",
-          relation, relRepo, member, owner_home ),
+          "leak-shaped {} member with absent target: relationship at relRepo '{}' names '{}'; because the target is absent, privacy is judged against the extant recorder's home '{}'. Move the membership with skg-set-relRepo (C-c s r).",
+          relation, relRepo, member, recorder_home ),
       TelescopeViolation::IgnoredForeignPidFolderlision {
-        ignored_repos } =>
+        ignored_skgrepos } =>
         write! ( f,
           "non-owned repo(s) [{}] use the same pid as one or more of your files. Skg kept your owned telescope, ignored those non-owned files, and left them untouched. Their contents are unreachable within Skg; inspect the raw .skg files if you need them.",
-          ignored_repos . iter ()
-            . map ( |repo| format! ("'{}'", repo) )
+          ignored_skgrepos . iter ()
+            . map ( |skgrepo| format! ("'{}'", skgrepo) )
             . collect::<Vec<String>> () . join (", ") ),
       TelescopeViolation::Fold (w) =>
         write! ( f, "{}", w ), }}}
@@ -114,18 +114,18 @@ pub fn telescope_violations_of (
   let mut check = |relation : &'static str,
                    members  : &[RelPartner<ID>]| {
     for m in members {
-      if config . repo_position ( &m . relRepo ) . is_none () {
+      if config . skgrepo_position ( &m . relRepo ) . is_none () {
         violations . push ( TelescopeViolation::UnconfiguredRelRepo {
           relation,
           relRepo : m . relRepo . clone (),
           member : m . member . clone (), } );
         continue; }
-      let target_home : Option<RepoName> =
+      let target_home : Option<SkgRepoName> =
         graph . pid_of ( &m . member )
         . and_then ( |p| graph . nodes . get (&p) )
-        . map ( |n| n . home_repo . clone () );
-      let privacy_ceiling : &RepoName = target_home . as_ref ()
-        . unwrap_or (&node . home_repo);
+        . map ( |n| n . home_skgrepo . clone () );
+      let privacy_ceiling : &SkgRepoName = target_home . as_ref ()
+        . unwrap_or (&node . home_skgrepo);
       if config . is_strictly_more_public ( &m . relRepo, privacy_ceiling ) {
         match target_home {
           Some (home) =>
@@ -140,7 +140,7 @@ pub fn telescope_violations_of (
                 relation,
                 relRepo  : m . relRepo . clone (),
                 member     : m . member . clone (),
-                owner_home : node . home_repo . clone (),
+                recorder_home : node . home_skgrepo . clone (),
               }), }} }};
   check ("contains", &node . contains);
   let msv = |m : &MSV<RelPartner<ID>>| -> Vec<RelPartner<ID>> {
@@ -153,25 +153,25 @@ pub fn telescope_violations_of (
          & msv ( &node . overrides_view_of ));
   violations }
 
-/// Owners whose telescope-warning truth may differ between two valid
-/// snapshots. Saved owners are always included; untouched inbound owners are
+/// Recorders whose telescope-warning truth may differ between two valid
+/// snapshots. Saved recorders are always included; untouched inbound recorders are
 /// included when a target's existence, canonical PID, or home changed.
-pub fn derive_affected_telescope_owners (
-  base         : &InRustGraph,
-  candidate    : &InRustGraph,
-  saved_pids   : &HashSet<ID>,
-  affected_ids : &HashSet<ID>,
+pub fn derive_affected_telescope_recorders (
+  base            : &InRustGraph,
+  candidate       : &InRustGraph,
+  saved_pids      : &HashSet<ID>,
+  affected_skgids : &HashSet<ID>,
 ) -> HashSet<ID> {
-  let mut owners : HashSet<ID> = saved_pids . clone ();
-  for raw in affected_ids {
+  let mut recorders : HashSet<ID> = saved_pids . clone ();
+  for raw in affected_skgids {
     let old_pid : Option<ID> = base . pid_of (raw);
     let final_pid : Option<ID> = candidate . pid_of (raw);
-    let old_home : Option<RepoName> = old_pid . as_ref ()
+    let old_home : Option<SkgRepoName> = old_pid . as_ref ()
       .and_then (|pid| base . nodes . get (pid))
-      .map (|node| node . home_repo . clone ());
-    let final_home : Option<RepoName> = final_pid . as_ref ()
+      .map (|node| node . home_skgrepo . clone ());
+    let final_home : Option<SkgRepoName> = final_pid . as_ref ()
       .and_then (|pid| candidate . nodes . get (pid))
-      .map (|node| node . home_repo . clone ());
+      .map (|node| node . home_skgrepo . clone ());
     if old_pid == final_pid && old_home == final_home { continue; }
     let old_key : &ID = old_pid . as_ref () . unwrap_or (raw);
     let final_key : &ID = final_pid . as_ref () . unwrap_or (raw);
@@ -186,29 +186,29 @@ pub fn derive_affected_telescope_owners (
         &graph . overriders_of,
       ] {
         if let Some (inbound) = index . get (key) {
-          owners . extend (inbound . iter () . cloned ()); }}} }
-  owners
+          recorders . extend (inbound . iter () . cloned ()); }}} }
+  recorders
 }
 
 pub fn affected_telescope_warnings (
-  config       : &SkgConfig,
-  base         : &InRustGraph,
-  candidate    : &InRustGraph,
-  saved_pids   : &HashSet<ID>,
-  affected_ids : &HashSet<ID>,
+  config          : &SkgConfig,
+  base            : &InRustGraph,
+  candidate       : &InRustGraph,
+  saved_pids      : &HashSet<ID>,
+  affected_skgids : &HashSet<ID>,
 ) -> Vec<(ID, TelescopeViolation)> {
   let _span : tracing::span::EnteredSpan =
     tracing::info_span! ("affected_telescope_warnings") . entered ();
-  let mut owners : Vec<ID> = derive_affected_telescope_owners (
-    base, candidate, saved_pids, affected_ids) . into_iter () . collect ();
-  owners . sort ();
+  let mut recorders : Vec<ID> = derive_affected_telescope_recorders (
+    base, candidate, saved_pids, affected_skgids) . into_iter () . collect ();
+  recorders . sort ();
   tracing::info! (
-    "incremental telescope work: telescope_owners_checked={}",
-    owners . len ());
+    "incremental telescope work: telescope_recorders_checked={}",
+    recorders . len ());
   let mut warnings : Vec<(ID, TelescopeViolation)> = Vec::new ();
-  for owner in owners {
-    for warning in telescope_violations_of (config, candidate, &owner) {
-      warnings . push ((owner . clone (), warning)); }}
+  for recorder in recorders {
+    for warning in telescope_violations_of (config, candidate, &recorder) {
+      warnings . push ((recorder . clone (), warning)); }}
   warnings . sort_by (|(pid_a, warning_a), (pid_b, warning_b)|
     pid_a . cmp (pid_b) . then_with (||
       warning_a . to_string () . cmp (&warning_b . to_string ())));

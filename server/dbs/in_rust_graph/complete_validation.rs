@@ -14,19 +14,19 @@ use crate::dbs::in_rust_graph::override_invariants::{
   validate_override_invariants,
 };
 use crate::telescope::invariants::{TelescopeViolation, validate_all_telescopes};
-use crate::types::misc::{ID, SkgConfig, RepoName};
+use crate::types::misc::{ID, SkgConfig, SkgRepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::rust::GraphnodeInRust;
-use crate::types::save::{DefineNode, DeleteNode, SaveNode};
+use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
 
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompleteGraphError {
-  DuplicatePrimaryId { pid : ID, homes : Vec<RepoName> },
-  DuplicateExtraId { id : ID, owners : Vec<ID> },
-  PrimaryExtraCollision { id : ID, primary_owners : Vec<ID>, extra_owners : Vec<ID> },
-  UnconfiguredNodeHome { pid : ID, repo : RepoName },
+  DuplicatePrimaryId { pid : ID, homes : Vec<SkgRepoName> },
+  DuplicateExtraId { skgid : ID, owners : Vec<ID> },
+  PrimaryExtraCollision { skgid : ID, primary_owners : Vec<ID>, extra_owners : Vec<ID> },
+  UnconfiguredNodeHome { pid : ID, skgrepo : SkgRepoName },
   Override (OverrideInvariantViolation),
   InternalIndex (InternalIndexMismatch),
 }
@@ -50,11 +50,11 @@ pub fn validate_complete_graph (
   config : &SkgConfig,
   nodes : &[Graphnode],
 ) -> CompleteGraphValidation {
-  let mut primary_homes : BTreeMap<ID, Vec<RepoName>> = BTreeMap::new ();
+  let mut primary_homes : BTreeMap<ID, Vec<SkgRepoName>> = BTreeMap::new ();
   let mut extra_owners : BTreeMap<ID, BTreeSet<ID>> = BTreeMap::new ();
   for node in nodes {
     primary_homes . entry (node . pid . clone ()) . or_default ()
-      . push (node . home_repo . clone ());
+      . push (node . home_skgrepo . clone ());
     for extra in node . normalized_extra_ids () {
       extra_owners . entry (extra) . or_default ()
         . insert (node . pid . clone ()); }}
@@ -66,28 +66,28 @@ pub fn validate_complete_graph (
       homes . sort ();
       errors . push (CompleteGraphError::DuplicatePrimaryId {
         pid : pid . clone (), homes }); }}
-  for (id, owners) in &extra_owners {
+  for (skgid, owners) in &extra_owners {
     if owners . len () > 1 {
       errors . push (CompleteGraphError::DuplicateExtraId {
-        id : id . clone (),
+        skgid : skgid . clone (),
         owners : owners . iter () . cloned () . collect (), }); }}
-  for id in primary_homes . keys () {
-    if let Some (extras) = extra_owners . get (id) {
+  for skgid in primary_homes . keys () {
+    if let Some (extras) = extra_owners . get (skgid) {
       let extra_owners : Vec<ID> = extras . iter ()
-        . filter ( |owner| *owner != id )
+        . filter ( |owner| *owner != skgid )
         . cloned ()
         . collect ();
       if ! extra_owners . is_empty () {
         errors . push (CompleteGraphError::PrimaryExtraCollision {
-          id : id . clone (),
-          primary_owners : vec![id . clone ()],
+          skgid : skgid . clone (),
+          primary_owners : vec![skgid . clone ()],
           extra_owners, }); }}}
   let mut nodes_by_pid : Vec<&Graphnode> = nodes . iter () . collect ();
   nodes_by_pid . sort_by (|a, b| a . pid . cmp (&b . pid));
   for node in nodes_by_pid {
-    if ! config . repos . contains_key (&node . home_repo) {
+    if ! config . skgrepos . contains_key (&node . home_skgrepo) {
       errors . push (CompleteGraphError::UnconfiguredNodeHome {
-        pid : node . pid . clone (), repo : node . home_repo . clone () }); }}
+        pid : node . pid . clone (), skgrepo : node . home_skgrepo . clone () }); }}
 
   let graph = InRustGraph::from_graphnodes (nodes);
   // Topology and derived-index diagnostics are meaningful only when identity
@@ -114,12 +114,12 @@ fn error_sort_key (error : &CompleteGraphError) -> (u8, String, String) {
   match error {
     CompleteGraphError::DuplicatePrimaryId { pid, .. } =>
       (0, pid . to_string (), String::new ()),
-    CompleteGraphError::DuplicateExtraId { id, .. } =>
-      (1, id . to_string (), String::new ()),
-    CompleteGraphError::PrimaryExtraCollision { id, .. } =>
-      (2, id . to_string (), String::new ()),
-    CompleteGraphError::UnconfiguredNodeHome { pid, repo } =>
-      (3, pid . to_string (), repo . to_string ()),
+    CompleteGraphError::DuplicateExtraId { skgid, .. } =>
+      (1, skgid . to_string (), String::new ()),
+    CompleteGraphError::PrimaryExtraCollision { skgid, .. } =>
+      (2, skgid . to_string (), String::new ()),
+    CompleteGraphError::UnconfiguredNodeHome { pid, skgrepo } =>
+      (3, pid . to_string (), skgrepo . to_string ()),
     CompleteGraphError::Override (violation) =>
       (4, format!("{:?}", violation), String::new ()),
     CompleteGraphError::InternalIndex (mismatch) =>
@@ -133,14 +133,14 @@ pub fn format_complete_graph_errors (errors : &[CompleteGraphError]) -> String {
     let detail = match error {
       CompleteGraphError::DuplicatePrimaryId { pid, homes } => format! (
         "duplicate primary id '{}' in homes {:?}", pid, homes),
-      CompleteGraphError::DuplicateExtraId { id, owners } => format! (
-        "duplicate extra id '{}' claimed by {:?}", id, owners),
+      CompleteGraphError::DuplicateExtraId { skgid, owners } => format! (
+        "duplicate extra id '{}' claimed by {:?}", skgid, owners),
       CompleteGraphError::PrimaryExtraCollision {
-        id, primary_owners, extra_owners } => format! (
+        skgid, primary_owners, extra_owners } => format! (
           "id '{}' is both primary {:?} and extra on {:?}",
-          id, primary_owners, extra_owners),
-      CompleteGraphError::UnconfiguredNodeHome { pid, repo } => format! (
-        "node '{}' has unconfigured home repo '{}'", pid, repo),
+          skgid, primary_owners, extra_owners),
+      CompleteGraphError::UnconfiguredNodeHome { pid, skgrepo } => format! (
+        "node '{}' has unconfigured home repo '{}'", pid, skgrepo),
       CompleteGraphError::Override (violation) =>
         format_override_invariant_violations (&[violation . clone ()])
           . lines () . skip (1) . collect::<Vec<&str>> () . join (" "),
@@ -171,17 +171,17 @@ pub fn validated_graph (
 pub fn validate_complete_graph_candidate (
   config : &SkgConfig,
   current : &InRustGraph,
-  definitions : &[DefineNode],
+  nodeInstructions : &[NodeInstruction],
 ) -> CompleteGraphValidation {
   let mut by_pid : BTreeMap<ID, Graphnode> = current . nodes . iter ()
     . map (|(pid, node)| (pid . clone (), complete_from_rust (node)))
     . collect ();
-  for definition in definitions {
-    match definition {
-      DefineNode::Save (SaveNode (node)) => {
+  for nodeInstruction in nodeInstructions {
+    match nodeInstruction {
+      NodeInstruction::Save (SaveNode (node)) => {
         by_pid . insert (node . pid . clone (), node . clone ()); }
-      DefineNode::Delete (DeleteNode { id, .. }) => {
-        by_pid . remove (id); }
+      NodeInstruction::Delete (DeleteNode { skgid, .. }) => {
+        by_pid . remove (skgid); }
     }}
   let nodes : Vec<Graphnode> = by_pid . into_values () . collect ();
   validate_complete_graph (config, &nodes)
@@ -192,7 +192,7 @@ pub(crate) fn complete_from_rust (node : &GraphnodeInRust) -> Graphnode {
     title : node . title . clone (),
     overPrivateText_telescope : node . overPrivateText_telescope,
     aliases : node . aliases . clone (),
-    home_repo : node . home_repo . clone (),
+    home_skgrepo : node . home_skgrepo . clone (),
     pid : node . pid . clone (),
     extra_ids : node . extra_ids . clone (),
     body : node . body . clone (),
@@ -200,6 +200,6 @@ pub(crate) fn complete_from_rust (node : &GraphnodeInRust) -> Graphnode {
     subscribes_to : node . subscribes_to . clone (),
     hides_from_its_subscriptions : node . hides_from_its_subscriptions . clone (),
     overrides_view_of : node . overrides_view_of . clone (),
-    misc : node . misc . clone (),
+    flags : node . flags . clone (),
   }
 }

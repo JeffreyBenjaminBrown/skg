@@ -123,7 +123,7 @@ M.commands = {
                       desc = 'Show only the outline ancestry of point' },
   ReadableIdsToggle = { module = 'skg.readable_ids', fn = 'toggle',
                         desc = 'Toggle shortened, title-annotated UUIDs' },
-  ViewIdStack = { module = 'skg.linkstack', fn = 'view_id_stack',
+  ViewLinkstack = { module = 'skg.linkstack', fn = 'view_linkstack',
                   desc = 'View and edit the linkstack' },
   ViewWithoutMetadata = { module = 'skg.metadata', fn = 'view_without_metadata',
                           desc = 'Copy the selection, metadata stripped, to a new buffer' },
@@ -205,7 +205,7 @@ function M.define_ex_commands ()
 end
 
 ---The content-view keybindings: {lhs, command-name} pairs under
----<localleader>, plus motions. The single repo of truth for the
+---<localleader>, plus motions. The single skgrepo of truth for the
 ---C-c chord translations; docs/COMMANDS-nvim.org is generated to
 ---match.
 M.content_view_bindings = {
@@ -256,7 +256,7 @@ M.content_view_bindings = {
   { 'vm', 'ViewMetadata' },              -- C-c v m
   { 'vo', 'ViewOrgAncestry' },           -- C-c v o
   { 'vr', 'ReadableIdsToggle' },         -- C-c v r
-  { 'vs', 'ViewIdStack' },               -- C-c v s
+  { 'vs', 'ViewLinkstack' },               -- C-c v s
   { 'vw', 'ViewWithoutMetadata' },       -- C-c v w
   { 'in', 'IdNext' },                    -- C-c i n
   { 'ip', 'IdPrev' },                    -- C-c i p
@@ -290,7 +290,7 @@ M.report_bindings = {
   { 'gm', 'GotoInGit' }, { 'Gm', 'GotoInGitAndCloseThis' },
   { 'gM', 'GotoInGitParent' }, { 'GM', 'GotoInGitParentAndCloseThis' },
   { 've', 'ViewNewEmpty' }, { 'vl', 'LimitRepoSet' },
-  { 'vs', 'ViewIdStack' },
+  { 'vs', 'ViewLinkstack' },
   { 'in', 'IdNext' }, { 'ip', 'IdPrev' },
   { 'u', 'IdPush' },
   { 'oi', 'PasteId' }, { 'ol', 'PasteLink' }, { 'on', 'PasteNode' },

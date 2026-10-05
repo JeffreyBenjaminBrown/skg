@@ -18,7 +18,7 @@ pub fn setup_gitrepo_with_reorder_fixtures(
 /// A parent that references 'ghost' at HEAD though ghost.skg exists in NO
 /// state (it has no file in head/ or worktree/ -- standing in for a node
 /// deleted by an earlier commit). The worktree drops the reference, so the
-/// diff treats ghost as a removed member whose Skg repo resolves to nothing.
+/// diff treats ghost as a removed member whose skgrepo resolves to nothing.
 pub fn setup_gitrepo_with_dangling_fixtures(
   gitrepo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {

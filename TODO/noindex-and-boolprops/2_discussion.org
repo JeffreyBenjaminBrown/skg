@@ -151,7 +151,7 @@ unfolding.  A save with no boolprop edit must preserve every existing
 * The setter's recursive meaning needs to be chosen
 
 “Recursively across the viewtree” is dangerous if it literally means every
-headline below point.  A subtree can contain alias/ID/property scaffolds,
+headline below point.  A subtree can contain alias/ID/property non-vognodes,
 inbound partner folders, backpaths, and repeated occurrences of graphnodes.
 Applying =NoIndex= to an inbound subscriber merely because it is displayed
 under the current node would be surprising.
@@ -233,7 +233,7 @@ to hold multiple nonconflicting operations.  I recommend explicit mutual
 exclusion for now: setting a property on a node being deleted or merged is
 ambiguous anyway.
 
-* DONE The boolprops view should reuse scaffold machinery
+* DONE The boolprops view should reuse non-vognode machinery
 
 The repository already models ID and alias folders as
 =QualFolder=/=Qual= variants.  Adding wholly separate top-level
@@ -241,7 +241,7 @@ The repository already models ID and alias folders as
 multiply exhaustive cases across parsing, rendering, ancestry, validation,
 reconciliation, diff mode, and source switching.
 
-I recommend adding a boolprops variant to the existing folder/qual scaffold
+I recommend adding a boolprops variant to the existing folder/qual non-vognode
 families, with external atoms such as =boolpropsFolder= and
 =(boolprop noIndex true)=.  It still constitutes a new viewnode kind at the
 wire/domain level, while reusing the architecture intended for “a generated
@@ -297,7 +297,7 @@ user to re-render and edit a definitive occurrence.  It does not offer an
 approved retry that discards the protected edit while preserving and saving
 the buffer's other edits.  Also, a boolprops folder under a definitive node is
 not itself a write-protected ActiveNode, so the existing comparison would need
-to be extended to cover that scaffold.
+to be extended to cover that non-vognode.
 
 The detection machinery and previous-view comparison are therefore reusable;
 only the “save anyway, discarding this part” continuation is new.  Do you still
@@ -313,7 +313,7 @@ giving both ID and title.
 * DONE Naming and command-surface pushback
 
 =collection= is retired vocabulary in this repository; the glossary says the
-old “col” name has been expunged in favor of “folder”
+old “folder” name has been expunged in favor of “folder”
 ([[file:../../docs/glossary.md][glossary.md]]).  =viewprops= is also broader than a folder that contains
 only booleans.
 
@@ -327,7 +327,7 @@ This follows the existing =skg-show-folderOf-aliases= family.  A shorter
 
 ** =boolpropsFolder= and =boolprop=
 
-These wire names say exactly what the scaffolds contain.
+These wire names say exactly what the non-vognodes contain.
 
 ** =skg-set-boolprop-indexing=
 

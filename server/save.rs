@@ -14,13 +14,13 @@ use crate::dbs::in_rust_graph::{
   },
 };
 use crate::dbs::tantivy::background_writer::{enqueue_tantivy_write, lock_tantivy_writes, TantivyWriteTask};
-use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
+use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_skgid_from_index};
 use crate::types::env::MutationGate;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, TantivyIndex};
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::nodes::tantivy::GraphnodeInTantivy;
-use crate::types::save::{DefineNode, SaveNode, DeleteNode, NodeMerge, RepoMove};
+use crate::types::save::{NodeInstruction, SaveNode, DeleteNode, NodeMerge, SkgRepoMove};
 use crate::types::nodes::complete::Graphnode;
 
 use std::collections::{HashMap, HashSet};
@@ -48,15 +48,15 @@ fn graph_preparation_save_error (
   })
 }
 
-/// Updates the authoritative and derived stores from prepared `DefineNode`s:
+/// Updates the authoritative and derived stores from prepared `NodeInstruction`s:
 ///   1) Filesystem (source of truth)
 ///   2) immutable in-Rust graph publication
 ///   3) Tantivy background update
 /// Returns `None` for the ordinary queued-index path.
 /// Returns `Some(new_index)` when Tantivy had to be rebuilt.
 pub async fn update_graph_minus_nodeMerges (
-  node_defs     : Vec<DefineNode>,
-  repo_moves  : &[RepoMove],
+  node_defs     : Vec<NodeInstruction>,
+  skgrepo_moves : &[SkgRepoMove],
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
   graph         : &InRustGraphHandle,
@@ -64,17 +64,17 @@ pub async fn update_graph_minus_nodeMerges (
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   let _mutation_guard = mutation_gate . lock () . await;
   update_graph_minus_nodeMerges_with_hoist_approval (
-    node_defs, repo_moves, config, tantivy_index, graph,
+    node_defs, skgrepo_moves, config, tantivy_index, graph,
     &HashSet::new () )
 }
 
 pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
-  mut node_defs : Vec<DefineNode>,
-  repo_moves  : &[RepoMove],
-  config        : SkgConfig,
-  tantivy_index : &TantivyIndex,
-  graph         : &InRustGraphHandle,
-  hoist_approved_pids : &HashSet<ID>,
+  mut node_defs : Vec<NodeInstruction>,
+  skgrepo_moves       : &[SkgRepoMove],
+  config              : SkgConfig,
+  tantivy_index       : &TantivyIndex,
+  graph               : &InRustGraphHandle,
+  approved_hoist_pids : &HashSet<ID>,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   tracing::info!("Updating filesystem, in-Rust graph, and Tantivy ...");
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -87,13 +87,13 @@ pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
     &config, base . clone (), node_defs)
     . map_err (|error| -> Box<dyn Error> { Box::new (error) }) ?;
   let prepared_filesystem : PreparedFilesystemUpdate = prepare_fs_update (
-    prepared . definitions (), repo_moves, &config, hoist_approved_pids) ?;
+    prepared . nodeInstructions (), skgrepo_moves, &config, approved_hoist_pids) ?;
   let telescope_warnings : Vec<(ID, TelescopeViolation)> =
     affected_telescope_warnings (
       &config, &base, prepared . candidate (),
-      prepared . saved_pids (), prepared . affected_ids ());
+      prepared . saved_pids (), prepared . affected_skgids ());
   let result : Result<Option<TantivyIndex>, Box<dyn Error>> =
-    apply_defineNodes ( prepared,
+    apply_nodeInstructions ( prepared,
                         prepared_filesystem,
                         config,
                         tantivy_index,
@@ -102,7 +102,7 @@ pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
     emit_telescope_warnings (&telescope_warnings); }
   result }
 
-fn apply_defineNodes (
+fn apply_nodeInstructions (
   prepared      : PreparedGraphUpdate,
   prepared_filesystem : PreparedFilesystemUpdate,
   config        : SkgConfig,
@@ -115,7 +115,7 @@ fn apply_defineNodes (
   { // FS (source of truth)
     // TODO: Print per-repo write information
     tracing::info!( "Writing {} instruction(s) to disk ...",
-               { let total_input : usize = prepared . definitions () . len ();
+               { let total_input : usize = prepared . nodeInstructions () . len ();
                  total_input } );
     let (deleted_count, written_count) : (usize, usize) =
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -124,7 +124,7 @@ fn apply_defineNodes (
     tracing::info!( "   Deleted {} file(s), wrote {} file(s).",
               deleted_count, written_count ); }
 
-  let (candidate, node_defs) : (Arc<InRustGraph>, Vec<DefineNode>) =
+  let (candidate, node_defs) : (Arc<InRustGraph>, Vec<NodeInstruction>) =
   { // In-Rust graph — atomic snapshot swap so readers see a
     // view that's consistent with what just landed on disk, and
     // never a mid-save half-applied state.
@@ -140,7 +140,7 @@ fn apply_defineNodes (
 pub(crate) fn enqueue_tantivy_delta (
   candidate     : &InRustGraph,
   tantivy_index : &TantivyIndex,
-  node_defs     : Vec<DefineNode>,
+  node_defs     : Vec<NodeInstruction>,
 ) {
   // Context origin types, read from the post-apply in-Rust graph, so
   // the Tantivy pass below indexes each saved doc once with its final
@@ -167,39 +167,39 @@ pub(crate) fn enqueue_tantivy_delta (
 /// Runs 'update_graph_minus_nodeMerges' and then 'merge_nodes' in that
 /// order, applying any Tantivy rebuild from either step to the
 /// caller's '&mut TantivyIndex'. The sole place the save pipeline
-/// should call when it has both save_instructions and
+/// should call when it has both nodeInstructions and
 /// nodeMerge_instructions in hand.
 pub async fn update_graph_including_nodeMerges (
-  save_instructions  : Vec<DefineNode>,
+  nodeInstructions  : Vec<NodeInstruction>,
   nodeMerge_instructions : &[NodeMerge],
-  repo_moves       : &[RepoMove],
+  skgrepo_moves       : &[SkgRepoMove],
   config             : SkgConfig,
   tantivy_index      : &mut TantivyIndex,
   graph              : &InRustGraphHandle,
   mutation_gate      : &MutationGate,
-  hoist_approved_pids : &HashSet<ID>,
+  approved_hoist_pids : &HashSet<ID>,
 ) -> Result<HashMap<ID, HashSet<ID>>, Box<dyn Error>> {
   let _mutation_guard = mutation_gate . lock () . await;
   update_graph_including_nodeMerges_under_mutation_gate (
-    save_instructions, nodeMerge_instructions, repo_moves, config,
-    tantivy_index, graph, hoist_approved_pids )
+    nodeInstructions, nodeMerge_instructions, skgrepo_moves, config,
+    tantivy_index, graph, approved_hoist_pids )
 }
 
 /// The combined save operation for a caller that already holds the shared
 /// mutation gate.  The TCP save handler takes the gate before parsing so its
 /// disk-derived SavePlan cannot become stale before this function publishes.
 pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
-  save_instructions  : Vec<DefineNode>,
+  nodeInstructions  : Vec<NodeInstruction>,
   nodeMerge_instructions : &[NodeMerge],
-  repo_moves       : &[RepoMove],
+  skgrepo_moves       : &[SkgRepoMove],
   config             : SkgConfig,
   tantivy_index      : &mut TantivyIndex,
   graph              : &InRustGraphHandle,
-  hoist_approved_pids : &HashSet<ID>,
+  approved_hoist_pids : &HashSet<ID>,
 ) -> Result<HashMap<ID, HashSet<ID>>, Box<dyn Error>> {
   let prepared : PreparedSave = prepare_save_under_mutation_gate (
-    save_instructions, nodeMerge_instructions, repo_moves, &config,
-    graph, hoist_approved_pids) ?;
+    nodeInstructions, nodeMerge_instructions, skgrepo_moves, &config,
+    graph, approved_hoist_pids) ?;
   prepared . apply (config, tantivy_index, graph)
 }
 
@@ -245,15 +245,15 @@ impl PreparedSave {
     {
       let save_replacement : Option<TantivyIndex> =
         { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-            "apply_ordinary_defineNodes" ). entered();
-          apply_defineNodes (
+            "apply_ordinary_nodeInstructions" ). entered();
+          apply_nodeInstructions (
             prepared, prepared_filesystem, config . clone (),
             tantivy_index, graph ) } ?;
       if let Some (new_index) = save_replacement {
         *tantivy_index = new_index; }}
     let nodeMerge_replacement : Option<TantivyIndex> =
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-          "apply_nodeMerge_defineNodes" ). entered();
+          "apply_nodeMerge_nodeInstructions" ). entered();
         crate::nodeMerge::apply_prepared_nodeMerges (
           self . prepared_nodeMerge . zip (
             self . prepared_nodeMerge_filesystem),
@@ -266,51 +266,51 @@ impl PreparedSave {
 }
 
 pub(crate) fn prepare_save_under_mutation_gate (
-  mut save_instructions  : Vec<DefineNode>,
+  mut nodeInstructions  : Vec<NodeInstruction>,
   nodeMerge_instructions : &[NodeMerge],
-  repo_moves       : &[RepoMove],
+  skgrepo_moves       : &[SkgRepoMove],
   config             : &SkgConfig,
   graph              : &InRustGraphHandle,
-  hoist_approved_pids : &HashSet<ID>,
+  approved_hoist_pids : &HashSet<ID>,
 ) -> Result<PreparedSave, Box<dyn Error>> {
   let graph_before_save : Arc<InRustGraph> = graph . load_full ();
   apply_delete_propagation_cleanup (
-    &mut save_instructions, &graph_before_save, config );
-  let all_filesystem_outputs : Vec<DefineNode> =
-    save_instructions . iter () . cloned ()
+    &mut nodeInstructions, &graph_before_save, config );
+  let all_filesystem_outputs : Vec<NodeInstruction> =
+    nodeInstructions . iter () . cloned ()
     . chain ( nodeMerge_instructions . iter ()
              . flat_map ( |node_merge| node_merge . to_vec () ) )
     . collect ();
   crate::nodeMerge::error_unless_nodeMerge_hoist_is_approved (
-    nodeMerge_instructions, config, hoist_approved_pids ) ?;
+    nodeMerge_instructions, config, approved_hoist_pids ) ?;
 
   let prepared_save : Option<PreparedGraphUpdate> =
-    if save_instructions . is_empty () { None }
+    if nodeInstructions . is_empty () { None }
     else { Some (prepare_graph_update (
-      config, graph_before_save . clone (), save_instructions)
+      config, graph_before_save . clone (), nodeInstructions)
       . map_err (graph_preparation_save_error) ?) };
   let graph_after_save : Arc<InRustGraph> = prepared_save . as_ref ()
     . map ( |prepared| prepared . candidate () . clone () )
     . unwrap_or_else ( || graph_before_save . clone () );
-  let nodeMerge_definitions : Vec<DefineNode> =
+  let nodeMerge_nodeInstructions : Vec<NodeInstruction> =
     nodeMerge_instructions . iter ()
     . flat_map ( |node_merge| node_merge . to_vec () )
     . collect ();
   let prepared_nodeMerge : Option<PreparedGraphUpdate> =
-    if nodeMerge_definitions . is_empty () { None }
+    if nodeMerge_nodeInstructions . is_empty () { None }
     else { Some (prepare_graph_update (
-      config, graph_after_save, nodeMerge_definitions)
+      config, graph_after_save, nodeMerge_nodeInstructions)
       . map_err (graph_preparation_save_error) ?) };
   // Prepare and retain both filesystem phases before either is consumed.
   // This is the save-level all-or-nothing preflight for fallible ownership,
   // shape, path, and serialization work.
   let prepared_save_filesystem : Option<PreparedFilesystemUpdate> =
     prepared_save . as_ref () . map (|prepared| prepare_fs_update (
-      prepared . definitions (), repo_moves, config, hoist_approved_pids))
+      prepared . nodeInstructions (), skgrepo_moves, config, approved_hoist_pids))
     . transpose () ?;
   let prepared_nodeMerge_filesystem : Option<PreparedFilesystemUpdate> =
     prepared_nodeMerge . as_ref () . map (|prepared| prepare_fs_update (
-      prepared . definitions (), &[], config, hoist_approved_pids))
+      prepared . nodeInstructions (), &[], config, approved_hoist_pids))
     . transpose () ?;
   let final_candidate : Arc<InRustGraph> = prepared_nodeMerge . as_ref ()
     .map (|prepared| prepared . candidate () . clone ())
@@ -323,7 +323,7 @@ pub(crate) fn prepare_save_under_mutation_gate (
     .collect ();
   let affected_ids_for_telescope : HashSet<ID> = prepared_save . iter ()
     .chain (prepared_nodeMerge . iter ())
-    .flat_map (|prepared| prepared . affected_ids () . iter () . cloned ())
+    .flat_map (|prepared| prepared . affected_skgids () . iter () . cloned ())
     .collect ();
   let telescope_warnings : Vec<(ID, TelescopeViolation)> =
     affected_telescope_warnings (
@@ -332,19 +332,19 @@ pub(crate) fn prepare_save_under_mutation_gate (
   let deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>> =
     all_filesystem_outputs . iter ()
     . filter_map ( |instruction| match instruction {
-      DefineNode::Delete (delete) => graph_before_save . nodes . get (&delete . id)
-        . map (|node| (delete . id . clone (),
+      NodeInstruction::Delete (delete) => graph_before_save . nodes . get (&delete . skgid)
+        . map (|node| (delete . skgid . clone (),
                        node . extra_ids . iter () . cloned () . collect ())),
       _ => None })
     . collect ();
   let final_write_identities : HashSet<ID> = all_filesystem_outputs . iter ()
     .chain (prepared_save . iter ()
-      .flat_map (|prepared| prepared . definitions () . iter ()))
+      .flat_map (|prepared| prepared . nodeInstructions () . iter ()))
     .chain (prepared_nodeMerge . iter ()
-      .flat_map (|prepared| prepared . definitions () . iter ()))
-    .flat_map (identities_in_definition)
-    .chain (repo_moves . iter () . map (|repo_move|
-      repo_move . pid . clone ()))
+      .flat_map (|prepared| prepared . nodeInstructions () . iter ()))
+    .flat_map (identities_in_nodeInstruction)
+    .chain (skgrepo_moves . iter () . map (|skgrepo_move|
+      skgrepo_move . pid . clone ()))
     .chain (affected_ids_for_telescope)
     .collect ();
   Ok (PreparedSave {
@@ -360,15 +360,15 @@ pub(crate) fn prepare_save_under_mutation_gate (
   })
 }
 
-fn identities_in_definition (
-  definition : &DefineNode,
+fn identities_in_nodeInstruction (
+  nodeInstruction : &NodeInstruction,
 ) -> Vec<ID> {
-  match definition {
-    DefineNode::Save (SaveNode (node)) =>
+  match nodeInstruction {
+    NodeInstruction::Save (SaveNode (node)) =>
       std::iter::once (node . pid . clone ())
         .chain (node . extra_ids . iter () . cloned ())
         .collect (),
-    DefineNode::Delete (delete) => vec![delete . id . clone ()], }
+    NodeInstruction::Delete (delete) => vec![delete . skgid . clone ()], }
 }
 
 pub(crate) fn emit_telescope_warnings (
@@ -414,14 +414,14 @@ pub(crate) fn emit_telescope_warnings (
 ///   rewriting. Dangling link targets render as PhantomUnknown
 ///   placeholders when followed, so this is non-fatal.
 pub(crate) fn apply_delete_propagation_cleanup (
-  node_defs  : &mut Vec<DefineNode>,
+  node_defs  : &mut Vec<NodeInstruction>,
   graph_snap : &Arc<InRustGraph>,
   config     : &SkgConfig,
 ) {
   let deleted_primary_pids : HashSet<ID> = node_defs . iter ()
     . filter_map ( |d| match d {
-      DefineNode::Delete (dn) => Some ( dn . id . clone ()),
-      DefineNode::Save (_)    => None } )
+      NodeInstruction::Delete (dn) => Some ( dn . skgid . clone ()),
+      NodeInstruction::Save (_)    => None } )
     . collect ();
   if deleted_primary_pids . is_empty () { return; }
 
@@ -433,11 +433,11 @@ pub(crate) fn apply_delete_propagation_cleanup (
           s . insert ( e . clone () ); }}}
     s };
 
-  { // Phase 1: append "save-it-unchanged" SaveNodes for referencers not already covered by the user's instructions. As-is, these would have no effect, but phase 2 strips some IDs.
+  { // Phase 1: append "save-it-unchanged" SaveNodes for referencers not already covered by the user's nodeInstructions. As-is, these would have no effect, but phase 2 strips some IDs.
     let user_save_pids : HashSet<ID> = node_defs . iter ()
       . filter_map ( |d| match d {
-        DefineNode::Save (SaveNode (n)) => Some ( n . pid . clone ()),
-        DefineNode::Delete (_)          => None } )
+        NodeInstruction::Save (SaveNode (n)) => Some ( n . pid . clone ()),
+        NodeInstruction::Delete (_)          => None } )
       . collect ();
     let mut referencer_pids : HashSet<ID> = HashSet::new ();
     for deleted in &deleted_primary_pids { // Inverse indexes are keyed by primary pid (id_to_pid_if_found resolves extra_ids during index construction), so iterating the primary pids of deletes is sufficient to find every referencer.
@@ -451,27 +451,27 @@ pub(crate) fn apply_delete_propagation_cleanup (
             referencer_pids . insert ( pid . clone () ); }} } }
     referencer_pids . retain ( |p|
       graph_snap . get (p)
-      . map ( |node| config . user_owns_repo (&node . home_repo) )
+      . map ( |node| config . skgrepo_is_owned (&node . home_skgrepo) )
       . unwrap_or (false)
       && ! user_save_pids . contains (p)
       && ! deleted_primary_pids . contains (p) );
     let cleanup_count : usize = referencer_pids . len ();
     for pid in referencer_pids {
       let Some (rust) = graph_snap . get (&pid) else { continue; };
-      node_defs . push ( DefineNode::Save ( SaveNode (
+      node_defs . push ( NodeInstruction::Save ( SaveNode (
         graphnode_from_graphnodeInRust (rust) ))); }
     if cleanup_count > 0 {
       tracing::info!(
         "Adding {} cleanup save(s) to remove references to deleted nodes.",
         cleanup_count); } }
 
-  { // Strip deleted IDs only from owned saves. A foreign buffer instruction
+  { // Strip deleted IDs only from owned saves. A foreign buffer nodeInstruction
     // remains intact so ordinary validation/preflight can reject the write.
     for nd in node_defs . iter_mut () {
-      if let DefineNode::Save ( SaveNode (nc) ) = nd {
-        if ! config . user_owns_repo (&nc . home_repo) { continue; }
-        nc . contains . retain ( |id|
-          ! deleted_id_set . contains (& id . member) );
+      if let NodeInstruction::Save ( SaveNode (nc) ) = nd {
+        if ! config . skgrepo_is_owned (&nc . home_skgrepo) { continue; }
+        nc . contains . retain ( |skgid|
+          ! deleted_id_set . contains (& skgid . member) );
         nc . subscribes_to = remove_from_msv (
           &nc . subscribes_to, &deleted_id_set );
         nc . hides_from_its_subscriptions = remove_from_msv (
@@ -487,7 +487,7 @@ pub(crate) fn graphnode_from_graphnodeInRust (
 ) -> Graphnode {
   Graphnode {
     pid                          : rust . pid . clone (),
-    home_repo                       : rust . home_repo . clone (),
+    home_skgrepo                 : rust . home_skgrepo . clone (),
     extra_ids                    : rust . extra_ids . clone (),
     title                        : rust . title . clone (),
     overPrivateText_telescope               : rust . overPrivateText_telescope,
@@ -497,7 +497,7 @@ pub(crate) fn graphnode_from_graphnodeInRust (
     subscribes_to                : rust . subscribes_to . clone (),
     hides_from_its_subscriptions : rust . hides_from_its_subscriptions . clone (),
     overrides_view_of            : rust . overrides_view_of . clone (),
-    misc                         : rust . misc . clone (),
+    flags                        : rust . flags . clone (),
   }}
 
 fn remove_from_msv (
@@ -508,32 +508,32 @@ fn remove_from_msv (
     MSV::Unspecified => MSV::Unspecified,
     MSV::Specified (v) => MSV::Specified (
       v . iter ()
-        . filter ( |id| ! exclude . contains (& id . member) )
+        . filter ( |skgid| ! exclude . contains (& skgid . member) )
         . cloned ()
         . collect ()), } }
 
-pub fn update_fs_from_saveinstructions (
-  node_defs    : &[DefineNode],
-  repo_moves : &[RepoMove],
-  config       : SkgConfig,
+pub fn update_fs_from_nodeInstructions (
+  node_defs     : &[NodeInstruction],
+  skgrepo_moves : &[SkgRepoMove],
+  config        : SkgConfig,
 ) -> io::Result<(usize, usize)> { // (deleted, written)
-  update_fs_from_saveinstructions_with_hoist_approval (
-    node_defs, repo_moves, config, &HashSet::new () )
+  update_fs_from_nodeInstructions_with_hoist_approval (
+    node_defs, skgrepo_moves, config, &HashSet::new () )
 }
 
 /// Save-only variant. Every delete target and every serialized telescope is
 /// prepared before the first filesystem mutation. The approval set is an
 /// explicit capability supplied only by the interactive Hoist retry; all
-/// ordinary callers use 'update_fs_from_saveinstructions' above and fail
+/// ordinary callers use 'update_fs_from_nodeInstructions' above and fail
 /// closed on overPrivateText disk telescopes.
-pub(crate) fn update_fs_from_saveinstructions_with_hoist_approval (
-  node_defs             : &[DefineNode],
-  repo_moves          : &[RepoMove],
+pub(crate) fn update_fs_from_nodeInstructions_with_hoist_approval (
+  node_defs             : &[NodeInstruction],
+  skgrepo_moves         : &[SkgRepoMove],
   config                : SkgConfig,
-  hoist_approved_pids   : &HashSet<ID>,
+  approved_hoist_pids   : &HashSet<ID>,
 ) -> io::Result<(usize, usize)> { // (deleted, written)
   prepare_fs_update (
-    node_defs, repo_moves, &config, hoist_approved_pids ) ?
+    node_defs, skgrepo_moves, &config, approved_hoist_pids ) ?
   . apply (&config)
 }
 
@@ -564,47 +564,47 @@ impl PreparedFilesystemUpdate {
 }
 
 pub(crate) fn prepare_fs_update (
-  node_defs           : &[DefineNode],
-  repo_moves        : &[RepoMove],
+  node_defs           : &[NodeInstruction],
+  skgrepo_moves       : &[SkgRepoMove],
   config              : &SkgConfig,
-  hoist_approved_pids : &HashSet<ID>,
+  approved_hoist_pids : &HashSet<ID>,
 ) -> io::Result<PreparedFilesystemUpdate> {
   let _span : tracing::span::EnteredSpan =
     tracing::info_span! ("prepare_fs_update") . entered ();
   let ( to_delete, mut to_save )
     : ( Vec<DeleteNode>, Vec<SaveNode> )
-    = DefineNode::partition_save_and_delete (node_defs);
+    = NodeInstruction::partition_save_and_delete (node_defs);
   for SaveNode (node) in &mut to_save {
-    node . normalize_ids (); }
+    node . normalize_skgids (); }
   let prepared_writes : Vec<PreparedTelescopeWrite> =
     to_save . iter ()
     . map ( |SaveNode (node)|
       prepare_graphnode_telescope (
         node,
         config,
-        hoist_approved_pids . contains (&node . pid) ) )
+        approved_hoist_pids . contains (&node . pid) ) )
     . collect::<io::Result<Vec<PreparedTelescopeWrite>>> () ?;
 
   // Resolve every deletion path before applying either deletion or write.
   // Only owned sections are eligible, exactly like the standalone deleter.
   let mut prepared_deletions : Vec<String> = Vec::new ();
   let mut deleted_pids : HashSet<ID> = HashSet::new ();
-  for DeleteNode { id, .. } in &to_delete {
-    for repo in config . ordered_repos () {
-      if ! config . user_owns_repo (&repo) { continue; }
-      let path : String = crate::util::path_from_pid_and_repo (
-        config, &repo, id . clone () )
+  for DeleteNode { skgid, .. } in &to_delete {
+    for skgrepo in config . ordered_skgrepos () {
+      if ! config . skgrepo_is_owned (&skgrepo) { continue; }
+      let path : String = crate::util::path_from_pid_and_skgrepo (
+        config, &skgrepo, skgid . clone () )
         . map_err ( |e| io::Error::new (io::ErrorKind::NotFound, e) ) ?;
       if std::path::Path::new (&path) . is_file () {
-        deleted_pids . insert ( id . clone () ); }
+        deleted_pids . insert ( skgid . clone () ); }
       prepared_deletions . push (path); }}
 
-  let _ = repo_moves;
+  let _ = skgrepo_moves;
   // Repo moves need no file relocation of their own anymore: the
-  // telescope write above places every section in its repo and
-  // sweeps owned sections whose repo lost its last member. An
+  // telescope write above places every section in its skgrepo and
+  // sweeps owned sections whose skgrepo lost its last member. An
   // explicit old-path delete here would even be WRONG for a
-  // private->public home move, where the old (more private) repo
+  // private->public home move, where the old (more private) skgrepo
   // legitimately retains a section holding the node's private
   // memberships. (repo_moves still matter to Tantivy, handled elsewhere.)
   Ok ( PreparedFilesystemUpdate {
@@ -614,12 +614,12 @@ pub(crate) fn prepare_fs_update (
   } ) }
 
 
-/// Updates the index with the provided DefineNodes.
-/// Deletes IDs from the index for every instruction,
-/// but only adds documents for instructions where is_save.
+/// Updates the index with the provided NodeInstructions.
+/// Deletes IDs from the index for every nodeInstruction,
+/// but only adds documents for nodeInstructions where is_save.
 /// Returns the number of documents processed.
-pub(crate) fn update_tantivy_from_saveinstructions (
-  instructions  : &[DefineNode],
+pub(crate) fn update_tantivy_from_nodeInstructions (
+  instructions  : &[NodeInstruction],
   tantivy_index : &TantivyIndex,
   context_types : &HashMap<ID, String>, // pid -> context_origin_type label, so each doc is indexed once with its final type (no second context pass needed). Empty for the nodeMerge path.
 ) -> Result<usize, Box<dyn Error>> {
@@ -633,22 +633,22 @@ pub(crate) fn update_tantivy_from_saveinstructions (
         TANTIVY_WRITER_BUFFER_BYTES)? };
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "tantivy_delete" ). entered();
-    delete_nodes_by_id_from_index(
+    delete_nodes_by_skgid_from_index(
       // Delete all IDs, be they from Saves or Deletes.
       // (The entry for each Save is then recreated.)
       instructions . iter() . map(|instr| match instr {
-        DefineNode::Save(SaveNode (node)) => &node . pid,
-        DefineNode::Delete(DeleteNode { id, .. }) => id }),
+        NodeInstruction::Save(SaveNode (node)) => &node . pid,
+        NodeInstruction::Delete(DeleteNode { skgid, .. }) => skgid }),
       &mut writer,
       tantivy_index)? ; }
-  // Add documents only for non-deletion instructions.
+  // Add documents only for non-deletion nodeInstructions.
   // Convert to GraphnodeInTantivy (narrow) at the boundary.
   let nodes_to_add: Vec<GraphnodeInTantivy> =
     instructions . iter()
     . filter_map( |instr| match instr {
-        DefineNode::Save(SaveNode (node)) =>
+        NodeInstruction::Save(SaveNode (node)) =>
           Some ( GraphnodeInTantivy::from (node) ),
-        DefineNode::Delete (_) => None } )
+        NodeInstruction::Delete (_) => None } )
     . collect();
   let processed_count: usize =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(

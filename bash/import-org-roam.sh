@@ -8,8 +8,8 @@ set -euo pipefail
 #
 # All paths are relative to the project root (CWD).
 #   SOURCE    — path to the org-roam directory
-#   DEST      — path to the destination Skg repo directory
-#   NICKNAME  — short name for the Skg repo
+#   DEST      — path to the destination skgrepo directory
+#   NICKNAME  — short name for the skgrepo
 #
 # The Docker container name is prompted for interactively at runtime,
 # since running this inside the container would leave no API keys on

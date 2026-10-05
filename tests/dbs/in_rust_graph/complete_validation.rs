@@ -6,37 +6,37 @@ use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::override_invariants::OverrideInvariantViolation;
 use skg::telescope::invariants::TelescopeViolation;
 use skg::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, SkgfileRepo, RepoName,
+  ID, MSV, RelPartner, SkgConfig, SkgRepo, SkgRepoName,
 };
-use skg::types::nodes::complete::{Graphnode, empty_node_complete};
-use skg::types::save::{DefineNode, SaveNode};
+use skg::types::nodes::complete::{Graphnode, empty_graphnode};
+use skg::types::save::{NodeInstruction, SaveNode};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 fn config () -> SkgConfig {
-  let mut repos = HashMap::new ();
+  let mut skgrepos = HashMap::new ();
   for (name, owned) in [("public", true), ("private", true), ("foreign", false)] {
-    repos . insert (RepoName::from (name), SkgfileRepo {
-      name : RepoName::from (name),
+    skgrepos . insert (SkgRepoName::from (name), SkgRepo {
+      name : SkgRepoName::from (name),
       abbreviation : None,
       path : PathBuf::from (format! ("{}-path", name)),
-      user_owns_it : owned,
+      owned        : owned,
     }); }
-  let mut config = SkgConfig::dummyFromRepos (repos);
-  config . repo_order = vec![
-    RepoName::from ("public"),
-    RepoName::from ("private"),
-    RepoName::from ("foreign"),
+  let mut config = SkgConfig::dummyFromSkgRepos (skgrepos);
+  config . skgrepo_order = vec![
+    SkgRepoName::from ("public"),
+    SkgRepoName::from ("private"),
+    SkgRepoName::from ("foreign"),
   ];
   config
 }
 
-fn node (pid : &str, repo : &str) -> Graphnode {
-  let mut node = empty_node_complete ();
+fn node (pid : &str, skgrepo : &str) -> Graphnode {
+  let mut node = empty_graphnode ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
-  node . home_repo = RepoName::from (repo);
+  node . home_skgrepo = SkgRepoName::from (skgrepo);
   node
 }
 
@@ -64,7 +64,7 @@ fn identity_errors_are_aggregated_and_deterministically_ordered () {
 }
 
 #[test]
-fn repeated_ids_of_one_owner_are_normalized_not_rejected () {
+fn repeated_skgids_of_one_recorder_are_normalized_not_rejected () {
   let mut owner = node ("owner", "public");
   owner . extra_ids = vec![
     ID::from ("B"),
@@ -90,7 +90,7 @@ fn unknown_home_is_hard_but_edge_provenance_is_a_warning () {
   let mut owner = node ("owner", "public");
   owner . contains = vec![
     RelPartner::at_relRepo (
-      RepoName::from ("unconfigured-relRepo"), ID::from ("dangling")),
+      SkgRepoName::from ("unconfigured-relRepo"), ID::from ("dangling")),
   ];
   let unknown_home = node ("unknown-home", "unconfigured-home");
   let report = validate_complete_graph (&config (), &[owner, unknown_home]);
@@ -109,7 +109,7 @@ fn unknown_home_is_hard_but_edge_provenance_is_a_warning () {
 fn configured_dangling_members_are_tolerated_without_warning () {
   let mut owner = node ("owner", "public");
   owner . subscribes_to = MSV::Specified (vec![RelPartner::at_relRepo (
-    RepoName::from ("public"), ID::from ("absent"))]);
+    SkgRepoName::from ("public"), ID::from ("absent"))]);
   let report = validate_complete_graph (&config (), &[owner]);
   assert! (report . is_valid ());
   assert! (report . warnings . is_empty ());
@@ -124,13 +124,13 @@ fn canonical_entry_includes_override_monogamy_and_telescope_orientation () {
   for overrider in [&mut a, &mut b] {
     overrider . overrides_view_of = MSV::Specified (vec![
       RelPartner::at_relRepo (
-        RepoName::from ("public"), ID::from ("target")),
+        SkgRepoName::from ("public"), ID::from ("target")),
     ]); }
   let report = validate_complete_graph (&config (), &[target, a, b]);
   assert! (report . errors . iter () . any (|error| matches! (
     error,
     CompleteGraphError::Override (
-      OverrideInvariantViolation::MultipleUserOwnedOverriders { overridden, .. })
+      OverrideInvariantViolation::MultipleOwnedOverriders { overridden, .. })
       if overridden == &ID::from ("target"))));
   assert_eq! (report . warnings . iter () . filter (|(_, warning)| matches! (
     warning, TelescopeViolation::LeakShapedMember {
@@ -146,14 +146,14 @@ fn save_candidate_is_rejected_before_publication () {
   let mut edited = node ("edited", "unconfigured-home");
   edited . extra_ids = vec![ID::from ("existing")];
   let report = validate_complete_graph_candidate (
-    &config (), &current, &[DefineNode::Save (SaveNode (edited))]);
+    &config (), &current, &[NodeInstruction::Save (SaveNode (edited))]);
   assert! (report . errors . iter () . any (|error| matches! (
-    error, CompleteGraphError::PrimaryExtraCollision { id, .. }
-      if id == &ID::from ("existing"))));
+    error, CompleteGraphError::PrimaryExtraCollision { skgid, .. }
+      if skgid == &ID::from ("existing"))));
   assert! (report . errors . iter () . any (|error| matches! (
     error, CompleteGraphError::UnconfiguredNodeHome { pid, .. }
       if pid == &ID::from ("edited"))));
   // Validation is pure: the caller's current graph remains untouched.
-  assert_eq! (current . get (&ID::from ("edited")) . unwrap () . home_repo,
-              RepoName::from ("public"));
+  assert_eq! (current . get (&ID::from ("edited")) . unwrap () . home_skgrepo,
+              SkgRepoName::from ("public"));
 }

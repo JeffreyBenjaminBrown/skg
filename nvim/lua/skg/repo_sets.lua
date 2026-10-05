@@ -1,5 +1,5 @@
 -- PURPOSE: List, query, and switch the per-connection active
--- repo-set; switching re-renders every open view in place. The Lua
+-- skgrepo-set; switching re-renders every open view in place. The Lua
 -- port of elisp/skg-request-repo-sets.el.
 
 local client = require('skg.client')
@@ -12,7 +12,7 @@ local state = require('skg.state')
 
 local M = {}
 
----Ask the server for the configured repo-sets.
+---Ask the server for the configured skgrepo-sets.
 function M.list_repo_sets ()
   state.register_response_handler('repo-sets',
     function (_payload_text, response)
@@ -27,7 +27,7 @@ function M.list_repo_sets ()
   client.send_string('((request . "list repo sets"))\n')
 end
 
----Ask the server for the active repo-set.
+---Ask the server for the active skgrepo-set.
 function M.active_repo_set ()
   state.register_response_handler('active-repo-set',
     function (_payload_text, response)
@@ -37,7 +37,7 @@ function M.active_repo_set ()
   client.send_string('((request . "active repo set"))\n')
 end
 
----Set the active repo-set for this connection to NAME (prompted
+---Set the active skgrepo-set for this connection to NAME (prompted
 ---when absent), after confirmation; the server replies with the
 ---confirmation followed by the rerender stream.
 ---@param name string|nil
@@ -64,7 +64,7 @@ function M.set_active_repo_set (name, approved_pids)
     sexpr.pair(sexpr.symbol('request'), 'set active repo set'),
     sexpr.pair(sexpr.symbol('name'), name) }
   if approved_pids and #approved_pids > 0 then
-    local approval = { sexpr.symbol('allow-overPrivateText-telescopes') }
+    local approval = { sexpr.symbol('approved-overPrivateText-pids') }
     for _, pid in ipairs(approved_pids) do table.insert(approval, pid) end
     table.insert(request, approval) end
   client.send_string(sexpr.to_string(request) .. '\n')

@@ -147,7 +147,7 @@ true-content subtree.  This modifies metadata but does not save."
               (progn
                 (push (copy-marker (line-beginning-position)) targets)
                 (outline-next-heading))
-            (skg--goto-next-heading-after-subtree))))
+            (skg--goto-next-headline-after-subtree))))
       (nreverse targets))))
 
 (provide 'skg-request-flag-state)

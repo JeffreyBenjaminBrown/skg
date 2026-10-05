@@ -4,10 +4,10 @@
 (require 'json)
 (require 'skg-client)
 
-(defun test-skg-recovery--json-snapshot (document heading)
+(defun test-skg-recovery--json-snapshot (document headline)
   "Decode the JSON snapshot below HEADING in DOCUMENT."
   (let ((pattern
-         (concat "\\*\\* " (regexp-quote heading)
+         (concat "\\*\\* " (regexp-quote headline)
                  "\n#\\+begin_src json\n\\([^\n]+\\)"
                  "\n#\\+end_src")))
     (should (string-match pattern document))

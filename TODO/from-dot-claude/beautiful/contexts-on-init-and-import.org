@@ -166,7 +166,7 @@
   in the lowest-level (callerward) function that puts them all to use.
 
 * Tracking org-roam IDs: the Misc field
-  Add a field to SkgNode:
+  Add a field to Graphnode:
     misc: Vec<FileProperty>
   where
     enum FileProperty { Had_ID_Before_Import }
@@ -192,8 +192,8 @@
     in the new misc field
   - [[./server/import_org_roam/mod.rs]] :
     after import, trigger context computation
-  - SkgNode type definition: add misc: Vec<FileProperty>
-  - SkgNode serialization: omit misc when empty
+  - Graphnode type definition: add misc: Vec<FileProperty>
+  - Graphnode serialization: omit misc when empty
   - [[./schema.tql]] : likely no change needed
     (context type is a Tantivy concern, not a TypeDB one)
   - New file(s) under server/ for context computation logic

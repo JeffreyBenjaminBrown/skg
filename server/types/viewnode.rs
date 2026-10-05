@@ -1,14 +1,13 @@
 /// Skg lets users control a graph, viewing it through a tree view in a text editor.
 /// Nodes of the graph are represented via the 'Graphnode' type.
 /// Nodes of the tree are represented via the 'Viewnode' type.
-///   (That name might change once there are more clients. The only client so far is written in Emacs org-mode; hence the name.)
 /// Some 'Viewnode's represent graphnodes, which need not exist; these are
 /// 'Vognode's (active, inactive, or phantom).
 /// Others encode information about neighboring tree nodes, such as
 /// aliases, IDs, and partner folders.
 
 use super::git::{NodeAxes, RelationshipAxes, Sign};
-use super::misc::{ID, RepoName};
+use super::misc::{ID, SkgRepoName};
 use super::nodes::complete::Flag;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use std::collections::HashSet;
@@ -16,7 +15,7 @@ use std::fmt;
 use std::str::FromStr;
 
 /// Whether this node participates in the membership represented by
-/// its visible parent. For an ordinary Vognode parent, that membership
+/// its viewparent. For an ordinary Vognode parent, that membership
 /// is the parent's content. For a PartnerFolder parent, the PartnerFolder
 /// decides the membership (per its relation and role). For other kinds of parent's,
 /// a node's AffectsParent has no effect.
@@ -32,13 +31,13 @@ pub enum AffectsParent {
   NA,    // It has no parent
 }
 
-/// Why a generated node was originally displayed under its visible parent.
+/// Why a generated node was originally displayed under its viewparent.
 /// This is view history used for display and stale-relation validation,
 /// not save extraction.
 ///
 /// A 'RoleGraft(role)' node was grafted by the role-tree engine as an
 /// role-tree partner; the RelationRole names the role that partner plays
-/// toward its org-parent (the origin) -- e.g. 'CONTAINER' for a
+/// toward its viewparent (the origin) -- e.g. 'CONTAINER' for a
 /// containerward ancestor, 'MENTIONER' for a node that links to the
 /// origin. The role determines the wire ROLENAME and the herald glyph
 /// (see PARTNER_ROLE_VOCAB).
@@ -77,26 +76,26 @@ pub enum ViewnodeKind {
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
   Active   (ActiveVognode),
-  Inactive (InactiveVognode), // From a repo that is inactive (see "repo sets").
+  Inactive (InactiveVognode), // From a skgrepo that is inactive (see "repo sets").
   Phantom  (Phantom),
 }
 
-/// The three display-only placeholder kinds. None of them is a current graph
-/// member: all are inert on save and excluded from the view's collateral pids
+/// The three display-only phantom kinds. None of them is a current graph
+/// member: all are save-inert on save and excluded from the view's collateral pids
 /// (`pids_from_viewforest`). They differ in *why* the node is absent and thus
 /// in how much they can still say about it.
 #[derive( Debug, Clone, PartialEq )]
 pub enum Phantom {
-  Diff    (PhantomDiff), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim PhantomDiff, not an ActiveVognode -- a phantom is always write-protected/bodyless and its affectsParent is never read or rendered, so it needs none of ActiveVognode's affectsParent/birth/viewStats/view_requests/editability. See PhantomDiff_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
+  Diff    (PhantomDiff), // Diff-only phantom: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim PhantomDiff, not an ActiveVognode -- a phantom is always write-protected/bodyless and its affectsParent is never read or rendered, so it needs none of ActiveVognode's affectsParent/birth/viewStats/view_requests/editability. See PhantomDiff_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
   Deleted (PhantomDeleted), // Epistemically: No longer exists in the graph. Procedurally: Skg just watched the user delete this node (maybe from a different view), but for some reason (e.g. its view-descendents are interesting, or it is a root) had to retain an image of it here.
   // PITFALL: There is an exception. If Skg watches a user delete a node, while that user has a view of a foreign node that refers to the deleted node, that "foreigner's view" will show it as Unknown rather than Deleted. This is to maintain consistency with how that relationship to a nonexistent node will appear when viewed in later sessions.
   Unknown (PhantomUnknown), // Skg can't find it (and, unlike Deleted, does not know why). Can result from bad data, or from a reference to another user's node that has since been deleted.
 }
 
-/// A placeholder ("phantom") for a node whose .skg file a save just
-/// removed -- one of the three placeholder kinds, alongside PhantomDiff and
+/// A phantom for a node whose .skg file a save just
+/// removed -- one of the three phantom kinds, alongside PhantomDiff and
 /// PhantomUnknown. All three stand in for something that is NOT a current graph
-/// member (so all three are inert on save and excluded from the view's
+/// member (so all three are save-inert on save and excluded from the view's
 /// collateral pids, `pids_from_viewforest`); they differ in *why* the node is
 /// absent and thus in how much they can still say about it.
 ///
@@ -104,14 +103,14 @@ pub enum Phantom {
 /// a node already materialized in the view turns up in
 /// `deleted_by_this_save_pids`. An Active content child flips here via
 /// `mutate_activeVognode_to_deletednode`. (An Inactive node is NOT flipped: it is an
-/// anonymous placeholder, and turning it into a DELETED marker would leak that a
+/// anonymous inactive vognode, and turning it into a DELETED marker would leak that a
 /// hidden node vanished, so it just lingers until the next full rerender drops
 /// it.) So it marks a node that genuinely no longer exists in the graph, killed
 /// by a completed save (this buffer's or a shared one's) -- not a git artifact.
 ///
-/// USED: inert -- it generates no save instructions and is excluded from its
+/// USED: save-inert -- it generates no fieldIntents and is excluded from its
 /// parent's contains list. It is never "completed", yet it retains its children
-/// (which `mark_orphans_under_dead_parents_false` demotes to Independent)
+/// (which `mark_orphans_under_dead_parents_false` demotes to non-member)
 /// so the user's subtree under a vanished node survives. A childless Deleted is
 /// pruned by the postorder sweep (`is_self_deletable_when_empty`), and a Deleted
 /// may stand as a view root (validate_tree) so a deleted root still shows.
@@ -123,14 +122,14 @@ pub enum Phantom {
 /// node, which carried none.) It holds no diff axes: it is not about git stages.
 #[derive( Debug, Clone, PartialEq )]
 pub struct PhantomDeleted {
-  pub id     : ID,
-  pub home_repo : RepoName,
-  pub title  : String,
-  pub body   : Option < String >,
+  pub skgid        : ID,
+  pub home_skgrepo : SkgRepoName,
+  pub title        : String,
+  pub body         : Option < String >,
 }
 
-/// A placeholder ("phantom") for a reference that resolves to nothing --
-/// one of the three placeholder kinds, alongside PhantomDiff and PhantomDeleted
+/// A phantom for a reference that resolves to nothing --
+/// one of the three phantom kinds, alongside PhantomDiff and PhantomDeleted
 /// (see PhantomDeleted for the shared framing).
 ///
 /// ARISES: when some node's `contains` (or similar list) names an ID that has no
@@ -142,31 +141,31 @@ pub struct PhantomDeleted {
 /// USED: it lets the view degrade gracefully -- carrying the bad reference as
 /// its own kind, rather than erroring, is what keeps a single bad reference deep
 /// in a subtree from killing the whole view at its root. Inert on save (it emits
-/// no instructions, though its descendants still might, so extraction recurses
+/// no fieldIntents, though its descendants still might, so extraction recurses
 /// through it). If it is still a member of its parent's contains it is retained
 /// (a present-but-unresolvable reference); if it is no longer a member it
 /// converts to a DeadViewnode (`convert_nonmember_unknown_children_to_dead`) and
 /// is pruned.
 ///
-/// DISTINCT INFO: it carries ONLY the `id`. Unlike PhantomDeleted it has no repo
+/// DISTINCT INFO: it carries ONLY the `id`. Unlike PhantomDeleted it has no skgrepo
 /// (it is the one Phantom kind for which `pid_and_repo` returns None) and no
 /// last-seen text; unlike PhantomDiff it has no diff axes. That emptiness IS
 /// the information: a reference exists, but we have no record of its target.
 #[derive( Debug, Clone, PartialEq )]
 pub struct PhantomUnknown {
-  pub id                 : ID,
+  pub skgid                 : ID,
   /// Display-only fact about this occurrence's binding relationship.
-  pub relRepo         : Option<RepoName>,
+  pub relRepo         : Option<SkgRepoName>,
   /// A pending relRepo change, consumed only by save.
-  pub relRepo_request : Option<RepoName>,
+  pub relRepo_request : Option<SkgRepoName>,
 }
 
 /// An anonymous "something from an inactive repo is/was here"
-/// placeholder. It carries NO data on purpose: an inactive node's id,
-/// repo, title, etc. describe content the user hid by restricting
-/// the active repo-set, so rendering any of it would leak.
+/// vognode. It carries NO data on purpose: an inactive node's id,
+/// skgrepo, title, etc. describe content the user hid by restricting
+/// the active skgrepo-set, so rendering any of it would leak.
 ///
-/// SCOPE: an InactiveVognode arises ONLY from a repo-set REDUCTION of an
+/// SCOPE: an InactiveVognode arises ONLY from a skgrepo-set REDUCTION of an
 /// already-drawn buffer ('update_buffer/repo_switch.rs' converts
 /// now-inactive Active nodes in place), where it is kept to host
 /// already-drawn active descendants. A de-novo render under a
@@ -176,32 +175,32 @@ pub struct PhantomUnknown {
 /// visit). So a public node reachable only through a private parent
 /// simply does not appear on a fresh restricted view.
 ///
-/// Being dataless, it is inert everywhere: it emits no save intention
-/// (its membership is owned by the disk weave), is not a collateral
+/// Being dataless, it is save-inert everywhere: it emits no save intention
+/// (its membership is owned by disk supplementation), is not a collateral
 /// pid, is irrelevant to every reconciler (preserved as-is, never
 /// goal-matched), and renders as the bare atom 'inactiveNode'.
 #[derive( Debug, Clone, PartialEq )]
 pub struct InactiveVognode;
 
-pub type ActiveVognode   = ActiveVognode_Generic < ID, RepoName >;
+pub type ActiveVognode   = ActiveVognode_Generic < ID, SkgRepoName >;
 pub type MpActiveVognode = ActiveVognode_Generic < Option < ID >,
-                                             Option < RepoName >>;
+                                             Option < SkgRepoName >>;
 
 /// A Viewnode that corresponds to a Graphnode.
 #[derive( Debug, Clone, PartialEq )]
-pub struct ActiveVognode_Generic < Id, Src > {
+pub struct ActiveVognode_Generic < Id, Repo > {
   pub title         : String,
-  pub id            : Id,
-  pub home_repo        : Src,
+  pub skgid         : Id,
+  pub home_skgrepo  : Repo,
   pub affectsParent      : AffectsParent,
   pub birth         : Birth,
 
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
   pub graphStats    : GraphnodeStats,
   pub viewStats     : ViewnodeStats,
-  /// A requested repo for this occurrence's binding relationship. Unlike
+  /// A requested skgrepo for this occurrence's binding relationship. Unlike
   /// `viewStats.relRepo`, this is save intent.
-  pub relRepo_request : Option<RepoName>,
+  pub relRepo_request : Option<SkgRepoName>,
 
   pub view_requests : HashSet < ViewRequest >,
   /// Per-stage diff state for the node's '.skg' file (the node axis).
@@ -209,24 +208,24 @@ pub struct ActiveVognode_Generic < Id, Src > {
   /// Per-stage diff state for the node's relationship at this position
   /// in the parent's contains list (the relationship axis).
   pub relationship_axes    : RelationshipAxes,
-  /// True iff the node's repo is not a git repo (or has no commits).
+  /// True iff the node's skgrepo is not a gitrepo (or has no commits).
   /// A per-repo fact, not an axis.
   pub not_in_git    : bool,
   pub editability  : Editability,
 }
 
-pub type PhantomDiff   = PhantomDiff_Generic < ID, RepoName >;
+pub type PhantomDiff   = PhantomDiff_Generic < ID, SkgRepoName >;
 pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
-                                               Option < RepoName >>;
+                                               Option < SkgRepoName >>;
 
-/// The slim payload of a `Phantom::Diff` -- one of the three placeholder
+/// The slim payload of a `Phantom::Diff` -- one of the three phantom
 /// ("phantom") kinds, alongside PhantomDeleted and PhantomUnknown (see
 /// PhantomDeleted for the shared framing).
 ///
 /// ARISES: only in git diff mode, from the diff-completion code. Two shapes,
 /// both detected by `diff_axes_require_phantom`: a "removed" member (present in
 /// the parent's HEAD/index contains but gone from the worktree's, inserted by
-/// `insert_phantoms_for_missing_contains` / `mk_phantom_viewnode`), or a Normal
+/// `insert_phantoms_for_missing_contains` / `mk_phantom_viewnode`), or an Active
 /// node flipped in place by `normal_to_phantom` because its own relationship/
 /// node axes went negative. "removed" vs "removedHere" (its .skg file is
 /// still in the worktree, so the graph can still answer about it) is told apart by
@@ -236,41 +235,41 @@ pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
 /// correct HEAD position among surviving siblings, decorated with per-stage diff
 /// atoms. Always write-protected and bodyless (enforced by `normal_to_phantom` /
 /// `mk_phantom_viewnode`); its affectsParent is never read or rendered (implicit
-/// Affected); a Normal child left under it is demoted to Independent.
+/// member); an Active child left under it is demoted to non-member.
 ///
 /// DISTINCT INFO: it is the only phantom that carries the git-diff coordinates
 /// -- per-stage `node_axes` and `relationship_axes` plus `not_in_git` -- because
 /// it exists solely to show a change between git snapshots. It keeps a `title`
-/// and `repo` (resolved via `title_for_phantom`; the repo may be the
+/// and `repo` (resolved via `title_for_phantom`; the skgrepo may be the
 /// RepoName NOT_FOUND sentinel) and `graphStats`, which IS rendered on
 /// phantoms. It needs NONE of ActiveVognode's affectsParent / birth / viewStats /
 /// view_requests / editability (TODO/DONE/local-view-update/plan_v2.org §11 reduction; see §18): nothing
 /// reads a phantom's affectsParent, and every phantom is write-protected.
 #[derive( Debug, Clone, PartialEq )]
-pub struct PhantomDiff_Generic < Id, Src > {
-  pub title      : String,
-  pub id         : Id,
-  pub home_repo     : Src,
+pub struct PhantomDiff_Generic < Id, Repo > {
+  pub title        : String,
+  pub skgid        : Id,
+  pub home_skgrepo : Repo,
   /// Per-stage diff state for the node's '.skg' file (the node axis).
   pub node_axes  : NodeAxes,
   /// Per-stage diff state for the node's relationship at this position
   /// in the parent's contains list (the relationship axis).
   pub relationship_axes : RelationshipAxes,
-  /// True iff the node's repo is not a git repo (or has no commits).
+  /// True iff the node's skgrepo is not a gitrepo (or has no commits).
   pub not_in_git : bool,
   pub graphStats : GraphnodeStats,
 }
 
-impl < Id, Src > PhantomDiff_Generic < Id, Src > {
+impl < Id, Repo > PhantomDiff_Generic < Id, Repo > {
   /// Build a phantom payload from an ActiveVognode, keeping only the phantom-relevant
   /// fields and discarding affectsParent / birth / viewStats / view_requests /
   /// editability. Used when flipping an Active node to a phantom and by the
   /// placed<->maybe-placed conversions.
-  pub fn from_activeVognode ( t : ActiveVognode_Generic < Id, Src > ) -> Self {
+  pub fn from_activeVognode ( t : ActiveVognode_Generic < Id, Repo > ) -> Self {
     PhantomDiff_Generic {
       title      : t . title,
-      id         : t . id,
-      home_repo     : t . home_repo,
+      skgid         : t . skgid,
+      home_skgrepo     : t . home_skgrepo,
       node_axes  : t . node_axes,
       relationship_axes : t . relationship_axes,
       not_in_git : t . not_in_git,
@@ -293,7 +292,7 @@ impl < Id, Src > PhantomDiff_Generic < Id, Src > {
 }
 
 /// Each ActiveVognode has one of these.
-/// - A Definitive represents an editable view.
+/// - A Editable represents an editable view.
 ///   The user's changes to title, body and children
 ///   will be written to disk and the dbs when they save.
 /// - `WriteProtected` represents a write-protected view,
@@ -301,19 +300,10 @@ impl < Id, Src > PhantomDiff_Generic < Id, Src > {
 ///   (TODO ? Maybe it should be.)
 #[derive( Debug, Clone, PartialEq )]
 pub enum Editability {
-  Definitive {
+  Editable {
     body         : Option < String >,
     edit_request : Option < NodeEditRequest >, },
   WriteProtected, }
-
-/// Containerward path statistics: how a node relates to the
-/// container hierarchy (path length, fork count, cycle detection).
-#[derive(Debug, Clone, PartialEq)]
-pub struct ContainerwardPathStats {
-  pub length : usize,
-  pub forks  : usize,
-  pub cycles : bool,
-}
 
 /// Directional member counts for the five graph relations, plus the
 /// substantive mentioners and distinct outbound targets, feeding the uniform-herald token grammar
@@ -329,8 +319,8 @@ pub struct RelationCounts {
   pub subscribees   : usize, // S outbound: its subscribees
   pub overriders    : usize, // O inbound: nodes that override it
   pub overrides_out : usize, // O outbound: nodes it overrides
-  pub link_total       : usize, // L inbound: distinct visible repos
-  pub link_substantive : usize, // inbound repos with body, content, or multiple targets
+  pub link_total       : usize, // L inbound: distinct visible skgrepos
+  pub link_substantive : usize, // inbound skgrepos with body, content, or multiple targets
   pub link_targets     : usize, // L outbound: distinct visible resolved targets
 }
 
@@ -348,18 +338,18 @@ pub struct GraphnodeStats {
 }
 
 /// View-specific statistics about a node.
-/// These depend on the node's position in the current view tree.
+/// These depend on the node's position in the current viewforest.
 /// `cycle` depends on ancestors; `affectsParent*` depends on the specific parent.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewnodeStats {
-  pub cycle             : bool,
-  pub homeRepoAtBoundary  : bool, // True if a root or if repo differs from repo of nearest activeVognode ancestor.
+  pub cycle                 : bool,
+  pub homeSkgRepoAtBoundary : bool, // True if a root or if skgrepo differs from skgrepo of nearest activeVognode ancestor.
   /// The relationship heralds as the SEMANTIC `(rels ...)` sexp string
   /// (server/herald_tokens.rs `relationship_heralds_sexp`): per-relation
   /// member counts and which tracked ancestors are members on each side,
   /// plus the birth. None when there is nothing to say. The
   /// client parses this and decides all presentation (letters, colors,
-  /// order). See TODO/heralds-semantic-wire.org.
+  /// order). See TODO/DONE/semantic-heralds-wire/plan.org.
   pub rel_heralds           : Option<String>,
   /// Some(N) means this viewnode was drawn here in place of N,
   /// which it (transitively) overrides. Herald pink "ĥ" after "O".
@@ -378,26 +368,26 @@ pub struct ViewnodeStats {
   /// herald strings; the parser accepts and discards it.
   pub hidden_body           : bool,
   /// Some(NAME) when the relationship instance this position's
-  /// binding edge to its org-parent represents (=contains= for an
+  /// binding relationship to its viewparent represents (=contains= for an
   /// ordinary content child; the folder's relation for a simple
   /// PartnerFolder member -- see 'PartnerFolder::relation_member_role')
-  /// is recorded in a repo that DIFFERS from that edge's DEFAULT
+  /// is recorded in a skgrepo that DIFFERS from that relationship's DEFAULT
   /// (see the relationship-default policy in 'SkgConfig'). None when
   /// equal to the default:
   /// the suppression is deliberate (render-and-gating,
-  /// TODO/user-owned_autofork_chain/5_plan.org) -- the herald marks
-  /// exactly the deliberately privatized edges. Also None: without a
+  /// TODO/DONE/privacy-telescope/5_plan.org) -- the herald marks
+  /// exactly the deliberately privatized relationships. Also None: without a
   /// graph handle; for a node that is not genuinely a member here
-  /// (affectsParent != Affected, or a role graft); and for the two
+  /// (affectsParent != True, or a role graft); and for the two
   /// compound filter folders (HiddenInSubscribee /
   /// HiddenOutsideOfSubscribee), which have no single
-  /// 'relation_member_role' to read a repo from.
+  /// 'relation_member_role' to read a skgrepo from.
   /// This is a display fact, unlike a requested replacement stored in
   /// 'ActiveVognode_Generic::relRepo_request'.  Save extraction never
-  /// treats this value as an instruction.
+  /// treats this value as a fieldIntent.
   /// Herald: red "~NAME" immediately before the ⌂ homeRepoHerald
   /// (server/heralds.rs).
-  pub relRepo            : Option<RepoName>,
+  pub relRepo            : Option<SkgRepoName>,
 }
 
 #[derive( Debug, Clone, PartialEq, Eq, Hash )]
@@ -410,10 +400,10 @@ pub enum PropertyFolder {
 #[derive( Debug, Clone, PartialEq )]
 pub enum Property {
   Alias { text: String, // an alias for the node's grandparent
-          relRepo: Option<RepoName>,
-          relRepo_request: Option<RepoName>,
+          relRepo: Option<SkgRepoName>,
+          relRepo_request: Option<SkgRepoName>,
           relationship_axes: RelationshipAxes },
-  ID { id: ID, // an ID of grandparent (the parent being an IDFolder)
+  ID { skgid: ID, // an ID of grandparent (the parent being an IDFolder)
        relationship_axes: RelationshipAxes },
   /// A true file-level boolean flag of the node's grandparent.
   Flag {
@@ -426,9 +416,9 @@ pub enum Property {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PartnerFolder {
-  Subscribee, // Collects subscribees its parent subscribes to. Writeable.
+  Subscribee, // Collects subscribees its parent subscribes to. Writable.
   Subscriber, // Collects nodes that subscribe to its parent. Write-protected (editable from the other side of the relationship).
-  Overridden, // Collects nodes whose view its parent overrides. Writeable.
+  Overridden, // Collects nodes whose view its parent overrides. Writable.
   Overrider, // Collects nodes that override its parent's view. Write-protected (editable from the other side of the relationship).
   Hider, // Collects nodes that hide its parent. Write-protected (editable from the other side of the relationship).
   // This folder is not itself hidden. Its children represent the nodes hidden
@@ -436,7 +426,7 @@ pub enum PartnerFolder {
   // here, but editable within the parent's SubscribeeFolder.
   Hidden,
   HiddenInSubscribee, // Child of a subscribee-as-such. Collects children of the subscribee that the subscriber hides. Write-protected (but these relationships are editable by modifying the listed contents of the subscribee-as-such).
-  HiddenOutsideOfSubscribee, // Child of a SubscribeeFolder. Collects things hidden by the SubscribeeFolder's parent but absent from every subscribee's content. This derived filter is editable as an exclusive visible-outside subset; its hide repos remain derived. Shown after all Subscribees, under the same SubscribeeFolder.
+  HiddenOutsideOfSubscribee, // Child of a SubscribeeFolder. Collects things hidden by the SubscribeeFolder's parent but absent from every subscribee's content. This derived filter is editable as an exclusive visible-outside subset; its hide skgrepos remain derived. Shown after all Subscribees, under the same SubscribeeFolder.
 }
 
 /// How a PartnerFolder's membership relates to user edits.
@@ -447,23 +437,23 @@ pub enum PartnerFolder {
 ///
 /// STALE-MEMBER RULE (uniform; decided 2026-06-10, superseding the
 /// discard policy once planned for the filter folders in
-/// TODO/full-schema/7_saving-readonly-cols.org): during
+/// TODO/DONE/full-schema/7_saving-readonly-cols.org): during
 /// reconciliation, a stale member that is a leaf is deleted, and one
 /// with children is demoted to affectsParent=false, whatever the
 /// policy. The policies differ in:
 /// - whether buffer membership is read at save extraction
-///   ('WritableSet' and 'EditableFilter'),
-/// - where the goal list comes from ('WritableSet' and 'WriteProtectedSet'
+///   ('EditableSet' and 'EditableFilter'),
+/// - where the goal list comes from ('EditableSet' and 'WriteProtectedSet'
 ///   from 'relation_member_role'; both filter policies from hide state),
-/// - goal-list order ('WritableSet': graph/disk order, which the
+/// - goal-list order ('EditableSet': graph/disk order, which the
 ///   user's own save defines; 'WriteProtectedSet': the view's current
 ///   member order, then missing members appended; filter folders are
 ///   derived),
 /// - whether repairs warn (the write-protected policies, in the saved view).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FolderPolicy {
-  WritableSet,    // Membership edits are graph edits. An absent folder means no opinion; a present-but-empty folder means an explicit empty set (see 'MSV').
-  EditableFilter, // A visible derived subset is an explicit edit of that subset; repo requests remain unsupported.
+  EditableSet,    // Membership edits are graph edits. An absent folder means no opinion; a present-but-empty folder means an explicit empty set (see 'MSV').
+  EditableFilter, // A visible derived subset is an explicit edit of that subset; skgrepo requests remain unsupported.
   WriteProtectedSet,    // Membership is generated from the graph. User order is respected view-locally; membership edits are repaired, with a warning.
   WriteProtectedFilter, // Membership is derived from hide state rather than from a relation role. Repaired, with a warning.
 }
@@ -548,7 +538,7 @@ pub fn diff_axes_require_phantom (
   || relationship_axes . unstaged == Some (Sign::Minus)
   || node_axes  . unstaged == Some (Sign::Minus) }
 
-impl < Id, Src > ActiveVognode_Generic < Id, Src > {
+impl < Id, Repo > ActiveVognode_Generic < Id, Repo > {
   pub fn should_be_diffPhantom (
     &self,
   ) -> bool {
@@ -570,13 +560,13 @@ impl < Id, Src > ActiveVognode_Generic < Id, Src > {
 
   pub fn body (&self) -> Option < &String > {
     match &self . editability {
-      Editability::Definitive { body, .. } =>
+      Editability::Editable { body, .. } =>
         body . as_ref(),
       Editability::WriteProtected => None, }}
 
   pub fn edit_request (&self) -> Option < &NodeEditRequest > {
     match &self . editability {
-      Editability::Definitive { edit_request, .. } =>
+      Editability::Editable { edit_request, .. } =>
         edit_request . as_ref(),
       Editability::WriteProtected => None, }}
 }
@@ -589,17 +579,17 @@ impl ActiveVognode {
   /// reconciler's orderkey all read this, never the raw 'id', so a
   /// drawn overrider round-trips to the original member instead of
   /// rewriting its parent's contains.
-  pub fn collected_id (&self) -> ID {
+  pub fn collected_skgid (&self) -> ID {
     self . viewStats . overridesHere . clone ()
-    . unwrap_or_else ( || self . id . clone () ) }
+    . unwrap_or_else ( || self . skgid . clone () ) }
 }
 
 impl MpActiveVognode {
   /// As 'ActiveVognode::collected_id', for the maybe-placed stage (the
   /// node might not have an ID yet; a marker, if present, wins).
-  pub fn collected_id (&self) -> Option<ID> {
+  pub fn collected_skgid (&self) -> Option<ID> {
     self . viewStats . overridesHere . clone ()
-    . or_else ( || self . id . clone () ) }
+    . or_else ( || self . skgid . clone () ) }
 }
 
 impl PartnerFolder {
@@ -607,7 +597,7 @@ impl PartnerFolder {
     match self {
       PartnerFolder::Subscribee
         | PartnerFolder::Overridden
-        => FolderPolicy::WritableSet,
+        => FolderPolicy::EditableSet,
       PartnerFolder::Subscriber
         | PartnerFolder::Overrider
         | PartnerFolder::Hider
@@ -684,7 +674,7 @@ impl Property {
   pub fn title (&self) -> &str {
     match self {
       Property::Alias { text, .. } => text,
-      Property::ID    { id, .. }   => id,
+      Property::ID    { skgid, .. }   => skgid,
       Property::Flag { title, .. } => title,
       Property::TextChanged { .. } => "",
     } }
@@ -696,22 +686,22 @@ impl Property {
 }
 
 impl Vognode {
-  /// None for an Inactive vognode: it is an anonymous placeholder with
+  /// None for an Inactive vognode: it is an anonymous inactive vognode with
   /// no id (see InactiveVognode). A phantom returns the id it stands for.
-  pub fn id (&self) -> Option<&ID> {
+  pub fn skgid (&self) -> Option<&ID> {
     match self {
-      Vognode::Active   (t) => Some (&t . id),
+      Vognode::Active   (t) => Some (&t . skgid),
       Vognode::Inactive (_) => None,
-      Vognode::Phantom  (p) => Some (p . id ()),
+      Vognode::Phantom  (p) => Some (p . skgid ()),
     } }
 
-  pub fn pid_and_repo (
+  pub fn pid_and_skgrepo (
     &self,
-  ) -> Option<(&ID, &RepoName)> {
+  ) -> Option<(&ID, &SkgRepoName)> {
     match self {
-      Vognode::Active   (t) => Some ((&t . id, &t . home_repo)),
+      Vognode::Active   (t) => Some ((&t . skgid, &t . home_skgrepo)),
       Vognode::Inactive (_) => None,
-      Vognode::Phantom  (p) => p . pid_and_repo (),
+      Vognode::Phantom  (p) => p . pid_and_skgrepo (),
     } }
 
   /// Whether this vognode represents a current graph member
@@ -721,19 +711,19 @@ impl Vognode {
 }
 
 impl Phantom {
-  pub fn id (&self) -> &ID {
+  pub fn skgid (&self) -> &ID {
     match self {
-      Phantom::Diff    (p) => &p . id,
-      Phantom::Deleted (d) => &d . id,
-      Phantom::Unknown (u) => &u . id,
+      Phantom::Diff    (p) => &p . skgid,
+      Phantom::Deleted (d) => &d . skgid,
+      Phantom::Unknown (u) => &u . skgid,
     } }
 
-  pub fn pid_and_repo (
+  pub fn pid_and_skgrepo (
     &self,
-  ) -> Option<(&ID, &RepoName)> {
+  ) -> Option<(&ID, &SkgRepoName)> {
     match self {
-      Phantom::Diff    (p) => Some ((&p . id, &p . home_repo)),
-      Phantom::Deleted (d) => Some ((&d . id, &d . home_repo)),
+      Phantom::Diff    (p) => Some ((&p . skgid, &p . home_skgrepo)),
+      Phantom::Deleted (d) => Some ((&d . skgid, &d . home_skgrepo)),
       Phantom::Unknown (_) => None, // preserves Unknown's lone-None invariant
     } }
 }
@@ -768,7 +758,7 @@ impl Viewnode {
     match &mut self . kind {
       ViewnodeKind::Vognode (Vognode::Active (active)) => {
         active . relRepo_request = None;
-        if let Editability::Definitive { edit_request, .. } =
+        if let Editability::Editable { edit_request, .. } =
           &mut active . editability
         { *edit_request = None; }},
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
@@ -786,10 +776,10 @@ impl Viewnode {
         { // A phantom is ALWAYS write-protected and renders no body (Jeff's
           // TODO/DONE/local-view-update/progress.org §9 TODO): the diff view presumes git literacy (magit
           // shows the real node), and a phantom must never be a node's
-          // definitive instance -- if Removed it has nothing to define, and if
+          // editable occurrence -- if Removed it has nothing to define, and if
           // RemovedHere "edit it here, where it isn't" is dangerously
           // confusing. So drop body/edit_request when flipping a (possibly
-          // Definitive) Active node to a phantom. mk_phantom_viewnode already
+          // Editable) Active node to a phantom. mk_phantom_viewnode already
           // builds from a `WriteProtected` base, so now every phantom is
           // write-protected by construction.
           let phantom : PhantomDiff =
@@ -838,19 +828,19 @@ impl Viewnode {
 
   /// The id of a vognode that represents a current graph member: None
   /// for phantoms, inactive vognodes and non-vognodes.
-  pub fn id_if_graph_member (&self) -> Option<&ID> {
+  pub fn skgid_if_graph_member (&self) -> Option<&ID> {
     match &self . kind {
-      ViewnodeKind::Vognode (v) if v . is_graph_member () => v . id (),
+      ViewnodeKind::Vognode (v) if v . is_graph_member () => v . skgid (),
       _ => None,
     }}
 
   /// The id of an Active vognode or a Diff phantom -- the two ActiveVognode-ish
   /// kinds. None for everything else
   /// (Inactive, Deleted/Unknown phantoms, folders, non-vognodes, BufferRoot).
-  pub fn active_or_diff_phantom_id (&self) -> Option<&ID> {
+  pub fn active_or_diff_phantom_skgid (&self) -> Option<&ID> {
     match &self . kind {
-      ViewnodeKind::Vognode (Vognode::Active (t)) => Some (&t . id),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))   => Some (&p . id),
+      ViewnodeKind::Vognode (Vognode::Active (t)) => Some (&t . skgid),
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))   => Some (&p . skgid),
       _ => None,
     }}
 }
@@ -861,7 +851,7 @@ impl fmt::Display for NodeEditRequest {
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
     match self {
-      NodeEditRequest::NodeMerge (id) => write!(f, "(merge {})", id . 0),
+      NodeEditRequest::NodeMerge (skgid) => write!(f, "(merge {})", skgid . 0),
       NodeEditRequest::Delete    => write!(f, "toDelete"),
       NodeEditRequest::SetFlag { flag, value } => write! (
         f, "(flag {} {})", flag . wire_name (), value),
@@ -912,7 +902,7 @@ impl Default for ViewnodeStats {
   fn default () -> Self {
     ViewnodeStats {
       cycle             : false,
-      homeRepoAtBoundary  : false,
+      homeSkgRepoAtBoundary  : false,
       rel_heralds       : None,
       overridesHere     : None,
       hidden_body       : false,
@@ -923,17 +913,17 @@ impl Default for ViewnodeStats {
 // Constructor functions
 //
 
-/// Create an ActiveVognode with default values for all fields except id, repo, and title.
+/// Create an ActiveVognode with default values for all fields except id, skgrepo, and title.
 /// Useful when you need to customize other fields after construction.
 pub fn default_activeVognode (
-  id     : ID,
-  repo : RepoName,
-  title  : String,
+  skgid   : ID,
+  skgrepo : SkgRepoName,
+  title   : String,
 ) -> ActiveVognode {
   ActiveVognode {
     title,
-    id,
-    home_repo: repo,
+    skgid,
+    home_skgrepo: skgrepo,
     affectsParent       : AffectsParent::True,
     birth          : Birth::Unremarkable,
     graphStats     : GraphnodeStats::default(),
@@ -943,7 +933,7 @@ pub fn default_activeVognode (
     node_axes      : NodeAxes::default(),
     relationship_axes     : RelationshipAxes::default(),
     not_in_git     : false,
-    editability   : Editability::Definitive {
+    editability    : Editability::Editable {
       body         : None,
       edit_request : None },
   }}
@@ -952,14 +942,14 @@ pub fn default_activeVognode (
 /// At least one relationship axis or the unstaged-node axis should be
 /// negative for this to be a real phantom; callers must ensure that.
 pub fn mk_phantom_viewnode (
-  id         : ID,
-  repo     : RepoName,
+  skgid      : ID,
+  skgrepo    : SkgRepoName,
   title      : String,
   node_axes  : NodeAxes,
   relationship_axes : RelationshipAxes,
 ) -> Viewnode {
   let mut viewnode : Viewnode =
-    mk_writeProtected_viewnode ( id, repo, title, AffectsParent::True );
+    mk_writeProtected_viewnode ( skgid, skgrepo, title, AffectsParent::True );
   if let ViewnodeKind::Vognode (Vognode::Active (mut t)) = viewnode . kind
     { t . node_axes  = node_axes;
       t . relationship_axes = relationship_axes;
@@ -972,27 +962,27 @@ pub fn mk_phantom_viewnode (
         "mk_phantom_viewnode: mk_writeProtected_viewnode did not yield an Active vognode" ); }
   viewnode }
 
-pub fn mk_definitive_viewnode (
-  id     : ID,
-  repo : RepoName,
-  title  : String,
-  body   : Option < String >,
-) -> Viewnode { mk_viewnode ( id,
-                            repo,
+pub fn mk_editable_viewnode (
+  skgid   : ID,
+  skgrepo : SkgRepoName,
+  title   : String,
+  body    : Option < String >,
+) -> Viewnode { mk_viewnode ( skgid,
+                            skgrepo,
                             title,
                             AffectsParent::True,
                             Birth::Unremarkable,
-                            Editability::Definitive {
+                            Editability::Editable {
                               body,
                               edit_request : None },
                             HashSet::new () ) } // view_requests
 
-/// Build an PhantomUnknown wrapper. Use when a referenced ID resolves
+/// Build a PhantomUnknown wrapper. Use when a referenced ID resolves
 /// to nothing in in_rust_graph, on disk, or via any phantom/diff procedure
-/// -- the placeholder lets the view render the line as a herald
+/// -- the phantom lets the view render the line as a herald
 /// rather than aborting the whole BFS expansion.
 pub fn mk_unknown_viewnode (
-  id : ID,
+  skgid : ID,
 ) -> Viewnode {
   Viewnode {
     focused     : false,
@@ -1000,7 +990,7 @@ pub fn mk_unknown_viewnode (
     body_folded : false,
     kind        : ViewnodeKind::Vognode (Vognode::Phantom (
       Phantom::Unknown ( PhantomUnknown {
-        id,
+        skgid,
         relRepo         : None,
         relRepo_request : None,
       } ) )),
@@ -1019,29 +1009,29 @@ pub fn mk_inactive_viewnode (
 /// Create a write-protected Viewnode from disk data.
 /// Body is always None since write-protected nodes don't have editable content.
 pub fn mk_writeProtected_viewnode (
-  id     : ID,
-  repo : RepoName,
+  skgid     : ID,
+  skgrepo : SkgRepoName,
   title  : String,
   affectsParent  : AffectsParent,
 ) -> Viewnode {
   mk_writeProtected_viewnode_with_birth (
-    id, repo, title, affectsParent, Birth::Unremarkable ) }
+    skgid, skgrepo, title, affectsParent, Birth::Unremarkable ) }
 
 pub fn mk_writeProtected_viewnode_with_birth (
-  id       : ID,
-  repo   : RepoName,
+  skgid    : ID,
+  skgrepo  : SkgRepoName,
   title    : String,
   affectsParent : AffectsParent,
   birth    : Birth,
-) -> Viewnode { mk_viewnode ( id,
-                            repo,
+) -> Viewnode { mk_viewnode ( skgid,
+                            skgrepo,
                             title,
                             affectsParent,
                             birth,
                             Editability::WriteProtected,
                             HashSet::new ( )) } // view_requests
 
-/// Convert a definitive Viewnode to write-protected.
+/// Convert an editable Viewnode to write-protected.
 /// Discards body and edit_request.
 /// Errors if the input is not an ActiveVognode.
 pub fn mk_writeProtected_from_viewnode (
@@ -1063,7 +1053,7 @@ pub fn mk_writeProtected_from_viewnode (
       // A phantom carries none of the fields preserved above,
       // so it is rebuilt rather than mutated.
       Ok ( mk_writeProtected_viewnode_with_birth (
-        p . id . clone (), p . home_repo . clone (), p . title . clone (),
+        p . skgid . clone (), p . home_skgrepo . clone (), p . title . clone (),
         affectsParent, birth )),
     _ => Err (
       "mk_writeProtected_from_viewnode: expected ActiveVognode"
@@ -1074,8 +1064,8 @@ pub fn mk_writeProtected_from_viewnode (
 /// because it would be difficult and dangerous to set that in isolation,
 /// without considering the rest of the Viewnode tree.
 pub fn mk_viewnode (
-  id            : ID,
-  repo        : RepoName,
+  skgid         : ID,
+  skgrepo       : SkgRepoName,
   title         : String,
   affectsParent      : AffectsParent,
   birth         : Birth,
@@ -1092,7 +1082,7 @@ pub fn mk_viewnode (
                             view_requests,
                             editability,
                             .. default_activeVognode (
-                              id, repo, title ) } ) ) }}
+                              skgid, skgrepo, title ) } ) ) }}
 
 /// Helper to create a BufferRoot Viewnode.
 pub fn viewforest_root_viewnode () -> Viewnode {

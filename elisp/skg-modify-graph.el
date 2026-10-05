@@ -12,10 +12,10 @@
   "Regex matching an org bracket link in a headline title.")
 
 (defun skg-goto-biggest-branch ()
-  "Go to the sibling, or child, with the most org-descendents.
+  "Go to the sibling, or child, with the most viewdescendants.
 If the node at point has siblings, consider the node itself and
 all of those siblings.  If it has no siblings, consider its
-immediate org-children instead.  This is intentionally an org
+immediate viewchildren instead.  This is intentionally an org
 outline heuristic, not a precise graph-content query."
   (interactive)
   (let* ((candidates (skg--biggest-branch-candidates))
@@ -23,18 +23,18 @@ outline heuristic, not a precise graph-content query."
          (pos (car winner))
          (descendent-count (cdr winner)))
     (goto-char pos)
-    (message "Biggest branch has %d org-descendent(s)."
+    (message "Biggest branch has %d viewdescendant(s)."
              descendent-count)))
 
 (defun skg--biggest-branch-candidates ()
   "Return candidate headline positions for `skg-goto-biggest-branch'."
   (save-excursion
-    (skg--back-to-current-heading)
+    (skg--back-to-current-headline)
     (let ((same-level-headlines
            (skg--same-level-headlines-in-parent-subtree)))
       (if (> (length same-level-headlines) 1)
           same-level-headlines
-        (let ((children (skg--immediate-org-children)))
+        (let ((children (skg--immediate-viewchildren)))
           (unless children
             (user-error "This branch has no siblings or children"))
           children)))))
@@ -44,36 +44,36 @@ outline heuristic, not a precise graph-content query."
   (let ((best-pos nil)
         (best-count -1))
     (dolist (pos positions)
-      (let ((count (skg--org-descendent-count pos)))
+      (let ((count (skg--viewdescendant-count pos)))
         (when (> count best-count)
           (setq best-pos pos
                 best-count count))))
     (cons best-pos best-count)))
 
 (defun skg--same-level-headlines-in-parent-subtree ()
-  "Return headline positions at the current heading's org level."
+  "Return headline positions at the current headline's org level."
   (let* ((level (org-current-level))
          (bounds (skg--parent-subtree-or-buffer-bounds)))
-    (skg--heading-positions-with-level level
+    (skg--headline-positions-with-level level
                                        (car bounds)
                                        (cdr bounds))))
 
 (defun skg--parent-subtree-or-buffer-bounds ()
-  "Return bounds for current heading's parent subtree, or whole buffer."
+  "Return bounds for current headline's parent subtree, or whole buffer."
   (save-excursion
     (if (org-up-heading-safe)
         (cons (line-beginning-position)
               (save-excursion (org-end-of-subtree t t)))
       (cons (point-min) (point-max)))))
 
-(defun skg--immediate-org-children ()
-  "Return positions of the current heading's immediate org-children."
+(defun skg--immediate-viewchildren ()
+  "Return positions of the current headline's immediate viewchildren."
   (let* ((child-level (1+ (org-current-level)))
          (start (line-beginning-position))
          (end (save-excursion (org-end-of-subtree t t))))
-    (skg--heading-positions-with-level child-level start end)))
+    (skg--headline-positions-with-level child-level start end)))
 
-(defun skg--heading-positions-with-level (level start end)
+(defun skg--headline-positions-with-level (level start end)
   "Return headline positions of org LEVEL between START and END."
   (let ((positions nil))
     (save-excursion
@@ -85,8 +85,8 @@ outline heuristic, not a precise graph-content query."
         (forward-line 1)))
     (nreverse positions)))
 
-(defun skg--org-descendent-count (pos)
-  "Return number of org-descendent headlines under POS."
+(defun skg--viewdescendant-count (pos)
+  "Return number of viewdescendant headlines under POS."
   (save-excursion
     (goto-char pos)
     (let ((start (line-beginning-position))
@@ -100,8 +100,8 @@ outline heuristic, not a precise graph-content query."
         (forward-line 1))
       count)))
 
-(defun skg--back-to-current-heading ()
-  "Move to the heading containing point, or signal a user error."
+(defun skg--back-to-current-headline ()
+  "Move to the headline containing point, or signal a user error."
   (condition-case nil
       (org-back-to-heading t)
     (error (user-error "Not in an org headline or body"))))
@@ -109,7 +109,7 @@ outline heuristic, not a precise graph-content query."
 (defun skg-replace-content-with-link ()
   "Replace the branch at point with a link to its former root.
 Point may be on the headline or in its body.  The root must be an
-existing ActiveVognode with an ID.  Its org-parent must be a definitive
+existing ActiveVognode with an ID.  Its viewparent must be a definitive
 ActiveVognode whose repo is owned by the user.  The whole org subtree
 at point is replaced by a same-level headline whose title is an
 org id link to the former root, then the buffer is saved."
@@ -130,7 +130,7 @@ org id link to the former root, then the buffer is saved."
   "Replace the leaf at point with content linked from that leaf.
 Point may be on the headline or in the body.  The leaf must have
 exactly one org bracket link in its title plus body, no
-org-descendents, and a definitive ActiveVognode org-parent whose repo
+viewdescendants, and a definitive ActiveVognode viewparent whose repo
 is owned by the user.  The link must be an id link.  The leaf is
 replaced by a write-protected same-level ActiveVognode for the link
 target, then the buffer is saved."
@@ -161,7 +161,7 @@ target, then the buffer is saved."
             :title (nth 2 split)))))
 
 (defun skg--content-link-replacement-container-data ()
-  "Return metadata for the org-parent of the headline at point."
+  "Return metadata for the viewparent of the headline at point."
   (save-excursion
     (unless (org-up-heading-safe)
       (user-error "Cannot replace this branch with a link: node has no container"))
@@ -198,11 +198,11 @@ The default link label is TITLE with any nested links reduced to plain text."
 
 (defun skg--single-link-in-current-leaf ()
   "Return plist data for the only org bracket link in this leaf.
-Signals a user error if the current node has org-descendents, if
+Signals a user error if the current node has viewdescendants, if
 there is not exactly one link in its title plus body, or if that
 one link is not an id link."
-  (when (skg--current-node-has-org-descendents-p)
-    (user-error "Cannot replace link with content: node has org-descendents"))
+  (when (skg--current-node-has-viewdescendants-p)
+    (user-error "Cannot replace link with content: node has viewdescendants"))
   (let* ((headline-text (skg-get-current-headline-text))
          (split (skg-split-as-stars-metadata-title headline-text))
          (title (nth 2 split))
@@ -217,7 +217,7 @@ one link is not an id link."
         (user-error "Cannot replace link with content: the link is not an id link"))
       (plist-put link :id (substring target 3)))))
 
-(defun skg--current-node-has-org-descendents-p ()
+(defun skg--current-node-has-viewdescendants-p ()
   "Return non-nil if the current org node has child headlines."
   (save-excursion
     (let ((level (org-outline-level))

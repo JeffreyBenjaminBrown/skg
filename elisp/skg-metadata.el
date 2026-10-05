@@ -11,7 +11,7 @@
 (defun skg-delete (&optional recursive)
   "Mark the headline at point for deletion.
 With a prefix argument RECURSIVE, also mark every activeNode
-org-descendent (equivalent to `skg-delete-recursive').
+viewdescendant (equivalent to `skg-delete-recursive').
 Edits the metadata to include `delete` in the `editRequest` section.
 Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive "P")
@@ -22,7 +22,7 @@ Does NOT save; call `skg-request-save-buffer' afterward."
     (message "This change will only be applied when you save the buffer.")))
 
 (defun skg-delete-recursive ()
-  "Mark the headline at point, and every activeNode org-descendent of it,
+  "Mark the headline at point, and every activeNode viewdescendant of it,
 for deletion. Descendent headlines that are not activeNodes (phantoms,
 aliasFolder, id-folder, etc.) are skipped. Does NOT save;
 call `skg-request-save-buffer' afterward."
@@ -143,13 +143,13 @@ via `skg--populate-minimal-node-metadata' (RECURSIVE is then moot).
 When the move would leave content relationships stuck at their old,
 more private repos (the sticky rule never lowers an edge's privacy
 without an explicit gesture; see
-TODO/MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org),
+TODO/DONE/MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org),
 offers to publicize them in the same go by writing
 `(editRequest (relRepo ...))' requests; declining leaves them and mentions that
 `skg-set-relRepo-recursive' (C-c s R) can publicize them
 later.
 
-Write-protected instances are NOT changed -- the save would silently
+Write-protected occurrences are NOT changed -- the save would silently
 ignore their repo edits -- and produce a loud warning, with the
 full ID list in *Messages*.
 
@@ -180,9 +180,9 @@ Does NOT save; call `skg-request-save-buffer' afterward."
   "The body of `skg-set-repo' once a real move is requested:
 analyze which content edges the move would leave stuck at more
 private repos, retarget the repos (skipping write-protected
-instances), offer to publicize the stuck edges in the same go, and
-report -- loudly, when write-protected instances were skipped."
-  (let* ((stuck ;; analyzed BEFORE any rewrite: it needs the old repos
+occurrences), offer to publicize the stuck edges in the same go, and
+report -- loudly, when write-protected occurrences were skipped."
+  (let* ((stuck ;; analyzed BEFORE any rewrite: it needs the old skgrepos
           (skg--analyze-move-stuck-edges old-repo new-repo recursive))
          (change-result (if recursive
                             (skg--change-repo-recursive old-repo
@@ -200,7 +200,7 @@ report -- loudly, when write-protected instances were skipped."
                               (if (= (length stuck) 1) "" "s"))))
             (skg--apply-stuck-relRepos stuck))))
     (dolist (id write-protected-ids)
-      (message "skg-set-repo: write-protected instance NOT changed (the save would ignore it): %s"
+      (message "skg-set-repo: write-protected occurrence NOT changed (the save would ignore it): %s"
                id))
     (message "%s"
              (concat
@@ -226,19 +226,19 @@ default, as a list of (MARKER . REPO) -- MARKER at the child
 headline, REPO the edge's new default. Only edges without an
 existing `(relRepo ...)' atom qualify: an atom-carrying edge was
 already assigned a deliberate relRepo. The walk's root itself is always
-retargeted (unless write-protected); its org-parent lies outside the
+retargeted (unless write-protected); its viewparent lies outside the
 move, so its repo counts as unchanging. With RECURSIVE nil only
 the point node moves, so only its own edge and its direct
 children's edges are examined."
   (save-excursion
     (let* ((stuck '())
            (start-level (org-outline-level))
-           (consider ;; point on a candidate child C, whose inbound edge is examined; the arguments say whether each endpoint's repo is about to be retargeted
+           (consider ;; point on a candidate child C, whose inbound relationship is examined; the arguments say whether each endpoint's skgrepo is about to be retargeted
             (lambda (parent-retargets-p child-retargets-p)
               (when (skg--relationship-kind-matches-p 'contained)
                 (let* ((child-meta (skg--metadata-sexp-at-point-or-nil))
                        (child-repo (skg--node-repo child-meta))
-                       (child-moves ;; a write-protected instance is skipped by the retargeting walk, so its repo does not actually change
+                       (child-moves ;; a write-protected occurrence is skipped by the retargeting walk, so its skgrepo does not actually change
                         (and child-retargets-p
                              (not (skg--node-write-protected-p child-meta))))
                        (parent-repo
@@ -261,19 +261,19 @@ children's edges are examined."
                     (push (cons (copy-marker (line-beginning-position))
                                 repo)
                           stuck)))))))
-      (funcall consider nil t) ;; the root's own inbound edge
+      (funcall consider nil t) ;; the root's own inbound relationship
       (outline-next-heading)
       (while (and (not (eobp))
                   (> (org-outline-level) start-level))
         (let ((meta (skg--metadata-sexp-at-point-or-nil)))
           (if (not (and (skg--activeNode-sexp-p meta)
                         (skg--node-affectsParent-content-of-p meta)))
-              (skg--goto-next-heading-after-subtree)
+              (skg--goto-next-headline-after-subtree)
             (if recursive
                 (funcall consider t t)
               (when (= (org-outline-level) (1+ start-level))
                 ;; Single move: only the point node moves, so only
-                ;; its direct children's inbound edges can change.
+                ;; its direct children's inbound relationships can change.
                 (funcall consider t nil)))
             (outline-next-heading))))
       (nreverse stuck))))
@@ -310,7 +310,7 @@ STUCK, then free the markers. Returns the number of requests written."
     (length stuck)))
 
 (defun skg--change-repo-at-point-unless-write-protected (new-repo)
-  "Set the repo at point to NEW-REPO, unless the instance is
+  "Set the repo at point to NEW-REPO, unless the occurrence is
 write-protected -- the save would silently ignore that edit. Returns
 (CHANGED-COUNT . WRITE-PROTECTED-IDS), matching `skg--change-repo-recursive'."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
@@ -357,17 +357,17 @@ be meaningless.")
   "The PartnerFolder atoms whose members' edges are WRITABLE
 from this side, each mapped to its relation's wire name
 (NodeRelation::relation_name, server/dbs/in_rust_graph/
-relation_accessors.rs). The folder's org-parent (the anchor) owns the
+relation_accessors.rs). The folder's viewparent (the anchor) owns the
 outbound edge to each member.")
 
 (defun skg--rel-at-point ()
   "Classify the relationship edge the headline at point represents.
-Returns a plist (:owner OWNER-ID :member MEMBER-ID :relation NAME):
-for a content child, the org-parent contains the node at point; for
-a writable-folder member, the folder's anchor (the folder's org-parent) owns
+Returns a plist (:recorder RECORDER-ID :member MEMBER-ID :relation NAME):
+for a content child, the viewparent contains the node at point; for
+a writable-folder member, the folder's anchor (the folder's viewparent) owns
 the folder's relation toward the node at point. Signals `user-error'
 when point represents no writable edge: not on an activeNode or Unknown
-headline, on a root headline (no org-parent, so no edge), on a
+headline, on a root headline (no viewparent, so no edge), on a
 member of a write-protected folder, or with an ID missing."
   (unless (org-at-heading-p)
     (user-error "Not on a headline"))
@@ -408,14 +408,14 @@ member of a write-protected folder, or with an ID missing."
                          (skg--metadata-sexp-at-point-or-nil))))))
             (unless anchor-id
               (user-error "Could not find the folder's anchor headline"))
-            (list :owner anchor-id
+            (list :recorder anchor-id
                   :member member-id
                   :relation (cdr writable-folder))))
          ((skg--activeNode-sexp-p parent-sexp)
           (let ((parent-id (skg--node-id parent-sexp)))
             (unless parent-id
               (user-error "No id in the parent headline's metadata"))
-            (list :owner parent-id
+            (list :recorder parent-id
                   :member member-id
                   :relation "contains")))
          (t (user-error
@@ -513,7 +513,7 @@ next save will do with the edge."
         (skg-edit-metadata-at-point
          `(skg (unknown (ENSURE (editRequest (relRepo ,(intern choice))))))))
        (t
-        ;; The display fact remains under viewStats; repo intent is separate.
+        ;; The display fact remains under viewStats; skgrepo intent is separate.
         (skg-edit-metadata-at-point '(skg (node (editRequest))))
         (skg-edit-metadata-at-point
          `(skg (node (editRequest (ENSURE (relRepo ,(intern choice)))))))))
@@ -589,7 +589,7 @@ The walk starts at the node at point (inclusive: its own edge to
 its view-parent counts when it matches) and recurses only on
 viewchildren that affect their viewparents: affectsParent=true
 activeNodes and writable folders. It prunes below write-protected nodes
-and subscribee-as-such members (their org-children's edges are not
+and subscribee-as-such members (their viewchildren's edges are not
 collected at save), and prunes write-protected folders and other non-vognodes
 entirely.
 
@@ -730,11 +730,11 @@ command, but does not edit anything."
             (cond
              ((skg--activeNode-sexp-p meta)
               (if (not (skg--node-affectsParent-content-of-p meta))
-                  (skg--goto-next-heading-after-subtree)
+                  (skg--goto-next-headline-after-subtree)
                 (when (skg--relationship-kind-matches-p kind)
                   (push (copy-marker (line-beginning-position)) targets))
                 (if (skg--relRepo-prune-below-p meta)
-                    (skg--goto-next-heading-after-subtree)
+                    (skg--goto-next-headline-after-subtree)
                   (outline-next-heading))))
              ((skg--unknown-headline-p meta)
               (when (skg--relationship-kind-matches-p kind)
@@ -743,7 +743,7 @@ command, but does not edit anything."
              ((skg--writable-folder-sexp-p meta)
               (outline-next-heading))
              (t ;; write-protected folders, alias/ID folders, and other phantoms.
-              (skg--goto-next-heading-after-subtree))))))
+              (skg--goto-next-headline-after-subtree))))))
       (nreverse targets))))
 
 (defun skg--relationship-kind-matches-p (kind)
@@ -753,7 +753,7 @@ from this position: for `contained', the view-parent must be a
 definitive activeNode not in subscribee-as-such position (an
 write-protected or subscribee-as-such parent's contains is not
 collected at save, so a relRepo request under one would be
-inert); for `subscribee' and `overridden', the view-parent must be
+inert); for `subscribee' and `overridden', the viewparent must be
 the matching writable folder with a definitive anchor."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (and (or (and (skg--activeNode-sexp-p meta)
@@ -781,7 +781,7 @@ the matching writable folder with a definitive anchor."
   "Non-nil iff the walk should not descend below the activeNode
 headline at point (with METADATA-SEXP its parsed metadata): an
 write-protected node's contains is not collected at save, and a
-subscribee-as-such member's org-children are hide/unhide signals,
+subscribee-as-such member's viewchildren are hide/unhide signals,
 not writable edges."
   (or (skg--node-write-protected-p metadata-sexp)
       (skg--subscribee-as-such-at-point-p)))
@@ -800,8 +800,8 @@ position: an true activeNode member of a subscribeeFolder."
 
 (defun skg--folder-anchor-definitive-p ()
   "Non-nil iff the folder headline at point has a definitive activeNode
-anchor (its org-parent). A write-protected anchor's writable folders are
-not collected at save (the folder owner is not save-eligible), so
+anchor (its viewparent). A write-protected anchor's writable folders are
+not collected at save (the folder recorder is not save-eligible), so
 atoms on their members have no effect."
   (save-excursion
     (and (org-up-heading-safe)
@@ -840,12 +840,12 @@ Does NOT save; call `skg-request-save-buffer' afterward."
              acquiree-id)))
 
 (defun skg--read-id-or-link (prompt)
-  "Read an ID or link with ID-stack paste/pop bindings in the minibuffer."
-  (minibuffer-with-setup-hook #'skg--install-id-stack-minibuffer-bindings
+  "Read an ID or link with linkstack paste/pop bindings in the minibuffer."
+  (minibuffer-with-setup-hook #'skg--install-linkstack-minibuffer-bindings
     (read-string prompt)))
 
-(defun skg--install-id-stack-minibuffer-bindings ()
-  "Install ID-stack paste/pop bindings in the active minibuffer."
+(defun skg--install-linkstack-minibuffer-bindings ()
+  "Install linkstack paste/pop bindings in the active minibuffer."
   (let ((map (copy-keymap (current-local-map))))
     (define-key map (kbd "C-c o i") #'skg-paste-id)
     (define-key map (kbd "C-c o l") #'skg-paste-link)
@@ -869,11 +869,11 @@ Does NOT save; call `skg-request-save-buffer' afterward."
   "Change OLD-REPO to NEW-REPO in this content subtree.
 Returns (CHANGED-COUNT . WRITE-PROTECTED-IDS).  The root node is inclusive;
 only descendents for which affectsParent=true are traversed.
-A write-protected instance is NOT edited -- the save would silently
+A write-protected occurrence is NOT edited -- the save would silently
 ignore its repo edit (see TODO/problems.org, \"skg-set-repo
-silently no-ops on write-protected instances\") -- and its ID is
+silently no-ops on write-protected occurrences\") -- and its ID is
 collected into WRITE-PROTECTED-IDS instead, for the caller to warn about.
-Its org-descendents are still traversed: they are self-writers, so
+Its viewdescendants are still traversed: they are self-writers, so
 their repo edits take effect even under a write-protected parent."
   (save-excursion
     (let* ((changed-count 0)
@@ -895,14 +895,14 @@ their repo edits take effect even under a write-protected parent."
         (let ((metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
           (if (not (and (skg--activeNode-sexp-p metadata-sexp)
                         (skg--node-affectsParent-content-of-p metadata-sexp)))
-              (skg--goto-next-heading-after-subtree)
+              (skg--goto-next-headline-after-subtree)
             (when (equal (skg--node-repo metadata-sexp) old-repo)
               (funcall change-or-collect))
             (outline-next-heading))))
       (cons changed-count (nreverse write-protected-ids)))))
 
-(defun skg--goto-next-heading-after-subtree ()
-  "Move to the next heading after the current subtree."
+(defun skg--goto-next-headline-after-subtree ()
+  "Move to the next headline after the current subtree."
   (let ((prune-level (org-outline-level)))
     (outline-next-heading)
     (while (and (not (eobp))
@@ -946,7 +946,7 @@ their repo edits take effect even under a write-protected parent."
       (format "%s" (car id-values)))))
 
 (defun skg--unknown-headline-p (metadata-sexp)
-  "Return non-nil when METADATA-SEXP is an Unknown placeholder."
+  "Return non-nil when METADATA-SEXP is an Unknown phantom."
   (and metadata-sexp
        (skg-sexp-subtree-p metadata-sexp '(skg (unknown)))))
 
@@ -997,7 +997,7 @@ METADATA-ALIST contains key-value pairs, BARE-VALUES-SET contains standalone val
   "Delete all kv-pairs with KEY from the metadata of the headline at point.
 If the current line is not a headline, or has no metadata, no effect.
 Routes the rewrite through `skg-replace-current-line' so that editing
-a folded heading does not fire org-fold's fragility check — see the
+a folded headline does not fire org-fold's fragility check — see the
 \"Programmatic metadata edits must be performed ignoring fragility
 checks\" entry in PITFALLs.org."
   (when (org-at-heading-p)
@@ -1026,7 +1026,7 @@ checks\" entry in PITFALLs.org."
   "Delete all instances of VALUE from the metadata of the headline at point.
 If the current line is not a headline, or has no metadata, no effect.
 Routes the rewrite through `skg-replace-current-line' so that editing
-a folded heading does not fire org-fold's fragility check — see the
+a folded headline does not fire org-fold's fragility check — see the
 \"Programmatic metadata edits must be performed ignoring fragility
 checks\" entry in PITFALLs.org."
   (when (org-at-heading-p)
@@ -1101,7 +1101,7 @@ If there is metadata, merges it with existing metadata.
 If there is no metadata, creates new metadata from EDITS.
 If the current line is not a headline, no effect.
 Routes the rewrite through `skg-replace-current-line' so that editing
-a folded heading does not fire org-fold's fragility check — see the
+a folded headline does not fire org-fold's fragility check — see the
 \"Programmatic metadata edits must be performed ignoring fragility
 checks\" entry in PITFALLs.org."
   (when (org-at-heading-p) ;; otherwise this does nothing
@@ -1135,10 +1135,10 @@ checks\" entry in PITFALLs.org."
 Moves to beginning of line, deletes the line, and inserts NEW-CONTENT.
 The `delete-region' + `insert' pair below runs inside
 `org-fold-core-ignore-fragility-checks' to protect against corrupting
-a folded subtree beneath the edited heading line — see the
+a folded subtree beneath the edited headline line — see the
 \"Programmatic metadata edits must be performed ignoring fragility
 checks\" entry in PITFALLs.org for the full explanation. Do not
-bypass this helper when rewriting a heading line in place; call it
+bypass this helper when rewriting a headline line in place; call it
 instead of raw `delete-region' + `insert'."
   (beginning-of-line)
   (org-fold-core-ignore-fragility-checks
@@ -1278,8 +1278,8 @@ Handles empty metadata correctly."
 (defun skg--around-org-todo (orig-fn &rest args)
   "Around advice for `org-todo'.
 Strip (skg ...) metadata before cycling, re-insert after."
-  (let* ((on-heading (org-at-heading-p))
-         (parts (when on-heading
+  (let* ((on-headline (org-at-heading-p))
+         (parts (when on-headline
                   (save-excursion
                     (beginning-of-line)
                     (skg-split-as-stars-metadata-title
@@ -1289,7 +1289,7 @@ Strip (skg ...) metadata before cycling, re-insert after."
          (has-metadata (and parts
                             (not (string-empty-p (nth 1 parts))))))
     (when has-metadata
-      ;; Remove metadata from the line so org sees a plain heading.
+      ;; Remove metadata from the line so org sees a plain headline.
       (save-excursion
         (skg-replace-current-line
          (concat (nth 0 parts) (nth 2 parts)))))

@@ -1,9 +1,9 @@
 //! `relRepo info` (BUG-and-fix_make-edge-more-public.org): given
-//! one relationship edge -- owner id, member id, and the relation
-//! between them -- reply with the edge's default relRepo and its
-//! current relRepo (when the graph records the edge). The client's
+//! one relationship -- recorder id, member id, and the relation
+//! between them -- reply with the relationship's default relRepo and its
+//! current relRepo (when the graph records the relationship). The client's
 //! 'skg-set-relRepo' gesture uses this to offer only
-//! repos the save's default floor can accept, instead of the whole
+//! Skgrepos the save's default floor can accept, instead of the whole
 //! ladder. The reply is advisory: the save-time floor check in
 //! 'apply_sticky_relRepos' stays load-bearing, since buffers go stale
 //! and the '(editRequest (relRepo ...))' request is plain text anyone can type.
@@ -14,7 +14,7 @@ use crate::serve::util::{
   send_response_with_length_prefix,
   value_from_request_sexp };
 use crate::types::env::SkgEnv;
-use crate::types::misc::{ID, RepoName};
+use crate::types::misc::{ID, SkgRepoName};
 
 use std::net::TcpStream;
 
@@ -35,55 +35,55 @@ pub fn handle_relRepo_info_request (
 
 /// The payload fields of a successful reply:
 /// '(default "NAME") (current "NAME")', with '(current ...)' absent
-/// when the graph records no such edge (e.g. one just typed into a
+/// when the graph records no such relationship (e.g. one just typed into a
 /// buffer and not yet saved).
 fn relRepo_info_response_body (
   request : &str,
   env     : &SkgEnv,
 ) -> Result<String, String> {
   let runtime = env . runtime_snapshot ();
-  let owner : ID = ID (
+  let recorder : ID = ID (
     value_from_request_sexp ("owner", request) ? );
   let member : ID = ID (
     value_from_request_sexp ("member", request) ? );
   let relation : NodeRelation = relation_from_client_string (
     & value_from_request_sexp ("relation", request) ? ) ?;
-  let (default, current) : (RepoName, Option<RepoName>) =
+  let (default, current) : (SkgRepoName, Option<SkgRepoName>) =
     relRepo_info (
       &runtime . graph, &runtime . config,
-      &owner, &member, relation ) ?;
+      &recorder, &member, relation ) ?;
   let mut body : String = format! (
     "(default {})", quoted ( & default . 0 ));
-  if let Some (repo) = current {
+  if let Some (skgrepo) = current {
     body . push_str ( & format! (
-      " (current {})", quoted ( & repo . 0 ))); }
+      " (current {})", quoted ( & skgrepo . 0 ))); }
   Ok (body) }
 
-/// One edge's (default relRepo, current relRepo). Between owned nodes,
+/// One relationship's (default relRepo, current relRepo). Between owned nodes,
 /// the default is the more private endpoint home. From an owned
-/// owner to a foreign or unresolved member, it is the owner's home.
+/// recorder to a foreign or unresolved member, it is the recorder's home.
 /// The current relRepo is None when the graph records no such exact raw
-/// member.  This lets an Unknown placeholder edit a stored dangling edge.
+/// member.  This lets an Unknown phantom edit a stored dangling relationship.
 pub fn relRepo_info (
   graph    : &crate::dbs::in_rust_graph::InRustGraph,
   config   : &crate::types::misc::SkgConfig,
-  owner    : &ID,
+  recorder : &ID,
   member   : &ID,
   relation : NodeRelation,
-) -> Result<(RepoName, Option<RepoName>), String> {
-  let (owner_pid, owner_home) : (ID, RepoName) =
-    graph . pid_and_repo (owner)
+) -> Result<(SkgRepoName, Option<SkgRepoName>), String> {
+  let (recorder_pid, recorder_home) : (ID, SkgRepoName) =
+    graph . pid_and_skgrepo (recorder)
     . ok_or_else ( || format! (
-      "owner '{}' is not in the graph", owner )) ?;
-  let member_home : RepoName = graph . pid_and_repo (member)
+      "recorder '{}' is not in the graph", recorder )) ?;
+  let member_home : SkgRepoName = graph . pid_and_skgrepo (member)
     . map ( |(_pid, src)| src )
-    // An unresolved destination has no home to make this edge more
-    // private, so its writable relationship defaults to the owner's home.
-    . unwrap_or_else ( || owner_home . clone () );
-  let default : RepoName = config . default_relRepo (
-    &owner_home, &member_home );
-  let current : Option<RepoName> =
-    graph . relRepo_for_stored_member ( &owner_pid, relation, member );
+    // An unresolved destination has no home to make this relationship more
+    // private, so its writable relationship defaults to the recorder's home.
+    . unwrap_or_else ( || recorder_home . clone () );
+  let default : SkgRepoName = config . default_relRepo (
+    &recorder_home, &member_home );
+  let current : Option<SkgRepoName> =
+    graph . relRepo_for_stored_member ( &recorder_pid, relation, member );
   Ok (( default, current )) }
 
 /// The three relations an explicit '(editRequest (relRepo ...))'

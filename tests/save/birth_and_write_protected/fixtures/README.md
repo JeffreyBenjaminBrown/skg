@@ -34,7 +34,7 @@ After save:
    - Node 4 is appended (new child in the buffer)
 
 2. **Node 1** should have `contains = []`
-   - Remains empty despite having node 2 as an org-child
+   - Remains empty despite having node 2 as an viewchild
    - Node 2 does not affect its parent due to `affectsParent=false`
 
 This verifies that:

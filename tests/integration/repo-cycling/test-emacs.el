@@ -1,6 +1,6 @@
-;;; Integration test for repo cycling in the metadata edit buffer.
-;;; Verifies that S-left / S-right cycle through owned repos only,
-;;; excluding foreign (user_owns_it = false) repos.
+;;; Integration test for skgrepo cycling in the metadata edit buffer.
+;;; Verifies that S-left / S-right cycle through owned skgrepos only,
+;;; excluding foreign (foreign) skgrepos.
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../test-wait.el")
@@ -53,7 +53,7 @@
   (goto-char (point-min))
   (unless (org-at-heading-p)
     (test-fail "Not on a headline"))
-  (skg-edit-metadata)
+  (skg-view-metadata)
   ;; The edit buffer should now be current.
   (let ((repo (repo-value-in-edit-buffer)))
     (message "  Initial repo: %S" repo)
@@ -65,7 +65,7 @@
   "Shift-right should change repo to the next owned repo."
   (message "=== PHASE 3: Cycle right ===")
   (setq integration-test-phase "phase-3")
-  ;; Position point on the repo value headline
+  ;; Position point on the skgrepo value headline
   (goto-char (point-min))
   (re-search-forward "^\\*\\*\\* repo$" nil t)
   (outline-next-heading)
@@ -81,7 +81,7 @@
   "Shift-left should change repo back to 'public'."
   (message "=== PHASE 4: Cycle left ===")
   (setq integration-test-phase "phase-4")
-  ;; Point should still be on the repo value
+  ;; Point should still be on the skgrepo value
   (skg-sexp-edit-cycle-left)
   (let ((repo (repo-value-in-edit-buffer)))
     (message "  After S-left: %S" repo)
@@ -93,7 +93,7 @@
   "Three S-rights from 'public' should wrap back to 'public'."
   (message "=== PHASE 5: Three S-rights wraps around ===")
   (setq integration-test-phase "phase-5")
-  ;; Currently at 'public'. Three owned repos: public, personal, private.
+  ;; Currently at 'public'. Three owned skgrepos: public, personal, private.
   (skg-sexp-edit-cycle-right) ; -> personal
   (skg-sexp-edit-cycle-right) ; -> private
   (skg-sexp-edit-cycle-right) ; -> public (wrap)

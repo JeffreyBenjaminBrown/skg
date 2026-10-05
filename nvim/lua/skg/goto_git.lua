@@ -1,6 +1,6 @@
 -- PURPOSE: From a node in a view, jump to git's picture of its .skg
 -- file: ask the server for the file's path, open a git UI on that
--- repo's repo, and land on the file (or, for the parent variant, on
+-- skgrepo's gitrepo, and land on the file (or, for the parent variant, on
 -- the first changed line containing this node's id). The Lua port of
 -- elisp/skg-request-file-path.el, re-targeted per the settled plan:
 -- neogit (baked into the docker image) plays magit for the status
@@ -38,19 +38,19 @@ function M.node_info_at_point ()
   return { id = id, repo = repo }
 end
 
----{id, repo} for the parent heading's node, or nil with a message.
+---{id, repo} for the parent headline's node, or nil with a message.
 ---@return table|nil
 function M.parent_info_at_point ()
   local line = metadata.current_line_number()
-  local level = metadata.at_heading_p(line)
+  local level = metadata.at_headline_p(line)
                 and metadata.outline_level(line) or 999
-  local parent = metadata.parent_heading_line(line, level)
+  local parent = metadata.parent_headline_line(line, level)
   if not parent then
-    vim.notify('No parent heading found.')
+    vim.notify('No parent headline found.')
     return nil end
   local sexp = metadata.metadata_sexp_at_line_or_nil(parent)
   if not sexp then
-    vim.notify('Parent heading has no node metadata.')
+    vim.notify('Parent headline has no node metadata.')
     return nil end
   local id = id_search.extract_id_from_metadata_sexp(sexp)
   local repo = id_search.extract_repo_from_metadata_sexp(sexp)
@@ -90,7 +90,7 @@ function M.request_file_path (id, repo, handler)
     sexpr.pair(sexpr.symbol('repo'), repo) }) .. '\n')
 end
 
----Open a git status view (neogit) for the repo holding RESOLVED_PATH
+---Open a git status view (neogit) for the skgrepo holding RESOLVED_PATH
 ---and land on the file's entry; warn when it appears several times
 ---(unstaged, staged, untracked all list it).
 ---@param resolved_path string

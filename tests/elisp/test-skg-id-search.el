@@ -71,7 +71,7 @@
 
 (ert-deftest test-skg-id-push ()
   "Test that skg-id-push pushes the metadata ID from the current line."
-  (setq skg-id-stack nil)
+  (setq skg-linkstack nil)
   (with-temp-buffer
     (insert "* (skg (node (id 1))) [[id:2][link to 2]]\n")
     (insert "* (skg (node (id 3))) [[id:2][link to 4]] hello [[id:2][link to 5]]\n")
@@ -85,32 +85,32 @@
            ( line3-end (line-end-position) ))
       (progn ;; Anywhere on a metadata line pushes that line's metadata ID
         (dolist (id '("1" "3" "6" "7"))
-          (let (( len-before (length skg-id-stack) ))
+          (let (( len-before (length skg-linkstack) ))
             (goto-char (point-min))
             (search-forward (format "(skg (node (id %s)))" id))
             (skg-id-push)
-            (should (equal (length skg-id-stack) (1+ len-before)))
-            (should (equal (caar skg-id-stack) id)) )) )
+            (should (equal (length skg-linkstack) (1+ len-before)))
+            (should (equal (caar skg-linkstack) id)) )) )
       (progn ;; From the title area, still finds metadata ID
-        (let (( len-before (length skg-id-stack) ))
+        (let (( len-before (length skg-linkstack) ))
           (goto-char (point-min))
           (search-forward "just a title")
           (backward-char 5)
           (skg-id-push)
-          (should (equal (length skg-id-stack) (1+ len-before)))
-          (should (equal (car skg-id-stack) '("6" "just a title"))) ))
-      (let (( len-before (length skg-id-stack) )) ;; Line 3: fake metadata — should NOT push
+          (should (equal (length skg-linkstack) (1+ len-before)))
+          (should (equal (car skg-linkstack) '("6" "just a title"))) ))
+      (let (( len-before (length skg-linkstack) )) ;; Line 3: fake metadata — should NOT push
         (dotimes (_ 3)
           (goto-char (+ line3-start
                         (random (- line3-end line3-start))))
           (skg-id-push)
-          (should (equal (length skg-id-stack) len-before)) )) )))
+          (should (equal (length skg-linkstack) len-before)) )) )))
 
 (ert-deftest test-skg-id-push-on-inline-link ()
   "When point is on an inline [[id:X][label]] link inside a headline,
 skg-id-push should push the link's ID and the link's label,
 not the headline's metadata ID and title."
-  (setq skg-id-stack nil)
+  (setq skg-linkstack nil)
   (with-temp-buffer
     (org-mode)
     (insert "* (skg (node (id outer-id))) outer headline with [[id:inner-id][inner label]] inside\n")
@@ -119,13 +119,13 @@ not the headline's metadata ID and title."
     (search-forward "inner label")
     (backward-char 5) ;; somewhere inside the label
     (skg-id-push)
-    (should (equal (length skg-id-stack) 1))
-    (should (equal (car skg-id-stack)
+    (should (equal (length skg-linkstack) 1))
+    (should (equal (car skg-linkstack)
                    '("inner-id" "inner label"))) ))
 
 (ert-deftest test-skg-id-push-and-view-stack ()
   "Test pushing IDs from a buffer and viewing the stack."
-  (setq skg-id-stack nil)
+  (setq skg-linkstack nil)
   (with-temp-buffer
     (org-mode)
     (insert "* (skg (node (id a))) a\n")
@@ -139,44 +139,44 @@ not the headline's metadata ID and title."
       (forward-line 1)
       (end-of-line)
       (skg-id-push))
-    (should (equal (length skg-id-stack) 2))
-    (should (equal (car skg-id-stack) '("b" "b has a [[id:a][link to a]]")))
-    (should (equal (cadr skg-id-stack) '("a" "a"))) ))
+    (should (equal (length skg-linkstack) 2))
+    (should (equal (car skg-linkstack) '("b" "b has a [[id:a][link to a]]")))
+    (should (equal (cadr skg-linkstack) '("a" "a"))) ))
 
-(ert-deftest test-skg-validate-id-stack-buffer_valid-input ()
-  "Test skg-validate-id-stack-buffer with valid inputs."
+(ert-deftest test-skg-validate-linkstack-buffer_valid-input ()
+  "Test skg-validate-linkstack-buffer with valid inputs."
   (with-temp-buffer ;; Single headline
     (insert "* the label\n")
     (insert "  the-id\n")
-    (should (equal (skg-validate-id-stack-buffer)
+    (should (equal (skg-validate-linkstack-buffer)
                    '(success (("the-id" "the label"))) )))
   (with-temp-buffer ;; Two headlines. First headline = head of stack.
     (insert "* the label\n")
     (insert "  the-id\n")
     (insert "* label 2\n")
     (insert "  id-2\n")
-    (should (equal (skg-validate-id-stack-buffer)
+    (should (equal (skg-validate-linkstack-buffer)
                    '(success ( ("the-id" "the label")
                                ("id-2" "label 2") )))) ))
 
-(ert-deftest test-skg-validate-id-stack-buffer_invalid-input ()
-  "Test skg-validate-id-stack-buffer rejects invalid inputs."
+(ert-deftest test-skg-validate-linkstack-buffer_invalid-input ()
+  "Test skg-validate-linkstack-buffer rejects invalid inputs."
   (with-temp-buffer ;; Text before first headline
     (insert "Hello!\n")
     (insert "* okay\n")
     (insert "  okay-id\n")
-    (should (eq (car (skg-validate-id-stack-buffer)) 'error)) )
+    (should (eq (car (skg-validate-linkstack-buffer)) 'error)) )
   (with-temp-buffer ;; looks like a headline but has no title
     (insert "* \n")
     (insert "  okay-id\n")
-    (should (eq (car (skg-validate-id-stack-buffer)) 'error)) )
+    (should (eq (car (skg-validate-linkstack-buffer)) 'error)) )
   (with-temp-buffer ;; Headline without body
     (insert "* okay\n")
     (insert "  okay-id\n")
     (insert "* label without ID\n")
     (insert "* okay\n")
     (insert "  okay-id\n")
-    (should (eq (car (skg-validate-id-stack-buffer)) 'error)) )
+    (should (eq (car (skg-validate-linkstack-buffer)) 'error)) )
   (with-temp-buffer ;; Headline with multi-line body
     (insert "* okay\n")
     (insert "  okay-id\n")
@@ -185,77 +185,77 @@ not the headline's metadata ID and title."
     (insert "  invalid-extra-stuff\n")
     (insert "* okay\n")
     (insert "  okay-id\n")
-    (should (eq (car (skg-validate-id-stack-buffer)) 'error)) ))
+    (should (eq (car (skg-validate-linkstack-buffer)) 'error)) ))
 
-(ert-deftest test-skg-replace-id-stack-from-buffer_empty-inputs ()
+(ert-deftest test-skg-replace-linkstack-from-buffer_empty-inputs ()
   "Test that empty/whitespace buffers result in empty stack."
   (dolist (content '( ""
                       "\n"
                       "\n\n"
                       " \n"
                       " \n \n" ))
-    (setq skg-id-stack '(("old" "stuff"))) ;; Start with non-empty stack
+    (setq skg-linkstack '(("old" "stuff"))) ;; Start with non-empty stack
     (with-temp-buffer
       (insert content)
-      (skg-replace-id-stack-from-buffer) )
-    (should (equal skg-id-stack nil)) ))
+      (skg-replace-linkstack-from-buffer) )
+    (should (equal skg-linkstack nil)) ))
 
-(ert-deftest test-skg-replace-id-stack-from-buffer_single-headline ()
+(ert-deftest test-skg-replace-linkstack-from-buffer_single-headline ()
   "Test single headline with body."
   (dolist (content
            '( "*   label\n  id\n" ;; leading space is ignored
               "* label\nid\n" )) ;; leading space is not needed, except the bit after the bullet
-    (setq skg-id-stack nil)
+    (setq skg-linkstack nil)
     (with-temp-buffer
       (insert content)
-      (skg-replace-id-stack-from-buffer) )
-    (should (equal skg-id-stack '(("id" "label")) )) ))
+      (skg-replace-linkstack-from-buffer) )
+    (should (equal skg-linkstack '(("id" "label")) )) ))
 
-(ert-deftest test-skg-replace-id-stack-from-buffer_two-headlines ()
+(ert-deftest test-skg-replace-linkstack-from-buffer_two-headlines ()
   "Test two headlines - first headline = head of stack."
-  (setq skg-id-stack nil)
+  (setq skg-linkstack nil)
   (with-temp-buffer
     (insert "* label\nid\n* label-2\n  id-2\n")
-    (skg-replace-id-stack-from-buffer) )
-  (should (equal skg-id-stack
+    (skg-replace-linkstack-from-buffer) )
+  (should (equal skg-linkstack
                  '( ("id" "label")
                     ("id-2" "label-2") )) ))
 
-(ert-deftest test-skg--format-id-stack-as-org ()
-  "Test that skg--format-id-stack-as-org produces correct org format."
-  (let (( skg-id-stack nil )) ;; Empty stack
-    (should (equal (skg--format-id-stack-as-org) "")) )
-  (let (( skg-id-stack '(("id-1" "label one")) )) ;; Single item
-    (should (equal (skg--format-id-stack-as-org) "* label one\nid-1")) )
-  (let (( skg-id-stack '(("id-2" "second") ("id-1" "first")) )) ;; Two items
+(ert-deftest test-skg--format-linkstack-as-org ()
+  "Test that skg--format-linkstack-as-org produces correct org format."
+  (let (( skg-linkstack nil )) ;; Empty stack
+    (should (equal (skg--format-linkstack-as-org) "")) )
+  (let (( skg-linkstack '(("id-1" "label one")) )) ;; Single item
+    (should (equal (skg--format-linkstack-as-org) "* label one\nid-1")) )
+  (let (( skg-linkstack '(("id-2" "second") ("id-1" "first")) )) ;; Two items
     ;; Head of stack (most recent) appears first in buffer
-    (should (equal (skg--format-id-stack-as-org)
+    (should (equal (skg--format-linkstack-as-org)
                    "* second\nid-2\n* first\nid-1")) ))
 
 (ert-deftest test-skg-paste-node ()
   "Test that skg-paste-node inserts a write-protected node without popping."
-  (let (( skg-id-stack '(("id-1" "Title from stack")) ))
+  (let (( skg-linkstack '(("id-1" "Title from stack")) ))
     (with-temp-buffer
       (org-mode)
       (skg-paste-node)
       (should (equal (buffer-string)
                      "* (skg (node (id id-1) writeProtected)) Title from stack\n"))
-      (should (equal skg-id-stack '(("id-1" "Title from stack")) )) )))
+      (should (equal skg-linkstack '(("id-1" "Title from stack")) )) )))
 
 (ert-deftest test-skg-pop-node ()
   "Test that skg-pop-node inserts a write-protected node and pops the stack."
-  (let (( skg-id-stack '(("id-2" "Second")
+  (let (( skg-linkstack '(("id-2" "Second")
                          ("id-1" "First")) ))
     (with-temp-buffer
       (org-mode)
       (skg-pop-node)
       (should (equal (buffer-string)
                      "* (skg (node (id id-2) writeProtected)) Second\n"))
-      (should (equal skg-id-stack '(("id-1" "First")) )) )))
+      (should (equal skg-linkstack '(("id-1" "First")) )) )))
 
 (ert-deftest test-skg-paste-node-after-typed-stars ()
   "If point is after headline stars, insert only node metadata and title."
-  (let (( skg-id-stack '(("id-1" "Title from stack")) ))
+  (let (( skg-linkstack '(("id-1" "Title from stack")) ))
     (with-temp-buffer
       (org-mode)
       (insert "** ")
@@ -263,12 +263,12 @@ not the headline's metadata ID and title."
       (should (equal (buffer-string)
                      "** (skg (node (id id-1) writeProtected)) Title from stack")) )))
 
-;; In a view, paste-node requests a definitive view unless the buffer
-;; already has a writeable (or definitive-requesting) instance.
+;; In a view, paste-node requests an editable view unless the buffer
+;; already has a writable (or definitive-requesting) occurrence.
 (defun skg-test--paste-node-in-view (existing-text)
   "Paste id-1 at the end of a view containing EXISTING-TEXT.
 Return (BUFFER-TEXT . LAST-MESSAGE)."
-  (let (( skg-id-stack '(("id-1" "Title from stack")) )
+  (let (( skg-linkstack '(("id-1" "Title from stack")) )
         ( last-message nil ))
     (with-temp-buffer
       (org-mode)
@@ -281,7 +281,7 @@ Return (BUFFER-TEXT . LAST-MESSAGE)."
       (cons (buffer-string) last-message)) ))
 
 (ert-deftest test-skg-paste-node-in-view-requests-definitive-view ()
-  "With no writeable instance present, the paste requests a definitive view."
+  "With no writable occurrence present, the paste requests a definitive view."
   (let (( result (skg-test--paste-node-in-view
                   "* (skg (node (id id-1) writeProtected)) Elsewhere\n") ))
     (should (equal (car result)
@@ -289,18 +289,18 @@ Return (BUFFER-TEXT . LAST-MESSAGE)."
                            "* (skg (node (id id-1) writeProtected (viewRequests definitiveView))) Title from stack\n")))
     (should (null (cdr result))) ))
 
-(ert-deftest test-skg-paste-node-in-view-beside-writeable-instance ()
-  "With a writeable instance present, the paste stays write-protected and says why."
+(ert-deftest test-skg-paste-node-in-view-beside-writable-occurrence ()
+  "With a writable occurrence present, the paste stays write-protected and says why."
   (let (( result (skg-test--paste-node-in-view
-                  "* (skg (node (id id-1) (repo main))) Writeable\n") ))
+                  "* (skg (node (id id-1) (repo main))) Writable\n") ))
     (should (equal (car result)
-                   (concat "* (skg (node (id id-1) (repo main))) Writeable\n"
+                   (concat "* (skg (node (id id-1) (repo main))) Writable\n"
                            "* (skg (node (id id-1) writeProtected)) Title from stack\n")))
     (should (equal (cdr result)
-                   "NOTE: Pasting node write-protected because a writeable instance is already present in this same buffer.")) ))
+                   "NOTE: Pasting node write-protected because a writable occurrence is already present in this same buffer.")) ))
 
 (ert-deftest test-skg-paste-node-in-view-twice ()
-  "A pending definitive view request counts as a writeable instance."
+  "A pending definitive view request counts as a writable occurrence."
   (let (( result (skg-test--paste-node-in-view
                   "* (skg (node (id id-1) writeProtected (viewRequests definitiveView))) First\n") ))
     (should (string-suffix-p
@@ -308,33 +308,33 @@ Return (BUFFER-TEXT . LAST-MESSAGE)."
              (car result)))
     (should (string-prefix-p "NOTE:" (cdr result))) ))
 
-(ert-deftest test-skg-view-id-stack ()
-  "Test that skg-view-id-stack creates buffer with correct content."
-  (let (( skg-id-stack '(("uuid-123" "My Node")) ))
-    (skg-view-id-stack)
-    (should (equal (buffer-name) "*skg-id-stack*"))
+(ert-deftest test-skg-view-linkstack ()
+  "Test that skg-view-linkstack creates buffer with correct content."
+  (let (( skg-linkstack '(("uuid-123" "My Node")) ))
+    (skg-view-linkstack)
+    (should (equal (buffer-name) "*skg-linkstack*"))
     (should (equal (buffer-string) "* My Node\nuuid-123"))
-    (should skg-id-stack-mode)
-    (kill-buffer "*skg-id-stack*") ))
+    (should skg-linkstack-mode)
+    (kill-buffer "*skg-linkstack*") ))
 
-(ert-deftest test-skg--save-id-stack-buffer-is-a-command ()
-  "skg--save-id-stack-buffer is bound to C-x C-s in skg-id-stack-mode.
+(ert-deftest test-skg--save-linkstack-buffer-is-a-command ()
+  "skg--save-linkstack-buffer is bound to C-x C-s in skg-linkstack-mode.
 For that binding to work, the function must satisfy `commandp'
 (i.e. it must have an `interactive' form)."
-  (should (commandp 'skg--save-id-stack-buffer)))
+  (should (commandp 'skg--save-linkstack-buffer)))
 
-(ert-deftest test-skg--save-id-stack-buffer ()
-  "Test that saving the id-stack buffer updates skg-id-stack."
-  (let (( skg-id-stack '(("old-id" "old label")) ))
-    (skg-view-id-stack)
+(ert-deftest test-skg--save-linkstack-buffer ()
+  "Test that saving the linkstack buffer updates skg-linkstack."
+  (let (( skg-linkstack '(("old-id" "old label")) ))
+    (skg-view-linkstack)
     (erase-buffer)
     (insert "* new label\nnew-id\n* another\nanother-id\n")
-    (skg--save-id-stack-buffer)
+    (skg--save-linkstack-buffer)
     ;; First headline = head of stack
-    (should (equal skg-id-stack
+    (should (equal skg-linkstack
                    '( ("new-id" "new label")
                       ("another-id" "another") )))
-    (kill-buffer "*skg-id-stack*") ))
+    (kill-buffer "*skg-linkstack*") ))
 
 (progn ;; skg-nearest-id in a raw .skg file (TODO/more.org): bare
   ;; UUIDs count, and nearest means nearest, with ambiguity between.

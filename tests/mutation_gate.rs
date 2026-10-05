@@ -9,7 +9,7 @@
 use futures::executor::block_on;
 use futures::join;
 use skg::dbs::in_rust_graph::{
-  InRustGraph, InRustGraphHandle, apply_definenodes_to_inRustGraph, new_handle,
+  InRustGraph, InRustGraphHandle, apply_nodeInstructions_to_inRustGraph, new_handle,
 };
 use skg::dbs::init::empty_in_ram_tantivy_index;
 use skg::dbs::tantivy::background_writer::{
@@ -18,24 +18,24 @@ use skg::dbs::tantivy::background_writer::{
 };
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::types::env::new_mutation_gate;
-use skg::types::misc::{ID, RelPartner, RepoName};
-use skg::types::nodes::complete::{Graphnode, empty_node_complete};
+use skg::types::misc::{ID, RelPartner, SkgRepoName};
+use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::nodes::rust::GraphnodeInRust;
-use skg::types::save::{DefineNode, DeleteNode, SaveNode};
+use skg::types::save::{NodeInstruction, DeleteNode, SaveNode};
 
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::{Barrier, Notify};
 
-fn save (pid : &str) -> DefineNode {
-  DefineNode::Save ( SaveNode (node (pid, "", "main")) ) }
+fn save (pid : &str) -> NodeInstruction {
+  NodeInstruction::Save ( SaveNode (node (pid, "", "main")) ) }
 
-fn node (pid : &str, title : &str, repo : &str) -> Graphnode {
-  let mut node = empty_node_complete ();
+fn node (pid : &str, title : &str, skgrepo : &str) -> Graphnode {
+  let mut node = empty_graphnode ();
   node . pid = ID::from (pid);
   node . title = title . to_string ();
-  node . home_repo = RepoName::from (repo);
+  node . home_skgrepo = SkgRepoName::from (skgrepo);
   node }
 
 fn complete_from_rust (node : &GraphnodeInRust) -> Graphnode {
@@ -43,7 +43,7 @@ fn complete_from_rust (node : &GraphnodeInRust) -> Graphnode {
     title : node . title . clone (),
     overPrivateText_telescope : node . overPrivateText_telescope,
     aliases : node . aliases . clone (),
-    home_repo : node . home_repo . clone (),
+    home_skgrepo : node . home_skgrepo . clone (),
     pid : node . pid . clone (),
     extra_ids : node . extra_ids . clone (),
     body : node . body . clone (),
@@ -51,16 +51,16 @@ fn complete_from_rust (node : &GraphnodeInRust) -> Graphnode {
     subscribes_to : node . subscribes_to . clone (),
     hides_from_its_subscriptions : node . hides_from_its_subscriptions . clone (),
     overrides_view_of : node . overrides_view_of . clone (),
-    misc : node . misc . clone (),
+    flags : node . flags . clone (),
   } }
 
 fn publish_from_snapshot (
   handle : &InRustGraphHandle,
   snapshot : &Arc<InRustGraph>,
-  instruction : &DefineNode,
+  instruction : &NodeInstruction,
 ) {
   let mut candidate : InRustGraph = (**snapshot) . clone ();
-  apply_definenodes_to_inRustGraph (
+  apply_nodeInstructions_to_inRustGraph (
     &mut candidate, std::slice::from_ref (instruction) );
   handle . store ( Arc::new (candidate) ); }
 
@@ -135,11 +135,11 @@ fn shared_mutation_gate_serializes_snapshot_capture_and_preserves_both_writes ()
 
 #[test]
 fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
-  let mut owner = node ("owner", "owner", "main");
-  owner . contains = vec! [ RelPartner::at_relRepo (
-    RepoName::from ("main"), ID::from ("acquiree")) ];
+  let mut recorder = node ("recorder", "recorder", "main");
+  recorder . contains = vec! [ RelPartner::at_relRepo (
+    SkgRepoName::from ("main"), ID::from ("acquiree")) ];
   let initial = vec! [
-    owner . clone (),
+    recorder . clone (),
     node ("acquiree", "old", "main"),
     node ("acquirer", "new", "main"),
   ];
@@ -159,16 +159,16 @@ fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
       release_a . notified () . await;
       let mut merged = node ("acquirer", "merged", "main");
       merged . extra_ids = vec! [ID::from ("acquiree")];
-      let mut rewritten_owner = owner . clone ();
-      rewritten_owner . contains [0] . member = ID::from ("acquirer");
+      let mut rewritten_recorder = recorder . clone ();
+      rewritten_recorder . contains [0] . member = ID::from ("acquirer");
       let instructions = vec! [
-        DefineNode::Save (SaveNode (merged)),
-        DefineNode::Save (SaveNode (rewritten_owner)),
-        DefineNode::Delete (DeleteNode {
-          id : ID::from ("acquiree"), home_repo : RepoName::from ("main") }),
+        NodeInstruction::Save (SaveNode (merged)),
+        NodeInstruction::Save (SaveNode (rewritten_recorder)),
+        NodeInstruction::Delete (DeleteNode {
+          skgid : ID::from ("acquiree"), home_skgrepo : SkgRepoName::from ("main") }),
       ];
       let mut candidate = (*snapshot) . clone ();
-      apply_definenodes_to_inRustGraph (&mut candidate, &instructions);
+      apply_nodeInstructions_to_inRustGraph (&mut candidate, &instructions);
       handle . store (Arc::new (candidate)); };
 
     let gate_b = gate . clone ();
@@ -182,20 +182,20 @@ fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
       // The request still names the acquiree.  Applying against the
       // post-merge snapshot must canonicalize its inverse entry.
       observer . contains = vec! [ RelPartner::at_relRepo (
-        RepoName::from ("main"), ID::from ("acquiree")) ];
+        SkgRepoName::from ("main"), ID::from ("acquiree")) ];
       publish_from_snapshot (
-        &handle, &snapshot, &DefineNode::Save (SaveNode (observer))); };
+        &handle, &snapshot, &NodeInstruction::Save (SaveNode (observer))); };
     join! (merge_delete, save_after); });
 
   let graph = handle . load_full ();
   assert! (! graph . nodes . contains_key (&ID::from ("acquiree")));
   assert_eq! (graph . pid_of (&ID::from ("acquiree")), Some (ID::from ("acquirer")));
   let inbound = graph . contained_by . get (&ID::from ("acquirer")) . unwrap ();
-  assert! (inbound . contains (&ID::from ("owner")));
+  assert! (inbound . contains (&ID::from ("recorder")));
   assert! (inbound . contains (&ID::from ("observer"))); }
 
 #[test]
-fn save_plan_captured_after_repo_move_preserves_the_new_repo () {
+fn save_plan_captured_after_skgrepo_move_preserves_the_new_skgrepo () {
   let initial = node ("moved", "old title", "main");
   let handle = new_handle (InRustGraph::from_graphnodes (&[initial]));
   let gate = new_mutation_gate ();
@@ -206,7 +206,7 @@ fn save_plan_captured_after_repo_move_preserves_the_new_repo () {
     let gate_a = gate . clone ();
     let entered_a = move_entered . clone ();
     let release_a = release_move . clone ();
-    let repo_move = async {
+    let skgrepo_move = async {
       let _guard = gate_a . lock () . await;
       let snapshot = handle . load_full ();
       entered_a . notify_one ();
@@ -214,7 +214,7 @@ fn save_plan_captured_after_repo_move_preserves_the_new_repo () {
       let mut moved = node ("moved", "old title", "private");
       moved . extra_ids = vec! [ID::from ("former-id")];
       publish_from_snapshot (
-        &handle, &snapshot, &DefineNode::Save (SaveNode (moved))); };
+        &handle, &snapshot, &NodeInstruction::Save (SaveNode (moved))); };
 
     let gate_b = gate . clone ();
     let entered_b = move_entered . clone ();
@@ -229,12 +229,12 @@ fn save_plan_captured_after_repo_move_preserves_the_new_repo () {
         complete_from_rust (snapshot . get (&ID::from ("moved")) . unwrap ());
       edited . title = "edited after move" . to_string ();
       publish_from_snapshot (
-        &handle, &snapshot, &DefineNode::Save (SaveNode (edited))); };
-    join! (repo_move, edit_after_move); });
+        &handle, &snapshot, &NodeInstruction::Save (SaveNode (edited))); };
+    join! (skgrepo_move, edit_after_move); });
 
   let graph = handle . load_full ();
   let moved = graph . get (&ID::from ("moved")) . unwrap ();
-  assert_eq! (moved . home_repo, RepoName::from ("private"));
+  assert_eq! (moved . home_skgrepo, SkgRepoName::from ("private"));
   assert_eq! (moved . title, "edited after move");
   assert_eq! (graph . pid_of (&ID::from ("former-id")), Some (ID::from ("moved"))); }
 
@@ -283,7 +283,7 @@ fn tantivy_worker_applies_same_pid_tasks_in_publication_order () {
   for title in ["firstversiontoken", "secondversiontoken"] {
     enqueue_tantivy_write (TantivyWriteTask {
       tantivy_index : index . clone (),
-      instructions : vec! [DefineNode::Save (SaveNode (
+      instructions  : vec! [NodeInstruction::Save (SaveNode (
         node ("same-pid", title, "main")))],
       context_types : HashMap::new (),
     }); }

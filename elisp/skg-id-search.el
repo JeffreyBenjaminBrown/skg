@@ -241,7 +241,7 @@ Otherwise return nil."
           (error nil) )) )))
 
 (defun skg-id-push ()
-  "Push an ID and its title/label to `skg-id-stack'.
+  "Push an ID and its title/label to `skg-linkstack'.
 If point is on an inline [[id:X][label]] link, push that link's
 ID and label. Otherwise push the headline's metadata ID and title."
   (interactive)
@@ -249,7 +249,7 @@ ID and label. Otherwise push the headline's metadata ID and title."
     (if link-hit
         (let (( id    (car link-hit) )
               ( label (cdr link-hit) ))
-          (push (list id label) skg-id-stack)
+          (push (list id label) skg-linkstack)
           (message "pushed to stack: %s" label) )
       (let* (( headline (skg-get-current-headline-text) )
              ( split (skg-split-as-stars-metadata-title headline) )
@@ -260,17 +260,17 @@ ID and label. Otherwise push the headline's metadata ID and title."
             (let (( sexp (read metadata-sexp) ))
               (if (skg--metadata-sexp-contains-id-p sexp)
                   (let (( id (skg--extract-id-from-metadata-sexp sexp) ))
-                    (push (list id title) skg-id-stack)
+                    (push (list id title) skg-linkstack)
                     (message "pushed to stack: %s" title) )
                 (message "No ID in metadata on this line") ))
           (message "No metadata on this line") )) )))
 
-(defun skg--id-stack-top-or-message ()
-  "If possible, return the top entry (id title) of `skg-id-stack'.
+(defun skg--linkstack-top-or-message ()
+  "If possible, return the top entry (id title) of `skg-linkstack'.
 Othewrise (because the stack is empty) print a message and return nil."
-  (if (null skg-id-stack)
-      (progn (message "ID stack is empty") nil)
-    (car skg-id-stack) ))
+  (if (null skg-linkstack)
+      (progn (message "Linkstack is empty") nil)
+    (car skg-linkstack) ))
 
 (defun skg--insert-link-from-entry (entry)
   "Insert an org link at point, using ENTRY, a (id title) pair.
@@ -295,10 +295,10 @@ Prompts for the link label, defaulting to the title."
 
 (defun skg--insert-node-from-entry (entry)
   "Insert a write-protected ActiveVognode headline from ENTRY, an (id title) pair.
-In a view whose buffer has no writeable instance of the node, the
+In a view whose buffer has no writable occurrence of the node, the
 headline also requests a definitive view, so the next save makes it
-writeable with its real title, body and content.  (Saving a bare
-writeable headline would instead erase that body and content.)
+writable with its real title, body and content.  (Saving a bare
+writable headline would instead erase that body and content.)
 If point is already after headline stars at the start of a line,
 insert only the metadata and title.  Otherwise insert a full same-level
 headline."
@@ -306,8 +306,8 @@ headline."
          ( title (cadr entry) )
          ( request-definitive-view
            (and (bound-and-true-p skg-view-uri)
-                (if (skg--buffer-has-writeable-instance-p id)
-                    (progn (message "NOTE: Pasting node write-protected because a writeable instance is already present in this same buffer.")
+                (if (skg--buffer-has-editable-occurrence-p id)
+                    (progn (message "NOTE: Pasting node write-protected because a writable occurrence is already present in this same buffer.")
                            nil)
                   t )) )
          ( node-text
@@ -327,9 +327,9 @@ headline."
                       (skg--org-stars-for-node-insertion)
                       node-text)))))
 
-(defun skg--buffer-has-writeable-instance-p (id)
+(defun skg--buffer-has-editable-occurrence-p (id)
   "Return non-nil if the current buffer has a headline for node ID that
-is writeable, or that will become writeable at the next save because it
+is writable, or that will become writable at the next save because it
 requests a definitive view.  The server allows only one of those per ID."
   (save-excursion
     (goto-char (point-min))
@@ -337,7 +337,7 @@ requests a definitive view.  The server allows only one of those per ID."
       (while (and (not found)
                   (re-search-forward org-heading-regexp nil t))
         (beginning-of-line)
-        (let (( sexp (ignore-errors ;; a half-edited headline is not an instance
+        (let (( sexp (ignore-errors ;; a half-edited headline is not an occurrence
                        (skg--metadata-sexp-at-point-or-nil)) ))
           (when (and (skg--activeNode-sexp-p sexp)
                      (equal (skg--node-id sexp) id)
@@ -349,58 +349,58 @@ requests a definitive view.  The server allows only one of those per ID."
       found)))
 
 (defun skg-paste-id ()
-  "Insert the ID at the top of `skg-id-stack' at point.
+  "Insert the ID at the top of `skg-linkstack' at point.
 Does not modify the stack."
   (interactive)
-  (let (( entry (skg--id-stack-top-or-message) ))
+  (let (( entry (skg--linkstack-top-or-message) ))
     (when entry
       (insert (car entry)) )))
 
 (defun skg-paste-link ()
-  "Insert an org link at point, using the top of `skg-id-stack'.
+  "Insert an org link at point, using the top of `skg-linkstack'.
 Does not modify the stack.
 Prompts for the link label, defaulting to the title from the stack."
   (interactive)
-  (let (( entry (skg--id-stack-top-or-message) ))
+  (let (( entry (skg--linkstack-top-or-message) ))
     (when entry
       (skg--insert-link-from-entry entry) )))
 
 (defun skg-paste-node ()
-  "Insert a write-protected ActiveVognode headline from the top of `skg-id-stack'.
+  "Insert a write-protected ActiveVognode headline from the top of `skg-linkstack'.
 Does not modify the stack.  The inserted metadata contains the node ID
 and `writeProtected`, and maybe a definitive view request (see
 `skg--insert-node-from-entry'); the headline title comes from the stack entry."
   (interactive)
-  (let (( entry (skg--id-stack-top-or-message) ))
+  (let (( entry (skg--linkstack-top-or-message) ))
     (when entry
       (skg--insert-node-from-entry entry) )))
 
 (defun skg-pop-id ()
-  "Pop the top of `skg-id-stack' and insert the ID at point."
+  "Pop the top of `skg-linkstack' and insert the ID at point."
   (interactive)
-  (let (( entry (skg--id-stack-top-or-message) ))
+  (let (( entry (skg--linkstack-top-or-message) ))
     (when entry
-      (pop skg-id-stack)
+      (pop skg-linkstack)
       (insert (car entry)) )))
 
 (defun skg-pop-link ()
-  "Pop the top of `skg-id-stack' and insert an org link at point.
+  "Pop the top of `skg-linkstack' and insert an org link at point.
 Prompts for the link label, defaulting to the title from the stack."
   (interactive)
-  (let (( entry (skg--id-stack-top-or-message) ))
+  (let (( entry (skg--linkstack-top-or-message) ))
     (when entry
-      (pop skg-id-stack)
+      (pop skg-linkstack)
       (skg--insert-link-from-entry entry) )))
 
 (defun skg-pop-node ()
-  "Pop the top of `skg-id-stack' and insert a write-protected ActiveVognode headline.
+  "Pop the top of `skg-linkstack' and insert a write-protected ActiveVognode headline.
 The inserted metadata contains the node ID and `writeProtected`, and maybe a
 definitive view request (see `skg--insert-node-from-entry'); the headline
 title comes from the stack entry."
   (interactive)
-  (let (( entry (skg--id-stack-top-or-message) ))
+  (let (( entry (skg--linkstack-top-or-message) ))
     (when entry
-      (pop skg-id-stack)
+      (pop skg-linkstack)
       (skg--insert-node-from-entry entry) )))
 
 (defun skg--point-in-metadata-p ()
@@ -516,33 +516,33 @@ e.g. \"557a869b-02ba-4c59-a5d3-5fb469a12353.skg\" or \"a.skg\"."
                              (match-string-no-properties 0) )) )) )
     result ))
 
-(defun skg-replace-id-stack-from-buffer ()
-  "Replace `skg-id-stack' with contents parsed from current buffer.
-Uses `skg-validate-id-stack-buffer' to parse and validate.
-On success, sets `skg-id-stack' to the parsed result.
-On failure, prints error message and leaves `skg-id-stack' unchanged."
-  (let (( validation-result (skg-validate-id-stack-buffer) ))
+(defun skg-replace-linkstack-from-buffer ()
+  "Replace `skg-linkstack' with contents parsed from current buffer.
+Uses `skg-validate-linkstack-buffer' to parse and validate.
+On success, sets `skg-linkstack' to the parsed result.
+On failure, prints error message and leaves `skg-linkstack' unchanged."
+  (let (( validation-result (skg-validate-linkstack-buffer) ))
     (if (eq (car validation-result) 'success)
-        (setq skg-id-stack (cadr validation-result))
+        (setq skg-linkstack (cadr validation-result))
       (message "Invalid ID buffer: %s" (cadr validation-result)) )))
 
-(defun skg--save-id-stack-buffer ()
-  "Save handler for the id-stack buffer.
-Validates and replaces `skg-id-stack' with buffer contents.
+(defun skg--save-linkstack-buffer ()
+  "Save handler for the linkstack buffer.
+Validates and replaces `skg-linkstack' with buffer contents.
 Bound to C-x C-s (which normally calls `save-buffer')
-by `skg-id-stack-mode'."
+by `skg-linkstack-mode'."
   (interactive)
-  (let (( validation-result (skg-validate-id-stack-buffer) ))
+  (let (( validation-result (skg-validate-linkstack-buffer) ))
     (if (eq (car validation-result) 'success)
         (progn
-          (setq skg-id-stack (cadr validation-result))
+          (setq skg-linkstack (cadr validation-result))
           (set-buffer-modified-p nil)
-          (message "ID stack updated (%d items)"
-                   (length skg-id-stack)) )
+          (message "Linkstack updated (%d items)"
+                   (length skg-linkstack)) )
       (message "Invalid ID buffer: %s" (cadr validation-result)) )))
 
-(defun skg-validate-id-stack-buffer ()
-  "Validate current buffer as an id-stack buffer and return the stack.
+(defun skg-validate-linkstack-buffer ()
+  "Validate current buffer as an linkstack buffer and return the stack.
 Each headline must have a non-empty title and exactly one body line (the ID).
 Returns (success RESULT) where RESULT is a list of (id label) pairs,
 with the first headline last in the list.
@@ -597,27 +597,27 @@ Returns (error MESSAGE) if validation fails."
         ;; nreverse so first headline in buffer = head of stack
         (list 'success (nreverse result)) )) ))
 
-;; skg-id-stack-mode-map is defined in skg-keymaps-and-aliases.el.
+;; skg-linkstack-mode-map is defined in skg-keymaps-and-aliases.el.
 
-(defun skg-view-id-stack ()
-  "Open a buffer to edit `skg-id-stack'.
+(defun skg-view-linkstack ()
+  "Open a buffer to edit `skg-linkstack'.
 The buffer displays the stack in org format
 (label headlines and ID bodies).
-Saving (C-x C-s) validates and updates `skg-id-stack'
+Saving (C-x C-s) validates and updates `skg-linkstack'
 without writing to disk."
   (interactive)
-  (let (( buf (get-buffer-create "*skg-id-stack*") ))
+  (let (( buf (get-buffer-create "*skg-linkstack*") ))
     (switch-to-buffer buf)
     (erase-buffer)
-    (insert (skg--format-id-stack-as-org))
+    (insert (skg--format-linkstack-as-org))
     (goto-char (point-min))
     (skg--org-mode-with-options)
-    (skg-id-stack-mode 1)
+    (skg-linkstack-mode 1)
     (set-buffer-modified-p nil)
-    (message "Edit ID stack. C-x C-s to save changes.") ))
+    (message "Edit the linkstack. C-x C-s to save changes.") ))
 
-(defun skg--format-id-stack-as-org ()
-  "Format `skg-id-stack' as org-mode text.
+(defun skg--format-linkstack-as-org ()
+  "Format `skg-linkstack' as org-mode text.
 Each (id label) pair becomes a headline with label as title and id as body.
 Head of stack (most recently pushed) appears at top of buffer."
   (mapconcat
@@ -625,17 +625,17 @@ Head of stack (most recently pushed) appears at top of buffer."
      (let (( id (car entry) )
            ( label (cadr entry) ))
        (format "* %s\n%s" label id) ))
-   skg-id-stack
+   skg-linkstack
    "\n" ))
 
-(define-minor-mode skg-id-stack-mode
-  "Minor mode for editing the skg ID stack.
-Overrides save to update `skg-id-stack' instead of writing to a file."
-  :lighter " ID-Stack"
-  :keymap skg-id-stack-mode-map)
+(define-minor-mode skg-linkstack-mode
+  "Minor mode for editing the skg linkstack.
+Overrides save to update `skg-linkstack' instead of writing to a file."
+  :lighter " Linkstack"
+  :keymap skg-linkstack-mode-map)
 
 ;; Hide from M-x: this mode is only activated
-;; programmatically by 'skg-view-id-stack'.
-(put 'skg-id-stack-mode 'completion-predicate #'ignore)
+;; programmatically by 'skg-view-linkstack'.
+(put 'skg-linkstack-mode 'completion-predicate #'ignore)
 
 (provide 'skg-id-search)

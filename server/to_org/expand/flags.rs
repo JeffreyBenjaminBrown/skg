@@ -1,6 +1,6 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
-use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
+use crate::to_org::util::{get_skgid_from_treenode, remove_completed_view_request};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::nodes::complete::{
   Flag, Graphnode, flag_is_true};
@@ -14,15 +14,15 @@ use std::error::Error;
 
 pub fn build_and_integrate_flags_then_drop_request (
   tree    : &mut Tree<Viewnode>,
-  node_id : ego_tree::NodeId,
+  treeid  : ego_tree::NodeId,
   graph   : &InRustGraph,
   config  : &SkgConfig,
   errors  : &mut Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
   let result : Result<(), Box<dyn Error>> =
-    build_and_integrate_flags (tree, node_id, graph, config);
+    build_and_integrate_flags (tree, treeid, graph, config);
   remove_completed_view_request (
-    tree, node_id, ViewRequest::Flags,
+    tree, treeid, ViewRequest::Flags,
     "Failed to integrate flags view", errors, result )
 }
 
@@ -30,22 +30,22 @@ pub fn build_and_integrate_flags_then_drop_request (
 /// useful even when empty, so it is always created and preserved.
 pub fn build_and_integrate_flags (
   tree     : &mut Tree<Viewnode>,
-  node_id  : ego_tree::NodeId,
+  treeid   : ego_tree::NodeId,
   graph    : &InRustGraph,
   _config  : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   if unique_non_vognode_child_of_viewnode (
-    tree, node_id,
+    tree, treeid,
     &ViewnodeKind::PropertyFolder (PropertyFolder::flags ())) ? . is_some ()
   { return Ok (()); }
-  let pid : ID = get_id_from_treenode (tree, node_id) ?;
+  let pid  : ID = get_skgid_from_treenode (tree, treeid) ?;
   let node : Option<Graphnode> = graphnode_from_graph (graph, &pid);
   let folder : ego_tree::NodeId = insert_non_vognode_as_child (
-    tree, node_id,
+    tree, treeid,
     ViewnodeKind::PropertyFolder (PropertyFolder::flags ()), false ) ?;
   if let Some (node) = node {
     for flag in Flag::ALL {
-      if flag_is_true (&node . misc, flag) {
+      if flag_is_true (&node . flags, flag) {
         insert_non_vognode_as_child (
           tree, folder,
           ViewnodeKind::Property (Property::Flag {
@@ -62,36 +62,36 @@ mod tests {
   use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
   use crate::org_to_text::viewforest_to_string;
   use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
-  use crate::types::misc::{RepoName, SkgfileRepo};
-  use crate::types::nodes::complete::empty_node_complete;
-  use crate::types::viewnode::mk_definitive_viewnode;
+  use crate::types::misc::{SkgRepoName, SkgRepo};
+  use crate::types::nodes::complete::empty_graphnode;
+  use crate::types::viewnode::mk_editable_viewnode;
   use std::collections::HashMap;
   use std::path::PathBuf;
   use indoc::indoc;
 
   fn config () -> SkgConfig {
-    let repo = RepoName::from ("main");
-    SkgConfig::fromReposAndTantivyFolder (HashMap::from ([
-      (repo . clone (), SkgfileRepo {
-        name: repo, abbreviation: None, path: PathBuf::from ("main"),
-        user_owns_it: true })]), "/tmp/none")
+    let skgrepo = SkgRepoName::from ("main");
+    SkgConfig::fromSkgReposAndTantivyFolder (HashMap::from ([
+      (skgrepo . clone (), SkgRepo {
+        name: skgrepo, abbreviation: None, path: PathBuf::from ("main"),
+        owned: true })]), "/tmp/none")
   }
 
   #[test]
   fn builder_emits_true_viewnodes_in_registry_order_and_keeps_empty_folder () {
-    let repo = RepoName::from ("main");
+    let skgrepo = SkgRepoName::from ("main");
     let rich = Graphnode {
       pid: ID::from ("rich"), title: "Rich" . to_string (),
-      home_repo: repo . clone (),
-      misc: vec![Flag::NoSearchMatching,
+      home_skgrepo: skgrepo . clone (),
+      flags: vec![Flag::NoSearchMatching,
                  Flag::Had_ID_Before_Import],
-      .. empty_node_complete () };
+      .. empty_graphnode () };
     let empty = Graphnode {
       pid: ID::from ("empty"), title: "Empty" . to_string (),
-      home_repo: repo . clone (), .. empty_node_complete () };
+      home_skgrepo: skgrepo . clone (), .. empty_graphnode () };
     let graph = InRustGraph::from_graphnodes (&[rich, empty]);
-    let mut tree = Tree::new (mk_definitive_viewnode (
-      ID::from ("rich"), repo . clone (), "Rich" . to_string (), None));
+    let mut tree = Tree::new (mk_editable_viewnode (
+      ID::from ("rich"), skgrepo . clone (), "Rich" . to_string (), None));
     let root = tree . root () . id ();
     build_and_integrate_flags (&mut tree, root, &graph, &config ())
       . unwrap ();
@@ -106,8 +106,8 @@ mod tests {
       (Flag::Had_ID_Before_Import, String::new ()),
       (Flag::NoSearchMatching, String::new ())]);
 
-    let mut empty_tree = Tree::new (mk_definitive_viewnode (
-      ID::from ("empty"), repo, "Empty" . to_string (), None));
+    let mut empty_tree = Tree::new (mk_editable_viewnode (
+      ID::from ("empty"), skgrepo, "Empty" . to_string (), None));
     let empty_root = empty_tree . root () . id ();
     build_and_integrate_flags (
       &mut empty_tree, empty_root, &graph, &config ()) . unwrap ();
@@ -122,7 +122,7 @@ mod tests {
   fn flags_surface_render_parse_round_trip_uses_all_canonical_atoms (
   ) {
     let org = indoc! {"
-      * (skg (node (id owner) (repo main))) Owner
+      * (skg (node (id recorder) (repo main))) Recorder
       ** (skg flagsFolder)
       *** (skg (flag hadId))
       *** (skg (flag wasOverloaded))

@@ -1,20 +1,20 @@
 /// This file defines text-claim validation, which is async because
 /// it consults disk. A 'SubscribeeTextClaim' is the title/body that
-/// a definitive subscribee-as-such displayed in the buffer; since
+/// an editable subscribee-as-such displayed in the buffer; since
 /// title/body edits in that position are forbidden, each claim must
 /// match the node's disk state. Claims for nodes absent from disk
 /// are ignored.
 
-use crate::dbs::node_lookup::opt_graphnode_by_id;
+use crate::dbs::node_lookup::opt_graphnode_by_skgid;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::from_text::local_instruction_collection::types::CollectedIntents;
+use crate::from_text::local_instruction_collection::types::CollectedFieldIntents;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::SkgConfig;
 
 use std::error::Error;
 
 pub fn validate_text_claims (
-  collected : &CollectedIntents,
+  collected : &CollectedFieldIntents,
   graph     : &InRustGraph,
   config    : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
@@ -24,7 +24,7 @@ pub fn validate_text_claims (
     if entry . text_claims . is_empty() {
       continue; }
     let Some (from_disk) =
-      opt_graphnode_by_id (graph, config, pid) ?
+      opt_graphnode_by_skgid (graph, config, pid) ?
       else { continue; };
     for claim in &entry . text_claims {
       if claim . title != from_disk . title

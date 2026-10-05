@@ -1,6 +1,6 @@
 # Test fixtures for SubscribeeFolder functionality.
 
-Two repos: 'home' (user-owned) and 'away' (foreign).
+Two repos: 'home' (owned) and 'away' (foreign).
 
 Structure:
   home/

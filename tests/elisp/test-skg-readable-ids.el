@@ -221,7 +221,7 @@ clears the cache and asks again."
          test-skg-readable-ids--id-c)))
      (should (= 2 (length sent)))
      (let ((retry (car sent)))
-       (should (string-match-p "allow-overPrivateText-telescopes" retry))
+       (should (string-match-p "approved-overPrivateText-pids" retry))
        (should (string-match-p test-skg-readable-ids--id-c retry)))
      (should-not (gethash test-skg-readable-ids--id-c
                           skg-readable-ids--title-cache)))))

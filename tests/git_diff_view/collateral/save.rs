@@ -27,7 +27,7 @@ async fn test_collateral_view_preserves_diff_annotations (
   let temp_dir : TempDir = TempDir::new()?;
   let gitrepo_path : &Path = temp_dir . path();
   setup_gitrepo_with_fixtures (gitrepo_path)?;
-  s . reset_with_repo_path (
+  s . reset_with_skgrepo_path (
     "test_collateral_view_preserves_diff_annotations",
     gitrepo_path ) ?;
   let (config, tantivy)
@@ -35,11 +35,11 @@ async fn test_collateral_view_preserves_diff_annotations (
     = (&s . config, &mut s . tantivy);
 
   // 1. Get an initial diff view of "a".
-  let root_ids : Vec<ID> = vec![ID("a" . to_string())];
+  let root_skgids : Vec<ID> = vec![ID("a" . to_string())];
   let (initial_buffer, pids, viewforest)
     : (String, Vec<ID>, Tree<Viewnode>) =
     multi_root_view (
-      &config, None, &root_ids, true ) ?;
+      &config, None, &root_skgids, true ) ?;
 
   // Sanity: initial view should match expected diff output.
   assert_buffer_contains(&initial_buffer, GIT_DIFF_VIEW);
@@ -138,18 +138,18 @@ async fn test_collateral_view_staged_text_and_unstaged_add (
   let temp_dir : TempDir = TempDir::new()?;
   let gitrepo_path : &Path = temp_dir . path();
   setup_gitrepo_with_fixtures_staged (gitrepo_path)?;
-  s . reset_with_repo_path (
+  s . reset_with_skgrepo_path (
     "test_collateral_view_staged_text_and_unstaged_add",
     gitrepo_path ) ?;
   let (config, tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
 
-  let root_ids : Vec<ID> = vec![ID("a" . to_string())];
+  let root_skgids : Vec<ID> = vec![ID("a" . to_string())];
   let (initial_buffer, pids, viewforest)
     : (String, Vec<ID>, Tree<Viewnode>) =
     multi_root_view (
-      &config, None, &root_ids, true ) ?;
+      &config, None, &root_skgids, true ) ?;
 
   // Sanity: initial view has textChanged attributed to staged.
   assert_buffer_contains(&initial_buffer, GIT_DIFF_VIEW_STAGED);

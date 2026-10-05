@@ -76,6 +76,6 @@ end
 
 ---The linkstack: a stack of {id, title} string pairs.
 ---@type string[][]
-M.id_stack = {}
+M.linkstack = {}
 
 return M

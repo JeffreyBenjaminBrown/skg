@@ -11,13 +11,13 @@ use skg::context::{
   compute_and_store_context_types,
   content_maps_from_nodes,
   had_id_set_from_nodes,
-  mentioned_ids_from_nodes,
+  mentioned_skgids_from_nodes,
   MapToContent,
   MapToContainers,
 };
 use skg::dbs::filesystem::not_nodes::load_config;
-use skg::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
+use skg::dbs::filesystem::multiple_nodes::error_unless_each_skgid_names_one_node;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::nodes::tantivy::GraphnodeInTantivy;
@@ -41,8 +41,8 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
   // Step 1: Read all .skg files
   let t0 : Instant = Instant::now ();
   let nodes : Vec<Graphnode> =
-    read_all_skg_files_from_repos (&config) ?;
-  error_unless_each_id_names_one_node (
+    read_all_skg_files_from_skgrepos (&config) ?;
+  error_unless_each_skgid_names_one_node (
     &nodes, &config . data_root) ?;
   let read_time : f64 = t0 . elapsed () . as_secs_f64 ();
   println! ("\n1. Read {} .skg files: {:.3}s", nodes . len (), read_time);
@@ -66,7 +66,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
 
   let t3 : Instant = Instant::now ();
   let mentioned_ids : HashSet<ID> =
-    mentioned_ids_from_nodes (&nodes);
+    mentioned_skgids_from_nodes (&nodes);
   let links_time : f64 = t3 . elapsed () . as_secs_f64 ();
   println! ("2c. mentioned_ids ({} dests): {:.6}s",
             mentioned_ids . len (), links_time);

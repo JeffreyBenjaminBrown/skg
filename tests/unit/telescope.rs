@@ -3,16 +3,16 @@
 //! - fold(unfold(x)) == x for every list of relation partners ("round-trip");
 //! - unfold(fold(sections)) is idempotent from the first application
 //!   (unfold output is canonical);
-//! - every member's repo survives both directions;
+//! - every member's skgrepo survives both directions;
 //! - dangling/duplicate-anchor junk folds totally and
 //!   deterministically;
-//! - the silent-leak guard: no member ever changes repo.
+//! - the silent-leak guard: no member ever changes skgrepo.
 
 use super::fold::{FoldedNode, fold_sections, graphnode_from_fold};
 use super::types::{FoldWarning, ListItem, SectionSlices, Telescope};
 use super::unfold::{UnfoldInput, unfold_node};
 use crate::types::misc::{
-  ID, RelPartner, SkgConfig, SkgfileRepo, RepoName,
+  ID, RelPartner, SkgConfig, SkgRepo, SkgRepoName,
 };
 use crate::types::nodes::complete::Flag;
 
@@ -21,51 +21,51 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// The test privacy order: S0 most public .. S3 most private.
-fn repo_universe () -> Vec<RepoName> {
-  (0..4) . map ( |i| RepoName ( format! ("S{}", i) ))
+fn skgrepo_universe () -> Vec<SkgRepoName> {
+  (0..4) . map ( |i| SkgRepoName ( format! ("S{}", i) ))
     . collect () }
 
 fn telescope_config () -> SkgConfig {
-  let repos : HashMap<RepoName, SkgfileRepo> =
-    repo_universe () . into_iter ()
-    . map ( |repo| (
-      repo . clone (),
-      SkgfileRepo {
-        name         : repo . clone (),
+  let skgrepos : HashMap<SkgRepoName, SkgRepo> =
+    skgrepo_universe () . into_iter ()
+    . map ( |skgrepo| (
+      skgrepo . clone (),
+      SkgRepo {
+        name         : skgrepo . clone (),
         abbreviation : None,
-        path         : PathBuf::from (format! ("owned/{}", repo)),
-        user_owns_it : true,
+        path         : PathBuf::from (format! ("owned/{}", skgrepo)),
+        owned        : true,
       } ))
     . collect ();
-  let mut config : SkgConfig = SkgConfig::dummyFromRepos (repos);
-  config . repo_order = repo_universe ();
+  let mut config : SkgConfig = SkgConfig::dummyFromSkgRepos (skgrepos);
+  config . skgrepo_order = skgrepo_universe ();
   config }
 
 fn unfold_sections (
   input : &UnfoldInput,
-) -> Vec<(RepoName, SectionSlices)> {
+) -> Vec<(SkgRepoName, SectionSlices)> {
   unfold_node (input, &telescope_config ()) . unwrap ()
     . into_sections () . into_iter ()
-    . map ( |(repo, node_fs)|
-      (repo, node_fs . into_section_slices ()) )
+    . map ( |(skgrepo, node_fs)|
+      (skgrepo, node_fs . into_section_slices ()) )
     . collect () }
 
 fn identity_resolve (
-  id : &ID,
+  skgid : &ID,
 ) -> ID {
-  id . clone () }
+  skgid . clone () }
 
 /// An arbitrary list of relation partners with UNIQUE members: up to N
-/// members, each at a random repo in the universe. Uniqueness matters
+/// members, each at a random skgrepo in the universe. Uniqueness matters
 /// because the fold dedups (with warnings), which round-trip inputs
 /// must not trigger.
 fn arb_rel_partners (
   max_len : usize,
 ) -> impl Strategy<Value = Vec<RelPartner<ID>>> {
   proptest::collection::vec ( 0usize..4, 0..max_len )
-    . prop_map ( |repos| {
-      let universe : Vec<RepoName> = repo_universe ();
-      repos . into_iter () . enumerate ()
+    . prop_map ( |skgrepos| {
+      let universe : Vec<SkgRepoName> = skgrepo_universe ();
+      skgrepos . into_iter () . enumerate ()
         . map ( |(i, l)| RelPartner::at_relRepo (
           universe [l] . clone (),
           ID ( format! ("id{}", i) )))
@@ -74,16 +74,16 @@ fn arb_rel_partners (
 /// Wrap ordered lists of relation partners (and nothing else) into an
 /// UnfoldInput-shaped FoldedNode for the round-trip tests.
 fn folded_from_lists (
-  home     : &RepoName,
+  home     : &SkgRepoName,
   contains : Vec<RelPartner<ID>>,
   subs     : Vec<RelPartner<ID>>,
   hides    : Vec<RelPartner<ID>>,
 ) -> FoldedNode {
   FoldedNode {
     title                        : Some ("t" . to_string ()),
-    title_repo                 : Some (home . clone ()),
+    title_skgrepo                : Some (home . clone ()),
     body                         : None,
-    body_repo                  : None,
+    body_skgrepo                 : None,
     home                         : Some ( home . clone () ),
     aliases                      : None,
     contains,
@@ -96,14 +96,14 @@ fn folded_from_lists (
 fn unfold_then_fold (
   folded : &FoldedNode,
 ) -> (FoldedNode, Vec<FoldWarning>) {
-  let home : RepoName =
+  let home : SkgRepoName =
     folded . home . clone () . expect ("home set");
-  let sections : Vec<(RepoName, SectionSlices)> =
+  let sections : Vec<(SkgRepoName, SectionSlices)> =
     unfold_sections (
       & UnfoldInput {
         pid      : &ID::new ("p"),
         extra_ids : &[],
-        misc      : &[],
+        flags    : &[],
         title    : folded . title . as_deref (),
         body     : folded . body . as_deref (),
         home     : &home,
@@ -122,15 +122,15 @@ fn unfold_then_fold (
 
 #[test]
 fn flags_write_at_home_and_fold_defensively_from_all_sections () {
-  let home = RepoName::from ("S0");
-  let private = RepoName::from ("S2");
+  let home = SkgRepoName::from ("S0");
+  let private = SkgRepoName::from ("S2");
   let misc = vec![
     Flag::Had_ID_Before_Import,
     Flag::NoSearchMatching];
   let contains = vec![RelPartner::at_relRepo (
     private . clone (), ID::from ("child"))];
   let mut sections = unfold_node (&UnfoldInput {
-    pid: &ID::from ("p"), extra_ids: &[], misc: &misc,
+    pid: &ID::from ("p"), extra_ids: &[], flags: &misc,
     title: Some ("title"), body: None, home: &home,
     aliases: &[], contains: &contains, subscribes_to: &[],
     hides_from_its_subscriptions: &[], overrides_view_of: &[],
@@ -140,13 +140,13 @@ fn flags_write_at_home_and_fold_defensively_from_all_sections () {
     . all (|(_, section)| section . misc . is_empty ()));
 
   let private_section = sections . iter_mut ()
-    . find (|(repo, _)| repo == &private) . unwrap ();
+    . find (|(skgrepo, _)| skgrepo == &private) . unwrap ();
   private_section . 1 . misc = vec![
     Flag::NoSearchMatching,
     Flag::Was_Overloaded];
   let telescope = Telescope::try_new (
     ID::from ("p"), sections, &telescope_config ()) . unwrap ();
-  assert_eq! (telescope . misc (), vec![
+  assert_eq! (telescope . flags (), vec![
     Flag::Had_ID_Before_Import,
     Flag::NoSearchMatching,
     Flag::Was_Overloaded]);
@@ -172,7 +172,7 @@ proptest! {
       . map ( |m| RelPartner::at_relRepo (
         m . relRepo, ID ( format! ("h-{}", m . member . 0 ))))
       . collect ();
-    let home : RepoName = RepoName::from ("S0");
+    let home   : SkgRepoName = SkgRepoName::from ("S0");
     let folded : FoldedNode =
       folded_from_lists (&home, contains, subs, hides);
     let (refolded, warnings) = unfold_then_fold (&folded);
@@ -185,7 +185,7 @@ proptest! {
       // cannot express cross-repo interleavings without anchors,
       // which unordered relations deliberately lack, so the fold's
       // output order is CANONICAL (repo-major). The law is
-      // set-equality with repos intact.
+      // set-equality with skgrepos intact.
       let sort = |v : Option<&Vec<RelPartner<ID>>>|
       -> Vec<RelPartner<ID>> {
         let mut v : Vec<RelPartner<ID>> =
@@ -206,24 +206,24 @@ proptest! {
     contains in arb_rel_partners (12),
   ) {
     // unfold . fold . unfold == unfold  (sections are a normal form)
-    let home : RepoName = RepoName::from ("S0");
+    let home   : SkgRepoName = SkgRepoName::from ("S0");
     let folded : FoldedNode = folded_from_lists (
       &home, contains, Vec::new (), Vec::new ());
     let (refolded, _) = unfold_then_fold (&folded);
-    let sections_once : Vec<(RepoName, SectionSlices)> =
+    let sections_once : Vec<(SkgRepoName, SectionSlices)> =
       unfold_sections (
         & UnfoldInput {
-          pid : &ID::new ("p"), extra_ids : &[], misc : &[],
+          pid : &ID::new ("p"), extra_ids : &[], flags : &[],
           title : folded . title . as_deref (),
           body : None, home : &home,
           aliases : &[], contains : &folded . contains,
           subscribes_to : &[],
           hides_from_its_subscriptions : &[],
           overrides_view_of : &[], } );
-    let sections_twice : Vec<(RepoName, SectionSlices)> =
+    let sections_twice : Vec<(SkgRepoName, SectionSlices)> =
       unfold_sections (
         & UnfoldInput {
-          pid : &ID::new ("p"), extra_ids : &[], misc : &[],
+          pid : &ID::new ("p"), extra_ids : &[], flags : &[],
           title : refolded . title . as_deref (),
           body : None, home : &home,
           aliases : &[], contains : &refolded . contains,
@@ -234,10 +234,10 @@ proptest! {
   }
 
   #[test]
-  fn no_member_ever_changes_repo ( // the silent-leak guard
+  fn no_member_ever_changes_skgrepo ( // the silent-leak guard
     contains in arb_rel_partners (12),
   ) {
-    let home : RepoName = RepoName::from ("S0");
+    let home   : SkgRepoName = SkgRepoName::from ("S0");
     let folded : FoldedNode = folded_from_lists (
       &home, contains . clone (), Vec::new (), Vec::new ());
     let (refolded, _) = unfold_then_fold (&folded);
@@ -257,15 +257,15 @@ fn dangling_anchor_attaches_after_preceding_run_with_warning (
 ) {
   // S1's section: prepend [p], run (a,[x]), then a run whose anchor
   // is unknown -- its members must follow the PRECEDING run, warned.
-  let sections : Vec<(RepoName, SectionSlices)> = vec! [
-    ( RepoName::from ("S0"),
+  let sections : Vec<(SkgRepoName, SectionSlices)> = vec! [
+    ( SkgRepoName::from ("S0"),
       SectionSlices {
         title : Some ("t" . to_string ()),
         contains : Some ( vec! [
           ListItem::Member ( ID::new ("a") ),
           ListItem::Member ( ID::new ("b") ) ] ),
         .. SectionSlices::default () } ),
-    ( RepoName::from ("S1"),
+    ( SkgRepoName::from ("S1"),
       SectionSlices {
         contains : Some ( vec! [
           ListItem::Member ( ID::new ("p") ),
@@ -290,14 +290,14 @@ fn dangling_anchor_attaches_after_preceding_run_with_warning (
 #[test]
 fn dangling_first_run_joins_the_prepend (
 ) {
-  let sections : Vec<(RepoName, SectionSlices)> = vec! [
-    ( RepoName::from ("S0"),
+  let sections : Vec<(SkgRepoName, SectionSlices)> = vec! [
+    ( SkgRepoName::from ("S0"),
       SectionSlices {
         title : Some ("t" . to_string ()),
         contains : Some ( vec! [
           ListItem::Member ( ID::new ("a") ) ] ),
         .. SectionSlices::default () } ),
-    ( RepoName::from ("S1"),
+    ( SkgRepoName::from ("S1"),
       SectionSlices {
         contains : Some ( vec! [
           ListItem::Anchor { anchor : ID::new ("GONE") },
@@ -317,14 +317,14 @@ fn dangling_first_run_joins_the_prepend (
 #[test]
 fn duplicate_anchors_concatenate_in_file_order (
 ) {
-  let sections : Vec<(RepoName, SectionSlices)> = vec! [
-    ( RepoName::from ("S0"),
+  let sections : Vec<(SkgRepoName, SectionSlices)> = vec! [
+    ( SkgRepoName::from ("S0"),
       SectionSlices {
         title : Some ("t" . to_string ()),
         contains : Some ( vec! [
           ListItem::Member ( ID::new ("a") ) ] ),
         .. SectionSlices::default () } ),
-    ( RepoName::from ("S1"),
+    ( SkgRepoName::from ("S1"),
       SectionSlices {
         contains : Some ( vec! [
           ListItem::Anchor { anchor : ID::new ("a") },
@@ -344,17 +344,17 @@ fn duplicate_anchors_concatenate_in_file_order (
 #[test]
 fn anchors_resolve_through_the_resolver ( // extra-id safety
 ) {
-  let resolve = |id : &ID| -> ID {
+  let resolve = |skgid : &ID| -> ID {
     // "a-alias" is an extra id of "a"
-    if id . 0 == "a-alias" { ID::new ("a") } else { id . clone () }};
-  let sections : Vec<(RepoName, SectionSlices)> = vec! [
-    ( RepoName::from ("S0"),
+    if skgid . 0 == "a-alias" { ID::new ("a") } else { skgid . clone () }};
+  let sections : Vec<(SkgRepoName, SectionSlices)> = vec! [
+    ( SkgRepoName::from ("S0"),
       SectionSlices {
         title : Some ("t" . to_string ()),
         contains : Some ( vec! [
           ListItem::Member ( ID::new ("a") ) ] ),
         .. SectionSlices::default () } ),
-    ( RepoName::from ("S1"),
+    ( SkgRepoName::from ("S1"),
       SectionSlices {
         contains : Some ( vec! [
           ListItem::Anchor { anchor : ID::new ("a-alias") },
@@ -376,13 +376,13 @@ fn the_home_is_the_most_public_section_titled_or_not (
     // section. So the home is the most public SECTION, not the most
     // public section bearing a title; a titleless one above the
     // title is a violation to report, not a shape to search past.
-  let titleless_public : (RepoName, SectionSlices) =
-    ( RepoName::from ("public"),
+  let titleless_public : (SkgRepoName, SectionSlices) =
+    ( SkgRepoName::from ("public"),
       SectionSlices { contains : Some ( vec! [
         ListItem::Member ( ID::new ("C") ) ] ),
         .. SectionSlices::default () } );
-  let titled_private : (RepoName, SectionSlices) =
-    ( RepoName::from ("private"),
+  let titled_private : (SkgRepoName, SectionSlices) =
+    ( SkgRepoName::from ("private"),
       SectionSlices { title : Some ( "N" . to_string () ),
                       body  : Some ( "secret" . to_string () ),
                       .. SectionSlices::default () } );
@@ -391,25 +391,25 @@ fn the_home_is_the_most_public_section_titled_or_not (
       & [ titleless_public, titled_private ],
       & identity_resolve );
   assert_eq! ( folded . home,
-               Some ( RepoName::from ("public") ),
+               Some ( SkgRepoName::from ("public") ),
                "the home is the most public section" );
   assert_eq! ( folded . title, Some ( "N" . to_string () ),
                "the title still folds in, from wherever it sits" );
   assert! ( warnings . contains ( & FoldWarning::TitleBelowHome {
-              home     : RepoName::from ("public"),
-              title_at : RepoName::from ("private"), } ),
+              home     : SkgRepoName::from ("public"),
+              title_at : SkgRepoName::from ("private"), } ),
             "the shape is reported: {:?}", warnings );
 }
 
 #[test]
 fn a_titled_most_public_section_raises_no_title_warning (
 ) {
-  let titled_public : (RepoName, SectionSlices) =
-    ( RepoName::from ("public"),
+  let titled_public : (SkgRepoName, SectionSlices) =
+    ( SkgRepoName::from ("public"),
       SectionSlices { title : Some ( "N" . to_string () ),
                       .. SectionSlices::default () } );
-  let titleless_private : (RepoName, SectionSlices) =
-    ( RepoName::from ("private"),
+  let titleless_private : (SkgRepoName, SectionSlices) =
+    ( SkgRepoName::from ("private"),
       SectionSlices { contains : Some ( vec! [
         ListItem::Member ( ID::new ("C") ) ] ),
         .. SectionSlices::default () } );
@@ -418,7 +418,7 @@ fn a_titled_most_public_section_raises_no_title_warning (
       & [ titled_public, titleless_private ],
       & identity_resolve );
   assert_eq! ( folded . home,
-               Some ( RepoName::from ("public") ) );
+               Some ( SkgRepoName::from ("public") ) );
   assert! ( ! warnings . iter () . any ( |w| matches! (
               w, FoldWarning::TitleBelowHome { .. }
                  | FoldWarning::NonHomeTitle { .. }
@@ -428,7 +428,7 @@ fn a_titled_most_public_section_raises_no_title_warning (
 }
 
 fn text_node (
-  sections : Vec<(RepoName, SectionSlices)>,
+  sections : Vec<(SkgRepoName, SectionSlices)>,
 ) -> (crate::types::nodes::complete::Graphnode, Vec<FoldWarning>) {
   let (folded, warnings) = fold_sections (&sections, &identity_resolve);
   let node = graphnode_from_fold (
@@ -439,8 +439,8 @@ fn text_node (
 #[test]
 fn title_and_body_select_independently_and_mark_overPrivateTextness (
 ) {
-  let public = RepoName::from ("public");
-  let private = RepoName::from ("private");
+  let public = SkgRepoName::from ("public");
+  let private = SkgRepoName::from ("private");
 
   let (clean, _) = text_node (vec! [
     ( public . clone (), SectionSlices {
@@ -493,8 +493,8 @@ fn title_and_body_select_independently_and_mark_overPrivateTextness (
 #[test]
 fn later_text_reports_the_repo_that_actually_won (
 ) {
-  let public = RepoName::from ("public");
-  let private = RepoName::from ("private");
+  let public = SkgRepoName::from ("public");
+  let private = SkgRepoName::from ("private");
   let (_node, warnings) = text_node (vec! [
     ( public . clone (), SectionSlices {
         title : Some ("winner" . to_string ()),
@@ -505,7 +505,7 @@ fn later_text_reports_the_repo_that_actually_won (
         body  : Some ("later body" . to_string ()),
         .. SectionSlices::default () } ) ]);
   assert! (warnings . contains (&FoldWarning::NonHomeTitle {
-    repo : private . clone (), selected_at : public . clone () }));
+    skgrepo : private . clone (), selected_at : public . clone () }));
   assert! (warnings . contains (&FoldWarning::NonHomeBody {
-    repo : private, selected_at : public }));
+    skgrepo : private, selected_at : public }));
 }

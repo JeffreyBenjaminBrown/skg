@@ -1,6 +1,6 @@
 //! Death-leafward: a folder self-checks its required ancestry at its BFS visit.
 //!
-//! See TODO/local-view-update/DONE/propagate-death-leafward/plan.org. In the
+//! See TODO/DONE/local-view-update/propagate-death-leafward/plan.org. In the
 //! single-visit BFS (complete.rs), each folder (a non-vognode viewnode: PropertyFolder,
 //! PartnerFolder) is reconciled at its own visit, and that reconcile reads its
 //! ancestor vognode(s). If a required ancestor died this save, the read would
@@ -27,7 +27,7 @@
 //! reads share one spec (the per-folder *field* each reconcile then pulls --
 //! subscriber.hides vs subscribee.contains -- stays per-folder).
 
-use crate::types::misc::{ID, RepoName};
+use crate::types::misc::{ID, SkgRepoName};
 use crate::types::tree::generic::{ read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree };
 use crate::types::tree::viewnode_graphnode::write_at_activeVognode_in_tree;
 use crate::types::viewnode::{ AffectsParent, PartnerFolder, Viewnode, ViewnodeKind, Vognode };
@@ -68,7 +68,7 @@ fn required_ancestry (
   match kind {
     // PropertyFolder(Alias) and PropertyFolder(ID): parent Active vognode.
     ViewnodeKind::PropertyFolder (_) => ANC_NORMAL,
-    // Subscribee folder: parent = subscriber (Normal).
+    // Subscribee folder: parent = subscriber (Active).
     // PartnerFolders (Subscriber/Overridden/Overrider/Hider/Hidden): parent
     // Active vognode.
     ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)
@@ -106,7 +106,7 @@ pub fn is_folder_kind (
   matches! ( kind,
     ViewnodeKind::PropertyFolder (_) | ViewnodeKind::PartnerFolder (_) ) }
 
-fn ancestor_nodeid (
+fn ancestor_treeid (
   tree       : &Tree<Viewnode>,
   node       : NodeId,
   generation : usize,
@@ -160,19 +160,19 @@ pub fn required_ancestor (
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   let spec : &[ExpectedAncestor] = required_ancestry (&kind);
   if i >= spec . len () { return Ok (None); }
-  Ok ( ancestor_nodeid (tree, folder, i + 1) ) }
+  Ok ( ancestor_treeid (tree, folder, i + 1) ) }
 
-/// The (pid, repo) of the folder's i-th required ancestor, read *through* the
+/// The (pid, skgrepo) of the folder's i-th required ancestor, read *through* the
 /// TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 table. Errors if that ancestor is absent (the folder is a generalized
 /// orphan up to i) -- unreachable in practice, since the BFS dispatch runs the
 /// orphan pre-check and deadens an orphan before its reconcile is ever called,
 /// but the contract is what keeps a reconcile from reading an unlisted ancestor.
-pub fn pid_and_repo_from_required_ancestor (
+pub fn pid_and_skgrepo_from_required_ancestor (
   tree   : &Tree<Viewnode>,
   folder    : NodeId,
   i      : usize,
   caller : &str,
-) -> Result<(ID, RepoName), Box<dyn Error>> {
+) -> Result<(ID, SkgRepoName), Box<dyn Error>> {
   let anc : NodeId =
     required_ancestor (tree, folder, i) ?
     . ok_or_else ( || format! (
@@ -182,8 +182,8 @@ pub fn pid_and_repo_from_required_ancestor (
     tree, anc,
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (v) if v . is_graph_member () =>
-        v . pid_and_repo ()
-        . map ( |(pid, repo)| (pid . clone (), repo . clone ()) ),
+        v . pid_and_skgrepo ()
+        . map ( |(pid, skgrepo)| (pid . clone (), skgrepo . clone ()) ),
       _ => None } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?
     . ok_or_else ( || format! (
@@ -192,16 +192,16 @@ pub fn pid_and_repo_from_required_ancestor (
 /// Deaden a generalized-orphan folder at its BFS visit (TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5): dispose each
 /// direct child, then convert the folder itself to a DeadViewnode and skip its
 /// reconcile. The BFS still visits the (disposed) children; a demoted-
-/// Independent survivor is visited normally, a DeadViewnode child is a no-op.
+/// non-member survivor is visited normally, a DeadViewnode child is a no-op.
 pub fn deaden_generalized_orphan_folder (
   tree : &mut Tree<Viewnode>,
   folder  : NodeId,
 ) -> Result<(), Box<dyn Error>> {
-  let child_ids : Vec<NodeId> =
+  let child_skgids : Vec<NodeId> =
     tree . get (folder)
     . ok_or ("deaden_generalized_orphan_folder: folder not found") ?
     . children () . map ( |c| c . id () ) . collect ();
-  for cid in child_ids {
+  for cid in child_skgids {
     dispose_orphaned_folder_child (tree, cid) ?; }
   write_at_node_in_tree ( tree, folder,
     |vn : &mut Viewnode| { vn . kind = ViewnodeKind::DeadViewnode; } )
@@ -209,8 +209,8 @@ pub fn deaden_generalized_orphan_folder (
   Ok (( )) }
 
 /// Dispose one direct child of a deadened orphan folder (TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5.1.a):
-/// - an Affected (affectsParent=Affected Normal) view-leaf -> delete;
-/// - an Affected branch (has children) -> demote to affectsParent=Independent, so
+/// - a member (affectsParent=true Active) view-leaf -> delete;
+/// - a member branch (has children) -> demote to affectsParent=false, so
 ///   the user's subtree survives;
 /// - a nested folder (PropertyFolder / PartnerFolder) -> LEAVE it untouched: it is itself a
 ///   generalized orphan under this now-dead folder, so it deadens itself -- and
@@ -224,7 +224,7 @@ pub fn deaden_generalized_orphan_folder (
 ///   below.)
 /// - any other non-vognode, non-phantom child (a Property, a DeadViewnode) -> convert
 ///   to DeadViewnode;
-/// - any other child (a non-Affected vognode -- an Independent Active or an
+/// - any other child (a non-member vognode -- a non-member Active or an
 ///   Inactive -- or any Phantom: Diff/Deleted/Unknown) -> keep untouched.
 fn dispose_orphaned_folder_child (
   tree  : &mut Tree<Viewnode>,
@@ -252,7 +252,7 @@ fn dispose_orphaned_folder_child (
     write_at_node_in_tree ( tree, child,
       |vn : &mut Viewnode| { vn . kind = ViewnodeKind::DeadViewnode; } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
-  // else: a non-Affected vognode or a phantom -- kept untouched.
+  // else: a non-member vognode or a phantom -- kept untouched.
   Ok (( )) }
 
 #[cfg(test)]

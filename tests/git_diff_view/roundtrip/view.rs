@@ -27,14 +27,14 @@ async fn reorder_within_parent_shows_move_and_roundtrips (
   let temp_dir = TempDir::new()?;
   let gitrepo_path = temp_dir . path();
   setup_gitrepo_with_reorder_fixtures (gitrepo_path)?;
-  s . reset_with_repo_path ( "roundtrip_reorder", gitrepo_path ) ?;
+  s . reset_with_skgrepo_path ( "roundtrip_reorder", gitrepo_path ) ?;
   let (config, tantivy)
     : (&SkgConfig, &TantivyIndex)
     = (&s . config, &s . tantivy);
 
-  let root_ids = vec![ ID ("parent" . to_string ()) ];
+  let root_skgids = vec![ ID ("parent" . to_string ()) ];
   let (actual, _pids, _) : (String, Vec<ID>, _) =
-    multi_root_view (&config, None, &root_ids, true) ?;
+    multi_root_view (&config, None, &root_skgids, true) ?;
 
   // The moved member is drawn at BOTH slots: 'removedR' at its old slot and
   // 'addedR' at its new slot (a git-style move). Which member git's LCS treats as
@@ -54,10 +54,10 @@ async fn reorder_within_parent_shows_move_and_roundtrips (
   assert_diff_buffer_roundtrips ( &actual, config, tantivy ) . await ?;
   Ok (( )) }
 
-/// A contains member referenced at HEAD whose .skg file exists in no Skg repo
-/// renders as a removedR phantom carrying the NOT_FOUND Skg repo sentinel; that
+/// A contains member referenced at HEAD whose .skg file exists in no skgrepo
+/// renders as a removedR phantom carrying the NOT_FOUND skgrepo sentinel; that
 /// buffer must save with no validation errors. Regression: validate_phantom
-/// used to reject a phantom whose Skg repo is not in the config.
+/// used to reject a phantom whose skgrepo is not in the config.
 async fn dangling_at_head_member_roundtrips (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
@@ -65,14 +65,14 @@ async fn dangling_at_head_member_roundtrips (
   let temp_dir = TempDir::new()?;
   let gitrepo_path = temp_dir . path();
   setup_gitrepo_with_dangling_fixtures (gitrepo_path)?;
-  s . reset_with_repo_path ( "roundtrip_dangling", gitrepo_path ) ?;
+  s . reset_with_skgrepo_path ( "roundtrip_dangling", gitrepo_path ) ?;
   let (config, tantivy)
     : (&SkgConfig, &TantivyIndex)
     = (&s . config, &s . tantivy);
 
-  let root_ids = vec![ ID ("parent" . to_string ()) ];
+  let root_skgids = vec![ ID ("parent" . to_string ()) ];
   let (actual, _pids, _) : (String, Vec<ID>, _) =
-    multi_root_view (&config, None, &root_ids, true) ?;
+    multi_root_view (&config, None, &root_skgids, true) ?;
 
   assert! (
     actual . contains ("(id ghost)") && actual . contains ("NOT_FOUND"),

@@ -3,12 +3,12 @@ use crate::types::viewnode::{mk_writeProtected_viewnode, viewforest_root_viewnod
 
 fn active_affected (id_str : &str) -> Viewnode {
   mk_writeProtected_viewnode (
-    ID::from (id_str), RepoName::from ("main"),
+    ID::from (id_str), SkgRepoName::from ("main"),
     id_str . to_string (), AffectsParent::True ) }
 
 fn active_independent (id_str : &str) -> Viewnode {
   mk_writeProtected_viewnode (
-    ID::from (id_str), RepoName::from ("main"),
+    ID::from (id_str), SkgRepoName::from ("main"),
     id_str . to_string (), AffectsParent::False ) }
 
 fn mk_folder (kind : PartnerFolder) -> Viewnode {
@@ -19,8 +19,8 @@ fn mk_folder (kind : PartnerFolder) -> Viewnode {
     kind        : ViewnodeKind::PartnerFolder (kind) } }
 
 // The user's view order of present members survives; missing graph
-// members are appended in graph order; nonmembers and Independent
-// children contribute nothing to the goal.
+// members are appended in graph order; non-member children
+// contribute nothing to the goal.
 #[test]
 fn view_order_wins_and_missing_members_append () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());

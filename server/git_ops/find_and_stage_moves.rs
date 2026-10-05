@@ -1,14 +1,14 @@
-/// Detects nodes that moved from one Skg repo to another, and renders
+/// Detects nodes that moved from one skgrepo to another, and renders
 /// a bash script -- a move list plus one loop over it -- that stages
-/// each clean move ('git rm' in the old repo, 'git add' in the new
-/// one), skipping any whose file is still present in the old Skg repo
+/// each clean move ('git rm' in the old skgrepo, 'git add' in the new
+/// one), skipping any whose file is still present in the old skgrepo
 /// (so a stale entry cannot delete it).
 ///
 /// Under privacy telescopes a node's sections live in several
-/// repos at once, so file presence alone no longer signals a move.
+/// skgrepos at once, so file presence alone no longer signals a move.
 /// To move "the" node is to move its most public titled
 /// representation: a node has "moved" iff its TITLE vanished from
-/// EXACTLY one Skg repo (titled in that Skg repo's git HEAD, absent or
+/// EXACTLY one skgrepo (titled in that skgrepo's git HEAD, absent or
 /// titleless in its worktree) and appeared in EXACTLY one other
 /// (titled in the worktree, absent or titleless in HEAD). Titleless
 /// section creations and deletions move individual relationships
@@ -16,15 +16,15 @@
 /// ordinary edits.
 ///
 /// A move is AUTO-STAGED only when it is a pure delete/create pair:
-/// the old Skg repo's file is gone from its worktree and the new
-/// Skg repo's file is absent from its HEAD. If instead either side
+/// the old skgrepo's file is gone from its worktree and the new
+/// skgrepo's file is absent from its HEAD. If instead either side
 /// mixes the move into a pre-existing section file (the destination
-/// already recorded relationships for the node, or the old Skg repo
+/// already recorded relationships for the node, or the old skgrepo
 /// keeps a titleless section), staging the file would drag those
 /// relationship changes along -- so the pair is REPORTED for the
 /// user to stage by hand, and never auto-staged.
 
-use crate::types::misc::{ID, SkgConfig, SkgfileRepo, RepoName};
+use crate::types::misc::{ID, SkgConfig, SkgRepo, SkgRepoName};
 
 use super::misc::path_relative_to_gitrepo;
 use super::read_gitrepo::open_gitrepo;
@@ -35,12 +35,12 @@ use std::error::Error as StdError;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// A node whose title vanished from exactly one Skg repo and appeared
-/// in exactly one (necessarily different) Skg repo.
+/// A node whose title vanished from exactly one skgrepo and appeared
+/// in exactly one (necessarily different) skgrepo.
 struct NodeMove {
-  id   : ID,
-  from : RepoName,
-  to   : RepoName,
+  skgid   : ID,
+  from : SkgRepoName,
+  to   : SkgRepoName,
   /// True iff the move is a pure delete/create pair, safe to stage
   /// mechanically; false means it is mixed into pre-existing
   /// section files and is only reported.
@@ -55,7 +55,7 @@ pub fn stage_moves_script (
     detect_moves (config) ?;
   Ok ( render_moves_script (config, &moves) ) }
 
-/// One Skg repo's view of one node's section file at one endpoint:
+/// One skgrepo's view of one node's section file at one endpoint:
 /// absent, or present with(out) a title.
 #[derive(Clone, Copy, PartialEq)]
 enum SectionSight {
@@ -64,81 +64,81 @@ enum SectionSight {
   Titled,
 }
 
-/// What one Skg repo holds for one id, in HEAD and on disk.
+/// What one skgrepo holds for one id, in HEAD and on disk.
 #[derive(Clone, Copy)]
-struct RepoSight {
+struct SkgRepoSight {
   head : SectionSight,
   disk : SectionSight,
 }
 
-/// Scan every Skg repo, then keep only IDs whose TITLE vanished from
-/// exactly one Skg repo and appeared in exactly one. The two repos
+/// Scan every skgrepo, then keep only IDs whose TITLE vanished from
+/// exactly one skgrepo and appeared in exactly one. The two skgrepos
 /// differ by construction: vanishing requires the worktree title
 /// absent, appearing requires it present.
 fn detect_moves (
   config : &SkgConfig,
 ) -> Result<Vec<NodeMove>, String> {
-  let mut sights : BTreeMap<ID, HashMap<RepoName, RepoSight>> =
+  let mut sights : BTreeMap<ID, HashMap<SkgRepoName, SkgRepoSight>> =
     BTreeMap::new (); // BTreeMap: deterministic output order.
-  for (repo_name, skgrepo) in &config . repos {
-    for (id, sight) in
-      sights_in_repo (skgrepo)
+  for (skgrepo_name, skgrepo) in &config . skgrepos {
+    for (skgid, sight) in
+      sights_in_skgrepo (skgrepo)
       . map_err ( |e| format! (
         "Could not read git status for repo '{}': {}",
-        repo_name, e )) ? {
-      sights . entry (id) . or_default ()
-        . insert ( repo_name . clone (), sight ); }}
+        skgrepo_name, e )) ? {
+      sights . entry (skgid) . or_default ()
+        . insert ( skgrepo_name . clone (), sight ); }}
   let mut moves : Vec<NodeMove> =
     Vec::new ();
-  for (id, by_repo) in &sights {
-    let froms : Vec<&RepoName> = // title vanished here
-      by_repo . iter ()
+  for (skgid, by_skgrepo) in &sights {
+    let froms : Vec<&SkgRepoName> = // title vanished here
+      by_skgrepo . iter ()
       . filter ( |(_, s)| s . head == SectionSight::Titled
                  && s . disk != SectionSight::Titled )
       . map ( |(name, _)| name ) . collect ();
-    let tos : Vec<&RepoName> = // title appeared here
-      by_repo . iter ()
+    let tos : Vec<&SkgRepoName> = // title appeared here
+      by_skgrepo . iter ()
       . filter ( |(_, s)| s . disk == SectionSight::Titled
                  && s . head != SectionSight::Titled )
       . map ( |(name, _)| name ) . collect ();
     if froms . len () != 1 || tos . len () != 1 { continue; }
-    let (from, to) : (&RepoName, &RepoName) =
+    let (from, to) : (&SkgRepoName, &SkgRepoName) =
       (froms [0], tos [0]);
     let clean : bool = // a pure delete/create pair
-      by_repo [from] . disk == SectionSight::Absent
-      && by_repo [to] . head == SectionSight::Absent;
+      by_skgrepo [from] . disk == SectionSight::Absent
+      && by_skgrepo [to] . head == SectionSight::Absent;
     moves . push ( NodeMove {
-      id    : id . clone (),
+      skgid : skgid . clone (),
       from  : from . clone (),
       to    : to . clone (),
       clean } ); }
   Ok (moves) }
 
-/// For one Skg repo: every id present in HEAD or on disk, with title
-/// presence at both endpoints. A Skg repo that is not a git repo
+/// For one skgrepo: every id present in HEAD or on disk, with title
+/// presence at both endpoints. A skgrepo that is not a gitrepo
 /// participates in no move -- nothing there is committed, and
 /// 'git add'/'git rm' would be meaningless -- so it contributes
 /// nothing.
-fn sights_in_repo (
-  skgrepo : &SkgfileRepo,
-) -> Result<HashMap<ID, RepoSight>, Box<dyn StdError>> {
-  let repo_path : &Path =
+fn sights_in_skgrepo (
+  skgrepo : &SkgRepo,
+) -> Result<HashMap<ID, SkgRepoSight>, Box<dyn StdError>> {
+  let skgrepo_path : &Path =
     skgrepo . path . as_path ();
-  let gitrepo : Repository = match open_gitrepo (repo_path) {
+  let gitrepo : Repository = match open_gitrepo (skgrepo_path) {
     Some (r) => r,
     None     => return Ok ( HashMap::new () ), };
   let disk : HashMap<ID, SectionSight> =
-    disk_skg_sights (repo_path) ?;
+    disk_skg_sights (skgrepo_path) ?;
   let head : HashMap<ID, SectionSight> =
-    head_skg_sights (&gitrepo, repo_path) ?;
-  let mut sights : HashMap<ID, RepoSight> =
+    head_skg_sights (&gitrepo, skgrepo_path) ?;
+  let mut sights : HashMap<ID, SkgRepoSight> =
     HashMap::new ();
-  for id in disk . keys () . chain ( head . keys () ) {
-    sights . entry ( id . clone () )
-      . or_insert ( RepoSight {
-        head : head . get (id) . copied ()
+  for skgid in disk . keys () . chain ( head . keys () ) {
+    sights . entry ( skgid . clone () )
+      . or_insert ( SkgRepoSight {
+        head : head . get (skgid) . copied ()
           . unwrap_or (SectionSight::Absent),
-        disk : disk . get (id) . copied ()
+        disk : disk . get (skgid) . copied ()
           . unwrap_or (SectionSight::Absent) } ); }
   Ok (sights) }
 
@@ -164,39 +164,39 @@ fn sight_of_content (
   if titled { SectionSight::Titled }
   else      { SectionSight::Titleless }}
 
-/// The '.skg' files currently on disk in a Skg repo directory, with
+/// The '.skg' files currently on disk in a skgrepo directory, with
 /// title presence.
 fn disk_skg_sights (
-  repo_path : &Path,
+  skgrepo_path : &Path,
 ) -> Result<HashMap<ID, SectionSight>, Box<dyn StdError>> {
   let mut sights : HashMap<ID, SectionSight> =
     HashMap::new ();
-  for entry in fs::read_dir (repo_path) ? {
+  for entry in fs::read_dir (skgrepo_path) ? {
     let entry : fs::DirEntry = entry ?;
-    if let Some (id) = skg_id_from_filename ( &entry . path () ) {
+    if let Some (skgid) = skg_skgid_from_filename ( &entry . path () ) {
       let content : Vec<u8> =
         fs::read ( entry . path () ) ?;
-      sights . insert ( id, sight_of_content (&content) ); } }
+      sights . insert ( skgid, sight_of_content (&content) ); } }
   Ok (sights) }
 
-/// The '.skg' files committed (in HEAD) within a Skg repo directory,
-/// with title presence. The repo may span several repos, so we
-/// scope to this Skg repo's subtree rather than the whole HEAD tree. A
-/// repo with no HEAD yet (no commits) has nothing committed, hence an
+/// The '.skg' files committed (in HEAD) within a skgrepo directory,
+/// with title presence. The gitrepo may span several skgrepos, so we
+/// scope to this skgrepo's subtree rather than the whole HEAD tree. A
+/// skgrepo with no HEAD yet (no commits) has nothing committed, hence an
 /// empty map.
 fn head_skg_sights (
   gitrepo        : &Repository,
-  repo_path : &Path,
+  skgrepo_path   : &Path,
 ) -> Result<HashMap<ID, SectionSight>, Box<dyn StdError>> {
   let head_tree : Tree = match gitrepo . head () {
     Ok (head) => head . peel_to_tree () ?,
     Err (_)   => return Ok ( HashMap::new () ), };
-  let repo_tree : Option<Tree> = {
-    // The Skg repo directory relative to the repo worktree. An empty
-    // relative path means the Skg repo IS the repo root, so we scan the
+  let skgrepo_tree : Option<Tree> = {
+    // The skgrepo directory relative to the gitrepo worktree. An empty
+    // relative path means the skgrepo IS the gitrepo root, so we scan the
     // whole HEAD tree. 'None' means the path is outside the worktree
-    // (e.g. a bare repo), which we treat as nothing committed.
-    match path_relative_to_gitrepo (gitrepo, repo_path) {
+    // (e.g. a bare gitrepo), which we treat as nothing committed.
+    match path_relative_to_gitrepo (gitrepo, skgrepo_path) {
       None                                      => None,
       Some (rel) if rel . as_os_str () . is_empty () =>
         Some ( head_tree ),
@@ -204,15 +204,15 @@ fn head_skg_sights (
         subtree_at (gitrepo, &head_tree, &rel) ?, } };
   let mut sights : HashMap<ID, SectionSight> =
     HashMap::new ();
-  if let Some (tree) = repo_tree {
+  if let Some (tree) = skgrepo_tree {
     for entry in tree . iter () {
       if entry . kind () != Some (ObjectType::Blob) { continue; }
-      if let Some (id) = entry . name ()
-        . and_then ( |name| skg_id_from_filename ( Path::new (name) )) {
+      if let Some (skgid) = entry . name ()
+        . and_then ( |name| skg_skgid_from_filename ( Path::new (name) )) {
           let blob : git2::Blob =
             gitrepo . find_blob ( entry . id () ) ?;
           sights . insert (
-            id, sight_of_content ( blob . content () ) ); } } }
+            skgid, sight_of_content ( blob . content () ) ); } } }
   Ok (sights) }
 
 /// The subtree of 'root' at relative path 'rel', or None if 'rel' is
@@ -234,7 +234,7 @@ fn subtree_at<'gitrepo> (
 
 /// The node ID of a '.skg' file path: its stem. Non-'.skg' paths
 /// yield None.
-fn skg_id_from_filename (
+fn skg_skgid_from_filename (
   path : &Path,
 ) -> Option<ID> {
   if path . extension () . and_then ( |e| e . to_str () )
@@ -266,20 +266,20 @@ fn render_moves_script (
     out . push_str (MIXED_MOVES_HEADER);
     for node_move in &mixed {
       out . push_str ( &format! (
-        "#   {id} : {from} -> {to}\n",
-        id   = node_move . id . 0,
-        from = repo_dir_relative_to_data_root (config, &node_move . from),
-        to   = repo_dir_relative_to_data_root (config, &node_move . to) )); }}
+        "#   {skgid} : {from} -> {to}\n",
+        skgid   = node_move . skgid . 0,
+        from = skgrepo_dir_relative_to_data_root (config, &node_move . from),
+        to   = skgrepo_dir_relative_to_data_root (config, &node_move . to) )); }}
   if clean . is_empty () {
     out . push_str ("# No cleanly stageable moves detected.\n");
     return out; }
   out . push_str ("moves=(\n");
   for node_move in &clean {
     out . push_str ( &format! (
-      "  \"{id} {from} {to}\"\n",
-      id   = node_move . id . 0,
-      from = repo_dir_relative_to_data_root (config, &node_move . from),
-      to   = repo_dir_relative_to_data_root (config, &node_move . to) )); }
+      "  \"{skgid} {from} {to}\"\n",
+      skgid   = node_move . skgid . 0,
+      from = skgrepo_dir_relative_to_data_root (config, &node_move . from),
+      to   = skgrepo_dir_relative_to_data_root (config, &node_move . to) )); }
   out . push_str (")\n");
   out . push_str (STAGE_MOVES_LOOP);
   out }
@@ -313,7 +313,7 @@ const STAGE_MOVES_HEADER : &str =
 /// depth below it (e.g. 'owned/personal-proc'), so every 'cd' is
 /// absolute, anchored at ORIGIN -- the data root, captured before
 /// the loop -- rather than relative ('cd ..' would misnavigate
-/// from a nested Skg repo). The final 'cd "$ORIGIN"' returns the
+/// from a nested skgrepo). The final 'cd "$ORIGIN"' returns the
 /// user to the data root whatever the last iteration did.
 const STAGE_MOVES_LOOP : &str =
 r#"
@@ -335,20 +335,20 @@ done
 cd "$ORIGIN"
 "#;
 
-/// A Skg repo's directory, named relative to the data root. Repo
+/// A skgrepo's directory, named relative to the data root. Repo
 /// paths are made absolute (data_root-joined) at config load, so
 /// stripping the data_root prefix recovers the configured folder.
-/// Falls back to the absolute path if the Skg repo lies outside the
+/// Falls back to the absolute path if the skgrepo lies outside the
 /// data root.
-fn repo_dir_relative_to_data_root (
+fn skgrepo_dir_relative_to_data_root (
   config : &SkgConfig,
-  skgrepo : &RepoName,
+  skgrepo : &SkgRepoName,
 ) -> String {
-  let repo_path : &Path = match config . repos . get (skgrepo) {
+  let skgrepo_path : &Path = match config . skgrepos . get (skgrepo) {
     Some (s) => s . path . as_path (),
     None     => return skgrepo . 0 . clone (), };
   let relative_or_absolute : PathBuf =
-    repo_path . strip_prefix ( &config . data_root )
+    skgrepo_path . strip_prefix ( &config . data_root )
     . map ( Path::to_path_buf )
-    . unwrap_or_else ( |_| repo_path . to_path_buf () );
+    . unwrap_or_else ( |_| skgrepo_path . to_path_buf () );
   relative_or_absolute . to_string_lossy () . into_owned () }

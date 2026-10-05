@@ -2,7 +2,7 @@ use crate::diff_report::types::{
   CommitStamp, DiffReport, DuplicateIDReport, ListDiffItem,
   NodeDiffReport, RelationshipDiff, RepoForReport, TextDiffLine,
   ValueSetDiff, VanishedNodeReport};
-use crate::types::misc::{ID, RepoName};
+use crate::types::misc::{ID, SkgRepoName};
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -14,7 +14,7 @@ pub fn render_report (
   let mut out : String =
     String::new ();
   out . push_str ("* affected nodes\n");
-  render_duplicate_ids (
+  render_duplicate_skgids (
     &mut out, &report . duplicate_ids, &abbreviations );
   let mut any_nodes : bool =
     ! report . duplicate_ids . is_empty ();
@@ -35,7 +35,7 @@ pub fn render_report (
 }
 
 /// The vanished-nodes section (TODO/more.org): each id the worktree
-/// references though it exists in no repo, with what git history
+/// references though it exists in no skgrepo, with what git history
 /// says it used to be. Like the buckets, the (empty) heading renders
 /// even with nothing to report, so the reader knows it was checked.
 fn render_vanished_nodes (
@@ -49,14 +49,14 @@ fn render_vanished_nodes (
   let stamp = |c : &CommitStamp| -> String {
     format! ("{} ({}, {:?})", c . short_sha, c . date, c . summary) };
   for report in vanished {
-    out . push_str (&format! ("** {}\n", report . id));
+    out . push_str (&format! ("** {}\n", report . skgid));
     if report . sightings . is_empty () {
       out . push_str (
         "*** never present in the git history of any repo\n");
       continue; }
     for sighting in & report . sightings {
       out . push_str (&format! (
-        "*** in repo {}\n", sighting . home_repo ));
+        "*** in repo {}\n", sighting . home_skgrepo ));
       out . push_str (&format! (
         "**** title when last present: {}\n", sighting . title ));
       out . push_str (&format! (
@@ -84,7 +84,7 @@ fn render_vanished_nodes (
             "***** {} (via {})\n", referrer, relation )); }} }}
 }
 
-fn render_duplicate_ids (
+fn render_duplicate_skgids (
   out           : &mut String,
   duplicates    : &[DuplicateIDReport],
   abbreviations : &HashMap<ID, String>,
@@ -95,23 +95,23 @@ fn render_duplicate_ids (
   for duplicate in duplicates {
     out . push_str (&format! (
       "*** {}\n",
-      abbreviation_for (&duplicate . id, abbreviations) ));
-    out . push_str (&format! ("**** {}\n", duplicate . id));
+      abbreviation_for (&duplicate . skgid, abbreviations) ));
+    out . push_str (&format! ("**** {}\n", duplicate . skgid));
     out . push_str ("**** repo(s) before these changes\n");
-    render_repos (out, &duplicate . before_repos);
+    render_skgrepos (out, &duplicate . before_skgrepos);
     out . push_str ("**** repo(s) after these changes\n");
-    render_repos (out, &duplicate . after_repos); }
+    render_skgrepos (out, &duplicate . after_skgrepos); }
 }
 
-fn render_repos (
-  out     : &mut String,
-  repos : &BTreeSet<RepoName>,
+fn render_skgrepos (
+  out      : &mut String,
+  skgrepos : &BTreeSet<SkgRepoName>,
 ) {
-  if repos . is_empty () {
+  if skgrepos . is_empty () {
     out . push_str ("***** none\n");
     return; }
-  for repo in repos {
-    out . push_str (&format! ("***** {}\n", repo)); }
+  for skgrepo in skgrepos {
+    out . push_str (&format! ("***** {}\n", skgrepo)); }
 }
 
 fn render_node_report (
@@ -124,10 +124,10 @@ fn render_node_report (
     "*** {}\n",
     abbreviation_for (&node . pid, abbreviations) ));
   out . push_str ("**** identifiers\n");
-  out . push_str (&format! ("***** {}\n", repo_text (&node . home_repo)));
+  out . push_str (&format! ("***** {}\n", skgrepo_text (&node . home_skgrepo)));
   out . push_str (&format! ("***** {}\n", node . pid));
   out . push_str (&format! ("***** {}\n", node . title));
-  if let Some ((before, after)) = &node . repo_change {
+  if let Some ((before, after)) = &node . skgrepo_change {
     out . push_str ("**** repo\n");
     out . push_str (&format! ("***** was: {}\n", before));
     out . push_str (&format! ("***** is: {}\n", after)); }
@@ -144,10 +144,10 @@ fn render_node_report (
     render_contained_list_diff (out, diff, abbreviations); }
 }
 
-fn repo_text (
-  repo : &RepoForReport,
+fn skgrepo_text (
+  skgrepo : &RepoForReport,
 ) -> String {
-  match repo {
+  match skgrepo {
     RepoForReport::Before (s) => s . to_string (),
     RepoForReport::After  (s) => s . to_string (), }
 }
@@ -196,12 +196,12 @@ fn render_relationship_diff (
   out . push_str (&format! ("**** {}\n", diff . role));
   if ! diff . lost . is_empty () {
     out . push_str ("***** lost\n");
-    for id in &diff . lost {
-      render_related_node (out, id, report, abbreviations); }}
+    for skgid in &diff . lost {
+      render_related_node (out, skgid, report, abbreviations); }}
   if ! diff . gained . is_empty () {
     out . push_str ("***** gained\n");
-    for id in &diff . gained {
-      render_related_node (out, id, report, abbreviations); }}
+    for skgid in &diff . gained {
+      render_related_node (out, skgid, report, abbreviations); }}
 }
 
 fn render_backward_relationship_diff (
@@ -212,15 +212,15 @@ fn render_backward_relationship_diff (
 ) {
   out . push_str (&format! (
     "**** {}\n", backward_relationship_heading (diff) ));
-  for id in &diff . lost {
+  for skgid in &diff . lost {
     render_related_node_with_marker (
-      out, "-", id, report, abbreviations ); }
-  for id in &diff . gained {
+      out, "-", skgid, report, abbreviations ); }
+  for skgid in &diff . gained {
     render_related_node_with_marker (
-      out, "+", id, report, abbreviations ); }
-  for id in &diff . unchanged {
+      out, "+", skgid, report, abbreviations ); }
+  for skgid in &diff . unchanged {
     render_related_node_with_marker (
-      out, " ", id, report, abbreviations ); }
+      out, " ", skgid, report, abbreviations ); }
 }
 
 fn backward_relationship_heading (
@@ -259,51 +259,51 @@ fn render_contained_list_diff (
   out . push_str ("**** contained diff\n");
   for item in diff {
     match item {
-      ListDiffItem::Unchanged (id) =>
+      ListDiffItem::Unchanged (skgid) =>
         out . push_str (&format! (
-          "  {}\n", abbreviation_for (id, abbreviations) )),
-      ListDiffItem::Removed (id) =>
+          "  {}\n", abbreviation_for (skgid, abbreviations) )),
+      ListDiffItem::Removed (skgid) =>
         out . push_str (&format! (
-          " -{}\n", abbreviation_for (id, abbreviations) )),
-      ListDiffItem::Added (id) =>
+          " -{}\n", abbreviation_for (skgid, abbreviations) )),
+      ListDiffItem::Added (skgid) =>
         out . push_str (&format! (
-          " +{}\n", abbreviation_for (id, abbreviations) )), } }
+          " +{}\n", abbreviation_for (skgid, abbreviations) )), } }
 }
 
 fn render_related_node (
   out           : &mut String,
-  id            : &ID,
+  skgid         : &ID,
   report        : &DiffReport,
   abbreviations : &HashMap<ID, String>,
 ) {
   render_related_node_with_marker (
-    out, "", id, report, abbreviations );
+    out, "", skgid, report, abbreviations );
 }
 
 fn render_related_node_with_marker (
   out           : &mut String,
   marker        : &str,
-  id            : &ID,
+  skgid         : &ID,
   report        : &DiffReport,
   abbreviations : &HashMap<ID, String>,
 ) {
   out . push_str (&format! (
     "****** {}{}\n",
-    marker, abbreviation_for (id, abbreviations) ));
-  out . push_str (&format! ("******* {}\n", id));
+    marker, abbreviation_for (skgid, abbreviations) ));
+  out . push_str (&format! ("******* {}\n", skgid));
   out . push_str (&format! (
     "******* {}\n",
-    report . titles . get (id)
+    report . titles . get (skgid)
       . map ( |s| s . as_str () )
       . unwrap_or ("[unknown title]") ));
 }
 
 fn abbreviation_for (
-  id            : &ID,
+  skgid            : &ID,
   abbreviations : &HashMap<ID, String>,
 ) -> String {
-  abbreviations . get (id) . cloned ()
-    . unwrap_or_else ( || format! ("{}..[unknown]", id) )
+  abbreviations . get (skgid) . cloned ()
+    . unwrap_or_else ( || format! ("{}..[unknown]", skgid) )
 }
 
 fn abbreviations_for_report (
@@ -313,45 +313,45 @@ fn abbreviations_for_report (
     BTreeMap::new ();
   for duplicate in &report . duplicate_ids {
     titles . insert (
-      duplicate . id . clone (), duplicate . title . clone () ); }
+      duplicate . skgid . clone (), duplicate . title . clone () ); }
   for bucket in &report . buckets {
     for node in &bucket . nodes {
       titles . insert (node . pid . clone (), node . title . clone ());
       for relationship in &node . relationship_diffs {
-        for id in relationship . lost . iter ()
+        for skgid in relationship . lost . iter ()
           . chain (relationship . gained . iter ())
           . chain (relationship . unchanged . iter ()) {
-          titles . entry (id . clone ())
-            . or_insert_with ( || report . titles . get (id)
+          titles . entry (skgid . clone ())
+            . or_insert_with ( || report . titles . get (skgid)
               . cloned () . unwrap_or_else (
                 || "[unknown title]" . to_string () ) ); }}
       if let Some (diff) = &node . contained_list_diff {
         for item in diff {
-          let id : &ID = match item {
-            ListDiffItem::Unchanged (id)
-            | ListDiffItem::Removed (id)
-            | ListDiffItem::Added (id) => id, };
-          titles . entry (id . clone ())
-            . or_insert_with ( || report . titles . get (id)
+          let skgid : &ID = match item {
+            ListDiffItem::Unchanged (skgid)
+            | ListDiffItem::Removed (skgid)
+            | ListDiffItem::Added (skgid) => skgid, };
+          titles . entry (skgid . clone ())
+            . or_insert_with ( || report . titles . get (skgid)
               . cloned () . unwrap_or_else (
                 || "[unknown title]" . to_string () ) ); }} } }
   let prefix_len : usize =
     distinguishing_prefix_len (titles . keys ());
   titles . into_iter ()
-    . map ( |(id, title)| {
+    . map ( |(skgid, title)| {
       let prefix : String =
-        id . 0 . chars () . take (prefix_len) . collect ();
+        skgid . 0 . chars () . take (prefix_len) . collect ();
       let title_head : String =
         title . chars () . take (40) . collect ();
-      (id, format! ("{}..{}", prefix, title_head)) } )
+      (skgid, format! ("{}..{}", prefix, title_head)) } )
     . collect ()
 }
 
 fn distinguishing_prefix_len<'a> (
-  ids : impl Iterator<Item = &'a ID>,
+  skgids : impl Iterator<Item = &'a ID>,
 ) -> usize {
   let id_strings : Vec<&'a str> =
-    ids . map ( |id| id . 0 . as_str () ) . collect ();
+    skgids . map ( |skgid| skgid . 0 . as_str () ) . collect ();
   let max_len : usize =
     id_strings . iter () . map ( |s| s . chars () . count () )
       . max () . unwrap_or (8);
@@ -359,9 +359,9 @@ fn distinguishing_prefix_len<'a> (
     let mut seen : BTreeSet<String> =
       BTreeSet::new ();
     let all_unique : bool =
-      id_strings . iter () . all ( |id| {
+      id_strings . iter () . all ( |skgid| {
         let prefix : String =
-          id . chars () . take (len) . collect ();
+          skgid . chars () . take (len) . collect ();
         seen . insert (prefix)
       });
     if all_unique {

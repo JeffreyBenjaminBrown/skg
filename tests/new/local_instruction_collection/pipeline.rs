@@ -4,7 +4,7 @@
 /// .
 /// The expectations were originally verified differentially against
 /// the old extraction path before its deletion
-/// (TODO/local-instruction-collection/3_plan.org). The cases marked
+/// (TODO/DONE/local-instruction-collection/3_plan.org). The cases marked
 /// "new recursion surface" are the deliberate behavior changes.
 
 use ego_tree::Tree;
@@ -25,7 +25,7 @@ use skg::types::maybe_placed_viewnode::{
   maybePlaced_to_placed_viewforest };
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, members_of, members_msv};
 use skg::types::nodes::complete::Graphnode;
-use skg::types::save::{DefineNode, NodeMerge, SaveNode, DeleteNode};
+use skg::types::save::{NodeInstruction, NodeMerge, SaveNode, DeleteNode};
 use skg::types::tree::forest::{MpViewForest, ViewForest};
 use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
 use std::error::Error;
@@ -54,23 +54,23 @@ async fn placed_forest_from_org_with_disk (
     &mut maybePlaced_viewforest, &config)?;
   Ok ( maybePlaced_to_placed_viewforest (maybePlaced_viewforest) ? ) }
 
-fn save_ids (
-  instructions : &[DefineNode],
+fn save_skgids (
+  instructions : &[NodeInstruction],
 ) -> Vec<ID> {
   instructions . iter() . map (|instruction| match instruction {
-    DefineNode::Save (SaveNode (node)) => node . pid . clone(),
-    DefineNode::Delete (DeleteNode { id, .. }) => id . clone(),
+    NodeInstruction::Save (SaveNode (node)) => node . pid . clone(),
+    NodeInstruction::Delete (DeleteNode { skgid, .. }) => skgid . clone(),
   }) . collect() }
 
-fn saved_node_by_id<'a> (
-  instructions : &'a [DefineNode],
-  id           : &str,
+fn saved_node_by_skgid<'a> (
+  instructions : &'a [NodeInstruction],
+  skgid           : &str,
 ) -> &'a Graphnode {
   for instruction in instructions {
-    if let DefineNode::Save (SaveNode (node)) = instruction {
-      if node . pid == ID::from (id) {
+    if let NodeInstruction::Save (SaveNode (node)) = instruction {
+      if node . pid == ID::from (skgid) {
         return node; }}}
-  panic! ("SaveNode not found: {}", id) }
+  panic! ("SaveNode not found: {}", skgid) }
 
 #[test]
 fn all_tests
@@ -137,16 +137,16 @@ async fn pipeline_basic_mixed_tree (
         extract_nonmergeSavePlan_locally (
           &placed_forest_from_org (input), config, None)?;
       assert_eq!(
-        save_ids (&plan . define_nodes),
+        save_skgids (&plan . node_instructions),
         vec![ ID::from ("root"), ID::from ("child"),
               ID::from ("grandchild"), ID::from ("independent"),
               ID::from ("explicit"), ID::from ("doomed") ]);
       assert!( matches!(
-        plan . define_nodes . last(),
-        Some (DefineNode::Delete (DeleteNode { id, .. }))
-          if id == &ID::from ("doomed") ));
+        plan . node_instructions . last(),
+        Some (NodeInstruction::Delete (DeleteNode { skgid, .. }))
+          if skgid == &ID::from ("doomed") ));
       { let root : &Graphnode =
-          saved_node_by_id (&plan . define_nodes, "root");
+          saved_node_by_skgid (&plan . node_instructions, "root");
         assert_eq!( root . body,
                     Some ("Root body" . to_string()) );
         assert_eq!( members_of (&root . contains), vec![ID::from ("child")] );
@@ -159,7 +159,7 @@ async fn pipeline_basic_mixed_tree (
         assert_eq!( members_msv (&root . overrides_view_of),
                     MSV::Specified (vec![ID::from ("o1")]) ); }
       { let explicit : &Graphnode =
-          saved_node_by_id (&plan . define_nodes, "explicit");
+          saved_node_by_skgid (&plan . node_instructions, "explicit");
         // Present-but-empty folders are explicit emptiness.
         assert_eq!( explicit . aliases,
                     MSV::Specified (vec![]) );
@@ -167,7 +167,7 @@ async fn pipeline_basic_mixed_tree (
                     MSV::Specified (vec![]) );
         assert_eq!( explicit . overrides_view_of,
                     MSV::Specified (vec![]) ); }
-      assert!( plan . repo_moves . is_empty() );
+      assert!( plan . skgrepo_moves . is_empty() );
       assert!( nodeMerge_acquisitions . is_empty() );
       Ok (( )) }
 
@@ -188,11 +188,11 @@ async fn pipeline_subscribee_hiderels (
         extract_nonmergeSavePlan_locally (
           &forest, config, None)?;
       assert_eq!(
-        members_msv (&saved_node_by_id (&plan . define_nodes, "r")
+        members_msv (&saved_node_by_skgid (&plan . node_instructions, "r")
           . hides_from_its_subscriptions),
         MSV::Specified (vec![ID::from ("e1")]));
       assert!(
-        ! save_ids (&plan . define_nodes)
+        ! save_skgids (&plan . node_instructions)
           . contains (&ID::from ("e")),
         "subscribee-as-such should not produce a SaveNode" );
       Ok (( )) }
@@ -201,11 +201,11 @@ async fn pipeline_write_protected_folder_member_edits (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // This tests the new recursion surface: definitive members of
+  // This tests the new recursion surface: editable members of
   // write-protected folders (and their subtrees) save their own edits.
       let input : &str =
         indoc! {"
-            * (skg (node (id owner) (repo main))) owner
+            * (skg (node (id recorder) (repo main))) recorder
             ** (skg subscriberFolder)
             *** (skg (node (id intruder) (repo main))) intruder
             **** (skg (node (id intruder-child) (repo main))) intruder child
@@ -216,14 +216,14 @@ async fn pipeline_write_protected_folder_member_edits (
         extract_nonmergeSavePlan_locally (
           &placed_forest_from_org (input), config, None)?;
       assert_eq!(
-        save_ids (&plan . define_nodes),
-        vec![ ID::from ("owner"), ID::from ("intruder"),
+        save_skgids (&plan . node_instructions),
+        vec![ ID::from ("recorder"), ID::from ("intruder"),
               ID::from ("intruder-child"), ID::from ("lurker") ]);
       assert_eq!(
-        members_of (&saved_node_by_id (&plan . define_nodes, "owner") . contains),
+        members_of (&saved_node_by_skgid (&plan . node_instructions, "recorder") . contains),
         Vec::<ID>::new() );
       assert_eq!(
-        members_of (&saved_node_by_id (&plan . define_nodes, "intruder") . contains),
+        members_of (&saved_node_by_skgid (&plan . node_instructions, "intruder") . contains),
         vec![ID::from ("intruder-child")] );
       Ok (( )) }
 
@@ -241,11 +241,11 @@ async fn pipeline_inactive_subtree (
         extract_nonmergeSavePlan_locally (
           &placed_forest_from_org (input), config, None)?;
       assert_eq!(
-        save_ids (&plan . define_nodes),
+        save_skgids (&plan . node_instructions),
         // stowaway is on the new recursion surface.
         vec![ ID::from ("root"), ID::from ("stowaway") ]);
       assert_eq!(
-        members_of (&saved_node_by_id (&plan . define_nodes, "root") . contains),
+        members_of (&saved_node_by_skgid (&plan . node_instructions, "root") . contains),
         Vec::<ID>::new(),
         "the inactive node emits no contains membership; under a \
          restricted set the weave restores it from disk (see \
@@ -273,7 +273,7 @@ async fn pipeline_phantom_subtree (
           . find ( |n| matches!(
               &n . value() . kind,
               ViewnodeKind::Vognode (Vognode::Active (t))
-                if t . id == ID::from ("fading") ))
+                if t . skgid == ID::from ("fading") ))
           . map ( |n| n . id() )
           . expect ("fading node not found");
         if let ViewnodeKind::Vognode (Vognode::Active (t)) =
@@ -286,12 +286,12 @@ async fn pipeline_phantom_subtree (
         extract_nonmergeSavePlan_locally (
           &forest, config, None)?;
       assert_eq!(
-        save_ids (&plan . define_nodes),
+        save_skgids (&plan . node_instructions),
         // survivor is on the new recursion surface; the phantom
         // itself emits nothing and is not content of its parent.
         vec![ ID::from ("root"), ID::from ("survivor") ]);
       assert_eq!(
-        members_of (&saved_node_by_id (&plan . define_nodes, "root") . contains),
+        members_of (&saved_node_by_skgid (&plan . node_instructions, "root") . contains),
         Vec::<ID>::new() );
       Ok (( )) }
 
@@ -320,8 +320,8 @@ async fn pipeline_nodeMerge_requests (
           &graph_handle_from_config (config)? . load_full (),
           config)?;
       assert_eq!( nodeMerges . len(), 1 );
-      assert_eq!( nodeMerges [0] . acquirer_id(), &ID::from ("1") );
-      assert_eq!( nodeMerges [0] . acquiree_id(), &ID::from ("2") );
+      assert_eq!( nodeMerges [0] . acquirer_skgid(), &ID::from ("1") );
+      assert_eq!( nodeMerges [0] . acquiree_skgid(), &ID::from ("2") );
       assert_eq!( nodeMerges [0] . acquiree_text_preserver . 0 . title,
                   "MERGED: 2" );
       Ok (( )) }

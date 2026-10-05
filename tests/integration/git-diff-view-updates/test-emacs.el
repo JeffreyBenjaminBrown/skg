@@ -40,7 +40,7 @@
       (message "✗ FAIL [phase 2]: buffer *b* not created")
       (kill-emacs 1))
     ;; multi_root_view prepends b's containerward role tree (a) as
-    ;; b's first child before the definitive true children (c, d, e).
+    ;; b's first child before the editable true children (c, d, e).
     (assert-headline-titles
      buf
      '((1 na "b")

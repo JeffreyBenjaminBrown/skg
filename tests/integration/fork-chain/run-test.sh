@@ -3,11 +3,11 @@
 # Integration test for the MOTIVATING override-chain case (the crux of
 # the override-chains arc): fork a FOREIGN node into a public clone, then
 # explicitly fork that clone (the drawn substitute) into a PRIVATE clone.
-# The result is a user-owned chain D overrides C overrides N; viewing N's
+# The result is an owned chain D overrides C overrides N; viewing N's
 # container draws the chain end D, marked (overridesHere N), and the save
 # accepts the chain-end carrier.
 #
-# Repos: public + private (owned) and foreign (write-protected).
+# Repos: public + private (owned) and foreign.
 
 set -e
 
@@ -26,7 +26,7 @@ restore_chain_fixtures() {
   git -C "$PROJECT_ROOT" checkout -- \
     "tests/integration/fork-chain/data/public" \
     "tests/integration/fork-chain/data/foreign" 2>/dev/null || true
-  # Remove any clones the test wrote into the owned repos.
+  # Remove any clones the test wrote into the owned skgrepos.
   find "$TEST_DIR/data/owned/public" -name '*.skg' ! -name 'P.skg' -delete 2>/dev/null || true
   find "$TEST_DIR/data/owned/private" -name '*.skg' -delete 2>/dev/null || true
 }

@@ -17,14 +17,14 @@ use std::error::Error;
 use std::net::TcpStream;
 use std::path::Path;
 
-use skg::dbs::filesystem::one_node::graphnode_from_pid_and_repo;
+use skg::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo;
 use skg::test_utils::{run_with_test_stores, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::views_state::OpenViews;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex, RepoName};
+use skg::types::misc::{ID, SkgConfig, TantivyIndex, SkgRepoName};
 
 
 #[test]
@@ -79,16 +79,16 @@ async fn merge_container_into_content_impl (
 
   // a.skg should be deleted from disk.
   let a_path : String =
-    skg::util::path_from_pid_and_repo (
-      config, &RepoName::from ("main"), ID::from ("a") ) ?;
+    skg::util::path_from_pid_and_skgrepo (
+      config, &SkgRepoName::from ("main"), ID::from ("a") ) ?;
   if Path::new (&a_path) . exists() {
     failures . push (
       "a.skg should be deleted after merge" . to_string() ); }
 
   // aa.skg should exist and have the merged content.
   let aa_graphnode =
-    graphnode_from_pid_and_repo (
-      config, ID::from ("aa"), &RepoName::from ("main") ) ?;
+    graphnode_from_pid_and_skgrepo (
+      config, ID::from ("aa"), &SkgRepoName::from ("main") ) ?;
   if !aa_graphnode . extra_ids . contains (&ID::from ("a")) {
     failures . push (
       "aa should have 'a' as an extra_id" . to_string() ); }
@@ -105,10 +105,10 @@ async fn merge_container_into_content_impl (
   // A text preserver should exist.
   // Its PID is a new UUID; find it: in aa's contains
   // but not x, b, c, or aa.
-  let known_ids : Vec<&str> = vec!["x", "b", "c", "aa"];
+  let known_skgids : Vec<&str> = vec!["x", "b", "c", "aa"];
   let preserver_candidates : Vec<&ID> =
     aa_graphnode . contains . iter()
-    . filter ( |m| !known_ids . contains (& m . member . 0 . as_str()) )
+    . filter ( |m| !known_skgids . contains (& m . member . 0 . as_str()) )
     . map ( |m| & m . member )
     . collect();
   if preserver_candidates . len() != 1 {
@@ -118,17 +118,17 @@ async fn merge_container_into_content_impl (
   } else {
     let preserver_pid : &ID = preserver_candidates[0];
     let preserver_graphnode =
-      graphnode_from_pid_and_repo (
+      graphnode_from_pid_and_skgrepo (
         config, preserver_pid . clone(),
-        &RepoName::from ("main") ) ?;
+        &SkgRepoName::from ("main") ) ?;
     if preserver_graphnode . title != "MERGED: a" {
       failures . push ( format!(
         "Text preserver title should be 'MERGED: a', got '{}'",
         preserver_graphnode . title )); }
-    if preserver_graphnode . home_repo != RepoName::from ("main") {
+    if preserver_graphnode . home_skgrepo != SkgRepoName::from ("main") {
       failures . push ( format!(
         "Text preserver repo should be 'main', got '{:?}'",
-        preserver_graphnode . home_repo )); }
+        preserver_graphnode . home_skgrepo )); }
     if !preserver_graphnode . contains . is_empty() {
       failures . push ( format!(
         "Text preserver should have no contents, got {:?}",

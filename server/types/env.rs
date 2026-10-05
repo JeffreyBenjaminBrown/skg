@@ -4,8 +4,8 @@
 //!
 
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
-use crate::dbs::tantivy::title_and_repo_by_id;
-use crate::types::misc::{ID, SkgConfig, RepoName, TantivyIndex};
+use crate::dbs::tantivy::title_and_skgrepo_by_skgid;
+use crate::types::misc::{ID, SkgConfig, SkgRepoName, TantivyIndex};
 use crate::types::phantom::home_from_disk;
 
 use std::collections::HashMap;
@@ -131,7 +131,7 @@ impl SkgEnv {
     self . runtime . mutation_gate . clone ()
   }
 
-  /// Resolve an ID to its repo by checking, in order:
+  /// Resolve an ID to its skgrepo by checking, in order:
   ///
   /// 1. The in-Rust graph snapshot (freshest; reflects in-flight
   ///    edits before they reach the indexed DBs or disk).
@@ -143,37 +143,37 @@ impl SkgEnv {
   ///    out-of-band since the last index sync).
   ///
   /// Tantivy is only an optimization here: the graph is authoritative for
-  /// identity and repo lookup, and this helper stays synchronous.
-  pub fn find_repo_in_generation (
+  /// identity and skgrepo lookup, and this helper stays synchronous.
+  pub fn find_skgrepo_in_generation (
     runtime : &RuntimeGeneration,
-    id : &ID,
-    deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
-  ) -> Option<RepoName> {
+    skgid : &ID,
+    deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
+  ) -> Option<SkgRepoName> {
     if let Some ((_pid, src)) =
-      runtime . graph . pid_and_repo (id)
+      runtime . graph . pid_and_skgrepo (skgid)
     { return Some (src); }
-    if let Some (s) = deleted_since_head_pid_src_map . get (id)
+    if let Some (s) = deleted_since_head_pid_src_map . get (skgid)
     { return Some (s . clone ()); }
     if let Some ((_title, src)) =
-      title_and_repo_by_id (&runtime . tantivy_index, id)
+      title_and_skgrepo_by_skgid (&runtime . tantivy_index, skgid)
     { return Some (src); }
-    home_from_disk (id, &runtime . config) }
+    home_from_disk (skgid, &runtime . config) }
 }
 
 /// Repo lookup against one explicit graph snapshot, with optional Tantivy
 /// and disk fallbacks for deleted or out-of-band nodes.
-pub fn find_repo_with_optional_tantivy (
+pub fn find_skgrepo_with_optional_tantivy (
   graph                          : &InRustGraph,
-  id                             : &ID,
-  deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
+  skgid                          : &ID,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
   tantivy_index                  : Option<&TantivyIndex>,
   config                         : &SkgConfig,
-) -> Option<RepoName> {
-  if let Some ((_pid, src)) = graph . pid_and_repo (id)
+) -> Option<SkgRepoName> {
+  if let Some ((_pid, src)) = graph . pid_and_skgrepo (skgid)
     { return Some (src); }
-  if let Some (s) = deleted_since_head_pid_src_map . get (id)
+  if let Some (s) = deleted_since_head_pid_src_map . get (skgid)
   { return Some (s . clone ()); }
   if let Some (idx) = tantivy_index {
-    if let Some ((_title, src)) = title_and_repo_by_id (idx, id)
+    if let Some ((_title, src)) = title_and_skgrepo_by_skgid (idx, skgid)
     { return Some (src); } }
-  home_from_disk (id, config) }
+  home_from_disk (skgid, config) }

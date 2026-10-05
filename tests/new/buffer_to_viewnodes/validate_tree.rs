@@ -3,7 +3,7 @@
 use indoc::indoc;
 use regex::Regex;
 use skg::types::errors::BufferValidationError;
-use skg::types::misc::{SkgConfig, SkgfileRepo, RepoName, TantivyIndex};
+use skg::types::misc::{SkgConfig, SkgRepo, SkgRepoName, TantivyIndex};
 use skg::types::tree::forest::MpViewForest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use skg::from_text::buffer_to_viewnodes::local::validate_local_structure;
@@ -38,19 +38,19 @@ fn all_tests
       test_duplicated_content_error (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_no_duplicated_content_error_when_different_ids", fixtures) ?;
-      test_no_duplicated_content_error_when_different_ids (
+      test_no_duplicated_content_error_when_different_skgids (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_no_duplicated_content_error_for_phantom_siblings", fixtures) ?;
       test_no_duplicated_content_error_for_phantom_siblings (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_root_without_repo_validation", fixtures) ?;
-      test_root_without_repo_validation (
+      test_root_without_skgrepo_validation (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_nonexistent_repo_validation", fixtures) ?;
-      test_nonexistent_repo_validation (
+      test_nonexistent_skgrepo_validation (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_empty_title_rejected_for_definitive_node", fixtures) ?;
-      test_empty_title_rejected_for_definitive_node (
+      s . reset ("test_empty_title_rejected_for_editable_node", fixtures) ?;
+      test_empty_title_rejected_for_editable_node (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_empty_title_allowed_for_writeProtected_and_delete", fixtures) ?;
       test_empty_title_allowed_for_writeProtected_and_delete (
@@ -140,9 +140,9 @@ async fn test_find_buffer_errors_for_saving (
           . collect();
         assert_eq!(ambiguous_deletion_errors . len(), 1,
                    "Should find 1 AmbiguousDeletion error");
-        if let BufferValidationError::AmbiguousDeletion (id)
+        if let BufferValidationError::AmbiguousDeletion (skgid)
           = ambiguous_deletion_errors[0] {
-          assert_eq!(id . 0, "conflict",
+          assert_eq!(skgid . 0, "conflict",
                      "AmbiguousDeletion error should come from conflicting ID"); }}
 
       // Multiple_Defining_Viewnodes
@@ -151,19 +151,19 @@ async fn test_find_buffer_errors_for_saving (
           . collect();
         assert_eq!(multiple_defining_errors . len(), 1,
                    "Should find 1 Multiple_Defining_Viewnodes error");
-        if let BufferValidationError::Multiple_Defining_Viewnodes (id)
+        if let BufferValidationError::Multiple_Defining_Viewnodes (skgid)
           = multiple_defining_errors[0] {
-          assert_eq!(id . 0, "conflict",
+          assert_eq!(skgid . 0, "conflict",
                      "Multiple_Defining_Viewnodes error should come from conflicting ID"); }}
 
-      // Repo validation (bad_child and alias_child have no repos)
-      { let repo_re = Regex::new(r"(?i)must.*repo") . unwrap();
-        let repo_errors: Vec<&BufferValidationError> =
+      // Repo validation (bad_child and alias_child have no skgrepos)
+      { let skgrepo_re = Regex::new(r"(?i)must.*repo") . unwrap();
+        let skgrepo_errors: Vec<&BufferValidationError> =
           local_errors . iter() . copied()
           . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
-                               if repo_re . is_match (msg)))
+                               if skgrepo_re . is_match (msg)))
           . collect();
-        assert_eq!(repo_errors . len(), 2,
+        assert_eq!(skgrepo_errors . len(), 2,
                    "Should find 2 repo validation errors"); }
 
       // Body_of_NonVognode (from parsing phase)
@@ -307,14 +307,14 @@ async fn test_duplicated_content_error (
       assert_eq!(duplicated_content_errors . len(), 1,
                  "Should find exactly 1 duplicate children error");
 
-      if let BufferValidationError::LocalStructureViolation(_, id) = duplicated_content_errors[0] {
-        assert_eq!(id . 0, "root",
+      if let BufferValidationError::LocalStructureViolation(_, skgid) = duplicated_content_errors[0] {
+        assert_eq!(skgid . 0, "root",
                    "Duplicate error should be reported at the parent node (root)");
       }
       Ok(())
 }
 
-async fn test_no_duplicated_content_error_when_different_ids (
+async fn test_no_duplicated_content_error_when_different_skgids (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -373,11 +373,11 @@ async fn test_no_duplicated_content_error_for_phantom_siblings (
       Ok(())
 }
 
-async fn test_root_without_repo_validation (
+async fn test_root_without_skgrepo_validation (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      // root without repo should be rejected
+      // root without skgrepo should be rejected
       let input: &str =
         indoc! {"
                 * (skg (node (id root1) (repo main))) Root with repo (valid)
@@ -389,27 +389,27 @@ async fn test_root_without_repo_validation (
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config)?;
 
-      let repo_re = Regex::new(r"(?i)must.*repo") . unwrap();
-      let repo_errors: Vec<&BufferValidationError> = errors . iter()
+      let skgrepo_re = Regex::new(r"(?i)must.*repo") . unwrap();
+      let skgrepo_errors: Vec<&BufferValidationError> = errors . iter()
         . filter(
           |e| matches!(e,
                        BufferValidationError::LocalStructureViolation(msg, _)
-                       if repo_re . is_match (msg)))
+                       if skgrepo_re . is_match (msg)))
         . collect();
-      assert_eq!(repo_errors . len(), 1,
+      assert_eq!(skgrepo_errors . len(), 1,
                  "Should find 1 repo validation error");
 
-      if let BufferValidationError::LocalStructureViolation(_, id)
-        = repo_errors[0]
-      { assert_eq!(id . 0, "root2",
+      if let BufferValidationError::LocalStructureViolation(_, skgid)
+        = skgrepo_errors[0]
+      { assert_eq!(skgid . 0, "root2",
                    "Repo error should be for root2"); }
       Ok(( )) }
 
-async fn test_nonexistent_repo_validation (
+async fn test_nonexistent_skgrepo_validation (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      { // Node with nonexistent repo should be rejected
+      { // Node with nonexistent skgrepo should be rejected
         let input: &str =
           indoc! {"
                   * (skg (node (id root1) (repo main))) Root with valid repo
@@ -421,36 +421,36 @@ async fn test_nonexistent_repo_validation (
         let errors: Vec<BufferValidationError> =
           find_buffer_errors_for_saving(&viewforest, config)?;
 
-        let repo_re = Regex::new(r"(?i)must.*repo") . unwrap();
-        let nonexistent_repo_errors: Vec<&BufferValidationError> =
+        let skgrepo_re = Regex::new(r"(?i)must.*repo") . unwrap();
+        let nonexistent_skgrepo_errors: Vec<&BufferValidationError> =
           errors . iter()
           . filter(
             |e| matches!(e,
                          BufferValidationError::LocalStructureViolation(msg, _)
-                         if repo_re . is_match (msg)))
+                         if skgrepo_re . is_match (msg)))
           . collect();
 
-        assert_eq!(nonexistent_repo_errors . len(), 2,
+        assert_eq!(nonexistent_skgrepo_errors . len(), 2,
                    "Should find 2 repo validation errors");
 
-        { // Check first error (child1, with repo 'nonexistent')
+        { // Check first error (child1, with skgrepo 'nonexistent')
           let found_child_error: bool =
-            nonexistent_repo_errors . iter() . any(|e| {
-              matches!(e, BufferValidationError::LocalStructureViolation(msg, id)
-                       if repo_re . is_match (msg) && id . 0 == "child1") });
+            nonexistent_skgrepo_errors . iter() . any(|e| {
+              matches!(e, BufferValidationError::LocalStructureViolation(msg, skgid)
+                       if skgrepo_re . is_match (msg) && skgid . 0 == "child1") });
           assert!(found_child_error,
                   "Should find repo error for child1"); }
 
-        { // Check second error (root2, with repo 'invalid_repo')
+        { // Check second error (root2, with skgrepo 'invalid_repo')
           let found_root_error: bool =
-            nonexistent_repo_errors . iter() . any(|e| {
-              matches!(e, BufferValidationError::LocalStructureViolation(msg, id)
-                       if repo_re . is_match (msg) && id . 0 == "root2") });
+            nonexistent_skgrepo_errors . iter() . any(|e| {
+              matches!(e, BufferValidationError::LocalStructureViolation(msg, skgid)
+                       if skgrepo_re . is_match (msg) && skgid . 0 == "root2") });
           assert!(found_root_error,
                   "Should find repo error for root2"); }}
       Ok(( )) }
 
-async fn test_empty_title_rejected_for_definitive_node (
+async fn test_empty_title_rejected_for_editable_node (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -475,9 +475,9 @@ async fn test_empty_title_rejected_for_definitive_node (
         . collect();
       assert_eq!(empty_title_errors . len(), 1,
                  "Should find 1 empty title error");
-      if let BufferValidationError::LocalStructureViolation(_, id)
+      if let BufferValidationError::LocalStructureViolation(_, skgid)
         = empty_title_errors[0]
-      { assert_eq!(id . 0, "no-title",
+      { assert_eq!(skgid . 0, "no-title",
                    "Empty title error should be for no-title"); }
       Ok(( )) }
 
@@ -512,8 +512,8 @@ async fn test_definitive_request_with_only_non_content_children_is_allowed (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // A definitive view request on a write-protected node whose children
-  // are all NON-content (affectsParent != Affected) should be permitted: the
+  // An editable view request on a write-protected node whose children
+  // are all NON-content (affectsParent != True) should be permitted: the
   // expansion would fill the node with content, and non-content
   // children (e.g. containerward role grafts) don't conflict
   // with that. Only Container children would be clobbered.
@@ -555,8 +555,8 @@ async fn test_definitive_request_with_content_child_is_rejected (
           &viewforest, config ) ?;
       let hits : Vec<&BufferValidationError> = errors . iter ()
         . filter ( |e| matches! (
-          e, BufferValidationError::DefinitiveRequestOnNodeWithContentChildren (id)
-            if id . 0 == "parent" ))
+          e, BufferValidationError::DefinitiveRequestOnNodeWithContentChildren (skgid)
+            if skgid . 0 == "parent" ))
         . collect ();
       assert_eq! ( hits . len (), 1,
         "A Container child should trigger exactly one \
@@ -584,8 +584,8 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
   let matching : Vec<&BufferValidationError> =
     parsing_errors . iter ()
     . filter ( |e| matches! (
-      e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (id)
-         if id . 0 == "phantom" ))
+      e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (skgid)
+         if skgid . 0 == "phantom" ))
     . collect ();
   assert_eq! ( matching . len (), 1,
     "(editRequest delete) on a write-protected node should produce exactly one EditRequestOnWriteProtectedOccurrence error. Parse errors: {:?}",
@@ -603,22 +603,22 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
   let matching2 : Vec<&BufferValidationError> =
     parsing_errors2 . iter ()
     . filter ( |e| matches! (
-      e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (id)
-         if id . 0 == "phantom" ))
+      e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (skgid)
+         if skgid . 0 == "phantom" ))
     . collect ();
   assert_eq! ( matching2 . len (), 1,
     "(editRequest (merge X)) on a write-protected node should also produce EditRequestOnWriteProtectedOccurrence. Parse errors: {:?}",
     parsing_errors2 );
 
-  // A definitive node with (editRequest delete) is legal -- no error.
-  let input_definitive: &str =
+  // An editable node with (editRequest delete) is legal -- no error.
+  let input_editable: &str =
     indoc! {"
       * (skg (node (id root) (repo main))) parent
       ** (skg (node (id leaf) (repo main) (editRequest delete))) leaf
     "};
   let (_viewforest3, parsing_errors3, _warnings__viewforest3)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
-    = org_to_uninterpreted_viewforest (input_definitive) . unwrap ();
+    = org_to_uninterpreted_viewforest (input_editable) . unwrap ();
   assert! ( ! parsing_errors3 . iter () . any ( |e|
     matches! (e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (_)) ),
     "(editRequest delete) on a definitive node must not trigger EditRequestOnWriteProtectedOccurrence. Parse errors: {:?}",
@@ -638,8 +638,8 @@ fn test_inactive_placeholder_content_edits_rejected_at_parse_time () {
   assert!(
     parsing_errors . iter () . any ( |e| matches!(
       e, BufferValidationError::Other (msg)
-         if msg . contains ("Inactive placeholder content cannot be edited"))),
-    "Changing an inactive placeholder title should be rejected. Parse errors: {:?}",
+         if msg . contains ("Inactive vognode content cannot be edited"))),
+    "Changing an inactive vognode title should be rejected. Parse errors: {:?}",
     parsing_errors );
 
   let input_with_body_edit : &str =
@@ -654,14 +654,14 @@ fn test_inactive_placeholder_content_edits_rejected_at_parse_time () {
   assert!(
     parsing_errors2 . iter () . any ( |e| matches!(
       e, BufferValidationError::Other (msg)
-         if msg . contains ("Inactive placeholder content cannot be edited"))),
-    "Adding inactive placeholder body text should be rejected. Parse errors: {:?}",
+         if msg . contains ("Inactive vognode content cannot be edited"))),
+    "Adding inactive vognode body text should be rejected. Parse errors: {:?}",
     parsing_errors2 );
 }
 
 #[test]
 fn test_inactive_placeholder_active_children_allowed_locally () {
-  // TODO/full-schema/9-2_repo-set-safety.org, the retained case:
+  // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org, the retained case:
   // an inactive node stays on screen because of its active
   // children, so an InactiveVognode with active children must pass.
   let input : &str =
@@ -679,7 +679,7 @@ fn test_inactive_placeholder_active_children_allowed_locally () {
     parsing_errors );
 
   let config : SkgConfig = validation_config ();
-  let inactive_id = viewforest . root () . traverse ()
+  let inactive_skgid = viewforest . root () . traverse ()
     . filter_map ( |edge| match edge {
       ego_tree::iter::Edge::Open (node_ref)
         if matches! (
@@ -689,12 +689,12 @@ fn test_inactive_placeholder_active_children_allowed_locally () {
           Some (node_ref . id ()),
       _ => None, })
     . next ()
-    . expect ("inactive placeholder should exist");
+    . expect ("inactive vognode should exist");
 
   validate_local_structure (
-      &viewforest, inactive_id, &config)
+      &viewforest, inactive_skgid, &config)
     . expect (
-      "an Inactive placeholder with an active child (the retained case) must pass validation");
+      "an Inactive vognode with an active child (the retained case) must pass validation");
 }
 
 #[test]
@@ -713,16 +713,16 @@ fn test_inactive_placeholder_under_activeVognode_allowed_locally () {
     parsing_errors );
 
   let config : SkgConfig = validation_config ();
-  let root_id = viewforest . first_root ()
+  let root_skgid = viewforest . first_root ()
     . expect ("root child should exist")
     . id ();
-  validate_local_structure (&viewforest, root_id, &config)
-    . expect ("ActiveVognode should accept an inactive placeholder child");
+  validate_local_structure (&viewforest, root_skgid, &config)
+    . expect ("ActiveVognode should accept an inactive vognode child");
 }
 
 #[test]
 fn inactive_placeholder_does_not_collide_with_content () {
-  // An inactive placeholder is anonymous and is not a content member
+  // An inactive vognode is anonymous and is not a content member
   // (its membership is owned by the disk weave), so it cannot
   // duplicate a real content child's id -- the buffer validates even
   // when an active child happens to be the very node the placeholder
@@ -742,22 +742,22 @@ fn inactive_placeholder_does_not_collide_with_content () {
     parsing_errors );
 
   let config : SkgConfig = validation_config ();
-  let root_id = viewforest . first_root ()
+  let root_skgid = viewforest . first_root ()
     . expect ("root child should exist")
     . id ();
-  validate_local_structure (&viewforest, root_id, &config)
+  validate_local_structure (&viewforest, root_skgid, &config)
     . expect (
-      "an inactive placeholder must not collide with content");
+      "an inactive vognode must not collide with content");
 }
 
 #[test]
 fn duplicate_members_of_defining_folders_pass_validation () {
   // Defining folders (SubscribeeFolder, OverriddenFolder; aliases were always
   // exempt) silently deduplicate at emission instead of bouncing the
-  // save (TODO/local-instruction-collection/3_plan.org).
+  // save (TODO/DONE/local-instruction-collection/3_plan.org).
   let input : &str =
     indoc! {"
-      * (skg (node (id owner) (repo main))) owner
+      * (skg (node (id recorder) (repo main))) recorder
       ** (skg subscribeeFolder)
       *** (skg (node (id dup) (repo main) writeProtected)) dup
       *** (skg (node (id dup) (repo main) writeProtected)) dup
@@ -773,15 +773,15 @@ fn duplicate_members_of_defining_folders_pass_validation () {
     "Test fixture should not have parse errors: {:?}",
     parsing_errors );
   let config : SkgConfig = validation_config ();
-  for folder_id in partner_folder_treeids (&viewforest) {
-    validate_local_structure (&viewforest, folder_id, &config)
+  for folder_skgid in partner_folder_treeids (&viewforest) {
+    validate_local_structure (&viewforest, folder_skgid, &config)
       . expect ("duplicate members of a defining folder should pass validation"); }}
 
 #[test]
 fn duplicate_members_of_write_protected_folders_are_still_rejected () {
   let input : &str =
     indoc! {"
-      * (skg (node (id owner) (repo main))) owner
+      * (skg (node (id recorder) (repo main))) recorder
       ** (skg hiddenFolder)
       *** (skg (node (id dup) (repo main) writeProtected)) dup
       *** (skg (node (id dup) (repo main) writeProtected)) dup
@@ -794,9 +794,9 @@ fn duplicate_members_of_write_protected_folders_are_still_rejected () {
     "Test fixture should not have parse errors: {:?}",
     parsing_errors );
   let config : SkgConfig = validation_config ();
-  for folder_id in partner_folder_treeids (&viewforest) {
+  for folder_skgid in partner_folder_treeids (&viewforest) {
     let error = validate_local_structure (
-        &viewforest, folder_id, &config)
+        &viewforest, folder_skgid, &config)
       . expect_err (
         "duplicate members of a write-protected folder should fail validation");
     assert!(
@@ -815,16 +815,16 @@ fn partner_folder_treeids (
     . collect () }
 
 fn validation_config () -> SkgConfig {
-  let mut repos : HashMap<RepoName, SkgfileRepo> =
+  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
     HashMap::new ();
-  for repo in ["main", "private"] {
-    let repo_name : RepoName = RepoName::from (repo);
-    repos . insert (
-      repo_name . clone (),
-      SkgfileRepo {
-        name          : repo_name,
+  for skgrepo in ["main", "private"] {
+    let skgrepo_name : SkgRepoName = SkgRepoName::from (skgrepo);
+    skgrepos . insert (
+      skgrepo_name . clone (),
+      SkgRepo {
+        name          : skgrepo_name,
         abbreviation  : None,
-        path          : PathBuf::from (format! ("/tmp/{}", repo)),
-        user_owns_it  : true,
+        path          : PathBuf::from (format! ("/tmp/{}", skgrepo)),
+        owned         : true,
       }); }
-  SkgConfig::dummyFromRepos (repos) }
+  SkgConfig::dummyFromSkgRepos (skgrepos) }

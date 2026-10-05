@@ -2,7 +2,7 @@ use skg::diff_report::diff_report_as_org;
 use skg::diff_report::types::DiffSelection;
 use skg::serve::handlers::diff_report::handle_diff_report_request;
 use skg::test_utils::read_lp_message;
-use skg::types::misc::{SkgConfig, SkgfileRepo, RepoName};
+use skg::types::misc::{SkgConfig, SkgRepo, SkgRepoName};
 
 use git2::Repository;
 use std::collections::HashMap;
@@ -73,7 +73,7 @@ fn diff_report_includes_inbound_and_link_changes (
 fn diff_report_shows_override_changes_on_raw_nodes (
 ) -> Result<(), Box<dyn Error>> {
   // No substitution in diff surfaces
-  // (TODO/full-schema/12-2_diff-mode-policy_discussion.org): the diff
+  // (TODO/DONE/full-schema/DONE/12-2_diff-mode-policy_discussion.org): the diff
   // report renders raw nodes -- each under its own title -- and
   // reports an overrides_view_of change in both roles.
   let fixture : DiffFixture =
@@ -184,8 +184,8 @@ fn diff_report_handler_sends_length_prefixed_response (
 #[test]
 fn diff_report_shows_cross_repo_inbound_relationships (
 ) -> Result<(), Box<dyn Error>> {
-  let multi : MultiRepoFixture =
-    MultiRepoFixture::new () ?;
+  let multi : MultiSkgRepoFixture =
+    MultiSkgRepoFixture::new () ?;
   multi . left . write_node ("a", "Alpha", "", &[]) ?;
   multi . right . write_node ("b", "Beta", "", &[]) ?;
   multi . left . commit_all ("left initial") ?;
@@ -218,8 +218,8 @@ fn diff_report_shows_cross_repo_inbound_relationships (
 #[test]
 fn diff_report_shows_repo_move_across_repos (
 ) -> Result<(), Box<dyn Error>> {
-  let multi : MultiRepoFixture =
-    MultiRepoFixture::new () ?;
+  let multi : MultiSkgRepoFixture =
+    MultiSkgRepoFixture::new () ?;
   multi . left . write_node ("a", "Moved", "", &[]) ?;
   multi . right . write_node ("keep", "Keep", "", &[]) ?;
   multi . left . commit_all ("left initial") ?;
@@ -250,7 +250,7 @@ fn diff_report_shows_repo_move_across_repos (
 fn diff_report_shows_vanished_nodes (
 ) -> Result<(), Box<dyn Error>> {
   // TODO/more.org: a node the worktree still references, though its
-  // file exists in no Skg repo, is investigated in git history: the
+  // file exists in no skgrepo, is investigated in git history: the
   // report names the commit it vanished at and what it was connected
   // to when last present. A reference that NEVER existed is reported
   // as such.
@@ -301,19 +301,19 @@ fn diff_report_refuses_non_git_repos (
 ) -> Result<(), Box<dyn Error>> {
   let tmp : TempDir =
     tempfile::tempdir () ?;
-  let repo_dir : PathBuf =
+  let skgrepo_dir : PathBuf =
     tmp . path () . join ("main");
-  fs::create_dir (&repo_dir) ?;
-  let repo_name : RepoName =
-    RepoName::from ("main");
+  fs::create_dir (&skgrepo_dir) ?;
+  let skgrepo_name : SkgRepoName =
+    SkgRepoName::from ("main");
   let config : SkgConfig =
-    SkgConfig::dummyFromRepos (HashMap::from ([
-      (repo_name . clone (),
-       SkgfileRepo {
-         name: repo_name,
+    SkgConfig::dummyFromSkgRepos (HashMap::from ([
+      (skgrepo_name . clone (),
+       SkgRepo {
+         name: skgrepo_name,
          abbreviation: None,
-         path: repo_dir,
-         user_owns_it: true }) ]));
+         path: skgrepo_dir,
+         owned: true }) ]));
   let error : String =
     diff_report_as_org (
       &config,
@@ -371,14 +371,14 @@ impl SkgrepoWithGitrepo {
   }
 }
 
-struct MultiRepoFixture {
+struct MultiSkgRepoFixture {
   _tmp   : TempDir,
   left   : SkgrepoWithGitrepo,
   right  : SkgrepoWithGitrepo,
   config : SkgConfig,
 }
 
-impl MultiRepoFixture {
+impl MultiSkgRepoFixture {
   fn new (
   ) -> Result<Self, Box<dyn Error>> {
     let tmp : TempDir =
@@ -387,25 +387,25 @@ impl MultiRepoFixture {
       SkgrepoWithGitrepo::new (&tmp . path () . to_path_buf (), "left") ?;
     let right : SkgrepoWithGitrepo =
       SkgrepoWithGitrepo::new (&tmp . path () . to_path_buf (), "right") ?;
-    let left_name : RepoName =
-      RepoName::from ("left");
-    let right_name : RepoName =
-      RepoName::from ("right");
+    let left_name : SkgRepoName =
+      SkgRepoName::from ("left");
+    let right_name : SkgRepoName =
+      SkgRepoName::from ("right");
     let config : SkgConfig =
-      SkgConfig::dummyFromRepos (HashMap::from ([
+      SkgConfig::dummyFromSkgRepos (HashMap::from ([
         (left_name . clone (),
-         SkgfileRepo {
+         SkgRepo {
            name: left_name,
            abbreviation: None,
            path: left . skgrepo . clone (),
-           user_owns_it: true }),
+           owned: true }),
         (right_name . clone (),
-         SkgfileRepo {
+         SkgRepo {
            name: right_name,
            abbreviation: None,
            path: right . skgrepo . clone (),
-           user_owns_it: true }) ]));
-    Ok ( MultiRepoFixture {
+           owned: true }) ]));
+    Ok ( MultiSkgRepoFixture {
       _tmp: tmp,
       left,
       right,
@@ -424,16 +424,16 @@ impl DiffFixture {
     let skgrepo : PathBuf =
       tmp . path () . join ("main");
     fs::create_dir (&skgrepo) ?;
-    let repo_name : RepoName =
-      RepoName::from ("main");
+    let skgrepo_name : SkgRepoName =
+      SkgRepoName::from ("main");
     let config : SkgConfig =
-      SkgConfig::dummyFromRepos (HashMap::from ([
-        (repo_name . clone (),
-         SkgfileRepo {
-           name: repo_name,
+      SkgConfig::dummyFromSkgRepos (HashMap::from ([
+        (skgrepo_name . clone (),
+         SkgRepo {
+           name: skgrepo_name,
            abbreviation: None,
            path: skgrepo . clone (),
-           user_owns_it: true }) ]));
+           owned: true }) ]));
     Ok ( DiffFixture {
       _tmp: tmp,
       gitrepo,
@@ -477,7 +477,7 @@ fn write_node_file (
       format! (
         "contains:\n{}\n",
         contains . iter ()
-          . map ( |id| format! ("- {}", id) )
+          . map ( |skgid| format! ("- {}", skgid) )
           . collect::<Vec<String>> ()
           . join ("\n") ) };
   let body_yaml : String =

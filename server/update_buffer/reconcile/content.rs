@@ -1,27 +1,27 @@
 use crate::to_org::complete::contents::clobberWriteProtectedViewnode;
-use crate::repo_sets::ActiveRepoSet;
+use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::types::viewnode::{mk_inactive_viewnode, mk_unknown_viewnode};
-use crate::to_org::util::{DefinitiveMap, make_writeProtected_if_repeat_then_extend_defmap};
-use crate::types::misc::{ID, SkgConfig, RepoName};
+use crate::to_org::util::{EditableMap, make_writeProtected_if_repeat_then_extend_editable_map};
+use crate::types::misc::{ID, SkgConfig, SkgRepoName};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::{
     OverrideResolution, resolve_override};
-use crate::types::env::find_repo_with_optional_tantivy;
+use crate::types::env::find_skgrepo_with_optional_tantivy;
 use crate::types::phantom::home_from_disk;
 use crate::types::nodes::complete::Graphnode;
-use crate::dbs::node_lookup::graphnode_rustFirst_by_pid_and_repo;
+use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     Viewnode, ViewnodeKind, PhantomDeleted, Editability,
-    AffectsParent, ViewRequest, mk_definitive_viewnode};
+    AffectsParent, ViewRequest, mk_editable_viewnode};
 use crate::types::viewnode::{Vognode, Phantom, PartnerFolder};
-use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_repo_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
+use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_skgrepo_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_graphnode::{
-    pid_and_repo_from_treenode,
+    pid_and_skgrepo_from_treenode,
     write_at_activeVognode_in_tree};
 use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::update_buffer::util::{
-    complete_relevant_children_in_viewnodetree,
+    complete_relevant_children_in_viewforest,
     partition_children,
     treat_certain_children,
     move_child_to_end};
@@ -34,49 +34,49 @@ use std::sync::Arc;
 enum ContentReality {
   Real, // Real content: Exists in worktree, and parent contains it at this position.
   Inactive,
-  Unknown, // TODO/DONE/local-view-update/plan_v2.org §7.6: a content id that resolves to nothing (a dangling reference) -> an Unknown placeholder, rather than aborting the whole view.
+  Unknown, // TODO/DONE/local-view-update/plan_v2.org §7.6: a content id that resolves to nothing (a dangling reference) -> an Unknown phantom, rather than aborting the whole view.
 }
 
 struct ChildData {
-  title  : String,
-  home_repo : RepoName,
-  body   : Option<String>,
-  kind   : ContentReality,
+  title        : String,
+  home_skgrepo : SkgRepoName,
+  body         : Option<String>,
+  kind         : ContentReality,
   /// The exact stored relRepo of an unresolved relationship member.
-  /// Known children derive their display facts from their graph node;
-  /// an Unknown has no home, so only this retained edge fact can draw
+  /// Known children derive their display facts from their graphnode;
+  /// an Unknown has no home, so only this retained relationship fact can draw
   /// its optional relRepo herald.
-  relRepo : Option<RepoName>,
+  relRepo : Option<SkgRepoName>,
   /// Some(R) = override substitution applies: draw R, marked
   /// '(overridesHere goal-id)', in place of the goal member. The
   /// title/repo/body above are then R's. Only ContentReality::Real
   /// children substitute.
-  drawn_id : Option<ID>,
+  drawn_skgid : Option<ID>,
 }
 
 /// ActiveVognode content reconcile + content-child creation, for one node, in the
 /// TODO/DONE/local-view-update/plan_v2.org §3 level-order BFS visit. View completion (dispatch_node_update)
 /// settles the node's
-/// Finalizable state *before* calling this (via 'apply_definitive_draw_rule')
+/// Finalizable state *before* calling this (via 'apply_editable_draw_rule')
 /// and passes:
 /// - `settled`: the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule already ran for this node (it carried a
-///   ViewRequest::Definitive), so its map entry and write-protected/def are already
+///   ViewRequest::Editable), so its map entry and write-protected/def are already
 ///   correct -- skip 'make_write-protected_if_repeat_then_extend_defmap', which would
 ///   otherwise write-protect a just-made-Final node against its own entry.
 /// - `cascade`: this node is Final (DVR-made); per TODO/DONE/local-view-update/plan_v2.org §5.3 it hands a
-///   ViewRequest::Definitive to each of its affected content children so the
+///   ViewRequest::Editable to each of its affected content children so the
 ///   BFS draws each Final (clobbering competing Tentative occurrences).
 /// - `node_budget`: the TODO/DONE/local-view-update/plan_v2.org §5.5 remaining budget of new Viewnodes; content-child
 ///   creation is capped against it.
 pub fn expand_true_content_at_activeVognode (
   node               : NodeId,
   tree               : &mut Tree<Viewnode>,
-  defmap             : &mut DefinitiveMap,
+  editable_map                   : &mut EditableMap,
   config             : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
-  deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
-  active_repo_set              : Option<&ActiveRepoSet>,
+  active_skgrepo_set             : Option<&ActiveSkgRepoSet>,
   settled                        : bool,
   cascade                        : bool,
   node_budget                    : &mut usize,
@@ -91,13 +91,13 @@ pub fn expand_true_content_at_activeVognode (
                                 ViewnodeKind::Vognode (Vognode::Active (_))),
     "expand_true_content_at_activeVognode: expected Active vognode" ) ?;
   if ! settled {
-    // A DVR node was already resolved by apply_definitive_draw_rule; running
+    // A DVR node was already resolved by apply_editable_draw_rule; running
     // the dedup here would write-protect it against its own (just-inserted)
     // map entry. Ordinary nodes still dedup first-wins (Tentative).
-    make_writeProtected_if_repeat_then_extend_defmap(
-      tree, node, defmap ) ?; }
-  let (pid, initial_repo) : (ID, RepoName) =
-    pid_and_repo_from_treenode( tree, node,
+    make_writeProtected_if_repeat_then_extend_editable_map(
+      tree, node, editable_map ) ?; }
+  let (pid, initial_skgrepo) : (ID, SkgRepoName) =
+    pid_and_skgrepo_from_treenode( tree, node,
                                   "expand_true_content_at_activeVognode" ) ?;
   // This content path produces the pure worktree view; the node's git diff
   // (axes, phantom flip, diff-only properties) is applied by process_activeVognode_diff at
@@ -111,16 +111,16 @@ pub fn expand_true_content_at_activeVognode (
     if is_writeProtected {
       clobberWriteProtectedViewnode( tree, node, graph_snap, config ) ?;
       return Ok (( )); }}
-  // TODO/DONE/local-view-update/plan_v2.org §5.5: this vognode is definitive and about to expand -- draw its whole
+  // TODO/DONE/local-view-update/plan_v2.org §5.5: this vognode is editable and about to expand -- draw its whole
   // content group, and (via the BFS) its folders. Each expansion costs ONE budget
   // unit; a write-protected node (returned above) costs nothing, and a folder fills
   // for free. visit_normal_node already forced this node write-protected if the
   // budget was 0, so here it is > 0; saturating_sub is defensive.
   *node_budget = node_budget . saturating_sub (1);
   let graphnode : Graphnode =
-    graphnode_rustFirst_by_pid_and_repo (
-      graph_snap, config, &pid, &initial_repo ) ?;
-  // TODO/DONE/local-view-update/plan_v2.org §8.3: EVERY definitive node re-syncs title/body/repo from the snapshot,
+    graphnode_graphFirst_by_pid_and_skgrepo (
+      graph_snap, config, &pid, &initial_skgrepo ) ?;
+  // TODO/DONE/local-view-update/plan_v2.org §8.3: EVERY editable node re-syncs title/body/repo from the snapshot,
   // saved and collateral alike. (After extraction the snapshot already reflects
   // the saved buffer's text, so re-syncing the saved node yields the same
   // content it just defined -- a no-op.)
@@ -129,7 +129,7 @@ pub fn expand_true_content_at_activeVognode (
     tree, node, &graphnode, config, graph_snap,
     deleted_since_head_pid_src_map,
     deleted_by_this_save_extra_ids,
-    active_repo_set,
+    active_skgrepo_set,
     substitution_enabled,
     substitute_existing_content_overrides ) ?;
   if cascade {
@@ -138,7 +138,7 @@ pub fn expand_true_content_at_activeVognode (
     tree, node ) ?;
   Ok(( )) }
 
-/// TODO/DONE/local-view-update/plan_v2.org §5.3 cascade: hand a ViewRequest::Definitive to each affected,
+/// TODO/DONE/local-view-update/plan_v2.org §5.3 cascade: hand a ViewRequest::Editable to each affected,
 /// non-phantom Active content child of a Final node -- new and existing
 /// alike -- so the main BFS draws each Final (and it in turn cascades to its
 /// own content). The cascade does *not* flow through non-vognodes, so only
@@ -147,7 +147,7 @@ fn attach_cascade_dvrs_to_affected_content (
   tree : &mut Tree<Viewnode>,
   node : NodeId,
 ) -> Result<(), Box<dyn Error>> {
-  let child_ids : Vec<NodeId> =
+  let child_skgids : Vec<NodeId> =
     tree . get (node) . unwrap ()
     . children ()
     . filter ( |c| matches!( &c . value () . kind,
@@ -156,15 +156,15 @@ fn attach_cascade_dvrs_to_affected_content (
              && ! t . should_be_diffPhantom () ) )
     . map ( |c| c . id () )
     . collect ();
-  for cid in child_ids {
+  for cid in child_skgids {
     write_at_activeVognode_in_tree (
       tree, cid,
       |t| { t . view_requests . insert ( ViewRequest::Definitive ); } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   Ok (( )) }
 
-/// Overwrite the viewnode's title, repo, and body with the fresh values from
-/// the snapshot. TODO/DONE/local-view-update/plan_v2.org §8.3: every definitive node re-syncs, saved and collateral
+/// Overwrite the viewnode's title, skgrepo, and body with the fresh values from
+/// the snapshot. TODO/DONE/local-view-update/plan_v2.org §8.3: every editable node re-syncs, saved and collateral
 /// alike -- after extraction the snapshot already holds the saved buffer's text,
 /// so the saved node re-syncs to the same content it just defined.
 fn sync_activeVognode_from_disk (
@@ -172,14 +172,14 @@ fn sync_activeVognode_from_disk (
   node         : NodeId,
   graphnode : &Graphnode,
 ) -> Result<(), Box<dyn Error>> {
-  let disk_title : String = graphnode . title . clone ();
-  let disk_body  : Option<String> = graphnode . body . clone ();
-  let disk_repo : RepoName = graphnode . home_repo . clone ();
+  let disk_title   : String = graphnode . title . clone ();
+  let disk_body    : Option<String> = graphnode . body . clone ();
+  let disk_skgrepo : SkgRepoName = graphnode . home_skgrepo . clone ();
   write_at_activeVognode_in_tree (
     tree, node,
     |t| { t . title = disk_title;
-          t . home_repo = disk_repo;
-          if let Editability::Definitive { body, .. }
+          t . home_skgrepo = disk_skgrepo;
+          if let Editability::Editable { body, .. }
             = &mut t . editability
             { *body = disk_body; }} ) ?;
   Ok (( )) }
@@ -193,9 +193,9 @@ fn reconcile_content_children (
   graphnode                   : &Graphnode,
   config                         : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
-  deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
-  active_repo_set              : Option<&ActiveRepoSet>,
+  active_skgrepo_set             : Option<&ActiveSkgRepoSet>,
   substitution_enabled           : bool,
   substitute_existing_content_overrides : bool,
 ) -> Result<(), Box<dyn Error>> {
@@ -208,7 +208,7 @@ fn reconcile_content_children (
   // at the acquirer. (Fresh views already got this for free from
   // 'pid_and_repo_from_id'; this makes the rerender consistent.)
   let content_members = graphnode . contains . iter ()
-    . filter ( |m| match active_repo_set {
+    . filter ( |m| match active_skgrepo_set {
       // relRepo gating (render-and-gating, 5_plan.org): a
       // membership whose REPO is inactive is invisible here even
       // when the member node itself is active -- the private
@@ -216,36 +216,36 @@ fn reconcile_content_children (
       // below, in omit_inactive_members.
       None => true,
       Some (a) => a . is_all ()
-        || a . contains_repo ( &m . relRepo ) } )
+        || a . contains_skgrepo ( &m . relRepo ) } )
     . collect::<Vec<_>> ();
-  let content_ids : Vec<ID> = content_members . iter ()
+  let content_skgids : Vec<ID> = content_members . iter ()
     . map ( |m| graph_snap . pid_of ( &m . member )
                  . unwrap_or_else ( || m . member . clone () ))
     . collect ();
-  let relRepos : HashMap<ID, RepoName> = content_members . iter ()
+  let relRepos : HashMap<ID, SkgRepoName> = content_members . iter ()
     .map ( |m| ( graph_snap . pid_of ( &m . member )
                   . unwrap_or_else ( || m . member . clone () ),
                   m . relRepo . clone () ))
     . collect ();
   let is_sub : bool = is_subscribee (tree, node) ?;
-  // TODO/DONE/local-view-update/plan_v2.org §6.1: a definitive subscribee-as-such regenerates its content as
+  // TODO/DONE/local-view-update/plan_v2.org §6.1: an editable subscribee-as-such regenerates its content as
   // contains-minus-hides, saved and collateral views alike. (View-update is
   // strictly post-extraction, so the hide edits are already in the graph and
   // regenerating contains-minus-hides is correct. The TODO/DONE/local-view-update/plan_v2.org §5.3 cascade draws
   // subscribee content through this same path.)
-  let apparent_content_ids : Vec<ID> =
-    content_goal_list( tree, node, &content_ids, is_sub, config,
-                       graph_snap, active_repo_set ) ?;
-  let apparent_content_ids : Vec<ID> =
-    // TODO/full-schema/9-2_repo-set-safety.org: rendering omits every
+  let apparent_content_skgids : Vec<ID> =
+    content_goal_list( tree, node, &content_skgids, is_sub, config,
+                       graph_snap, active_skgrepo_set ) ?;
+  let apparent_content_skgids : Vec<ID> =
+    // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: rendering omits every
     // inactive member from the goal (the weave preserves them at save).
-    // A retained inactive placeholder already in the tree survives
+    // A retained inactive vognode already in the tree survives
     // anyway -- it is irrelevant to this reconciler, not goal-matched.
     omit_inactive_members (
-      apparent_content_ids, active_repo_set,
-      |id : &ID| graph_snap . pid_and_repo (id)
+      apparent_content_skgids, active_skgrepo_set,
+      |skgid : &ID| graph_snap . pid_and_skgrepo (skgid)
                  . map ( |(_pid, src)| src )
-                 . or_else ( || home_from_disk (id, config) ));
+                 . or_else ( || home_from_disk (skgid, config) ));
   // TODO/DONE/local-view-update/plan_v2.org §5.5: the content group is drawn WHOLE -- never truncated mid-group. The
   // budget is spent once per expanding vognode (in expand_true_content_at_activeVognode),
   // not per child, so a node either fully expands or is left write-protected; we
@@ -268,18 +268,18 @@ fn reconcile_content_children (
     && ! is_overridden_drawn_raw (tree, node, config, graph_snap) ?;
   if substitute_existing_content_overrides {
     replace_raw_content_children_with_visible_overriders (
-      tree, node, config, graph_snap, active_repo_set,
+      tree, node, config, graph_snap, active_skgrepo_set,
       substitution_for_children ) ?; }
   complete_content_children(
-    tree, node, &apparent_content_ids, &relRepos,
-    &graphnode . home_repo, config, graph_snap,
+    tree, node, &apparent_content_skgids, &relRepos,
+    &graphnode . home_skgrepo, config, graph_snap,
     deleted_since_head_pid_src_map, deleted_by_this_save_extra_ids,
-    active_repo_set,
+    active_skgrepo_set,
     substitution_for_children ) ?;
   mark_erroneous_content_children_as_indep(
-    tree, node, &apparent_content_ids ) ?;
+    tree, node, &apparent_content_skgids ) ?;
   convert_nonmember_unknown_children_to_dead(
-    tree, node, &apparent_content_ids ) ?;
+    tree, node, &apparent_content_skgids ) ?;
   Ok (( )) }
 
 /// Replace already-rendered raw content children whose newly committed
@@ -296,7 +296,7 @@ fn replace_raw_content_children_with_visible_overriders (
   node                 : NodeId,
   config               : &SkgConfig,
   graph_snap           : &Arc<InRustGraph>,
-  active_repo_set    : Option<&ActiveRepoSet>,
+  active_skgrepo_set   : Option<&ActiveSkgRepoSet>,
   substitution_enabled : bool,
 ) -> Result<(), Box<dyn Error>> {
   if ! substitution_enabled { return Ok (()); }
@@ -310,17 +310,17 @@ fn replace_raw_content_children_with_visible_overriders (
       if active . affectsParent != AffectsParent::True
          || active . viewStats . overridesHere . is_some ()
       { continue; }
-      let original : ID = active . id . clone ();
+      let original : ID = active . skgid . clone ();
       let effective : ID = resolve_override (
-        config, graph_snap, active_repo_set, &original ) . effective;
+        config, graph_snap, active_skgrepo_set, &original ) . effective;
       if effective == original { continue; }
-      let repo : RepoName = graph_snap . pid_and_repo (&effective)
-        . map (|(_pid, repo)| repo)
+      let skgrepo : SkgRepoName = graph_snap . pid_and_skgrepo (&effective)
+        . map (|(_pid, skgrepo)| skgrepo)
         . ok_or_else (|| format! (
           "replace_raw_content_children_with_visible_overriders: no repo for overrider {}",
           effective . 0 )) ?;
-      let overrider : Graphnode = graphnode_rustFirst_by_pid_and_repo (
-        graph_snap, config, &effective, &repo ) ?;
+      let overrider : Graphnode = graphnode_graphFirst_by_pid_and_skgrepo (
+        graph_snap, config, &effective, &skgrepo ) ?;
       result . push ((child . id (), original, overrider));
     }
     result };
@@ -328,10 +328,10 @@ fn replace_raw_content_children_with_visible_overriders (
     write_at_activeVognode_in_tree (
       tree, child,
       |active| {
-        active . id = overrider . pid . clone ();
-        active . home_repo = overrider . home_repo . clone ();
+        active . skgid = overrider . pid . clone ();
+        active . home_skgrepo = overrider . home_skgrepo . clone ();
         active . title = overrider . title . clone ();
-        if let Editability::Definitive { body, .. } = &mut active . editability
+        if let Editability::Editable { body, .. } = &mut active . editability
         { *body = overrider . body . clone (); }
         active . viewStats . overridesHere = Some (original);
       }) . map_err (|e| -> Box<dyn Error> { e . into () }) ?;
@@ -347,26 +347,26 @@ fn replace_raw_content_children_with_visible_overriders (
 /// decides member-vs-convert, so a Dead -> Unknown -> Dead chain collapses in
 /// one sweep.
 fn convert_nonmember_unknown_children_to_dead (
-  tree       : &mut Tree<Viewnode>,
-  node       : NodeId,
-  member_ids : &[ID],
+  tree          : &mut Tree<Viewnode>,
+  node          : NodeId,
+  member_skgids : &[ID],
 ) -> Result<(), Box<dyn Error>> {
   let member_set : HashSet<ID> =
-    member_ids . iter () . cloned () . collect ();
+    member_skgids . iter () . cloned () . collect ();
   treat_certain_children(
     tree, node,
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
-        ! member_set . contains (&u . id),
+        ! member_set . contains (&u . skgid),
       _ => false },
     |vn : &mut Viewnode| { vn . kind = ViewnodeKind::DeadViewnode; },
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
 pub(in crate::update_buffer) fn mutate_activeVognode_to_deletednode (
-  tree   : &mut Tree<Viewnode>,
-  node   : NodeId,
-  pid    : &ID,
-  repo : &RepoName,
+  tree    : &mut Tree<Viewnode>,
+  node    : NodeId,
+  pid     : &ID,
+  skgrepo : &SkgRepoName,
 ) -> Result<(), Box<dyn Error>> {
   let (title, body) : (String, Option<String>) =
     read_at_node_in_tree ( tree, node,
@@ -379,8 +379,8 @@ pub(in crate::update_buffer) fn mutate_activeVognode_to_deletednode (
     |vn : &mut Viewnode| {
       vn . kind = ViewnodeKind::Vognode (Vognode::Phantom (
         Phantom::Deleted ( PhantomDeleted {
-        id     : pid . clone(),
-        home_repo : repo . clone(),
+        skgid           : pid . clone(),
+        home_skgrepo : skgrepo . clone(),
         title,
         body, } ) )); }
   ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) }
@@ -392,7 +392,7 @@ pub(in crate::update_buffer) fn mutate_activeVognode_to_deletednode (
 /// overriddenFolder member) to every raw-drawn position. Decided
 /// 2026-06-12:
 /// - POSITION: a member of any PartnerFolder that draws raw -- every folder
-///   EXCEPT the writable subscribeeFolder, whose subscribees-as-such DO
+///   EXCEPT the editable subscribeeFolder, whose subscribees-as-such DO
 ///   substitute (the subscriber's view of them) -- or a view root.
 /// - OVERRIDDEN: ownership-gated, visibility-UNGATED ('active' = None),
 ///   so even a node whose only overrider is invisible counts as
@@ -424,17 +424,17 @@ fn is_overridden_drawn_raw (
       . unwrap_or (false);
     affects_parent_raw_drawing_folder || is_view_root };
   if ! in_raw_position { return Ok (false); }
-  let (id, has_marker) : (Option<ID>, bool) =
+  let (skgid, has_marker) : (Option<ID>, bool) =
     read_at_node_in_tree( tree, node,
       |vn : &Viewnode| match &vn . kind {
         ViewnodeKind::Vognode (Vognode::Active (t))
-          => ( Some (t . id . clone ()),
+          => ( Some (t . skgid . clone ()),
                t . viewStats . overridesHere . is_some () ),
         _ => ( None, false ) } ) ?;
-  let id : ID = match id { Some (id) => id, None => return Ok (false) };
+  let skgid : ID = match skgid { Some (skgid) => skgid, None => return Ok (false) };
   if has_marker { return Ok (false); }
   let overridden : bool =
-    resolve_override (config, graph_snap, None, &id) . effective != id;
+    resolve_override (config, graph_snap, None, &skgid) . effective != skgid;
   Ok (overridden) }
 
 /// Whether this node claims affectsParent=true
@@ -473,21 +473,21 @@ fn is_subscribee (
 fn content_goal_list (
   tree               : &Tree<Viewnode>,
   node               : NodeId,
-  content_ids        : &[ID],
+  content_skgids     : &[ID],
   is_subscribee      : bool,
   config             : &SkgConfig,
   graph_snap         : &Arc<InRustGraph>,
-  active_repo_set  : Option<&ActiveRepoSet>,
+  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
   if !is_subscribee {
-    Ok ( content_ids . to_vec () )
+    Ok ( content_skgids . to_vec () )
   } else {
-    let (grandparent_pid, grandparent_repo) : (ID, RepoName) =
-      pid_and_repo_from_ancestor( tree, node, 2,
+    let (grandparent_pid, grandparent_skgrepo) : (ID, SkgRepoName) =
+      pid_and_skgrepo_from_ancestor( tree, node, 2,
                                     "content_goal_list" ) ?;
     let grandparent_graphnode : Graphnode =
-      graphnode_rustFirst_by_pid_and_repo (
-        graph_snap, config, &grandparent_pid, &grandparent_repo ) ?;
+      graphnode_graphFirst_by_pid_and_skgrepo (
+        graph_snap, config, &grandparent_pid, &grandparent_skgrepo ) ?;
     // Resolve the subtrahends through extra_id -> pid the same way
     // 'content_ids' (the minuend) was resolved by the caller. Without
     // this, a child the subscriber has integrated under a now-MERGED id
@@ -495,45 +495,45 @@ fn content_goal_list (
     // subscribee's contains holds the acquirer's primary) would not
     // cancel, and would double-show as unintegrated subscribed content.
     // relRepo gating (render-and-gating, 5_plan.org): a member
-    // the grandparent-subscriber HIDES or CONTAINS only in a repo
+    // the grandparent-subscriber HIDES or CONTAINS only in a skgrepo
     // outside the active set must not subtract the subscribee's
     // content here -- else a privately-contained/-hidden member
-    // would vanish from a public view even though no ACTIVE edge
+    // would vanish from a public view even though no ACTIVE relationship
     // explains its absence (leak by omission). Mirrors the
     // 'reconcile_content_children' gate on 'graphnode.contains'
     // just above.
-    let repo_active = |repo : &RepoName| match active_repo_set {
+    let skgrepo_active = |skgrepo : &SkgRepoName| match active_skgrepo_set {
       None      => true,
-      Some (a)  => a . is_all () || a . contains_repo (repo) };
+      Some (a)  => a . is_all () || a . contains_skgrepo (skgrepo) };
     let worktree_hidden : Vec<ID> =
         grandparent_graphnode . hides_from_its_subscriptions
         . or_default () . iter ()
-        . filter ( |m| repo_active (& m . relRepo) )
+        . filter ( |m| skgrepo_active (& m . relRepo) )
         . map ( |m| m . member . clone () )
         . collect ();
     let subscriber_contains : Vec<ID> =
         grandparent_graphnode . contains . iter ()
-        . filter ( |m| repo_active (& m . relRepo) )
+        . filter ( |m| skgrepo_active (& m . relRepo) )
         . map ( |m| m . member . clone () )
         . collect ();
-    Ok ( unintegrated_content_ids (
-      graph_snap, content_ids, &worktree_hidden, &subscriber_contains ) )
+    Ok ( unintegrated_content_skgids (
+      graph_snap, content_skgids, &worktree_hidden, &subscriber_contains ) )
   } }
 
 /// The membership subtraction shared by subscribee reconciliation and
 /// occurrence-level herald facts. Inputs preserve raw IDs; extra IDs are
 /// resolved before comparing membership, without replacing overridden nodes.
-pub fn unintegrated_content_ids (
+pub fn unintegrated_content_skgids (
   graph               : &InRustGraph,
-  content_ids         : &[ID],
+  content_skgids      : &[ID],
   subscriber_hidden   : &[ID],
   subscriber_contains : &[ID],
 ) -> Vec<ID> {
-  let resolve_pids = |ids : &[ID]| -> Vec<ID> {
-    ids . iter ()
-      . map (|id| graph . pid_of (id) . unwrap_or_else (|| id . clone ()))
+  let resolve_pids = |skgids : &[ID]| -> Vec<ID> {
+    skgids . iter ()
+      . map (|skgid| graph . pid_of (skgid) . unwrap_or_else (|| skgid . clone ()))
       . collect () };
-  let contents : Vec<ID> = resolve_pids (content_ids);
+  let contents : Vec<ID> = resolve_pids (content_skgids);
   let hidden : Vec<ID> = resolve_pids (subscriber_hidden);
   let contained : Vec<ID> = resolve_pids (subscriber_contains);
   setlike_vector_subtraction (
@@ -547,26 +547,26 @@ fn complete_content_children (
   tree               : &mut Tree<Viewnode>,
   node               : NodeId,
   goal_list          : &[ID],
-  relRepos : &HashMap<ID, RepoName>,
-  owner_home         : &RepoName,
+  relRepos : &HashMap<ID, SkgRepoName>,
+  recorder_home      : &SkgRepoName,
   config             : &SkgConfig,
   graph_snap         : &Arc<InRustGraph>,
-  deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
-  active_repo_set  : Option<&ActiveRepoSet>,
+  active_skgrepo_set  : Option<&ActiveSkgRepoSet>,
   substitution_enabled : bool,
 ) -> Result<(), Box<dyn Error>> {
   let child_data : HashMap<ID, ChildData> =
     build_child_creation_data(
       tree, node, goal_list, relRepos, config, graph_snap,
-      deleted_since_head_pid_src_map, active_repo_set,
+      deleted_since_head_pid_src_map, active_skgrepo_set,
       substitution_enabled ) ?;
   normalize_relationship_backed_content_unknowns (
-    tree, node, goal_list, relRepos, owner_home, graph_snap,
+    tree, node, goal_list, relRepos, recorder_home, graph_snap,
     deleted_by_this_save_extra_ids ) ?;
   // The RepairSummary is dropped: content is not a generated
   // folder, so its reconciliation is not a "repair" to warn about.
-  complete_relevant_children_in_viewnodetree(
+  complete_relevant_children_in_viewforest(
     tree, node,
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Active (t))
@@ -577,7 +577,7 @@ fn complete_content_children (
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))
         // An Unknown is a real raw relationship member.  Match it by
         // its raw ID so a rerender retains one placeholder rather than
-        // appending another one for the same dangling edge.
+        // appending another one for the same dangling relationship.
         => true,
       // An InactiveVognode is IRRELEVANT: never matched against the goal
       // list, so it is preserved as-is (a retained placeholder hosting
@@ -592,53 +592,53 @@ fn complete_content_children (
       // its original goal member, and only genuinely missing members
       // are created -- which keeps post-save rerendering stable.
       ViewnodeKind::Vognode (Vognode::Active (t))
-        => Ok ( t . collected_id () ),
+        => Ok ( t . collected_skgid () ),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
-        => Ok ( p . id . clone() ),
+        => Ok ( p . skgid . clone() ),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u)))
-        => Ok ( u . id . clone() ),
+        => Ok ( u . skgid . clone() ),
       _ => Err(
         "complete_content_children: relevant child had no content ID"
         . to_string() ) },
     goal_list,
-    |id : &ID| {
-      let d : &ChildData = child_data . get (id) . ok_or_else( || format!(
+    |skgid : &ID| {
+      let d : &ChildData = child_data . get (skgid) . ok_or_else( || format!(
         "complete_content_children: child data not pre-fetched for {}",
-        id . 0 )) ?;
+        skgid . 0 )) ?;
       Ok ( match d . kind {
         ContentReality::Real =>
-          match &d . drawn_id {
+          match &d . drawn_skgid {
             None =>
-              mk_definitive_viewnode(
-                id . clone(), d . home_repo . clone(),
+              mk_editable_viewnode(
+                skgid . clone(), d . home_skgrepo . clone(),
                 d . title . clone(), d . body . clone() ),
             Some (drawn) => {
               // Override substitution: draw the overrider, marked
               // with the original it stands for.
               let mut vn : Viewnode =
-                mk_definitive_viewnode(
-                  drawn . clone(), d . home_repo . clone(),
+                mk_editable_viewnode(
+                  drawn . clone(), d . home_skgrepo . clone(),
                   d . title . clone(), d . body . clone() );
               if let ViewnodeKind::Vognode (
                 Vognode::Active (ref mut t)) = vn . kind
               { t . viewStats . overridesHere =
-                  Some ( id . clone() ); }
+                  Some ( skgid . clone() ); }
               vn }},
         ContentReality::Inactive =>
           mk_inactive_viewnode (),
         ContentReality::Unknown => {
-          let mut unknown : Viewnode = mk_unknown_viewnode ( id . clone() );
+          let mut unknown : Viewnode = mk_unknown_viewnode ( skgid . clone() );
           if let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =
             &mut unknown . kind
           { u . relRepo = d . relRepo . clone ()
-              . filter ( |repo| repo != owner_home ); }
+              . filter ( |skgrepo| skgrepo != recorder_home ); }
           unknown } } ) },
   ) . map ( |_summary| () ) ?;
   Ok (())
 }
 
 /// An open view can still hold an Active occurrence when this save deletes its
-/// graph node but leaves the parent's exact raw membership in place.  Replace
+/// graphnode but leaves the parent's exact raw membership in place.  Replace
 /// that occurrence before its later BFS visit reaches generic deletion handling:
 /// the surviving relationship is the authoritative fact, so it is Unknown,
 /// not a last-seen Deleted node.  Assigning only `kind` deliberately preserves
@@ -647,8 +647,8 @@ fn normalize_relationship_backed_content_unknowns (
   tree                 : &mut Tree<Viewnode>,
   node                 : NodeId,
   goal_list            : &[ID],
-  relRepos : &HashMap<ID, RepoName>,
-  owner_home           : &RepoName,
+  relRepos             : &HashMap<ID, SkgRepoName>,
+  recorder_home        : &SkgRepoName,
   graph_snap           : &Arc<InRustGraph>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
 ) -> Result<(), Box<dyn Error>> {
@@ -657,29 +657,29 @@ fn normalize_relationship_backed_content_unknowns (
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Active (active)) =>
         active . affectsParent == AffectsParent::True
-        && graph_snap . pid_of (&active . collected_id ()) . is_none ()
+        && graph_snap . pid_of (&active . collected_skgid ()) . is_none ()
         && goal_list . iter () . any (|raw_member|
-          raw_member == &active . collected_id ()
+          raw_member == &active . collected_skgid ()
           || deleted_by_this_save_extra_ids
-             . get (&active . collected_id ())
+             . get (&active . collected_skgid ())
              . is_some_and (|extra_ids| extra_ids . contains (raw_member))),
       _ => false },
     |vn : &mut Viewnode| {
-      let active_id : ID = match &vn . kind {
+      let active_skgid : ID = match &vn . kind {
         ViewnodeKind::Vognode (Vognode::Active (active)) =>
-          active . collected_id (),
+          active . collected_skgid (),
         _ => unreachable! (), };
-      let id : ID = goal_list . iter () . find (|raw_member|
-        *raw_member == &active_id
-        || deleted_by_this_save_extra_ids . get (&active_id)
+      let skgid : ID = goal_list . iter () . find (|raw_member|
+        *raw_member == &active_skgid
+        || deleted_by_this_save_extra_ids . get (&active_skgid)
            . is_some_and (|extra_ids| extra_ids . contains (*raw_member)))
         . expect ("normalization predicate found a raw member") . clone ();
       vn . kind = ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (
         crate::types::viewnode::PhantomUnknown {
-          relRepo: relRepos . get (&id) . cloned ()
-            . filter (|repo| repo != owner_home),
+          relRepo: relRepos . get (&skgid) . cloned ()
+            . filter (|skgrepo| skgrepo != recorder_home),
           relRepo_request: None,
-          id }))); })
+          skgid }))); })
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }
 
@@ -695,20 +695,20 @@ fn normalize_relationship_backed_content_unknowns (
 /// placement, we would rewrite the phantom to `AffectsParent::False` and
 /// lose the information that the diff is about removed content.
 fn mark_erroneous_content_children_as_indep (
-  tree        : &mut Tree<Viewnode>,
-  node        : NodeId,
-  content_ids : &[ID],
+  tree           : &mut Tree<Viewnode>,
+  node           : NodeId,
+  content_skgids : &[ID],
 ) -> Result<(), Box<dyn Error>> {
   let content_id_set : HashSet<ID> =
-    content_ids . iter() . cloned() . collect();
+    content_skgids . iter() . cloned() . collect();
   treat_certain_children(
     tree, node,
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Active (t)) =>
         t . affectsParent == AffectsParent::True
         // collected_id: a drawn substitute is a member via its
-        // original, and must not be demoted to Independent.
-        && !content_id_set . contains( &t . collected_id () )
+        // original, and must not be demoted to non-member.
+        && !content_id_set . contains( &t . collected_skgid () )
         && !t . should_be_diffPhantom(), // see this function's docstring
       _ => false },
     |vn : &mut Viewnode| {
@@ -754,7 +754,7 @@ fn order_children_as_non_vognodes_then_ignored_then_content (
 
 
 /// WHAT IT DOES: Maps each child of 'node' to a ChildData:
-/// determines title, repo, and phantom|normal status
+/// determines title, skgrepo, and phantom|normal status
 /// (where phantom = removed from this list of children,
 /// which only applies in the git diff view).
 ///
@@ -763,28 +763,28 @@ fn order_children_as_non_vognodes_then_ignored_then_content (
 /// that is, by the closure that creates children,
 /// This way the closure captures only owned/pre-computed data
 /// and does not conflict with the &mut tree borrow
-/// in complete_relevant_children_in_viewnodetree.
+/// in complete_relevant_children_in_viewforest.
 fn build_child_creation_data (
   tree               : &Tree<Viewnode>,
   node               : NodeId,
   goal_list          : &[ID],
-  relRepos : &HashMap<ID, RepoName>,
+  relRepos : &HashMap<ID, SkgRepoName>,
   config             : &SkgConfig,
   graph_snap         : &Arc<InRustGraph>,
-  deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
-  active_repo_set  : Option<&ActiveRepoSet>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SkgRepoName>,
+  active_skgrepo_set  : Option<&ActiveSkgRepoSet>,
   substitution_enabled : bool,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
-  let child_repos : HashMap<ID, RepoName> =
+  let child_skgrepos : HashMap<ID, SkgRepoName> =
     { let node_ref : NodeRef<Viewnode> =
         tree . get (node)
           . ok_or ("build_child_creation_data: node not found") ?;
-      let mut m : HashMap<ID, RepoName> = HashMap::new();
+      let mut m : HashMap<ID, SkgRepoName> = HashMap::new();
       for child_ref in node_ref . children() {
         match &child_ref . value() . kind {
-          // Only an Affected Normal child counts as "already present" -- the
+          // Only a member Active child counts as "already present" -- the
           // same predicate complete_content_children's reconcile applies. An
-          // Independent same-id child is a distinct occurrence (e.g. a
+          // non-member same-id child is a distinct occurrence (e.g. a
           // containerward ancestor, or a TODO/DONE/local-view-update/plan_v2.org §6.0-demoted branch), so its goal id
           // must still be pre-fetched here; otherwise the reconcile sends it to
           // the create closure and child_data.get(id).expect(..) panics.
@@ -792,91 +792,91 @@ fn build_child_creation_data (
           // an existing drawn substitute registers under its original.
           ViewnodeKind::Vognode (Vognode::Active (t))
             if t . affectsParent == AffectsParent::True
-            => { m . insert( t . collected_id (),
-                             t . home_repo . clone()); },
+            => { m . insert( t . collected_skgid (),
+                             t . home_skgrepo . clone()); },
           ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
-            => { m . insert( p . id . clone(),
-                             p . home_repo . clone()); },
+            => { m . insert( p . skgid . clone(),
+                             p . home_skgrepo . clone()); },
           // No Inactive arm: an inactive child is never a goal member
           // (omit_inactive_members drops it), so it needs no
           // already-present entry here.
           _ => {}, }}
       m };
   let mut result : HashMap<ID, ChildData> = HashMap::new();
-  for id in goal_list {
-    if result . contains_key (id) { continue; }
+  for skgid in goal_list {
+    if result . contains_key (skgid) { continue; }
     // Skip IDs already present as children in the viewnode tree.
-    // 'complete_relevant_children_in_viewnodetree' only needs
+    // 'complete_relevant_children_in_viewforest' only needs
     // ChildData for children it creates from scratch; existing
     // children keep their in-tree state. Eagerly reading disk for
     // every goal_list ID would fail (ENOENT) for children that
     // this save just deleted, since their .skg file is gone.
-    if child_repos . contains_key (id) { continue; }
-    let child_repo : RepoName =
-      match find_repo_with_optional_tantivy (
-        graph_snap, id, deleted_since_head_pid_src_map, None, config )
+    if child_skgrepos . contains_key (skgid) { continue; }
+    let child_skgrepo : SkgRepoName =
+      match find_skgrepo_with_optional_tantivy (
+        graph_snap, skgid, deleted_since_head_pid_src_map, None, config )
       { Some (s) => s,
         None => {
           // TODO/DONE/local-view-update/plan_v2.org §7.6: the id resolves to nothing (a dangling reference). Render an
-          // Unknown placeholder rather than aborting the whole view. This is
+          // Unknown phantom rather than aborting the whole view. This is
           // what lets the one view completion serve de-novo (which must tolerate
           // dangling refs) and makes post-save robust to them too.
-          result . insert ( id . clone (),
+          result . insert ( skgid . clone (),
             ChildData { title  : String::new (),
-                        home_repo : RepoName::not_found (),
-                        body   : None,
-                        kind   : ContentReality::Unknown,
+                        home_skgrepo : SkgRepoName::not_found (),
+                        body         : None,
+                        kind         : ContentReality::Unknown,
                         relRepo:
-                          relRepos . get (id) . cloned (),
-                        drawn_id : None } );
+                          relRepos . get (skgid) . cloned (),
+                        drawn_skgid : None } );
           continue; } };
-    if active_repo_set
-      . is_some_and ( |active| !active . contains_repo (&child_repo) )
+    if active_skgrepo_set
+      . is_some_and ( |active| !active . contains_skgrepo (&child_skgrepo) )
     {
       // Omission precedes substitution: an inactive original draws
       // nothing (this arm is the safety net; the goal list normally
       // omitted it already), so its overrider is not consulted.
-      result . insert( id . clone(),
+      result . insert( skgid . clone(),
                      ChildData { title: String::new (),
-                                 home_repo: child_repo,
+                                 home_skgrepo: child_skgrepo,
                                  body: None,
                                  kind: ContentReality::Inactive,
                                  relRepo: None,
-                                 drawn_id : None } );
+                                 drawn_skgid : None } );
       continue; }
-    let drawn_id : Option<ID> =
+    let drawn_skgid : Option<ID> =
       if substitution_enabled {
         let resolution : OverrideResolution =
           resolve_override (
-            config, graph_snap, active_repo_set, id );
+            config, graph_snap, active_skgrepo_set, skgid );
         // A chain of any length resolves to its end; substitution
         // draws that effective overrider (the carrier collects the
         // original id, so the parent's contains round-trips to N).
-        if resolution . effective != *id {
+        if resolution . effective != *skgid {
           Some ( resolution . effective )
         } else { None }
       } else { None };
-    let fetch_id : &ID = drawn_id . as_ref () . unwrap_or (id);
-    let fetch_repo : RepoName = match &drawn_id {
-      None => child_repo,
+    let fetch_skgid : &ID = drawn_skgid . as_ref () . unwrap_or (skgid);
+    let fetch_skgrepo : SkgRepoName = match &drawn_skgid {
+      None => child_skgrepo,
       Some (drawn) =>
-        // The overrider is user-owned and active (the resolver's
-        // gates), so the graph knows its repo.
-        graph_snap . pid_and_repo (drawn)
+        // The overrider is owned and active (the resolver's
+        // gates), so the graph knows its skgrepo.
+        graph_snap . pid_and_skgrepo (drawn)
         . map ( |(_pid, src)| src )
         . ok_or_else ( || format! (
           "build_child_creation_data: no repo for overrider {}",
           drawn . 0 )) ? };
     let skg : Graphnode =
-      graphnode_rustFirst_by_pid_and_repo (
-        graph_snap, config, fetch_id, &fetch_repo ) ?;
-    result . insert( id . clone(),
+      graphnode_graphFirst_by_pid_and_skgrepo (
+        graph_snap, config, fetch_skgid, &fetch_skgrepo ) ?;
+    result . insert( skgid . clone(),
                    ChildData { title: skg . title . clone(),
-                               home_repo: skg . home_repo . clone(),
+                               home_skgrepo: skg . home_skgrepo . clone(),
                                body: skg . body . clone(),
                                kind: ContentReality::Real,
                                relRepo: None,
-                               drawn_id } ); }
+                               drawn_skgid } ); }
   Ok (result) }
 
 #[cfg(test)]

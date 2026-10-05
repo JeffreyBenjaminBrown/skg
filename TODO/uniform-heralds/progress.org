@@ -55,9 +55,9 @@ overridesHere. Added: birth_herald:Option<String>, rels_herald:Option<String>.
 ** Ancestor flags + generation distance
 
 Letters a=parent(gen1), b=grandparent(gen2), c, d... counting ALL
-viewnodes incl. col scaffolds. For each Active node, the "tracked
+viewnodes incl. folders. For each Active node, the "tracked
 ancestors" checked are: the immediate visible parent IF an Active
-gnode (gen1); for a col member, the col's required_ancestry real-node
+gnode (gen1); for a folder member, the folder's required_ancestry real-node
 entries (owner = last entry) at their tree-gen distances. For each
 tracked ancestor A at gen g and each relation R, both directions are
 checked via relation_membership_is_real; a hit records flag g on that
@@ -66,7 +66,7 @@ side.
 Birth designation (which relation token(s) are orange + order):
 - parent-gnode & parent contains it -> [Contains]
 - Birth::Backpath(role)            -> [role.relation] (side per role)
-- edge col member (Affected)       -> [relation_member_role.relation]
+- edge folder member (Affected)       -> [relation_member_role.relation]
 - HiddenInSubscribee member        -> [Hides, Contains]   (H first)
 - HiddenOutsideOfSubscribee member -> [Hides]
 
@@ -85,7 +85,7 @@ ancestor letters); outbound shows letters only (the linkSource-birth
 
 normalize_body(Option<String>): drop leading & trailing whitespace-only
 lines; empty -> None. Applied at NodeFS::from (every disk write =
-save+import) AND into_nodecomplete (the in-memory save NodeComplete),
+save+import) AND into_nodecomplete (the in-memory save Graphnode),
 plus a one-time data/bash/trim-node-bodies.org migration.
 
 * What's done and went well
@@ -99,7 +99,7 @@ plus a one-time data/bash/trim-node-bodies.org migration.
     a(b,c)L collapses, La, Ak/Ik). All green.
   - GraphNodeStats restructured to directional RelationCounts; the
     TypeDB-fallback path RETIRED (no graph -> empty stats).
-  - viewnodestats.rs: ancestor-flag pass (parent gnode at gen1; col
+  - viewnodestats.rs: ancestor-flag pass (parent gnode at gen1; folder
     members via required_ancestor at gen i+2) + birth designation +
     assembly into ViewNodeStats.{birth_herald,rels_herald}.
   - org_to_text.rs emits (birthHerald "..") + (rels ".."); viewStats
@@ -115,7 +115,7 @@ plus a one-time data/bash/trim-node-bodies.org migration.
 - *Step 7 (goldens)*: DONE. Renderer verified correct by hand on
   content/cycle (=2aC1=, =aCa=), subscribee-as-such (=bS=),
   subscriber-as-such (=Sb=), overrider/overridden (=Oa/aO/Ob/bO=),
-  filter-col owner distances (=dH bC=), roots, source heralds. Blessed
+  filter-folder owner distances (=dH bC=), roots, source heralds. Blessed
   all failing Rust test files (one agent per test binary, using
   =cargo nextest --test <binary>= to isolate builds; each re-ran to
   green) and the bash integration =test-emacs.el= assertions. Every

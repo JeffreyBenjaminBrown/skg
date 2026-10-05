@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::git::NodeChanges;
 use crate::types::list::Diff_Item;
-use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, RepoName, members_of};
+use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgRepoName, members_of};
 use crate::types::nodes::rust::GraphnodeInRust;
 
 /// The five stored outbound relationship types and their endpoint roles.
@@ -115,7 +115,7 @@ impl RelationRole {
 impl RelationRole {
   // The nine partner roles a role tree can graft, named for the
   // role the grafted partner plays toward the origin (= toward its
-  // org-parent). 'Contains, Second' ("content") is intentionally
+  // viewparent). 'Contains, Second' ("content") is intentionally
   // absent -- the recursive content view already serves it.
   pub const CONTAINER : RelationRole =
     RelationRole { relation : NodeRelation::Contains,
@@ -215,11 +215,11 @@ impl InRustGraph {
     &self,
     seeds : impl IntoIterator<Item = ID>,
   ) -> HashSet<ID> {
-    let seed_ids : HashSet<ID> = seeds . into_iter ()
-      . map (|id| self . pid_of (&id) . unwrap_or (id))
+    let seed_skgids : HashSet<ID> = seeds . into_iter ()
+      . map (|skgid| self . pid_of (&skgid) . unwrap_or (skgid))
       . collect ();
-    let mut result : HashSet<ID> = seed_ids . clone ();
-    for seed in &seed_ids {
+    let mut result : HashSet<ID> = seed_skgids . clone ();
+    for seed in &seed_skgids {
       for relation in [
         NodeRelation::Contains,
         NodeRelation::LinksTo,
@@ -227,15 +227,15 @@ impl InRustGraph {
         NodeRelation::HidesFromItsSubscriptions,
       ] {
         result . extend (
-          self . outbound_ids_for_relation (seed, relation)
+          self . outbound_skgids_for_relation (seed, relation)
             . into_iter ()
-            . map (|id| self . pid_of (&id) . unwrap_or (id)));
+            . map (|skgid| self . pid_of (&skgid) . unwrap_or (skgid)));
         result . extend (
           self . inbound_pids_for_relation (seed, relation)); }}
     result . extend (self . override_walk_from_seeds (
-      &seed_ids, BinaryRolePosition::First));
+      &seed_skgids, BinaryRolePosition::First));
     result . extend (self . override_walk_from_seeds (
-      &seed_ids, BinaryRolePosition::Second));
+      &seed_skgids, BinaryRolePosition::Second));
     result
   }
 
@@ -249,15 +249,15 @@ impl InRustGraph {
     while let Some (node) = pending . pop () {
       let next : Vec<ID> = match seed_position {
         BinaryRolePosition::First =>
-          self . outbound_ids_for_relation (
+          self . outbound_skgids_for_relation (
             &node, NodeRelation::OverridesViewOf),
         BinaryRolePosition::Second =>
           self . inbound_pids_for_relation (
             &node, NodeRelation::OverridesViewOf), };
-      for raw_id in next {
-        let id : ID = self . pid_of (&raw_id) . unwrap_or (raw_id);
-        if visited . insert (id . clone ()) {
-          pending . push (id); }} }
+      for raw_skgid in next {
+        let skgid : ID = self . pid_of (&raw_skgid) . unwrap_or (raw_skgid);
+        if visited . insert (skgid . clone ()) {
+          pending . push (skgid); }} }
     visited
   }
 
@@ -273,13 +273,13 @@ impl InRustGraph {
 
   /// Stored outbound members for one relationship. Unlike the PID-oriented
   /// accessors, this preserves an unresolved raw ID and its relRepo.
-  /// Callers that require a current graph node should keep using the existing
+  /// Callers that require a current graphnode should keep using the existing
   /// canonical-PID accessors instead.
   pub fn outbound_rel_partners_for_relation_gated (
     &self,
     pid      : &ID,
     relation : NodeRelation,
-    active   : Option<&crate::repo_sets::ActiveRepoSet>,
+    active   : Option<&crate::skgrepo_sets::ActiveSkgRepoSet>,
   ) -> Vec<RelPartner<ID>> {
     let Some (node) = self . nodes . get (pid) else {
       return Vec::new (); };
@@ -299,27 +299,27 @@ impl InRustGraph {
       . filter ( |member| match active {
         None => true,
         Some (set) => set . is_all ()
-          || set . contains_repo (&member . relRepo), } )
+          || set . contains_skgrepo (&member . relRepo), } )
       . collect () }
 
   /// Raw outbound member IDs whose relRepo is in the active set. Unlike the
   /// PID-oriented accessor, this retains unresolved stored IDs so rendering
-  /// can preserve them as Unknown placeholders.
-  pub fn outbound_ids_for_relation_gated (
+  /// can preserve them as Unknown phantoms.
+  pub fn outbound_skgids_for_relation_gated (
     &self,
     pid      : &ID,
     relation : NodeRelation,
-    active   : Option<&crate::repo_sets::ActiveRepoSet>,
+    active   : Option<&crate::skgrepo_sets::ActiveSkgRepoSet>,
   ) -> Vec<ID> {
     if relation == NodeRelation::LinksTo {
-      return self . outbound_ids_for_relation (pid, relation); }
+      return self . outbound_skgids_for_relation (pid, relation); }
     self . outbound_rel_partners_for_relation_gated (
       pid, relation, active ) . into_iter ()
       . map ( |member| member . member )
       . collect () }
 
-  /// The relRepo of the relationship from OWNER to TARGET under RELATION,
-  /// read from the owner's outbound list. None when no such relationship
+  /// The relRepo of the relationship from RECORDER to TARGET under RELATION,
+  /// read from the recorder's outbound list. None when no such relationship
   /// exists. This is how INBOUND
   /// surfaces gate: an inbound partner P of X is visible at the
   /// active set iff relRepo(P, R, X) is active -- private
@@ -328,12 +328,12 @@ impl InRustGraph {
   /// (render-and-gating, 5_plan.org).
   pub fn relRepo (
     &self,
-    owner    : &ID,
+    recorder : &ID,
     relation : NodeRelation,
     target   : &ID,
-  ) -> Option<RepoName> {
+  ) -> Option<SkgRepoName> {
     let target_key : ID = self . pid_of (target) ? ;
-    let node : &GraphnodeInRust = self . nodes . get (owner) ? ;
+    let node : &GraphnodeInRust = self . nodes . get (recorder) ? ;
     let rel_partners : Vec<RelPartner<ID>> = match relation {
       NodeRelation::Contains =>
         node . contains . clone (),
@@ -345,9 +345,9 @@ impl InRustGraph {
         node . overrides_view_of . or_default () . to_vec (),
       NodeRelation::LinksTo =>
         // links derive from the body, which is home-only, so
-        // their repo is the owner's home by construction.
-        return self . nodes . get (owner)
-          . map ( |n| n . home_repo . clone () ), };
+        // their skgrepo is the recorder's home by construction.
+        return self . nodes . get (recorder)
+          . map ( |n| n . home_skgrepo . clone () ), };
     rel_partners . iter ()
       . find ( |m| self . pid_of ( &m . member )
                . as_ref () == Some (&target_key) )
@@ -356,15 +356,15 @@ impl InRustGraph {
   /// The relRepo of one exact, stored outbound member ID.
   /// Unlike 'relRepo', this deliberately does not canonicalize the
   /// target: an unresolved raw ID has no PID, but is still a real stored
-  /// relationship member and can be edited from an Unknown placeholder.
+  /// relationship member and can be edited from an Unknown phantom.
   pub fn relRepo_for_stored_member (
     &self,
-    owner    : &ID,
+    recorder    : &ID,
     relation : NodeRelation,
     raw_member : &ID,
-  ) -> Option<RepoName> {
+  ) -> Option<SkgRepoName> {
     self . outbound_rel_partners_for_relation_gated (
-      owner, relation, None ) . into_iter ()
+      recorder, relation, None ) . into_iter ()
       . find ( |member| &member . member == raw_member )
       . map ( |member| member . relRepo ) }
 
@@ -374,9 +374,9 @@ impl InRustGraph {
     &self,
     pid      : &ID,
     relation : NodeRelation,
-    active   : Option<&crate::repo_sets::ActiveRepoSet>,
+    active   : Option<&crate::skgrepo_sets::ActiveSkgRepoSet>,
   ) -> Vec<ID> {
-    self . outbound_ids_for_relation_gated (
+    self . outbound_skgids_for_relation_gated (
       pid, relation, active ) . iter ()
       . filter_map ( |member| self . pid_of (member) )
       . collect () }
@@ -387,7 +387,7 @@ impl InRustGraph {
     &self,
     pid      : &ID,
     relation : NodeRelation,
-    active   : Option<&crate::repo_sets::ActiveRepoSet>,
+    active   : Option<&crate::skgrepo_sets::ActiveSkgRepoSet>,
   ) -> Vec<ID> {
     self . inbound_pids_for_relation (pid, relation)
       . into_iter ()
@@ -395,17 +395,17 @@ impl InRustGraph {
         None => true,
         Some (a) => a . is_all ()
           || self . relRepo (partner, relation, pid)
-             . map ( |repo| a . contains_repo (&repo) )
+             . map ( |skgrepo| a . contains_skgrepo (&skgrepo) )
              . unwrap_or (false) } )
       . collect () }
 
-  pub fn outbound_ids_for_relation (
+  pub fn outbound_skgids_for_relation (
     &self,
     pid      : &ID,
     relation : NodeRelation,
   ) -> Vec<ID> {
     self . nodes . get (pid)
-      . map ( |node| outbound_ids_from_node (node, relation) )
+      . map ( |node| outbound_skgids_from_node (node, relation) )
       . unwrap_or_default () }
 
   pub fn outbound_pids_for_relation (
@@ -413,9 +413,9 @@ impl InRustGraph {
     pid      : &ID,
     relation : NodeRelation,
   ) -> Vec<ID> {
-    self . outbound_ids_for_relation (pid, relation)
+    self . outbound_skgids_for_relation (pid, relation)
       . iter ()
-      . filter_map ( |id| self . pid_of (id) )
+      . filter_map ( |skgid| self . pid_of (skgid) )
       . collect () }
 
   pub fn inbound_pids_for_relation (
@@ -450,7 +450,7 @@ impl InRustGraph {
     &self,
     pid    : &ID,
     role   : RelationRole,
-    active : Option<&crate::repo_sets::ActiveRepoSet>,
+    active : Option<&crate::skgrepo_sets::ActiveSkgRepoSet>,
   ) -> Vec<ID> {
     if role . is_first_role () {
       self . outbound_pids_for_relation_gated (
@@ -461,31 +461,31 @@ impl InRustGraph {
 
   pub fn relation_membership_is_real (
     &self,
-    owner_pid  : &ID,
+    recorder_pid  : &ID,
     member_pid : &ID,
     member_role : RelationRole,
   ) -> bool {
     self . relation_membership_is_visible (
-      owner_pid, member_pid, member_role, None ) }
+      recorder_pid, member_pid, member_role, None ) }
 
-  /// 'relation_membership_is_real' with relRepo gating: an edge
+  /// 'relation_membership_is_real' with relRepo gating: a relationship
   /// whose relRepo is outside the active prefix does not count
   /// as a membership (see 'relRepo'). Pass None to ask about the
   /// full fold.
   pub fn relation_membership_is_visible (
     &self,
-    owner_pid   : &ID,
-    member_pid  : &ID,
-    member_role : RelationRole,
-    active      : Option<&crate::repo_sets::ActiveRepoSet>,
+    recorder_pid : &ID,
+    member_pid   : &ID,
+    member_role  : RelationRole,
+    active       : Option<&crate::skgrepo_sets::ActiveSkgRepoSet>,
   ) -> bool {
     let members : Vec<ID> =
       self . other_member_pids_gated (
-        owner_pid, member_role . opposite_role (), active );
+        recorder_pid, member_role . opposite_role (), active );
     members . contains (member_pid) }
 }
 
-fn outbound_ids_from_node (
+fn outbound_skgids_from_node (
   node     : &GraphnodeInRust,
   relation : NodeRelation,
 ) -> Vec<ID> {
@@ -507,7 +507,7 @@ fn inbound_pid_set (
   pid      : &ID,
   relation : NodeRelation,
 ) -> HashSet<ID> {
-  let ids : Vec<ID> = match relation {
+  let skgids : Vec<ID> = match relation {
     NodeRelation::Contains =>
       graph . contained_by . get (pid)
       . map ( |s| s . iter () . cloned () . collect () )
@@ -529,7 +529,7 @@ fn inbound_pid_set (
       . map ( |s| s . iter () . cloned () . collect () )
       . unwrap_or_default (),
   };
-  ids . into_iter () . collect () }
+  skgids . into_iter () . collect () }
 
 #[cfg(test)]
 #[allow(non_snake_case)]

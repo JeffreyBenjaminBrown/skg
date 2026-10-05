@@ -7,8 +7,8 @@
 ;;; Phase 1: Open content view from a.
 ;;; Phase 2: Toggle diff mode on. b appears as a phantom under a.
 ;;; Phase 3: Call skg-goto-in-magit on the phantom b.
-;;; Phase 4: Verify magit opened on the skg-data repo (NOT the outer
-;;;          skg project repo), and that point is on b.skg.
+;;; Phase 4: Verify magit opened on the skg-data skgrepo (NOT the outer
+;;;          skg project skgrepo), and that point is on b.skg.
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../test-wait.el")

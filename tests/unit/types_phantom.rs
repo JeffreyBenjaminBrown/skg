@@ -1,9 +1,9 @@
 use super::*;
 use super::super::git::{GitDiffStatus, NodeChanges};
-use super::super::misc::SkgfileRepo;
+use super::super::misc::SkgRepo;
 
-fn repo_name (s: &str) -> RepoName { RepoName ( s . to_string () ) }
-fn id        (s: &str) -> ID         { ID ( s . to_string () ) }
+fn skgrepo_name (s: &str) -> SkgRepoName { SkgRepoName ( s . to_string () ) }
+fn skgid        (s: &str) -> ID         { ID ( s . to_string () ) }
 
 fn make_parent_diff (
   contains_diff : Vec<Diff_Item<ID>>,
@@ -16,11 +16,11 @@ fn make_parent_diff (
     before_node: None,
     after_node: None, } }
 
-fn repo_diff_with_parent_contains (
+fn skgrepo_diff_with_parent_contains (
   parent_pid : &ID,
   staged_ops   : Vec<Diff_Item<ID>>,
   unstaged_ops : Vec<Diff_Item<ID>>,
-) -> RepoDiff {
+) -> SkgRepoDiff {
   let parent_file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", parent_pid . 0 ) );
   let mut staged   : HashMap<PathBuf, GraphnodeDiff> = HashMap::new ();
@@ -31,7 +31,7 @@ fn repo_diff_with_parent_contains (
   if !unstaged_ops . is_empty () {
     unstaged . insert ( parent_file,
                         make_parent_diff (unstaged_ops) ); }
-  RepoDiff {
+  SkgRepoDiff {
     is_gitrepo: true,
     staged, unstaged,
     added_nodes: HashMap::new (),
@@ -39,12 +39,12 @@ fn repo_diff_with_parent_contains (
 
 #[test]
 fn staged_removal_is_attributed_to_staged_side () {
-  let parent : ID = id ("parent");
-  let child  : ID = id ("child");
-  let src    : RepoName = repo_name ("public");
-  let mut diffs : HashMap<RepoName, RepoDiff> = HashMap::new ();
+  let parent    : ID = skgid ("parent");
+  let child     : ID = skgid ("child");
+  let src       : SkgRepoName = skgrepo_name ("public");
+  let mut diffs : HashMap<SkgRepoName, SkgRepoDiff> = HashMap::new ();
   diffs . insert ( src . clone (),
-                   repo_diff_with_parent_contains (
+                   skgrepo_diff_with_parent_contains (
                      &parent,
                      vec! [ Diff_Item::Removed (child . clone ()) ],
                      vec! [] ) );
@@ -58,12 +58,12 @@ fn staged_removal_is_attributed_to_staged_side () {
 
 #[test]
 fn unstaged_removal_is_attributed_to_unstaged_side () {
-  let parent : ID = id ("parent");
-  let child  : ID = id ("child");
-  let src    : RepoName = repo_name ("public");
-  let mut diffs : HashMap<RepoName, RepoDiff> = HashMap::new ();
+  let parent    : ID = skgid ("parent");
+  let child     : ID = skgid ("child");
+  let src       : SkgRepoName = skgrepo_name ("public");
+  let mut diffs : HashMap<SkgRepoName, SkgRepoDiff> = HashMap::new ();
   diffs . insert ( src . clone (),
-                   repo_diff_with_parent_contains (
+                   skgrepo_diff_with_parent_contains (
                      &parent,
                      vec! [],
                      vec! [ Diff_Item::Removed (child . clone ()) ] ) );
@@ -76,12 +76,12 @@ fn unstaged_removal_is_attributed_to_unstaged_side () {
 
 #[test]
 fn staged_add_then_unstaged_remove () {
-  let parent : ID = id ("parent");
-  let child  : ID = id ("child");
-  let src    : RepoName = repo_name ("public");
-  let mut diffs : HashMap<RepoName, RepoDiff> = HashMap::new ();
+  let parent    : ID = skgid ("parent");
+  let child     : ID = skgid ("child");
+  let src       : SkgRepoName = skgrepo_name ("public");
+  let mut diffs : HashMap<SkgRepoName, SkgRepoDiff> = HashMap::new ();
   diffs . insert ( src . clone (),
-                   repo_diff_with_parent_contains (
+                   skgrepo_diff_with_parent_contains (
                      &parent,
                      vec! [ Diff_Item::New     (child . clone ()) ],
                      vec! [ Diff_Item::Removed (child . clone ()) ] ) );
@@ -96,10 +96,10 @@ fn staged_add_then_unstaged_remove () {
 fn no_parent_contains_diff_falls_back_to_unstaged_minus () {
   // Fallback preserves legacy behavior for callers (e.g. subscription
   // phantoms) where there's no contains_diff entry for this child.
-  let parent : ID = id ("parent");
-  let child  : ID = id ("child");
-  let src    : RepoName = repo_name ("public");
-  let diffs  : HashMap<RepoName, RepoDiff> = HashMap::new ();
+  let parent : ID = skgid ("parent");
+  let child  : ID = skgid ("child");
+  let src    : SkgRepoName = skgrepo_name ("public");
+  let diffs  : HashMap<SkgRepoName, SkgRepoDiff> = HashMap::new ();
   let (_, mem) = phantom_axes (
     &child, &src, &parent, &src,
     NodeRelation::Contains, Some (&diffs) );
@@ -108,16 +108,16 @@ fn no_parent_contains_diff_falls_back_to_unstaged_minus () {
 }
 
 #[test]
-fn each_relation_reads_its_own_diff_when_one_owner_bears_both () {
+fn each_relation_reads_its_own_diff_when_one_recorder_bears_both () {
   // The mislabeling case that motivated relation-true attribution:
-  // one owner both contains and overrides the same child, each edge
+  // one recorder both contains and overrides the same child, each relationship
   // removed in a DIFFERENT stage. The contains-phantom must carry
   // the contains stage and the overriddenFolder-phantom the overrides
   // stage; a first-hit scan across relations would label both from
   // whichever relation it checked first.
-  let parent : ID = id ("parent");
-  let child  : ID = id ("child");
-  let src    : RepoName = repo_name ("public");
+  let parent : ID = skgid ("parent");
+  let child  : ID = skgid ("child");
+  let src    : SkgRepoName = skgrepo_name ("public");
   let parent_file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", parent . 0 ) );
   let diff_for = | contains_ops : Vec<Diff_Item<ID>>,
@@ -131,14 +131,14 @@ fn each_relation_reads_its_own_diff_when_one_owner_bears_both () {
         .. NodeChanges::default () } ),
       before_node: None,
       after_node: None, } };
-  let mut diffs : HashMap<RepoName, RepoDiff> = HashMap::new ();
-  diffs . insert ( src . clone (), RepoDiff {
+  let mut diffs : HashMap<SkgRepoName, SkgRepoDiff> = HashMap::new ();
+  diffs . insert ( src . clone (), SkgRepoDiff {
     is_gitrepo: true,
-    staged: HashMap::from ([ // contains edge removed STAGED
+    staged: HashMap::from ([ // contains relationship removed STAGED
       ( parent_file . clone (),
         diff_for ( vec! [ Diff_Item::Removed (child . clone ()) ],
                    vec! [] )) ]),
-    unstaged: HashMap::from ([ // overrides edge removed UNSTAGED
+    unstaged: HashMap::from ([ // overrides relationship removed UNSTAGED
       ( parent_file,
         diff_for ( vec! [],
                    vec! [ Diff_Item::Removed (child . clone ()) ] )) ]),
@@ -159,7 +159,7 @@ fn each_relation_reads_its_own_diff_when_one_owner_bears_both () {
      overrides_view_of_diff only" );
 }
 
-/// A node with sections in several repos has exactly one home: the
+/// A node with sections in several skgrepos has exactly one home: the
 /// most public RETAINED section. The privacy order here is declaration
 /// order (foreign, zed, alpha), deliberately NOT alphabetical. The
 /// foreign section is discarded by the owned-pid collision rule, so
@@ -176,23 +176,23 @@ fn home_from_disk_is_the_most_public_section () {
   std::fs::create_dir_all (&public_path)  . unwrap ();
   std::fs::create_dir_all (&private_path) . unwrap ();
   let make_config = || -> SkgConfig {
-    let mut repos : HashMap<RepoName, SkgfileRepo> =
+    let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
       HashMap::new ();
-    for (name, path, user_owns_it) in
+    for (name, path, owned) in
       [ ("foreign", foreign_path . clone (), false),
         ("zed",     public_path  . clone (), true),
         ("alpha",   private_path . clone (), true) ] {
-      repos . insert ( repo_name (name), SkgfileRepo {
-        name         : repo_name (name),
+      skgrepos . insert ( skgrepo_name (name), SkgRepo {
+        name         : skgrepo_name (name),
         abbreviation : None,
         path,
-        user_owns_it, } ); }
+        owned, } ); }
     let mut config : SkgConfig =
-      SkgConfig::dummyFromRepos (repos);
-    config . repo_order = // most public first
-      vec! [ repo_name ("foreign"),
-             repo_name ("zed"),
-             repo_name ("alpha") ];
+      SkgConfig::dummyFromSkgRepos (skgrepos);
+    config . skgrepo_order = // most public first
+      vec! [ skgrepo_name ("foreign"),
+             skgrepo_name ("zed"),
+             skgrepo_name ("alpha") ];
     config };
   { // The foreign collision is ignored; most-public retained wins.
     std::fs::write ( foreign_path . join ("N.skg"),
@@ -203,14 +203,14 @@ fn home_from_disk_is_the_most_public_section () {
                      "pid: N\ncontains:\n- C\n" ) . unwrap ();
     for _ in 0 .. 20 {
       let config : SkgConfig = make_config ();
-      assert_eq! ( home_from_disk ( &id ("N"), &config ),
-                   Some ( repo_name ("zed") ) ); }}
-  { // A section in only the more private Skg repo: that is the home.
+      assert_eq! ( home_from_disk ( &skgid ("N"), &config ),
+                   Some ( skgrepo_name ("zed") ) ); }}
+  { // A section in only the more private skgrepo: that is the home.
     std::fs::write ( private_path . join ("P.skg"),
                      "pid: P\ntitle: P\n" ) . unwrap ();
     let config : SkgConfig = make_config ();
-    assert_eq! ( home_from_disk ( &id ("P"), &config ),
-                 Some ( repo_name ("alpha") ) ); }
+    assert_eq! ( home_from_disk ( &skgid ("P"), &config ),
+                 Some ( skgrepo_name ("alpha") ) ); }
   let config : SkgConfig = make_config ();
-  assert_eq! ( home_from_disk ( &id ("absent"), &config ), None );
+  assert_eq! ( home_from_disk ( &skgid ("absent"), &config ), None );
 }

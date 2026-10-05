@@ -2,14 +2,16 @@
 
 ** What a herald describes
 An Skg headline begins with metadata. In a view, heralds condense that
-metadata into short styled tokens. Toggle the compact display with
+metadata into short styled tokens. (Decorations on text that is not
+metadata, such as the label shown after a link or a title shown beside
+an ID in magit, are *annotations*, not heralds.) Toggle the compact display with
 'skg-view-heralds-mode' (=C-c v h=) in Emacs or ':SkgHeraldsToggle'
 (=<localleader>vh=) in Neovim. The expanded metadata is useful when you
 need to inspect the exact facts or requests.
 
 Relationship counts describe the latest rendered graph under the active
-repo-set. They count distinct visible nodes, including visible
-relationship edges, and resolve extra IDs. They do not count repeated
+skgrepo-set. They count distinct visible nodes, including visible
+relationships, and resolve extra IDs. They do not count repeated
 links or unsaved buffer edits as new graph facts. A folded body can still
 contribute links. A view's position can add ancestor flags and a birth
 style, so two occurrences of the same node can have different heralds.
@@ -58,9 +60,9 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | diff facts           | nonstandard | =N -N R -R=, =text changed=, =diff:not-in-git=                                |
 |                      | go          | =✓= staged                                                                    |
 |                      | stop        | =✗= unstaged                                                                  |
-| placeholders         | message     | =Reference to unknown node.=, =node from inactive repo=, =DELETED=            |
+| phantoms, inactive   | message     | =Reference to unknown node.=, =node from inactive repo=, =DELETED=            |
 | link annotations     | normal      | a resolved target's =[⌂:pub]=                                                 |
-|                      | yucky       | =[⌂:inactive]=, =[⌂:…]=, =[⌂:lookup failed]=, a broken link's label           |
+|                      | yucky       | =[⌂:inactive]=, =[⌂:…]=, =[⌂:lookup failed]=, a dangling link's label           |
 
 ** Relationship heralds
 *** Letters and sides
@@ -85,11 +87,11 @@ Each side has a tier, which says how much it deserves attention.
 | hides                 | medium                          | normal                                                                     |
 
 Most normal sides are normal because their members are usually visible
-elsewhere: as view-children, in the text, or in the hidden-in and
+elsewhere: as viewchildren, in the text, or in the hidden-in and
 hidden-outside-subscribee folders.
 
 *** Ancestor flags and floors
-Lowercase flags name tracked ancestors: =a= is the visible parent, =b=
+Lowercase flags name tracked ancestors: =a= is the viewparent, =b=
 the grandparent, and so on, counting folders as generations. After =z=,
 a generation appears as ={27}=, ={28}=, etc. =aC= says the parent
 contains this node; =Ca= says this node contains its parent. A flag
@@ -156,11 +158,11 @@ On a node, =B= rides the ☮ when the node's body exists but is hidden.
 =⊥= means a displayed child does not affect its parent's membership on
 save. =⟳= marks a cycle.
 
-=⌂:LABEL= marks a node's home repo boundary. A =~NAME= immediately
+=⌂:LABEL= marks a node's home skgrepo boundary. A =~NAME= immediately
 before it reports a relationship stored at a more private relRepo than
 its default; =request:~NAME= is an explicit pending request to change
-that relationship's Skg repo on save. The home repo belongs to the
-node; relRepo belongs to an edge.
+that relationship's skgrepo on save. The home skgrepo belongs to the
+node; relRepo belongs to a relationship.
 
 Folder labels, =alias=, =ID= and the flag rows describe their view
 positions. The flags folder spells out =had ID before import=, =was
@@ -170,8 +172,8 @@ request a view. =delete=, =merge:...=, and =request:no search matching=
 or =request:search matching= are save requests.
 
 An unknown node is labeled =Reference to unknown node.=; an inactive
-Skg repo yields an anonymous =node from inactive repo= marker, which
-reveals no node title or Skg repo. =DELETED= marks a deleted node, or a
+skgrepo yields an anonymous =node from inactive repo= marker, which
+reveals no node title or skgrepo. =DELETED= marks a deleted node, or a
 viewnode whose node was deleted.
 
 ** Diff heralds
@@ -183,16 +185,16 @@ Git counterpart.
 
 ** Link annotations
 The current buffer can display a suffix after each literal
-='[[id:ID][LABEL]]'= link with the target's home repo abbreviation.
+='[[id:ID][LABEL]]'= link with the target's home skgrepo abbreviation.
 Use 'skg-toggle-repo-overlay-on-links' (=C-c v L=) in Emacs or
 ':SkgToggleRepoOverlayOnLinks' (=<localleader>vL=) in Neovim.
 Suffixes start off and the toggle is local to the buffer. A resolved
-target shows its repo, for example =[⌂:pub]=. Extra IDs resolve to
-their target's home repo. =[⌂:inactive]=, =[⌂:…]= and
+target shows its skgrepo, for example =[⌂:pub]=. Extra IDs resolve to
+their target's home skgrepo. =[⌂:inactive]=, =[⌂:…]= and
 =[⌂:lookup failed]= distinguish inactive, pending and lookup-failed
-targets, and reveal no Skg repo name. A broken link gets no suffix.
+targets, and reveal no skgrepo name. A dangling link gets no suffix.
 
-Even with suffixes off, the label of a link confirmed missing in the
+Even with suffixes off, the label of a link confirmed dangling in the
 current graph is yucky and underlined. Inactive or still unknown
 targets are not marked broken. These display-only annotations do not
 change link text, save contents, or exact-ID navigation.

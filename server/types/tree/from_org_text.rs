@@ -56,10 +56,10 @@ pub fn tree_from_org_text(
       return Err(format!("Invalid nesting at line: {}", line) . into());
     }
 
-    let parent_id : NodeId = stack . last() . unwrap() . 1;
-    let new_id : NodeId =
-      tree . get_mut (parent_id) . unwrap() . append (title) . id();
-    stack . push((level, new_id));
+    let parent_skgid : NodeId = stack . last() . unwrap() . 1;
+    let new_skgid : NodeId =
+      tree . get_mut (parent_skgid) . unwrap() . append (title) . id();
+    stack . push((level, new_skgid));
   }
 
   Ok (tree)

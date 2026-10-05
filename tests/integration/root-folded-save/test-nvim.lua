@@ -52,7 +52,7 @@ print('=== visibility after fold setup (org-startup-folded=t analog) ===')
 do
   local last = vim.api.nvim_buf_line_count(0)
   for line = 1, last do
-    if metadata.at_heading_p(line) then
+    if metadata.at_headline_p(line) then
       print(string.format('  %s | invisible: %s',
         metadata.line_text(line), tostring(folds.line_invisible_p(line))))
     end

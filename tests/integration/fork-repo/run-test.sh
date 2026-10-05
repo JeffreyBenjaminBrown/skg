@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Integration test for the fork-confirmation buffer's editable clone
-# repo. Two OWNED repos (owned, owned2) plus a FOREIGN one.
-# - Emacs opens owned P (whose content is foreign N), makes N definitive,
+# skgrepo. Two OWNED skgrepos (owned, owned2) plus a FOREIGN one.
+# - Emacs opens owned P (whose content is foreign N), makes N editable,
 #   edits its title, and saves -> a fork-confirmation buffer.
-# - The clone's repo is inferred as "owned"; the test rotates it to
+# - The clone's skgrepo is inferred as "owned"; the test rotates it to
 #   "owned2" in the confirmation buffer, then approves.
-# - The clone must land in "owned2" (the rotated repo), not "owned".
+# - The clone must land in "owned2" (the rotated skgrepo), not "owned".
 
 set -e
 
@@ -26,7 +26,7 @@ restore_fork_fixtures() {
     "tests/integration/fork-repo/data/owned" \
     "tests/integration/fork-repo/data/owned2" \
     "tests/integration/fork-repo/data/foreign" 2>/dev/null || true
-  # Remove any clone .skg written into either owned repo.
+  # Remove any clone .skg written into either owned skgrepo.
   find "$TEST_DIR/data/owned/owned"  -name '*.skg' ! -name 'P.skg' -delete 2>/dev/null || true
   find "$TEST_DIR/data/owned/owned2" -name '*.skg' -delete 2>/dev/null || true
 }

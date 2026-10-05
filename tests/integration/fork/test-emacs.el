@@ -69,7 +69,7 @@
                    (buffer-string))))
 
     ;; 2. Insert bare N under F, and move the existing O headline from
-    ;; F to N.  The bare node must inherit the eventual clone repo.
+    ;; F to N.  The bare node must inherit the eventual clone skgrepo.
     (with-current-buffer fork-buffer
       (goto-char (point-min))
       (unless (re-search-forward "^\\*\\* .*?(id O).*$" nil t)
@@ -88,7 +88,7 @@
       (goto-char (point-min))
       (skg-request-save-buffer))
 
-    ;; 3. The confirmation names F; choose the owned repo and approve.
+    ;; 3. The confirmation names F; choose the owned skgrepo and approve.
     (let ((confirm-buf
            (skg-test-wait-for
             (lambda () (get-buffer "*SKG Fork Confirmation*")) 10)))

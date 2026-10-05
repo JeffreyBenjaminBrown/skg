@@ -1,9 +1,9 @@
 ;;; Integration test for the fork-confirmation buffer's EDITABLE clone
-;;; repo. Open owned P (whose content is foreign N); make N definitive
+;;; skgrepo. Open owned P (whose content is foreign N); make N editable
 ;;; and edit its title; save -> a fork-confirmation buffer. The clone's
-;;; repo is inferred as "owned"; rotate it to "owned2" in the
+;;; skgrepo is inferred as "owned"; rotate it to "owned2" in the
 ;;; confirmation buffer, then approve. The clone must land in "owned2"
-;;; (the rotated repo), not in "owned".
+;;; (the rotated skgrepo), not in "owned".
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../test-wait.el")
@@ -43,7 +43,7 @@ the clone landed in the rotated repo."
                 (lambda () (fork-repo-test--buffer-showing "P")) 10)))
     (unless p-buf (test-fail "P's view never appeared"))
     (with-current-buffer p-buf
-      ;; 2. Make N definitive and edit its title -- the fork gesture.
+      ;; 2. Make N editable and edit its title -- the fork gesture.
       (goto-char (point-min))
       (unless (re-search-forward "^.*(id N) (repo foreign).*$" nil t)
         (test-fail "could not find N's headline:\n%s" (buffer-string)))
@@ -56,14 +56,14 @@ the clone landed in the rotated repo."
       ;; 3. Save -> fork-confirmation (nothing committed).
       (skg-request-save-buffer)))
 
-  ;; 4. The confirmation buffer appears. Rotate the clone-to-be's repo
+  ;; 4. The confirmation buffer appears. Rotate the clone-to-be's skgrepo
   ;;    from the inferred "owned" to "owned2", then approve.
   (let ((confirm-buf (skg-test-wait-for
                       (lambda () (get-buffer "*SKG Fork Confirmation*")) 10)))
     (unless confirm-buf (test-fail "no fork-confirmation buffer appeared"))
     (with-current-buffer confirm-buf
       ;; The server pre-fills the PICK-A-REPO placeholder and only
-      ;; SUGGESTS the inferred repo in a comment line (fork.rs;
+      ;; SUGGESTS the inferred skgrepo in a comment line (fork.rs;
       ;; documented in docs/COMMANDS.org and glossary.org). An earlier
       ;; version of this test asserted "(repo owned)" directly,
       ;; which predates the placeholder mechanism -- see the 2026-07-02
@@ -76,7 +76,7 @@ the clone landed in the rotated repo."
         (test-fail "the inferred repo 'owned' should be suggested:\n%s"
                    (buffer-string)))
       ;; Move to the clone-to-be parent (the first, level-1 headline) and
-      ;; rotate its repo -- what C-c s s does interactively.
+      ;; rotate its skgrepo -- what C-c s s does interactively.
       (goto-char (point-min))
       (unless (re-search-forward "^\\* (skg" nil t)
         (test-fail "could not find the clone-to-be headline:\n%s"
@@ -86,7 +86,7 @@ the clone landed in the rotated repo."
       (unless (string-match-p "(repo owned2)" (buffer-string))
         (test-fail "rotation did not set repo owned2:\n%s" (buffer-string)))
       (message "✓ rotated the clone's repo to owned2")
-      ;; 5. Approve: re-save the origin with the chosen repo.
+      ;; 5. Approve: re-save the source buffer with the chosen skgrepo.
       (skg-approve-fork)))
 
   ;; 6. The clone must land in owned2 (rotated), NOT owned (inferred).

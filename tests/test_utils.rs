@@ -1,62 +1,62 @@
-use skg::test_utils::compare_headlines_modulo_id;
+use skg::test_utils::compare_headlines_modulo_skgid;
 
 #[test]
-fn test_compare_headlines_modulo_id() {
+fn test_compare_headlines_modulo_skgid() {
   // Test identical headlines
-  assert!(compare_headlines_modulo_id(
+  assert!(compare_headlines_modulo_skgid(
     "* Title",
     "* Title"
   ));
 
   // Test headlines that differ only by ID
-  assert!(compare_headlines_modulo_id(
+  assert!(compare_headlines_modulo_skgid(
     "* (skg (node (id abc123))) Title",
     "* (skg (node (id xyz789))) Title"
   ));
 
   // Test headlines where one has ID and other doesn't - should be unequal
-  assert!(!compare_headlines_modulo_id(
+  assert!(!compare_headlines_modulo_skgid(
     "* (skg (node (id abc123))) Title",
     "* Title"
   ));
 
   // Test headlines with same other metadata but different IDs
-  assert!(compare_headlines_modulo_id(
+  assert!(compare_headlines_modulo_skgid(
     "* (skg (node (id abc))) Title",
     "* (skg (node (id xyz))) Title"
   ));
 
   // Test headlines that differ by title
-  assert!(!compare_headlines_modulo_id(
+  assert!(!compare_headlines_modulo_skgid(
     "* (skg (node (id abc))) Title One",
     "* (skg (node (id xyz))) Title Two"
   ));
 
   // Test headlines that differ by level
-  assert!(!compare_headlines_modulo_id(
+  assert!(!compare_headlines_modulo_skgid(
     "* (skg (node (id abc))) Title",
     "** (skg (node (id xyz))) Title"
   ));
 
   // Test headlines that differ by other metadata
-  assert!(!compare_headlines_modulo_id(
+  assert!(!compare_headlines_modulo_skgid(
     "* (skg (node (id abc))) Title",
     "* (skg alias) Title"
   ));
 
   // Test non-headlines
-  assert!(compare_headlines_modulo_id(
+  assert!(compare_headlines_modulo_skgid(
     "This is body text",
     "This is body text"
   ));
 
-  assert!(!compare_headlines_modulo_id(
+  assert!(!compare_headlines_modulo_skgid(
     "This is body text",
     "This is different text"
   ));
 
   // Test mixed (one headline, one not)
-  assert!(!compare_headlines_modulo_id(
+  assert!(!compare_headlines_modulo_skgid(
     "* Title",
     "Body text" )); }
 

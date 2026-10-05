@@ -3,12 +3,12 @@
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::org_to_text::viewforest_to_string;
-use skg::repo_sets::ActiveRepoSet;
-use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, RepoName, RepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
-use skg::types::nodes::complete::{Graphnode, empty_node_complete};
+use skg::skgrepo_sets::ActiveSkgRepoSet;
+use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgRepoName, SkgRepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
+use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::serve::handlers::text_search::{
-  group_matches_by_id, build_search_viewforest};
+  group_matches_by_skgid, build_search_viewforest};
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -34,26 +34,26 @@ fn test_text_search_org_format (
 
       // Create test nodes with overlapping titles/aliases
       let mut node1 : Graphnode = // the best match
-        empty_node_complete ();
+        empty_graphnode ();
       node1 . pid =
         ID::new ("id_1");
       node1 . title =
         "the bear eats cheese" . to_string ();
       node1 . aliases =
-        rel_partners_at_relRepo_msv ( & node1 . home_repo, MSV::Specified ( vec! [
+        rel_partners_at_relRepo_msv ( & node1 . home_skgrepo, MSV::Specified ( vec! [
           "bear cheese" . to_string (),
           "the cheese" . to_string ()
         ] ) );
 
       let mut node2 : Graphnode = // matches, but less well
-        empty_node_complete ();
+        empty_graphnode ();
       node2 . pid =
         ID::new ("id_2");
       node2 . title =
         "cheese makes me happy" . to_string ();
 
       let mut node3 : Graphnode = // will not match
-        empty_node_complete ();
+        empty_graphnode ();
       node3 . pid =
         ID::new ("id_3");
       node3 . title =
@@ -70,17 +70,17 @@ fn test_text_search_org_format (
         "the bear eats cheese";
       let ( best_matches, searcher ) =
         search_index ( &tantivy_index, search_terms, &SearchOptions::default () ) ?;
-      let matches_by_id =
-        group_matches_by_id (
+      let matches_by_skgid =
+        group_matches_by_skgid (
           best_matches, searcher, &tantivy_index,
           search_terms, &SearchOptions::default (), None );
       let (viewforest, _search_results) =
         build_search_viewforest (
           search_terms,
-          &matches_by_id,
+          &matches_by_skgid,
           &std::collections::HashSet::new () );
       let dummy_config : SkgConfig =
-        SkgConfig::dummyFromRepos (HashMap::new ());
+        SkgConfig::dummyFromSkgRepos (HashMap::new ());
       let result : String =
         viewforest_to_string ( &viewforest, &dummy_config )
         . expect ("search viewforest rendering never fails");
@@ -106,9 +106,9 @@ fn test_text_search_org_format (
                   aliases_under_current . clone () );
                 aliases_under_current . clear (); }
               if let Some (md) = metadata {
-                if let Some (id) = md . id {
+                if let Some (skgid) = md . skgid {
                   level1_headlines . push (
-                    ( id . to_string (), title ) ); }} },
+                    ( skgid . to_string (), title ) ); }} },
             _ => {
               if let Some (md) = metadata {
                 if let Some ( MpViewnodeKind::Property (
@@ -185,11 +185,11 @@ fn test_search_results_preserve_links_in_title (
       // Two nodes; both will match a search for "science".
       // node_link's title is a link with label "science"; its
       // raw title carries the link syntax.
-      let mut node_link : Graphnode = empty_node_complete ();
+      let mut node_link : Graphnode = empty_graphnode ();
       node_link . pid = ID::new ("link_node");
       node_link . title =
         "[[id:other][science]]" . to_string ();
-      let mut node_plain : Graphnode = empty_node_complete ();
+      let mut node_plain : Graphnode = empty_graphnode ();
       node_plain . pid = ID::new ("plain_node");
       node_plain . title = "science" . to_string ();
       let nodes : Vec < Graphnode > =
@@ -200,13 +200,13 @@ fn test_search_results_preserve_links_in_title (
       let ( best_matches, searcher ) =
         search_index ( &tantivy_index, "science",
                        &SearchOptions::default () ) ?;
-      let matches_by_id = group_matches_by_id (
+      let matches_by_skgid = group_matches_by_skgid (
         best_matches, searcher, &tantivy_index,
         "science", &SearchOptions::default (), None );
       let (viewforest, _ids) = build_search_viewforest (
-        "science", &matches_by_id, &std::collections::HashSet::new () );
+        "science", &matches_by_skgid, &std::collections::HashSet::new () );
       let dummy_config : SkgConfig =
-        SkgConfig::dummyFromRepos (HashMap::new ());
+        SkgConfig::dummyFromSkgRepos (HashMap::new ());
       let result : String =
         viewforest_to_string ( &viewforest, &dummy_config )
         . expect ("search viewforest rendering never fails");
@@ -217,7 +217,7 @@ fn test_search_results_preserve_links_in_title (
       let mut found_link_node_title : Option<String> = None;
       for line in result . lines () {
         if let Ok (( 1, Some (md), title )) = headline_to_triple (line) {
-          if md . id . as_ref () . map ( |i| i . as_str () )
+          if md . skgid . as_ref () . map ( |i| i . as_str () )
                                   == Some ("link_node") {
             found_link_node_title = Some (title); }} }
       let title : String = found_link_node_title
@@ -264,15 +264,15 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
       let mut nodes : Vec<Graphnode> = Vec::new ();
       // 30 noise docs to set the IDF baseline for the query terms.
       for i in 0 .. 30 {
-        let mut n : Graphnode = empty_node_complete ();
+        let mut n : Graphnode = empty_graphnode ();
         n . pid   = ID::new (& format! ("noise_{}", i));
         n . title = "fluorgastric" . to_string ();
         nodes . push (n); }
-      let mut few : Graphnode = empty_node_complete ();
+      let mut few : Graphnode = empty_graphnode ();
       few . pid   = ID::new ("few");
       few . title = "axiom" . to_string ();
       nodes . push (few);
-      let mut many : Graphnode = empty_node_complete ();
+      let mut many : Graphnode = empty_graphnode ();
       many . pid   = ID::new ("many");
       many . title = "axiom thesis lemma" . to_string ();
       nodes . push (many);
@@ -282,17 +282,17 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
       let ( best_matches, searcher ) =
         search_index ( &tantivy_index, "axiom thesis lemma",
                        &SearchOptions::default () ) ?;
-      let matches_by_id = group_matches_by_id (
+      let matches_by_skgid = group_matches_by_skgid (
         best_matches, searcher, &tantivy_index,
         "axiom thesis lemma",
         &SearchOptions::default (), None );
       // Both should be in the result set.
-      assert! ( matches_by_id . contains_key (&ID::new ("few")),
+      assert! ( matches_by_skgid . contains_key (&ID::new ("few")),
                 "few should appear among results" );
-      assert! ( matches_by_id . contains_key (&ID::new ("many")),
+      assert! ( matches_by_skgid . contains_key (&ID::new ("many")),
                 "many should appear among results" );
-      let score_for = |id : &str| -> f32 {
-        matches_by_id . get (& ID::new (id)) . unwrap ()
+      let score_for = |skgid : &str| -> f32 {
+        matches_by_skgid . get (& ID::new (skgid)) . unwrap ()
           . 1 . iter () . map ( |(s, _)| *s )
           . fold (f32::NEG_INFINITY, f32::max) };
       let many_score : f32 = score_for ("many");
@@ -317,7 +317,7 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
       let ( best_matches_re, searcher_re ) =
         search_index ( &tantivy_index, "axiom thesis lemma",
                        &regex_opts ) ?;
-      let matches_re = group_matches_by_id (
+      let matches_re = group_matches_by_skgid (
         best_matches_re, searcher_re, &tantivy_index,
         "axiom thesis lemma", &regex_opts, None );
       assert! ( matches_re . contains_key (&ID::new ("few")),
@@ -352,7 +352,7 @@ fn private_alias_documents_are_filtered_before_grouping (
 ) -> Result < (), Box < dyn std::error::Error >> {
   // A node's home is "main" but one alias lives at level
   // "private". A search restricted to "main" must drop the
-  // alias DOCUMENT itself (per-document repo filtering, before
+  // alias DOCUMENT itself (per-document skgrepo filtering, before
   // group_matches_by_id groups by ID) -- not merely drop whole
   // ID-groups whose home is inactive.
   let index_dir : &str =
@@ -360,50 +360,50 @@ fn private_alias_documents_are_filtered_before_grouping (
   let test_result
     : Result < (), Box < dyn std::error::Error >>
     = ( || {
-      let mut node : Graphnode = empty_node_complete ();
+      let mut node : Graphnode = empty_graphnode ();
       node . pid = ID::new ("id_leveled");
       node . title = "public title" . to_string ();
       node . aliases = MSV::Specified ( vec! [
         RelPartner::at_relRepo (
-          RepoName::from ("private"),
+          SkgRepoName::from ("private"),
           "secret zanzibar" . to_string () ) ] );
       let nodes : Vec<Graphnode> = vec! [ node ];
       let ( tantivy_index, _ ) : ( TantivyIndex, usize ) =
         wipe_then_init_tantivy_db (
           &nodes, Path::new (index_dir) ) ?;
-      let public_only : ActiveRepoSet = ActiveRepoSet {
-        name    : RepoSetName::from ("main"),
-        repos : [ RepoName::from ("main") ]
+      let public_only : ActiveSkgRepoSet = ActiveSkgRepoSet {
+        name    : SkgRepoSetName::from ("main"),
+        skgrepos : [ SkgRepoName::from ("main") ]
           . into_iter () . collect (), };
       { // Restricted search: the private alias doc must not match.
         let ( best_matches, searcher ) =
           search_index ( &tantivy_index, "zanzibar",
                          &SearchOptions::default () ) ?;
-        let matches_by_id = group_matches_by_id (
+        let matches_by_skgid = group_matches_by_skgid (
           best_matches, searcher, &tantivy_index,
           "zanzibar", &SearchOptions::default (),
           Some (&public_only) );
-        assert! ( ! matches_by_id . contains_key (
+        assert! ( ! matches_by_skgid . contains_key (
                     &ID::new ("id_leveled")),
                   "private alias doc leaked into a main-only search" ); }
       { // Unrestricted (None): the alias matches.
         let ( best_matches, searcher ) =
           search_index ( &tantivy_index, "zanzibar",
                          &SearchOptions::default () ) ?;
-        let matches_by_id = group_matches_by_id (
+        let matches_by_skgid = group_matches_by_skgid (
           best_matches, searcher, &tantivy_index,
           "zanzibar", &SearchOptions::default (), None );
-        assert! ( matches_by_id . contains_key (
+        assert! ( matches_by_skgid . contains_key (
                     &ID::new ("id_leveled")) ); }
       { // The title doc still matches under the restricted set.
         let ( best_matches, searcher ) =
           search_index ( &tantivy_index, "public title",
                          &SearchOptions::default () ) ?;
-        let matches_by_id = group_matches_by_id (
+        let matches_by_skgid = group_matches_by_skgid (
           best_matches, searcher, &tantivy_index,
           "public title", &SearchOptions::default (),
           Some (&public_only) );
-        assert! ( matches_by_id . contains_key (
+        assert! ( matches_by_skgid . contains_key (
                     &ID::new ("id_leveled")) ); }
       Ok (( )) } ) ();
   if Path::new (index_dir) . exists () {

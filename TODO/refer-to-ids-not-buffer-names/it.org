@@ -68,7 +68,7 @@ structured log entry.  The last user-visible text remains the earlier
 ="Visiting node: ..."= message.
 
 There is also prior evidence in
-[[../from-dot-claude/done/investigations.org]] that even a successful lookup is
+[[../DONE/from-dot-claude/investigations.org]] that even a successful lookup is
 fragile: 'switch-to-buffer' is currently called inside the network process
 filter, where the selected buffer can be restored when the filter returns.
 

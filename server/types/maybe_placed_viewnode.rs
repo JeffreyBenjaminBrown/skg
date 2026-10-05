@@ -1,6 +1,6 @@
 /// Mp variants of Viewnode and ViewnodeKind,
 /// plus conversions between placed and maybePlaced trees.
-/// 'Mp' means id and repo might be absent.
+/// 'Mp' means id and skgrepo might be absent.
 /// Only needed briefly after parsing a buffer from the client;
 /// after validation, converted to placed types.
 
@@ -19,7 +19,7 @@ use std::collections::{HashMap, HashSet};
 // Type declarations
 //
 
-/// Every Viewnode has an ID and a repo.
+/// Every Viewnode has an ID and a skgrepo.
 /// In MpViewnode, those two fields are optional.
 /// That's the only difference.
 #[derive(Debug, Clone, PartialEq)]
@@ -64,14 +64,14 @@ impl TryFrom<MpActiveVognode> for ActiveVognode {
   type Error = String;
 
   fn try_from(u: MpActiveVognode) -> Result<Self, Self::Error> {
-    let id = u . id . ok_or_else(
+    let skgid = u . skgid . ok_or_else(
       || format!("Node '{}' has no ID", u . title))?;
-    let repo = u . home_repo . ok_or_else(
+    let skgrepo = u . home_skgrepo . ok_or_else(
       || format!("Node '{}' has no repo", u . title))?;
     Ok(ActiveVognode {
       title          : u . title,
-      id,
-      home_repo: repo,
+      skgid          : skgid,
+      home_skgrepo: skgrepo,
       affectsParent          : u . affectsParent,
       birth          : u . birth,
       graphStats     : u . graphStats,
@@ -90,14 +90,14 @@ impl TryFrom<MpPhantomDiff> for PhantomDiff {
   type Error = String;
 
   fn try_from(u: MpPhantomDiff) -> Result<Self, Self::Error> {
-    let id = u . id . ok_or_else(
+    let skgid = u . skgid . ok_or_else(
       || format!("Phantom '{}' has no ID", u . title))?;
-    let repo = u . home_repo . ok_or_else(
+    let skgrepo = u . home_skgrepo . ok_or_else(
       || format!("Phantom '{}' has no repo", u . title))?;
     Ok(PhantomDiff {
       title      : u . title,
-      id,
-      home_repo: repo,
+      skgid      : skgid,
+      home_skgrepo: skgrepo,
       node_axes  : u . node_axes,
       relationship_axes : u . relationship_axes,
       not_in_git : u . not_in_git,
@@ -110,8 +110,8 @@ impl From<PhantomDiff> for MpPhantomDiff {
   fn from(p: PhantomDiff) -> Self {
     MpPhantomDiff {
       title      : p . title,
-      id         : Some(p . id),
-      home_repo     : Some(p . home_repo),
+      skgid         : Some(p . skgid),
+      home_skgrepo     : Some(p . home_skgrepo),
       node_axes  : p . node_axes,
       relationship_axes : p . relationship_axes,
       not_in_git : p . not_in_git,
@@ -168,8 +168,8 @@ impl From<ActiveVognode> for MpActiveVognode {
   fn from(t: ActiveVognode) -> Self {
     MpActiveVognode {
       title          : t . title,
-      id             : Some(t . id),
-      home_repo         : Some(t . home_repo),
+      skgid          : Some(t . skgid),
+      home_skgrepo   : Some(t . home_skgrepo),
       affectsParent          : t . affectsParent,
       birth          : t . birth,
       graphStats     : t . graphStats,
@@ -222,10 +222,10 @@ impl From<Viewnode> for MpViewnode {
   }
 }
 
-/// Does *not* compute missing repo or ID.
+/// Does *not* compute missing skgrepo or ID.
 /// Merely converts a Tree<MpViewnode>
 ///              to a Tree<Viewnode>,
-/// failing if it finds any repo or ID missing.
+/// failing if it finds any skgrepo or ID missing.
 pub fn maybePlaced_to_placed_tree (
   unchecked: Tree<MpViewnode>
 ) -> Result<Tree<Viewnode>, String> {
@@ -239,7 +239,7 @@ pub fn maybePlaced_to_placed_viewforest (
 ) -> Result<ViewForest, String> {
   let unchecked : Tree<MpViewnode> =
     unchecked . into_internal_tree ();
-  let unchecked_root_id: NodeId =
+  let unchecked_root_skgid: NodeId =
     unchecked . root() . id();
   let mut checked: Tree<Viewnode> =
     // This tree begins as a clone of the other's root.
@@ -248,29 +248,29 @@ pub fn maybePlaced_to_placed_viewforest (
   let mut id_map: HashMap< NodeId, // key : unchecked
                            NodeId > // value : checked
     = HashMap::new();
-  id_map . insert( unchecked_root_id,
+  id_map . insert( unchecked_root_skgid,
                    checked . root() . id() );
   do_everywhere_in_tree_dfs_readonly(
     // PITFALL: Readonly for 'unchecked',
     // but mutates 'checked' and 'id_map'.
-    &unchecked, unchecked_root_id, true,
+    &unchecked, unchecked_root_skgid, true,
     &mut |node_ref
     | {
-      if node_ref . id() == unchecked_root_id {
+      if node_ref . id() == unchecked_root_skgid {
         return Ok (( )); } // already converted
       let checked_node: Viewnode =
         Viewnode::try_from(
           node_ref . value() . clone() )?;
-      let parent_checked_id: NodeId =
+      let parent_checked_skgid: NodeId =
         *id_map . get (
           &node_ref . parent() . unwrap() . id()
         ) . unwrap();
-      let checked_id: NodeId = {
+      let checked_skgid: NodeId = {
         let mut parent_mut: NodeMut<Viewnode> =
-          checked . get_mut (parent_checked_id) . unwrap();
+          checked . get_mut (parent_checked_skgid) . unwrap();
         parent_mut . append (checked_node) . id() };
       id_map . insert( node_ref . id(),
-                       checked_id );
+                       checked_skgid );
       Ok (( )) } )?;
   Ok (ViewForest::from_internal_tree (checked)) }
 
@@ -283,8 +283,8 @@ impl Default for MpActiveVognode {
   fn default() -> Self {
     MpActiveVognode {
       title          : String::new(),
-      id             : None,
-      home_repo         : None,
+      skgid          : None,
+      home_skgrepo   : None,
       affectsParent       : AffectsParent::True,
       birth          : Birth::Unremarkable,
       graphStats     : GraphnodeStats::default(),
@@ -294,7 +294,7 @@ impl Default for MpActiveVognode {
       node_axes      : NodeAxes::default(),
       relationship_axes     : RelationshipAxes::default(),
       not_in_git     : false,
-      editability   : Editability::Definitive {
+      editability    : Editability::Editable {
         body         : None,
         edit_request : None },
     }
@@ -343,8 +343,8 @@ impl MpViewnode {
         => p . title . clone(),
       MpViewnodeKind::Property (Property::Alias { text, .. }) =>
         format!("property:alias({})", text),
-      MpViewnodeKind::Property (Property::ID { id, .. }) =>
-        format!("property:id({})", id),
+      MpViewnodeKind::Property (Property::ID { skgid, .. }) =>
+        format!("property:id({})", skgid),
       MpViewnodeKind::Property (Property::Flag { flag, .. }) =>
         format!("property:flag({})", flag . wire_name ()),
       MpViewnodeKind::Property (Property::TextChanged { .. }) =>
@@ -356,13 +356,13 @@ impl MpViewnode {
       MpViewnodeKind::BufferRoot =>
         "forestRoot" . to_string (),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
-        format!("deleted:{}", d . id . 0),
+        format!("deleted:{}", d . skgid . 0),
       MpViewnodeKind::DeadViewnode =>
         "deadViewnode" . to_string (),
       MpViewnodeKind::Vognode (MpVognode::Inactive (_)) =>
         "inactive" . to_string (),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
-        format!("unknown:{}", u . id . 0), }}
+        format!("unknown:{}", u . skgid . 0), }}
 
   /// The body text to render for this node, when it has one.
   pub fn body (&self) -> Option<&String> {
@@ -383,19 +383,19 @@ impl MpViewnode {
         None, }}
 
   /// PITFALL: Don't let this convince you a Scaff can have an ID.
-  pub fn id_opt (&self) -> Option<&ID> {
+  pub fn skgid_opt (&self) -> Option<&ID> {
     match &self . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t))
-        => t . id . as_ref(),
+        => t . skgid . as_ref(),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p)))
-        => p . id . as_ref(),
+        => p . skgid . as_ref(),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
-        Some (&d . id),
-      // An inactive placeholder is anonymous: no id.
+        Some (&d . skgid),
+      // An inactive vognode is anonymous: no id.
       MpViewnodeKind::Vognode (MpVognode::Inactive (_)) =>
         None,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
-        Some (&u . id),
+        Some (&u . skgid),
       MpViewnodeKind::PropertyFolder (_)
         | MpViewnodeKind::Property (_)
         | MpViewnodeKind::PartnerFolder (_)

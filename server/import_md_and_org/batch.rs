@@ -4,14 +4,14 @@ use super::{discover_documents, build::{BuiltDocument, build_document},
   parse::{ParsedDocument, line_at}, publish::prepare_import_publication,
   resolve::{contains_absolute_file_link, resolve_document_links}};
 use crate::dbs::filesystem::multiple_nodes::{
-  read_all_skg_files_from_repos_read_only, read_skg_sections_from_folder};
+  read_all_skg_files_from_skgrepos_read_only, read_skg_sections_from_folder};
 use crate::dbs::in_rust_graph::{InRustGraph,
   complete_validation::complete_from_rust};
 use crate::export_org::claimed_export_targets;
 use crate::types::env::SkgEnv;
 use crate::types::links::org_literal_ranges::HEADLINES_INSIDE_BLOCKS_EXPLANATION;
-use crate::types::misc::{ID, MSV, SkgConfig, RepoName};
-use crate::types::nodes::complete::{Graphnode, empty_node_complete};
+use crate::types::misc::{ID, MSV, SkgConfig, SkgRepoName};
+use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 use std::collections::HashMap;
 use std::collections::BTreeMap;
 use std::fs;
@@ -23,7 +23,7 @@ use uuid::Uuid;
 pub struct PreparedImportBatch {
   pub input_directory : PathBuf,
   pub host_root : Option<PathBuf>,
-  pub destination_repo : RepoName,
+  pub destination_skgrepo : SkgRepoName,
   pub documents : Vec<ParsedDocument>,
   pub nodes : Vec<Graphnode>,
   pub record_id : Option<ID>,
@@ -42,20 +42,20 @@ pub enum ImportPreparation {
 
 pub fn prepare_import_batch (
   input_directory : &Path,
-  destination_repo : &RepoName,
+  destination_skgrepo : &SkgRepoName,
   host_root : Option<&Path>,
   host_mapping_answered : bool,
   env : &SkgEnv,
 ) -> Result<ImportPreparation, String> {
   let mut new_id = || ID::new (&Uuid::new_v4 () . to_string ());
   prepare_import_batch_with (
-    input_directory, destination_repo, host_root,
+    input_directory, destination_skgrepo, host_root,
     host_mapping_answered, env, &mut new_id)
 }
 
 pub fn prepare_import_batch_with (
   input_directory : &Path,
-  destination_repo : &RepoName,
+  destination_skgrepo : &SkgRepoName,
   host_root : Option<&Path>,
   host_mapping_answered : bool,
   env : &SkgEnv,
@@ -67,22 +67,22 @@ pub fn prepare_import_batch_with (
     if ! host . is_absolute () {
       return Err ("Host root must be an absolute path" . to_string ()); } }
   let runtime = env . runtime_snapshot ();
-  if ! runtime . config . user_owns_repo (destination_repo) {
+  if ! runtime . config . skgrepo_is_owned (destination_skgrepo) {
     return Err (format! ("Destination repo {} is absent or not owned",
-      destination_repo)); }
+      destination_skgrepo)); }
   let mut documents : Vec<ParsedDocument> = discover_documents (input_directory)?;
   refuse_documents_with_errors (&documents)?;
   if ! host_mapping_answered && contains_absolute_file_link (&documents) {
     return Ok (ImportPreparation::HostMappingNeeded); }
-  let existing_ids : HashMap<String, ID> =
+  let existing_skgids : HashMap<String, ID> =
     configured_identity_map (env)?;
   let destination_evidence : BTreeMap<PathBuf, Vec<u8>> =
-    repo_file_evidence (&runtime . config)?;
+    skgrepo_file_evidence (&runtime . config)?;
   let mut built : Vec<BuiltDocument> = documents . iter ()
-    .map (|document| build_document (document, destination_repo, new_id))
+    .map (|document| build_document (document, destination_skgrepo, new_id))
     .collect::<Result<_, _>> ()?;
   resolve_document_links (&mut documents, &mut built,
-    input_directory, host_root, &existing_ids);
+    input_directory, host_root, &existing_skgids);
   let export_targets : Vec<(PathBuf, String)> = documents . iter ()
     .zip (built . iter ())
     .map (|(document, built)|
@@ -95,7 +95,7 @@ pub fn prepare_import_batch_with (
     &export_targets, &runtime . config, &existing)?;
   let record_documents : Vec<(PathBuf, ID)> = documents . iter ()
     . zip (built . iter ())
-    . map (|(document, built)| (document . path . clone (), built . root_id . clone ()))
+    . map (|(document, built)| (document . path . clone (), built . root_skgid . clone ()))
     . collect ();
   let mut nodes : Vec<Graphnode> = built . into_iter ()
     .flat_map (|document| document . nodes) . collect ();
@@ -103,14 +103,14 @@ pub fn prepare_import_batch_with (
     let record_id : ID = new_id ();
     nodes . push (import_record (
       record_id . clone (), &record_documents, input_directory,
-      host_root, destination_repo, "on confirmation"));
+      host_root, destination_skgrepo, "on confirmation"));
     Some (record_id) };
   if ! nodes . is_empty () {
     let _ = prepare_import_publication (&nodes, env)?; }
   Ok (ImportPreparation::Prepared (PreparedImportBatch {
     input_directory : input_directory . to_path_buf (),
     host_root : host_root . map (Path::to_path_buf),
-    destination_repo : destination_repo . clone (),
+    destination_skgrepo : destination_skgrepo . clone (),
     documents, nodes, record_id, export_targets,
     config : runtime . config . clone (),
     destination_evidence,
@@ -127,7 +127,7 @@ impl PreparedImportBatch {
   ) -> String {
     let mut out : String = format! (
       "* Import preview\nImport directory: {}\nDestination repo: {} (determines privacy)\nHost root: {}\n",
-      self . input_directory . display (), self . destination_repo,
+      self . input_directory . display (), self . destination_skgrepo,
       self . host_root . as_ref () . map (|path| path . display () . to_string ())
         . unwrap_or_else (|| "none" . to_string ()));
     let warning_count : usize = self . documents . iter ()
@@ -166,7 +166,7 @@ impl PreparedImportBatch {
   ) -> Result<(usize, ID), String> {
     let runtime = env . runtime_snapshot ();
     if *runtime . config != *self . config ||
-      ! runtime . config . user_owns_repo (&self . destination_repo) {
+      ! runtime . config . skgrepo_is_owned (&self . destination_skgrepo) {
       return Err ("Configuration or repo ownership changed; preview again"
         . to_string ()); }
     let current : Vec<ParsedDocument> = discover_documents (&self . input_directory)?;
@@ -175,7 +175,7 @@ impl PreparedImportBatch {
         .any (|(now, before)| now . path != before . path ||
           now . text != before . text) {
       return Err ("Input files changed; preview again" . to_string ()); }
-    if repo_file_evidence (&runtime . config)? != self . destination_evidence {
+    if skgrepo_file_evidence (&runtime . config)? != self . destination_evidence {
       return Err ("Configured repo files changed; preview again" . to_string ()); }
     let existing : Vec<Graphnode> =
       existing_authoritative_nodes (&runtime . config)?;
@@ -191,7 +191,7 @@ impl PreparedImportBatch {
       .find (|node| node . pid == record_id) .unwrap ();
     record . body = Some (import_record_body (
       &self . record_documents, &self . input_directory,
-      self . host_root . as_deref (), &self . destination_repo,
+      self . host_root . as_deref (), &self . destination_skgrepo,
       &execution_time));
     let prepared = prepare_import_publication (&nodes, env)?;
     let created : usize = prepared . apply_under_mutation_gate (env)?;
@@ -218,25 +218,25 @@ fn configured_identity_map (
   env : &SkgEnv,
 ) -> Result<HashMap<String, ID>, String> {
   let runtime = env . runtime_snapshot ();
-  let mut ids : HashMap<String, ID> = HashMap::new ();
+  let mut skgids : HashMap<String, ID> = HashMap::new ();
   for node in runtime . graph . nodes . values () {
-    ids . insert (node . pid . 0 . clone (), node . pid . clone ());
+    skgids . insert (node . pid . 0 . clone (), node . pid . clone ());
     for extra in &node . extra_ids {
-      ids . insert (extra . 0 . clone (), node . pid . clone ()); } }
-  for repo in runtime . config . ordered_repos () {
-    let sections = read_skg_sections_from_folder (&repo, &runtime . config)
-      .map_err (|error| format! ("Reading repo {}: {}", repo, error))?;
+      skgids . insert (extra . 0 . clone (), node . pid . clone ()); } }
+  for skgrepo in runtime . config . ordered_skgrepos () {
+    let sections = read_skg_sections_from_folder (&skgrepo, &runtime . config)
+      .map_err (|error| format! ("Reading repo {}: {}", skgrepo, error))?;
     for (_, section) in sections {
-      ids . insert (section . pid . 0 . clone (), section . pid . clone ());
+      skgids . insert (section . pid . 0 . clone (), section . pid . clone ());
       for extra in &section . extra_ids {
-        ids . insert (extra . 0 . clone (), section . pid . clone ()); } } }
-  Ok (ids)
+        skgids . insert (extra . 0 . clone (), section . pid . clone ()); } } }
+  Ok (skgids)
 }
 
 fn existing_authoritative_nodes (
   config : &SkgConfig,
 ) -> Result<Vec<Graphnode>, String> {
-  read_all_skg_files_from_repos_read_only (config)
+  read_all_skg_files_from_skgrepos_read_only (config)
     . map_err (|error| format! ("Reading configured repos: {}", error))
 }
 
@@ -248,7 +248,7 @@ fn ensure_runtime_matches_disk (
     .map (|node| (node . pid . clone (),
       normalized_for_runtime_comparison (node . clone ()))) . collect ();
   let runtime : HashMap<ID, Graphnode> = graph . nodes . iter ()
-    .map (|(id, node)| (id . clone (),
+    .map (|(skgid, node)| (skgid . clone (),
       normalized_for_runtime_comparison (complete_from_rust (node))))
     .collect ();
   if disk != runtime {
@@ -267,15 +267,15 @@ fn normalized_for_runtime_comparison (
   node
 }
 
-fn repo_file_evidence (
+fn skgrepo_file_evidence (
   config : &SkgConfig,
 ) -> Result<BTreeMap<PathBuf, Vec<u8>>, String> {
   let mut files : BTreeMap<PathBuf, Vec<u8>> = BTreeMap::new ();
-  for repo_name in config . ordered_repos () {
-    let repo = config . repos . get (&repo_name)
-      . ok_or_else (|| format! ("Configured repo {} disappeared", repo_name))?;
-    let entries = fs::read_dir (&repo . path)
-      .map_err (|error| format! ("Reading repo {}: {}", repo_name, error))?;
+  for skgrepo_name in config . ordered_skgrepos () {
+    let skgrepo = config . skgrepos . get (&skgrepo_name)
+      . ok_or_else (|| format! ("Configured repo {} disappeared", skgrepo_name))?;
+    let entries = fs::read_dir (&skgrepo . path)
+      .map_err (|error| format! ("Reading repo {}: {}", skgrepo_name, error))?;
     for entry in entries {
       let entry = entry . map_err (|error| error . to_string ())?;
       let path : PathBuf = entry . path ();
@@ -311,20 +311,20 @@ fn check_export_target_conflicts (
 /// The import record links to each document's file root rather than
 /// containing it, so viewing the record does not expand every document.
 fn import_record (
-  id : ID,
+  skgid : ID,
   documents : &[(PathBuf, ID)],
   input_directory : &Path,
   host_root : Option<&Path>,
-  repo : &RepoName,
+  skgrepo : &SkgRepoName,
   time : &str,
 ) -> Graphnode {
-  let mut node : Graphnode = empty_node_complete ();
-  node . pid = id;
+  let mut node : Graphnode = empty_graphnode ();
+  node . pid = skgid;
   node . title = format! ("Imported Markdown and Org from {}",
     input_directory . display ());
-  node . home_repo = repo . clone ();
+  node . home_skgrepo = skgrepo . clone ();
   node . body = Some (import_record_body (
-    documents, input_directory, host_root, repo, time));
+    documents, input_directory, host_root, skgrepo, time));
   node
 }
 
@@ -334,7 +334,7 @@ fn import_record_body (
   documents : &[(PathBuf, ID)],
   input_directory : &Path,
   host_root : Option<&Path>,
-  repo : &RepoName,
+  skgrepo : &SkgRepoName,
   time : &str,
 ) -> String {
   let mut body : String = format! (
@@ -342,7 +342,7 @@ fn import_record_body (
     input_directory . display (),
     host_root . map (|path| path . display () . to_string ())
       .unwrap_or_else (|| "none" . to_string ()),
-    repo, time);
+    skgrepo, time);
   for (path, root) in documents {
     body . push_str (&format! ("\n- [[id:{}][{}]]", root, path . display ())); }
   body
@@ -356,21 +356,21 @@ mod tests {
   use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
   use crate::dbs::tantivy::search::{SearchOptions, search_index};
   use crate::export_org::export_to_org;
-  use crate::repo_sets::{ActiveRepoSet, RepoSetName};
-  use crate::types::misc::SkgfileRepo;
+  use crate::skgrepo_sets::{ActiveSkgRepoSet, SkgRepoSetName};
+  use crate::types::misc::SkgRepo;
   use std::fs;
 
   fn environment (
-    repo_directory : &Path,
+    skgrepo_directory : &Path,
     owned : bool,
   ) -> SkgEnv {
-    let name : RepoName = RepoName::from ("notes");
-    let config : SkgConfig = SkgConfig::dummyFromRepos (HashMap::from ([
-      (name . clone (), SkgfileRepo {
+    let name : SkgRepoName = SkgRepoName::from ("notes");
+    let config : SkgConfig = SkgConfig::dummyFromSkgRepos (HashMap::from ([
+      (name . clone (), SkgRepo {
         name,
         abbreviation : None,
-        path : repo_directory . to_path_buf (),
-        user_owns_it : owned,
+        path         : skgrepo_directory . to_path_buf (),
+        owned        : owned,
       }),
     ]));
     SkgEnv::new (config, Arc::new (InRustGraph::new ()),
@@ -381,16 +381,16 @@ mod tests {
   fn imports_empty_and_nonempty_documents_as_one_additive_batch () {
     let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
     let input : PathBuf = temp . path () . join ("input");
-    let repo : PathBuf = temp . path () . join ("repo");
+    let skgrepo : PathBuf = temp . path () . join ("repo");
     fs::create_dir (&input) . unwrap ();
-    fs::create_dir (&repo) . unwrap ();
+    fs::create_dir (&skgrepo) . unwrap ();
     fs::write (input . join ("empty.md"), "") . unwrap ();
     fs::write (input . join ("notes.org"),
       "#+title: Notes\n:PROPERTIES:\n:ID: org-root\n:ROAM_ALIASES: first \"second alias\"\n:END:\n* Heading\nText\n")
       .unwrap ();
-    let env : SkgEnv = environment (&repo, true);
+    let env      : SkgEnv = environment (&skgrepo, true);
     let prepared : PreparedImportBatch = match prepare_import_batch (
-      &input, &RepoName::from ("notes"), None, false, &env).unwrap () {
+      &input, &SkgRepoName::from ("notes"), None, false, &env).unwrap () {
       ImportPreparation::Prepared (prepared) => prepared,
       ImportPreparation::HostMappingNeeded => panic! ("unexpected host prompt"),
     };
@@ -415,7 +415,7 @@ mod tests {
     assert_eq! (created, node_count);
     assert_eq! (reported_id, record_id);
     assert_eq! (env . runtime_snapshot () . graph . len (), node_count);
-    assert! (repo . join (format! ("{}.skg", record_id)) . exists ());
+    assert! (skgrepo . join (format! ("{}.skg", record_id)) . exists ());
     assert_eq! (fs::read_to_string (input . join ("empty.md")) . unwrap (), "");
     let runtime = env . runtime_snapshot ();
     let disk : Vec<Graphnode> =
@@ -432,14 +432,14 @@ mod tests {
   fn heading_inside_a_block_refuses_the_preview () {
     let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
     let input : PathBuf = temp . path () . join ("input");
-    let repo : PathBuf = temp . path () . join ("repo");
+    let skgrepo : PathBuf = temp . path () . join ("repo");
     fs::create_dir (&input) . unwrap ();
-    fs::create_dir (&repo) . unwrap ();
+    fs::create_dir (&skgrepo) . unwrap ();
     fs::write (input . join ("bad.org"),
       "* Top\n#+begin_src\n* inside\n#+end_src\n") . unwrap ();
-    let env : SkgEnv = environment (&repo, true);
+    let env   : SkgEnv = environment (&skgrepo, true);
     let error : String = prepare_import_batch (
-      &input, &RepoName::from ("notes"), None, false, &env)
+      &input, &SkgRepoName::from ("notes"), None, false, &env)
       . err () . unwrap ();
     assert! (error . starts_with ("Nothing was imported."), "{}", error);
     assert! (error . contains ("bad.org:3: \"* inside\""), "{}", error);
@@ -449,13 +449,13 @@ mod tests {
   fn changed_input_refuses_approval_without_writes () {
     let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
     let input : PathBuf = temp . path () . join ("input");
-    let repo : PathBuf = temp . path () . join ("repo");
+    let skgrepo : PathBuf = temp . path () . join ("repo");
     fs::create_dir (&input) . unwrap ();
-    fs::create_dir (&repo) . unwrap ();
+    fs::create_dir (&skgrepo) . unwrap ();
     fs::write (input . join ("a.md"), "original") . unwrap ();
-    let env : SkgEnv = environment (&repo, true);
+    let env      : SkgEnv = environment (&skgrepo, true);
     let prepared : PreparedImportBatch = match prepare_import_batch (
-      &input, &RepoName::from ("notes"), None, false, &env).unwrap () {
+      &input, &SkgRepoName::from ("notes"), None, false, &env).unwrap () {
       ImportPreparation::Prepared (prepared) => prepared,
       ImportPreparation::HostMappingNeeded => panic! ("unexpected host prompt"),
     };
@@ -464,7 +464,7 @@ mod tests {
     let _guard = futures::executor::block_on (gate . lock ());
     assert! (prepared . apply_under_mutation_gate (&env) .unwrap_err ()
       .contains ("Input files changed"));
-    assert_eq! (fs::read_dir (&repo) . unwrap () . count (), 0);
+    assert_eq! (fs::read_dir (&skgrepo) . unwrap () . count (), 0);
     assert_eq! (env . runtime_snapshot () . graph . len (), 0);
   }
 
@@ -472,17 +472,17 @@ mod tests {
   fn added_destination_file_makes_preview_stale () {
     let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
     let input : PathBuf = temp . path () . join ("input");
-    let repo : PathBuf = temp . path () . join ("repo");
+    let skgrepo : PathBuf = temp . path () . join ("repo");
     fs::create_dir (&input) . unwrap ();
-    fs::create_dir (&repo) . unwrap ();
+    fs::create_dir (&skgrepo) . unwrap ();
     fs::write (input . join ("a.md"), "original") . unwrap ();
-    let env : SkgEnv = environment (&repo, true);
+    let env      : SkgEnv = environment (&skgrepo, true);
     let prepared : PreparedImportBatch = match prepare_import_batch (
-      &input, &RepoName::from ("notes"), None, false, &env).unwrap () {
+      &input, &SkgRepoName::from ("notes"), None, false, &env).unwrap () {
       ImportPreparation::Prepared (prepared) => prepared,
       ImportPreparation::HostMappingNeeded => panic! ("unexpected host prompt"),
     };
-    let foreign : PathBuf = repo . join ("unrelated.skg");
+    let foreign : PathBuf = skgrepo . join ("unrelated.skg");
     fs::write (&foreign, "external change") . unwrap ();
     let gate = env . mutation_gate ();
     let _guard = futures::executor::block_on (gate . lock ());
@@ -496,38 +496,38 @@ mod tests {
   fn export_path_collision_and_foreign_destination_refuse_preflight () {
     let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
     let input : PathBuf = temp . path () . join ("input");
-    let repo : PathBuf = temp . path () . join ("repo");
+    let skgrepo : PathBuf = temp . path () . join ("repo");
     fs::create_dir (&input) . unwrap ();
-    fs::create_dir (&repo) . unwrap ();
+    fs::create_dir (&skgrepo) . unwrap ();
     fs::write (input . join ("guide.md"), "Markdown") . unwrap ();
     fs::write (input . join ("guide.org"), "Org") . unwrap ();
-    let owned : SkgEnv = environment (&repo, true);
+    let owned : SkgEnv = environment (&skgrepo, true);
     assert! (prepare_import_batch (
-      &input, &RepoName::from ("notes"), None, false, &owned)
+      &input, &SkgRepoName::from ("notes"), None, false, &owned)
       .err () .unwrap () .contains ("Export path conflict"));
-    let foreign : SkgEnv = environment (&repo, false);
+    let foreign : SkgEnv = environment (&skgrepo, false);
     assert! (prepare_import_batch (
-      &input, &RepoName::from ("notes"), None, false, &foreign)
+      &input, &SkgRepoName::from ("notes"), None, false, &foreign)
       .err () .unwrap () .contains ("not owned"));
-    assert_eq! (fs::read_dir (&repo) . unwrap () . count (), 0);
+    assert_eq! (fs::read_dir (&skgrepo) . unwrap () . count (), 0);
   }
 
   #[test]
   fn real_export_after_mixed_import_keeps_originals_and_emits_org_paths () {
     let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
     let input : PathBuf = temp . path () . join ("input");
-    let repo : PathBuf = temp . path () . join ("repo");
+    let skgrepo : PathBuf = temp . path () . join ("repo");
     let output : PathBuf = temp . path () . join ("output");
     fs::create_dir (&input) . unwrap ();
-    fs::create_dir (&repo) . unwrap ();
+    fs::create_dir (&skgrepo) . unwrap ();
     fs::create_dir (input . join ("nested")) . unwrap ();
     let markdown : &str = "# Introduction\nSee [Org](../details.org) and note[^a].\n\n[^a]: Footnote text.\n";
     let org : &str = "#+title: Details\n* Section\n[[file:nested/guide.md][Guide]]\n";
     fs::write (input . join ("nested/guide.md"), markdown) . unwrap ();
     fs::write (input . join ("details.org"), org) . unwrap ();
-    let env : SkgEnv = environment (&repo, true);
+    let env      : SkgEnv = environment (&skgrepo, true);
     let prepared : PreparedImportBatch = match prepare_import_batch (
-      &input, &RepoName::from ("notes"), None, false, &env).unwrap () {
+      &input, &SkgRepoName::from ("notes"), None, false, &env).unwrap () {
       ImportPreparation::Prepared (prepared) => prepared,
       ImportPreparation::HostMappingNeeded => panic! ("unexpected host prompt"),
     };
@@ -538,9 +538,9 @@ mod tests {
     drop (_guard);
     let config = env . runtime_snapshot () . config . clone ();
     let nodes : Vec<Graphnode> =
-      read_all_skg_files_from_repos_read_only (&config) . unwrap ();
-    let active : ActiveRepoSet = ActiveRepoSet::named (
-      &config, RepoSetName::from ("all")) . unwrap ();
+      read_all_skg_files_from_skgrepos_read_only (&config) . unwrap ();
+    let active : ActiveSkgRepoSet = ActiveSkgRepoSet::named (
+      &config, SkgRepoSetName::from ("all")) . unwrap ();
     export_to_org (&active, &nodes, &output) . unwrap ();
     let exported_markdown : String =
       fs::read_to_string (output . join ("nested/guide.org")) . unwrap ();

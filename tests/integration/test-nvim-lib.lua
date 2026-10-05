@@ -2,7 +2,7 @@
 -- integration tests, the Lua analog of loading elisp/skg-init.el plus
 -- ../test-wait.el. Load from a test directory with
 --   local T = dofile('../test-nvim-lib.lua')
--- It puts the repo's nvim/ plugin on the runtimepath, points the
+-- It puts the skgrepo's nvim/ plugin on the runtimepath, points the
 -- client at $SKG_TEST_PORT, and arms a global timeout.
 
 local M = {}

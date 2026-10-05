@@ -105,7 +105,7 @@ as described (at least a little) in the comment for the Birth typedef.
 File: [[../../server/to_org/expand/backpath.rs][backpath.rs]].
 
 Walks the subtree under a given NodeId with a recursive DFS.
-Returns Vec<(NodeId, ID)> of every TrueNode with birth == Birth::LinksTo.
+Returns Vec<(NodeId, ID)> of every ActiveVognode with birth == Birth::LinksTo.
 
 ** new function: 'insert_containerward_ancestry_tree_recursive'
 File: [[../../server/to_org/expand/backpath.rs][backpath.rs]].
@@ -117,8 +117,8 @@ For each AncestryTree node:
 - if Inner, recurse into children (in reverse, for prepend ordering)
 
 This reuses 'prepend_indef_indep_child' (backpath.rs line 238),
-which already handles fetching the SkgNode via TypeDB and
-creating an indefinitive ViewNode with the given Birth.
+which already handles fetching the Graphnode via TypeDB and
+creating a write-protected ViewNode with the given Birth.
 
 ** new imports in backpath.rs
 #+begin_example
@@ -160,8 +160,8 @@ This makes the graph:
 The expected output for sourceward-on-line-1 gains a new child
 under the l-11 source node:
 #+begin_example
-  *** (skg (node (id l-11) ... (birth linksTo) indefinitive ...)) [[id:11][a link to 11]]
-  **** (skg (node (id c-l-11) ... (birth containerOf) indefinitive ...)) container of l-11
+  *** (skg (node (id l-11) ... (birth linksTo) writeProtected ...)) [[id:11][a link to 11]]
+  **** (skg (node (id c-l-11) ... (birth containerOf) writeProtected ...)) container of l-11
 #+end_example
 
 The stripped expected output changes from:

@@ -5,17 +5,17 @@ use std::collections::HashMap;
 use tantivy::schema as schema;
 use tantivy::TantivyDocument;
 use tantivy::schema::document::Value;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::wipe_then_init_tantivy_db;
-use skg::dbs::tantivy::title_and_repo_by_id;
+use skg::dbs::tantivy::title_and_skgrepo_by_skgid;
 use skg::dbs::tantivy::escape::{escape_tantivy_intra_word, escape_tantivy_literal};
 use skg::dbs::tantivy::search::{
   SearchOptions, has_overPrivateText_telescope, search_index};
 use skg::dbs::tantivy::write::update_index_with_nodes;
-use skg::types::misc::{ID, MSV, RepoName, TantivyIndex, rel_partners_at_relRepo_msv};
+use skg::types::misc::{ID, MSV, SkgRepoName, TantivyIndex, rel_partners_at_relRepo_msv};
 use skg::types::nodes::tantivy::GraphnodeInTantivy;
-use skg::types::nodes::complete::{Flag, Graphnode, empty_node_complete};
+use skg::types::nodes::complete::{Flag, Graphnode, empty_graphnode};
 
 #[test]
 fn test_many_tantivy_things (
@@ -27,7 +27,7 @@ fn test_many_tantivy_things (
 
   let config = load_config ("tests/tantivy/fixtures/skgconfig.toml")?;
   let nodes: Vec<Graphnode> =
-    read_all_skg_files_from_repos (&config)?;
+    read_all_skg_files_from_skgrepos (&config)?;
 
   let (tantivy_index, indexed_count): (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
@@ -91,7 +91,7 @@ fn test_many_tantivy_things (
 
   // Create a new Graphnode with ID 6 and title "This is one big tuna."
   let mut new_node : Graphnode =
-    empty_node_complete ();
+    empty_graphnode ();
   { new_node . title = "This is one big tuna." . to_string();
     new_node . pid = ID::new ("6"); }
 
@@ -179,21 +179,21 @@ pub fn print_search_results(
 
 #[test]
 fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
-  let empty_node : Graphnode = empty_node_complete ();
+  let empty_node : Graphnode = empty_graphnode ();
   let mut apple  = empty_node . clone();
   { apple . pid      = ID::new ("apple");
     apple . title    =               "eat apple" . to_string();
-    apple . aliases  = rel_partners_at_relRepo_msv ( & apple . home_repo, MSV::Specified(vec![    "munch apple" . to_string(),
+    apple . aliases  = rel_partners_at_relRepo_msv ( & apple . home_skgrepo, MSV::Specified(vec![    "munch apple" . to_string(),
                                     "chomp apple" . to_string() ])); }
   let mut banana = empty_node . clone();
   { banana . pid     = ID::new ("banana");
     banana . title   =               "eat banana" . to_string();
-    banana . aliases = rel_partners_at_relRepo_msv ( & banana . home_repo, MSV::Specified(vec![    "chomp banana" . to_string(),
+    banana . aliases = rel_partners_at_relRepo_msv ( & banana . home_skgrepo, MSV::Specified(vec![    "chomp banana" . to_string(),
                                     "throw banana" . to_string()])); }
   let mut kiwi   = empty_node . clone();
   { kiwi . pid       = ID::new ("kiwi");
     kiwi . title     =               "eat kiwi" . to_string();
-    kiwi . aliases   = rel_partners_at_relRepo_msv ( & kiwi . home_repo, MSV::Specified(vec![    "munch kiwi" . to_string()])); }
+    kiwi . aliases   = rel_partners_at_relRepo_msv ( & kiwi . home_skgrepo, MSV::Specified(vec![    "munch kiwi" . to_string()])); }
   let nodes = vec![apple, banana, kiwi];
 
   // Create Tantivy index - use a separate directory to avoid conflicts with test_many_tantivy_things
@@ -342,7 +342,7 @@ fn test_escape_tantivy_intra_word (
 #[test]
 fn test_search_finds_titles_with_special_chars (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : Graphnode = empty_node_complete ();
+  let empty      : Graphnode = empty_graphnode ();
   let mut c_plus : Graphnode = empty . clone ();
   { c_plus . pid   = ID::new ("c_plus");
     c_plus . title = "C++ tips" . to_string (); }
@@ -383,7 +383,7 @@ fn test_search_finds_titles_with_special_chars (
 #[test]
 fn test_search_body_axis (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : Graphnode = empty_node_complete ();
+  let empty      : Graphnode = empty_graphnode ();
   let mut recipe : Graphnode = empty . clone ();
   { recipe . pid   = ID::new ("recipe");
     recipe . title = "soup recipe" . to_string ();
@@ -418,16 +418,16 @@ fn test_search_body_axis (
 #[test]
 fn no_search_matching_excludes_title_alias_and_body_in_every_query_mode (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let mut excluded : Graphnode = empty_node_complete ();
+  let mut excluded : Graphnode = empty_graphnode ();
   excluded . pid = ID::new ("excluded");
   excluded . title = "shaver titletoken" . to_string ();
   excluded . aliases = rel_partners_at_relRepo_msv (
-    &excluded . home_repo,
+    &excluded . home_skgrepo,
     MSV::Specified (vec!["shaver aliastoken" . to_string ()]) );
   excluded . body = Some ("shaver bodytoken" . to_string ());
-  excluded . misc = vec![Flag::NoSearchMatching];
+  excluded . flags = vec![Flag::NoSearchMatching];
 
-  let mut ordinary : Graphnode = empty_node_complete ();
+  let mut ordinary : Graphnode = empty_graphnode ();
   ordinary . pid = ID::new ("ordinary");
   ordinary . title = "shaver ordinarytoken" . to_string ();
 
@@ -461,18 +461,18 @@ fn no_search_matching_excludes_title_alias_and_body_in_every_query_mode (
       . and_then (|value| value . as_str ()),
     Some ("ordinary"));
   assert_eq! (
-    title_and_repo_by_id (&index, &ID::new ("excluded"))
+    title_and_skgrepo_by_skgid (&index, &ID::new ("excluded"))
       . map (|(title, _)| title),
     Some ("shaver titletoken" . to_string ()),
     "supporting Tantivy documents remain available to exact-ID lookup");
 
-  excluded . misc . clear ();
+  excluded . flags . clear ();
   update_index_with_nodes (&[GraphnodeInTantivy::from (&excluded)], &index) ?;
   let (matches, _) = search_index (
     &index, "titletoken", &SearchOptions::default ()) ?;
   assert_eq! (matches . len (), 1,
     "clearing the flag must become searchable without restart");
-  excluded . misc . push (Flag::NoSearchMatching);
+  excluded . flags . push (Flag::NoSearchMatching);
   update_index_with_nodes (&[GraphnodeInTantivy::from (&excluded)], &index) ?;
   let (matches, _) = search_index (
     &index, "titletoken", &SearchOptions::default ()) ?;
@@ -484,17 +484,17 @@ fn no_search_matching_excludes_title_alias_and_body_in_every_query_mode (
 #[test]
 fn no_search_matching_overPrivateText_does_not_trigger_search_preflight (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let mut node : Graphnode = empty_node_complete ();
+  let mut node : Graphnode = empty_graphnode ();
   node . pid = ID::new ("excluded-private");
   node . title = "private excluded" . to_string ();
   node . overPrivateText_telescope = true;
-  node . misc = vec![Flag::NoSearchMatching];
+  node . flags = vec![Flag::NoSearchMatching];
   let (index, _) = wipe_then_init_tantivy_db (
     &[node . clone ()],
     Path::new ("/tmp/tantivy-test-no-search-private") ) ?;
   assert! (! has_overPrivateText_telescope (&index) ?);
 
-  node . misc . clear ();
+  node . flags . clear ();
   update_index_with_nodes (&[GraphnodeInTantivy::from (&node)], &index) ?;
   assert! (has_overPrivateText_telescope (&index) ?);
   Ok (( ))
@@ -503,7 +503,7 @@ fn no_search_matching_overPrivateText_does_not_trigger_search_preflight (
 #[test]
 fn overPrivateText_telescope_filter_runs_inside_the_search_query (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : Graphnode = empty_node_complete ();
+  let empty     : Graphnode = empty_graphnode ();
   let mut clean : Graphnode = empty . clone ();
   clean . pid = ID::new ("clean");
   clean . title = "shared privacy term" . to_string ();
@@ -512,7 +512,7 @@ fn overPrivateText_telescope_filter_runs_inside_the_search_query (
   overPrivateText . title = "shared privacy term" . to_string ();
   overPrivateText . overPrivateText_telescope = true;
   overPrivateText . aliases = rel_partners_at_relRepo_msv (
-    &RepoName::from ("main"),
+    &SkgRepoName::from ("main"),
     MSV::Specified (vec! ["dirty alias secret" . to_string ()]) );
   let (index, _) = wipe_then_init_tantivy_db (
     &[clean, overPrivateText], Path::new ("/tmp/tantivy-test-overPrivateText-filter") ) ?;
@@ -538,7 +538,7 @@ fn overPrivateText_telescope_filter_runs_inside_the_search_query (
 #[test]
 fn test_search_regex_axis (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : Graphnode = empty_node_complete ();
+  let empty          : Graphnode = empty_graphnode ();
   let mut history    : Graphnode = empty . clone ();
   { history    . pid   = ID::new ("history");
     history    . title = "history" . to_string (); }
@@ -577,7 +577,7 @@ fn test_search_regex_axis (
 #[test]
 fn test_search_regex_multiword (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : Graphnode = empty_node_complete ();
+  let empty : Graphnode = empty_graphnode ();
   let mk = |pid : &str, title : &str| -> Graphnode {
     let mut n : Graphnode = empty . clone ();
     n . pid = ID::new (pid);
@@ -630,7 +630,7 @@ fn test_search_regex_multiword (
 #[test]
 fn test_search_regex_with_operators (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : Graphnode = empty_node_complete ();
+  let empty : Graphnode = empty_graphnode ();
   let mk = |pid : &str, title : &str| -> Graphnode {
     let mut n : Graphnode = empty . clone ();
     n . pid = ID::new (pid);
@@ -699,7 +699,7 @@ fn test_search_regex_with_operators (
 #[test]
 fn test_search_regex_operator_grouping (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : Graphnode = empty_node_complete ();
+  let empty : Graphnode = empty_graphnode ();
   let mk = |pid : &str, title : &str| -> Graphnode {
     let mut n : Graphnode = empty . clone ();
     n . pid = ID::new (pid);
@@ -721,48 +721,48 @@ fn test_search_regex_operator_grouping (
       SearchOptions { regex: true, operators: true,
                       ..SearchOptions::default () };
     let (matches, searcher) = search_index (&ti, pattern, &opts) ?;
-    let mut ids : Vec<String> = Vec::new ();
+    let mut skgids : Vec<String> = Vec::new ();
     for (_, addr) in &matches {
       let doc : TantivyDocument = searcher . doc (*addr) ?;
-      ids . push (
+      skgids . push (
         doc . get_first (ti . id_field) . unwrap ()
         . as_str () . unwrap () . to_string () ); }
-    Ok (ids) };
-  let assert_set = | label : &str, ids : &[String],
+    Ok (skgids) };
+  let assert_set = | label : &str, skgids : &[String],
                      inside : &[&str], outside : &[&str] | {
-    for id in inside {
-      assert! ( ids . contains (&id . to_string ()),
-                "{}: should match '{}' (got {:?})", label, id, ids ); }
-    for id in outside {
-      assert! ( ! ids . contains (&id . to_string ()),
-                "{}: should NOT match '{}' (got {:?})", label, id, ids ); }};
-  { let ids : Vec<String> =
+    for skgid in inside {
+      assert! ( skgids . contains (&skgid . to_string ()),
+                "{}: should match '{}' (got {:?})", label, skgid, skgids ); }
+    for skgid in outside {
+      assert! ( ! skgids . contains (&skgid . to_string ()),
+                "{}: should NOT match '{}' (got {:?})", label, skgid, skgids ); }};
+  { let skgids : Vec<String> =
       gather ("( poli.* AND sci.* ) OR fish.*") ?;
-    assert_set ( "grouped AND under OR", &ids,
+    assert_set ( "grouped AND under OR", &skgids,
                  &["polsci", "fish", "polfish"],
                  &["polbio", "scibio", "bio"] ); }
   { // Same expression without parens: AND binds tighter than OR.
-    let ids : Vec<String> =
+    let skgids : Vec<String> =
       gather ("poli.* AND sci.* OR fish.*") ?;
-    assert_set ( "precedence AND > OR", &ids,
+    assert_set ( "precedence AND > OR", &skgids,
                  &["polsci", "fish", "polfish"],
                  &["polbio", "scibio", "bio"] ); }
   { // Parens override precedence.
-    let ids : Vec<String> =
+    let skgids : Vec<String> =
       gather ("poli.* AND ( sci.* OR fish.* )") ?;
-    assert_set ( "grouped OR under AND", &ids,
+    assert_set ( "grouped OR under AND", &skgids,
                  &["polsci", "polfish"],
                  &["fish", "polbio", "scibio", "bio"] ); }
   { // NOT inside a group excludes within it.
-    let ids : Vec<String> =
+    let skgids : Vec<String> =
       gather ("( sci.* NOT bio.* )") ?;
-    assert_set ( "NOT inside a group", &ids,
+    assert_set ( "NOT inside a group", &skgids,
                  &["polsci"],
                  &["scibio", "bio"] ); }
   { // A paren attached to a pattern is regex syntax, not grouping.
-    let ids : Vec<String> =
+    let skgids : Vec<String> =
       gather ("(poli|fish).*") ?;
-    assert_set ( "regex-internal parens", &ids,
+    assert_set ( "regex-internal parens", &skgids,
                  &["polsci", "polbio", "fish", "polfish"],
                  &["scibio", "bio"] ); }
   { // A lone unbalanced paren errors loudly.
@@ -779,13 +779,13 @@ fn test_search_regex_operator_grouping (
   Ok (( )) }
 
 #[test]
-fn test_title_by_id_returns_title_not_alias (
+fn test_title_by_skgid_returns_title_not_alias (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty_node : Graphnode = empty_node_complete ();
+  let empty_node : Graphnode = empty_graphnode ();
   let mut node = empty_node . clone ();
   { node . pid     = ID::new ("node-with-aliases");
     node . title   =               "The Real Title" . to_string ();
-    node . aliases = rel_partners_at_relRepo_msv ( & node . home_repo, MSV::Specified (vec![   "Alias One" . to_string (),
+    node . aliases = rel_partners_at_relRepo_msv ( & node . home_skgrepo, MSV::Specified (vec![   "Alias One" . to_string (),
                                    "Alias Two" . to_string () ])); }
   let nodes : Vec<Graphnode> = vec![node];
   let index_dir : &str =
@@ -796,15 +796,15 @@ fn test_title_by_id_returns_title_not_alias (
       Path::new (index_dir) )?;
   assert_eq! (indexed_count, 3,
     "Expected 3 documents (1 title + 2 aliases)");
-  let result : Option<(String, RepoName)> =
-    title_and_repo_by_id (
+  let result : Option<(String, SkgRepoName)> =
+    title_and_skgrepo_by_skgid (
       &tantivy_index,
       &ID::new ("node-with-aliases") );
   assert_eq! (result . as_ref () . map ( |(t, _)| t . as_str () ),
     Some ("The Real Title"),
     "title_and_repo_by_id should return the title, not an alias");
-  let missing : Option<(String, RepoName)> =
-    title_and_repo_by_id (
+  let missing : Option<(String, SkgRepoName)> =
+    title_and_skgrepo_by_skgid (
       &tantivy_index,
       &ID::new ("nonexistent-id") );
   assert_eq! (missing, None,
@@ -815,7 +815,7 @@ fn test_title_by_id_returns_title_not_alias (
 #[test]
 fn overPrivateText_telescope_flag_survives_index_build_and_update (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let mut node : Graphnode = empty_node_complete ();
+  let mut node : Graphnode = empty_graphnode ();
   node . pid = ID::new ("overPrivateText-indexed");
   node . title = "uniquely overPrivateText indexed title" . to_string ();
   node . overPrivateText_telescope = true;

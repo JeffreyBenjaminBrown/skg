@@ -17,12 +17,12 @@ pub enum ContainerwardRoleTree {
 }
 
 impl ContainerwardRoleTree {
-  pub fn id ( &self ) -> &ID {
+  pub fn skgid ( &self ) -> &ID {
     match self {
-      ContainerwardRoleTree::Root           (id)      => id,
-      ContainerwardRoleTree::Repeated       (id)      => id,
-      ContainerwardRoleTree::DepthTruncated (id)      => id,
-      ContainerwardRoleTree::Inner          ( id, _ ) => id, }} }
+      ContainerwardRoleTree::Root           (skgid)      => skgid,
+      ContainerwardRoleTree::Repeated       (skgid)      => skgid,
+      ContainerwardRoleTree::DepthTruncated (skgid)      => skgid,
+      ContainerwardRoleTree::Inner          ( skgid, _ ) => skgid, }} }
 
 /// Internal: tracks what will happen to a child node
 /// during the BFS in 'full_containerward_role_tree'.
@@ -38,29 +38,29 @@ fn assemble(
   children_of          : &HashMap<usize, Vec<(ID, NodeFate)>>,
   depth_truncated_keys : &HashSet<usize>,
 ) -> ContainerwardRoleTree {
-  let id : ID =
+  let skgid : ID =
     id_of . get (& key)
     . expect ("id_of should have every key")
     . clone ();
   if depth_truncated_keys . contains (& key) {
-    return ContainerwardRoleTree::DepthTruncated (id); }
+    return ContainerwardRoleTree::DepthTruncated (skgid); }
   match children_of . get (& key) {
     None =>
-      ContainerwardRoleTree::Root (id),
+      ContainerwardRoleTree::Root (skgid),
     Some ( child_entries ) if child_entries . is_empty () =>
-      ContainerwardRoleTree::Root (id),
+      ContainerwardRoleTree::Root (skgid),
     Some ( child_entries ) => {
       let children : Vec<ContainerwardRoleTree> =
         child_entries . iter ()
-        . map ( |(child_id, fate)| match fate {
+        . map ( |(child_skgid, fate)| match fate {
           NodeFate::Repeated =>
-            ContainerwardRoleTree::Repeated ( child_id . clone () ),
+            ContainerwardRoleTree::Repeated ( child_skgid . clone () ),
           NodeFate::Open ( child_key ) =>
             assemble (
               *child_key, id_of, children_of,
               depth_truncated_keys ), } )
         . collect ();
-      ContainerwardRoleTree::Inner ( id, children ) }, } }
+      ContainerwardRoleTree::Inner ( skgid, children ) }, } }
 
 /// In-Rust-graph containerward role tree, walking the 'contained_by'
 /// inverse index. Uses breadth-first traversal with no
@@ -92,10 +92,10 @@ pub fn full_containerward_role_tree_from_in_rust_graph (
       break; }
     let mut next_frontier : Vec<(usize, ID)> =
       Vec::new ();
-    for (parent_key, current_id) in & frontier {
+    for (parent_key, current_skgid) in & frontier {
       let containers : HashSet<ID> = {
         let empty : im::HashSet<ID> = im::HashSet::new ();
-        graph . contained_by . get (current_id)
+        graph . contained_by . get (current_skgid)
           . unwrap_or (&empty)
           . iter () . cloned () . collect () };
       if containers . is_empty () {
@@ -103,20 +103,20 @@ pub fn full_containerward_role_tree_from_in_rust_graph (
       } else {
         let mut node_children : Vec<(ID, NodeFate)> =
           Vec::new ();
-        for container_id in &containers {
-          if visited . contains (container_id) {
+        for container_skgid in &containers {
+          if visited . contains (container_skgid) {
             node_children . push ((
-              container_id . clone (), NodeFate::Repeated ));
+              container_skgid . clone (), NodeFate::Repeated ));
           } else {
             let child_key : usize = next_key;
             next_key += 1;
-            id_of . insert (child_key, container_id . clone ());
-            visited . insert (container_id . clone ());
+            id_of . insert (child_key, container_skgid . clone ());
+            visited . insert (container_skgid . clone ());
             node_children . push ((
-              container_id . clone (),
+              container_skgid . clone (),
               NodeFate::Open ( child_key ) ));
             next_frontier . push ((
-              child_key, container_id . clone () )); } }
+              child_key, container_skgid . clone () )); } }
         children_of . insert ( *parent_key, node_children ); } }
     frontier = next_frontier;
     depth += 1; }
@@ -125,16 +125,16 @@ pub fn full_containerward_role_tree_from_in_rust_graph (
     & depth_truncated_keys ) }
 
 /// Compute full containerward role tree for each ID.
-pub fn containerward_role_trees_by_id_from_ids (
+pub fn containerward_role_trees_by_skgid_from_skgids (
   graph     : &InRustGraph,
-  ids       : &[ID],
+  skgids    : &[ID],
   max_depth : usize,
 ) -> HashMap<ID, ContainerwardRoleTree> {
   let mut map : HashMap<ID, ContainerwardRoleTree> =
     HashMap::new ();
-  for id in ids {
+  for skgid in skgids {
     map . insert (
-      id . clone (),
+      skgid . clone (),
       full_containerward_role_tree_from_in_rust_graph (
-        graph, id, max_depth ) ); }
+        graph, skgid, max_depth ) ); }
   map }

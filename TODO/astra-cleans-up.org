@@ -118,7 +118,7 @@ requests into separate maps; supplementation later rejoins the facts and
 resolves sticky/default/explicit sources. The boolean-property request is
 also saved aside before conversion and applied afterward.
 
-This makes 'NodeComplete' do two jobs: a complete folded node, and a partly
+This makes 'Graphnode' do two jobs: a complete folded node, and a partly
 resolved write whose absent fields still mean “keep the old value.” The
 comments at the top of 'supplement_from_disk.rs' even still describe
 'None'/ 'Some([])', while the actual type is 'MSV'.
@@ -127,7 +127,7 @@ comments at the top of 'supplement_from_disk.rs' even still describe
 
 Keep 'NodeSaveIntent' as the unresolved representation. Resolve one field at
 a time against the captured graph and prospective homes, and construct a
-'NodeComplete' only when the save's choices are resolved. Conceptually:
+'Graphnode' only when the save's choices are resolved. Conceptually:
 
 #+begin_example
 FieldEdit<T> = Keep | Set(T)
@@ -368,7 +368,7 @@ eagerly calls 'build_initial_render_child_data' and
 then visits that new folder and invokes its reconciler again.
 
 The inspected callers do not require its members before that visit. Let
-creation determine scaffold existence, placement, and initial folding; let
+creation determine non-vognode existence, placement, and initial folding; let
 the existing completion pass create/reconcile members. The first candidate
 change removes the four eager build/reconcile blocks and, if unused, their
 helper. Confirm this with initial-view versus initial-then-rerender cases.
@@ -401,7 +401,7 @@ helper should remove procedural repetition without obscuring those formulas.
 
 ** Share conversions before changing the node representation
 
-'NodeRust' repeats almost all 'NodeComplete' fields and adds derived text
+'NodeRust' repeats almost all 'Graphnode' fields and adds derived text
 links. The reverse field-by-field projection appears at least three times:
 'nodecomplete_from_graph' in
 [[file:../server/dbs/node_lookup.rs][node_lookup.rs]],
@@ -510,7 +510,7 @@ Crash recovery or journaling would be a separate reliability project.
 
 ** Several attractive-looking refactors are already substantially done
 
-[[file:ditch-typedb/progress.org][TypeDB removal]] records completion, and the
+[[file:DONE/ditch-typedb/progress.org][TypeDB removal]] records completion, and the
 current code uses captured graph generations. The adapter cleanup above is
 leftover work, not a recommendation to repeat that migration.
 

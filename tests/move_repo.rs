@@ -2,8 +2,8 @@
 // cargo nextest run --test grouped_repos -E 'test(move_repo::)'
 
 use indoc::indoc;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
-use skg::dbs::filesystem::one_node::graphnode_from_id;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
+use skg::dbs::filesystem::one_node::graphnode_from_skgid;
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
@@ -11,19 +11,19 @@ use skg::save::update_graph_minus_nodeMerges;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::errors::{SaveError, BufferValidationError};
 
-use skg::types::misc::{ID, SkgConfig, RepoName, TantivyIndex, members_of};
+use skg::types::misc::{ID, SkgConfig, SkgRepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
-use skg::types::save::DefineNode;
+use skg::types::save::NodeInstruction;
 use std::error::Error;
 use std::path::PathBuf;
 use tantivy::{DocAddress, TantivyDocument};
 use tantivy::schema::document::Value;
 
-/// Query Tantivy for a node by title and return its repo.
-fn tantivy_repo_for_id (
-  tantivy_index : &TantivyIndex,
-  query         : &str,
-  expected_id   : &str,
+/// Query Tantivy for a node by title and return its skgrepo.
+fn tantivy_skgrepo_for_skgid (
+  tantivy_index  : &TantivyIndex,
+  query          : &str,
+  expected_skgid : &str,
 ) -> Result<Option<String>, Box<dyn Error>> {
   // A save commits its Tantivy index update in the background, so wait
   // for it to land before reading — mirroring the production search
@@ -38,11 +38,11 @@ fn tantivy_repo_for_id (
     let id_value : Option<String> =
       doc . get_first (tantivy_index . id_field)
       . and_then (|v| v . as_str() . map (String::from));
-    if id_value . as_deref() == Some (expected_id) {
-      let repo_value : Option<String> =
-        doc . get_first (tantivy_index . repo_field)
+    if id_value . as_deref() == Some (expected_skgid) {
+      let skgrepo_value : Option<String> =
+        doc . get_first (tantivy_index . skgrepo_field)
         . and_then (|v| v . as_str() . map (String::from));
-      return Ok (repo_value); }}
+      return Ok (skgrepo_value); }}
   Ok (None) }
 
 
@@ -57,7 +57,7 @@ fn all_tests
     "skg-test-move-repo",
     |s| Box::pin ( async move {
       s . reset ("test_move_node_to_another_owned_repo", "tests/move_repo/fixtures") ?;
-      test_move_node_to_another_owned_repo (
+      test_move_node_to_another_owned_skgrepo (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_move_node_referenced_by_extra_id", "tests/move_repo/fixtures") ?;
       test_move_node_referenced_by_extra_id (
@@ -66,33 +66,33 @@ fn all_tests
       test_move_multiple_nodes (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_move_to_foreign_repo_rejected", "tests/move_repo/fixtures") ?;
-      test_move_to_foreign_repo_rejected (
+      test_move_to_foreign_skgrepo_rejected (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_move_from_foreign_repo_rejected", "tests/move_repo/fixtures") ?;
-      test_move_from_foreign_repo_rejected (
+      test_move_from_foreign_skgrepo_rejected (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_move_and_merge_simultaneously_rejected", "tests/move_repo/fixtures") ?;
       test_move_and_merge_simultaneously_rejected (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_no_repo_change_produces_no_moves", "tests/move_repo/fixtures") ?;
-      test_no_repo_change_produces_no_moves (
+      test_no_skgrepo_change_produces_no_moves (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_repo_only_change_with_populated_pool", "tests/move_repo/fixtures") ?;
-      test_repo_only_change_with_populated_pool (
+      test_skgrepo_only_change_with_populated_pool (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
-/// Basic move: change b's repo from public to private.
+/// Basic move: change b's skgrepo from public to private.
 /// Verify FS (old file gone, new file present),
-/// the graph, and Tantivy all reflect the new repo.
-async fn test_move_node_to_another_owned_repo (
+/// the graph, and Tantivy all reflect the new skgrepo.
+async fn test_move_node_to_another_owned_skgrepo (
   config : &SkgConfig,
   tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let temp_fixtures : &PathBuf = &config . data_root;
 
     // a (public) contains b (public) contains c (public).
-    // Edit b's repo to private.
+    // Edit b's skgrepo to private.
     let org_text : &str = indoc! {"
       * (skg (node (id a) (repo public))) a
       ** (skg (node (id b) (repo private))) b
@@ -102,17 +102,17 @@ async fn test_move_node_to_another_owned_repo (
       = buffer_to_validated_saveplan (
           org_text, &config
           , None ) ?;
-    assert_eq!(save_plan . repo_moves . len(), 1,
+    assert_eq!(save_plan . skgrepo_moves . len(), 1,
                "Expected exactly 1 repo move");
-    assert_eq!(save_plan . repo_moves[0] . pid . 0, "b");
-    assert_eq!(save_plan . repo_moves[0] . old_repo . as_str(), "public");
-    assert_eq!(save_plan . repo_moves[0] . new_repo . as_str(), "private");
+    assert_eq!(save_plan . skgrepo_moves[0] . pid . 0, "b");
+    assert_eq!(save_plan . skgrepo_moves[0] . old_skgrepo . as_str(), "public");
+    assert_eq!(save_plan . skgrepo_moves[0] . new_skgrepo . as_str(), "private");
 
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
       update_graph_minus_nodeMerges (
-        save_plan . define_nodes, &save_plan . repo_moves,
+        save_plan . node_instructions, &save_plan . skgrepo_moves,
         config . clone(), &tantivy_index,
         &graph, &skg::types::env::new_mutation_gate () ) . await?;
     if let Some (new_idx) = replacement {
@@ -131,43 +131,43 @@ async fn test_move_node_to_another_owned_repo (
 
     { // FS: read Graphnode back from disk via graph identity lookup
       let node_b : Graphnode =
-        graphnode_from_id (&config, &ID::new ("b"))
+        graphnode_from_skgid (&config, &ID::new ("b"))
 ?;
-      assert_eq!(node_b . home_repo, RepoName::from ("private"),
+      assert_eq!(node_b . home_skgrepo, SkgRepoName::from ("private"),
                  "Graphnode read from disk should have repo=private"); }
 
-    { // Graph: repo should be updated
-      let (pid, repo) : (ID, RepoName) =
-        graph . load_full () . pid_and_repo (&ID::new ("b"))
+    { // Graph: skgrepo should be updated
+      let (pid, skgrepo) : (ID, SkgRepoName) =
+        graph . load_full () . pid_and_skgrepo (&ID::new ("b"))
         . expect ("b should exist in graph");
       assert_eq!(pid . 0, "b");
-      assert_eq!(repo . as_str(), "private",
+      assert_eq!(skgrepo . as_str(), "private",
                  "graph should show repo=private for b"); }
 
-    { // Tantivy: repo should be updated
-      let repo : Option<String> =
-        tantivy_repo_for_id (&tantivy_index, "b", "b")?;
-      assert_eq!(repo . as_deref(), Some ("private"),
+    { // Tantivy: skgrepo should be updated
+      let skgrepo : Option<String> =
+        tantivy_skgrepo_for_skgid (&tantivy_index, "b", "b")?;
+      assert_eq!(skgrepo . as_deref(), Some ("private"),
                  "Tantivy should show repo=private for b"); }
 
     { // Other nodes unchanged
       let node_a : Graphnode =
-        graphnode_from_id (&config, &ID::new ("a"))
+        graphnode_from_skgid (&config, &ID::new ("a"))
 ?;
-      assert_eq!(node_a . home_repo, RepoName::from ("public"));
+      assert_eq!(node_a . home_skgrepo, SkgRepoName::from ("public"));
       let node_c : Graphnode =
-        graphnode_from_id (&config, &ID::new ("c"))
+        graphnode_from_skgid (&config, &ID::new ("c"))
 ?;
-      assert_eq!(node_c . home_repo, RepoName::from ("public")); }
+      assert_eq!(node_c . home_skgrepo, SkgRepoName::from ("public")); }
 
     { // Containment relationships should be unchanged
       let node_a : Graphnode =
-        graphnode_from_id (&config, &ID::new ("a"))
+        graphnode_from_skgid (&config, &ID::new ("a"))
 ?;
       assert!(members_of ( &node_a . contains ) . contains (&ID::new ("b")),
               "a should still contain b after move");
       let node_b : Graphnode =
-        graphnode_from_id (&config, &ID::new ("b"))
+        graphnode_from_skgid (&config, &ID::new ("b"))
 ?;
       assert!(members_of ( &node_b . contains ) . contains (&ID::new ("c")),
               "b should still contain c after move"); }
@@ -194,16 +194,16 @@ async fn test_move_node_referenced_by_extra_id (
           org_text, &config , None ) ?;
 
     // repo_moves should use the PID, not the extra_id
-    assert_eq!(save_plan . repo_moves . len(), 1,
+    assert_eq!(save_plan . skgrepo_moves . len(), 1,
                "Expected exactly 1 repo move");
-    assert_eq!(save_plan . repo_moves[0] . pid . 0, "b",
+    assert_eq!(save_plan . skgrepo_moves[0] . pid . 0, "b",
                "RepoMove should use PID, not extra_id");
 
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
       update_graph_minus_nodeMerges (
-        save_plan . define_nodes, &save_plan . repo_moves,
+        save_plan . node_instructions, &save_plan . skgrepo_moves,
         config . clone(), &tantivy_index,
         &graph, &skg::types::env::new_mutation_gate () ) . await?;
     if let Some (new_idx) = replacement {
@@ -220,20 +220,20 @@ async fn test_move_node_referenced_by_extra_id (
       assert!( new_path . exists(),
                "b.skg should exist in private/"); }
 
-    { // Graph: repo updated, extra_ids preserved
+    { // Graph: skgrepo updated, extra_ids preserved
       let snapshot = graph . load_full ();
-      let (pid, repo) : (ID, RepoName) =
-        snapshot . pid_and_repo (&ID::new ("b"))
+      let (pid, skgrepo) : (ID, SkgRepoName) =
+        snapshot . pid_and_skgrepo (&ID::new ("b"))
         . expect ("b should exist in graph");
       assert_eq!(pid . 0, "b");
-      assert_eq!(repo . as_str(), "private");
+      assert_eq!(skgrepo . as_str(), "private");
       assert_eq!(snapshot . pid_of (&ID::new ("b-alias")), Some (pid),
               "extra_id b-alias should be preserved after move"); }
 
-    { // Tantivy: repo updated
-      let repo : Option<String> =
-        tantivy_repo_for_id (&tantivy_index, "b", "b")?;
-      assert_eq!(repo . as_deref(), Some ("private")); }
+    { // Tantivy: skgrepo updated
+      let skgrepo : Option<String> =
+        tantivy_skgrepo_for_skgid (&tantivy_index, "b", "b")?;
+      assert_eq!(skgrepo . as_deref(), Some ("private")); }
 
     Ok (()) }
 
@@ -254,11 +254,11 @@ async fn test_move_multiple_nodes (
       = buffer_to_validated_saveplan (
           org_text, &config
           , None ) ?;
-    assert_eq!(save_plan . repo_moves . len(), 2,
+    assert_eq!(save_plan . skgrepo_moves . len(), 2,
                "Expected 2 repo moves");
 
     let move_pids : Vec<&str> =
-      save_plan . repo_moves . iter()
+      save_plan . skgrepo_moves . iter()
       . map (|sm| sm . pid . 0 . as_str()) . collect();
     assert!(move_pids . contains (&"b"), "Should move b");
     assert!(move_pids . contains (&"c"), "Should move c");
@@ -267,7 +267,7 @@ async fn test_move_multiple_nodes (
       graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
       update_graph_minus_nodeMerges (
-        save_plan . define_nodes, &save_plan . repo_moves,
+        save_plan . node_instructions, &save_plan . skgrepo_moves,
         config . clone(), &_tantivy_index,
         &graph, &skg::types::env::new_mutation_gate () ) . await?;
     if let Some (new_idx) = replacement {
@@ -284,23 +284,23 @@ async fn test_move_multiple_nodes (
 
     { // Graph
       let snapshot = graph . load_full ();
-      let (_, repo_b) = snapshot . pid_and_repo (&ID::new ("b"))
+      let (_, skgrepo_b) = snapshot . pid_and_skgrepo (&ID::new ("b"))
         . expect ("b should exist");
-      let (_, repo_c) = snapshot . pid_and_repo (&ID::new ("c"))
+      let (_, skgrepo_c) = snapshot . pid_and_skgrepo (&ID::new ("c"))
         . expect ("c should exist");
-      assert_eq!(repo_b . as_str(), "private");
-      assert_eq!(repo_c . as_str(), "private"); }
+      assert_eq!(skgrepo_b . as_str(), "private");
+      assert_eq!(skgrepo_c . as_str(), "private"); }
 
     Ok (()) }
 
-/// Moving to a foreign repo should be rejected.
-async fn test_move_to_foreign_repo_rejected (
+/// Moving to a foreign skgrepo should be rejected.
+async fn test_move_to_foreign_skgrepo_rejected (
   config : &SkgConfig,
   _tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let temp_fixtures : &PathBuf = &config . data_root;
 
-    // Try to move b to foreign repo.
+    // Try to move b to foreign skgrepo.
     let org_text : &str = indoc! {"
       * (skg (node (id a) (repo public))) a
       ** (skg (node (id b) (repo foreign))) b
@@ -316,7 +316,7 @@ async fn test_move_to_foreign_repo_rejected (
       let inner : &dyn Error = e . as_ref();
       assert!(inner . downcast_ref::<BufferValidationError>()
               . map_or (false, |bve| matches!(
-                bve, BufferValidationError::CannotMoveToOrFromForeignRepo(_, _, _))),
+                bve, BufferValidationError::CannotMoveToOrFromForeignSkgRepo(_, _, _))),
               "Expected CannotMoveToOrFromForeignRepo, got: {}", e);
     } else if let Err (other) = &result {
       panic!("Expected DatabaseError wrapping CannotMoveToOrFromForeignRepo, got: {:?}", other);
@@ -328,8 +328,8 @@ async fn test_move_to_foreign_repo_rejected (
 
     Ok (()) }
 
-/// Moving from a foreign repo should be rejected.
-async fn test_move_from_foreign_repo_rejected (
+/// Moving from a foreign skgrepo should be rejected.
+async fn test_move_from_foreign_skgrepo_rejected (
   config : &SkgConfig,
   _tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -383,12 +383,12 @@ async fn test_move_and_merge_simultaneously_rejected (
 
     Ok (()) }
 
-/// No repo change: no RepoMove should be produced.
-async fn test_no_repo_change_produces_no_moves (
+/// No skgrepo change: no RepoMove should be produced.
+async fn test_no_skgrepo_change_produces_no_moves (
   config : &SkgConfig,
   _tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-    // Save with same repos as on disk.
+    // Save with same skgrepos as on disk.
     let org_text : &str = indoc! {"
       * (skg (node (id a) (repo public))) a
       ** (skg (node (id b) (repo public))) b
@@ -398,15 +398,15 @@ async fn test_no_repo_change_produces_no_moves (
       = buffer_to_validated_saveplan (
           org_text, &config
           , None ) ?;
-    assert_eq!(save_plan . repo_moves . len(), 0,
+    assert_eq!(save_plan . skgrepo_moves . len(), 0,
                "No repo changes => no repo moves");
 
     Ok (()) }
 
-/// Reproduces the bug: changing only the repo (nothing else)
-/// with a populated pool caused the instruction to be filtered out
-/// by filter_wouldbe_noop_defineNodes (which didn't compare repo).
-async fn test_repo_only_change_with_populated_pool (
+/// Reproduces the bug: changing only the skgrepo (nothing else)
+/// with a populated pool caused the nodeInstruction to be filtered out
+/// by filter_wouldbe_noop_nodeInstructions (which didn't compare skgrepo).
+async fn test_skgrepo_only_change_with_populated_pool (
   config : &SkgConfig,
   tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -414,9 +414,9 @@ async fn test_repo_only_change_with_populated_pool (
 
     // Read all nodes (for test parity with earlier pool-populating variant).
     let _nodes : Vec<Graphnode> =
-      read_all_skg_files_from_repos (&config)?;
+      read_all_skg_files_from_skgrepos (&config)?;
 
-    // Change only b's repo to private.
+    // Change only b's skgrepo to private.
     // Title, body, contains — all identical to disk.
     let org_text : &str = indoc! {"
       * (skg (node (id a) (repo public))) a
@@ -427,15 +427,15 @@ async fn test_repo_only_change_with_populated_pool (
       = buffer_to_validated_saveplan (
           org_text, &config , None ) ?;
 
-    // The repo move must be detected even with populated pool.
-    assert_eq!(save_plan . repo_moves . len(), 1,
+    // The skgrepo move must be detected even with populated pool.
+    assert_eq!(save_plan . skgrepo_moves . len(), 1,
                "Repo-only change should produce a RepoMove");
-    assert_eq!(save_plan . repo_moves[0] . pid . 0, "b");
+    assert_eq!(save_plan . skgrepo_moves[0] . pid . 0, "b");
 
-    // The save instruction for b must not have been filtered out.
+    // The nodeInstruction for b must not have been filtered out.
     let b_in_instructions : bool =
-      save_plan . define_nodes . iter() . any (|i| match i {
-        DefineNode::Save (skg::types::save::SaveNode (n)) =>
+      save_plan . node_instructions . iter() . any (|i| match i {
+        NodeInstruction::Save (skg::types::save::SaveNode (n)) =>
           n . pid . 0 == "b",
         _ => false });
     assert!(b_in_instructions,
@@ -445,7 +445,7 @@ async fn test_repo_only_change_with_populated_pool (
       graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
       update_graph_minus_nodeMerges (
-        save_plan . define_nodes, &save_plan . repo_moves,
+        save_plan . node_instructions, &save_plan . skgrepo_moves,
         config . clone(), &tantivy_index,
         &graph, &skg::types::env::new_mutation_gate () ) . await?;
     if let Some (new_idx) = replacement {
@@ -458,15 +458,15 @@ async fn test_repo_only_change_with_populated_pool (
       assert!( temp_fixtures . join ("owned/private/b.skg") . exists(),
                "b.skg should exist in private/"); }
 
-    { // Graph: repo updated
-      let (_, repo) = graph . load_full ()
-        . pid_and_repo (&ID::new ("b"))
+    { // Graph: skgrepo updated
+      let (_, skgrepo) = graph . load_full ()
+        . pid_and_skgrepo (&ID::new ("b"))
         . expect ("b should exist in graph");
-      assert_eq!(repo . as_str(), "private"); }
+      assert_eq!(skgrepo . as_str(), "private"); }
 
-    { // Tantivy: repo updated
-      let repo : Option<String> =
-        tantivy_repo_for_id (&tantivy_index, "b", "b")?;
-      assert_eq!(repo . as_deref(), Some ("private")); }
+    { // Tantivy: skgrepo updated
+      let skgrepo : Option<String> =
+        tantivy_skgrepo_for_skgid (&tantivy_index, "b", "b")?;
+      assert_eq!(skgrepo . as_deref(), Some ("private")); }
 
     Ok (()) }

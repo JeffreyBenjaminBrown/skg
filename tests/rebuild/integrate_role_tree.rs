@@ -62,9 +62,9 @@ async fn test_path_with_cycle_impl(
   assert_eq!(viewforest . root() . children() . count(), 1,
              "Should have exactly 1 tree");
 
-  let tree_root_id =
+  let tree_root_skgid =
     viewforest . root () . first_child () . unwrap () . id ();
-  let root_id = tree_root_id;
+  let root_skgid = tree_root_skgid;
 
   // Setup role-tree data (origin-free: origin "1" is stripped)
   let path = vec![
@@ -78,7 +78,7 @@ async fn test_path_with_cycle_impl(
   // Integrate the path
 
   integrate_path_that_might_fork_or_cycle(
-    &mut viewforest, root_id, path, branches,
+    &mut viewforest, root_skgid, path, branches,
     cycle_nodes, &graph_handle_from_config (config)? . load_full (),
     &config, Birth::RoleGraft (RelationRole::CONTAINER)
   )?;
@@ -128,17 +128,17 @@ async fn test_path_with_branches_no_cycle_impl(
              "Should have exactly 1 tree");
 
   // Find node with id "1" (second node in the tree)
-  let mut node_1_id : Option<NodeId> = None;
+  let mut node_1_skgid : Option<NodeId> = None;
   for edge in viewforest . root() . traverse() {
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
       if let ViewnodeKind::Vognode (
         Vognode::Active (t)) =
         &node_ref . value() . kind {
-        if t . id . 0 == "1" {
-          node_1_id = Some(node_ref . id());
+        if t . skgid . 0 == "1" {
+          node_1_skgid = Some(node_ref . id());
           break; }}}}
-  let node_1_id : NodeId =
-    node_1_id . expect ("Should find node with id 1");
+  let node_1_skgid : NodeId =
+    node_1_skgid . expect ("Should find node with id 1");
 
   // Setup role-tree data (origin-free: origin "1" is stripped)
   let path = vec![
@@ -154,7 +154,7 @@ async fn test_path_with_branches_no_cycle_impl(
   // Integrate the path
 
   integrate_path_that_might_fork_or_cycle(
-    &mut viewforest, node_1_id, path, branches,
+    &mut viewforest, node_1_skgid, path, branches,
     cycle_nodes, &graph_handle_from_config (config)? . load_full (),
     &config, Birth::RoleGraft (RelationRole::CONTAINER)
   )?;
@@ -206,18 +206,18 @@ async fn test_path_with_branches_with_cycle_impl(
              "Should have exactly 1 tree");
 
   // Find node with id "1" (second node in the tree)
-  let mut node_1_id : Option<NodeId> =
+  let mut node_1_skgid : Option<NodeId> =
     None;
   for edge in viewforest . root() . traverse() {
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
       if let ViewnodeKind::Vognode (
         Vognode::Active (t)) =
         &node_ref . value() . kind {
-        if t . id . 0 == "1" {
-          node_1_id = Some(node_ref . id());
+        if t . skgid . 0 == "1" {
+          node_1_skgid = Some(node_ref . id());
           break; }}}}
-  let node_1_id : NodeId =
-    node_1_id . expect ("Should find node with id 1");
+  let node_1_skgid : NodeId =
+    node_1_skgid . expect ("Should find node with id 1");
 
   // Setup role-tree data (origin-free: origin "1" is stripped)
   let path = vec![
@@ -233,7 +233,7 @@ async fn test_path_with_branches_with_cycle_impl(
   // Integrate the path
 
   integrate_path_that_might_fork_or_cycle(
-    &mut viewforest, node_1_id, path, branches,
+    &mut viewforest, node_1_skgid, path, branches,
     cycle_nodes, &graph_handle_from_config (config)? . load_full (),
     &config, Birth::RoleGraft (RelationRole::CONTAINER)
   )?;
@@ -280,11 +280,11 @@ async fn test_fork_expansion_at_origin_impl(
   let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
   let mut viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (unchecked_viewforest)?;
-  let node_a11_id : NodeId =
+  let node_a11_skgid : NodeId =
     viewforest . root () . first_child () . unwrap () . id ();
 
   build_and_integrate_containerward_role_tree (
-    &mut viewforest, node_a11_id,
+    &mut viewforest, node_a11_skgid,
     &graph_handle_from_config (config)? . load_full (), &config
   ) ?;
   // Expected: a11 gets two children (a1 and a2).

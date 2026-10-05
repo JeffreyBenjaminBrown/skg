@@ -115,7 +115,7 @@ function M.extract_id_from_metadata_sexp (sexp)
   return nil
 end
 
----The repo from SEXP, same shapes as the id extractor.
+---The skgrepo from SEXP, same shapes as the id extractor.
 ---@param sexp any
 ---@return string|nil
 function M.extract_repo_from_metadata_sexp (sexp)

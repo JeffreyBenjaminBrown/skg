@@ -2,7 +2,7 @@
 ** It's not very strange.
 Using skg is much like ordinary reading and writing. You read something you want to keep. You add it to your data. (Although unusually, edits to that thing will propogate into your data.) You write text. You divide, subdivide, organize, make links. You make some things public and others private (although with unusual granularity). You might learn someone enjoyed some of your public knowledge (although unusually, the way you would learn this is through their revelation of how it fit into their knowledge).
 ** graph, view and the 'contains' relationship
-A user's knowledge is represented as a graph ("linked forest"). Each node ("point") in the graph has a "title" (just text), a "body" (just text), a unique ID (a long number) and a 'home repo'. Skg repos are for sharing and privacy, described later.
+A user's knowledge is represented as a graph ("linked forest"). Each graphnode in the graph has a "title" (just text), a "body" (just text), a unique ID (a long number) and a 'home skgrepo'. Skgrepos are for sharing and privacy, described later.
 
 There is too much data to see it all at once, so we use trees to visualize parts of the graph. (This should eventually be extended to include tables and other presentation schemes.) The distinction between the underlying data and the view is important; I will refer to them as 'graph' and 'view'.
 
@@ -10,8 +10,8 @@ A node's body text can be hidden from view. The title can also be hidden, but on
 
 The foundational relationship in the graph is "contains". The tree providing a view of a node shows not its node's text, but also the other nodes that it contains, and the nodes they contain, etc., recursively until reaching the 'leaves' of the tree, which contain nothing. Or until running into cycles, in which case the second and future occurences of the same node do show its children. The software is prepared to show containment cycles, because users have complete control over their data, but the 'contains' relationship is not intended to be cyclic.
 
-'contains' is the relationship between sections and subsections, subsections and sub-subsections, etc. An initial view of a node is just itself plus everything it contains, recursively. The view might show other kinds of relationships, once the user starts exploring it, but initially, every parent-child relationship is the contains relationship.
-** Skg repos, privacy and sharing
+'contains' is the relationship between sections and subsections, subsections and sub-subsections, etc. An initial view of a node is just itself plus everything it contains, recursively. The view might show other kinds of relations, once the user starts exploring it, but initially, every parent-child relationship is the contains relation.
+** Skgrepos, privacy and sharing
 'Sharing' makes it sound like more work than it is.
 Integration need not be mutual.
 If someone integrates knowledge that you made available into theirs,
@@ -19,7 +19,7 @@ and they make available the context
 into which they integrated your knowledge,
 you don't have to look, or even be notified.
 
-Recall that each node has a 'home repo'. If your notes are entirely private, you only need one Skg repo, but you might want to distinguish between a private Skg repo and a public Skg repo, or maybe more kinds than that.
+Recall that each node has a 'home repo'. If your notes are entirely private, you only need one skgrepo, but you might want to distinguish between a private skgrepo and a public skgrepo, or maybe more kinds than that.
 
 Note that a private node can contain a public one, and vice versa. You do not, thus, have to decide whether a topic in its entirety is public or private; you can decide node by node whether to share each part of that document.
 
@@ -28,10 +28,10 @@ How you share your data is up to you. Skg includes no network protocol between p
 If you want to hide your private knowledge from your view (say, while reading it in public) you can do that.
 ** links
 Any text at any node (so both title and body) can contain any number of links to other nodes. A link is defined by the ID of its target and an arbitrary label invented by the author. A link points from its "mentioner" node to its "mentioned" node; the relation is "links to".
-** A tree can show more than the contains relationship.
-Usually, probably, most nodes in the view will correspond to nodes in the graph, but not always. It thus helps to distinguish view-nodes from graph-nodes.
+** A tree can show more than the contains relation.
+Usually, probably, most nodes in the view will correspond to nodes in the graph, but not always. It thus helps to distinguish viewnodes from graphnodes.
 
-When a view is first created, each view-node represents a graph-node. Here's some example data -- probably private -- representing an initial view of a node called 'Go to the dentist.':
+When a view is first created, each viewnode represents a graphnode. Here's some example data -- probably private -- representing an initial view of a node called 'Go to the dentist.':
 #+begin_example
   * Go to the dentist.
   ** Tooth #5 hurt when I drank lemonade.
@@ -51,9 +51,9 @@ Each parent-child relationship in an initial view like the one above is the 'con
   ** retrieve the hat I left there
 #+end_example
 
-The third and fourth view-nodes represent graph-nodes that link to the first. The second view-node *does not represent a graph-node* at all; it just introduces the 'hyperlinks' relationships from nodes 3 and 4 to node 1.
+The third and fourth viewnodes represent graphnodes that link to the first. The second viewnode *does not represent a graphnode* at all; it just introduces the 'hyperlinks' relationships from nodes 3 and 4 to node 1.
 
-It bears repeating that in the graph, there is no concept of parent or child. There are instead explicit relationships: the contains relationship from container to content, the links-to relationship from mentioner to mentioned, etc. Parent and child only mean something in a tree view. The relationship from parent to child is containment unless otherwise indicated.
+It bears repeating that in the graph, there is no concept of parent or child. There are instead explicit relationships: the contains relation from container to content, the links-to relation from mentioner to mentioned, etc. Parent and child only mean something in a tree view. The relationship from parent to child is containment unless otherwise indicated.
 ** Forks of foreign data require three more relationships.
 The three relationships are called 'subscribes', 'hides-from-its-subscriptions' and 'overrides'.
 

@@ -18,7 +18,7 @@ local function buffer_text ()
 end
 
 ---Visible non-empty lines, counting a closed fold's own first line as
----visible (org showed the folded heading too).
+---visible (org showed the folded headline too).
 local function count_visible_nonempty_lines ()
   local count = 0
   for line = 1, vim.api.nvim_buf_line_count(0) do
@@ -119,7 +119,7 @@ describe('skg.folds', function ()
     assert.is_false(folds.headline_has_bodyfolded_p(1))
   end)
 
-  it('treats a folded subtree heading as visible', function ()
+  it('treats a folded subtree headline as visible', function ()
     buffer_with(table.concat({
       '* a',
       '** b',

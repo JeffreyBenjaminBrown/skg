@@ -231,7 +231,7 @@ pub fn herald_rule_table () -> HeraldRule {
         crule (Nonstandard, "relRepo", vec! [
           any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ],
       // The six WRITE-PROTECTED folders carry ☮ ("cannot be changed
-      // from here"); the writable folders (subscribeeFolder, overriddenFolder,
+      // from here"); the editable folders (subscribeeFolder, overriddenFolder,
       // aliasFolder) do not.
       write_protected_leaves (PartnerFolder::HiddenInSubscribee . repr_in_client (),
             "It contains these, but the subscribing ancestor hides them."),
@@ -284,7 +284,7 @@ pub fn herald_rule_table () -> HeraldRule {
         rule ("editRequest", vec! [
           crule (Nonstandard, "relRepo", vec! [
             any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ]),
-      // An inactive placeholder is anonymous and dataless: the bare
+      // An inactive vognode is anonymous and dataless: the bare
       // atom 'inactiveNode' (see InactiveVognode), like the other dataless
       // non-vognode markers. Its id/repo would leak hidden content, so
       // they are not emitted.
@@ -308,7 +308,7 @@ pub fn herald_rule_table () -> HeraldRule {
         // The server emits the atom 'writeProtected'
         // (see org_to_text.rs); we match that here.
         leaf_abut (Crucial, "writeProtected", "☮"),
-        // Emitted only on a write-protected node whose graph node has a
+        // Emitted only on a write-protected node whose graphnode has a
         // body -- one the rendering hides. ABUT so the B rides the ☮.
         leaf_abut (Crucial, "hiddenBody", "B"),
         // The relationship heralds are per-CHARACTER styled spans that
@@ -326,7 +326,7 @@ pub fn herald_rule_table () -> HeraldRule {
           vac ("overridesHere"),
           // relRepo is a display fact, not a save request.  It
           // echoes its own value directly:
-          // "~" + the repo name, yucky, immediately before the ⌂
+          // "~" + the skgrepo name, yucky, immediately before the ⌂
           // homeRepoHerald below (table ORDER is presentation order,
           // per the module doc, so placing this rule first guarantees
           // that regardless of the atoms' order in the raw sexp).
@@ -454,7 +454,7 @@ pub fn atoms_in_rule_table () -> std::collections::HashSet<&'static str> {
   out }
 
 /// Every metadata atom the server can emit in a MATCH (label)
-/// position. Value-position data (counts, IDs, repo names,
+/// position. Value-position data (counts, IDs, skgrepo names,
 /// the homeRepoHerald payload) is consumed by ANY/IT
 /// rules and so is deliberately absent.
 ///
@@ -517,7 +517,7 @@ fn viewstats_atoms () -> Vec<&'static str> {
   fn guard ( v : ViewnodeStats ) {
     let ViewnodeStats {
       cycle : _,
-      homeRepoAtBoundary : _, // -> the homeRepoHerald atom
+      homeSkgRepoAtBoundary : _, // -> the homeRepoHerald atom
       rel_heralds : _,      // -> the node-level rels atom (semantic sexp)
       overridesHere : _,    // keyed form (a viewStats sub-form)
       hidden_body : _,      // -> the node-level hiddenBody atom

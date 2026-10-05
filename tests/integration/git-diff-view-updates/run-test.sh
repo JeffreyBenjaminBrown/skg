@@ -34,7 +34,7 @@ FIXTURE_FILES="a.skg b.skg c.skg d.skg e.skg f.skg"
 backup_and_reset_test_data() {
     echo "=== Setting up git repo from fixture files ==="
 
-    # Remove any leftover git repo or extra files from previous runs
+    # Remove any leftover gitrepo or extra files from previous runs
     rm -rf "$SKG_DATA/.git"
     find "$SKG_DATA" -name "*.skg" ! -name "a.skg" ! -name "b.skg" \
          ! -name "c.skg" ! -name "d.skg" ! -name "e.skg" ! -name "f.skg" \
@@ -48,7 +48,7 @@ backup_and_reset_test_data() {
     # Reset fixtures to clean state
     restore_fixtures
 
-    # Init git repo and commit the fixture files
+    # Init gitrepo and commit the fixture files
     cd "$SKG_DATA"
     git init -q
     git config user.email "test@test.com"
@@ -68,7 +68,7 @@ restore_fixtures() {
 }
 
 cleanup_test_data() {
-    # Remove git repo
+    # Remove gitrepo
     rm -rf "$SKG_DATA/.git"
     # Restore fixture files from backups
     restore_fixtures

@@ -5,7 +5,7 @@
 // walks it.
 //
 // Graph fixture:
-//   b and d, both leaves, both at the main repo.
+//   b and d, both leaves, both at the main skgrepo.
 //
 // The saved buffer has both b and d as top-level roots (i.e. not
 // content-children of anything), and puts (editRequest (merge b))
@@ -17,7 +17,7 @@
 // short-circuited to (deleted ...)). The goal-list-resolution fix
 // in reconcile_content_children only helped for acquirees that
 // were content-children of some other node in the view -- it did
-// nothing for top-level/Independent acquirees because reconcile
+// nothing for top-level/non-member acquirees because reconcile
 // never runs on them.
 //
 // Correct behaviour: any viewnode with pid = acquiree should be
@@ -25,7 +25,7 @@
 // pass rewriteInPlace_viewnodes_whose_id_is_newly_extra does that.
 //
 // Expected result:
-//   * d            <-- was b, rewritten to d (first in doc order -> definitive)
+//   * d            <-- was b, rewritten to d (first in doc order -> editable)
 //   ** MERGED: b
 //   * d (write-protected)    <-- the original d root
 // (No (deleted ...) anywhere.)
@@ -121,7 +121,7 @@ async fn merge_acquiree_as_independent_root_impl (
        original d); found {}", d_root_count )); }
 
   // 4. The MERGED: b preserver should appear in the view (under
-  //    whichever d root is definitive -- the first one in doc
+  //    whichever d root is editable -- the first one in doc
   //    order, i.e. the rewritten-from-b root).
   if ! view . contains ("MERGED: b") {
     failures . push (

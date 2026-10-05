@@ -37,16 +37,16 @@ impl SaveAffectedIds {
 
   pub(crate) fn matching_identity (
     &self,
-    id     : &ID,
+    skgid  : &ID,
     before : &InRustGraph,
     after  : &InRustGraph,
   ) -> Option<ID> {
-    if self . raw_touched . contains (id) {
-      return Some (id . clone ()); }
-    if let Some (canonical) = before . pid_of (id) {
+    if self . raw_touched . contains (skgid) {
+      return Some (skgid . clone ()); }
+    if let Some (canonical) = before . pid_of (skgid) {
       if self . before . contains (&canonical) {
         return Some (canonical); }}
-    if let Some (canonical) = after . pid_of (id) {
+    if let Some (canonical) = after . pid_of (skgid) {
       if self . after . contains (&canonical) {
         return Some (canonical); }}
     None
@@ -61,8 +61,8 @@ impl SaveAffectedIds {
   ) -> Vec<ViewUri> {
     let mut uris : Vec<ViewUri> = views_state . open_views . views . iter ()
       .filter (|(uri, state)| {
-        *uri != saved_uri && state . pids . iter () . any (|id|
-          self . matching_identity (id, before, after) . is_some ()) })
+        *uri != saved_uri && state . pids . iter () . any (|skgid|
+          self . matching_identity (skgid, before, after) . is_some ()) })
       .map (|(uri, _)| uri . clone ())
       .collect ();
     uris . sort_by_key (ViewUri::repr_in_client);
@@ -72,7 +72,7 @@ impl SaveAffectedIds {
 
 pub(crate) struct DirtyViewConflict {
   pub(crate) uri : ViewUri,
-  pub(crate) ids : Vec<ID>,
+  pub(crate) skgids : Vec<ID>,
 }
 
 pub(crate) fn dirty_view_conflicts (
@@ -103,13 +103,13 @@ pub(crate) fn dirty_view_conflicts (
     // A save of A and a dirty view of B can conflict merely because both
     // link to X, even when B does not display X's changing herald.
     let mut matching : Vec<ID> = dependencies . iter ()
-      .filter_map (|id| affected . matching_identity (id, before, after))
+      .filter_map (|skgid| affected . matching_identity (skgid, before, after))
       .collect ();
     matching . sort_by (|left, right| left . 0 . cmp (&right . 0));
     matching . dedup ();
     if ! matching . is_empty () {
       conflicts . push (DirtyViewConflict {
-        uri : snapshot . uri . clone (), ids : matching, }); }}
+        uri : snapshot . uri . clone (), skgids : matching, }); }}
   Ok (conflicts)
 }
 
@@ -129,7 +129,7 @@ fn dependencies_from_text (
         .collect::<Vec<String>> () . join ("; "))); }
   let mut result : HashSet<ID> = dependencies_from_uninterpreted (&forest);
   result . extend (links_from_text (text) . into_iter ()
-    .map (|link| link . id));
+    .map (|link| link . skgid));
   Ok (result)
 }
 
@@ -140,20 +140,20 @@ fn dependencies_from_uninterpreted (
   for node in forest . nodes () {
     match &node . value () . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (active)) => {
-        result . extend (active . id . iter () . cloned ());
+        result . extend (active . skgid . iter () . cloned ());
         result . extend (active . viewStats . overridesHere . iter () . cloned ());
-        if let Editability::Definitive {
+        if let Editability::Editable {
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
         } = &active . editability
         { result . insert (target . clone ()); }}
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (phantom))) =>
-        result . extend (phantom . id . iter () . cloned ()),
+        result . extend (phantom . skgid . iter () . cloned ()),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (phantom))) => {
-        result . insert (phantom . id . clone ()); }
+        result . insert (phantom . skgid . clone ()); }
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (phantom))) => {
-        result . insert (phantom . id . clone ()); }
-      MpViewnodeKind::Property (Property::ID { id, .. }) => {
-        result . insert (id . clone ()); }
+        result . insert (phantom . skgid . clone ()); }
+      MpViewnodeKind::Property (Property::ID { skgid, .. }) => {
+        result . insert (skgid . clone ()); }
       _ => {}, }}
   result
 }
@@ -165,20 +165,20 @@ fn dependencies_from_registered (
   for node in forest . nodes () {
     match &node . value () . kind {
       ViewnodeKind::Vognode (Vognode::Active (active)) => {
-        result . insert (active . id . clone ());
+        result . insert (active . skgid . clone ());
         result . extend (active . viewStats . overridesHere . iter () . cloned ());
-        if let Editability::Definitive {
+        if let Editability::Editable {
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
         } = &active . editability
         { result . insert (target . clone ()); }}
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (phantom))) => {
-        result . insert (phantom . id . clone ()); }
+        result . insert (phantom . skgid . clone ()); }
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (phantom))) => {
-        result . insert (phantom . id . clone ()); }
+        result . insert (phantom . skgid . clone ()); }
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (phantom))) => {
-        result . insert (phantom . id . clone ()); }
-      ViewnodeKind::Property (Property::ID { id, .. }) => {
-        result . insert (id . clone ()); }
+        result . insert (phantom . skgid . clone ()); }
+      ViewnodeKind::Property (Property::ID { skgid, .. }) => {
+        result . insert (skgid . clone ()); }
       _ => {}, }}
   result
 }
@@ -189,7 +189,7 @@ pub(crate) fn format_conflict_error (
   let by_view : HashMap<String, String> = conflicts . iter ()
     .map (|conflict| (
       conflict . uri . repr_in_client (),
-      conflict . ids . iter () . map (ToString::to_string)
+      conflict . skgids . iter () . map (ToString::to_string)
         .collect::<Vec<String>> () . join (", ")))
     .collect ();
   let mut entries : Vec<(String, String)> = by_view . into_iter () . collect ();
@@ -198,6 +198,6 @@ pub(crate) fn format_conflict_error (
     "NOTHING WAS SAVED: this save conflicts with unsaved dependencies in {}. Archive those edits with skg-show-unsaved-changes (Emacs) or :SkgShowUnsavedChanges (Neovim), close the archived views, and retry. Conflicts: {}",
     entries . iter () . map (|entry| entry . 0 . as_str ())
       .collect::<Vec<&str>> () . join (", "),
-    entries . iter () . map (|(uri, ids)| format! ("{} [{}]", uri, ids))
+    entries . iter () . map (|(uri, skgids)| format! ("{} [{}]", uri, skgids))
       .collect::<Vec<String>> () . join ("; "))
 }

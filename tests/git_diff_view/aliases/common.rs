@@ -14,7 +14,7 @@ pub const GIT_DIFF_VIEW: &str = "\
 ** (skg (node (id child) (repo main))) child
 ";
 
-/// Create a git repo with head->worktree transition from aliases fixtures.
+/// Create a gitrepo with head->worktree transition from aliases fixtures.
 pub fn setup_gitrepo_with_fixtures(
   gitrepo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {

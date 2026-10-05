@@ -54,13 +54,13 @@ Worked from the vision's own examples:
 - =aC5=   : its parent contains it, and it contains 5 nodes
 - =Ca=    : it contains its parent (today's "}" / 'containsParent')
 
-The ancestor letters count generations up the VIEW tree, INCLUDING col
-scaffolds (settled 2026-06-21): =a= = first ancestor = the visible
+The ancestor letters count generations up the VIEW tree, INCLUDING folder
+non-vognodes (settled 2026-06-21): =a= = first ancestor = the visible
 parent, =b= = second = grandparent, =c= = third, =d= = fourth, and so
 on. A letter says "this specific ancestor is among the members on this
-side." Because a col scaffold counts as a generation but carries no
+side." Because a folder counts as a generation but carries no
 graph relation, an =a= flag appears only when the visible parent is a
-real node (ordinary content); a col member's nearest flaggable ancestor
+real node (ordinary content); a folder member's nearest flaggable ancestor
 is its owner, two-or-more generations up. (Note: these literal
 lowercase letters =a b c …= are ancestor flags; the =a=, =b=, =c= in
 the surprising-links form =a(b,c)L= below are placeholders for digit
@@ -113,11 +113,11 @@ to a visible ancestor that explains why it was drawn:
 - ordinary content: =contains=, inbound from its parent → its C token
   (=aC=, =3aC=, =aC5=, ...);
 - a backpath-grafted partner: its 'Birth::Backpath(role)' relation;
-- a member of a writable/read-only partner col: the col's relation
-  toward the col's owning ancestor (e.g. a subscribee-as-such →
+- a member of a writable/read-only partner folder: the folder's relation
+  toward the folder's owning ancestor (e.g. a subscribee-as-such →
   =bS=, its grandparent subscribes to it; an overrider-as-such →
   =Ob=, it overrides its grandparent);
-- a member of a filter col (settled 2026-06-21): a 'HiddenInSubscribee'
+- a member of a filter folder (settled 2026-06-21): a 'HiddenInSubscribee'
   member gets TWO birth heralds — the hides herald (to the subscriber
   owner) first, then the contains herald (to the subscribee that
   contains it); a 'HiddenOutsideOfSubscribee' member gets ONLY the
@@ -152,12 +152,12 @@ to flag. The rule:
 - For every node, check its relationship to its immediate visible
   parent — one hop. This yields the =a= flag. (This is exactly what
   'set_relation_relative_stats' does today for six edges.)
-- For a col member, additionally check the relationship to its /owning
+- For a folder member, additionally check the relationship to its /owning
   ancestor/ and every intervening vognode. The owning ancestor is the
-  LAST entry of the col's 'required_ancestry' chain (fact-checked in
+  LAST entry of the folder's 'required_ancestry' chain (fact-checked in
   [[*Problems][Problems]] — no new table needed); the intervening vognodes are that
   chain's other real-node entries. This yields the =b=/=c=/=d=/...
-  flags. The depth is small and fixed per col kind.
+  flags. The depth is small and fixed per folder kind.
 
 ** What stays out of scope (unchanged)
 
@@ -168,8 +168,8 @@ LOAD-BEARING for save extraction, see [[../../server/types/viewnode.rs][viewnode
 'sourceHerald' (⌂:label), 'parentIs' independent (⊥) / absent,
 'textChanged', the staged/unstaged diff axes, 'notInGit', 'editRequest'
 (delete / merge), 'viewRequests', the deleted / unknown / inactive /
-deadScaffold placeholders, the read-only-col ☮ scaffold markers, and
-the col labels themselves ("aliases", "subscribeeCol", ...). The node
+deadScaffold placeholders, the read-only-folder ☮ non-vognode markers, and
+the folder labels themselves ("aliases", "subscribeeFolder", ...). The node
 'writeProtected' ☮ stays but is repositioned to lead, so the birth herald can
 sit right after it.
 
@@ -189,16 +189,16 @@ In order (the early "step 0" items first):
 
 1. Pin the remaining open questions in [[*Problems][Problems]] (this document): the
    surprising-links title-normalization rule and double-label case,
-   the filter-col contains-ancestor, and step-0 scope. The
-   ancestor-distance vocabulary (=a/b/c/...=, counting scaffolds), the
+   the filter-folder contains-ancestor, and step-0 scope. The
+   ancestor-distance vocabulary (=a/b/c/...=, counting non-vognodes), the
    =Ik= and blue/omit decisions, and the rest are settled.
 
-2. Locate col owners WITHOUT a new table. Fact-checked (see [[*Problems][Problems]]):
-   the owning ancestor is always the LAST entry of the col's
+2. Locate folder owners WITHOUT a new table. Fact-checked (see [[*Problems][Problems]]):
+   the owning ancestor is always the LAST entry of the folder's
    'required_ancestry' chain ([[../../server/update_buffer/ancestry.rs][ancestry.rs]]), so no owner-depth table
    is needed. We need only the member→owner relation/role:
-   'PartnerCol::relation_member_role' ([[../../server/to_org/complete/partner_col/kind.rs][kind.rs]]) supplies it for the
-   six edge-backed cols; the two filter cols ('HiddenInSubscribee',
+   'PartnerFolder::relation_member_role' ([[../../server/to_org/complete/partner_col/kind.rs][kind.rs]]) supplies it for the
+   six edge-backed folders; the two filter folders ('HiddenInSubscribee',
    'HiddenOutsideOfSubscribee') return None and get an explicit HIDER
    role (and also a contains herald toward a containing vognode). The
    intervening vognodes (for the deeper ancestor flags) are the
@@ -217,14 +217,14 @@ In order (the early "step 0" items first):
    - In [[../../server/update_buffer/viewnodestats.rs][viewnodestats.rs]]: generalize the per-relation ancestor
      flags. Replace the ad-hoc 'grandparentOverrides' /
      'grandparentSubscribes' (the only two owner-relative stats today,
-     reachable only one gnode-hop up via 'VisibleParent::Col') with a
+     reachable only one gnode-hop up via 'VisibleParent::Folder') with a
      pass that locates the owning ancestor (the LAST 'required_ancestry'
      entry) and the intervening vognodes, and records, per relation and
      direction, which tracked ancestors are members.
    - Designate the birth relationship(s) per node — a LIST, usually of
      length 1 (contains for ordinary content via 'parentIsContainer';
-     the 'Birth::Backpath' role for grafted partners; the col relation
-     for col members). A 'HiddenInSubscribee' member is length 2: hides
+     the 'Birth::Backpath' role for grafted partners; the folder relation
+     for folder members). A 'HiddenInSubscribee' member is length 2: hides
      (to the subscriber owner) first, then contains (to the subscribee
      that contains it). A 'HiddenOutsideOfSubscribee' member is length
      1: hides only (no in-view container).
@@ -233,7 +233,7 @@ In order (the early "step 0" items first):
    module, or within [[../../server/org_to_text.rs][org_to_text.rs]]) that turns counts + ancestor
    flags into the compact token string per relationship, applying the
    number-omission and whole-token-omission rules and the =a(b,c)L=
-   form. Emit the birth list (one or more orange tokens — a filter-col
+   form. Emit the birth list (one or more orange tokens — a filter-folder
    member emits two) under a distinct atom (so the rule table can place
    it first and color it orange), and each remaining nonempty token
    under a per-relation atom (blue). Emit =Ak= and =Ik=. Remove the
@@ -300,24 +300,24 @@ generalize the owner-relative flags beyond gO/gS using
 
 The herald letters =p/g/b/t= must measure SOME distance. The existing
 code already uses =gO=/=gS= for a subscribee-as-such whose owner is the
-/grandparent/ — i.e. the letter counts TREE ancestors (member → col
-scaffold → owner = 2 levels = "g"), which also matches what a user sees
+/grandparent/ — i.e. the letter counts TREE ancestors (member → folder
+non-vognode → owner = 2 levels = "g"), which also matches what a user sees
 (two headline levels up). Good.
 
 But the vision says a hiddeninsubscribeecol member's owning ancestor is
 its "great-grandparent". The actual view tree is
 
-: subscriber → SubscribeeCol → subscribee → HiddenInSubscribeeCol → member
+: subscriber → SubscribeeFolder → subscribee → HiddenInSubscribeeFolder → member
 
 so the subscriber (the owner) is FOUR headline levels up =
 great-/great/-grandparent = =t=, not =b=. The code reconcilers read it
-at col-index 2 (member-index 3), confirming four hops.
+at folder-index 2 (member-index 3), confirming four hops.
 
 Question for you: are the letters tree distance (matching =gS=/=gO=
 and the visible headline count), making the hiddeninsubscribee owner
 =t=? If so the vision's "great-grandparent" is just a slip and the
 plan should use =t=. (If instead you intend the letters to count only
-gnode ancestors, skipping col scaffolds, then a subscribee-as-such's
+gnode ancestors, skipping folders, then a subscribee-as-such's
 owner would be =p=, which contradicts the existing =gS=/=gO= — so I
 don't think that's what you mean. Please confirm.)
 
@@ -333,7 +333,7 @@ b = grandparent, c = great-grandparent, etc.
 The vision lumps "I, O and S" together as removable. O and S clearly go
 because the counted O/S tokens replace them. But =I= (extraIDs) is not
 a graph relationship and has no token to fold into. Two readable
-options: drop the bare boolean entirely (the idCol surfaces the extra
+options: drop the bare boolean entirely (the idFolder surfaces the extra
 IDs on demand), or mirror aliases and show =Ik= (k = number of extra
 IDs). I lean toward =Ik= for symmetry with =Ak=, but it is your call.
 
@@ -434,7 +434,7 @@ inbound side carries both an ancestor letter and the =(b,c)= split. I
 propose the ancestor letter prefixes the count, e.g. =b3(1,1)L=. This
 is rare; say if you'd rather suppress the letter there.
 **** DONE let's suppress
-** DONE Birth heralds for the two filter cols
+** DONE Birth heralds for the two filter folders
 
 'HiddenInSubscribee' and 'HiddenOutsideOfSubscribee' members have no
 single relation role ('relation_member_role' returns None); their
@@ -458,7 +458,7 @@ settle: for a 'HiddenInSubscribee' member the contains herald points at
 the subscribee that contains it (its =b= ancestor) — clean. But a
 'HiddenOutsideOfSubscribee' member is, by definition, NOT contained by
 anything the subscriber subscribes to; its 'required_ancestry' chain
-=[Col(Subscribee), NormalVognode]= has no containing vognode except the
+=[Folder(Subscribee), NormalVognode]= has no containing vognode except the
 subscriber (the hider) itself. So its orange contains herald has no
 in-view container to flag. Options: (i) show the node's graph container
 count with no ancestor letter, or (ii) omit the contains herald for
@@ -500,13 +500,13 @@ push the grammar into the lens engine.
 The vision says "a table somewhere in the rust code defines them all."
 It does not — the only "owning ancestor" mentions in the repo are in
 vision.org. What exists is 'required_ancestry' in [[../../server/update_buffer/ancestry.rs][ancestry.rs]] (the
-per-col ancestor-/kind/ chain) plus 'relation_member_role'; the owner
+per-folder ancestor-/kind/ chain) plus 'relation_member_role'; the owner
 DEPTH is currently encoded ad hoc in each reconcile call site
 (index 0/1/2). Fact-checked (below): the owner is always the LAST entry
 of 'required_ancestry', so NO new owner-depth table is needed — step 2
 just reads the last entry, and the member→owner ROLE still comes from
 'relation_member_role' (plus an explicit HIDER for the two filter
-cols).
+folders).
 
 *** DONE the owning table is always (I think) the last of the required ancestors
 That is, the farthest ancestor.
@@ -515,16 +515,16 @@ that means we don't need another table.
 **** DONE (me) Confirmed — the owner is always the last required ancestor
 I checked all three chains in 'required_ancestry':
 - ANC_NORMAL =[NormalVognode]= — owner = that vognode (the 6 simple
-  partner cols + the 2 QualCols);
-- ANC_HIDDEN_OUTSIDE =[Col(Subscribee), NormalVognode]= — owner = the
+  partner folders + the 2 QualFolders);
+- ANC_HIDDEN_OUTSIDE =[Folder(Subscribee), NormalVognode]= — owner = the
   trailing subscriber;
-- ANC_HIDDEN_IN =[NormalVognode, Col(Subscribee), NormalVognode]= —
+- ANC_HIDDEN_IN =[NormalVognode, Folder(Subscribee), NormalVognode]= —
   owner = the trailing subscriber.
 In every case the owning gnode is the LAST entry, so no owner-depth
 table is needed. The one caveat: 'required_ancestry' records ancestor
 KINDS, not relations, so the member→owner RELATION still comes from
 'relation_member_role' (and the explicit HIDER we assign the two filter
-cols). The intervening vognode for the contains herald you asked for
+folders). The intervening vognode for the contains herald you asked for
 (HiddenInSubscribee's subscribee) is the chain's first NormalVognode
 entry, so it too falls out of the same chain — no extra bookkeeping.
 

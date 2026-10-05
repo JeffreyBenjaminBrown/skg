@@ -20,13 +20,13 @@
 //!     (extraIds K)
 //!     (flags K)
 //!     (birth (RELNAME SIDE [GEN])...))
-//! GEN is a generation distance: 1 = visible parent, 2 = grandparent,
+//! GEN is a generation distance: 1 = viewparent, 2 = grandparent,
 //! ... `in` = "N nodes RELATION it"; `out` = "it RELATIONs N nodes".
 //! Each birth fact names a relation explaining why this occurrence is
 //! here, the side of this node it is on, and the generation of the
 //! ancestor it accounts for -- omitted when no ancestor does, as for a
 //! node drawn in place of a node it overrides.
-//! See TODO/heralds-semantic-wire.org.
+//! See TODO/DONE/semantic-heralds-wire/plan.org.
 
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 
@@ -68,7 +68,7 @@ impl BirthFact {
 use crate::types::viewnode::RelationCounts;
 
 /// Per-relation, per-side ancestor-flag generation distances (1 = the
-/// visible parent, 2 = grandparent, ...). Transient: computed in the
+/// viewparent, 2 = grandparent, ...). Transient: computed in the
 /// viewnodestats pass and consumed immediately when emitting the
 /// relationship heralds.
 #[derive(Debug, Default, Clone, PartialEq)]

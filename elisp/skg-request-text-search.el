@@ -1,6 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; DATA USED/ASSUMED: See /api.md.
+;;; DATA USED/ASSUMED: See docs/api-and-formats.org.
 
 (require 'skg-client)
 (require 'skg-buffer)
@@ -105,7 +105,7 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
        (skg--display-search-phase1 payload clean-terms))
      t)
     (skg-register-response-handler
-     ;; Register phase 2 handler for search results 'enriched' with containerward paths and graphnodestats. Persists until fired or replaced.
+     ;; Register phase 2 handler for search results 'enriched' with containerward role trees and graphnodestats. Persists until fired or replaced.
      'search-enrichment
      (lambda (_tcp-proc payload)
        (unwind-protect
@@ -114,7 +114,7 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
      t)
     (skg-register-response-handler
      ;; Rust asks for a snapshot of the search buffer so it can
-     ;; integrate ancestry without losing user edits.
+     ;; integrate role trees without losing user edits.
      'request-snapshot
      (lambda (tcp-proc payload)
        (skg--handle-snapshot-request tcp-proc payload))
@@ -202,7 +202,7 @@ kill-buffer-hook to send close-view to the server."
 
 (defun skg--display-search-enrichment (payload)
   "Replace search buffer with results
-'enriched' with containerward paths and graphnodestats.
+'enriched' with containerward role trees and graphnodestats.
 PAYLOAD contains response-type, terms, and content.
 Exits readonly after replacing content."
   (let* ((response (read payload))

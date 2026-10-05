@@ -154,7 +154,7 @@ describe('skg.heralds', function ()
     heralds.disable(buf)
   end)
 
-  it('displays the inactive-node placeholder as a message', function ()
+  it('displays the inactive vognode as a message', function ()
     local chunks = heralds.chunks_from_metadata('(skg inactiveNode)')
     assert.are.equal('node from inactive repo',
                      heralds.chunks_text(chunks))

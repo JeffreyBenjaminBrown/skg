@@ -47,7 +47,7 @@ common file loaded by integration tests:
   headlines in a buffer.
 - =skg-test-headline-records=: return structured records with depth,
   metadata sexp, id, title, parentIs, birth, staged/unstaged axes, and
-  scaffold kind. This can replace ad hoc =(depth relation title)= triples
+  non-vognode kind. This can replace ad hoc =(depth relation title)= triples
   where tests need more precision.
 - =skg-test-find-node-line=: find a headline by exact metadata structure,
   for example id plus optional parent relation and title.

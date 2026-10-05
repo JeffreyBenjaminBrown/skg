@@ -1,10 +1,10 @@
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::node_lookup::{graphnode_by_id, opt_graphnode_by_id};
+use crate::dbs::node_lookup::{graphnode_by_skgid, opt_graphnode_by_skgid};
 use crate::from_text::local_instruction_collection::lower::nodeMerge_pairs;
 use crate::from_text::local_instruction_collection::traverse::collect_instructions_locally;
-use crate::from_text::local_instruction_collection::types::CollectedIntents;
+use crate::from_text::local_instruction_collection::types::CollectedFieldIntents;
 use crate::types::save::{NodeMerge, SaveNode, DeleteNode};
-use crate::types::misc::{MSV, RelPartner, SkgConfig, RepoName, ID, members_of, rel_partners_at_relRepo};
+use crate::types::misc::{MSV, RelPartner, SkgConfig, SkgRepoName, ID, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
   Flag, Graphnode, flag_is_true, set_flag};
 use crate::types::list::dedup_vector;
@@ -27,7 +27,7 @@ pub fn nodeMerge_instructions_from_viewforest (
   graph      : &InRustGraph,
   config     : &SkgConfig,
 ) -> Result<Vec<NodeMerge>, Box<dyn Error>> {
-  let collected : CollectedIntents =
+  let collected : CollectedFieldIntents =
     collect_instructions_locally (viewforest)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   nodeMerge_instructions_from_pairs (
@@ -44,24 +44,24 @@ pub fn nodeMerge_instructions_from_pairs (
 ) -> Result<Vec<NodeMerge>, Box<dyn Error>> {
   let mut merges : Vec<NodeMerge> =
     Vec::with_capacity (pairs . len());
-  for (acquirer_id, acquiree_id) in pairs {
+  for (acquirer_skgid, acquiree_skgid) in pairs {
     merges . push (
       nodeMerge_from_acquirer_and_acquiree (
-        acquirer_id, acquiree_id, graph, config ) ? ); }
+        acquirer_skgid, acquiree_skgid, graph, config ) ? ); }
   Ok (merges) }
 
 fn nodeMerge_from_acquirer_and_acquiree (
-  acquirer_id : &ID,
-  acquiree_id : &ID,
-  graph       : &InRustGraph,
-  config      : &SkgConfig,
+  acquirer_skgid : &ID,
+  acquiree_skgid : &ID,
+  graph          : &InRustGraph,
+  config         : &SkgConfig,
 ) -> Result<NodeMerge, Box<dyn Error>> {
   let acquirer_from_disk : Graphnode =
-    graphnode_by_id (
-      graph, config, acquirer_id )?;
+    graphnode_by_skgid (
+      graph, config, acquirer_skgid )?;
   let acquiree_from_disk : Graphnode =
-    graphnode_by_id (
-      graph, config, &acquiree_id )?;
+    graphnode_by_skgid (
+      graph, config, &acquiree_skgid )?;
   let acquiree_text_preserver : Graphnode =
     create_acquiree_text_preserver (&acquiree_from_disk);
   let shown_pre_merge : HashSet<ID> = {
@@ -71,10 +71,10 @@ fn nodeMerge_from_acquirer_and_acquiree (
     // when merging"), so these ids are dropped from the combined
     // hides below.
     let mut shown : HashSet<ID> =
-      ids_shown_through_subscriptions (
+      skgids_shown_through_subscriptions (
         &acquirer_from_disk, graph, config ) ?;
     shown . extend (
-      ids_shown_through_subscriptions (
+      skgids_shown_through_subscriptions (
         &acquiree_from_disk, graph, config ) ? );
     shown };
   let updated_acquirer : Graphnode =
@@ -90,8 +90,8 @@ fn nodeMerge_from_acquirer_and_acquiree (
       SaveNode (updated_acquirer),
     acquiree_to_delete :
       DeleteNode {
-        id     : acquiree_id . clone(),
-        home_repo : acquiree_from_disk . home_repo . clone() }} ) }
+        skgid           : acquiree_skgid . clone(),
+        home_skgrepo : acquiree_from_disk . home_skgrepo . clone() }} ) }
 
 /// Computes the updated acquirer node with all fields properly merged.
 /// Returns a new Graphnode with:
@@ -115,12 +115,12 @@ fn three_nodeMerged_graphnodes(
   // excluded only when both inputs were excluded.  The acquiree's original
   // text is preserved separately below, with its own value unchanged.
   set_flag (
-    &mut updated_acquirer . misc,
+    &mut updated_acquirer . flags,
     Flag::NoSearchMatching,
     flag_is_true (
-      &acquirer_from_disk . misc, Flag::NoSearchMatching)
+      &acquirer_from_disk . flags, Flag::NoSearchMatching)
     && flag_is_true (
-      &acquiree_from_disk . misc, Flag::NoSearchMatching));
+      &acquiree_from_disk . flags, Flag::NoSearchMatching));
   { // Append acquiree's IDs (esp. its PID) to acquirer's extra_ids.
     let mut combined_extra_ids : Vec<ID> =
       acquirer_from_disk . extra_ids . clone();
@@ -133,25 +133,25 @@ fn three_nodeMerged_graphnodes(
   // Combining lists of relation partners (5_plan.org, work item interactions;
   // "fold both, concatenate acquiree-after-acquirer, dedup,
   // unfold"): relRepos are PRESERVED, so a merge cannot silently
-  // de-privatize an edge. On a member both sides carry, the more
-  // PRIVATE repo wins (the safe tie-break); every repo clamps at
+  // de-privatize a relationship. On a member both sides carry, the more
+  // PRIVATE skgrepo wins (the safe tie-break); every skgrepo clamps at
   // the acquirer's home, since no section may be more public than
   // its home.
   let combine_rel_partners =
     |lists : &[&[RelPartner<ID>]]| -> Vec<RelPartner<ID>> {
-      let home : &RepoName = & updated_acquirer . home_repo;
+      let home    : &SkgRepoName = & updated_acquirer . home_skgrepo;
       let mut out : Vec<RelPartner<ID>> = Vec::new ();
       for list in lists {
         for m in *list {
-          let repo : RepoName = config . more_private_of (
+          let skgrepo : SkgRepoName = config . more_private_of (
             m . relRepo . clone (), home . clone () );
           match out . iter_mut ()
             . find ( |o| o . member == m . member ) {
             Some (existing) => {
               existing . relRepo = config . more_private_of (
-                existing . relRepo . clone (), repo ); }
+                existing . relRepo . clone (), skgrepo ); }
             None => out . push ( RelPartner::at_relRepo (
-              repo, m . member . clone () )), }} }
+              skgrepo, m . member . clone () )), }} }
       out };
   let new_contains : Vec<ID> = {
     // [preserver] + acquirer's old content + acquiree's old content
@@ -164,14 +164,14 @@ fn three_nodeMerged_graphnodes(
     dedup_vector (combined) };
   updated_acquirer . contains = {
     let mut combined : Vec<RelPartner<ID>> = combine_rel_partners (
-      & [ & rel_partners_at_relRepo ( & updated_acquirer . home_repo,
+      & [ & rel_partners_at_relRepo ( & updated_acquirer . home_skgrepo,
                             vec! [ acquiree_text_preserver . pid . clone() ] ),
           & acquirer_from_disk . contains,
           & acquiree_from_disk . contains ] );
-    let own_ids : Vec<ID> =
-      updated_acquirer . all_ids() . cloned() . collect::<Vec<_>>();
+    let own_skgids : Vec<ID> =
+      updated_acquirer . all_skgids() . cloned() . collect::<Vec<_>>();
     combined . retain ( // prevent acquirer from containing itself
-      |m| ! own_ids . contains ( &m . member ));
+      |m| ! own_skgids . contains ( &m . member ));
     combined };
   { // Union aliases (parallel to extra_ids): a merged node should
     // still be findable by the acquiree's old aliases.
@@ -179,16 +179,16 @@ fn three_nodeMerged_graphnodes(
     for list in [ acquirer_from_disk . aliases . or_default (),
                   acquiree_from_disk . aliases . or_default () ] {
       for m in list {
-        let repo : RepoName = config . more_private_of (
+        let skgrepo : SkgRepoName = config . more_private_of (
           m . relRepo . clone (),
-          updated_acquirer . home_repo . clone () );
+          updated_acquirer . home_skgrepo . clone () );
         match combined . iter_mut ()
           . find ( |o| o . member == m . member ) {
           Some (existing) => {
             existing . relRepo = config . more_private_of (
-              existing . relRepo . clone (), repo ); }
+              existing . relRepo . clone (), skgrepo ); }
           None => combined . push ( RelPartner::at_relRepo (
-            repo, m . member . clone () )), }} }
+            skgrepo, m . member . clone () )), }} }
     updated_acquirer . aliases =
       MSV::Specified (combined); }
   { // Combine subscribes_to
@@ -227,7 +227,7 @@ fn three_nodeMerged_graphnodes(
 /// its own contents (the subscribee-as-such display rule,
 /// docs/sharing-model.org). A subscribee with no disk entry
 /// contributes nothing.
-fn ids_shown_through_subscriptions (
+fn skgids_shown_through_subscriptions (
   node   : &Graphnode,
   graph  : &InRustGraph,
   config : &SkgConfig,
@@ -237,14 +237,14 @@ fn ids_shown_through_subscriptions (
     members_of ( node . hides_from_its_subscriptions . or_default () );
   let contains : Vec<ID> =
     members_of ( & node . contains );
-  for subscribee_id in members_of ( node . subscribes_to . or_default () ) {
-    let Some (subscribee) = opt_graphnode_by_id (
-      graph, config, &subscribee_id ) ?
+  for subscribee_skgid in members_of ( node . subscribes_to . or_default () ) {
+    let Some (subscribee) = opt_graphnode_by_skgid (
+      graph, config, &subscribee_skgid ) ?
     else { continue; };
-    for id in members_of ( & subscribee . contains ) {
-      if ! hides . contains (&id)
-        && ! contains . contains (&id)
-      { shown . insert ( id ); }} }
+    for skgid in members_of ( & subscribee . contains ) {
+      if ! hides . contains (&skgid)
+        && ! contains . contains (&skgid)
+      { shown . insert ( skgid ); }} }
   Ok (shown) }
 
 /// Create an acquiree_text_preserver from the acquiree's data
@@ -253,7 +253,7 @@ fn create_acquiree_text_preserver(acquiree: &Graphnode) -> Graphnode {
     title: format!("MERGED: {}", acquiree . title),
     overPrivateText_telescope: false,
     aliases: MSV::Unspecified,
-    home_repo: acquiree . home_repo . clone(),
+    home_skgrepo: acquiree . home_skgrepo . clone(),
     pid: ID(uuid::Uuid::new_v4() . to_string()),
     extra_ids: vec![],
     body: acquiree . body . clone(),
@@ -261,8 +261,8 @@ fn create_acquiree_text_preserver(acquiree: &Graphnode) -> Graphnode {
     subscribes_to                : MSV::Specified(vec![]),
     hides_from_its_subscriptions : MSV::Specified(vec![]),
     overrides_view_of            : MSV::Specified(vec![]),
-    misc                         : if flag_is_true (
-      &acquiree . misc, Flag::NoSearchMatching)
+    flags                        : if flag_is_true (
+      &acquiree . flags, Flag::NoSearchMatching)
       { vec![Flag::NoSearchMatching] }
       else { Vec::new () },
   }}
@@ -270,19 +270,19 @@ fn create_acquiree_text_preserver(acquiree: &Graphnode) -> Graphnode {
 #[cfg(test)]
 mod flag_tests {
   use super::*;
-  use crate::types::misc::SkgfileRepo;
-  use crate::types::nodes::complete::{empty_node_complete, flag_is_true};
+  use crate::types::misc::SkgRepo;
+  use crate::types::nodes::complete::{empty_graphnode, flag_is_true};
   use std::collections::HashMap;
   use std::path::PathBuf;
 
   fn config () -> SkgConfig {
-    let repo : RepoName = RepoName::from ("owned");
-    SkgConfig::fromReposAndTantivyFolder (
-      HashMap::from ([(repo . clone (), SkgfileRepo {
-        name         : repo,
+    let skgrepo : SkgRepoName = SkgRepoName::from ("owned");
+    SkgConfig::fromSkgReposAndTantivyFolder (
+      HashMap::from ([(skgrepo . clone (), SkgRepo {
+        name         : skgrepo,
         abbreviation : None,
         path         : PathBuf::from ("owned"),
-        user_owns_it : true, })]),
+        owned        : true, })]),
       "/tmp/none" )
   }
 
@@ -295,34 +295,34 @@ mod flag_tests {
       (true,  true,  true),
     ] {
       let mut acquirer : Graphnode = Graphnode {
-        pid    : ID::from ("A"),
-        home_repo : RepoName::from ("owned"),
-        .. empty_node_complete () };
+        pid          : ID::from ("A"),
+        home_skgrepo : SkgRepoName::from ("owned"),
+        .. empty_graphnode () };
       let mut acquiree : Graphnode = Graphnode {
-        pid    : ID::from ("B"),
-        home_repo : RepoName::from ("owned"),
-        .. empty_node_complete () };
-      acquirer . misc . extend ([
+        pid          : ID::from ("B"),
+        home_skgrepo : SkgRepoName::from ("owned"),
+        .. empty_graphnode () };
+      acquirer . flags . extend ([
         Flag::Had_ID_Before_Import,
         Flag::Was_Overloaded]);
-      acquiree . misc . push (Flag::Had_ID_Before_Import);
+      acquiree . flags . push (Flag::Had_ID_Before_Import);
       if acquirer_value {
-        acquirer . misc . push (Flag::NoSearchMatching); }
+        acquirer . flags . push (Flag::NoSearchMatching); }
       if acquiree_value {
-        acquiree . misc . push (Flag::NoSearchMatching); }
+        acquiree . flags . push (Flag::NoSearchMatching); }
       let preserver : Graphnode = create_acquiree_text_preserver (&acquiree);
       let merged : Graphnode = three_nodeMerged_graphnodes (
         &config (), &acquirer, &acquiree, &preserver, &HashSet::new ())
         . unwrap ();
       assert_eq! ( flag_is_true (
-        &merged . misc, Flag::NoSearchMatching), expected );
+        &merged . flags, Flag::NoSearchMatching), expected );
       assert! (flag_is_true (
-        &merged . misc, Flag::Had_ID_Before_Import));
+        &merged . flags, Flag::Had_ID_Before_Import));
       assert! (flag_is_true (
-        &merged . misc, Flag::Was_Overloaded));
+        &merged . flags, Flag::Was_Overloaded));
       assert_eq! ( flag_is_true (
-        &preserver . misc, Flag::NoSearchMatching), acquiree_value );
-      assert_eq! (preserver . misc,
+        &preserver . flags, Flag::NoSearchMatching), acquiree_value );
+      assert_eq! (preserver . flags,
         if acquiree_value { vec![Flag::NoSearchMatching] }
         else { Vec::new () }); }
   }

@@ -341,14 +341,14 @@ later graph snapshot.
 
 ** Stable ID normalization
 
-Add one shared =NodeComplete= helper that scans =extra_ids= in order with a
+Add one shared =Graphnode= helper that scans =extra_ids= in order with a
 seen set initially containing =pid=.  It retains the first occurrence of every
 other ID and removes later occurrences plus the PID itself.  It is idempotent
 and does not sort.
 
 Call it:
 
-- immediately after telescope folding produces a =NodeComplete=;
+- immediately after telescope folding produces a =Graphnode=;
 - on every final synthesized =SaveNode= entering graph/filesystem preparation;
   and
 - defensively inside the complete validator's owned/materialized input path so
@@ -606,7 +606,7 @@ in this task's implementing commit message, using filters
 
 ** DONE Implement one stable ID-normalization rule and repair the full oracle
 
-- Add the idempotent =NodeComplete= helper and unit tests for order retention,
+- Add the idempotent =Graphnode= helper and unit tests for order retention,
   repeated extras, PID-in-extras, and already-normal input.
 - Call it after telescope fold and at final =SaveNode= preparation.
 - Make =validate_complete_graph= validate normalized ID claims and construct a
@@ -623,7 +623,7 @@ Focused telescope and complete-validation tests pass, followed by
 =cargo nextest run --test grouped_unit=.  No existing merge extra-ID order
 expectation changes except removal of actual duplicates/PID self-repetition.
 
-Implemented stable first-occurrence normalization in =NodeComplete= and applied
+Implemented stable first-occurrence normalization in =Graphnode= and applied
 it after telescope fold, after buffer lowering, during =NodeRust= projection,
 inside the full validator, and to cloned filesystem instructions before
 serialization.  The full oracle now uses distinct extra-ID owners while keeping
@@ -1213,7 +1213,7 @@ Avoid introducing hidden graph-sized work in helpers whose outer loop is
 incremental:
 
 - no collecting =graph.nodes= merely to sort an error; sort only affected IDs;
-- no =NodeRust -> NodeComplete= conversion for untouched nodes;
+- no =NodeRust -> Graphnode= conversion for untouched nodes;
 - no rebuilding an inverse index to check a local mutation;
 - no body parse for an untouched inbound owner—use =textlinks_to=;
 - no full telescope-warning pass hidden in a formatter/report helper;
@@ -1262,7 +1262,7 @@ names: they say when, not what, and invite callers to assume the wrong scope.
 | internal-index full oracle | =server/dbs/in_rust_graph/internal_index_validation.rs= |
 | override validation and resolution | =server/dbs/in_rust_graph/override_invariants.rs=, =server/dbs/in_rust_graph/override_resolution.rs= |
 | telescope warnings | =server/telescope/invariants.rs= |
-| stable NodeComplete ID normalization | =server/types/nodes/complete.rs=, =server/telescope/fold.rs= |
+| stable Graphnode ID normalization | =server/types/nodes/complete.rs=, =server/telescope/fold.rs= |
 | structured save errors | =server/types/errors.rs= |
 | complete/index unit coverage | =tests/dbs/in_rust_graph/complete_validation.rs=, =tests/dbs/in_rust_graph/internal_index_validation.rs= |
 | save override coverage | =tests/save/override_invariants.rs= |

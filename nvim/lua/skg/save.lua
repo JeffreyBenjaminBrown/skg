@@ -18,7 +18,7 @@ local state = require('skg.state')
 
 local M = {}
 
----Sentinel repo the server pre-fills for a clone-to-be whose repo
+---Sentinel skgrepo the server pre-fills for a clone-to-be whose skgrepo
 ---the user has not specified (in the saved metadata or a prior
 ---round). 'choose_placeholder_repos' prompts for a replacement per
 ---carrying clone (<localleader>ss on the headline works too);
@@ -31,13 +31,13 @@ M.fork_repo_placeholder = 'PICK-A-REPO'
 ---from what the user sees. If the save edited any FOREIGN node the
 ---server replies fork-confirmation instead of save-result, committing
 ---nothing, unless FORK_APPROVED rides along; FORK_REPOS then pairs
----each forked node's id with the owned repo chosen for its clone.
----@param fork_approved boolean|nil
+---each forked node's id with the owned skgrepo chosen for its clone.
+---@param approved_forks boolean|nil
 ---@param fork_repos table[]|nil {{id, repo}, ...}
----@param hoist_approved_pids string[]|nil
+---@param approved_hoist_pids string[]|nil
 ---@param text_approved_pids string[]|nil
-function M.request_save_buffer (fork_approved, fork_repos,
-                                hoist_approved_pids,
+function M.request_save_buffer (approved_forks, fork_repos,
+                                approved_hoist_pids,
                                 text_approved_pids)
   local save_buf = vim.api.nvim_get_current_buf()
   local saved_uri = vim.b[save_buf].skg_view_uri
@@ -50,16 +50,16 @@ function M.request_save_buffer (fork_approved, fork_repos,
   lock.begin_stream('save')
   lock.lock_all_skg_buffers()
   local ok, err = pcall(
-    M.send_save_buffer, save_buf, saved_uri, fork_approved, fork_repos,
-    hoist_approved_pids, text_approved_pids)
+    M.send_save_buffer, save_buf, saved_uri, approved_forks, fork_repos,
+    approved_hoist_pids, text_approved_pids)
   if not ok then
     M.cancel_locally_failed_save()
     error(err) end
 end
 
 ---Serialize and send a save after the stream guard and locks are held.
-function M.send_save_buffer (save_buf, saved_uri, fork_approved, fork_repos,
-                             hoist_approved_pids, text_approved_pids)
+function M.send_save_buffer (save_buf, saved_uri, approved_forks, fork_repos,
+                             approved_hoist_pids, text_approved_pids)
   local focused_line = focus.owning_headline_line()
   local focused_had_metadata = focused_line ~= nil
     and metadata.line_text(focused_line):match('^%*+ %(skg') ~= nil
@@ -73,8 +73,8 @@ function M.send_save_buffer (save_buf, saved_uri, fork_approved, fork_repos,
   })
   local request_line =
     M.save_request_string(saved_uri, save_point_position,
-                          fork_approved, fork_repos,
-                          hoist_approved_pids,
+                          approved_forks, fork_repos,
+                          approved_hoist_pids,
                           text_approved_pids)
   state.register_response_handler('save-lock',
     function (_payload_text, response)
@@ -109,14 +109,14 @@ function M.send_save_buffer (save_buf, saved_uri, fork_approved, fork_repos,
   state.register_response_handler('telescope-hoist-confirmation',
     function (_payload_text, response)
       M.telescope_hoist_confirmation_handler(
-        save_buf, response, fork_approved, fork_repos,
+        save_buf, response, approved_forks, fork_repos,
         text_approved_pids)
     end, false)
   state.register_response_handler('overPrivateText-telescope-confirmation',
     function (_payload_text, response)
       M.save_text_release_confirmation_handler(
-        save_buf, response, fork_approved, fork_repos,
-        hoist_approved_pids)
+        save_buf, response, approved_forks, fork_repos,
+        approved_hoist_pids)
     end, false)
   state.lp_reset()
   client.send_string(request_line)
@@ -201,13 +201,13 @@ end
 ---The save-buffer request line.
 ---@param view_uri string
 ---@param position table
----@param fork_approved boolean|nil
+---@param approved_forks boolean|nil
 ---@param fork_repos table[]|nil
----@param hoist_approved_pids string[]|nil
+---@param approved_hoist_pids string[]|nil
 ---@param text_approved_pids string[]|nil
 ---@return string
-function M.save_request_string (view_uri, position, fork_approved,
-                                fork_repos, hoist_approved_pids,
+function M.save_request_string (view_uri, position, approved_forks,
+                                fork_repos, approved_hoist_pids,
                                 text_approved_pids)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'save buffer'),
@@ -218,22 +218,22 @@ function M.save_request_string (view_uri, position, fork_approved,
                tostring(position.column)),
     sexpr.pair(sexpr.symbol('point-screen-lines-below-window-start'),
                tostring(position.screen_lines_below_window_start)) }
-  if fork_approved then
+  if approved_forks then
     table.insert(request,
-      sexpr.pair(sexpr.symbol('fork-approved'), 'true')) end
+      sexpr.pair(sexpr.symbol('approved-forks'), 'true')) end
   if fork_repos then
     local pairs_sexp = {}
     for _, pair in ipairs(fork_repos) do
       table.insert(pairs_sexp, sexpr.pair(pair[1], pair[2])) end
     table.insert(request,
       { sexpr.symbol('fork-repos'), pairs_sexp }) end
-  if hoist_approved_pids then
-    local field = { sexpr.symbol('hoist-approved-pids') }
-    for _, pid in ipairs(hoist_approved_pids) do
+  if approved_hoist_pids then
+    local field = { sexpr.symbol('approved-hoist-pids') }
+    for _, pid in ipairs(approved_hoist_pids) do
       table.insert(field, pid) end
     table.insert(request, field) end
   if text_approved_pids then
-    local field = { sexpr.symbol('allow-overPrivateText-telescopes') }
+    local field = { sexpr.symbol('approved-overPrivateText-pids') }
     for _, pid in ipairs(text_approved_pids) do
       table.insert(field, pid) end
     table.insert(request, field) end
@@ -457,9 +457,9 @@ end
 function M.restore_point_below_focused_headline (line_offset, column)
   local headline_line = vim.api.nvim_win_get_cursor(0)[1]
   local entry_end -- first line past the focused headline's entry
-  local next_heading = metadata.next_heading_line(headline_line)
-  if next_heading then
-    entry_end = next_heading
+  local next_headline = metadata.next_headline_line(headline_line)
+  if next_headline then
+    entry_end = next_headline
   else
     entry_end = vim.api.nvim_buf_line_count(0) + 1 end
   local target = headline_line + line_offset
@@ -527,7 +527,7 @@ function M.fork_confirmation_handler (save_buf, response)
     -- flow below runs OUTSIDE it: a refusal from approve_fork must
     -- reach the user, not the log -- nesting it here used to swallow
     -- the "pick a repo first" refusal, so approving with a
-    -- placeholder repo silently did nothing.
+    -- placeholder skgrepo silently did nothing.
     local content = payload.field_text(response, 'content')
     local to_minibuffer = payload.field_text(response, 'to-minibuffer')
     confirm_buf = M.show_fork_confirmation(content or '', save_buf)
@@ -541,7 +541,7 @@ function M.fork_confirmation_handler (save_buf, response)
   if confirm_buf and #vim.api.nvim_list_uis() > 0 then
     -- In headless runs (tests) the caller drives approve_fork /
     -- decline_fork directly; interactively, prompt for any clone
-    -- repo not yet specified, then ask.
+    -- skgrepo not yet specified, then ask.
     vim.api.nvim_buf_call(confirm_buf, function ()
       M.choose_placeholder_repos(confirm_buf)
       if vim.fn.confirm('Fork the listed node(s)?',
@@ -558,10 +558,10 @@ end
 ---and headless operation leave the buffer and disk untouched.
 ---@param save_buf integer
 ---@param response any
----@param fork_approved boolean|nil
+---@param approved_forks boolean|nil
 ---@param fork_repos table[]|nil
 function M.telescope_hoist_confirmation_handler (
-    save_buf, response, fork_approved, fork_repos,
+    save_buf, response, approved_forks, fork_repos,
     text_approved_pids)
   state.response_handler_map['collateral-view'] = nil
   state.response_handler_map['save-relax-lock'] = nil
@@ -593,7 +593,7 @@ function M.telescope_hoist_confirmation_handler (
     if vim.fn.confirm(prompt, '&Hoist\n&Abort', 2) == 1 then
       vim.api.nvim_set_current_buf(save_buf)
       M.request_save_buffer(
-        fork_approved, fork_repos, approved_pids,
+        approved_forks, fork_repos, approved_pids,
         text_approved_pids)
     else
       vim.notify('Hoist aborted; nothing was saved. Repair the .skg'
@@ -612,12 +612,12 @@ end
 ---reissues with exact PIDs; Abort keeps current buffers as they are.
 ---@param save_buf integer
 ---@param response any
----@param fork_approved boolean|nil
+---@param approved_forks boolean|nil
 ---@param fork_repos table[]|nil
----@param hoist_approved_pids string[]|nil
+---@param approved_hoist_pids string[]|nil
 function M.save_text_release_confirmation_handler (
-    save_buf, response, fork_approved, fork_repos,
-    hoist_approved_pids)
+    save_buf, response, approved_forks, fork_repos,
+    approved_hoist_pids)
   for _, response_type in ipairs({
       'collateral-view', 'save-relax-lock', 'fork-confirmation',
       'telescope-hoist-confirmation', 'overPrivateText-telescope-confirmation' }) do
@@ -641,7 +641,7 @@ function M.save_text_release_confirmation_handler (
   if vim.fn.confirm(prompt, '&Include\n&Keep withheld', 2) == 1 then
     vim.api.nvim_set_current_buf(save_buf)
     M.request_save_buffer(
-      fork_approved, fork_repos, hoist_approved_pids,
+      approved_forks, fork_repos, approved_hoist_pids,
       approved_pids)
   else
     vim.notify('Save succeeded; protected rerender text remains withheld'
@@ -649,9 +649,9 @@ function M.save_text_release_confirmation_handler (
   end
 end
 
----Prompt for an owned repo for each clone-to-be still carrying the
+---Prompt for an owned skgrepo for each clone-to-be still carrying the
 ---placeholder, writing the choice into the buffer. The server's
----suggested repo (the comment directly above the clone) is the
+---suggested skgrepo (the comment directly above the clone) is the
 ---default; aborting the prompt accepts it. A no-op when every clone's
 ---repo is already specified -- notably when the saved metadata
 ---itself specified it (the server then omits the placeholder), per
@@ -692,12 +692,12 @@ function M.choose_placeholder_repos (buf)
 end
 
 ---Show CONTENT in the fork-confirmation buffer, recording SAVE_BUF as
----its origin; returns the buffer. It is a navigable, editable content
----view (so the user can rotate each clone's repo), but NOT an
+---its source; returns the buffer. It is a navigable, editable content
+---view (so the user can rotate each clone's skgrepo), but NOT an
 ---ordinary save target: it has no view uri (tripping the nil-uri save
 ---guard) and its ':w' refuses. Only approve (<localleader>cc) and
 ---decline (<localleader>ck) act on it. Dismissing it without
----approving strips the origin's lingering fork atom, so the next save
+---approving strips the source's lingering fork atom, so the next save
 ---does not silently re-fork.
 ---@param content string
 ---@param save_buf integer
@@ -721,7 +721,7 @@ function M.show_fork_confirmation (content, save_buf)
   vim.bo[buf].swapfile = false
   vim.bo[buf].filetype = 'org'
   vim.b[buf].skg_view_uri = nil -- not a registered view
-  vim.b[buf].skg_fork_origin = save_buf
+  vim.b[buf].skg_fork_source = save_buf
   vim.b[buf].skg_fork_suppress_strip = false
   require('skg.heralds').enable(buf)
   require('skg.keymaps').attach_content_view(buf)
@@ -742,9 +742,9 @@ function M.show_fork_confirmation (content, save_buf)
       buffer = buf,
       callback = function ()
         if not vim.b[buf].skg_fork_suppress_strip then
-          local origin = vim.b[buf].skg_fork_origin
-          if origin and vim.api.nvim_buf_is_valid(origin) then
-            vim.api.nvim_buf_call(origin, function ()
+          local source = vim.b[buf].skg_fork_source
+          if source and vim.api.nvim_buf_is_valid(source) then
+            vim.api.nvim_buf_call(source, function ()
               metadata.strip_fork_requests_in_buffer() end)
           end
         end
@@ -785,14 +785,14 @@ function M.fork_repos_from_confirmation_buffer (buf)
 end
 
 ---Approve the forks listed in the fork-confirmation buffer: extract
----each clone's chosen repo, kill the confirmation buffer, and
----re-save the originating buffer with the forks approved. Refuses
----while any clone-to-be still carries the placeholder repo.
+---each clone's chosen skgrepo, kill the confirmation buffer, and
+---re-save the source buffer with the forks approved. Refuses
+---while any clone-to-be still carries the placeholder skgrepo.
 function M.approve_fork ()
   local buf = vim.api.nvim_get_current_buf()
-  local origin = vim.b[buf].skg_fork_origin
+  local source = vim.b[buf].skg_fork_source
   local fork_repos = M.fork_repos_from_confirmation_buffer(buf)
-  if not origin or not vim.api.nvim_buf_is_valid(origin) then
+  if not source or not vim.api.nvim_buf_is_valid(source) then
     error('The buffer that requested these forks is no longer open')
   end
   for _, pair in ipairs(fork_repos) do
@@ -805,18 +805,18 @@ function M.approve_fork ()
   -- strip.
   vim.b[buf].skg_fork_suppress_strip = true
   vim.api.nvim_buf_delete(buf, { force = true })
-  vim.api.nvim_set_current_buf(origin)
+  vim.api.nvim_set_current_buf(source)
   M.request_save_buffer(true, fork_repos)
 end
 
 ---Decline the forks; nothing was written. Strips any lingering
----explicit fork atom from the origin buffer and leaves this
+---explicit fork atom from the source buffer and leaves this
 ---confirmation buffer open for reference.
 function M.decline_fork ()
   local buf = vim.api.nvim_get_current_buf()
-  local origin = vim.b[buf].skg_fork_origin
-  if origin and vim.api.nvim_buf_is_valid(origin) then
-    vim.api.nvim_buf_call(origin, function ()
+  local source = vim.b[buf].skg_fork_source
+  if source and vim.api.nvim_buf_is_valid(source) then
+    vim.api.nvim_buf_call(source, function ()
       metadata.strip_fork_requests_in_buffer() end)
   end
   vim.notify('Fork declined; nothing was saved. This buffer is left'

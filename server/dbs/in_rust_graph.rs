@@ -23,15 +23,15 @@ use arc_swap::ArcSwap;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::types::misc::{ID, RepoName, members_of};
+use crate::types::misc::{ID, SkgRepoName, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::rust::GraphnodeInRust;
-use crate::types::save::{DefineNode, DeleteNode, SaveNode};
+use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
 
 /// The in-Rust-graph projection of the graph.
 ///
 /// Values are 'GraphnodeInRust' — everything a 'Graphnode' has except
-/// 'misc', plus 'links_to' parsed from body text.
+/// 'flags', plus 'links_to' parsed from body text.
 ///
 /// The six inverse indexes mirror the five outbound relations and
 /// the extra_ids list, so a reader can ask "who points at X?" in
@@ -98,18 +98,18 @@ impl InRustGraph {
 
   /// Resolve an ID (primary or extra) to the node's primary ID.
   /// Returns None if the ID is unknown.
-  pub fn pid_of (&self, id: &ID) -> Option<ID> {
-    if self . nodes . contains_key (id) {
-      Some (id . clone ())
+  pub fn pid_of (&self, skgid: &ID) -> Option<ID> {
+    if self . nodes . contains_key (skgid) {
+      Some (skgid . clone ())
     } else {
-      self . extra_id_to_pid . get (id) . cloned () } }
+      self . extra_id_to_pid . get (skgid) . cloned () } }
 
   /// Resolve an ID (primary or extra) to its '(pid, repo)'.
   /// Returns None if the ID is unknown.
-  pub fn pid_and_repo (&self, id: &ID) -> Option<(ID, RepoName)> {
-    let pid : ID = self . pid_of (id) ?;
+  pub fn pid_and_skgrepo (&self, skgid: &ID) -> Option<(ID, SkgRepoName)> {
+    let pid : ID = self . pid_of (skgid) ?;
     let node : &GraphnodeInRust = self . nodes . get (&pid) ?;
-    Some ( ( pid, node . home_repo . clone () ) ) }
+    Some ( ( pid, node . home_skgrepo . clone () ) ) }
 }
 
 /// Resolve a raw relationship ID to its inverse-index key under an explicit
@@ -121,7 +121,7 @@ fn canonical_key (
   identity . pid_of (raw) . unwrap_or_else (|| raw . clone ())
 }
 
-/// Add one owner's five relationship contributions. Identity claims are
+/// Add one recorder's five relationship contributions. Identity claims are
 /// installed separately, before relationship indexing begins.
 fn add_relationship_contributions (
   graph    : &mut InRustGraph,
@@ -187,11 +187,11 @@ fn remove_relationship_contributions (
     let key : ID = canonical_key (identity, second_member);
     remove_from_inverse_map (&mut graph . mentioners_of, &key, pid); } }
 
-pub(crate) fn inbound_owners_at (
+pub(crate) fn inbound_recorders_at (
   graph : &InRustGraph,
   key   : &ID,
 ) -> HashSet<ID> {
-  let mut owners : HashSet<ID> = HashSet::new ();
+  let mut recorders : HashSet<ID> = HashSet::new ();
   for index in [
     &graph . contained_by,
     &graph . subscribers_of,
@@ -200,24 +200,24 @@ pub(crate) fn inbound_owners_at (
     &graph . mentioners_of,
   ] {
     if let Some (indexed) = index . get (key) {
-      owners . extend (indexed . iter () . cloned ()); }}
-  owners
+      recorders . extend (indexed . iter () . cloned ()); }}
+  recorders
 }
 
-fn coalesced_final_definitions (
-  definitions : &[DefineNode],
-) -> Vec<&DefineNode> {
-  let mut by_pid : HashMap<&ID, (usize, &DefineNode)> = HashMap::new ();
-  for (position, definition) in definitions . iter () . enumerate () {
-    let pid : &ID = match definition {
-      DefineNode::Save (SaveNode (node))       => &node . pid,
-      DefineNode::Delete (DeleteNode { id, .. }) => id,
+fn coalesced_final_nodeInstructions (
+  nodeInstructions : &[NodeInstruction],
+) -> Vec<&NodeInstruction> {
+  let mut by_pid : HashMap<&ID, (usize, &NodeInstruction)> = HashMap::new ();
+  for (position, nodeInstruction) in nodeInstructions . iter () . enumerate () {
+    let pid : &ID = match nodeInstruction {
+      NodeInstruction::Save (SaveNode (node))       => &node . pid,
+      NodeInstruction::Delete (DeleteNode { skgid, .. }) => skgid,
     };
-    by_pid . insert (pid, (position, definition)); }
-  let mut positioned : Vec<(usize, &DefineNode)> =
+    by_pid . insert (pid, (position, nodeInstruction)); }
+  let mut positioned : Vec<(usize, &NodeInstruction)> =
     by_pid . into_values () . collect ();
   positioned . sort_by_key (|(position, _)| *position);
-  positioned . into_iter () . map (|(_, definition)| definition) . collect ()
+  positioned . into_iter () . map (|(_, nodeInstruction)| nodeInstruction) . collect ()
 }
 
 fn add_to_inverse_map (
@@ -240,68 +240,68 @@ fn remove_from_inverse_map (
     if set . is_empty () { map . remove (key); }
     else                 { map . insert ( key . clone (), set ); } } }
 
-/// Apply a batch of DefineNodes to an ordinary in-memory graph value.
+/// Apply a batch of NodeInstructions to an ordinary in-memory graph value.
 ///
 /// This is the shared mutation path for the live graph update and for
 /// save-time validation simulations.  Keep graph mutation semantics in
 /// this helper so the validator asks the same "what graph would this
 /// produce?" question as the real save path.
 ///
-/// Definitions have simultaneous, last-definition-per-PID graph semantics.
-/// Touched owners and inbound owners whose raw IDs change canonical target are
+/// NodeInstructions have simultaneous, last-nodeInstruction-per-PID graph semantics.
+/// Touched recorders and inbound recorders whose raw IDs change canonical target are
 /// removed under the base resolver, then re-added under the complete final
-/// resolver. This covers edge edits, alias acquisition/transfer, deletion
+/// resolver. This covers relationship edits, alias acquisition/transfer, deletion
 /// rekeying, and body-derived text links with one rule.
-pub fn apply_definenodes_to_inRustGraph (
+pub fn apply_nodeInstructions_to_inRustGraph (
   candidate : &mut InRustGraph,
-  node_defs : &[DefineNode],
+  node_defs : &[NodeInstruction],
 ) {
   let base : InRustGraph = candidate . clone ();
-  let definitions : Vec<&DefineNode> =
-    coalesced_final_definitions (node_defs);
-  let touched_pids : HashSet<ID> = definitions . iter () . map (|definition|
-    match definition {
-      DefineNode::Save (SaveNode (node))       => node . pid . clone (),
-      DefineNode::Delete (DeleteNode { id, .. }) => id . clone (),
+  let nodeInstructions : Vec<&NodeInstruction> =
+    coalesced_final_nodeInstructions (node_defs);
+  let touched_pids : HashSet<ID> = nodeInstructions . iter () . map (|nodeInstruction|
+    match nodeInstruction {
+      NodeInstruction::Save (SaveNode (node))       => node . pid . clone (),
+      NodeInstruction::Delete (DeleteNode { skgid, .. }) => skgid . clone (),
     }) . collect ();
-  let mut affected_ids : HashSet<ID> = touched_pids . clone ();
+  let mut affected_skgids : HashSet<ID> = touched_pids . clone ();
 
   // Install the complete final identity state before rebuilding any forward
   // contribution. The inherited inverse maps are deliberately left in place
-  // until affected owners have been discovered from the base snapshot.
+  // until affected recorders have been discovered from the base snapshot.
   for pid in &touched_pids {
     if let Some (old) = base . nodes . get (pid) {
-      affected_ids . extend (old . extra_ids . iter () . cloned ());
+      affected_skgids . extend (old . extra_ids . iter () . cloned ());
       for extra in &old . extra_ids {
         if candidate . extra_id_to_pid . get (extra) == Some (pid) {
           candidate . extra_id_to_pid . remove (extra); }} }
     candidate . nodes . remove (pid); }
-  for definition in &definitions {
-    if let DefineNode::Save (SaveNode (node)) = definition {
+  for nodeInstruction in &nodeInstructions {
+    if let NodeInstruction::Save (SaveNode (node)) = nodeInstruction {
       let rust : GraphnodeInRust = GraphnodeInRust::from (node);
-      affected_ids . extend (rust . extra_ids . iter () . cloned ());
+      affected_skgids . extend (rust . extra_ids . iter () . cloned ());
       candidate . nodes . insert (rust . pid . clone (), rust . clone ());
       for extra in &rust . extra_ids {
         candidate . extra_id_to_pid . insert (
           extra . clone (), rust . pid . clone ()); }} }
 
   let final_identity : InRustGraph = candidate . clone ();
-  let mut owners_to_reindex : HashSet<ID> = touched_pids;
-  for raw in affected_ids {
+  let mut recorders_to_reindex : HashSet<ID> = touched_pids;
+  for raw in affected_skgids {
     let old_key : ID = canonical_key (&base, &raw);
     let final_key : ID = canonical_key (&final_identity, &raw);
     if old_key != final_key {
-      owners_to_reindex . extend (inbound_owners_at (&base, &old_key)); }}
-  for owner in &owners_to_reindex {
-    if let Some (old) = base . nodes . get (owner) {
+      recorders_to_reindex . extend (inbound_recorders_at (&base, &old_key)); }}
+  for recorder in &recorders_to_reindex {
+    if let Some (old) = base . nodes . get (recorder) {
       remove_relationship_contributions (candidate, old, &base); }}
-  for owner in &owners_to_reindex {
-    if let Some (final_node) = final_identity . nodes . get (owner) {
+  for recorder in &recorders_to_reindex {
+    if let Some (final_node) = final_identity . nodes . get (recorder) {
       add_relationship_contributions (candidate, final_node, &final_identity); }}
 }
 
 /// Check that in-Rust graph reflects the expected post-apply state
-/// for a batch of save instructions: every Save's pid is present in
+/// for a batch of nodeInstructions: every Save's pid is present in
 /// in_rust_graph, and every Delete's id is absent. Used as a 'debug_assert!'
 /// invariant guard at the top of 'update_views_after_save' to catch
 /// pipeline-ordering regressions (someone reshuffles the pipeline so
@@ -309,22 +309,22 @@ pub fn apply_definenodes_to_inRustGraph (
 /// coherence, Err with the offending pid's detail otherwise. Never
 /// panics — the caller wraps in 'debug_assert!' so release builds pay
 /// no cost.
-pub fn in_rust_graph_coherent_with_save_instructions_in (
+pub fn in_rust_graph_coherent_with_nodeInstructions_in (
   graph : &InRustGraph,
-  save_instructions : &[DefineNode],
+  nodeInstructions : &[NodeInstruction],
 ) -> Result<(), String> {
-  for instr in save_instructions {
+  for instr in nodeInstructions {
     match instr {
-      DefineNode::Save (SaveNode (node)) => {
+      NodeInstruction::Save (SaveNode (node)) => {
         if ! graph . nodes . contains_key (&node . pid) {
           return Err ( format! (
             "Save instruction pid {} absent from the in-Rust graph",
             node . pid )); }}
-      DefineNode::Delete (DeleteNode { id, .. }) => {
-        if graph . nodes . contains_key (id) {
+      NodeInstruction::Delete (DeleteNode { skgid, .. }) => {
+        if graph . nodes . contains_key (skgid) {
           return Err ( format! (
             "Delete instruction id {} still present in the in-Rust graph",
-            id )); }} } }
+            skgid )); }} } }
   Ok (( )) }
 
 /// Server-wide handle to the shared graph. Readers call

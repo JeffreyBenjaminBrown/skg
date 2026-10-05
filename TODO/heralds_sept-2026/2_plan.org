@@ -121,7 +121,7 @@ parent source renders 'a/L'. A slash must never stand for 0/0.
 
 *** Ancestors can appear on either side of the slash
 Preserve the existing tracked-ancestor policy and generation meanings,
-including scaffold levels. Add incoming-link ancestor facts; do not
+including non-vognode levels. Add incoming-link ancestor facts; do not
 expand which ancestors are tracked merely for this feature.
 
 Print each ancestor flag once within a fraction: in the numerator if its

@@ -29,7 +29,7 @@
 //   * c
 //   ** d
 //   *** MERGED: b
-// (The first d is expected to be definitive since a's subtree is
+// (The first d is expected to be editable since a's subtree is
 // visited first in document order; the second d write-protected.)
 
 use indoc::indoc;
@@ -120,7 +120,7 @@ async fn merge_acquiree_in_sibling_subtree_impl (
     failures . push (
       "a not found in rendered view" . to_string() ); }
 
-  // 3. d should also appear under c (same pid, definitive under
+  // 3. d should also appear under c (same pid, editable under
   //    whichever root comes first in document order).
   let c_idx : Option<usize> =
     lines . iter() . position ( |l| l . contains ("(id c)") );
@@ -140,8 +140,8 @@ async fn merge_acquiree_in_sibling_subtree_impl (
 
   // 4. The MERGED: b preserver should appear somewhere in the view.
   //    Exactly one of the two d occurrences (a's and c's) is
-  //    definitive; the other is write-protected and won't expand its
-  //    contents. DefinitiveMap picks the first in document order.
+  //    editable; the other is write-protected and won't expand its
+  //    contents. EditableMap picks the first in document order.
   if ! view . contains ("MERGED: b") {
     failures . push (
       "text preserver 'MERGED: b' not found anywhere in rendered \

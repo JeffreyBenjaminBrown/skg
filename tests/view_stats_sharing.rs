@@ -1,12 +1,12 @@
 // cargo nextest run --test grouped_overrides -E 'test(view_stats_sharing::)'
 //
 // The position-relative sharing view-stats
-// (TODO/full-schema/10_heralds-and-stats.org):
-// - grandparentOverrides ("gO"): a subscribee-as-such whose folder owner
+// (TODO/DONE/full-schema/DONE/10_heralds-and-stats.org):
+// - grandparentOverrides ("gO"): a subscribee-as-such whose folder recorder
 //   also overrides it;
 // - grandparentSubscribes ("gS"): an overriddenFolder member whose folder
-//   owner also subscribes to it;
-// - overridesParent ("Op"): a node drawn under a gnode it overrides.
+//   recorder also subscribes to it;
+// - overridesParent ("Op"): a node drawn under a vognode it overrides.
 // One fixture serves all three: R subscribes to E and F and overrides
 // E (so E under R's subscribeeFolder carries gO and under R's
 // overriddenFolder carries gS, while F carries neither); R contains P,
@@ -118,7 +118,7 @@ fn assert_op_in_view_of_P (
   label : &str,
 ) {
   let c_lines : Vec<&str> = lines_containing (buf, "(id C)");
-  // Op ("overridesParent"): C overrides its visible parent (a = P), so
+  // Op ("overridesParent"): C overrides its viewparent (a = P), so
   // it is born of an overrides-OUT relation to generation 1.
   assert! ( c_lines . iter ()
             . any ( |l| l . contains ("(overrides_view_of (out")
@@ -200,6 +200,6 @@ async fn overridesParent_is_position_relative (
         . find ( |l| l . starts_with ("* ") && l . contains ("(id C)") )
         . expect ("view of C should have C as its root");
       assert! ( ! c_root_line . contains ("overridesParent"),
-        "C as a view root has no visible parent to override:\n{}",
+        "C as a view root has no viewparent to override:\n{}",
         view_of_c );
       Ok (( )) }

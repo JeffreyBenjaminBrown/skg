@@ -66,7 +66,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
       let (b_view, _, _) = single_root_view (
         config, Some (tantivy), &ID::from ("B"), false) ?;
       let dirty_b : String = format! ("{}\nlocal edit", b_view);
-      let a_path = config . repos . values () . next () . unwrap ()
+      let a_path = config . skgrepos . values () . next () . unwrap ()
         . path . join ("A.skg");
       let a_before : Vec<u8> = fs::read (&a_path) ?;
 

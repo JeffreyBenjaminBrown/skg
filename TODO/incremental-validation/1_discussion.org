@@ -257,7 +257,7 @@ boundary must remain when they are called directly.
 ** Complete validation's work
 
 =validate_graph_after_definitions= first converts every current =NodeRust= back
-to a cloned =NodeComplete= and inserts it in a PID-keyed =BTreeMap=.  It applies
+to a cloned =Graphnode= and inserts it in a PID-keyed =BTreeMap=.  It applies
 the small definition batch to that map, collects every value, then calls
 =validate_complete_graph= (=server/dbs/in_rust_graph/complete_validation.rs:165=).
 
@@ -333,7 +333,7 @@ ID in the node, then retain only the first occurrence of each ID in
 =extra_ids=.  This both removes repeated extras and removes the PID if it also
 appears as an extra, while preserving the order of the meaningful extra IDs.
 
-Apply that normalization whenever a =NodeComplete= enters the graph: after a
+Apply that normalization whenever a =Graphnode= enters the graph: after a
 filesystem telescope is folded and when a final =Save= is prepared.  A later
 save of such a node consequently writes the normalized list back to disk, but
 an otherwise valid startup need not fail merely because redundant spellings
@@ -436,7 +436,7 @@ they are easier to read.
 
 The filesystem is authoritative, so validation that makes each proposed
 telescope representable and writable must remain before mutation.
-=prepare_nodecomplete_telescope= unfolds one changed =NodeComplete=, verifies its
+=prepare_nodecomplete_telescope= unfolds one changed =Graphnode=, verifies its
 home and section ownership, serializes it, and returns prepared writes and
 deletions (=server/dbs/filesystem/one_node.rs:145=).  The combined save already
 preflights every ordinary and merge output at =server/save.rs:193=.
@@ -663,7 +663,7 @@ gate.  A generation number would be another valid base identity.
 10. Return the prepared candidate; do not rebuild or reapply it later.
 
 The existing incremental graph apply took about 0.26 ms in the measured save,
-including =NodeComplete= to =NodeRust= conversion and text-link parsing only for
+including =Graphnode= to =NodeRust= conversion and text-link parsing only for
 the two changed definitions.
 
 ** Store-update algorithm
@@ -779,7 +779,7 @@ production mutator and return it for publication.  Retain the full validator in
 test-only shadow comparisons.
 
 Make the revised ID semantics explicit at this stage.  Add one shared
-=NodeComplete= ID-normalization helper that treats the PID as the first
+=Graphnode= ID-normalization helper that treats the PID as the first
 occurrence and retains only the first occurrence of every remaining
 =extra_id=.  Call it after telescope folding and on every final =Save= before
 identity validation, graph construction, or filesystem preparation.  Thus the
@@ -1075,7 +1075,7 @@ bookkeeping need into unnecessary authoritative file writes.
 
 Git history shows all three save-time calls and the canonical complete
 validator arriving together in commit =773d0506d= ("Complete
-TODO/ditch-typedb/2_plan.org").  The duplication is therefore a boundary-design
+TODO/DONE/ditch-typedb/2_plan.org").  The duplication is therefore a boundary-design
 artifact rather than evidence that independent historical callers require two
 checks.
 

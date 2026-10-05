@@ -28,7 +28,7 @@ pub struct OpenViews {
   // TODO ? OPTIMIZE:
   // The reverse lookup (PID -> views) is computed by scanning `views` via views_containing(). This is O(views) per call, fine for < 10 views. If the number of views grows large, consider a bijective map (HashMap<ID, HashSet<ViewUri>> maintained alongside this one) for O(1) reverse lookups.
 
-  root_ids        : ManyToMany<ID, ViewUri>, // Maps every root ID (primary + extra) ↔ ViewUri. Supports many-to-many because a view can have multiple roots, and an ID could be a root in multiple views. Maintained by register_view / update_view / unregister_view.
+  root_skgids        : ManyToMany<ID, ViewUri>, // Maps every root ID (primary + extra) ↔ ViewUri. Supports many-to-many because a view can have multiple roots, and an ID could be a root in multiple views. Maintained by register_view / update_view / unregister_view.
 }
 
 /// Invariant: all viewforest mutations must go through register_view /
@@ -36,7 +36,7 @@ pub struct OpenViews {
 /// Direct viewforest mutation would make pids stale.
 pub struct ViewState {
   pub viewforest : ViewForest,
-  pub pids   : HashSet<ID>, // the Active (Normal) vognodes in the buffer (the
+  pub pids       : HashSet<ID>, // the Active vognodes in the buffer (the
                             // kind this view renders meaningfully; see
                             // pids_from_viewforest)
 }
@@ -63,11 +63,11 @@ impl OpenViews {
   pub fn new () -> Self {
     OpenViews {
       views       : HashMap::new (),
-      root_ids    : ManyToMany::new () }}
+      root_skgids : ManyToMany::new () }}
 
   pub fn clear (&mut self) {
     self . views       . clear ();
-    self . root_ids    = ManyToMany::new (); }
+    self . root_skgids    = ManyToMany::new (); }
 
   pub fn viewuri_to_pids (
     &self,
@@ -87,11 +87,11 @@ impl OpenViews {
   /// Returns the first (if any exists) CONTENT buffer (not a search
   /// view) for which the ID is a root
   /// (level-1 headline).
-  pub fn content_view_uri_for_root_id (
+  pub fn content_view_uri_for_root_skgid (
     &self,
-    id : &ID,
+    skgid : &ID,
   ) -> Option<&ViewUri> {
-    self . root_ids . get_right (id)
+    self . root_skgids . get_right (skgid)
       . and_then ( |uris| uris . iter ()
                    . find ( |u| matches! (
                        u, ViewUri::ContentView (_) ))) }
@@ -105,9 +105,9 @@ impl OpenViews {
   ) { let viewforest : ViewForest =
         viewforest . into ();
       let rids : HashSet<ID> =
-        root_ids_from_viewforest ( graph, &viewforest );
+        root_skgids_from_viewforest ( graph, &viewforest );
       for rid in &rids {
-        self . root_ids . insert (
+        self . root_skgids . insert (
           rid . clone (), uri . clone () ); }
       let pids : HashSet<ID> =
         pids . iter () . cloned () . collect ();
@@ -124,11 +124,11 @@ impl OpenViews {
         new_viewforest . into ();
       let pids : HashSet<ID> =
         pids_from_viewforest ( &new_viewforest );
-      self . root_ids . remove_right (uri);
+      self . root_skgids . remove_right (uri);
       let rids : HashSet<ID> =
-        root_ids_from_viewforest ( graph, &new_viewforest );
+        root_skgids_from_viewforest ( graph, &new_viewforest );
       for rid in &rids {
-        self . root_ids . insert (
+        self . root_skgids . insert (
           rid . clone (), uri . clone () ); }
       if let Some (vs)
         = self . views . get_mut (uri)
@@ -142,7 +142,7 @@ impl OpenViews {
   pub fn unregister_view (
     &mut self,
     uri : &ViewUri,
-  ) { self . root_ids . remove_right (uri);
+  ) { self . root_skgids . remove_right (uri);
       self . views . remove (uri); }
 
   pub fn views_containing (
@@ -160,8 +160,8 @@ impl OpenViews {
 //
 
 /// The pids a view "contains" for collateral detection (views_containing): the
-/// primary ids of its Active (Normal) vognodes -- the only kind backed by a
-/// real, current graph node that this view renders meaningfully. Inactive
+/// primary ids of its Active vognodes -- the only kind backed by a
+/// real, current graphnode that this view renders meaningfully. Inactive
 /// placeholders are excluded: they are anonymous markers whose rerender shows
 /// nothing about the node, so a save touching that node need not re-render this
 /// view (its active descendants register themselves). Deleted / Unknown / Diff
@@ -175,27 +175,27 @@ pub fn pids_from_viewforest (
   viewforest . nodes ()
     . filter_map ( |n| match &n . value () . kind {
       ViewnodeKind::Vognode (Vognode::Active (t)) =>
-        Some ( t . id . clone () ),
+        Some ( t . skgid . clone () ),
       _ => None } )
     . collect () }
 
 /// Collect all IDs (primary + extras) for every root
 /// -- i.e. every level-1 headline -- in the view.
-/// (There can be graph roots at other levels, via non-Content affectsParent;
+/// (There can be graph roots at other levels, via non-member (affectsParent false) children;
 /// this does not return those.)
 ///
 /// Extra IDs are pulled from the operation's captured in-Rust graph.
-fn root_ids_from_viewforest (
+fn root_skgids_from_viewforest (
   graph      : &InRustGraph,
   viewforest : &ViewForest,
 ) -> HashSet<ID> {
-  let mut ids : HashSet<ID> = HashSet::new ();
+  let mut skgids : HashSet<ID> = HashSet::new ();
   for child in viewforest . roots () {
-    if let Some (vid) = child . value () . active_or_diff_phantom_id () {
-      ids . insert ( vid . clone () );
+    if let Some (vid) = child . value () . active_or_diff_phantom_skgid () {
+      skgids . insert ( vid . clone () );
       if let Some (pid) = graph . pid_of ( vid ) {
           if let Some (node) = graph . nodes . get (&pid) {
-            ids . insert ( pid . clone () );
+            skgids . insert ( pid . clone () );
             for extra_id in &node . extra_ids {
-              ids . insert ( extra_id . clone () ); }}}}}
-  ids }
+              skgids . insert ( extra_id . clone () ); }}}}}
+  skgids }

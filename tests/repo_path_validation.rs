@@ -6,106 +6,106 @@ use std::io::{Result as IoResult, Error as IoError, ErrorKind as IoErrorKind};
 use std::path::PathBuf;
 use tempfile::{tempdir, TempDir};
 
-use skg::dbs::filesystem::not_nodes::validate_repo_paths_creating_owned_ones_if_needed;
-use skg::types::misc::{SkgfileRepo, RepoName};
+use skg::dbs::filesystem::not_nodes::validate_skgrepo_paths_creating_owned_ones_if_needed;
+use skg::types::misc::{SkgRepo, SkgRepoName};
 
 #[test]
-fn test_validate_existing_owned_repo() {
+fn test_validate_existing_owned_skgrepo() {
   // Create a temporary directory
   let dir : TempDir = tempdir() . unwrap();
-  let repo_path : PathBuf = dir . path() . to_path_buf();
+  let skgrepo_path : PathBuf = dir . path() . to_path_buf();
 
-  let mut repos : HashMap<RepoName, SkgfileRepo> =
+  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
     HashMap::new();
-  repos . insert(
-    RepoName::from ("main"),
-    SkgfileRepo {
-      name: RepoName::from ("main"),
+  skgrepos . insert(
+    SkgRepoName::from ("main"),
+    SkgRepo {
+      name: SkgRepoName::from ("main"),
         abbreviation: None,
-      path: repo_path . clone(),
-      user_owns_it: true,
+      path: skgrepo_path . clone(),
+      owned: true,
     }
   );
 
   // Should succeed since directory exists
   let result : IoResult<()> =
-    validate_repo_paths_creating_owned_ones_if_needed (&repos);
+    validate_skgrepo_paths_creating_owned_ones_if_needed (&skgrepos);
   assert!(result . is_ok(),
           "Validation should pass for existing owned repo");
 }
 
 #[test]
-fn test_validate_nonexistent_owned_repo() {
+fn test_validate_nonexistent_owned_skgrepo() {
   // Use a path that doesn't exist yet
   let temp_dir : TempDir = tempdir() . unwrap();
-  let repo_path : PathBuf =
+  let skgrepo_path : PathBuf =
     temp_dir . path() . join ("nonexistent_repo");
 
-  let mut repos : HashMap<RepoName, SkgfileRepo> =
+  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
     HashMap::new();
-  repos . insert(
-    RepoName::from ("main"),
-    SkgfileRepo {
-      name: RepoName::from ("main"),
+  skgrepos . insert(
+    SkgRepoName::from ("main"),
+    SkgRepo {
+      name: SkgRepoName::from ("main"),
         abbreviation: None,
-      path: repo_path . clone(),
-      user_owns_it: true,
+      path: skgrepo_path . clone(),
+      owned: true,
     }
   );
 
   // Should succeed and create the directory
   let result : IoResult<()> =
-    validate_repo_paths_creating_owned_ones_if_needed (&repos);
+    validate_skgrepo_paths_creating_owned_ones_if_needed (&skgrepos);
   assert!(result . is_ok(), "Validation should pass and create directory for owned repo");
-  assert!(repo_path . exists(), "Directory should have been created");
+  assert!(skgrepo_path . exists(), "Directory should have been created");
 }
 
 #[test]
-fn test_validate_existing_foreign_repo() {
+fn test_validate_existing_foreign_skgrepo() {
   // Create a temporary directory
   let dir : TempDir = tempdir() . unwrap();
-  let repo_path : PathBuf = dir . path() . to_path_buf();
+  let skgrepo_path : PathBuf = dir . path() . to_path_buf();
 
-  let mut repos : HashMap<RepoName, SkgfileRepo> =
+  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
     HashMap::new();
-  repos . insert(
-    RepoName::from ("foreign"),
-    SkgfileRepo {
-      name: RepoName::from ("foreign"),
+  skgrepos . insert(
+    SkgRepoName::from ("foreign"),
+    SkgRepo {
+      name: SkgRepoName::from ("foreign"),
         abbreviation: None,
-      path: repo_path . clone(),
-      user_owns_it: false,
+      path: skgrepo_path . clone(),
+      owned: false,
     }
   );
 
   // Should succeed since directory exists
   let result : IoResult<()> =
-    validate_repo_paths_creating_owned_ones_if_needed (&repos);
+    validate_skgrepo_paths_creating_owned_ones_if_needed (&skgrepos);
   assert!(result . is_ok(), "Validation should pass for existing foreign repo");
 }
 
 #[test]
-fn test_validate_nonexistent_foreign_repo() {
+fn test_validate_nonexistent_foreign_skgrepo() {
   // Use a path that doesn't exist
   let temp_dir : TempDir = tempdir() . unwrap();
-  let repo_path : PathBuf =
+  let skgrepo_path : PathBuf =
     temp_dir . path() . join ("nonexistent_foreign");
 
-  let mut repos : HashMap<RepoName, SkgfileRepo> =
+  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
     HashMap::new();
-  repos . insert(
-    RepoName::from ("foreign"),
-    SkgfileRepo {
-      name: RepoName::from ("foreign"),
+  skgrepos . insert(
+    SkgRepoName::from ("foreign"),
+    SkgRepo {
+      name: SkgRepoName::from ("foreign"),
         abbreviation: None,
-      path: repo_path . clone(),
-      user_owns_it: false,
+      path: skgrepo_path . clone(),
+      owned: false,
     }
   );
 
-  // Should fail since foreign repo path doesn't exist
+  // Should fail since foreign skgrepo path doesn't exist
   let result : IoResult<()> =
-    validate_repo_paths_creating_owned_ones_if_needed (&repos);
+    validate_skgrepo_paths_creating_owned_ones_if_needed (&skgrepos);
   assert!(result . is_err(), "Validation should fail for nonexistent foreign repo");
 
   let err : IoError = result . unwrap_err();
@@ -115,7 +115,7 @@ fn test_validate_nonexistent_foreign_repo() {
 }
 
 #[test]
-fn test_validate_multiple_repos() {
+fn test_validate_multiple_skgrepos() {
   let temp_dir : TempDir = tempdir() . unwrap();
 
   // Create one existing directory
@@ -125,37 +125,37 @@ fn test_validate_multiple_repos() {
   // Path that doesn't exist yet (will be created)
   let new_owned_path : PathBuf = temp_dir . path() . join ("new_owned");
 
-  let mut repos : HashMap<RepoName, SkgfileRepo> =
+  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
     HashMap::new();
-  repos . insert(
-    RepoName::from ("existing"),
-    SkgfileRepo {
-      name: RepoName::from ("existing"),
+  skgrepos . insert(
+    SkgRepoName::from ("existing"),
+    SkgRepo {
+      name: SkgRepoName::from ("existing"),
         abbreviation: None,
       path: existing_path . clone(),
-      user_owns_it: true,
+      owned: true,
     }
   );
-  repos . insert(
-    RepoName::from ("new_owned"),
-    SkgfileRepo {
-      name: RepoName::from ("new_owned"),
+  skgrepos . insert(
+    SkgRepoName::from ("new_owned"),
+    SkgRepo {
+      name: SkgRepoName::from ("new_owned"),
         abbreviation: None,
       path: new_owned_path . clone(),
-      user_owns_it: true,
+      owned: true,
     }
   );
 
   // Should succeed, creating the new directory
   let result : IoResult<()> =
-    validate_repo_paths_creating_owned_ones_if_needed (&repos);
+    validate_skgrepo_paths_creating_owned_ones_if_needed (&skgrepos);
   assert!(result . is_ok(), "Validation should pass for multiple repos");
   assert!(existing_path . exists(), "Existing path should still exist");
   assert!(new_owned_path . exists(), "New owned path should have been created");
 }
 
 #[test]
-fn test_validate_multiple_repos_with_foreign_failure() {
+fn test_validate_multiple_skgrepos_with_foreign_failure() {
   let temp_dir : TempDir = tempdir() . unwrap();
 
   // Create one existing directory
@@ -166,30 +166,30 @@ fn test_validate_multiple_repos_with_foreign_failure() {
   let nonexistent_foreign : PathBuf =
     temp_dir . path() . join ("nonexistent_foreign");
 
-  let mut repos : HashMap<RepoName, SkgfileRepo> =
+  let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
     HashMap::new();
-  repos . insert(
-    RepoName::from ("existing"),
-    SkgfileRepo {
-      name: RepoName::from ("existing"),
+  skgrepos . insert(
+    SkgRepoName::from ("existing"),
+    SkgRepo {
+      name: SkgRepoName::from ("existing"),
         abbreviation: None,
       path: existing_path . clone(),
-      user_owns_it: true,
+      owned: true,
     }
   );
-  repos . insert(
-    RepoName::from ("foreign"),
-    SkgfileRepo {
-      name: RepoName::from ("foreign"),
+  skgrepos . insert(
+    SkgRepoName::from ("foreign"),
+    SkgRepo {
+      name: SkgRepoName::from ("foreign"),
         abbreviation: None,
       path: nonexistent_foreign . clone(),
-      user_owns_it: false,
+      owned: false,
     }
   );
 
-  // Should fail because of the foreign repo
+  // Should fail because of the foreign skgrepo
   let result : IoResult<()> =
-    validate_repo_paths_creating_owned_ones_if_needed (&repos);
+    validate_skgrepo_paths_creating_owned_ones_if_needed (&skgrepos);
   assert!(result . is_err(),
           "Validation should fail when foreign repo doesn't exist");
 

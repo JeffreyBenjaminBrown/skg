@@ -2,8 +2,8 @@
 
 use crate::context::{MapToContent, MapToContainers};
 use crate::context::{content_maps_from_nodes, had_id_set_from_nodes};
-use crate::context::mentioned_ids_from_nodes;
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos_collecting_violations;
+use crate::context::mentioned_skgids_from_nodes;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos_collecting_violations;
 use crate::dbs::tantivy::{mk_tantivy_schema, tantivy_index_from_index};
 use crate::dbs::tantivy::write::update_index_with_nodes;
 use crate::types::env::SkgEnv;
@@ -31,8 +31,8 @@ use tantivy::Index;
 /// window.
 pub struct InitContextHandoff {
   pub had_id_set        : HashSet<ID>,
-  pub all_node_ids      : HashSet<ID>,
-  pub mentioned_ids      : HashSet<ID>,
+  pub all_node_skgids   : HashSet<ID>,
+  pub mentioned_skgids  : HashSet<ID>,
   pub map_to_content    : MapToContent,
   pub map_to_containers : MapToContainers,
 }
@@ -48,7 +48,7 @@ pub fn initialize_dbs (
   tracing::info! ("Reading authoritative .skg files from all repos...");
   let (nodes, load_violations)
     : (Vec<Graphnode>, Vec<(ID, TelescopeViolation)>) =
-    read_all_skg_files_from_repos_collecting_violations (config)
+    read_all_skg_files_from_skgrepos_collecting_violations (config)
     . unwrap_or_else (|e| {
       tracing::error! ("Failed to read .skg files: {}", e);
       std::process::exit (1); });
@@ -64,7 +64,7 @@ pub fn initialize_dbs (
     &graph_warnings, &config . data_root ) {
     tracing::warn! (error = %e, "could not write the telescope report"); }
   tracing::info! (
-    files = nodes . len (), repos = config . repos . len (),
+    files = nodes . len (), skgrepos = config . skgrepos . len (),
     ".skg files read and graph validated");
   let tantivy_index = wipe_then_init_tantivy_db_with_logs_and_errors (
     config, &nodes);
@@ -86,12 +86,12 @@ fn env_and_handoff_from_nodes (
 ) -> (SkgEnv, InitContextHandoff) {
   let had_id_set : HashSet<ID> =
     had_id_set_from_nodes (&nodes);
-  let all_node_ids : HashSet<ID> =
+  let all_node_skgids : HashSet<ID> =
     nodes . iter ()
     . map ( |n| n . pid . clone () )
     . collect ();
-  let mentioned_ids : HashSet<ID> =
-    mentioned_ids_from_nodes (&nodes);
+  let mentioned_skgids : HashSet<ID> =
+    mentioned_skgids_from_nodes (&nodes);
   let ( map_to_content, map_to_containers )
     : ( MapToContent, MapToContainers )
     = content_maps_from_nodes (&nodes);
@@ -99,8 +99,8 @@ fn env_and_handoff_from_nodes (
       config . clone (), Arc::new (graph), tantivy_index ),
     InitContextHandoff {
       had_id_set,
-      all_node_ids,
-      mentioned_ids,
+      all_node_skgids,
+      mentioned_skgids,
       map_to_content,
       map_to_containers } ) }
 

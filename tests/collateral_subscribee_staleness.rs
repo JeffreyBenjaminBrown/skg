@@ -2,11 +2,11 @@
 //
 // Regression for the collateral-rerender staleness flagged in
 // subscribeeFolder-maybe-todo.org and fixed for forks (plan.org:
-// "Collateral-rerender staleness fix"). A DEFINITIVE subscriber open in
+// "Collateral-rerender staleness fix"). A EDITABLE subscriber open in
 // two views: changing its subscriptions in one view and saving must
 // refresh the OTHER (collateral) view's subscribeeFolder from the graph,
 // not leave it showing the old subscription. Before the fix,
-// reconcile_subscribeeFolder_children skipped a definitive subscriber
+// reconcile_subscribeeFolder_children skipped an editable subscriber
 // outside diff mode (the `parent_write-protected || repo_diffs.is_some()`
 // gate), so the collateral subscribeeFolder kept stale members.
 //
@@ -87,7 +87,7 @@ fn collateral_definitive_subscriber_subscribeeFolder_refreshes
       let a_uri : ViewUri = ViewUri::ContentView ("S-a" . into ());
       let b_uri : ViewUri = ViewUri::ContentView ("S-b" . into ());
 
-      // View A rooted at S: S is a definitive root, its subscribeeFolder
+      // View A rooted at S: S is an editable root, its subscribeeFolder
       // shows both subscribees M and N.
       let (a_view, a_pids, a_vf) =
         single_root_view (
@@ -99,7 +99,7 @@ fn collateral_definitive_subscriber_subscribeeFolder_refreshes
       views_state . open_views . register_view (
         &graph . load_full (), a_uri . clone (), a_vf, &a_pids );
 
-      // View B rooted at S too -- the collateral view. S is definitive
+      // View B rooted at S too -- the collateral view. S is editable
       // here as well (it is the root).
       let (b_view, b_pids, b_vf) =
         single_root_view (
@@ -120,7 +120,7 @@ fn collateral_definitive_subscriber_subscribeeFolder_refreshes
 
       // The collateral view B must refresh from the just-saved graph:
       // its subscribeeFolder now shows M but NOT N, even though S is
-      // DEFINITIVE there (the root) and diff mode is off. Before the
+      // EDITABLE there (the root) and diff mode is off. Before the
       // fix, B kept N stale.
       assert_eq! ( collateral_views . len (), 1,
         "exactly view B should be collateral: {:?}", collateral_views );

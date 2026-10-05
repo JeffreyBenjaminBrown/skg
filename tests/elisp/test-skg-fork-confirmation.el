@@ -6,25 +6,25 @@
 (require 'cl-lib)
 (require 'skg-request-save)
 
-(ert-deftest test-save-request-sexp-omits-fork-approved-by-default ()
-  "Without approval, the save request carries no fork-approved field."
+(ert-deftest test-save-request-sexp-omits-approved-forks-by-default ()
+  "Without approval, the save request carries no approved-forks field."
   (let ((sexp (skg--save-request-sexp
                "uri-1"
                '(:point-lines-below-focused-headline 0
                  :point-column 0
                  :point-screen-lines-below-window-start 0))))
     (should (equal (cdr (assoc 'request sexp)) "save buffer"))
-    (should-not (assoc 'fork-approved sexp))))
+    (should-not (assoc 'approved-forks sexp))))
 
-(ert-deftest test-save-request-sexp-includes-fork-approved-when-set ()
-  "With approval, the save request carries (fork-approved . \"true\")."
+(ert-deftest test-save-request-sexp-includes-approved-forks-when-set ()
+  "With approval, the save request carries (approved-forks . \"true\")."
   (let ((sexp (skg--save-request-sexp
                "uri-1"
                '(:point-lines-below-focused-headline 0
                  :point-column 0
                  :point-screen-lines-below-window-start 0)
                t)))
-    (should (equal (cdr (assoc 'fork-approved sexp)) "true"))))
+    (should (equal (cdr (assoc 'approved-forks sexp)) "true"))))
 
 (ert-deftest test-save-request-sexp-omits-fork-repos-by-default ()
   "Without chosen repos, the save request carries no fork-repos field."
@@ -60,12 +60,12 @@
                   :point-column 0
                   :point-screen-lines-below-window-start 0)
                 nil nil '("A" "B")))
-         (entry (assoc 'hoist-approved-pids sexp)))
-    (should (equal entry '(hoist-approved-pids "A" "B")))))
+         (entry (assoc 'approved-hoist-pids sexp)))
+    (should (equal entry '(approved-hoist-pids "A" "B")))))
 
 (ert-deftest test-hoist-confirmation-balances-save-and-retries-exact-pids ()
   "Approving Hoist terminates the first save and preserves fork authority."
-  (let ((origin (generate-new-buffer "*hoist-origin*"))
+  (let ((source (generate-new-buffer "*hoist-origin*"))
         (skg-response-handler-map
          '((save-result ignore . t)
            (collateral-view ignore)
@@ -82,10 +82,10 @@
                    (lambda (&rest args) (setq called args))))
           (let ((noninteractive nil))
             (skg--telescope-hoist-confirmation-handler
-             origin
+             source
              "((response-type telescope-hoist-confirmation) (telescopes (((pid \"A\") (home \"public\")) ((pid \"B\") (home \"private\")))) (prompt \"Hoist?\"))"
              t '(("N" . "owned")))))
-      (kill-buffer origin))
+      (kill-buffer source))
     (should (equal called
                    '(t (("N" . "owned")) ("A" "B") nil)))
     (should (= skg-lp--pending-count 0))
@@ -99,12 +99,12 @@
                   :point-column 0
                   :point-screen-lines-below-window-start 0)
                 nil nil nil '("U1" "U2")))
-         (entry (assoc 'allow-overPrivateText-telescopes sexp)))
-    (should (equal entry '(allow-overPrivateText-telescopes "U1" "U2")))))
+         (entry (assoc 'approved-overPrivateText-pids sexp)))
+    (should (equal entry '(approved-overPrivateText-pids "U1" "U2")))))
 
 (ert-deftest test-save-text-release-balances-and-retries-exact-pids ()
   "The save is committed, but no staged text is adopted before approval."
-  (let ((origin (generate-new-buffer "*save-release-origin*"))
+  (let ((source (generate-new-buffer "*save-release-origin*"))
         (skg-response-handler-map
          '((save-result ignore . t)
            (collateral-view ignore)
@@ -120,10 +120,10 @@
                    (lambda (&rest args) (setq called args))))
           (let ((noninteractive nil))
             (skg--save-text-release-confirmation-handler
-             origin
+             source
              "((response-type overPrivateText-telescope-confirmation) (operation save-rerender) (pids (U1 U2)) (prompt \"Include?\"))"
              t '(("N" . "owned")) '("H"))))
-      (kill-buffer origin))
+      (kill-buffer source))
     (should (equal called
                    '(t (("N" . "owned")) ("H") ("U1" "U2"))))
     (should (= skg-lp--pending-count 0))
@@ -147,28 +147,28 @@ repo to a later fork's child (parent-repo resets on every level 1)."
     (insert "* (skg (node (repo ownedA))) A-edited\n")
     (insert "** (skg (node (id N1) (repo foreign) writeProtected)) N1-original\n")
     ;; A stray/garbled level-1 headline with no skg metadata.
-    (insert "* plain heading, no metadata\n")
+    (insert "* plain headline, no metadata\n")
     (insert "** (skg (node (id N2) (repo foreign) writeProtected)) N2-original\n")
     (org-mode)
-    ;; N1 -> ownedA; N2 must NOT inherit ownedA (its parent has no repo).
+    ;; N1 -> ownedA; N2 must NOT inherit ownedA (its parent has no skgrepo).
     (should (equal (skg--fork-repos-from-confirmation-buffer)
                    '(("N1" . "ownedA"))))))
 
 (ert-deftest test-show-fork-confirmation-builds-editable-navigable-buffer ()
   "skg--show-fork-confirmation inserts the content into an EDITABLE
 content-view buffer (so the user can rotate each clone's repo), records
-the origin, leaves skg-view-uri nil, and binds approve/decline plus an
+the source buffer, leaves skg-view-uri nil, and binds approve/decline plus an
 ordinary-save refusal on C-x C-s."
-  (let ((origin (generate-new-buffer "*fork-origin*")))
+  (let ((source (generate-new-buffer "*fork-origin*")))
     (unwind-protect
         (let ((buf (skg--show-fork-confirmation
                     "# FORK CONFIRMATION\n* (skg (node (repo owned))) N-edited\n** (skg (node (id N) (repo foreign) (affectsParent false) writeProtected (rels \"aO\"))) N-original\n"
-                    origin)))
+                    source)))
           (unwind-protect
               (with-current-buffer buf
                 (should-not buffer-read-only)
                 (should (null skg-view-uri))
-                (should (eq skg--fork-origin-buffer origin))
+                (should (eq skg--fork-source-buffer source))
                 (should (derived-mode-p 'skg-content-view-mode))
                 (should (string-match-p "(id N)" (buffer-string)))
                 ;; approve / decline / save-refusal are reachable
@@ -177,11 +177,11 @@ ordinary-save refusal on C-x C-s."
                 (should (eq (key-binding (kbd "C-x C-s"))
                             #'skg--fork-confirmation-refuse-save)))
             (kill-buffer buf)))
-      (when (buffer-live-p origin) (kill-buffer origin)))))
+      (when (buffer-live-p source) (kill-buffer source)))))
 
 (ert-deftest test-approve-fork-replaces-confirmation-pane-with-result ()
   "Approval leaves the confirmation window showing a truthful result buffer."
-  (let ((origin (generate-new-buffer "*fork-result-origin*"))
+  (let ((source (generate-new-buffer "*fork-result-origin*"))
         (result-name "*SKG Fork Result*")
         confirm confirm-window called)
     (unwind-protect
@@ -190,7 +190,7 @@ ordinary-save refusal on C-x C-s."
           (setq confirm
                 (skg--show-fork-confirmation
                  "* (skg (node (repo owned))) N-edited\n** (skg (node (id N) (repo foreign) writeProtected)) N-original\n"
-                 origin))
+                 source))
           (setq confirm-window (get-buffer-window confirm t))
           (should (window-live-p confirm-window))
           (cl-letf (((symbol-function 'skg-request-save-buffer)
@@ -208,29 +208,29 @@ ordinary-save refusal on C-x C-s."
                        (buffer-string))))
             (should (equal called '(t (("N" . "owned")))))
             (skg--finish-pending-fork-result
-             origin "((content \"saved\") (errors ()) (warnings ()))")
+             source "((content \"saved\") (errors ()) (warnings ()))")
             (with-current-buffer result
               (should (string-match-p
                        "Fork confirmed; save successful\\."
                        (buffer-string))))
-            (with-current-buffer origin
+            (with-current-buffer source
               (should-not skg--pending-fork-result))))
       (when (buffer-live-p confirm) (kill-buffer confirm))
       (when (get-buffer result-name) (kill-buffer result-name))
-      (when (buffer-live-p origin) (kill-buffer origin)))))
+      (when (buffer-live-p source) (kill-buffer source)))))
 
 (ert-deftest test-fork-confirmation-does-not-mutate-shared-mode-map ()
   "The buffer-local key overrides must not leak into the shared
 skg-content-view-mode-map (which would break C-x C-s in real views)."
-  (let ((origin (generate-new-buffer "*fork-origin-3*")))
+  (let ((source (generate-new-buffer "*fork-origin-3*")))
     (let ((buf (skg--show-fork-confirmation
                 "* (skg (node (repo owned))) N-edited\n"
-                origin)))
+                source)))
       (unwind-protect
           (should (eq (lookup-key skg-content-view-mode-map (kbd "C-x C-s"))
                       #'skg-request-save-buffer))
         (kill-buffer buf)
-        (when (buffer-live-p origin) (kill-buffer origin))))))
+        (when (buffer-live-p source) (kill-buffer source))))))
 
 (ert-deftest test-fork-choose-placeholder-repos-prompts-with-suggestion ()
   "skg--fork-choose-placeholder-repos prompts once per placeholder
@@ -273,10 +273,10 @@ saved metadata, so the server omitted the placeholder) prompts nothing."
 
 (ert-deftest test-approve-fork-errors-when-origin-is-gone ()
   "skg-approve-fork refuses when the originating buffer is dead."
-  (let ((origin (generate-new-buffer "*fork-origin-2*")))
+  (let ((source (generate-new-buffer "*fork-origin-2*")))
     (let ((buf (skg--show-fork-confirmation "* (skg (node (id N) (repo foreign) writeProtected)) N\n"
-                                            origin)))
-      (kill-buffer origin) ;; origin dies before approval
+                                            source)))
+      (kill-buffer source) ;; source dies before approval
       (unwind-protect
           (with-current-buffer buf
             (should-error (skg-approve-fork)))

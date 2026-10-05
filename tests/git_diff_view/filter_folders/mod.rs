@@ -3,7 +3,7 @@
 /// per-stage signs come from comparing the derived membership at the
 /// three snapshots -- HEAD, index, worktree -- rather than from any
 /// one relation's diff
-/// (TODO/full-schema/12-2_diff-mode-policy_discussion.org).
+/// (TODO/DONE/full-schema/DONE/12-2_diff-mode-policy_discussion.org).
 ///
 /// Fixture, all HEAD -> worktree:
 ///   S subscribes to B throughout.
@@ -44,7 +44,7 @@ fn setup_filter_fixtures_staged (
     "tests/git_diff_view/filter_folders/fixtures/worktree" ) }
 
 /// The worktree state of the view, as a user's diff-mode buffer
-/// would hold it (B expanded as a definitive subscribee-as-such).
+/// would hold it (B expanded as an editable subscribee-as-such).
 const INPUT : &str = "\
 * (skg (node (id S) (repo main))) S
 ** (skg subscribeeFolder)
@@ -99,7 +99,7 @@ async fn run_filter_folder_test (
   let gitrepo_path : &Path = temp_dir . path ();
   if staged { setup_filter_fixtures_staged (gitrepo_path)?; }
   else      { setup_filter_fixtures        (gitrepo_path)?; }
-  s . reset_with_repo_path (subtest_name, gitrepo_path) ?;
+  s . reset_with_skgrepo_path (subtest_name, gitrepo_path) ?;
   let (config, tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
@@ -147,7 +147,7 @@ async fn emptied_filter_folders_still_render_in_diff_mode (
   let temp_dir : TempDir = TempDir::new ()?;
   let gitrepo_path : &Path = temp_dir . path ();
   setup_filter_fixtures (gitrepo_path)?;
-  s . reset_with_repo_path (
+  s . reset_with_skgrepo_path (
     "emptied_filter_folders_still_render_in_diff_mode",
     gitrepo_path ) ?;
   let (config, tantivy)

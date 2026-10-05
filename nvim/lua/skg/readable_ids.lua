@@ -119,7 +119,7 @@ function M.request_titles (ids, generation, buf, approved_pids)
       sexpr.pair(sexpr.symbol('request'), 'titles by ids'),
       ids_form }
     if approved_pids and #approved_pids > 0 then
-      local approval = { sexpr.symbol('allow-overPrivateText-telescopes') }
+      local approval = { sexpr.symbol('approved-overPrivateText-pids') }
       for _, pid in ipairs(approved_pids) do
         table.insert(approval, pid) end
       table.insert(request_form, approval) end

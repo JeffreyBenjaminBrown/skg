@@ -12,8 +12,8 @@
 use crate::types::viewnode::{NodeEditRequest, AffectsParent, ActiveVognode};
 
 /// This returns true iff the given Active vognode counts as a
-/// member of the writeable PartnerFolder (a SubscribeeFolder or
-/// OverriddenFolder) that is its parent. To count, it must be Affected,
+/// member of the writable PartnerFolder (a SubscribeeFolder or
+/// OverriddenFolder) that is its parent. To count, it must be a member,
 /// not a would-be diff phantom, and not marked for deletion.
 pub fn member_counts_for_partnerFolder (
   t : &ActiveVognode,
@@ -36,7 +36,7 @@ pub fn active_child_counts_as_content (
   member_counts_for_partnerFolder (t) }
 
 /// This returns true iff the given Active vognode, a child of a
-/// definitive subscribee-as-such, counts as visible content of the
+/// editable subscribee-as-such, counts as visible content of the
 /// subscribee. That visible content is the signal from which the
 /// subscriber's hides/unhides are inferred.
 /// PITFALL: Unlike the other two Active-vognode predicates, this one

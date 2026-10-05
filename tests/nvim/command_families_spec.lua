@@ -34,7 +34,7 @@ local function unstub_save ()
   package.loaded['skg.save'] = nil
 end
 
----Stub the config's owned repos.
+---Stub the config's owned skgrepos.
 local config = require('skg.config')
 local real_owned_repos = config.owned_repos
 local function stub_owned_repos (repos)
@@ -182,7 +182,7 @@ describe('skg.modify_graph replacements', function ()
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     ok, err = pcall(modify_graph.replace_link_with_content)
     assert.is_false(ok)
-    assert.is_truthy(tostring(err):find('descendents', 1, true))
+    assert.is_truthy(tostring(err):find('viewdescendants', 1, true))
   end)
 end)
 

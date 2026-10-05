@@ -46,7 +46,7 @@
    to that goal id. That is the only structural use of the id.
 
    Replacement: make inactive nodes IRRELEVANT in the reconcilers'
-   'relevant' predicates ('reconcile/content.rs', and the partner-col
+   'relevant' predicates ('reconcile/content.rs', and the partner-folder
    path via 'complete/partner_col/child_data.rs'). 'complete_relevant_
    children' preserves irrelevant children as-is (it only stale-checks
    relevant ones), so a retained inactive node survives WITHOUT a goal
@@ -97,7 +97,7 @@
         (and any elisp) from '(BLUE inactiveNode "..." (id) (source)
         (RED overridesHere ...) (staged) (unstaged))' to '(BLUE
         inactiveNode "node from inactive source")'.
-   8. Sweep: glossary.md "PartnerCol"/inactive notes, api-and-formats.md
+   8. Sweep: glossary.md "PartnerFolder"/inactive notes, api-and-formats.md
       inactiveNode grammar, and the InactiveNode doc comments.
 
 ** Tests to update / add

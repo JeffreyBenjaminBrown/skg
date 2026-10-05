@@ -58,7 +58,7 @@ by `skg-register-response-handler' and the dispatcher."
 Set by `skg-client-init'. Used to resolve relative paths
 returned by the server (e.g. for get-file-path responses).")
 
-(defvar skg-id-stack nil
+(defvar skg-linkstack nil
   "Stack of (id title) pairs for navigation history.
 Each element is a list of two strings.")
 

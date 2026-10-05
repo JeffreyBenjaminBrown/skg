@@ -21,9 +21,9 @@
 //! logs and moves on: the filesystem already holds the truth, so the
 //! index stays recoverable via a 'rebuild ephemeral data stores'.
 
-use crate::save::update_tantivy_from_saveinstructions;
+use crate::save::update_tantivy_from_nodeInstructions;
 use crate::types::misc::{ID, TantivyIndex};
-use crate::types::save::DefineNode;
+use crate::types::save::NodeInstruction;
 
 use std::collections::HashMap;
 use std::sync::mpsc::{Sender, channel};
@@ -39,12 +39,12 @@ pub fn lock_tantivy_writes () -> MutexGuard<'static, ()> {
   TANTIVY_WRITE_LOCK . lock ()
     . unwrap_or_else ( |poisoned| poisoned . into_inner () ) }
 
-/// One queued index update: the saved instructions, the per-pid context
+/// One queued index update: the nodeInstructions, the per-pid context
 /// origin types to stamp on each doc, and a handle to the index. Owned,
 /// so it can move to the worker thread.
 pub struct TantivyWriteTask {
   pub tantivy_index : TantivyIndex,
-  pub instructions  : Vec<DefineNode>,
+  pub instructions  : Vec<NodeInstruction>,
   pub context_types : HashMap<ID, String>, }
 
 /// Shared between the worker thread and the enqueue/wait API: the count
@@ -69,8 +69,8 @@ fn worker () -> &'static Worker {
     let worker_inflight : Arc<Inflight> = inflight . clone ();
     std::thread::spawn ( move || {
       while let Ok (task) = receiver . recv () {
-        // update_tantivy_from_saveinstructions takes the write lock itself.
-        if let Err (e) = update_tantivy_from_saveinstructions (
+        // update_tantivy_from_nodeInstructions takes the write lock itself.
+        if let Err (e) = update_tantivy_from_nodeInstructions (
           &task . instructions, &task . tantivy_index, &task . context_types )
         { tracing::error! (
             "Background Tantivy write failed: {}. The filesystem is correct; \

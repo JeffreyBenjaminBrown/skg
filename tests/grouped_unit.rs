@@ -32,10 +32,10 @@ mod import_org_roam;
 mod init_refusal;
 
 #[path = "multi_repo_errors.rs"]
-mod multi_repo_errors;
+mod multi_skgrepo_errors;
 
 #[path = "multi_repo_loading.rs"]
-mod multi_repo_loading;
+mod multi_skgrepo_loading;
 
 #[path = "render_util.rs"]
 mod render_util;
@@ -47,10 +47,10 @@ mod runtime_generation;
 mod serve_text_search_test;
 
 #[path = "repo_inheritance_for_non_content.rs"]
-mod repo_inheritance_for_non_content;
+mod skgrepo_inheritance_for_non_content;
 
 #[path = "repo_path_validation.rs"]
-mod repo_path_validation;
+mod skgrepo_path_validation;
 
 #[path = "subscribee_folder.rs"]
 mod subscribee_folder;
@@ -65,7 +65,7 @@ mod test_utils;
 mod links;
 
 #[path = "titles_by_ids.rs"]
-mod titles_by_ids;
+mod titles_by_skgids;
 
 #[path = "to_org.rs"]
 mod to_org;

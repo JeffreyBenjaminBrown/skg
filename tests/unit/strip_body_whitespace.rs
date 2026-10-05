@@ -1,10 +1,10 @@
 //! Unit tests for the "strip body whitespace" request's core:
-//! the line transform, and the on-disk pass over every repo.
+//! the line transform, and the on-disk pass over every skgrepo.
 
 use super::{strip_body_whitespace_on_disk,
             strip_trailing_whitespace_from_body};
-use crate::dbs::filesystem::one_node::graphnode_from_pid_and_repo;
-use crate::types::misc::{ID, SkgConfig, SkgfileRepo, RepoName};
+use crate::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo;
+use crate::types::misc::{ID, SkgConfig, SkgRepo, SkgRepoName};
 use crate::types::nodes::complete::Graphnode;
 
 use std::collections::{HashMap, HashSet};
@@ -46,7 +46,7 @@ fn strips_on_disk_only_where_needed () {
               "title: bodyless\npid: bodyless\n"
             ) . unwrap ();
   fs::write ( foreign_dir . join ("theirs.skg"),
-              // A foreign repo is write-protected: its trailing
+              // A foreign skgrepo is write-protected: its trailing
               // whitespace survives the strip.
               "title: theirs\npid: theirs\nbody: \"alpha \\nbeta\"\n"
             ) . unwrap ();
@@ -55,19 +55,19 @@ fn strips_on_disk_only_where_needed () {
   let foreign_bytes_before : Vec<u8> =
     fs::read ( foreign_dir . join ("theirs.skg") ) . unwrap ();
   let config : SkgConfig = {
-    let mut repos : HashMap<RepoName, SkgfileRepo> =
+    let mut skgrepos : HashMap<SkgRepoName, SkgRepo> =
       HashMap::new ();
     for (name, dir, owns) in [ ("owned",   &owned_dir,   true),
                                ("foreign", &foreign_dir, false) ] {
-      repos . insert (
-        RepoName::from (name),
-        SkgfileRepo {
-          name         : RepoName::from (name),
+      skgrepos . insert (
+        SkgRepoName::from (name),
+        SkgRepo {
+          name         : SkgRepoName::from (name),
           abbreviation : None,
           path         : dir . clone (),
-          user_owns_it : owns, } ); }
-    SkgConfig::fromReposAndTantivyFolder (
-      repos,
+          owned        : owns, } ); }
+    SkgConfig::fromSkgReposAndTantivyFolder (
+      skgrepos,
       & tmp . path () . join ("tantivy") . to_string_lossy () ) };
   let (all_nodes, changed) : (Vec<Graphnode>, Vec<Graphnode>) =
     strip_body_whitespace_on_disk (&config) . unwrap ();
@@ -77,9 +77,9 @@ fn strips_on_disk_only_where_needed () {
       . map ( |n| n . pid . as_str () ) . collect ();
     assert_eq! ( changed_pids,
                  HashSet::from ([ "dirty", "blank" ]) ); }
-  let from_disk = |pid : &str, repo : &str| -> Graphnode {
-    graphnode_from_pid_and_repo (
-      &config, ID::from (pid), & RepoName::from (repo)
+  let from_disk = |pid : &str, skgrepo : &str| -> Graphnode {
+    graphnode_from_pid_and_skgrepo (
+      &config, ID::from (pid), & SkgRepoName::from (skgrepo)
     ) . unwrap () };
   assert_eq! ( from_disk ("dirty", "owned") . body,
                Some ( "one\ntwo" . to_string () ));
@@ -96,7 +96,7 @@ fn strips_on_disk_only_where_needed () {
                  // so caches refreshed from them agree with the files
       node . body,
       from_disk ( node . pid . as_str (),
-                  node . home_repo . 0 . as_str () ) . body ); }
+                  node . home_skgrepo . 0 . as_str () ) . body ); }
   assert_eq! ( // an already-clean file is not rewritten
     fs::read ( owned_dir . join ("clean.skg") ) . unwrap (),
     clean_bytes_before );

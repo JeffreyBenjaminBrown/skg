@@ -1,6 +1,6 @@
 /// Fulfill a '(viewRequests (folder RELNAME))' request: build BOTH folders of
 /// the relation, each POPULATED from the graph, reusing the de-novo
-/// PartnerFolder generators. The WRITABLE folder of the relation is created
+/// PartnerFolder generators. The EDITABLE folder of the relation is created
 /// even when empty (its editable "add here" surface); the WRITE-PROTECTED
 /// folders are built only when populated in the worktree or, in diff mode,
 /// on the HEAD side (decision A -- a write-protected folder empty on both sides is
@@ -9,13 +9,13 @@
 /// 'aliases' is handled by the AliasFolder builder ('expand/aliases.rs'),
 /// not here -- the dispatch in 'execute_view_requests' routes it there.
 
-use crate::repo_sets::ActiveRepoSet;
+use crate::skgrepo_sets::ActiveSkgRepoSet;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::complete::partner_folder::{
   maybe_add_one_partnerFolder, maybe_add_subscribeeFolder_branch };
 use crate::to_org::util::remove_completed_view_request;
-use crate::types::git::RepoDiff;
-use crate::types::misc::{SkgConfig, RepoName};
+use crate::types::git::SkgRepoDiff;
+use crate::types::misc::{SkgConfig, SkgRepoName};
 use crate::types::viewnode::{Viewnode, ViewRequest, FolderRelation, PartnerFolder};
 
 use ego_tree::{NodeId, Tree};
@@ -23,21 +23,21 @@ use std::collections::HashMap;
 use std::error::Error;
 
 pub fn build_and_integrate_folder_then_drop_request (
-  tree          : &mut Tree<Viewnode>,
-  node_id       : NodeId,
-  graph         : &InRustGraph,
-  rel           : FolderRelation,
-  config        : &SkgConfig,
-  errors        : &mut Vec < String >,
-  active_repo_set : Option<&ActiveRepoSet>,
-  repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
+  tree               : &mut Tree<Viewnode>,
+  treeid             : NodeId,
+  graph              : &InRustGraph,
+  rel                : FolderRelation,
+  config             : &SkgConfig,
+  errors             : &mut Vec < String >,
+  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_diffs      : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
     build_and_integrate_folder (
-      tree, node_id, rel, graph, config, active_repo_set,
-      repo_diffs );
+      tree, treeid, rel, graph, config, active_skgrepo_set,
+      skgrepo_diffs );
   remove_completed_view_request (
-    tree, node_id,
+    tree, treeid,
     ViewRequest::Folder (rel),
     "Failed to build folder view",
     errors, result ) }
@@ -45,15 +45,15 @@ pub fn build_and_integrate_folder_then_drop_request (
 /// Build the relation's folders. Idempotent: each generator skips a folder
 /// that already exists (e.g. one content completion already added), so
 /// a populated relation's folders are not doubled, while the empty
-/// writable folder is still forced in.
+/// editable folder is still forced in.
 fn build_and_integrate_folder (
-  tree    : &mut Tree<Viewnode>,
-  node_id : NodeId,
-  rel     : FolderRelation,
-  graph   : &InRustGraph,
-  config  : &SkgConfig,
-  active_repo_set : Option<&ActiveRepoSet>,
-  repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
+  tree               : &mut Tree<Viewnode>,
+  treeid             : NodeId,
+  rel                : FolderRelation,
+  graph              : &InRustGraph,
+  config             : &SkgConfig,
+  active_skgrepo_set : Option<&ActiveSkgRepoSet>,
+  skgrepo_diffs      : &Option<HashMap<SkgRepoName, SkgRepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   match rel {
     FolderRelation::Aliases =>
@@ -65,26 +65,26 @@ fn build_and_integrate_folder (
     FolderRelation::OverridesViewOf => {
       // overriddenFolder (writable) -- forced empty; overriderFolder (write-protected).
       maybe_add_one_partnerFolder (
-        tree, node_id, PartnerFolder::Overridden, config, graph,
-        active_repo_set, repo_diffs, true ) ?;
+        tree, treeid, PartnerFolder::Overridden, config, graph,
+        active_skgrepo_set, skgrepo_diffs, true ) ?;
       maybe_add_one_partnerFolder (
-        tree, node_id, PartnerFolder::Overrider, config, graph,
-        active_repo_set, repo_diffs, false ) ?; },
+        tree, treeid, PartnerFolder::Overrider, config, graph,
+        active_skgrepo_set, skgrepo_diffs, false ) ?; },
     FolderRelation::HidesFromItsSubscriptions => {
       // Both sides write-protected: hiding is editable only from a
       // subscribee-as-such, never from a hider/hidden folder.
       maybe_add_one_partnerFolder (
-        tree, node_id, PartnerFolder::Hider, config, graph,
-        active_repo_set, repo_diffs, false ) ?;
+        tree, treeid, PartnerFolder::Hider, config, graph,
+        active_skgrepo_set, skgrepo_diffs, false ) ?;
       maybe_add_one_partnerFolder (
-        tree, node_id, PartnerFolder::Hidden, config, graph,
-        active_repo_set, repo_diffs, false ) ?; },
+        tree, treeid, PartnerFolder::Hidden, config, graph,
+        active_skgrepo_set, skgrepo_diffs, false ) ?; },
     FolderRelation::SubscribesTo => {
       // subscribeeFolder (writable) -- forced empty; subscriberFolder (write-protected).
       maybe_add_subscribeeFolder_branch (
-        tree, node_id, graph, config,
-        active_repo_set, repo_diffs, true ) ?;
+        tree, treeid, graph, config,
+        active_skgrepo_set, skgrepo_diffs, true ) ?;
       maybe_add_one_partnerFolder (
-        tree, node_id, PartnerFolder::Subscriber, config, graph,
-        active_repo_set, repo_diffs, false ) ?; }, }
+        tree, treeid, PartnerFolder::Subscriber, config, graph,
+        active_skgrepo_set, skgrepo_diffs, false ) ?; }, }
   Ok (( )) }

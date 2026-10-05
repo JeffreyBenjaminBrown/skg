@@ -3,10 +3,10 @@
 // Tests for HiddenOutsideOfSubscribeeFolder, HiddenInSubscribeeFolder, and HiddenFromSubscribees.
 // These test that:
 // 1. Initial view shows subscribees as write-protected with HiddenOutsideOfSubscribeeFolder
-// 2. After saving with definitive view requests, HiddenInSubscribeeFolder is shown
+// 2. After saving with editable view requests, HiddenInSubscribeeFolder is shown
 
 use indoc::indoc;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::assert_metadata_eq;
 use skg::test_utils::{
   extract_string_field_from_sexp,
@@ -51,7 +51,7 @@ fn mk_test_tcp_stream_pair ()
   (write_end, read_end) }
 
 /// Add (viewRequests definitiveView) to all subscribee nodes in org text.
-/// Modifies the node section of each subscribee to request a definitive view.
+/// Modifies the node section of each subscribee to request an editable view.
 /// Subscribees are ActiveVognode children of SubscribeeFolders.
 ///
 /// KLUDGE: We identify subscribees by matching on "subscribee-" in the title.
@@ -286,10 +286,10 @@ fn node_from_disk (
   config : &SkgConfig,
   pid    : &str,
 ) -> Result<Graphnode, Box<dyn Error>> {
-  let id : ID = ID::from (pid);
-  read_all_skg_files_from_repos (config)?
+  let skgid : ID = ID::from (pid);
+  read_all_skg_files_from_skgrepos (config)?
     . into_iter()
-    . find ( |node| node . pid == id )
+    . find ( |node| node . pid == skgid )
     . ok_or_else ( || format! ("node not found on disk: {}", pid) . into() ) }
 
 #[test]
@@ -565,7 +565,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
     // occurrence to affectsParent=false rather than deleting it -- chaos-
     // monkey safety: the user may have deliberately placed content there, and
     // we must not lose it. So e1 shows twice: once hidden (write-protected), once as a
-    // preserved Independent branch.
+    // preserved non-member branch.
     let collateral : &str = &collateral_views[0];
     assert! (
       collateral . contains (
@@ -575,7 +575,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       collateral . lines() . any ( |line|
         line . starts_with ("**** (skg (node (id e1)")
         && line . contains ("(affectsParent false)") ),
-      "Expected hidden branch e1 demoted to Independent (subtree preserved):\n{}",
+      "Expected hidden branch e1 demoted to non-member (subtree preserved):\n{}",
       collateral );
 
     Ok (( )) }
@@ -693,9 +693,9 @@ async fn test_extra_view_child_under_foreign_subscribee_is_deleted (
         &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
-    // §6.0: the extra view-child 'a' is a stale leaf (not in e's contains,
+    // §6.0: the extra viewchild 'a' is a stale leaf (not in e's contains,
     // claiming membership, no children), so it is deleted -- not preserved as
-    // an Independent child.
+    // a non-member child.
     assert!(
       ! rerendered . lines() . any ( |line| line . contains ("(id a)") ),
       "Extra stale-leaf view-child 'a' should be deleted, not preserved:\n{}",
@@ -735,9 +735,9 @@ async fn test_extra_view_child_under_owned_subscribee_is_deleted (
         &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
-    // §6.0: the extra view-child 'e' is a stale leaf (not in r's contains,
+    // §6.0: the extra viewchild 'e' is a stale leaf (not in r's contains,
     // claiming membership, no children), so it is deleted -- not preserved as
-    // an Independent child.
+    // a non-member child.
     assert!(
       ! rerendered . lines() . any ( |line| line . contains ("(id e)") ),
       "Extra stale-leaf view-child 'e' should be deleted, not preserved:\n{}",
@@ -765,7 +765,7 @@ async fn test_extra_view_child_under_owned_subscribee_is_deleted (
 ///
 /// Tests two views:
 /// - Initial view from R: subscribees are write-protected (bare leaves)
-/// - View from R with definitive views expanded at each subscribee
+/// - View from R with editable views expanded at each subscribee
 ///
 /// Also tests ordering rule: HiddenInSubscribeeFolder precedes content regardless of .skg order.
 /// E2's .skg has [E21, hidden-in-E2] but view shows HiddenInSubscribeeFolder before E21.
@@ -794,7 +794,7 @@ async fn test_subscribee_and_filter_folders (
     assert_metadata_eq!(initial_view, expected_initial,
       "Initial view from R: write-protected subscribees are bare leaves; only HiddenOutsideOfSubscribeeFolder shown");
 
-    let expanded = { // Request definitive views, then save
+    let expanded = { // Request editable views, then save
       let modified_view : String =
         add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}", modified_view);
@@ -841,7 +841,7 @@ async fn test_subscribee_and_filter_folders (
 ///
 /// Tests two views:
 /// - Initial view from R: E1 is write-protected (bare leaf), H doesn't appear
-/// - View from R with definitive views expanded at each subscribee: H appears in HiddenInSubscribeeFolder before E11 and E12
+/// - View from R with editable views expanded at each subscribee: H appears in HiddenInSubscribeeFolder before E11 and E12
 ///
 /// No HiddenOutsideOfSubscribeeFolder in either state (H is in E1's content).
 async fn test_hidden_within_but_none_without (
@@ -864,7 +864,7 @@ async fn test_hidden_within_but_none_without (
     assert_metadata_eq!(initial_view, expected_initial,
       "Initial view from R: write-protected subscribee is bare leaf; H doesn't appear");
 
-    let expanded = { // request definitive views, then save
+    let expanded = { // request editable views, then save
       let modified_view : String =
         add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}", modified_view);
@@ -1070,7 +1070,7 @@ async fn test_deleting_from_hiddenin_folder_does_not_unhide (
 ///
 /// Tests two views:
 /// - Initial view from R: E1, E2 are write-protected (bare leaves), H in HiddenOutsideOfSubscribeeFolder
-/// - View from R with definitive views expanded at each subscribee: E1 shows E11, E12 (E12 write-protected); E2 expanded but empty; H still in HiddenOutsideOfSubscribeeFolder
+/// - View from R with editable views expanded at each subscribee: E1 shows E11, E12 (E12 write-protected); E2 expanded but empty; H still in HiddenOutsideOfSubscribeeFolder
 ///
 /// No HiddenInSubscribeeFolder in either state (H is not in any subscribee's content).
 async fn test_hidden_without_but_none_within (
@@ -1209,7 +1209,7 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
 ///
 /// Tests two views:
 /// - Initial view from R: E1, E2 are write-protected (bare leaves), H doesn't appear
-/// - View from R with definitive views expanded at each subscribee: H appears in HiddenInSubscribeeFolder under BOTH E1 and E2
+/// - View from R with editable views expanded at each subscribee: H appears in HiddenInSubscribeeFolder under BOTH E1 and E2
 ///
 /// No HiddenOutsideOfSubscribeeFolder in either state (H is in subscribees' content).
 async fn test_overlapping_hidden_within (

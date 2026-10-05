@@ -1,0 +1,147 @@
+#+TITLE: Claude's raw scouting notes for homogenizing language
+Incremental notes, kept so a crash loses nothing. Terse and unpolished;
+the report is '1_reconnaissance.org'. Counts are matching lines, per area.
+
+* Housekeeping done along the way
+** Deleted 'coding-advice/claude-to-claude.org' (Jeff: all workspaces done)
+Also removed its "Pending one-time task" pointer from ORIENTATION.
+Stale pointers to its OLD content (before it was repurposed) remain:
+'docs/glossary.org' (save-buffer pipeline section), 'tests/USAGE.md'
+("Running Tests"), 'TODO/typedb-performance-research.org'.
+
+* Doc bugs found (spec deviations)
+** api-and-formats: get-file-path request key documented "(Skg repo . ...)"; code reads "repo"
+** api-and-formats: flag-state response documented "(Skg repo "REPO")"; code emits "(repo ...)"
+Both from an overreaching prose rename source -> "Skg repo".
+** api-and-formats: (folder RELNAME) says aliases/overrides/hides/subscribes
+Code ('FolderRelation::from_relname') accepts only aliases,
+overrides_view_of, hides_from_its_subscriptions, subscribes_to.
+** api-and-formats: (rels ...) relation keys listed as subscribes/overrides/hides
+But the example and the birth table in the same doc use the long names.
+** elisp headers cite '/api.md' and 'USAGE.md' (neither exists); server/serve.rs cites api.md
+
+* Clusters found (name variants for one thing)
+** TODO.org already has "CRITICAL : language changes" (Jeff's own)
+mentioner mentions mentioned; hides-from-subscriptions -> hides;
+follower subscribes-to followed; source -> repository; dubious
+graphnode -> atom; container presents contained. Also
+"Really contains should be presents."
+"atom" collides with sexp atom (230 server lines) -- objection.
+** ego_tree handle: NodeId / node_id (277) / treeid (106) / nid / nodeids / tree_node_id
+'node_id' reads like a Skg ID. Prefer treeid.
+** Skg ID: ID / id / pid / skgid / skg_id / uuid / "primary ID"
+** repo: repo / skgrepo / Skg repo / "repository" / source (TODO only) / Src generic param
+'SkgfileRepo' is the config entry type. 'Graphnode.repo' means home repo,
+while vognodes say 'home_repo'.
+** level: outline level (clients) vs privacy level (docs)
+** generation: runtime generation / ancestor generation in rels (GEN) / client buffer generation
+** snapshot: graph snapshot / git snapshot (HEAD,index,worktree) / buffer snapshot (enrichment) / dirty-view baseline
+** index: Tantivy index / git index / graph inverse indexes
+** md: glossary says md = metadata; "import md and org" means Markdown
+** owner (node that stores an edge) vs owned (repo the user owns): "an owned owner"
+relations.json says 'stored_by'.
+** AffectsParent: enum True/False/NA; prose still says Affected / Independent / Normal / Content
+"non-Content affectsParent" in views_state.rs; "Active (Normal) vognodes".
+** write-protected / definitive / editable / writable / writeable / read-only / readonly / indefinitive / inert
+writable vs writeable spelling. "readonly" in TODO.org.
+** phantom / placeholder / ghost (TODO.org) / DeadViewnode / deletednode
+InactiveVognode is called a "placeholder" but is not a Phantom.
+** TrueNode / truenode (api-and-formats, tools, TODO): stale for ActiveVognode
+** OrgNode (TODO.org), view-node, view node, viewnode; graph-node, graphnode, SkgNode (TODO), gnode
+** forest: viewforest / forest / buffer / view / viewtree / "tree"
+** view vs buffer: ViewUri "Identifies a buffer"
+** content view: single root content view / content view / single-root-view / initial view / multi root view
+** contains: contained (role name) / content / contents / content child; "presents" (Jeff wants)
+** link endpoints: mentioned / target / destination / dest / linked; "link source" = mentioner (TODO.org); backlinks
+mentioners_of doc says "destination pid -> linking pids".
+** relation / relationship / rel / edge / membership / "relationship instance"
+** partner / member / relative / neighbor; role
+** save: intent / intention / instruction / definition / DefineNode / SavePlan / save_plan / saveplan
+** edit request vs view request vs gesture vs command
+** disk merge / anchored weave / supplement_from_disk / disk supplementation
+** derived stores / ephemeral data stores / dbs / databases / derived databases / in-Rust graph + Tantivy
+** in-Rust graph / in-memory graph / runtime graph / graph store / InRustGraph / inRustGraph
+** collateral view / other views / affected view
+** metadata / sexp / header / md; herald / token / glyph / marker / label / annotation
+** marker overloaded: focused/folded markers, overridesHere marker, export marker, save markers
+** heading vs headline (clients use both)
+** paths retired for role trees, but: ContainerwardPathStats, ancestry, backpaths (TODO), "containerward ancestries" (protocol.rs SearchEnrichment comment), "ancestry insertions" (api doc)
+** origin: role-tree origin / fork origin (api doc "origin F to clone K") vs original (ForkSpec original_*) / context-origin multiplier / git origin
+** misc (YAML field) = flags
+** graphnode_rustFirst_by_pid_and_repo is an exact alias of graphnode_graphFirst_by_pid_and_repo (and ignores repo)
+** occurrence / position / instance / appearance (of a node in a view)
+** repo-set / repo set / source set (TODO.org) / active repos
+** data root / data dir
+** fork / clone / copy
+
+* Memory
+** 'concurrent-test-runs-collide-on-typedb' is stale: TypeDB is gone
+Collisions are still possible: per-test fixed '/tmp/{test_name}-fixtures'.
+** fold overloaded: org folding (Viewnode.folded, body_folded) vs telescope fold/unfold (combining sections)
+** hide overloaded: hides_from_its_subscriptions relation / hidden_body / folded "hidden in parent" / inactive repo "content the user hid"
+** context overloaded: search-ranking ContextOriginType ("rooty", context-origin multiplier) / LocalContext (instruction collection) / CompletionContext / RerenderAfterSaveContext
+** fork overloaded: forking a node (clone) vs branching point in a containerward path ('PathToFirstNonlinearity', glossary "fork : can be any number > 1", ContainerwardPathStats.forks)
+** ContainerwardPathStats: defined, referenced nowhere else (dead)
+** references to nonexistent nodes: Unknown (phantom) / absent node (delete-references command) / dangling / missing (link-statuses) / dead link / broken link
+** relation-name spellings: overrides_view_of (wire, YAML) / overridesViewOf (command names) / "overrides" (api doc short forms) / letter O
+** ID stack (elisp, both docs' commands) vs linkstack (nvim module, both docs' headlines) vs "the stack of links/ids"
+** view ancestry: org-ancestry / org-parent / visible parent / viewparent / view-parent; org-child / viewchild / view-child
+** aliases with contradictory verbs: skg-view-metadata = skg-edit-metadata; skg-limit-repo-set = skg-set-active-repo-set; skg-set-definitive = skg-request-definitive-view
+** goto-in-magit (emacs) vs GotoInGit (nvim)
+** flag spellings: YAML Had_ID_Before_Import / wire hadId / herald text; misc field holds flags; TODO dir "noindex-and-boolprops"
+** SkgfileRepo (config entry) vs RepoName vs Jeff's proposed SkgRepo
+** ephemeral overloaded: "ephemeral data stores" (graph+Tantivy) vs glossary "ephem" (view-lifetime data)
+** dependencies overloaded: DEPENDENCIES.toml repo manifest vs save_dependencies (dirty-view conflict check)
+** commit overloaded: git commit / save commit phase / Tantivy commit / Jeff's "commitment status"
+** publish overloaded: graph-generation publication / Hoist publishes text at home / sharing notes publicly
+** content overloaded: contains-children vs wire field (content "...") vs buffer contents
+** view overloaded: whole buffer vs ViewRequest sub-views (folders, role trees)
+** member overloaded: is_graph_member (exists now) vs list/folder member
+** dirty / unsaved / modified (buffers)
+** retry approvals: fork-approved(bool)+fork-repos / hoist-approved-pids / allow-overPrivateText-telescopes / approved-preview / approval-token
+** glossary dead entries: interp (unused), update-relevant neighborhood (code: update_relevant_neighborhood, 3 lines, ok)
+** duplicates: TODO/from-dot-claude/git-diff-view/* == done/git-diff-view/*; beautiful/show-both-staged-and-unstaged-diff.org == done/git-diff-staged-v-unstaged.org
+** stale-vocab-dense TODO files: ditch-typedb/*, from-dot-claude/*, typedb-performance-research, split-and-extend-paths-and-cols/*, forks/*, lying-names
+* Proposals forming
+** holder / member / partner: holder = first role (stores the list; relations.json 'stored_by'), member = entry; partner = other end. Replaces edge "owner".
+** relation (type) / edge (instance); retire "relationship" or reserve.
+** one-verb relations: contains, mentions, follows, hides, overrides; roles V-er/V-ed (Jeff's TODO)
+** telescope fold -> compose/decompose (org owns "fold"); "hide" reserved for relation
+** qualify-always rule (like merge): snapshot, index, generation, commit, context
+* Execution log, 2026-10-05 (Jeff's approved EASY items)
+** Done: plan moves, treeid, member/non-member, prose sweep, identifier cleanups, most glossary repairs
+** Tests: cargo nextest 698/698; bash/emacs-tests.sh 352/352; bash/nvim-tests.sh all passed
+Logs in target/homogenize/.
+** Waiting on Jeff: hide naming (two questions), PartnerFolder 6+2=8 sentence, names.org qualify rule
+** Nothing committed
+* Execution log, 2026-10-05 afternoon ("Stale names" sign-offs)
+** Done: col/TrueNode/indefinitive/SkgNode/NodeComplete/OrgNode/scaffold sweeps, paths.rs branch-point wording, skgrepo prose sweep
+** Tests: nextest 698/698, emacs 352/352, nvim all passed (target/homogenize/*-2.log, nextest-3.log)
+** Waiting: skgrepo identifier/wire/config tiers; relation-name reach (a/b/c); hide; PartnerFolder 6+2; names.org rule
+* Execution plan, 2026-10-05 evening (synonyms sign-offs)
+Slices, in order; mark each when done:
+- [ ] S14 heralds.org annotation sentence; heading->headline in skg client names
+- [ ] S15 dirty in docs
+- [ ] S17 skg-edit-metadata->skg-view-metadata, skg-set-active-repo-set->skg-limit-repo-set
+- [ ] S16 ID stack -> linkstack
+- [ ] S20 fork origin -> original (prose)
+- [ ] S8 phantom/placeholder/ghost; dangling/absent (prose)
+- [ ] S13 disk supplementation (prose)
+- [ ] S10 occurrence (prose); S11 viewparent etc (prose)
+- [ ] S1 graphnode/viewnode prose + gnode/view_node identifiers + glossary vognode
+- [ ] S9 viewtree/viewnodetree -> viewforest
+- [ ] S6 owned (not user-owned); repos not write-protected
+- [ ] S2 relation/relationship/edge prose
+- [ ] S3 owner->recorder (edge sense) code+prose; stored_by->recorded_by
+- [ ] S7 Definitive->Editable, WritableSet->EditableSet, inert->save-inert
+- [ ] S12 DefineNode->NodeInstruction, intents->fieldIntents
+- [ ] S18 misc->flags in memory (YAML key kept)
+- [ ] S19 approval keys (wire, both clients)
+- [ ] S5 repo->skgrepo identifiers; repo-set->skgrepo-set; privacy level
+- [ ] S4 id->skgid/pid/extra_id in code
+- [X] S14 S15 S17 S16 S20 S8 S13 S10 S11 done (elisp+nvim suites green after S20)
+- [X] S1 S9 S6 S2 S3 done. Lesson: realign only strictly-aligned blocks that contain a renamed line (reverted 1043 spurious whitespace changes). Rules files must use raw strings (one \x01 corruption, repaired).
+- LESSON: the bare-owner python pass touched .skg fixtures and tests/import_md_and_org_samples (reverted). Filter file types strictly; never touch fixtures/, *.skg, *.toml data, *_samples/.
+- [X] S7 S12 done (Editable, EditableSet, save-inert; NodeInstruction, FieldIntent, nodeIntent kept, glossary ladder). Flake seen once: save::write_protected_edits::saving_an_edited_writeProtected_occurrence_is_rejected (passes in isolation).
+- [X] S18 (Graphnode/GraphnodeInRust/Tantivy .misc -> .flags; GraphnodeOnDisk keeps misc = YAML key) and S19 (approved-forks, approved-hoist-pids, approved-overPrivateText-pids) done; all suites green.
+- [X] S5 Rust identifiers (310 names; serde renames keep TOML keys repos/default_repo_set; module files repo_sets.rs, repo_switch.rs moved; generic param Repo kept); prose repo-set -> skgrepo-set; privacy level. Clients' bare 'repo' NOT renamed (wire-key collision risk) -> question for Jeff. Reverted sweep edits in non-skg tools/ (call-graph "edges").

@@ -159,7 +159,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
     _ => panic!("expected ActiveVognode") };
   assert_eq!(first_node . title(), "simple node");
   assert_eq!(first_node . body(), Some(&"Simple body" . to_string()));
-  assert_eq!(first_t . id . as_ref(), None);
+  assert_eq!(first_t . skgid . as_ref(), None);
   assert_eq!(first_t . viewStats . cycle, false);
   assert_eq!(first_t . affectsParent != AffectsParent::True, false);
   assert_eq!(first_node . focused, false);
@@ -250,13 +250,13 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
   let meta_node = tree_roots[0] . value();
   assert_eq!(meta_node . title(), "simple node with metadata");
   assert_eq!(meta_node . body(), Some(&"Node body" . to_string()));
-  assert_eq!(meta_node . id_opt(), Some(&ID::from ("test")));
+  assert_eq!(meta_node . skgid_opt(), Some(&ID::from ("test")));
   assert_eq!(meta_node . folded, true);
 
   // Test node without metadata (should have defaults)
   let regular_node = tree_roots[1] . value();
   assert_eq!(regular_node . title(), "regular node without metadata");
-  assert_eq!(regular_node . id_opt(), None);
+  assert_eq!(regular_node . skgid_opt(), None);
   assert_eq!(regular_node . folded, false);
   assert_eq!(regular_node . body(), Some(&"Regular body" . to_string()));
 }

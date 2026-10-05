@@ -1,6 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; DATA USED/ASSUMED: See /api.md.
+;;; DATA USED/ASSUMED: See docs/api-and-formats.org.
 
 (require 'skg-length-prefix)
 

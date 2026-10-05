@@ -36,7 +36,7 @@
 ///    its children by ID.
 
 use crate::types::misc::{
-  ID, MSV, RelPartner, RepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
+  ID, MSV, RelPartner, SkgRepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
 use crate::types::nodes::complete::{Flag, Graphnode};
 
 use std::path::Path;
@@ -85,7 +85,7 @@ pub fn parse_org_file (
     build_section_viewforest (sections, lines . len());
   for st in &mut viewforest {
     insert_super_indentation_groups (st);
-    assign_missing_ids (st); }
+    assign_missing_skgids (st); }
   let mut nodes : Vec<Graphnode> = Vec::new();
   for st in &viewforest {
     collect_graphnodes (st, &lines, &mut nodes); }
@@ -259,13 +259,13 @@ fn group_children_by_level (
 // Graphnode collection
 //
 
-fn assign_missing_ids (
+fn assign_missing_skgids (
   tree : &mut SectionTree,
 ) {
   if tree . section . id . is_none() {
     tree . section . id = Some (Uuid::new_v4() . to_string()); }
   for child in &mut tree . children {
-    assign_missing_ids (child); }}
+    assign_missing_skgids (child); }}
 
 fn collect_graphnodes (
   tree  : &SectionTree,
@@ -284,7 +284,7 @@ fn graphnode_from_section_tree (
   // All sections have IDs after assign_missing_ids pre-pass.
   let id_str : &str =
     tree . section . id . as_ref() . unwrap();
-  let contained_ids : Vec<ID> =
+  let contained_skgids : Vec<ID> =
     tree . children . iter() . map (|child| {
       let cid : &str =
         child . section . id . as_ref() . unwrap();
@@ -298,24 +298,24 @@ fn graphnode_from_section_tree (
   let body : Option<String> =
     tree . section . override_body . clone()
       . or_else (|| collect_body (lines, tree . section . body_start, body_end));
-  // The real repo is not known here; the caller (import_org_roam.rs)
+  // The real skgrepo is not known here; the caller (import_org_roam.rs)
   // overwrites 'repo' after parsing. Tag members with this
-  // placeholder repo, matching the node's own repo at
+  // placeholder skgrepo, matching the node's own skgrepo at
   // construction time -- degenerate, and dropped at the FS boundary.
-  let repo : RepoName = RepoName::default();
+  let skgrepo     : SkgRepoName = SkgRepoName::default();
   let aliases_msv : MSV<String> =
     match tree . section . roam_aliases . clone() {
       None    => MSV::Unspecified,
       Some(v) => MSV::Specified(v) };
   let aliases : MSV<RelPartner<String>> =
-    rel_partners_at_relRepo_msv (&repo, aliases_msv);
+    rel_partners_at_relRepo_msv (&skgrepo, aliases_msv);
   let contains : Vec<RelPartner<ID>> =
-    rel_partners_at_relRepo (&repo, contained_ids);
+    rel_partners_at_relRepo (&skgrepo, contained_skgids);
   Graphnode {
     title    : tree . section . headline . clone(),
     overPrivateText_telescope : false,
     aliases,
-    home_repo: repo,
+    home_skgrepo: skgrepo,
     pid      : ID::new (id_str),
     extra_ids: vec![],
     body,
@@ -323,7 +323,7 @@ fn graphnode_from_section_tree (
     subscribes_to                : MSV::Unspecified,
     hides_from_its_subscriptions : MSV::Unspecified,
     overrides_view_of            : MSV::Unspecified,
-    misc :
+    flags                        :
       if tree . section . had_id {
         vec![Flag::Had_ID_Before_Import] }
       else { Vec::new () }, }}

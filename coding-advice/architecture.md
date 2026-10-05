@@ -29,7 +29,7 @@ When the user saves, the client sends the whole buffer back. Saving
 updates the authoritative files, publishes a validated graph generation,
 queues the Tantivy update, and sends updated views to the client.
 
-Viewnodes are not all graph nodes:
+Viewnodes are not all graphnodes:
 
 ```
 viewnode = vognode | propertyFolder | property | partnerFolder
@@ -38,12 +38,12 @@ vognode  = active | inactive | phantom
 ```
 
 A vognode represents a graphnode, which need not exist. Active and inactive
-vognodes represent current graph nodes; phantoms represent missing or
+vognodes represent current graphnodes; phantoms represent missing or
 historical occurrences. Property folders and partner folders carry aliases,
 IDs, flags, or relationships.
 New editable nodes may lack an ID until save preparation assigns one.
-Editability, view-node kind, and relationship context determine how text is
+Editability, viewnode kind, and relationship context determine how text is
 interpreted on save; not every displayed headline is an instruction to write
-a graph node. See [the view-node types](../server/types/viewnode.rs) and
+a graphnode. See [the viewnode types](../server/types/viewnode.rs) and
 [the metadata parser](../server/serve/parse_metadata_sexp.rs) for the current
 representation, and the API document for its wire format.

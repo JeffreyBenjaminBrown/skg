@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_overrides -E 'test(overridden_as_such::)'
 //
 // The overridden-as-such exception
-// (TODO/full-schema/11_override-rendering-and-navigation.org), on
+// (TODO/DONE/full-schema/DONE/11_override-rendering-and-navigation.org), on
 // vision.org's R/E/G/H example: R subscribes to AND overrides E,
 // R hides H, E contains G and H. Extended with X overriding G, so
 // the no-cascade decision is observable:
@@ -96,7 +96,7 @@ async fn save_and_rerender (
     "save must not error; got: {:?}", response . errors );
   Ok ( response . saved_view ) }
 
-/// Request a definitive view of the E copy under 'folder' (by editing
+/// Request an editable view of the E copy under 'folder' (by editing
 /// the de novo view's text), save, and return the rerendered view.
 async fn expand_e_under (
   folder     : &str,
