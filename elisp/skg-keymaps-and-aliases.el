@@ -34,7 +34,7 @@ and hide INTERNAL from M-x completion."
   (global-set-key (kbd "C-c f i")   #'skg-search-interactive)
   (global-set-key (kbd "C-c f l")   #'skg-search-make-link)
   (global-set-key (kbd "C-c g i")   #'skg-goto-by-id) ;; Global because it works from ANY buffer: it only reads a typed/pasted ID (TODO/more.org).
-  (global-set-key (kbd "C-c v l")   #'skg-limit-repo-set))
+  (global-set-key (kbd "C-c v l")   #'skg-restrict-repo-set))
 
 (with-eval-after-load 'magit ;; Magit
   ;; Popping to the linkstack would make no sense here,
@@ -153,7 +153,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c v d") #'skg-view-diff-mode)
     (define-key map (kbd "C-c v e") #'skg-view-new-empty)
     (define-key map (kbd "C-c v h") #'skg-view-heralds-mode)
-    (define-key map (kbd "C-c v l") #'skg-limit-repo-set)
+    (define-key map (kbd "C-c v l") #'skg-restrict-repo-set)
     (define-key map (kbd "C-c v L") #'skg-toggle-repo-overlay-on-links)
     (define-key map (kbd "C-c v m") #'skg-view-metadata)
     (define-key map (kbd "C-c v o") #'skg-view-org-ancestry)
@@ -205,7 +205,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c G M")   #'skg-goto-in-magit-parent-and-close-this))
   (progn;; view
     (define-key map (kbd "C-c v e") #'skg-view-new-empty)
-    (define-key map (kbd "C-c v l") #'skg-limit-repo-set)
+    (define-key map (kbd "C-c v l") #'skg-restrict-repo-set)
     (define-key map (kbd "C-c v s") #'skg-view-linkstack))
   (progn;; id navigation
     (define-key map (kbd "C-c i n") #'skg-id-next)

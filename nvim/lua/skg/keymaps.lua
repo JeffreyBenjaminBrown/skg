@@ -115,8 +115,8 @@ M.commands = {
   ToggleRepoOverlayOnLinks = {
     module = 'skg.link_annotations', fn = 'toggle_repo_overlay',
     desc = 'Toggle repo suffixes on Skg links', pass_buf = true },
-  LimitRepoSet = { module = 'skg.repo_sets', fn = 'set_active_repo_set',
-                     desc = 'Limit display and search to one repo-set' },
+  RestrictRepoSet = { module = 'skg.repo_sets', fn = 'set_active_repo_set',
+                     desc = 'Restrict display and search to one skgrepo-set' },
   ViewMetadata = { module = 'skg.metadata_edit', fn = 'edit_metadata',
                    desc = "Edit the node's metadata as an org tree" },
   ViewOrgAncestry = { module = 'skg.org_ancestry', fn = 'view_org_ancestry',
@@ -251,7 +251,7 @@ M.content_view_bindings = {
   { 'vd', 'ViewDiffMode' },              -- C-c v d
   { 've', 'ViewNewEmpty' },              -- C-c v e
   { 'vh', 'HeraldsToggle' },             -- C-c v h
-  { 'vl', 'LimitRepoSet' },            -- C-c v l
+  { 'vl', 'RestrictRepoSet' },            -- C-c v l
   { 'vL', 'ToggleRepoOverlayOnLinks' }, -- C-c v L
   { 'vm', 'ViewMetadata' },              -- C-c v m
   { 'vo', 'ViewOrgAncestry' },           -- C-c v o
@@ -289,7 +289,7 @@ M.report_bindings = {
   { 'gi', 'GotoById' }, { 'Gi', 'GotoByIdAndCloseThis' },
   { 'gm', 'GotoInGit' }, { 'Gm', 'GotoInGitAndCloseThis' },
   { 'gM', 'GotoInGitParent' }, { 'GM', 'GotoInGitParentAndCloseThis' },
-  { 've', 'ViewNewEmpty' }, { 'vl', 'LimitRepoSet' },
+  { 've', 'ViewNewEmpty' }, { 'vl', 'RestrictRepoSet' },
   { 'vs', 'ViewLinkstack' },
   { 'in', 'IdNext' }, { 'ip', 'IdPrev' },
   { 'u', 'IdPush' },

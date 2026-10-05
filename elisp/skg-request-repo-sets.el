@@ -52,7 +52,7 @@
               '((request . "active repo set")))
              "\n"))))
 
-(defun skg-limit-repo-set (name &optional approved-pids)
+(defun skg-restrict-repo-set (name &optional approved-pids)
   "Set the active repo-set for this TCP connection to NAME.
 Open SKG buffers are kept and re-rendered in place: the server
 replies with the active-repo-set confirmation followed by the
@@ -69,13 +69,13 @@ rerender stream (rerender-lock, rerender-view*, rerender-done)."
                     (content (cadr (assoc 'content response))))
                (message "%s" content))
            (error
-            (message "skg-limit-repo-set: %S" err))))
+            (message "skg-restrict-repo-set: %S" err))))
        t)
       (skg--begin-stream "rerender")
       (skg--lock-all-skg-buffers)
       (skg--register-rerender-stream-handlers)
       (skg--register-rerender-overPrivateText-confirmation
-       (lambda (pids) (skg-limit-repo-set name pids))
+       (lambda (pids) (skg-restrict-repo-set name pids))
        'active-repo-set)
       (skg-lp-reset)
       (process-send-string
