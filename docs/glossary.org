@@ -366,7 +366,8 @@ A role tree is drawn as paths that each end at their first
 "nonlinearity" ('PathToFirstNonlinearity'): a cycle, or a node with
 several partners in the direction walked, which the drawn path shows
 as a branching viewnode. (The path code, which walks the graph before
-anything is drawn, calls that node a "branch point".) None of this is
+anything is drawn, calls that node a *branching graphnode*: one with
+several partners in the direction walked, e.g. containerward-branching.) None of this is
 related to forking a node, below.
 
 *** clone, and the fork operation

@@ -7,16 +7,21 @@ use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::ID;
 
-/// Most paths probably end without a branch point or a cycle, but the same path can actually end in both: If it ends in a branch point, any of its branches might be cycles.
+/// A *branching graphnode* has more than one partner in the direction
+/// walked: walking containerward, more than one container -- it is
+/// "containerward-branching". (Once drawn, it becomes a branching
+/// viewnode.) Most paths probably end without a branching graphnode or
+/// a cycle, but the same path can actually end in both: if it ends in a
+/// branching graphnode, any of its branches might be cycles.
 pub struct PathToFirstNonlinearity {
   pub path        : Vec<ID>,     // Does not include the origin.
-  pub cycle_nodes : HashSet<ID>, // Nodes already in the path, if any. Unless there is a branch point, there can be at most one of these.
-  pub branches    : HashSet<ID>, // If the path ends in a branch point, these are its branches.
+  pub cycle_nodes : HashSet<ID>, // Nodes already in the path, if any. Unless there is a branching graphnode, there can be at most one of these.
+  pub branches    : HashSet<ID>, // If the path ends in a branching graphnode, these are its branches.
 }
 
 /// Graph-native path traversal. Visibility is applied before topology is
 /// classified, so private relationships and private targets cannot create apparent
-/// branch points, cycles, or extra path length.
+/// branching graphnodes, cycles, or extra path length.
 pub fn paths_to_first_nonlinearities_in_graph (
   graph       : &InRustGraph,
   restriction : Option<&SkgrepoRestriction>,
