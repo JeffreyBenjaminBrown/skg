@@ -56,6 +56,18 @@ So far there are these endpoints:
     special scaffold types). A no-match or error response has the same
     response type and a single =content= field.
 
+  - Every =search-results= is followed by exactly one
+    =search-enrichment=, which is what releases the client's stream
+    guard. (The overPrivateText challenge above sends neither.) When no
+    enrichment is coming, that message omits =content=:
+    =((response-type search-enrichment) (terms "TERMS") (warnings (...)))=.
+    The client then leaves the search buffer alone and shows any
+    warnings. This happens immediately after a no-match or error
+    response; when the client closes the search view (=close view= of
+    =search:TERMS=) before enrichment arrives, after the close-view
+    response; and when the server cannot enrich a snapshot, with the
+    reason as a warning.
+
   - Phase 2, enrichment: A three-message sequence:
     1. Rust sends LP response-type "request-snapshot" with =(("content" "TERMS"))= — asking Emacs for a snapshot of the search buffer matching those terms.
     2. Emacs replies with =((request . "snapshot response") (terms . "TERMS"))\n= followed by =Content-Length: N\r\n\r\n<buffer text>= — the current buffer contents, including any unsaved user edits. Emacs sets the buffer to readonly before sending.
@@ -219,7 +231,7 @@ So far there are these endpoints:
 ** Snapshot response (part of search enrichment; see "Text search" above)
   - Request: First =((request . "snapshot response") (terms . "TERMS"))\n=, then =Content-Length: N\r\n\r\n<buffer text>=.
   - Initiated by the client in response to a "request-snapshot" message from the server.
-  - Response: LP response-type "search-enrichment" with enriched buffer content and an explicit =warnings= list.
+  - Response: LP response-type "search-enrichment" with enriched buffer content and an explicit =warnings= list. If enrichment fails, the response omits =content= and gives the reason in =warnings=.
 
 ** Get file path
   - Request: ((request . "get file path") (id . "THE_ID") (source . "THE_SOURCE"))
