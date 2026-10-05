@@ -146,23 +146,23 @@ Slices, in order; mark each when done:
 - [X] S18 (Graphnode/GraphnodeInRust/Tantivy .misc -> .flags; GraphnodeOnDisk keeps misc = YAML key) and S19 (approved-forks, approved-hoist-pids, approved-overPrivateText-pids) done; all suites green.
 - [X] S5 Rust identifiers (310 names; serde renames keep TOML keys repos/default_repo_set; module files repo_sets.rs, repo_switch.rs moved; generic param Repo kept); prose repo-set -> skgrepo-set; privacy level. Clients' bare 'repo' NOT renamed (wire-key collision risk) -> question for Jeff. Reverted sweep edits in non-skg tools/ (call-graph "edges").
 * Homonyms ("One name, several things"), one commit each
-- [X] snapshot: cc12a25a. Wire atoms request-snapshot / snapshot response kept. Flake: grouped_views subscribee_folder_empty_persists (DirectoryNotEmpty; passes alone).
-- [X] index (prose only; relMap is Jeff's question, don't implement): cc6b0b50
-- [X] context -> prominence: eec7da34
-- [X] branching viewnode (glossary + role_tree.rs; paths.rs waits): 62e82771
-- [X] ephemeral glossary -> view-lifetime: 72aae25e
-- [X] OTHER_SKGREPO_DEPENDENCIES.toml: a0ddb164
-- [X] commit -> git-commit / skgsave-commit / tantivy-commit: 2629930a
-- [X] publish -> swap in (generations); Hoist moves the text to home: 0a840144
-- [X] content (api preamble sentence): 4f9b43f7
-- [X] viewbranch (glossary + prose): c372d96a
-- [X] is_graph_member -> is_current_graphnode: 17fcc1d7
-- [X] PartnerFolder glossary: many kinds, list them: 0747487b + 38f05640 (table)
-- [X] names.org never-bare rule: 13d33d3b. Doc statuses: 81fee9b9.
+- [X] snapshot: 519c84b5. Wire atoms request-snapshot / snapshot response kept. Flake: grouped_views subscribee_folder_empty_persists (DirectoryNotEmpty; passes alone).
+- [X] index (prose only; relMap is Jeff's question, don't implement): f9579422
+- [X] context -> prominence: 61c14b4b
+- [X] branching viewnode (glossary + role_tree.rs; paths.rs waits): 6fb4cec3
+- [X] ephemeral glossary -> view-lifetime: 1d3b0c3d
+- [X] OTHER_SKGREPO_DEPENDENCIES.toml: b20c82a9
+- [X] commit -> git-commit / skgsave-commit / tantivy-commit: 70e9c25e
+- [X] publish -> swap in (generations); Hoist moves the text to home: ac54c4b2
+- [X] content (api preamble sentence): 3923bf2d
+- [X] viewbranch (glossary + prose): a79b5a39
+- [X] is_graph_member -> is_current_graphnode: e940484f
+- [X] PartnerFolder glossary: many kinds, list them: f34bff54 + fcdcfc33 (table)
+- [X] names.org never-bare rule: 50163afd. Doc statuses: e40d9ada.
 - NEXT (Jeff answered elsewhere in the doc): relation names "all of them" + one-off migration script (don't run on his data without asking); move finished plans to TODO/DONE (he said yes).
-- [X] Relation rename, all four layers + misc->flags on disk + contained->content: 6e442288. Serde aliases read old keys. Migration NOT run on data/ (dry run: 6433 keys / 6429 files). Integration: only import-md-and-org fails, same as baseline.
+- [X] Relation rename, all four layers + misc->flags on disk + contained->content: 75a8b810. Serde aliases read old keys. Migration NOT run on data/ (dry run: 6433 keys / 6429 files). Integration: only import-md-and-org fails, same as baseline.
 - PENDING: apply TODO/homogenize-language/claude-pending.diff to 1_reconnaissance.org once Jeff releases it (he is editing it).
 * Round: everything before "Opportunities" (2026-10-05 evening)
-- Done, one commit each: 3f166d04 treenode->viewnode_at; 84ef3b74 edge->relationship; 32ca7a60 definitive->editable view; 3252a487 ViewUri->ViewId; 4489bd9a content view prose; 9aba068c skg-view-ancestry; 361a6f29 local_fieldintent_collection; a090d9c9 affected view; 4f87c287 active/inactive->unrestricted/restricted (+limit); a0bd678f recorderward relmaps; ec9b1dab branching graphnode; 021c5396 session-lifetime stores; aff6f5f5 metadata edit apply; 5ea73baa marker->atom/fact/placeholder.
+- Done, one commit each: 5e5d75b2 treenode->viewnode_at; bc8fdde9 edge->relationship; 1b3933ac definitive->editable view; 2c13557a ViewUri->ViewId; 6e7b7ee3 content view prose; 91ea32c5 skg-view-ancestry; dfa2fd83 local_fieldintent_collection; 45ea9f02 affected view; c702796b active/inactive->unrestricted/restricted (+limit); b4fe634c recorderward relmaps; 7f9af04f branching graphnode; d34699eb session-lifetime stores; 32f947cd metadata edit apply; 70c2e3c3 marker->atom/fact/placeholder.
 - Open questions for Jeff (TODO in doc): NodeInstruction Save vs Define; AncestorGeneration vs PredecessorGeneration; SkgRepo* -> Skgrepo* casing; TODO/one-definitive-view dir; server/dbs module name; run migrate.py on data/.
 - LESSON: rename scripts must exclude Jeff's root notes (queue.org, jeff-should-weigh-in-on.org) and thoughts/; restrict.py touched two notes (reverted). Rust strings continued across lines defeat per-line code/string splitting.

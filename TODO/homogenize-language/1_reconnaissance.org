@@ -155,7 +155,7 @@ rather than mentions and follows), and the answer to "hide"
 ***** DONE J : all of them
 No permanent migration script necessary -- I'm the only user so far.
 Do write a migration script but we'll only be using it here.
-****** TODO Claude says: done ('6e442288'), except migrating your data
+****** TODO Claude says: done ('75a8b810'), except migrating your data
 All four layers, plus 'misc' -> 'flags' on disk and the role
 'contained' -> 'content'. The commands are now
 'skg-show-folderOf-overrides' and 'skg-show-folderOf-hidesFromSubs'
@@ -195,9 +195,9 @@ now "branch point".
 ***** DONE J : branching is better than branch
 I described this elsewhere. Is that what you did?
 ****** DONE Claude says: it is now
-'paths.rs' says "branching graphnode" ('ec9b1dab'), with your
+'paths.rs' says "branching graphnode" ('7f9af04f'), with your
 "containerward-branching" as the explanatory comment, and drawn role
-trees say "branching viewnode" ('62e82771').
+trees say "branching viewnode" ('6fb4cec3').
 *** 'protocol.rs': 'SearchEnrichment' "Includes containerward ancestries"
 *** 'api-and-formats.org': "ancestry insertions" (override section), "override folders and paths"
 *** 'ContainerwardPathStats' in 'viewnode.rs': defined and used nowhere (filed as dead code)
@@ -287,14 +287,14 @@ vognode is a viewnode representing a graphnode.
 Per server/types/viewnode.rs, it can be active (visible), inactive (not),
 or a phantom (not even in the graph any more).
 ***** DONE Claude says: done; one question about "treenode"
-Done (commit 6f4223b6): "graph node", "graph-node", "view node", "view-node" and "point" become graphnode / viewnode in docs and comments; identifiers like 'validate_gnode_identity_and_structure' and 'view_node_line_cols' too; and the glossary gets your vognode definition.
+Done (commit b97ae20d): "graph node", "graph-node", "view node", "view-node" and "point" become graphnode / viewnode in docs and comments; identifiers like 'validate_gnode_identity_and_structure' and 'view_node_line_cols' too; and the glossary gets your vognode definition.
 ****** DONE Should "treenode" go too?
 Functions like 'get_id_from_treenode (tree, treeid)' and 'pid_and_repo_from_treenode' say "treenode" for the viewnode stored at a treeid. "viewnode" would do, e.g. 'get_id_from_viewnode_at'. I've left these alone until you say.
 ******* DONE J
 It sounds like that might be talking about getting an egotree ID,
 not a skg ID. If it is, then 'from treenode' is right.
 If it's actually fetching a skg ID, then yes, better 'from viewnode'.
-******** DONE Claude says: they fetch skg IDs, so "viewnode" ('3f166d04')
+******** DONE Claude says: they fetch skg IDs, so "viewnode" ('5e5d75b2')
 'get_skgid_from_treenode' -> 'get_skgid_from_viewnode_at',
 'pid_and_skgrepo_from_treenode' -> 'pid_and_skgrepo_from_viewnode_at'.
 *** Recommendation
@@ -350,7 +350,7 @@ I'd do it, but you said you like how distinct "edge" is, so asking.
 ****** DONE J : yes please
 Coders can surely handle it,
 but there's no reason to invite confusion when unneeded.
-******* DONE Claude says: done ('84ef3b74')
+******* DONE Claude says: done ('bc8fdde9')
 Left alone: ego_tree's traversal 'Edge', the call-graph tools, and
 the fixture node IDs 'edge-r' / 'edge-h'.
 ** DONE The two ends of an edge: holder, member, partner
@@ -391,7 +391,7 @@ I copied the sidecar into here and deleted it.
 Did something go awry when I did that?
 God I hope I didn't lose that work.
 ******* DONE Claude says: nothing was lost
-"carrier" was done from your first sidecar ('10dc010c'), and every
+"carrier" was done from your first sidecar ('9807900d'), and every
 answer in that sidecar was acted on. The 'sidecar.org' now in this
 directory is a later one (18:05), holding only your "all of them"
 answer about relation names, which is here too and done. You can
@@ -456,7 +456,7 @@ won't change much. In code it renames 'RelationRole::CONTAINED' and the
 ***** DONE J : is this done?
 I feel like we talked about it elsewhere,
 and I asked for everything.
-****** DONE Claude says: it is now ('6e442288')
+****** DONE Claude says: it is now ('75a8b810')
 All four layers, plus 'misc' -> 'flags' on disk and the role
 'contained' -> 'content'. See the short-names item for the migration.
 ** DONE IDs
@@ -480,7 +480,7 @@ that could be destined for skg IDs or buffer IDs.
 Those should keep referring to UUIDs.
 Otherwise yes -- uuid in other contexts is probably a mistake.
 ***** DONE Claude says: done
-Commits 6f4223b6 (Rust), 0e3dfd79 (elisp and Lua locals) and f98e0bed
+Commits b97ae20d (Rust), b28d1ebc (elisp and Lua locals) and 7c28f409
 (uuid). What it did: in Rust, every variable, field and parameter that holds a skg ID and is
 named 'id' (or 'ids', '*_id') becomes 'pid' when it is known to be
 primary, 'extra_id' when known extra, else 'skgid'. That includes
@@ -531,7 +531,7 @@ bare "repo"). If you meant first-mention-then-"repo", say so and I'll
 loosen it.
 ****** DONE J : perfect
 ***** DONE Claude says: doing the code; three questions about the edges of "code"
-Done (commits 6f4223b6, 4ee70f77): Rust and client-internal identifiers say skgrepo / gitrepo:
+Done (commits b97ae20d, bf1f6a5e): Rust and client-internal identifiers say skgrepo / gitrepo:
 'RepoName' -> 'SkgRepoName', 'repo' -> 'skgrepo', 'home_repo' ->
 'home_skgrepo', 'repo_sets' -> 'skgrepo_sets', and so on. Following your
 'SkgRepo', types write the R in capitals ('SkgRepoName'); values write
@@ -585,7 +585,7 @@ Both clients and many tests use them. "editableView" and
 'skg-set-editable' would match. Also 'TODO/one-definitive-view/', a
 live plan, is named for the old word.
 ****** DONE J : yes
-******* DONE Claude says: done ('32ca7a60'); the plan directory is still named for the old word
+******* DONE Claude says: done ('1b3933ac'); the plan directory is still named for the old word
 'definitiveView' -> 'editableView', 'ViewRequest::Definitive' ->
 'Editable', 'skg-set-definitive' -> 'skg-set-editable' (key unchanged),
 "DVR" -> "EVR". I didn't rename 'TODO/one-definitive-view/': renaming
@@ -635,7 +635,7 @@ clients). OK to do both? The settled part is done: "viewtree" /
 "viewnodetree" are retired in favor of viewforest, and the glossary
 entry "view, buffer, viewforest" defines all three.
 ****** DONE J: yes
-******* DONE Claude says: done ('3252a487')
+******* DONE Claude says: done ('2c13557a')
 'ViewUri' -> 'ViewId', wire 'view-uri' -> 'view-id' (and
 'exclude-view-uris' -> 'exclude-view-ids'), 'skg-view-uri' ->
 'skg-view-id', and every local that said "uri".
@@ -666,7 +666,7 @@ doesn't grow contentward. The one change I'd make is in prose: say
 "content view", and "single-root content view" only when talking about
 the request. Shall I?
 ****** DONE J : yes
-******* DONE Claude says: done ('4489bd9a')
+******* DONE Claude says: done ('6e7b7ee3')
 ** DONE A node's place in a view
 *** DONE occurrence, position, instance, appearance
 "occurrence" (80 server lines) is the best of these: a graphnode can
@@ -700,7 +700,7 @@ user-facing, so I'm leaving it. Rename it to 'skg-view-ancestry'?
 (Spelling: I'll write "descendant", the noun; "descendent" is the
 adjective.)
 ****** DONE J : yes
-******* DONE Claude says: done ('9aba068c'): 'skg-view-ancestry', ':SkgViewAncestry'
+******* DONE Claude says: done ('91ea32c5'): 'skg-view-ancestry', ':SkgViewAncestry'
 ** DONE The save pipeline
 *** intent, instruction, definition, plan
 - *intent*: per-field, emitted during local instruction collection
@@ -753,7 +753,7 @@ the old name of the whole enum, so old plans would read confusingly.)
 Or keep 'Save'. Which?
 ******** DONE J : perfect
 ****** DONE J : yes, call it local_fieldintent_collection
-******* DONE Claude says: done ('361a6f29')
+******* DONE Claude says: done ('dfa2fd83')
 *** DONE What a save keeps that the buffer didn't show
 "disk merge" (api doc), "anchored weave" (api doc), 'weave' (22 server
 lines), "disk supplementation" (glossary), 'supplement_from_disk.rs'.
@@ -818,7 +818,7 @@ do you want?
 I believe the inrustgraph and search index are session-lifetime, right?
 Anyplace we've been saying 'ephemeral'
 we should explicitly state the lifetime instead.
-****** DONE Claude says: right; done ('021c5396'), except 'server/dbs/'
+****** DONE Claude says: right; done ('d34699eb'), except 'server/dbs/'
 Both are rebuilt at each server start (and on request), so both are
 session-lifetime. Together they're now the *session-lifetime stores*:
 the command is 'skg-rebuild-session-lifetime-stores'
@@ -845,7 +845,7 @@ loose synonym for collateral, used in three places. Retire "affected
 view", keep the other two, and the glossary's "collateral view" entry
 already says how they differ. Shall I?
 ***** DONE J : yes
-****** DONE Claude says: done ('a090d9c9')
+****** DONE Claude says: done ('45ea9f02')
 ** DONE Metadata, heralds, markers
 *** DONE metadata / sexp / header / md
 "metadata" (dominant), "metadata header" (api doc), "sexp" (code, for
@@ -913,9 +913,9 @@ I think I said to call the skgrepos 'restricted/unrestricted', right?
 If so, then skg-limit-repo-set should be skg-restrict-repo-set,
 and any similar uses of 'limit' should be changed to 'restricted'.
 ****** DONE Claude says: yes; done
-The command was renamed earlier ('292281d3'). The leftovers (the
+The command was renamed earlier ('1d1533de'). The leftovers (the
 Neovim docs still said ':SkgLimitRepoSet', and two export comments said
-"limited to") went with the restriction rename ('4f87c287').
+"limited to") went with the restriction rename ('c702796b').
 ** DONE Flags
 The YAML field holding flags is 'misc' (the Rust field too:
 'Graphnode.misc : Vec<Flag>'). Each flag has three spellings: YAML
@@ -931,7 +931,7 @@ spellings; they are a deliberate mapping.
 migrating foreign skgrepos; that part waits on [[*Claude says: your new names are a rename; how far should it reach?][the file-format question]]
 (option c bundles it with the relation-name keys).
 ***** DONE J : this is ongoing or done now, right?
-****** DONE Claude says: done now; the YAML key is 'flags' too ('6e442288')
+****** DONE Claude says: done now; the YAML key is 'flags' too ('75a8b810')
 ** DONE Approval on retry
 Five different shapes for "the user approved; re-issue":
 '(fork-approved . "true")' plus 'fork-repos'; '(hoist-approved-pids ...)';
@@ -963,7 +963,7 @@ Recommendation: rename the telescope sense. Candidates: *compose* /
 composition". Identifier tier ('telescope/fold.rs', 'FoldWarning') plus
 docs.
 *** DONE J : compose/decompose is perfect
-**** DONE Claude says: done ('bb6c1166')
+**** DONE Claude says: done ('9a17f9a1')
 The telescope sense only: 'telescope/fold.rs' -> 'compose.rs',
 'unfold.rs' -> 'decompose.rs', 'FoldWarning' -> 'CompositionWarning',
 "visible/full fold" -> "visible/full composition", and the prose. Org
@@ -1016,7 +1016,7 @@ the mapping I'd use. Correct it before I start:
 ****** DONE J : rename them all
 and note that I lowercased the R in two of those words above,
 so that Skgrepo reads as one token.
-******* DONE Claude says: done ('4f87c287'); should the older names follow your casing?
+******* DONE Claude says: done ('c702796b'); should the older names follow your casing?
 As mapped: 'SkgrepoRestriction', 'UnrestrictedVognode' /
 'RestrictedVognode', the metadata atom 'restrictedNode' (rare: only a
 restricted node kept for its unrestricted viewchildren), the clients'
@@ -1031,11 +1031,11 @@ Your casing: the new names use 'Skgrepo'. The existing types still say
 'SkgRepo' ('SkgRepo', 'SkgRepoName', 'SkgRepoSetName',
 'ForkSkgRepoNotOwned', ...). Shall I make them 'Skgrepo...' too?
 ******** DONE J : yes, let's make those all Skgrepo not SkgRepo
-********* DONE Claude says: done ('b98172d4')
+********* DONE Claude says: done ('4b6aa6fb')
 ** DONE owner
 Edge holder vs extra-ID holder vs user ownership. See [[*The two ends of an edge: holder, member, partner][holder]].
 *** DONE edge recorder, extra-id carrier, user owns
-**** DONE Claude says: done ('10dc010c')
+**** DONE Claude says: done ('9807900d')
 The ID-ownership sense ('extra_owners', 'primary_owners',
 'OwnersForId', 'old_owner' / 'new_owner' in identity changes) becomes
 "carrier": the node that carries an ID, as its PID or as an extra ID.
@@ -1099,11 +1099,11 @@ reader could take it to count graph steps. 'AncestorGeneration' (prose:
 "the ancestor's generation") says it's the view tree. Your pick; I'll
 rename when you choose.
 ******* DONE J : agreed, ancestor generation
-******** DONE Claude says: done ('1cc9b460')
+******** DONE Claude says: done ('30155821')
 The herald code, both clients' herald renderers, the docs, names.org
 and a glossary entry. The tree utilities' "generation" (counting down
 from a root) keeps its name.
-***** DONE Claude says: the runtime and buffer parts are done ('d1a8c812')
+***** DONE Claude says: the runtime and buffer parts are done ('ed308e11')
 Only the ancestor sense waits on the question above.
 ** DONE snapshot
 Graph snapshot ('GraphSnapshot', 'graph_snap'); git snapshots (HEAD,
@@ -1112,7 +1112,7 @@ snapshot that search enrichment requests ('request-snapshot'); the
 baseline/current snapshots of dirty views in the save envelope.
 Recommendation: always qualify (graph / git / buffer snapshot).
 *** DONE J : yes
-**** DONE Claude says: done ('cc12a25a')
+**** DONE Claude says: done ('519c84b5')
 Prose says "graph snapshot", "git snapshot" or "buffer snapshot", and
 code names that say bare 'snapshot' get the qualifier. The wire atoms
 'request-snapshot' and 'snapshot response' stay; the glossary says
@@ -1150,12 +1150,12 @@ We should call them, then, 'recorderward relmaps'. That's unambiguous.
 (Justification: Although so far relationships are only ever
 recorded by the left member, expansions in the data model could change that.
 Please record that justification where the term is defined in the code.)
-****** DONE Claude says: done ('a0bd678f')
+****** DONE Claude says: done ('b4fe634c')
 A type alias 'RecorderwardRelmap' in 'server/dbs/in_rust_graph.rs'
 names them in code and carries the justification; the five fields
 use it. "graph index" stays the umbrella term, since
 'extra_id_to_pid' is not a relmap.
-***** DONE Claude says: the qualifying is done ('cc6b0b50')
+***** DONE Claude says: the qualifying is done ('f9579422')
 One wrinkle: the in-Rust graph's maps include 'extra_id_to_pid',
 which inverts no relation. So the umbrella term is "graph index"
 (the docs' table was already headed "Graph indexes"), and "inverse
@@ -1171,7 +1171,7 @@ Recommendation: rename the search-ranking sense to something specific,
 e.g. *prominence* ('ProminenceSource': root, cycle member, mentioned,
 had-ID, multi-contained). "Rooty" then becomes "prominent".
 *** DONE J : yes
-**** DONE Claude says: done ('eec7da34')
+**** DONE Claude says: done ('61c14b4b')
 'ContextOriginType' -> 'ProminenceSource', "context-origin multiplier"
 -> "prominence multiplier", "rooty" -> "prominent", and the module
 'context.rs' -> 'prominence.rs'. The other "context"s (LocalContext,
@@ -1198,7 +1198,7 @@ and 'role_tree.rs' will say "branching viewnode", with your caveat about
 node it stops at has several containers, not several viewchildren.
 There I'd say "branching graphnode" (a graphnode with more than one
 partner in the direction walked). OK?
-***** DONE Claude says: the view part is done ('62e82771')
+***** DONE Claude says: the view part is done ('6fb4cec3')
 Glossary entry "branching viewnode (vs a branch)", the 'role_tree.rs'
 comments, and 'integrate_path_that_might_fork_or_cycle' ->
 '..._might_branch_or_cycle'. 'paths.rs' still says "branch point".
@@ -1207,7 +1207,7 @@ Branching graphnode makes sense here.
 More precise would be 'containerward-branching'.
 That's pretty long, so don't use it as a variable name,
 but it would make a useful explanatory comment.
-****** DONE Claude says: done ('ec9b1dab')
+****** DONE Claude says: done ('7f9af04f')
 ** DONE md
 Metadata (glossary) vs Markdown ('import-md-and-org'). See [[*metadata / sexp / header / md][metadata]].
 *** DONE J : yes
@@ -1230,9 +1230,9 @@ So I'll make the glossary entry "view-lifetime" now. For the stores,
 the choice is the user-facing name. "derived stores" says what they
 are; "session-lifetime" is also accurate, since they are rebuilt each
 server session. Which do you want users to see?
-***** DONE Claude says: the glossary entry is "view-lifetime" now ('72aae25e')
+***** DONE Claude says: the glossary entry is "view-lifetime" now ('1d3b0c3d')
 ***** DONE J : "session-lifetime"
-****** DONE Claude says: done ('021c5396'); see [[*The derived stores][the derived stores]]
+****** DONE Claude says: done ('d34699eb'); see [[*The derived stores][the derived stores]]
 ** DONE dependencies
 'DEPENDENCIES.toml' (which repos a repo may reference) vs
 'save_dependencies' / 'dependencies_from_registered' (the IDs a dirty
@@ -1241,7 +1241,7 @@ the save sense to "view footprint" or "view reach". The api doc already
 says the server "unions dependencies from" each dirty view.
 *** DONE J
 Rename the file OTHER_SKGREPO_DEPENDENCIES.toml.
-**** DONE Claude says: done ('a0ddb164')
+**** DONE Claude says: done ('b20c82a9')
 The server writes the new name into each owned skgrepo. Two
 consequences: your owned skgrepos keep a stale 'DEPENDENCIES.toml'
 until you delete it (I won't touch your data), and a foreign skgrepo's
@@ -1261,7 +1261,7 @@ mutation step. Leave "commit" for git and Tantivy, where it is the
 library's word.
 *** DONE J
 call them git-commit, skgsave-commit and tantivy-commit
-**** DONE Claude says: done ('2629930a')
+**** DONE Claude says: done ('70e9c25e')
 In prose and in code names wherever "commit" is ambiguous.
 'skgsave-commit' is the step of a save that writes files and swaps in
 the new graph.
@@ -1277,7 +1277,7 @@ headline: 'skg-sexp-edit--commit' (C-c C-c), and in Neovim ':w' or
 command name. Rename it?
 ****** DONE J : apply is good
 I believe this means no change needed, right?
-******* DONE Claude says: it needed the rename; done ('aff6f5f5')
+******* DONE Claude says: it needed the rename; done ('32f947cd')
 The command was 'skg-sexp-edit--commit'; it's now
 'skg-sexp-edit--apply' (keys unchanged), and Neovim's "Commit the
 edited metadata" is "Apply the edited metadata".
@@ -1288,7 +1288,7 @@ selected title and body at home"; and sharing notes publicly
 is the user's sense. Say "install" or "swap in" for generations, and
 "Hoist moves the text to home" for Hoist.
 *** DONE J : agreeed, using 'swap in'
-**** DONE Claude says: done ('0a840144')
+**** DONE Claude says: done ('ac54c4b2')
 Generations are "swapped in"; Hoist "moves the text to home";
 "publish" stays for sharing.
 That includes the save-time refusals that say a write "would publish"
@@ -1301,7 +1301,7 @@ in code, but it makes "content view" responses read oddly
 ('(response-type content-view) (content "...")'). Low priority; mention
 it in the api doc's preamble and move on.
 *** DONE J : agreed, not a big deal
-**** DONE Claude says: done ('4f9b43f7')
+**** DONE Claude says: done ('3923bf2d')
 ** DONE view
 A whole view (one URI) vs the "additional views" a 'ViewRequest' asks
 for (folders, role trees, flags) inside a view. Recommendation: keep
@@ -1317,7 +1317,7 @@ viewbranches (folders, role trees, the flags folder). Prose that says
 type 'ViewRequest' and the wire atom '(viewRequests ...)' follow, as
 "viewbranch request"? Today "view request" reads as "a request about
 the view", which is still true, so I'd leave them.
-***** DONE Claude says: the glossary entry and prose are done ('c372d96a')
+***** DONE Claude says: the glossary entry and prose are done ('a79b5a39')
 ***** DONE J : yes, they can stay that way
 ** DONE member
 Membership in a list or folder vs 'Vognode::is_graph_member' /
@@ -1325,7 +1325,7 @@ Membership in a list or folder vs 'Vognode::is_graph_member' /
 Recommendation: rename the latter "current" ('is_current_graphnode'),
 which is how its doc comment already explains it.
 *** DONE J : yes
-**** DONE Claude says: done ('17fcc1d7')
+**** DONE Claude says: done ('e940484f')
 ** DONE level
 Outline depth vs privacy level. See [[*Repos][Repos]].
 *** DONE J : already covered, right?
@@ -1357,7 +1357,7 @@ So "marker" would disappear entirely. Shall I?
 'child' is not a graph property, just a view property,
 and 'export content node' reads awkwardly.
 The others, though, do change please.
-****** DONE Claude says: done ('5ea73baa')
+****** DONE Claude says: done ('70c2e3c3')
 focused / folded / bodyFolded are "metadata" ('skg-add-folded-metadata',
 ...) or "atoms" one at a time; '(overridesHere N)' is a "fact"; anonymous
 nodes are "placeholders". Kept: the export marker, Emacs position
@@ -1415,7 +1415,7 @@ shrinks the homogenization surface by roughly half and loses nothing.
 api doc's "LP" prefix: fine), "mk" (code idiom, fine), "interp" (gone),
 "ephem" (glossary only). Only "interp" and "md" need action.
 ** DONE Make the qualify-always rule a written convention
-*** DONE Claude says: done in 'names.org' ('13d33d3b', 'ancestor generation' added in '1cc9b460')
+*** DONE Claude says: done in 'names.org' ('50163afd', 'ancestor generation' added in '30155821')
 *** Claude says (earlier): waiting on [[*Claude says: a one-paragraph rule in names.org][its open question]] and your sidecar answers
 'names.org' could say: these words are never used bare — merge,
 snapshot, index, generation, commit — with the qualifiers listed. That
@@ -1454,7 +1454,7 @@ the server consumes on save ('editRequest', 'viewRequests'). The docs
 explain this per field, over and over. One glossary entry, with those
 two words, would let each field's documentation just say which it is.
 ** DONE git snapshot
-*** DONE Claude says: settled under [[*snapshot][snapshot]] ('cc12a25a'): one of HEAD, index, worktree is a "git snapshot"
+*** DONE Claude says: settled under [[*snapshot][snapshot]] ('519c84b5'): one of HEAD, index, worktree is a "git snapshot"
 *** Claude says (earlier): still a suggestion; your sidecar answer on "snapshot" may settle it
 HEAD, index and worktree, collectively. The diff code needs a word for
 "one of the three", and today uses "stage", "endpoint" and "snapshot"
@@ -1743,7 +1743,7 @@ Those explanations will be too long to fit in a readable table,
 so just put the name of the folder where it exists,
 and where it doesn't write 'not implemented[footnote]'
 for some integer 'footnote' in the range [1,3].
-******* DONE Claude says: done ('38f05640')
+******* DONE Claude says: done ('fcdcfc33')
 Footnote 3 covers both containerFolder and mentionerFolder: neither
 is implemented, and the containerward and mentionerward role trees
 do the job. The two subscription-filtered hide folders follow the
@@ -1782,8 +1782,8 @@ it as above and leave those two senses out until you decide them.
 ****** DONE Jeff : yes, and
 I think I already weighed in on each of these decisions earlier.
 If I didn't let me know what I still need to choose.
-******* DONE Claude says: done ('13d33d3b'); one choice is still open
+******* DONE Claude says: done ('50163afd'); one choice is still open
 The rule covers merge, snapshot, index, commit, and generation
 (runtime and buffer). The ancestor sense of "generation" waits on my
 question under [[*generation][generation]]: is your 'DigraphGeneration' that sense?
-******** DONE Claude says: settled as "ancestor generation"; 'names.org' says so ('1cc9b460')
+******** DONE Claude says: settled as "ancestor generation"; 'names.org' says so ('30155821')
