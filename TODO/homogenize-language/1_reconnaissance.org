@@ -585,13 +585,14 @@ Both clients and many tests use them. "editableView" and
 'skg-set-editable' would match. Also 'TODO/one-definitive-view/', a
 live plan, is named for the old word.
 ****** DONE J : yes
-******* TODO Claude says: done ('32ca7a60'); the plan directory is still named for the old word
+******* ONGOING Claude says: done ('32ca7a60'); the plan directory is still named for the old word
 'definitiveView' -> 'editableView', 'ViewRequest::Definitive' ->
 'Editable', 'skg-set-definitive' -> 'skg-set-editable' (key unchanged),
 "DVR" -> "EVR". I didn't rename 'TODO/one-definitive-view/': renaming
 it means editing links in 'TODO.org', which had your uncommitted
 edits, and in finished plans under 'TODO/DONE/'. Shall I, now or
 later?
+******** TODO yes now please
 ** DONE Phantoms, placeholders, and references to nothing
 *** Placeholder vs phantom
 'Phantom' is a type with three variants. "placeholder" is used for
@@ -736,7 +737,7 @@ define the node, delete the node. It seems like we need
 Then those can be the two constructors for the enum 'NodeInstruction'.
 
 Push back if you think there's a more natural way.
-******* TODO Claude says: it already is that enum; only the names could change
+******* DONE Claude says: it already is that enum; only the names could change
 Today: 'enum NodeInstruction { Save (SaveNode), Delete (DeleteNode) }'.
 So the two constructors exist. Naming them 'DefineNodeInstruction' and
 'DeleteNodeInstruction' would repeat the enum's name at every use
@@ -745,6 +746,7 @@ rather than "save", I'd do 'NodeInstruction::Define (DefineNode)' and
 'NodeInstruction::Delete (DeleteNode)'. (One wrinkle: 'DefineNode' was
 the old name of the whole enum, so old plans would read confusingly.)
 Or keep 'Save'. Which?
+******** DONE J : perfect
 ****** DONE J : yes, call it local_fieldintent_collection
 ******* DONE Claude says: done ('361a6f29')
 *** DONE What a save keeps that the buffer didn't show
@@ -1407,8 +1409,9 @@ shrinks the homogenization surface by roughly half and loses nothing.
 "kv-pair", "lp" (in code only as 'skg-lp-*' in elisp and 'lp' in the
 api doc's "LP" prefix: fine), "mk" (code idiom, fine), "interp" (gone),
 "ephem" (glossary only). Only "interp" and "md" need action.
-** Make the qualify-always rule a written convention
-*** Claude says: waiting on [[*Claude says: a one-paragraph rule in names.org][its open question]] and your sidecar answers
+** DONE Make the qualify-always rule a written convention
+*** DONE Claude says: done in 'names.org' ('13d33d3b', 'ancestor generation' added in '1cc9b460')
+*** Claude says (earlier): waiting on [[*Claude says: a one-paragraph rule in names.org][its open question]] and your sidecar answers
 'names.org' could say: these words are never used bare — merge,
 snapshot, index, generation, commit — with the qualifiers listed. That
 covers most homonyms here without any renames.
@@ -1445,8 +1448,9 @@ and discards on read (viewStats, heralds, relRepo display), and requests
 the server consumes on save ('editRequest', 'viewRequests'). The docs
 explain this per field, over and over. One glossary entry, with those
 two words, would let each field's documentation just say which it is.
-** git snapshot
-*** Claude says: still a suggestion; your sidecar answer on "snapshot" may settle it
+** DONE git snapshot
+*** DONE Claude says: settled under [[*snapshot][snapshot]] ('cc12a25a'): one of HEAD, index, worktree is a "git snapshot"
+*** Claude says (earlier): still a suggestion; your sidecar answer on "snapshot" may settle it
 HEAD, index and worktree, collectively. The diff code needs a word for
 "one of the three", and today uses "stage", "endpoint" and "snapshot"
 interchangeably.
@@ -1506,13 +1510,13 @@ The execution is mechanical, but the word is your call.
 I think it's a clear winner, but each of the ~800 prose uses needs a
 judgment about which sense is meant, and the user-facing docs use
 "relationship" heavily. Worth your yes first.
-** ONGOING Rename the telescope "fold" (combining sections) so "fold" means only Org folding?
+** DONE Rename the telescope "fold" (combining sections) so "fold" means only Org folding?
 *** Claude says: your sidecar says compose/decompose; I'll do it when I process the sidecar
 Candidates: compose/decompose, stack/unstack. Identifier and prose
 tier. [[*fold][Discussion]].
 *** Claude says: not EASY
 Easy to execute once you pick the word.
-** ONGOING Reserve "hide" for the relation, renaming 'hiddenBody' to 'omittedBody'?
+** DONE Reserve "hide" for the relation, renaming 'hiddenBody' to 'omittedBody'?
 *** Claude says: your sidecar answers both of my questions below; I'll act when I process it
 Small format change (a display-only atom). [[*hide][Discussion]].
 *** Claude says: EASY
@@ -1521,11 +1525,11 @@ it, so no saved data changes. The job is a rename across the server,
 both clients, the herald table, tests and docs. Then fix the prose that
 uses "hide" for folding ("hidden in its parent") or for repo-set
 restriction.
-*** ONGOING [jeff]
+*** DONE [jeff]
 Let's use hidesFromSubs and hidesBody.
 There will be yet more hides later (from a links mentioners);
 no single kind can claim the whole word.
-**** ONGOING Claude says: two questions before I start
+**** DONE Claude says: two questions before I start
 ***** Does "hidesFromSubs" rename the stored relation, or only how we talk about it?
 The stored name 'hides_from_its_subscriptions' is a YAML key and a wire
 name, so renaming it means migrating every .skg file, including foreign
@@ -1598,9 +1602,13 @@ split-and-extend-paths-and-cols/. [[*Bury finished plans instead of rewriting th
 *** Claude says: split into an EASY part and a TODO part
 The EASY part is the next headline. Everything else stays here for you
 to judge, since you know which plans are done.
-**** TODO J : yes
+**** ONGOING J : yes
 It's too late to move them before the other work,
 but yes, please move them.
+***** TODO Claude says: not done yet; next I'd propose the list
+The certain ones were moved in the item below. For the rest I'd go
+through TODO/ and propose a list of finished plans for you to confirm
+before moving anything. Shall I?
 ** DONE Move the certainly-finished plans into TODO/DONE/, and delete exact duplicates
 - 'ditch-typedb/': its ledger says "all ten phases are DONE". Keep
   '3_external-cleanup.org' where it is, since it is ONGOING (the
@@ -1693,7 +1701,7 @@ a user-facing message, and the tests that check it. Emacs and Neovim
 suites pass.
 *** DONE Fix the stale 'Viewnode' doc comment that predates Neovim.
 Jeff : yes.
-** ONGOING Glossary repairs that need no decision
+** DONE Glossary repairs that need no decision
 *** DONE Remove the dead entries: "interp", "md = Metadata".
 Jeff : yes.
 Claude says: "md = Metadata" had a useful description of metadata, so I
@@ -1769,7 +1777,8 @@ it as above and leave those two senses out until you decide them.
 ****** DONE Jeff : yes, and
 I think I already weighed in on each of these decisions earlier.
 If I didn't let me know what I still need to choose.
-******* TODO Claude says: done ('13d33d3b'); one choice is still open
+******* DONE Claude says: done ('13d33d3b'); one choice is still open
 The rule covers merge, snapshot, index, commit, and generation
 (runtime and buffer). The ancestor sense of "generation" waits on my
 question under [[*generation][generation]]: is your 'DigraphGeneration' that sense?
+******** DONE Claude says: settled as "ancestor generation"; 'names.org' says so ('1cc9b460')
