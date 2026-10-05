@@ -568,7 +568,7 @@ it" means "restart Skg too," and the lag that matters is *Skg's*
 startup, not TypeDB's 0.25 s.
 
 Skg's startup (traced by an Explore pass over 'server/dbs/init.rs' and
-'TODO/incremental-init-might-be-broken.org'):
+'TODO/DONE/incremental-init-might-be-broken.org'):
 
 - It REUSES the persistent TypeDB store by default ('delete_on_quit'
   defaults false and is unset for the real config), and does an

@@ -1,4 +1,4 @@
-// Binary grouping (TODO/faster-tests.org): every tests/*.rs file
+// Binary grouping (TODO/DONE/faster-tests.org): every tests/*.rs file
 // used to be its own ~quarter-GB test binary; after any change to
 // server/ code, relinking all of them dominated the test cycle.
 // Cargo.toml sets autotests = false and declares a few [[test]]

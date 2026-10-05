@@ -1,7 +1,7 @@
 #+title: fork-fixes: execution progress
 #+startup: overview
 
-Companion to TODO/fork-fixes.org, per coding-advice/when-to-stop.org.
+Companion to TODO/DONE/fork-fixes.org, per coding-advice/when-to-stop.org.
 The request is left as-is; this file records what got done, deviations
 on *how*, and bad news. Choices Jeff might dispute live in
 jeff-should-weigh-in-on.org (repo root), not here.

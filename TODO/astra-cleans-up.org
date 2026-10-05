@@ -514,7 +514,7 @@ Crash recovery or journaling would be a separate reliability project.
 current code uses captured graph generations. The adapter cleanup above is
 leftover work, not a recommendation to repeat that migration.
 
-[[file:incremental-validation/2_plan.org][Incremental validation]] and current
+[[file:DONE/incremental-validation/2_plan.org][Incremental validation]] and current
 'PreparedGraphUpdate' already provide local validation and a full oracle.
 Improve their common change facts; do not “optimize” saves by reinstalling
 full graph validation on every update.
@@ -524,8 +524,8 @@ pieces visibly present: 'FileProperty', property intents, the property
 folder, and both clients. Treat it as a specification to verify, not an
 unstarted checklist. The source code is the evidence of implementation.
 
-[[file:split-and-extend-paths-and-cols/progress.org][Relationship/path generalization]],
-[[file:strip-inactive-node-fields-progress.org][anonymous inactive nodes]], and
+[[file:DONE/split-and-extend-paths-and-cols/progress.org][Relationship/path generalization]],
+[[file:DONE/strip-inactive-node-fields-progress.org][anonymous inactive nodes]], and
 [[file:uniform-heralds/progress.org][uniform heralds]] likewise have completed
 work behind them. Preserve their established distinctions. In particular,
 anonymous inactive placeholders should not regain IDs for reconciliation
@@ -540,7 +540,7 @@ entry describes duplicated cycle walks; current validation already uses
 facts, not reimplementing cycle detection.
 
 [[file:potential-optimizations.org][potential-optimizations.org]],
-[[file:what-affects-dbs.org][what-affects-dbs.org]],
+[[file:DONE/what-affects-dbs.org][what-affects-dbs.org]],
 [[file:maybe-dead-things.org][maybe-dead-things.org]], and parts of
 [[file:partial-reload-and-magit/2_discussion.org][partial reload discussions]]
 still depend on TypeDB or incremental-init machinery from the old design.
@@ -627,7 +627,7 @@ Keep 'assert_metadata_eq!' for unordered metadata comparison, but its
 canonicalizer deliberately erases order inside relationship herald spans.
 Preserve the exact order checks for those spans. For test performance, keep
 the already-consolidated Cargo targets and shared sessions documented in
-[[file:faster-tests-progress.org][the test-speed work]].
+[[file:DONE/faster-tests-progress.org][the test-speed work]].
 
 ** Decisions that deserve your input during a later implementation
 

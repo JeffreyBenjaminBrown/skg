@@ -170,7 +170,7 @@ fn assert_hides_e1_in_subscribee_folder (
   buffer : &str,
 ) {
   assert! (
-    // 'folded': a new hidden folder begins folded (TODO/fork-fixes.org),
+    // 'folded': a new hidden folder begins folded (TODO/DONE/fork-fixes.org),
     // expressed as a folded atom on each member.
     buffer . contains ("**** (skg hiddenInSubscribeeFolder)\n***** (skg folded (node (id e1) (repo foreign) writeProtected"),
     "Expected e1 to be rendered folded under HiddenInSubscribeeFolder:\n{}",
@@ -440,7 +440,7 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
       r_skg . hidesFromSubs );
     Ok (( )) }
 
-/// The contains-removal rule (TODO/fork-fixes.org, "Editing a forked
+/// The contains-removal rule (TODO/DONE/fork-fixes.org, "Editing a forked
 /// node is bad"): owned f contains [c, x] and subscribes to o, whose
 /// contains include c (but not x). Saving f WITHOUT its children must
 /// hide c (it would otherwise reappear under f as unintegrated

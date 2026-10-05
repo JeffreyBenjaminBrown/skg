@@ -54,7 +54,7 @@ const FORK_ROOT_BUFFER : &str = indoc! {"
   ** (skg (node (id N2) (repo foreign) writeProtected)) N2
   "};
 
-/// Case 1 of TODO/fork-fixes.org: a BARE new headline (no metadata at
+/// Case 1 of TODO/DONE/fork-fixes.org: a BARE new headline (no metadata at
 /// all) appended under a foreign root. Enrichment mints it an id and
 /// inherits the foreign skgrepo; that must NOT be a foreign-creation
 /// error -- appending it edits N's contains, which forks N, and the
@@ -411,7 +411,7 @@ async fn fork_user_set_skgrepo_overrides (
      got {:?}", c . home_skgrepo );
   Ok (( )) }
 
-/// TODO/fork-fixes.org Case 2: appending a new child that EXPLICITLY
+/// TODO/DONE/fork-fixes.org Case 2: appending a new child that EXPLICITLY
 /// names an owned skgrepo specifies the clone's skgrepo. The spec must
 /// resolve to that skgrepo, CONFIRMED, and the confirmation buffer must
 /// show it as settled -- no PICK-A-REPO, no suggestion comment.
@@ -503,7 +503,7 @@ async fn fork_confirmation_gates_skgsave_commit (
     "the clone must be skgsave-committed after approval" );
   Ok (( )) }
 
-/// TODO/fork-fixes.org Case 1, at the plan level: appending a bare
+/// TODO/DONE/fork-fixes.org Case 1, at the plan level: appending a bare
 /// (metadata-less) new headline under a foreign root forks the root
 /// rather than dying with "Cannot create node in foreign repo". The
 /// SavePlan must hold one ForkSpec for N, whose clone's contains end
@@ -561,7 +561,7 @@ async fn fork_new_parent_adopts_relationship_skgrepos (
     new_parent . contains);
   Ok (( )) }
 
-/// TODO/fork-fixes.org Case 1, committed: the approved save creates
+/// TODO/DONE/fork-fixes.org Case 1, committed: the approved save creates
 /// the clone AND the new node, both in the owned skgrepo; N's foreign
 /// .skg is untouched.
 async fn fork_from_bare_new_child_skgsave_commits (

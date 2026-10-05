@@ -38,7 +38,7 @@ async fn test_content_diff_with_moved_and_deleted_nodes (
   Ok(())
 }
 
-/// TODO/fork-fixes.org: no git phantoms under write-protected nodes. The
+/// TODO/DONE/fork-fixes.org: no git phantoms under write-protected nodes. The
 /// same transition as above, but with 11 also a view ROOT, so the
 /// copy of 11 under 1 draws write-protected. The removed-member
 /// phantoms of 11 must appear only under its editable (root) copy;

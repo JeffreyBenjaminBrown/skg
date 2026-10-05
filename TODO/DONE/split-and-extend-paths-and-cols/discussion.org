@@ -49,7 +49,7 @@
   non-vognode, so your unified "cannot be changed from here" reading holds.
   Decision: ☮ on the six read-only folders (a lock 🔒 stays a
   one-line swap). NOTHING left open. Plan written:
-  'TODO/split-and-extend-paths-and-cols/plan.org'.
+  'TODO/DONE/split-and-extend-paths-and-cols/plan.org'.
 
 * Ground truth — what exists today (so we agree before deciding)
   I traced the whole path, client to server. The relevant facts:

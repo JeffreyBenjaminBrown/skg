@@ -30,7 +30,7 @@ where
     } ) . map_err( |e| -> String { e . into() } )?; }
   Ok( () ) }
 
-/// TODO/fork-fixes.org: a NEW hiddenInSubscribee or
+/// TODO/DONE/fork-fixes.org: a NEW hiddenInSubscribee or
 /// hiddenOutsideOfSubscribee folder begins folded. Creation sites stamp
 /// 'folded' on the newborn folder; this runs at the folder's own BFS visit
 /// (its members now reconciled in) and transfers the stamp: every

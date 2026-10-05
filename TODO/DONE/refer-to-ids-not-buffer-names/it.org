@@ -19,7 +19,7 @@ The live server log records the failed visit at
 =2026-08-24T02:57:10=, but no =single_root_view= rendering spans follow it.
 That means 'handle_single_root_view_request' returns through one of its two
 early =switch-to-view= branches in
-[[../../server/serve/handlers/single_root_view.rs]].  A fresh diagnostic TCP
+[[../../../server/serve/handlers/single_root_view.rs]].  A fresh diagnostic TCP
 connection requested the same node and received the complete 740-byte
 override-choice view immediately:
 
@@ -40,7 +40,7 @@ Both nodes have the title =cooking=:
 - =056a7de8-d7e5-4fb4-9a42-7e0f088ab898= in =Cheese=.
 
 'skg-content-view-buffer-name' therefore names either view =*cooking*=.
-'skg-open-org-buffer-from-text' in [[../../elisp/skg-buffer.el]] uses
+'skg-open-org-buffer-from-text' in [[../../../elisp/skg-buffer.el]] uses
 'get-buffer-create' with that name, then erases the returned buffer and
 replaces its =skg-view-uri=.  Opening the second cooking view consequently
 destroys the first view in place instead of allocating =*cooking*<2>=.
@@ -61,14 +61,14 @@ The server is therefore pointing at a URI that no Emacs buffer carries.
 *** The stale-URI response is intentionally invisible to the user today
 
 'skg-handle-content-view-sexp' in
-[[../../elisp/skg-request-single-root-content-view.el]] receives
+[[../../../elisp/skg-request-single-root-content-view.el]] receives
 =(switch-to-view override-menu:95fc4b53-...)= and calls
 'skg-find-buffer-by-uri'.  When that returns nil, the handler only writes a
 structured log entry.  The last user-visible text remains the earlier
 ="Visiting node: ..."= message.
 
 There is also prior evidence in
-[[../DONE/from-dot-claude/investigations.org]] that even a successful lookup is
+[[../from-dot-claude/investigations.org]] that even a successful lookup is
 fragile: 'switch-to-buffer' is currently called inside the network process
 filter, where the selected buffer can be restored when the filter returns.
 
@@ -134,14 +134,14 @@ logic client-side: the server cannot inspect Emacs's buffer list, and its
 deduplication decision is correct given the close/open messages it received.
 
 If factoring the close request avoids duplicating protocol formatting, add a
-'skg-send-close-view-uri' helper in [[../../elisp/skg-buffer.el]] and make the
+'skg-send-close-view-uri' helper in [[../../../elisp/skg-buffer.el]] and make the
 existing buffer-local 'skg-send-close-view' call it.
 
 ** Regression tests
 
 *** Buffer allocation unit test
 
-Extend [[../../tests/elisp/test-skg-view-uri-persistence.el]]:
+Extend [[../../../tests/elisp/test-skg-view-id-persistence.el]]:
 
 - open two texts under the same requested buffer name but different URIs;
 - assert that two distinct live buffers exist;
@@ -156,7 +156,7 @@ This test should fail on today's 'get-buffer-create' behavior.
 *** Switch response unit tests
 
 Add focused ERT coverage near
-[[../../tests/elisp/test-skg-warning-channel.el]] (or a new navigation test
+[[../../../tests/elisp/test-skg-warning-channel.el]] (or a new navigation test
 file) for both branches:
 
 - a =switch-to-view= URI with a live buffer is displayed by the deferred

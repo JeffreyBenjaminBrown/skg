@@ -431,7 +431,7 @@ by skipping those tests sometimes.)
   COMMANDS.org's structure (same command vocabulary, vim keys), plus a
   keybinding column note in COMMANDS.org pointing there. Alternative:
   one merged doc with two key columns — heavier to maintain.
-- The deviations report: 'TODO/vim-client/deviations.org', linked from
+- The deviations report: 'docs/nvim-client-deviations.org', linked from
   nvim/README.org.
 - Test locations: 'tests/nvim/' + 'test-nvim.lua' files inside existing
   tests/integration dirs; runner 'bash/nvim-tests.sh'; wired into

@@ -147,7 +147,7 @@ static TEST_STORE_GROUPS_MUTEX : std::sync::Mutex<()> =
 /// sequential sub-tests. 'reset' restores a pristine state between
 /// sub-tests by wiping the DATA in place (~10ms) instead of
 /// deleting and recreating the fixture stores (~250ms) -- see
-/// TODO/faster-tests.org for the measurements.
+/// TODO/DONE/faster-tests.org for the measurements.
 pub struct SharedStoreSession {
   pub test_name    : String,
   temp_fixtures  : PathBuf, // where reset() copies each sub-test's fixtures, so saves don't corrupt originals

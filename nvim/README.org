@@ -46,4 +46,4 @@ also an ':Skg*' Ex command.
 
 * Deviations from the Emacs client
 Every intentional behavioral difference is cataloged in
-[[../TODO/vim-client/deviations.org][TODO/vim-client/deviations.org]].
+[[../docs/nvim-client-deviations.org][docs/nvim-client-deviations.org]].

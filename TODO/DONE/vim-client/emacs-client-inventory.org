@@ -2,7 +2,7 @@
 # Compiled 2026-07-02 by Claude, from reading every file in elisp/
 # (ignoring abandoned/, experim/, *~), elisp/PITFALLs.org,
 # docs/COMMANDS.org, tests/elisp/ and tests/integration/.
-# Reference material for TODO/vim-client/plan.org.
+# Reference material for TODO/DONE/vim-client/plan.org.
 
 * 0. Orientation and architecture
 

@@ -1,4 +1,4 @@
-// Binary grouping (TODO/faster-tests.org): multi-repo, skgrepo-set,
+// Binary grouping (TODO/DONE/faster-tests.org): multi-repo, skgrepo-set,
 // and skgrepo/storage-layer tests. See tests/grouped_unit.rs for why test
 // files are grouped into a few [[test]] targets.
 

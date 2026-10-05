@@ -233,7 +233,7 @@
    Nothing trims them. They are also the files a crash leaves NUL-padded,
    which makes them progressively less pleasant to read. Suggested fix:
    rotate on startup (keep one previous generation), or cap by size.
-* Problems noted during the fork-fixes arc (TODO/fork-fixes.org)
+* Problems noted during the fork-fixes arc (TODO/DONE/fork-fixes.org)
 ** The git_diff_view test matcher ignores bare metadata atoms
    'assert_buffer_contains' (tests/git_diff_view/common.rs) matches
    each expected line by star depth, title, and PARENTHESIZED
@@ -559,7 +559,7 @@
    flake above: per-test dbs, so the shared resource is something
    else.  Not chased.
 * Problems found while investigating test-suite speed (2026-06-12)
-  See TODO/faster-tests.org for the full investigation.
+  See TODO/DONE/faster-tests.org for the full investigation.
 ** (mostly fixed) Six near-duplicate test-db setup paths
    The same connect / create-db / define-schema / populate / teardown
    sequence is implemented in: 'run_with_test_db' and

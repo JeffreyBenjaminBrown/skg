@@ -35,7 +35,7 @@ If they are fixed, please mark their parent headline DONE.
 *** Claude: yes, both cases were fixed on 2026-07-07; re-verified today (2026-07-08).
 A prior session implemented them (commits 'd5d173be' for Case 1,
 'df1ec4dc' and 'a5c228db' for Case 2; its report is
-TODO/fork-fixes-progress.org, its judgment calls are in
+TODO/DONE/fork-fixes-progress.org, its judgment calls are in
 jeff-should-weigh-in-on.org at the repo root). I re-checked each case
 against the current tree today:
 - Case 1: a bare new node under a foreign parent no longer dies with

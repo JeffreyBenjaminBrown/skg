@@ -643,7 +643,7 @@ The server's suggested repo (the comment above the clone) is the
 default; S-left/S-right cycle through the repos you own. A no-op
 when every clone's repo is already specified -- notably when the
 saved metadata itself specified it (the server then omits the
-placeholder), per TODO/fork-fixes.org: no redundant ask."
+placeholder), per TODO/DONE/fork-fixes.org: no redundant ask."
   (save-excursion
     (goto-char (point-min))
     (while (re-search-forward org-heading-regexp nil t)

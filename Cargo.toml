@@ -7,7 +7,7 @@ version = "0.1.0"
 edition = "2024"
 # Every tests/*.rs file used to auto-become its own ~quarter-GB test
 # binary; relinking all of them after any server/ change dominated
-# the test cycle (TODO/faster-tests.org). The explicit [[test]]
+# the test cycle (TODO/DONE/faster-tests.org). The explicit [[test]]
 # targets below group them into a few binaries instead.
 autotests = false
 

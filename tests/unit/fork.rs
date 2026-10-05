@@ -136,7 +136,7 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
     build_fork_confirmation_buffer ( & [ fork_spec_n_edited (false) ] );
   let lines : Vec<&str> = buf . lines () . collect ();
   // The explanation lives under an org headline (foldable), not a
-  // long '#' comment block (TODO/fork-fixes.org Case 2).
+  // long '#' comment block (TODO/DONE/fork-fixes.org Case 2).
   assert! ( lines . first () . map_or ( false, |l|
       l . starts_with ("* Fork confirmation") ),
     "the buffer must open with the instructions headline:\n{}", buf );

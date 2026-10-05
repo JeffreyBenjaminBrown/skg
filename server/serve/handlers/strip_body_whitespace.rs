@@ -1,4 +1,4 @@
-//! The "strip body whitespace" request (TODO/fork-fixes.org): strips
+//! The "strip body whitespace" request (TODO/DONE/fork-fixes.org): strips
 //! trailing whitespace from every line of every body (and trailing
 //! blank lines from the body's tail), in every OWNED skgrepo in the
 //! config -- foreign skgrepos are never written, and stripping them would

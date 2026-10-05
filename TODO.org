@@ -594,7 +594,7 @@ Git review after reshaping it is hell.
 ***** [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skg]]
 ***** [[id:627da2c2-2f34-46ac-a6d3-9c625c4ff31d][AI]]
 ***** [[id:001d7913-c431-461c-92ae-a6a39394856c][processing]]
-*** [[./TODO/incremental-init-might-be-broken.org]]
+*** [[./TODO/DONE/incremental-init-might-be-broken.org]]
 *** to be more sure of the git diff analysis
 Have independent code count the number of disappeared files,
 moved files, new roots, and other anomalies,
@@ -799,7 +799,7 @@ see lying-names.org
 Using
 command-tree-to-read-from.org
 *** "incremental init" might be garbage
-see TODO/what-affects-dbs.org
+see TODO/DONE/what-affects-dbs.org
 but that was before some tremendous improvements in performance
 on <2026-04-22 Wed> and before and maybe after
 *** eliminate some 'tracing' commands

@@ -1,4 +1,4 @@
-* Progress executing TODO/faster-tests.org
+* Progress executing TODO/DONE/faster-tests.org
   Started 2026-06-12. The plan file is unchanged (per when-to-stop.org);
   deviations are recorded here.
 

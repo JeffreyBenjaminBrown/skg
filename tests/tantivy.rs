@@ -691,7 +691,7 @@ fn test_search_regex_with_operators (
               "OR should match 'biology' (got {:?})", ids ); }
   Ok (( )) }
 
-/// Regex + operators, grouping (TODO/fork-fixes.org): parens that
+/// Regex + operators, grouping (TODO/DONE/fork-fixes.org): parens that
 /// stand ALONE between whitespace group operator expressions;
 /// precedence is conventional (NOT > AND > OR, adjacency = OR);
 /// a paren ATTACHED to a pattern stays regex syntax; a lone

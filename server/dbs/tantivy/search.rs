@@ -148,7 +148,7 @@ fn build_parser_query (
 /// expression over the pieces ('parse_regex_operator_query'):
 /// AND / OR / NOT with conventional precedence, +foo / -foo
 /// prefixes, and grouping via parens that stand ALONE between
-/// whitespace (TODO/fork-fixes.org).
+/// whitespace (TODO/DONE/fork-fixes.org).
 fn build_regex_query (
   tantivy_index : &TantivyIndex,
   pattern       : &str,
@@ -266,7 +266,7 @@ enum RegexOpExpr {
   Piece (String),
 }
 
-/// Parse a regex-mode operator query (TODO/fork-fixes.org). The
+/// Parse a regex-mode operator query (TODO/DONE/fork-fixes.org). The
 /// pattern is split on whitespace; the grammar, in conventional
 /// precedence (NOT binds tightest, then AND, then OR; bare
 /// adjacency is OR):

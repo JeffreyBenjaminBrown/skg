@@ -225,7 +225,7 @@ pub fn maybe_add_subscribeeFolder_branch (
         false ) ?;
     with_node_mut ( tree, hidden_outside_folder_treeid,
       |mut n| {
-        // TODO/fork-fixes.org: a new hidden folder begins folded. The
+        // TODO/DONE/fork-fixes.org: a new hidden folder begins folded. The
         // stamp moves to the members at the folder's own BFS visit
         // ('fold_members_of_newborn_folder').
         n . value () . folded = true; } )
@@ -440,7 +440,7 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
       true ) ?;
   with_node_mut ( tree, hidden_folder_treeid,
     |mut n| {
-      // TODO/fork-fixes.org: a new hidden folder begins folded. The
+      // TODO/DONE/fork-fixes.org: a new hidden folder begins folded. The
       // stamp moves to the members at the folder's own BFS visit
       // ('fold_members_of_newborn_folder').
       n . value () . folded = true; } )

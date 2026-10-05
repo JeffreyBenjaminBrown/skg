@@ -191,7 +191,7 @@ fn ensure_hiddenOutsideOfSubscribeeFolder_is_last (
           false ) ?;
       with_node_mut ( tree, new_folder,
         |mut n| {
-          // TODO/fork-fixes.org: a new hidden folder begins folded. The
+          // TODO/DONE/fork-fixes.org: a new hidden folder begins folded. The
           // stamp moves to the members at the folder's own BFS visit
           // ('fold_members_of_newborn_folder'), which reconciles them in.
           n . value () . folded = true; } )

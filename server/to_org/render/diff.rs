@@ -146,7 +146,7 @@ pub(crate) fn process_unrestrictedVognode_diff (
   if matches! ( & node_mut . value () . kind,
                 ViewnodeKind::Vognode (Vognode::Unrestricted (t))
                   if t . is_writeProtected () ) {
-    // TODO/fork-fixes.org: no git phantoms under a write-protected node.
+    // TODO/DONE/fork-fixes.org: no git phantoms under a write-protected node.
     // It draws none of its worktree children, so a removed-member
     // phantom under it would show the node's DELETED children while
     // its kept children go unshown. Its editable occurrence (or a

@@ -88,7 +88,7 @@ pub fn setup_gitrepo_with_added_subscribee_fixtures(
   )
 }
 
-/// Expected when 11 is also a view root (TODO/fork-fixes.org, no git
+/// Expected when 11 is also a view root (TODO/DONE/fork-fixes.org, no git
 /// ghosts under write-protected nodes): the copy of 11 under 1 draws
 /// write-protected and so gets NO removed-member phantoms; the
 /// editable root copy of 11 carries them.
