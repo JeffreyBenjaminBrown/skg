@@ -3,8 +3,10 @@
 /// role grafts.
 /// PITFALL: The tree is drawn as paths to their first nonlinearity
 /// (server/dbs/in_rust_graph/paths.rs): each follows single partners
-/// until it branches, then includes the first layer of branches, and if it
-/// cycles, the first node to cycle is duplicated at the end.
+/// until it branches, then includes the first layer of branches (so the
+/// path's last viewnode is a branching viewnode: one with several
+/// viewchildren), and if it cycles, the first node to cycle is
+/// duplicated at the end.
 /// I say 'integrate' rather than 'insert' because some of the tree,
 /// maybe even all of it, might already be there.
 
@@ -154,7 +156,7 @@ fn integrate_role_trees (
   active  : Option<&ActiveSkgRepoSet>,
 ) -> Result < (), Box<dyn Error> > {
   for p in paths {
-    integrate_path_that_might_fork_or_cycle_with_skgrepo_set (
+    integrate_path_that_might_branch_or_cycle_with_skgrepo_set (
       tree, treeid,
       p.path, p.branches, p.cycle_nodes,
       graph, config, birth, active
@@ -163,7 +165,7 @@ fn integrate_role_trees (
 
 /// Integrate a (maybe branching or cyclic) path into an Viewnode tree,
 /// using provided role tree data.
-pub fn integrate_path_that_might_fork_or_cycle (
+pub fn integrate_path_that_might_branch_or_cycle (
   tree        : &mut Tree<Viewnode>,
   treeid      : NodeId,
   path        : Vec < ID >,
@@ -173,12 +175,12 @@ pub fn integrate_path_that_might_fork_or_cycle (
   config      : &SkgConfig,
   birth       : Birth,
 ) -> Result < (), Box<dyn Error> > {
-  integrate_path_that_might_fork_or_cycle_with_skgrepo_set (
+  integrate_path_that_might_branch_or_cycle_with_skgrepo_set (
     tree, treeid, path, branches, cycle_nodes,
     graph, config, birth, None )
 }
 
-pub fn integrate_path_that_might_fork_or_cycle_with_skgrepo_set (
+pub fn integrate_path_that_might_branch_or_cycle_with_skgrepo_set (
   tree        : &mut Tree<Viewnode>,
   treeid      : NodeId,
   path        : Vec < ID >,
@@ -240,7 +242,8 @@ fn integrate_linear_portion_of_path (
       birth,
       active ) }
 
-/// Add branch nodes as children of the specified node.
+/// Add branch nodes as children of the specified node, which thereby
+/// becomes a branching viewnode (if there are at least two).
 /// Branches are added in sorted order (reversed for prepending).
 /// Branches that are already children are skipped.
 fn integrate_branches_in_node (

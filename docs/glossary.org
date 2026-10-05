@@ -314,13 +314,19 @@ Non-ephemeral data, by contrast,
 remains on disk when the app terminates,
 and can be recovered by a later session.
 
-*** branch point (in a containerward path)
+*** branching viewnode (vs a branch)
 
-Following containers away from a node, a *branch point* is a node with
-more than one container. It can split into any number of branches, not
-just two. The code calls the end of a linear run a "nonlinearity"
-('PathToFirstNonlinearity'), and some of its comments still call a
-branch point a "fork". That is unrelated to forking a node, below.
+A *branching viewnode* is a viewnode with more than one viewchild. Do
+not confuse it with a *branch*: any viewnode together with its
+descendants, which may be degenerate, its root having one viewchild
+or none.
+
+A role tree is drawn as paths that each end at their first
+"nonlinearity" ('PathToFirstNonlinearity'): a cycle, or a node with
+several partners in the direction walked, which the drawn path shows
+as a branching viewnode. (The path code, which walks the graph before
+anything is drawn, calls that node a "branch point".) None of this is
+related to forking a node, below.
 
 *** clone, and the fork operation
 

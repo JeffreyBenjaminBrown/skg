@@ -1,6 +1,6 @@
 # Test Fixtures for integrate_role_tree tests
 
-These are minimal fixtures used for testing the `integrate_path_that_might_fork_or_cycle` function.
+These are minimal fixtures used for testing the `integrate_path_that_might_branch_or_cycle` function.
 
 Each file (0.skg through 4.skg) contains only:
 - An ID matching its filename

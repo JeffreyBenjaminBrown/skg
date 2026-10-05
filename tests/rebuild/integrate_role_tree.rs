@@ -2,7 +2,7 @@
 
 use indoc::indoc;
 use skg::to_org::expand::role_tree::{
-  integrate_path_that_might_fork_or_cycle,
+  integrate_path_that_might_branch_or_cycle,
   build_and_integrate_containerward_role_tree};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
@@ -77,7 +77,7 @@ async fn test_path_with_cycle_impl(
 
   // Integrate the path
 
-  integrate_path_that_might_fork_or_cycle(
+  integrate_path_that_might_branch_or_cycle(
     &mut viewforest, root_skgid, path, branches,
     cycle_nodes, &graph_handle_from_config (config)? . load_full (),
     &config, Birth::RoleGraft (RelationRole::CONTAINER)
@@ -153,7 +153,7 @@ async fn test_path_with_branches_no_cycle_impl(
 
   // Integrate the path
 
-  integrate_path_that_might_fork_or_cycle(
+  integrate_path_that_might_branch_or_cycle(
     &mut viewforest, node_1_skgid, path, branches,
     cycle_nodes, &graph_handle_from_config (config)? . load_full (),
     &config, Birth::RoleGraft (RelationRole::CONTAINER)
@@ -232,7 +232,7 @@ async fn test_path_with_branches_with_cycle_impl(
 
   // Integrate the path
 
-  integrate_path_that_might_fork_or_cycle(
+  integrate_path_that_might_branch_or_cycle(
     &mut viewforest, node_1_skgid, path, branches,
     cycle_nodes, &graph_handle_from_config (config)? . load_full (),
     &config, Birth::RoleGraft (RelationRole::CONTAINER)
