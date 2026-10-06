@@ -1,7 +1,7 @@
 use crate::types::viewnode::NodeEditRequest;
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::MpVognode;
-use crate::types::misc::{ID, SkgrepoName};
+use crate::types::misc::ID;
 
 use ego_tree::{Tree,NodeRef};
 use std::collections::{HashMap, HashSet};
@@ -23,27 +23,24 @@ enum WhetherToDelete {
 ///   but another node with the same ID that has 'toDelete' false.
 /// - Two nodes with the same ID 'define their contents'
 ///   (i.e. their 'writeProtected' fields are both false).
-/// - Two nodes with the same ID have different skgrepos,
-///   even if some are write-protected.
+/// Write-protected nodes contribute no instructions, so they cannot
+/// contradict anything -- not even with a different skgrepo, which save
+/// ignores. (Two editable nodes with different skgrepos are already
+/// two defining nodes.)
 /// .
 /// STRATEGY:
 /// Builds a map from IDs to sets of WhetherToDelete.
 /// After traversing the tree, reports every key (ID)
 /// for which the associated value (set) has size 2.
-/// Also builds a map from IDs to count of defining containers,
-/// and a map from IDs to sets of skgrepos. */
+/// Also builds a map from IDs to count of defining containers. */
 pub fn find_inconsistent_instructions(
   viewforest: &Tree<MpViewnode>
 ) -> (Vec<ID>, // IDs with inconsistent deletions across nodes
-      Vec<ID>, // IDs with multiple defining nodes
-      Vec<(ID, // IDs with inconsistent skgrepos
-           HashSet<SkgrepoName>)>)
-{ let (id_toDelete_instructions, id_to_definer_count, id_to_skgrepos) =
+      Vec<ID>) // IDs with multiple defining nodes
+{ let (id_toDelete_instructions, id_to_definer_count) =
     collect_instructions (viewforest);
   let mut inconsistent_deletion_skgids: Vec<ID> = Vec::new();
   let mut problematic_defining_skgids: Vec<ID> = Vec::new();
-  let mut inconsistent_skgrepo_skgids: Vec<(ID, HashSet<SkgrepoName>)> =
-    Vec::new();
   { // filter to problematic instructions
     { // Collect inconsistent deletion instructions
       for (skgid, delete_set) in id_toDelete_instructions {
@@ -54,31 +51,22 @@ pub fn find_inconsistent_instructions(
       for (skgid, count) in id_to_definer_count {
         if count > 1 {
           // Multiple defining containers for this ID
-          problematic_defining_skgids . push (skgid); }} }
-    { // Collect inconsistent skgrepos
-      for (skgid, skgrepos) in id_to_skgrepos {
-        if skgrepos . len() > 1 {
-          // Multiple different skgrepos for this ID
-          inconsistent_skgrepo_skgids . push((skgid, skgrepos)); }} }}
+          problematic_defining_skgids . push (skgid); }} }}
   ( inconsistent_deletion_skgids,
-    problematic_defining_skgids,
-    inconsistent_skgrepo_skgids ) }
+    problematic_defining_skgids ) }
 
-/// Collect delete instructions, defining containers, and skgrepos.
+/// Collect delete instructions and defining containers.
 fn collect_instructions(
   viewforest: &Tree<MpViewnode>
 ) -> (HashMap<ID, HashSet<WhetherToDelete>>, // deletes
-      HashMap<ID, usize>, // defining containers
-      HashMap<ID, HashSet<SkgrepoName>>) { // skgrepos
+      HashMap<ID, usize>) { // defining containers
 
   fn collect_instructions_rec(
     node_ref: NodeRef<MpViewnode>,
     id_toDelete_instructions: &mut
       HashMap<ID, HashSet<WhetherToDelete>>,
     id_defining_count: &mut
-      HashMap<ID, usize>,
-    id_to_skgrepos: &mut
-      HashMap<ID, HashSet<SkgrepoName>>
+      HashMap<ID, usize>
   ) {
     let viewnode : &MpViewnode = node_ref . value();
     if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
@@ -96,21 +84,12 @@ fn collect_instructions(
             . insert (delete_instruction);
           *id_defining_count . entry(skgid . clone())
             // increment the count for this defining container
-            . or_insert (0) += 1; }
-        if let Some (skgrepo_str) = &t . home_skgrepo {
-          // Collect skgrepo for this ID
-          let skgrepo : SkgrepoName =
-            SkgrepoName::from(skgrepo_str . as_str());
-          id_to_skgrepos
-            . entry(skgid . clone())
-            . or_insert_with (HashSet::new)
-            . insert (skgrepo); }}}
+            . or_insert (0) += 1; }}}
     for child in node_ref . children() { // recurse
       collect_instructions_rec(
         child,
         id_toDelete_instructions,
-        id_defining_count,
-        id_to_skgrepos); }} // end of inner function definition
+        id_defining_count); }} // end of inner function definition
 
   let mut id_toDelete_instructions
     : HashMap<ID, HashSet<WhetherToDelete>>
@@ -118,12 +97,8 @@ fn collect_instructions(
   let mut id_to_definer_count
     : HashMap<ID, usize>
     = HashMap::new();
-  let mut id_to_skgrepos
-    : HashMap<ID, HashSet<SkgrepoName>>
-    = HashMap::new();
   collect_instructions_rec(
     viewforest . root(),
     &mut id_toDelete_instructions,
-    &mut id_to_definer_count,
-    &mut id_to_skgrepos);
-  (id_toDelete_instructions, id_to_definer_count, id_to_skgrepos) }
+    &mut id_to_definer_count);
+  (id_toDelete_instructions, id_to_definer_count) }

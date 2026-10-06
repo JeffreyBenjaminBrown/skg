@@ -50,10 +50,9 @@ pub fn find_buffer_errors_for_saving_in_graph (
   // performs only local structural verifications:
   // each ID belongs to an IDFolder, etc.
   let mut errors: Vec<BufferValidationError> = Vec::new();
-  { // inconsistent instructions (deletion, defining containers, and skgrepos)
+  { // inconsistent instructions (deletion and defining containers)
     let (ambiguous_deletion_skgids,
-         problematic_defining_skgids,
-         inconsistent_skgrepo_skgids) =
+         problematic_defining_skgids) =
       find_inconsistent_instructions (viewforest);
     { // transfer the relevant IDs, in the appropriate constructors.
       for skgid in ambiguous_deletion_skgids {
@@ -61,11 +60,7 @@ pub fn find_buffer_errors_for_saving_in_graph (
           BufferValidationError::AmbiguousDeletion (skgid)); }
       for skgid in problematic_defining_skgids {
         errors . push(
-          BufferValidationError::Multiple_Defining_Viewnodes (skgid)); }
-      for (skgid, skgrepos) in inconsistent_skgrepo_skgids {
-        errors . push(
-          BufferValidationError::InconsistentSkgrepos(skgid, skgrepos));
-      }} }
+          BufferValidationError::Multiple_Defining_Viewnodes (skgid)); }} }
   { // merge validation
     for error_msg in {
       let nodeMerge_errors: Vec<String> =

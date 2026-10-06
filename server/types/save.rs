@@ -191,11 +191,6 @@ fn format_buffer_validation_error (
     BufferValidationError::DuplicatedContent (skgid) => {
       format!("Node has multiple Content children with the same ID:\n- ID: {}\n",
               skgid . 0) },
-    BufferValidationError::InconsistentSkgrepos(skgid, skgrepos) => {
-      let skgrepo_list: Vec<String> =
-        skgrepos . iter() . map(|s| s . 0 . clone()) . collect();
-      format!( "Multiple viewnodes with ID {} have inconsistent repos:\n- Repos: {:?}\n- All occurrences of the same ID must have the same repo.\n",
-              skgid . 0, skgrepo_list) },
     BufferValidationError::ModifiedForeignNode(skgid, skgrepo) => {
       format!("Cannot modify node from foreign repo:\n- ID: {}\n- Repo: {}\n- Foreign repos can only be viewed, not modified.\n",
               skgid . 0, skgrepo) },
