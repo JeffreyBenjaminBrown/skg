@@ -225,38 +225,54 @@ the move would leave stuck in a more private repo than their new
 default, as a list of (MARKER . REPO) -- MARKER at the child
 headline, REPO the relationship's new default. Only relationships without an
 existing `(relRepo ...)' atom qualify: an atom-carrying relationship was
-already assigned a deliberate relRepo. The walk's root itself is always
-retargeted (unless write-protected); its viewparent lies outside the
-move, so its repo counts as unchanging. With RECURSIVE nil only
-the point node moves, so only its own relationship and its direct
-children's relationships are examined."
+already assigned a deliberate relRepo.
+An endpoint with an ID moves iff the move retargets that ID's editable
+occurrence, so a write-protected repeat moves with it; an endpoint
+without one (not yet saved) moves iff the walk retargets it in place.
+The walk's root itself is always retargeted (unless write-protected);
+its viewparent lies outside the move, so its repo counts as
+unchanging. With RECURSIVE nil only the point node moves, so only its
+own relationship and its direct children's relationships are examined
+in its subtree. Elsewhere in the buffer, the relationships into
+write-protected repeats of moved nodes are examined too."
   (save-excursion
     (let* ((stuck '())
+           (considered '()) ;; line starts of the child headlines already examined
+           (moved-skgids (skg--skgids-moved-by-repo-move
+                          old-skgrepo recursive))
            (start-level (org-outline-level))
-           (consider ;; point on a candidate child C, whose inbound relationship is examined; the arguments say whether each endpoint's skgrepo is about to be retargeted
+           (moves-p ;; whether the occurrence META is about to change repo; RETARGETS-P says whether the walk retargets it in place
+            (lambda (meta retargets-p)
+              (let ((skgid (skg--node-id meta)))
+                (if skgid
+                    (and (member skgid moved-skgids) t)
+                  (and retargets-p
+                       (not (skg--node-write-protected-p meta)))))))
+           (consider ;; point on a candidate child C, whose inbound relationship is examined; the arguments say whether the walk retargets each endpoint in place
             (lambda (parent-retargets-p child-retargets-p)
               (when (skg--relationship-kind-matches-p 'content)
+                (push (line-beginning-position) considered)
                 (let* ((child-meta (skg--metadata-sexp-at-point-or-nil))
                        (child-skgrepo (skg--node-repo child-meta))
-                       (child-moves ;; a write-protected occurrence is skipped by the retargeting walk, so its skgrepo does not actually change
-                        (and child-retargets-p
-                             (not (skg--node-write-protected-p child-meta))))
-                       (parent-skgrepo
+                       (parent-meta
                         (save-excursion
                           (org-up-heading-safe)
-                          (skg--node-repo
-                           (skg--metadata-sexp-at-point-or-nil))))
-                       (eff (lambda (skgrepo retargets-p)
-                              (if (and retargets-p
+                          (skg--metadata-sexp-at-point-or-nil)))
+                       (parent-skgrepo (skg--node-repo parent-meta))
+                       (eff (lambda (skgrepo moves)
+                              (if (and moves
                                        (equal skgrepo old-skgrepo))
                                   new-skgrepo
                                 skgrepo)))
                        (skgrepo (skg--content-relationship-stuck-repo
                                parent-skgrepo
                                (funcall eff parent-skgrepo
-                                        parent-retargets-p)
+                                        (funcall moves-p parent-meta
+                                                 parent-retargets-p))
                                child-skgrepo
-                               (funcall eff child-skgrepo child-moves))))
+                               (funcall eff child-skgrepo
+                                        (funcall moves-p child-meta
+                                                 child-retargets-p)))))
                   (when skgrepo
                     (push (cons (copy-marker (line-beginning-position))
                                 skgrepo)
@@ -276,6 +292,18 @@ children's relationships are examined."
                 ;; its direct children's inbound relationships can change.
                 (funcall consider t nil)))
             (outline-next-heading))))
+      (goto-char (point-min))
+      (while (not (eobp))
+        (when (org-at-heading-p)
+          (let ((meta (skg--metadata-sexp-at-point-or-nil)))
+            (when (and (skg--unrestrictedNode-sexp-p meta)
+                       (skg--node-write-protected-p meta)
+                       (member (skg--node-id meta) moved-skgids)
+                       (not (memq (line-beginning-position) considered)))
+              ;; Both endpoints are judged by ID: a parent without one
+              ;; that the walk retargets in place was considered above.
+              (funcall consider nil nil))))
+        (outline-next-heading))
       (nreverse stuck))))
 
 (defun skg--content-relationship-stuck-repo (parent-eff-old parent-eff-new
@@ -881,22 +909,33 @@ unless the walk also changed that ID's editable occurrence: that one
 carries the move, and the rerender after the save shows it everywhere.
 Its viewdescendants are still traversed: they are self-writers, so
 their repo edits take effect even under a write-protected parent."
+  (let* ((changed-count 0)
+         (changed-skgids '())
+         (write-protected-skgids '()))
+    (skg--do-at-recursive-repo-move-occurrences
+     old-skgrepo
+     (lambda ()
+       (let ((meta (skg--metadata-sexp-at-point-or-nil)))
+         (if (skg--node-write-protected-p meta)
+             (push (or (skg--node-id meta) "(no id)")
+                   write-protected-skgids)
+           (push (skg--node-id meta) changed-skgids)
+           (setq changed-count
+                 (+ changed-count
+                    (skg--change-repo-at-point new-skgrepo)))))))
+    (cons changed-count
+          (nreverse (seq-remove
+                     (lambda (skgid) (member skgid changed-skgids))
+                     write-protected-skgids)))))
+
+(defun skg--do-at-recursive-repo-move-occurrences (old-skgrepo fn)
+  "Call FN, with point on each headline a recursive repo move from
+the headline at point covers: that root, and every viewdescendant
+reached through affectsParent=true UnrestrictedVognodes whose repo is
+OLD-REPO. Restores point afterward."
   (save-excursion
-    (let* ((changed-count 0)
-           (changed-skgids '())
-           (write-protected-skgids '())
-           (start-level (org-outline-level))
-           (change-or-collect
-            (lambda ()
-              (let ((meta (skg--metadata-sexp-at-point-or-nil)))
-                (if (skg--node-write-protected-p meta)
-                    (push (or (skg--node-id meta) "(no id)")
-                          write-protected-skgids)
-                  (push (skg--node-id meta) changed-skgids)
-                  (setq changed-count
-                        (+ changed-count
-                           (skg--change-repo-at-point new-skgrepo))))))))
-      (funcall change-or-collect) ;; the root
+    (let ((start-level (org-outline-level)))
+      (funcall fn) ;; the root
       (outline-next-heading)
       (while (and (not (eobp))
                   (> (org-outline-level) start-level))
@@ -905,12 +944,24 @@ their repo edits take effect even under a write-protected parent."
                         (skg--node-affectsParent-content-of-p metadata-sexp)))
               (skg--goto-next-headline-after-subtree)
             (when (equal (skg--node-repo metadata-sexp) old-skgrepo)
-              (funcall change-or-collect))
-            (outline-next-heading))))
-      (cons changed-count
-            (nreverse (seq-remove
-                       (lambda (skgid) (member skgid changed-skgids))
-                       write-protected-skgids))))))
+              (save-excursion (funcall fn)))
+            (outline-next-heading)))))))
+
+(defun skg--skgids-moved-by-repo-move (old-skgrepo recursive)
+  "The IDs whose editable occurrence a `skg-set-repo' move from the
+headline at point retargets: that headline's own (unless write-protected),
+and with RECURSIVE those of the matching viewdescendants too."
+  (let* ((skgids '())
+         (collect
+          (lambda ()
+            (let ((meta (skg--metadata-sexp-at-point-or-nil)))
+              (when (and (skg--node-id meta)
+                         (not (skg--node-write-protected-p meta)))
+                (push (skg--node-id meta) skgids))))))
+    (if recursive
+        (skg--do-at-recursive-repo-move-occurrences old-skgrepo collect)
+      (funcall collect))
+    skgids))
 
 (defun skg--goto-next-headline-after-subtree ()
   "Move to the next headline after the current subtree."
