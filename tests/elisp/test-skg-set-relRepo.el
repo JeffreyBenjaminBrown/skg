@@ -98,6 +98,38 @@ viewparent), relation = the folder's relation."
                     '(:recorder "anchor" :member "seen"
                       :relation "subscribesTo"))))))
 
+(ert-deftest test-rel-write-protected-child-of-editable-parent ()
+  "A write-protected child's relationship belongs to its editable parent,
+so it can be set from the child."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id recorder) (repo public))) recorder\n"
+    "** (skg (node (id kid) (repo public) writeProtected)) kid\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (search-forward "(id kid)" nil t)
+     (beginning-of-line)
+     (should (equal (skg--rel-at-point)
+                    '(:recorder "recorder" :member "kid"
+                      :relation "contains"))))))
+
+(ert-deftest test-rel-refuses-under-write-protected-parent ()
+  "Refuses (user-error) under a write-protected parent, which the save
+would not let write the relationship."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id recorder) (repo public) writeProtected)) recorder\n"
+    "** (skg (node (id kid) (repo public))) kid\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (search-forward "(id kid)" nil t)
+     (beginning-of-line)
+     (let ((err (should-error (skg--rel-at-point)
+                              :type 'user-error)))
+       (should (string-match-p "write-protected" (cadr err)))))))
+
 (ert-deftest test-rel-refuses-on-write-protected-folder-member ()
   "Refuses (user-error) on a member of a write-protected folder."
   (test--with-skg-content-view

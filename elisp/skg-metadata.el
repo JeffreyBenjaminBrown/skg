@@ -400,14 +400,16 @@ member of a write-protected folder, or with an ID missing."
                             skg--writable-folder-relations))))
         (cond
          (writable-folder
-          (let ((anchor-skgid
-                 (save-excursion
-                   (and (org-up-heading-safe) ;; to the folder
-                        (org-up-heading-safe) ;; to its anchor
-                        (skg--node-id
-                         (skg--metadata-sexp-at-point-or-nil))))))
+          (let* ((anchor-sexp
+                  (save-excursion
+                    (and (org-up-heading-safe) ;; to the folder
+                         (org-up-heading-safe) ;; to its anchor
+                         (skg--metadata-sexp-at-point-or-nil))))
+                 (anchor-skgid (skg--node-id anchor-sexp)))
             (unless anchor-skgid
               (user-error "Could not find the folder's anchor headline"))
+            (when (skg--node-write-protected-p anchor-sexp)
+              (user-error "The folder's anchor is write-protected here, so the save would not write this relationship; set it from a view where the anchor is editable"))
             (list :recorder anchor-skgid
                   :member member-skgid
                   :relation (cdr writable-folder))))
@@ -415,6 +417,8 @@ member of a write-protected folder, or with an ID missing."
           (let ((parent-skgid (skg--node-id parent-sexp)))
             (unless parent-skgid
               (user-error "No id in the parent headline's metadata"))
+            (when (skg--node-write-protected-p parent-sexp)
+              (user-error "The parent is write-protected here, so the save would not write this relationship; set it from a view where the parent is editable"))
             (list :recorder parent-skgid
                   :member member-skgid
                   :relation "contains")))
