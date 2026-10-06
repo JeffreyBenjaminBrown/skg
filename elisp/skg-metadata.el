@@ -872,11 +872,14 @@ only descendents for which affectsParent=true are traversed.
 A write-protected occurrence is NOT edited -- the save would silently
 ignore its repo edit (see TODO/problems.org, \"skg-set-repo
 silently no-ops on write-protected occurrences\") -- and its ID is
-collected into WRITE-PROTECTED-IDS instead, for the caller to warn about.
+collected into WRITE-PROTECTED-IDS instead, for the caller to warn about,
+unless the walk also changed that ID's editable occurrence: that one
+carries the move, and the rerender after the save shows it everywhere.
 Its viewdescendants are still traversed: they are self-writers, so
 their repo edits take effect even under a write-protected parent."
   (save-excursion
     (let* ((changed-count 0)
+           (changed-skgids '())
            (write-protected-skgids '())
            (start-level (org-outline-level))
            (change-or-collect
@@ -885,6 +888,7 @@ their repo edits take effect even under a write-protected parent."
                 (if (skg--node-write-protected-p meta)
                     (push (or (skg--node-id meta) "(no id)")
                           write-protected-skgids)
+                  (push (skg--node-id meta) changed-skgids)
                   (setq changed-count
                         (+ changed-count
                            (skg--change-repo-at-point new-skgrepo))))))))
@@ -899,7 +903,10 @@ their repo edits take effect even under a write-protected parent."
             (when (equal (skg--node-repo metadata-sexp) old-skgrepo)
               (funcall change-or-collect))
             (outline-next-heading))))
-      (cons changed-count (nreverse write-protected-skgids)))))
+      (cons changed-count
+            (nreverse (seq-remove
+                       (lambda (skgid) (member skgid changed-skgids))
+                       write-protected-skgids))))))
 
 (defun skg--goto-next-headline-after-subtree ()
   "Move to the next headline after the current subtree."

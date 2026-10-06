@@ -761,6 +761,37 @@ it are not offered (they cannot actually publicize)."
        (should (string-match-p "(repo public)"
                                (test--line-of-id skgid)))))))
 
+(ert-deftest test-set-repo-recursive-repeat-follows-its-editable-occurrence ()
+  "A write-protected repeat of a node whose editable occurrence the move
+changes is left as rendered (the save ignores it) and draws no warning:
+the node does move."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id r) (repo private))) r\n"
+    "** (skg (node (id a) (repo private))) a\n"
+    "*** (skg (node (id x) (repo private))) x\n"
+    "** (skg (node (id b) (repo private))) b\n"
+    "*** (skg (node (id x) (repo private) writeProtected)) x again\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
+                (lambda (_current) "trusted")))
+       (let ((msgs (cdr (test--messages-during
+                         (lambda () (skg-set-repo t))))))
+         (should-not (seq-find (lambda (m)
+                                 (or (string-match-p "NOT changed" m)
+                                     (string-match-p "WARNING" m)))
+                               msgs))))
+     (should (string-match-p "(repo trusted)" (test--line-of-id "x")))
+     (should (string-match-p
+              "(repo private) writeProtected"
+              (save-excursion
+                (goto-char (point-min))
+                (search-forward "x again")
+                (buffer-substring (line-beginning-position)
+                                  (line-end-position))))))))
+
 (ert-deftest test-set-repo-single-publicizes-a-public-parents-child-relationship ()
   "Moving a private child into public offers its public parent's relationship too."
   (test--with-skg-content-view
