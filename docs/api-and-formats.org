@@ -875,7 +875,11 @@ under different parents):
   privacy is lowered; a legacy or hand-authored relationship whose DISK
   skgrepo already sits more public than the default may be held or
   made more private, never made still more public). Absent means the
-  relationship sits at its default relRepo. Alias and Unknown headlines likewise
+  relationship sits at its default relRepo. The relationship belongs to the
+  view-parent (or a writable folder's anchor), so a write-protected headline
+  may carry this request too; the save refuses it only when nothing editable
+  writes that relationship, e.g. under a write-protected parent.
+  Alias and Unknown headlines likewise
   expose a flat/nested display =relRepo= fact and put write requests only
   under =editRequest=; copying a fact is harmless while copying a request
   deliberately requests it at the destination.
