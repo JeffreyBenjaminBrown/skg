@@ -11,7 +11,7 @@ use crate::types::viewnode::Vognode;
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 
-/// Insert full containerward role tree trees into the search viewforest,
+/// Insert full containerward role trees into the search viewforest,
 /// under each level-1 result UnrestrictedVognode.
 /// Role tree children are prepended (inserted first among siblings).
 pub(crate) fn insert_full_containerward_role_trees_into_search_view (

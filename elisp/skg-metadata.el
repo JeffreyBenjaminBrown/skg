@@ -361,7 +361,7 @@ relation_accessors.rs). The folder's viewparent (the anchor) owns the
 outbound relationship to each member.")
 
 (defun skg--rel-at-point ()
-  "Classify the relationship relationship the headline at point represents.
+  "Classify the relationship the headline at point represents.
 Returns a plist (:recorder RECORDER-ID :member MEMBER-ID :relation NAME):
 for a content child, the viewparent contains the node at point; for
 a writable-folder member, the folder's anchor (the folder's viewparent) owns
@@ -383,7 +383,7 @@ member of a write-protected folder, or with an ID missing."
         (user-error "No id in this headline's metadata"))
       (unless parent-sexp
         (user-error
-         "Root headline: there is no relationship relationship here to set"))
+         "Root headline: there is no relationship here to set"))
       (let ((write-protected-atom
              (and (consp parent-sexp)
                   (seq-find (lambda (atom)
@@ -522,7 +522,7 @@ next save will do with the relationship."
 
 (defconst skg--relationship-role-menu-prose
   '(("container" nil
-     "The node would CONTAIN its view-parent -- the shape of a containerward role graft. The relationship belongs to the role role graft's own contains list, wherever that list is drawn definitively; it cannot be set from the role role graft's position.")
+     "The node would CONTAIN its view-parent -- the shape of a containerward role graft. The relationship belongs to the role graft's own contains list, wherever that list is drawn editable; it cannot be set from the role graft's position.")
     ("content" content
      "The view-parent contains the node: ordinary content. Sets the repo of each parent-contains-child relationship.")
     ("mentioner" nil
@@ -568,7 +568,7 @@ each ROLE an entry of `skg--relationship-role-menu-prose'."
 menu buffer, called with the chosen kind symbol.")
 
 (defun skg-set-relRepo-recursive ()
-  "Set the relRepo of every matching relationship relationship in the
+  "Set the relRepo of every matching relationship in the
 subtree at point.
 
 First presents an org-menu of the schema's five node-node relations

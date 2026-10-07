@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::ID;
 
-/// A node in the full containerward role tree tree.
+/// A node in the full containerward role tree.
 ///
 /// Root: a genuine root (no containers).
 /// Repeated: already visited via another branch (cycle or diamond).
