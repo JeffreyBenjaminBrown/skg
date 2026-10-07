@@ -29,5 +29,5 @@ These fixtures are used to test various error conditions including:
 - Nonexistent repo references
 - Modifications to foreign nodes
 - Repo conflicts between disk and buffer
-- Inconsistent repos for duplicate IDs
+- Duplicate editable IDs, and duplicate IDs whose write-protected occurrence carries a stale repo
 - Merge operations involving foreign nodes

@@ -738,8 +738,8 @@ fn relrepo_requests_are_contextual_and_singular (
     &parse_metadata_to_viewnodemd (
       "(skg (node (id n) (repo public) writeProtected (editRequest (relRepo private))))" )
     . unwrap (), "N" . to_string (), None );
-  assert! ( error . is_some (),
-            "write-protected relRepo request must be rejected" );
+  assert! ( error . is_none (),
+            "a write-protected node's relRepo request is its view-parent's instruction, so parsing must accept it" );
 }
 
 #[test]

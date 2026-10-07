@@ -22,7 +22,7 @@ fn test_find_inconsistent_toDelete_instructions() {
 
   let viewforest_consistent: MpViewForest =
     org_to_uninterpreted_viewforest (input_consistent) . unwrap() . 0;
-  let (inconsistent_ids_consistent, _, _) =
+  let (inconsistent_ids_consistent, _) =
     find_inconsistent_instructions (&viewforest_consistent);
   assert_eq!(inconsistent_ids_consistent . len(), 0, "Should have no inconsistent IDs when all nodes with same ID have same toDelete value");
 
@@ -38,7 +38,7 @@ fn test_find_inconsistent_toDelete_instructions() {
 
   let viewforest_inconsistent: MpViewForest =
     org_to_uninterpreted_viewforest (input_inconsistent) . unwrap() . 0;
-  let (inconsistent_skgids, _, _) = find_inconsistent_instructions (&viewforest_inconsistent);
+  let (inconsistent_skgids, _) = find_inconsistent_instructions (&viewforest_inconsistent);
 
   assert_eq!(inconsistent_skgids . len(), 2, "Should find exactly 2 conflicting IDs");
   assert!(inconsistent_skgids . contains(&ID::from ("conflict1")), "Should include conflict1 ID");
@@ -54,13 +54,13 @@ fn test_find_inconsistent_toDelete_instructions() {
 
   let viewforest_no_skgids: MpViewForest =
     org_to_uninterpreted_viewforest (input_no_skgids) . unwrap() . 0;
-  let (inconsistent_no_skgids, _, _) = find_inconsistent_instructions (&viewforest_no_skgids);
+  let (inconsistent_no_skgids, _) = find_inconsistent_instructions (&viewforest_no_skgids);
   assert_eq!(inconsistent_no_skgids . len(), 0, "Should have no conflicts when only one node has each ID");
 
   // Test empty viewforest (just BufferRoot, no tree roots)
   let empty_viewforest: MpViewForest =
     MpViewForest::new();
-  let (inconsistent_empty, _, _) =
+  let (inconsistent_empty, _) =
     find_inconsistent_instructions (&empty_viewforest);
   assert_eq!(inconsistent_empty . len(), 0,
              "Should have no conflicts in empty viewforest");

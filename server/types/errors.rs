@@ -1,7 +1,6 @@
 use super::misc::{ID, SkgrepoName};
 use std::error::Error;
 use std::io;
-use std::collections::HashSet;
 
 #[derive (Debug)]
 pub enum LinkParseError {
@@ -30,7 +29,6 @@ pub enum BufferValidationError {
   Multiple_Defining_Viewnodes     (ID), // For any given ID, at most one occurrence can be editable. (Its contents are intended to define those of the node.)
   AmbiguousDeletion              (ID),
   DuplicatedContent              (ID), // A node has multiple Content children with the same ID
-  InconsistentSkgrepos            (ID, HashSet<SkgrepoName>), // Multiple viewnodes with same ID have different skgrepos
   ModifiedForeignNode            (ID, SkgrepoName), // Attempted to modify a node from a foreign skgrepo - (skgid, repo_name)
   CreatedForeignNode             (ID, SkgrepoName), // Attempted to create a node in a foreign skgrepo - (skgid, repo_name)
   CannotMoveToOrFromForeignSkgrepo (ID,
@@ -114,9 +112,6 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Ambiguous deletion request for ID {:?}", skgid),
       BufferValidationError::DuplicatedContent (skgid) =>
         write!(f, "Node has multiple Content children with the same ID {:?}", skgid),
-      BufferValidationError::InconsistentSkgrepos(skgid, skgrepos) => {
-        let skgrepo_list: Vec<&SkgrepoName> = skgrepos . iter() . collect();
-        write!(f, "Multiple viewnodes with ID {:?} have inconsistent repos: {:?}", skgid, skgrepo_list) },
       BufferValidationError::ModifiedForeignNode(skgid, skgrepo) =>
         write!(f, "Cannot modify node {:?} from foreign repo '{}'", skgid, skgrepo),
       BufferValidationError::CreatedForeignNode(skgid, skgrepo) =>

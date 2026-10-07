@@ -235,16 +235,15 @@ pub fn viewnode_from_metadata (
         // clear message. We can only report this when the id is
         // known; if it isn't, other validations cover the missing-id
         // case.
+        // (A relRepo request is not among these: it belongs to the
+        // relationship from the view-parent, so it is the view-parent's
+        // instruction. 'writeProtected_relRepo_request_errors' checks
+        // that some editable node collects it.)
         let error : Option<BufferValidationError> =
           if     metadata . writeProtected
               && metadata . edit_request . is_some ()
           { metadata . skgid . clone ()
             . map ( BufferValidationError::EditRequestOnWriteProtectedOccurrence ) }
-          else if metadata . writeProtected
-               && metadata . relRepo_request . is_some ()
-          { Some ( BufferValidationError::Other (
-              "relRepo request on a write-protected node"
-              . to_string () )) }
           else { None };
         let t : MpUnrestrictedVognode = MpUnrestrictedVognode {
             title,

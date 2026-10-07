@@ -66,6 +66,14 @@ A config option, for recording videos.
 Could put a second minibuffer line,
 that reads if anything (key sequence -> command),
 leaving a trail for five seconds or until interrupted.
+** TODO CRITICAL : don't force that we keep owned files under 'owned/'
+Let the user do that,
+but have them write out an explicit path for each owned repo,
+including the owned/ part if that's part of it.
+
+Otherwise, when I switch between editing as myself and as Mr. Cheese
+and push and pull from multiple skg images,
+my DEPENDENCIES.toml file gets mangled.
 ** TODO CRITICAL : representation change for safety
 *** subscribee-as-such must be a metadata property.
 The metadata should in effect say
@@ -316,6 +324,7 @@ e.g. weird b/c it has a link
 *** ingest into skg
 ** embarrasssments
 *** the org-export and docs nodes should be in another skgrepo
+*** tests should share fixtures across clients
 ** bugs
 *** heralds temporarily lose the overlay
 If I save a big buffer, and then quickly move a node

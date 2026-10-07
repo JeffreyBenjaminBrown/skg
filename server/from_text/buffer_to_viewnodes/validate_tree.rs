@@ -6,9 +6,9 @@ use crate::dbs::in_rust_graph::override_resolution::{
 use crate::dbs::in_rust_graph::override_invariants::existing_owned_overrider_of;
 use crate::dbs::node_lookup::opt_graphnode_by_skgid;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::viewnode::{AffectsParent, Property, PropertyFolder, ViewRequest};
+use crate::types::viewnode::{AffectsParent, NodeEditRequest, PartnerFolder, Property, PropertyFolder, ViewRequest};
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
-use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
+use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom, MpUnrestrictedVognode};
 use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::errors::BufferValidationError;
@@ -16,7 +16,7 @@ use crate::nodeMerge::validate_nodeMerge::validate_nodeMerge_requests;
 use contradictory_instructions::find_inconsistent_instructions;
 use super::local;
 use ego_tree::iter::Edge;
-use ego_tree::NodeId;
+use ego_tree::{NodeId, NodeRef};
 use std::collections::HashSet;
 
 /// PURPOSE: Look for invalid structure in the org buffer
@@ -50,10 +50,9 @@ pub fn find_buffer_errors_for_saving_in_graph (
   // performs only local structural verifications:
   // each ID belongs to an IDFolder, etc.
   let mut errors: Vec<BufferValidationError> = Vec::new();
-  { // inconsistent instructions (deletion, defining containers, and skgrepos)
+  { // inconsistent instructions (deletion and defining containers)
     let (ambiguous_deletion_skgids,
-         problematic_defining_skgids,
-         inconsistent_skgrepo_skgids) =
+         problematic_defining_skgids) =
       find_inconsistent_instructions (viewforest);
     { // transfer the relevant IDs, in the appropriate constructors.
       for skgid in ambiguous_deletion_skgids {
@@ -61,11 +60,7 @@ pub fn find_buffer_errors_for_saving_in_graph (
           BufferValidationError::AmbiguousDeletion (skgid)); }
       for skgid in problematic_defining_skgids {
         errors . push(
-          BufferValidationError::Multiple_Defining_Viewnodes (skgid)); }
-      for (skgid, skgrepos) in inconsistent_skgrepo_skgids {
-        errors . push(
-          BufferValidationError::InconsistentSkgrepos(skgid, skgrepos));
-      }} }
+          BufferValidationError::Multiple_Defining_Viewnodes (skgid)); }} }
   { // merge validation
     for error_msg in {
       let nodeMerge_errors: Vec<String> =
@@ -83,6 +78,8 @@ pub fn find_buffer_errors_for_saving_in_graph (
     viewforest, graph, config, &mut errors );
   validate_view_roots (
       viewforest, &mut errors);
+  writeProtected_relRepo_request_errors (
+    viewforest, &mut errors );
   { // local structure validation
     let root_skgids : Vec<NodeId> =
       viewforest . root_skgids ();
@@ -319,3 +316,73 @@ fn validate_editable_view_requests (
             if ! ids_with_requests . insert(skgid . clone())
             { errors . push( BufferValidationError::MultipleEditableViewRequestsForSameId(
               skgid . clone() )); }} }}} }}}
+
+/// A relRepo request describes the relationship from a node's view-parent
+/// to the node, so it is an instruction of the view-parent's, not of the
+/// node's. A write-protected occurrence may therefore carry one, and save
+/// collects it ('content_members', 'subscribeeFolder_members',
+/// 'partnerFolder_members' in
+/// 'from_text/local_fieldintent_collection/traverse.rs'). But when no
+/// save-eligible node writes that relationship -- most often because the
+/// view-parent is itself write-protected -- the request would silently
+/// vanish, so it is an error.
+#[allow(non_snake_case)]
+fn writeProtected_relRepo_request_errors (
+  viewforest : &MpViewForest,
+  errors     : &mut Vec<BufferValidationError>,
+) {
+  for edge in viewforest . root () . traverse () {
+    let Edge::Open (node_ref) = edge else { continue; };
+    let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =
+      &node_ref . value () . kind else { continue; };
+    if t . is_writeProtected ()
+       && t . relRepo_request . is_some ()
+       && ! relRepo_request_is_collected (node_ref, t)
+    { errors . push ( BufferValidationError::Other ( format! (
+        "relRepo request on write-protected node {} that no editable node collects:\n- Its view-parent is write-protected (or marked for deletion, or a subscribee shown as such), or it is not a member of that view-parent.\n- Make the relRepo request from a view where the view-parent is editable.\n",
+        t . skgid . as_ref () . map ( |skgid| skgid . 0 . as_str () )
+          . unwrap_or ("(no ID)") ))); }} }
+
+/// Whether save reads the relRepo request on this Unrestricted node:
+/// the node is a member of its view-parent, and the relationship's
+/// writer is save-eligible. That writer is the view-parent, or, when the
+/// view-parent is a writable PartnerFolder, the folder's view-parent.
+fn relRepo_request_is_collected (
+  node_ref : NodeRef<MpViewnode>,
+  t        : &MpUnrestrictedVognode,
+) -> bool {
+  let is_member : bool =
+    t . affectsParent == AffectsParent::True
+    && ! t . should_be_diffPhantom ();
+  is_member
+  && match node_ref . parent () {
+    Some (parent) => match &parent . value () . kind {
+      MpViewnodeKind::Vognode (MpVognode::Unrestricted (_)) =>
+        is_saveEligible_unrestricted_vognode (parent),
+      MpViewnodeKind::PartnerFolder (
+        PartnerFolder::Subscribee | PartnerFolder::Overridden ) =>
+        parent . parent ()
+        . map ( is_saveEligible_unrestricted_vognode )
+        . unwrap_or (false),
+      _ => false },
+    None => false } }
+
+/// As the save-eligibility of
+/// 'from_text/local_fieldintent_collection/traverse.rs', at the
+/// maybe-placed stage: an editable Unrestricted node, not marked for
+/// deletion, not in subscribee-as-such position.
+#[allow(non_snake_case)]
+fn is_saveEligible_unrestricted_vognode (
+  node_ref : NodeRef<MpViewnode>,
+) -> bool {
+  let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =
+    &node_ref . value () . kind else { return false; };
+  let is_subscribee_as_such : bool =
+    t . affectsParent == AffectsParent::True
+    && node_ref . parent ()
+       . map ( |p| matches! ( &p . value () . kind,
+                 MpViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) ))
+       . unwrap_or (false);
+  ! t . is_writeProtected ()
+  && ! matches! ( t . edit_request (), Some (&NodeEditRequest::Delete) )
+  && ! is_subscribee_as_such }

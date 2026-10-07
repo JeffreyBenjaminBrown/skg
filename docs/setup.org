@@ -5,9 +5,9 @@ Skg is free software, without a ghost of a path to making money.
 This is just enough for a programmer to see how to get it working.
 Please ask an AI for help setting it up.
 ** build the Docker container
-   See the image and mounts documented in =../bash/docker.sh=.
+See the image and mounts documented in =../bash/docker.sh=.
 ** start the Docker container
-   See ../bash/docker.sh
+See ../bash/docker.sh
 ** within the Docker container
 *** start the Skg server
 See ../bash/start-servers.sh
@@ -20,9 +20,9 @@ into an existing owned skgrepo, use [[file:COMMANDS.org::#import-md-and-org][=M-
 after starting the server and client instead. Keep the source documents as
 a backup; Org export is readable but not a round trip.
 ** set up your data folder
-   You can make your thoughts entirely private, entirely public,
-   or a mix, and you can share with anyone.
-   See example-data/ for how.
+You can make your thoughts entirely private, entirely public,
+or a mix, and you can share with anyone.
+See example-data/ for how.
 ** start the client
 #+begin_src elisp
   (progn (load-file "../elisp/skg-reload.el")
@@ -31,8 +31,8 @@ a backup; Org export is readable but not a round trip.
 #+end_src
 ** Now you can use it. See [[./COMMANDS.org][commands]].
 ** stop the server later if you want
-   #+begin_example
+#+begin_example
    ../bash/stop-servers.sh
-   #+end_example
+#+end_example
 
-   You can't use the client (much) when the server isn't running.
+You can't use the client (much) when the server isn't running.

@@ -61,7 +61,49 @@ fn all_tests
       s . reset ("test_editable_view_request_with_content_child_is_rejected", fixtures) ?;
       test_editable_view_request_with_content_child_is_rejected (
         &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_writeProtected_relRepo_request_needs_an_editable_recorder", fixtures) ?;
+      test_writeProtected_relRepo_request_needs_an_editable_recorder (
+        &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
+
+/// A write-protected node may carry a relRepo request for the
+/// relationship from its view-parent, unless no editable node collects
+/// that relationship -- here, because the view-parent is write-protected.
+async fn test_writeProtected_relRepo_request_needs_an_editable_recorder (
+  config : &SkgConfig,
+  _tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let input : &str =
+    indoc! {"
+      * (skg (node (id root) (repo main))) root
+      ** (skg (node (id collected) (repo main) writeProtected (editRequest (relRepo main)))) under an editable parent
+      ** (skg subscribeeFolder)
+      *** (skg (node (id collected_subscribee) (repo main) writeProtected (editRequest (relRepo main)))) in an editable recorder's folder
+      ** (skg (node (id protected_parent) (repo main) writeProtected)) write-protected parent
+      *** (skg (node (id orphaned) (repo main) writeProtected (editRequest (relRepo main)))) under a write-protected parent
+    "};
+  let (viewforest, parsing_errors, _warnings)
+    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
+    = org_to_uninterpreted_viewforest (input) ?;
+  assert! ( parsing_errors . is_empty (),
+            "Parsing should accept every relRepo request: {:?}",
+            parsing_errors );
+  let errors : Vec<BufferValidationError> =
+    find_buffer_errors_for_saving (&viewforest, config) ?;
+  let relRepo_errors : Vec<String> = errors . iter ()
+    . filter_map ( |e| match e {
+        BufferValidationError::Other (message)
+          if message . contains ("relRepo request on write-protected node")
+          => Some (message . clone ()),
+        _ => None } )
+    . collect ();
+  assert_eq! ( relRepo_errors . len (), 1,
+               "Expected one relRepo error, for 'orphaned'. Errors: {:?}",
+               errors );
+  assert! ( relRepo_errors [0] . contains ("orphaned"),
+            "The relRepo error should name 'orphaned': {}",
+            relRepo_errors [0] );
+  Ok (( )) }
 
 async fn test_find_buffer_errors_for_saving (
   config : &SkgConfig,
