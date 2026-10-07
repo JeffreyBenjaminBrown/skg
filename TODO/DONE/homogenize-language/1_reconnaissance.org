@@ -155,7 +155,7 @@ rather than mentions and follows), and the answer to "hide"
 ***** DONE J : all of them
 No permanent migration script necessary -- I'm the only user so far.
 Do write a migration script but we'll only be using it here.
-****** TODO Claude says: done ('75a8b810'), except migrating your data
+****** DONE Claude says: done ('75a8b810'), except migrating your data (since done: no old keys remain in data/)
 All four layers, plus 'misc' -> 'flags' on disk and the role
 'contained' -> 'content'. The commands are now
 'skg-show-folderOf-overrides' and 'skg-show-folderOf-hidesFromSubs'
@@ -1422,10 +1422,10 @@ snapshot, index, generation, commit — with the qualifiers listed. That
 covers most homonyms here without any renames.
 
 * Terms that ought to exist
-** vognode, defined
+** DONE vognode, defined
 In code everywhere, defined nowhere.
 *** DONE Claude says: the glossary now defines it, in your words
-** holder
+** DONE holder
 The first-role node of an edge, which stores it. See above.
 *** DONE Claude says: exists now, as "recorder"
 ** binding edge
@@ -1435,7 +1435,55 @@ content; the folder's relation for a folder member). 'viewnode.rs' and
 the relRepo docs already lean on this ("the relRepo of the RELATIONSHIP
 this headline represents"). Naming it makes the relRepo rules much
 shorter to state.
-** A word for an affectsParent-false child
+**** DONE J : please elaborate.
+What are the situations in which a parent-child relationship is binding,
+and where is it not?
+How would this simplify the code?
+Would it be a user-facing term, and if so,
+would it simplify usage instructions?
+***** DONE Claude says: where it holds, what it would buy, and my take
+A headline's binding relationship would be the one relationship that
+explains why it sits under its viewparent.
+****** Where a headline has one
+- A content child (a member): its viewparent contains it. The
+  viewparent records it.
+- A member of a subscribeeFolder, overriddenFolder or hiddenFolder: the
+  folder's anchor (its viewparent) subscribesTo / overrides /
+  hidesFromSubs it. The anchor records it.
+- A member of a subscriberFolder, overriderFolder or hiderFolder: the
+  same relations pointing the other way, so the member records it.
+  That is why those folders are write-protected: the relationship
+  lives in the member's file.
+- A role graft: its role's relation (a containerward graft contains
+  its viewparent, and records that). It is a non-member, so saving its
+  viewparent ignores it.
+- A substitute drawn in place of an overridden node N: still "the
+  viewparent contains N", not the substitute. '(overridesHere N)' is
+  what preserves it.
+****** Where it has none
+Roots; folders and other non-vognodes; a non-member left behind after
+its relationship disappeared; and restricted nodes and phantoms, whose
+relationship exists (or existed) but can't be acted on from here.
+****** Code: little gain
+Three places work it out today: Emacs's 'skg--rel-at-point', its
+Neovim twin, and the server's fieldIntent collection, which decides
+what each child asserts and where an '(editRequest (relRepo ...))'
+lands. A shared name would make them findable as one concept, but it
+can't merge them (two languages plus Rust), so it is naming, not
+simplification.
+****** Users: a little
+The relRepo instructions ('telescopes.org', the COMMANDS entries for
+'skg-set-relRepo' and its recursive variant), the '~NAME' herald, and
+the explanation of what deleting or moving a headline does all say
+"the relationship this headline represents". The term would save that
+clause each time, at the cost of one more word to learn.
+It is not *birth*: birth records why the renderer drew a generated
+occurrence, and save never reads it, while the binding relationship is
+what save and 'skg-set-relRepo' act on.
+****** My take
+Low payoff. I'd add it only when the relRepo docs get rewritten
+anyway. Nothing depends on it, so dropping it is fine too.
+** DONE A word for an affectsParent-false child
 *** DONE Claude says: "non-member", which you chose
 Prose currently says Independent / non-member / "affects not its parent"
 (heralds.org, glyph ⊥). If you dislike "non-member", "bystander" is

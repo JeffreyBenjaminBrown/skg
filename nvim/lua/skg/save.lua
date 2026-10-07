@@ -45,7 +45,7 @@ function M.request_save_buffer (approved_forks, fork_skgrepos,
     -- A nil view-id causes an unfiltered save AND the server won't
     -- update its in-Rust graph: slow and wasted. Refuse.
     error(string.format(
-      "Cannot save: view view_id is nil in buffer '%s'. Re-open the view.",
+      "Cannot save: view ID is nil in buffer '%s'. Re-open the view.",
       vim.api.nvim_buf_get_name(save_buf))) end
   lock.begin_stream('save')
   lock.lock_all_skg_buffers()
@@ -304,7 +304,7 @@ function M.save_relax_lock_handler (saved_view_id, response)
 end
 
 ---Apply one streamed view update: unlock and replace the buffer for
----its view view_id. Shared by the save (collateral-view) and rerender
+---its view ID. Shared by the save (collateral-view) and rerender
 ---(rerender-view) streams.
 ---@param _payload_text string
 ---@param response any
@@ -694,7 +694,7 @@ end
 ---Show CONTENT in the fork-confirmation buffer, recording SAVE_BUF as
 ---its source; returns the buffer. It is a navigable, editable content
 ---view (so the user can rotate each clone's skgrepo), but NOT an
----ordinary save target: it has no view view_id (tripping the nil-view_id save
+---ordinary save target: it has no view ID (tripping the nil-view_id save
 ---guard) and its ':w' refuses. Only approve (<localleader>cc) and
 ---decline (<localleader>ck) act on it. Dismissing it without
 ---approving strips the source's lingering fork atom, so the next save

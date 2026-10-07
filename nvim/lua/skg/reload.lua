@@ -3,7 +3,7 @@
 -- restarting the editor.
 --
 -- The elisp version must spare two files from unloading (skg-buffer,
--- because 'unload-feature' would destroy the permanent-local view view_id
+-- because 'unload-feature' would destroy the permanent-local view ID
 -- and degrade the major mode; skg-keymaps-and-aliases, because minor
 -- modes capture their maps at definition time). Neither hazard exists
 -- here: buffer-scoped state lives in 'vim.b' (untouched by reloading

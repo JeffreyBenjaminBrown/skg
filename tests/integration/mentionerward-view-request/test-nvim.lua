@@ -36,7 +36,7 @@ local function strip_metadata_and_bodies (text)
 end
 
 ---Reset the scratch view buffer to base_buffer_text under a fresh
----view view_id, position the cursor at LINE_NUMBER (0-based, like the
+---view ID, position the cursor at LINE_NUMBER (0-based, like the
 ---elisp), request the mentionerward view (auto-saves), and return the
 ---resulting full buffer text. Port of
 ---skg-mentionerward--request-on-line.

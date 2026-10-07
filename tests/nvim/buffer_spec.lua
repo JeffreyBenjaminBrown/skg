@@ -201,7 +201,7 @@ describe('skg.buffer confirmation before dirtying another view', function ()
     assert.is_true(vim.bo[c].modified)
   end)
 
-  it('ignores buffers without a view view_id', function ()
+  it('ignores buffers without a view ID', function ()
     answer(2)
     local a = open('a')
     local b = open('b')

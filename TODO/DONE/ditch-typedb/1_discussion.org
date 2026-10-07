@@ -1110,7 +1110,7 @@ I will start the main agent (you) with High reasoning.
 This is a pretty big overhaul. I do want to save tokens,
 but not at the expense of correctness.
 
-* TODO Cycle headlines in the plan between between TODO, ONGOING and DONE.
+* TODO Cycle headlines in the plan between TODO, ONGOING and DONE.
 Every headline, be it top-level or nested, that represents a thing to do
 should cycle between TODO, ONGOING and DONE.
 This should help both the executor (across handoffs) and me
