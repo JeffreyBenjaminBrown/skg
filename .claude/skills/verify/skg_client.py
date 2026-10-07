@@ -49,7 +49,10 @@ if __name__ == "__main__":
         msgs = run ( req )
     elif mode == "save":
         view_id, body_file = sys . argv [2], sys . argv [3]
-        body = open ( body_file ) . read ()
+        buffer_text = open ( body_file ) . read ()
+        body = ( '((saved-buffer "' +
+                 buffer_text . replace ( "\\", "\\\\" ) . replace ( '"', '\\"' ) +
+                 '") (other-views ()))' )
         req = ( f'((request . "save buffer") (view-id . "{view_id}")'
                 ' (point-lines-below-focused-headline . "0")'
                 ' (point-column . "0")'

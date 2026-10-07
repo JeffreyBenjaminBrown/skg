@@ -15,7 +15,7 @@ use skg::from_text::local_fieldintent_collection::types::{
 use skg::types::git::Sign;
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, maybePlaced_to_placed_tree };
-use skg::types::misc::ID;
+use skg::types::misc::{ID, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
@@ -85,6 +85,29 @@ fn ordinary_editable_emissions () {
     vec![ ID::from ("root"), ID::from ("child"),
           ID::from ("independent"),
           ID::from ("doomed"), ID::from ("acquirer") ]); }
+
+#[test]
+fn writeProtected_members_relRepo_requests_reach_their_editable_recorder () {
+  // A relRepo request describes the relationship from the view-parent,
+  // so it is the editable recorder's instruction even when the member
+  // carrying it is write-protected.
+  let collected : CollectedFieldIntents =
+    collected_from_org ( indoc! {"
+      * (skg (node (id root) (repo main))) root
+      ** (skg (node (id c) (repo main) writeProtected (editRequest (relRepo private)))) c
+      ** (skg subscribeeFolder)
+      *** (skg (node (id s) (repo main) writeProtected (editRequest (relRepo private)))) s
+      ** (skg overriddenFolder)
+      *** (skg (node (id o) (repo main) writeProtected (editRequest (relRepo private)))) o
+      "} );
+  let root : &FieldIntentsForOneId = entry (&collected, "root");
+  let private : Option<SkgrepoName> = Some (SkgrepoName::from ("private"));
+  assert_eq!( root . contains,
+              Some (vec![(ID::from ("c"), private . clone ())]) );
+  assert_eq!( root . subscribesTo,
+              Some (vec![(ID::from ("s"), private . clone ())]) );
+  assert_eq!( root . overrides,
+              Some (vec![(ID::from ("o"), private)]) ); }
 
 #[test]
 fn subscribee_as_such_emits_claim_and_visibility () {

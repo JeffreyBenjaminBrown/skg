@@ -98,6 +98,38 @@ viewparent), relation = the folder's relation."
                     '(:recorder "anchor" :member "seen"
                       :relation "subscribesTo"))))))
 
+(ert-deftest test-rel-write-protected-child-of-editable-parent ()
+  "A write-protected child's relationship belongs to its editable parent,
+so it can be set from the child."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id recorder) (repo public))) recorder\n"
+    "** (skg (node (id kid) (repo public) writeProtected)) kid\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (search-forward "(id kid)" nil t)
+     (beginning-of-line)
+     (should (equal (skg--rel-at-point)
+                    '(:recorder "recorder" :member "kid"
+                      :relation "contains"))))))
+
+(ert-deftest test-rel-refuses-under-write-protected-parent ()
+  "Refuses (user-error) under a write-protected parent, which the save
+would not let write the relationship."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id recorder) (repo public) writeProtected)) recorder\n"
+    "** (skg (node (id kid) (repo public))) kid\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (search-forward "(id kid)" nil t)
+     (beginning-of-line)
+     (let ((err (should-error (skg--rel-at-point)
+                              :type 'user-error)))
+       (should (string-match-p "write-protected" (cadr err)))))))
+
 (ert-deftest test-rel-refuses-on-write-protected-folder-member ()
   "Refuses (user-error) on a member of a write-protected folder."
   (test--with-skg-content-view
@@ -732,7 +764,9 @@ no offer is made."
 (ert-deftest test-set-repo-recursive-warns-about-write-protected ()
   "A write-protected matching instance is NOT edited; its ID goes to
 *Messages* and the summary carries a loud WARNING. Relationships touching
-it are not offered (they cannot actually publicize)."
+it are not offered: it does not move (its editable occurrence is not
+in the buffer), so its inbound relationship's default stays private, and
+its own relationships are not written by a write-protected parent."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id r) (repo private))) r\n"
@@ -760,6 +794,99 @@ it are not offered (they cannot actually publicize)."
      (dolist (skgid '("r" "f"))
        (should (string-match-p "(repo public)"
                                (test--line-of-id skgid)))))))
+
+(ert-deftest test-set-repo-recursive-repeat-follows-its-editable-occurrence ()
+  "A write-protected repeat of a node whose editable occurrence the move
+changes is left as rendered (the save ignores it) and draws no warning:
+the node does move."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id r) (repo private))) r\n"
+    "** (skg (node (id a) (repo private))) a\n"
+    "*** (skg (node (id x) (repo private))) x\n"
+    "** (skg (node (id b) (repo private))) b\n"
+    "*** (skg (node (id x) (repo private) writeProtected)) x again\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
+                (lambda (_current) "trusted")))
+       (let ((msgs (cdr (test--messages-during
+                         (lambda () (skg-set-repo t))))))
+         (should-not (seq-find (lambda (m)
+                                 (or (string-match-p "NOT changed" m)
+                                     (string-match-p "WARNING" m)))
+                               msgs))))
+     (should (string-match-p "(repo trusted)" (test--line-of-id "x")))
+     (should (string-match-p
+              "(repo private) writeProtected"
+              (save-excursion
+                (goto-char (point-min))
+                (search-forward "x again")
+                (buffer-substring (line-beginning-position)
+                                  (line-end-position))))))))
+
+(ert-deftest test-set-repo-recursive-offers-a-repeats-relationship ()
+  "A write-protected repeat moves with its editable occurrence, so a
+publicizing move offers the relationship into the repeat too, and writes
+its relRepo request on the repeat's headline."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id r) (repo private))) r\n"
+    "** (skg (node (id a) (repo private))) a\n"
+    "*** (skg (node (id x) (repo private))) x\n"
+    "** (skg (node (id b) (repo private))) b\n"
+    "*** (skg (node (id x) (repo private) writeProtected)) x again\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (let (offer-prompt)
+       (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
+                  (lambda (_current) "public"))
+                 ((symbol-function 'y-or-n-p)
+                  (lambda (prompt) (setq offer-prompt prompt) t)))
+         (test--messages-during (lambda () (skg-set-repo t))))
+       ;; r->a, a->x, r->b, b->(x again)
+       (should (string-match-p "4 content relationships" offer-prompt)))
+     (should (string-match-p
+              "writeProtected (editRequest (relRepo public))"
+              (save-excursion
+                (goto-char (point-min))
+                (search-forward "x again")
+                (buffer-substring (line-beginning-position)
+                                  (line-end-position))))))))
+
+(ert-deftest test-set-repo-single-offers-a-repeats-relationship-outside-the-subtree ()
+  "Moving a node's editable occurrence also strands the relationship into
+its write-protected repeat elsewhere in the buffer; the offer includes it."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id r) (repo public))) r\n"
+    "** (skg (node (id a) (repo public))) a\n"
+    "*** (skg (node (id x) (repo private))) x\n"
+    "** (skg (node (id b) (repo public))) b\n"
+    "*** (skg (node (id x) (repo private) writeProtected)) x again\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (search-forward "(id x)")
+     (beginning-of-line)
+     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
+                (lambda (_current) "public"))
+               ((symbol-function 'y-or-n-p)
+                (lambda (prompt)
+                  ;; a->x and b->(x again)
+                  (should (string-match-p "2 content relationships" prompt))
+                  t)))
+       (test--messages-during (lambda () (skg-set-repo))))
+     (should (string-match-p "(relRepo public)" (test--line-of-id "x")))
+     (should (string-match-p
+              "(relRepo public)"
+              (save-excursion
+                (goto-char (point-min))
+                (search-forward "x again")
+                (buffer-substring (line-beginning-position)
+                                  (line-end-position))))))))
 
 (ert-deftest test-set-repo-single-publicizes-a-public-parents-child-relationship ()
   "Moving a private child into public offers its public parent's relationship too."

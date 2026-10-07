@@ -75,19 +75,8 @@ fn test_multi_skgrepo_errors() -> Result<(), Box<dyn Error>> {
       if let BufferValidationError::Multiple_Defining_Viewnodes (skgid) = multiple_defining_errors[0] {
         assert_eq!(skgid . 0, "priv-1", "Multiple_Defining_Viewnodes should be for priv-1"); }}
 
-    { let inconsistent_skgrepo_errors: Vec<&BufferValidationError>
-      = ( errors . iter()
-          . filter(
-            |e| matches!(e, BufferValidationError::InconsistentSkgrepos(_, _)))
-          . collect() );
-      assert_eq!(inconsistent_skgrepo_errors . len(), 1,
-                 "Expected exactly 1 InconsistentRepos error for priv-1");
-      if let BufferValidationError::InconsistentSkgrepos(skgid, skgrepos) = inconsistent_skgrepo_errors[0] {
-        assert_eq!(skgid . 0, "priv-1", "InconsistentRepos should be for priv-1");
-        assert_eq!(skgrepos . len(), 2, "Should have 2 different repos for priv-1"); }}
-
-    assert_eq!(errors . len(), 4,
-               "Expected exactly 4 errors: 2 LocalStructureViolation (repo errors), 1 Multiple_Defining_Viewnodes, 1 InconsistentRepos");
+    assert_eq!(errors . len(), 3,
+               "Expected exactly 3 errors: 2 LocalStructureViolation (repo errors), 1 Multiple_Defining_Viewnodes");
 
     cleanup_test_tantivy(
       Some(config . tantivy_folder . as_path())
@@ -284,43 +273,27 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       assert_eq!(save_plan . skgrepo_moves[0] . new_skgrepo . as_str(), "public");
     }
 
-    // Test 2: InconsistentRepos
-    // Two instances of pub-1 with different skgrepos (validation should catch this)
+    // Test 2: A write-protected occurrence's skgrepo is not an instruction.
+    // Save ignores it, so it cannot disagree with the editable occurrence.
+    // (This arises after a skgrepo move: the move edits only the
+    // editable occurrence, leaving its write-protected repeats as rendered.)
     {
-      let buffer_with_inconsistent_skgrepos: &str = indoc! {"
+      let buffer_with_stale_write_protected_skgrepo: &str = indoc! {"
         * (skg (node (id pub-1) (repo public))) pub-1                # editable instance with 'public'
         * (skg (node (id pub-1) (repo private) writeProtected)) pub-1  # write-protected instance with 'private'
       "};
-
       let buffer_text: String =
-        strip_org_comments (buffer_with_inconsistent_skgrepos);
-
-      // This should fail during validation (before write-protected_occurrences are filtered)
+        strip_org_comments (buffer_with_stale_write_protected_skgrepo);
       let result = buffer_to_validated_saveplan(
         &buffer_text,
         &config,
         None ) ;
-
-      println!("\n=== InconsistentRepos test ===");
-
-      assert!(result . is_err(), "Expected InconsistentRepos error");
-
-      if let Err (e) = result {
-        println!("Error: {:?}", e);
-
-        match e {
-          SaveError::BufferValidationErrors { errors, .. } => {
-            // Should contain InconsistentRepos error
-            let skgrepo_errors: Vec<&BufferValidationError> = errors . iter()
-              . filter(|e| matches!(e, BufferValidationError::InconsistentSkgrepos(_, _)))
-              . collect();
-            assert!(!skgrepo_errors . is_empty(),
-                    "Expected InconsistentRepos error in validation");
-            println!("Successfully caught InconsistentRepos error during validation");
-          }
-          _ => panic!("Expected BufferValidationErrors, got: {:?}", e),
-        }
-      }
+      assert!(result . is_ok(),
+              "A write-protected occurrence's skgrepo should be ignored, got: {:?}",
+              result . err());
+      let ( _viewforest, save_plan, _warnings ) = result?;
+      assert!(save_plan . skgrepo_moves . is_empty(),
+              "The write-protected occurrence's skgrepo should not move pub-1");
     }
 
     // Cleanup
