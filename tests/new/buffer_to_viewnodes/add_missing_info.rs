@@ -38,7 +38,50 @@ fn all_tests
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
       test_repoless_folder_member_gets_graph_skgrepo (
         &s . config ) . await ?;
+      s . reset ("test_child_of_writeProtected_occurrence_inherits_its_skgid_skgrepo",
+                 "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
+      test_child_of_writeProtected_occurrence_inherits_its_skgid_skgrepo (
+        &s . config ) . await ?;
       Ok (( )) } )) }
+
+/// A new child of a write-protected occurrence inherits the skgrepo its
+/// parent's ID will have after the save, not the (stale) one that
+/// occurrence shows: its editable occurrence's, if the buffer has one,
+/// else the graph's. (Fixture node 'root-pid' lives in 'main'.)
+async fn test_child_of_writeProtected_occurrence_inherits_its_skgid_skgrepo (
+  config : &SkgConfig,
+) -> Result<(), Box<dyn Error>> {
+  for (input, expected_skgrepo) in [
+    ( // The editable occurrence moves root-pid to 'moved'.
+      indoc! {"
+        * (skg (node (id root) (repo moved))) root
+        * (skg (node (id other) (repo main))) other
+        ** (skg (node (id root) (repo main) writeProtected)) root again
+        *** new child
+      "}, "moved" ),
+    ( // No editable occurrence: the graph says 'main'.
+      indoc! {"
+        * (skg (node (id other) (repo main))) other
+        ** (skg (node (id root) (repo stale) writeProtected)) root again
+        *** new child
+      "}, "main" ), ] {
+    let mut viewforest : MpViewForest =
+      org_to_uninterpreted_viewforest (input) . unwrap() . 0;
+    add_missing_info_to_viewforest (
+      &mut viewforest, &config) ?;
+    let new_child_skgrepo : Option<SkgrepoName> =
+      viewforest . nodes ()
+      . find_map ( |node_ref| match &node_ref . value () . kind {
+          MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
+            if t . title == "new child"
+            => Some (t . home_skgrepo . clone ()),
+          _ => None } )
+      . expect ("the new child should be in the forest");
+    assert_eq! ( new_child_skgrepo,
+                 Some (SkgrepoName::from (expected_skgrepo)),
+                 "new child of a write-protected occurrence, in:\n{}",
+                 input ); }
+  Ok (( )) }
 
 /// Regression for TODO/DONE/BUG_reciprocal-subscribe.org: a subscribee
 /// pasted from the link stack arrives as a bare id under a

@@ -27,9 +27,13 @@ use uuid::Uuid;
 /// tree itself has erased -- e.g. a NEW node whose INHERITED skgrepo is
 /// foreign is not a foreign-creation error but a rider on its
 /// parent's fork, whereas an explicitly foreign new node is the error.
+/// It also needs a fact the tree does not show:
+/// 'writeProtected_skgrepos_after_save' (see
+/// 'skgrepos_after_save_of_writeProtected_occurrences').
 pub struct EnrichmentProvenance {
   pub new_nodes               : HashSet<ID>,
   pub inherited_skgrepo_nodes : HashSet<ID>,
+  pub writeProtected_skgrepos_after_save : HashMap<ID, SkgrepoName>,
 }
 
 /// PURPOSE:
@@ -59,18 +63,51 @@ pub fn add_missing_info_to_viewforest_in_graph(
   replace_ids_with_pids (viewforest, root_skgid, graph);
   let skgrepo_of_skgid : HashMap<ID, SkgrepoName> =
     skgrepos_for_repoless_ided_nodes_from_graph (viewforest, graph);
-  finish_missing_info_enrichment (viewforest, root_skgid, &skgrepo_of_skgid)
+  let writeProtected_skgrepos_after_save : HashMap<ID, SkgrepoName> =
+    skgrepos_after_save_of_writeProtected_occurrences (viewforest, graph);
+  finish_missing_info_enrichment (
+    viewforest, root_skgid, &skgrepo_of_skgid,
+    writeProtected_skgrepos_after_save )
 }
+
+/// The skgrepo each ID with a write-protected occurrence will have once
+/// this save lands: that of its editable occurrence in this buffer, if
+/// one carries a skgrepo (it may be moving the node), else the graph's.
+/// A write-protected occurrence's own skgrepo is not an instruction, and
+/// it is stale whenever the buffer moved the node's editable occurrence
+/// (C-c s s edits only that one). Whatever reads an ancestor's skgrepo
+/// must therefore read a write-protected ancestor's from here.
+fn skgrepos_after_save_of_writeProtected_occurrences (
+  viewforest : &MpViewForest,
+  graph      : &InRustGraph,
+) -> HashMap<ID, SkgrepoName> {
+  let mut editable_skgrepos : HashMap<ID, SkgrepoName> = HashMap::new ();
+  let mut writeProtected_skgids : HashSet<ID> = HashSet::new ();
+  for node_ref in viewforest . nodes () {
+    let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =
+      &node_ref . value () . kind else { continue; };
+    let Some (skgid) = &t . skgid else { continue; };
+    if t . is_writeProtected () {
+      writeProtected_skgids . insert (skgid . clone ());
+    } else if let Some (skgrepo) = &t . home_skgrepo {
+      editable_skgrepos . insert (skgid . clone (), skgrepo . clone ()); }}
+  writeProtected_skgids . into_iter ()
+    . filter_map ( |skgid| {
+      let skgrepo : Option<SkgrepoName> =
+        editable_skgrepos . get (&skgid) . cloned ()
+        . or_else ( || graph . pid_and_skgrepo (&skgid)
+                         . map ( |(_pid, skgrepo)| skgrepo ) );
+      skgrepo . map ( |skgrepo| (skgid, skgrepo) ) } )
+    . collect () }
 
 fn finish_missing_info_enrichment(
   viewforest       : &mut MpViewForest,
   root_skgid       : NodeId,
   skgrepo_of_skgid : &HashMap<ID, SkgrepoName>,
+  writeProtected_skgrepos_after_save : HashMap<ID, SkgrepoName>,
 ) -> Result<EnrichmentProvenance, Box<dyn Error>> {
-  let mut provenance : EnrichmentProvenance =
-    EnrichmentProvenance {
-      new_nodes               : HashSet::new (),
-      inherited_skgrepo_nodes : HashSet::new (), };
+  let mut new_nodes               : HashSet<ID> = HashSet::new ();
+  let mut inherited_skgrepo_nodes : HashSet<ID> = HashSet::new ();
   do_everywhere_in_tree_dfs(
     viewforest,
     root_skgid,
@@ -79,7 +116,8 @@ fn finish_missing_info_enrichment(
       make_alias_if_appropriate (&mut node)?;
       fill_skgrepo_from_graph_map (&mut node, skgrepo_of_skgid);
       let skgrepo_inherited : bool =
-        inherit_parent_skgrepo_if_possible (&mut node)?;
+        inherit_parent_skgrepo_if_possible (
+          &mut node, &writeProtected_skgrepos_after_save )?;
       let id_assigned : bool =
         assign_new_skgid_if_absent (&mut node)?; // Do this *after* PID replacement, so fresh UUIDs do not trigger a pointless graph lookup.
       if skgrepo_inherited || id_assigned {
@@ -87,12 +125,14 @@ fn finish_missing_info_enrichment(
           = & node . value () . kind
         { if let Some (skgid) = & t . skgid {
             if id_assigned {
-              provenance . new_nodes . insert (skgid . clone ()); }
+              new_nodes . insert (skgid . clone ()); }
             if skgrepo_inherited {
-              provenance . inherited_skgrepo_nodes
-                . insert (skgid . clone ()); }} }}
+              inherited_skgrepo_nodes . insert (skgid . clone ()); }} }}
       Ok (( )) } )?;
-  Ok (provenance) }
+  Ok ( EnrichmentProvenance {
+         new_nodes,
+         inherited_skgrepo_nodes,
+         writeProtected_skgrepos_after_save, } ) }
 
 pub fn na_affectsParent_under_visible_parent_becomes_isContainer (
   viewforest : &mut MpViewForest,
@@ -149,9 +189,12 @@ fn make_alias_if_appropriate(
 /// Inherit parent's skgrepo if both:
 /// - this is a repoless UnrestrictedVognode
 /// - its parent is an UnrestrictedVognode with a skgrepo
+/// A write-protected parent's skgrepo is the one its ID will have after
+/// this save (WRITEPROTECTED_SKGREPOS_AFTER_SAVE), not the one it shows.
 /// Returns whether it inherited one.
 fn inherit_parent_skgrepo_if_possible(
-  node: &mut NodeMut<MpViewnode>
+  node                               : &mut NodeMut<MpViewnode>,
+  writeProtected_skgrepos_after_save : &HashMap<ID, SkgrepoName>,
 ) -> Result<bool, String> {
   let needs_skgrepo : bool =
     match &node . value() . kind {
@@ -163,7 +206,12 @@ fn inherit_parent_skgrepo_if_possible(
       node . parent() . and_then(|mut p| {
         match &p . value() . kind {
           MpViewnodeKind::Vognode (MpVognode::Unrestricted (pt))
-            => pt . home_skgrepo . clone(),
+            => if pt . is_writeProtected () {
+                 pt . skgid . as_ref ()
+                 . and_then ( |skgid| writeProtected_skgrepos_after_save
+                                      . get (skgid) . cloned () )
+                 . or_else ( || pt . home_skgrepo . clone () )
+               } else { pt . home_skgrepo . clone () },
           _ => None, }} );
     if let Some (skgrepo) = parent_skgrepo {
       if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
