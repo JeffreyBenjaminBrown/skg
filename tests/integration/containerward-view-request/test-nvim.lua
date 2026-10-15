@@ -37,7 +37,7 @@ end
 print('=== SKG Containerward View Request Integration Test ===')
 
 -- PHASE 1: establish relationships on disk. Both phases below reuse
--- the SAME buffer and view view_id, mirroring the elisp test's single
+-- the SAME buffer and view ID, mirroring the elisp test's single
 -- *skg-content-view* buffer whose skg-view-id never changes.
 print('=== PHASE 1: Establishing relationships on disk ===')
 local view_id = buffer.generate_uuid()

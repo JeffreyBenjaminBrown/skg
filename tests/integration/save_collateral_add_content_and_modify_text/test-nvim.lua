@@ -37,7 +37,7 @@ local function child_named (list, name)
   return nil
 end
 
----A role role graft's ROLENAME from its SEMANTIC relationship facts
+---A role graft's ROLENAME from its SEMANTIC relationship facts
 ---(RELS_BODY = the cdr of (rels ...)), or nil. A role graft relates OUTBOUND
 ---to a tracked ancestor: a relation with an (out ... (ancestors ...))
 ---side, mapped to its role. Port of headline--role-of-role-graft-from-rels.

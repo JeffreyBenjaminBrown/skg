@@ -12,7 +12,7 @@
 -- USAGE:
 --   log.log('info', 'save', 'sending %d bytes', content_length)
 --   log.log('debug', 'tcp', 'received %s', payload)
---   log.log('warn', 'view_id', 'nil view view_id in %s', buffer_name)
+--   log.log('warn', 'view_id', 'nil view ID in %s', buffer_name)
 --   log.log('error', 'parse', 'failed: %s', vim.inspect(err))
 
 local M = {}

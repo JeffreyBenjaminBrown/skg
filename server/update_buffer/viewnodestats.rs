@@ -277,7 +277,7 @@ fn birth_facts (
   overridesHere : bool, // whether the node is drawn in place of a node it overrides
 ) -> Vec<BirthFact> {
   let mut facts : Vec<BirthFact> = {
-    // A role role graft's birth is its role's relation, regardless of
+    // A role graft's birth is its role's relation, regardless of
     // affectsParent (role grafts are typically non-members and write-protected).
     // The role graft relates to its viewparent, one generation up.
     if let Birth::RoleGraft (role) = birth {

@@ -96,7 +96,7 @@ function M.find_buffer_by_view_id (view_id)
   return nil
 end
 
----Is BUF an skg view buffer? It qualifies if it carries a view view_id or
+---Is BUF an skg view buffer? It qualifies if it carries a view ID or
 ---the content-view marker, both set solely by skg's own view code --
 ---so a real .skg file the user merely opened never matches (and is
 ---never reaped by close_all_skg_buffers).
@@ -117,7 +117,7 @@ function M.all_skg_buffers ()
   return result
 end
 
----A view is a buffer with a view view_id: a content view or search
+---A view is a buffer with a view ID: a content view or search
 ---results, but not the fork-confirmation buffer.
 ---@return integer[] views other than BUF with unsaved edits
 function M.other_unsaved_skg_buffers (buf)
@@ -317,7 +317,7 @@ end
 
 ---A v4-format UUID, the analog of org-id-uuid. Built from OS-level
 ---randomness (an unseeded math.random would repeat across editor
----processes, and view view_ids must not collide between clients).
+---processes, and view IDs must not collide between clients).
 ---@return string
 function M.generate_uuid ()
   local bytes = { vim.uv.random(16):byte(1, 16) }

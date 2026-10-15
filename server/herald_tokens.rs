@@ -20,10 +20,10 @@
 //!     (extraIds K)
 //!     (flags K)
 //!     (birth (RELNAME SIDE [GEN])...))
-//! GEN is an ancestor ancestor_generation: 1 = viewparent, 2 = grandparent,
+//! GEN is an ancestor generation: 1 = viewparent, 2 = grandparent,
 //! ... `in` = "N nodes RELATION it"; `out` = "it RELATIONs N nodes".
 //! Each birth fact names a relation explaining why this occurrence is
-//! here, the side of this node it is on, and the ancestor ancestor_generation
+//! here, the side of this node it is on, and the ancestor generation
 //! it accounts for -- omitted when no ancestor does, as for a
 //! node drawn in place of a node it overrides.
 //! See TODO/DONE/semantic-heralds-wire/plan.org.
@@ -40,7 +40,7 @@ impl Side {
     match self { Side::In => "in", Side::Out => "out" } } }
 
 /// One reason an occurrence is drawn where it is: a relation, the side
-/// of this node it is on, and the ancestor ancestor_generation it
+/// of this node it is on, and the ancestor generation it
 /// accounts for (None when it accounts for no ancestor).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BirthFact {
