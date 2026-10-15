@@ -3,6 +3,16 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
+* Problems noticed while fixing repo moves over repeated nodes (2026-10-07)
+** Repo moves do graph logic in the client
+The Emacs client computes which relationships a repo move strands, from
+the buffer alone, re-implementing server rules with verified
+divergences: a foreign relRepo the save refuses, deliberate
+privatizations undone, stale repeat repos, out-of-view and non-content
+relationships missed. Also, relationships INTO a node moved more private
+keep their more public repo, leaving its ID there; that one is a server
+gap too. Details, options and questions:
+[[file:repo-move-graph-logic/1_discussion.org][Repo moves do graph logic in the client]].
 * Problems noticed while executing the herald-colors renames (2026-10-04)
 ** import-md-and-org integration test fails at baseline
   Before any herald-colors change, 'bash/integration-tests.sh' fails

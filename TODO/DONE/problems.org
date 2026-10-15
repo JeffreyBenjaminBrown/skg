@@ -1,3 +1,59 @@
+* Problems noticed while fixing repo moves over repeated nodes (2026-10-06)
+Fixed on 2026-10-07 in '02f7749d'. The larger problem it revealed is open in
+'TODO/problems.org' ("Repo moves do graph logic in the client").
+** Two save-time defaults read a write-protected occurrence's displayed repo
+'inherit_parent_skgrepo_if_possible'
+('server/from_text/buffer_to_viewnodes/add_missing_info.rs') gives a
+repo-less new child its view-parent's repo, and
+'owned_ancestor_skgrepos_for_foreign_vognodes' ('server/from_text/fork.rs')
+proposes the nearest owned ancestor's repo for a clone. Either parent can
+be a write-protected repeat, whose displayed repo is stale when the same
+unsaved buffer already moved that node (C-c s s edits only the editable
+occurrence). The repo of the same ID's editable occurrence would be the
+accurate source. Details: [[file:write-protected-repeats/1_discussion.org][the write-protected repeats discussion]].
+*** J
+The natural solution would seem to be to deduce the true repo
+not from the relevant ancestor, but from that ancestor's ID.
+If the logic was in the client it will have to move to the server
+(but it should have been in the server to begin with --
+we want to minimize the amount of graph logic the clients need to do).
+**** Claude says: yes, with one refinement; it's the only good path
+***** The ID must resolve to the repo this save will leave it in
+Not to the graph's repo. The stale case arises exactly when an
+editable occurrence in the same buffer moved the node. Before the
+save, the graph still has the old repo, so resolving by ID through
+the graph alone reproduces the bug. The resolution order would be:
+the editable occurrence of that ID in this buffer if there is one,
+else the graph. Never the write-protected occurrence's displayed
+repo: without an editable occurrence, the graph is still more
+current than a possibly stale view.
+***** Both sites are already in the server
+'inherit_parent_skgrepo_if_possible' and
+'owned_ancestor_skgrepos_for_foreign_vognodes'. There is even prior
+art: 'skgrepos_for_repoless_ided_nodes_from_graph'
+(add_missing_info.rs) already resolves a repo-less write-protected
+reference by ID through the graph. The fix is a small server change:
+build one ID-to-repo map (editable occurrences first, then the graph)
+and have both sites read it whenever the ancestor has an ID.
+***** The alternatives are worse
+Propagating the move to the write-protected repeats' displayed repos
+is what you rejected, and 'write_protected_edits.rs' would refuse it
+anyway ("changed repo"). Detecting the mismatch and refusing the save
+makes no sense: whatever detects it can just use the right repo.
+***** It is less urgent than my first note suggested
+A new member child under an existing write-protected repeat is
+already refused ("changed content membership",
+'write_protected_edits.rs'). So the inheritance case only bites for a
+non-member child (affectsParent false), or a child of a newly pasted
+write-protected occurrence. For forks, the inferred repo is only a
+suggestion: the confirmation buffer makes you choose before
+approving. Still worth fixing; it's cheap.
+***** The same pattern exists in the client, and it is bigger
+[[file:../repo-move-graph-logic/1_discussion.org][Repo moves do graph logic in the client]]
+***** Done in '02f7749d'
+Both sites read a write-protected ancestor's repo from
+'skgrepos_after_save_of_writeProtected_occurrences'
+(server/from_text/buffer_to_viewnodes/add_missing_info.rs).
 * Problems noticed during the language-homogenization audit (2026-10-05)
 All four fixed on 2026-10-05 in the same effort; see
 'TODO/homogenize-language/1_reconnaissance.org'.

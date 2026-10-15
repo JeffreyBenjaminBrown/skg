@@ -1,0 +1,84 @@
+#+TITLE: What write-protected occurrences say to the save
+* Context
+The bug: a recursive repo move (C-u C-c s s) over a view showing a node
+twice could not be saved: "Multiple viewnodes with ID ... have
+inconsistent repos". Fixed in 'ca0cb7c5' (the server no longer reads a
+write-protected occurrence's repo) and '9cab831c' (no false "NOT changed"
+warning).
+* Claude says: do write-protected viewnodes generate save instructions?
+** Not about their own node
+Four guards keep a write-protected occurrence from writing its node:
+*** Parsing refuses requests on it
+An '(editRequest ...)' (delete, merge, flag) or a relRepo request on a
+write-protected headline fails the save
+('server/serve/parse_metadata_sexp.rs:236-247'). I confirmed the
+delete case on a scratch server.
+*** Collection emits nothing for it
+'server/from_text/local_fieldintent_collection/traverse.rs:137-140'.
+*** Edits to it are refused
+'server/from_text/write_protected_edits.rs' compares each
+write-protected occurrence with the server's last rendering of it,
+and refuses changed titles, bodies, repos and folder contents.
+*** Consistency checks skip it
+'contradictory_instructions.rs' already skipped write-protected
+occurrences when counting deletes and defining nodes. Their repo was
+the one exception, and that exception was the bug.
+** But they are data for an editable parent
+This is the reason you imagined. An editable parent's 'contains' is
+read off its children ('content_members',
+'server/from_text/local_fieldintent_collection/traverse.rs:457'),
+whether or not the children are write-protected. From each child it
+takes the ID, the position, 'affectsParent', the diff axes and the
+relRepo request. The relationship belongs to the parent, and the
+child's headline is how the parent lists it. That is what lets you
+reorder or remove a repeat under an editable parent.
+** Two places read a write-protected occurrence's displayed repo as a default
+'inherit_parent_skgrepo_if_possible'
+('server/from_text/buffer_to_viewnodes/add_missing_info.rs:150') gives
+a repo-less new child its view-parent's repo. Forking
+('owned_ancestor_skgrepos_for_foreign_vognodes',
+'server/from_text/fork.rs:43') proposes the nearest owned ancestor's
+repo for a clone. Either parent can be a write-protected occurrence.
+Its displayed repo is stale only when the same unsaved buffer already
+moved that node. Before 'ca0cb7c5', the repo-consistency check
+rejected such a buffer. Now it saves, and the default comes from the
+stale repo. For a fork, you see the default in the confirmation
+buffer before approving. I think this is minor, and I have not
+changed either one. It is logged in 'TODO/problems.org'.
+*** Claude says: fixed in the commit that moved this file into DONE
+Both now read a write-protected ancestor's repo by its ID.
+* DONE Claude says: publicizing a relationship to a write-protected repeat needs your call
+** The limitation
+In your view, "irresponsibility" contains a write-protected repeat of
+51fa3d39. After the move to pers-i, the relationship
+irresponsibility -> 51fa3d39 stays at pers-p, and the move's
+"publicize stuck relationships?" offer leaves it out. Nor can you
+publicize it by hand from this view: a relRepo request lives on the
+child headline, and on a write-protected headline parsing refuses it
+("relRepo request on a write-protected node",
+'server/serve/parse_metadata_sexp.rs:243'). Yet that request is the
+editable parent's instruction, and 'content_members' would read it.
+** Option A (recommended): allow it when the view-parent is editable
+Permit a relRepo request on a write-protected occurrence iff it sits
+in content position under an editable unrestricted node. The check
+would move from parsing to tree validation, since parsing cannot see
+the parent. Then the move's analysis would count a write-protected
+repeat as moving whenever its editable occurrence moves, and offer
+its relationship. This reverses one sentence of an existing Elisp
+test's docstring ('test-set-repo-recursive-warns-about-write-protected':
+relationships touching a write-protected node "cannot actually
+publicize").
+** Option B: keep the refusal
+Publicize such a relationship from a view where the occurrence under
+that parent is the editable one (e.g. a view rooted at
+"irresponsibility"). Perhaps also make the refusal message say so.
+** ANSWER: A
+(Jeff, in chat: "A write-protected node bearing a request to change the
+source of the relationship to its parent should still contribute that
+instruction, unless its parent is write-protected.")
+*** Claude says: done
+'e966ae9f' (server: parsing accepts the request; tree validation
+refuses it only when nothing editable collects it), '0fdb8a2b'
+(C-c s r refuses under a write-protected parent or folder anchor),
+'233f5fdf' (the move's offer includes relationships into repeats,
+inside or outside the moved subtree).

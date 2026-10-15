@@ -190,7 +190,10 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
   // the view. The flat NodeInstructions have lost that ancestry, so resolve
   // it here, where the placed viewforest is live, keyed by foreign pid.
   let owned_ancestor_skgrepo : HashMap<ID, SkgrepoName> =
-    owned_ancestor_skgrepos_for_foreign_vognodes (&viewforest, config);
+    owned_ancestor_skgrepos_for_foreign_vognodes (
+      &viewforest,
+      & enrichment . writeProtected_skgrepos_after_save,
+      config );
   let adopt_clone_skgrepo : HashMap<ID, ID> = {
     // Bare new headlines under a foreign node are not foreign-creation
     // errors; they ride that node's fork, adopting its clone's skgrepo.

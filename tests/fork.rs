@@ -207,6 +207,9 @@ fn all_tests
       s . reset ("disagreeing_new_child_repos_leave_clone_repo_unconfirmed", two_owned) ?;
       disagreeing_new_child_skgrepos_leave_clone_skgrepo_unconfirmed (
         &s . config ) . await ?;
+      s . reset ("clone_skgrepo_inferred_from_a_moved_writeProtected_ancestor", two_owned) ?;
+      clone_skgrepo_inferred_from_a_moved_writeProtected_ancestor (
+        &s . config ) . await ?;
       s . reset ("explicit_fork_save_instruction", fixtures) ?;
       explicit_fork_save_instruction (
         &s . config ) . await ?;
@@ -461,6 +464,31 @@ async fn disagreeing_new_child_skgrepos_leave_clone_skgrepo_unconfirmed (
   assert_eq! ( save_plan . fork_specs . len (), 1 );
   assert! ( ! save_plan . fork_specs[0] . skgrepo_confirmed,
     "disagreeing explicit child repos must not confirm a clone repo" );
+  Ok (( )) }
+
+/// N's nearest owned ancestor is a write-protected repeat of P, still
+/// showing P's old repo 'owned', while P's editable occurrence moves it
+/// to 'owned2' in the same save. The clone's inferred repo follows P's
+/// ID to 'owned2'. (The repeat comes first: the first foreign
+/// occurrence of N in preorder supplies the inference.)
+async fn clone_skgrepo_inferred_from_a_moved_writeProtected_ancestor (
+  config : &SkgConfig,
+) -> Result<(), Box<dyn Error>> {
+  let buffer : &str = indoc! {"
+    * (skg (node (id P) (repo owned) writeProtected)) P-container again
+    ** (skg (node (id N) (repo foreign))) N-edited
+    *** (skg (node (id N1) (repo foreign) writeProtected)) N1
+    *** (skg (node (id N2) (repo foreign) writeProtected)) N2
+    * (skg (node (id P) (repo owned2))) P-container
+    ** (skg (node (id N) (repo foreign) writeProtected)) N
+    "};
+  let fork_specs : Vec<ForkSpec> =
+    fork_specs_from (buffer, config) . await ?;
+  assert_eq! ( fork_specs . len (), 1,
+    "exactly one fork (of N): {:?}", fork_specs );
+  assert_eq! ( fork_specs[0] . clone . 0 . home_skgrepo,
+               SkgrepoName::from ("owned2"),
+    "the clone's inferred repo must be P's after-save repo" );
   Ok (( )) }
 
 /// The confirmation stage: a save that finds forks but is NOT approved

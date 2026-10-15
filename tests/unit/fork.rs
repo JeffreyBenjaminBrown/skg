@@ -13,8 +13,8 @@ use crate::types::misc::{Skgrepo, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
   Flag, empty_graphnode};
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder,
-                             mk_editable_viewnode};
+use crate::types::viewnode::{AffectsParent, Viewnode, ViewnodeKind, PartnerFolder,
+                             mk_editable_viewnode, mk_writeProtected_viewnode};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -67,7 +67,7 @@ fn owned_foreign_N_infers_nothing () {
   // corrected rule stops at F (foreign) and infers nothing for N.
   let config : SkgConfig = config_two_owned_one_foreign ();
   let map = owned_ancestor_skgrepos_for_foreign_vognodes (
-    & build_forest (), & config );
+    & build_forest (), & HashMap::new (), & config );
   assert! ( ! map . contains_key (& ID::from ("N")),
     "owned -> foreign -> N must infer no repo; got {:?}",
     map . get (& ID::from ("N")) ); }
@@ -77,7 +77,7 @@ fn owned_N_still_infers_the_owned_skgrepo () {
   // owned2 Q directly contains foreign M: M inherits owned2.
   let config : SkgConfig = config_two_owned_one_foreign ();
   let map = owned_ancestor_skgrepos_for_foreign_vognodes (
-    & build_forest (), & config );
+    & build_forest (), & HashMap::new (), & config );
   assert_eq! ( map . get (& ID::from ("M")),
                Some (& SkgrepoName::from ("owned2")),
     "owned -> M must infer the owned ancestor's repo" ); }
@@ -88,10 +88,30 @@ fn non_vognode_ancestor_is_skipped () {
   // S's nearest VOGNODE ancestor is the owned R.
   let config : SkgConfig = config_two_owned_one_foreign ();
   let map = owned_ancestor_skgrepos_for_foreign_vognodes (
-    & build_forest (), & config );
+    & build_forest (), & HashMap::new (), & config );
   assert_eq! ( map . get (& ID::from ("S")),
                Some (& SkgrepoName::from ("owned1")),
     "a non-vognode between an owned ancestor and a foreign node is skipped" ); }
+
+#[test]
+fn writeProtected_ancestor_skgrepo_is_read_from_its_skgid () {
+  // A write-protected occurrence of X shows owned1, but this save moves
+  // X (via its editable occurrence elsewhere) to owned2. The foreign N
+  // under the write-protected occurrence infers owned2.
+  let config : SkgConfig = config_two_owned_one_foreign ();
+  let mut forest : ViewForest = ViewForest::new ();
+  let x : ego_tree::NodeId = forest . append_root (
+    mk_writeProtected_viewnode (
+      ID::from ("X"), SkgrepoName::from ("owned1"), "X" . to_string (),
+      AffectsParent::NA ));
+  forest . get_mut (x) . unwrap () . append ( restriction ("N", "foreign") );
+  let writeProtected_skgrepos_after_save : HashMap<ID, SkgrepoName> =
+    HashMap::from ([ ( ID::from ("X"), SkgrepoName::from ("owned2") ) ]);
+  let map = owned_ancestor_skgrepos_for_foreign_vognodes (
+    & forest, & writeProtected_skgrepos_after_save, & config );
+  assert_eq! ( map . get (& ID::from ("N")),
+               Some (& SkgrepoName::from ("owned2")),
+    "a write-protected ancestor's repo must come from its ID, not its stale display" ); }
 
 /// A fork-to-be (clone) with an edited title over the original N it
 /// overrides, in N's foreign repo. (original_title is N's disk title.)

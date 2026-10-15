@@ -1,0 +1,185 @@
+#+TITLE: Repo moves do graph logic in the client
+* Context
+Found while fixing repo moves over repeated nodes (2026-10-06/07; see
+[[file:../DONE/write-protected-repeats/1_discussion.org][the write-protected repeats discussion]]). The principle is yours:
+minimize the graph logic the clients do. The Emacs client's repo-move
+command (C-c s s) breaks it. Before a move it computes which
+relationships the move will strand at an old, more private repo, and
+offers to publicize them. That computation re-implements, partially and
+from the buffer alone, rules the server owns. Each defect below was
+verified, either on a scratch server or in a throwaway batch-Emacs
+probe.
+* What the client computes
+** Which occurrences a move retargets
+A move is one use of C-c s s. One vognode bears the move request.
+To retarget a headline is
+to rewrite the repo in its metadata (the '(repo ...)' value and its ⌂
+herald) to the move's new repo. That edits only the buffer; the save
+then moves the headline's graphnode.
+
+A plain move retargets just the vognode bearing the move request. A
+recursive move (C-u C-c s s) also retargets each of that vognode's
+descendants that has the moved graphnode's old repo and is reached
+through affectsParent=true unrestricted nodes
+('skg--do-at-recursive-repo-move-occurrences', elisp/skg-metadata.el).
+Either way, a write-protected headline is skipped and reported, since
+the save would ignore its repo.
+This is about editing the buffer, so it can reasonably stay in the
+client. The Neovim client duplicates it ('change_repo_recursive' in
+nvim/lua/skg/metadata.lua).
+** Which relationships a move strands, and at what repo
+*** the stick-else-default rule
+At save, the server picks the relRepo of each relationship it writes by
+this rule
+('apply_sticky_relRepos_in_graph_with_prospective_homes',
+'server/from_text/supplement_from_disk.rs').
+
+An explicit
+'(editRequest (relRepo NAME))' request wins, provided NAME is owned, no
+more public than the recorder's home, and no more public than the
+relationship's default, or than its current relRepo if that is already
+more public than the default; otherwise the save fails. Absent a request,
+a relationship already on disk keeps its disk relRepo: that is the
+sticky part. Only a new relationship gets the default: the more private
+of its two endpoints' homes, or, from an owned recorder to a foreign
+member, the recorder's home ('default_relRepo', 'server/types/misc.rs').
+Finally, a sticky or default relRepo more public than the recorder's own
+home is raised to that home. (Hides have one more floor: the most public
+subscription that explains them.)
+A move strands a relationship when its relRepo, kept by the sticky part,
+ends up more private than its new default. Only a publicizing move can
+do that, by making an endpoint's home more public. A stranded
+relationship stays in its old, more private repo, so a reader of the
+more public repo sees both endpoints but not the relationship between
+them. Publicizing it means lowering its relRepo to the new default, which
+takes an explicit request. The client's code calls such relationships
+"stuck".
+'skg--analyze-move-stuck-relationships' and
+'skg--content-relationship-stuck-repo', using the privacy ladder
+('skg--repo-privacy-position', 'skg--more-private-of-repos',
+'skg--strictly-more-public-repo-p'), recompute part of that rule from
+the buffer. This is graph logic; its server counterpart is the rule
+itself.
+** Which relationships are writable from a headline's position
+'skg--relationship-kind-matches-p', 'skg--subscribee-as-such-at-point-p',
+'skg--folder-anchor-editable-p', and the tables
+'skg--writable-folder-relations' and
+'skg--relRepo-unsupported-folder-atoms'. These mirror the save's
+collection policy ('server/from_text/local_fieldintent_collection/traverse.rs').
+Since 'e966ae9f' the save itself refuses an uncollected relRepo request
+on a write-protected node, so these client predicates are now only
+for user experience. A mistake in them produces an error at save
+instead of a silent loss.
+** What the server already owns
+The 'relRepo info' request ('server/serve/handlers/relRepo_info.rs')
+returns one relationship's default and current relRepo from the graph,
+and C-c s r uses it to build its prompt. This is the precedent: the
+client asks, and the server answers from the graph. The move's analysis
+never asks.
+* Defects
+** It offers a foreign relRepo, which the save refuses
+The client takes a relationship's default to be the more private of
+the two endpoints' homes. The server makes one exception: from an
+owned recorder to a foreign member, the default is the recorder's
+home, because Skg never writes a relationship into a foreign repo.
+Probe: privacy order public, theirs (foreign), private. Owned P in
+'private' contains foreign F in 'theirs'. Moving P to 'public', the
+client offers to publicize P -> F and writes
+'(editRequest (relRepo theirs))'. The save would refuse that
+("relRepos must be owned"). The right target is 'public'. Your
+current config has only one foreign repo, Mr Cheese, which sits more
+public than every owned repo except skg, so this is latent for you.
+** It overrides a deliberately private relationship
+The analysis docstring says "an atom-carrying relationship was already
+assigned a deliberate relRepo" and is skipped. The code only skips a
+pending '(editRequest (relRepo ...))'. It does not skip the displayed
+'(viewStats (relRepo ...))' fact, which marks a relationship deliberately
+more private than its default. Probe: public P contains private C, and
+P -> C sits deliberately at 'trusted'. Moving C to 'public', the client
+offers to publicize P -> C and, on yes, writes a request for 'public',
+undoing the deliberate 'trusted'. The prompt also mislabels where the
+relationship sits: it says "their old, more private repo", meaning the
+old default, but the relationship is at 'trusted'. (Probably a leftover
+from when one '(relRepo ...)' atom served as both fact and request.)
+** It reads the stale repos of write-protected repeats
+The analysis reads each endpoint's repo from the headline. A repeat's
+displayed repo is stale when an earlier, unsaved C-c s s in the same
+buffer moved the node's editable occurrence. The server fixed its own
+two instances of this in '02f7749d' by resolving repos by ID. The client
+cannot do that without graph access.
+** It sees only the view
+A move of X can strand any relationship touching X in the graph:
+from containers not shown, from subscribers in other views, and so on.
+The offer covers only the ones visible in this buffer. The rest stay
+silently stranded until someone finds them with C-c s R from a view
+that shows them.
+** It analyzes only 'contains'
+Every editable relation kind has a home-derived default and follows the
+sticky-else-default rule: 'subscribesTo', 'overrides', aliases (whose default is the
+owner's home) and hides (derived). A publicizing move can strand any
+of them the same way. The client analyzes only content relationships.
+** It says privatizing moves strand nothing; inbound relationships stay too public
+The client skips privatizing moves: the docstring of
+'test-set-repo-recursive-no-offer-when-privatizing' says relationships
+"rise automatically". The server's clamp raises only the moved node's
+own relationships, those it records, to its new home:
+'more_private_of (unclamped, recorder_home)'. A relationship INTO the
+moved node, recorded by a container, keeps its sticky repo, even when
+the container is saved in the same save.
+Verified on a scratch server: public C contains public X. Moving X to
+private (C editable in the same view) leaves 'owned/pub/c.skg' listing
+'x'. X's ID therefore stays in the public repo, which the default rule
+exists to prevent. The rerender flags it with a '~public' herald on X.
+This is a server gap as much as a client one; see the questions below.
+** Neovim implements none of it
+'set_repo' in nvim/lua/skg/metadata.lua retargets and reports, with no
+stranded-relationship analysis and no write-protected handling. That
+is already noted in TODO/problems.org ("Neovim skgrepo moves omit
+Emacs's write-protection and stuck-edge handling"). Every policy kept
+in a client must be written twice, and drifts.
+* What moving it to the server could look like
+** Option A: a preview request
+Before editing, the client sends the buffer and the intended move. The
+server answers with the occurrences to retarget and the stranded
+relationships (all kinds, both directions) with their target relRepos,
+computed from the graph plus the buffer's pending homes. The client
+then writes '(editRequest (relRepo ...))' on the visible headlines.
+This fixes every defect above except two. Relationships out of view
+have no headline to carry a request. And inbound relationships of a
+privatizing move still need the save to raise them.
+** Option B (recommended): the save decides, with a confirmation round-trip
+The client writes only the new home, as now, with no analysis. At save,
+for each home move, the server finds every relationship touching the
+moved node in the graph: all kinds, both directions, in view or not.
+If any would be stranded, it
+returns a confirmation listing them. The fork confirmation and the
+overPrivateText-telescope confirmation are the precedents. The approving
+re-save carries the chosen relationships back (like 'fork-repos'), and
+the server re-levels them. That includes relationships recorded by
+nodes not otherwise in the save, so those nodes' telescopes must be
+rewritten too, and views showing them refreshed (the collateral
+rerender machinery exists).
+The client's analysis, its privacy-ladder helpers and the Neovim gap
+all disappear. Inbound relationships of a privatizing move become one
+more case for the same machinery: raised automatically, or listed.
+** Option C: fix the client in place
+Patch each defect above in Elisp, then port all of it to Lua. This keeps
+the duplication, and still cannot see out-of-view relationships.
+* TODO Claude says: questions for you
+** TODO Which option?
+ANSWER:
+I'll default to: B, after your answers to the next two questions.
+** TODO When a node moves more private, should relationships into it rise automatically?
+Today they keep their old, more public repo, leaving the moved node's ID
+in the more public repo. Raising them automatically matches what the
+clamp already does for the node's own relationships, but means writing
+containers the user did not touch. Alternatively, list them in the
+confirmation and let the user choose.
+ANSWER:
+I'll default to: raise automatically (privacy errs toward private),
+and say so in the save's warnings.
+** TODO Should the confirmation cover relationships outside the view?
+Option B can reach them; listing them reveals graph structure the user
+is not looking at, but that's their own data.
+ANSWER:
+I'll default to: yes, every relationship touching a moved node.

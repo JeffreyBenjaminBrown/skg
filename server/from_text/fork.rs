@@ -40,9 +40,13 @@ use std::collections::{HashMap, HashSet};
 /// ancestors; the first OWNED one reached in preorder wins -- monogamy
 /// means at most one clone anyway, and the user can override the choice
 /// in the confirmation buffer.
+/// A write-protected ancestor's skgrepo is read from its ID
+/// (WRITEPROTECTED_SKGREPOS_AFTER_SAVE): what it shows is stale when the
+/// same buffer moved that node's editable occurrence.
 pub fn owned_ancestor_skgrepos_for_foreign_vognodes (
-  viewforest : &ViewForest,
-  config     : &SkgConfig,
+  viewforest                         : &ViewForest,
+  writeProtected_skgrepos_after_save : &HashMap<ID, SkgrepoName>,
+  config                             : &SkgConfig,
 ) -> HashMap<ID, SkgrepoName> {
   let mut map : HashMap<ID, SkgrepoName> = HashMap::new ();
   for node in viewforest . nodes () {
@@ -55,9 +59,14 @@ pub fn owned_ancestor_skgrepos_for_foreign_vognodes (
         ViewnodeKind::Vognode (Vognode::Unrestricted (pt)) => {
           // N's nearest vognode ancestor: record its skgrepo IFF owned,
           // then stop -- never walk past it.
-          if config . skgrepo_is_owned (& pt . home_skgrepo) {
+          let ancestor_skgrepo : &SkgrepoName =
+            if pt . is_writeProtected () {
+              writeProtected_skgrepos_after_save . get (& pt . skgid)
+              . unwrap_or (& pt . home_skgrepo)
+            } else { & pt . home_skgrepo };
+          if config . skgrepo_is_owned (ancestor_skgrepo) {
             map . entry ( t . skgid . clone () )
-              . or_insert_with ( || pt . home_skgrepo . clone () ); }
+              . or_insert_with ( || ancestor_skgrepo . clone () ); }
           break; }
         ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
           // A restricted vognode is a real container boundary too (and
