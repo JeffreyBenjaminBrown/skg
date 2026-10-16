@@ -1,0 +1,512 @@
+* [Jeff] vision : a total diff view
+** how to read this
+In all of the following, hopefully (i.e. if I haven't screwed up),
+angle brackets wrap descriptors,
+and quotation marks wrap special herald text.
+
+Sometimes I'll say gnode and vnode (graphnode and viewnode) here,
+because it's important to bear in mind the distinction:
+A gnode can be represented by a vnode,
+but not every vnode represents a gnode;
+a vnode might instead represent an aspect of a gnode.
+Child and parent is meaningless in the graph,
+but meaningful in a viewforest.
+
+Sometimes I'll talk about a vnode's gnode.
+When I do that I mean the gnode that a vnode represents.
+(If the vnode is a folder, or anything but a vognode,
+then I'm probably accidentally talking nonsense.)
+Similarly, maybe I'll talk about a gnode's vnode(s);
+that would be all the vnodes that represent the gnode.
+** problems and motivation
+*** Changes must be committed to all skgrepos at once.
+Magit is already not a great graph interface.
+But it's particualarly terrible when changes span repos.
+One problem the total diff view will solve is that
+it will let the user see all changes at once.
+*** A user needs to be able to mark changed aspects of a node commit-ready.
+In the diff, a node might come up in multiple different places.
+The user (me) has in the past needed to see all those spots
+before deciding whether a node is ready to commit.
+This required manual note-taking in some side channel; painful.
+The user should therefore be able to represent commit-readiness
+in skg, and granularly: not just that the whole node is ready,
+but that some aspect (its aliases, say) is ready.
+
+If two vnodes V and V' represent the same gnode G,
+and the user marks one of them commit-ready,
+the other should be updated to show the same thing.
+Stated declaratively rather than procedurally,
+commit-readiness is a property of gnodes, not vnodes.
+
+It is also a property of *aspects* of gnodes,
+such as a gnode's list of aliases.
+The same logic (share it across vnodes)
+applies to two folders representing
+the same aspect of the same gnode.
+** prerequisites
+*** folder the non-content trees
+Currently, commands like "C-c p C" draw a viewforest
+by making its roots children of the vnode it was called at.
+That's fine. But we should also be able to draw those same
+viewforests under folders. That is, where
+skg-show-containerward-tree would show:
+#+begin_example
+  * node A
+  ** node C which contains A, with a special herald
+  *** node C' which contains C
+  ** node B, ordinary content
+#+end_example
+skg-show-containerward-tree-in-folder would instead show
+#+begin_example
+  * node A
+  ** "these nodes contain it"
+  *** node C which contains A, with a special herald
+  **** node C' which contains C
+  ** node B, ordinary content
+#+end_example
+The heralds on C would be the same in both cases,
+as would the heralds on C'.
+*** folder the content
+The special treatment of content relationships is
+problematic for marking changes commit-ready.
+
+The changes to other aspects of a gnode -- its aliases, say,
+or even its containers (once non-content trees are folderable)
+-- can be collected under a folder.
+Its contents, though, are presented as immediate children.
+There is thus no content folder that one can mark 'done'
+after verifying that the content relationships are commit-ready.
+
+Skg therefore needs two equivalent ways of presenting content:
+As immediate children, or under a "content folder",
+which would bear the herald text "its content" in the system font.
+** desired behavior
+*** overarching goal : build a total diff view (TDV)
+**** in brief
+The total diff view will show all aspects (except order)
+that have changed in the graph,
+with enough context to understand them,
+and a minimum of extraneous context.
+(I'm saying "total" to distinguish it from the two extant
+lesser implementations, the diff-view and the diff-report.)
+It will let the user mark aspects of gnodes,
+as well as whole gnodes, commit-ready.
+**** "pruned change-spanning viewforest" (PCSVF)
+A pruned change-spanning viewforest is built when the user
+requests the total diff view.
+The total diff view's purpose is to show all changes,
+and all the context necessary to understand them,
+with a minimum of other stuff.
+
+Let C be the set of changes:
+Each gnode that was changed, including new and deleted gnodes.
+We trace each c in C containerward to find
+the set R of "pseudo-root(s)" that contain it.
+WHen tracing containerward to compute R,
+we stop at any node that is multi-contained --
+this is the sense in which the roots are pseudo.
+Oh and also anything that is part of a cycle.
+Tantivy already does something like this to define search rank.
+
+If any r in R is within the contentward tree
+from some other r' in R, then the view from r' will contain
+the view from r. We should therefore define a second set D,
+the 'deduplicated pseudo-roots' of the view,
+which is R minus all such redundant values r.
+
+From D we will build a contentward viewforest.
+Each d in D will be a root of the viewforest.
+
+In order to minimize unnecessary context, we
+prune branches from the viewforest that would show no changes.
+To compute the pruned view,
+we build a set U of nodes to unfold contentward.
+U starts with the union of R and C.
+We then augment it by tracing each c in C contentward to R,
+and adding every node from that path to U.
+
+Once we know U, we can unfold the view contentward from D.
+Every node reached contentward from D that is in U,
+we draw writable. Every other node, we draw write-protected.
+
+Every node in C, we draw not just writable,
+but with its content foldered.
+The other nodes in U do not need their content foldered.
+However, by modifying a node (the total diff view can be saved,
+just like any other skg view) the user can move that node
+into the changed set C. When they do so,
+the view should be redrawn to folder that node's content.
+
+Even though this "total diff view"
+is constructed using only the content relation,
+it will still reveal changes to other relationships.
+Each node that was changed will be drawn with
+subscribee, overridden and hidden folders,
+in the way already used for ordinary contentward views.
+The only difference is that those folders will now
+have diff heralds indicating new, deleted and modified nodes,
+as described below.
+**** a note on terminology and permanence
+The acronym PCSVF will need to persist in the codebase.
+TDV is temporary, though -- I'm only using that to distinguish it
+from the diff view that already exists. Once we have
+replaced the partial diff view with the TDV,
+we can just call it the diff view again.
+**** a separate PCSVF only for merges
+This would start with C, the set of changed nodes,
+including only those nodes that were involved in merges.
+**** a separate PCSVF only for skgrepo changes
+Similarly, this would start with C, the set of changed nodes,
+being only those nodes whose skgrepo changed.
+
+For this to be truly convenient,
+since skgrepo changes are often contentward-recursive,
+we will need a command, 'skg-mark-skgrepo-changes-commitReady',
+that can be applied to a viewnode (rather than from its
+"its skgrepo changed" child, which can be cycled via a simple
+shift-left/shift-right), or, via the C-u prefix,
+to every child whose skgrepo changed the same way
+(same way = same source, same dest)
+and each of their children as well, recursively.
+**** The TDV will consist of three branches.
+One called 'all changes',
+one called 'skgrepo changes',
+and one called 'merges'.
+**** The TDV avoids uniquifies writable nodes the usual way.
+If writable vognode V represents gnode G,
+any other vognode V' representing G is write-protected.
+*** Once the total diff view is implemented, we can retire
+both the diff report (which builds a non-skg org buffer)
+and the simpler diff mode.
+*** The total diff view includes all skgrepos.
+Refuse the view if that conflicts with the set of active skgrepos,
+i.e. the current maximum privacy level shown.
+(I am here violating my one-thing-one-name rule.
+What is the codebase's term for that?)
+*** how to show and mark commit-ready each kind of edit
+**** changes to a gnode's text
+If its title and body both changed:
+#+begin_example
+  * <new title>
+  <new body if present>
+  ** "old title and body" <old title>
+  <old body if present>
+  *** "body diff"
+  <the body diff>
+#+end_example
+No title diff is ever needed -- it would just be two lines,
+and we're already showing both.
+
+If the body changed but not the title:
+#+begin_example
+  * <title>
+  <new body if present>
+  ** "old body"
+  <old body>
+  ** "body diff"
+  <body diff>
+#+end_example
+
+If the title changed but not the body:
+#+begin_example
+  * <new title>
+  <new body if present>
+  ** "old title" <old title>
+#+end_example
+**** changes to a gnode's content list
+Recall that a prerequisite is that content can be foldered.
+When a total diff view is built, the content of all edited nodes
+are shown that way.
+
+Each member of that folder represents two things:
+the contained gnode, and the containment relationship to it.
+It should show whether the node is new or deleted
+(showing nothing if it is neither),
+and whether the relationship is new or deleted
+(again showing nothing if it is neither).
+
+The most succinct way to do that is probably
+- ∃+ ∃- if the node is new or deleted.
+- ~+ ~- if the relationship is new or deleted.
+
+Each of those marks should be separately cycleable
+commit-ready and not-commit-ready.
+When marked commit-ready, it has a green check next to it.
+
+Once all changes of either kind are manually marked commit-ready,
+the entire content folder should be automatically marked the same.
+It therefore needs two heralds, ∃ and ~, to be so marked.
+
+The user can also cycle the commit-ready status
+of the whole collection, which in turn would propagate
+to each change among its children, but not recursively.
+Note that some children have no change to cycle the status of.
+**** changes to a gnode's container set
+For each node whose set of containers changed --
+including deleted nodes --
+show a foldered, diffed containerward forest.
+(I have trouble typing that existence symbol,
+so instead I'll just write newHere for a new relationship,
+new for a new node's existence, etc.
+When you process this, Claude, please change all those symbols
+to the shorter (two-character) ones described earlier.)
+This forest is strange, because it should include (recursively)
+not just current container relatinoships, but removed ones:
+#+begin_example
+  * <node N, which may not even have itself changed>
+  ** "its containers changed"
+  *** "new" <node A, which is new and contains N>
+  **** "newHere" <node A', which already existed but newly contains A>
+  ***** <node A'', a root that contains A'> (no diff herald)
+  ***** "removedHere" <node A2, which used to contain A' and still exists>
+  ***** "removed" <node A3, which used to contain A and was deleted>
+  ****** "removed" <node A3', which used to contain A3 and was deleted>
+  *** <Node B, which contained N and still does>
+  **** <B's container>
+  ***** ...
+  *** "removedHere" <Node C, which contained N but doesn't now>
+  **** ...
+  *** "removed" <Node D, which has been deleted entirely>
+  **** <Node E, which used to contain D and has also been deleted>
+  ***** <Node F, which still exists and used to contain E>
+  ****** ...
+#+end_example
+
+Even though a node does not define its containers
+(its containers do),
+from a view like this the user can mark those
+containment relationships commit-ready.
+Earlier I said that one vnode image of a gnode marked commit-ready
+should propagate that mark to other images of the same gnode.
+The same logic applies to relationships: One image of a relationship,
+marked commit-ready, should propagate to other images of that relationship,
+which could go in either direction
+(i.e. in the case of containment, containerward or contentward).
+**** changes to a gnode's set of mentioners, subscribers, overriders, hiders
+Show these almost just like changes to its containers.
+The difference is that for containers we show
+a full containerward forest, and only that direction.
+The other three use two directions, where containerward is the other.
+For instance, for the override relationship,
+we show a mixed forest,
+unfolding in both the overriderward and containerward directinos,
+using both the new graph and the old graph:
+#+begin_example
+  * <node N, which may not even have changed>
+  ** "its overriders changed"
+  *** "newHere" <node A, which newly overrides N>
+  **** <node Ac, which contains A>
+  ***** "removed" <node Ac', which contained Ac but is now gone>
+  ***** <node Acc, which still contains Ac>
+  **** <node Ao, which overrides A>
+#+end_example
+When I say N may not even have changed,
+I mean it may not have changed in itself (text, aliases, IDs)
+or in the rightward direction (content, subscribees, etc.)
+
+Note that the roots of the overrierward-containerward forest
+drawn under N's "its overriders changed" includes only nodes
+O for which O overrides or overrode N.
+That is, the first generation is reached from N
+through only the override relation, not the contains relation.
+In subsequent generations, though,
+to draw those roots' descendents, we use both.
+
+We need to include the contains relation
+because nodes are only meaningful
+in their containment context. (If we needed the user to
+ask for a contentward forest under each node manually
+that they're looking at, it would mean a lot of typing.)
+**** changes to a gnode's subscribees, overridden, hidden
+These we show just like changes to subscribers, etc.
+Confusingly, that means we'll be mixing two directions:
+We always use the containerward direction, which is leftward,
+but for the other relationships we use the rightward direction.
+
+So, for instance, the changes to its subscribees might look like:
+#+begin_example
+  * <node N, which definitely changed, because its subscribee list changed>
+  ** "its subscribees changed"
+  *** "newHere" <node A, which N newly subscribes to>
+  **** <node Ac, which contains A>
+  ***** "removed" <node Ac', which contained Ac but is now gone>
+  ***** <node Acc, which still contains Ac>
+  **** <node Ao, which overrides A>
+#+end_example
+Again, the roots of the "its subscribees changed"
+are reached from N only through the subscribe relation,
+but subsequent generations are unfolded using both.
+**** changes to a gnode's set of mentioned : omit
+Omit this, because it's obvious from the gnode's text.
+**** changes to a gnode's set of aliases
+Rather than the usual aliases folder, show an "aliases chnaged"
+folder. Since aliases are a set, the order doesn't matter;
+put all removals first, then all unchanged ones, then all new ones.
+#+begin_example
+  * <the node with alias changes>
+  ** "its aliases changed"
+  *** - <removed alias>
+  *** <unchanged alias>
+  *** + <new alias>
+#+end_example
+Just like the content list,
+the user can mark individual alias changes commit-ready.
+They can also mark the entire collection commit-ready,
+which then propagates to each individual one.
+**** changes to a gnode's IDs
+Same as aliases.
+**** deleted a gnode
+Show it in each of its former containers --
+even the ones that were themselves deleted.
+***** Show text, content.
+It should show the title, body and content it used to have.
+The content can include more such deleted nodes.
+This suggests keeping two inRustGraphs: one that matches the .skg files on disk,
+and the other that matches the graph obtained from the union of
+the last commit of each skgrepo.
+(Refuse to construct the diff if any repo is not version-controlled.)
+***** If it was acquired, show that in a folder.
+If the deleted graphnode was the acquiree in a merger,
+the viewnode representing its deletion
+should mention the acquirer.
+This seems most easily shown via an intermediary folder:
+#+begin_example
+  * <deleted node>
+  ** "it was acquired by"
+  *** <acquirer>
+#+end_example
+***** Show a deleted gnode also under its acquirer.
+#+begin_example
+  * <the acquirer>
+  ** "it acquired"
+  *** <the deleted node>
+#+end_example
+**** added IDs to a gnode
+Show an "id changes" folder, like the "alias changes" folder.
+(It should never have subtractions,
+but it can be constructed with the same machinery,
+even though that machinery knows how to handle subtractions.)
+**** changes to a gnode's skgrepo
+***** in the "all changes" and "merges" branches of the TDV
+We folder the change:
+#+begin_example
+  * <moved node>
+  ** "its skgrepo changed"
+  *** "old skgrepo <reponame>"
+  *** "new skgrepo <reponame>"
+#+end_example
+***** in the "skgrepo changes only" branch of the TDV
+To increase readability, we'll show the same information
+in the heralds themselves:
+#+begin_example
+  * "-<oldrepo> +<newrepo>" <moved node>
+#+end_example
+***** in both
+Include a "movedLikeNearestAncestor" herald, to indicate
+that a vnode's skgrepo move matches (in both oldrepo and newrepo)
+that of its parent (or more generally nearest ancestor,
+in case its parent is a folder).
+Omit that herald where it doesn't apply.
+
+The movedLikeNearestAncestor herald will appear as
+a (purple? where are the colors named?)
+house character (I don't know the name of that character,
+but the herald system already uses it for skgrepos)
+conjoined with an ancestor character
+(a for parent, b for grandparent, etc.)
+***** to record commit-readiness
+'skg-mark-skgrepo-changes-commitReady' can be done to
+a skgrepo folder or the vognode that owns that folder,
+and can be called recursively (also from either point,
+to the same effect).
+
+But in the "skgrepo changes" branch of the TDV,
+there is no folder to mark. Therefore,
+commit-readiness of the source change must be recordable
+in the metadata of a vognode. Doing that should have the same
+effect as recording it in the folder.
+(We will use the MSV type here: If one of those metadata items
+is absent from a viewnode, it indicates that the viewnode
+expresses no opinion.)
+**** changed a relationship's skgrepo
+#+begin_example
+  * <container>
+  ** "some content relationships changed skgrepo"
+  ** <unchanged content>
+  ** <content>
+  *** "relationship moved from <skgrepo> to <skgrepo>"
+#+end_example
+The quoted text should be system-font, except for the two skgrepos,
+which should be the usual (blue?) color.
+
+This same shape can be used to show changes to other kinds of relationships, with the exception of mention relationships.
+Mentions are defined by the text,
+so they are always defined in the skgrepo that defines the text.
+
+I toyed with the idea of letting these changes
+be heraldable in the vognode, in addition to in one of its folders,
+but the heralds would be too noisy.
+
+The purpose of the empty
+"some content relationships changed skgrepo"
+folder is to give a place to indicate that all such
+changes have been marked commit-ready.
+
+We'll want two separate commands,
+'skg-mark-gnode-skgrepo-changes-commitReady' and
+'skg-mark-rel-skgrepo-changes-commitReady'.
+(So where I wrote 'skg-mark-skgrepo-changes-commitReady'
+I was in error.)
+**** changes of order
+Don't even bother showing them.
+(If the user wanst this they can see it in magit,
+via skg-readable-ids-mode.)
+
+In the TDV, show things in the current order,
+ignoring the old order --
+except deleted things, which are not part of the new order,
+and should be wherever the minus sign would show up
+in a git diff of the relevant list.
+**** distinguish rightward ("carried"?) changes from leftward ("passenger"?) changes
+Changes to something's list of content are,
+from the filesystem's perspective, changes to it.
+These I'm calling rightward changes.
+Changes to something's set of containers are,
+from the filesystem's perspective,
+changes to its relationship partners.
+The first kind of folder is more important,
+so it should rank higher (earlier) in a vnode's of children.
+We'll suffix (R) (including the parens)
+to the rightward ones, and (L) to the leftward ones.
+**** automatic commit-readiness aggregation
+(Is "aggregation" the best word for this?)
+
+When all changes in a folder have been
+(manually) marked commit-ready,
+skg should (automatically) mark that folder commit-ready.
+
+Similarly, when all of a node's
+change-bearing folders have been so marked,
+that node should be marked commit-ready.
+
+Once everything in the buffer has been marked commit-ready,
+skg should inform the user in the minibuffer.
+At that point the user knows they can
+stage and commit all changes to all skgrepos.
+** questions
+*** What new heralds does this introduce? What are all the heralds it involves?
+Some of the heralds
+(new here, removed here, removed entirely, etc.)
+overlap somewhat or entirely heralds already implemented
+in the current (partial) diff view.
+*** What new viewfolder types does this introduce?
+*** Which nodes can be marked DONE, in which ways?
+Each alias, or just the whole collection of aliases?
+Use the same vnode to mark its gnode
+and its relationship to its parent's gnode?
+Use DONE, R-DONE, L-DONE?
+*** How will the metadata for these things be represented?
+I have described the underlying facts they represent,
+and the heralds that show them to the user,
+skipping over the metadata representation.
