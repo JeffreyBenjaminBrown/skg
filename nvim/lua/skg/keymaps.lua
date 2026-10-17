@@ -168,6 +168,8 @@ M.commands = {
     module = 'skg.readiness',
     fn = 'mark_gnode_skgrepo_changes_commitReady_recursive',
     desc = 'Mark commit-ready every home move in the subtree like this one, and save' },
+  StageAndCommit = { module = 'skg.stage_and_commit', fn = 'stage_and_commit',
+                     desc = 'Stage and git-commit every owned skgrepo with changes, with one message' },
   StageMoves = { module = 'skg.stage_moves', fn = 'stage_moves',
                  desc = 'Script staging cross-repo node moves' },
   DiffReport = { module = 'skg.diff_report', fn = 'diff_report',
@@ -267,6 +269,7 @@ M.content_view_bindings = {
   { 'rR', 'CycleCommitReadyRecursive' }, -- C-u C-c r r
   { 'rh', 'MarkGnodeSkgrepoChangesCommitReady' }, -- C-c r h
   { 'rH', 'MarkGnodeSkgrepoChangesCommitReadyRecursive' }, -- C-u C-c r h
+  { 'rc', 'StageAndCommit' },            -- C-c r c
   { 'sx', 'SetFlagSearchMatching' },
   { 'sX', 'SetFlagSearchMatchingRecursive' },
   { 'mc', 'ReplaceLinkWithContent' },    -- C-c m c
