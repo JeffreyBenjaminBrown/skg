@@ -1,5 +1,5 @@
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
-use crate::prominence::prominence_sources_for_saved_from_in_rust_graph;
+use crate::prominence::prominence_sources_for_saved_from_inRustGraph;
 use crate::dbs::filesystem::one_node::{
   PreparedTelescopeWrite, prepare_graphnode_telescope,
 };
@@ -149,7 +149,7 @@ pub(crate) fn enqueue_tantivy_delta (
   let prominence_sources : HashMap<ID, String> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "prominence_sources_for_saved" ). entered();
-      prominence_sources_for_saved_from_in_rust_graph (
+      prominence_sources_for_saved_from_inRustGraph (
         candidate, &node_defs ) };
 
   // Tantivy (background): the search index is a derived cache that the

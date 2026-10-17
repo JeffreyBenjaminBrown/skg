@@ -65,7 +65,7 @@ fn assemble(
 /// In-Rust-graph containerward role tree, walking the 'contained_by'
 /// recorderward relmap. Uses breadth-first traversal with no
 /// async / no parallel queries / no frontier-batching.
-pub fn full_containerward_role_tree_from_in_rust_graph (
+pub fn full_containerward_role_tree_from_inRustGraph (
   graph     : &InRustGraph,
   origin    : &ID,
   max_depth : usize,
@@ -135,6 +135,6 @@ pub fn containerward_role_trees_by_skgid_from_skgids (
   for skgid in skgids {
     map . insert (
       skgid . clone (),
-      full_containerward_role_tree_from_in_rust_graph (
+      full_containerward_role_tree_from_inRustGraph (
         graph, skgid, max_depth ) ); }
   map }

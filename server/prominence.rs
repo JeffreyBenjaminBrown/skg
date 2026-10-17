@@ -129,7 +129,7 @@ pub fn compute_and_store_prominence_sources (
 /// it does a containerward walk from each still-untyped saved node
 /// rather than the whole-graph cycle expansion, which stays at
 /// init/rebuild ('compute_and_store_prominence_sources').
-pub fn prominence_sources_for_saved_from_in_rust_graph (
+pub fn prominence_sources_for_saved_from_inRustGraph (
   graph     : &InRustGraph,
   node_defs : &[NodeInstruction],
 ) -> HashMap<ID, String> {

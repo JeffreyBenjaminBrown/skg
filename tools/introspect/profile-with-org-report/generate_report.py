@@ -528,7 +528,7 @@ def main() -> None:
     graphnodeInRust_conversions = callgrind_call_count(
         "GraphnodeInRust as core::convert::From<&skg::types::nodes::complete::Graphnode")
     context_derivations = callgrind_call_count(
-        "prominence_sources_for_saved_from_in_rust_graph")
+        "prominence_sources_for_saved_from_inRustGraph")
     tantivy_enqueues = callgrind_call_count("skg::save::enqueue_tantivy_delta")
     first_normalized_count = (graph_work[0].get("normalized_definitions", 0)
                               if graph_work else 0)

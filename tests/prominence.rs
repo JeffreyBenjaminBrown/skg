@@ -6,7 +6,7 @@ use skg::prominence::{
   MapToContent,
   MapToContainers,
   content_maps_from_nodes,
-  prominence_sources_for_saved_from_in_rust_graph,
+  prominence_sources_for_saved_from_inRustGraph,
   had_id_set_from_nodes,
   mentioned_skgids_from_nodes,
   find_roots_and_multiply_contained,
@@ -123,7 +123,7 @@ fn in_rust_prominence_sources_for_saved_nodes () {
     nodes . iter () . cloned ()
     . map ( |n| NodeInstruction::Save ( SaveNode (n) )) . collect ();
   let types : HashMap<ID, String> =
-    prominence_sources_for_saved_from_in_rust_graph (&graph, &defs);
+    prominence_sources_for_saved_from_inRustGraph (&graph, &defs);
   let got = |skgid : &str| types . get (&ID::new (skgid)) . map ( |s| s . as_str () );
   assert_eq! (got ("root"),   Some ("Root"));
   assert_eq! (got ("other"),  Some ("Root"));
