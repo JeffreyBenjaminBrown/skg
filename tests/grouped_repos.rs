@@ -5,6 +5,9 @@
 #[path = "diff_mode_refusals.rs"]
 mod diff_mode_refusals;
 
+#[path = "graph_pair.rs"]
+mod graph_pair;
+
 #[path = "leak_battery.rs"]
 mod leak_battery;
 
