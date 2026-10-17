@@ -16,7 +16,6 @@ use crate::graph_pair::types::GraphPair;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::delete_references_to_absent_node::handle_delete_references_to_absent_node_request;
-use crate::serve::handlers::diff_report::handle_diff_report_request_with_repo_set;
 use crate::serve::handlers::relRepo_info::handle_relRepo_info_request;
 use crate::serve::handlers::flag_state::handle_flag_state_request;
 use crate::serve::handlers::export_to_org::handle_export_to_org_request;
@@ -24,6 +23,7 @@ use crate::serve::handlers::import_md_and_org::{
   PendingImport, handle_import_md_and_org_request};
 use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_skgrepo_set;
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
+use crate::serve::handlers::investigate_unknown_node::handle_investigate_unknown_node_request;
 use crate::serve::handlers::rebuild_session_lifetime_stores::handle_rebuild_session_lifetime_stores_request;
 use crate::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
@@ -230,9 +230,9 @@ fn handle_emacs (
             handle_link_statuses_request (
               &mut stream, &request_header, &runtime . graph,
               &runtime . config, &skgrepo_restriction ),
-          Ok (RequestType::DiffReport) =>
-            handle_diff_report_request_with_repo_set (
-              &mut stream, &request_header, &runtime . config,
+          Ok (RequestType::InvestigateUnknownNode) =>
+            handle_investigate_unknown_node_request (
+              &mut stream, &request_header, &runtime,
               &skgrepo_restriction ),
           Ok (RequestType::StageMoves) =>
             handle_stage_moves_request (

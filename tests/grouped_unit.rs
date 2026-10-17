@@ -13,9 +13,6 @@ mod change_facts_metadata;
 #[path = "dbs.rs"]
 mod dbs;
 
-#[path = "diff_report.rs"]
-mod diff_report;
-
 #[path = "git_ops.rs"]
 mod git_ops;
 
@@ -27,6 +24,9 @@ mod herald_tokens;
 
 #[path = "import_org_roam.rs"]
 mod import_org_roam;
+
+#[path = "investigate_unknown_node.rs"]
+mod investigate_unknown_node;
 
 #[path = "init_refusal.rs"]
 mod init_refusal;

@@ -1,64 +1,51 @@
-//! TODO/more.org, "The skg diff report should report what vanished
-//! nodes used to be": a node id that the worktree still REFERENCES
-//! (in some contains / subscribesTo / hidesFromSubs /
-//! overrides list) but that exists in NO skgrepo -- the kind
-//! that renders as "Parent references unknown node." -- is
-//! investigated in the git history of every skgrepo. If it was never
-//! there, the report says that; otherwise it names the commit at
-//! which it vanished and what it was connected to (in every possible
-//! way, links included) when last present.
+//! An unknown node is an ID that some node's relation lists name but
+//! that no node answers to ("Parent references unknown node"). The
+//! "investigate unknown node" request
+//! ('server/serve/handlers/investigate_unknown_node.rs') looks for it
+//! in the git history of every skgrepo. If it was never there, the
+//! answer says that; otherwise it names the commit at which it
+//! vanished and what it was connected to (in every possible way,
+//! links included) when last present.
 
-use crate::diff_report::types::{
-  CommitStamp, VanishedNodeReport, VanishedNodeSighting};
 use crate::git_ops::git_snapshot::{
   parse_blob_node, path_is_skgrepo_skg, repo_prefix_in_gitrepo};
-use crate::git_ops::git_snapshot_types::GraphSnapshot;
 use crate::git_ops::read_gitrepo::open_gitrepo;
 use crate::types::misc::{ID, MSV, SkgConfig, SkgrepoName, members_msv, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::links::links_from_node;
 
 use git2::{Commit, ObjectType, Repository, TreeWalkMode, TreeWalkResult};
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-/// Every id some node of 'git_snapshot' lists as a relationship member
-/// (contains, subscribesTo, hidesFromSubs,
-/// overrides) that no node of 'git_snapshot' answers to (as
-/// primary or extra id). Link targets are NOT collected here:
-/// a dangling link degrades to text, not to an unknown-node phantom.
-pub fn dangling_skgids_in_git_snapshot (
-  git_snapshot : &GraphSnapshot,
-) -> BTreeSet<ID> {
-  let resolvable : HashSet<&ID> = {
-    let mut skgids : HashSet<&ID> = HashSet::new ();
-    for node in git_snapshot . nodes . values () {
-      skgids . insert (& node . pid);
-      skgids . extend ( node . extra_ids . iter () ); }
-    skgids };
-  let mut dangling : BTreeSet<ID> = BTreeSet::new ();
-  for node in git_snapshot . nodes . values () {
-    let contains_skgids   : Vec<ID> = members_of (& node . contains);
-    let subscribes_skgids : MSV<ID> = members_msv (& node . subscribesTo);
-    let hides_skgids       : MSV<ID> = members_msv (
-      & node . hidesFromSubs);
-    let overrides_skgids   : MSV<ID> = members_msv (& node . overrides);
-    let referenced =
-      contains_skgids . iter ()
-      . chain ( subscribes_skgids . or_default () . iter () )
-      . chain ( hides_skgids . or_default () . iter () )
-      . chain ( overrides_skgids . or_default () . iter () );
-    for skgid in referenced {
-      if ! resolvable . contains (skgid) {
-        dangling . insert ( skgid . clone () ); }} }
-  dangling }
+#[derive(Clone, Debug)]
+pub struct VanishedNodeReport {
+  pub skgid        : ID,
+  pub sightings : Vec<VanishedNodeSighting>, // empty means: never in any skgrepo's git history
+}
+
+#[derive(Clone, Debug)]
+pub struct VanishedNodeSighting {
+  pub home_skgrepo : SkgrepoName,
+  pub last_present : CommitStamp,
+  pub vanished_at  : Option<CommitStamp>, // its first-parent descendant, which lacks the file
+  pub title        : String,             // the node's title when last present
+  pub outbound     : Vec<(&'static str, Vec<ID>)>, // its own nonempty relation lists then
+  pub inbound      : Vec<(ID, &'static str)>,      // who referred to it then, and how (links included)
+}
+
+#[derive(Clone, Debug)]
+pub struct CommitStamp {
+  pub short_sha : String,
+  pub date      : String, // YYYY-MM-DD, UTC
+  pub summary   : String,
+}
 
 /// Investigate each id of 'ids' in the git history of every skgrepo:
 /// walk each skgrepo's FIRST-PARENT chain from HEAD looking for the most
 /// recent commit whose tree holds '<id>.skg'. A skgrepo that cannot be
-/// opened or walked contributes nothing (the ordinary diff-report
-/// refusals have already vetted the skgrepos the selection needs).
-/// One walk per skgrepo covers all ids.
+/// opened or walked contributes nothing. One walk per skgrepo covers
+/// all ids.
 pub fn investigate_vanished_skgids (
   config : &SkgConfig,
   skgids    : &BTreeSet<ID>,
@@ -219,7 +206,7 @@ fn inbound_references_in_tree (
   inbound }
 
 /// Days-to-civil conversion (Howard Hinnant's algorithm), so the
-/// report can stamp commits without a date-time dependency.
+/// answer can stamp commits without a date-time dependency.
 fn date_from_epoch (
   seconds : i64,
 ) -> String {
@@ -237,3 +224,45 @@ fn date_from_epoch (
   let m : i64 = if mp < 10 { mp + 3 } else { mp - 9 };
   let y : i64 = if m <= 2 { y + 1 } else { y };
   format! ("{:04}-{:02}-{:02}", y, m, d) }
+
+/// One ID's report as Org text: what git history says it used to be.
+pub fn vanished_node_report_as_org (
+  report : &VanishedNodeReport,
+) -> String {
+  let mut out : String = String::new ();
+  let stamp = |c : &CommitStamp| -> String {
+    format! ("{} ({}, {:?})", c . short_sha, c . date, c . summary) };
+  out . push_str (&format! ("* {}\n", report . skgid));
+  if report . sightings . is_empty () {
+    out . push_str (
+      "** never present in the git history of any skgrepo\n");
+    return out; }
+  for sighting in & report . sightings {
+    out . push_str (&format! (
+      "** in skgrepo {}\n", sighting . home_skgrepo ));
+    out . push_str (&format! (
+      "*** title when last present: {}\n", sighting . title ));
+    out . push_str (&format! (
+      "*** last present at commit {}\n",
+      stamp (& sighting . last_present) ));
+    match & sighting . vanished_at {
+      Some (c) => out . push_str (&format! (
+        "*** vanished at commit {}\n", stamp (c) )),
+      None => out . push_str (
+        "*** still present at HEAD (only the worktree lacks it)\n" ), }
+    if sighting . outbound . is_empty () {
+      out . push_str ("*** its own relationship lists then: all empty\n");
+    } else {
+      out . push_str ("*** its own relationship lists then\n");
+      for (relation, members) in & sighting . outbound {
+        out . push_str (&format! ("**** {}\n", relation));
+        for member in members {
+          out . push_str (&format! ("***** {}\n", member)); }} }
+    if sighting . inbound . is_empty () {
+      out . push_str ("*** nothing else referred to it then\n");
+    } else {
+      out . push_str ("*** referred to then by\n");
+      for (referrer, relation) in & sighting . inbound {
+        out . push_str (&format! (
+          "**** {} (via {})\n", referrer, relation )); }} }
+  out }

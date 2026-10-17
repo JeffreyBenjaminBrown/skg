@@ -10,24 +10,6 @@ pub enum GitSnapshotKind {
   Worktree,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct DiffSelection {
-  pub include_staged   : bool,
-  pub include_unstaged : bool,
-}
-
-#[derive(Clone, Debug)]
-pub struct GitSnapshotPair {
-  pub before : GraphSnapshot,
-  pub after  : GraphSnapshot,
-}
-
-#[derive(Clone, Debug)]
-pub struct ChangedGitSnapshotPair {
-  pub pair          : GitSnapshotPair,
-  pub affected_pids : BTreeSet<ID>,
-}
-
 #[derive(Clone, Debug, Default)]
 pub struct GraphSnapshot {
   /// One entry per TELESCOPE (keyed by pid, sections folded).

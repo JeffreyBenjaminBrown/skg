@@ -101,6 +101,8 @@ pub fn preview_warning_org (
     for o in &preview . links {
       text . push_str (&format! ("- {} {:?} line {}: {}\n",
         o . recorder_pid, o . field, o . line, o . label)); }}
+  text . push_str (
+    "\nTo see this node's history, run skg-investigate-unknown-node on it.\n");
   text
 }
 

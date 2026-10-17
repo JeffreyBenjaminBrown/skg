@@ -19,7 +19,6 @@ pub enum RequestType {
   StripBodyWhitespace,
   TitlesByIds,
   LinkStatuses,
-  DiffReport,
   StageMoves,
   RelRepoInfo,
   FlagState,
@@ -31,6 +30,7 @@ pub enum RequestType {
   DeleteReferencesToAbsentNode,
   TotalDiffView,
   StageAndCommit,
+  InvestigateUnknownNode,
 }
 
 impl RequestType {
@@ -52,7 +52,6 @@ impl RequestType {
       "strip body whitespace"    => Ok (RequestType::StripBodyWhitespace),
       "titles by ids"            => Ok (RequestType::TitlesByIds),
       "link statuses"            => Ok (RequestType::LinkStatuses),
-      "diff report"            => Ok (RequestType::DiffReport),
       "stage moves"              => Ok (RequestType::StageMoves),
       "relRepo info"          => Ok (RequestType::RelRepoInfo),
       "flag state"            => Ok (RequestType::FlagState),
@@ -64,6 +63,7 @@ impl RequestType {
       "delete references to absent node" => Ok (RequestType::DeleteReferencesToAbsentNode),
       "total diff view"          => Ok (RequestType::TotalDiffView),
       "stage and commit"         => Ok (RequestType::StageAndCommit),
+      "investigate unknown node" => Ok (RequestType::InvestigateUnknownNode),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See docs/api-and-formats.org
@@ -98,7 +98,6 @@ pub enum TcpToClient {
   StripBodyWhitespace,
   TitlesByIds,
   LinkStatuses,
-  DiffReport,
   StageMoves,
   RelRepoInfo,
   FlagState,
@@ -112,6 +111,7 @@ pub enum TcpToClient {
   DeleteReferencesResult,
   TotalDiffView, // One buffer of the total diff view, or '(empty . t)' when that buffer would show nothing.
   StageAndCommit, // The per-skgrepo git-commits, or the readiness summary with '(needs-confirmation . t)'. A rerender stream follows.
+  InvestigateUnknownNode, // What git history says an unknown node used to be, or the node an ID resolves to, as Org text.
   Error,
 }
 
@@ -147,7 +147,6 @@ impl TcpToClient {
       TcpToClient::StripBodyWhitespace => "strip-body-whitespace",
       TcpToClient::TitlesByIds      => "titles-by-ids",
       TcpToClient::LinkStatuses     => "link-statuses",
-      TcpToClient::DiffReport     => "diff-report",
       TcpToClient::StageMoves       => "stage-moves",
       TcpToClient::RelRepoInfo    => "relRepo-info",
       TcpToClient::FlagState     => "flag-state",
@@ -161,4 +160,5 @@ impl TcpToClient {
       TcpToClient::DeleteReferencesResult => "delete-references-result",
       TcpToClient::TotalDiffView    => "total-diff-view",
       TcpToClient::StageAndCommit   => "stage-and-commit",
+      TcpToClient::InvestigateUnknownNode => "investigate-unknown-node",
       TcpToClient::Error            => "error", }} }
