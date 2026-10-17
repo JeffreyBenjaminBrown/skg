@@ -146,6 +146,9 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c s x") #'skg-set-flag-search-matching)
     (define-key map (kbd "C-c s s") #'skg-set-repo)
     (define-key map (kbd "C-c s S") #'skg-set-repo-recursive))
+  (progn;; commit readiness, in the total diff view (prefix arg => recursive)
+    (define-key map (kbd "C-c r r") #'skg-cycle-commit-ready)
+    (define-key map (kbd "C-c r h") #'skg-mark-gnode-skgrepo-changes-commitReady))
   (progn;; graph modifications
     (define-key map (kbd "C-c m c") #'skg-replace-link-with-content)
     (define-key map (kbd "C-c m f") #'skg-fork-node)

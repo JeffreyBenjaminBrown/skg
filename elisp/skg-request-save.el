@@ -987,9 +987,38 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
         (when (or (skg--message-list-nonempty-p errors-list)
                   (skg--message-list-nonempty-p warnings-list))
           (skg-show-save-errors-and-warnings
-           errors-list warnings-list content-value)))
+           errors-list warnings-list content-value))
+        (let ((summary (assq 'readiness-summary response)))
+          (when summary ;; the saved buffer is one of the total diff view's
+            (message "%s" (skg--readiness-summary-message summary)))))
     (error (skg-log 'error 'save "parsing save response: %S" err)
            (skg-log 'error 'save "sexp string was: %S" sexp-string))))
+
+(defun skg--readiness-summary-message (summary)
+  "The line shown after a save of a buffer of the total diff view,
+from SUMMARY, the save response's
+'(readiness-summary (ready N) (changed M) (foreign F) (order-only O)
+\(unshown K))'."
+  (let* ((count (lambda (key)
+                  (or (cadr (assq key (cdr summary))) 0)))
+         (ready (funcall count 'ready))
+         (changed (funcall count 'changed))
+         (foreign (funcall count 'foreign))
+         (unshown (funcall count 'unshown))
+         (complete (= ready changed)))
+    (concat
+     (if complete
+         (format "COMMIT READY. All %d of %d changed files are ready"
+                 ready changed)
+       (format "%d of %d changed files are ready" ready changed))
+     (if (> unshown 0)
+         (format ", %d changes are not shown in this view; reopen it"
+                 unshown)
+       "")
+     (if (> foreign 0)
+         (format ", %d files changed in foreign skgrepos" foreign)
+       "")
+     (if complete "." ""))))
 
 (defun skg--save-point-position-from-response (response)
   "Extract optional save point position from RESPONSE."
