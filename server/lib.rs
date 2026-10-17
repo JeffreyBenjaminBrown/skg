@@ -7,6 +7,7 @@ pub mod diff_report;
 pub mod export_org;
 pub mod from_text;
 pub mod git_ops;
+pub mod graph_pair;
 pub mod herald_tokens;
 pub mod heralds;
 pub mod import_org_roam;
