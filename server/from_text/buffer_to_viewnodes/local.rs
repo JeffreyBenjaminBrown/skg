@@ -5,6 +5,7 @@
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpUnrestrictedVognode, MpPhantomDiff};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 use crate::types::viewnode::{NodeEditRequest, Editability, AffectsParent, PartnerFolder, Property, PropertyFolder};
+use crate::types::viewnode::ChangesetMarkerKind;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::viewnode_graphnode::{
   generation_includes_only,
@@ -78,7 +79,22 @@ pub fn validate_local_structure (
       MpViewnodeKind::Vognode (MpVognode::Restricted (_))
         => validate_restricted_node(tree, treeid),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
-        => Vec::new() };
+        => Vec::new(),
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_)))
+        => validate_historical_phantom (tree, treeid),
+      MpViewnodeKind::PartnerFolder (PartnerFolder::AcquiredBy) =>
+        validate_acquiredBy_folder (tree, treeid),
+      MpViewnodeKind::PartnerFolder (PartnerFolder::Acquired) =>
+        validate_acquired_folder (tree, treeid),
+      MpViewnodeKind::Property (Property::OldText { .. }) =>
+        validate_old_text (tree, treeid),
+      MpViewnodeKind::Property (Property::BodyDiff { .. }) =>
+        validate_body_diff (tree, treeid),
+      MpViewnodeKind::Property (
+        Property::HomeSkgrepoMove { .. } | Property::RelRepoMove { .. }) =>
+        validate_skgrepo_move (tree, treeid),
+      MpViewnodeKind::Property (Property::ChangesetMarker { kind, .. }) =>
+        validate_changeset_marker (tree, treeid, *kind) };
 
   if errors . is_empty() {
     Ok (( ))
@@ -374,6 +390,153 @@ fn validate_text_changed (
     |node| matches!(&node . kind,
                     MpViewnodeKind::Property (Property::TextChanged { .. })))
     { errors . push("TextChanged must be unique among its siblings." . to_string()); }
+  errors }
+
+// The total diff view's viewnodes are save-inert: these checks only
+// keep each where the total diff view draws it.
+
+fn validate_historical_phantom (
+  tree    : &Tree<MpViewnode>,
+  treeid  : NodeId,
+) -> Vec<String> {
+  let mut errors : Vec<String> =
+    validate_vognode_identity_and_structure (
+      tree, treeid,
+      tree . get (treeid) . and_then ( |n| n . value () . skgid_opt () )
+        . is_some_and ( |skgid| ! skgid . 0 . is_empty () ),
+      "Historical phantom" );
+  if !generation_includes_only(
+    tree, treeid, 1, false,
+    |node| matches!(&node . kind,
+                    MpViewnodeKind::Vognode (_)
+                    | MpViewnodeKind::PartnerFolder (PartnerFolder::AcquiredBy)))
+    { errors . push("A historical phantom's children can only be vognodes (its old content) and an acquiredByFolder."
+                    . to_string()); }
+  errors }
+
+fn validate_acquiredBy_folder (
+  tree    : &Tree<MpViewnode>,
+  treeid  : NodeId,
+) -> Vec<String> {
+  validate_acquisition_folder (
+    tree, treeid, "acquiredByFolder",
+    |node| matches!(&node . kind,
+                    MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_)))),
+    |node| matches!(&node . kind,
+                    MpViewnodeKind::Vognode (
+                      MpVognode::Unrestricted (_)
+                      | MpVognode::Phantom (MpPhantom::Unknown (_))))) }
+
+fn validate_acquired_folder (
+  tree    : &Tree<MpViewnode>,
+  treeid  : NodeId,
+) -> Vec<String> {
+  validate_acquisition_folder (
+    tree, treeid, "acquiredFolder",
+    |node| matches!(&node . kind,
+                    MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))),
+    |node| matches!(&node . kind,
+                    MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))))) }
+
+/// The checks shared by the two derived acquisition folders: which
+/// parent, which children, one per parent.
+fn validate_acquisition_folder (
+  tree        : &Tree<MpViewnode>,
+  treeid      : NodeId,
+  label       : &str,
+  valid_parent : fn (&MpViewnode) -> bool,
+  valid_child  : fn (&MpViewnode) -> bool,
+) -> Vec<String> {
+  let mut errors : Vec<String> = Vec::new();
+  if !generation_exists_and_includes(tree, treeid, -1, false, valid_parent)
+    { errors . push(format!("{} has the wrong kind of parent.", label)); }
+  if !generation_includes_only(tree, treeid, 1, false, valid_child)
+    { errors . push(format!("{} has the wrong kind of child.", label)); }
+  let kind : Option<MpViewnodeKind> =
+    tree . get (treeid) . map ( |n| n . value () . kind . clone () );
+  if !siblings_cannot_include( tree, treeid, |node| Some (&node . kind) == kind . as_ref ())
+    { errors . push(format!("{} must be unique among its siblings.", label)); }
+  errors }
+
+fn validate_old_text (
+  tree    : &Tree<MpViewnode>,
+  treeid  : NodeId,
+) -> Vec<String> {
+  let mut errors : Vec<String> = Vec::new();
+  if !generation_exists_and_includes(
+    tree, treeid, -1, false,
+    |node| matches!(&node . kind, MpViewnodeKind::Vognode (_)))
+    { errors . push("oldText must have a vognode parent." . to_string()); }
+  if !generation_includes_only(
+    tree, treeid, 1, false,
+    |node| matches!(&node . kind,
+                    MpViewnodeKind::Property (Property::BodyDiff { .. })))
+    { errors . push("oldText's only child can be a bodyDiff." . to_string()); }
+  if !siblings_cannot_include(
+    tree, treeid,
+    |node| matches!(&node . kind,
+                    MpViewnodeKind::Property (Property::OldText { .. })))
+    { errors . push("oldText must be unique among its siblings." . to_string()); }
+  errors }
+
+fn validate_body_diff (
+  tree    : &Tree<MpViewnode>,
+  treeid  : NodeId,
+) -> Vec<String> {
+  let mut errors : Vec<String> = Vec::new();
+  if !generation_exists_and_includes(
+    tree, treeid, -1, false,
+    |node| matches!(&node . kind,
+                    MpViewnodeKind::Property (Property::OldText { .. })))
+    { errors . push("bodyDiff must have an oldText parent." . to_string()); }
+  if !generation_does_not_exist(tree, treeid, 1, false) {
+    errors . push("bodyDiff must have no children." . to_string()); }
+  errors }
+
+fn validate_skgrepo_move (
+  tree    : &Tree<MpViewnode>,
+  treeid  : NodeId,
+) -> Vec<String> {
+  let mut errors : Vec<String> = Vec::new();
+  let is_home_move : bool =
+    tree . get (treeid) . is_some_and ( |n| matches! ( &n . value () . kind,
+      MpViewnodeKind::Property (Property::HomeSkgrepoMove { .. }) ));
+  let label : &str = if is_home_move { "homeMove" } else { "relRepoMove" };
+  if !generation_exists_and_includes(
+    tree, treeid, -1, false,
+    |node| matches!(&node . kind, MpViewnodeKind::Vognode (_)))
+    { errors . push(format!("{} must have a vognode parent.", label)); }
+  if !generation_does_not_exist(tree, treeid, 1, false) {
+    errors . push(format!("{} must have no children.", label)); }
+  if !siblings_cannot_include(
+    tree, treeid,
+    |node| match &node . kind {
+      MpViewnodeKind::Property (Property::HomeSkgrepoMove { .. }) => is_home_move,
+      MpViewnodeKind::Property (Property::RelRepoMove { .. }) => ! is_home_move,
+      _ => false, } )
+    { errors . push(format!("{} must be unique among its siblings.", label)); }
+  errors }
+
+fn validate_changeset_marker (
+  tree    : &Tree<MpViewnode>,
+  treeid  : NodeId,
+  kind    : ChangesetMarkerKind,
+) -> Vec<String> {
+  let mut errors : Vec<String> = Vec::new();
+  if !generation_exists_and_includes(
+    tree, treeid, -1, false,
+    |node| matches!(&node . kind, MpViewnodeKind::Vognode (_)))
+    { errors . push("changesetMarker must have a vognode parent." . to_string()); }
+  if !generation_does_not_exist(tree, treeid, 1, false) {
+    errors . push("changesetMarker must have no children." . to_string()); }
+  if !siblings_cannot_include(
+    tree, treeid,
+    |node| matches!(&node . kind,
+                    MpViewnodeKind::Property (Property::ChangesetMarker {
+                      kind : sibling_kind, .. })
+                    if *sibling_kind == kind))
+    { errors . push("A changesetMarker of each kind must be unique among its siblings."
+                    . to_string()); }
   errors }
 
 fn validate_idFolder (

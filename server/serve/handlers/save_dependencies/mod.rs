@@ -152,6 +152,8 @@ fn dependencies_from_uninterpreted (
         result . insert (phantom . skgid . clone ()); }
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (phantom))) => {
         result . insert (phantom . skgid . clone ()); }
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (phantom))) => {
+        result . insert (phantom . skgid . clone ()); }
       MpViewnodeKind::Property (Property::ID { skgid, .. }) => {
         result . insert (skgid . clone ()); }
       _ => {}, }}
@@ -176,6 +178,8 @@ fn dependencies_from_registered (
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (phantom))) => {
         result . insert (phantom . skgid . clone ()); }
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (phantom))) => {
+        result . insert (phantom . skgid . clone ()); }
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (phantom))) => {
         result . insert (phantom . skgid . clone ()); }
       ViewnodeKind::Property (Property::ID { skgid, .. }) => {
         result . insert (skgid . clone ()); }

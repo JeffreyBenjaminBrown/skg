@@ -266,10 +266,11 @@ fn validate_view_roots (
         MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))
         | MpViewnodeKind::Vognode (MpVognode::Restricted (_)) // a retained restricted root (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org)
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_)))
-        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))))
+        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
+        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))))
     { errors . push (
         BufferValidationError::Other (
-          "View roots must be UnrestrictedVognodes, restricted vognodes, deleted nodes or Unknown phantoms."
+          "View roots must be UnrestrictedVognodes, restricted vognodes, deleted nodes, Unknown phantoms or historical phantoms."
           . to_string () )); }}}
 
 /// For each node in the viewforest, if it has an editable view request,

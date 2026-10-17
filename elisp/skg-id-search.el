@@ -430,31 +430,37 @@ title comes from the stack entry."
     (sexp)
   "Return t if SEXP contains an id under the UnrestrictedVognode shape
 (skg (node (id ...))), the diff-phantom shape
-(skg (diffPhantom (id ...))), or the Deleted-phantom shape
-(skg (deleted (id ...)))."
+(skg (diffPhantom (id ...))), the Deleted-phantom shape
+(skg (deleted (id ...))), or the historical-phantom shape
+(skg (historical (id ...)))."
   (or (skg-sexp-subtree-p sexp '(skg (node        (id))))
       (skg-sexp-subtree-p sexp '(skg (diffPhantom (id))))
-      (skg-sexp-subtree-p sexp '(skg (deleted     (id))))))
+      (skg-sexp-subtree-p sexp '(skg (deleted     (id))))
+      (skg-sexp-subtree-p sexp '(skg (historical  (id))))))
 
 (defun skg--extract-id-from-metadata-sexp
     (sexp)
   "Extract the id value from SEXP. Accepts the UnrestrictedVognode shape
 (skg (node (id X) ...)), the diff-phantom shape
-(skg (diffPhantom (id X) ...)), or the Deleted-phantom shape
-(skg (deleted (id X) ...)). Returns the id as a string, or nil."
+(skg (diffPhantom (id X) ...)), the Deleted-phantom shape
+(skg (deleted (id X) ...)), or the historical-phantom shape
+(skg (historical (id X) ...)). Returns the id as a string, or nil."
   (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node        id)))
                  (car (skg-sexp-cdr-at-path sexp '(skg diffPhantom id)))
-                 (car (skg-sexp-cdr-at-path sexp '(skg deleted     id))))))
+                 (car (skg-sexp-cdr-at-path sexp '(skg deleted     id)))
+                 (car (skg-sexp-cdr-at-path sexp '(skg historical  id))))))
     (when val (format "%s" val))))
 
 (defun skg--extract-repo-from-metadata-sexp (sexp)
   "Extract the repo value from SEXP. Accepts the UnrestrictedVognode shape
 (skg (node (repo X) ...)), the diff-phantom shape
-(skg (diffPhantom (repo X) ...)), or the Deleted-phantom shape
-(skg (deleted (repo X) ...)). Returns the repo as a string, or nil."
+(skg (diffPhantom (repo X) ...)), the Deleted-phantom shape
+(skg (deleted (repo X) ...)), or the historical-phantom shape
+(skg (historical (repo X) ...)). Returns the repo as a string, or nil."
   (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node        repo)))
                  (car (skg-sexp-cdr-at-path sexp '(skg diffPhantom repo)))
-                 (car (skg-sexp-cdr-at-path sexp '(skg deleted     repo))))))
+                 (car (skg-sexp-cdr-at-path sexp '(skg deleted     repo)))
+                 (car (skg-sexp-cdr-at-path sexp '(skg historical  repo))))))
     (when val (format "%s" val))))
 
 (defun skg--point-in-link-p ()

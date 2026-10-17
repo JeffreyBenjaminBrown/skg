@@ -30,7 +30,7 @@
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::generic::{ read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree };
 use crate::types::tree::viewnode_graphnode::write_at_unrestrictedVognode_in_tree;
-use crate::types::viewnode::{ AffectsParent, PartnerFolder, Viewnode, ViewnodeKind, Vognode };
+use crate::types::viewnode::{ AffectsParent, PartnerFolder, Phantom, Viewnode, ViewnodeKind, Vognode };
 use crate::update_buffer::util::detach_viewnode_transferring_focus;
 
 use ego_tree::{ NodeId, NodeRef, Tree };
@@ -45,6 +45,8 @@ enum ExpectedAncestor {
   /// Must be exactly this folder kind (TODO/DONE/local-view-update/plan_v2.org §19: a folder = a collecting non-vognode). The
   /// only intermediate-chain folder the table uses is the SubscribeeFolder.
   Folder (PartnerFolder),
+  /// Must be a `Phantom::Historical` (the parent of an AcquiredBy folder).
+  HistoricalPhantom,
 }
 
 // The TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 required-ancestry table, nearest -> farthest. required_ancestry[i] is
@@ -58,6 +60,8 @@ const ANC_HIDDEN_IN : &[ExpectedAncestor] =
   &[ ExpectedAncestor::NormalVognode,
      ExpectedAncestor::Folder (PartnerFolder::Subscribee),
      ExpectedAncestor::NormalVognode ];
+const ANC_HISTORICAL : &[ExpectedAncestor] =
+  &[ ExpectedAncestor::HistoricalPhantom ];
 const ANC_NONE : &[ExpectedAncestor] = &[];
 
 /// The TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 required ancestry for a folder kind, nearest -> farthest. Non-folder kinds
@@ -78,7 +82,10 @@ fn required_ancestry (
       | ViewnodeKind::PartnerFolder (PartnerFolder::Hider)
       | ViewnodeKind::PartnerFolder (PartnerFolder::Hidden)
       | ViewnodeKind::PartnerFolder (PartnerFolder::Container)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Mentioner) => ANC_NORMAL,
+      | ViewnodeKind::PartnerFolder (PartnerFolder::Mentioner)
+      | ViewnodeKind::PartnerFolder (PartnerFolder::Acquired) => ANC_NORMAL,
+    ViewnodeKind::PartnerFolder (PartnerFolder::AcquiredBy) =>
+      ANC_HISTORICAL,
     ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
       ANC_HIDDEN_OUTSIDE,
     ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee) =>
@@ -95,6 +102,9 @@ fn matches_expected (
       matches! ( actual, ViewnodeKind::Vognode (Vognode::Unrestricted (_)) ),
     ExpectedAncestor::Folder (rc) =>
       matches! ( actual, ViewnodeKind::PartnerFolder (r) if r == rc ),
+    ExpectedAncestor::HistoricalPhantom =>
+      matches! ( actual,
+                 ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) ),
   } }
 
 /// Whether `kind` is a FOLDER -- in Jeff's terminology (TODO/DONE/local-view-update/plan_v2.org §19) a folder is a

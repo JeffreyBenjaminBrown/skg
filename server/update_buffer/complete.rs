@@ -342,7 +342,7 @@ fn visit_normal_node (
 /// themselves when empty.
 /// - DeadViewnode and a childless Vognode::Deleted (TODO/DONE/local-view-update/plan_v2.org §6.6).
 /// - the write-protected PartnerFolders Subscriber/Overrider/Hider/Hidden/
-///   Container/Mentioner (a graph
+///   Container/Mentioner/AcquiredBy/Acquired (a graph
 ///   relationship the user cannot edit from this side, so an emptied one is
 ///   just noise) -- but NOT Overridden (the editable interface for adding
 ///   overrides, preserved when empty like AliasFolder).
@@ -363,6 +363,8 @@ fn is_self_deletable_when_empty (
     | ViewnodeKind::PartnerFolder (PartnerFolder::Hidden)
     | ViewnodeKind::PartnerFolder (PartnerFolder::Container)
     | ViewnodeKind::PartnerFolder (PartnerFolder::Mentioner)
+    | ViewnodeKind::PartnerFolder (PartnerFolder::AcquiredBy)
+    | ViewnodeKind::PartnerFolder (PartnerFolder::Acquired)
     | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)
     | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee)
     | ViewnodeKind::PropertyFolder (PropertyFolder::ID) ) }

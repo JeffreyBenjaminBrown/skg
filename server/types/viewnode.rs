@@ -122,7 +122,7 @@ pub enum Vognode {
   Phantom  (Phantom),
 }
 
-/// The three display-only phantom kinds. None of them is a current
+/// The four display-only phantom kinds. None of them is a current
 /// graphnode: all are save-inert on save and excluded from the view's collateral pids
 /// (`pids_from_viewforest`). They differ in *why* the node is absent and thus
 /// in how much they can still say about it.
@@ -132,6 +132,7 @@ pub enum Phantom {
   Deleted (PhantomDeleted), // Epistemically: No longer exists in the graph. Procedurally: Skg just watched the user delete this node (maybe from a different view), but for some reason (e.g. its view-descendents are interesting, or it is a root) had to retain an image of it here.
   // PITFALL: There is an exception. If Skg watches a user delete a node, while that user has a view of a foreign node that refers to the deleted node, that "foreigner's view" will show it as Unknown rather than Deleted. This is to maintain consistency with how that relationship to a nonexistent node will appear when viewed in later sessions.
   Unknown (PhantomUnknown), // Skg can't find it (and, unlike Deleted, does not know why). Can result from bad data, or from a reference to another user's node that has since been deleted.
+  Historical (PhantomHistorical), // The total diff view's image of a node that HEAD has and the worktree lacks.
 }
 
 /// A phantom for a node whose .skg file a save just
@@ -202,6 +203,33 @@ pub struct PhantomUnknown {
   pub relRepo         : Option<SkgrepoName>,
   /// A pending relRepo change, consumed only by save.
   pub relRepo_request : Option<SkgrepoName>,
+  pub change_facts      : ChangeFacts,
+  pub readiness_request : Option<ReadinessRequest>,
+}
+
+/// A phantom for a node that the before-graph of the total diff
+/// view's graph pair has and the after-graph lacks: a node deleted
+/// (or acquired by a nodeMerge) since HEAD.
+///
+/// ARISES: only in a total diff view, built from the graph pair
+/// ('server/to_org/render/change_viewnodes.rs'): under each former
+/// container as a removed member, or as a view root. Its own old
+/// content hangs beneath it, recursing into deleted members.
+///
+/// USED: write-protected and save-inert, like every phantom: it emits
+/// no fieldIntents, is excluded from its parent's contains, and the
+/// vognodes under it are not its members. The total diff view's
+/// reconciler owns it.
+///
+/// DISTINCT INFO: the before-graph's title, body and home skgrepo,
+/// and the change facts of its existence leaf (node-) and of its
+/// relationship to its viewparent (rel-).
+#[derive( Debug, Clone, PartialEq )]
+pub struct PhantomHistorical {
+  pub skgid             : ID,
+  pub home_skgrepo      : SkgrepoName,
+  pub title             : String,
+  pub body              : Option<String>,
   pub change_facts      : ChangeFacts,
   pub readiness_request : Option<ReadinessRequest>,
 }
@@ -468,6 +496,52 @@ pub enum Property {
     readiness_request : Option<ReadinessRequest>,
   },
   TextChanged { staged: bool, unstaged: bool }, // Indicates title or body changed between stages. Visible in 'git diff mode'. Per-stage bools mark whether the change is staged (HEAD vs index) and/or unstaged (index vs worktree).
+  // The total diff view's properties, below, are display-only and
+  // save-inert: the validator ignores them, and the total diff view's
+  // reconciler owns them. Each but BodyDiff is a change-forest leaf or
+  // aggregate, so it carries '(ready ...)' and a readiness request.
+  /// The node's text at HEAD, under a node whose text changed.
+  /// 'title' is Some iff the title changed, 'body' Some iff the body
+  /// changed (the empty string for a body HEAD lacked). Its leaf is
+  /// the node's text change.
+  OldText {
+    title             : Option<String>,
+    body              : Option<String>,
+    change_facts      : ChangeFacts,
+    readiness_request : Option<ReadinessRequest>,
+  },
+  /// The line diff of the node's body, under its OldText.
+  BodyDiff { diff : String },
+  /// The node's home skgrepo changed. Its leaf is the node's home.
+  HomeSkgrepoMove {
+    old               : SkgrepoName,
+    new               : SkgrepoName,
+    change_facts      : ChangeFacts,
+    readiness_request : Option<ReadinessRequest>,
+  },
+  /// Under a member: the relationship to its viewparent moved from
+  /// one skgrepo to another. Its leaf is that relationship's relRepo.
+  RelRepoMove {
+    old               : SkgrepoName,
+    new               : SkgrepoName,
+    change_facts      : ChangeFacts,
+    readiness_request : Option<ReadinessRequest>,
+  },
+  /// A childless stand-in for a set of changes recorded in its
+  /// parent's files, carrying their derived readiness.
+  ChangesetMarker {
+    kind              : ChangesetMarkerKind,
+    change_facts      : ChangeFacts,
+    readiness_request : Option<ReadinessRequest>,
+  },
+}
+
+/// Which changes a 'Property::ChangesetMarker' stands for.
+#[derive( Debug, Clone, Copy, PartialEq, Eq, Hash )]
+pub enum ChangesetMarkerKind {
+  Content,   // "its content changed": the ~ leaves of its content
+  RelRepo,   // "some content relationships changed skgrepo"
+  OrderOnly, // "order-only change", always ready
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -485,6 +559,9 @@ pub enum PartnerFolder {
   HiddenOutsideOfSubscribee, // Child of a SubscribeeFolder. Collects things hidden by the SubscribeeFolder's parent but absent from every subscribee's content. This derived filter is editable as an exclusive visible-outside subset; its hide skgrepos remain derived. Shown after all Subscribees, under the same SubscribeeFolder.
   Container, // Collects nodes that contain its parent. Write-protected (editable from the other side of the relationship).
   Mentioner, // Collects nodes that link to its parent. Write-protected (a link lives in the linking node's text).
+  // The total diff view's two derived folders. Their membership comes from the extra IDs of the graph pair's after-graph; both are save-inert.
+  AcquiredBy, // Child of a historical phantom: the node that acquired it by a nodeMerge.
+  Acquired, // Child of an acquirer: the historical phantoms of the nodes it acquired.
 }
 
 /// How a PartnerFolder's membership relates to user edits.
@@ -670,6 +747,8 @@ impl PartnerFolder {
         | PartnerFolder::Hidden
         | PartnerFolder::Container
         | PartnerFolder::Mentioner
+        | PartnerFolder::AcquiredBy
+        | PartnerFolder::Acquired
         => FolderPolicy::WriteProtectedSet,
       PartnerFolder::HiddenInSubscribee
         => FolderPolicy::WriteProtectedFilter,
@@ -689,6 +768,8 @@ impl PartnerFolder {
       PartnerFolder::HiddenOutsideOfSubscribee => "hiddenOutsideOfSubscribeeFolder",
       PartnerFolder::Container                 => "containerFolder",
       PartnerFolder::Mentioner                 => "mentionerFolder",
+      PartnerFolder::AcquiredBy                => "acquiredByFolder",
+      PartnerFolder::Acquired                  => "acquiredFolder",
     }}
 
   pub fn from_client_string (s : &str) -> Option<PartnerFolder> {
@@ -703,6 +784,8 @@ impl PartnerFolder {
       "hiddenOutsideOfSubscribeeFolder" => Some (PartnerFolder::HiddenOutsideOfSubscribee),
       "containerFolder"                 => Some (PartnerFolder::Container),
       "mentionerFolder"                 => Some (PartnerFolder::Mentioner),
+      "acquiredByFolder"                => Some (PartnerFolder::AcquiredBy),
+      "acquiredFolder"                  => Some (PartnerFolder::Acquired),
       _                              => None,
     } }
 
@@ -741,6 +824,11 @@ impl Property {
       Property::ID { .. }          => "id",
       Property::Flag { .. }    => "flag",
       Property::TextChanged { .. } => "textChanged",
+      Property::OldText { .. }         => "oldText",
+      Property::BodyDiff { .. }        => "bodyDiff",
+      Property::HomeSkgrepoMove { .. } => "homeMove",
+      Property::RelRepoMove { .. }     => "relRepoMove",
+      Property::ChangesetMarker { .. } => "changesetMarker",
     } }
 
   pub fn title (&self) -> &str {
@@ -748,13 +836,72 @@ impl Property {
       Property::Alias { text, .. } => text,
       Property::ID    { skgid, .. }   => skgid,
       Property::Flag { title, .. } => title,
-      Property::TextChanged { .. } => "",
+      Property::OldText { title, .. } =>
+        title . as_deref () . unwrap_or (""),
+      Property::TextChanged { .. }
+        | Property::BodyDiff { .. }
+        | Property::HomeSkgrepoMove { .. }
+        | Property::RelRepoMove { .. }
+        | Property::ChangesetMarker { .. } => "",
     } }
 
   pub fn body (&self) -> Option<&String> {
     match self {
       Property::Flag { body, .. } => body . as_ref (),
+      Property::OldText { body, .. } => body . as_ref (),
+      Property::BodyDiff { diff } => Some (diff),
       _ => None, } }
+
+  /// The readiness request a save consumes, on a property that can
+  /// carry one.
+  pub fn readiness_request (
+    &self,
+  ) -> Option<&ReadinessRequest> {
+    match self {
+      Property::Alias { readiness_request, .. }
+        | Property::ID { readiness_request, .. }
+        | Property::Flag { readiness_request, .. }
+        | Property::OldText { readiness_request, .. }
+        | Property::HomeSkgrepoMove { readiness_request, .. }
+        | Property::RelRepoMove { readiness_request, .. }
+        | Property::ChangesetMarker { readiness_request, .. } =>
+        readiness_request . as_ref (),
+      Property::TextChanged { .. } | Property::BodyDiff { .. } => None, } }
+
+  fn readiness_request_mut (
+    &mut self,
+  ) -> Option<&mut Option<ReadinessRequest>> {
+    match self {
+      Property::Alias { readiness_request, .. }
+        | Property::ID { readiness_request, .. }
+        | Property::Flag { readiness_request, .. }
+        | Property::OldText { readiness_request, .. }
+        | Property::HomeSkgrepoMove { readiness_request, .. }
+        | Property::RelRepoMove { readiness_request, .. }
+        | Property::ChangesetMarker { readiness_request, .. } =>
+        Some (readiness_request),
+      Property::TextChanged { .. } | Property::BodyDiff { .. } => None, } }
+}
+
+impl ChangesetMarkerKind {
+  pub const ALL : [ChangesetMarkerKind; 3] = [
+    ChangesetMarkerKind::Content,
+    ChangesetMarkerKind::RelRepo,
+    ChangesetMarkerKind::OrderOnly ];
+
+  pub fn wire_name (
+    self,
+  ) -> &'static str {
+    match self {
+      ChangesetMarkerKind::Content   => "content",
+      ChangesetMarkerKind::RelRepo   => "relRepo",
+      ChangesetMarkerKind::OrderOnly => "orderOnly", } }
+
+  pub fn from_wire_name (
+    s : &str,
+  ) -> Option<ChangesetMarkerKind> {
+    ChangesetMarkerKind::ALL . into_iter ()
+      . find ( |kind| kind . wire_name () == s ) }
 }
 
 impl Vognode {
@@ -788,6 +935,7 @@ impl Phantom {
       Phantom::Diff    (p) => &p . skgid,
       Phantom::Deleted (d) => &d . skgid,
       Phantom::Unknown (u) => &u . skgid,
+      Phantom::Historical (h) => &h . skgid,
     } }
 
   pub fn pid_and_skgrepo (
@@ -797,6 +945,7 @@ impl Phantom {
       Phantom::Diff    (p) => Some ((&p . skgid, &p . home_skgrepo)),
       Phantom::Deleted (d) => Some ((&d . skgid, &d . home_skgrepo)),
       Phantom::Unknown (_) => None, // preserves Unknown's lone-None invariant
+      Phantom::Historical (h) => Some ((&h . skgid, &h . home_skgrepo)),
     } }
 }
 
@@ -882,14 +1031,13 @@ impl Viewnode {
         unknown . readiness_request = None; },
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (deleted))) =>
         deleted . readiness_request = None,
-      ViewnodeKind::Property (Property::Alias {
-        relRepo_request, readiness_request, .. }) => {
-        *relRepo_request = None;
-        *readiness_request = None; },
-      ViewnodeKind::Property (
-        Property::ID { readiness_request, .. }
-        | Property::Flag { readiness_request, .. }) =>
-        *readiness_request = None,
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (historical))) =>
+        historical . readiness_request = None,
+      ViewnodeKind::Property (property) => {
+        if let Property::Alias { relRepo_request, .. } = property {
+          *relRepo_request = None; }
+        if let Some (readiness_request) = property . readiness_request_mut () {
+          *readiness_request = None; }},
       _ => {}, }}
 
   pub fn normal_to_phantom (
@@ -918,6 +1066,8 @@ impl Viewnode {
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) => &p . title,
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) =>
         &d . title,
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
+        &h . title,
       ViewnodeKind::Property (q) =>
         q . title (),
       ViewnodeKind::PropertyFolder (folder) => folder . title (),
@@ -935,6 +1085,7 @@ impl Viewnode {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t . body (),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) => p . body (),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) => d . body . as_ref (),
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) => h . body . as_ref (),
       ViewnodeKind::PropertyFolder (folder) => folder . body (),
       ViewnodeKind::Property (property) => property . body (),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))

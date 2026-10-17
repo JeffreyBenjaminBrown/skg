@@ -22,8 +22,8 @@
 
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
-  DiffPresence, PartnerFolder, Property, PropertyFolder, ReadinessAxis,
-  ViewRequest};
+  ChangesetMarkerKind, DiffPresence, PartnerFolder, Property, PropertyFolder,
+  ReadinessAxis, ViewRequest};
 
 use serde_json::Value;
 use std::collections::HashSet;
@@ -182,6 +182,51 @@ fn any_abut_styled_as (
   RuleChild::Rule ( HeraldRule {
     node_heralds_key : Some (node_heralds_key), interc : None,
     label : Some ("ANY"), abut : true, children : vec! [ s (text) ] } ) }
+
+/// (STYLE ANY children...), with STYLE from 'node_heralds' under
+/// NODE_HERALDS_KEY
+fn any_styled_as (
+  node_heralds_key : &'static str,
+  children         : Vec<RuleChild>,
+) -> RuleChild {
+  RuleChild::Rule ( HeraldRule {
+    node_heralds_key : Some (node_heralds_key), interc : None,
+    label : Some ("ANY"), abut : false, children } ) }
+
+/// The total diff view's properties, each a label. A ready one's ✓
+/// comes from the property-leaf rules after them in the table.
+/// "⌂ -OLD +NEW" and "relationship moved from OLD to NEW" show the
+/// skgrepo names in their own style.
+fn total_diff_view_property_rules (
+) -> Vec<RuleChild> {
+  vec! [
+    crule ("oldText", vec! [
+      rule ("titleAndBody", vec! [ s ("old title and body") ]),
+      rule ("title",        vec! [ s ("old title") ]),
+      rule ("body",         vec! [ s ("old body") ]) ]),
+    leaf ("bodyDiff", "body diff"),
+    crule ("homeMove", vec! [
+      any (vec! [ s ("⌂") ]),
+      // The sign is a prefix: an ANY rule would join it to the name
+      // with a colon.
+      crule_styled_as ("homeMove_skgrepo", "old", vec! [
+        s ("-"), any (vec! [ RuleChild::It ]) ]),
+      crule_styled_as ("homeMove_skgrepo", "new", vec! [
+        s ("+"), any (vec! [ RuleChild::It ]) ]) ]),
+    crule ("relRepoMove", vec! [
+      any (vec! [ s ("relationship moved from") ]),
+      rule ("old", vec! [ any_styled_as ("relRepoMove_skgrepo",
+                                         vec! [ RuleChild::It ]) ]),
+      rule ("new", vec! [ any (vec! [ s ("to") ]) ]),
+      rule ("new", vec! [ any_styled_as ("relRepoMove_skgrepo",
+                                         vec! [ RuleChild::It ]) ]) ]),
+    crule ("changesetMarker", ChangesetMarkerKind::ALL . into_iter ()
+      . map ( |kind| rule ( kind . wire_name (), vec! [ s (
+        match kind {
+          ChangesetMarkerKind::Content   => "its content changed",
+          ChangesetMarkerKind::RelRepo   => "some content relationships changed skgrepo",
+          ChangesetMarkerKind::OrderOnly => "order-only change", } ) ] ))
+      . collect () ) ] }
 
 /// The total diff view's facts on a vognode: '(diff ...)' as ∃+ ∃-
 /// (the node axis) and ~+ ~- (the relationship axis), each followed
@@ -352,6 +397,10 @@ pub fn herald_rule_table () -> HeraldRule {
             "These contain it."),
       write_protected_leaves (PartnerFolder::Mentioner . repr_in_client (),
             "These link to it."),
+      write_protected_leaves (PartnerFolder::AcquiredBy . repr_in_client (),
+            "it was acquired by"),
+      write_protected_leaves (PartnerFolder::Acquired . repr_in_client (),
+            "it acquired"),
       vec! [
       leaf (PropertyFolder::ID . repr_in_client (), "IDs"),
       leaf ("id", "ID") ], // Property::ID
@@ -365,6 +414,7 @@ pub fn herald_rule_table () -> HeraldRule {
         . map (|flag| rule (
           flag . wire_name (), vec! [s (flag . herald_text ())]))
         . collect ()) ],
+      total_diff_view_property_rules (),
       // The total diff view's facts on a property leaf: + and - for
       // its presence, ✓ when ready.
       change_fact_rules_for_one_axis ("+", "-"),
@@ -393,6 +443,13 @@ pub fn herald_rule_table () -> HeraldRule {
           crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
             any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ]),
       rule ("unknown", change_fact_rules_for_one_axis ("~+", "~-")),
+      // A historical phantom is write-protected; its two axes are
+      // its existence (∃-) and its relationship to its viewparent.
+      crule_styled_as ("writeProtected", "historical", vec! [
+        s ("☮"),
+        vac ("id"),
+        vac ("repo") ]),
+      rule ("historical", change_fact_rules_for_two_axes ()),
       // A restricted vognode is anonymous and dataless: the bare
       // atom 'restrictedNode' (see RestrictedVognode), like the other dataless
       // non-vognode atoms. Its id/repo would leak hidden content, so
@@ -646,7 +703,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     "focused", "folded", "bodyFolded",
     // Form heads, from org_to_text.rs:
     "node", "diffPhantom", "deleted", "unknown", "restrictedNode",
-    "deadViewnode",
+    "deadViewnode", "historical",
     // Keys inside node / diffPhantom / deleted / unknown forms:
     "id", "repo",
     "affectsParent", "writeProtected", "omittedBody", "notInGit",
@@ -752,15 +809,17 @@ fn property_and_folder_atoms () -> Vec<&'static str> {
       | PartnerFolder::Hider | PartnerFolder::Hidden
       | PartnerFolder::HiddenInSubscribee
       | PartnerFolder::HiddenOutsideOfSubscribee
-      | PartnerFolder::Container | PartnerFolder::Mentioner => () }}
+      | PartnerFolder::Container | PartnerFolder::Mentioner
+      | PartnerFolder::AcquiredBy | PartnerFolder::Acquired => () }}
   let _ = partnerFolder_guard;
-  let all_partnerFolders : [PartnerFolder; 10] = [
+  let all_partnerFolders : [PartnerFolder; 12] = [
     PartnerFolder::Subscribee, PartnerFolder::Subscriber,
     PartnerFolder::Overridden, PartnerFolder::Overrider,
     PartnerFolder::Hider, PartnerFolder::Hidden,
     PartnerFolder::HiddenInSubscribee,
     PartnerFolder::HiddenOutsideOfSubscribee,
-    PartnerFolder::Container, PartnerFolder::Mentioner ];
+    PartnerFolder::Container, PartnerFolder::Mentioner,
+    PartnerFolder::AcquiredBy, PartnerFolder::Acquired ];
   fn propertyFolder_guard ( c : &PropertyFolder ) { // ditto
     match c {
       PropertyFolder::ID | PropertyFolder::Alias
@@ -769,20 +828,30 @@ fn property_and_folder_atoms () -> Vec<&'static str> {
   let all_propertyFolders : [PropertyFolder; 3] = [
     PropertyFolder::ID, PropertyFolder::Alias, PropertyFolder::flags () ];
   for c in &all_propertyFolders { propertyFolder_guard (c); }
-  let all_property_atoms : [&'static str; 4] = {
+  let all_property_atoms : [&'static str; 9] = {
     fn property_guard ( q : &Property ) { // ditto
       match q {
         Property::Alias { .. } | Property::ID { .. } | Property::TextChanged { .. }
-          | Property::Flag { .. }
+          | Property::Flag { .. } | Property::OldText { .. }
+          | Property::BodyDiff { .. } | Property::HomeSkgrepoMove { .. }
+          | Property::RelRepoMove { .. } | Property::ChangesetMarker { .. }
           => () }}
     let _ = property_guard;
-    [ "alias", "id", "textChanged", "flag" ] };
+    [ "alias", "id", "textChanged", "flag", "oldText", "bodyDiff",
+      "homeMove", "relRepoMove", "changesetMarker" ] };
+  // The arguments the total diff view's properties take in match
+  // position (org_to_text.rs's 'property_metadata_to_string').
+  let property_argument_atoms : Vec<&'static str> =
+    [ vec! [ "titleAndBody", "title", "body", "old", "new" ],
+      ChangesetMarkerKind::ALL . into_iter ()
+        . map (ChangesetMarkerKind::wire_name) . collect () ] . concat ();
   let mut out : Vec<&'static str> = Vec::new ();
   out . extend ( all_partnerFolders . iter ()
                  . map ( |c| c . repr_in_client () ) );
   out . extend ( all_propertyFolders . iter ()
                  . map ( |c| c . repr_in_client () ) );
   out . extend ( all_property_atoms );
+  out . extend ( property_argument_atoms );
   out }
 
 #[cfg(test)]

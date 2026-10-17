@@ -743,6 +743,8 @@ fn order_children_as_non_vognodes_then_ignored_then_content (
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (_)))  => 2,
         ViewnodeKind::Vognode (Vognode::Unrestricted (_)) => 2,
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))  => 2,
+        // A historical phantom stands where a removed member was.
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_)))  => 2,
         ViewnodeKind::Vognode (Vognode::Restricted (_)) => 2,
         // PhantomUnknown is a content-position placeholder: order it
         // alongside the Deleted/True content children rather than as

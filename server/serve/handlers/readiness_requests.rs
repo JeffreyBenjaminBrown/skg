@@ -17,8 +17,8 @@ use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  Phantom, Property, ReadinessAxis, ReadinessRequest, Viewnode,
-  ViewnodeKind, Vognode};
+  ChangesetMarkerKind, Phantom, Property, ReadinessAxis, ReadinessRequest,
+  Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::NodeRef;
 use std::sync::{Arc, MutexGuard};
@@ -61,13 +61,17 @@ pub struct RequestedReadiness {
   pub leaves   : Vec<LeafKey>,
   /// The nodes whose leaves an 'all' request names.
   pub all_of   : Vec<ID>,
+  /// The recorders whose content relationships' leaves of an aspect
+  /// a changeset marker's request names.
+  pub content_relationships_of : Vec<(ID, RelationshipAspect)>,
   /// The headline, for warnings.
   pub headline : String,
 }
 
 /// Every readiness request in the saved buffer, with the leaves it
 /// names. IDs resolve through 'graph' (the graph after the save),
-/// falling back to the ID as written.
+/// falling back to the ID as written, except a historical phantom's,
+/// which names a node of the before-graph.
 pub fn readiness_requests_in_viewforest (
   viewforest : &ViewForest,
   graph      : &InRustGraph,
@@ -79,9 +83,11 @@ pub fn readiness_requests_in_viewforest (
       let request : &ReadinessRequest = readiness_request_of (node . value ()) ?;
       let mut leaves : Vec<LeafKey> = Vec::new ();
       let mut all_of : Vec<ID> = Vec::new ();
+      let mut content_relationships_of : Vec<(ID, RelationshipAspect)> =
+        Vec::new ();
       match &node . value () . kind {
         ViewnodeKind::Vognode (vognode) => {
-          let pid : ID = pid_of ( vognode . skgid () ? );
+          let pid : ID = vognode_leaf_pid (node . value (), &pid_of) ?;
           let is_unknown : bool =
             matches! (vognode, Vognode::Phantom (Phantom::Unknown (_)));
           let axes : Vec<ReadinessAxis> =
@@ -97,23 +103,70 @@ pub fn readiness_requests_in_viewforest (
               ReadinessAxis::Node => {},
               ReadinessAxis::Rel =>
                 leaves . extend ( relationship_to_viewparent (
-                  node, &pid, &pid_of )),
+                  node, &pid, &pid_of, RelationshipAspect::Existence )),
               ReadinessAxis::All =>
                 all_of . push (pid . clone ()), }} },
         ViewnodeKind::Property (property) => {
-          let owner : ID = pid_of ( &grandparent_pid (node) ? );
-          let aspect : NodeAspect = match property {
-            Property::Alias { text, .. } => NodeAspect::Alias (text . clone ()),
-            Property::ID { skgid, .. }   => NodeAspect::ExtraId (skgid . clone ()),
-            Property::Flag { flag, .. }  => NodeAspect::Flag (*flag),
-            Property::TextChanged { .. } => return None, };
-          leaves . push ( LeafKey::Node { pid : owner, aspect } ); },
+          // A folder's leaf belongs to the folder's viewparent; the
+          // total diff view's properties hang under their node.
+          let owner_of_folder = || -> Option<ID> {
+            Some ( pid_of ( &grandparent_pid (node) ? )) };
+          let parent : NodeRef<Viewnode> = node . parent () ?;
+          let parent_pid = || -> Option<ID> {
+            vognode_leaf_pid (parent . value (), &pid_of) };
+          match property {
+            Property::Alias { text, .. } =>
+              leaves . push ( LeafKey::Node {
+                pid : owner_of_folder () ?,
+                aspect : NodeAspect::Alias (text . clone ()) } ),
+            Property::ID { skgid, .. } =>
+              leaves . push ( LeafKey::Node {
+                pid : owner_of_folder () ?,
+                aspect : NodeAspect::ExtraId (skgid . clone ()) } ),
+            Property::Flag { flag, .. } =>
+              leaves . push ( LeafKey::Node {
+                pid : owner_of_folder () ?,
+                aspect : NodeAspect::Flag (*flag) } ),
+            Property::OldText { .. } =>
+              leaves . push ( LeafKey::Node {
+                pid : parent_pid () ?, aspect : NodeAspect::Text } ),
+            Property::HomeSkgrepoMove { .. } =>
+              leaves . push ( LeafKey::Node {
+                pid : parent_pid () ?, aspect : NodeAspect::Home } ),
+            Property::RelRepoMove { .. } =>
+              leaves . extend ( relationship_to_viewparent (
+                parent, &parent_pid () ?, &pid_of,
+                RelationshipAspect::RelRepo )),
+            Property::ChangesetMarker { kind, .. } => match kind {
+              ChangesetMarkerKind::Content =>
+                content_relationships_of . push ((
+                  parent_pid () ?, RelationshipAspect::Existence )),
+              ChangesetMarkerKind::RelRepo =>
+                content_relationships_of . push ((
+                  parent_pid () ?, RelationshipAspect::RelRepo )),
+              ChangesetMarkerKind::OrderOnly => {}, }, // always ready
+            Property::TextChanged { .. } | Property::BodyDiff { .. } =>
+              return None, }},
         _ => return None, }
       Some ( RequestedReadiness {
         ready    : request . ready,
-        leaves, all_of,
+        leaves, all_of, content_relationships_of,
         headline : node . value () . title () . to_string (), } ) } )
     . collect () }
+
+/// The ID a vognode's leaves are keyed by: a historical phantom's as
+/// written (a node of the before-graph), any other's resolved by
+/// 'pid_of'. None for a restricted vognode or a non-vognode.
+fn vognode_leaf_pid (
+  viewnode : &Viewnode,
+  pid_of   : &dyn Fn (&ID) -> ID,
+) -> Option<ID> {
+  match &viewnode . kind {
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
+      Some ( h . skgid . clone () ),
+    ViewnodeKind::Vognode (vognode) =>
+      Some ( pid_of ( vognode . skgid () ? )),
+    _ => None, } }
 
 /// Set or clear the marks the requests name, at their fingerprints
 /// in 'forest'. Returns a warning for each request that names no
@@ -130,6 +183,15 @@ pub fn apply_readiness_requests (
       . chain ( request . all_of . iter () . flat_map ( |pid|
         forest . leaves_under (pid) . iter ()
           . map ( |leaf| leaf . key . clone () )) )
+      . chain ( request . content_relationships_of . iter ()
+        . flat_map ( |(pid, aspect)|
+          forest . leaves_under (pid) . iter ()
+            . map ( |leaf| leaf . key . clone () )
+            . filter ( move |key| matches! ( key,
+              LeafKey::Relationship {
+                relation : NodeRelation::Contains, recorder,
+                aspect : leaf_aspect, .. }
+              if recorder == pid && leaf_aspect == aspect )) ))
       . filter ( |key| forest . leaf (key) . is_some () )
       . collect ();
     if keys . is_empty () {
@@ -155,11 +217,10 @@ fn readiness_request_of (
       d . readiness_request . as_ref (),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
       u . readiness_request . as_ref (),
-    ViewnodeKind::Property (
-      Property::Alias { readiness_request, .. }
-      | Property::ID { readiness_request, .. }
-      | Property::Flag { readiness_request, .. }) =>
-      readiness_request . as_ref (),
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
+      h . readiness_request . as_ref (),
+    ViewnodeKind::Property (property) =>
+      property . readiness_request (),
     _ => None, } }
 
 /// The relationship by which a vognode is a member here: its
@@ -170,20 +231,20 @@ fn relationship_to_viewparent (
   node   : NodeRef<Viewnode>,
   pid    : &ID,
   pid_of : &dyn Fn (&ID) -> ID,
+  aspect : RelationshipAspect,
 ) -> Option<LeafKey> {
   let parent : NodeRef<Viewnode> = node . parent () ?;
   let key = |relation : NodeRelation, recorder : ID, member : ID| -> LeafKey {
-    LeafKey::Relationship {
-      relation, recorder, member,
-      aspect : RelationshipAspect::Existence } };
+    LeafKey::Relationship { relation, recorder, member, aspect } };
   match &parent . value () . kind {
-    ViewnodeKind::Vognode (vognode) =>
+    ViewnodeKind::Vognode (_) =>
       Some ( key ( NodeRelation::Contains,
-                   pid_of ( vognode . skgid () ? ), pid . clone () )),
+                   vognode_leaf_pid (parent . value (), pid_of) ?,
+                   pid . clone () )),
     ViewnodeKind::PartnerFolder (folder) => {
       let role : RelationRole = folder . relation_member_role () ?;
-      let anchor : ID = pid_of ( &parent . parent () ? . value ()
-                                 . kind . vognode_skgid () ? );
+      let anchor : ID = vognode_leaf_pid (
+        parent . parent () ? . value (), pid_of ) ?;
       Some ( if role . is_first_role () { // the member records it
                key ( role . relation, pid . clone (), anchor )
              } else {

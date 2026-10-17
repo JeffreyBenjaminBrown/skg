@@ -42,7 +42,12 @@ impl PartnerFolder {
       PartnerFolder::HiddenInSubscribee =>
         "reconcile_hiddenInSubscribeeFolder_children",
       PartnerFolder::HiddenOutsideOfSubscribee =>
-        "reconcile_hiddenoutsideSubscribeeFolder_children", } }
+        "reconcile_hiddenoutsideSubscribeeFolder_children",
+      // Derived from the graph pair, and owned by the total diff
+      // view's reconciler rather than by view completion.
+      PartnerFolder::AcquiredBy
+        | PartnerFolder::Acquired =>
+        "acquisition_folder", } }
 
   pub fn relation_member_role (self) -> Option<RelationRole> {
     match self {
@@ -72,6 +77,10 @@ impl PartnerFolder {
           NodeRelation::LinksTo, BinaryRolePosition::First)),
       PartnerFolder::HiddenInSubscribee |
       PartnerFolder::HiddenOutsideOfSubscribee =>
+        None,
+      // A nodeMerge is no relation: these come from extra IDs.
+      PartnerFolder::AcquiredBy |
+      PartnerFolder::Acquired =>
         None,
     } }
 

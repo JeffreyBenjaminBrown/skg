@@ -25,11 +25,13 @@ enum OccurrencePathStep {
   DiffPhantom (ID),
   DeletedPhantom (ID),
   UnknownPhantom (ID),
+  HistoricalPhantom (ID),
   PropertyFolder (PropertyFolder),
   Alias,
   ID,
   Flag,
   TextChanged,
+  TotalDiffViewProperty (&'static str), // its 'repr_in_client'
   PartnerFolder (PartnerFolder),
   DeadViewnode,
 }
@@ -422,6 +424,8 @@ fn path_step (
       OccurrencePathStep::DeletedPhantom (phantom . skgid . clone ()),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (phantom))) =>
       OccurrencePathStep::UnknownPhantom (phantom . skgid . clone ()),
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (phantom))) =>
+      OccurrencePathStep::HistoricalPhantom (phantom . skgid . clone ()),
     ViewnodeKind::PropertyFolder (folder) =>
       OccurrencePathStep::PropertyFolder (folder . clone ()),
     ViewnodeKind::Property (Property::Alias { .. }) =>
@@ -432,6 +436,11 @@ fn path_step (
       OccurrencePathStep::Flag,
     ViewnodeKind::Property (Property::TextChanged { .. }) =>
       OccurrencePathStep::TextChanged,
+    ViewnodeKind::Property (
+      property @ ( Property::OldText { .. } | Property::BodyDiff { .. }
+                   | Property::HomeSkgrepoMove { .. } | Property::RelRepoMove { .. }
+                   | Property::ChangesetMarker { .. } )) =>
+      OccurrencePathStep::TotalDiffViewProperty (property . repr_in_client ()),
     ViewnodeKind::PartnerFolder (folder) =>
       OccurrencePathStep::PartnerFolder (*folder),
     ViewnodeKind::DeadViewnode =>

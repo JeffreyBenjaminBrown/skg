@@ -207,7 +207,7 @@ write-protected -- the save would silently ignore that edit. Returns
 
 (defconst skg--relRepo-unsupported-folder-atoms
   '(subscriberFolder overriderFolder hiderFolder hiddenFolder
-    containerFolder mentionerFolder
+    containerFolder mentionerFolder acquiredByFolder acquiredFolder
     hiddenInSubscribeeFolder hiddenOutsideOfSubscribeeFolder)
   "The PartnerFolder atoms where an explicit relRepo
 request is unsupported from this side.  HiddenOutside membership is

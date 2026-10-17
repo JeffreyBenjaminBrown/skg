@@ -5,7 +5,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   ChangeFacts, ReadinessRequest,
   Viewnode, ViewnodeKind, Vognode, Phantom, Property, PropertyFolder, UnrestrictedVognode, PhantomDiff,
-  PhantomDeleted, PhantomUnknown, NodeEditRequest, GraphnodeStats,
+  PhantomDeleted, PhantomHistorical, PhantomUnknown, NodeEditRequest, GraphnodeStats,
   AffectsParent,
 };
 
@@ -182,6 +182,10 @@ pub fn viewnode_to_string (
       Ok ( phantomUnknown_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, unknown_node )),
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (historical))) =>
+      Ok ( phantomHistorical_metadata_to_string (
+        viewnode . focused, viewnode . folded,
+        viewnode . body_folded, historical )),
     ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
       Ok ( restricted_node_metadata_to_string (
         viewnode . focused, viewnode . folded,
@@ -246,6 +250,24 @@ fn property_metadata_to_string (
       parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
     Property::Flag { flag, change_facts, readiness_request, .. } => {
       parts . push ( format! ("(flag {})", flag . wire_name ()) );
+      parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
+    Property::OldText { title, body, change_facts, readiness_request } => {
+      parts . push ( format! ( "(oldText {})",
+        match (title . is_some (), body . is_some ()) {
+          (true, true)  => "titleAndBody",
+          (true, false) => "title",
+          _             => "body", } ));
+      parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
+    Property::BodyDiff { .. } =>
+      parts . push ( "bodyDiff" . to_string () ),
+    Property::HomeSkgrepoMove { old, new, change_facts, readiness_request }
+      | Property::RelRepoMove { old, new, change_facts, readiness_request } => {
+      parts . push ( format! ( "({} (old {}) (new {}))",
+        property . repr_in_client (),
+        metadata_value_atom (old), metadata_value_atom (new) ));
+      parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
+    Property::ChangesetMarker { kind, change_facts, readiness_request } => {
+      parts . push ( format! ( "(changesetMarker {})", kind . wire_name () ));
       parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
   }
   Ok ( parts . join (" ")) }
@@ -486,6 +508,29 @@ fn phantomDeleted_metadata_to_string (
       &deleted_node . change_facts, &deleted_node . readiness_request ))
     . collect ();
   parts . push ( format! ( "(deleted {})", deleted_parts . join (" ") ));
+  parts . join (" ") }
+
+/// Render metadata for a PhantomHistorical:
+///   (skg [focused] [folded] (historical (id X) (repo S) ...))
+fn phantomHistorical_metadata_to_string (
+  focused     : bool,
+  folded      : bool,
+  body_folded : bool,
+  historical  : &PhantomHistorical,
+) -> String {
+  let mut parts : Vec < String > = Vec::new ();
+  if focused     { parts . push ( "focused"    . to_string () ); }
+  if folded      { parts . push ( "folded"     . to_string () ); }
+  if body_folded { parts . push ( "bodyFolded" . to_string () ); }
+  let historical_parts : Vec<String> =
+    [ format! ("(id {})", historical . skgid . 0),
+      format! ("(repo {})",
+               metadata_value_atom (&historical . home_skgrepo)) ]
+    . into_iter ()
+    . chain ( change_fact_forms (
+      &historical . change_facts, &historical . readiness_request ))
+    . collect ();
+  parts . push ( format! ( "(historical {})", historical_parts . join (" ") ));
   parts . join (" ") }
 
 /// Render metadata for a PhantomUnknown:

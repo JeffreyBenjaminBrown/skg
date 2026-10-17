@@ -90,6 +90,13 @@ describe('skg.id_search navigation', function ()
     vim.api.nvim_win_set_cursor(0, { 3, 42 }) -- inside the link
     assert.are.equal('link-id', id_search.id_at_point().id)
   end)
+
+  it('reads the id and repo of a historical phantom', function ()
+    local sexp = require('skg.sexpr.parse').read(
+      '(skg (historical (id gone) (repo main) (diff node- rel-)))')
+    assert.are.equal('gone', id_search.extract_id_from_metadata_sexp(sexp))
+    assert.are.equal('main', id_search.extract_repo_from_metadata_sexp(sexp))
+  end)
 end)
 
 describe('skg.id_search.replace_links_with_labels', function ()

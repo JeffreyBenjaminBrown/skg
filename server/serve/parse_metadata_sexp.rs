@@ -20,8 +20,17 @@
 ///                         [(readyRequest AXIS...) | (unreadyRequest AXIS...)]))
 ///   where PRESENCE is node+, node-, rel+ or rel-, and AXIS is node,
 ///   rel or (in a request only) all. The last three forms may also
-///   appear in (deleted ...) and (unknown ...), and at top level on
-///   an alias, id or flag property.
+///   appear in (deleted ...), (unknown ...) and (historical ...), and
+///   at top level on an alias, id or flag property and on the total
+///   diff view's properties other than bodyDiff.
+///   The total diff view's own viewnodes:
+///     (historical (id ID) (repo REPO) ...)   a historical phantom
+///     (oldText titleAndBody | title | body)  the text at HEAD
+///     bodyDiff
+///     (homeMove (old REPO) (new REPO))
+///     (relRepoMove (old REPO) (new REPO))
+///     (changesetMarker content | relRepo | orderOnly)
+///     acquiredByFolder, acquiredFolder
 
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SkgrepoName};
@@ -31,7 +40,8 @@ use crate::types::git::{NodeAxes, RelationshipAxes, Sign};
 use crate::types::viewnode::{
   ChangeFacts, ReadinessAxis, ReadinessRequest,
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
-  Property, PropertyFolder, PartnerFolder, PhantomDeleted, RestrictedVognode, PhantomUnknown,
+  ChangesetMarkerKind, Property, PropertyFolder, PartnerFolder, PhantomDeleted,
+  PhantomHistorical, RestrictedVognode, PhantomUnknown,
   Birth, Editability, AffectsParent,
 };
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
@@ -81,6 +91,8 @@ pub struct ViewnodeMetadata {
   pub textchanged_unstaged : bool,
   // When true, this is a PhantomDeleted (id and skgrepo are used).
   pub is_deleted_node: bool,
+  // When true, this is a PhantomHistorical (id and skgrepo are used).
+  pub is_historical_node: bool,
   // When true, this is a DeadViewnode.
   pub is_dead_viewnode: bool,
   // When Some, this is a PhantomUnknown (a phantom for a missing
@@ -125,6 +137,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     textchanged_staged   : false,
     textchanged_unstaged : false,
     is_deleted_node: false,
+    is_historical_node: false,
     is_dead_viewnode: false,
     unknown_node_skgid: None,
     unknown_relRepo: None,
@@ -176,6 +189,18 @@ pub fn viewnode_from_metadata (
           error, None )
       } else if metadata . is_dead_viewnode {
         ( MpViewnodeKind::DeadViewnode, None, None )
+      } else if metadata . is_historical_node {
+        ( MpViewnodeKind::Vognode (MpVognode::Phantom (
+            MpPhantom::Historical ( PhantomHistorical {
+              skgid : metadata . skgid . clone ()
+                      . unwrap_or_else ( || ID::from ("")),
+              home_skgrepo : metadata . home_skgrepo . clone ()
+                             . unwrap_or_else ( || SkgrepoName::from ("")),
+              title,
+              body,
+              change_facts      : metadata . change_facts . clone (),
+              readiness_request : metadata . readiness_request . clone (),
+            } ) )), None, None )
       } else if metadata . is_deleted_node {
         ( MpViewnodeKind::Vognode (MpVognode::Phantom (
             MpPhantom::Deleted ( PhantomDeleted {
@@ -193,8 +218,13 @@ pub fn viewnode_from_metadata (
           MpViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }));
         let is_flag = matches! (non_vognode,
           MpViewnodeKind::Property (Property::Flag { .. }));
+        let carries_text : bool = // the total diff view's text properties
+          matches! (non_vognode,
+            MpViewnodeKind::Property (
+              Property::OldText { .. } | Property::BodyDiff { .. } ));
         let error : Option<BufferValidationError> =
-          if body . is_some () && ! is_flags_folder && ! is_flag {
+          if body . is_some () && ! is_flags_folder && ! is_flag
+             && ! carries_text {
             Some ( BufferValidationError::Body_of_NonVognode (
               title . clone (),
               maybeplaced_kind_error_label (non_vognode) ))
@@ -242,6 +272,34 @@ pub fn viewnode_from_metadata (
             MpViewnodeKind::Property (Property::TextChanged {
                               staged   : metadata . textchanged_staged,
                               unstaged : metadata . textchanged_unstaged }),
+          // The parser marks which aspects an OldText shows; its text
+          // comes from the headline and the body.
+          MpViewnodeKind::Property (Property::OldText {
+            title : title_changed, body : body_changed, .. }) =>
+            MpViewnodeKind::Property (Property::OldText {
+              title : title_changed . as_ref () . map ( |_| title . clone () ),
+              body  : body_changed . as_ref ()
+                      . map ( |_| body . clone () . unwrap_or_default () ),
+              change_facts      : metadata . change_facts . clone (),
+              readiness_request : metadata . readiness_request . clone () }),
+          MpViewnodeKind::Property (Property::BodyDiff { .. }) =>
+            MpViewnodeKind::Property (Property::BodyDiff {
+              diff : body . clone () . unwrap_or_default () }),
+          MpViewnodeKind::Property (Property::HomeSkgrepoMove { old, new, .. }) =>
+            MpViewnodeKind::Property (Property::HomeSkgrepoMove {
+              old : old . clone (), new : new . clone (),
+              change_facts      : metadata . change_facts . clone (),
+              readiness_request : metadata . readiness_request . clone () }),
+          MpViewnodeKind::Property (Property::RelRepoMove { old, new, .. }) =>
+            MpViewnodeKind::Property (Property::RelRepoMove {
+              old : old . clone (), new : new . clone (),
+              change_facts      : metadata . change_facts . clone (),
+              readiness_request : metadata . readiness_request . clone () }),
+          MpViewnodeKind::Property (Property::ChangesetMarker { kind, .. }) =>
+            MpViewnodeKind::Property (Property::ChangesetMarker {
+              kind : *kind,
+              change_facts      : metadata . change_facts . clone (),
+              readiness_request : metadata . readiness_request . clone () }),
           other => other . clone () };
         ( non_vognode_with_title, error, folder_title_warning )
       } else {
@@ -376,6 +434,47 @@ pub fn parse_metadata_to_viewnodemd (
           "deleted" => {
             result . is_deleted_node = true;
             parse_deleted_sexp ( &items[1..], &mut result ) ?; },
+          "historical" => {
+            // Same grammar as (deleted ...).
+            result . is_historical_node = true;
+            parse_deleted_sexp ( &items[1..], &mut result ) ?; },
+          "oldText" => {
+            let aspect : String = single_argument (&first, &items[1..]) ?;
+            let (title_changed, body_changed) : (bool, bool) =
+              match aspect . as_str () {
+                "titleAndBody" => (true,  true),
+                "title"        => (true,  false),
+                "body"         => (false, true),
+                other => return Err ( format! (
+                  "Unknown oldText aspect: {}", other )), };
+            result . non_vognode = Some ( MpViewnodeKind::Property (
+              Property::OldText {
+                title : title_changed . then (String::new),
+                body  : body_changed  . then (String::new),
+                change_facts : ChangeFacts::default (),
+                readiness_request : None } )); },
+          "homeMove" | "relRepoMove" => {
+            let (old, new) : (SkgrepoName, SkgrepoName) =
+              parse_old_and_new_skgrepos (&first, &items[1..]) ?;
+            result . non_vognode = Some ( MpViewnodeKind::Property (
+              if first == "homeMove" {
+                Property::HomeSkgrepoMove {
+                  old, new, change_facts : ChangeFacts::default (),
+                  readiness_request : None }
+              } else {
+                Property::RelRepoMove {
+                  old, new, change_facts : ChangeFacts::default (),
+                  readiness_request : None } } )); },
+          "changesetMarker" => {
+            let name : String = single_argument (&first, &items[1..]) ?;
+            let kind : ChangesetMarkerKind =
+              ChangesetMarkerKind::from_wire_name (&name)
+              . ok_or_else ( || format! (
+                "Unknown changesetMarker kind: {}", name )) ?;
+            result . non_vognode = Some ( MpViewnodeKind::Property (
+              Property::ChangesetMarker {
+                kind, change_facts : ChangeFacts::default (),
+                readiness_request : None } )); },
           "unknown" => {
             // (unknown (id X)) -- placeholder for a referenced
             // node with no record anywhere. No skgrepo/title/body.
@@ -485,6 +584,13 @@ pub fn parse_metadata_to_viewnodemd (
             result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Container)),
           "mentionerFolder" =>
             result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Mentioner)),
+          "acquiredByFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::AcquiredBy)),
+          "acquiredFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Acquired)),
+          "bodyDiff" =>
+            result . non_vognode = Some (MpViewnodeKind::Property (
+              Property::BodyDiff { diff : String::new () } )),
           "overriddenFolder" =>
             result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Overridden)),
           "overriderFolder" =>
@@ -518,8 +624,11 @@ pub fn parse_metadata_to_viewnodemd (
      && ! matches! ( result . non_vognode,
                      Some (MpViewnodeKind::Property (
                        Property::Alias { .. } | Property::ID { .. }
-                       | Property::Flag { .. } )) )
-  { return Err ( "Top-level diff, ready and readiness requests are valid only on alias, id and flag properties"
+                       | Property::Flag { .. } | Property::OldText { .. }
+                       | Property::HomeSkgrepoMove { .. }
+                       | Property::RelRepoMove { .. }
+                       | Property::ChangesetMarker { .. } )) )
+  { return Err ( "Top-level diff, ready and readiness requests are valid only on alias, id and flag properties and the total diff view's properties other than bodyDiff"
                  . to_string () ); }
   Ok (result) }
 
@@ -719,6 +828,40 @@ fn parse_restrictednode_sexp (
 ) -> Result<(), String> {
   metadata . is_restricted_node = true;
   Ok (( )) }
+
+/// The one atom argument of the form whose head is 'head'.
+fn single_argument (
+  head : &str,
+  args : &[Sexp],
+) -> Result<String, String> {
+  match args {
+    [arg] => atom_to_string (arg),
+    _ => Err ( format! ( "{} requires exactly one argument", head )), } }
+
+/// The skgrepos of '(HEAD (old OLD) (new NEW))', whose arguments are 'args'.
+fn parse_old_and_new_skgrepos (
+  head : &str,
+  args : &[Sexp],
+) -> Result<(SkgrepoName, SkgrepoName), String> {
+  let mut old : Option<SkgrepoName> = None;
+  let mut new : Option<SkgrepoName> = None;
+  for arg in args {
+    let Sexp::List (pair) = arg else {
+      return Err ( format! ( "{} takes only (old REPO) and (new REPO)", head )); };
+    let key : String = match pair . first () {
+      Some (key) => atom_to_string (key) ?,
+      None => return Err ( format! ( "{} has an empty form", head )), };
+    let slot : &mut Option<SkgrepoName> = match key . as_str () {
+      "old" => &mut old,
+      "new" => &mut new,
+      other => return Err ( format! ( "Unknown {} key: {}", head, other )), };
+    if slot . is_some () {
+      return Err ( format! ( "{} names {} twice", head, key )); }
+    *slot = Some ( SkgrepoName::from (
+      single_argument (&key, &pair [1..]) ? )); }
+  match (old, new) {
+    (Some (old), Some (new)) => Ok ((old, new)),
+    _ => Err ( format! ( "{} requires both (old REPO) and (new REPO)", head )), } }
 
 /// Parse the (deleted (id X) (repo S)) s-expression contents.
 fn parse_deleted_sexp (

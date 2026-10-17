@@ -282,3 +282,51 @@
 (skg (node (id x) (readyRequest node rel)))
 ---- text: request:ready:node request:ready:rel
 ---- styles: nonstandard*18 -*1 nonstandard*17
+==== tdv: old title and body, ready
+(skg (oldText titleAndBody) (ready))
+---- text: old title and body✓
+---- styles: message*18 go*1
+==== tdv: old title
+(skg (oldText title))
+---- text: old title
+---- styles: message*9
+==== tdv: old body
+(skg (oldText body))
+---- text: old body
+---- styles: message*8
+==== tdv: body diff
+(skg bodyDiff)
+---- text: body diff
+---- styles: message*9
+==== tdv: a home move, ready
+(skg (homeMove (old pub) (new priv)) (ready))
+---- text: ⌂ -pub +priv✓
+---- styles: message*1 -*1 normal*4 -*1 normal*5 go*1
+==== tdv: a relRepo move
+(skg (relRepoMove (old pub) (new priv)))
+---- text: relationship moved from pub to priv
+---- styles: message*23 -*1 normal*3 -*1 message*2 -*1 normal*4
+==== tdv: the content changeset marker, ready
+(skg (changesetMarker content) (ready))
+---- text: its content changed✓
+---- styles: message*19 go*1
+==== tdv: the relRepo changeset marker
+(skg (changesetMarker relRepo))
+---- text: some content relationships changed skgrepo
+---- styles: message*42
+==== tdv: the order-only changeset marker
+(skg (changesetMarker orderOnly) (ready))
+---- text: order-only change✓
+---- styles: message*17 go*1
+==== tdv: a historical phantom, its existence ready
+(skg (historical (id x) (repo main) (diff node- rel-) (ready node)))
+---- text: ☮ ∃-✓ ~-
+---- styles: crucial*1 -*1 nonstandard*2 go*1 -*1 nonstandard*2
+==== tdv: the acquired-by folder
+(skg acquiredByFolder)
+---- text: ☮ it was acquired by
+---- styles: crucial*1 -*1 message*18
+==== tdv: the acquired folder
+(skg acquiredFolder)
+---- text: ☮ it acquired
+---- styles: crucial*1 -*1 message*11

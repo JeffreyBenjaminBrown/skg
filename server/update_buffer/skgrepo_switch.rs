@@ -116,6 +116,8 @@ fn should_prune (
       | ViewnodeKind::PartnerFolder (PartnerFolder::Hidden)
       | ViewnodeKind::PartnerFolder (PartnerFolder::Container)
       | ViewnodeKind::PartnerFolder (PartnerFolder::Mentioner)
+      | ViewnodeKind::PartnerFolder (PartnerFolder::AcquiredBy)
+      | ViewnodeKind::PartnerFolder (PartnerFolder::Acquired)
       | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)
       | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
       is_leaf, // empty folder (children, if any, were pruned first)

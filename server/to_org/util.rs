@@ -534,6 +534,7 @@ pub fn unrestrictedVognode_in_tree_is_writeProtected (
   match node_kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Ok (t . is_writeProtected ()),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) => Ok (p . is_writeProtected ()),
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => Ok (true),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))
       | ViewnodeKind::Vognode (Vognode::Restricted (_))
       | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_))) => Ok (false),

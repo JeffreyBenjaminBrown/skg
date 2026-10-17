@@ -101,12 +101,12 @@ function M.metadata_sexp_contains_id_p (sexp)
   return M.extract_id_from_metadata_sexp(sexp) ~= nil
 end
 
----The id from SEXP, accepting the UnrestrictedVognode, diff-phantom, and
----Deleted-phantom shapes. Nil when absent.
+---The id from SEXP, accepting the UnrestrictedVognode, diff-phantom,
+---Deleted-phantom and historical-phantom shapes. Nil when absent.
 ---@param sexp any
 ---@return string|nil
 function M.extract_id_from_metadata_sexp (sexp)
-  for _, holder in ipairs({ 'node', 'diffPhantom', 'deleted' }) do
+  for _, holder in ipairs({ 'node', 'diffPhantom', 'deleted', 'historical' }) do
     local values = metadata.sexp_cdr_at_path(sexp,
                                              { 'skg', holder, 'id' })
     if values and values[1] ~= nil then
@@ -119,7 +119,7 @@ end
 ---@param sexp any
 ---@return string|nil
 function M.extract_repo_from_metadata_sexp (sexp)
-  for _, holder in ipairs({ 'node', 'diffPhantom', 'deleted' }) do
+  for _, holder in ipairs({ 'node', 'diffPhantom', 'deleted', 'historical' }) do
     local values = metadata.sexp_cdr_at_path(
       sexp, { 'skg', holder, 'repo' })
     if values and values[1] ~= nil then
