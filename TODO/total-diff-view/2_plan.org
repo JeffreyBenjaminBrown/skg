@@ -469,7 +469,7 @@ Each slice ends with its tests passing ('cargo nextest run' for Rust,
 updated, and a commit. Slices 0 to 3 are general-purpose tools; the
 TDV proper starts at slice 4.
 
-** Slice 0: housekeeping
+** DONE Slice 0: housekeeping
 Rename 'full_containerward_role_tree_from_in_rust_graph',
 'full_containerward_ancestry_from_in_rust_graph' and
 'prominence_sources_for_saved_from_in_rust_graph' to end in
