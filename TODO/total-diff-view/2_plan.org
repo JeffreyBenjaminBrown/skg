@@ -14,10 +14,13 @@ granularly, one or a few commits per slice, each message naming the
 slice it implements. Do not change branches or git configuration. Build
 every client-facing piece for Emacs and Neovim in the same slice. Finish
 the agreed work and its verification without stopping for routine
-choices; the stop rules are in [[file:../../coding-advice/when-to-stop.org][when-to-stop.org]]. Record meaningful
-deviations, and any substantive new question, in 'progress.org' beside
-this plan; this plan itself stays as it is. Mark each slice headline
-DONE when its tests pass and its commit is made.
+choices. Resolve ordinary implementation choices yourself; stopping to
+ask is for the rare conditions that [[file:../../coding-advice/when-to-stop.org][when-to-stop.org]] describes, an
+architectural decision this plan did not anticipate or a goal you cannot
+reach without something ugly. Record meaningful deviations, and any
+such question, in 'progress.org' beside this plan, in the shape that
+file prescribes; this plan itself stays as it is. Mark each slice
+headline DONE when its tests pass and its commit is made.
 
 ** Scope and completion
 The deliverable is the four diff-view buffers, the commit-readiness
