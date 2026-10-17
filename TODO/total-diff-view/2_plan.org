@@ -484,7 +484,7 @@ the tests that assert the refusal. Update the first entry under
 "Problems noticed while discussing the total diff view" in
 'TODO/problems.org' to say the refusals are gone.
 
-** Slice 1: herald tiers from one source, the 'boring' style, and 'yucky' to 'ugly'
+** DONE Slice 1: herald tiers from one source, the 'boring' style, and 'yucky' to 'ugly'
 *** the file
 In 'shared/herald-styles.json': rename the style 'yucky' to 'ugly'
 (same look); add a 'boring' style (white text on dark gray, "#3a3a3a",

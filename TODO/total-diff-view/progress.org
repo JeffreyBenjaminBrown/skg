@@ -1,0 +1,17 @@
+#+title: Total diff view (TDV) — progress notes
+* Slice 1: deviations
+** a rule holds its 'node_heralds' key, not its style name
+'HeraldRule' carries 'node_heralds_key'; 'HeraldRule::style' looks the
+name up. Holding the key lets the consistency check report a styled
+rule with no entry, instead of the table panicking while it is built.
+The served sexp still carries the uppercased style name.
+** qualified 'node_heralds' keys
+An atom styled differently in different places gets a qualified key:
+'affectsParent_false', and 'editRequest_relRepo' and 'editRequest_flag'
+for the requested forms. The ☮ on a write-protected label or flag row
+takes 'writeProtected''s style. Later slices that add atoms (the diff
+atoms, the labels) add entries the same way.
+** 'ready' is listed before its atom exists
+The plan names 'ready' go, so 'node_heralds' has it now. The check only
+requires that every styled rule has an entry, not the converse. The
+retiring 'staged' and 'unstaged' keep go and stop until slice 9.
