@@ -696,7 +696,7 @@ The order-only buffer is a flat list from 'order_only_pids', each node
 with bodies folded and an order-only changeset marker. Tests per buffer,
 plus the one-command behavior end to end.
 
-** Slice 8: stage and commit
+** DONE Slice 8: stage and commit
 'RequestType::StageAndCommit', handler in 'server/serve/handlers/stage_and_commit.rs':
 compute the readiness summary; if it is incomplete and the request
 lacks '(confirmed . t)', answer with the summary and

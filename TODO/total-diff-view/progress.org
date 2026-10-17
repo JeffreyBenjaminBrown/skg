@@ -457,3 +457,56 @@ rendering cases, so both clients' herald tests cover them.
 A folder member's continuation is redrawn at each save, so any
 folding the user gave its headlines is lost, as with the context
 bodies (slice 6).
+* Slice 8: deviations
+** a rerender stream follows every answer
+The plan says to rebuild the graph pair "so open TDV buffers rerender
+empty or shrunken", without naming the messages. The request follows
+the delete-references command's shape: the clients lock every view
+and register the rerender handlers before sending, and the
+"stage-and-commit" response is always followed by a rerender stream.
+It is empty unless something was committed. A confirmation's resend
+waits for that empty stream to finish, so Emacs's
+'skg--delete-absent-wrap-rerender-done' moved to
+'skg-request-rerender-all-views.el' as
+'skg--wrap-rerender-done-with-after-empty-stream', shared by both
+commands (Neovim already had 'rerender.after_empty_stream').
+*** the buffers are redrawn, not reconciled
+A rerender reconciles a TDV buffer over the pair but keeps its roots,
+so a buffer whose changes were all committed would never come back
+empty. After a commit, each open TDV buffer is instead drawn afresh,
+as the "total diff view" request draws it ('redraw_tdv_views'), and
+registered in place; one with nothing left is registered with an
+empty viewforest and sent empty. Folding the user gave it is lost.
+*** an empty view on the wire
+The 'sexp' crate writes an empty string as nothing, so the emptied
+view arrives as '(content )'. Both clients' streamed view update now
+reads that as empty. Noted in 'TODO/problems.org'.
+** what the request refuses
+Besides an incomplete, unconfirmed summary: a skgrepo restriction
+other than 'all' (as the TDV request refuses it), a blank message,
+and a graph pair that cannot be built. The clients also refuse while
+any view has unsaved edits, as the delete-references command does:
+the commit takes the files on disk.
+** what is staged, and "with changes"
+In each owned skgrepo, the '.skg' files under its folder
+('<prefix>/*.skg'), by 'add_all' and then 'update_all', since
+'add_all' does not stage deletions. A skgrepo has changes when the
+staged tree differs from its HEAD's; one without gets no commit and is
+in neither list of the response. Each skgrepo is committed on its
+own, so two owned skgrepos in one gitrepo would give two commits with
+the same message.
+** the response
+'((commits (("SKGREPO" "COMMIT-ID") ...)) (errors (...)) (warnings
+()))', a failed skgrepo being an error "skgrepo NAME: why". The
+needs-confirmation answer carries the save response's
+'(readiness-summary ...)', with '(unshown 0)', so the clients format
+it with their existing summary line. Documented in
+'docs/api-and-formats.org', "Stage and commit".
+** a commit lapses the marks
+After the commits, the marks whose leaf is not in the rebuilt pair's
+change-forest are dropped from the store and the file rewritten. A
+skgrepo whose commit failed keeps its marks.
+** bindings
+'C-c r c' in Emacs, '<localleader>rc' (':SkgStageAndCommit') in
+Neovim, beside the readiness gestures; 'docs/COMMANDS*.org' describe
+them.
