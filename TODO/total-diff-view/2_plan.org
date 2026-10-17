@@ -628,7 +628,7 @@ no-op), in a new 'tests/tdv/roundtrip/' modelled on today's
 content as ~- members, recursing into deleted members; the renderer
 must allow phantoms under a write-protected historical node.
 
-** Slice 5: the PCSVF and the "all changes" buffer
+** DONE Slice 5: the PCSVF and the "all changes" buffer
 *** builder
 'server/pcsvf.rs': 'PCSVF' with 'pcsvf_sets (pair) -> Sets { c, r, u, d }'
 and 'pcsvf_viewforest (pair, forest, store, roots)'. The builder makes a

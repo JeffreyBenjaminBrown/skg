@@ -234,3 +234,92 @@ result is a fixed point of a second save.
 Both clients read the ID and skgrepo of a historical phantom at point,
 as they do a deleted one's. Emacs refuses a relRepo request on a
 member of either acquisition folder.
+* Slice 5: deviations
+** names and shapes
+'server/pcsvf.rs' has 'PcsvfSets { c, r, u, d }', 'pcsvf_sets (pair)'
+(cached in the pair as 'GraphPair::pcsvf_sets', like 'changed_pids'),
+'pcsvf_sets_over (pair, c)' for slice 7's subsets, and
+'pcsvf_viewforest (runtime, pair, store, roots)', which returns the
+text, pids and viewforest as 'multi_root_view_via_runtime' does; the
+change-forest comes from the pair. There is no separate 'PCSVF' type.
+The per-visit step is 'server/to_org/render/changes.rs'
+('process_unrestrictedVognode_changes'), beside 'diff.rs'. The
+containerward climb of 'server/prominence.rs' is lifted to a
+containers function ('climb_containerward_to_cycle_via'); one climb
+from a changed node gives both its walk and its origins, because the
+walk stops at the first multiply-contained node.
+** readiness is set after completion, not at each visit
+'set_ready_facts_in_viewforest' ('readiness_requests.rs') sets every
+'(ready ...)' in one pass over the completed viewforest, from the
+same leaf naming the save's readiness requests use (refactored into
+'leaves_named_at' and 'keys_in_forest'). An axis is ready when it
+names at least one leaf and all of them are marked. Slice 6's save
+reconcile can call the same pass.
+** the folder's '(changed)' fact
+The plan writes '(changed)'; a folder drawn because of a change is
+written '(containerFolder changed)' in place of the bare atom, and
+'(ready)' follows when every changed member is ready. The lens engine
+matches a bare atom and a form with the same head separately, so the
+changed label replaces the ordinary one instead of adding to it. The
+fact is not stored: 'PartnerFolder' is a fieldless enum matched in
+some 170 places, so the serializer derives both facts from the
+folder's members ('folder_change_facts' in 'org_to_text.rs'): a member
+with a presence sign, or with a relRepo move under it. The parser
+accepts and drops them. Labels: "its aliases / IDs / flags /
+containers / mentioners / subscribers / overriders / hiders /
+subscribees changed", and "the nodes it overrides / hides changed",
+each with "(this file)" or "(other files)". The new 'node_heralds' key
+is 'changed' (message).
+** removed members and what the save reads
+*** a removed member that survives
+is drawn under its former container as a write-protected vognode with
+affectsParent false, tagged rel-. As affectsParent true the save would
+re-add it. Likewise in the editable subscribee and overridden folders.
+*** a removed dangling ID
+is not drawn in an editable node's content or an editable folder:
+the save reads an unknown phantom there as a member. Its leaf is
+still under the content changeset marker.
+*** lost aliases and IDs
+The alias folder is read at save, and the ID folder is checked
+against the node's IDs. Both now skip an entry tagged '(diff rel-)'
+('visit_aliasFolder', 'validate_tree.rs'), as the ID check already
+skipped the old view's removed entries. This is the one place the
+save reads a presence fact. Entries carry their + or - on the rel
+axis.
+** folders and continuations
+The partner folders of a node in C are drawn when a partner's
+relationship is only in one graph (and, for the node's own lists,
+also when its relRepo moved); the BFS fills them from the pair. In
+the pair-driven reconciler, a member only in the before-graph is now
+a historical phantom, and each member (each changed one, in an
+out-folder) gets the continuation: a full containerward tree under a
+container, the folder role's role tree under any other. A relRepo
+move hangs under its member in content and in folders. The
+Subscribee folder goes through the generic reconciler when the pair
+is set. Alias, ID and flags folders are filled at the node's visit;
+their own reconcilers do nothing when the pair is set. The default
+HiddenInSubscribee folder is not created in a TDV.
+** override substitution
+is off in a TDV, as in the old diff view: the content is the union of
+the stored lists.
+** the request
+The merges, skgrepo-changes and order-only buffers answer
+'(empty . t)' until slice 7 draws them. A refusal is a content
+response with the error and no content; the clients stop the
+sequence at the first refusal. The empty answer is
+'((empty . t) (errors ()) (warnings ()))' after the response type.
+'ViewState' records 'tdv_buffer' ('TdvBuffer'), set by
+'register_tdv_view'; closing the last such view drops the pair.
+** clients
+Both clients chain the four requests (each one-shot handler sends the
+next after it returns, since the handler map holds one handler per
+response type). Neovim names the buffers "skg://diff-view: ...", as
+its content views are "skg://...". 'C-c v d' and '<localleader>vd'
+now run the new command; the old toggle is unbound until slice 9
+removes it, and 'docs/COMMANDS*.org' say so.
+** an ego_tree pitfall
+'prepend_id' and 'insert_id_before' (ego-tree 0.6.3) read the old
+first child or previous sibling before detaching the node they move,
+so moving a node already in that place links it to itself and a
+traversal never ends. 'changes.rs' detaches first. Noted in
+'TODO/problems.org'.
