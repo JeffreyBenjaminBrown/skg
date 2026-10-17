@@ -121,7 +121,7 @@ fn test_org_to_uninterpreted_nodes2_restricted_placeholder() {
   // an anonymous, dataless, titleless placeholder.
   let input: &str =
     indoc! {"
-            * (skg (restrictedNode (id hidden) (repo private) (unstaged addedR)))
+            * (skg (restrictedNode (id hidden) (repo private)))
         "};
 
   let viewforest: Tree<MpViewnode> =

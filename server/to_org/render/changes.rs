@@ -1,8 +1,6 @@
 //! The total diff view's step at each unrestricted vognode's visit
 //! in view completion ('TODO/total-diff-view/2_plan.org', "The
-//! PCSVF" and "What each kind of change looks like"). It does for the
-//! graph pair what 'process_unrestrictedVognode_diff' does for the
-//! per-stage git diffs.
+//! PCSVF" and "What each kind of change looks like").
 //!
 //! On an editable occurrence: the content members (which the content
 //! reconciler drew from the after-graph) are tagged with the presence
@@ -27,8 +25,7 @@ use crate::to_org::render::change_viewnodes::{
   append_acquired_folder, append_historical_phantom, append_old_text,
   mk_changeset_marker_viewnode, mk_home_move_viewnode,
   mk_relRepo_move_viewnode};
-use crate::to_org::render::diff::phantom_insertion_plan;
-use crate::types::git::{RelationshipAxes, Sign};
+use crate::types::git::Sign;
 use crate::types::list::{Diff_Item, compute_interleaved_diff};
 use crate::types::misc::{ID, members_msv};
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -288,6 +285,26 @@ fn insert_removed_content_members (
       tree . get_mut (anchor_treeid) . unwrap () . insert_id_before (inserted); }}
   Ok (( )) }
 
+/// Decide where each removed-member phantom belongs among its surviving
+/// siblings: insert it immediately before the *next* surviving child in
+/// net HEAD->worktree order, or append it (anchor = None) when no surviving
+/// child follows. Returns (removed_id, anchor_id) pairs in the order the
+/// phantoms should be created, so consecutive removals before the same
+/// survivor keep their relative order.
+pub(crate) fn phantom_insertion_plan (
+  net_contains : &[Diff_Item<ID>],
+) -> Vec<(ID, Option<ID>)> {
+  let mut plan : Vec<(ID, Option<ID>)> = Vec::new ();
+  let mut next_survivor : Option<ID> = None;
+  for item in net_contains . iter () . rev () {
+    match item {
+      Diff_Item::Unchanged (skgid) | Diff_Item::New (skgid)
+        => { next_survivor = Some ( skgid . clone () ); },
+      Diff_Item::Removed (skgid)
+        => { plan . push ( ( skgid . clone (), next_survivor . clone () )); }, }}
+  plan . reverse ();
+  plan }
+
 /// A node's content list in one graph, each member as that graph
 /// resolves it.
 fn content_list (
@@ -335,7 +352,6 @@ fn changed_property_folders (
       signed_union ( &aliases (before), &aliases (after) ) . into_iter ()
       . map ( |(text, sign)| Property::Alias {
         text, relRepo : None, relRepo_request : None,
-        relationship_axes : RelationshipAxes::default (),
         change_facts : facts_of_entry (sign), readiness_request : None } )
       . collect () )); }
   if ! changes . extra_ids_gained . is_empty () || ! changes . extra_ids_lost . is_empty () {
@@ -346,7 +362,7 @@ fn changed_property_folders (
       tree, treeid, PropertyFolder::ID,
       signed_union ( &ids (before), &ids (after) ) . into_iter ()
       . map ( |(skgid, sign)| Property::ID {
-        skgid, relationship_axes : RelationshipAxes::default (),
+        skgid,
         change_facts : facts_of_entry (sign), readiness_request : None } )
       . collect () )); }
   if ! changes . flags_gained . is_empty () || ! changes . flags_lost . is_empty () {
@@ -436,3 +452,7 @@ fn viewnode_of (
   kind : ViewnodeKind,
 ) -> Viewnode {
   Viewnode { focused : false, folded : false, body_folded : false, kind } }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/render_changes.rs"]
+mod phantom_insertion_plan_tests;

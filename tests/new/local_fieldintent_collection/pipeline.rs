@@ -18,7 +18,6 @@ use skg::from_text::local_fieldintent_collection::{
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::types::errors::BufferValidationError;
-use skg::types::git::Sign;
 use skg::types::maybe_placed_viewnode::{
   MpViewnode,
   maybePlaced_to_placed_tree,
@@ -27,7 +26,6 @@ use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, members_of, members_msv
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, NodeMerge, SaveNode, DeleteNode};
 use skg::types::tree::forest::{MpViewForest, ViewForest};
-use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
 use std::error::Error;
 
 const SUBSCRIBEE_EDIT_CONFIG : &str =
@@ -259,29 +257,10 @@ async fn pipeline_phantom_subtree (
       let input : &str =
         indoc! {"
             * (skg (node (id root) (repo main))) root
-            ** (skg (node (id fading) (repo main))) fading
+            ** (skg (historical (id fading) (repo main))) fading
             *** (skg (node (id survivor) (repo main))) survivor
             "};
-      let forest : ViewForest = {
-        let mut tree : Tree<Viewnode> = {
-          let maybePlaced_viewforest : Tree<MpViewnode> =
-            org_to_uninterpreted_nodes (input) . unwrap() . 0;
-          maybePlaced_to_placed_tree (maybePlaced_viewforest)
-            . unwrap() };
-        let fading_treeid : ego_tree::NodeId =
-          tree . nodes()
-          . find ( |n| matches!(
-              &n . value() . kind,
-              ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-                if t . skgid == ID::from ("fading") ))
-          . map ( |n| n . id() )
-          . expect ("fading node not found");
-        if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
-          &mut tree . get_mut (fading_treeid) . unwrap() . value() . kind
-        { t . relationship_axes . unstaged = Some (Sign::Minus); }
-        tree . get_mut (fading_treeid) . unwrap()
-          . value() . normal_to_phantom ();
-        ViewForest::from_internal_tree (tree) };
+      let forest : ViewForest = placed_forest_from_org (input);
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
           &forest, config, None)?;

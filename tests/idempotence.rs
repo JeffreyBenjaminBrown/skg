@@ -52,7 +52,6 @@ async fn rerender_once (
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false,
     open_views        : OpenViews::new (),
     graph_pair        : None,
   };
@@ -62,7 +61,7 @@ async fn rerender_once (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    buf, config, tantivy, &graph, false,
+    buf, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "rerender must not error; got: {:?}", response . errors );
@@ -78,7 +77,7 @@ async fn rerender_is_idempotent_impl (
     : (String, Vec<ID>, _) =
     multi_root_view (
       config, Some (tantivy),
-      &[ ID ("a" . to_string ()) ], false ) ?;
+      &[ ID ("a" . to_string ()) ] ) ?;
 
   let first  : String =
     rerender_once (&complete_buffer, config, tantivy) . await ?;

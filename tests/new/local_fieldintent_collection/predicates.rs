@@ -7,7 +7,6 @@ use skg::from_text::local_fieldintent_collection::predicates::{
   unrestricted_child_counts_as_content,
   unrestricted_child_counts_as_visible_content,
   member_counts_for_partnerFolder };
-use skg::types::git::Sign;
 use skg::types::misc::{ID, SkgrepoName};
 use skg::types::viewnode::{
   default_unrestrictedVognode, NodeEditRequest, Editability, AffectsParent,
@@ -38,22 +37,6 @@ fn relation_folder_membership_conditions () {
     let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
     t . affectsParent = AffectsParent::False;
     assert!( ! member_counts_for_partnerFolder (&t) ); }
-  { // A negative staged relationship axis (would-be diff phantom) excludes.
-    let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
-    t . relationship_axes . staged = Some (Sign::Minus);
-    assert!( ! member_counts_for_partnerFolder (&t) ); }
-  { // A negative unstaged relationship axis excludes.
-    let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
-    t . relationship_axes . unstaged = Some (Sign::Minus);
-    assert!( ! member_counts_for_partnerFolder (&t) ); }
-  { // A negative unstaged node axis (file deleted) excludes.
-    let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
-    t . node_axes . unstaged = Some (Sign::Minus);
-    assert!( ! member_counts_for_partnerFolder (&t) ); }
-  { // A positive axis does not exclude.
-    let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
-    t . relationship_axes . unstaged = Some (Sign::Plus);
-    assert!( member_counts_for_partnerFolder (&t) ); }
   // A Delete edit request excludes; a NodeMerge edit request does not.
   assert!( ! member_counts_for_partnerFolder (
     &with_edit_request (NodeEditRequest::Delete) ));
@@ -72,12 +55,6 @@ fn content_membership_coincides_with_relation_folder_membership () {
     { let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
       t . affectsParent = AffectsParent::False;
       cases . push (t); }
-    { let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
-      t . relationship_axes . unstaged = Some (Sign::Minus);
-      cases . push (t); }
-    { let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
-      t . node_axes . unstaged = Some (Sign::Minus);
-      cases . push (t); }
     cases };
   for t in &cases {
     assert_eq!( unrestricted_child_counts_as_content (t),
@@ -95,12 +72,4 @@ fn visible_content_membership_conditions () {
   assert!( ! unrestricted_child_counts_as_visible_content (
     &with_edit_request (NodeEditRequest::Delete) ));
   assert!( unrestricted_child_counts_as_visible_content (
-    &with_edit_request (NodeEditRequest::NodeMerge (ID::from ("other"))) ));
-  { // This pins an asymmetry: negative diff axes do NOT exclude
-    // here, unlike in the contains and PartnerFolder
-    // predicates.
-    let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
-    t . relationship_axes . staged   = Some (Sign::Minus);
-    t . relationship_axes . unstaged = Some (Sign::Minus);
-    t . node_axes  . unstaged = Some (Sign::Minus);
-    assert!( unrestricted_child_counts_as_visible_content (&t) ); }}
+    &with_edit_request (NodeEditRequest::NodeMerge (ID::from ("other"))) )); }

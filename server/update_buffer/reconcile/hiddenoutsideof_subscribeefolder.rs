@@ -1,8 +1,7 @@
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::to_org::complete::partner_folder::child_data::{ChildData, apply_relationship_axes_to_folder_members, build_child_data, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
+use crate::to_org::complete::partner_folder::child_data::{ChildData, build_child_data, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
 use crate::to_org::complete::partner_folder::goal_list::goal_list_for_hiddenOutsideOfSubscribee_folder;
-use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgrepoDiff, file_node_axes_from_skgrepo_diff};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::nodes::complete::Graphnode;
@@ -19,7 +18,6 @@ use std::error::Error;
 
 struct HiddenOutsideContext {
   subscriber_pid      : ID,
-  subscriber_skgrepo  : SkgrepoName,
   subscriber_hides    : Vec<ID>,
   relRepos            : HashMap<ID, SkgrepoName>,
   subscribees         : Vec<ID>,
@@ -40,9 +38,7 @@ struct HiddenOutsideContext {
 pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
   node                           : NodeId,
   tree                           : &mut Tree<Viewnode>,
-  skgrepo_diffs                  : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   runtime                        : &RuntimeGeneration,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
   warning_sink                   : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
@@ -57,42 +53,23 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
   let context : HiddenOutsideContext =
     read_hiddenoutside_context (
       tree, node, kind, runtime, skgrepo_restriction) ?;
-  let (goal_list, removed_skgids, member_axes)
-    : (Vec<ID>, HashSet<ID>, HashMap<ID, RelationshipAxes>) =
+  let goal_list : Vec<ID> =
     goal_list_for_hiddenOutsideOfSubscribee_folder (
       &runtime . graph,
-      &context . subscriber_pid, &context . subscriber_skgrepo,
       &context . subscriber_hides, &context . subscribees,
-      skgrepo_diffs, &runtime . config );
+      &runtime . config );
   let goal_list : Vec<ID> =
     // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: omit restricted
     // members; no retention for this filter folder.
     omit_restricted_members (
       goal_list, skgrepo_restriction,
-      |skgid : &ID| SkgEnv::find_skgrepo_in_generation (
-        runtime, skgid, deleted_since_head_pid_src_map) );
+      |skgid : &ID| SkgEnv::find_skgrepo_in_generation (runtime, skgid) );
   // TODO/DONE/local-view-update/plan_v2.org §5.5: a folder fills its members WHOLE and is budget-neutral -- the owning
   // subscriber already spent its budget unit when it expanded, so drawing all
   // these hidden members here costs nothing and never truncates the group.
-  let axes_for_removed =
-    // This folder's membership is DERIVED (subscriber hides minus
-    // subscribee content), so no single relation diff is
-    // authoritative: the relationship signs come from the
-    // three-snapshot comparison; node signs from the member's own
-    // file statuses.
-    |child : &ID, child_src : &SkgrepoName|
-    -> (NodeAxes, RelationshipAxes) {
-    ( file_node_axes_from_skgrepo_diff (
-        skgrepo_diffs, child, child_src ),
-      member_axes . get (child) . copied ()
-        . unwrap_or ( RelationshipAxes {
-            staged : None, unstaged : Some (Sign::Minus) } )) };
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
-      tree, node,
-      &goal_list, &removed_skgids, &axes_for_removed,
-      skgrepo_diffs, deleted_since_head_pid_src_map,
-      &context . relRepos, runtime ) ?;
+      tree, node, &goal_list, &context . relRepos, runtime ) ?;
   let summary =
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       // TODO/DONE/local-view-update/plan_v2.org §6.0: a stale member of this write-protected folder is removed when a view-leaf
@@ -100,11 +77,6 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
       // subtree. Handled uniformly by the reconciler.
       tree, node, kind,
       &goal_list, &child_data, deleted_by_this_save_extra_ids ) ?;
-  if skgrepo_diffs . is_some () {
-    // Present members newly derived-in in some stage get that
-    // stage's 'addedR'; removed members are the phantoms above.
-    apply_relationship_axes_to_folder_members (
-      tree, node, &member_axes ) ?; }
   if let Some (sink) = warning_sink {
     push_repair_warnings (
       sink, kind, &context . subscriber_pid, summary ); }
@@ -156,7 +128,6 @@ fn read_hiddenoutside_context (
     . collect ();
   Ok (HiddenOutsideContext {
     subscriber_pid,
-    subscriber_skgrepo,
     subscriber_hides : wt_subscriber_hides,
     relRepos,
     subscribees      : wt_subscribees }) }

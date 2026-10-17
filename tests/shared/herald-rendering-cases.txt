@@ -166,26 +166,6 @@
 (skg folded aliasFolder)
 ---- text: aliases
 ---- styles: message*7
-==== non-vognodes: text changed in both stages
-(skg (textChanged staged unstaged))
----- text: text changed ✓ ✗
----- styles: nonstandard*13 go*1 nonstandard*1 stop*1
-==== diff: a relationship removed, unstaged
-(skg (node (id 1) (repo s) (unstaged removedR)))
----- text: ✗-R
----- styles: stop*1 nonstandard*2
-==== diff: a node and relationship added, unstaged
-(skg (node (id 2) (repo s) (unstaged addedN addedR)))
----- text: ✗NR
----- styles: stop*1 nonstandard*2
-==== diff: an alias added, staged
-(skg alias (staged addedR))
----- text: alias ✓R
----- styles: message*5 -*1 go*1 nonstandard*1
-==== diff: an alias removed, unstaged
-(skg alias (unstaged removedR))
----- text: alias ✗-R
----- styles: message*5 -*1 stop*1 nonstandard*2
 ==== placeholders: restricted node
 (skg restrictedNode)
 ---- text: node from restricted skgrepo
@@ -250,18 +230,6 @@
 (skg (node (id x) (editRequest (merge y))))
 ---- text: merge:y
 ---- styles: nonstandard*7
-==== diff: text changed, staged only
-(skg (textChanged staged))
----- text: text changed ✓
----- styles: nonstandard*13 go*1
-==== diff: text changed, unstaged only
-(skg (textChanged unstaged))
----- text: text changed ✗
----- styles: nonstandard*13 stop*1
-==== diff: a node deleted, staged, and not in Git
-(skg (node (id x) (staged deletedN) notInGit))
----- text: ✓-N diff:not-in-git
----- styles: go*1 nonstandard*2 -*1 nonstandard*15
 ==== tdv: a new member whose node axis is ready
 (skg (node (id x) (diff node+ rel+) (ready node)))
 ---- text: ∃+✓ ~+

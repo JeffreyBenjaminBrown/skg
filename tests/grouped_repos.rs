@@ -2,9 +2,6 @@
 // and skgrepo/storage-layer tests. See tests/grouped_unit.rs for why test
 // files are grouped into a few [[test]] targets.
 
-#[path = "diff_mode_refusals.rs"]
-mod diff_mode_refusals;
-
 #[path = "graph_pair.rs"]
 mod graph_pair;
 

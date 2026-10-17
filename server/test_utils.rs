@@ -398,7 +398,6 @@ pub async fn update_from_and_rerender_buffer_test (
   config                      : &SkgConfig,
   tantivy_index               : &TantivyIndex,
   graph                       : &InRustGraphHandle,
-  diff_mode_enabled           : bool,
   viewid_from_request_result  : &Result<ViewId, String>,
   views_state                 : &mut ViewsState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
@@ -407,7 +406,7 @@ pub async fn update_from_and_rerender_buffer_test (
   // own shim below.
   update_from_and_rerender_buffer_with_fork_approval_test (
     stream, org_buffer_text, config, tantivy_index, graph,
-    diff_mode_enabled, viewid_from_request_result, views_state,
+    viewid_from_request_result, views_state,
     /* approved_forks = */ true ) . await }
 
 /// Drive the full prepared-save conflict path with explicit buffer snapshots.
@@ -417,7 +416,6 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
   config                      : &SkgConfig,
   tantivy_index               : &TantivyIndex,
   graph                       : &InRustGraphHandle,
-  diff_mode_enabled           : bool,
   viewid_from_request_result  : &Result<ViewId, String>,
   views_state                 : &mut ViewsState,
   other_views                 : &[ClientViewSnapshot],
@@ -425,7 +423,7 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
   let mut env : SkgEnv =
     skg_env_from_parts (config, tantivy_index, graph);
   update_from_and_rerender_buffer_with_approvals (
-    stream, org_buffer_text, &mut env, diff_mode_enabled,
+    stream, org_buffer_text, &mut env,
     viewid_from_request_result, views_state, None,
     true, &HashMap::new (), &std::collections::HashSet::new (),
     &std::collections::HashSet::new (), &StrandReview::NotReviewed,
@@ -441,7 +439,6 @@ pub async fn update_from_and_rerender_buffer_with_fork_approval_test (
   config                      : &SkgConfig,
   tantivy_index               : &TantivyIndex,
   graph                       : &InRustGraphHandle,
-  diff_mode_enabled           : bool,
   viewid_from_request_result  : &Result<ViewId, String>,
   views_state                 : &mut ViewsState,
   approved_forks              : bool,
@@ -450,7 +447,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_approval_test (
   // inference-else-default.
   update_from_and_rerender_buffer_with_fork_skgrepos_test (
     stream, org_buffer_text, config, tantivy_index, graph,
-    diff_mode_enabled, viewid_from_request_result, views_state,
+    viewid_from_request_result, views_state,
     approved_forks, &HashMap::new () ) . await }
 
 /// As 'update_from_and_rerender_buffer_with_fork_approval_test', but also
@@ -463,7 +460,6 @@ pub async fn update_from_and_rerender_buffer_with_fork_skgrepos_test (
   config                      : &SkgConfig,
   tantivy_index               : &TantivyIndex,
   graph                       : &InRustGraphHandle,
-  diff_mode_enabled           : bool,
   viewid_from_request_result  : &Result<ViewId, String>,
   views_state                 : &mut ViewsState,
   approved_forks              : bool,
@@ -475,7 +471,6 @@ pub async fn update_from_and_rerender_buffer_with_fork_skgrepos_test (
     stream,
     org_buffer_text,
     &mut env,
-    diff_mode_enabled,
     viewid_from_request_result,
     views_state,
     None,
@@ -650,20 +645,14 @@ fn compare_two_viewnode_branches_recursively_modulo_skgid (
   let n1 : &MpViewnode = node1 . value();
   let n2 : &MpViewnode = node2 . value();
   match (&n1 . kind, &n2 . kind) {
-    ( MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))
-        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_))),
-      MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))
-        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_)))) =>
-    { // Copy the ID from one to the other, then compare. TODO/DONE/local-view-update/plan_v2.org §11: Unrestricted and
-      // Diff phantom payloads are now different types, so read n2's id via the
-      // shared accessor and write n1_copy's per variant.
+    ( MpViewnodeKind::Vognode (MpVognode::Unrestricted (_)),
+      MpViewnodeKind::Vognode (MpVognode::Unrestricted (_)) ) =>
+    { // Copy the ID from one to the other, then compare.
       let id2 : Option<ID> = n2 . skgid_opt () . cloned ();
       let mut n1_copy : MpViewnode =
         n1 . clone();
-      match &mut n1_copy . kind {
-        MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) => t . skgid = id2,
-        MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) => p . skgid = id2,
-        _ => {} }
+      if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) = &mut n1_copy . kind
+        { t . skgid = id2; }
       if n1_copy != *n2 { return false; }}
     ( MpViewnodeKind::PropertyFolder (_)
       | MpViewnodeKind::Property (_)

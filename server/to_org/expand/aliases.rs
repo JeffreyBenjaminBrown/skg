@@ -1,7 +1,6 @@
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::util::{get_skgid_from_viewnode_at, remove_completed_view_request};
-use crate::types::git::RelationshipAxes;
 use crate::types::misc::{ID, RelPartner, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, ViewRequest, FolderRelation};
@@ -74,7 +73,6 @@ pub fn build_and_integrate_aliases (
                           if &alias . relRepo == home { None }
                           else { Some (alias . relRepo . clone ()) } ),
                       relRepo_request: None,
-                      relationship_axes: RelationshipAxes::default (),
                       change_facts: ChangeFacts::default (),
                       readiness_request: None } ),
       false ) ?; }

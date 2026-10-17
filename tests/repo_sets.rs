@@ -43,7 +43,7 @@ use skg::types::viewnode::{
   Viewnode,
   ViewnodeKind,
   viewforest_root_viewnode};
-use skg::types::viewnode::{Vognode, Phantom};
+use skg::types::viewnode::Vognode;
 use skg::types::views_state::{OpenViews, ViewState, ViewId};
 
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -139,7 +139,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
         : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view (
           config, Some (tantivy),
-          &[ ID::from ("ovr-sub-container") ], false ) ?;
+          &[ ID::from ("ovr-sub-container") ] ) ?;
       assert! (
         view_all . contains ("(overridesHere ovr-sub-original)"),
         "under 'all' the overrider should substitute for N:\n{}",
@@ -157,7 +157,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
       let mut restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (config, SkgrepoSetName::from ("all")) ?;
       let mut views_state : ViewsState =
-        ViewsState { diff_mode_enabled : false,
+        ViewsState { 
                      open_views        : OpenViews::new (),
                      graph_pair        : None };
       let view_id : ViewId =
@@ -276,8 +276,6 @@ fn true_child_skgids (
     . filter_map ( |child| match &child . value () . kind {
       ViewnodeKind::Vognode ( Vognode::Unrestricted (node) )
         => Some (node . skgid . clone ()),
-      ViewnodeKind::Vognode (Vognode::Phantom ( Phantom::Diff (p) ))
-        => Some (p . skgid . clone ()),
       _ => None, })
     . collect () }
 
@@ -345,7 +343,6 @@ async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment 
           SkgrepoSetName::from ("public"))?;
       let mut views_state : ViewsState =
         ViewsState {
-          diff_mode_enabled : false,
           open_views        : OpenViews::new (),
           graph_pair        : None, };
       let view_id : ViewId =
@@ -412,7 +409,6 @@ async fn content_view_omits_restricted_contained_nodes (
         multi_root_view_with_skgrepo_set (
           config, None,
           &[ID::from ("root")],
-          false,
           &restriction ) ?;
       assert! (
         ! actual . contains ("private-a"),
@@ -442,7 +438,6 @@ async fn diff_view_omits_restricted_members_without_content_leak (
         multi_root_view_with_skgrepo_set (
           config, None,
           &[ID::from ("diff-root")],
-          true,
           &restriction ) ?;
       // Defense in depth: the connection-level refusals
       // (TODO/DONE/full-schema/DONE/12-2_diff-mode-policy_discussion.org) keep
@@ -598,7 +593,6 @@ async fn restricted_skgrepo_search_and_save_work_together_end_to_end (
         multi_root_view_with_skgrepo_set (
           config, None,
           &[ID::from ("root")],
-          false,
           &restriction ) ?;
       assert! (
         ! rendered . contains ("private-a"),

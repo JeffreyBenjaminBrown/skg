@@ -46,7 +46,6 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
-        diff_mode_enabled : false,
         open_views        : OpenViews::new (),
         graph_pair        : None, };
       let p_view_id : ViewId = ViewId::ContentView ("collat-del-P" . into ());
@@ -55,7 +54,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       // A view of P (showing L) stays open.
       let (p_view, p_pids, p_vf) =
         single_root_view (
-          config, Some (tantivy), &ID::from ("P"), false ) ?;
+          config, Some (tantivy), &ID::from ("P") ) ?;
       assert! ( p_view . contains ("(id L)"),
         "P's view should show L:\n{}", p_view );
       views_state . open_views . register_view (
@@ -67,13 +66,13 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
         // reached it (a search, or a goto-id view).
         let (_v, pids2, vf2) =
           single_root_view (
-            config, Some (tantivy), &ID::from ("L"), false ) ?;
+            config, Some (tantivy), &ID::from ("L") ) ?;
         views_state . open_views . register_view (
           &graph . load_full (),
           ViewId::ContentView ("collat-del-L-2" . into ()), vf2, &pids2 );
         let (_v3, pids3, vf3) =
           single_root_view (
-            config, Some (tantivy), &ID::from ("L"), false ) ?;
+            config, Some (tantivy), &ID::from ("L") ) ?;
         views_state . open_views . register_view (
           &graph . load_full (),
           ViewId::SearchView ("to X" . into ()), vf3, &pids3 ); }
@@ -86,7 +85,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
         let (view, pids, vf) =
           multi_root_view (
             config, Some (tantivy),
-            &[ID::from ("L"), ID::from ("L")], false ) ?;
+            &[ID::from ("L"), ID::from ("L")] ) ?;
         assert! ( view . contains ("writeProtected"),
           "duplicate-root content view should contain a write-protected L:\n{}",
           view );
@@ -99,7 +98,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       // marked for deletion.
       let (_l_view, l_pids, l_vf) =
         single_root_view (
-          config, Some (tantivy), &ID::from ("L"), false ) ?;
+          config, Some (tantivy), &ID::from ("L") ) ?;
       views_state . open_views . register_view (
         &graph . load_full (), l_view_id . clone (), l_vf, &l_pids );
       let delete_buffer : String =
@@ -108,8 +107,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       let (mut stream, read_end) : (TcpStream, TcpStream) = mk_pair ();
       let response : SaveResponse =
         update_from_and_rerender_buffer (
-          &mut stream, &delete_buffer, config, tantivy, &graph,
-          false, &Ok (l_view_id . clone ()), &mut views_state ) . await ?;
+          &mut stream, &delete_buffer, config, tantivy, &graph, &Ok (l_view_id . clone ()), &mut views_state ) . await ?;
       drop (stream);
       let msgs : Vec<String> = {
         let mut reader : BufReader<TcpStream> = BufReader::new (read_end);

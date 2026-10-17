@@ -92,7 +92,7 @@ async fn save_buffer_for_hidden_subscriptions_test (
   let mut stream : TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    buffer, config, tantivy, graph, false,
+    buffer, config, tantivy, graph,
 
     &Err ( String::new () ), views_state
   ) . await ?;
@@ -112,7 +112,7 @@ async fn save_buffer_and_read_collateral_views (
   let response =
     update_from_and_rerender_buffer (
       &mut stream,
-      buffer, config, tantivy, graph, false,
+      buffer, config, tantivy, graph,
       &Ok (view_id . clone ()), views_state
     ) . await ?;
   drop (stream);
@@ -376,7 +376,6 @@ async fn test_deleting_foreign_subscribee_content_preserves_branch_edit (
       (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None,};
 
@@ -384,8 +383,7 @@ async fn test_deleting_foreign_subscribee_content_preserves_branch_edit (
       : (String, Vec<ID>, _)
       = single_root_view(
           &config, None,
-          &ID ("r" . to_string()),
-          false )?;
+          &ID ("r" . to_string()) )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_editable_view_request_to_subscribees (&initial_view),
@@ -409,7 +407,6 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
       (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None,};
 
@@ -417,8 +414,7 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
       : (String, Vec<ID>, _)
       = single_root_view(
           &config, None,
-          &ID ("r" . to_string()),
-          false )?;
+          &ID ("r" . to_string()) )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_editable_view_request_to_subscribees (&initial_view),
@@ -428,7 +424,7 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
       expanded_subscribee_edit_view (&expanded, "delete");
     let mut stream : TcpStream = mk_test_tcp_stream ();
     let response = update_from_and_rerender_buffer (
-      &mut stream, &edited, config, tantivy, &graph, false,
+      &mut stream, &edited, config, tantivy, &graph,
       &Err (String::new ()), &mut views_state ) . await ?;
     let rerendered : String = response . saved_view;
 
@@ -456,7 +452,6 @@ async fn test_removing_subscribee_content_from_subscriber_contains_infers_hide (
       (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None,};
     let buffer : &str = indoc! {"
@@ -489,7 +484,6 @@ async fn test_readding_subscribee_content_to_subscriber_contains_unhides (
       (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None,};
     let buffer : &str = indoc! {"
@@ -517,7 +511,6 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None,};
     let saved_view_id : ViewId =
@@ -530,8 +523,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
     let (initial_view, pids, viewforest) =
       single_root_view(
         &config, None,
-        &ID ("r" . to_string()),
-        false )?;
+        &ID ("r" . to_string()) )?;
     views_state . open_views . register_view (
       &graph . load_full (), saved_view_id . clone(), viewforest, &pids);
 
@@ -593,7 +585,6 @@ async fn test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
       (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None,};
 
@@ -601,8 +592,7 @@ async fn test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
       : (String, Vec<ID>, _)
       = single_root_view(
           &config, None,
-          &ID ("r" . to_string()),
-          false )?;
+          &ID ("r" . to_string()) )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_editable_view_request_to_subscribees (&initial_view),
@@ -636,7 +626,6 @@ async fn test_moving_foreign_subscribee_content_elsewhere_still_hides (
       (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None,};
 
@@ -644,8 +633,7 @@ async fn test_moving_foreign_subscribee_content_elsewhere_still_hides (
       : (String, Vec<ID>, _)
       = single_root_view(
           &config, None,
-          &ID ("r" . to_string()),
-          false )?;
+          &ID ("r" . to_string()) )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_editable_view_request_to_subscribees (&initial_view),
@@ -674,7 +662,6 @@ async fn test_extra_view_child_under_foreign_subscribee_is_deleted (
       (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None,};
 
@@ -682,8 +669,7 @@ async fn test_extra_view_child_under_foreign_subscribee_is_deleted (
       : (String, Vec<ID>, _)
       = single_root_view(
           &config, None,
-          &ID ("r" . to_string()),
-          false )?;
+          &ID ("r" . to_string()) )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_editable_view_request_to_subscribees (&initial_view),
@@ -727,7 +713,6 @@ async fn test_extra_view_child_under_owned_subscribee_is_deleted (
       (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None,};
     let edited : String =
@@ -787,8 +772,7 @@ async fn test_subscribee_and_filter_folders (
       : (String, Vec<ID>, _)
       = single_root_view(
           &config, None,
-          &ID("R" . to_string()), // Initial view from R ("subscribeR")
-          false )?;
+          &ID("R" . to_string()) )?;
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
@@ -811,13 +795,12 @@ async fn test_subscribee_and_filter_folders (
         (
           graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = ViewsState {
-        diff_mode_enabled : false,
         open_views            : OpenViews::new (),
         graph_pair            : None,};
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
           &mut stream,
-          &modified_view, &config, tantivy, &graph, false,
+          &modified_view, &config, tantivy, &graph,
 
           &Err ( String::new () ), &mut views_state
         ) . await ?;
@@ -861,8 +844,7 @@ async fn test_hidden_within_but_none_without (
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
       = single_root_view( &config, None,
-                          &ID("R" . to_string()), // the root
-                          false )?;
+                          &ID("R" . to_string()) )?;
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
@@ -882,13 +864,12 @@ async fn test_hidden_within_but_none_without (
         (
           graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = ViewsState {
-        diff_mode_enabled : false,
         open_views            : OpenViews::new (),
         graph_pair            : None,};
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
           &mut stream,
-          &modified_view, &config, tantivy, &graph, false,
+          &modified_view, &config, tantivy, &graph,
 
           &Err ( String::new () ), &mut views_state
         ) . await ?;
@@ -920,7 +901,6 @@ async fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
       (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None,};
 
@@ -928,8 +908,7 @@ async fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
       : (String, Vec<ID>, _)
       = single_root_view(
           &config, None,
-          &ID ("R" . to_string()),
-          false )?;
+          &ID ("R" . to_string()) )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_editable_view_request_to_subscribees (&initial_view),
@@ -971,7 +950,6 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
       (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None,};
     let saved_view_id : ViewId =
@@ -984,8 +962,7 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
     let (initial_view, pids, viewforest) =
       single_root_view(
         &config, None,
-        &ID ("R" . to_string()),
-        false )?;
+        &ID ("R" . to_string()) )?;
     views_state . open_views . register_view (
       &graph . load_full (), saved_view_id . clone(), viewforest, &pids);
 
@@ -1040,7 +1017,6 @@ async fn test_deleting_from_hiddenin_folder_does_not_unhide (
       (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None,};
 
@@ -1048,8 +1024,7 @@ async fn test_deleting_from_hiddenin_folder_does_not_unhide (
       : (String, Vec<ID>, _)
       = single_root_view(
           &config, None,
-          &ID ("R" . to_string()),
-          false )?;
+          &ID ("R" . to_string()) )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_editable_view_request_to_subscribees (&initial_view),
@@ -1094,8 +1069,7 @@ async fn test_hidden_without_but_none_within (
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
       = single_root_view( &config, None,
-                          &ID("R" . to_string()), // origin of the view
-                          false )?;
+                          &ID("R" . to_string()) )?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
       "* (skg (node (id R) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
@@ -1116,13 +1090,12 @@ async fn test_hidden_without_but_none_within (
         (
           graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = ViewsState {
-        diff_mode_enabled : false,
         open_views            : OpenViews::new (),
         graph_pair            : None,};
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
         &mut stream,
-        &modified_view, &config, tantivy, &graph, false,
+        &modified_view, &config, tantivy, &graph,
 
         &Err ( String::new () ), &mut views_state ) . await ?;
       response . saved_view };
@@ -1153,7 +1126,6 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
       (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None,};
 
@@ -1161,13 +1133,12 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
       : (String, Vec<ID>, _)
       = single_root_view(
           &config, None,
-          &ID ("R" . to_string()),
-          false )?;
+          &ID ("R" . to_string()) )?;
     let edited : String =
       add_e11_to_hiddenoutside_folder (&initial_view);
     let mut stream : TcpStream = mk_test_tcp_stream ();
     let response = update_from_and_rerender_buffer (
-      &mut stream, &edited, config, tantivy, &graph, false,
+      &mut stream, &edited, config, tantivy, &graph,
       &Err (String::new ()), &mut views_state ) . await ?;
     let rerendered : String = response . saved_view;
 
@@ -1235,8 +1206,7 @@ async fn test_overlapping_hidden_within (
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
       = single_root_view( &config, None,
-                          &ID("R" . to_string()), // root of the view
-                          false )?;
+                          &ID("R" . to_string()) )?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
       "* (skg (node (id R) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
@@ -1256,13 +1226,12 @@ async fn test_overlapping_hidden_within (
         (
           graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = ViewsState {
-        diff_mode_enabled : false,
         open_views            : OpenViews::new (),
         graph_pair            : None,};
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
         &mut stream,
-        &modified_view, &config, tantivy, &graph, false,
+        &modified_view, &config, tantivy, &graph,
 
         &Err ( String::new () ), &mut views_state ) . await ?;
       response . saved_view };

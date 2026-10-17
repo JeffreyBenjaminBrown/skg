@@ -1,4 +1,0 @@
-pid: 'ES'
-title: "ES"
-subscribesTo:
-  - "EB"

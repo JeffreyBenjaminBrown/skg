@@ -30,7 +30,7 @@ fn raw_drawn_overridden_root_children_are_raw
       let (x_view, _pids, _tree)
         : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view (
-          config, Some (tantivy), &[ID::from ("X")], false )
+          config, Some (tantivy), &[ID::from ("X")] )
  ?;
       // X is drawn raw (a view root).
       assert! ( x_view . lines () . any (

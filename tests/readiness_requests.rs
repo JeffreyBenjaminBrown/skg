@@ -6,7 +6,7 @@
 // a gains the alias "ay".
 
 #[path = "shared/git_fixture_helpers.rs"]
-#[allow(unused_imports, dead_code)] // shared with the git diff view tests, which use more of it
+#[allow(unused_imports, dead_code)] // shared by several test targets, each using part of it
 mod git_fixture_helpers;
 
 use git_fixture_helpers::{mk_test_tcp_stream_pair, setup_gitrepo_with_fixtures};
@@ -57,7 +57,6 @@ fn fixture (
   Ok ( Fixture {
     _root : root, config, tantivy, graph,
     views_state : ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None, } } ) }
 
@@ -69,7 +68,7 @@ fn save (
     mk_test_tcp_stream_pair ();
   let response : SaveResponse = block_on (
     update_from_and_rerender_buffer_test (
-      &mut stream, buffer, &f . config, &f . tantivy, &f . graph, false,
+      &mut stream, buffer, &f . config, &f . tantivy, &f . graph,
       &Ok ( ViewId::ContentView ("readiness" . to_string ()) ),
       &mut f . views_state )) ?;
   Ok (response) }

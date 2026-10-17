@@ -49,7 +49,6 @@ async fn save_buffer (
   graph   : &InRustGraphHandle, // must be the explicit handle, or the save's coherence debug-assert reads a stale graph
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false,
     open_views        : OpenViews::new (),
     graph_pair        : None,
   };
@@ -59,7 +58,7 @@ async fn save_buffer (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   update_from_and_rerender_buffer (
     &mut stream,
-    buf, config, tantivy, graph, false,
+    buf, config, tantivy, graph,
     &Err ( String::new () ), &mut views_state ) . await }
 
 fn line_containing<'a> (
@@ -82,7 +81,7 @@ async fn write_protected_folder_repairs_warn_impl (
     : (String, Vec<ID>, _) =
     multi_root_view (
       config, Some (tantivy),
-      &[ ID ("n" . to_string ()) ], false ) ?;
+      &[ ID ("n" . to_string ()) ] ) ?;
   let folder_request : String = initial_buffer . replace (
     "(affectsParent na)",
     "(affectsParent na) (viewRequests (folder subscribesTo))" );

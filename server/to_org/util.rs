@@ -150,12 +150,7 @@ pub fn complete_branch_minus_content (
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "maybe_add_default_partnerFolder_branches" ). entered();
     maybe_add_default_partnerFolder_branches (
-      tree, treeid, graph, config, skgrepo_restriction,
-      // This birth path runs outside the diff-aware BFS (search
-      // results, ancestry attachment, stubs); diff-mode folder
-      // existence is decided at each node's completion visit, which
-      // passes the real diffs.
-      &None ) } ?;
+      tree, treeid, graph, config, skgrepo_restriction ) } ?;
   Ok (( )) }
 
 /// Does only what it says -- in particular,
@@ -374,8 +369,7 @@ pub fn mark_orphans_under_dead_parents_false (
       let affects_parent_non_container : bool =
         child_ref . parent () . map_or ( false, |p|
           matches! ( & p . value () . kind,
-            ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (_)))
-              | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))
+            ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))
               | ViewnodeKind::DeadViewnode ) );
       if affects_parent_non_container { targets . push ( child_ref . id () ); }}}
   for skgid in targets {
@@ -409,7 +403,7 @@ pub fn skgids_that_can_have_graphnodestats (
   for edge in tree . root () . traverse () {
     if let Edge::Open (node_ref) = edge {
       if let Some (vid) =
-        node_ref . value () . unrestricted_or_diff_phantom_skgid ()
+        node_ref . value () . unrestricted_skgid ()
       { skgids . push ( vid . clone () ); }}}
   skgids }
 
@@ -533,7 +527,6 @@ pub fn unrestrictedVognode_in_tree_is_writeProtected (
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   match node_kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Ok (t . is_writeProtected ()),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) => Ok (p . is_writeProtected ()),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => Ok (true),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))
       | ViewnodeKind::Vognode (Vognode::Restricted (_))

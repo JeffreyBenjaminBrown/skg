@@ -3,7 +3,6 @@
 /// - when treatment should be Alias, make it so
 /// - add missing IDs where treatment is Content
 
-use crate::types::git::RelationshipAxes;
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::viewnode::AffectsParent;
@@ -183,7 +182,6 @@ fn make_alias_if_appropriate(
         Property::Alias { text: t . title . clone(),
                       relRepo: t . viewStats . relRepo . clone (),
                       relRepo_request: t . relRepo_request . clone (),
-                      relationship_axes: RelationshipAxes::default (),
                       change_facts: t . change_facts . clone (),
                       readiness_request: t . readiness_request . clone () } ); }}
   Ok (( )) }

@@ -98,7 +98,6 @@ pub fn handle_single_root_view_request (
             match multi_root_view_via_runtime (
               &runtime,
               &[skgid . clone ()],
-              views_state . diff_mode_enabled,
               Some (skgrepo_restriction),
               &mut render_warnings )
             { Ok ( (buffer_content, pids, viewforest) ) => {

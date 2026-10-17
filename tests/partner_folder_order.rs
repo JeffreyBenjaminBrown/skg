@@ -42,7 +42,6 @@ async fn save_and_rerender (
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false,
     open_views        : OpenViews::new (),
     graph_pair        : None,
   };
@@ -52,7 +51,7 @@ async fn save_and_rerender (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    buf, config, tantivy, &graph, false,
+    buf, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "save must not error; got: {:?}", response . errors );
@@ -89,7 +88,7 @@ async fn write_protected_folder_order_is_preserved_impl (
     : (String, Vec<ID>, _) =
     multi_root_view (
       config, Some (tantivy),
-      &[ ID ("n" . to_string ()) ], false ) ?;
+      &[ ID ("n" . to_string ()) ] ) ?;
   let folder_request : String = initial_buffer . replace (
     "(affectsParent na)",
     "(affectsParent na) (viewRequests (folder subscribesTo))" );

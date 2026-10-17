@@ -324,17 +324,6 @@ fn any (
 ) -> RuleChild {
   rule ( "ANY", children ) }
 
-/// (STYLE INTERC "sep" label children...), with STYLE from
-/// 'node_heralds' under the label
-fn interc (
-  sep      : &'static str,
-  label    : &'static str,
-  children : Vec<RuleChild>,
-) -> RuleChild {
-  RuleChild::Rule ( HeraldRule {
-    node_heralds_key : Some (label), interc : Some (sep),
-    label : Some (label), abut : false, children } ) }
-
 fn s ( text : &'static str ) -> RuleChild { RuleChild::Str (text) }
 
 /// The placeholder token the `rels` rule emits. The relationship
@@ -364,10 +353,9 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///   * INTERC rules -- used when the server emits a parent whose
 ///     children should be glued together with a separator, preserving
 ///     each child's own style. Labelled INTERCs match a child of the
-///     object bearing that label (e.g. the staged/unstaged forms);
-///     unlabelled INTERCs run their sub-rules against the current
-///     object's own children. Empty slots and their separators are
-///     skipped, so "text changed ✓ ✗" shows only the marks that apply.
+///     object bearing that label; unlabelled INTERCs run their
+///     sub-rules against the current object's own children. Empty
+///     slots and their separators are skipped.
 ///
 ///   * 'leaf_abut' -- the emitted token glues onto the preceding
 ///     token with no space (used so the write-protected glyph "☮" sits
@@ -385,11 +373,6 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///     server depending on whether the deletion is on a non-vognode viewnode
 ///     (like a deleted aliasFolder) or on a file-level node. Each gets
 ///     its own matcher; both render as "DELETED".
-///
-///   * Two non-vognode-level staged/unstaged INTERC rules and two
-///     node-level ones -- the non-vognode-level pair omits the N / -N
-///     axes because node-axis atoms only apply to UnrestrictedVognodes,
-///     not to non-vognodes.
 ///
 ///   * The 'affectsParent' sub-rule 'true' is vacuous: the server leaves
 ///     affectsParent=true implicit, and an explicit '(affectsParent
@@ -459,12 +442,6 @@ pub fn herald_rule_table () -> HeraldRule {
       // its presence, ✓ when ready.
       change_fact_rules_for_one_axis ("+", "-"),
       vec! [
-      // A text change reads "text changed ✓ ✗", showing whichever
-      // stages it is in: ✓ staged, ✗ unstaged.
-      interc (" ", "textChanged", vec! [
-        s ("text changed "),
-        leaf ("staged",   "✓"),
-        leaf ("unstaged", "✗") ]),
       crule ("deadViewnode", vec! [ s ("DELETED") ]),
       crule ("deleted", vec! [
         s ("DELETED"),
@@ -496,14 +473,6 @@ pub fn herald_rule_table () -> HeraldRule {
       // they are not emitted.
       crule ("restrictedNode", vec! [
         s ("node from restricted skgrepo") ]),
-      interc ("", "staged", vec! [
-        s ("✓"),
-        leaf ("addedR", "R"),
-        leaf ("removedR", "-R") ]),
-      interc ("", "unstaged", vec! [
-        s ("✗"),
-        leaf ("addedR", "R"),
-        leaf ("removedR", "-R") ]),
       rule ("node", [ vec! [
         vac ("id"),
         vac ("repo"),
@@ -568,45 +537,8 @@ pub fn herald_rule_table () -> HeraldRule {
           rule ("folder",  vec! [ any (vec! [ s ("req:folder:"),  RuleChild::It ]) ]),
           rule ("roleTree", vec! [ any (vec! [ s ("req:roleTree:"), RuleChild::It ]) ]),
           rule ("flags", vec! [ s ("req:flags") ]),
-          rule ("editableView", vec! [ s ("req:editable") ]) ]),
-        interc ("", "staged", vec! [
-          s ("✓"),
-          leaf ("addedN", "N"),
-          leaf ("deletedN", "-N"),
-          leaf ("addedR", "R"),
-          leaf ("removedR", "-R") ]),
-        interc ("", "unstaged", vec! [
-          s ("✗"),
-          leaf ("addedN", "N"),
-          leaf ("deletedN", "-N"),
-          leaf ("addedR", "R"),
-          leaf ("removedR", "-R") ]),
-        leaf ("notInGit", "diff:not-in-git") ],
-        change_fact_rules_for_two_axes () ] . concat ()),
-      // A PhantomDiff (a moved/removed node in git-diff mode) emits its
-      // own root atom 'diffPhantom', not 'node'. Its grammar is the
-      // strict subset of node's that phantomDiff_metadata_to_string can
-      // produce: id, repo, write-protected, graphStats, the staged/unstaged diff
-      // axes, and notInGit -- never affectsParent/birth/viewStats/editRequest/
-      // viewRequests.
-      rule ("diffPhantom", vec! [
-        vac ("id"),
-        vac ("repo"),
-        leaf_abut ("writeProtected", "☮"),
-        rule ("rels", vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
-        interc ("", "staged", vec! [
-          s ("✓"),
-          leaf ("addedN", "N"),
-          leaf ("deletedN", "-N"),
-          leaf ("addedR", "R"),
-          leaf ("removedR", "-R") ]),
-        interc ("", "unstaged", vec! [
-          s ("✗"),
-          leaf ("addedN", "N"),
-          leaf ("deletedN", "-N"),
-          leaf ("addedR", "R"),
-          leaf ("removedR", "-R") ]),
-        leaf ("notInGit", "diff:not-in-git") ]) ] ] . concat (),
+          rule ("editableView", vec! [ s ("req:editable") ]) ]) ],
+        change_fact_rules_for_two_axes () ] . concat ()) ] ] . concat (),
   }}
 
 //
@@ -752,17 +684,16 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     // Bare buffer-position atoms, from org_to_text.rs:
     "focused", "folded", "bodyFolded",
     // Form heads, from org_to_text.rs:
-    "node", "diffPhantom", "deleted", "unknown", "restrictedNode",
+    "node", "deleted", "unknown", "restrictedNode",
     "deadViewnode", "historical",
-    // Keys inside node / diffPhantom / deleted / unknown forms:
+    // Keys inside node / deleted / unknown forms:
     "id", "repo",
-    "affectsParent", "writeProtected", "omittedBody", "notInGit",
+    "affectsParent", "writeProtected", "omittedBody",
     // The assembled relationship-herald atom, a payload of styled spans
     // (server/herald_tokens.rs); its span sub-forms are value position,
     // consumed by the client's renderer, so they are not match atoms.
     "rels",
     "viewStats", "editRequest", "viewRequests",
-    "staged", "unstaged",
     // NodeEditRequest atoms. The flag form's name and desired value
     // are matched literally so its herald can describe the complete state
     // change rather than echoing two context-free arguments.
@@ -774,7 +705,6 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   atoms . extend ( graphstats_atoms () );
   atoms . extend ( viewstats_atoms () );
   atoms . extend ( affectsParent_emitted_atoms () );
-  atoms . extend ( axis_atoms () );
   atoms . extend ( property_and_folder_atoms () );
   atoms . extend ( ViewRequest::EMITTABLE_MATCH_ATOMS );
   atoms . extend ( change_fact_atoms () );
@@ -845,14 +775,6 @@ fn affectsParent_emitted_atoms () -> Vec<&'static str> {
   let _ = guard;
   vec! [ "false", "na" ] }
 
-/// The staged/unstaged axis atoms, from types/git.rs.
-fn axis_atoms () -> Vec<&'static str> {
-  use crate::types::git::Sign;
-  fn guard ( s : Sign ) { // compile error here = update the list below
-    match s { Sign::Plus | Sign::Minus => () }}
-  let _ = guard;
-  vec! [ "addedN", "deletedN", "addedR", "removedR" ] }
-
 /// Folder and Property atoms, via the same repr_in_client constants the
 /// serializer uses.
 fn property_and_folder_atoms () -> Vec<&'static str> {
@@ -882,16 +804,16 @@ fn property_and_folder_atoms () -> Vec<&'static str> {
   let all_propertyFolders : [PropertyFolder; 3] = [
     PropertyFolder::ID, PropertyFolder::Alias, PropertyFolder::flags () ];
   for c in &all_propertyFolders { propertyFolder_guard (c); }
-  let all_property_atoms : [&'static str; 9] = {
+  let all_property_atoms : [&'static str; 8] = {
     fn property_guard ( q : &Property ) { // ditto
       match q {
-        Property::Alias { .. } | Property::ID { .. } | Property::TextChanged { .. }
+        Property::Alias { .. } | Property::ID { .. }
           | Property::Flag { .. } | Property::OldText { .. }
           | Property::BodyDiff { .. } | Property::HomeSkgrepoMove { .. }
           | Property::RelRepoMove { .. } | Property::ChangesetMarker { .. }
           => () }}
     let _ = property_guard;
-    [ "alias", "id", "textChanged", "flag", "oldText", "bodyDiff",
+    [ "alias", "id", "flag", "oldText", "bodyDiff",
       "homeMove", "relRepoMove", "changesetMarker" ] };
   // The arguments the total diff view's properties take in match
   // position (org_to_text.rs's 'property_metadata_to_string').

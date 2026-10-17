@@ -78,7 +78,7 @@ async fn test_bfs_limit_across_multiple_trees (
       ];
 
       let (result, _pids, _) : (String, Vec<ID>, _) =
-        multi_root_view ( &test_config, None, & focii, false
+        multi_root_view ( &test_config, None, & focii
                         ) ?;
 
       println!("BFS multi-tree limit result:\n{}", result);
@@ -124,7 +124,7 @@ async fn test_bfs_limit_9_three_branches (
       ];
 
       let (result, _pids, _) : (String, Vec<ID>, _) =
-        multi_root_view ( &test_config, None, & focii, false
+        multi_root_view ( &test_config, None, & focii
                         ) ?;
 
       println!("BFS limit=9 three branches result:\n{}", result);
@@ -172,7 +172,7 @@ async fn test_bfs_limit_8_two_branches (
       ];
 
       let (result, _pids, _) : (String, Vec<ID>, _) =
-        multi_root_view ( &test_config, None, & focii, false
+        multi_root_view ( &test_config, None, & focii
                         ) ?;
 
       println!("BFS limit=8 two branches result:\n{}", result);
@@ -215,7 +215,7 @@ async fn test_budget_content_beats_subscribers (
 
       let focii = vec![ ID ( "r" . to_string () ) ];
       let (result, _pids, _) : (String, Vec<ID>, _) =
-        multi_root_view ( &test_config, None, & focii, false
+        multi_root_view ( &test_config, None, & focii
                         ) ?;
 
       println!("content-vs-subscribers (budget 3):\n{}", result);

@@ -25,7 +25,7 @@ use crate::serve::handlers::import_md_and_org::{
 use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_skgrepo_set;
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
 use crate::serve::handlers::rebuild_session_lifetime_stores::handle_rebuild_session_lifetime_stores_request;
-use crate::serve::handlers::rerender_all_views::{ handle_git_diff_toggle_and_rerender, handle_rerender_all_views_request};
+use crate::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
@@ -69,7 +69,6 @@ use std::time::Duration;
 /// handle is in 'SkgEnv', which is also per-connection (cloned at
 /// connection acceptance), so it doesn't appear here.
 pub struct ViewsState {
-  pub diff_mode_enabled : bool,
   pub open_views        : OpenViews,
   // Built when a total-diff-view buffer is requested, and brought up
   // to date by 'current_graph_pair_in_slot'.
@@ -105,7 +104,6 @@ fn handle_emacs (
   let runtime = env . runtime_snapshot ();
   let mut views_state : ViewsState =
     ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None, };
   let mut skgrepo_restriction : SkgrepoRestriction =
@@ -226,7 +224,6 @@ fn handle_emacs (
             handle_titles_by_skgids_request_with_skgrepo_set (
               &mut stream, &request_header,
               &runtime . tantivy_index, &runtime . config,
-              views_state . diff_mode_enabled,
               &skgrepo_restriction,
               &runtime . graph ),
           Ok (RequestType::LinkStatuses) =>
@@ -267,13 +264,6 @@ fn handle_emacs (
               &skgrepo_restriction ),
           Ok (RequestType::HeraldRules) =>
             handle_herald_rules_request ( &mut stream ),
-          Ok (RequestType::GitDiffModeToggle) =>
-            handle_git_diff_toggle_and_rerender (
-              &mut stream,
-              &request_header,
-              &env,
-              &mut views_state,
-              &skgrepo_restriction ),
           Ok (RequestType::ExportToOrg) =>
             handle_export_to_org_request ( &mut stream,
                                            &runtime . config,

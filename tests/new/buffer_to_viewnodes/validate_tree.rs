@@ -386,16 +386,14 @@ async fn test_no_duplicated_content_error_for_phantom_siblings (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      // A phantom sibling (a diffPhantom carrying unstaged deletedN
-      // removedR) sharing an ID with a real sibling should not trigger a
-      // duplicate error. The 'diffPhantom' root atom -- not the diff axes
-      // -- is what marks it a phantom, matching what the diff renderer
-      // emits and what the user saves back.
+      // A phantom sibling (a historical phantom) sharing an ID with a
+      // real sibling should not trigger a duplicate error: a phantom is
+      // not a member of its parent.
       let input: &str =
         indoc! {"
                 * (skg (node (id root) (repo main))) parent
                 ** (skg (node (id 1) (repo main))) real child
-                ** (skg (diffPhantom (id 1) (repo main) (unstaged deletedN removedR))) phantom child
+                ** (skg (historical (id 1) (repo main) (diff node- rel-))) phantom child
             "};
 
       let viewforest: MpViewForest =
@@ -609,16 +607,15 @@ async fn test_editable_view_request_with_content_child_is_rejected (
 
 #[test]
 fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
-  // A phantom (a diffPhantom, always write-protected) marked for deletion
-  // cannot be saved: Editability::WriteProtected has no slot for an
-  // edit_request, so the parser would silently drop the user's
-  // instruction. Instead we emit EditRequestOnWriteProtectedOccurrence so the save
-  // is rejected with a clear message. (The error is raised before the
-  // phantom-vs-vognode dispatch, so it fires on the diffPhantom path too.)
+  // A write-protected node marked for deletion cannot be saved:
+  // Editability::WriteProtected has no slot for an edit_request, so the
+  // parser would silently drop the user's instruction. Instead we emit
+  // EditRequestOnWriteProtectedOccurrence so the save is rejected with a
+  // clear message.
   let input_delete: &str =
     indoc! {"
       * (skg (node (id root) (repo main))) parent
-      ** (skg (diffPhantom (id phantom) (repo main) writeProtected (unstaged removedR) (editRequest delete))) phantom child
+      ** (skg (node (id phantom) (repo main) writeProtected (editRequest delete))) phantom child
     "};
   let (_viewforest, parsing_errors, _warnings)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)

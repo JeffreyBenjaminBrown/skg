@@ -121,7 +121,7 @@ async fn test_multi_root_view_logic (
   ];
   let (result, _pids, _)
     : (String, Vec<ID>, _)
-    = multi_root_view ( & config, None, & focii, false
+    = multi_root_view ( & config, None, & focii
                       ) ?;
 
   println!("Multi-root view result:\n{}", result);
@@ -147,8 +147,7 @@ async fn test_single_root_view_with_cycle (
       let (result, _pids, _)
         : (String, Vec<ID>, _)
         = single_root_view ( config, None,
-                             &ID ( "a" . to_string () ),
-                             false
+                             &ID ( "a" . to_string () )
                            ) ?;
 
       println!("Single root view with cycle result:\n{}", result);
@@ -174,7 +173,7 @@ async fn test_multi_root_view_with_shared_nodes (
         ID ( "2" . to_string () )
       ];
       let (result, _pids, _) : (String, Vec<ID>, _) =
-        multi_root_view ( config, None, & focii, false
+        multi_root_view ( config, None, & focii
                         ) ?;
 
       println!("Multi root view with shared nodes result:\n{}", result);
@@ -222,7 +221,7 @@ async fn test_multi_root_view_with_node_limit (
         ID ( "2" . to_string () )
       ];
       let (result, _pids, _) : (String, Vec<ID>, _) =
-        multi_root_view ( &test_config, None, & focii, false
+        multi_root_view ( &test_config, None, & focii
                         ) ?;
 
       println!("Multi root view with limit=3 result:\n{}", result);
@@ -277,8 +276,7 @@ async fn test_limit_with_multiple_sibling_groups (
 
       let (result, _pids, _) : (String, Vec<ID>, _)
       = single_root_view ( &test_config, None,
-                           &ID ( "1" . to_string () ),
-                           false
+                           &ID ( "1" . to_string () )
                          ) ?;
 
       println!("Result with multiple sibling groups:\n{}", result);

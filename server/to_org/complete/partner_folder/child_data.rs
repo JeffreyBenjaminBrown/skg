@@ -7,7 +7,7 @@
 ///
 /// - A `goal_list` is the ordered list of node IDs that a folder
 ///   should present after completion.  The list is computed from the
-///   graph and, in diff views, from git-diff state.
+///   graph.
 /// - A goal child is a child Viewnode whose UnrestrictedVognode ID appears in
 ///   that `goal_list`, whether it already existed in the buffer or
 ///   was created during reconciliation.
@@ -15,16 +15,14 @@
 ///   manage: for PartnerFolders, an UnrestrictedVognode marked affectsParent=true.
 ///   Relevant children whose IDs are not in the goal list are removed
 ///   or otherwise demoted by the caller-specific cleanup step.
-/// - `ChildData` is the pre-fetched title/repo/phantom metadata
+/// - `ChildData` is the pre-fetched title/repo metadata
 ///   needed to create any missing goal child without querying while
 ///   the tree is being mutated.
 
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgrepoDiff};
 use crate::types::misc::{ID, SkgrepoName};
-use crate::types::phantom::title_for_phantom;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
-use crate::types::viewnode::{ChangeFacts, DiffPresence, Phantom, Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{ChangeFacts, DiffPresence, Phantom, Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{complete_relevant_children_in_viewforest, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
 
@@ -36,13 +34,9 @@ use std::io;
 /// Per-child information needed to build a viewnode for a sharing
 /// folder's child (subscribee, hidden-in-subscribee, or
 /// hidden-outside-of-subscribees).
-///
-/// `phantom: None` => normal write-protected child marked AffectsParent::True.
-/// `phantom: Some(axes)` => diff-view phantom marking removal.
 pub struct ChildData {
   pub home_skgrepo : SkgrepoName,
   pub title        : String,
-  pub phantom      : Option<(NodeAxes, RelationshipAxes)>,
   /// True when the exact stored relationship member has no current
   /// node.  It is rendered as an Unknown, never as a title-less unrestricted
   /// fallback.
@@ -55,22 +49,10 @@ pub struct ChildData {
 /// The sharing completers build this before mutation so their flow
 /// stays explicit: read tree and graph facts, compute the goal list,
 /// prepare child data, then reconcile folder children.
-///
-/// `axes_for_removed` supplies each removed member's per-stage diff
-/// axes.  The caller must name the relation its folder represents when
-/// building that closure (outbound folders call `phantom_axes` with
-/// their relation; inbound folders read the inverse scan; filter folders
-/// compare derived membership), so an axis can never silently come
-/// from a different relation involving the same ID.
 pub fn build_child_data (
   tree                           : &Tree<Viewnode>,
   folder_node                       : NodeId,
   goal_list                      : &[ID],
-  removed_skgids                 : &HashSet<ID>,
-  axes_for_removed               : &dyn Fn (&ID, &SkgrepoName)
-                                     -> (NodeAxes, RelationshipAxes),
-  skgrepo_diffs                  : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   relRepos                       : &HashMap<ID, SkgrepoName>,
   runtime                        : &RuntimeGeneration,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
@@ -89,62 +71,38 @@ pub fn build_child_data (
   let mut result : HashMap<ID, ChildData> = HashMap::new ();
   for child_skgid in goal_list {
     if result . contains_key (child_skgid) { continue; }
-    if removed_skgids . contains (child_skgid) {
-      // A removed-member diff-phantom is a *non-Unrestricted* viewnode. If its
-      // skgrepo can't be determined, fall back to the NOT_FOUND sentinel
-      // rather than aborting the whole render (TODO/DONE/local-view-update/plan_v2.org §7.6).
-      let child_src : SkgrepoName =
-        SkgEnv::find_skgrepo_in_generation (
-          runtime, child_skgid, deleted_since_head_pid_src_map)
-        . unwrap_or_else ( SkgrepoName::not_found );
-      let axes : (NodeAxes, RelationshipAxes) =
-        axes_for_removed ( child_skgid, &child_src );
-      let child_title : String =
-        title_for_phantom ( &runtime . graph, child_skgid, &child_src,
-                            skgrepo_diffs . as_ref (), &runtime . config );
-      result . insert ( child_skgid . clone (),
-                        ChildData { home_skgrepo  : child_src,
-                                    title   : child_title,
-                                    phantom : Some (axes),
-                                    unknown : false,
-                                    relRepo : None } );
-    } else {
-      match SkgEnv::find_skgrepo_in_generation (
-        runtime, child_skgid, deleted_since_head_pid_src_map) {
-        None => { result . insert ( child_skgid . clone (),
-          ChildData { home_skgrepo: SkgrepoName::not_found (), title: String::new (),
-                      phantom: None, unknown: true,
-                      relRepo: relRepos . get (child_skgid) . cloned () } ); },
-        Some (child_src) => {
-          // `find_repo` deliberately falls back through Tantivy.  During a
-          // same-save rerender the search index can still name a just-deleted node;
-          // do not let that stale hint turn a retained raw relationship member
-          // into a failed disk read.  An unreadable, formerly indexed file
-          // means precisely an Unknown relationship member.
-          match graphnode_graphFirst_by_pid_and_skgrepo (
-            &runtime . graph, &runtime . config, child_skgid, &child_src ) {
-            Ok (skg) => if let Some ( (s, t) ) = existing_children . get (child_skgid) {
-              result . insert ( child_skgid . clone (),
-                                ChildData { home_skgrepo  : s . clone (),
-                                            title   : t . clone (),
-                                            phantom : None,
-                                            unknown : false,
-                                            relRepo : None } );
-            } else {
-              result . insert ( child_skgid . clone (),
-                                ChildData { home_skgrepo  : skg . home_skgrepo . clone (),
-                                            title   : skg . title . clone (),
-                                            phantom : None,
-                                            unknown : false,
-                                            relRepo : None } ); },
-            Err (e) if e . downcast_ref::<io::Error> ()
-              . is_some_and (|io_error| io_error . kind () == io::ErrorKind::NotFound) => {
-              result . insert ( child_skgid . clone (),
-                ChildData { home_skgrepo: SkgrepoName::not_found (), title: String::new (),
-                            phantom: None, unknown: true,
-                            relRepo: relRepos . get (child_skgid) . cloned () } ); },
-            Err (e) => return Err (e),
-          }
+    match SkgEnv::find_skgrepo_in_generation (runtime, child_skgid) {
+      None => { result . insert ( child_skgid . clone (),
+        ChildData { home_skgrepo: SkgrepoName::not_found (), title: String::new (),
+                    unknown: true,
+                    relRepo: relRepos . get (child_skgid) . cloned () } ); },
+      Some (child_src) => {
+        // `find_repo` deliberately falls back through Tantivy.  During a
+        // same-save rerender the search index can still name a just-deleted node;
+        // do not let that stale hint turn a retained raw relationship member
+        // into a failed disk read.  An unreadable, formerly indexed file
+        // means precisely an Unknown relationship member.
+        match graphnode_graphFirst_by_pid_and_skgrepo (
+          &runtime . graph, &runtime . config, child_skgid, &child_src ) {
+          Ok (skg) => if let Some ( (s, t) ) = existing_children . get (child_skgid) {
+            result . insert ( child_skgid . clone (),
+                              ChildData { home_skgrepo  : s . clone (),
+                                          title   : t . clone (),
+                                          unknown : false,
+                                          relRepo : None } );
+          } else {
+            result . insert ( child_skgid . clone (),
+                              ChildData { home_skgrepo  : skg . home_skgrepo . clone (),
+                                          title   : skg . title . clone (),
+                                          unknown : false,
+                                          relRepo : None } ); },
+          Err (e) if e . downcast_ref::<io::Error> ()
+            . is_some_and (|io_error| io_error . kind () == io::ErrorKind::NotFound) => {
+            result . insert ( child_skgid . clone (),
+              ChildData { home_skgrepo: SkgrepoName::not_found (), title: String::new (),
+                          unknown: true,
+                          relRepo: relRepos . get (child_skgid) . cloned () } ); },
+          Err (e) => return Err (e),
         }
       }
     }
@@ -158,9 +116,9 @@ pub fn build_child_data (
 /// HiddenOutsideOfSubscribeeFolder) share the same call shape: build
 /// per-child data before mutation, then call
 /// `complete_relevant_children_in_viewforest` with identical
-/// relevance/key/create closures. Phantom-flagged ChildData entries
-/// produce phantom viewnodes; non-phantom entries produce
-/// write-protected viewnodes marked AffectsParent::True.
+/// relevance/key/create closures. An unknown ChildData entry produces
+/// an unknown phantom; any other, a write-protected viewnode marked
+/// AffectsParent::True.
 pub fn reconcile_partnerFolder_children_against_goal_list (
   tree          : &mut Tree<Viewnode>,
   folder_node      : NodeId,
@@ -219,15 +177,10 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
             crate::types::viewnode::Phantom::Unknown (u))) = &mut unknown . kind
           { u . relRepo = d . relRepo . clone (); }
           unknown
-        } else { match d . phantom {
-          None => mk_writeProtected_viewnode ( skgid . clone (),
-                                             d . home_skgrepo . clone (),
-                                             d . title . clone (),
-                                             AffectsParent::True ),
-          Some ((ex, mem)) =>
-            mk_phantom_viewnode (
-              skgid . clone (), d . home_skgrepo . clone (),
-              d . title . clone (), ex, mem ) } } ) },
+        } else { mk_writeProtected_viewnode ( skgid . clone (),
+                                              d . home_skgrepo . clone (),
+                                              d . title . clone (),
+                                              AffectsParent::True ) } ) },
   ) ?;
   mark_goal_children_as_folder_members (
     tree, folder_node, goal_list) ?;
@@ -277,45 +230,6 @@ fn normalize_relationship_backed_partner_unknowns (
             readiness_request: None }))); })
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }
-
-/// Stamp per-stage membership signs onto a folder's existing Unrestricted
-/// members, from a per-member axes map (an outbound folder reads the
-/// recorder's relation diff via 'outbound_member_axes'; an inbound folder
-/// reads the inverse scan):
-/// - a member PRESENT after both stages gets only its Plus signs
-///   ('addedR'), mirroring 'mark_relationship_axes_on_existing_children's
-///   rule for content children (Minus positions are phantoms,
-///   handled by the goal list);
-/// - an Unrestricted child whose net result is REMOVED -- reachable only
-///   when a stale saved buffer still holds, as an Unrestricted member, a
-///   write-protected-folder member whose relationship is gone -- gets the full axes
-///   and flips to a phantom, so the rendered buffer cannot show a
-///   removed relationship as a live member.
-pub fn apply_relationship_axes_to_folder_members (
-  tree       : &mut Tree<Viewnode>,
-  folder_node   : NodeId,
-  axes_by_skgid : &HashMap<ID, RelationshipAxes>,
-) -> Result<(), Box<dyn Error>> {
-  if axes_by_skgid . is_empty () { return Ok (( )); }
-  treat_certain_children (
-    tree, folder_node,
-    |vn : &Viewnode| matches! (
-      &vn . kind, ViewnodeKind::Vognode (Vognode::Unrestricted (_)) ),
-    |vn : &mut Viewnode| {
-      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-        = &mut vn . kind
-      { if let Some (m) = axes_by_skgid . get (&t . skgid) {
-          if m . net_is_present () {
-            if m . staged   == Some (Sign::Plus)
-              { t . relationship_axes . staged   = Some (Sign::Plus); }
-            if m . unstaged == Some (Sign::Plus)
-              { t . relationship_axes . unstaged = Some (Sign::Plus); }
-          } else {
-            t . relationship_axes = *m; }}}
-      vn . normal_to_phantom (); // flips only when the axes require
-    } )
-    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
-  Ok (( )) }
 
 /// Stamp each member of a folder with the presence of its node and of
 /// its relationship to the folder's anchor, from 'presence_by_skgid'.
@@ -367,7 +281,7 @@ mod tests {
     let child_treeid   : NodeId = tree . root_mut () . append (child) . id ();
     let mut child_data : HashMap<ID, ChildData> = HashMap::new ();
     child_data . insert ( raw_extra . clone (), ChildData {
-      home_skgrepo: SkgrepoName::not_found (), title: String::new (), phantom: None,
+      home_skgrepo: SkgrepoName::not_found (), title: String::new (),
       unknown: true, relRepo: Some (skgrepo ("foreign")) } );
     let mut deleted_extra_ids : HashMap<ID, HashSet<ID>> = HashMap::new ();
     deleted_extra_ids . insert (
@@ -404,8 +318,7 @@ fn mark_goal_children_as_folder_members (
     tree, folder_node,
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-        goal_set . contains (&t . skgid)
-        && ! t . should_be_diffPhantom (),
+        goal_set . contains (&t . skgid),
       _ => false },
     |vn : &mut Viewnode| {
       if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))

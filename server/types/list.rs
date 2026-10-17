@@ -49,25 +49,6 @@ where
           result . push ( Diff_Item::New ( change . value() )), }}}
   result }
 
-/// From a diff, extract:
-/// - itemlist: all items (Unchanged, New, and Removed)
-/// - removedset: only the Removed items
-pub fn itemlist_and_removedset_from_diff<T> (
-  diff : &[Diff_Item<T>],
-) -> (Vec<T>, HashSet<T>)
-where T: Clone + Eq + std::hash::Hash {
-  let mut itemlist : Vec<T> = Vec::new();
-  let mut removedset : HashSet<T> = HashSet::new();
-  for d in diff {
-    match d {
-      Diff_Item::Unchanged (x)
-      | Diff_Item::New (x) =>
-        { itemlist . push( x . clone() ); },
-      Diff_Item::Removed (x) =>
-        { itemlist . push( x . clone() );
-          removedset . insert( x . clone() ); }} }
-  (itemlist, removedset) }
-
 /// Removes duplicates from a vector.
 /// Preserves the order of first occurrence.
 pub fn dedup_vector<T> (

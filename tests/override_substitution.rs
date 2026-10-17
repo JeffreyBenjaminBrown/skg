@@ -54,12 +54,6 @@ fn all_tests
       s . reset ("extraction_honors_overridesHere", fixtures) ?;
       extraction_honors_overridesHere (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("diff_mode_disables_substitution", fixtures) ?;
-      diff_mode_disables_substitution (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("marked_view_is_shape_stable_across_diff_toggle", fixtures) ?;
-      marked_view_is_shape_stable_across_diff_toggle (
-        &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("ownership_and_visibility_gate_substitution",
                              "tests/override_substitution/fixtures-multi/skgconfig.toml") ?;
       ownership_and_visibility_gate_substitution (
@@ -113,7 +107,6 @@ async fn save_and_rerender (
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false,
     open_views        : OpenViews::new (),
     graph_pair        : None,
   };
@@ -123,7 +116,7 @@ async fn save_and_rerender (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    buf, config, tantivy, &graph, false,
+    buf, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "save must not error; got: {:?}", response . errors );
@@ -148,7 +141,7 @@ async fn de_novo_draws_the_overrider_marked (
       let (view, _pids, _tree) =
         multi_root_view (
           config, Some (tantivy),
-          &[ ID::from ("P") ], false ) ?;
+          &[ ID::from ("P") ] ) ?;
       { let marked : Vec<&str> = marked_lines (&view, "N");
         assert_eq! ( marked . len (), 1,
           "exactly one drawn substitute for N:\n{}", view );
@@ -172,7 +165,7 @@ async fn save_roundtrips_to_original_and_is_idempotent (
       let (de_novo, _pids, _tree) =
         multi_root_view (
           config, Some (tantivy),
-          &[ ID::from ("P") ], false ) ?;
+          &[ ID::from ("P") ] ) ?;
       let saved : String =
         save_and_rerender (&de_novo, config, tantivy)
         . await ?;
@@ -313,149 +306,6 @@ async fn extraction_honors_overridesHere (
             "S must not hide N: the drawn R stands for N" ); }}
       Ok (( )) }
 
-async fn diff_mode_disables_substitution (
-  config : &SkgConfig,
-  tantivy : &mut TantivyIndex,
-) -> Result<(), Box<dyn Error>> {
-      (
-        graph_handle_from_config (config) ? );
-      let (view, _pids, _tree) =
-        multi_root_view (
-          config, Some (tantivy),
-          &[ ID::from ("P") ], true ) ?; // diff mode
-      assert! ( marked_lines (&view, "N") . is_empty (),
-        "diff surfaces show raw graph facts; no substitution:\n{}",
-        view );
-      assert! ( view . lines () . any (
-                  |l| l . contains ("(id N)") ),
-        "N draws raw in diff mode:\n{}", view );
-      Ok (( )) }
-
-/// A view already containing a drawn substitute (R marked
-/// '(overridesHere N)') is shape-stable across a diff-mode toggle:
-/// the rerender keeps the marked child (creation-only substitution;
-/// the reconciler matches by collected ID), creates no duplicate raw
-/// N and no phantom for N
-/// (TODO/DONE/full-schema/DONE/12-2_diff-mode-policy_discussion.org).
-async fn marked_view_is_shape_stable_across_diff_toggle (
-  config : &SkgConfig,
-  tantivy : &mut TantivyIndex,
-) -> Result<(), Box<dyn Error>> {
-      (
-        graph_handle_from_config (config) ? );
-      { // git-init the temp fixture copy, so the toggle's diff is
-        // real (and clean: HEAD == worktree).
-        let skgrepo_path : &std::path::Path =
-          & config . skgrepos . values () . next () . unwrap () . path;
-        let gitrepo : git2::Repository =
-          git2::Repository::init (skgrepo_path) ?;
-        { let mut git_config : git2::Config = gitrepo . config () ?;
-          git_config . set_str ("user.email", "test@test.invalid") ?;
-          git_config . set_str ("user.name", "skg tests") ?; }
-        let mut index : git2::Index = gitrepo . index () ?;
-        index . add_all (
-          ["*.skg"] . iter (), git2::IndexAddOption::DEFAULT, None ) ?;
-        index . write () ?;
-        let tree_id : git2::Oid = index . write_tree () ?;
-        let tree : git2::Tree = gitrepo . find_tree (tree_id) ?;
-        let sig : git2::Signature = gitrepo . signature () ?;
-        gitrepo . commit (
-          Some ("HEAD"), &sig, &sig, "baseline", &tree, &[] ) ?; }
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
-      let env : skg::types::env::SkgEnv =
-        skg::test_utils::skg_env_from_parts (
-          config, tantivy, &graph );
-      let mut views_state : ViewsState =
-        ViewsState {
-          diff_mode_enabled : false,
-          open_views        : OpenViews::new (),
-          graph_pair        : None, };
-      let before : String = {
-        let (view, pids, tree) =
-          multi_root_view (
-            config, None,
-            &[ ID::from ("P") ], false ) ?;
-        views_state . open_views . register_view (
-          &graph . load_full (),
-          skg::types::views_state::ViewId::ContentView (
-            "toggle-subst-uuid" . to_string ()),
-          tree, &pids );
-        view };
-      assert_eq! ( marked_lines (&before, "N") . len (), 1,
-        "precondition: P's view draws marked R for N:\n{}", before );
-      let connected_tcp_stream_pair = || -> (TcpStream, TcpStream) {
-        let listener : std::net::TcpListener =
-          std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
-        let client : TcpStream =
-          TcpStream::connect (listener . local_addr () . unwrap ())
-          . unwrap ();
-        let (server, _) = listener . accept () . unwrap ();
-        (server, client) };
-      let toggle = |views_state : &mut ViewsState| -> String {
-        let (mut server, client) =
-          connected_tcp_stream_pair ();
-        std::thread::scope ( |scope| {
-          scope . spawn ( || {
-            skg::serve::handlers::rerender_all_views::handle_git_diff_toggle_and_rerender (
-              &mut server,
-              "((request . \"git diff mode toggle\"))",
-              &env, views_state,
-              & SkgrepoRestriction::named (
-                  config, SkgrepoSetName ("all" . to_string ()))
-                . expect ("set all resolves") ); } ); } );
-        drop (server);
-        let mut reader : std::io::BufReader<TcpStream> =
-          std::io::BufReader::new (client);
-        let mut rerendered : Option<String> = None;
-        while let Ok (m) =
-          skg::test_utils::read_lp_message (&mut reader) {
-          if m . contains ("rerender-view")
-             && m . contains ("toggle-subst-uuid") {
-            rerendered = Some (m); }}
-        rerendered . expect ("the registered view rerenders") };
-      let shape = | buf : &str | -> Vec<(usize, String)> {
-        // (depth, id) per headline carrying an id; decoration-blind.
-        buf . lines ()
-          . filter_map ( |l| {
-              let depth : usize =
-                l . chars () . take_while ( |c| *c == '*' ) . count ();
-              l . find ("(id ")
-                . map ( |start| ( depth,
-                    l [start + 4 ..]
-                      . chars ()
-                      . take_while ( |c| *c != ')' )
-                      . collect () )) } )
-          . collect () };
-      let content_of = | msg : &str | -> String {
-        let start : usize =
-          msg . find ("(content \"")
-          . expect ("rerender-view carries content")
-          + "(content \"" . len ();
-        let end : usize =
-          msg . rfind ("\"))")
-          . expect ("rerender-view content terminates");
-        msg [start .. end] . to_string () };
-      let before_shape : Vec<(usize, String)> = shape (&before);
-      let assert_stable = | view : &str, when : &str | {
-        assert_eq! ( shape (view), before_shape,
-          "{}: same nodes at the same depths -- the marked child \
-           is kept, no duplicate raw N, no phantom:\n{}",
-          when, view );
-        assert_eq! ( marked_lines (view, "N") . len (), 1,
-          "{}: exactly one marked substitute survives:\n{}",
-          when, view );
-        assert! ( ! view . contains ("removedR"),
-          "{}: no phantom -- P's contains still names N, and the \
-           marked R collects N:\n{}", when, view ); };
-      { let on : String = toggle (&mut views_state);
-        assert! ( views_state . diff_mode_enabled );
-        assert_stable ( & content_of (&on), "diff on" ); }
-      { let off : String = toggle (&mut views_state);
-        assert! ( ! views_state . diff_mode_enabled );
-        assert_stable ( & content_of (&off), "diff off" ); }
-      Ok (( )) }
-
 async fn ownership_and_visibility_gate_substitution (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
@@ -465,7 +315,7 @@ async fn ownership_and_visibility_gate_substitution (
         let (view, _pids, _tree) =
           multi_root_view (
             config, None,
-            &[ ID::from ("P1") ], false ) ?;
+            &[ ID::from ("P1") ] ) ?;
         assert! ( marked_lines (&view, "N1") . is_empty (),
           "FR is foreign; N1 draws raw:\n{}", view );
         assert! ( view . contains ("(id N1)"), "{}", view ); }
@@ -476,7 +326,7 @@ async fn ownership_and_visibility_gate_substitution (
         let (view, _pids, _tree) =
           multi_root_view_with_skgrepo_set (
             config, None,
-            &[ ID::from ("P2") ], false, &restriction ) ?;
+            &[ ID::from ("P2") ], &restriction ) ?;
         assert! ( marked_lines (&view, "N2") . is_empty (),
           "R2's repo is restricted; N2 draws raw:\n{}", view );
         assert! ( view . contains ("(id N2)"), "{}", view ); }
@@ -484,7 +334,7 @@ async fn ownership_and_visibility_gate_substitution (
         let (view, _pids, _tree) =
           multi_root_view (
             config, None,
-            &[ ID::from ("P2") ], false ) ?;
+            &[ ID::from ("P2") ] ) ?;
         let marked : Vec<&str> = marked_lines (&view, "N2");
         assert_eq! ( marked . len (), 1, "{}", view );
         assert! ( marked [0] . contains ("(id R2)"), "{}", view ); }
@@ -493,7 +343,7 @@ async fn ownership_and_visibility_gate_substitution (
         let (view, _pids, _tree) =
           multi_root_view_with_skgrepo_set (
             config, None,
-            &[ ID::from ("P3") ], false, &restriction ) ?;
+            &[ ID::from ("P3") ], &restriction ) ?;
         assert! ( ! view . contains ("(id N3)"),
           "the restricted original is omitted:\n{}", view );
         assert! ( ! view . contains ("(id R3)"),
@@ -516,7 +366,6 @@ async fn save_under_set (
     skg::test_utils::skg_env_from_parts (
       config, tantivy, &graph );
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false,
     open_views        : OpenViews::new (),
     graph_pair        : None, };
   let listener : std::net::TcpListener =
@@ -525,7 +374,7 @@ async fn save_under_set (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response =
     skg::serve::handlers::save_buffer::update_from_and_rerender_buffer (
-      &mut stream, buf, &mut env, false,
+      &mut stream, buf, &mut env, 
       &Err (String::new ()), &mut views_state,
       Some (set), true,
       &std::collections::HashMap::new () ) . await ?;
@@ -548,7 +397,7 @@ async fn chain_half_visible_keeps_the_original (
         let (view, _p, _t) =
           multi_root_view (
             config, Some (tantivy),
-            &[ ID::from ("P") ], false ) ?;
+            &[ ID::from ("P") ] ) ?;
         let marked : Vec<&str> = marked_lines (&view, "N");
         assert_eq! ( marked . len (), 1,
           "one substitute for N under all:\n{}", view );
@@ -563,7 +412,7 @@ async fn chain_half_visible_keeps_the_original (
         let (view, _p, _t) =
           multi_root_view_with_skgrepo_set (
             config, Some (tantivy),
-            &[ ID::from ("P") ], false, &main_set ) ?;
+            &[ ID::from ("P") ], &main_set ) ?;
         let marked : Vec<&str> = marked_lines (&view, "N");
         assert_eq! ( marked . len (), 1,
           "one substitute for N under main:\n{}", view );

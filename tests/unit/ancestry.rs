@@ -1,5 +1,4 @@
 use super::*;
-use crate::types::git::RelationshipAxes;
 use crate::types::viewnode::{
   mk_writeProtected_viewnode, viewforest_root_viewnode,
   ChangeFacts, Phantom, PhantomDeleted, Property, PropertyFolder };
@@ -31,7 +30,6 @@ fn alias_property (text : &str) -> Viewnode {
       text : text . to_string (),
       relRepo : None,
       relRepo_request : None,
-      relationship_axes : RelationshipAxes::default (),
       change_facts : ChangeFacts::default (), readiness_request : None }) } }
 
 fn child (

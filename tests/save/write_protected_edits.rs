@@ -28,7 +28,6 @@ fn deleting_the_flags_folder_is_accepted_and_inert (
     |config, tantivy| Box::pin (async move {
       let graph : InRustGraphHandle = graph_handle_from_config (config)?;
       let mut views_state : ViewsState = ViewsState {
-        diff_mode_enabled : false,
         open_views        : OpenViews::new (),
         graph_pair        : None, };
       let listener : std::net::TcpListener =
@@ -43,7 +42,7 @@ fn deleting_the_flags_folder_is_accepted_and_inert (
         *** (skg (flag noSearchMatching))
       "};
       let first = update_from_and_rerender_buffer (
-        &mut stream, with_flags, config, tantivy, &graph, false,
+        &mut stream, with_flags, config, tantivy, &graph,
         &view_id, &mut views_state ) . await ?;
       assert! (first . errors . is_empty ());
       assert! (first . saved_view . contains ("flagsFolder"));
@@ -51,7 +50,7 @@ fn deleting_the_flags_folder_is_accepted_and_inert (
       let without_flags =
         "* (skg (node (id brie) (repo main))) brie\n";
       let second = update_from_and_rerender_buffer (
-        &mut stream, without_flags, config, tantivy, &graph, false,
+        &mut stream, without_flags, config, tantivy, &graph,
         &view_id, &mut views_state ) . await ?;
       assert! (second . errors . is_empty ());
       assert! (! second . saved_view . contains ("flagsFolder"));
@@ -92,7 +91,6 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config)?;
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false,
     open_views        : OpenViews::new (),
     graph_pair        : None, };
   let listener : std::net::TcpListener =
@@ -106,7 +104,7 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
     ** (skg (node (id 2) (repo main) writeProtected)) 2
   "};
   let first = update_from_and_rerender_buffer (
-    &mut stream, rendered, config, tantivy, &graph, false,
+    &mut stream, rendered, config, tantivy, &graph,
     &view_id, &mut views_state ) . await ?;
 
   // A second, newly inserted occurrence of node 1 is not an edit to a
@@ -117,7 +115,7 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
     "\n** (skg (node (id 1) (repo main) writeProtected)) new self occurrence\n",
     1);
   let second = update_from_and_rerender_buffer (
-    &mut stream, &with_new_self_occurrence, config, tantivy, &graph, false,
+    &mut stream, &with_new_self_occurrence, config, tantivy, &graph,
     &view_id, &mut views_state ) . await ?;
   assert! (second . errors . is_empty (),
     "the new self occurrence should be accepted: {:?}", second . errors);
@@ -135,7 +133,7 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
   let new_line : String = format! ("{}) silently changed", metadata);
   let edited : String = second . saved_view . replace (old_line, &new_line);
   let result = update_from_and_rerender_buffer (
-    &mut stream, &edited, config, tantivy, &graph, false,
+    &mut stream, &edited, config, tantivy, &graph,
     &view_id, &mut views_state ) . await;
   let error = match result {
     Err (error) => error,

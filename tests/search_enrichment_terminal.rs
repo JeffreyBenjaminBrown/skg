@@ -85,7 +85,6 @@ async fn no_match_search_ends_with_contentless_enrichment (
     skg_env_from_parts (config, tantivy, &graph);
   let mut views_state : ViewsState =
     ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None, };
   let all : SkgrepoRestriction =
@@ -126,7 +125,6 @@ async fn abandoned_enrichment_ends_with_contentless_enrichment (
     skg_env_from_parts (config, tantivy, &graph);
   let mut views_state : ViewsState =
     ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None, };
   let all : SkgrepoRestriction =

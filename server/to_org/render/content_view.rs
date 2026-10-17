@@ -5,10 +5,9 @@
 /// METHOD (phase 8 TODO/DONE/local-view-update/plan_v2.org §13): the de-novo render runs the ONE post-save view
 /// completion path (multi_root_view_via_env -> render_initial_view)
 /// over a stub forest. View completion (complete_viewforest) completes each node
-/// at its BFS visit -- including, when diff_mode_enabled, that node's git diff
-/// inline (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3). After view completion, the shared finish_viewforest
+/// at its BFS visit. After view completion, the shared finish_viewforest
 /// tail (server/update_buffer.rs, TODO/DONE/local-view-update/plan_v2.org §20.3)
-/// attaches containerward role tree (roots + removed-here phantoms),
+/// attaches the roots' containerward role trees,
 /// marks/validates affectsParent, sets graph/view stats, applies the skgrepo set,
 /// and renders to string.
 
@@ -33,26 +32,22 @@ pub fn single_root_view (
   config            : &SkgConfig,
   tantivy_index     : Option<&TantivyIndex>,
   root_skgid        : &ID,
-  diff_mode_enabled : bool,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   multi_root_view (
     config,
     tantivy_index,
-    & [ root_skgid . clone () ],
-    diff_mode_enabled ) }
+    & [ root_skgid . clone () ] ) }
 
 /// See file header comment.
 pub fn multi_root_view (
   config            : &SkgConfig,
   tantivy_index     : Option<&TantivyIndex>,
   root_skgids       : &[ID],
-  diff_mode_enabled : bool,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   multi_root_view_inner (
-    config, tantivy_index, root_skgids,
-    diff_mode_enabled, None )
+    config, tantivy_index, root_skgids, None )
 }
 
 /// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): the parts-based de-novo entry -- a thin shim that assembles a
@@ -64,7 +59,6 @@ fn multi_root_view_inner (
   config             : &SkgConfig,
   tantivy_index      : Option<&TantivyIndex>,
   root_skgids        : &[ID],
-  diff_mode_enabled  : bool,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
@@ -83,7 +77,7 @@ fn multi_root_view_inner (
     Arc::new (InRustGraph::from_graphnodes (&nodes)),
     tantivy_owned);
   multi_root_view_via_env (
-    &env, root_skgids, diff_mode_enabled, skgrepo_restriction,
+    &env, root_skgids, skgrepo_restriction,
     // The test shims discard render warnings; the production
     // caller (the single-root handler) surfaces them.
     &mut Vec::new () ) }
@@ -97,32 +91,27 @@ fn multi_root_view_inner (
 pub fn multi_root_view_via_env (
   env                : &SkgEnv,
   root_skgids        : &[ID],
-  diff_mode_enabled  : bool,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   warnings_out       : &mut Vec<String>,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   let runtime = env . runtime_snapshot ();
   multi_root_view_via_runtime (
-    &runtime, root_skgids, diff_mode_enabled, skgrepo_restriction, warnings_out)
+    &runtime, root_skgids, skgrepo_restriction, warnings_out)
 
 }
 
 pub(crate) fn multi_root_view_via_runtime (
   runtime            : &crate::types::env::RuntimeGeneration,
   root_skgids        : &[ID],
-  diff_mode_enabled  : bool,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   warnings_out       : &mut Vec<String>,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>), Box<dyn Error> > {
-  // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the diff (when diff_mode_enabled) is computed inline by
-  // view completion, per Unrestricted node at its BFS visit.
   let mut viewforest : ViewForest =
     { let (viewforest, render_warnings)
         : (ViewForest, Vec<String>) =
         render_initial_view (
-          runtime, root_skgids, skgrepo_restriction,
-          diff_mode_enabled ) ?;
+          runtime, root_skgids, skgrepo_restriction ) ?;
       warnings_out . extend (render_warnings);
       viewforest };
   // TODO/DONE/local-view-update/plan_v2.org §20.3: the de-novo and post-save render tails are one shared helper now.
@@ -145,7 +134,6 @@ pub fn multi_root_view_with_skgrepo_set (
   config             : &SkgConfig,
   tantivy_index      : Option<&TantivyIndex>,
   root_skgids        : &[ID],
-  diff_mode_enabled  : bool,
   skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
@@ -153,4 +141,4 @@ pub fn multi_root_view_with_skgrepo_set (
   // multi_root_view_via_env), so this wrapper just forwards it.
   multi_root_view_inner (
     config, tantivy_index, root_skgids,
-    diff_mode_enabled, Some (skgrepo_restriction) ) }
+    Some (skgrepo_restriction) ) }

@@ -243,7 +243,7 @@ fn root_skgids_from_viewforest (
 ) -> HashSet<ID> {
   let mut skgids : HashSet<ID> = HashSet::new ();
   for child in viewforest . roots () {
-    if let Some (vid) = child . value () . unrestricted_or_diff_phantom_skgid () {
+    if let Some (vid) = child . value () . unrestricted_skgid () {
       skgids . insert ( vid . clone () );
       if let Some (pid) = graph . pid_of ( vid ) {
           if let Some (node) = graph . nodes . get (&pid) {

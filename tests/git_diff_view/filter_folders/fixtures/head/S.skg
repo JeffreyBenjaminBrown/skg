@@ -1,9 +1,0 @@
-pid: 'S'
-title: "S"
-subscribesTo:
-  - "B"
-hidesFromSubs:
-  - "h1"
-  - "h3"
-  - "h4"
-  - "h6"

@@ -102,13 +102,13 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
     config, tantivy, &graph );
   let restriction     : SkgrepoRestriction = SkgrepoRestriction::default_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (),
+    open_views : OpenViews::new (),
     graph_pair : None };
   for (view_id, root) in [("affected", "owner"),
                       ("clean-unrelated", "unrelated"),
                       ("dirty-unrelated", "unrelated-dirty")] {
     let (_text, pids, tree) = single_root_view (
-      config, Some (tantivy), &ID::from (root), false ) ?;
+      config, Some (tantivy), &ID::from (root) ) ?;
     views_state . open_views . register_view (
       &graph . load_full (),
       ViewId::ContentView (view_id . to_string ()), tree, &pids ); }
@@ -223,7 +223,6 @@ async fn delete_preserves_foreign_referencer (
   let foreign_before : Vec<u8> = fs::read (&foreign_path) ?;
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false,
     open_views        : OpenViews::new (),
     graph_pair        : None,
   };
@@ -236,7 +235,7 @@ async fn delete_preserves_foreign_referencer (
     ** (skg (node (id victim) (repo owned) (editRequest delete))) victim
   "};
   let response = update_from_and_rerender_buffer (
-    &mut stream, input_org_text, config, tantivy, &graph, false,
+    &mut stream, input_org_text, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
   let saved_root : &str = response . saved_view . lines () . next ()
     . ok_or ("the saved view must not be empty") ?;
@@ -257,7 +256,7 @@ async fn delete_preserves_foreign_referencer (
             . contains (&ID::from ("victim-alt")),
     "foreign raw membership must survive deletion" );
   let (fresh_view, _, _) = single_root_view (
-    config, Some (tantivy), &ID::from ("cheese"), false ) ?;
+    config, Some (tantivy), &ID::from ("cheese") ) ?;
   assert! (fresh_view . contains ("(unknown (id victim-alt))"),
     "the raw foreign original must retain its extra ID as Unknown after the \
      owned primary is deleted: {}", fresh_view);
@@ -269,7 +268,7 @@ async fn delete_in_foreign_subscribee_rerenders_as_unknown (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (),
+    open_views : OpenViews::new (),
     graph_pair : None };
   let listener = std::net::TcpListener::bind ("127.0.0.1:0") ?;
   let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
@@ -278,14 +277,14 @@ async fn delete_in_foreign_subscribee_rerenders_as_unknown (
       * (skg (node (id subscriber) (repo foreign))) foreign subscriber
       ** (skg subscribeeFolder)
       *** (skg (node (id victim) (repo owned) (affectsParent false) (editRequest delete))) victim
-    "}, config, tantivy, &graph, false,
+    "}, config, tantivy, &graph,
     &Err (String::new ()), &mut views_state ) . await ?;
   assert! (response . errors . is_empty (), "{:?}", response . errors);
   assert! (response . saved_view . contains ("(overridesHere subscriber)"),
     "the buffer whose foreign root was forked must immediately show the fork: {}",
     response . saved_view);
   let (fresh, _, _) = single_root_view (
-    config, Some (tantivy), &ID::from ("subscriber"), false ) ?;
+    config, Some (tantivy), &ID::from ("subscriber") ) ?;
   assert! (fresh . contains ("(unknown (id victim-alt))"),
     "the raw foreign subscribee must retain the deleted node's extra ID as \
      Unknown: {}", fresh);
@@ -298,7 +297,7 @@ async fn delete_in_foreign_overridden_rerenders_as_unknown (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (),
+    open_views : OpenViews::new (),
     graph_pair : None };
   let listener = std::net::TcpListener::bind ("127.0.0.1:0") ?;
   let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
@@ -307,7 +306,7 @@ async fn delete_in_foreign_overridden_rerenders_as_unknown (
       * (skg (node (id overrider) (repo foreign))) foreign overrider
       ** (skg overriddenFolder)
       *** (skg (node (id victim) (repo owned) (editRequest delete))) victim
-    "}, config, tantivy, &graph, false,
+    "}, config, tantivy, &graph,
     &Err (String::new ()), &mut views_state ) . await ?;
   assert! (response . errors . is_empty (), "{:?}", response . errors);
   assert! (response . saved_view . contains ("(overridesHere overrider)"),
@@ -328,7 +327,7 @@ async fn delete_in_foreign_hiddenoutside_rerenders_as_unknown (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (),
+    open_views : OpenViews::new (),
     graph_pair : None };
   let listener = std::net::TcpListener::bind ("127.0.0.1:0") ?;
   let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
@@ -339,14 +338,14 @@ async fn delete_in_foreign_hiddenoutside_rerenders_as_unknown (
       *** (skg (node (id hide-subscribee) (repo foreign))) foreign hide subscribee
       *** (skg hiddenOutsideOfSubscribeeFolder)
       **** (skg (node (id victim) (repo owned) (editRequest delete))) victim
-    "}, config, tantivy, &graph, false,
+    "}, config, tantivy, &graph,
     &Err (String::new ()), &mut views_state ) . await ?;
   assert! (response . errors . is_empty (), "{:?}", response . errors);
   assert! (response . saved_view . contains ("(unknown (id victim-alt))"),
     "a retained foreign hide must become its raw extra ID immediately: {}",
     response . saved_view);
   let (fresh, _, _) = single_root_view (
-    config, Some (tantivy), &ID::from ("hide-subscriber"), false ) ?;
+    config, Some (tantivy), &ID::from ("hide-subscriber") ) ?;
   assert! (fresh . contains ("(unknown (id victim-alt))"),
     "immediate hidden-outside rerender must match a fresh render: {}", fresh);
   Ok (( ))
@@ -371,7 +370,6 @@ async fn delete_strips_references_impl (
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
-        diff_mode_enabled : false,
         open_views            : OpenViews::new (),
         graph_pair            : None,
         };
@@ -381,7 +379,7 @@ async fn delete_strips_references_impl (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let _response = update_from_and_rerender_buffer (
     &mut stream,
-    input_org_text, config, tantivy, &graph, false,
+    input_org_text, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
 
   let mut failures : Vec<String> = Vec::new ();
@@ -524,7 +522,6 @@ async fn strip_pass_handles_extra_ids_impl (
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
-        diff_mode_enabled : false,
         open_views            : OpenViews::new (),
         graph_pair            : None,
         };
@@ -534,7 +531,7 @@ async fn strip_pass_handles_extra_ids_impl (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let _response = update_from_and_rerender_buffer (
     &mut stream,
-    input_org_text, config, tantivy, &graph, false,
+    input_org_text, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
   let main       : SkgrepoName = SkgrepoName::from ("main");
   let referencer : Graphnode =

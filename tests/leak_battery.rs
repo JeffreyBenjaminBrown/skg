@@ -34,7 +34,7 @@ use skg::to_org::render::content_view::multi_root_view_with_skgrepo_set;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::misc::ID;
 use skg::types::nodes::complete::Graphnode;
-use skg::types::viewnode::{Phantom, RelationCounts, Viewnode, ViewnodeKind, Vognode};
+use skg::types::viewnode::{RelationCounts, Viewnode, ViewnodeKind, Vognode};
 use skg::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
 
 use std::collections::HashMap;
@@ -59,8 +59,6 @@ fn true_child_skgids (
     . filter_map ( |child| match &child . value () . kind {
       ViewnodeKind::Vognode ( Vognode::Unrestricted (node) )
         => Some (node . skgid . clone ()),
-      ViewnodeKind::Vognode (Vognode::Phantom ( Phantom::Diff (p) ))
-        => Some (p . skgid . clone ()),
       _ => None, })
     . collect () }
 
@@ -83,7 +81,7 @@ fn content_view_of_N_gates_privately_contained_C (
       let (at_public, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view_with_skgrepo_set (
           config, Some (tantivy),
-          &[ ID::from ("N") ], false, &public ) ?;
+          &[ ID::from ("N") ], &public ) ?;
       assert! (
         ! at_public . contains ("leak-battery-C"),
         "a privately-contained public member must not leak by \
@@ -96,7 +94,7 @@ fn content_view_of_N_gates_privately_contained_C (
       let (at_all, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view_with_skgrepo_set (
           config, Some (tantivy),
-          &[ ID::from ("N") ], false, &all ) ?;
+          &[ ID::from ("N") ], &all ) ?;
       assert! (
         at_all . contains ("leak-battery-C"),
         "under 'all' the private containment is visible: {}", at_all );
@@ -234,7 +232,7 @@ fn default_subscribeeFolder_requires_an_unrestricted_subscription_relationship (
       let (at_public, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view_with_skgrepo_set (
           config, Some (tantivy),
-          &[ ID::from ("S") ], false, &public ) ?;
+          &[ ID::from ("S") ], &public ) ?;
       assert! (
         ! at_public . contains ("subscribeeFolder"),
         "a restricted subscription must not leave an empty default \
@@ -243,7 +241,7 @@ fn default_subscribeeFolder_requires_an_unrestricted_subscription_relationship (
       let (at_all, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view_with_skgrepo_set (
           config, Some (tantivy),
-          &[ ID::from ("S") ], false, &all ) ?;
+          &[ ID::from ("S") ], &all ) ?;
       assert! (
         at_all . contains ("subscribeeFolder"),
         "the unrestricted subscription must create the default folder under all:\n{}",

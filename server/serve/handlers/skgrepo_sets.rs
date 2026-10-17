@@ -84,18 +84,6 @@ fn set_skgrepo_restriction (
         refuse_unwinding (
           stream, skgrepo_restriction, &e . to_string ());
         return; }};
-  if views_state . diff_mode_enabled
-     && ! restriction . is_all () {
-    { // Refuse to switch to a restricted set while diff mode is
-      // on.  (Switching TO 'all' is always allowed.)  This check
-      // precedes every side effect: search-enrichment
-      // cancellation, the set assignment, and the rerenders.
-      let msg : String = format! (
-        "Cannot switch to repo-set {}: git diff mode is on, and it requires no skgrepo restriction (the skgrepo-set all). Disable diff mode first.",
-        restriction . name . 0 );
-      tracing::info! ( msg = %msg, "Repo-set switch refused" );
-      refuse_unwinding (stream, skgrepo_restriction, &msg);
-      return; }}
   let mut prepared =
   { let target : SkgrepoRestriction = restriction . clone ();
     let prepass = |viewforest : &mut ViewForest|
@@ -103,7 +91,7 @@ fn set_skgrepo_restriction (
       convert_and_prune_for_skgrepo_switch (
         viewforest . as_internal_tree_mut (), &target ) };
     prepare_rerender_views_with_runtime (
-      env, runtime, views_state, views_state . diff_mode_enabled,
+      env, runtime, views_state,
       Some (&target), Some (&prepass), true ) };
   if ! authorize_prepared_rerenders (
     stream, &mut prepared, Some (&restriction),

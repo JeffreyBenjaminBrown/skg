@@ -36,7 +36,7 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::errors::BufferValidationError;
 use crate::types::nodes::complete::Flag;
-use crate::types::git::{NodeAxes, RelationshipAxes, Sign};
+use crate::types::git::Sign;
 use crate::types::viewnode::{
   ChangeFacts, ReadinessAxis, ReadinessRequest,
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
@@ -46,7 +46,7 @@ use crate::types::viewnode::{
 };
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::maybe_placed_viewnode::{
-    MpViewnode, MpViewnodeKind, MpUnrestrictedVognode, MpPhantomDiff,
+    MpViewnode, MpViewnodeKind, MpUnrestrictedVognode,
     MpVognode, MpPhantom,
 };
 
@@ -81,14 +81,8 @@ pub struct ViewnodeMetadata {
   // leaf carries them.
   pub change_facts: ChangeFacts,
   pub readiness_request: Option<ReadinessRequest>,
-  pub unrestrictedVognode_node_axes : NodeAxes,
-  pub unrestrictedVognode_relationship_axes : RelationshipAxes,
-  pub unrestrictedVognode_not_in_git : bool,
-  pub property_relationship_axes : RelationshipAxes,
   pub property_relRepo : Option<SkgrepoName>,
   pub property_relRepo_request : Option<SkgrepoName>,
-  pub textchanged_staged   : bool,
-  pub textchanged_unstaged : bool,
   // When true, this is a PhantomDeleted (id and skgrepo are used).
   pub is_deleted_node: bool,
   // When true, this is a PhantomHistorical (id and skgrepo are used).
@@ -103,11 +97,6 @@ pub struct ViewnodeMetadata {
   // When true, this is a restricted-skgrepo placeholder: an anonymous,
   // dataless atom (see RestrictedVognode). It carries no id/repo/etc.
   pub is_restricted_node : bool,
-  // When true, this is a PhantomDiff. It carries the same fields as a
-  // node (id/repo/write-protected/graphStats/diff axes), parsed via
-  // parse_node_sexp, but emits and is recognized by its own root atom
-  // 'diffPhantom' rather than being inferred from the diff axes.
-  pub is_diff_phantom : bool,
 }
 
 pub fn default_metadata() -> ViewnodeMetadata {
@@ -128,22 +117,15 @@ pub fn default_metadata() -> ViewnodeMetadata {
     view_requests: HashSet::new(),
     change_facts: ChangeFacts::default(),
     readiness_request: None,
-    unrestrictedVognode_node_axes : NodeAxes::default(),
-    unrestrictedVognode_relationship_axes : RelationshipAxes::default(),
-    unrestrictedVognode_not_in_git : false,
-    property_relationship_axes : RelationshipAxes::default(),
     property_relRepo : None,
     property_relRepo_request : None,
-    textchanged_staged   : false,
-    textchanged_unstaged : false,
     is_deleted_node: false,
     is_historical_node: false,
     is_dead_viewnode: false,
     unknown_node_skgid: None,
     unknown_relRepo: None,
     unknown_relRepo_request: None,
-    is_restricted_node: false,
-    is_diff_phantom: false, }}
+    is_restricted_node: false, }}
 
 /// Create an MpViewnode from parsed metadata components.
 /// This is the bridge between parsing (ViewnodeMetadata) and runtime (MpViewnode).
@@ -241,7 +223,7 @@ pub fn viewnode_from_metadata (
               title )) }
           else { None };
         let non_vognode_with_title : MpViewnodeKind = match non_vognode {
-          // Use headline title for string and apply non-vognode relationship axes
+          // Use headline title for string
           MpViewnodeKind::Property (Property::Alias { .. }) =>
             MpViewnodeKind::Property (Property::Alias {
                               text: title . clone (),
@@ -249,13 +231,11 @@ pub fn viewnode_from_metadata (
                                 metadata . property_relRepo . clone (),
                               relRepo_request:
                                 metadata . property_relRepo_request . clone (),
-                              relationship_axes: metadata . property_relationship_axes,
                               change_facts: metadata . change_facts . clone (),
                               readiness_request: metadata . readiness_request . clone () }),
           MpViewnodeKind::Property (Property::ID { .. }) =>
             MpViewnodeKind::Property (Property::ID {
                               skgid: title . clone () . into (),
-                              relationship_axes: metadata . property_relationship_axes,
                               change_facts: metadata . change_facts . clone (),
                               readiness_request: metadata . readiness_request . clone () }),
           MpViewnodeKind::Property (Property::Flag { flag, .. }) =>
@@ -268,10 +248,6 @@ pub fn viewnode_from_metadata (
           MpViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }) =>
             MpViewnodeKind::PropertyFolder (PropertyFolder::Flags {
               title : title . clone (), body : body . clone () }),
-          MpViewnodeKind::Property (Property::TextChanged { .. }) =>
-            MpViewnodeKind::Property (Property::TextChanged {
-                              staged   : metadata . textchanged_staged,
-                              unstaged : metadata . textchanged_unstaged }),
           // The parser marks which aspects an OldText shows; its text
           // comes from the headline and the body.
           MpViewnodeKind::Property (Property::OldText {
@@ -340,23 +316,9 @@ pub fn viewnode_from_metadata (
             change_facts      : metadata . change_facts . clone (),
             readiness_request : metadata . readiness_request . clone (),
             view_requests    : metadata . view_requests . clone (),
-            node_axes        : metadata . unrestrictedVognode_node_axes,
-            relationship_axes       : metadata . unrestrictedVognode_relationship_axes,
-            not_in_git       : metadata . unrestrictedVognode_not_in_git,
             editability, };
         let node_kind : MpViewnodeKind =
-          if metadata . is_diff_phantom
-          { // TODO/DONE/local-view-update/plan_v2.org §11: a phantom carries only the slim MpPhantomDiff. The
-            // root atom 'diffPhantom' (not the diff axes) decides this, so a
-            // live node carrying e.g. removedR stays a Vognode. The
-            // EditRequestOnWriteProtectedOccurrence validation above already fired if this
-            // phantom (write-protected) carried an edit_request, so dropping
-            // editability/affectsParent/etc. here loses nothing.
-            MpViewnodeKind::Vognode (MpVognode::Phantom (
-              MpPhantom::Diff (
-                MpPhantomDiff::from_unrestrictedVognode (t) ))) }
-          else
-          { MpViewnodeKind::Vognode ( MpVognode::Unrestricted (t) ) };
+          MpViewnodeKind::Vognode ( MpVognode::Unrestricted (t) );
         ( node_kind,
           error, None ) }
     };
@@ -425,13 +387,6 @@ pub fn parse_metadata_to_viewnodemd (
         match first . as_str () {
           "node" => {
             parse_node_sexp ( &items[1..], &mut result ) ?; },
-          "diffPhantom" => {
-            // (diffPhantom ...) -- a moved/removed phantom in git-diff
-            // mode. Same field grammar as (node ...) (id/repo/write-protected/
-            // graphStats/diff axes), but its own root atom so the client
-            // and round-trip never infer phantom-ness from the diff axes.
-            parse_node_sexp ( &items[1..], &mut result ) ?;
-            result . is_diff_phantom = true; },
           "deleted" => {
             result . is_deleted_node = true;
             parse_deleted_sexp ( &items[1..], &mut result ) ?; },
@@ -482,17 +437,6 @@ pub fn parse_metadata_to_viewnodemd (
             parse_unknownnode_sexp ( &items[1..], &mut result ) ?; },
           "restrictedNode" => {
             parse_restrictednode_sexp ( &items[1..], &mut result ) ?; },
-          "staged" => {
-            // (staged ATOMS) at top level is for Properties (Alias/ID).
-            apply_axis_atoms_to_property (
-              &items[1..],
-              true,  // staged
-              &mut result . property_relationship_axes ) ?; },
-          "unstaged" => {
-            apply_axis_atoms_to_property (
-              &items[1..],
-              false, // unstaged
-              &mut result . property_relationship_axes ) ?; },
           "relRepo" => {
             if items . len () != 2 {
               return Err (
@@ -522,18 +466,6 @@ pub fn parse_metadata_to_viewnodemd (
               &first, &items[1..], &mut result ) ?;
             top_level_change_facts = true;
             if first != "ready" { top_level_facts_beyond_ready = true; }},
-          "textChanged" => {
-            // (textChanged STAGE_TAGS) for the TextChanged property.
-            result . non_vognode = Some (
-              MpViewnodeKind::Property (
-                Property::TextChanged { staged: false, unstaged: false } ) );
-            for tag in &items[1..] {
-              let tag_str : String = atom_to_string (tag) ?;
-              match tag_str . as_str () {
-                "staged"   => result . textchanged_staged   = true,
-                "unstaged" => result . textchanged_unstaged = true,
-                other => return Err ( format! (
-                  "Unknown textChanged stage tag: {}", other )), } } },
           "flag" => {
             if items . len () != 2 {
               return Err ("flag requires exactly one flag name"
@@ -578,7 +510,7 @@ pub fn parse_metadata_to_viewnodemd (
           // above so a stale buffer round-trips.
           "restrictedNode" => result . is_restricted_node = true,
           // Non-vognode kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
-          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Property ( Property::Alias { text: String::new(), relRepo: None, relRepo_request: None, relationship_axes: RelationshipAxes::default(), change_facts: ChangeFacts::default(), readiness_request: None } ) ),
+          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Property ( Property::Alias { text: String::new(), relRepo: None, relRepo_request: None, change_facts: ChangeFacts::default(), readiness_request: None } ) ),
           "aliasFolder" => result . non_vognode = Some (MpViewnodeKind::PropertyFolder (PropertyFolder::Alias)),
           "flagsFolder" => result . non_vognode = Some (
             MpViewnodeKind::PropertyFolder (PropertyFolder::flags ())),
@@ -610,14 +542,10 @@ pub fn parse_metadata_to_viewnodemd (
             result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Subscriber)),
           "subscribeeFolder" =>
             result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)),
-          "textChanged" =>
-            result . non_vognode = Some (
-              MpViewnodeKind::Property (
-                Property::TextChanged { staged: false, unstaged: false } ) ),
           "idFolder" =>
             result . non_vognode = Some (MpViewnodeKind::PropertyFolder (PropertyFolder::ID)),
           "id" =>
-            result . non_vognode = Some ( MpViewnodeKind::Property ( Property::ID { skgid: ID::default(), relationship_axes: RelationshipAxes::default(), change_facts: ChangeFacts::default(), readiness_request: None } ) ),
+            result . non_vognode = Some ( MpViewnodeKind::Property ( Property::ID { skgid: ID::default(), change_facts: ChangeFacts::default(), readiness_request: None } ) ),
           "deadViewnode" => result . is_dead_viewnode = true,
           _ => {
             return Err ( format! ( "Unknown top-level value: {}",
@@ -710,18 +638,6 @@ fn parse_node_sexp (
           "diff" | "ready" | "readyRequest" | "unreadyRequest" =>
             parse_change_fact_form (
               &key, &subitems[1..], metadata ) ?,
-          "staged" => {
-            apply_axis_atoms_to_unrestrictedVognode (
-              &subitems[1..],
-              true,  // staged
-              &mut metadata . unrestrictedVognode_node_axes,
-              &mut metadata . unrestrictedVognode_relationship_axes ) ?; },
-          "unstaged" => {
-            apply_axis_atoms_to_unrestrictedVognode (
-              &subitems[1..],
-              false, // unstaged
-              &mut metadata . unrestrictedVognode_node_axes,
-              &mut metadata . unrestrictedVognode_relationship_axes ) ?; },
           _ => { return Err ( format! ( "Unknown node key: {}",
                                          key )); }} },
       Sexp::Atom (_) => {
@@ -736,58 +652,11 @@ fn parse_node_sexp (
             // Display-only (like rels): the view
             // regenerates it, so accept and discard.
             {},
-          "notInGit" =>
-            metadata . unrestrictedVognode_not_in_git = true,
           _ => {
             return Err ( format! ( "Unknown node value: {}",
                                     bare_value )); }} },
       _ => { return Err ( "Unexpected element in node"
                            . to_string () ); }} }
-  Ok (( )) }
-
-/// Apply a sequence of axis atoms (addedN, deletedN, addedR, removedR) to
-/// an UnrestrictedVognode's node and relationship axes for the given stage.
-fn apply_axis_atoms_to_unrestrictedVognode (
-  atoms      : &[Sexp],
-  is_staged  : bool,
-  node_axes  : &mut NodeAxes,
-  relationship_axes : &mut RelationshipAxes,
-) -> Result<(), String> {
-  for atom in atoms {
-    let atom_str : String = atom_to_string (atom) ?;
-    let (axis, sign) : (char, Sign) =
-      Sign::parse_axis_atom (&atom_str)
-        . ok_or_else ( || format! (
-          "Unknown axis atom: {}", atom_str )) ?;
-    let slot : &mut Option<Sign> = match (axis, is_staged) {
-      ('N', true)  => &mut node_axes . staged,
-      ('N', false) => &mut node_axes . unstaged,
-      ('R', true)  => &mut relationship_axes . staged,
-      ('R', false) => &mut relationship_axes . unstaged,
-      _ => unreachable!(), };
-    *slot = Some (sign); }
-  Ok (( )) }
-
-/// Apply axis atoms (addedR, removedR only) to a Non-vognode's relationship axes.
-fn apply_axis_atoms_to_property (
-  atoms      : &[Sexp],
-  is_staged  : bool,
-  relationship_axes : &mut RelationshipAxes,
-) -> Result<(), String> {
-  for atom in atoms {
-    let atom_str : String = atom_to_string (atom) ?;
-    let (axis, sign) : (char, Sign) =
-      Sign::parse_axis_atom (&atom_str)
-        . ok_or_else ( || format! (
-          "Unknown axis atom: {}", atom_str )) ?;
-    if axis != 'R' {
-      return Err ( format! (
-        "Property (alias/id) only supports R axis atoms, got: {}",
-        atom_str )); }
-    let slot : &mut Option<Sign> =
-      if is_staged { &mut relationship_axes . staged }
-      else         { &mut relationship_axes . unstaged };
-    *slot = Some (sign); }
   Ok (( )) }
 
 /// Parse the (unknown (id X)) s-expression contents.

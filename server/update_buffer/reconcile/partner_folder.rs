@@ -10,19 +10,13 @@ use crate::to_org::complete::partner_folder::child_data::{
   build_child_data,
   ChildData,
   apply_presence_to_folder_members,
-  apply_relationship_axes_to_folder_members,
   reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds,
 };
-use crate::to_org::complete::partner_folder::goal_list::{
-  goal_list_for_outbound_folder,
-  outbound_member_axes,
-};
-use crate::to_org::complete::partner_folder::inverse_scan::inverse_scan_for_inbound_folder;
-use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgrepoDiff, file_node_axes_from_skgrepo_diff};
+use crate::types::env::RuntimeGeneration;
+use crate::types::git::Sign;
 use crate::types::misc::{ID, RelPartner, SkgrepoName};
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::phantom::{phantom_axes, home_from_disk};
+use crate::types::phantom::home_from_disk;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::util::RepairSummary;
@@ -37,7 +31,7 @@ use std::sync::Arc;
 /// Where a partner folder's goal list comes from.
 #[derive(Clone, Copy)]
 pub enum PartnerFolderGoalSource<'a> {
-  /// The live graph (and, in the git diff view, the per-stage diffs).
+  /// The live graph.
   LiveGraph,
   /// The union of a graph pair: the members of either graph, each
   /// tagged with the presence of its node and of its relationship.
@@ -55,10 +49,8 @@ pub fn reconcile_partnerFolder_children (
   tree         : &mut Tree<Viewnode>,
   kind         : PartnerFolder,
   goal_source  : PartnerFolderGoalSource,
-  skgrepo_diffs : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   runtime      : &RuntimeGeneration,
   graph_snap   : &Arc<InRustGraph>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   warning_sink : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
@@ -93,17 +85,7 @@ pub fn reconcile_partnerFolder_children (
     graph_snap . outbound_rel_partners_for_relation_gated (
       &recorder_pid, member_role . relation, skgrepo_restriction )
   } else { Vec::new () };
-  let inbound_scan : HashMap<ID, RelationshipAxes> =
-    // Inbound folders' relationships live in the MEMBERS' files; the inverse
-    // scan reads those files' diffs (Modified relation diffs,
-    // Deleted before_node lists, Added after_node lists). Empty
-    // outside diff mode and for outbound folders.
-    if ! outbound && skgrepo_diffs . is_some () {
-      inverse_scan_for_inbound_folder (
-        &recorder_pid, member_role . relation, skgrepo_diffs,
-        skgrepo_restriction )
-    } else { HashMap::new () };
-  let (goal_list, removed_skgids) : (Vec<ID>, HashSet<ID>) = {
+  let goal_list : Vec<ID> = {
     let graph_members : Vec<ID> =
       // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: these folders omit
       // restricted members, with no retention (a stale RestrictedVognode
@@ -118,86 +100,24 @@ pub fn reconcile_partnerFolder_children (
           &recorder_pid, recorder_role, skgrepo_restriction ) },
         skgrepo_restriction,
         skgrepo_resolver );
-    if outbound && skgrepo_diffs . is_some () {
-      // Diff mode, outbound folder: the recorder's per-stage relation diff
-      // interleaves members removed since HEAD (phantom positions)
-      // into the worktree list. This diff-derived order supersedes
-      // the WriteProtectedSet view-local order (the hiddenFolder) while diff
-      // mode is on: a phantom belongs at its HEAD position, which a
-      // view-local reordering cannot express.
-      let (goal, removed) : (Vec<ID>, HashSet<ID>) =
-        goal_list_for_outbound_folder (
-          &recorder_pid, &recorder_skgrepo, member_role . relation,
-          skgrepo_diffs, &graph_members );
-      let goal : Vec<ID> = // phantoms can be restricted too
-        omit_restricted_members (
-          goal, skgrepo_restriction, skgrepo_resolver );
-      (goal, removed)
-    } else {
-      let mut goal : Vec<ID> = match kind . policy () {
-        FolderPolicy::EditableSet =>
-          // Graph (disk) order is meaningful here: the user's own
-          // save defines it.
-          graph_members,
-        FolderPolicy::WriteProtectedSet =>
-          // The user may have reordered this generated folder; the
-          // order is view-local and respected (metaplan_2.org,
-          // "preserve user-visible order in write-protected sets").
-          view_order_preserving_goal_list (tree, node, &graph_members) ?,
-        FolderPolicy::WriteProtectedFilter =>
-          // Unreachable: the let-else above already returned,
-          // because the filter folders have no relation member role.
-          graph_members,
-        FolderPolicy::EditableFilter =>
-          // Likewise unreachable here: HiddenOutside has its own
-          // hide-derived reconciler, rather than a relation role.
-          graph_members, };
-      let removed : HashSet<ID> = {
-        // Inbound phantom tail: members the inverse scan says are
-        // gone from the worktree. Inbound folders have no meaningful
-        // HEAD order (display order is view-local), so phantoms
-        // append after the real members in sorted-ID order -- the
-        // stage-8 deterministic tail rule. Appended AFTER the
-        // view-order pass above, which filters to graph-real
-        // members and so cannot carry them.
-        let mut tail : Vec<ID> = {
-          let goal_set : HashSet<&ID> =
-            goal . iter () . collect ();
-          inbound_scan . iter ()
-            . filter ( |(_, axes)| ! axes . net_is_present () )
-            . map ( |(skgid, _)| skgid . clone () )
-            . filter ( |skgid| ! goal_set . contains (skgid) )
-            . collect () };
-        tail = // phantoms of restricted members are omitted too
-          omit_restricted_members (
-            tail, skgrepo_restriction,
-            |skgid : &ID| SkgEnv::find_skgrepo_in_generation (
-              runtime, skgid, deleted_since_head_pid_src_map ));
-        tail . sort_by ( |a, b| a . 0 . cmp (&b . 0) );
-        let removed : HashSet<ID> =
-          tail . iter () . cloned () . collect ();
-        goal . extend (tail);
-        removed };
-      (goal, removed) }};
-  let outbound_axes = // the recorder's own relation diff
-    |child : &ID, child_src : &SkgrepoName|
-    -> (NodeAxes, RelationshipAxes) {
-    phantom_axes ( child, child_src,
-                   &recorder_pid, &recorder_skgrepo,
-                   member_role . relation,
-                   skgrepo_diffs . as_ref () ) };
-  let inbound_axes = // relationship axes from the inverse scan; node
-                     // axes from the member's own file statuses
-    |child : &ID, child_src : &SkgrepoName|
-    -> (NodeAxes, RelationshipAxes) {
-    ( file_node_axes_from_skgrepo_diff (
-        skgrepo_diffs, child, child_src ),
-      inbound_scan . get (child) . copied ()
-        . unwrap_or ( RelationshipAxes {
-            staged : None, unstaged : Some (Sign::Minus) } )) };
-  let axes_for_removed // the relation this folder represents
-    : &dyn Fn (&ID, &SkgrepoName) -> (NodeAxes, RelationshipAxes) =
-    if outbound { &outbound_axes } else { &inbound_axes };
+    match kind . policy () {
+      FolderPolicy::EditableSet =>
+        // Graph (disk) order is meaningful here: the user's own
+        // save defines it.
+        graph_members,
+      FolderPolicy::WriteProtectedSet =>
+        // The user may have reordered this generated folder; the
+        // order is view-local and respected (metaplan_2.org,
+        // "preserve user-visible order in write-protected sets").
+        view_order_preserving_goal_list (tree, node, &graph_members) ?,
+      FolderPolicy::WriteProtectedFilter =>
+        // Unreachable: the let-else above already returned,
+        // because the filter folders have no relation member role.
+        graph_members,
+      FolderPolicy::EditableFilter =>
+        // Likewise unreachable here: HiddenOutside has its own
+        // hide-derived reconciler, rather than a relation role.
+        graph_members, }};
   // TODO/DONE/local-view-update/plan_v2.org §5.5: a folder fills its members WHOLE and is budget-neutral -- the owning
   // vognode already spent its budget unit when it expanded, so drawing all the
   // relation members here costs nothing and never truncates the group. (The
@@ -210,10 +130,7 @@ pub fn reconcile_partnerFolder_children (
       . collect ();
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
-      tree, node,
-      &goal_list, &removed_skgids, axes_for_removed,
-      skgrepo_diffs, deleted_since_head_pid_src_map,
-      &relRepos, runtime ) ?;
+      tree, node, &goal_list, &relRepos, runtime ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §6.0/§16: the reconciler deletes a stale member that is a view-leaf and
   // demotes one that is a branch, so a write-protected PartnerFolder
   // drops a stale leaf member instead of preserving it.
@@ -221,17 +138,6 @@ pub fn reconcile_partnerFolder_children (
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       tree, node, kind, &goal_list, &child_data,
       deleted_by_this_save_extra_ids ) ?;
-  if skgrepo_diffs . is_some () {
-    // Present members whose relationship is New in some stage get that
-    // stage's 'addedR'; removed members are the phantoms above.
-    let axes_by_skgid : HashMap<ID, RelationshipAxes> =
-      if outbound {
-        outbound_member_axes (
-          &recorder_pid, &recorder_skgrepo, member_role . relation,
-          skgrepo_diffs )
-      } else { inbound_scan . clone () };
-    apply_relationship_axes_to_folder_members (
-      tree, node, &axes_by_skgid ) ?; }
   if kind . policy () != FolderPolicy::EditableSet {
     // Repairs to an editable folder are not repairs: its membership IS
     // whatever the user saved. Write-protected folders warn (when there is a
@@ -266,10 +172,7 @@ fn reconcile_partnerFolder_children_from_graph_pair (
     _ => members, };
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
-      tree, node, &goal_list, &HashSet::new (),
-      &|_skgid : &ID, _skgrepo : &SkgrepoName| (
-        NodeAxes::default (), RelationshipAxes::default () ),
-      &None, &HashMap::new (), &HashMap::new (), runtime ) ?;
+      tree, node, &goal_list, &HashMap::new (), runtime ) ?;
   let summary : RepairSummary<ID> =
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       tree, node, kind, &goal_list, &child_data,

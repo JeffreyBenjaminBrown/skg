@@ -1,11 +1,9 @@
-use crate::herald_tokens::{AncestorFlags, relationship_heralds_sexp};
-use crate::types::git::RelationshipAxes;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   ChangeFacts, ReadinessAxis, ReadinessRequest,
-  Viewnode, ViewnodeKind, Vognode, Phantom, Property, UnrestrictedVognode, PhantomDiff,
-  PhantomDeleted, PhantomHistorical, PhantomUnknown, NodeEditRequest, GraphnodeStats,
+  Viewnode, ViewnodeKind, Vognode, Phantom, Property, UnrestrictedVognode,
+  PhantomDeleted, PhantomHistorical, PhantomUnknown, NodeEditRequest,
   AffectsParent,
 };
 
@@ -250,10 +248,6 @@ fn viewnode_to_string_with_folder_facts (
       Ok ( unrestrictedVognode_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, unrestrictedVognode, config )),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (phantom))) =>
-      Ok ( phantomDiff_metadata_to_string (
-        viewnode . focused, viewnode . folded,
-        viewnode . body_folded, phantom, config )),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (deleted_node))) =>
       Ok ( phantomDeleted_metadata_to_string (
         viewnode . focused, viewnode . folded,
@@ -313,7 +307,7 @@ fn property_metadata_to_string (
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   match property {
-    Property::Alias { relRepo, relRepo_request, relationship_axes,
+    Property::Alias { relRepo, relRepo_request,
                       change_facts, readiness_request, .. } => {
       parts . push ( "alias" . to_string () );
       if let Some (skgrepo) = relRepo {
@@ -323,19 +317,9 @@ fn property_metadata_to_string (
         parts . push ( format! (
           "(editRequest (relRepo {}))",
           metadata_value_atom (skgrepo) ) ); }
-      append_relationship_axes_stage_forms (&mut parts, relationship_axes);
       parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
-    Property::TextChanged { staged, unstaged } => {
-      let mut tags : Vec<&'static str> = Vec::new ();
-      if *staged   { tags . push ("staged"); }
-      if *unstaged { tags . push ("unstaged"); }
-      if tags . is_empty ()
-      { parts . push ( "textChanged" . to_string () ); }
-      else
-      { parts . push ( format! ( "(textChanged {})", tags . join (" ") )); } }
-    Property::ID { relationship_axes, change_facts, readiness_request, .. } => {
+    Property::ID { change_facts, readiness_request, .. } => {
       parts . push ( "id" . to_string () );
-      append_relationship_axes_stage_forms (&mut parts, relationship_axes);
       parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
     Property::Flag { flag, change_facts, readiness_request, .. } => {
       parts . push ( format! ("(flag {})", flag . wire_name ()) );
@@ -382,17 +366,6 @@ fn change_fact_forms (
       request . axes . iter () . map ( |axis| axis . wire_name () )
       . collect () )); }
   forms }
-
-/// Emit '(staged AXES)' and/or '(unstaged AXES)' for a RelationshipAxes.
-/// Adds nothing if neither stage has a change.
-fn append_relationship_axes_stage_forms (
-  parts      : &mut Vec<String>,
-  relationship_axes : &RelationshipAxes,
-) {
-  if let Some (atom) = relationship_axes . staged_atom ()
-    { parts . push ( format! ( "(staged {})", atom ) ); }
-  if let Some (atom) = relationship_axes . unstaged_atom ()
-    { parts . push ( format! ( "(unstaged {})", atom ) ); } }
 
 /// Render metadata for an UnrestrictedVognode:
 ///   (skg [focused] [folded] (node ...))
@@ -469,25 +442,6 @@ fn unrestrictedVognode_metadata_to_string (
       request_strings . sort ();
       Some ( format! ( "(viewRequests {})",
                        request_strings . join (" ") )) }
-    fn staged_axes ( unrestrictedVognode : & UnrestrictedVognode ) -> Option < String > {
-      let mut atoms : Vec<&'static str> = Vec::new ();
-      if let Some (a) = unrestrictedVognode . node_axes  . staged_atom ()
-        { atoms . push (a); }
-      if let Some (a) = unrestrictedVognode . relationship_axes . staged_atom ()
-        { atoms . push (a); }
-      if atoms . is_empty () { None }
-      else { Some ( format! ( "(staged {})", atoms . join (" "))) } }
-    fn unstaged_axes ( unrestrictedVognode : & UnrestrictedVognode ) -> Option < String > {
-      let mut atoms : Vec<&'static str> = Vec::new ();
-      if let Some (a) = unrestrictedVognode . node_axes  . unstaged_atom ()
-        { atoms . push (a); }
-      if let Some (a) = unrestrictedVognode . relationship_axes . unstaged_atom ()
-        { atoms . push (a); }
-      if atoms . is_empty () { None }
-      else { Some ( format! ( "(unstaged {})", atoms . join (" "))) } }
-    fn not_in_git_atom ( unrestrictedVognode : & UnrestrictedVognode ) -> Option < String > {
-      if unrestrictedVognode . not_in_git { Some ("notInGit" . to_string ()) }
-      else                      { None } }
     let mut parts : Vec < String > =
       vec! [ "node" . to_string () ];
     parts . push ( format! ( "(id {})", unrestrictedVognode . skgid . 0 ));
@@ -517,12 +471,6 @@ fn unrestrictedVognode_metadata_to_string (
     { parts . push (s); }
     if let Some (s) = view_requests (unrestrictedVognode)
     { parts . push (s); }
-    if let Some (s) = staged_axes (unrestrictedVognode)
-    { parts . push (s); }
-    if let Some (s) = unstaged_axes (unrestrictedVognode)
-    { parts . push (s); }
-    if let Some (s) = not_in_git_atom (unrestrictedVognode)
-    { parts . push (s); }
     parts . extend ( change_fact_forms (
       &unrestrictedVognode . change_facts,
       &unrestrictedVognode . readiness_request ));
@@ -532,57 +480,6 @@ fn unrestrictedVognode_metadata_to_string (
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   parts . push ( node_sexp (unrestrictedVognode, config));
-  parts . join (" ") }
-
-/// Render metadata for a PhantomDiff (TODO/DONE/local-view-update/plan_v2.org §11). The root atom is
-/// `diffPhantom`, distinct from the `node` atom an UnrestrictedVognode emits, so the
-/// client can tell a moved/removed phantom apart from a live node without
-/// inferring it from the diff axes. A phantom is always write-protected (so always
-/// emits `writeProtected` and never a body, editRequest, or viewRequests) and its
-/// affectsParent is implicitly true and birth Unremarkable (so neither atom
-/// appears, and graphStats is rendered as if affectsParent true / birth Unremarkable). It
-/// carries no viewStats. What remains: id, repo, write-protected, graphStats, the
-/// staged/unstaged diff axes, and notInGit.
-fn phantomDiff_metadata_to_string (
-  focused     : bool,
-  folded      : bool,
-  body_folded : bool,
-  phantom     : & PhantomDiff,
-  config      : & SkgConfig,
-) -> String {
-  fn node_sexp (
-    phantom : & PhantomDiff,
-    config  : & SkgConfig,
-  ) -> String {
-    let mut parts : Vec < String > =
-      vec! [ "diffPhantom" . to_string () ];
-    parts . push ( format! ( "(id {})", phantom . skgid . 0 ));
-    parts . push ( format! (
-      "(repo {})", metadata_value_atom (&phantom . home_skgrepo) ));
-    // affectsParent is implicitly true and birth Unremarkable on a phantom, so
-    // neither atom is emitted; both are passed as such to graphnodestats.
-    parts . push ( "writeProtected" . to_string () );
-    if let Some (s) = phantom_rels_atom (& phantom . graphStats)
-    { parts . push (s); }
-    { let mut atoms : Vec<&'static str> = Vec::new ();
-      if let Some (a) = phantom . node_axes  . staged_atom () { atoms . push (a); }
-      if let Some (a) = phantom . relationship_axes . staged_atom () { atoms . push (a); }
-      if ! atoms . is_empty ()
-      { parts . push ( format! ( "(staged {})", atoms . join (" "))); } }
-    { let mut atoms : Vec<&'static str> = Vec::new ();
-      if let Some (a) = phantom . node_axes  . unstaged_atom () { atoms . push (a); }
-      if let Some (a) = phantom . relationship_axes . unstaged_atom () { atoms . push (a); }
-      if ! atoms . is_empty ()
-      { parts . push ( format! ( "(unstaged {})", atoms . join (" "))); } }
-    if phantom . not_in_git
-    { parts . push ( "notInGit" . to_string () ); }
-    let _ = config; // reserved for parity with unrestrictedVognode_metadata_to_string
-    format! ( "({})", parts . join (" ")) }
-  let mut parts : Vec < String > = Vec::new ();
-  if focused     { parts . push ( "focused"    . to_string () ); }
-  if folded      { parts . push ( "folded"     . to_string () ); }
-  if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  parts . push ( node_sexp (phantom, config));
   parts . join (" ") }
 
 /// Render metadata for a PhantomDeleted:
@@ -687,16 +584,6 @@ fn dead_viewnode_metadata_to_string (
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   parts . push ( "deadViewnode" . to_string () );
   parts . join (" ") }
-
-/// The relationship-herald atom for a phantom: counts-only semantic
-/// facts (no ancestor flags, no birth, no view position).
-fn phantom_rels_atom (
-  gs : &GraphnodeStats,
-) -> Option < String > {
-  gs . rels . as_ref () . and_then ( |counts|
-    relationship_heralds_sexp (
-      counts, gs . aliases, gs . extra_ids, gs . flags,
-      &AncestorFlags::default (), &[], None ) ) }
 
 fn org_bullet ( level: usize ) -> String {
   "*" . repeat ( level . max (1)) }

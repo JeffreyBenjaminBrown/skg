@@ -58,7 +58,7 @@ fn test_skgrepo_move_updates_collateral_view_metadata (
       let (initial_buffer, pids, viewforest)
         : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view (
-          &config, None, &root_skgids, false )?;
+          &config, None, &root_skgids )?;
       assert! (
         buffer_has_skgrepo_for_title (
           &initial_buffer, "b", "public" ),
@@ -66,7 +66,6 @@ fn test_skgrepo_move_updates_collateral_view_metadata (
         initial_buffer );
 
       let mut views_state : ViewsState = ViewsState {
-        diff_mode_enabled : false,
         open_views        : OpenViews::new (),
         graph_pair        : None, };
       let view_id_1 : ViewId =
@@ -91,7 +90,6 @@ fn test_skgrepo_move_updates_collateral_view_metadata (
           &config,
           &tantivy,
           &graph,
-          false,
           &Ok ( view_id_1 . clone() ),
           &mut views_state ) . await?;
       drop (stream);
@@ -149,7 +147,7 @@ fn successful_save_consumes_relRepo_edit_request (
 
   let saved : String = block_on ( async {
     let (initial_buffer, _pids, _viewforest) = multi_root_view (
-      &config, None, &[ID::new ("a")], false ) ?;
+      &config, None, &[ID::new ("a")] ) ?;
     let save_input : String = initial_buffer . replace (
       "(id b) (repo public)",
       "(id b) (repo public) (editRequest (relRepo private))" );
@@ -157,12 +155,11 @@ fn successful_save_consumes_relRepo_edit_request (
       "fixture rendering should expose b's unrestricted-node metadata");
 
     let mut views_state : ViewsState = ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None, };
     let (mut stream, _read_end) = mk_test_tcp_stream_pair ();
     let response : SaveResponse = update_from_and_rerender_buffer (
-      &mut stream, &save_input, &config, &tantivy, &graph, false,
+      &mut stream, &save_input, &config, &tantivy, &graph,
       &Err (String::new ()), &mut views_state ) . await ?;
     assert! (response . errors . is_empty (),
       "relRepo save should succeed: {:?}", response . errors);

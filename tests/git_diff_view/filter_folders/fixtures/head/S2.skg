@@ -1,7 +1,0 @@
-pid: 'S2'
-title: "S2"
-subscribesTo:
-  - "B2"
-hidesFromSubs:
-  - "x2"
-  - "y2"

@@ -63,7 +63,6 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
       text : "alias" . into (),
       relRepo : None,
       relRepo_request : Some (SkgrepoName::from ("private")),
-      relationship_axes : RelationshipAxes::default (),
       change_facts : ChangeFacts::default (),
       readiness_request : Some (ReadinessRequest {
         ready : false, axes : BTreeSet::new () }), }) };

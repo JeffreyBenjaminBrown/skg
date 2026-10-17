@@ -2,7 +2,7 @@
 /// These check structural flags of individual nodes
 /// without requiring global context.
 
-use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpUnrestrictedVognode, MpPhantomDiff};
+use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpUnrestrictedVognode};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 use crate::types::viewnode::{NodeEditRequest, Editability, AffectsParent, PartnerFolder, Property, PropertyFolder};
 use crate::types::viewnode::ChangesetMarkerKind;
@@ -40,8 +40,6 @@ pub fn validate_local_structure (
     match &node_ref . value() . kind
     { MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =>
         validate_unrestrictedVognode(tree, treeid, t, config),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) =>
-        validate_phantom(tree, treeid, p),
       MpViewnodeKind::BufferRoot =>
         Vec::new (),
       MpViewnodeKind::Property (Property::Alias { .. }) =>
@@ -63,8 +61,6 @@ pub fn validate_local_structure (
         => validate_relation_folder(tree, treeid, *role),
       MpViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) =>
           validate_subscribeefolder(tree, treeid),
-      MpViewnodeKind::Property (Property::TextChanged { .. }) =>
-          validate_text_changed(tree, treeid),
       MpViewnodeKind::PropertyFolder (PropertyFolder::ID) =>
           validate_idFolder(tree, treeid),
       MpViewnodeKind::Property (Property::ID { .. }) =>
@@ -198,13 +194,13 @@ fn validate_hiddenInSubscribee_folder (
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(
     tree, treeid, -1, false,
-    |node| node . is_unrestricted_or_diff_phantom ())
+    |node| node . is_unrestricted ())
     { errors . push(
         "HiddenInSubscribeeFolder must have an UnrestrictedVognode parent (the subscribee)"
         . to_string()); }
   if !generation_includes_only(
     tree, treeid, 1, true,
-    |node| node . is_unrestricted_or_diff_phantom ()
+    |node| node . is_unrestricted ()
            || matches! ( &node . kind,
                          MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) ))
     { errors . push(
@@ -215,8 +211,6 @@ fn validate_hiddenInSubscribee_folder (
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         => t . affectsParent == AffectsParent::True,
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_)))
-        => true,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
         => true,
       _ => false, } )
@@ -251,7 +245,7 @@ fn validate_hiddenOutsideOfSubscribee_folder (
         . to_string()); }
   if !generation_includes_only(
     tree, treeid, 1, true,
-    |node| node . is_unrestricted_or_diff_phantom ()
+    |node| node . is_unrestricted ()
            || matches! ( &node . kind,
                          MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) ))
     { errors . push("HiddenOutsideOfSubscribeeFolder's children must include only UnrestrictedVognodes or Unknown phantoms." . to_string()); }
@@ -260,8 +254,6 @@ fn validate_hiddenOutsideOfSubscribee_folder (
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         => t . affectsParent == AffectsParent::True,
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_)))
-        => true,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
         => true,
       _ => false, } )
@@ -289,11 +281,11 @@ fn validate_subscribeefolder (
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(
     tree, treeid, -1, false,
-    |node| node . is_unrestricted_or_diff_phantom ())
+    |node| node . is_unrestricted ())
     { errors . push("SubscribeeFolder must have an UnrestrictedVognode parent." . to_string()); }
   if !generation_includes_only(
     tree, treeid, 1, true,
-    |node| node . is_unrestricted_or_diff_phantom ()
+    |node| node . is_unrestricted ()
            || matches!(&node . kind,
                     MpViewnodeKind::Vognode (MpVognode::Restricted (_)) // a retained restricted subscribee may sit here as an save-inert display placeholder; it emits no subscribesTo membership (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org)
                       | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
@@ -307,8 +299,6 @@ fn validate_subscribeefolder (
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =>
         t . affectsParent == AffectsParent::True,
       MpViewnodeKind::Vognode (MpVognode::Restricted (_)) =>
-        true,
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_))) =>
         true,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
         true,
@@ -337,11 +327,11 @@ fn validate_relation_folder (
   let label : String = partnerFolder . repr_in_client () . to_string ();
   if !generation_exists_and_includes(
     tree, treeid, -1, false,
-    |node| node . is_unrestricted_or_diff_phantom ())
+    |node| node . is_unrestricted ())
     { errors . push(format!("{} must have an UnrestrictedVognode parent.", label)); }
   if !generation_includes_only(
     tree, treeid, 1, true,
-    |node| node . is_unrestricted_or_diff_phantom ()
+    |node| node . is_unrestricted ()
            || ( partnerFolder == PartnerFolder::Overridden
                 && matches! ( &node . kind,
                               MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) ))
@@ -356,8 +346,6 @@ fn validate_relation_folder (
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         => t . affectsParent == AffectsParent::True,
       MpViewnodeKind::Vognode (MpVognode::Restricted (_))
-        => true,
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_)))
         => true,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
         if partnerFolder == PartnerFolder::Overridden => true,
@@ -379,24 +367,6 @@ fn validate_relation_folder (
     && !partnerFolder_children_have_distinct_skgids(tree, treeid) {
     errors . push(format!(
       "{} must not have duplicate UnrestrictedVognode children.", label)); }
-  errors }
-
-fn validate_text_changed (
-  tree    : &Tree<MpViewnode>,
-  treeid  : NodeId,
-) -> Vec<String> {
-  let mut errors : Vec<String> = Vec::new();
-  if !generation_exists_and_includes(
-    tree, treeid, -1, false,
-    |node| node . is_unrestricted_or_diff_phantom ())
-    { errors . push("TextChanged must have an UnrestrictedVognode parent." . to_string()); }
-  if !generation_does_not_exist(tree, treeid, 1, true) {
-    errors . push("TextChanged must have no (non-ignored) children." . to_string()); }
-  if !siblings_cannot_include(
-    tree, treeid,
-    |node| matches!(&node . kind,
-                    MpViewnodeKind::Property (Property::TextChanged { .. })))
-    { errors . push("TextChanged must be unique among its siblings." . to_string()); }
   errors }
 
 // The total diff view's viewnodes are save-inert: these checks only
@@ -553,7 +523,7 @@ fn validate_idFolder (
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(
     tree, treeid, -1, false,
-    |node| node . is_unrestricted_or_diff_phantom ())
+    |node| node . is_unrestricted ())
     { errors . push("IDFolder must have an UnrestrictedVognode parent." . to_string()); }
   if !generation_includes_only(
     tree, treeid, 1, true,
@@ -596,7 +566,7 @@ fn validate_restricted_node (
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(
     tree, treeid, -1, false,
-    |node| node . is_unrestricted_or_diff_phantom ()
+    |node| node . is_unrestricted ()
            || matches! ( &node . kind,
                          MpViewnodeKind::Vognode (MpVognode::Restricted (_))
                          | MpViewnodeKind::PropertyFolder (_)
@@ -665,21 +635,6 @@ fn validate_unrestrictedVognode (
     errors . push("Editable node has an empty title." . to_string()); }
   errors }
 
-/// Validate a phantom (TODO/DONE/local-view-update/plan_v2.org §11): the same
-/// identity and child-structure checks as an UnrestrictedVognode, minus the two
-/// UnrestrictedVognode-only rules. The editable-title rule does not apply (a phantom is
-/// always write-protected, hence exempt). The repo-in-config rule does not
-/// apply either: a phantom writes nothing and is ignored at save, so its
-/// skgrepo -- possibly the NOT_FOUND sentinel for a reference that resolves to
-/// no skgrepo -- is save-inert.
-fn validate_phantom (
-  tree    : &Tree<MpViewnode>,
-  treeid  : NodeId,
-  p       : &MpPhantomDiff,
-) -> Vec<String> {
-  validate_vognode_identity_and_structure (
-    tree, treeid, p . skgid . is_some (), "Phantom" ) }
-
 fn cannot_be_child_of_vognode (
   node : &MpViewnode,
   affects_parent_subscribee_as_such : bool,
@@ -717,10 +672,9 @@ fn has_empty_title ( t : &MpUnrestrictedVognode ) -> bool {
                Some (&NodeEditRequest::Delete) );
   is_editable && !is_delete && t . title . trim () . is_empty () }
 
-/// Check that all non-ignored, non-phantom content children
+/// Check that all non-ignored content children
 /// have distinct IDs.
 /// "Non-ignored" means affectsParent == True.
-/// "Non-phantom" means diff is not Removed or RemovedHere.
 /// Returns true if all such children have distinct IDs,
 /// or if there are no such children.
 pub fn nonignored_children_have_distinct_skgids (

@@ -39,7 +39,6 @@ pub fn handle_titles_by_skgids_request (
   graph             : &InRustGraph,
   tantivy_index     : &TantivyIndex,
   config            : &SkgConfig,
-  diff_mode_enabled : bool,
 ) {
   let restriction : SkgrepoRestriction =
     SkgrepoRestriction::named (
@@ -48,14 +47,13 @@ pub fn handle_titles_by_skgids_request (
     . expect ("reserved repo-set all should always resolve");
   handle_titles_by_skgids_request_with_skgrepo_set (
     stream, request, tantivy_index, config,
-    diff_mode_enabled, &restriction, graph ) }
+    &restriction, graph ) }
 
 pub fn handle_titles_by_skgids_request_with_skgrepo_set (
   stream            : &mut TcpStream,
   request           : &str,
   tantivy_index     : &TantivyIndex,
   config            : &SkgConfig,
-  diff_mode_enabled : bool,
   restriction       : &SkgrepoRestriction,
   graph             : &InRustGraph,
 ) {
@@ -84,7 +82,7 @@ pub fn handle_titles_by_skgids_request_with_skgrepo_set (
   let mut title_map : HashMap<ID, String> =
     titles_by_skgids (tantivy_index, &skgids);
   let skgrepo_diffs : Option<HashMap<SkgrepoName, SkgrepoDiff>> =
-    if diff_mode_enabled || title_map . len () < skgids . len () {
+    if title_map . len () < skgids . len () {
       Some (compute_diff_for_every_skgrepo (config))
     } else { None };
   if let Some (skgrepo_diffs) = &skgrepo_diffs {

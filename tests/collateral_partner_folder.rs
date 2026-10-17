@@ -54,7 +54,7 @@ async fn save_and_read_collateral (
   let (mut stream, read_end) : (TcpStream, TcpStream) = mk_pair ();
   let response : SaveResponse =
     update_from_and_rerender_buffer (
-      &mut stream, buffer, config, tantivy, graph, false,
+      &mut stream, buffer, config, tantivy, graph,
       &Ok (view_id . clone ()), views_state ) . await ?;
   drop (stream);
   let mut reader : BufReader<TcpStream> = BufReader::new (read_end);
@@ -85,7 +85,6 @@ fn collateral_partner_folder_update_and_warning_scoping
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
-        diff_mode_enabled : false,
         open_views        : OpenViews::new (),
         graph_pair        : None, };
       let n_view_id : ViewId = ViewId::ContentView ("collat-N" . into ());
@@ -96,7 +95,7 @@ fn collateral_partner_folder_update_and_warning_scoping
       // is no longer part of the default presentation.
       let (n_view, _n_pids, _n_vf) =
         single_root_view (
-          config, Some (tantivy), &ID::from ("N"), false ) ?;
+          config, Some (tantivy), &ID::from ("N") ) ?;
       let n_folder_request : String = n_view . replace (
         "(affectsParent na)",
         "(affectsParent na) (viewRequests (folder subscribesTo))" );
@@ -118,7 +117,7 @@ fn collateral_partner_folder_update_and_warning_scoping
       // view.
       let (s_view, s_pids, s_vf) =
         single_root_view (
-          config, Some (tantivy), &ID::from ("S"), false ) ?;
+          config, Some (tantivy), &ID::from ("S") ) ?;
       assert! ( s_view . contains ("subscribeeFolder")
                 && s_view . contains ("(id N)"),
         "S's view should show N in a subscribeeFolder:\n{}", s_view );

@@ -38,7 +38,7 @@ fn test_subscribee_folder_appears_for_subscribers(
     let config =
       setup_multi_skgrepo_test (test_name) . await?;
     let (result, _pids, _) : (String, Vec<ID>, _) =
-      single_root_view( &config, None, &ID("1" . to_string()), false
+      single_root_view( &config, None, &ID("1" . to_string())
                       )?;
     println!("SubscribeeFolder test result:\n{}", result);
 

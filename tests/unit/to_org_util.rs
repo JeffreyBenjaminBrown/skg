@@ -139,15 +139,19 @@ fn containerof_false_claim_flipped () {
 #[test]
 fn orphan_under_dead_parent_demoted_member_under_folder_kept () {
   // §A (Jeff's invariant): a member Unrestricted node under a non-container
-  // parent (Diff phantom / DeadViewnode) demotes to non-member; a legitimate
+  // parent (Deleted phantom / DeadViewnode) demotes to non-member; a legitimate
   // folder MEMBER (member Unrestricted under a PartnerFolder) is left untouched.
-  use crate::types::viewnode::{ mk_phantom_viewnode, PartnerFolder };
-  use crate::types::git::{ NodeAxes, RelationshipAxes };
+  use crate::types::viewnode::{ ChangeFacts, PartnerFolder, Phantom, PhantomDeleted };
   let mut vf : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = vf . root () . id ();
   let phantom : NodeId = vf . get_mut (root) . unwrap () . append (
-    mk_phantom_viewnode ( skgid ("PH"), src (), "PH" . to_string (),
-                          NodeAxes::default (), RelationshipAxes::default () )
+    Viewnode { focused: false, folded: false, body_folded: false,
+               kind: ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (
+                 PhantomDeleted {
+                   skgid : skgid ("PH"), home_skgrepo : src (),
+                   title : "PH" . to_string (), body : None,
+                   change_facts : ChangeFacts::default (),
+                   readiness_request : None }))) }
   ) . id ();
   let under_phantom : NodeId = vf . get_mut (phantom) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("A"), src (), "A" . to_string (),
@@ -168,7 +172,7 @@ fn orphan_under_dead_parent_demoted_member_under_folder_kept () {
   mark_orphans_under_dead_parents_false (&mut vf);
 
   assert_eq! (affectsParent_if_normal (&vf, under_phantom), AffectsParent::False,
-    "A member child under a Diff phantom must demote to non-member");
+    "A member child under a Deleted phantom must demote to non-member");
   assert_eq! (affectsParent_if_normal (&vf, under_dead), AffectsParent::False,
     "A member child under a DeadViewnode must demote to non-member");
   assert_eq! (affectsParent_if_normal (&vf, member), AffectsParent::True,

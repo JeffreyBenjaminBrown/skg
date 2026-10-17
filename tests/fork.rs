@@ -278,12 +278,12 @@ async fn explicit_fork_round_trip_and_monogamy (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (),
+    open_views : OpenViews::new (),
     graph_pair : None };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer_with_fork_approval_test (
     &mut stream, EXPLICIT_FORK_BUFFER, config, tantivy, &graph,
-    false, &Err ( String::new () ), &mut views_state,
+     &Err ( String::new () ), &mut views_state,
     /* approved_forks = */ true ) . await ?;
   assert! ( response . errors . is_empty (),
     "the approved explicit fork must skgsave-commit: {:?}", response . errors );
@@ -367,11 +367,11 @@ async fn fork_no_owned_ancestor_defaults (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (),
+    open_views : OpenViews::new (),
     graph_pair : None };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer (
-    &mut stream, FORK_ROOT_BUFFER, config, tantivy, &graph, false,
+    &mut stream, FORK_ROOT_BUFFER, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "a fork with no owned ancestor must complete: {:?}", response . errors );
@@ -400,13 +400,13 @@ async fn fork_user_set_skgrepo_overrides (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (),
+    open_views : OpenViews::new (),
     graph_pair : None };
   let fork_skgrepos : HashMap<ID, SkgrepoName> =
     HashMap::from ([ ( ID::from ("N"), SkgrepoName::from ("owned2") ) ]);
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer_with_fork_skgrepos_test (
-    &mut stream, FORK_BUFFER, config, tantivy, &graph, false,
+    &mut stream, FORK_BUFFER, config, tantivy, &graph, 
     &Err ( String::new () ), &mut views_state,
     /* approved_forks = */ true, &fork_skgrepos ) . await ?;
   assert! ( response . errors . is_empty (),
@@ -504,13 +504,13 @@ async fn fork_confirmation_gates_skgsave_commit (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (),
+    open_views : OpenViews::new (),
     graph_pair : None };
 
   // Unapproved save -> fork-confirmation, nothing skgsave-committed.
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer_with_fork_approval_test (
-    &mut stream, FORK_BUFFER, config, tantivy, &graph, false,
+    &mut stream, FORK_BUFFER, config, tantivy, &graph, 
     &Err ( String::new () ), &mut views_state,
     /* approved_forks = */ false ) . await ?;
   assert! ( response . fork_confirmation . is_some (),
@@ -526,7 +526,7 @@ async fn fork_confirmation_gates_skgsave_commit (
   // Approved re-issue -> skgsave-commits the clone.
   let mut stream2 : std::net::TcpStream = mk_test_tcp_stream ();
   let response2 = update_from_and_rerender_buffer_with_fork_approval_test (
-    &mut stream2, FORK_BUFFER, config, tantivy, &graph, false,
+    &mut stream2, FORK_BUFFER, config, tantivy, &graph, 
     &Err ( String::new () ), &mut views_state,
     /* approved_forks = */ true ) . await ?;
   assert! ( response2 . fork_confirmation . is_none (),
@@ -603,12 +603,12 @@ async fn fork_from_bare_new_child_skgsave_commits (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (),
+    open_views : OpenViews::new (),
     graph_pair : None };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer_with_fork_approval_test (
     &mut stream, FORK_WITH_BARE_NEW_CHILD_BUFFER, config, tantivy,
-    &graph, false, &Err ( String::new () ), &mut views_state,
+    &graph,  &Err ( String::new () ), &mut views_state,
     /* approved_forks = */ true ) . await ?;
   assert! ( response . errors . is_empty (),
     "the approved bare-new-child fork must skgsave-commit: {:?}",
@@ -658,11 +658,11 @@ async fn fork_monogamy (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (),
+    open_views : OpenViews::new (),
     graph_pair : None };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   update_from_and_rerender_buffer (
-    &mut stream, FORK_BUFFER, config, tantivy, &graph, false,
+    &mut stream, FORK_BUFFER, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
   let c1 : ID = clone_on_disk (config) ? . pid;
 
@@ -750,11 +750,11 @@ async fn fork_fixture_files (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (),
+    open_views : OpenViews::new (),
     graph_pair : None };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer (
-    &mut stream, FORK_BUFFER, config, tantivy, &graph, false,
+    &mut stream, FORK_BUFFER, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "fork save must not error: {:?}", response . errors );
@@ -789,11 +789,11 @@ async fn fork_round_trip (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (),
+    open_views : OpenViews::new (),
     graph_pair : None };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   update_from_and_rerender_buffer (
-    &mut stream, FORK_BUFFER, config, tantivy, &graph, false,
+    &mut stream, FORK_BUFFER, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
 
   let clone_skgid : ID = clone_on_disk (config) ? . pid;
@@ -802,7 +802,7 @@ async fn fork_round_trip (
   // clone in its place with (overridesHere N).
   let (p_view, _pids, _) =
     single_root_view (
-      config, Some (tantivy), &ID::from ("P"), false ) ?;
+      config, Some (tantivy), &ID::from ("P") ) ?;
   assert! ( p_view . contains ("(overridesHere N)"),
     "the clone must be drawn in N's place with (overridesHere N):\n{}",
     p_view );
@@ -831,12 +831,12 @@ async fn fork_collateral_rerender_without_substitution (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let ( _text, pids, p_view ) = single_root_view (
-    config, Some (tantivy), &ID::from ("P"), false ) ?;
+    config, Some (tantivy), &ID::from ("P") ) ?;
   let saved_view_id : ViewId = ViewId::ContentView ("saved-P" . to_string ());
   let collateral_view_id : ViewId = ViewId::SearchView (
     "P before fork" . to_string ());
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (),
+    open_views : OpenViews::new (),
     graph_pair : None };
   let graph_snap = graph . load_full ();
   views_state . open_views . register_view (
@@ -847,7 +847,7 @@ async fn fork_collateral_rerender_without_substitution (
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let buffer : String = FORK_BUFFER . replace ("P-container", "P-edited");
   let response = update_from_and_rerender_buffer (
-    &mut stream, &buffer, config, tantivy, &graph, false,
+    &mut stream, &buffer, config, tantivy, &graph,
     &Ok (saved_view_id), &mut views_state ) . await ?;
   assert! ( response . saved_view . contains ("(overridesHere N)"),
     "the saved view must substitute the clone:\n{}", response . saved_view );

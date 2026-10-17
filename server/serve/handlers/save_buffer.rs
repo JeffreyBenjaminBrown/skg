@@ -44,7 +44,7 @@ use crate::serve::util::{
 use crate::from_text::fork::build_fork_confirmation_buffer;
 use crate::types::env::SkgEnv;
 use crate::types::errors::SaveError;
-use crate::types::git::{SkgrepoDiff, GitDiffStatus};
+use crate::types::git::SkgrepoDiff;
 use crate::types::misc::{ID, SkgrepoName, SkgConfig};
 use crate::types::save::{
   NodeInstruction, PostSkgsaveCommitNoticeCandidate, SavePlan, format_save_error_as_org };
@@ -209,7 +209,6 @@ pub fn handle_save_buffer_request (
             stream,
             & envelope . saved_buffer,
             env,
-            views_state . diff_mode_enabled,
             &viewid_from_request_result,
             views_state,
             Some (skgrepo_restriction),
@@ -664,7 +663,6 @@ pub async fn update_from_and_rerender_buffer (
   stream                      : &mut TcpStream,
   org_buffer_text             : &str,
   env                         : &mut SkgEnv,
-  diff_mode_enabled           : bool,
   viewid_from_request_result  : &Result<ViewId, String>,
   views_state                  : &mut ViewsState,
   skgrepo_restriction         : Option<&SkgrepoRestriction>,
@@ -673,7 +671,7 @@ pub async fn update_from_and_rerender_buffer (
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let no_hoist_approvals : HashSet<ID> = HashSet::new ();
   update_from_and_rerender_buffer_with_hoist_approval (
-    stream, org_buffer_text, env, diff_mode_enabled,
+    stream, org_buffer_text, env,
     viewid_from_request_result, views_state, skgrepo_restriction,
     approved_forks, fork_skgrepos, &no_hoist_approvals ) . await
 }
@@ -682,7 +680,6 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
   stream                      : &mut TcpStream,
   org_buffer_text             : &str,
   env                         : &mut SkgEnv,
-  diff_mode_enabled           : bool,
   viewid_from_request_result  : &Result<ViewId, String>,
   views_state                  : &mut ViewsState,
   skgrepo_restriction         : Option<&SkgrepoRestriction>,
@@ -691,7 +688,7 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
   approved_hoist_pids         : &HashSet<ID>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   update_from_and_rerender_buffer_with_approvals (
-    stream, org_buffer_text, env, diff_mode_enabled,
+    stream, org_buffer_text, env,
     viewid_from_request_result, views_state, skgrepo_restriction,
     approved_forks, fork_skgrepos, approved_hoist_pids,
     &HashSet::new (), &StrandReview::NotReviewed, &[] ) . await
@@ -701,7 +698,6 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   stream                      : &mut TcpStream,
   org_buffer_text             : &str,
   env                         : &mut SkgEnv,
-  diff_mode_enabled           : bool,
   viewid_from_request_result  : &Result<ViewId, String>,
   views_state                  : &mut ViewsState,
   skgrepo_restriction         : Option<&SkgrepoRestriction>,
@@ -939,7 +935,6 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         viewforest,
         node_instructions,
         collateral_view_ids,
-        diff_mode_enabled,
         env,
         swapped_in . clone (),
         viewid_from_request_result,
@@ -1013,36 +1008,6 @@ pub fn compute_diff_for_every_skgrepo (
           "Failed to compute diff for repo '{}': {}",
           skgrepo_name, e ); }} }
   skgrepo_diffs }
-
-/// Build a map from ID to HOME for all deleted files: the skgrepo of
-/// nodes that exist in git HEAD but not in the worktree.
-///
-/// Walks the skgrepos in privacy order and keeps the FIRST (most
-/// public) hit, because deleting a node deletes its whole
-/// TELESCOPE -- every owned section, in as many skgrepos as hold one
-/// ('delete_all_nodes_from_fs') -- so one id routinely appears as
-/// deleted in several skgrepos at once. Iterating 'repo_diffs'
-/// (a HashMap) and letting the last writer win answered that
-/// arbitrarily, per process.
-pub fn deleted_skgids_to_skgrepo (
-  skgrepo_diffs : &HashMap<SkgrepoName, SkgrepoDiff>,
-  config        : &SkgConfig,
-) -> HashMap<ID, SkgrepoName> {
-  let mut result : HashMap<ID, SkgrepoName> =
-    HashMap::new();
-  for skgrepo_name in config . ordered_skgrepos () {
-    let Some (skgrepo_diff) : Option<&SkgrepoDiff> =
-      skgrepo_diffs . get (&skgrepo_name) else { continue; };
-    for diffs in [ &skgrepo_diff . staged,
-                   &skgrepo_diff . unstaged ] {
-      for (path, graphnode_diff) in diffs {
-        if graphnode_diff . status == GitDiffStatus::Deleted {
-          if let Some (stem) = path . file_stem() {
-            let skgid : ID = ID ( stem . to_string_lossy()
-                               . into_owned() );
-            result . entry (skgid) // most public wins
-              . or_insert_with ( || skgrepo_name . clone() ); }} }} }
-  result }
 
 /// Every other open view sharing at least one PID with the saved view.
 /// Over-approximates true collateral (which requires parsing the buffer

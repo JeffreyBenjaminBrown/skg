@@ -29,7 +29,6 @@ async fn save (
   graph   : &InRustGraphHandle,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false,
     open_views        : OpenViews::new (),
     graph_pair        : None, };
   let listener : std::net::TcpListener =
@@ -37,7 +36,7 @@ async fn save (
   let mut stream : TcpStream =
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   update_from_and_rerender_buffer (
-    &mut stream, buf, config, tantivy, graph, false,
+    &mut stream, buf, config, tantivy, graph,
     &Err ( String::new () ), &mut views_state ) . await }
 
 fn subtree_for_node_in_folder (
@@ -127,7 +126,7 @@ fn initial_and_as_such_editable_nodes_get_only_the_default_folders
       let (n_view, _pids, _tree)
         : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view (
-          config, Some (tantivy), &[ID::from ("N")], false )
+          config, Some (tantivy), &[ID::from ("N")] )
  ?;
       assert! ( n_view . contains ("subscribeeFolder"),
         "N's nonempty subscribeeFolder should be shown initially:\n{}",

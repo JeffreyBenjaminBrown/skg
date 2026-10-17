@@ -11,7 +11,7 @@ fn one_subscribee_has_contextual_counts_under_two_subscribers (
     Some ("skg-test-subscribee-heralds"), &[] ) ?;
   for (subscriber, numerator) in [("A1", 1), ("A2", 2)] {
     let (view, _, _) : (String, Vec<ID>, _) = single_root_view (
-      &config, None, &ID::from (subscriber), false ) ?;
+      &config, None, &ID::from (subscriber) ) ?;
     let b_line : &str = view . lines ()
       . find (|line| line . contains ("(id B)"))
       . expect ("shared subscribee in view");

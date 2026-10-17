@@ -171,7 +171,7 @@ fn leaves_named_at (
             content_relationships_of . push ((
               parent_pid () ?, RelationshipAspect::RelRepo )),
           ChangesetMarkerKind::OrderOnly => {}, }, // always ready
-        Property::TextChanged { .. } | Property::BodyDiff { .. } =>
+        Property::BodyDiff { .. } =>
           return None, }},
     _ => return None, }
   Some ( NamedLeaves { leaves, all_of, content_relationships_of } ) }
@@ -257,7 +257,7 @@ fn change_facts_of_property (
     | Property::HomeSkgrepoMove { change_facts, .. }
     | Property::RelRepoMove { change_facts, .. }
     | Property::ChangesetMarker { change_facts, .. } => Some (change_facts),
-    Property::TextChanged { .. } | Property::BodyDiff { .. } => None, } }
+    Property::BodyDiff { .. } => None, } }
 
 fn change_facts_mut (
   viewnode : &mut Viewnode,

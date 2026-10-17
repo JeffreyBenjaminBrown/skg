@@ -50,7 +50,6 @@ async fn merge_preserves_acquiree_child_bodies_impl (
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false,
     open_views        : OpenViews::new (),
     graph_pair        : None,
   };
@@ -60,7 +59,7 @@ async fn merge_preserves_acquiree_child_bodies_impl (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    input_org_text, config, tantivy, &graph, false,
+    input_org_text, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
 
   println!("Rendered buffer after merge:\n{}", response . saved_view);

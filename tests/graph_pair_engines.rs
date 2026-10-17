@@ -100,8 +100,8 @@ fn a_container_folder_from_a_graph_pair_holds_both_graphs_containers (
   reconcile_partnerFolder_children (
     folder, &mut tree, PartnerFolder::Container,
     PartnerFolderGoalSource::GraphPair (&f . pair),
-    &None, &f . runtime, &f . runtime . graph,
-    &HashMap::new (), &HashMap::new (), None, None ) ?;
+    &f . runtime, &f . runtime . graph,
+    &HashMap::new (), None, None ) ?;
   let both : DiffPresence = DiffPresence::default ();
   assert_eq! ( children_with_presence (tree . get (folder) . unwrap ()), vec! [
     ( "c1" . to_string (), both ),

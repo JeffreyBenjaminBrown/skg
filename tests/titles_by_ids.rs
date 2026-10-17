@@ -59,8 +59,7 @@ fn titles_by_skgids_handler_sends_parseable_titles (
     request,
     &InRustGraph::new (),
     &tantivy_index,
-    &SkgConfig::dummyFromSkgrepos (HashMap::new ()),
-    false );
+    &SkgConfig::dummyFromSkgrepos (HashMap::new ()) );
   drop (server);
   let mut reader =
     std::io::BufReader::new (client);
@@ -118,7 +117,7 @@ fn restricted_title_lookup_challenges_without_releasing_text (
     let client : TcpStream = TcpStream::connect (listener . local_addr ()?)?;
     let (mut server, _) = listener . accept ()?;
     handle_titles_by_skgids_request_with_skgrepo_set (
-      &mut server, request, &index, &config, false, &restriction, &graph );
+      &mut server, request, &index, &config, &restriction, &graph );
     drop (server);
     Ok (read_lp_message (&mut std::io::BufReader::new (client))?)
   };
@@ -219,8 +218,7 @@ fn titles_by_skgids_finds_deleted_git_file_title_without_diff_mode (
     &request,
     &InRustGraph::new (),
     &tantivy_index,
-    &config,
-    false );
+    &config );
   drop (server);
   let mut reader =
     std::io::BufReader::new (client);
@@ -280,8 +278,7 @@ fn titles_by_skgids_finds_untracked_git_file_title_without_diff_mode (
     &request,
     &InRustGraph::new (),
     &tantivy_index,
-    &config,
-    false );
+    &config );
   drop (server);
   let mut reader =
     std::io::BufReader::new (client);

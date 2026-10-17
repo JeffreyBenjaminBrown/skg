@@ -1,4 +1,4 @@
-/// Shared utilities for tests over git fixtures: the git diff view and the graph pair.
+/// Shared utilities for tests over git fixtures: the graph pair and the total diff view.
 
 pub use git2::Repository;
 pub use std::collections::HashMap;
@@ -114,99 +114,6 @@ pub fn read_graphnode(gitrepo_path: &Path, skgid: &str) -> Result<Graphnode, Box
 }
 
 //
-// Buffer comparison helpers
-//
-
-/// Assert that `actual` buffer contains all the structure from `expected`.
-/// Each expected line must have a matching actual line with:
-/// - Same level (number of *)
-/// - Same title (end of line)
-/// - All (skg ...) metadata fragments present
-pub fn assert_buffer_contains(actual: &str, expected: &str) {
-  let actual_lines: Vec<&str> = actual . lines() . collect();
-
-  for expected_line in expected . lines() {
-    if expected_line . trim() . is_empty() { continue; }
-
-    let found = actual_lines . iter() . any(|actual_line| {
-      line_matches(actual_line, expected_line)
-    });
-
-    assert!(found,
-      "Expected line not found in actual output.\n\
-       Expected: {}\n\
-       Actual output:\n{}",
-      expected_line, actual);
-  }
-}
-
-fn line_matches(actual: &str, expected: &str) -> bool {
-  let actual_level = count_stars (actual);
-  let expected_level = count_stars (expected);
-  if actual_level != expected_level { return false; }
-
-  let actual_title = extract_title (actual);
-  let expected_title = extract_title (expected);
-  if actual_title != expected_title { return false; }
-
-  for fragment in extract_metadata_fragments (expected) {
-    if !actual . contains (&fragment) { return false; }
-  }
-
-  true
-}
-
-fn count_stars(line: &str) -> usize {
-  line . trim_start() . chars() . take_while(|c| *c == '*') . count()
-}
-
-fn extract_title(line: &str) -> &str {
-  if let Some (pos) = line . rfind (')') {
-    line[pos + 1..] . trim()
-  } else {
-    line . trim_start() . trim_start_matches ('*') . trim()
-  }
-}
-
-/// Extract leaf metadata fragments like "(id foo)", "(diff new)", etc.
-fn extract_metadata_fragments(line: &str) -> Vec<String> {
-  let mut fragments = Vec::new();
-  let mut i = 0;
-  let chars: Vec<char> = line . chars() . collect();
-
-  while i < chars . len() {
-    if chars[i] == '(' {
-      let start = i;
-      let mut depth = 1;
-      i += 1;
-      let mut has_nested = false;
-
-      while i < chars . len() && depth > 0 {
-        if chars[i] == '(' {
-          depth += 1;
-          has_nested = true;
-        } else if chars[i] == ')' {
-          depth -= 1;
-        }
-        i += 1;
-      }
-
-      if !has_nested {
-        let fragment: String = chars[start..i] . iter() . collect();
-        fragments . push (fragment);
-      } else {
-        let inner: String = chars[start..i] . iter() . collect();
-        fragments . extend(extract_metadata_fragments(&inner[1..inner . len()-1]));
-      }
-    } else {
-      i += 1;
-    }
-  }
-
-  fragments
-}
-
-//
 // Buffer editing helpers
 //
 
@@ -234,18 +141,6 @@ pub fn mk_test_tcp_stream_pair ()
     listener . accept () . unwrap ();
   (write_end, read_end) }
 
-/// Insert a line after the line containing the given substring.
-pub fn insert_after(buffer: &str, after_substring: &str, new_line: &str) -> String {
-  let mut result = Vec::new();
-  for line in buffer . lines() {
-    result . push(line . to_string());
-    if line . contains (after_substring) {
-      result . push(new_line . to_string());
-    }
-  }
-  result . join ("\n") + "\n"
-}
-
 //
 // Test setup helper
 //
@@ -271,34 +166,4 @@ pub fn setup_gitrepo_with_fixtures(
   copy_dir_all(Path::new (worktree_fixtures), gitrepo_path)?;
 
   Ok (gitrepo)
-}
-
-/// Like 'setup_gitrepo_with_fixtures' but then 'git add .' after
-/// switching the worktree, so the transition lands staged (index == worktree,
-/// both differ from HEAD) rather than unstaged.
-pub fn setup_gitrepo_with_fixtures_staged(
-  gitrepo_path: &Path,
-  head_fixtures: &str,
-  worktree_fixtures: &str,
-) -> Result<Repository, Box<dyn Error>> {
-  let gitrepo = setup_gitrepo_with_fixtures(
-    gitrepo_path, head_fixtures, worktree_fixtures )?;
-  stage_everything(&gitrepo)?;
-  Ok (gitrepo)
-}
-
-/// Stage every .skg change currently in the worktree (including
-/// deletions) so that the full diff lives on the staged side.
-pub fn stage_everything(
-  gitrepo: &Repository,
-) -> Result<(), Box<dyn Error>> {
-  let mut index = gitrepo . index ()?;
-  index . add_all(
-    ["*.skg"],
-    git2::IndexAddOption::DEFAULT,
-    None )?;
-  // add_all doesn't register deletions for files removed from the worktree.
-  index . update_all(["*.skg"], None)?;
-  index . write ()?;
-  Ok (( ))
 }

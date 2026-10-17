@@ -1,85 +1,9 @@
-use crate::types::git::{GitDiffStatus, NodeChanges, GraphnodeDiff, SkgrepoDiff, per_stage_node_changes_for_unrestrictedVognode};
 
 use super::*;
-use std::path::PathBuf;
 
 fn skgrepo_name (s: &str) -> SkgrepoName { SkgrepoName ( s . to_string () ) }
 fn skgid          (s: &str) -> ID          { ID ( s . to_string () ) }
 
-fn make_diff_entry (text_changed: bool) -> GraphnodeDiff {
-  GraphnodeDiff {
-    status: GitDiffStatus::Modified,
-    node_changes: Some ( NodeChanges {
-      text_changed,
-      .. NodeChanges::default () } ),
-    before_node: None,
-    after_node: None, } }
-
-fn sd_with (
-  pid     : &ID,
-  staged  : Option<bool>,
-  unstag  : Option<bool>,
-) -> SkgrepoDiff {
-  let file : PathBuf = PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-  let mut s : HashMap<PathBuf, GraphnodeDiff> = HashMap::new ();
-  let mut u : HashMap<PathBuf, GraphnodeDiff> = HashMap::new ();
-  if let Some (t) = staged { s . insert (file . clone (), make_diff_entry (t)); }
-  if let Some (t) = unstag { u . insert (file,           make_diff_entry (t)); }
-  SkgrepoDiff {
-    is_gitrepo: true,
-    staged: s, unstaged: u,
-    added_nodes: HashMap::new (),
-    deleted_nodes: HashMap::new (), } }
-
-fn diffs_with (src: &SkgrepoName, sd: SkgrepoDiff)
-  -> Option<HashMap<SkgrepoName, SkgrepoDiff>> {
-  let mut m : HashMap<SkgrepoName, SkgrepoDiff> = HashMap::new ();
-  m . insert (src . clone (), sd);
-  Some (m) }
-
-fn text_changed_both (
-  diffs : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
-  pid   : &ID,
-  src   : &SkgrepoName,
-) -> (bool, bool) {
-  let (s, u) = per_stage_node_changes_for_unrestrictedVognode (diffs, pid, src);
-  ( s . map ( |n| n . text_changed ) . unwrap_or (false),
-    u . map ( |n| n . text_changed ) . unwrap_or (false) )
-}
-
-#[test]
-fn text_change_only_staged () {
-  let src = skgrepo_name ("public");
-  let pid = skgid ("n");
-  let diffs = diffs_with (&src, sd_with (&pid, Some (true), None));
-  assert_eq! ( text_changed_both (&diffs, &pid, &src), (true, false) );
-}
-
-#[test]
-fn text_change_only_unstaged () {
-  let src = skgrepo_name ("public");
-  let pid = skgid ("n");
-  let diffs = diffs_with (&src, sd_with (&pid, None, Some (true)));
-  assert_eq! ( text_changed_both (&diffs, &pid, &src), (false, true) );
-}
-
-#[test]
-fn text_change_both_stages () {
-  let src = skgrepo_name ("public");
-  let pid = skgid ("n");
-  let diffs = diffs_with (&src, sd_with (&pid, Some (true), Some (true)));
-  assert_eq! ( text_changed_both (&diffs, &pid, &src), (true, true) );
-}
-
-#[test]
-fn no_diff_at_all () {
-  let src = skgrepo_name ("public");
-  let pid = skgid ("n");
-  assert_eq! ( text_changed_both (&None, &pid, &src), (false, false) );
-}
-
-// §6.5: an Unknown content child whose id is no longer in the parent's
-// contains converts to DeadViewnode; one still in contains is retained.
 fn parent_with_unknown_child (child : &ID) -> (Tree<Viewnode>, NodeId, NodeId) {
   use crate::types::viewnode::{mk_editable_viewnode, mk_unknown_viewnode};
   let mut tree : Tree<Viewnode> =
@@ -209,15 +133,13 @@ fn independent_same_skgid_child_is_prefetched () {
   tree . root_mut () . append (child);
   let config : SkgConfig =
     SkgConfig::dummyFromSkgrepos ( HashMap::new () );
-  let no_deletes  : HashMap<ID, SkgrepoName> = HashMap::new ();
   let no_relRepos : HashMap<ID, SkgrepoName> = HashMap::new ();
   let graph_snap : std::sync::Arc<InRustGraph> =
     std::sync::Arc::new ( InRustGraph::new () );
   let data : HashMap<ID, ChildData> =
     build_child_creation_data (
       &tree, parent, &[ goal . clone () ], &no_relRepos,
-      &config, &graph_snap,
-      &no_deletes, None, false )
+      &config, &graph_snap, None, false )
       . unwrap ();
   assert! ( data . contains_key (&goal),
             "a non-member same-id child's goal id must be pre-fetched, not \

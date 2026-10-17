@@ -1,15 +1,14 @@
 use crate::to_org::complete::partner_folder::{ maybe_add_hiddenInSubscribeeFolder_branch, type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::expand::editable::execute_view_requests;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::git::SkgrepoDiff;
-use crate::types::misc::{SkgConfig, SkgrepoName};
+use crate::types::misc::SkgConfig;
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, ViewRequest};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId, Tree};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::error::Error;
 
 pub fn execute_unrestrictedVognode_view_requests (
@@ -19,7 +18,6 @@ pub fn execute_unrestrictedVognode_view_requests (
   config             : &SkgConfig,
   errors             : &mut Vec<String>,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  skgrepo_diffs      : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
     tree, node,
@@ -32,7 +30,7 @@ pub fn execute_unrestrictedVognode_view_requests (
   if ! requests . is_empty() {
     execute_view_requests(
       tree, requests, graph, config, errors,
-      skgrepo_restriction, skgrepo_diffs ) ?; }
+      skgrepo_restriction ) ?; }
   Ok(( )) }
 
 pub fn ensure_hiddenInFolder_under_editable_subscribee (
@@ -41,7 +39,6 @@ pub fn ensure_hiddenInFolder_under_editable_subscribee (
   graph              : &crate::dbs::in_rust_graph::InRustGraph,
   config             : &SkgConfig,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  skgrepo_diffs      : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
 ) -> Result<(), Box<dyn Error>> {
   let is_subscribee : bool =
     type_and_parent_type_consistent_with_subscribee (
@@ -57,7 +54,7 @@ pub fn ensure_hiddenInFolder_under_editable_subscribee (
   if is_writeProtected { return Ok (( )); }
   maybe_add_hiddenInSubscribeeFolder_branch (
     tree, node, graph, config,
-    skgrepo_restriction, skgrepo_diffs ) }
+    skgrepo_restriction ) }
 
 /// Read the node's non-consumed view_requests as a Vec. View completion
 /// (dispatch_node_update) settles

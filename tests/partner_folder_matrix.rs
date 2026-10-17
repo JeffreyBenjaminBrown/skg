@@ -104,7 +104,7 @@ async fn render (
 ) -> Result<String, Box<dyn Error>> {
   let (buf, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
     multi_root_view (
-      config, None, &[ ID::from (root) ], false ) ?;
+      config, None, &[ ID::from (root) ] ) ?;
   Ok (buf) }
 
 async fn save (
@@ -114,7 +114,6 @@ async fn save (
   graph   : &InRustGraphHandle,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false,
     open_views        : OpenViews::new (),
     graph_pair        : None, };
   let listener : std::net::TcpListener =
@@ -122,7 +121,7 @@ async fn save (
   let mut stream : TcpStream =
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   update_from_and_rerender_buffer (
-    &mut stream, buf, config, tantivy, graph, false,
+    &mut stream, buf, config, tantivy, graph,
     &Err ( String::new () ), &mut views_state ) . await }
 
 async fn render_with_requested_relation_folders (
@@ -698,8 +697,7 @@ async fn omission_scenarios (
     let s : &str = "subscriberFolder/omission";
     let (buf, _p, _t) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view_with_skgrepo_set (
-        config, None, &[ID::from ("omSub-owner")],
-        false, &restriction ) ?;
+        config, None, &[ID::from ("omSub-owner")], &restriction ) ?;
     fails . want_absent (s, &buf, "subscriberFolder");
     fails . want_absent (s, &buf, "omSub-active");
     fails . want_absent (s, &buf, "omSub-inactive"); }
@@ -708,8 +706,7 @@ async fn omission_scenarios (
     let s : &str = "subscribeeFolder/omission";
     let (buf, _p, _t) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view_with_skgrepo_set (
-        config, None, &[ID::from ("omWsub-owner")],
-        false, &restriction ) ?;
+        config, None, &[ID::from ("omWsub-owner")], &restriction ) ?;
     fails . want_contains (s, &buf, "(id omWsub-active)");
     fails . want_absent (s, &buf, "omWsub-inactive");
     // Delete the only VISIBLE subscribee and save under the restricted

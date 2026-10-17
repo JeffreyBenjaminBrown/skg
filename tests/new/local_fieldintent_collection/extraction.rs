@@ -18,7 +18,6 @@ use skg::from_text::validate::validate_and_filter_foreign_instructions;
 use skg::test_utils::extract_graphnode_if_save_else_error;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::types::errors::BufferValidationError;
-use skg::types::git::Sign;
 use skg::types::misc::{ID, MSV, SkgConfig, SkgrepoName, members_of, members_msv};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode, DeleteNode};
@@ -27,8 +26,7 @@ use skg::types::maybe_placed_viewnode::{
   maybePlaced_to_placed_tree,
   maybePlaced_to_placed_viewforest};
 use skg::types::tree::forest::{MpViewForest, ViewForest};
-use skg::types::viewnode::{Viewnode, ViewnodeKind, viewforest_root_viewnode};
-use skg::types::viewnode::{Vognode, Phantom};
+use skg::types::viewnode::{Viewnode, viewforest_root_viewnode};
 use std::error::Error;
 
 const SUBSCRIBEE_EDIT_CONFIG: &str =
@@ -129,48 +127,6 @@ fn unknown_members_write_their_editable_relationship_recorders_only () {
                       members: vec! [ID::from ("hiddenoutside-unknown")] })],
               "HiddenOutside passes the raw Unknown ID to its hide resolver");
 }
-
-fn set_relationship_axes_unstaged_minus (
-  tree : &mut Tree<Viewnode>,
-  skgid   : &str,
-) {
-  set_relationship_axes_unstaged_minus_keeping_unrestricted (tree, skgid);
-  let target_skgid : ego_tree::NodeId =
-    find_unrestricted_or_phantom (tree, skgid);
-  // The target is an Unrestricted node here; the next line flips it to a phantom.
-  tree . get_mut (target_skgid) . unwrap()
-    . value()
-    . normal_to_phantom (); }
-
-/// This is like 'set_relationship_axes_unstaged_minus', but it leaves the
-/// node Unrestricted: a would-be diff phantom that has not been converted,
-/// which is how such nodes reach save extraction.
-fn set_relationship_axes_unstaged_minus_keeping_unrestricted (
-  tree : &mut Tree<Viewnode>,
-  skgid   : &str,
-) {
-  let target_skgid : ego_tree::NodeId =
-    find_unrestricted_or_phantom (tree, skgid);
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
-    &mut tree . get_mut (target_skgid) . unwrap() . value() . kind
-  { t . relationship_axes . unstaged = Some (Sign::Minus); }}
-
-fn find_unrestricted_or_phantom (
-  tree : &Tree<Viewnode>,
-  skgid   : &str,
-) -> ego_tree::NodeId {
-  for node_ref in tree . nodes() {
-    let is_target : bool =
-      match &node_ref . value() . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-          t . skgid == ID::from (skgid),
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) =>
-          p . skgid == ID::from (skgid),
-        _ => false,
-      };
-    if is_target {
-      return node_ref . id(); }}
-  panic! ("node not found: {}", skgid) }
 
 async fn nodeInstructions_from_org_with_disk (
   org_text : &str,
@@ -695,11 +651,10 @@ fn subscribee_hiderel_intent_excludes_non_content_delete_and_phantom_children (
             **** (skg (node (id keep) (repo main))) keep
             **** (skg (node (id independent) (repo main) (affectsParent false))) independent
             **** (skg (node (id delete-me) (repo main) (editRequest delete))) delete me
-            **** (skg (node (id phantom) (repo main))) phantom
+            **** (skg (historical (id phantom) (repo main))) phantom
             "};
-  let mut viewforest : Tree<Viewnode> =
+  let viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
-  set_relationship_axes_unstaged_minus (&mut viewforest, "phantom");
   let intents : Vec<(ID, SubscribeeVisibility)> =
     visibility_pairs_from_tree (viewforest);
 
@@ -1420,24 +1375,6 @@ fn test_extract_nonmergeSavePlan_complex_scenario() {
 // audit).
 
 #[test]
-fn would_be_diff_phantom_child_is_excluded_from_contains (
-) {
-  let input : &str =
-    indoc! {"
-            * (skg (node (id root) (repo main))) root
-            ** (skg (node (id a) (repo main))) a
-            ** (skg (node (id b) (repo main))) b
-        "};
-  let mut viewforest : Tree<Viewnode> =
-    checked_viewforest_from_org (input);
-  set_relationship_axes_unstaged_minus_keeping_unrestricted (&mut viewforest, "b");
-  let instructions : Vec<NodeInstruction> =
-    nodeInstructions_from_tree (viewforest) . unwrap ();
-  assert_eq!(
-    members_of (&saved_node_by_skgid (&instructions, "root") . contains),
-    vec![ID::from ("a")]); }
-
-#[test]
 fn toDelete_member_is_excluded_from_subscribees (
 ) {
   let input : &str =
@@ -1449,25 +1386,6 @@ fn toDelete_member_is_excluded_from_subscribees (
         "};
   let viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
-  let instructions : Vec<NodeInstruction> =
-    nodeInstructions_from_tree (viewforest) . unwrap ();
-  assert_eq!(
-    members_msv (&saved_node_by_skgid (&instructions, "subscriber") . subscribesTo),
-    MSV::Specified (vec![ID::from ("keep")])); }
-
-#[test]
-fn would_be_diff_phantom_member_is_excluded_from_subscribees (
-) {
-  let input : &str =
-    indoc! {"
-            * (skg (node (id subscriber) (repo main))) subscriber
-            ** (skg subscribeeFolder)
-            *** (skg (node (id keep) (repo main))) keep
-            *** (skg (node (id ghost) (repo main))) ghost
-        "};
-  let mut viewforest : Tree<Viewnode> =
-    checked_viewforest_from_org (input);
-  set_relationship_axes_unstaged_minus_keeping_unrestricted (&mut viewforest, "ghost");
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
@@ -1509,34 +1427,6 @@ fn independent_member_is_excluded_from_overriddens (
   assert_eq!(
     members_msv (&saved_node_by_skgid (&instructions, "overrider") . overrides),
     MSV::Specified (vec![ID::from ("keep")])); }
-
-#[test]
-fn would_be_diff_phantom_child_still_counts_as_visible_content (
-) {
-  // This pins an asymmetry: the visible-content predicate has no
-  // diff-phantom condition, unlike the contains and PartnerFolder
-  // membership predicates. See
-  // 'unrestricted_child_counts_as_visible_content'.
-  let input : &str =
-    indoc! {"
-            * (skg (node (id subscriber) (repo main))) subscriber
-            ** (skg subscribeeFolder)
-            *** (skg (node (id subscribee) (repo main))) subscribee
-            **** (skg (node (id still-visible) (repo main))) still visible
-        "};
-  let mut viewforest : Tree<Viewnode> =
-    checked_viewforest_from_org (input);
-  set_relationship_axes_unstaged_minus_keeping_unrestricted (
-    &mut viewforest, "still-visible");
-  let intents : Vec<(ID, SubscribeeVisibility)> =
-    visibility_pairs_from_tree (viewforest);
-  assert_eq!(
-    intents,
-    vec![(ID::from ("subscriber"),
-       SubscribeeVisibility {
-         subscribee : ID::from ("subscribee"),
-         visible    : vec![ID::from ("still-visible")],
-       })]); }
 
 #[test]
 fn duplicate_members_of_defining_folders_are_silently_deduplicated (

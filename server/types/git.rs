@@ -1,7 +1,6 @@
-/// Git-related types for diff view functionality.
+/// Git-related types.
 
-use crate::types::list::{Diff_Item, compute_interleaved_diff};
-use crate::types::misc::{ID, SkgrepoName};
+use crate::types::misc::ID;
 use crate::types::nodes::complete::Graphnode;
 
 use std::collections::HashMap;
@@ -18,27 +17,6 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Sign { Plus, Minus }
 
-/// Per-stage node diff, for a node's '.skg' file (existing or not).
-/// 'staged'   compares HEAD  vs index.
-/// 'unstaged' compares index vs worktree.
-/// Both signs being identical within a single NodeAxes is impossible
-/// (it would require the file to be both present and absent in the git index)
-/// but the type does not enforce that; consumers must.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct NodeAxes {
-  pub staged   : Option<Sign>,
-  pub unstaged : Option<Sign>,
-}
-
-/// Per-stage relationship diff for a node's appearance at a particular position
-/// in its parent's contains list. Same shape as NodeAxes but tracks a
-/// different fact (a relationship at this position rather than the node file).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct RelationshipAxes {
-  pub staged   : Option<Sign>,
-  pub unstaged : Option<Sign>,
-}
-
 /// Represents the per-stage diff for an entire skgrepo directory.
 /// 'staged'   maps each changed '.skg' file to its HEAD-vs-index diff.
 /// 'unstaged' maps each changed '.skg' file to its index-vs-worktree diff.
@@ -53,16 +31,14 @@ pub struct SkgrepoDiff {
   /// search index has seen them.
   pub added_nodes: HashMap<ID, Graphnode>,
   /// Nodes that existed in HEAD but not in worktree (deleted files).
-  /// Loaded from git HEAD or from the git index. Used for phantom titles.
+  /// Loaded from git HEAD or from the git index. Used to title them.
   pub deleted_nodes: HashMap<ID, Graphnode>,
 }
 
 /// All the diff info for a single .skg file.
 #[derive(Debug, Clone)]
 pub struct GraphnodeDiff {
-  // TODO ? Since we keep the graphnode around for deleted nodes already, why not just do that for everything, and dispense with the node_changes field?
   pub status: GitDiffStatus,
-  pub node_changes: Option<NodeChanges>,
   /// The "before" state of this stage: HEAD for staged, INDEX for
   /// unstaged. Populated only for Deleted status; read by
   /// 'collect_deleted_nodes_for_both' to resolve phantom titles.
@@ -89,96 +65,9 @@ pub enum GitDiffStatus {
   Deleted,  // File was deleted (in HEAD but not on disk)
 }
 
-/// Represents changes to a single Graphnode.
-#[derive(Debug, Clone, Default)]
-pub struct NodeChanges {
-  pub text_changed  : bool,
-  pub aliases_diff  : Vec<Diff_Item<String>>,
-  pub ids_diff      : Vec<Diff_Item<ID>>,
-  pub contains_diff : Vec<Diff_Item<ID>>,
-  /// Per-stage diffs of the node's sharing relations, so a PartnerFolder
-  /// member added to or removed from one of them carries a PER-STAGE
-  /// relationship axis (staged vs unstaged) instead of only the
-  /// net-removal fallback.  Each relationship-axis consumer names which
-  /// relation its folder represents and reads exactly that diff
-  /// ('NodeRelation::diff_in_nodechanges'): one recorder can bear the
-  /// same ID in two relations, changed in different stages, and a
-  /// phantom's stage label must come from its own folder's relation.
-  pub subscribesTo_diff       : Vec<Diff_Item<ID>>,
-  pub hides_diff              : Vec<Diff_Item<ID>>,
-  pub overrides_diff          : Vec<Diff_Item<ID>>,
-}
-
 //
 // Implementations
 //
-
-impl Sign {
-  /// Parse an axis atom like "addedN", "removedR" into (axis-letter, sign).
-  /// Returns Some ((axis, sign)) where axis is 'N' or 'R'.
-  pub fn parse_axis_atom (s: &str) -> Option<(char, Sign)> {
-    match s {
-      "addedN"   => Some (('N', Sign::Plus)),
-      "deletedN" => Some (('N', Sign::Minus)),
-      "addedR"   => Some (('R', Sign::Plus)),
-      "removedR" => Some (('R', Sign::Minus)),
-      _          => None, } }
-}
-
-impl NodeAxes {
-  pub fn is_empty (&self) -> bool {
-    self . staged . is_none () && self . unstaged . is_none () }
-
-  /// Atoms for this stage's node change, if any:
-  /// '+' -> "addedN", '-' -> "deletedN".
-  fn atom_for_stage (sign: Option<Sign>) -> Option<&'static str> {
-    match sign {
-      Some (Sign::Plus)  => Some ("addedN"),
-      Some (Sign::Minus) => Some ("deletedN"),
-      None               => None, } }
-
-  /// The atom-list for the staged side, e.g. "addedN" or "" if empty.
-  pub fn staged_atom (&self) -> Option<&'static str> {
-    Self::atom_for_stage (self . staged) }
-  pub fn unstaged_atom (&self) -> Option<&'static str> {
-    Self::atom_for_stage (self . unstaged) }
-
-  /// Whether the member is present after both stages: the later
-  /// stage with a sign wins (unstaged follows staged); no signs at
-  /// all means unchanged, hence present.
-  pub fn net_is_present (&self) -> bool {
-    match (self . staged, self . unstaged) {
-      (_, Some (Sign::Minus))    => false,
-      (_, Some (Sign::Plus))     => true,
-      (Some (Sign::Minus), None) => false,
-      _                          => true, } }
-}
-
-impl RelationshipAxes {
-  pub fn is_empty (&self) -> bool {
-    self . staged . is_none () && self . unstaged . is_none () }
-
-  fn atom_for_stage (sign: Option<Sign>) -> Option<&'static str> {
-    match sign {
-      Some (Sign::Plus)  => Some ("addedR"),
-      Some (Sign::Minus) => Some ("removedR"),
-      None               => None, } }
-
-  pub fn staged_atom (&self) -> Option<&'static str> {
-    Self::atom_for_stage (self . staged) }
-  pub fn unstaged_atom (&self) -> Option<&'static str> {
-    Self::atom_for_stage (self . unstaged) }
-
-  /// Whether the member is present after both stages: the later
-  /// stage with a sign wins (unstaged follows staged); no signs at
-  /// all means unchanged, hence present.
-  pub fn net_is_present (&self) -> bool {
-    match (self . staged, self . unstaged) {
-      (_, Some (Sign::Minus))    => false,
-      (_, Some (Sign::Plus))     => true,
-      (Some (Sign::Minus), None) => false,
-      _                          => true, } }
-}
 
 impl SkgrepoDiff {
   pub fn new_not_gitrepo () -> Self {
@@ -188,229 +77,3 @@ impl SkgrepoDiff {
       unstaged     : HashMap::new(),
       added_nodes  : HashMap::new(),
       deleted_nodes: HashMap::new() } } }
-
-impl GitDiffStatus {
-  /// Map a file-level git status to a node-axis sign.
-  /// Modified files have no node-axis change.
-  pub fn to_node_axis_sign (&self) -> Option<Sign> {
-    match self {
-      GitDiffStatus::Added    => Some (Sign::Plus),
-      GitDiffStatus::Deleted  => Some (Sign::Minus),
-      GitDiffStatus::Modified => None, } } }
-
-//
-// Functions
-//
-
-/// Returns the (staged, unstaged) pair of NodeChanges for an UnrestrictedVognode.
-/// Either element may be None (that stage has no diff entry for this
-/// file, or the entry has 'node_changes: None').
-///
-/// Consumers that need a flat HEAD→worktree view can compose both
-/// stages via 'net_diff_from_per_stage'. Consumers that need
-/// per-stage signs use 'axes_from_per_stage_diffs'.
-pub fn per_stage_node_changes_for_unrestrictedVognode<'a> (
-  skgrepo_diffs : &'a Option<HashMap<SkgrepoName, SkgrepoDiff>>,
-  pid           : &ID,
-  skgrepo       : &SkgrepoName,
-) -> (Option<&'a NodeChanges>, Option<&'a NodeChanges>) {
-  let sd : Option<&SkgrepoDiff> =
-    skgrepo_diffs . as_ref () . and_then ( |d| d . get (skgrepo) );
-  let sd : Option<&SkgrepoDiff> =
-    sd . filter ( |sd| sd . is_gitrepo );
-  let file_path : PathBuf =
-    PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-  let staged : Option<&NodeChanges> =
-    sd . and_then ( |sd| sd . staged   . get (&file_path) )
-       . and_then ( |d| d . node_changes . as_ref () );
-  let unstaged : Option<&NodeChanges> =
-    sd . and_then ( |sd| sd . unstaged . get (&file_path) )
-       . and_then ( |d| d . node_changes . as_ref () );
-  (staged, unstaged) }
-
-/// Union the per-stage signs for a list-field diff into a single
-/// (item, RelationshipAxes) list. Order comes from whichever stage is
-/// present (prefers unstaged if both -- the worktree-relative baseline).
-/// Items present in only one stage's diff are
-/// included with their stage's sign and the other stage unset.
-///
-/// 'Unchanged' in a single stage contributes an unset axis for that
-/// stage: the item is still listed (so goal-list building can see it)
-/// but no sign is placed there.
-pub fn axes_from_per_stage_diffs<T: Clone + Eq + std::hash::Hash> (
-  staged_diff   : Option<&[Diff_Item<T>]>,
-  unstaged_diff : Option<&[Diff_Item<T>]>,
-) -> Vec<(T, RelationshipAxes)> {
-  let mut result : Vec<(T, RelationshipAxes)> = Vec::new ();
-  let mut index : HashMap<T, usize> = HashMap::new ();
-  let baseline : &[Diff_Item<T>] = unstaged_diff
-    . or (staged_diff)
-    . unwrap_or (&[]);
-  for item in baseline {
-    let value : T = match item {
-      Diff_Item::Unchanged (v) | Diff_Item::New (v) | Diff_Item::Removed (v)
-        => v . clone (), };
-    if ! index . contains_key (&value) {
-      index . insert ( value . clone (), result . len () );
-      result . push ( ( value, RelationshipAxes::default () )); } }
-  let apply = | result : &mut Vec<(T, RelationshipAxes)>,
-                index  : &mut HashMap<T, usize>,
-                diff   : Option<&[Diff_Item<T>]>,
-                set_axis : fn(&mut RelationshipAxes, Option<Sign>) | {
-    if let Some (slice) = diff {
-      for item in slice {
-        let (value, sign) : (T, Option<Sign>) = match item {
-          Diff_Item::New      (v) => ( v . clone (), Some (Sign::Plus)),
-          Diff_Item::Removed  (v) => ( v . clone (), Some (Sign::Minus)),
-          Diff_Item::Unchanged (_) => continue, };
-        let i : usize = *index . entry (value . clone ())
-          . or_insert_with ( || {
-            result . push ( ( value . clone (), RelationshipAxes::default () ));
-            result . len () - 1 });
-        set_axis (&mut result[i] . 1, sign); } } };
-  apply (&mut result, &mut index, staged_diff,
-         |m, s| m . staged   = s);
-  apply (&mut result, &mut index, unstaged_diff,
-         |m, s| m . unstaged = s);
-  result }
-
-/// Per-stage REMOVAL axes, keyed by id: for each id a stage's list diff marks
-/// Removed, that stage's sign is Minus. Unlike 'axes_from_per_stage_diffs',
-/// this records removals ONLY -- so a REORDERED id (Removed at its old slot and
-/// New at its new slot within one stage) still gets a Minus here, rather than
-/// having the New (Plus) overwrite it. A removed-member diff phantom takes its
-/// relationship axes from this map, so its old slot renders 'removedR' and round-trips
-/// as a phantom; the live new-slot child takes its Plus from the mirror,
-/// 'added_relationship_axes_from_per_stage_diffs'.
-pub fn removed_relationship_axes_from_per_stage_diffs<T: Clone + Eq + std::hash::Hash> (
-  staged_diff   : Option<&[Diff_Item<T>]>,
-  unstaged_diff : Option<&[Diff_Item<T>]>,
-) -> HashMap<T, RelationshipAxes> {
-  let mut result : HashMap<T, RelationshipAxes> = HashMap::new ();
-  let apply = | result   : &mut HashMap<T, RelationshipAxes>,
-                diff     : Option<&[Diff_Item<T>]>,
-                set_axis : fn(&mut RelationshipAxes, Option<Sign>) | {
-    if let Some (slice) = diff {
-      for item in slice {
-        if let Diff_Item::Removed (v) = item {
-          set_axis (
-            result . entry (v . clone ())
-              . or_insert_with (RelationshipAxes::default),
-            Some (Sign::Minus) ); } } } };
-  apply (&mut result, staged_diff,   |m, s| m . staged   = s);
-  apply (&mut result, unstaged_diff, |m, s| m . unstaged = s);
-  result }
-
-/// Per-stage ADDITION axes, keyed by id: for each id a stage's list diff marks
-/// New, that stage's sign is Plus. The mirror of
-/// 'removed_relationship_axes_from_per_stage_diffs', recording additions ONLY -- so a
-/// REORDERED id (New at its new slot, Removed at its old slot within one stage)
-/// still gets a Plus here, rather than having the Removed (Minus) overwrite it.
-/// Used to mark the live worktree child's relationship axes, so a moved member's new
-/// slot renders 'addedR' while its old-slot phantom takes Minus from the removed
-/// map. (Unlike 'axes_from_per_stage_diffs', which keys one RelationshipAxes per
-/// id and so collapses a reorder's New+Removed to whichever it applies last.)
-pub fn added_relationship_axes_from_per_stage_diffs<T: Clone + Eq + std::hash::Hash> (
-  staged_diff   : Option<&[Diff_Item<T>]>,
-  unstaged_diff : Option<&[Diff_Item<T>]>,
-) -> HashMap<T, RelationshipAxes> {
-  let mut result : HashMap<T, RelationshipAxes> = HashMap::new ();
-  let apply = | result   : &mut HashMap<T, RelationshipAxes>,
-                diff     : Option<&[Diff_Item<T>]>,
-                set_axis : fn(&mut RelationshipAxes, Option<Sign>) | {
-    if let Some (slice) = diff {
-      for item in slice {
-        if let Diff_Item::New (v) = item {
-          set_axis (
-            result . entry (v . clone ())
-              . or_insert_with (RelationshipAxes::default),
-            Some (Sign::Plus) ); } } } };
-  apply (&mut result, staged_diff,   |m, s| m . staged   = s);
-  apply (&mut result, unstaged_diff, |m, s| m . unstaged = s);
-  result }
-
-/// Per-stage file-level NodeAxes for a node, derived from
-/// 'RepoDiff's staged / unstaged maps. Each stage's sign comes
-/// from the file's git status in that stage (Added → Plus,
-/// Deleted → Minus, Modified / absent → None).
-///
-/// Used by the editable-expand path (extendEditableSubtree_fromGit, for the
-/// UnrestrictedVognode's own node axes and for phantoms of a removed parent's
-/// children).
-pub fn file_node_axes_from_skgrepo_diff (
-  skgrepo_diffs : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
-  pid           : &ID,
-  skgrepo       : &SkgrepoName,
-) -> NodeAxes {
-  let file : PathBuf =
-    PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-  node_axes_in_skgrepo_diff (
-    skgrepo_diffs . as_ref () . and_then ( |d| d . get (skgrepo) ),
-    &file ) }
-
-/// The staged (HEAD->index) and unstaged (index->worktree) NODE-axis signs for a
-/// `.skg` file within a single skgrepo's diff. The one place that reads a file's
-/// per-stage status; the callers differ only in how they pick the RepoDiff to
-/// read (by the node's own skgrepo, or with a fallback).
-pub fn node_axes_in_skgrepo_diff (
-  skgrepo_diff : Option<&SkgrepoDiff>,
-  file         : &PathBuf,
-) -> NodeAxes {
-  let staged : Option<Sign> = skgrepo_diff
-    . and_then ( |sd| sd . staged . get (file) )
-    . and_then ( |d| d . status . to_node_axis_sign () );
-  let unstaged : Option<Sign> = skgrepo_diff
-    . and_then ( |sd| sd . unstaged . get (file) )
-    . and_then ( |d| d . status . to_node_axis_sign () );
-  NodeAxes { staged, unstaged } }
-
-/// Compose two stage diffs into a single HEAD→worktree diff, with each item at
-/// its correct position.
-///
-/// Reconstructs the HEAD and worktree item-lists from the per-stage diffs --
-/// HEAD = the items a stage marks Unchanged or Removed, worktree = those it
-/// marks Unchanged or New -- then LCS-diffs the two lists directly. This keeps a
-/// cross-stage change at its real position. (Composing the two stages' signs
-/// classifies each item correctly but can mis-ORDER an item that changed in one
-/// stage relative to siblings that changed in the other -- it lands at the tail
-/// rather than interleaved.)
-///
-/// Items absent from both HEAD and worktree (added staged, then removed
-/// unstaged) are dropped — they're not part of the net diff.
-///
-/// Used by consumers that need a flat "what changed HEAD vs worktree" view. For
-/// the per-stage signs separately, use 'axes_from_per_stage_diffs'.
-pub fn net_diff_from_per_stage<T: Clone + Eq + std::hash::Hash + Ord> (
-  staged_diff   : Option<&[Diff_Item<T>]>,
-  unstaged_diff : Option<&[Diff_Item<T>]>,
-) -> Vec<Diff_Item<T>> {
-  // A present-but-EMPTY stage diff carries no list (it lists items only when
-  // that stage actually changed something), so treat empty as absent and read
-  // the list from the other stage.
-  let staged   : Option<&[Diff_Item<T>]> =
-    staged_diff   . filter ( |s| ! s . is_empty () );
-  let unstaged : Option<&[Diff_Item<T>]> =
-    unstaged_diff . filter ( |s| ! s . is_empty () );
-  let head : Vec<T> =
-    // HEAD = items present before the change: a stage marks them Unchanged or
-    // Removed. Prefer the staged stage (HEAD->index); if it is empty/absent then
-    // HEAD == index, so the unstaged stage's before-state (index) serves.
-    staged . or (unstaged) . unwrap_or (&[]) . iter ()
-      . filter_map ( |item| match item {
-          Diff_Item::Unchanged (v) | Diff_Item::Removed (v) => Some (v . clone ()),
-          Diff_Item::New (_) => None } )
-      . collect ();
-  let worktree : Vec<T> =
-    // worktree = items present after the change: a stage marks them Unchanged or
-    // New. Prefer the unstaged stage (index->worktree); if it is empty/absent
-    // then worktree == index, so the staged stage's after-state (index) serves.
-    unstaged . or (staged) . unwrap_or (&[]) . iter ()
-      . filter_map ( |item| match item {
-          Diff_Item::Unchanged (v) | Diff_Item::New (v) => Some (v . clone ()),
-          Diff_Item::Removed (_) => None } )
-      . collect ();
-  compute_interleaved_diff (&head, &worktree) }
-
-#[cfg(test)]
-#[path = "../../tests/unit/types_git.rs"]
-mod net_diff_tests;

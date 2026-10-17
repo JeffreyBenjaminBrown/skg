@@ -81,7 +81,6 @@ async fn save_and_rerender (
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false,
     open_views        : OpenViews::new (),
     graph_pair        : None,
   };
@@ -91,7 +90,7 @@ async fn save_and_rerender (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    buf, config, tantivy, &graph, false,
+    buf, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "save must not error; got: {:?}", response . errors );
@@ -107,7 +106,7 @@ async fn expand_e_under (
   let (de_novo, _pids, _tree) =
     multi_root_view (
       config, Some (tantivy),
-      &[ ID::from ("R") ], false ) ?;
+      &[ ID::from ("R") ] ) ?;
   let view_with_folder : String =
     if folder == "overriddenFolder" {
       let request : String = de_novo . replace (
@@ -191,7 +190,7 @@ async fn folder_members_never_substitute (
       let (de_novo, _pids, _tree) =
         multi_root_view (
           config, Some (tantivy),
-          &[ ID::from ("R") ], false ) ?;
+          &[ ID::from ("R") ] ) ?;
       let request : String = de_novo . replace (
         "(affectsParent na)",
         "(affectsParent na) (viewRequests (folder overrides))" );

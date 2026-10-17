@@ -1,24 +1,16 @@
 pub mod child_data;
 pub mod goal_list;
-pub mod inverse_scan;
 pub mod kind;
 
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::phantom::home_from_disk;
 use crate::update_buffer::reconcile::omit_restricted_members;
-use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::to_org::complete::partner_folder::child_data::{
   ChildData, reconcile_partnerFolder_children_against_goal_list };
-use crate::to_org::complete::partner_folder::goal_list::{
-  goal_list_for_hiddenInSubscribee_folder,
-  goal_list_for_hiddenOutsideOfSubscribee_folder,
-  goal_list_for_outbound_folder };
-use crate::to_org::complete::partner_folder::inverse_scan::inverse_scan_for_inbound_folder;
 use crate::to_org::util::graphnode_and_viewnode_from_skgid;
-use crate::types::git::SkgrepoDiff;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder};
 use crate::types::viewnode::Vognode;
@@ -44,10 +36,6 @@ use std::error::Error;
 /// Returns '(resolved_pids, child_data)': the resolved goal list
 /// and the per-pid data map that 'reconcile_partnerFolder_children_against_goal_list'
 /// expects.
-///
-/// 'phantom' is always 'None' on initial render: there is no diff
-/// view, no removed children, and no notion of a node that "used
-/// to be here" from a previous state.
 fn build_initial_render_child_data (
   skgids : &[ID],
   graph  : &InRustGraph,
@@ -73,7 +61,7 @@ fn build_initial_render_child_data (
     goal . push (primary_pid . clone ());
     resolved . insert (
       primary_pid,
-      ChildData { home_skgrepo: skgrepo, title, phantom : None, unknown,
+      ChildData { home_skgrepo: skgrepo, title, unknown,
                   relRepo : None } ); }
   Ok ((goal, resolved)) }
 
@@ -109,7 +97,6 @@ pub fn maybe_add_subscribeeFolder_branch (
   graph   : &InRustGraph,
   config  : &SkgConfig,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  skgrepo_diffs : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   force_create_when_empty : bool, // a Folder view-request materializes the
     // editable subscribeeFolder as an empty "add here" surface even with
     // no subscribees.
@@ -132,14 +119,13 @@ pub fn maybe_add_subscribeeFolder_branch (
       tree, treeid,
       &ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) )? . is_some ()
     { return Ok (( )); }}
-  let ( subscriber_pid, subscriber_skgrepo ) : (ID, SkgrepoName) =
+  let subscriber_pid : ID =
     read_at_node_in_tree (
       tree, treeid,
       |vn| match &vn . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          => Some (( graph . pid_of (&t . skgid)
-                       . unwrap_or_else (|| t . skgid . clone ()),
-                     t . home_skgrepo . clone () )),
+          => Some ( graph . pid_of (&t . skgid)
+                    . unwrap_or_else (|| t . skgid . clone ()) ),
         _ => None } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
     . ok_or ("maybe_add_subscribeeFolder_branch: expected UnrestrictedVognode") ?;
@@ -155,19 +141,9 @@ pub fn maybe_add_subscribeeFolder_branch (
       |skgid : &ID| graph . pid_and_skgrepo (skgid)
                  . map ( |(_pid, src)| src )
                  . or_else ( || home_from_disk (skgid, config) ));
-  if subscribee_skgids . is_empty () {
-    // Skip because it would be empty -- unless, in diff mode, the
-    // HEAD side of the membership is non-empty: a folder emptied since
-    // HEAD still renders, so its phantoms have a home (the folder is
-    // created bare; its own BFS visit reconciles the phantoms in).
-    let head_side_occupied : bool =
-      skgrepo_diffs . is_some ()
-      && ! goal_list_for_outbound_folder (
-             &subscriber_pid, &subscriber_skgrepo,
-             NodeRelation::SubscribesTo,
-             skgrepo_diffs, &subscribee_skgids ) . 0 . is_empty ();
-    if ! head_side_occupied && ! force_create_when_empty {
-      return Ok (( )); }}
+  if subscribee_skgids . is_empty () && ! force_create_when_empty {
+    // Skip because it would be empty.
+    return Ok (( )); }
 
   let hidden_outside_content : HashSet < ID > = {
     // hidden IDs that are outside all subscribee content. Read
@@ -198,25 +174,7 @@ pub fn maybe_add_subscribeeFolder_branch (
       tree, subscribee_folder_treeid,
       PartnerFolder::Subscribee,
       &goal, &data ) ?; }
-  let hidden_outside_head_side_occupied : bool =
-    // Diff-mode folder existence: a hiddenOutside membership emptied
-    // since HEAD still warrants the folder, for its phantoms.
-    hidden_outside_content . is_empty ()
-    && skgrepo_diffs . is_some ()
-    && { let wt_hides : Vec<ID> =
-           graphnode_graphFirst_by_pid_and_skgrepo (
-             graph, config, &subscriber_pid, &subscriber_skgrepo )
-           . ok ()
-           . map ( |skg| members_of (
-                       skg . hidesFromSubs . or_default () ) )
-           . unwrap_or_default ();
-         ! goal_list_for_hiddenOutsideOfSubscribee_folder (
-             graph,
-             &subscriber_pid, &subscriber_skgrepo,
-             &wt_hides, &subscribee_skgids,
-             skgrepo_diffs, config ) . 0 . is_empty () };
-  if ! hidden_outside_content . is_empty ()
-     || hidden_outside_head_side_occupied {
+  if ! hidden_outside_content . is_empty () {
     // HiddenOutsideOfSubscribeeFolder presents last, if it exists.
     let hidden_outside_folder_treeid : NodeId =
       insert_non_vognode_as_child (
@@ -251,7 +209,6 @@ pub fn maybe_add_default_partnerFolder_branches (
   graph              : &InRustGraph,
   config             : &SkgConfig,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  skgrepo_diffs      : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   error_unless_node_satisfies(
     tree, treeid,
@@ -267,8 +224,7 @@ pub fn maybe_add_default_partnerFolder_branches (
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_writeProtected { return Ok(( )); } }
   maybe_add_subscribeeFolder_branch (
-    tree, treeid, graph, config, skgrepo_restriction,
-    skgrepo_diffs, false ) ?;
+    tree, treeid, graph, config, skgrepo_restriction, false ) ?;
   Ok (( )) }
 
 /// Add a generated PartnerFolder for `treeid` if it would
@@ -286,7 +242,6 @@ pub fn maybe_add_one_partnerFolder (
   config  : &SkgConfig,
   graph   : &InRustGraph,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  skgrepo_diffs : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   force_create_when_empty : bool,
 ) -> Result < (), Box<dyn Error> > {
   if unique_non_vognode_child_of_viewnode (
@@ -294,12 +249,12 @@ pub fn maybe_add_one_partnerFolder (
     )? . is_some ()
   { // There already is one. Don't draw a new one.
     return Ok (( )); }
-  let (recorder_pid, recorder_skgrepo) : (ID, SkgrepoName) =
+  let recorder_pid : ID =
     read_at_node_in_tree (
       tree, treeid,
       |vn| match &vn . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          => Ok (( t . skgid . clone (), t . home_skgrepo . clone () )),
+          => Ok ( t . skgid . clone () ),
         _ => Err ("expected UnrestrictedVognode" . to_string ()), } )
     .map_err( |e| -> Box<dyn Error> { e . into() } ) ??;
   let Some (member_role) = kind . relation_member_role ()
@@ -318,26 +273,9 @@ pub fn maybe_add_one_partnerFolder (
       |skgid : &ID| graph . pid_and_skgrepo (skgid)
                  . map ( |(_pid, src)| src )
                  . or_else ( || home_from_disk (skgid, config) ));
-  if member_skgids . is_empty () {
-    // It would be empty, so don't draw it -- unless, in diff mode,
-    // the HEAD side of the membership is non-empty: a folder emptied
-    // since HEAD still renders, so its phantoms have a home (the
-    // folder is created bare; its own BFS visit reconciles the
-    // phantoms in).
-    let head_side_occupied : bool =
-      skgrepo_diffs . is_some ()
-      && if recorder_role . is_first_role () { // outbound
-           ! goal_list_for_outbound_folder (
-               &recorder_pid, &recorder_skgrepo, member_role . relation,
-               skgrepo_diffs, &member_skgids ) . 0 . is_empty ()
-         } else { // inbound: the inverse scan
-           inverse_scan_for_inbound_folder (
-             &recorder_pid, member_role . relation, skgrepo_diffs,
-             skgrepo_restriction )
-           . values ()
-           . any ( |axes| ! axes . net_is_present () ) };
-    if ! head_side_occupied && ! force_create_when_empty {
-      return Ok (( )); }}
+  if member_skgids . is_empty () && ! force_create_when_empty {
+    // It would be empty, so don't draw it.
+    return Ok (( )); }
   let folder_treeid : NodeId =
     insert_non_vognode_as_child (
       tree, treeid, ViewnodeKind::PartnerFolder (kind), true) ?;
@@ -359,7 +297,6 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
   graph              : &InRustGraph,
   config             : &SkgConfig,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  skgrepo_diffs      : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   if ! type_and_parent_type_consistent_with_subscribee (
     tree, subscribee_treeid )?
@@ -397,40 +334,8 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
             . filter ( |skgid| subscriber_hides . contains (skgid) )
             . cloned () . collect () ) } };
   if hidden_in_content . is_empty () {
-    // Skip because it would be empty -- unless, in diff mode, the
-    // HEAD-side DERIVED membership is non-empty: a hidden-in
-    // membership emptied since HEAD still warrants the folder, for its
-    // phantoms (created bare; the BFS reconciles them in).
-    let head_side_occupied : bool =
-      skgrepo_diffs . is_some ()
-      && { let skgrepo_of = | pid : &ID | -> SkgrepoName {
-             graph . pid_and_skgrepo (pid)
-               . map ( |(_p, src)| src )
-               . or_else ( || home_from_disk (pid, config) )
-               . unwrap_or_else ( SkgrepoName::not_found ) };
-           let subscribee_skgrepo : SkgrepoName =
-             skgrepo_of (&subscribee_pid);
-           let subscriber_skgrepo : SkgrepoName =
-             skgrepo_of (&subscriber_pid);
-           let subscribee_contains : Vec<ID> =
-             graphnode_graphFirst_by_pid_and_skgrepo (
-               graph, config, &subscribee_pid, &subscribee_skgrepo )
-             . ok () . map ( |skg| members_of (& skg . contains) )
-             . unwrap_or_default ();
-           let subscriber_hides : Vec<ID> =
-             graphnode_graphFirst_by_pid_and_skgrepo (
-               graph, config, &subscriber_pid, &subscriber_skgrepo )
-             . ok ()
-             . map ( |skg| members_of (
-                         skg . hidesFromSubs . or_default () ) )
-             . unwrap_or_default ();
-           ! goal_list_for_hiddenInSubscribee_folder (
-               graph,
-               &subscribee_pid, &subscribee_skgrepo,
-               &subscriber_pid, &subscriber_skgrepo,
-               &subscribee_contains, &subscriber_hides,
-               skgrepo_diffs ) . 0 . is_empty () };
-    if ! head_side_occupied { return Ok (( )); }}
+    // Skip because it would be empty.
+    return Ok (( )); }
   let hidden_in_skgids : Vec<ID> =
     hidden_in_content . into_iter () . collect ();
   let hidden_folder_treeid : NodeId =

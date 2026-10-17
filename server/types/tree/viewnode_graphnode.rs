@@ -9,7 +9,7 @@ use crate::types::viewnode::{
 use crate::types::viewnode::{Vognode, Phantom, PropertyFolder, Property, PartnerFolder};
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind };
-use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
+use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::list::dedup_vector;
 use super::generic::{ unique_non_vognode_child, write_at_node_in_tree, with_node_mut };
@@ -72,8 +72,6 @@ pub fn skgid_from_self_or_nearest_ancestor (
     match &node . value() . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =>
         { if let Some (skgid) = &t . skgid { return Ok(skgid . clone()); }}
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) =>
-        { if let Some (skgid) = &p . skgid { return Ok(skgid . clone()); }}
       _ => {} }
     node = node . parent()
       . ok_or ("id_from_self_or_nearest_ancestor: reached root without finding ID")?; }}
@@ -205,8 +203,7 @@ pub fn find_children_by_skgids (
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         if target_skgids . contains (&t . skgid)
         { result . insert (t . skgid . clone (), child . id()); },
-      ViewnodeKind::Vognode (Vognode::Phantom (p @ (Phantom::Diff (_)
-                                  | Phantom::Deleted (_)))) =>
+      ViewnodeKind::Vognode (Vognode::Phantom (p @ Phantom::Deleted (_))) =>
         if target_skgids . contains (p . skgid ())
         { result . insert (p . skgid () . clone (), child . id()); },
       _ => {} } }

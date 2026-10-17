@@ -49,8 +49,7 @@ async fn test_dangling_reference_renders_unknown_node (
       let (rendered, _pids, _) =
         single_root_view (
           config, None,
-          &ID ( "parent" . to_string () ),
-          false ) ?;
+          &ID ( "parent" . to_string () ) ) ?;
       println!("Rendered:\n{}", rendered);
       // graphStats is empty because contents/containers counters
       // count only resolvable nodes (PhantomUnknown is a placeholder,
@@ -89,7 +88,6 @@ async fn buffer_with_unknownnode_child_saves_cleanly_impl (
   let graph : InRustGraphHandle =
     new_handle (InRustGraph::new ());
   let mut views_state : ViewsState = ViewsState {
-        diff_mode_enabled : false,
         open_views            : OpenViews::new (),
         graph_pair            : None,
         };
@@ -99,13 +97,13 @@ async fn buffer_with_unknownnode_child_saves_cleanly_impl (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    input_org_text, config, tantivy, &graph, false,
+    input_org_text, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
   if ! response . errors . is_empty () {
     panic! ("save returned errors instead of completing: {:?}",
             response . errors); }
   let (rerendered, _, _) = single_root_view (
-    config, None, &ID::from ("parent"), false ) ?;
+    config, None, &ID::from ("parent") ) ?;
   assert! ( rerendered . contains ("(unknown (id ghost))"),
     "an unchanged Unknown must preserve its raw relationship member: {}",
     rerendered );

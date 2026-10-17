@@ -1,53 +1,11 @@
 use crate::types::git::PathDiffStatus;
-use crate::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
-use crate::types::nodes::fs::GraphnodeOnDisk;
-use crate::types::nodes::complete::Graphnode;
 
 use git2::{Repository, Diff, DiffOptions, Error, ErrorCode, ObjectType};
-use std::error::Error as StdError;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::str::from_utf8;
 
-use super::misc::{diff_delta_to_entry, path_relative_to_gitrepo};
+use super::misc::diff_delta_to_entry;
 
-
-/// Load a Graphnode for a node whose worktree file is gone, preferring
-/// the git index version over HEAD when both exist (since the git index is
-/// staged and therefore more recent).
-/// Returns Err if neither location has the file.
-pub fn graphnode_from_index_or_head (
-  pid    : &ID,
-  src    : &SkgrepoName,
-  config : &SkgConfig,
-) -> Result<Graphnode, Box<dyn StdError>> {
-  let skgrepo_config : &Skgrepo =
-    config . skgrepos . get (src)
-    . ok_or_else ( || format! ( "Repo '{}' not found in config",
-                                src )) ?;
-  let skgrepo_path : &Path =
-    Path::new ( &skgrepo_config . path );
-  let gitrepo : git2::Repository =
-    open_gitrepo (skgrepo_path) . ok_or_else ( || format! (
-      "Could not open git repo at {:?}", skgrepo_path )) ?;
-  let file_path : PathBuf =
-    PathBuf::from ( format! ( "{}.skg", pid . 0 ));
-  let rel_path : PathBuf =
-    path_relative_to_gitrepo ( &gitrepo, &skgrepo_path . join (&file_path) )
-    . unwrap_or (file_path . clone ());
-  // Git index first.
-  if let Some (content) = get_file_content_at_index (&gitrepo, &rel_path) ? {
-    let node_fs : GraphnodeOnDisk = serde_yaml::from_str (&content) . map_err (
-      |e| format! ( "Failed to parse Graphnode for {} from index: {}",
-                    pid . 0, e )) ?;
-    return Ok ( node_fs . into_complete_as_single_section ( src . clone ())); }
-  // HEAD fallback.
-  let content : String = get_file_content_at_head (&gitrepo, &rel_path) ?
-    . ok_or_else ( || format! (
-      "File {:?} not found in the git index or HEAD", rel_path )) ?;
-  let node_fs : GraphnodeOnDisk = serde_yaml::from_str (&content) . map_err (
-    |e| format! ( "Failed to parse Graphnode for {} from HEAD: {}",
-                  pid . 0, e )) ?;
-  Ok ( node_fs . into_complete_as_single_section ( src . clone ())) }
 
 /// Get the list of staged changes: files whose contents in the git index
 /// differ from HEAD.

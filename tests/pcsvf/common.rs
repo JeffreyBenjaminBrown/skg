@@ -3,7 +3,7 @@
 // '<case>/<skgrepo>/worktree' in the worktree.
 
 #[path = "../shared/git_fixture_helpers.rs"]
-#[allow(unused_imports, dead_code)] // shared with the git diff view tests, which use more of it
+#[allow(unused_imports, dead_code)] // shared by several test targets, each using part of it
 pub mod git_fixture_helpers;
 
 use git_fixture_helpers::{mk_test_tcp_stream_pair, setup_gitrepo_with_fixtures};
@@ -73,7 +73,6 @@ pub fn fixture (
     skgrepos : skgrepos . iter () . map ( |name| name . to_string () ) . collect (),
     config, tantivy, graph,
     views_state : ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None, } } ) }
 
@@ -173,7 +172,7 @@ pub fn save_buffer (
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   Ok ( block_on ( update_from_and_rerender_buffer_test (
-    &mut stream, text, &f . config, &f . tantivy, &f . graph, false,
+    &mut stream, text, &f . config, &f . tantivy, &f . graph,
     &Ok ( view_id_of (tdv_buffer) ), &mut f . views_state )) ? ) }
 
 /// The round-trip invariant for a buffer of the total diff view:

@@ -32,7 +32,6 @@ use crate::serve::handlers::text_release::{
   search_choice_from_request};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
-use crate::types::git::RelationshipAxes;
 use crate::types::views_state::ViewId;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgrepoName};
 use crate::skgrepo_sets::{SkgrepoRestriction, search_skgids_for_skgrepo_set_for_test as search_ids_for_skgrepo_set_for_test_impl};
@@ -701,7 +700,6 @@ pub fn build_search_viewforest (
                 text       : title . clone (),
                 relRepo : None,
                 relRepo_request : None,
-                relationship_axes : RelationshipAxes::default (),
                 change_facts : ChangeFacts::default (),
                 readiness_request : None } ) } ); }} }
   (viewforest, search_results) }

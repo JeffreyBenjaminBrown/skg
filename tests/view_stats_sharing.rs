@@ -134,7 +134,6 @@ async fn save_and_rerender (
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false,
     open_views        : OpenViews::new (),
     graph_pair        : None,
   };
@@ -144,7 +143,7 @@ async fn save_and_rerender (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    buf, config, tantivy, &graph, false,
+    buf, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "save must not error; got: {:?}", response . errors );
@@ -160,7 +159,7 @@ async fn sharing_view_stats_appear_and_roundtrip (
         : (String, Vec<ID>, _) =
         multi_root_view (
           config, Some (tantivy),
-          &[ ID ("R" . to_string ()) ], false ) ?;
+          &[ ID ("R" . to_string ()) ] ) ?;
       let folder_request : String = initial . replace (
         "(affectsParent na)",
         "(affectsParent na) (viewRequests (folder overrides))" );
@@ -177,7 +176,7 @@ async fn sharing_view_stats_appear_and_roundtrip (
           : (String, Vec<ID>, _) =
           multi_root_view (
             config, Some (tantivy),
-            &[ ID ("P" . to_string ()) ], false ) ?;
+            &[ ID ("P" . to_string ()) ] ) ?;
         assert_op_in_view_of_P (&view_of_p, "de novo, view of P");
         let saved_p : String =
           save_and_rerender (&view_of_p, config, tantivy)
@@ -195,7 +194,7 @@ async fn overridesParent_is_position_relative (
         : (String, Vec<ID>, _) =
         multi_root_view (
           config, Some (tantivy),
-          &[ ID ("C" . to_string ()) ], false ) ?;
+          &[ ID ("C" . to_string ()) ] ) ?;
       let c_root_line : &str =
         view_of_c . lines ()
         . find ( |l| l . starts_with ("* ") && l . contains ("(id C)") )

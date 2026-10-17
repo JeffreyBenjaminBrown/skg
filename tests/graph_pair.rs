@@ -3,7 +3,7 @@
 // worktree state per skgrepo.
 
 #[path = "shared/git_fixture_helpers.rs"]
-#[allow(unused_imports, dead_code)] // shared with the git diff view tests, which use more of it
+#[allow(unused_imports, dead_code)] // shared by several test targets, each using part of it
 mod git_fixture_helpers;
 
 use git_fixture_helpers::{commit_all, setup_gitrepo_with_fixtures};

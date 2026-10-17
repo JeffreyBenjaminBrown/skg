@@ -7,7 +7,7 @@ use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 pub use crate::types::misc::SkgrepoSetName;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, mk_restricted_viewnode};
-use crate::types::viewnode::{Vognode, Phantom};
+use crate::types::viewnode::Vognode;
 use crate::test_utils::cleanup_test_tantivy;
 
 use ego_tree::{NodeId, NodeMut, Tree};
@@ -62,10 +62,8 @@ impl SkgrepoRestriction {
   ) -> Result<bool, Box<dyn Error>> {
     if self . is_all () {
       return Ok (true); }
-    let deleted_since_head_pid_src_map : HashMap<ID, SkgrepoName> =
-      HashMap::new ();
     Ok ( match find_skgrepo_with_optional_tantivy (
-      graph, skgid, &deleted_since_head_pid_src_map, None, config ) {
+      graph, skgid, None, config ) {
       Some (skgrepo) => self . contains_skgrepo (&skgrepo),
       None          => false } ) }
 }
@@ -77,12 +75,10 @@ pub fn filter_path_to_unrestricted_skgrepos_for_test (
   path   : Vec<ID>,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
   let mut result : Vec<ID> = Vec::new ();
-  let deleted_since_head_pid_src_map : HashMap<ID, SkgrepoName> =
-    HashMap::new ();
   for skgid in path {
     let skgrepo : SkgrepoName =
       match find_skgrepo_with_optional_tantivy (
-        graph, &skgid, &deleted_since_head_pid_src_map, None, config ) {
+        graph, &skgid, None, config ) {
         Some (skgrepo) => skgrepo,
         None => break };
     if restriction . contains_skgrepo (&skgrepo) {
@@ -98,12 +94,10 @@ pub fn filter_branches_to_unrestricted_skgrepos_for_test (
   branches : BTreeSet<ID>,
 ) -> Result<BTreeSet<ID>, Box<dyn Error>> {
   let mut result : BTreeSet<ID> = BTreeSet::new ();
-  let deleted_since_head_pid_src_map : HashMap<ID, SkgrepoName> =
-    HashMap::new ();
   for skgid in branches {
     if let Some (skgrepo) =
       find_skgrepo_with_optional_tantivy (
-        graph, &skgid, &deleted_since_head_pid_src_map, None, config )
+        graph, &skgid, None, config )
     {
       if restriction . contains_skgrepo (&skgrepo) {
         result . insert (skgid); }}}
@@ -120,37 +114,14 @@ pub fn apply_skgrepo_set_to_viewforest (
     . map ( |n| n . id () )
     . collect ();
   for skgid in skgids {
-    enum Treatment { Convert, Detach }
-    let treatment : Option<Treatment> = {
-      let Some (n) = viewforest . get (skgid) else { continue; }; // already detached with an ancestor
-      let has_children : bool = n . has_children ();
-      match &n . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          if ! restriction . contains_skgrepo (&t . home_skgrepo)
-          => Some ( Treatment::Convert ),
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
-          if ! restriction . contains_skgrepo (&p . home_skgrepo)
-          // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org (interim,
-          // until diff mode and restricted sets refuse to combine):
-          // a removed-member phantom for a restricted node is
-          // quietly omitted, like every other restricted member. One
-          // with children (e.g. an attached role tree) is converted
-          // instead, so nothing unrestricted is silently dropped.
-          => if has_children { Some ( Treatment::Convert ) }
-             else { Some ( Treatment::Detach ) },
-        _ => None } };
-    match treatment {
-      None => {},
-      Some (Treatment::Convert) => {
-        let mut node_mut : NodeMut<Viewnode> =
-          viewforest . get_mut (skgid) . unwrap ();
-        node_mut . value () . kind =
-          mk_restricted_viewnode () . kind; },
-      Some (Treatment::Detach) => {
-        let mut node_mut : NodeMut<Viewnode> =
-          viewforest . get_mut (skgid) . unwrap ();
-        node_mut . detach (); }, }}}
-
+    let mut node_mut : NodeMut<Viewnode> =
+      viewforest . get_mut (skgid) . unwrap ();
+    let convert : bool = matches! ( &node_mut . value () . kind,
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+        if ! restriction . contains_skgrepo (&t . home_skgrepo) );
+    if convert {
+      node_mut . value () . kind =
+        mk_restricted_viewnode () . kind; }}}
 
 pub fn titles_for_skgrepo_set_for_test (
   config : &SkgConfig,

@@ -1,11 +1,7 @@
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::to_org::complete::partner_folder::child_data::{ChildData, build_child_data, apply_relationship_axes_to_folder_members, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
+use crate::to_org::complete::partner_folder::child_data::{ChildData, build_child_data, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
 use crate::update_buffer::reconcile::omit_restricted_members;
-use crate::to_org::complete::partner_folder::goal_list::{goal_list_for_outbound_folder, outbound_member_axes};
-use crate::types::git::{NodeAxes, RelationshipAxes, SkgrepoDiff};
-use crate::types::phantom::phantom_axes;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::misc::{ID, RelPartner, SkgrepoName};
 use crate::types::tree::generic::{read_at_node_in_tree, with_node_mut};
@@ -20,8 +16,6 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
 struct SubscribeeFolderContext {
-  parent_pid             : ID,
-  parent_skgrepo         : SkgrepoName,
   worktree_subscribees   : Vec<ID>,
   relRepos               : HashMap<ID, SkgrepoName>,
 }
@@ -39,9 +33,7 @@ struct SubscribeeFolderContext {
 pub fn reconcile_subscribeeFolder_children (
   node                           : NodeId,
   tree                           : &mut Tree<Viewnode>,
-  skgrepo_diffs                  : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   runtime                        : &RuntimeGeneration,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
 ) -> Result<(), Box<dyn Error>> {
@@ -51,20 +43,14 @@ pub fn reconcile_subscribeeFolder_children (
   let context : SubscribeeFolderContext =
     read_subscribeeFolder_context (
       tree, node, runtime, skgrepo_restriction) ?;
-  let (goal_list, removed_skgids) : (Vec<ID>, HashSet<ID>) =
-    goal_list_for_outbound_folder (
-      &context . parent_pid, &context . parent_skgrepo,
-      NodeRelation::SubscribesTo,
-      skgrepo_diffs, &context . worktree_subscribees );
   let goal_list : Vec<ID> =
     // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: omit every restricted
     // subscribee from the goal (the weave preserves them at save). A
     // retained restricted vognode already in the tree survives anyway
     // -- the folder reconciler treats it as irrelevant, not goal-matched.
     omit_restricted_members (
-      goal_list, skgrepo_restriction,
-      |skgid : &ID| SkgEnv::find_skgrepo_in_generation (
-        runtime, skgid, deleted_since_head_pid_src_map) );
+      context . worktree_subscribees . clone (), skgrepo_restriction,
+      |skgid : &ID| SkgEnv::find_skgrepo_in_generation (runtime, skgid) );
 
   // TODO/DONE/local-view-update/plan_v2.org §3.4/§6.7 exception: an *empty* SubscribeeFolder is PRESERVED, not
   // self-deleted. It is the editable interface onto the origin's outgoing
@@ -84,36 +70,16 @@ pub fn reconcile_subscribeeFolder_children (
   // than clobbering them. This also refreshes a EDITABLE subscriber's
   // subscribeeFolder during a collateral rerender -- the latent staleness
   // subscribeeFolder-maybe-todo.org flagged (forks plan.org: "Collateral-rerender
-  // staleness fix"). The old gate (`if parent_write-protected ||
-  // repo_diffs.is_some()`) wrongly skipped an editable subscriber outside
-  // diff mode; 'parent_write-protected' is no longer read.
+  // staleness fix").
   { // TODO/DONE/local-view-update/plan_v2.org §5.5: a folder fills its members WHOLE and is budget-neutral -- the owning
     // subscriber already spent its budget unit when it expanded, so drawing all
     // its subscribees here costs nothing and never truncates the group.
-    let axes_for_removed = // the relation this folder represents
-      |child : &ID, child_src : &SkgrepoName|
-      -> (NodeAxes, RelationshipAxes) {
-      phantom_axes ( child, child_src,
-                     &context . parent_pid, &context . parent_skgrepo,
-                     NodeRelation::SubscribesTo,
-                     skgrepo_diffs . as_ref () ) };
     let child_data : HashMap<ID, ChildData> =
       build_child_data (
-        tree, node,
-        &goal_list, &removed_skgids, &axes_for_removed,
-        skgrepo_diffs, deleted_since_head_pid_src_map,
-        &context . relRepos, runtime ) ?;
+        tree, node, &goal_list, &context . relRepos, runtime ) ?;
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       tree, node, kind,
-      &goal_list, &child_data, deleted_by_this_save_extra_ids ) ?;
-    if skgrepo_diffs . is_some () {
-      // Present members whose relationship is New in some stage get that
-      // stage's 'addedR'; removed members are the phantoms above.
-      apply_relationship_axes_to_folder_members (
-        tree, node,
-        & outbound_member_axes (
-          &context . parent_pid, &context . parent_skgrepo,
-          NodeRelation::SubscribesTo, skgrepo_diffs )) ?; }}
+      &goal_list, &child_data, deleted_by_this_save_extra_ids ) ?; }
 
   ensure_hiddenOutsideOfSubscribeeFolder_is_last (tree, node) ?;
   Ok(( )) }
@@ -168,8 +134,6 @@ fn read_subscribeeFolder_context (
       . filter ( |m| m . relRepo != parent_skgrepo )
       . map ( |m| (m . member, m . relRepo) ) . collect ();
   Ok (SubscribeeFolderContext {
-    parent_pid,
-    parent_skgrepo,
     worktree_subscribees,
     relRepos }) }
 

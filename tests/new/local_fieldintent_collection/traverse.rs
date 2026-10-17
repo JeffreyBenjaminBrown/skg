@@ -12,13 +12,11 @@ use skg::from_text::local_fieldintent_collection::traverse::collect_instructions
 use skg::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, FieldIntentsForOneId, SubscribeeTextClaim,
   SubscribeeVisibility };
-use skg::types::git::Sign;
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, maybePlaced_to_placed_tree };
 use skg::types::misc::{ID, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::tree::forest::ViewForest;
-use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
 
 fn collected_from_org (
   input : &str,
@@ -219,31 +217,14 @@ fn editable_child_of_restricted_vognode_emits () {
                membership is owned by the disk weave" ); }
 
 #[test]
-fn editable_node_inside_diff_phantom_subtree_emits () {
+fn editable_node_inside_historical_phantom_subtree_emits () {
   let input : &str =
     indoc! {"
       * (skg (node (id root) (repo main))) root
-      ** (skg (node (id fading) (repo main))) fading
+      ** (skg (historical (id fading) (repo main))) fading
       *** (skg (node (id survivor) (repo main))) survivor
       "};
-  let forest : ViewForest = {
-    let mut forest : ViewForest = forest_from_org (input);
-    let fading_treeid : ego_tree::NodeId =
-      forest . nodes()
-      . find ( |n| matches!(
-          &n . value() . kind,
-          ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-            if t . skgid == ID::from ("fading") ))
-      . map ( |n| n . id() )
-      . expect ("fading node not found");
-    { let tree : &mut Tree<Viewnode> =
-        forest . as_internal_tree_mut();
-      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
-        &mut tree . get_mut (fading_treeid) . unwrap() . value() . kind
-      { t . relationship_axes . unstaged = Some (Sign::Minus); }
-      tree . get_mut (fading_treeid) . unwrap()
-        . value() . normal_to_phantom (); }
-    forest };
+  let forest : ViewForest = forest_from_org (input);
   let collected : CollectedFieldIntents =
     collect_instructions_locally (&forest) . unwrap();
   assert!( collected . by_pid . get (&ID::from ("fading")) . is_none(),

@@ -10,7 +10,7 @@ use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{GraphnodeStats, Viewnode, ViewnodeKind};
-use crate::types::viewnode::{Vognode, Phantom};
+use crate::types::viewnode::Vognode;
 
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
@@ -83,11 +83,7 @@ pub fn set_metadata_relationships_in_node_recursive (
   config : &SkgConfig,
 ) {
   let new_stats : Option < GraphnodeStats > =
-    { // Phantoms keep graphStats: these are node-global
-      // decorations for the ID, not parent/content facts. Missing
-      // current data still falls back to false rather than querying
-      // historical graph context for a placeholder.
-      match & tree . get (treeid) . unwrap () . value () . kind {
+    { match & tree . get (treeid) . unwrap () . value () . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           => { let graphnode_opt : Option<Graphnode>
                  = graphnode_graphFirst_by_pid_and_skgrepo (
@@ -95,25 +91,12 @@ pub fn set_metadata_relationships_in_node_recursive (
                    ). ok ();
                Some ( graphnodestats_for_pid (
                  &t . skgid, stats, graphnode_opt . as_ref () )) },
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
-          => { let graphnode_opt : Option<Graphnode>
-                 = graphnode_graphFirst_by_pid_and_skgrepo (
-                     graph, config, &p . skgid, &p . home_skgrepo
-                   ). ok ();
-               Some ( graphnodestats_for_pid (
-                 &p . skgid, stats, graphnode_opt . as_ref () )) },
         _ => None }};
   match new_stats {
     Some (gs) =>
-      // Keep writeback aligned with the read arm above: both normal
-      // vognodes and phantoms can display node-explicit graphStats.
-      match &mut tree . get_mut (treeid)
-        . unwrap () . value () . kind
-        { ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          => { t . graphStats = gs; },
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
-          => { p . graphStats = gs; },
-        _ => {} },
+      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+        &mut tree . get_mut (treeid) . unwrap () . value () . kind
+        { t . graphStats = gs; },
     None => {} }
   let child_treeids : Vec < NodeId > =
     tree . get (treeid) . unwrap ()

@@ -146,8 +146,6 @@ fn dependencies_from_uninterpreted (
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
         } = &restriction . editability
         { result . insert (target . clone ()); }}
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (phantom))) =>
-        result . extend (phantom . skgid . iter () . cloned ()),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (phantom))) => {
         result . insert (phantom . skgid . clone ()); }
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (phantom))) => {
@@ -173,8 +171,6 @@ fn dependencies_from_registered (
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
         } = &restriction . editability
         { result . insert (target . clone ()); }}
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (phantom))) => {
-        result . insert (phantom . skgid . clone ()); }
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (phantom))) => {
         result . insert (phantom . skgid . clone ()); }
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (phantom))) => {

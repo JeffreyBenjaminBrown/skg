@@ -1,4 +1,3 @@
-use crate::types::git::{RelationshipAxes, NodeChanges, SkgrepoDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_unrestrictedVognode};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
@@ -32,7 +31,6 @@ pub fn reconcile_aliasFolder_children (
   tree               : &mut Tree<Viewnode>,
   aliasfolder_treeid : NodeId,
   graph              : &InRustGraph,
-  skgrepo_diffs      : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   config             : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   { let is_aliasFolder : bool = // barf if not an aliasFolder
@@ -56,26 +54,8 @@ pub fn reconcile_aliasFolder_children (
     parent_graphnode . aliases . or_default () . iter ()
     .map ( |alias| (alias . member . clone (), alias . relRepo . clone ()) )
     .collect ();
-  let (staged_nc, unstaged_nc)
-    : (Option<&NodeChanges>, Option<&NodeChanges>) =
-    per_stage_node_changes_for_unrestrictedVognode (
-      skgrepo_diffs, &parent_pid, &parent_skgrepo );
-  let (goal_list, axes_map)
-    : (Vec<String>, HashMap<String, RelationshipAxes>) =
-    if staged_nc . is_none () && unstaged_nc . is_none () {
-      let goals : Vec<String> =
-        members_of ( parent_graphnode . aliases . or_default() );
-      ( goals, HashMap::new() )
-    } else {
-      let merged : Vec<(String, RelationshipAxes)> =
-        axes_from_per_stage_diffs (
-          staged_nc   . map ( |c| c . aliases_diff . as_slice () ),
-          unstaged_nc . map ( |c| c . aliases_diff . as_slice () ) );
-      let goals : Vec<String> =
-        merged . iter () . map ( |(t, _)| t . clone () ) . collect ();
-      let amap : HashMap<String, RelationshipAxes> =
-        merged . into_iter () . collect ();
-      ( goals, amap ) };
+  let goal_list : Vec<String> =
+    members_of ( parent_graphnode . aliases . or_default() );
   let is_alias : fn (&Viewnode) -> bool =
     // relevance to complete_relevant_children
     |viewnode| matches!( &viewnode . kind,
@@ -87,8 +67,6 @@ pub fn reconcile_aliasFolder_children (
       _ => Err ( "reconcile_aliasFolder_children: relevant child is not an alias"
                  . to_string() ), }; // relevance means Property::Alias
   let create_alias = |text: &String| -> Result<Viewnode, String> {
-    let relationship_axes : RelationshipAxes =
-      axes_map . get (text) . copied () . unwrap_or_default ();
     Ok ( Viewnode {
       focused     : false,
       folded      : false,
@@ -100,7 +78,6 @@ pub fn reconcile_aliasFolder_children (
                                                    if relRepo == &parent_graphnode . home_skgrepo { None }
                                                    else { Some (relRepo . clone ()) } ),
                                                relRepo_request : None,
-                                               relationship_axes,
                                                change_facts : ChangeFacts::default (),
                                                readiness_request : None } ), })};
   complete_relevant_children_in_viewforest(

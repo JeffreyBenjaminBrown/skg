@@ -5,7 +5,6 @@ use crate::to_org::expand::folder_request::build_and_integrate_folder_then_drop_
 use crate::to_org::expand::flags::build_and_integrate_flags_then_drop_request;
 use crate::to_org::util::{ EditableMap, Finalizable, get_skgid_from_viewnode_at, makeWriteProtectedAndClobber, unrestrictedVognode_in_tree_is_writeProtected };
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
-use crate::types::git::SkgrepoDiff;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, ViewRequest, FolderRelation, Editability, AffectsParent };
 use crate::types::viewnode::Vognode;
 use crate::types::nodes::complete::Graphnode;
@@ -14,7 +13,6 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::tree::viewnode_graphnode::{write_at_unrestrictedVognode_in_tree, pid_and_skgrepo_from_viewnode_at};
 
 use ego_tree::{Tree, NodeId, NodeRef};
-use std::collections::HashMap;
 use std::error::Error;
 
 pub fn execute_view_requests (
@@ -24,7 +22,6 @@ pub fn execute_view_requests (
   config             : &SkgConfig,
   errors             : &mut Vec < String >,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  skgrepo_diffs      : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   for (treeid, request) in requests {
     match request {
@@ -35,7 +32,7 @@ pub fn execute_view_requests (
       ViewRequest::Folder (rel) => {
         build_and_integrate_folder_then_drop_request (
           viewforest, treeid, graph, rel, config, errors,
-          skgrepo_restriction, skgrepo_diffs ) ?; },
+          skgrepo_restriction ) ?; },
       ViewRequest::RoleTree (role) => {
         // Relation-generic: every partner role routes through the one
         // role-tree engine (container, mentioner, and the seven new

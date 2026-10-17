@@ -1,8 +1,0 @@
-pid: 'R'
-title: "R"
-overrides:
-  - "Z"
-  - "W"
-hidesFromSubs:
-  - "ha"
-  - "hb"

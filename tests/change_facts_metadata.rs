@@ -8,7 +8,7 @@
 use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
   ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
-use skg::types::git::{RelationshipAxes, Sign};
+use skg::types::git::Sign;
 use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::nodes::complete::Flag;
@@ -114,14 +114,12 @@ fn property_leaves_round_trip_their_change_facts () {
   assert_round_trip (
     viewnode ( ViewnodeKind::Property ( Property::Alias {
       text : "an alias" . into (), relRepo : None, relRepo_request : None,
-      relationship_axes : RelationshipAxes::default (),
       change_facts : facts ( None, Some (Sign::Plus), Some (&[]) ),
       readiness_request : None, } )),
     "alias (diff rel+) (ready)" );
   assert_round_trip (
     viewnode ( ViewnodeKind::Property ( Property::ID {
       skgid : ID::from ("x"),
-      relationship_axes : RelationshipAxes::default (),
       change_facts : facts ( None, Some (Sign::Minus), None ),
       readiness_request : request (true, &[]), } )),
     "id (diff rel-) (readyRequest)" );

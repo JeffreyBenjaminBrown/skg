@@ -4,12 +4,10 @@
 /// Only needed briefly after parsing a buffer from the client;
 /// after validation, converted to placed types.
 
-pub use super::viewnode::{MpUnrestrictedVognode, MpPhantomDiff};
-use super::viewnode::PhantomDiff;
+pub use super::viewnode::MpUnrestrictedVognode;
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
-use super::git::{NodeAxes, RelationshipAxes};
 use super::viewnode::{ ChangeFacts, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Birth, Editability, AffectsParent, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
@@ -51,7 +49,6 @@ pub enum MpVognode {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MpPhantom {
-  Diff    (MpPhantomDiff),
   Deleted (PhantomDeleted),
   Unknown (PhantomUnknown),
   Historical (PhantomHistorical),
@@ -81,45 +78,8 @@ impl TryFrom<MpUnrestrictedVognode> for UnrestrictedVognode {
       change_facts      : u . change_facts,
       readiness_request : u . readiness_request,
       view_requests  : u . view_requests,
-      node_axes      : u . node_axes,
-      relationship_axes     : u . relationship_axes,
-      not_in_git     : u . not_in_git,
       editability   : u . editability,
     })
-  }
-}
-
-impl TryFrom<MpPhantomDiff> for PhantomDiff {
-  type Error = String;
-
-  fn try_from(u: MpPhantomDiff) -> Result<Self, Self::Error> {
-    let skgid = u . skgid . ok_or_else(
-      || format!("Phantom '{}' has no ID", u . title))?;
-    let skgrepo = u . home_skgrepo . ok_or_else(
-      || format!("Phantom '{}' has no repo", u . title))?;
-    Ok(PhantomDiff {
-      title      : u . title,
-      skgid      : skgid,
-      home_skgrepo: skgrepo,
-      node_axes  : u . node_axes,
-      relationship_axes : u . relationship_axes,
-      not_in_git : u . not_in_git,
-      graphStats : u . graphStats,
-    })
-  }
-}
-
-impl From<PhantomDiff> for MpPhantomDiff {
-  fn from(p: PhantomDiff) -> Self {
-    MpPhantomDiff {
-      title      : p . title,
-      skgid         : Some(p . skgid),
-      home_skgrepo     : Some(p . home_skgrepo),
-      node_axes  : p . node_axes,
-      relationship_axes : p . relationship_axes,
-      not_in_git : p . not_in_git,
-      graphStats : p . graphStats,
-    }
   }
 }
 
@@ -133,9 +93,6 @@ impl TryFrom<MpViewnodeKind> for ViewnodeKind {
           Vognode::Unrestricted (UnrestrictedVognode::try_from (t)?))),
       MpViewnodeKind::Vognode (MpVognode::Restricted (i)) =>
         Ok (ViewnodeKind::Vognode (Vognode::Restricted (i))),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) =>
-        Ok (ViewnodeKind::Vognode (Vognode::Phantom (
-          Phantom::Diff (PhantomDiff::try_from (p)?)))),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
         Ok (ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d)))),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
@@ -183,9 +140,6 @@ impl From<UnrestrictedVognode> for MpUnrestrictedVognode {
       change_facts      : t . change_facts,
       readiness_request : t . readiness_request,
       view_requests  : t . view_requests,
-      node_axes      : t . node_axes,
-      relationship_axes     : t . relationship_axes,
-      not_in_git     : t . not_in_git,
       editability   : t . editability,
     }
   }
@@ -199,9 +153,6 @@ impl From<ViewnodeKind> for MpViewnodeKind {
           MpVognode::Unrestricted (MpUnrestrictedVognode::from (t))),
       ViewnodeKind::Vognode (Vognode::Restricted (i)) =>
         MpViewnodeKind::Vognode (MpVognode::Restricted (i)),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) =>
-        MpViewnodeKind::Vognode (MpVognode::Phantom (
-          MpPhantom::Diff (MpPhantomDiff::from (p)))),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) =>
         MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
@@ -302,9 +253,6 @@ impl Default for MpUnrestrictedVognode {
       change_facts      : ChangeFacts::default (),
       readiness_request : None,
       view_requests  : HashSet::new(),
-      node_axes      : NodeAxes::default(),
-      relationship_axes     : RelationshipAxes::default(),
-      not_in_git     : false,
       editability    : Editability::Editable {
         body         : None,
         edit_request : None },
@@ -332,7 +280,6 @@ impl MpViewnode {
   pub fn title (&self) -> &str {
     match &self . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) => &t . title,
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) => &p . title,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
         &d . title,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (h))) =>
@@ -352,8 +299,6 @@ impl MpViewnode {
     match &self . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         => t . title . clone(),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p)))
-        => p . title . clone(),
       MpViewnodeKind::Property (Property::Alias { text, .. }) =>
         format!("property:alias({})", text),
       MpViewnodeKind::Property (Property::ID { skgid, .. }) =>
@@ -361,7 +306,7 @@ impl MpViewnode {
       MpViewnodeKind::Property (Property::Flag { flag, .. }) =>
         format!("property:flag({})", flag . wire_name ()),
       MpViewnodeKind::Property (
-        property @ ( Property::TextChanged { .. } | Property::OldText { .. }
+        property @ ( Property::OldText { .. }
                      | Property::BodyDiff { .. } | Property::HomeSkgrepoMove { .. }
                      | Property::RelRepoMove { .. } | Property::ChangesetMarker { .. } )) =>
         format! ("property:{}", property . repr_in_client ()),
@@ -387,8 +332,6 @@ impl MpViewnode {
     match &self . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         => t . body (),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p)))
-        => p . body (),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
         d . body . as_ref(),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (h))) =>
@@ -407,8 +350,6 @@ impl MpViewnode {
     match &self . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         => t . skgid . as_ref(),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p)))
-        => p . skgid . as_ref(),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
         Some (&d . skgid),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (h))) =>
@@ -425,11 +366,9 @@ impl MpViewnode {
         | MpViewnodeKind::DeadViewnode =>
         None, }}
 
-  /// True for the two UnrestrictedVognode-ish kinds: an Unrestricted vognode or a Diff phantom.
-  pub fn is_unrestricted_or_diff_phantom (&self) -> bool {
+  pub fn is_unrestricted (&self) -> bool {
     matches! ( &self . kind,
-      MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))
-        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_))) ) }
+      MpViewnodeKind::Vognode (MpVognode::Unrestricted (_)) ) }
 }
 
 //

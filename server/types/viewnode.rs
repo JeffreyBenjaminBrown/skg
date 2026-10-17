@@ -6,7 +6,7 @@
 /// Others encode information about neighboring tree nodes, such as
 /// aliases, IDs, and partner folders.
 
-use super::git::{NodeAxes, RelationshipAxes, Sign};
+use super::git::Sign;
 use super::misc::{ID, SkgrepoName};
 use super::nodes::complete::Flag;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
@@ -122,13 +122,12 @@ pub enum Vognode {
   Phantom  (Phantom),
 }
 
-/// The four display-only phantom kinds. None of them is a current
+/// The three display-only phantom kinds. None of them is a current
 /// graphnode: all are save-inert on save and excluded from the view's collateral pids
 /// (`pids_from_viewforest`). They differ in *why* the node is absent and thus
 /// in how much they can still say about it.
 #[derive( Debug, Clone, PartialEq )]
 pub enum Phantom {
-  Diff    (PhantomDiff), // Diff-only phantom: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim PhantomDiff, not an UnrestrictedVognode -- a phantom is always write-protected/bodyless and its affectsParent is never read or rendered, so it needs none of UnrestrictedVognode's affectsParent/birth/viewStats/view_requests/editability. See PhantomDiff_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
   Deleted (PhantomDeleted), // Epistemically: No longer exists in the graph. Procedurally: Skg just watched the user delete this node (maybe from a different view), but for some reason (e.g. its view-descendents are interesting, or it is a root) had to retain an image of it here.
   // PITFALL: There is an exception. If Skg watches a user delete a node, while that user has a view of a foreign node that refers to the deleted node, that "foreigner's view" will show it as Unknown rather than Deleted. This is to maintain consistency with how that relationship to a nonexistent node will appear when viewed in later sessions.
   Unknown (PhantomUnknown), // Skg can't find it (and, unlike Deleted, does not know why). Can result from bad data, or from a reference to another user's node that has since been deleted.
@@ -136,13 +135,13 @@ pub enum Phantom {
 }
 
 /// A phantom for a node whose .skg file a save just
-/// removed -- one of the three phantom kinds, alongside PhantomDiff and
+/// removed -- one of the three phantom kinds, alongside PhantomHistorical and
 /// PhantomUnknown. All three stand in for something that is NOT a current
 /// graphnode (so all three are save-inert on save and excluded from the view's
 /// collateral pids, `pids_from_viewforest`); they differ in *why* the node is
 /// absent and thus in how much they can still say about it.
 ///
-/// ARISES: during post-save / collateral re-render (NOT in git diff mode), when
+/// ARISES: during post-save / collateral re-render, when
 /// a node already materialized in the view turns up in
 /// `deleted_by_this_save_pids`. An Unrestricted content child flips here via
 /// `mutate_unrestrictedVognode_to_deletednode`. (A Restricted node is NOT flipped: it is an
@@ -162,7 +161,7 @@ pub enum Phantom {
 /// other phantom it keeps the `title`/`body` it last displayed -- because it was
 /// a fully materialized node right up until the save deleted it, so that text is
 /// still worth showing. (The title is empty for one promoted from a Restricted
-/// node, which carried none.) It holds no diff axes: it is not about git stages.
+/// node, which carried none.)
 #[derive( Debug, Clone, PartialEq )]
 pub struct PhantomDeleted {
   pub skgid        : ID,
@@ -174,7 +173,7 @@ pub struct PhantomDeleted {
 }
 
 /// A phantom for a reference that resolves to nothing --
-/// one of the three phantom kinds, alongside PhantomDiff and PhantomDeleted
+/// one of the three phantom kinds, alongside PhantomHistorical and PhantomDeleted
 /// (see PhantomDeleted for the shared framing).
 ///
 /// ARISES: when some node's `contains` (or similar list) names an ID that has no
@@ -194,7 +193,7 @@ pub struct PhantomDeleted {
 ///
 /// DISTINCT INFO: it carries ONLY the `id`. Unlike PhantomDeleted it has no skgrepo
 /// (it is the one Phantom kind for which `pid_and_repo` returns None) and no
-/// last-seen text; unlike PhantomDiff it has no diff axes. That emptiness IS
+/// last-seen text; unlike PhantomHistorical it has no old text. That emptiness IS
 /// the information: a reference exists, but we have no record of its target.
 #[derive( Debug, Clone, PartialEq )]
 pub struct PhantomUnknown {
@@ -281,92 +280,7 @@ pub struct UnrestrictedVognode_Generic < Id, Repo > {
   pub readiness_request : Option<ReadinessRequest>,
 
   pub view_requests : HashSet < ViewRequest >,
-  /// Per-stage diff state for the node's '.skg' file (the node axis).
-  pub node_axes     : NodeAxes,
-  /// Per-stage diff state for the node's relationship at this position
-  /// in the parent's contains list (the relationship axis).
-  pub relationship_axes    : RelationshipAxes,
-  /// True iff the node's skgrepo is not a gitrepo (or has no commits).
-  /// A per-repo fact, not an axis.
-  pub not_in_git    : bool,
   pub editability  : Editability,
-}
-
-pub type PhantomDiff   = PhantomDiff_Generic < ID, SkgrepoName >;
-pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
-                                               Option < SkgrepoName >>;
-
-/// The slim payload of a `Phantom::Diff` -- one of the three phantom
-/// ("phantom") kinds, alongside PhantomDeleted and PhantomUnknown (see
-/// PhantomDeleted for the shared framing).
-///
-/// ARISES: only in git diff mode, from the diff-completion code. Two shapes,
-/// both detected by `diff_axes_require_phantom`: a "removed" member (present in
-/// the parent's HEAD/index contains but gone from the worktree's, inserted by
-/// `insert_phantoms_for_missing_contains` / `mk_phantom_viewnode`), or an Unrestricted
-/// node flipped in place by `normal_to_phantom` because its own relationship/
-/// node axes went negative. "removed" vs "removedHere" (its .skg file is
-/// still in the worktree, so the graph can still answer about it) is told apart by
-/// `is_removedhere_diffPhantom`.
-///
-/// USED: as a write-protected diff annotation. It depicts a removed member at its
-/// correct HEAD position among surviving siblings, decorated with per-stage diff
-/// atoms. Always write-protected and bodyless (enforced by `normal_to_phantom` /
-/// `mk_phantom_viewnode`); its affectsParent is never read or rendered (implicit
-/// member); an Unrestricted child left under it is demoted to non-member.
-///
-/// DISTINCT INFO: it is the only phantom that carries the git-diff coordinates
-/// -- per-stage `node_axes` and `relationship_axes` plus `not_in_git` -- because
-/// it exists solely to show a change between git snapshots. It keeps a `title`
-/// and `repo` (resolved via `title_for_phantom`; the skgrepo may be the
-/// RepoName NOT_FOUND sentinel) and `graphStats`, which IS rendered on
-/// phantoms. It needs NONE of UnrestrictedVognode's affectsParent / birth / viewStats /
-/// view_requests / editability (TODO/DONE/local-view-update/plan_v2.org §11 reduction; see §18): nothing
-/// reads a phantom's affectsParent, and every phantom is write-protected.
-#[derive( Debug, Clone, PartialEq )]
-pub struct PhantomDiff_Generic < Id, Repo > {
-  pub title        : String,
-  pub skgid        : Id,
-  pub home_skgrepo : Repo,
-  /// Per-stage diff state for the node's '.skg' file (the node axis).
-  pub node_axes  : NodeAxes,
-  /// Per-stage diff state for the node's relationship at this position
-  /// in the parent's contains list (the relationship axis).
-  pub relationship_axes : RelationshipAxes,
-  /// True iff the node's skgrepo is not a gitrepo (or has no commits).
-  pub not_in_git : bool,
-  pub graphStats : GraphnodeStats,
-}
-
-impl < Id, Repo > PhantomDiff_Generic < Id, Repo > {
-  /// Build a phantom payload from an UnrestrictedVognode, keeping only the phantom-relevant
-  /// fields and discarding affectsParent / birth / viewStats / view_requests /
-  /// editability. Used when flipping an Unrestricted node to a phantom and by the
-  /// placed<->maybe-placed conversions.
-  pub fn from_unrestrictedVognode ( t : UnrestrictedVognode_Generic < Id, Repo > ) -> Self {
-    PhantomDiff_Generic {
-      title      : t . title,
-      skgid         : t . skgid,
-      home_skgrepo     : t . home_skgrepo,
-      node_axes  : t . node_axes,
-      relationship_axes : t . relationship_axes,
-      not_in_git : t . not_in_git,
-      graphStats : t . graphStats,
-    }}
-
-  /// A phantom is always write-protected, hence never has a body.
-  pub fn body (&self) -> Option < &String > { None }
-  pub fn is_writeProtected (&self) -> bool { true }
-
-  /// True iff this node's diff axes require phantom display; for a correctly
-  /// constructed phantom this holds, but some shared code asks regardless.
-  pub fn should_be_diffPhantom (&self) -> bool {
-    diff_axes_require_phantom (&self . node_axes, &self . relationship_axes) }
-
-  /// A "removed-here" phantom whose '.skg' file is still in the worktree.
-  pub fn is_removedhere_diffPhantom (&self) -> bool {
-    self . should_be_diffPhantom ()
-    && self . node_axes . unstaged != Some (Sign::Minus) }
 }
 
 /// Each UnrestrictedVognode has one of these.
@@ -492,11 +406,9 @@ pub enum Property {
   Alias { text: String, // an alias for the node's grandparent
           relRepo: Option<SkgrepoName>,
           relRepo_request: Option<SkgrepoName>,
-          relationship_axes: RelationshipAxes,
           change_facts: ChangeFacts,
           readiness_request: Option<ReadinessRequest> },
   ID { skgid: ID, // an ID of grandparent (the parent being an IDFolder)
-       relationship_axes: RelationshipAxes,
        change_facts: ChangeFacts,
        readiness_request: Option<ReadinessRequest> },
   /// A true file-level boolean flag of the node's grandparent.
@@ -507,7 +419,6 @@ pub enum Property {
     change_facts      : ChangeFacts,
     readiness_request : Option<ReadinessRequest>,
   },
-  TextChanged { staged: bool, unstaged: bool }, // Indicates title or body changed between stages. Visible in 'git diff mode'. Per-stage bools mark whether the change is staged (HEAD vs index) and/or unstaged (index vs worktree).
   // The total diff view's properties, below, are display-only and
   // save-inert: the validator ignores them, and the total diff view's
   // reconciler owns them. Each but BodyDiff is a change-forest leaf or
@@ -678,37 +589,7 @@ pub enum ViewRequest {
 // Implementations
 //
 
-/// True when a node's diff axes require displaying it with the
-/// `Phantom::Diff` variant. Triggered by either:
-/// - any relationship axis being '-' (removed in some stage), or
-/// - the worktree node axis being '-' (file deleted), or
-/// - the "moved twice" pattern: stagedM = +, unstagedM = -.
-/// Shared by UnrestrictedVognode_Generic and PhantomDiff_Generic, which both carry
-/// these axes.
-pub fn diff_axes_require_phantom (
-  node_axes  : &NodeAxes,
-  relationship_axes : &RelationshipAxes,
-) -> bool {
-  relationship_axes . staged   == Some (Sign::Minus)
-  || relationship_axes . unstaged == Some (Sign::Minus)
-  || node_axes  . unstaged == Some (Sign::Minus) }
-
 impl < Id, Repo > UnrestrictedVognode_Generic < Id, Repo > {
-  pub fn should_be_diffPhantom (
-    &self,
-  ) -> bool {
-    diff_axes_require_phantom (&self . node_axes, &self . relationship_axes) }
-
-  /// A "removed-here" phantom: a phantom whose '.skg' file is still
-  /// present in the worktree (so the graph still knows the node and can
-  /// answer queries about it). Distinguished from a phantom whose file
-  /// is also gone, for which graph queries would fail.
-  pub fn is_removedhere_diffPhantom (
-    &self,
-  ) -> bool {
-    self . should_be_diffPhantom ()
-    && self . node_axes . unstaged != Some (Sign::Minus) }
-
   pub fn is_writeProtected (&self) -> bool {
     matches! ( self . editability,
                Editability::WriteProtected ) }
@@ -835,7 +716,6 @@ impl Property {
       Property::Alias { .. }       => "alias",
       Property::ID { .. }          => "id",
       Property::Flag { .. }    => "flag",
-      Property::TextChanged { .. } => "textChanged",
       Property::OldText { .. }         => "oldText",
       Property::BodyDiff { .. }        => "bodyDiff",
       Property::HomeSkgrepoMove { .. } => "homeMove",
@@ -850,8 +730,7 @@ impl Property {
       Property::Flag { title, .. } => title,
       Property::OldText { title, .. } =>
         title . as_deref () . unwrap_or (""),
-      Property::TextChanged { .. }
-        | Property::BodyDiff { .. }
+      Property::BodyDiff { .. }
         | Property::HomeSkgrepoMove { .. }
         | Property::RelRepoMove { .. }
         | Property::ChangesetMarker { .. } => "",
@@ -878,7 +757,7 @@ impl Property {
         | Property::RelRepoMove { readiness_request, .. }
         | Property::ChangesetMarker { readiness_request, .. } =>
         readiness_request . as_ref (),
-      Property::TextChanged { .. } | Property::BodyDiff { .. } => None, } }
+      Property::BodyDiff { .. } => None, } }
 
   fn readiness_request_mut (
     &mut self,
@@ -892,7 +771,7 @@ impl Property {
         | Property::RelRepoMove { readiness_request, .. }
         | Property::ChangesetMarker { readiness_request, .. } =>
         Some (readiness_request),
-      Property::TextChanged { .. } | Property::BodyDiff { .. } => None, } }
+      Property::BodyDiff { .. } => None, } }
 }
 
 impl ChangesetMarkerKind {
@@ -944,7 +823,6 @@ impl Vognode {
 impl Phantom {
   pub fn skgid (&self) -> &ID {
     match self {
-      Phantom::Diff    (p) => &p . skgid,
       Phantom::Deleted (d) => &d . skgid,
       Phantom::Unknown (u) => &u . skgid,
       Phantom::Historical (h) => &h . skgid,
@@ -954,7 +832,6 @@ impl Phantom {
     &self,
   ) -> Option<(&ID, &SkgrepoName)> {
     match self {
-      Phantom::Diff    (p) => Some ((&p . skgid, &p . home_skgrepo)),
       Phantom::Deleted (d) => Some ((&d . skgid, &d . home_skgrepo)),
       Phantom::Unknown (_) => None, // preserves Unknown's lone-None invariant
       Phantom::Historical (h) => Some ((&h . skgid, &h . home_skgrepo)),
@@ -1052,30 +929,9 @@ impl Viewnode {
           *readiness_request = None; }},
       _ => {}, }}
 
-  pub fn normal_to_phantom (
-    &mut self,
-  ) {
-    if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-      = &self . kind
-      { if t . should_be_diffPhantom ()
-        { // A phantom is ALWAYS write-protected and renders no body (Jeff's
-          // TODO/DONE/local-view-update/progress.org §9 TODO): the diff view presumes git literacy (magit
-          // shows the real node), and a phantom must never be a node's
-          // editable occurrence -- if Removed it has nothing to define, and if
-          // RemovedHere "edit it here, where it isn't" is dangerously
-          // confusing. So drop body/edit_request when flipping a (possibly
-          // Editable) Unrestricted node to a phantom. mk_phantom_viewnode already
-          // builds from a `WriteProtected` base, so now every phantom is
-          // write-protected by construction.
-          let phantom : PhantomDiff =
-            PhantomDiff::from_unrestrictedVognode ( t . clone () );
-          self . kind = ViewnodeKind::Vognode (Vognode::Phantom (
-            Phantom::Diff (phantom))); }}}
-
   pub fn title (&self) -> &str {
     match &self . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => &t . title,
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) => &p . title,
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) =>
         &d . title,
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
@@ -1095,7 +951,6 @@ impl Viewnode {
   pub fn body (&self) -> Option < &String > {
     match &self . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t . body (),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) => p . body (),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) => d . body . as_ref (),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) => h . body . as_ref (),
       ViewnodeKind::PropertyFolder (folder) => folder . body (),
@@ -1122,13 +977,11 @@ impl Viewnode {
       _ => None,
     }}
 
-  /// The id of an Unrestricted vognode or a Diff phantom -- the two UnrestrictedVognode-ish
-  /// kinds. None for everything else
-  /// (Restricted, Deleted/Unknown phantoms, folders, non-vognodes, BufferRoot).
-  pub fn unrestricted_or_diff_phantom_skgid (&self) -> Option<&ID> {
+  /// The id of an Unrestricted vognode. None for everything else
+  /// (Restricted vognodes, phantoms, folders, non-vognodes, BufferRoot).
+  pub fn unrestricted_skgid (&self) -> Option<&ID> {
     match &self . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some (&t . skgid),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))   => Some (&p . skgid),
       _ => None,
     }}
 }
@@ -1222,37 +1075,10 @@ pub fn default_unrestrictedVognode (
     change_facts      : ChangeFacts::default (),
     readiness_request : None,
     view_requests  : HashSet::new(),
-    node_axes      : NodeAxes::default(),
-    relationship_axes     : RelationshipAxes::default(),
-    not_in_git     : false,
     editability    : Editability::Editable {
       body         : None,
       edit_request : None },
   }}
-
-/// Create a write-protected phantom Viewnode with the given diff axes.
-/// At least one relationship axis or the unstaged-node axis should be
-/// negative for this to be a real phantom; callers must ensure that.
-pub fn mk_phantom_viewnode (
-  skgid      : ID,
-  skgrepo    : SkgrepoName,
-  title      : String,
-  node_axes  : NodeAxes,
-  relationship_axes : RelationshipAxes,
-) -> Viewnode {
-  let mut viewnode : Viewnode =
-    mk_writeProtected_viewnode ( skgid, skgrepo, title, AffectsParent::True );
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (mut t)) = viewnode . kind
-    { t . node_axes  = node_axes;
-      t . relationship_axes = relationship_axes;
-      viewnode . kind = ViewnodeKind::Vognode (Vognode::Phantom (
-        Phantom::Diff ( PhantomDiff::from_unrestrictedVognode (t) ))); }
-  else
-    // mk_writeProtected_viewnode always yields an Unrestricted vognode; if that ever
-    // changes, fail loudly rather than silently return a non-phantom.
-    { unreachable! (
-        "mk_phantom_viewnode: mk_writeProtected_viewnode did not yield an Unrestricted vognode" ); }
-  viewnode }
 
 pub fn mk_editable_viewnode (
   skgid   : ID,
@@ -1336,19 +1162,13 @@ pub fn mk_writeProtected_from_viewnode (
   match &mut viewnode . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
       // Mutate in place, so that every field not named here
-      // (view_requests, diff axes, graphStats, viewStats, and any
+      // (view_requests, change facts, graphStats, viewStats, and any
       // field added later) is preserved rather than silently reset.
       t . affectsParent = affectsParent;
       t . birth = birth;
       t . editability = // discards body and edit_request
         Editability::WriteProtected;
       Ok (viewnode) },
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) =>
-      // A phantom carries none of the fields preserved above,
-      // so it is rebuilt rather than mutated.
-      Ok ( mk_writeProtected_viewnode_with_birth (
-        p . skgid . clone (), p . home_skgrepo . clone (), p . title . clone (),
-        affectsParent, birth )),
     _ => Err (
       "mk_writeProtected_from_viewnode: expected UnrestrictedVognode"
         . to_string () ) }}

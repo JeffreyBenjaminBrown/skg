@@ -1,4 +1,0 @@
-pid: 'S2'
-title: "S2"
-subscribesTo:
-  - "B2"

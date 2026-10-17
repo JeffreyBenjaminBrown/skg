@@ -74,13 +74,12 @@ pub fn expand_true_content_at_unrestrictedVognode (
   editable_map                   : &mut EditableMap,
   config             : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
   settled                        : bool,
   cascade                        : bool,
   node_budget                    : &mut usize,
-  substitution_enabled           : bool, // false in diff mode: diff surfaces show raw graph facts.
+  substitution_enabled           : bool, // false in the total diff view: it shows raw graph facts.
   substitute_existing_content_overrides : bool,
 ) -> Result<(), Box<dyn Error>> {
   // Phantoms are diff placeholders; this pass mutates and expands
@@ -99,9 +98,6 @@ pub fn expand_true_content_at_unrestrictedVognode (
   let (pid, initial_skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_viewnode_at( tree, node,
                                   "expand_true_content_at_unrestrictedVognode" ) ?;
-  // This content path produces the pure worktree view; the node's git diff
-  // (axes, phantom flip, diff-only properties) is applied by process_unrestrictedVognode_diff at
-  // the end of the node's BFS visit (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3).
   { let is_writeProtected : bool =
       read_at_node_in_tree( tree, node,
         |vn : &Viewnode| match &vn . kind {
@@ -127,7 +123,6 @@ pub fn expand_true_content_at_unrestrictedVognode (
   sync_unrestrictedVognode_from_disk (tree, node, &graphnode) ?;
   reconcile_content_children (
     tree, node, &graphnode, config, graph_snap,
-    deleted_since_head_pid_src_map,
     deleted_by_this_save_extra_ids,
     skgrepo_restriction,
     substitution_enabled,
@@ -152,8 +147,7 @@ fn attach_cascade_dvrs_to_affected_content (
     . children ()
     . filter ( |c| matches!( &c . value () . kind,
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          if t . affectsParent == AffectsParent::True
-             && ! t . should_be_diffPhantom () ) )
+          if t . affectsParent == AffectsParent::True ) )
     . map ( |c| c . id () )
     . collect ();
   for cid in child_skgids {
@@ -193,7 +187,6 @@ fn reconcile_content_children (
   graphnode                   : &Graphnode,
   config                         : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
   substitution_enabled           : bool,
@@ -273,7 +266,7 @@ fn reconcile_content_children (
   complete_content_children(
     tree, node, &apparent_content_skgids, &relRepos,
     &graphnode . home_skgrepo, config, graph_snap,
-    deleted_since_head_pid_src_map, deleted_by_this_save_extra_ids,
+    deleted_by_this_save_extra_ids,
     skgrepo_restriction,
     substitution_for_children ) ?;
   mark_erroneous_content_children_as_indep(
@@ -468,10 +461,6 @@ fn is_subscribee (
 /// "hiding your own content is silly", resolve_visibility -- so without the
 /// contains subtraction it would double-show, once as integrated content and
 /// once as unintegrated; forks plan.org Prerequisite / discussion.org Option B).
-/// The git-diff decorations (removed-member phantoms, relationship axes) are NOT
-/// computed here: they are applied per node by process_unrestrictedVognode_diff at its BFS
-/// visit (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3), so the main content path produces only the pure
-/// worktree view.
 fn content_goal_list (
   tree               : &Tree<Viewnode>,
   node               : NodeId,
@@ -542,9 +531,8 @@ pub fn unintegrated_content_skgids (
     setlike_vector_subtraction (contents, &hidden), &contained) }
 
 /// Reconcile the node's non-parentIgnored UnrestrictedVognode children
-/// against the goal list (content IDs, possibly interleaved with
-/// phantom IDs in diff view). Missing children are created as
-/// write-protected Viewnodes or phantom Viewnodes as appropriate.
+/// against the goal list of content IDs. Missing children are created
+/// as editable, restricted or unknown viewnodes as appropriate.
 fn complete_content_children (
   tree               : &mut Tree<Viewnode>,
   node               : NodeId,
@@ -553,7 +541,6 @@ fn complete_content_children (
   recorder_home      : &SkgrepoName,
   config             : &SkgConfig,
   graph_snap         : &Arc<InRustGraph>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   substitution_enabled : bool,
@@ -561,7 +548,7 @@ fn complete_content_children (
   let child_data : HashMap<ID, ChildData> =
     build_child_creation_data(
       tree, node, goal_list, relRepos, config, graph_snap,
-      deleted_since_head_pid_src_map, skgrepo_restriction,
+      skgrepo_restriction,
       substitution_enabled ) ?;
   normalize_relationship_backed_content_unknowns (
     tree, node, goal_list, relRepos, recorder_home, graph_snap,
@@ -573,9 +560,6 @@ fn complete_content_children (
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         => t . affectsParent == AffectsParent::True,
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (_)))
-        // Existing phantoms are reordered or replaced, not duplicated.
-        => true,
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))
         // An Unknown is a real raw relationship member.  Match it by
         // its raw ID so a rerender retains one placeholder rather than
@@ -588,15 +572,13 @@ fn complete_content_children (
       // never created here either.
       _ => false },
     |vn : &Viewnode| match &vn . kind {
-      // Unrestricted, Diff-phantom, and Unknown children participate. COLLECTED
+      // Unrestricted and Unknown children participate. COLLECTED
       // ids (the overridesHere original when present), so goal lists
       // stay in original IDs, an existing drawn substitute satisfies
       // its original goal member, and only genuinely missing members
       // are created -- which keeps post-save rerendering stable.
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         => Ok ( t . collected_skgid () ),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
-        => Ok ( p . skgid . clone() ),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u)))
         => Ok ( u . skgid . clone() ),
       _ => Err(
@@ -692,12 +674,7 @@ fn normalize_relationship_backed_content_unknowns (
 /// This marks them affectsParent=false.
 ///
 /// `content_ids` describes the parent's current, saved/worktree
-/// `contains` list. A removed-here phantom deliberately is *not* in that
-/// list: the point of the phantom is to show content that used to be under
-/// this parent in HEAD, but was removed from this parent in the worktree.
-/// If we treated that missing worktree membership as erroneous view
-/// placement, we would rewrite the phantom to `AffectsParent::False` and
-/// lose the information that the diff is about removed content.
+/// `contains` list.
 fn mark_erroneous_content_children_as_indep (
   tree           : &mut Tree<Viewnode>,
   node           : NodeId,
@@ -712,8 +689,7 @@ fn mark_erroneous_content_children_as_indep (
         t . affectsParent == AffectsParent::True
         // collected_id: a drawn substitute is a member via its
         // original, and must not be demoted to non-member.
-        && !content_id_set . contains( &t . collected_skgid () )
-        && !t . should_be_diffPhantom(), // see this function's docstring
+        && !content_id_set . contains( &t . collected_skgid () ),
       _ => false },
     |vn : &mut Viewnode| {
       if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
@@ -740,7 +716,6 @@ fn order_children_as_non_vognodes_then_ignored_then_content (
           | ViewnodeKind::DeadViewnode                => 0,
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           if t . affectsParent != AffectsParent::True                  => 1,
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (_)))  => 2,
         ViewnodeKind::Vognode (Vognode::Unrestricted (_)) => 2,
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))  => 2,
         // A historical phantom stands where a removed member was.
@@ -760,9 +735,8 @@ fn order_children_as_non_vognodes_then_ignored_then_content (
 
 
 /// WHAT IT DOES: Maps each child of 'node' to a ChildData:
-/// determines title, skgrepo, and phantom|normal status
-/// (where phantom = removed from this list of children,
-/// which only applies in the git diff view).
+/// determines title, skgrepo, and whether it is real, restricted
+/// or unknown.
 ///
 /// MOTIVATION: We pre-extract what will be needed
 /// by the last argument to complete_content_children,
@@ -777,7 +751,6 @@ fn build_child_creation_data (
   relRepos : &HashMap<ID, SkgrepoName>,
   config             : &SkgConfig,
   graph_snap         : &Arc<InRustGraph>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   substitution_enabled : bool,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
@@ -800,9 +773,6 @@ fn build_child_creation_data (
             if t . affectsParent == AffectsParent::True
             => { m . insert( t . collected_skgid (),
                              t . home_skgrepo . clone()); },
-          ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
-            => { m . insert( p . skgid . clone(),
-                             p . home_skgrepo . clone()); },
           // No Restricted arm: a restricted child is never a goal member
           // (omit_restricted_members drops it), so it needs no
           // already-present entry here.
@@ -820,7 +790,7 @@ fn build_child_creation_data (
     if child_skgrepos . contains_key (skgid) { continue; }
     let child_skgrepo : SkgrepoName =
       match find_skgrepo_with_optional_tantivy (
-        graph_snap, skgid, deleted_since_head_pid_src_map, None, config )
+        graph_snap, skgid, None, config )
       { Some (s) => s,
         None => {
           // TODO/DONE/local-view-update/plan_v2.org §7.6: the id resolves to nothing (a dangling reference). Render an

@@ -1,8 +1,6 @@
 use std::collections::HashSet;
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::git::NodeChanges;
-use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgrepoName, members_of};
 use crate::types::nodes::rust::GraphnodeInRust;
 
@@ -52,28 +50,6 @@ impl NodeRelation {
         "overrides",
     } }
 
-
-  /// The per-stage diff of this relation's outbound list within a
-  /// NodeChanges, or None for a relation NodeChanges does not diff
-  /// (links are inferred from node text, not stored as a list).
-  /// Membership-sign consumers (e.g. 'phantom_axes') call this with
-  /// the one relation their folder represents, so a sign can never be
-  /// read from a different relation that involves the same ID.
-  pub fn diff_in_nodechanges<'a> (
-    self,
-    nc : &'a NodeChanges,
-  ) -> Option<&'a [Diff_Item<ID>]> {
-    match self {
-      Self::Contains =>
-        Some ( & nc . contains_diff ),
-      Self::SubscribesTo =>
-        Some ( & nc . subscribesTo_diff ),
-      Self::HidesFromSubs =>
-        Some ( & nc . hides_diff ),
-      Self::Overrides =>
-        Some ( & nc . overrides_diff ),
-      Self::LinksTo =>
-        None, } }
 
   pub fn roles (self) -> (&'static str, &'static str) {
     let relation_name : &'static str = self . relation_name ();

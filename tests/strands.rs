@@ -67,7 +67,6 @@ fn fixture (
     _dir : dir, config, tantivy,
     graph : new_handle ( InRustGraph::from_graphnodes (&nodes) ),
     views_state : ViewsState {
-      diff_mode_enabled : false,
       open_views        : OpenViews::new (),
       graph_pair        : None, } } ) }
 
@@ -79,7 +78,7 @@ fn open_view (
 ) -> Result<String, Box<dyn Error>> {
   let root_ids : Vec<ID> = roots . iter () . map ( |r| ID::from (*r) ) . collect ();
   let (buffer, pids, viewforest) : (String, Vec<ID>, Tree<Viewnode>) =
-    multi_root_view (&f . config, None, &root_ids, false) ?;
+    multi_root_view (&f . config, None, &root_ids) ?;
   f . views_state . open_views . register_view (
     &f . graph . load_full (), view_id . clone (), viewforest, &pids );
   Ok (buffer) }
@@ -99,7 +98,7 @@ fn save (
     skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let response : SaveResponse = block_on (
     update_from_and_rerender_buffer_with_approvals (
-      &mut stream, buffer, &mut env, false, &Ok (view_id . clone ()),
+      &mut stream, buffer, &mut env,  &Ok (view_id . clone ()),
       &mut f . views_state, None, true, &HashMap::new (),
       &HashSet::new (), &HashSet::new (), review, &[] )) ?;
   // The test helper's env holds its own graph handle: carry the

@@ -55,17 +55,16 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
     |config, tantivy| Box::pin (async move {
       let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
-        diff_mode_enabled : false,
         open_views        : OpenViews::new (),
         graph_pair        : None,
       };
       let saved_view_id : ViewId = ViewId::ContentView ("saved-a" . into ());
       let (a_view, _, _) = single_root_view (
-        config, Some (tantivy), &ID::from ("A"), false) ?;
+        config, Some (tantivy), &ID::from ("A")) ?;
       let edited_a : String = a_view . replace (
         "A links to [[id:X][X]]", "[[id:X][X]] [[id:A][A]]");
       let (b_view, _, _) = single_root_view (
-        config, Some (tantivy), &ID::from ("B"), false) ?;
+        config, Some (tantivy), &ID::from ("B")) ?;
       let dirty_b : String = format! ("{}\nlocal edit", b_view);
       let a_path = config . skgrepos . values () . next () . unwrap ()
         . path . join ("A.skg");
@@ -73,7 +72,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
 
       let (mut stream, read_end) = mk_pair ();
       let result = update_from_and_rerender_buffer_with_snapshots_test (
-        &mut stream, &edited_a, config, tantivy, &graph, false,
+        &mut stream, &edited_a, config, tantivy, &graph,
         &Ok (saved_view_id . clone ()), &mut views_state,
         &[dirty_buffer_snapshot ("client-only-b", Some (&b_view), &dirty_b)])
         . await;
@@ -98,19 +97,19 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
                messages);
 
       let (c_view, _, _) = single_root_view (
-        config, Some (tantivy), &ID::from ("C"), false) ?;
+        config, Some (tantivy), &ID::from ("C")) ?;
       let dirty_c : String = format! ("{}\nindependent edit", c_view);
       // The collateral fixture contains only endpoint X as an unrestricted node.
       // Reaching it therefore proves the A -> X ordinary graph hop, rather
       // than shared ancestry supplied by a larger rendered view.
       let x_view_id : ViewId = ViewId::ContentView ("endpoint-x" . into ());
       let (_, x_pids, x_forest) = single_root_view (
-        config, Some (tantivy), &ID::from ("X"), false) ?;
+        config, Some (tantivy), &ID::from ("X")) ?;
       views_state . open_views . register_view (
         &graph . load_full (), x_view_id, x_forest, &x_pids);
       let (mut stream, read_end) = mk_pair ();
       let response = update_from_and_rerender_buffer_with_snapshots_test (
-        &mut stream, &edited_a, config, tantivy, &graph, false,
+        &mut stream, &edited_a, config, tantivy, &graph,
         &Ok (saved_view_id), &mut views_state,
         &[dirty_buffer_snapshot ("client-only-c", Some (&c_view), &dirty_c)])
         . await ?;
@@ -147,20 +146,19 @@ fn missing_or_unparseable_dirty_baseline_refuses () -> Result<(), Box<dyn Error>
     |config, tantivy| Box::pin (async move {
       let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
       let (a_view, _, _) = single_root_view (
-        config, Some (tantivy), &ID::from ("A"), false) ?;
+        config, Some (tantivy), &ID::from ("A")) ?;
       for buffer_snapshot in [
         dirty_buffer_snapshot ("missing-baseline", None, "* new node"),
         dirty_buffer_snapshot (
           "malformed-baseline", Some ("** starts too deep"), "* new node"),
       ] {
         let mut views_state : ViewsState = ViewsState {
-          diff_mode_enabled : false,
           open_views        : OpenViews::new (),
           graph_pair        : None,
         };
         let (mut stream, _) = mk_pair ();
         let result = update_from_and_rerender_buffer_with_snapshots_test (
-          &mut stream, &a_view, config, tantivy, &graph, false,
+          &mut stream, &a_view, config, tantivy, &graph,
           &Ok (ViewId::ContentView ("saved-a" . into ())),
           &mut views_state, &[buffer_snapshot]) . await;
         let error = match result {

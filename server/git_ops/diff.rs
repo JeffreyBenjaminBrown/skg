@@ -1,6 +1,5 @@
-use crate::types::git::{ GitDiffStatus, PathDiffStatus, SkgrepoDiff, GraphnodeDiff, NodeChanges };
-use crate::types::list::{compute_interleaved_diff, Diff_Item};
-use crate::types::misc::{ID, MSV, SkgrepoName, members_msv, members_of};
+use crate::types::git::{ GitDiffStatus, PathDiffStatus, SkgrepoDiff, GraphnodeDiff };
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::nodes::complete::Graphnode;
 
@@ -82,13 +81,8 @@ fn compute_graphnode_diff_for_stage (
     (GitDiffStatus::Deleted, _)  => None,
     (_, Stage::Staged)           => load_from_index (gitrepo, &rel_path),
     (_, Stage::Unstaged)         => load_from_disk  (&abs_path), };
-  let node_changes : Option<NodeChanges> =
-    match (&before_node, &after_node) {
-      (Some (old), Some (new)) => Some ( compare_graphnodes (old, new) ),
-      _                        => None };
   Ok ( GraphnodeDiff {
     status: entry . status . clone(),
-    node_changes,
     before_node: before_node . filter (
       |_| entry . status == GitDiffStatus::Deleted),
     after_node: after_node . filter (
@@ -175,58 +169,3 @@ fn collect_added_nodes_for_both (
           let pid : &ID = &after_node . pid;
           result . insert ( pid . clone(), after_node . clone() ); }} } }
   result }
-
-/// Compare two Graphnodes and return the differences.
-fn compare_graphnodes (
-  old : &Graphnode,
-  new : &Graphnode,
-) -> NodeChanges {
-  let text_changed : bool =
-    old . title != new . title ||
-    old . body  != new . body;
-  let old_aliases : MSV<String> = members_msv (& old . aliases);
-  let new_aliases : MSV<String> = members_msv (& new . aliases);
-  let aliases_diff : Vec<Diff_Item<String>> =
-    compute_interleaved_diff (
-      old_aliases . or_default(),
-      new_aliases . or_default() );
-  let ids_diff : Vec<Diff_Item<ID>> =
-    compute_interleaved_diff (
-      & old . all_skgids() . cloned() . collect::<Vec<ID>>(),
-      & new . all_skgids() . cloned() . collect::<Vec<ID>>() );
-  let old_contains : Vec<ID> = members_of (& old . contains);
-  let new_contains : Vec<ID> = members_of (& new . contains);
-  let contains_diff : Vec<Diff_Item<ID>> =
-    compute_interleaved_diff (
-      &old_contains,
-      &new_contains );
-  // §C: per-stage diffs of the sharing relations, so a removed
-  // subscribee / hidden-outside member gets a per-stage relationship axis.
-  let old_subscribesTo  : MSV<ID> = members_msv (& old . subscribesTo);
-  let new_subscribesTo  : MSV<ID> = members_msv (& new . subscribesTo);
-  let subscribesTo_diff : Vec<Diff_Item<ID>> =
-    compute_interleaved_diff (
-      old_subscribesTo . or_default (),
-      new_subscribesTo . or_default () );
-  let old_hides : MSV<ID> = members_msv (
-    & old . hidesFromSubs);
-  let new_hides : MSV<ID> = members_msv (
-    & new . hidesFromSubs);
-  let hides_diff : Vec<Diff_Item<ID>> =
-    compute_interleaved_diff (
-      old_hides . or_default (),
-      new_hides . or_default () );
-  let old_overrides         : MSV<ID> = members_msv (& old . overrides);
-  let new_overrides         : MSV<ID> = members_msv (& new . overrides);
-  let overrides_diff : Vec<Diff_Item<ID>> =
-    compute_interleaved_diff (
-      old_overrides . or_default (),
-      new_overrides . or_default () );
-  NodeChanges {
-    text_changed,
-    aliases_diff,
-    ids_diff,
-    contains_diff,
-    subscribesTo_diff,
-    hides_diff,
-    overrides_diff }}

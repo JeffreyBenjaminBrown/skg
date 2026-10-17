@@ -9,7 +9,6 @@ use crate::readiness_store::ReadinessStore;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use crate::types::phantom::home_from_disk;
 
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex as SyncMutex;
 use arc_swap::ArcSwap;
@@ -143,11 +142,8 @@ impl SkgEnv {
   ///
   /// 1. The in-Rust graph snapshot (freshest; reflects in-flight
   ///    edits before they reach the indexed DBs or disk).
-  /// 2. The caller's 'deleted_since_head_pid_src_map' hint (only
-  ///    relevant in diff view; covers IDs whose '.skg' file has been
-  ///    deleted between HEAD and now).
-  /// 3. Tantivy (in-process indexed lookup; ~6us at p50).
-  /// 4. Disk scan (slow last resort; covers nodes that were created
+  /// 2. Tantivy (in-process indexed lookup; ~6us at p50).
+  /// 3. Disk scan (slow last resort; covers nodes that were created
   ///    out-of-band since the last search-index sync).
   ///
   /// Tantivy is only an optimization here: the graph is authoritative for
@@ -155,13 +151,10 @@ impl SkgEnv {
   pub fn find_skgrepo_in_generation (
     runtime : &RuntimeGeneration,
     skgid : &ID,
-    deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   ) -> Option<SkgrepoName> {
     if let Some ((_pid, src)) =
       runtime . graph . pid_and_skgrepo (skgid)
     { return Some (src); }
-    if let Some (s) = deleted_since_head_pid_src_map . get (skgid)
-    { return Some (s . clone ()); }
     if let Some ((_title, src)) =
       title_and_skgrepo_by_skgid (&runtime . tantivy_index, skgid)
     { return Some (src); }
@@ -169,18 +162,15 @@ impl SkgEnv {
 }
 
 /// Repo lookup against one explicit graph snapshot, with optional Tantivy
-/// and disk fallbacks for deleted or out-of-band nodes.
+/// and disk fallbacks for out-of-band nodes.
 pub fn find_skgrepo_with_optional_tantivy (
   graph                          : &InRustGraph,
   skgid                          : &ID,
-  deleted_since_head_pid_src_map : &HashMap<ID, SkgrepoName>,
   tantivy_index                  : Option<&TantivyIndex>,
   config                         : &SkgConfig,
 ) -> Option<SkgrepoName> {
   if let Some ((_pid, src)) = graph . pid_and_skgrepo (skgid)
     { return Some (src); }
-  if let Some (s) = deleted_since_head_pid_src_map . get (skgid)
-  { return Some (s . clone ()); }
   if let Some (idx) = tantivy_index {
     if let Some ((_title, src)) = title_and_skgrepo_by_skgid (idx, skgid)
     { return Some (src); } }

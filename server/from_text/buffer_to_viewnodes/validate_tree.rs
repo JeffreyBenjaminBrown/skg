@@ -146,10 +146,9 @@ fn idFolder_membership_errors (
     let mut buffer_skgids : Vec<ID> =
       node_ref . children ()
       . filter_map ( |child| match &child . value () . kind {
-          MpViewnodeKind::Property (Property::ID { skgid, relationship_axes, change_facts, .. })
-            if relationship_axes . net_is_present ()
-               // the total diff view's lost IDs
-               && change_facts . presence . rel != Some (Sign::Minus)
+          MpViewnodeKind::Property (Property::ID { skgid, change_facts, .. })
+            if // the total diff view's lost IDs
+               change_facts . presence . rel != Some (Sign::Minus)
             => Some ( skgid . clone () ),
           _ => None } )
       . collect ();
@@ -356,8 +355,7 @@ fn relRepo_request_is_collected (
   t        : &MpUnrestrictedVognode,
 ) -> bool {
   let is_member : bool =
-    t . affectsParent == AffectsParent::True
-    && ! t . should_be_diffPhantom ();
+    t . affectsParent == AffectsParent::True;
   is_member
   && match node_ref . parent () {
     Some (parent) => match &parent . value () . kind {

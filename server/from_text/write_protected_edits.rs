@@ -22,7 +22,6 @@ use std::collections::HashSet;
 enum OccurrencePathStep {
   Unrestricted (ID),
   Restricted,
-  DiffPhantom (ID),
   DeletedPhantom (ID),
   UnknownPhantom (ID),
   HistoricalPhantom (ID),
@@ -30,7 +29,6 @@ enum OccurrencePathStep {
   Alias,
   ID,
   Flag,
-  TextChanged,
   TotalDiffViewProperty (&'static str), // its 'repr_in_client'
   PartnerFolder (PartnerFolder),
   DeadViewnode,
@@ -418,8 +416,6 @@ fn path_step (
       OccurrencePathStep::Unrestricted (restriction . skgid . clone ()),
     ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
       OccurrencePathStep::Restricted,
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (phantom))) =>
-      OccurrencePathStep::DiffPhantom (phantom . skgid . clone ()),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (phantom))) =>
       OccurrencePathStep::DeletedPhantom (phantom . skgid . clone ()),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (phantom))) =>
@@ -434,8 +430,6 @@ fn path_step (
       OccurrencePathStep::ID,
     ViewnodeKind::Property (Property::Flag { .. }) =>
       OccurrencePathStep::Flag,
-    ViewnodeKind::Property (Property::TextChanged { .. }) =>
-      OccurrencePathStep::TextChanged,
     ViewnodeKind::Property (
       property @ ( Property::OldText { .. } | Property::BodyDiff { .. }
                    | Property::HomeSkgrepoMove { .. } | Property::RelRepoMove { .. }

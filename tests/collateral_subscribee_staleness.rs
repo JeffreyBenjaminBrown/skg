@@ -51,7 +51,7 @@ async fn save_and_read_collateral (
   let (mut stream, read_end) : (TcpStream, TcpStream) = mk_pair ();
   let response : SaveResponse =
     update_from_and_rerender_buffer (
-      &mut stream, buffer, config, tantivy, graph, false,
+      &mut stream, buffer, config, tantivy, graph,
       &Ok (view_id . clone ()), views_state ) . await ?;
   drop (stream);
   let mut reader : BufReader<TcpStream> = BufReader::new (read_end);
@@ -82,7 +82,6 @@ fn collateral_editable_subscriber_subscribeeFolder_refreshes
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
-        diff_mode_enabled : false,
         open_views        : OpenViews::new (),
         graph_pair        : None, };
       let a_view_id : ViewId = ViewId::ContentView ("S-a" . into ());
@@ -92,7 +91,7 @@ fn collateral_editable_subscriber_subscribeeFolder_refreshes
       // shows both subscribees M and N.
       let (a_view, a_pids, a_vf) =
         single_root_view (
-          config, Some (tantivy), &ID::from ("S"), false ) ?;
+          config, Some (tantivy), &ID::from ("S") ) ?;
       assert! ( a_view . contains ("subscribeeFolder")
                 && a_view . contains ("(id M)")
                 && a_view . contains ("(id N)"),
@@ -104,7 +103,7 @@ fn collateral_editable_subscriber_subscribeeFolder_refreshes
       // here as well (it is the root).
       let (b_view, b_pids, b_vf) =
         single_root_view (
-          config, Some (tantivy), &ID::from ("S"), false ) ?;
+          config, Some (tantivy), &ID::from ("S") ) ?;
       assert! ( b_view . contains ("(id M)")
                 && b_view . contains ("(id N)"),
         "view B should show M and N in S's subscribeeFolder:\n{}", b_view );
