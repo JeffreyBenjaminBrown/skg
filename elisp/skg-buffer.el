@@ -162,10 +162,7 @@ view-forest edits do not change it.")
   (setq skg-clean-baseline
         (buffer-substring-no-properties (point-min) (point-max)))
   (setq skg-clean-baseline-context
-        (list :git-diff-mode
-              (and (boundp 'skg--git-diff-mode-enabled)
-                   skg--git-diff-mode-enabled)
-              :repo-set "unavailable"))
+        (list :repo-set "unavailable"))
   (setq skg--search-enrichment-includes-user-edits nil))
 
 (defun skg-content-view-buffer-name (org-text)
@@ -189,7 +186,6 @@ prevent a view from opening."
                (sexp-start (string-match "(skg\\_>" org-text start))
                (sexp (car (read-from-string org-text sexp-start)))
                (kind (or (assoc 'node (cdr sexp))
-                         (assoc 'diffPhantom (cdr sexp))
                          (assoc 'deleted (cdr sexp))
                          (assoc 'historical (cdr sexp))))
                (skgrepo (and kind (cadr (assoc 'repo (cdr kind))))))

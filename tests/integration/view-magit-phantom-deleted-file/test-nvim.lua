@@ -5,8 +5,8 @@
 -- HEAD:       a contains [b]; a.skg and b.skg both committed.
 -- Worktree:   a no longer contains b; b.skg deleted from disk.
 --
--- Phase 1: Open content view from a.
--- Phase 2: Toggle diff mode on. b appears as a phantom under a.
+-- Phase 1: Open the total diff view.
+-- Phase 2: Its "all changes" buffer draws b as a historical phantom.
 -- Phase 3: Resolve b's on-disk path and open its plain diff.
 -- Phase 4: Verify the resolved path is exactly skg-data/b.skg (NOT
 --          the outer skg project skgrepo, and NOT a double-prefixed
@@ -35,7 +35,7 @@
 -- magit's directory walk landing somewhere unexpected. b's own id is
 -- not searched for within its own diff (there is no meaningful
 -- "which file" ambiguity to resolve, unlike the parent-diff case in
--- view-magit-phantom): the diff buffer's name already identifies the
+-- view-magit-removed-member): the diff buffer's name already identifies the
 -- file.
 
 local T = dofile('../test-nvim-lib.lua')
@@ -54,14 +54,15 @@ do -- Mirror the elisp test's skg-config-dir: the directory holding
     test_dir .. '/data/skgconfig.toml.test'
 end
 
----@param needle string
 ---@param timeout_secs number|nil
----@return integer|nil bufnr
-local function find_content_view_buffer_matching (needle, timeout_secs)
+---@return integer|nil bufnr of the "all changes" buffer, once it shows a
+local function find_all_changes_buffer (timeout_secs)
   return T.wait_for(function ()
     for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-      if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_content_view
-         and T.buffer_text(buf):find(needle, 1, true) then
+      if vim.api.nvim_buf_is_valid(buf)
+         and vim.api.nvim_buf_get_name(buf):find(
+               'diff-view: all changes', 1, true)
+         and T.buffer_text(buf):find('(id a)', 1, true) then
         return buf
       end
     end
@@ -71,36 +72,32 @@ end
 
 print('=== SKG View-Magit-Phantom-Deleted-File Integration Test ===')
 
--- PHASE 1: open content view from a.
-print('=== PHASE 1: Open content view from a ===')
-require('skg.content_view').request_single_root_content_view_from_id('a')
-local content_view = find_content_view_buffer_matching('(id a)')
-if not content_view then T.fail('Timeout waiting for content view of a') end
-T.check(true, 'Content view of a loaded')
+-- PHASE 1: open the total diff view.
+print('=== PHASE 1: Open the total diff view ===')
+require('skg.total_diff_view').diff_view()
+local all_changes = find_all_changes_buffer()
+if not all_changes then
+  T.fail('Timeout waiting for the "all changes" buffer') end
+T.check(true, 'The "all changes" buffer loaded')
 
--- PHASE 2: toggle diff mode on; verify phantom b (deletedN axis --
--- b.skg is deleted from disk).
-print('=== PHASE 2: Toggle diff mode, verify phantom b ===')
-vim.api.nvim_set_current_buf(content_view)
-require('skg.diff_mode').toggle()
-T.check(T.wait_for_response(20), 'diff-mode-on response arrived')
+-- PHASE 2: verify the historical phantom b (b.skg is deleted from
+-- disk).
+print('=== PHASE 2: Verify phantom b ===')
 do
-  local content = T.buffer_text(content_view)
-  T.check(content:find('(id b)', 1, true) ~= nil,
-          string.format('No (id b) in buffer. Content: %s', content))
-  T.check(content:find('deletedN', 1, true) ~= nil,
-          string.format('No deletedN axis on phantom. Content: %s',
-                        content))
+  local content = T.buffer_text(all_changes)
+  T.check(content:find('(historical (id b)', 1, true) ~= nil,
+          string.format('No historical phantom b. Content: %s', content))
 end
 
 -- PHASE 3: resolve phantom b's path and open its plain diff.
 print('=== PHASE 3: Resolve path and open diff for phantom b ===')
-vim.api.nvim_set_current_buf(content_view)
+vim.api.nvim_set_current_buf(all_changes)
 do
-  local lines = vim.api.nvim_buf_get_lines(content_view, 0, -1, false)
+  local lines = vim.api.nvim_buf_get_lines(all_changes, 0, -1, false)
   local phantom_line = nil
   for lnum, line in ipairs(lines) do
-    if line:find('(id b)', 1, true) then phantom_line = lnum break end
+    if line:find('(historical (id b)', 1, true) then
+      phantom_line = lnum break end
   end
   if not phantom_line then T.fail('Could not find phantom b line') end
   vim.api.nvim_win_set_cursor(0, { phantom_line, 0 })

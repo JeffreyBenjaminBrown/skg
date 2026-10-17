@@ -1,5 +1,5 @@
--- Coverage for the rerender stream and its consumers (diff mode,
--- skgrepo sets), plus the report-shaped requests (diff report, stage
+-- Coverage for the rerender stream and its consumers (skgrepo
+-- sets), plus the report-shaped requests (diff report, stage
 -- moves, export). Mirrors tests/elisp/test-skg-diff-report.el's
 -- wiring cases and test-skg-warning-channel.el's rerender-done
 -- channel, end-to-end through the loopback fake server.
@@ -9,7 +9,6 @@ local helpers = dofile(
 
 local buffer = require('skg.buffer')
 local diff_report = require('skg.diff_report')
-local diff_mode = require('skg.diff_mode')
 local lock = require('skg.lock')
 local rerender = require('skg.rerender')
 local repo_sets = require('skg.repo_sets')
@@ -80,43 +79,6 @@ describe('skg stream consumers', function ()
     assert.is_truthy(table.concat(
       vim.api.nvim_buf_get_lines(found, 0, -1, false), '\n')
       :find('stale herald', 1, true))
-  end)
-
-  it('diff-mode toggle refuses on unsaved buffers, else acks and'
-     .. ' rerenders', function ()
-    server = helpers.connect_to_fake_server(function (line, respond)
-      if line:find('git diff mode toggle', 1, true) then
-        respond(helpers.framed(
-          '((response-type git-diff-mode)'
-          .. ' (content "Git diff mode enabled"))'))
-        respond(helpers.framed(
-          '((response-type rerender-lock) (lock-views ()))'))
-        respond(helpers.framed(
-          '((response-type rerender-done) (errors ())'
-          .. ' (warnings ()))'))
-      end
-    end)
-    local a = buffer.open_org_buffer_from_text(
-      '* (skg (node (id a))) a', 'skg://a', 'view_id-a')
-    vim.bo[a].modified = true
-    local ok, err = pcall(diff_mode.toggle)
-    assert.is_false(ok)
-    assert.is_truthy(tostring(err):find('unsaved skg buffer'))
-    vim.bo[a].modified = false
-    local notified = {}
-    local original_notify = vim.notify
-    vim.notify = function (msg) table.insert(notified, msg) end
-    diff_mode.toggle()
-    vim.wait(3000, function ()
-      return lock.stream_in_progress == nil end, 10)
-    vim.notify = original_notify
-    local acked = false
-    for _, msg in ipairs(notified) do
-      if tostring(msg):find('Git diff mode enabled', 1, true) then
-        acked = true end
-    end
-    assert.is_true(acked)
-    assert.is_true(vim.bo[a].modifiable)
   end)
 
   it('switches the repo-set and rides the rerender stream',

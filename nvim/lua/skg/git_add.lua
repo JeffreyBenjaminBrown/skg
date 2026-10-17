@@ -77,7 +77,7 @@ end
 ---their by-directory grouping, and the reviewable script.
 ---@return table {paths, groups, script}
 function M.git_add_new_files_recursive_plan ()
-  local pairs_found = M.subtree_unstaged_new_file_pairs()
+  local pairs_found = M.subtree_new_file_pairs()
   local paths = {}
   local seen = {}
   for _, pair in ipairs(pairs_found) do
@@ -96,7 +96,8 @@ end
 ---@return string a shell script staging each still-unknown file
 function M.git_add_script (groups)
   if #groups == 0 then
-    return '# No unstaged new skg files found in this subtree.' end
+    return '# No new skg files found in this subtree. (Only a buffer of'
+      .. ' the total diff view, :SkgDiffView, marks new nodes.)' end
   local lines = {
     '# Stages each listed .skg file unless git already knows it',
     '# (present in the git index); a staged-but-modified file is left',
@@ -133,18 +134,17 @@ function M.group_paths_by_dir (paths)
   return groups
 end
 
----{id, repo} pairs in this subtree whose metadata carries the
----unstaged addedN axis (node changes, not relationship-only
----addedR).
+---{id, repo} pairs in this subtree whose metadata carries the total
+---diff view's node+ (a node HEAD lacks; not relationship-only rel+).
 ---@return table[]
-function M.subtree_unstaged_new_file_pairs ()
+function M.subtree_new_file_pairs ()
   local start = focus.owning_headline_line()
   if not start then error('Not on a headline') end
   local last = M.subtree_last_line(start)
   local pairs_found = {}
   for line = start, last do
     local sexp = metadata.metadata_sexp_at_line_or_nil(line)
-    if sexp and M.metadata_has_unstaged_new_file_p(sexp) then
+    if sexp and M.metadata_has_new_file_p(sexp) then
       local skgid = id_search.extract_id_from_metadata_sexp(sexp)
       local skgrepo = id_search.extract_repo_from_metadata_sexp(sexp)
       if skgid and skgrepo then
@@ -163,12 +163,12 @@ function M.subtree_last_line (start)
 end
 
 ---@param sexp any
----@return boolean is SEXP an UnrestrictedVognode marked as a new worktree file?
-function M.metadata_has_unstaged_new_file_p (sexp)
+---@return boolean is SEXP an UnrestrictedVognode that HEAD lacks?
+function M.metadata_has_new_file_p (sexp)
   local values = metadata.sexp_cdr_at_path(sexp,
-                                           { 'skg', 'node', 'unstaged' })
+                                           { 'skg', 'node', 'diff' })
   for _, value in ipairs(values or {}) do
-    if value == sexpr.symbol('addedN') then return true end
+    if value == sexpr.symbol('node+') then return true end
   end
   return false
 end

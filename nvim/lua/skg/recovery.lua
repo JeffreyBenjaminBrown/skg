@@ -40,7 +40,7 @@ function M.document (buf)
     '- Buffer name: ' .. vim.api.nvim_buf_get_name(buf),
     '- View ID: ' .. tostring(vim.b[buf].skg_view_id),
     '- Captured UTC: ' .. os.date('!%Y-%m-%dT%H:%M:%SZ'),
-    '- Repo-set and git diff mode: unavailable to this client',
+    '- Repo-set: unavailable to this client',
     '- Search enrichment: ' .. enrichment_note,
     baseline_available
       and '- Baseline: verified client clean baseline'

@@ -4,8 +4,9 @@
 ;;; HEAD:       a contains [b]; a.skg and b.skg both committed.
 ;;; Worktree:   a no longer contains b; b.skg deleted from disk.
 ;;;
-;;; Phase 1: Open content view from a.
-;;; Phase 2: Toggle diff mode on. b appears as a phantom under a.
+;;; Phase 1: Open the total diff view.
+;;; Phase 2: In its "all changes" buffer, b appears as a historical
+;;;          phantom.
 ;;; Phase 3: Call skg-goto-in-magit on the phantom b.
 ;;; Phase 4: Verify magit opened on the skg-data skgrepo (NOT the outer
 ;;;          skg project skgrepo), and that point is on b.skg.
@@ -27,13 +28,12 @@
   (apply #'message (concat "✓ PASS: " message) args))
 
 (defun find-content-view-buffer ()
+  "The total diff view's \"all changes\" buffer."
   (cl-find-if
-   (lambda (b)
-     (with-current-buffer b
-       (derived-mode-p 'skg-content-view-mode)))
+   (lambda (b) (string-match-p "diff-view: all changes" (buffer-name b)))
    (buffer-list)))
 
-(defun phase-1-open-content-view-from-a ()
+(defun phase-1-open-the-total-diff-view ()
   (setq integration-test-phase "phase-1")
   (let ((test-port (getenv "SKG_TEST_PORT")))
     (when test-port
@@ -44,7 +44,7 @@
   ;; $TEST_DIR/data/.
   (setq skg-config-dir
         (expand-file-name "data/" (file-name-directory load-file-name)))
-  (skg-request-single-root-content-view-from-id "a")
+  (skg-diff-view)
   (unless (skg-test-wait-for
            (lambda ()
              (let ((buf (find-content-view-buffer)))
@@ -53,32 +53,24 @@
                    (string-match-p "(id a)"
                                    (buffer-substring-no-properties
                                     (point-min) (point-max))))))))
-    (test-fail "Timeout waiting for content view of a"))
-  (test-pass "Content view of a loaded"))
+    (test-fail "Timeout waiting for the \"all changes\" buffer"))
+  (test-pass "The \"all changes\" buffer loaded"))
 
-(defun phase-2-toggle-diff-and-verify-phantom-b ()
+(defun phase-2-verify-phantom-b ()
   (setq integration-test-phase "phase-2")
-  (let ((buf (find-content-view-buffer)))
-    (switch-to-buffer buf)
-    (skg-view-diff-mode)
-    (skg-test-wait-for-response 20)
-    (let ((content (buffer-substring-no-properties
-                    (point-min) (point-max))))
-      ;; Phantom b shows up as a child of a with 'removedR on the
-      ;; unstaged side (removed from contains) and 'deletedN on the
-      ;; unstaged side (b.skg deleted).
-      (unless (string-match-p "(id b)" content)
-        (test-fail "No (id b) in buffer. Content:\n%s" content))
-      (unless (string-match-p "deletedN" content)
-        (test-fail "No deletedN axis on phantom. Content:\n%s" content))
-      (test-pass "Phantom b present with deletedN axis"))))
+  (let ((content (with-current-buffer (find-content-view-buffer)
+                   (buffer-substring-no-properties
+                    (point-min) (point-max)))))
+    (unless (string-match-p "(historical (id b)" content)
+      (test-fail "No historical phantom b in buffer. Content:\n%s" content))
+    (test-pass "Historical phantom b present")))
 
 (defun phase-3-call-view-magit-on-phantom-b ()
   (setq integration-test-phase "phase-3")
   (let ((buf (find-content-view-buffer)))
     (switch-to-buffer buf)
     (goto-char (point-min))
-    (unless (re-search-forward "(id b)" nil t)
+    (unless (re-search-forward "(historical (id b)" nil t)
       (test-fail "Could not find phantom b line"))
     (beginning-of-line)
     (message "  Positioned on: %s"
@@ -133,8 +125,8 @@
 
 (defun run-all-tests ()
   (message "=== SKG View-Magit-Phantom-Deleted-File Integration Test ===")
-  (phase-1-open-content-view-from-a)
-  (phase-2-toggle-diff-and-verify-phantom-b)
+  (phase-1-open-the-total-diff-view)
+  (phase-2-verify-phantom-b)
   (phase-3-call-view-magit-on-phantom-b)
   (phase-4-verify-magit-root-folder-and-point-position)
   (message "")

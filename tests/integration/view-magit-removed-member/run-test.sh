@@ -1,16 +1,15 @@
 #!/bin/bash
 
-# Integration test: containerward view request on a removed-here phantom.
+# Integration test: skg-goto-in-magit-parent on a removed member.
 #
-# Graph (at HEAD):
-#   a contains [b, c]
-#   b contains [c]
+# Graph at HEAD: a contains [b].
+# Worktree:      a contains [].  (b removed from a's content)
+# Both a.skg and b.skg still exist on disk.
 #
-# The test opens a view from a, removes c from under b, saves
-# (so b.skg loses c from its contains list), then toggles diff mode.
-# Under b, c appears as a removed-here phantom (was in b's contains
-# at HEAD, still exists on disk).  The test requests a containerward
-# view on that phantom c and verifies the path is integrated.
+# The test opens the total diff view, verifies that its "all changes"
+# buffer draws b under a as a removed member, calls
+# skg-goto-in-magit-parent on b, and checks that magit navigates to
+# a.skg (the parent) at the deletion line.
 
 set -e
 
@@ -19,10 +18,10 @@ PROJECT_ROOT="$(cd "$TEST_DIR/../../.." && pwd)"
 
 source "$TEST_DIR/../test-lib.sh"
 
-echo "=== SKG Containerward-on-Phantom Integration Test ==="
+echo "=== SKG View-Magit-Removed-Member Integration Test ==="
 
 SKG_DATA="$TEST_DIR/data/owned/skg-data"
-FIXTURE_FILES="a.skg b.skg c.skg"
+FIXTURE_FILES="a.skg b.skg"
 
 backup_and_reset_test_data() {
     echo "=== Setting up git repo from fixture files ==="
@@ -42,7 +41,13 @@ backup_and_reset_test_data() {
     git add *.skg
     git commit -q -m "Initial commit"
 
-    echo "✓ Git repo ready with 3 nodes committed"
+    # Modify a.skg: remove b from its contains list.
+    cat > "$SKG_DATA/a.skg" << 'EOF'
+title: a
+pid: a
+EOF
+
+    echo "✓ Git repo ready: a.skg modified (b removed from contains)"
 }
 
 restore_fixtures() {

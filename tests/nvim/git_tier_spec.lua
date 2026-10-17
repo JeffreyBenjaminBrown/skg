@@ -1,5 +1,5 @@
 -- Mirrors tests/elisp/test-skg-git-add.el (the preview collects only
--- unstaged-new files, works from a body line, and touches no git
+-- new nodes, works from a body line, and touches no git
 -- state) and test-skg-readable-ids.el (stale-generation dropping;
 -- shortened ids without title annotations), plus goto_git's plain-diff
 -- fallback against a real temporary gitrepo.
@@ -39,16 +39,14 @@ describe('skg.git_add', function ()
           vim.api.nvim_get_current_buf(), { force = true })
   end)
 
-  it('collects only unstaged-new files, from the body too', function ()
+  it('collects only new nodes, from the body too', function ()
     buffer_with(table.concat({
-      '* (skg (node (id root-id) (repo main) (unstaged addedN addedR)))'
+      '* (skg (node (id root-id) (repo main) (diff node+ rel+)))'
       .. ' root',
       'a body line',
-      '** (skg (node (id staged-only) (repo main) (staged addedN)))'
-      .. ' staged already',
-      '** (skg (node (id member-only) (repo main) (unstaged addedR)))'
+      '** (skg (node (id member-only) (repo main) (diff rel+)))'
       .. ' membership only',
-      '** (skg (node (id also-new) (repo main) (unstaged addedN)))'
+      '** (skg (node (id also-new) (repo main) (diff node+)))'
       .. ' also new' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 2, 3 }) -- in the body
     local plan = git_add.git_add_new_files_recursive_plan()
@@ -63,7 +61,7 @@ describe('skg.git_add', function ()
 
   it('previews without touching git state', function ()
     buffer_with('* (skg (node (id n1) (repo main)'
-                .. ' (unstaged addedN))) n1')
+                .. ' (diff node+))) n1')
     git_add.git_add_if_new_recursive_preview()
     local preview = vim.api.nvim_get_current_buf()
     assert.are.equal('sh', vim.bo[preview].filetype)
@@ -77,7 +75,7 @@ describe('skg.git_add', function ()
     buffer_with('* (skg (node (id n1) (repo main))) unchanged')
     local plan = git_add.git_add_new_files_recursive_plan()
     assert.are.same({}, plan.paths)
-    assert.is_truthy(plan.script:find('No unstaged new skg files',
+    assert.is_truthy(plan.script:find('No new skg files',
                                       1, true))
   end)
 end)

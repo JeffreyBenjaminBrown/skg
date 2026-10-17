@@ -1,8 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; Handler for the "rerender all views" request/response.
-;;; Used by skg-view-diff-mode to refresh all open views
-;;; after toggling diff mode.
+;;; Handler for the "rerender all views" request/response,
+;;; and the rerender stream that follows several other requests.
 ;;;
 ;;; Protocol: rerender-lock → rerender-view* → rerender-done.
 ;;; Each view is unlocked and updated as its rerender-view arrives.
@@ -70,7 +69,8 @@ request replaced; remove it and balance its pending count."
 
 (defun skg--register-rerender-stream-handlers ()
   "Register the three handlers for streamed rerender responses.
-Shared by 'skg-request-rerender-all-views' and 'skg-view-diff-mode'."
+Shared by 'skg-request-rerender-all-views' and every request whose
+response a rerender stream follows."
   (skg-register-response-handler
    ;; 1. Lock message: unlock buffers not in the view ID list.
    'rerender-lock

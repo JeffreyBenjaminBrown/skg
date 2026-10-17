@@ -29,7 +29,7 @@ Initial state:
 - old.skg      : committed (present in HEAD).
 - new.skg      : on disk, untracked.
 - child.skg    : on disk, untracked.
-- staged.skg   : on disk, staged but never committed (`(staged addedN)` shape).
+- staged.skg   : on disk, staged but never committed.
 
 Returns the absolute data-root path."
   (let* ((root (make-temp-file "skg-git-add-" t))
@@ -64,16 +64,16 @@ Returns the absolute data-root path."
                          "ls-files" "--error-unmatch" file))))
 
 (defun test-skg-git-add--make-diff-view ()
-  "Create a skg content-view buffer with mixed git-diff metadata."
+  "Create a skg content-view buffer with the total diff view's metadata."
   (let ((buf (get-buffer-create "*test-skg-git-add-view*")))
     (with-current-buffer buf
       (erase-buffer)
       (insert
-       "* (skg (node (id new) (repo main) (unstaged addedN addedR))) new\n"
+       "* (skg (node (id new) (repo main) (diff node+ rel+))) new\n"
        "body\n"
-       "** (skg (node (id child) (repo main) (unstaged addedN addedR))) child\n"
-       "** (skg (node (id old) (repo main) (unstaged addedR))) old\n"
-       "* (skg (node (id staged) (repo main) (staged addedN))) staged\n")
+       "** (skg (node (id child) (repo main) (diff node+ rel+))) child\n"
+       "** (skg (node (id old) (repo main) (diff rel+))) old\n"
+       "* (skg (node (id staged) (repo main) (diff node+))) staged\n")
       (skg-content-view-mode)
       (goto-char (point-min)))
     buf))
@@ -96,7 +96,8 @@ Returns the absolute data-root path."
     (string-trim (buffer-string))))
 
 (ert-deftest test-skg-git-add-if-new-recursive-runs-previewed-command ()
-  "The recursive executor stages the same addedN subtree files as the preview."
+  "The recursive executor stages the subtree's new files, as the preview
+shows, and leaves a file already in the git index as it is."
   (unwind-protect
       (let* ((root (test-skg-git-add--setup))
              (src  (expand-file-name "main" root))
@@ -122,8 +123,8 @@ Returns the absolute data-root path."
             (test-skg-git-add--staged-blob-hash src "staged.skg")))))
     (test-skg-git-add--teardown)))
 
-(ert-deftest test-skg-git-add-preview-collects-only-unstaged-new-files ()
-  "The preview collector uses addedN, not relationship-only addedR or staged addedN."
+(ert-deftest test-skg-git-add-preview-collects-only-new-nodes ()
+  "The preview collector uses node+, not relationship-only rel+."
   (unwind-protect
       (progn
         (test-skg-git-add--setup)
@@ -132,7 +133,7 @@ Returns the absolute data-root path."
             (goto-char (point-min))
             (should
              (equal
-              (skg--subtree-unstaged-new-file-id-and-repo-pairs)
+              (skg--subtree-new-file-id-and-repo-pairs)
               '(("new" . "main")
                 ("child" . "main")))))))
     (test-skg-git-add--teardown)))
@@ -148,7 +149,7 @@ Returns the absolute data-root path."
             (search-forward "body")
             (should
              (equal
-              (skg--subtree-unstaged-new-file-id-and-repo-pairs)
+              (skg--subtree-new-file-id-and-repo-pairs)
               '(("new" . "main")
                 ("child" . "main")))))))
     (test-skg-git-add--teardown)))
@@ -202,9 +203,9 @@ ellipsis object to `call-process' instead of a string."
         (setq skgids (nreverse skgids))
         (with-current-buffer buf
           (erase-buffer)
-          (insert "* (skg (node (id old) (repo main) (unstaged addedR))) old\n")
+          (insert "* (skg (node (id old) (repo main) (diff rel+))) old\n")
           (dolist (skgid skgids)
-            (insert (format "** (skg (node (id %s) (repo main) (unstaged addedN addedR))) %s\n"
+            (insert (format "** (skg (node (id %s) (repo main) (diff node+ rel+))) %s\n"
                             skgid skgid)))
           (skg-content-view-mode)
           (goto-char (point-min)))
@@ -226,32 +227,10 @@ ellipsis object to `call-process' instead of a string."
         (kill-buffer "*skg git add new files*")))
     (test-skg-git-add--teardown)))
 
-(ert-deftest test-skg-git-add-explains-when-diff-mode-off ()
-  "With git diff mode off and no addedN atoms in the subtree, both
-commands must explain that diff mode is required to recognize new
-files, rather than reporting 0 files as if the user did it right
-(TODO/more.org)."
-  (let ((messages nil)
-        (skg--git-diff-mode-enabled nil))
-    (with-temp-buffer
-      (insert "* (skg (node (id old) (repo main))) old\n")
-      (org-mode)
-      (goto-char (point-min))
-      (cl-letf (((symbol-function 'message)
-                 (lambda (fmt &rest args)
-                   (push (apply #'format fmt args) messages))))
-        (skg-git-add-if-new-recursive)
-        (skg-git-add-if-new-recursive-preview)))
-    (should (= (length messages) 2))
-    (dolist (m messages)
-      (should (string-match-p "diff mode is off" m)))
-    ;; The preview must not have popped its buffer either.
-    (should-not (get-buffer "*skg git add new files*"))))
-
-(ert-deftest test-skg-git-add-reports-zero-when-diff-mode-on ()
-  "With diff mode ON and genuinely nothing new, the old report stands."
-  (let ((messages nil)
-        (skg--git-diff-mode-enabled t))
+(ert-deftest test-skg-git-add-reports-zero-and-says-where-new-nodes-are-marked ()
+  "With nothing new in the subtree, the command reports zero files and
+says that only the total diff view marks new nodes."
+  (let ((messages nil))
     (with-temp-buffer
       (insert "* (skg (node (id old) (repo main))) old\n")
       (org-mode)
@@ -264,6 +243,6 @@ files, rather than reporting 0 files as if the user did it right
                    ;; Reverse-chronological: the evaluated (empty) plan
                    ;; says nothing was found, then the command reports.
                    '("skg-git-add-if-new-recursive: ran git-add command for 0 new file(s)"
-                     "No unstaged new skg files found in this subtree.")))))
+                     "No new skg files found in this subtree. (Only a buffer of the total diff view, M-x skg-diff-view, marks new nodes.)")))))
 
 (provide 'test-skg-git-add)

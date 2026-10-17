@@ -28,19 +28,6 @@
 (require 'skg-readable-ids)
 (require 'skg-sexpr-search)   ;; skg-first-sexpr-on-line
 
-(defun skg--explain-if-blind-to-new-files (path-count)
-  "When PATH-COUNT is 0 because git diff mode is off, say so.
-New files are recognized by the `(unstaged addedN)' atoms that only a
-diff-mode render carries, so with diff mode off this command is blind
--- reporting \"0 files\" as if the user did it right would mislead.
-Returns non-nil when it explained (the caller then skips its own
-report)."
-  (when (and (zerop path-count)
-             (not skg--git-diff-mode-enabled))
-    (message
-     "Git diff mode is off, so new files cannot be recognized: this command looks for the addedN atoms only a diff-mode view carries. Toggle diff mode (M-x skg-view-diff-mode), then retry.")
-    t))
-
 (defun skg-git-add-if-new-recursive ()
   "Run new-file git-add command that
 `skg-git-add-if-new-recursive-preview' would display.
@@ -51,45 +38,42 @@ you might not want to review the command manually.)"
   (let* ((plan (skg--git-add-new-files-recursive-plan))
          (paths (plist-get plan :paths))
          (form (plist-get plan :form)))
-    (if (skg--explain-if-blind-to-new-files (length paths))
-        nil
-      (eval form t)
-      (message "skg-git-add-if-new-recursive: ran git-add command for %d new file(s)"
-               (length paths)))))
+    (eval form t)
+    (message "skg-git-add-if-new-recursive: ran git-add command for %d new file(s)"
+             (length paths))))
 
 (defun skg-git-add-if-new-recursive-preview ()
   "Show an executable buffer that stages new files in the current subtree.
 The current headline and its viewdescendants are scanned for UnrestrictedVognode
-metadata containing `(unstaged addedN)'. The generated form rechecks
+metadata containing `(diff node+)', which the total diff view puts on a
+node HEAD lacks. The generated form rechecks
 the git index before staging each file, so evaluating it will not
 stage later modifications to files that are already known to git."
   (interactive)
   (let* ((plan (skg--git-add-new-files-recursive-plan))
          (paths (plist-get plan :paths)))
-    (if (skg--explain-if-blind-to-new-files (length paths))
-        nil
-      (let ((buffer (get-buffer-create "*skg git add new files*")))
-        (with-current-buffer buffer
-          (let ((inhibit-read-only t))
-            (erase-buffer)
-            (emacs-lisp-mode)
-            ;; The preview is meant to be evaluated later. If user/custom
-            ;; printer limits are active, `pp-to-string' can emit `...'
-            ;; inside the quoted filename list, making the buffer invalid
-            ;; as executable code.
-            (let ((print-length nil)
-                  (print-level nil))
-              (insert (pp-to-string (plist-get plan :form))))
-            (goto-char (point-min))
-            (skg-readable-ids-mode 1)))
-        (pop-to-buffer buffer)
-        (message "skg-git-add-if-new-recursive-preview: %d new file(s)"
-                 (length paths))))))
+    (let ((buffer (get-buffer-create "*skg git add new files*")))
+      (with-current-buffer buffer
+        (let ((inhibit-read-only t))
+          (erase-buffer)
+          (emacs-lisp-mode)
+          ;; The preview is meant to be evaluated later. If user/custom
+          ;; printer limits are active, `pp-to-string' can emit `...'
+          ;; inside the quoted filename list, making the buffer invalid
+          ;; as executable code.
+          (let ((print-length nil)
+                (print-level nil))
+            (insert (pp-to-string (plist-get plan :form))))
+          (goto-char (point-min))
+          (skg-readable-ids-mode 1)))
+      (pop-to-buffer buffer)
+      (message "skg-git-add-if-new-recursive-preview: %d new file(s)"
+               (length paths)))))
 
 (defun skg--git-add-new-files-recursive-plan ()
   "Return the executable git-add plan for new files in this subtree.
 The result is a plist with :paths and :form keys."
-  (let* ((pairs (skg--subtree-unstaged-new-file-id-and-repo-pairs))
+  (let* ((pairs (skg--subtree-new-file-id-and-repo-pairs))
          (paths (skg--abs-paths-for-id-repo-pairs pairs)))
     (list :paths paths
           :form (skg--git-add-new-files-form paths))))
@@ -101,7 +85,7 @@ The result is a plist with :paths and :form keys."
                  (skg--group-abs-paths-by-dir abs-paths))))
     (if forms
         (cons 'progn forms)
-      '(message "No unstaged new skg files found in this subtree."))))
+      '(message "No new skg files found in this subtree. (Only a buffer of the total diff view, M-x skg-diff-view, marks new nodes.)"))))
 
 (defun skg--git-add-form-for-repo-dir (dir-and-files)
   "Return one executable git-add form for DIR-AND-FILES.
@@ -145,12 +129,11 @@ DIR-AND-FILES is (DIR . FILES), where FILES are basenames."
           (push path paths))))
     (delete-dups (nreverse paths))))
 
-(defun skg--subtree-unstaged-new-file-id-and-repo-pairs ()
-  "Return (id . repo) pairs in this subtree whose metadata has unstaged addedN.
-This collects node changes, not relationship-only `addedR'
-changes."
+(defun skg--subtree-new-file-id-and-repo-pairs ()
+  "Return (id . repo) pairs in this subtree whose metadata has `(diff node+)'.
+This collects new nodes, not relationship-only `rel+' changes."
   (skg--subtree-id-and-repo-pairs-if
-   #'skg--metadata-has-unstaged-new-file-p))
+   #'skg--metadata-has-new-file-p))
 
 (defun skg--subtree-id-and-repo-pairs-if (predicate)
   "Return subtree (id . repo) pairs whose metadata satisfies PREDICATE.
@@ -177,8 +160,8 @@ interactively-folded content view."
               (cl-return-from done)))))
       (nreverse pairs))))
 
-(defun skg--metadata-has-unstaged-new-file-p (sexp)
-  "Return t if SEXP is an UnrestrictedVognode marked as a new worktree file."
-  (memq 'addedN (skg-sexp-cdr-at-path sexp '(skg node unstaged))))
+(defun skg--metadata-has-new-file-p (sexp)
+  "Return t if SEXP is an UnrestrictedVognode that HEAD lacks."
+  (memq 'node+ (skg-sexp-cdr-at-path sexp '(skg node diff))))
 
 (provide 'skg-git-add)

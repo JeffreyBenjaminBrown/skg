@@ -1,12 +1,12 @@
-;;; Integration test: skg-goto-in-magit-parent on a removed-here phantom.
+;;; Integration test: skg-goto-in-magit-parent on a removed member.
 ;;;
 ;;; Graph at HEAD: a contains [b].
 ;;; Worktree:      a contains [].
 ;;;
-;;; Phase 1: Open content view from a.
-;;; Phase 2: Toggle diff mode on.
-;;;          b appears as a removed-here phantom under a.
-;;; Phase 3: Call skg-goto-in-magit-parent on the phantom b.
+;;; Phase 1: Open the total diff view.
+;;; Phase 2: In its "all changes" buffer, b appears under a as a
+;;;          removed member: write-protected, tagged (diff rel-).
+;;; Phase 3: Call skg-goto-in-magit-parent on b.
 ;;; Phase 4: Verify magit opened on a.skg's diff,
 ;;;          point on the line showing deletion of b's ID.
 
@@ -28,63 +28,59 @@
   "Report test success."
   (apply #'message (concat "✓ PASS: " message) args))
 
-(defun phase-1-open-content-view-from-a ()
+;;; The line of the total diff view's "all changes" buffer that draws
+;;; b as a removed member of a.
+(defconst test-removed-member-line-regexp
+  "(id b).*(diff rel-)")
+
+(defun find-all-changes-buffer ()
+  (cl-find-if
+   (lambda (b) (string-match-p "diff-view: all changes" (buffer-name b)))
+   (buffer-list)))
+
+(defun phase-1-open-the-total-diff-view ()
   (setq integration-test-phase "phase-1")
   (let ((test-port (getenv "SKG_TEST_PORT")))
     (when test-port
       (setq skg-port (string-to-number test-port))))
   (setq skg-config-dir
         (expand-file-name "data/" (file-name-directory load-file-name)))
-  (skg-request-single-root-content-view-from-id "a")
+  (skg-diff-view)
   (unless (skg-test-wait-for
            (lambda ()
-             (let ((buf (cl-find-if
-                          (lambda (b)
-                            (with-current-buffer b
-                              (derived-mode-p 'skg-content-view-mode)))
-                          (buffer-list))))
+             (let ((buf (find-all-changes-buffer)))
                (when buf
                  (with-current-buffer buf
                    (string-match-p "(id a)"
                                    (buffer-substring-no-properties
                                     (point-min) (point-max))))))))
-    (test-fail "Timeout waiting for content view of a"))
-  (test-pass "Content view of a loaded"))
+    (test-fail "Timeout waiting for the \"all changes\" buffer"))
+  (test-pass "The \"all changes\" buffer loaded"))
 
-(defun phase-2-toggle-diff-and-verify-phantom-b ()
+(defun phase-2-verify-removed-member-b ()
   (setq integration-test-phase "phase-2")
-  (let ((buf (cl-find-if
-               (lambda (b) (with-current-buffer b
-                             (derived-mode-p 'skg-content-view-mode)))
-               (buffer-list))))
-    (switch-to-buffer buf)
-    (skg-view-diff-mode)
-    (skg-test-wait-for-response 20)
-    (let ((content (buffer-substring-no-properties
-                    (point-min) (point-max))))
-      (unless (string-match-p "(unstaged removedR)" content)
-        (test-fail "No removed-here phantom found. Buffer: %S" content))
-      (test-pass "removed-here phantom b present"))))
+  (let ((content (with-current-buffer (find-all-changes-buffer)
+                   (buffer-substring-no-properties
+                    (point-min) (point-max)))))
+    (unless (string-match-p test-removed-member-line-regexp content)
+      (test-fail "No removed member b found. Buffer: %S" content))
+    (test-pass "removed member b present")))
 
-(defun phase-3-call-view-magit-on-phantom-b ()
+(defun phase-3-call-view-magit-on-removed-member-b ()
   (setq integration-test-phase "phase-3")
-  (let ((buf (cl-find-if
-               (lambda (b) (with-current-buffer b
-                             (derived-mode-p 'skg-content-view-mode)))
-               (buffer-list))))
-    (switch-to-buffer buf)
-    (goto-char (point-min))
-    (unless (re-search-forward "(unstaged removedR)" nil t)
-      (test-fail "Could not find removed-here line"))
-    (beginning-of-line)
-    (message "  Positioned on: %s"
-             (buffer-substring-no-properties
-              (line-beginning-position) (line-end-position)))
-    (skg-goto-in-magit-parent)
-    (unless (skg-test-wait-for-response 20)
-      (test-fail "Timeout waiting for skg-goto-in-magit-parent response"))
-    (sleep-for 1)
-    (test-pass "skg-goto-in-magit-parent completed on phantom")))
+  (switch-to-buffer (find-all-changes-buffer))
+  (goto-char (point-min))
+  (unless (re-search-forward test-removed-member-line-regexp nil t)
+    (test-fail "Could not find the removed member's line"))
+  (beginning-of-line)
+  (message "  Positioned on: %s"
+           (buffer-substring-no-properties
+            (line-beginning-position) (line-end-position)))
+  (skg-goto-in-magit-parent)
+  (unless (skg-test-wait-for-response 20)
+    (test-fail "Timeout waiting for skg-goto-in-magit-parent response"))
+  (sleep-for 1)
+  (test-pass "skg-goto-in-magit-parent completed on the removed member"))
 
 (defun phase-4-verify-magit-points-to-deletion-of-b-in-a ()
   (setq integration-test-phase "phase-4")
@@ -119,13 +115,13 @@
     (test-pass "Point is on the deletion line for b in a.skg's diff")))
 
 (defun run-all-tests ()
-  (message "=== SKG View-Magit-Phantom Integration Test ===")
-  (phase-1-open-content-view-from-a)
-  (phase-2-toggle-diff-and-verify-phantom-b)
-  (phase-3-call-view-magit-on-phantom-b)
+  (message "=== SKG View-Magit-Removed-Member Integration Test ===")
+  (phase-1-open-the-total-diff-view)
+  (phase-2-verify-removed-member-b)
+  (phase-3-call-view-magit-on-removed-member-b)
   (phase-4-verify-magit-points-to-deletion-of-b-in-a)
   (message "")
-  (test-pass "All view-magit-phantom tests passed!")
+  (test-pass "All view-magit-removed-member tests passed!")
   (kill-emacs 0))
 
 (progn

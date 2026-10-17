@@ -20,7 +20,6 @@
 (require 'skg-request-flag-state)
 (require 'skg-request-export-org)
 (require 'skg-request-import-md-and-org)
-(require 'skg-request-git-diff-mode)
 (require 'skg-request-total-diff-view)
 (require 'skg-readiness)
 (require 'skg-request-rebuild-session-lifetime-stores)
@@ -99,9 +98,6 @@ other server, and saving one would write it into this server's graph."
           ;; or the existing one is dead
       (and                 skg-rust-tcp-proc
            (process-live-p skg-rust-tcp-proc ))
-    (setq skg--git-diff-mode-enabled
-          ;; The server starts each connection with diff mode off.
-          nil)
     (condition-case err
         (setq skg-rust-tcp-proc
               (make-network-process

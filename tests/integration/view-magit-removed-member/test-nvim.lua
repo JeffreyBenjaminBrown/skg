@@ -1,14 +1,14 @@
--- Integration test: skg.goto_git.goto_in_git_parent on a removed-here
--- phantom, nvim client. The Lua mirror of test-emacs.el in this
+-- Integration test: skg.goto_git.goto_in_git_parent on a removed
+-- member, nvim client. The Lua mirror of test-emacs.el in this
 -- directory.
 --
 -- Graph at HEAD: a contains [b].
 -- Worktree:      a contains [].
 --
--- Phase 1: Open content view from a.
--- Phase 2: Toggle diff mode on. b appears as a removed-here phantom
---          under a.
--- Phase 3: Call goto_git.goto_in_git_parent on the phantom b.
+-- Phase 1: Open the total diff view.
+-- Phase 2: In its "all changes" buffer, b appears under a as a
+--          removed member: write-protected, tagged (diff rel-).
+-- Phase 3: Call goto_git.goto_in_git_parent on b.
 -- Phase 4: Verify a plain-diff buffer opened on a.skg (the parent)
 --          and that b's removal is present in it.
 --
@@ -36,14 +36,15 @@ T.arm_timeout(45)
 
 local goto_git = require('skg.goto_git')
 
----@param needle string
 ---@param timeout_secs number|nil
----@return integer|nil bufnr
-local function find_content_view_buffer_matching (needle, timeout_secs)
+---@return integer|nil bufnr of the "all changes" buffer, once it shows a
+local function find_all_changes_buffer (timeout_secs)
   return T.wait_for(function ()
     for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-      if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_content_view
-         and T.buffer_text(buf):find(needle, 1, true) then
+      if vim.api.nvim_buf_is_valid(buf)
+         and vim.api.nvim_buf_get_name(buf):find(
+               'diff-view: all changes', 1, true)
+         and T.buffer_text(buf):find('(id a)', 1, true) then
         return buf
       end
     end
@@ -51,41 +52,46 @@ local function find_content_view_buffer_matching (needle, timeout_secs)
   end, timeout_secs)
 end
 
-print('=== SKG View-Magit-Phantom Integration Test ===')
-
--- PHASE 1: open content view from a.
-print('=== PHASE 1: Open content view from a ===')
-require('skg.content_view').request_single_root_content_view_from_id('a')
-local content_view = find_content_view_buffer_matching('(id a)')
-if not content_view then T.fail('Timeout waiting for content view of a') end
-T.check(true, 'Content view of a loaded')
-
--- PHASE 2: toggle diff mode on; verify the removed-here phantom b.
-print('=== PHASE 2: Toggle diff mode, verify phantom b ===')
-vim.api.nvim_set_current_buf(content_view)
-require('skg.diff_mode').toggle()
-T.check(T.wait_for_response(20), 'diff-mode-on response arrived')
-do
-  local content = T.buffer_text(content_view)
-  T.check(content:find('(unstaged removedR)', 1, true) ~= nil,
-          string.format('removed-here phantom b present. Buffer: %s',
-                        content))
+---@param line string
+---@return boolean does LINE draw b as a removed member?
+local function is_removed_member_line (line)
+  return line:find('(id b)', 1, true) ~= nil
+     and line:find('(diff rel-)', 1, true) ~= nil
 end
 
--- PHASE 3: call goto_in_git_parent on the phantom b.
-print('=== PHASE 3: goto_in_git_parent on phantom b ===')
-vim.api.nvim_set_current_buf(content_view)
+print('=== SKG View-Magit-Removed-Member Integration Test ===')
+
+-- PHASE 1: open the total diff view.
+print('=== PHASE 1: Open the total diff view ===')
+require('skg.total_diff_view').diff_view()
+local all_changes = find_all_changes_buffer()
+if not all_changes then
+  T.fail('Timeout waiting for the "all changes" buffer') end
+T.check(true, 'The "all changes" buffer loaded')
+
+-- PHASE 2: verify the removed member b.
+print('=== PHASE 2: Verify removed member b ===')
 do
-  local lines = vim.api.nvim_buf_get_lines(content_view, 0, -1, false)
-  local phantom_line = nil
-  for lnum, line in ipairs(lines) do
-    if line:find('(unstaged removedR)', 1, true) then
-      phantom_line = lnum break
-    end
+  local found = false
+  for _, line in ipairs(vim.api.nvim_buf_get_lines(all_changes, 0, -1, false)) do
+    if is_removed_member_line(line) then found = true break end
   end
-  if not phantom_line then T.fail('Could not find removed-here line') end
-  vim.api.nvim_win_set_cursor(0, { phantom_line, 0 })
-  print('  Positioned on: ' .. lines[phantom_line])
+  T.check(found, string.format('removed member b present. Buffer: %s',
+                               T.buffer_text(all_changes)))
+end
+
+-- PHASE 3: call goto_in_git_parent on b.
+print('=== PHASE 3: goto_in_git_parent on removed member b ===')
+vim.api.nvim_set_current_buf(all_changes)
+do
+  local lines = vim.api.nvim_buf_get_lines(all_changes, 0, -1, false)
+  local member_line = nil
+  for lnum, line in ipairs(lines) do
+    if is_removed_member_line(line) then member_line = lnum break end
+  end
+  if not member_line then T.fail("Could not find the removed member's line") end
+  vim.api.nvim_win_set_cursor(0, { member_line, 0 })
+  print('  Positioned on: ' .. lines[member_line])
 end
 goto_git.goto_in_git_parent()
 T.check(T.wait_for_response(20),
@@ -112,5 +118,5 @@ if diff_buf then
 end
 
 print('')
-print('All view-magit-phantom tests passed!')
+print('All view-magit-removed-member tests passed!')
 T.pass()

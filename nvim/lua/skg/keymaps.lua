@@ -110,8 +110,6 @@ M.commands = {
            desc = 'Fork the owned node at point into a private clone' },
   ReplaceContentWithLink = { module = 'skg.modify_graph', fn = 'replace_content_with_link',
                              desc = 'Turn the branch at point into a link (saves)' },
-  ViewDiffMode = { module = 'skg.diff_mode', fn = 'toggle',
-                   desc = 'Toggle git diff annotations in all views' },
   DiffView = { module = 'skg.total_diff_view', fn = 'diff_view',
                desc = 'Open the total diff view: every change since the last commits' },
   ViewNewEmpty = { module = 'skg.view_new_empty', fn = 'view_new_empty',

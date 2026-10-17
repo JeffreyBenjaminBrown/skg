@@ -106,7 +106,7 @@ end
 ---@param sexp any
 ---@return string|nil
 function M.extract_id_from_metadata_sexp (sexp)
-  for _, holder in ipairs({ 'node', 'diffPhantom', 'deleted', 'historical' }) do
+  for _, holder in ipairs({ 'node', 'deleted', 'historical' }) do
     local values = metadata.sexp_cdr_at_path(sexp,
                                              { 'skg', holder, 'id' })
     if values and values[1] ~= nil then
@@ -119,7 +119,7 @@ end
 ---@param sexp any
 ---@return string|nil
 function M.extract_repo_from_metadata_sexp (sexp)
-  for _, holder in ipairs({ 'node', 'diffPhantom', 'deleted', 'historical' }) do
+  for _, holder in ipairs({ 'node', 'deleted', 'historical' }) do
     local values = metadata.sexp_cdr_at_path(
       sexp, { 'skg', holder, 'repo' })
     if values and values[1] ~= nil then

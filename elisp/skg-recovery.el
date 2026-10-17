@@ -51,9 +51,6 @@ With OVERWRITE non-nil, replace an existing PATH without prompting."
      (format "- View ID: %s\n" skg-view-id)
      (format "- Captured UTC: %s\n"
              (format-time-string "%Y-%m-%dT%H:%M:%SZ" nil t))
-     (format "- Git diff mode: %s\n"
-             (if (plist-get skg-clean-baseline-context :git-diff-mode)
-                 "enabled" "disabled or unavailable"))
      "- Repo-set: unavailable to this client\n"
      (if skg--search-enrichment-includes-user-edits
          (concat "- Search enrichment: current text includes both unsaved "

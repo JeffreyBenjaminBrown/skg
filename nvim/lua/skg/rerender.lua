@@ -1,6 +1,6 @@
 -- PURPOSE: The rerender stream (rerender-lock -> rerender-view* ->
--- rerender-done), shared by the diff-mode toggle, the skgrepo-set
--- switch, and the explicit rerender-all request. The Lua port of
+-- rerender-done), shared by the skgrepo-set switch, the explicit
+-- rerender-all request, and the requests a rerender stream follows. The Lua port of
 -- elisp/skg-request-rerender-all-views.el.
 
 local client = require('skg.client')
