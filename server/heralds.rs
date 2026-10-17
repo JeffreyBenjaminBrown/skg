@@ -228,6 +228,45 @@ fn total_diff_view_property_rules (
           ChangesetMarkerKind::OrderOnly => "order-only change", } ) ] ))
       . collect () ) ] }
 
+/// The label of a folder the total diff view drew because of a
+/// change, '(KIND changed)', which takes the place of the folder's
+/// ordinary label: "its X changed (this file)" for a folder of the
+/// node's own lists, "(other files)" for one of its recorders. A
+/// write-protected folder's label starts with ☮, as its ordinary one
+/// does.
+fn changed_folder_rules (
+) -> Vec<RuleChild> {
+  let changed = |atom : &'static str, write_protected : bool,
+                 text : &'static str| -> RuleChild {
+    rule ( atom, [
+      if write_protected {
+        vec! [ leaf_styled_as ("writeProtected", "changed", "☮") ]
+      } else { vec! [] },
+      vec! [ leaf ("changed", text) ] ] . concat () ) };
+  vec! [
+    changed (PropertyFolder::Alias . repr_in_client (), false,
+             "its aliases changed (this file)"),
+    changed (PropertyFolder::ID . repr_in_client (), false,
+             "its IDs changed (this file)"),
+    changed (PropertyFolder::flags () . repr_in_client (), true,
+             "its flags changed (this file)"),
+    changed (PartnerFolder::Container . repr_in_client (), true,
+             "its containers changed (other files)"),
+    changed (PartnerFolder::Mentioner . repr_in_client (), true,
+             "its mentioners changed (other files)"),
+    changed (PartnerFolder::Subscriber . repr_in_client (), true,
+             "its subscribers changed (other files)"),
+    changed (PartnerFolder::Overrider . repr_in_client (), true,
+             "its overriders changed (other files)"),
+    changed (PartnerFolder::Hider . repr_in_client (), true,
+             "its hiders changed (other files)"),
+    changed (PartnerFolder::Subscribee . repr_in_client (), false,
+             "its subscribees changed (this file)"),
+    changed (PartnerFolder::Overridden . repr_in_client (), false,
+             "the nodes it overrides changed (this file)"),
+    changed (PartnerFolder::Hidden . repr_in_client (), true,
+             "the nodes it hides changed (this file)") ] }
+
 /// The total diff view's facts on a vognode: '(diff ...)' as ∃+ ∃-
 /// (the node axis) and ~+ ~- (the relationship axis), each followed
 /// by a ✓ when '(ready ...)' names its axis, then the readiness
@@ -415,6 +454,7 @@ pub fn herald_rule_table () -> HeraldRule {
           flag . wire_name (), vec! [s (flag . herald_text ())]))
         . collect ()) ],
       total_diff_view_property_rules (),
+      changed_folder_rules (),
       // The total diff view's facts on a property leaf: + and - for
       // its presence, ✓ when ready.
       change_fact_rules_for_one_axis ("+", "-"),
@@ -743,7 +783,8 @@ fn change_fact_atoms () -> Vec<&'static str> {
     match axis { // compile error here = update ReadinessAxis::ALL
       ReadinessAxis::Node | ReadinessAxis::Rel | ReadinessAxis::All => () }}
   let _ = guard;
-  [ vec! [ "diff", "ready", "readyRequest", "unreadyRequest" ],
+  [ vec! [ "diff", "ready", "readyRequest", "unreadyRequest",
+           "changed" ], // the head of a changed folder's form
     DiffPresence::EMITTABLE_ATOMS . to_vec (),
     ReadinessAxis::ALL . into_iter () . map (ReadinessAxis::wire_name)
       . collect () ] . concat () }

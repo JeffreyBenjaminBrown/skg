@@ -3,8 +3,8 @@ use crate::types::git::RelationshipAxes;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ChangeFacts, ReadinessRequest,
-  Viewnode, ViewnodeKind, Vognode, Phantom, Property, PropertyFolder, UnrestrictedVognode, PhantomDiff,
+  ChangeFacts, ReadinessAxis, ReadinessRequest,
+  Viewnode, ViewnodeKind, Vognode, Phantom, Property, UnrestrictedVognode, PhantomDiff,
   PhantomDeleted, PhantomHistorical, PhantomUnknown, NodeEditRequest, GraphnodeStats,
   AffectsParent,
 };
@@ -92,7 +92,8 @@ fn render_view_roots_to_string <'a> (
   ) -> Result < String, Box<dyn Error> > {
     let viewnode : &Viewnode = node_ref . value ();
     let mut out : String =
-      viewnode_to_text ( level, viewnode, config )?;
+      viewnode_to_text_with_folder_facts (
+        level, viewnode, folder_change_facts (node_ref), config )?;
     for child in node_ref . children () {
       out . push_str (
         & render_node_subtree_to_org (
@@ -115,8 +116,79 @@ pub fn viewnode_to_text (
   viewnode : &Viewnode,
   config   : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
+  viewnode_to_text_with_folder_facts (level, viewnode, None, config) }
+
+/// The total diff view's facts about a folder, derived from its
+/// members when the buffer is rendered: it is drawn because of a
+/// change when some member carries one, and ready when every such
+/// member's change is ready. Rendered '(KIND changed)' in place of
+/// the bare folder atom, then '(ready)'.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FolderChangeFacts {
+  pub ready : bool,
+}
+
+/// None unless 'node_ref' is a folder some member of which carries a
+/// change: a presence sign, or (on a member) a relRepo move.
+pub fn folder_change_facts (
+  node_ref : NodeRef<Viewnode>,
+) -> Option<FolderChangeFacts> {
+  if ! matches! ( &node_ref . value () . kind,
+                  ViewnodeKind::PartnerFolder (_)
+                  | ViewnodeKind::PropertyFolder (_) ) {
+    return None; }
+  let member_changes : Vec<bool> = // whether each changed member is ready
+    node_ref . children ()
+    . filter_map ( |member| {
+      let relRepo_move_ready : Option<bool> =
+        member . children () . find_map ( |child| match &child . value () . kind {
+          ViewnodeKind::Property (Property::RelRepoMove { change_facts, .. }) =>
+            Some ( change_facts . ready . is_some () ),
+          _ => None, } );
+      let presence_ready : Option<bool> = match &member . value () . kind {
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+          rel_change_ready (&t . change_facts),
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
+          single_change_ready (&u . change_facts),
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
+          rel_change_ready (&h . change_facts),
+        ViewnodeKind::Property (
+          Property::Alias { change_facts, .. }
+          | Property::ID { change_facts, .. }
+          | Property::Flag { change_facts, .. } ) =>
+          single_change_ready (change_facts),
+        _ => None, };
+      match (presence_ready, relRepo_move_ready) {
+        (None, None) => None,
+        (a, b) => Some ( a . unwrap_or (true) && b . unwrap_or (true) ), } } )
+    . collect ();
+  if member_changes . is_empty () { return None; }
+  Some ( FolderChangeFacts {
+    ready : member_changes . iter () . all ( |ready| *ready ) } ) }
+
+/// Some (whether ready) when the relationship axis changed.
+fn rel_change_ready (
+  change_facts : &ChangeFacts,
+) -> Option<bool> {
+  change_facts . presence . rel . map ( |_| change_facts . ready . as_ref ()
+    . is_some_and ( |axes| axes . contains (&ReadinessAxis::Rel) )) }
+
+/// Some (whether ready) when a single-axis leaf changed.
+fn single_change_ready (
+  change_facts : &ChangeFacts,
+) -> Option<bool> {
+  let changed : bool = change_facts . presence . node . is_some ()
+    || change_facts . presence . rel . is_some ();
+  changed . then ( || change_facts . ready . is_some () ) }
+
+fn viewnode_to_text_with_folder_facts (
+  level        : usize,
+  viewnode     : &Viewnode,
+  folder_facts : Option<FolderChangeFacts>,
+  config       : &SkgConfig,
+) -> Result < String, Box<dyn Error> > {
   let metadata_str : String =
-    viewnode_to_string (viewnode, config)?;
+    viewnode_to_string_with_folder_facts (viewnode, folder_facts, config)?;
   let title : &str = viewnode . title ();
   let body : Option < &String > = viewnode . body ();
   if metadata_str . is_empty () && title . is_empty () {
@@ -147,19 +219,27 @@ pub fn viewnode_to_string (
   viewnode : &Viewnode,
   config   : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
+  viewnode_to_string_with_folder_facts (viewnode, None, config) }
+
+fn viewnode_to_string_with_folder_facts (
+  viewnode     : &Viewnode,
+  folder_facts : Option<FolderChangeFacts>,
+  config       : &SkgConfig,
+) -> Result < String, Box<dyn Error> > {
   match &viewnode . kind {
     ViewnodeKind::PropertyFolder (folder) =>
-      propertyFolder_metadata_to_string (
+      Ok ( folder_atom_metadata_to_string (
         viewnode . focused, viewnode . folded,
-        viewnode . body_folded, folder ),
+        viewnode . body_folded, folder . repr_in_client (), folder_facts )),
     ViewnodeKind::Property (property) =>
       property_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, property ),
     ViewnodeKind::PartnerFolder (partnerFolder) =>
-      Ok ( non_vognode_atom_metadata_to_string (
+      Ok ( folder_atom_metadata_to_string (
         viewnode . focused, viewnode . folded,
-        viewnode . body_folded, partnerFolder . repr_in_client () ) ),
+        viewnode . body_folded, partnerFolder . repr_in_client (),
+        folder_facts )),
     ViewnodeKind::BufferRoot =>
       Err ( "viewnode_to_string: BufferRoot should never be rendered" . into () ),
     ViewnodeKind::DeadViewnode =>
@@ -204,14 +284,23 @@ fn non_vognode_atom_metadata_to_string (
   parts . push (atom . to_string ());
   parts . join (" ") }
 
-fn propertyFolder_metadata_to_string (
-  focused     : bool,
-  folded      : bool,
-  body_folded : bool,
-  folder         : &PropertyFolder,
-) -> Result < String, Box<dyn Error> > {
-  Ok ( non_vognode_atom_metadata_to_string (
-    focused, folded, body_folded, folder . repr_in_client () ) ) }
+/// A folder's atom, or, when it is drawn because of a change,
+/// '(ATOM changed)' and '(ready)' if that change is ready.
+fn folder_atom_metadata_to_string (
+  focused      : bool,
+  folded       : bool,
+  body_folded  : bool,
+  atom         : &str,
+  folder_facts : Option<FolderChangeFacts>,
+) -> String {
+  match folder_facts {
+    None => non_vognode_atom_metadata_to_string (
+      focused, folded, body_folded, atom ),
+    Some (facts) => {
+      let mut metadata : String = non_vognode_atom_metadata_to_string (
+        focused, folded, body_folded, &format! ("({} changed)", atom) );
+      if facts . ready { metadata . push_str (" (ready)"); }
+      metadata }, } }
 
 fn property_metadata_to_string (
   focused     : bool,

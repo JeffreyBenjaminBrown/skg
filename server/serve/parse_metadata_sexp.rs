@@ -415,6 +415,7 @@ pub fn parse_metadata_to_viewnodemd (
     };
 
   let mut top_level_change_facts : bool = false;
+  let mut top_level_facts_beyond_ready : bool = false;
   // Process each element
   for element in elements {
     match element {
@@ -515,10 +516,12 @@ pub fn parse_metadata_to_viewnodemd (
             result . property_relRepo_request =
               request_metadata . relRepo_request; },
           "diff" | "ready" | "readyRequest" | "unreadyRequest" => {
-            // At top level, valid only on a property leaf (checked below).
+            // At top level, valid only on a property leaf, or as
+            // '(ready)' on a folder (checked below).
             parse_change_fact_form (
               &first, &items[1..], &mut result ) ?;
-            top_level_change_facts = true; },
+            top_level_change_facts = true;
+            if first != "ready" { top_level_facts_beyond_ready = true; }},
           "textChanged" => {
             // (textChanged STAGE_TAGS) for the TextChanged property.
             result . non_vognode = Some (
@@ -552,6 +555,14 @@ pub fn parse_metadata_to_viewnodemd (
                The new format uses (skg [focused] [folded] (node ...)) for UnrestrictedVognodes \
                and (skg [focused] [folded] nonVognodeKind) for Non-vognodes.",
               first )); },
+          folder_atom if folder_kind_of_atom (folder_atom) . is_some () => {
+            // '(KIND changed)': a folder the total diff view drew
+            // because of a change. A display fact, like its '(ready)'.
+            if items . len () != 2
+              || atom_to_string (&items[1]) ? != "changed" {
+              return Err ( format! (
+                "A folder form must be ({} changed)", folder_atom )); }
+            result . non_vognode = folder_kind_of_atom (folder_atom); },
           _ => { return Err ( format! ( "Unknown metadata key: {}",
                                          first )); }} },
       Sexp::Atom (_) => {
@@ -620,7 +631,11 @@ pub fn parse_metadata_to_viewnodemd (
                      Some (MpViewnodeKind::Property (Property::Alias { .. })) )
   { return Err ( "relRepo and its editRequest are valid only on Alias properties"
                  . to_string () ); }
+  let is_folder : bool = matches! ( result . non_vognode,
+    Some ( MpViewnodeKind::PartnerFolder (_)
+           | MpViewnodeKind::PropertyFolder (_) ));
   if top_level_change_facts
+     && ! ( is_folder && ! top_level_facts_beyond_ready )
      && ! matches! ( result . non_vognode,
                      Some (MpViewnodeKind::Property (
                        Property::Alias { .. } | Property::ID { .. }
@@ -628,9 +643,20 @@ pub fn parse_metadata_to_viewnodemd (
                        | Property::HomeSkgrepoMove { .. }
                        | Property::RelRepoMove { .. }
                        | Property::ChangesetMarker { .. } )) )
-  { return Err ( "Top-level diff, ready and readiness requests are valid only on alias, id and flag properties and the total diff view's properties other than bodyDiff"
+  { return Err ( "Top-level diff, ready and readiness requests are valid only on alias, id and flag properties and the total diff view's properties other than bodyDiff (and ready on folders)"
                  . to_string () ); }
   Ok (result) }
+
+/// The folder a bare folder atom names.
+fn folder_kind_of_atom (
+  atom : &str,
+) -> Option<MpViewnodeKind> {
+  match atom {
+    "aliasFolder" => Some (MpViewnodeKind::PropertyFolder (PropertyFolder::Alias)),
+    "idFolder"    => Some (MpViewnodeKind::PropertyFolder (PropertyFolder::ID)),
+    "flagsFolder" => Some (MpViewnodeKind::PropertyFolder (PropertyFolder::flags ())),
+    _ => PartnerFolder::from_client_string (atom)
+         . map (MpViewnodeKind::PartnerFolder), } }
 
 
 /// Parse the (node ...) s-expression contents.

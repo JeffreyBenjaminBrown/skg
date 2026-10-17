@@ -136,7 +136,8 @@ fn property_leaves_round_trip_their_change_facts () {
 fn malformed_change_facts_are_refused () {
   for metadata in [
     "(skg (diff rel+))",                              // top level, not a property
-    "(skg aliasFolder (ready))",                      // top level, not a leaf
+    "(skg aliasFolder (diff rel+))",                  // a folder's only fact is '(ready)'
+    "(skg (aliasFolder sideways))",                   // a folder's form is '(KIND changed)'
     "(skg (node (id a) (ready all)))",                // 'all' only in a request
     "(skg (node (id a) (diff node+ node-)))",         // an axis twice
     "(skg (node (id a) (readyRequest) (unreadyRequest node)))", // two requests
