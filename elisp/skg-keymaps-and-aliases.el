@@ -182,7 +182,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c t A") #'skg-git-add-if-new-recursive)
     (define-key map (kbd "C-c t a") #'skg-git-add-if-new-recursive-preview)
     (define-key map (kbd "C-c t m") #'skg-stage-moves)
-    (define-key map (kbd "C-c t r") #'skg-diff-report)))
+    (define-key map (kbd "C-c t r") #'skg-investigate-unknown-node)))
 
 (defvar skg-linkstack-mode-map (make-sparse-keymap)
   "Keymap for `skg-linkstack-mode'.")
