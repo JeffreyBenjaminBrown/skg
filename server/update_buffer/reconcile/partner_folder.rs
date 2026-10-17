@@ -363,7 +363,9 @@ fn redraw_removed_members_of_pair_folder (
 /// the folder's role, with a full containerward tree under each
 /// graft. In a folder of the anchor's own relationships, only under
 /// the members whose relationship changed. A member whose
-/// relationship moved to another skgrepo gets that move.
+/// relationship moved to another skgrepo gets that move. What an
+/// earlier drawing hung under the members goes first, so that drawing
+/// again is idempotent.
 fn attach_continuations_under_pair_folder_members (
   tree        : &mut Tree<Viewnode>,
   folder      : NodeId,
@@ -376,13 +378,24 @@ fn attach_continuations_under_pair_folder_members (
   let by_id : HashMap<&ID, &Partner> =
     partners . iter () . map ( |partner| (&partner . id, partner) ) . collect ();
   let outbound : bool = ! member_role . is_first_role ();
-  let members : Vec<(NodeId, &Partner)> =
+  let all_members : Vec<(NodeId, &Partner)> =
     tree . get (folder) . ok_or ("attach_continuations_under_pair_folder_members: folder not found") ?
     . children ()
     . filter_map ( |child| match &child . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         by_id . get (&t . skgid) . map ( |partner| (child . id (), *partner) ),
       _ => None, } )
+    . collect ();
+  { // The previous drawing's continuations and moves.
+    let stale : Vec<NodeId> =
+      all_members . iter ()
+      . flat_map ( |(member, _)| tree . get (*member) . unwrap () . children ()
+                   . map ( |child| child . id () ) . collect::<Vec<NodeId>> () )
+      . collect ();
+    for treeid in stale {
+      tree . get_mut (treeid) . unwrap () . detach (); }}
+  let members : Vec<(NodeId, &Partner)> =
+    all_members . into_iter ()
     . filter ( |(_, partner)| ! outbound || partner . changed () )
     . collect ();
   for (member, partner) in &members {
