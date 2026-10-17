@@ -330,7 +330,7 @@ goes one way. A role-tree request '(roleTree ROLE)' draws one (e.g.
 and override role trees under results. A role tree drawn on request
 follows single partners until a node has several, then includes that
 first layer; a full containerward role tree ('ContainerwardRoleTree')
-goes as deep as 'max_role_tree_depth'.
+goes as deep as 'max_roleTree_depth'.
 
 A *role graft* is one node of a role tree other than its origin. It is
 in the view because of the role, not because its parent contains it, so

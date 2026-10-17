@@ -378,7 +378,7 @@ pub fn attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
     pairs . iter () . map ( |(_, skgid)| skgid . clone () ) . collect ();
   let role_trees_by_skgid : HashMap<ID, ContainerwardRoleTree> =
     containerward_role_trees_by_skgid_from_skgids (
-      graph, &skgids, config . max_role_tree_depth );
+      graph, &skgids, config . max_roleTree_depth );
   attach_full_containerward_role_trees_from_map (
     tree, &pairs, &role_trees_by_skgid, graph, config, restriction ) }
 

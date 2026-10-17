@@ -6,7 +6,7 @@ use crate::types::misc::ID;
 ///
 /// Root: a genuine root (no containers).
 /// Repeated: already visited via another branch (cycle or diamond).
-/// DepthTruncated: max_role_tree_depth reached; may have containers we didn't explore.
+/// DepthTruncated: max_roleTree_depth reached; may have containers we didn't explore.
 /// Inner: plays content to at least one container; children are its containers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ContainerwardRoleTree {

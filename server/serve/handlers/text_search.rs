@@ -370,7 +370,7 @@ fn spawn_enrichment_thread (
   let restriction_clone : SkgrepoRestriction   = restriction . clone ();
   let terms_clone   : String            = search_terms . to_string ();
   let ids_clone     : Vec<ID>           = search_results . to_vec ();
-  let max_depth : usize = runtime . config . max_role_tree_depth;
+  let max_depth : usize = runtime . config . max_roleTree_depth;
   std::thread::spawn ( move || {
     tracing::info! (
       generation = runtime . generation,

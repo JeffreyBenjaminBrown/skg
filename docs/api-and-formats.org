@@ -968,6 +968,8 @@ Pass its path as a command-line argument (default: =data/skgconfig.toml=) when s
 | =timing_log=         | no       | false   | When true, writes a JSON log to =<data_root>/logs/server.jsonl=. |
 | =beep_when_server_becomes_available= | no | true | When true, plays a local sound after server initialization finishes. |
 | =default_repo_set= | no | =all= | The skgrepo restriction when a client connects. Runtime changes are per connection and are not written back. |
+| =owned_folder= | no | =owned= | The top-level folder under the data root whose skgrepos the user owns (see Skgrepos, below). |
+| =max_roleTree_depth= | no | 20 | Max breadth-first depth of a full containerward role tree. |
 
 The retired keys =db_name=, =delete_on_quit=, and =auto_audit_daily= are
 rejected with a migration error; remove them from older configurations.
