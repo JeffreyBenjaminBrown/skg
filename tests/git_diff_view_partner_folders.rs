@@ -5,7 +5,7 @@
 // modules here exercise de novo renders with fixture-local graph snapshots.
 // The separate target is retained because it keeps this focused matrix cheap.
 
-#[path = "git_diff_view/common.rs"]
+#[path = "shared/git_fixture_helpers.rs"]
 #[allow(unused_imports, dead_code)] // shared with tests/git_diff_view.rs, which uses more of it
 mod common;
 

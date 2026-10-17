@@ -1,4 +1,4 @@
-/// Shared utilities for all git diff view tests.
+/// Shared utilities for tests over git fixtures: the git diff view and the graph pair.
 
 pub use git2::Repository;
 pub use std::collections::HashMap;

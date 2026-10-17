@@ -1,6 +1,6 @@
 /// Git diff view tests.
 
-#[path = "git_diff_view/common.rs"]
+#[path = "shared/git_fixture_helpers.rs"]
 mod common;
 
 #[path = "git_diff_view/content/mod.rs"]
