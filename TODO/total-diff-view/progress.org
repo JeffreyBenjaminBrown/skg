@@ -510,3 +510,94 @@ skgrepo whose commit failed keeps its marks.
 'C-c r c' in Emacs, '<localleader>rc' (':SkgStageAndCommit') in
 Neovim, beside the readiness gestures; 'docs/COMMANDS*.org' describe
 them.
+* Slice 9: deviations
+** what of the old diff machinery stays
+*** the git fallback of "titles by ids"
+'titles by ids' still looks up, in each skgrepo's staged and unstaged
+diffs, the titles of nodes the search index lacks (new or deleted
+files), for readable IDs in magit. So 'SkgrepoDiff', 'GraphnodeDiff',
+'GitDiffStatus', 'PathDiffStatus' and 'compute_diff_for_skgrepo'
+stay; 'GraphnodeDiff' lost its 'node_changes', which only the old
+view read. 'Sign' stays, for '(diff ...)'.
+*** the snapshot reader
+What the graph pair uses stays: 'read_owned_head_graph_snapshot_maybe_cached',
+its per-skgrepo loop and cache, 'GraphSnapshot' and 'GitSnapshotKind'.
+What served only the report goes: 'read_graph_snapshot_maybe_cached'
+by kind and its cache key, the pair readers ('read_git_snapshot_pair',
+'read_changed_git_snapshot_pair', 'DiffSelection', 'GitSnapshotPair',
+'ChangedGitSnapshotPair'), the changed-path overlay, and
+'validate_skgrepos_for_selection' with 'head_cache_identity', as the
+slice-2 notes foresaw. The profiling switch is now
+'SKG_PROFILE_GIT_SNAPSHOT'.
+*** gone as dead once the old view went
+The view-completion threading of the per-stage diffs (and of the
+deleted-since-HEAD map, always empty without them), the diff-aware
+goal lists of the partner folders, 'inverse_scan.rs' and
+'three_git_snapshots_of_relation_list' (no pair-drawn folder used
+them), 'title_for_phantom' and 'phantom_axes', 'graphnode_from_index_or_head'
+(already unused), 'itemlist_and_removedset_from_diff', and the
+'bench-diff-report' binary. 'strip_stale_diff_state' is now
+'remove_id_folders': the total diff view redraws an ID folder at its
+node's visit. 'phantom_insertion_plan' moved into 'changes.rs', the
+one user left, with its unit tests ('tests/unit/render_changes.rs').
+** a consumer of the old atoms the plan did not list
+The git-add commands ('skg-git-add-if-new-recursive' and its preview,
+in both clients) found new files by '(unstaged addedN)'. They now look
+for '(diff node+)', so they work in a buffer of the total diff view.
+A node HEAD lacks may already be in the git index; the commands' own
+recheck ('git ls-files --error-unmatch') already skipped such a file.
+With nothing found, they say that only the total diff view marks new
+nodes.
+** renames whose old names would lie
+'unrestricted_or_diff_phantom_skgid' is 'unrestricted_skgid', and
+'MpViewnode::is_unrestricted_or_diff_phantom' is 'is_unrestricted'.
+The Neovim git-add helpers lost "unstaged" from their names.
+** the investigation request
+*** refused under a skgrepo restriction
+Not in the plan: git history can hold the text of any skgrepo, and a
+resolvable ID's answer names its node's title, so the request refuses,
+as the diff report did, unless the restriction is 'all'.
+*** its answer
+For a resolvable ID, the plan's line, as plain text. Otherwise the
+report's section for one ID, with its headline levels raised to start
+at '* ID'. 'dangling_skgids_in_git_snapshot', which found the report's
+IDs, went with the report; the report's types for a vanished node
+moved into 'vanished.rs'.
+*** the preview line
+'preview_warning_org' lives in 'server/delete_references_to_absent_node.rs',
+not in the handler the plan names; the line was added there.
+*** Neovim
+The ID at point is read by 'delete_absent_references.unknown_id_at_point',
+now exported, rather than by a copy.
+** tests
+*** ported from the old view
+To the TDV fixtures, in 'tests/pcsvf/editing.rs': deleting the ID
+folder respawns it; editing an entry of it aborts the save; deleting
+the image of a removed member (a write-protected rel- member, a
+historical phantom) respawns it; a new child is created and drawn as
+new; a buffer rerendered as collateral shows the new change and keeps
+the old; override substitution is off ('tests/pcsvf/fixtures/overrides').
+The rest of 'tests/git_diff_view', 'tests/diff_mode_refusals.rs', the
+diff-mode cases of 'tests/override_substitution.rs' and
+'tests/repo_sets.rs', and the predicate tests of the diff axes are
+gone. Tests that only flipped a node into a diff phantom now use a
+historical phantom.
+*** integration
+'view-magit-phantom' and 'view-magit-phantom-deleted-file' open the
+total diff view instead of toggling diff mode; the first is now
+'view-magit-removed-member', since a removed member there is a
+write-protected vognode. 'git-diff-view-updates' and
+'containerward-on-phantom' tested only what the old view drew, and are
+gone. The plan's scenario ("Verification and completion") is
+'tests/integration/total-diff-view', for both clients, written in this
+slice because it ends with the investigation. Its gestures skip a
+root already ready: the recursive gesture toggles, and an acquiree is
+drawn both under its acquirer and as a root.
+** docs and problems
+The config rows the plan names are the two slice 0 added; the TDV
+adds no config field. 'TODO/problems.org' says its own done entries
+move to 'TODO/DONE/problems.org'; the plan says the file records the
+two resolved entries, so they are marked RESOLVED in place.
+** imperfect
+The 'stop' herald style is now used by no herald ('✗' retired); the
+plan does not retire it, so it stays defined.

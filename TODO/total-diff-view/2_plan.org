@@ -713,7 +713,7 @@ with '(confirmed . t)'. Tests: a fixture with two owned skgrepos commits
 both with one message; an incomplete summary answers needs-confirmation
 and commits nothing; a confirmed resend commits.
 
-** Slice 9: retire the old diff view and the diff report, add the investigation request, finish docs
+** DONE Slice 9: retire the old diff view and the diff report, add the investigation request, finish docs
 *** the old diff view
 Remove 'RequestType::GitDiffModeToggle', 'TcpToClient::GitDiffMode',
 'diff_mode_enabled', 'handle_git_diff_toggle_and_rerender', the
