@@ -1,3 +1,4 @@
+use crate::change_forest::ChangeForest;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
@@ -13,8 +14,15 @@ pub struct GraphPair {
   /// ('owned_head_identity'). When it differs from the current one,
   /// the pair is stale.
   pub head_identity : String,
+  /// How many '.skg' files of the foreign skgrepos changed since
+  /// HEAD ('foreign_changed_skg_file_count'). Foreign skgrepos are
+  /// read at their worktrees in both halves, so the pair shows none
+  /// of those changes.
+  pub foreign_changed_files : usize,
   /// Computed on first use; see 'GraphPair::changed_pids'.
   pub(super) changed_pids : OnceLock<ChangedPids>,
+  /// Computed on first use; see 'GraphPair::change_forest'.
+  pub(super) change_forest : OnceLock<ChangeForest>,
 }
 
 /// Which graphs of the pair hold a node or a relationship.
@@ -64,12 +72,28 @@ pub struct ChangedPids {
 
 impl GraphPair {
   pub fn new (
-    before        : Arc<InRustGraph>,
-    after         : Arc<InRustGraph>,
-    head_identity : String,
+    before                : Arc<InRustGraph>,
+    after                 : Arc<InRustGraph>,
+    head_identity         : String,
+    foreign_changed_files : usize,
   ) -> GraphPair {
-    GraphPair { before, after, head_identity,
-                changed_pids : OnceLock::new () } }
+    GraphPair { before, after, head_identity, foreign_changed_files,
+                changed_pids  : OnceLock::new (),
+                change_forest : OnceLock::new () } }
+
+  /// The change-forest of this pair. Computed once per pair.
+  pub fn change_forest (
+    &self,
+  ) -> &ChangeForest {
+    self . change_forest . get_or_init (
+      || ChangeForest::from_graph_pair (self) ) }
+
+  /// The nodes whose file changed but whose change-forest has no
+  /// leaf: only the order of some list changed.
+  pub fn order_only_pids (
+    &self,
+  ) -> &BTreeSet<ID> {
+    self . change_forest () . order_only_pids () }
 }
 
 impl Presence {

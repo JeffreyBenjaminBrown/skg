@@ -1,4 +1,5 @@
 pub mod telescope;
+pub mod change_forest;
 pub mod consts;
 pub mod prominence;
 pub mod delete_references_to_absent_node;
@@ -16,6 +17,7 @@ pub(crate) mod body_view_escape;
 pub mod metadata_canon;
 pub mod nodeMerge;
 pub mod org_to_text;
+pub mod readiness_store;
 pub mod save;
 pub mod serve;
 pub mod skgrepo_sets;

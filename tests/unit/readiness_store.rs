@@ -1,0 +1,54 @@
+// Unit tests for the readiness store's marks and its persistence.
+
+use super::*;
+use crate::change_forest::{NodeAspect, RelationshipAspect};
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
+use crate::types::misc::ID;
+use crate::types::nodes::complete::Flag;
+
+use std::fs;
+use tempfile::TempDir;
+
+fn some_keys () -> Vec<LeafKey> {
+  vec! [
+    LeafKey::Node { pid : ID::from ("a"), aspect : NodeAspect::Text },
+    LeafKey::Node { pid : ID::from ("a"),
+                    aspect : NodeAspect::Alias ("x" . to_string ()) },
+    LeafKey::Node { pid : ID::from ("b"),
+                    aspect : NodeAspect::Flag (Flag::NoSearchMatching) },
+    LeafKey::Relationship {
+      relation : NodeRelation::Contains,
+      recorder : ID::from ("a"),
+      member   : ID::from ("b"),
+      aspect   : RelationshipAspect::RelRepo }, ] }
+
+#[test]
+fn a_mark_is_ready_only_with_its_fingerprint () {
+  let key : LeafKey = some_keys () . remove (0);
+  let mut store : ReadinessStore = ReadinessStore::default ();
+  assert! ( ! store . is_ready (&key, 7) );
+  store . mark (key . clone (), 7);
+  assert! ( store . is_ready (&key, 7) );
+  assert! ( ! store . is_ready (&key, 8) );
+  store . unmark (&key);
+  assert! ( ! store . is_ready (&key, 7) ); }
+
+#[test]
+fn the_store_round_trips_through_its_file () {
+  let dir : TempDir = TempDir::new () . unwrap ();
+  let mut store : ReadinessStore = ReadinessStore::default ();
+  for (fingerprint, key) in some_keys () . into_iter () . enumerate () {
+    store . mark (key, fingerprint as u64 + 1); }
+  store . save (dir . path ()) . unwrap ();
+  assert! ( readiness_marks_path (dir . path ()) . is_file () );
+  assert_eq! ( ReadinessStore::load (dir . path ()), store ); }
+
+#[test]
+fn a_missing_or_unreadable_file_is_an_empty_store () {
+  let dir : TempDir = TempDir::new () . unwrap ();
+  assert_eq! ( ReadinessStore::load (dir . path ()),
+               ReadinessStore::default () );
+  fs::write ( readiness_marks_path (dir . path ()), "not json" )
+    . unwrap ();
+  assert_eq! ( ReadinessStore::load (dir . path ()),
+               ReadinessStore::default () ); }

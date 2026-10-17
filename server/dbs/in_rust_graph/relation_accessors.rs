@@ -16,7 +16,7 @@ pub const OUTBOUND_RELATIONSHIP_TYPES : &[(&str, &str, &str)] = &[
   ("overrides",                     "overrider",  "overridden"),
 ];
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum NodeRelation {
   Contains,
   LinksTo,

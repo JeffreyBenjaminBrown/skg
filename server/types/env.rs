@@ -5,11 +5,13 @@
 
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
 use crate::dbs::tantivy::title_and_skgrepo_by_skgid;
+use crate::readiness_store::ReadinessStore;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use crate::types::phantom::home_from_disk;
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::Mutex as SyncMutex;
 use arc_swap::ArcSwap;
 use tokio::sync::Mutex;
 
@@ -37,6 +39,9 @@ pub struct SharedRuntime {
   pub mutation_gate : MutationGate,
   // Shared atomic swap-in state for coherent runtime generations.
   legacy_graph : InRustGraphHandle,
+  /// The commit-readiness marks, read from '<data_root>' at startup
+  /// and written back after every change.
+  pub readiness_store : SyncMutex<ReadinessStore>,
 }
 
 impl SharedRuntime {
@@ -55,12 +60,15 @@ impl SharedRuntime {
     tantivy_index : TantivyIndex,
   ) -> Self {
     let graph = legacy_graph . load_full ();
+    let readiness_store : ReadinessStore =
+      ReadinessStore::load (&config . data_root);
     SharedRuntime {
       current : ArcSwap::from_pointee (RuntimeGeneration {
         config : Arc::new (config), graph, tantivy_index, generation : 0,
       }),
       mutation_gate : new_mutation_gate (),
       legacy_graph,
+      readiness_store : SyncMutex::new (readiness_store),
     }
   }
 

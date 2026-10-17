@@ -1063,6 +1063,23 @@ The server writes to =<data_root>/logs/=:
 - =server-to-user.log= — human-readable log (always on).
 - =server.jsonl= — structured JSON log (when ~timing_log = true~). Queryable with =jq=.
 
+** Readiness marks file
+
+=<data_root>/readiness-marks.json= holds the commit-readiness marks
+of the total diff view ('server/readiness_store.rs'). The server reads
+it at startup and rewrites it after every change; a missing or
+unreadable file means no marks. It is a JSON object whose =marks= is a
+list of ={"leaf": KEY, "fingerprint": N}= entries. KEY names one
+change-forest leaf ('LeafKey' in 'server/change_forest.rs'): a node
+aspect ={"Node": {"pid": ..., "aspect": ...}}=, where the aspect is
+="Existence"=, ="Text"=, ="Home"=, ={"Alias": TEXT}=, ={"ExtraId": ID}=
+or ={"Flag": FLAG}=; or a relationship aspect ={"Relationship":
+{"relation": ..., "recorder": ..., "member": ..., "aspect": ...}}=,
+where the aspect is ="Existence"= or ="RelRepo"=. N is the fingerprint
+of the change the mark approved, a hash of the leaf's before and after
+values; a mark whose fingerprint no longer matches the current change
+counts as absent.
+
 ** Example
 
 See =example-data/skgconfig.toml=.

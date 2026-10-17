@@ -26,7 +26,7 @@ const CONTENT : RelationRole =
 /// The roles that the members of a node's own relationship lists
 /// play: a change among them is recorded in the node's files.
 /// (Mentions are not in a list; they change with the text.)
-const ROLES_OF_LISTED_MEMBERS : [RelationRole; 4] = [
+pub(crate) const ROLES_OF_LISTED_MEMBERS : [RelationRole; 4] = [
   CONTENT,
   RelationRole::SUBSCRIBEE,
   RelationRole::HIDDEN,

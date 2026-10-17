@@ -164,6 +164,28 @@ pub fn owned_head_identity (
   Ok (parts . join ("|"))
 }
 
+/// How many '.skg' files of the foreign skgrepos differ between HEAD
+/// and the worktree. The graph pair reads foreign skgrepos at their
+/// worktrees, so their changes never reach it; the readiness summary
+/// reports this count instead. A foreign skgrepo that is not in a
+/// gitrepo, or has no HEAD commit, counts nothing.
+pub fn foreign_changed_skg_file_count (
+  config : &SkgConfig,
+) -> usize {
+  config . ordered_skgrepos () . into_iter ()
+    . filter ( |skgrepo_name| ! config . skgrepo_is_owned (skgrepo_name) )
+    . filter_map ( |skgrepo_name| {
+      let skgrepo : &Skgrepo = config . skgrepos . get (&skgrepo_name) ?;
+      let skgrepo_path : &Path = Path::new (&skgrepo . path);
+      let gitrepo : Repository = open_gitrepo (skgrepo_path) ?;
+      let prefix : PathBuf =
+        repo_prefix_in_gitrepo (&gitrepo, skgrepo_path) . ok () ?;
+      changed_paths_for_skgrepo (
+        &gitrepo, &prefix, GitSnapshotKind::Head, GitSnapshotKind::Worktree )
+        . ok ()
+        . map ( |paths| paths . len () ) } )
+    . sum () }
+
 /// Sections arrive in privacy order (ordered_repos) so each
 /// telescope composes with its most public section first.
 fn read_graph_snapshot_per_skgrepo (

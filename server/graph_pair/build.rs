@@ -1,7 +1,8 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::complete_validation::validated_graph;
 use crate::git_ops::git_snapshot::{
-  owned_head_identity, read_owned_head_graph_snapshot_maybe_cached};
+  foreign_changed_skg_file_count, owned_head_identity,
+  read_owned_head_graph_snapshot_maybe_cached};
 use crate::git_ops::git_snapshot_types::GraphSnapshot;
 use crate::graph_pair::types::GraphPair;
 use crate::telescope::invariants::TelescopeViolation;
@@ -36,7 +37,9 @@ impl GraphPair {
       : (InRustGraph, Vec<(ID, TelescopeViolation)>) =
       validated_graph (config, &nodes)
       . map_err ( |e| format! ("At HEAD: {}", e) ) ?;
-    Ok ( GraphPair::new ( Arc::new (before), live, head_identity )) }
+    Ok ( GraphPair::new (
+      Arc::new (before), live, head_identity,
+      foreign_changed_skg_file_count (config) )) }
 
   /// The same before-graph, paired with a newer live graph.
   pub fn with_after (
@@ -44,7 +47,8 @@ impl GraphPair {
     live : Arc<InRustGraph>,
   ) -> GraphPair {
     GraphPair::new (
-      self . before . clone (), live, self . head_identity . clone () ) }
+      self . before . clone (), live, self . head_identity . clone (),
+      self . foreign_changed_files ) }
 }
 
 /// The graph pair held in 'slot' (a connection's
