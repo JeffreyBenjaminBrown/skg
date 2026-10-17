@@ -12,7 +12,7 @@
     "stop":        { "foreground": "white",   "background": "red",      "what_it_looks_like": "white text on red" },
     "go":          { "foreground": "black",   "background": "#00bb00",  "what_it_looks_like": "black text on bright green" },
     "nonstandard": { "foreground": "white",   "background": "#8b00ff",  "what_it_looks_like": "white text on violet purple" },
-    "yucky":       { "foreground": "#c84286",                           "what_it_looks_like": "magenta-pink text, no background" }
+    "ugly":        { "foreground": "#c84286",                           "what_it_looks_like": "magenta-pink text, no background" }
   },
   "view_faces_comment": "Skg dictates every face in a view, in both clients: these colors and weights replace the user's theme for the Org elements a view contains (not the typeface). They follow Jeff's Emacs setup: rainbow headlines, from his custom faces, and the manoj-dark theme's Org faces. Each entry names the Emacs faces and Neovim highlight groups it governs. A face with no background gets the default's.",
   "view_faces": [

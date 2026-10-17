@@ -16,7 +16,7 @@ M.epoch = 0
 M.next_request = 0
 
 vim.api.nvim_set_hl(0, 'SkgBrokenLink',
-  { fg = shared.herald_styles.styles.yucky.foreground, underline = true,
+  { fg = shared.herald_styles.styles.ugly.foreground, underline = true,
     default = true })
 
 local function valid (buf)
@@ -157,7 +157,7 @@ function M.paint (buf, positions)
       local label = ({ restricted = '⌂:restricted',
                        lookup_failed = '⌂:lookup failed', pending = '⌂:…' })[kind]
                     or ('⌂:' .. status[3])
-      local group = kind == 'resolved' and 'SkgHeraldNormal' or 'SkgHeraldYucky'
+      local group = kind == 'resolved' and 'SkgHeraldNormal' or 'SkgHeraldUgly'
       vim.api.nvim_buf_set_extmark(buf, M.namespace,
         position.row, position.link_end, {
           virt_text = { { ' ', 'Normal' }, { '[' .. label .. ']', group } },

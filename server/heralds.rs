@@ -28,14 +28,14 @@ use crate::types::viewnode::{PartnerFolder, Property, PropertyFolder, ViewReques
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HeraldStyle {
   Crucial, High, Medium, Low, Normal,
-  Message, Stop, Go, Nonstandard, Yucky }
+  Message, Stop, Go, Nonstandard, Ugly }
 
 impl HeraldStyle {
   pub const ALL : [HeraldStyle; 10] = [
     HeraldStyle::Crucial, HeraldStyle::High, HeraldStyle::Medium,
     HeraldStyle::Low, HeraldStyle::Normal, HeraldStyle::Message,
     HeraldStyle::Stop, HeraldStyle::Go, HeraldStyle::Nonstandard,
-    HeraldStyle::Yucky ];
+    HeraldStyle::Ugly ];
 
   /// The style's name, as in 'shared/herald-styles.json'.
   pub fn name (self) -> &'static str {
@@ -49,7 +49,7 @@ impl HeraldStyle {
       HeraldStyle::Stop        => "stop",
       HeraldStyle::Go          => "go",
       HeraldStyle::Nonstandard => "nonstandard",
-      HeraldStyle::Yucky       => "yucky", } }
+      HeraldStyle::Ugly       => "ugly", } }
 
   /// The style directive in the served rule table: the style's name in
   /// capitals, like the table's other directives (ANY, IT, ABUT, INTERC).
@@ -79,7 +79,7 @@ pub struct HeraldRule {
 // Constructor sugar, so the table below stays close to the sexp it serializes to.
 //
 
-use HeraldStyle::{Crucial, Medium, Normal, Message, Stop, Go, Nonstandard, Yucky};
+use HeraldStyle::{Crucial, Medium, Normal, Message, Stop, Go, Nonstandard, Ugly};
 
 /// (label children...)
 fn rule (
@@ -226,7 +226,7 @@ pub fn herald_rule_table () -> HeraldRule {
       // An alias's stored relRepo is a display fact.  A
       // requested replacement lives under editRequest below, so the
       // two values can be rendered side by side without conflation.
-      crule (Yucky, "relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
+      crule (Ugly, "relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
       rule ("editRequest", vec! [
         crule (Nonstandard, "relRepo", vec! [
           any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ],
@@ -279,7 +279,7 @@ pub fn herald_rule_table () -> HeraldRule {
         s ("Reference to unknown node."),
         vac ("id"),
         rule ("viewStats", vec! [
-          crule (Yucky, "relRepo", vec! [
+          crule (Ugly, "relRepo", vec! [
             any (vec! [ s ("~"), RuleChild::It ]) ]) ]),
         rule ("editRequest", vec! [
           crule (Nonstandard, "relRepo", vec! [
@@ -326,11 +326,11 @@ pub fn herald_rule_table () -> HeraldRule {
           vac ("overridesHere"),
           // relRepo is a display fact, not a save request.  It
           // echoes its own value directly:
-          // "~" + the skgrepo name, yucky, immediately before the ⌂
+          // "~" + the skgrepo name, ugly, immediately before the ⌂
           // homeRepoHerald below (table ORDER is presentation order,
           // per the module doc, so placing this rule first guarantees
           // that regardless of the atoms' order in the raw sexp).
-          crule (Yucky, "relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
+          crule (Ugly, "relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
           crule (Normal, "homeRepoHerald", vec! [ any (vec! [RuleChild::It]) ]) ]),
         rule ("editRequest", vec! [
           leaf (Nonstandard, "delete", "delete"),

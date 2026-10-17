@@ -31,7 +31,7 @@ polarity or kind, never its hue. There are ten styles.
 | stop        | white on red                   | polarity: bad, or not yet       |
 | go          | black on green                 | polarity: good, done            |
 | nonstandard | white on purple                | requests and diff facts         |
-| yucky       | pink foreground, no background | error-flavored, but not too bad |
+| ugly        | pink foreground, no background | error-flavored, but not too bad |
 
 The tiers, least to greatest, are normal, low, medium, high and crucial.
 
@@ -54,7 +54,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | position glyphs      | crucial     | =☮= write-protected, =B= omitted body, =⊥= affects not its parent, =ĥ= overrides here |
 |                      | medium      | =⟳= cycle                                                                     |
 | home-repo heralds    | normal      | =⌂:LABEL=                                                                     |
-|                      | yucky       | =~NAME=, a relRepo more private than the default                              |
+|                      | ugly        | =~NAME=, a relRepo more private than the default                              |
 | labels               | message     | folder labels, =alias=, =ID=, flag rows                                       |
 | requests             | nonstandard | =delete=, =merge:...=, =request:~NAME=, =request:...= flags, =req:...= views  |
 | diff facts           | nonstandard | =N -N R -R=, =text changed=, =diff:not-in-git=                                |
@@ -62,7 +62,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 |                      | stop        | =✗= unstaged                                                                  |
 | phantoms, restricted   | message     | =Reference to unknown node.=, =node from restricted skgrepo=, =DELETED=            |
 | link annotations     | normal      | a resolved target's =[⌂:pub]=                                                 |
-|                      | yucky       | =[⌂:restricted]=, =[⌂:…]=, =[⌂:lookup failed]=, a dangling link's label           |
+|                      | ugly        | =[⌂:restricted]=, =[⌂:…]=, =[⌂:lookup failed]=, a dangling link's label           |
 
 ** Relationship heralds
 *** Letters and sides
@@ -195,7 +195,7 @@ their target's home skgrepo. =[⌂:restricted]=, =[⌂:…]= and
 targets, and reveal no skgrepo name. A dangling link gets no suffix.
 
 Even with suffixes off, the label of a link confirmed dangling in the
-current graph is yucky and underlined. Restricted or still unknown
+current graph is ugly and underlined. Restricted or still unknown
 targets are not marked broken. These display-only annotations do not
 change link text, save contents, or exact-ID navigation.
 

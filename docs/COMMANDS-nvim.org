@@ -540,7 +540,7 @@ It is turned on at every view by default.
 See [[file:heralds.org][the herald legend]] for the tokens and styles.
 *** <localleader>vL : :SkgToggleRepoOverlayOnLinks
 Toggle display-only home skgrepo suffixes on Skg links in this buffer.
-The suffixes start off. Links confirmed missing are yucky and underlined
+The suffixes start off. Links confirmed missing are ugly and underlined
 even with suffixes off. See [[file:heralds.org::*Link annotations][link annotations]].
 *** <localleader>vl : :SkgRestrictRepoSet
 Restricts display and search to one configured skgrepo-set for this

@@ -245,7 +245,7 @@
 ==== node: a private relRepo and its home repo
 (skg (node (id x) (viewStats (relRepo priv) (homeRepoHerald ⌂:pub))))
 ---- text: ~priv ⌂pub
----- styles: yucky*5 -*1 normal*4
+---- styles: ugly*5 -*1 normal*4
 ==== node: a merge request
 (skg (node (id x) (editRequest (merge y))))
 ---- text: merge:y

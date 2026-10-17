@@ -157,7 +157,7 @@ character."
         (let ((overlay (make-overlay label-start label-end nil nil t)))
           (overlay-put overlay 'skg-link-annotation t)
           (overlay-put overlay 'face
-                       '(:inherit heralds-yucky-face :underline t))))
+                       '(:inherit heralds-ugly-face :underline t))))
       ;; A dangling link's label is styled above and gets no suffix.
       (when (and skg-link-annotations--repo-suffix-enabled
                  (not (eq kind 'missing)))
@@ -167,7 +167,7 @@ character."
                         ('lookup-failed "⌂:lookup failed")
                         (_ "⌂:…")))
                (face (if (eq kind 'resolved)
-                         'heralds-normal-face 'heralds-yucky-face))
+                         'heralds-normal-face 'heralds-ugly-face))
                (overlay (make-overlay link-end link-end nil nil t)))
           (overlay-put overlay 'skg-link-annotation t)
           (overlay-put overlay 'after-string
