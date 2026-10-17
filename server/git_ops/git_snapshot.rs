@@ -116,10 +116,64 @@ fn read_graph_snapshot (
   config : &SkgConfig,
   kind   : GitSnapshotKind,
 ) -> Result<GraphSnapshot, String> {
-  // Sections arrive in privacy order (ordered_repos) so each
-  // telescope composes with its most public section first.
+  read_graph_snapshot_per_skgrepo (config, |_| kind) }
+
+/// The before endpoint of the graph pair: every owned skgrepo at
+/// HEAD, every foreign skgrepo at its worktree. The live graph reads
+/// foreign skgrepos from their worktrees too, so their sections are
+/// the same at both endpoints and contribute no change.
+/// 'owned_head_identity' is that of 'owned_head_identity (config)';
+/// it keys the cache.
+pub fn read_owned_head_graph_snapshot_maybe_cached (
+  config              : &SkgConfig,
+  owned_head_identity : &str,
+) -> Result<GraphSnapshot, String> {
+  git_snapshot_from_cache_or_read (
+    format! ("OwnedHead|{}", owned_head_identity),
+    || read_graph_snapshot_per_skgrepo (
+      config,
+      |skgrepo_name| if config . skgrepo_is_owned (skgrepo_name) {
+        GitSnapshotKind::Head } else { GitSnapshotKind::Worktree } ))
+}
+
+/// The HEAD commit of every owned skgrepo, as one string: equal
+/// strings mean no owned HEAD moved. Refuses when an owned skgrepo is
+/// not in a gitrepo or has no HEAD commit.
+pub fn owned_head_identity (
+  config : &SkgConfig,
+) -> Result<String, String> {
+  let mut parts : Vec<String> =
+    Vec::new ();
+  for skgrepo_name in config . owned_skgrepos_in_config_order () {
+    let skgrepo : &Skgrepo =
+      config . skgrepos . get (&skgrepo_name) . ok_or_else ( || format! (
+        "Repo '{}' not found in config", skgrepo_name )) ?;
+    let gitrepo : Repository =
+      open_gitrepo (Path::new (&skgrepo . path)) . ok_or_else ( || format! (
+        "Cannot open the diff view: Skg repo '{}' is not in a git repository.",
+        skgrepo_name )) ?;
+    let identity : String =
+      gitrepo . head ()
+        . and_then ( |head| head . peel_to_commit () )
+        . map ( |commit| format! ("head:{}", commit . id ()) )
+        . map_err ( |e| format! (
+          "Cannot open the diff view: Skg repo '{}' has no HEAD commit: {}",
+          skgrepo_name, e )) ?;
+    parts . push (format! (
+      "{}:{}:{}", skgrepo_name, skgrepo . path . display (), identity )); }
+  Ok (parts . join ("|"))
+}
+
+/// Sections arrive in privacy order (ordered_repos) so each
+/// telescope composes with its most public section first.
+fn read_graph_snapshot_per_skgrepo (
+  config            : &SkgConfig,
+  kind_for_skgrepo  : impl Fn (&SkgrepoName) -> GitSnapshotKind,
+) -> Result<GraphSnapshot, String> {
   let mut sections : Vec<(SkgrepoName, GraphnodeOnDisk)> = Vec::new ();
   for skgrepo_name in config . ordered_skgrepos () {
+    let kind : GitSnapshotKind =
+      kind_for_skgrepo (&skgrepo_name);
     let label : String =
       format! ("read repo '{}' from {:?}", skgrepo_name, kind);
     let mut skgrepo_sections : Vec<(SkgrepoName, GraphnodeOnDisk)> =
@@ -145,22 +199,30 @@ fn read_graph_snapshot_maybe_cached (
     git_snapshot_cache_key (config, kind) ?;
   let Some (key) = key else {
     return read_graph_snapshot (config, kind); };
+  git_snapshot_from_cache_or_read (
+    key, || read_graph_snapshot (config, kind) )
+}
+
+fn git_snapshot_from_cache_or_read (
+  key  : String,
+  read : impl FnOnce () -> Result<GraphSnapshot, String>,
+) -> Result<GraphSnapshot, String> {
   if let Some (git_snapshot) =
     git_snapshot_cache ()
       . lock ()
       . map_err ( |e| format! (
-        "Diff report snapshot cache lock failed: {}", e )) ?
+        "Git snapshot cache lock failed: {}", e )) ?
       . get (&key)
       . cloned () {
     profile_log ("snapshot cache hit", Duration::from_millis (0));
     return Ok (git_snapshot); }
   profile_log ("snapshot cache miss", Duration::from_millis (0));
   let git_snapshot : GraphSnapshot =
-    read_graph_snapshot (config, kind) ?;
+    read () ?;
   git_snapshot_cache ()
     . lock ()
     . map_err ( |e| format! (
-      "Diff report snapshot cache lock failed: {}", e )) ?
+      "Git snapshot cache lock failed: {}", e )) ?
     . insert (key, git_snapshot . clone ());
   Ok (git_snapshot)
 }
