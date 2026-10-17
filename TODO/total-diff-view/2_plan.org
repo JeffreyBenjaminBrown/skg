@@ -659,7 +659,7 @@ node, a deleted subtree, a leftward-only change; a rendered buffer
 fixture per change kind; round trip of a full TDV buffer. Client tests:
 the command opens only nonempty buffers.
 
-** Slice 6: readiness in the view, saving a TDV, the summary
+** DONE Slice 6: readiness in the view, saving a TDV, the summary
 *** save reconcile
 'rerender_view' detects a TDV buffer (its 'ViewState' records the
 buffer kind) and completes it with 'graph_pair' set, after rebuilding

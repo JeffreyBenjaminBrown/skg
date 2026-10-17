@@ -323,3 +323,74 @@ first child or previous sibling before detaching the node they move,
 so moving a node already in that place links it to itself and a
 traversal never ends. 'changes.rs' detaches first. Noted in
 'TODO/problems.org'.
+* Slice 6: deviations
+** where a TDV buffer is detected
+'rerender_view' sees a viewforest, not its 'ViewState', so it takes
+'tdv_buffer : Option<TdvBuffer>' and its callers look it up
+('tdv_buffer_of_view'): the saved view, each collateral view, and
+each view of a rerender-all (stage moves, absent-reference cleanup,
+the skgrepo switch). 'RerenderAfterSaveContext' carries the graph
+pair slot ('graph_pair'), brought up to date by
+'current_graph_pair_in_slot' at the first TDV buffer; the save writes
+it back to 'ViewsState::graph_pair', a rerender-all does not. The TDV
+branch completes as 'complete_viewforest_with_graph_pair' does (no
+skgrepo diffs, no restriction during completion, no default folders,
+no override substitution) but keeps the save's deleted-ID maps, then
+sets the '(ready ...)' facts with 'set_ready_facts_in_viewforest'.
+** what counts as shown
+K counts the leaves whose owner is not among the buffer's pids or
+its historical phantoms ('nodes_drawn_in_viewforest'). Read
+literally, "not in the buffer's pids" would count every deleted
+node's existence leaf as unshown, since a deleted node is drawn as a
+phantom, so the summary would always ask to reopen the view.
+** the summary
+It is sent only on a save-result, and only when the saved buffer is
+a TDV buffer ('SaveResponse::readiness_summary',
+'BufferReadinessSummary' in 'change_forest.rs'). The foreign count
+reads ", F files changed in foreign skgrepos". The complete form keeps
+its final period after the suffixes; the incomplete form has none,
+as the plan writes them.
+** a node deleted in a TDV buffer
+Completion turns a node the save deleted into a deleted phantom.
+Over the pair it is drawn as the PCSVF draws it, as a historical
+phantom: 'redraw_deleted_phantoms_as_historical' ('changes.rs') drops
+a deleted phantom that stands beside a historical one of the same
+node, and redraws any other (a root, say) as a historical phantom
+with its old content. A node created and deleted since HEAD stays a
+deleted phantom.
+** two slice-5 bugs the reconcile exposed
+*** removed members of a pair-drawn folder were drawn twice
+The redraw demotes a removed member of an editable set (Subscribee,
+Overridden) to a non-member, and turns a deleted one into a
+historical phantom. The reconciler matches neither, so the next pass
+drew each again. 'restore_removed_members_of_pair_folder' undoes the
+redraw before reconciling, so they are matched where they stand.
+*** a historical phantom in a partner folder failed validation
+The relation-folder and subscribee-folder checks now admit it
+(save-inert, like elsewhere). The kinds fixture gained 'gone', a
+deleted subscriber of 'orph', to cover both.
+** the gestures
+*** what an aggregate writes
+On a changed folder (folders carry no request), the one-level
+gesture writes a request on each leaf-naming child. On a changed
+node without a diff fact it writes '(readyRequest all)' on the node.
+It readies unless the aggregate is ready: a folder's '(ready)', or,
+for a node, all of its leaf-naming and changed-folder children.
+*** the recursive form
+writes, in one direction, a request on every leaf-naming headline in
+the subtree, write-protected ones included, and '(readyRequest all)'
+on the headline at point when it is a changed node. It readies unless
+the headline at point is ready.
+*** the home-move gesture
+marks; it does not toggle. Point may be on the node or its move.
+*** bindings
+'C-c r r' and 'C-c r h' in Emacs (C-u for the recursive forms).
+Neovim has no prefix argument, so the recursive forms are their own
+commands: '<localleader>rr', 'rR', 'rh', 'rH'.
+** imperfect
+*** context bodies refold
+'process_unrestrictedVognode_changes' sets 'body_folded' at every
+visit, so a context body the user unfolded folds again at each save.
+*** a node that changed after the buffer opened
+If such a node is drawn only write-protected, its change is not drawn
+there, yet it counts as shown, because its pid is in the buffer.
