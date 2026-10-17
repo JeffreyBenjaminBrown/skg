@@ -106,7 +106,7 @@ fn partners_in_graph_for_roles<'a> (
   input_role  : &'a str,
   output_role : &'a str,
 ) -> Result<impl Fn (&ID) -> HashSet<ID> + 'a, Box<dyn Error>> {
-  let relation_kind = node_relation_from_name (relation)
+  let relation_kind = NodeRelation::from_relation_name (relation)
     . ok_or_else (|| format! ("Unknown graph relation: {}", relation))?;
   let (first_role, second_role) = relation_kind . roles ();
   if ! ((input_role == first_role && output_role == second_role)
@@ -175,13 +175,6 @@ fn related_nodes_from_graph_gated (
           . map (|skgrepo| set . contains_skgrepo (&skgrepo))
           . unwrap_or (false) } })
     . collect ()
-}
-
-fn node_relation_from_name (name : &str) -> Option<NodeRelation> {
-  [ NodeRelation::Contains, NodeRelation::LinksTo,
-    NodeRelation::SubscribesTo, NodeRelation::HidesFromSubs,
-    NodeRelation::Overrides ]
-    . into_iter () . find (|relation| relation . relation_name () == name)
 }
 
 /// Graph-native containerward traversal for one origin.

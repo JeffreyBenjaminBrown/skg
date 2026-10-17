@@ -9,6 +9,7 @@ pub mod buffer_to_viewnodes;
 pub mod fork;
 pub mod write_protected_edits;
 pub mod local_fieldintent_collection;
+pub mod strands;
 pub mod supplement_from_disk;
 pub mod weave;
 pub mod validate;

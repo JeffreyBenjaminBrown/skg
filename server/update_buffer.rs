@@ -206,6 +206,7 @@ pub fn update_views_after_save (
         save_point_position : None,
         fork_confirmation   : None,
         hoist_confirmation  : None,
+        strand_confirmation : None,
         text_release_confirmation : challenge_response (&release),
       } ); }}
   let mut repair_warnings : Vec<CompletionWarning> = Vec::new ();
@@ -248,6 +249,7 @@ pub fn update_views_after_save (
           save_point_position : None,
           fork_confirmation   : None,
           hoist_confirmation  : None,
+          strand_confirmation : None,
           text_release_confirmation : challenge_response (&decision),
         } ); }
       TextReleaseDecision::AllowWithWarning { warning } =>
@@ -274,6 +276,7 @@ pub fn update_views_after_save (
     save_point_position : None,
     fork_confirmation   : None,
     hoist_confirmation  : None,
+    strand_confirmation : None,
     text_release_confirmation : None, } ) }
 
 fn unrestricted_skgids_in_viewforest (

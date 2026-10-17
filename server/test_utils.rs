@@ -7,6 +7,7 @@ use crate::dbs::init::create_empty_tantivy_index;
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::types::env::SkgEnv;
+use crate::from_text::strands::StrandReview;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
 use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{
@@ -427,7 +428,8 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
     stream, org_buffer_text, &mut env, diff_mode_enabled,
     viewid_from_request_result, views_state, None,
     true, &HashMap::new (), &std::collections::HashSet::new (),
-    &std::collections::HashSet::new (), other_views ) . await
+    &std::collections::HashSet::new (), &StrandReview::NotReviewed,
+    other_views ) . await
 }
 
 /// As 'update_from_and_rerender_buffer_test', but lets the test choose

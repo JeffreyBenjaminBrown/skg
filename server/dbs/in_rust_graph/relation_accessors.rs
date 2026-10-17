@@ -26,6 +26,18 @@ pub enum NodeRelation {
 }
 
 impl NodeRelation {
+  pub const ALL : [NodeRelation; 5] = [
+    NodeRelation::Contains, NodeRelation::LinksTo,
+    NodeRelation::SubscribesTo, NodeRelation::HidesFromSubs,
+    NodeRelation::Overrides ];
+
+  /// The inverse of 'relation_name'.
+  pub fn from_relation_name (
+    name : &str,
+  ) -> Option<NodeRelation> {
+    NodeRelation::ALL . into_iter ()
+      . find ( |relation| relation . relation_name () == name ) }
+
   pub fn relation_name (self) -> &'static str {
     match self {
       Self::Contains =>

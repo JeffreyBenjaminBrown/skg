@@ -1,8 +1,13 @@
 use crate::dbs::in_rust_graph::{
   in_rust_graph_coherent_with_nodeInstructions_in, new_handle };
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::from_text
   ::buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_graph;
+use crate::from_text::strands::{
+  RelationshipKey, StrandReview, StrandedRelationship,
+  raised_relationship_warning, relevel_relationships,
+  stranded_relationships};
 use crate::git_ops::diff::compute_diff_for_skgrepo;
 use crate::save::{
   apply_delete_propagation_cleanup,
@@ -77,6 +82,11 @@ pub struct SaveResponse {
   /// Fully tagged overPrivateText-telescope-confirmation response produced after the
   /// save's rerenders have been staged but before text or view-state release.
   pub text_release_confirmation : Option<String>,
+  /// Some when a home move would strand relationships and the request
+  /// carried no review of them: nothing was skgsave-committed, and the
+  /// handler sends a 'strand-confirmation' listing these. Checked
+  /// before every other confirmation.
+  pub strand_confirmation : Option<Vec<StrandedRelationship>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -149,6 +159,8 @@ pub fn handle_save_buffer_request (
     hoist_approved_pids_from_request (request);
   let text_approved_pids : HashSet<ID> =
     text_approved_pids_from_request (request);
+  let strand_review : StrandReview =
+    strand_review_from_request (request);
   { // Send the early broad lock BEFORE reading the buffer, so the client's
     // one-shot save-lock handler always fires exactly once and balances its
     // pending-count -- even when the read below fails (otherwise only
@@ -183,10 +195,18 @@ pub fn handle_save_buffer_request (
             &fork_skgrepos,
             &approved_hoist_pids,
             &text_approved_pids,
+            &strand_review,
             &envelope . other_views ))
         { Ok (mut save_response) => {
             save_response . save_point_position =
               save_point_position . clone ();
+            if let Some (stranded) = &save_response . strand_confirmation {
+              send_response_with_length_prefix (
+                stream,
+                & tag_sexp_response (
+                  TcpToClient::StrandConfirmation,
+                  & strand_confirmation_response (stranded) ));
+              return; }
             match (&save_response . hoist_confirmation,
                    &save_response . fork_confirmation,
                    &save_response . text_release_confirmation) {
@@ -488,6 +508,67 @@ fn nat_from_request (
 ) -> Option<usize> {
   value_from_request_sexp (key, request) . ok () ? . parse () . ok () }
 
+/// The request's review of the relationships a home move strands:
+/// '(strands-reviewed . "true")' marks a re-save after a
+/// strand-confirmation, and '(relevel-strands (RELATION RECORDER
+/// MEMBER) ...)' names the ones the user chose to re-level. Without
+/// the first, not reviewed.
+fn strand_review_from_request (
+  request : &str,
+) -> StrandReview {
+  let reviewed : bool =
+    value_from_request_sexp ("strands-reviewed", request)
+    . map ( |v| v == "true" )
+    . unwrap_or (false);
+  if ! reviewed { return StrandReview::NotReviewed; }
+  let mut chosen : HashSet<RelationshipKey> = HashSet::new ();
+  let Ok (Sexp::List (items)) = sexp::parse (request)
+    else { return StrandReview::Reviewed (chosen); };
+  for item in &items {
+    let Sexp::List (field) = item else { continue; };
+    let Some ( Sexp::Atom ( Atom::S (key) )) = field . first ()
+      else { continue; };
+    if key != "relevel-strands" { continue; }
+    for entry in &field [1..] {
+      if let Sexp::List (triple) = entry {
+        if let [ Sexp::Atom ( Atom::S (relation) ),
+                 Sexp::Atom ( Atom::S (recorder) ),
+                 Sexp::Atom ( Atom::S (member) ) ] = & triple [..]
+        { if let Some (relation) = NodeRelation::from_relation_name (relation) {
+            chosen . insert ( RelationshipKey {
+              relation,
+              recorder : ID::from (recorder . as_str ()),
+              member   : ID::from (member . as_str ()), } ); }} }} }
+  StrandReview::Reviewed (chosen) }
+
+/// The strand-confirmation payload: each stranded relationship (its
+/// relation, recorder and member IDs, where the save would leave it
+/// and its new default), and a prompt. IDs only, no titles: the
+/// response precedes any text-release decision.
+fn strand_confirmation_response (
+  stranded : &[StrandedRelationship],
+) -> String {
+  let atom = |text : &str| -> Sexp { Sexp::Atom ( Atom::S ( text . to_string () )) };
+  let pair = |key : &str, value : &str| -> Sexp {
+    Sexp::List ( vec! [ atom (key), atom (value) ] ) };
+  let entries : Vec<Sexp> = stranded . iter ()
+    . map ( |strand| Sexp::List ( vec! [
+      pair ("relation", strand . relationship . relation . relation_name ()),
+      pair ("recorder", strand . relationship . recorder . as_str ()),
+      pair ("member",   strand . relationship . member . as_str ()),
+      pair ("relRepo",  strand . relRepo . as_str ()),
+      pair ("default",  strand . new_default . as_str ()), ] ))
+    . collect ();
+  let count : usize = stranded . len ();
+  let prompt : String = format! (
+    "This move would leave {} relationship{} in {} old, more private skgrepo{}. Nothing was saved. Re-level them to their new defaults?",
+    count, if count == 1 { "" } else { "s" },
+    if count == 1 { "its" } else { "their" },
+    if count == 1 { "" } else { "s" } );
+  Sexp::List ( vec! [
+    Sexp::List ( vec! [ atom ("strands"), Sexp::List (entries) ] ),
+    pair ("prompt", &prompt), ] ) . to_string () }
+
 /// Whether this save request carries '(approved-forks . "true")', set by
 /// the client when the user approves a fork-confirmation. Absent or any
 /// other value means not approved.
@@ -591,7 +672,7 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
     stream, org_buffer_text, env, diff_mode_enabled,
     viewid_from_request_result, views_state, skgrepo_restriction,
     approved_forks, fork_skgrepos, approved_hoist_pids,
-    &HashSet::new (), &[] ) . await
+    &HashSet::new (), &StrandReview::NotReviewed, &[] ) . await
 }
 
 pub async fn update_from_and_rerender_buffer_with_approvals (
@@ -606,6 +687,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   fork_skgrepos               : &HashMap<ID, SkgrepoName>,
   approved_hoist_pids         : &HashSet<ID>,
   text_approved_pids        : &HashSet<ID>,
+  strand_review             : &StrandReview,
   other_views               : &[ClientViewSnapshot],
 ) -> Result<SaveResponse, Box<dyn Error>> {
   // Save-plan construction reads the current files and graph.  Hold the sole
@@ -646,6 +728,40 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     let graph_snap = working_graph . load_full ();
     apply_delete_propagation_cleanup (
       &mut nonmerge_nodeInstructions, &graph_snap, &runtime . config ); }
+  let strand_warnings : Vec<String> =
+  { // What the home moves strand (server/from_text/strands.rs). This
+    // precedes the Hoist classification, which must see the recorders
+    // re-leveling adds.
+    let graph_snap = working_graph . load_full ();
+    let stranded : Vec<StrandedRelationship> =
+      stranded_relationships (
+        &skgrepo_moves, &nonmerge_nodeInstructions,
+        &graph_snap, &runtime . config );
+    let (raised, asked) : (Vec<&StrandedRelationship>,
+                           Vec<&StrandedRelationship>) =
+      stranded . iter () . partition ( |strand| strand . raised_automatically );
+    match strand_review {
+      StrandReview::NotReviewed if ! asked . is_empty () =>
+        return Ok ( SaveResponse {
+          saved_view          : String::new (),
+          errors              : Vec::new (),
+          warnings            : parse_warnings,
+          save_point_position : None,
+          fork_confirmation   : None,
+          hoist_confirmation  : None,
+          text_release_confirmation : None,
+          strand_confirmation : Some (
+            asked . into_iter () . cloned () . collect () ), } ),
+      StrandReview::NotReviewed => {},
+      StrandReview::Reviewed (chosen) => {
+        let chosen : Vec<&StrandedRelationship> = asked . into_iter ()
+          . filter ( |strand| chosen . contains (&strand . relationship) )
+          . collect ();
+        relevel_relationships (
+          &mut nonmerge_nodeInstructions, &chosen, &graph_snap ); }, }
+    relevel_relationships (
+      &mut nonmerge_nodeInstructions, &raised, &graph_snap );
+    raised . into_iter () . map (raised_relationship_warning) . collect () };
   let hoist_candidates : Vec<HoistCandidate> =
     hoist_candidates_from_disk (
       &nonmerge_nodeInstructions, &nodeMerges, &runtime . config ) ?;
@@ -659,6 +775,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       fork_confirmation   : None,
       hoist_confirmation  : Some (hoist_candidates),
       text_release_confirmation : None,
+      strand_confirmation : None,
     } ); }
   // In particular, make a dirty nodeMerge acquiree clean before the merge
   // copies its text into a fresh preservation node and deletes it.
@@ -681,7 +798,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
                    or kill this buffer to decline.",
                   fork_specs . len () )),
       hoist_confirmation  : None,
-      text_release_confirmation : None, } ); }
+      text_release_confirmation : None,
+      strand_confirmation : None, } ); }
   // Forks detected this save (approved, or none): editing a foreign node
   // N is a request to clone it. The clone C is skgsave-committed with the rest of the
   // save -- its 'overrides = [N]' relationship rides in the same
@@ -809,6 +927,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       // precede the completion-repair warnings.
       let mut warnings : Vec<String> = parse_warnings;
       warnings . extend ( response . warnings );
+      warnings . extend ( strand_warnings );
       warnings . extend ( readiness_warnings );
       warnings . extend (
         post_skgsave_commit_hiddenoutside_warnings (

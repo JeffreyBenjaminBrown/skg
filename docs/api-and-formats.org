@@ -140,6 +140,11 @@ So far there are these endpoints:
       =(fork-repos ((N . REPO) ...))= pairs each forked node's id
       N with the owned skgrepo chosen for its clone. Both are absent on
       an ordinary save.
+    - =(strands-reviewed . "true")= and =(relevel-strands ("RELATION"
+      "RECORDER" "MEMBER") ...)= are present only on a retry after
+      =strand-confirmation=: the first says the user reviewed the
+      stranded relationships, the second names those to re-level
+      (possibly none).
     - =(approved-hoist-pids "PID" ...)= is present only on a retry
       after =telescope-hoist-confirmation=. It is the exact list the
       user approved for text publication; it is not a boolean and
@@ -183,6 +188,24 @@ So far there are these endpoints:
     =save-result= with nil content and actionable errors naming view IDs and
     IDs, and performs no filesystem, graph, search index, registry, or collateral
     update. There is no save-anyway path.
+  - Moving a node between skgrepos: for each home move the server
+    finds every relationship touching the moved node, in either
+    direction and whether or not a view shows it, that sat at its
+    default relRepo and that the sticky-else-default rule would leave
+    off its new default ('server/from_text/strands.rs'). One left more
+    public than its member's new home (an inbound relationship of a
+    privatizing move) is raised to the new default, and the save's
+    warnings say so. If any other remains and the request lacks
+    =(strands-reviewed . "true")=, nothing is skgsave-committed and the
+    server replies, before any other decision and in place of
+    save-result,
+    =((response-type strand-confirmation) (strands (((relation
+    "contains") (recorder "R") (member "M") (relRepo "REPO") (default
+    "REPO")) ...)) (prompt "..."))=, with IDs but no titles. The
+    client re-issues the SAME save with =(strands-reviewed . "true")=
+    and the chosen =(relevel-strands ...)=; the server re-levels those
+    to their new defaults, saving each recorder (outside the view or
+    not), so the views that show them rerender as collateral.
   - The first ALTERNATIVE terminal message: after validation, a save
     rereads every telescope it will write. If any currently selects a
     title or body below home and lacks exact approval, nothing is
@@ -227,8 +250,8 @@ So far there are these endpoints:
     approved retry, the ordinary save-result carries the shared overPrivateText-
     telescope warning. Declining leaves current client buffers and the
     server's open-view registry unchanged.
-  - Exactly one of =save-result=, =telescope-hoist-confirmation=,
-    =fork-confirmation=, and the save-rerender
+  - Exactly one of =save-result=, =strand-confirmation=,
+    =telescope-hoist-confirmation=, =fork-confirmation=, and the save-rerender
     =overPrivateText-telescope-confirmation= is sent as the terminal response to
     one save attempt.
   - If the server errors before sending the early lock message (e.g. malformed request), only one message is sent: the error response in the save-result format.

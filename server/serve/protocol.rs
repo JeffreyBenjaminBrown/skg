@@ -77,6 +77,7 @@ pub enum TcpToClient {
   SaveRelaxLock, // Sent after preparation and the dirty-view conflict check, before mutation. Lists collateral targets plus every dirty conflict-check input. The client also retains the saved view, and may unlock unrelated clean views.
   SaveResult,
   ForkConfirmation, // Terminal message of a save that found fork candidates and was not pre-approved: a write-protected buffer listing the foreign nodes about to be forked, for the user to approve (re-issue the save with (approved-forks . "true")) or decline. Sent after SaveLock, in place of SaveResult; nothing is committed.
+  StrandConfirmation, // Terminal message of a save whose home moves would strand relationships at their old, more private skgrepos, when the request carried no review of them. Lists each one; the client re-saves with (strands-reviewed . "true") and the chosen (relevel-strands (RELATION RECORDER MEMBER) ...). Nothing is committed.
   TelescopeHoistConfirmation, // Terminal message of a save whose current disk inputs select title/body below home. Carries only pid/home pairs and a publication warning; an approved retry carries the exact pids. Nothing is committed.
   OverPrivateTextTelescopeConfirmation, // A textual response would expose title/body selected below home under a restricted skgrepo-set. Carries only the operation, affected pids, and a prompt; the client may retry with an explicit per-pid approval.
   CollateralView, // One streamed collateral-view update during save. Sent per-view between SaveLock and SaveResult.
@@ -121,6 +122,8 @@ impl TcpToClient {
       TcpToClient::SaveRelaxLock    => "save-relax-lock",
       TcpToClient::SaveResult       => "save-result",
       TcpToClient::ForkConfirmation => "fork-confirmation",
+      TcpToClient::StrandConfirmation =>
+        "strand-confirmation",
       TcpToClient::TelescopeHoistConfirmation =>
         "telescope-hoist-confirmation",
       TcpToClient::OverPrivateTextTelescopeConfirmation =>

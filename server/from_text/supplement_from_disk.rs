@@ -520,7 +520,7 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
 /// explanation found, fall back to the most private subscription
 /// skgrepo, and with no subscriptions at all, to the endpoint rule
 /// alone (junk-tolerant; the validators report residue).
-fn hide_skgrepo (
+pub(crate) fn hide_skgrepo (
   graph         : &InRustGraph,
   config        : &SkgConfig,
   recorder_home : &SkgrepoName,

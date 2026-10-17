@@ -1,0 +1,15 @@
+tantivy_folder = "/tmp/tantivy-test-strands"
+port = 1730
+beep_when_server_becomes_available = false
+
+[[repos]]
+name = "public"
+path = "owned/public"
+
+[[repos]]
+name = "private"
+path = "owned/private"
+
+[[repos]]
+name = "foreign"
+path = "foreign"
