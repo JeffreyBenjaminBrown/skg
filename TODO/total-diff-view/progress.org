@@ -67,3 +67,95 @@ TDV buffers (slice 5).
 'tests/git_diff_view/common.rs' is now 'tests/shared/git_fixture_helpers.rs',
 used by both the git diff view tests and 'tests/graph_pair.rs', so it
 is not duplicated. The fixtures are in 'tests/graph_pair/fixtures/'.
+* Slice 3: deviations
+** the new property atoms wait for their kinds
+'(oldText)', '(bodyDiff)', '(homeMove ...)', '(relRepoMove ...)',
+'(changesetMarker ...)' and '(historical)' mark viewnode kinds that
+slice 4 creates, so slice 4 parses and serializes them with the kinds.
+'(movedLikeAncestor ...)' is a vognode fact slice 7 computes. A
+folder ('PartnerFolder' is a fieldless enum) cannot yet carry
+'(changed)' or an aggregate '(ready ...)'; those come when slice 5
+draws folders because of a change.
+** where the facts sit on the wire
+'(diff ...)', '(ready ...)' and the readiness requests sit inside
+'(node ...)', '(deleted ...)' and '(unknown ...)', and at top level on
+the alias, id and flag leaves (the form the existing '(staged ...)'
+takes there). The parser refuses them at top level on anything else.
+The folder atoms are bare, like the existing folder atoms:
+'containerFolder', 'mentionerFolder'.
+*** which viewnodes carry them
+'ChangeFacts' (presence and ready) and 'readiness_request' are on the
+unrestricted vognode, the deleted and unknown phantoms, and the alias,
+id and flag leaves. Not on 'PhantomDiff', which retires in slice 9.
+*** what a request names
+On a vognode, 'node' is its existence leaf, 'rel' the relationship to
+its viewparent (content, or the relation of the partner folder it is
+in), 'all' every leaf the node owns ('leaves_under'), and no axis both
+'node' and 'rel'. On a single-axis leaf (alias, id, flag, deleted,
+unknown) no axis names its one leaf. A request that names no current
+change is dropped with a warning. Until slice 4 draws the old-text
+property, a text leaf can be marked only through 'all' on its node.
+** change-forest details
+*** roots
+The roots are the rightward nodes that own a leaf. A leftward-only
+node owns none: its change is its recorders' relationship leaves.
+*** fingerprints
+A new or deleted node's existence leaf hashes the node's own content
+(title, body, aliases, extra IDs, flags, home), so editing a new node
+lapses its mark. A relationship's existence leaf hashes which graphs
+hold it; its relRepo leaf, the two relRepos. 'leaf_fingerprint'
+returns 'Option<u64>': None when the change does not exist.
+*** files
+A node aspect is recorded in the node's home file, a home move in both
+homes' files, a relationship in its relRepo's file (both, for a
+relRepo move). A file is order-only when its node is in both graphs,
+owns no leaf, and differs between them.
+*** foreign changed files
+'GraphPair::foreign_changed_files' is counted when the pair is built:
+the '.skg' files that differ between HEAD and the worktree in each
+foreign skgrepo that is in a gitrepo with a HEAD commit.
+** the marks file
+JSON object keys must be strings, so '<data_root>/readiness-marks.json'
+holds a list of '{ "leaf": KEY, "fingerprint": N }' entries
+(documented in 'docs/api-and-formats.org').
+** the role-tree engine takes a partners source, not a bare function
+'build_and_integrate_role_tree_with_skgrepo_set' takes
+'RoleTreePartners' ('LiveGraph' or 'GraphPair'). Over the live graph
+the engine keeps its two gatings: the role tree's steps see only what
+the skgrepo restriction does, while the containerward trees attached
+beneath are walked ungated and gated where drawn. One function could
+not carry both. The generic engines are 'paths_to_first_nonlinearities_via'
+and 'full_containerward_role_tree' (over a 'PartnersOf');
+'full_containerward_role_tree_from_inRustGraph' keeps its name as the
+live-graph wrapper.
+** a partner folder over a graph pair
+'reconcile_partnerFolder_children' takes a 'PartnerFolderGoalSource'.
+Over a pair, a member whose node exists only in the before-graph is
+drawn as an unknown phantom, tagged node- rel-, until slice 4's
+historical phantom replaces it. Nothing uses the pair source yet;
+slice 5 does.
+** strands
+*** where the client analysis was
+It lived in 'elisp/skg-metadata.el' ('skg-set-repo'), not in
+'skg-request-relRepo-info.el'. Neovim's 'set_repo' never had one, so
+Neovim only gained the confirmation handling. The ERT tests of the old
+analysis are gone; their scenarios are in 'tests/unit/strands.rs'.
+*** what counts as stranded
+A relationship touching a moved node is stranded when its relRepo was
+its default before the save and the sticky-else-default rule leaves it
+off its new default. One that would be left more public than its
+member's new home is raised without asking: that is exactly an
+inbound relationship of a privatizing move. A hide's default is the
+hide rule's ('hide_skgrepo'). Mentions have no relRepo and are
+skipped.
+*** the round trip
+The analysis runs before the Hoist gate, so recorders that
+re-leveling adds are gated too, and its confirmation precedes every
+other one. The confirmation carries IDs, no titles. The re-save
+carries '(strands-reviewed . "true")' and '(relevel-strands ("REL"
+"REC" "MEM") ...)'; the clients offer all, none, each in turn, or
+quit. Documented in 'docs/api-and-formats.org' and 'docs/COMMANDS*.org'.
+** smaller things
+'NodeRelation' derives serde and gains 'from_relation_name', which
+replaced a private copy in 'paths.rs'. The folder commands are 'C-c l
+c' and 'C-c l m' in Emacs, '<localleader>cc' and 'cm' in Neovim.

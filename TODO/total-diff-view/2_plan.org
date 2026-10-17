@@ -558,7 +558,7 @@ container is reachable from the deleted node; a relRepo-only change is
 reported; 'changed_pids' splits rightward and leftward correctly; a
 duplicate ID at HEAD refuses.
 
-** Slice 3: change-forest, readiness store, partner folders, strand computation
+** DONE Slice 3: change-forest, readiness store, partner folders, strand computation
 *** change-forest
 'server/change_forest.rs': 'ChangeForest' built from the graph pair,
 with 'LeafKey' (the keys under "marks"), 'leaf_fingerprint (key) -> u64'
