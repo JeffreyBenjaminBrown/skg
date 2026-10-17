@@ -2,7 +2,7 @@ use super::*;
 use crate::types::git::RelationshipAxes;
 use crate::types::viewnode::{
   mk_writeProtected_viewnode, viewforest_root_viewnode,
-  Phantom, PhantomDeleted, Property, PropertyFolder };
+  ChangeFacts, Phantom, PhantomDeleted, Property, PropertyFolder };
 
 fn sid (s : &str) -> ID { ID::from (s) }
 fn src () -> SkgrepoName { SkgrepoName::from ("main") }
@@ -14,7 +14,8 @@ fn deleted (title : &str) -> Viewnode {
   Viewnode { focused : false, folded : false, body_folded : false,
     kind : ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (PhantomDeleted {
       skgid    : sid (title), home_skgrepo : src (),
-      title : title . to_string (), body : None }))) } }
+      title : title . to_string (), body : None,
+      change_facts : ChangeFacts::default (), readiness_request : None }))) } }
 
 fn role_folder (rc : PartnerFolder) -> Viewnode {
   Viewnode { focused : false, folded : false, body_folded : false,
@@ -30,7 +31,8 @@ fn alias_property (text : &str) -> Viewnode {
       text : text . to_string (),
       relRepo : None,
       relRepo_request : None,
-      relationship_axes : RelationshipAxes::default () }) } }
+      relationship_axes : RelationshipAxes::default (),
+      change_facts : ChangeFacts::default (), readiness_request : None }) } }
 
 fn child (
   tree : &mut Tree<Viewnode>, parent : NodeId, vn : Viewnode

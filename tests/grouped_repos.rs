@@ -17,5 +17,8 @@ mod move_skgrepo;
 #[path = "search_enrichment_terminal.rs"]
 mod search_enrichment_terminal;
 
+#[path = "readiness_requests.rs"]
+mod readiness_requests;
+
 #[path = "repo_sets.rs"]
 mod skgrepo_sets;

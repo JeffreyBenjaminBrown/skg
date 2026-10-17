@@ -24,7 +24,7 @@ use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgrepoDiff};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::phantom::title_for_phantom;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
-use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{ChangeFacts, Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{complete_relevant_children_in_viewforest, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
 
@@ -272,7 +272,9 @@ fn normalize_relationship_backed_partner_unknowns (
       vn . kind = ViewnodeKind::Vognode (Vognode::Phantom (
         crate::types::viewnode::Phantom::Unknown (
           crate::types::viewnode::PhantomUnknown {
-            skgid, relRepo, relRepo_request: None }))); })
+            skgid, relRepo, relRepo_request: None,
+            change_facts: ChangeFacts::default (),
+            readiness_request: None }))); })
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }
 

@@ -262,3 +262,23 @@
 (skg (node (id x) (staged deletedN) notInGit))
 ---- text: ✓-N diff:not-in-git
 ---- styles: go*1 nonstandard*2 -*1 nonstandard*15
+==== tdv: a new member whose node axis is ready
+(skg (node (id x) (diff node+ rel+) (ready node)))
+---- text: ∃+✓ ~+
+---- styles: nonstandard*2 go*1 -*1 nonstandard*2
+==== tdv: each ✓ follows its own axis, whatever the raw order
+(skg (node (id x) (ready rel node) (diff rel- node+)))
+---- text: ∃+✓ ~-✓
+---- styles: nonstandard*2 go*1 -*1 nonstandard*2 go*1
+==== tdv: an added alias, ready
+(skg alias (diff rel+) (ready))
+---- text: alias +✓
+---- styles: message*5 -*1 nonstandard*1 go*1
+==== tdv: a deleted node with a request to unmark it
+(skg (deleted (id x) (diff node-) (unreadyRequest)))
+---- text: DELETED ∃- request:unready
+---- styles: message*7 -*1 nonstandard*2 -*1 nonstandard*15
+==== tdv: a request to mark both axes of a member
+(skg (node (id x) (readyRequest node rel)))
+---- text: request:ready:node request:ready:rel
+---- styles: nonstandard*18 -*1 nonstandard*17

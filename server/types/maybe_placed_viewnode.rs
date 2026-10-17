@@ -10,7 +10,7 @@ use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
 use super::git::{NodeAxes, RelationshipAxes};
-use super::viewnode::{ Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Birth, Editability, AffectsParent, };
+use super::viewnode::{ ChangeFacts, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Birth, Editability, AffectsParent, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -77,6 +77,8 @@ impl TryFrom<MpUnrestrictedVognode> for UnrestrictedVognode {
       graphStats     : u . graphStats,
       viewStats      : u . viewStats,
       relRepo_request : u . relRepo_request,
+      change_facts      : u . change_facts,
+      readiness_request : u . readiness_request,
       view_requests  : u . view_requests,
       node_axes      : u . node_axes,
       relationship_axes     : u . relationship_axes,
@@ -175,6 +177,8 @@ impl From<UnrestrictedVognode> for MpUnrestrictedVognode {
       graphStats     : t . graphStats,
       viewStats      : t . viewStats,
       relRepo_request : t . relRepo_request,
+      change_facts      : t . change_facts,
+      readiness_request : t . readiness_request,
       view_requests  : t . view_requests,
       node_axes      : t . node_axes,
       relationship_axes     : t . relationship_axes,
@@ -290,6 +294,8 @@ impl Default for MpUnrestrictedVognode {
       graphStats     : GraphnodeStats::default(),
       viewStats      : ViewnodeStats::default(),
       relRepo_request : None,
+      change_facts      : ChangeFacts::default (),
+      readiness_request : None,
       view_requests  : HashSet::new(),
       node_axes      : NodeAxes::default(),
       relationship_axes     : RelationshipAxes::default(),

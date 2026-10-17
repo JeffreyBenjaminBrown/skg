@@ -183,7 +183,9 @@ fn make_alias_if_appropriate(
         Property::Alias { text: t . title . clone(),
                       relRepo: t . viewStats . relRepo . clone (),
                       relRepo_request: t . relRepo_request . clone (),
-                      relationship_axes: RelationshipAxes::default () } ); }}
+                      relationship_axes: RelationshipAxes::default (),
+                      change_facts: t . change_facts . clone (),
+                      readiness_request: t . readiness_request . clone () } ); }}
   Ok (( )) }
 
 /// Inherit parent's skgrepo if both:

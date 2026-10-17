@@ -7,7 +7,7 @@ use crate::types::git::{SkgrepoDiff, axes_from_per_stage_diffs, per_stage_node_c
 use crate::types::tree::generic::error_unless_node_satisfies;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
-use crate::types::viewnode::{PropertyFolder, Property};
+use crate::types::viewnode::{ChangeFacts, PropertyFolder, Property};
 use crate::update_buffer::util::complete_relevant_children_in_viewforest;
 use ego_tree::{NodeId, Tree};
 use std::collections::HashMap;
@@ -85,7 +85,9 @@ pub fn reconcile_idFolder_children (
       body_folded : false,
       kind        : ViewnodeKind::Property (
         Property::ID {
-          skgid: skgid . clone(), relationship_axes } ) } ) };
+          skgid: skgid . clone(), relationship_axes,
+          change_facts: ChangeFacts::default (),
+          readiness_request: None } ) } ) };
   complete_relevant_children_in_viewforest(
     tree,
     idfolder_treeid,

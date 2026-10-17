@@ -7,7 +7,7 @@ use crate::types::nodes::complete::{
 use crate::types::tree::viewnode_graphnode::{
   insert_non_vognode_as_child, unique_non_vognode_child_of_viewnode};
 use crate::types::viewnode::{
-  Property, PropertyFolder, Viewnode, ViewnodeKind, ViewRequest};
+  ChangeFacts, Property, PropertyFolder, Viewnode, ViewnodeKind, ViewRequest};
 
 use ego_tree::Tree;
 use std::error::Error;
@@ -51,7 +51,9 @@ pub fn build_and_integrate_flags (
           ViewnodeKind::Property (Property::Flag {
             flag,
             title : String::new (),
-            body  : None, }),
+            body  : None,
+            change_facts      : ChangeFacts::default (),
+            readiness_request : None, }),
           false ) ?; } } }
   Ok (())
 }

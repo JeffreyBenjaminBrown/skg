@@ -39,7 +39,7 @@ use crate::skgrepo_sets::{SkgrepoRestriction, search_skgids_for_skgrepo_set_for_
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, AffectsParent, mk_writeProtected_viewnode};
-use crate::types::viewnode::{PropertyFolder, Property};
+use crate::types::viewnode::{ChangeFacts, PropertyFolder, Property};
 
 use ego_tree::{NodeId, NodeMut};
 use sexp::{Sexp, Atom};
@@ -701,5 +701,7 @@ pub fn build_search_viewforest (
                 text       : title . clone (),
                 relRepo : None,
                 relRepo_request : None,
-                relationship_axes : RelationshipAxes::default () } ) } ); }} }
+                relationship_axes : RelationshipAxes::default (),
+                change_facts : ChangeFacts::default (),
+                readiness_request : None } ) } ); }} }
   (viewforest, search_results) }

@@ -3,7 +3,7 @@ use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::{
   Flag, Graphnode, flag_is_true};
-use crate::types::viewnode::{Property, Viewnode, ViewnodeKind};
+use crate::types::viewnode::{ChangeFacts, Property, Viewnode, ViewnodeKind};
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::util::{
   complete_relevant_children_in_viewforest, treat_certain_children};
@@ -41,7 +41,9 @@ pub fn reconcile_flags_folder_children (
       kind        : ViewnodeKind::Property (Property::Flag {
         flag : *flag,
         title    : String::new (),
-        body     : None, }), })) ?;
+        body     : None,
+        change_facts      : ChangeFacts::default (),
+        readiness_request : None, }), })) ?;
   // The key-based reconciler retains an existing leaf. Restore its generated
   // titleless shape too, so title edits never linger after a refresh.
   treat_certain_children (

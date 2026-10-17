@@ -3,6 +3,7 @@ use crate::types::git::RelationshipAxes;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
+  ChangeFacts, ReadinessRequest,
   Viewnode, ViewnodeKind, Vognode, Phantom, Property, PropertyFolder, UnrestrictedVognode, PhantomDiff,
   PhantomDeleted, PhantomUnknown, NodeEditRequest, GraphnodeStats,
   AffectsParent,
@@ -219,7 +220,8 @@ fn property_metadata_to_string (
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   match property {
-    Property::Alias { relRepo, relRepo_request, relationship_axes, .. } => {
+    Property::Alias { relRepo, relRepo_request, relationship_axes,
+                      change_facts, readiness_request, .. } => {
       parts . push ( "alias" . to_string () );
       if let Some (skgrepo) = relRepo {
         parts . push ( format! (
@@ -228,7 +230,8 @@ fn property_metadata_to_string (
         parts . push ( format! (
           "(editRequest (relRepo {}))",
           metadata_value_atom (skgrepo) ) ); }
-      append_relationship_axes_stage_forms (&mut parts, relationship_axes); }
+      append_relationship_axes_stage_forms (&mut parts, relationship_axes);
+      parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
     Property::TextChanged { staged, unstaged } => {
       let mut tags : Vec<&'static str> = Vec::new ();
       if *staged   { tags . push ("staged"); }
@@ -237,13 +240,37 @@ fn property_metadata_to_string (
       { parts . push ( "textChanged" . to_string () ); }
       else
       { parts . push ( format! ( "(textChanged {})", tags . join (" ") )); } }
-    Property::ID { relationship_axes, .. } => {
+    Property::ID { relationship_axes, change_facts, readiness_request, .. } => {
       parts . push ( "id" . to_string () );
-      append_relationship_axes_stage_forms (&mut parts, relationship_axes); }
-    Property::Flag { flag, .. } =>
-      parts . push ( format! ("(flag {})", flag . wire_name ()) ),
+      append_relationship_axes_stage_forms (&mut parts, relationship_axes);
+      parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
+    Property::Flag { flag, change_facts, readiness_request, .. } => {
+      parts . push ( format! ("(flag {})", flag . wire_name ()) );
+      parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
   }
   Ok ( parts . join (" ")) }
+
+/// The total diff view's forms for one viewnode: '(diff ...)',
+/// '(ready ...)', and its readiness request. Empty outside a TDV.
+fn change_fact_forms (
+  facts   : &ChangeFacts,
+  request : &Option<ReadinessRequest>,
+) -> Vec<String> {
+  let form = |head : &str, atoms : Vec<&str>| -> String {
+    if atoms . is_empty () { format! ("({})", head) }
+    else { format! ("({} {})", head, atoms . join (" ")) } };
+  let mut forms : Vec<String> = Vec::new ();
+  let presence : Vec<&'static str> = facts . presence . atoms ();
+  if ! presence . is_empty () {
+    forms . push ( form ("diff", presence) ); }
+  if let Some (axes) = &facts . ready {
+    forms . push ( form ( "ready",
+      axes . iter () . map ( |axis| axis . wire_name () ) . collect () )); }
+  if let Some (request) = request {
+    forms . push ( form ( request . form_head (),
+      request . axes . iter () . map ( |axis| axis . wire_name () )
+      . collect () )); }
+  forms }
 
 /// Emit '(staged AXES)' and/or '(unstaged AXES)' for a RelationshipAxes.
 /// Adds nothing if neither stage has a change.
@@ -376,6 +403,9 @@ fn unrestrictedVognode_metadata_to_string (
     { parts . push (s); }
     if let Some (s) = not_in_git_atom (unrestrictedVognode)
     { parts . push (s); }
+    parts . extend ( change_fact_forms (
+      &unrestrictedVognode . change_facts,
+      &unrestrictedVognode . readiness_request ));
     format! ( "({})", parts . join (" ")) }
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
@@ -447,10 +477,15 @@ fn phantomDeleted_metadata_to_string (
   if focused     { parts . push ( "focused"    . to_string () ); }
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  parts . push ( format! (
-    "(deleted (id {}) (repo {}))",
-    deleted_node . skgid . 0,
-    metadata_value_atom (&deleted_node . home_skgrepo) ));
+  let deleted_parts : Vec<String> =
+    [ format! ("(id {})", deleted_node . skgid . 0),
+      format! ("(repo {})",
+               metadata_value_atom (&deleted_node . home_skgrepo)) ]
+    . into_iter ()
+    . chain ( change_fact_forms (
+      &deleted_node . change_facts, &deleted_node . readiness_request ))
+    . collect ();
+  parts . push ( format! ( "(deleted {})", deleted_parts . join (" ") ));
   parts . join (" ") }
 
 /// Render metadata for a PhantomUnknown:
@@ -474,6 +509,8 @@ fn phantomUnknown_metadata_to_string (
   if let Some (skgrepo) = &unknown_node . relRepo_request {
     unknown_parts . push ( format! (
       "(editRequest (relRepo {}))", metadata_value_atom (skgrepo)) ); }
+  unknown_parts . extend ( change_fact_forms (
+    &unknown_node . change_facts, &unknown_node . readiness_request ));
   parts . push ( format! ( "(unknown {})", unknown_parts . join (" ") ) );
   parts . join (" ") }
 

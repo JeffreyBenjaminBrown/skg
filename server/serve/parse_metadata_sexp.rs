@@ -14,7 +14,14 @@
 ///                                 [(contents N)]
 ///                                 [(linksIn N)])]
 ///                         [(editRequest <delete | (merge ID)>)]
-///                         [(viewRequests REQUEST...)]))
+///                         [(viewRequests REQUEST...)]
+///                         [(diff PRESENCE...)]
+///                         [(ready AXIS...)]
+///                         [(readyRequest AXIS...) | (unreadyRequest AXIS...)]))
+///   where PRESENCE is node+, node-, rel+ or rel-, and AXIS is node,
+///   rel or (in a request only) all. The last three forms may also
+///   appear in (deleted ...) and (unknown ...), and at top level on
+///   an alias, id or flag property.
 
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SkgrepoName};
@@ -22,6 +29,7 @@ use crate::types::errors::BufferValidationError;
 use crate::types::nodes::complete::Flag;
 use crate::types::git::{NodeAxes, RelationshipAxes, Sign};
 use crate::types::viewnode::{
+  ChangeFacts, ReadinessAxis, ReadinessRequest,
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
   Property, PropertyFolder, PartnerFolder, PhantomDeleted, RestrictedVognode, PhantomUnknown,
   Birth, Editability, AffectsParent,
@@ -33,7 +41,7 @@ use crate::types::maybe_placed_viewnode::{
 };
 
 use sexp::Sexp;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
 //
 // Parsing-internal types
@@ -58,6 +66,11 @@ pub struct ViewnodeMetadata {
   pub edit_request: Option<NodeEditRequest>,
   pub relRepo_request: Option<SkgrepoName>,
   pub view_requests: HashSet<ViewRequest>,
+  // The total diff view's '(diff ...)' and '(ready ...)' facts and
+  // readiness requests, on whichever vognode, phantom or property
+  // leaf carries them.
+  pub change_facts: ChangeFacts,
+  pub readiness_request: Option<ReadinessRequest>,
   pub unrestrictedVognode_node_axes : NodeAxes,
   pub unrestrictedVognode_relationship_axes : RelationshipAxes,
   pub unrestrictedVognode_not_in_git : bool,
@@ -101,6 +114,8 @@ pub fn default_metadata() -> ViewnodeMetadata {
     edit_request: None,
     relRepo_request: None,
     view_requests: HashSet::new(),
+    change_facts: ChangeFacts::default(),
+    readiness_request: None,
     unrestrictedVognode_node_axes : NodeAxes::default(),
     unrestrictedVognode_relationship_axes : RelationshipAxes::default(),
     unrestrictedVognode_not_in_git : false,
@@ -140,6 +155,8 @@ pub fn viewnode_from_metadata (
                 skgid           : uid . clone (),
                 relRepo         : metadata . unknown_relRepo . clone (),
                 relRepo_request : metadata . unknown_relRepo_request . clone (),
+                change_facts      : metadata . change_facts . clone (),
+                readiness_request : metadata . readiness_request . clone (),
               } ) )),
           if body . is_some () || ! title . is_empty () {
             Some ( BufferValidationError::Other (
@@ -168,6 +185,8 @@ pub fn viewnode_from_metadata (
                        . unwrap_or_else ( || SkgrepoName::from ("")),
             title,
             body,
+            change_facts      : metadata . change_facts . clone (),
+            readiness_request : metadata . readiness_request . clone (),
           } ) )), None, None )
       } else if let Some ( ref non_vognode ) = metadata . non_vognode {
         let is_flags_folder = matches! (non_vognode,
@@ -200,16 +219,22 @@ pub fn viewnode_from_metadata (
                                 metadata . property_relRepo . clone (),
                               relRepo_request:
                                 metadata . property_relRepo_request . clone (),
-                              relationship_axes: metadata . property_relationship_axes }),
+                              relationship_axes: metadata . property_relationship_axes,
+                              change_facts: metadata . change_facts . clone (),
+                              readiness_request: metadata . readiness_request . clone () }),
           MpViewnodeKind::Property (Property::ID { .. }) =>
             MpViewnodeKind::Property (Property::ID {
                               skgid: title . clone () . into (),
-                              relationship_axes: metadata . property_relationship_axes }),
+                              relationship_axes: metadata . property_relationship_axes,
+                              change_facts: metadata . change_facts . clone (),
+                              readiness_request: metadata . readiness_request . clone () }),
           MpViewnodeKind::Property (Property::Flag { flag, .. }) =>
             MpViewnodeKind::Property (Property::Flag {
               flag : *flag,
               title    : title . clone (),
-              body     : body . clone () }),
+              body     : body . clone (),
+              change_facts      : metadata . change_facts . clone (),
+              readiness_request : metadata . readiness_request . clone () }),
           MpViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }) =>
             MpViewnodeKind::PropertyFolder (PropertyFolder::Flags {
               title : title . clone (), body : body . clone () }),
@@ -254,6 +279,8 @@ pub fn viewnode_from_metadata (
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
             relRepo_request : metadata . relRepo_request . clone (),
+            change_facts      : metadata . change_facts . clone (),
+            readiness_request : metadata . readiness_request . clone (),
             view_requests    : metadata . view_requests . clone (),
             node_axes        : metadata . unrestrictedVognode_node_axes,
             relationship_axes       : metadata . unrestrictedVognode_relationship_axes,
@@ -329,6 +356,7 @@ pub fn parse_metadata_to_viewnodemd (
       _ => return Err ( "Expected metadata to be a list" . to_string () ),
     };
 
+  let mut top_level_change_facts : bool = false;
   // Process each element
   for element in elements {
     match element {
@@ -387,6 +415,11 @@ pub fn parse_metadata_to_viewnodemd (
                            . to_string () ); }
             result . property_relRepo_request =
               request_metadata . relRepo_request; },
+          "diff" | "ready" | "readyRequest" | "unreadyRequest" => {
+            // At top level, valid only on a property leaf (checked below).
+            parse_change_fact_form (
+              &first, &items[1..], &mut result ) ?;
+            top_level_change_facts = true; },
           "textChanged" => {
             // (textChanged STAGE_TAGS) for the TextChanged property.
             result . non_vognode = Some (
@@ -408,7 +441,9 @@ pub fn parse_metadata_to_viewnodemd (
               . ok_or_else (|| format! ("Unknown flag: {}", name)) ?;
             result . non_vognode = Some (MpViewnodeKind::Property (
               Property::Flag {
-                flag, title: String::new (), body: None })); },
+                flag, title: String::new (), body: None,
+                change_facts: ChangeFacts::default (),
+                readiness_request: None })); },
           // Note: "alias" as a list like (alias "string") is no longer supported.
           // Use bare "alias" atom instead - the alias string comes from headline title.
           // Legacy format detection - reject with helpful error
@@ -433,7 +468,7 @@ pub fn parse_metadata_to_viewnodemd (
           // above so a stale buffer round-trips.
           "restrictedNode" => result . is_restricted_node = true,
           // Non-vognode kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
-          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Property ( Property::Alias { text: String::new(), relRepo: None, relRepo_request: None, relationship_axes: RelationshipAxes::default() } ) ),
+          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Property ( Property::Alias { text: String::new(), relRepo: None, relRepo_request: None, relationship_axes: RelationshipAxes::default(), change_facts: ChangeFacts::default(), readiness_request: None } ) ),
           "aliasFolder" => result . non_vognode = Some (MpViewnodeKind::PropertyFolder (PropertyFolder::Alias)),
           "flagsFolder" => result . non_vognode = Some (
             MpViewnodeKind::PropertyFolder (PropertyFolder::flags ())),
@@ -461,7 +496,7 @@ pub fn parse_metadata_to_viewnodemd (
           "idFolder" =>
             result . non_vognode = Some (MpViewnodeKind::PropertyFolder (PropertyFolder::ID)),
           "id" =>
-            result . non_vognode = Some ( MpViewnodeKind::Property ( Property::ID { skgid: ID::default(), relationship_axes: RelationshipAxes::default() } ) ),
+            result . non_vognode = Some ( MpViewnodeKind::Property ( Property::ID { skgid: ID::default(), relationship_axes: RelationshipAxes::default(), change_facts: ChangeFacts::default(), readiness_request: None } ) ),
           "deadViewnode" => result . is_dead_viewnode = true,
           _ => {
             return Err ( format! ( "Unknown top-level value: {}",
@@ -474,6 +509,13 @@ pub fn parse_metadata_to_viewnodemd (
      && ! matches! ( result . non_vognode,
                      Some (MpViewnodeKind::Property (Property::Alias { .. })) )
   { return Err ( "relRepo and its editRequest are valid only on Alias properties"
+                 . to_string () ); }
+  if top_level_change_facts
+     && ! matches! ( result . non_vognode,
+                     Some (MpViewnodeKind::Property (
+                       Property::Alias { .. } | Property::ID { .. }
+                       | Property::Flag { .. } )) )
+  { return Err ( "Top-level diff, ready and readiness requests are valid only on alias, id and flag properties"
                  . to_string () ); }
   Ok (result) }
 
@@ -526,6 +568,9 @@ fn parse_node_sexp (
               "na"    => AffectsParent::NA,
               _ => return Err ( format! (
                 "Invalid affectsParent value: {}", value )), }; },
+          "diff" | "ready" | "readyRequest" | "unreadyRequest" =>
+            parse_change_fact_form (
+              &key, &subitems[1..], metadata ) ?,
           "staged" => {
             apply_axis_atoms_to_unrestrictedVognode (
               &subitems[1..],
@@ -649,6 +694,9 @@ fn parse_unknownnode_sexp (
                            . to_string () ); }
             metadata . unknown_relRepo_request =
               request_metadata . relRepo_request; },
+          "diff" | "ready" | "readyRequest" | "unreadyRequest" =>
+            parse_change_fact_form (
+              &key, &subitems[1..], metadata ) ?,
           _ => { return Err ( format! (
             "Unknown 'unknown' key: {}", key )); }} },
       _ => { return Err ( "Unexpected element in unknown sexp"
@@ -691,6 +739,9 @@ fn parse_deleted_sexp (
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
             metadata . home_skgrepo = Some ( SkgrepoName::from (value)); },
+          "diff" | "ready" | "readyRequest" | "unreadyRequest" =>
+            parse_change_fact_form (
+              &key, &subitems[1..], metadata ) ?,
           _ => { return Err ( format! ( "Unknown deleted key: {}",
                                          key )); }} },
       _ => { return Err ( "Unexpected element in deleted sexp"
@@ -834,3 +885,56 @@ fn parse_viewrequests_sexp (
          or '(folder ...)' / '(roleTree ...)')" . to_string () ), };
     requests . insert (request); }
   Ok (( )) }
+
+
+/// Parse one of the total diff view's forms -- '(diff PRESENCE...)',
+/// '(ready AXIS...)', '(readyRequest AXIS...)' or
+/// '(unreadyRequest AXIS...)' -- whose head is 'key' and whose
+/// arguments are 'args', into 'metadata'. Each may appear once; a
+/// viewnode carries at most one readiness request.
+fn parse_change_fact_form (
+  key      : &str,
+  args     : &[Sexp],
+  metadata : &mut ViewnodeMetadata,
+) -> Result<(), String> {
+  let atoms : Vec<String> =
+    args . iter () . map (atom_to_string) . collect::<Result<_, _>> () ?;
+  match key {
+    "diff" => {
+      if metadata . change_facts . presence != Default::default () {
+        return Err ( "diff may appear only once" . to_string () ); }
+      for atom in &atoms {
+        let slot : &mut Option<Sign> = match atom . as_str () {
+          "node+" | "node-" => &mut metadata . change_facts . presence . node,
+          "rel+"  | "rel-"  => &mut metadata . change_facts . presence . rel,
+          other => return Err ( format! (
+            "Unknown diff atom: {}", other )), };
+        if slot . is_some () {
+          return Err ( format! ( "diff names an axis twice: {}", atom )); }
+        *slot = Some ( if atom . ends_with ('+') { Sign::Plus }
+                       else { Sign::Minus } ); }},
+    "ready" => {
+      if metadata . change_facts . ready . is_some () {
+        return Err ( "ready may appear only once" . to_string () ); }
+      let axes : BTreeSet<ReadinessAxis> =
+        readiness_axes_from_atoms (&atoms) ?;
+      if axes . contains (&ReadinessAxis::All) {
+        return Err ( "ready cannot name the axis all; only a request can"
+                     . to_string () ); }
+      metadata . change_facts . ready = Some (axes); },
+    _ => { // readyRequest or unreadyRequest
+      if metadata . readiness_request . is_some () {
+        return Err ( "A viewnode may carry only one readiness request"
+                     . to_string () ); }
+      metadata . readiness_request = Some ( ReadinessRequest {
+        ready : key == "readyRequest",
+        axes  : readiness_axes_from_atoms (&atoms) ?, } ); }, }
+  Ok (( )) }
+
+fn readiness_axes_from_atoms (
+  atoms : &[String],
+) -> Result<BTreeSet<ReadinessAxis>, String> {
+  atoms . iter ()
+    . map ( |atom| ReadinessAxis::from_wire_name (atom)
+            . ok_or_else ( || format! ( "Unknown readiness axis: {}", atom )) )
+    . collect () }

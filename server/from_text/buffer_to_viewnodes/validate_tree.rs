@@ -145,7 +145,7 @@ fn idFolder_membership_errors (
     let mut buffer_skgids : Vec<ID> =
       node_ref . children ()
       . filter_map ( |child| match &child . value () . kind {
-          MpViewnodeKind::Property (Property::ID { skgid, relationship_axes })
+          MpViewnodeKind::Property (Property::ID { skgid, relationship_axes, .. })
             if relationship_axes . net_is_present ()
             => Some ( skgid . clone () ),
           _ => None } )

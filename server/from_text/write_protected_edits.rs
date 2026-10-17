@@ -211,7 +211,7 @@ fn collect_flags_surfaces (
         for leaf in child . children () {
           match &leaf . value () . kind {
             ViewnodeKind::Property (Property::Flag {
-              flag, title, body }) =>
+              flag, title, body, .. }) =>
               viewnodes . push ((*flag, title . clone (), body . clone ())),
             other => other_children . push (format! ("{:?}", other)), } }
         Some (FlagsFolderSurface {

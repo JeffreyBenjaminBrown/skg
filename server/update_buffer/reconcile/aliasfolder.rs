@@ -4,7 +4,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, AffectsParent};
-use crate::types::viewnode::{Vognode, PropertyFolder, Property};
+use crate::types::viewnode::{ChangeFacts, Vognode, PropertyFolder, Property};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::util::{complete_relevant_children_in_viewforest, treat_certain_children};
@@ -100,7 +100,9 @@ pub fn reconcile_aliasFolder_children (
                                                    if relRepo == &parent_graphnode . home_skgrepo { None }
                                                    else { Some (relRepo . clone ()) } ),
                                                relRepo_request : None,
-                                               relationship_axes } ), })};
+                                               relationship_axes,
+                                               change_facts : ChangeFacts::default (),
+                                               readiness_request : None } ), })};
   complete_relevant_children_in_viewforest(
     tree,
     aliasfolder_treeid,

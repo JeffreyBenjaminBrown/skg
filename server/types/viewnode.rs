@@ -10,7 +10,7 @@ use super::git::{NodeAxes, RelationshipAxes, Sign};
 use super::misc::{ID, SkgrepoName};
 use super::nodes::complete::Flag;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::fmt;
 use std::str::FromStr;
 
@@ -45,6 +45,48 @@ pub enum AffectsParent {
 pub enum Birth {
   Unremarkable,
   RoleGraft (RelationRole),
+}
+
+/// The total diff view's facts about one viewnode: which graphs of
+/// the graph pair hold its node and its relationship to its
+/// viewparent ('(diff ...)'), and which of its change-forest leaves
+/// are marked commit-ready ('(ready ...)'). Display facts: the view
+/// derives them, and a save reads nothing from them.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ChangeFacts {
+  pub presence : DiffPresence,
+  /// None when nothing is ready. 'Some' of an empty set is the bare
+  /// '(ready)' of a leaf with a single axis.
+  pub ready    : Option<BTreeSet<ReadinessAxis>>,
+}
+
+/// The '(diff ATOMS)' of a viewnode, from 'node+ node- rel+ rel-'.
+/// None on an axis means the node (or relationship) is in both
+/// graphs of the pair, or that the axis does not apply.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct DiffPresence {
+  pub node : Option<Sign>,
+  pub rel  : Option<Sign>,
+}
+
+/// The axes of a viewnode's change-forest leaves: 'node' (the node's
+/// own existence), 'rel' (its relationship to its viewparent), and,
+/// in a request only, 'all' (every leaf of an aggregate, one level
+/// down).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum ReadinessAxis {
+  Node,
+  Rel,
+  All,
+}
+
+/// '(readyRequest AXES)' or '(unreadyRequest AXES)': save intent that
+/// sets or clears the commit-readiness marks of the viewnode's
+/// leaves on those axes. No axes means the viewnode's only leaf.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReadinessRequest {
+  pub ready : bool, // true for readyRequest, false for unreadyRequest
+  pub axes  : BTreeSet<ReadinessAxis>,
 }
 
 //
@@ -126,6 +168,8 @@ pub struct PhantomDeleted {
   pub home_skgrepo : SkgrepoName,
   pub title        : String,
   pub body         : Option < String >,
+  pub change_facts      : ChangeFacts,
+  pub readiness_request : Option<ReadinessRequest>,
 }
 
 /// A phantom for a reference that resolves to nothing --
@@ -158,6 +202,8 @@ pub struct PhantomUnknown {
   pub relRepo         : Option<SkgrepoName>,
   /// A pending relRepo change, consumed only by save.
   pub relRepo_request : Option<SkgrepoName>,
+  pub change_facts      : ChangeFacts,
+  pub readiness_request : Option<ReadinessRequest>,
 }
 
 /// An anonymous "something from a restricted repo is/was here"
@@ -201,6 +247,10 @@ pub struct UnrestrictedVognode_Generic < Id, Repo > {
   /// A requested skgrepo for this occurrence's binding relationship. Unlike
   /// `viewStats.relRepo`, this is save intent.
   pub relRepo_request : Option<SkgrepoName>,
+  pub change_facts      : ChangeFacts,
+  /// Save intent, like 'relRepo_request', but allowed on a
+  /// write-protected occurrence, and beside an edit request.
+  pub readiness_request : Option<ReadinessRequest>,
 
   pub view_requests : HashSet < ViewRequest >,
   /// Per-stage diff state for the node's '.skg' file (the node axis).
@@ -402,14 +452,20 @@ pub enum Property {
   Alias { text: String, // an alias for the node's grandparent
           relRepo: Option<SkgrepoName>,
           relRepo_request: Option<SkgrepoName>,
-          relationship_axes: RelationshipAxes },
+          relationship_axes: RelationshipAxes,
+          change_facts: ChangeFacts,
+          readiness_request: Option<ReadinessRequest> },
   ID { skgid: ID, // an ID of grandparent (the parent being an IDFolder)
-       relationship_axes: RelationshipAxes },
+       relationship_axes: RelationshipAxes,
+       change_facts: ChangeFacts,
+       readiness_request: Option<ReadinessRequest> },
   /// A true file-level boolean flag of the node's grandparent.
   Flag {
     flag : Flag,
     title    : String,
     body     : Option<String>,
+    change_facts      : ChangeFacts,
+    readiness_request : Option<ReadinessRequest>,
   },
   TextChanged { staged: bool, unstaged: bool }, // Indicates title or body changed between stages. Visible in 'git diff mode'. Per-stage bools mark whether the change is staged (HEAD vs index) and/or unstaged (index vs worktree).
 }
@@ -728,6 +784,48 @@ impl Phantom {
     } }
 }
 
+impl DiffPresence {
+  /// The '(diff ...)' atoms, the node axis first.
+  pub fn atoms (
+    &self,
+  ) -> Vec<&'static str> {
+    let node : Option<&'static str> = self . node . map ( |sign| match sign {
+      Sign::Plus => "node+", Sign::Minus => "node-" } );
+    let rel : Option<&'static str> = self . rel . map ( |sign| match sign {
+      Sign::Plus => "rel+", Sign::Minus => "rel-" } );
+    node . into_iter () . chain (rel) . collect () }
+
+  /// The atoms the serializer can emit, for the herald conformance test.
+  pub const EMITTABLE_ATOMS : [&'static str; 4] =
+    [ "node+", "node-", "rel+", "rel-" ];
+}
+
+impl ReadinessAxis {
+  pub const ALL : [ReadinessAxis; 3] =
+    [ ReadinessAxis::Node, ReadinessAxis::Rel, ReadinessAxis::All ];
+
+  pub fn wire_name (
+    self,
+  ) -> &'static str {
+    match self {
+      ReadinessAxis::Node => "node",
+      ReadinessAxis::Rel  => "rel",
+      ReadinessAxis::All  => "all", } }
+
+  pub fn from_wire_name (
+    s : &str,
+  ) -> Option<ReadinessAxis> {
+    ReadinessAxis::ALL . into_iter ()
+      . find ( |axis| axis . wire_name () == s ) }
+}
+
+impl ReadinessRequest {
+  pub fn form_head (
+    &self,
+  ) -> &'static str {
+    if self . ready { "readyRequest" } else { "unreadyRequest" } }
+}
+
 impl ViewRequest {
   /// The MATCH-position atoms the server can emit inside
   /// '(viewRequests ...)'. The RELNAME / ROLENAME arguments of the
@@ -748,7 +846,8 @@ impl AsMut<Viewnode> for Viewnode {
     self }}
 
 impl Viewnode {
-  /// Consume every save-only `(editRequest ...)` carried by this occurrence.
+  /// Consume every save-only `(editRequest ...)`, and every readiness
+  /// request, carried by this occurrence.
   /// Call only after the save's skgsave-commit: failed saves and confirmation
   /// round-trips must leave requests in the user's buffer. `view_requests` are
   /// deliberately separate -- completion fulfills those while rendering.
@@ -758,13 +857,23 @@ impl Viewnode {
     match &mut self . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) => {
         restriction . relRepo_request = None;
+        restriction . readiness_request = None;
         if let Editability::Editable { edit_request, .. } =
           &mut restriction . editability
         { *edit_request = None; }},
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
-        unknown . relRepo_request = None,
-      ViewnodeKind::Property (Property::Alias { relRepo_request, .. }) =>
-        *relRepo_request = None,
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
+        unknown . relRepo_request = None;
+        unknown . readiness_request = None; },
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (deleted))) =>
+        deleted . readiness_request = None,
+      ViewnodeKind::Property (Property::Alias {
+        relRepo_request, readiness_request, .. }) => {
+        *relRepo_request = None;
+        *readiness_request = None; },
+      ViewnodeKind::Property (
+        Property::ID { readiness_request, .. }
+        | Property::Flag { readiness_request, .. }) =>
+        *readiness_request = None,
       _ => {}, }}
 
   pub fn normal_to_phantom (
@@ -929,6 +1038,8 @@ pub fn default_unrestrictedVognode (
     graphStats     : GraphnodeStats::default(),
     viewStats      : ViewnodeStats::default(),
     relRepo_request : None,
+    change_facts      : ChangeFacts::default (),
+    readiness_request : None,
     view_requests  : HashSet::new(),
     node_axes      : NodeAxes::default(),
     relationship_axes     : RelationshipAxes::default(),
@@ -993,6 +1104,8 @@ pub fn mk_unknown_viewnode (
         skgid,
         relRepo         : None,
         relRepo_request : None,
+        change_facts      : ChangeFacts::default (),
+        readiness_request : None,
       } ) )),
   }}
 

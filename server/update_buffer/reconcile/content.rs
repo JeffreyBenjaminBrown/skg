@@ -1,6 +1,6 @@
 use crate::to_org::complete::contents::clobberWriteProtectedViewnode;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::viewnode::{mk_restricted_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{ChangeFacts, mk_restricted_viewnode, mk_unknown_viewnode};
 use crate::to_org::util::{EditableMap, make_writeProtected_if_repeat_then_extend_editable_map};
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -382,7 +382,9 @@ pub(in crate::update_buffer) fn mutate_unrestrictedVognode_to_deletednode (
         skgid           : pid . clone(),
         home_skgrepo : skgrepo . clone(),
         title,
-        body, } ) )); }
+        body,
+        change_facts      : ChangeFacts::default (),
+        readiness_request : None, } ) )); }
   ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) }
 
 /// Whether this node is overridden yet drawn RAW by its position, so
@@ -679,6 +681,8 @@ fn normalize_relationship_backed_content_unknowns (
           relRepo: relRepos . get (&skgid) . cloned ()
             . filter (|skgrepo| skgrepo != recorder_home),
           relRepo_request: None,
+          change_facts: ChangeFacts::default (),
+          readiness_request: None,
           skgid }))); })
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }

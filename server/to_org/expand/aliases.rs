@@ -5,7 +5,7 @@ use crate::types::git::RelationshipAxes;
 use crate::types::misc::{ID, RelPartner, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, ViewRequest, FolderRelation};
-use crate::types::viewnode::{PropertyFolder, Property};
+use crate::types::viewnode::{ChangeFacts, PropertyFolder, Property};
 use crate::types::tree::viewnode_graphnode::{
   insert_non_vognode_as_child, unique_non_vognode_child_of_viewnode};
 
@@ -74,6 +74,8 @@ pub fn build_and_integrate_aliases (
                           if &alias . relRepo == home { None }
                           else { Some (alias . relRepo . clone ()) } ),
                       relRepo_request: None,
-                      relationship_axes: RelationshipAxes::default () } ),
+                      relationship_axes: RelationshipAxes::default (),
+                      change_facts: ChangeFacts::default (),
+                      readiness_request: None } ),
       false ) ?; }
   Ok (( )) }

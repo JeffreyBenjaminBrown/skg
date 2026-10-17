@@ -19,6 +19,7 @@ use crate::serve::handlers::telescope_hoist::{
   needs_confirmation as hoist_needs_confirmation,
   repair_saves_for_unwritten_candidates,
 };
+use crate::serve::handlers::readiness_requests::consume_readiness_requests;
 use crate::serve::handlers::text_release::{
   approved_pids_from_request as text_approved_pids_from_request,
 };
@@ -785,6 +786,10 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
 
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "update_views_after_save" ). entered();
+    let readiness_warnings : Vec<String> =
+      // The graph edits succeeded, so the readiness requests are consumed.
+      consume_readiness_requests (
+        &viewforest, env, &swapped_in, &mut views_state . graph_pair );
     let mut response : SaveResponse =
       update_views_after_save (
         stream,
@@ -804,6 +809,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       // precede the completion-repair warnings.
       let mut warnings : Vec<String> = parse_warnings;
       warnings . extend ( response . warnings );
+      warnings . extend ( readiness_warnings );
       warnings . extend (
         post_skgsave_commit_hiddenoutside_warnings (
           &swapped_in . graph, &post_skgsave_commit_notice_candidates ) );

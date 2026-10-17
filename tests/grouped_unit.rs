@@ -7,6 +7,9 @@
 #[path = "body_yaml_format.rs"]
 mod body_yaml_format;
 
+#[path = "change_facts_metadata.rs"]
+mod change_facts_metadata;
+
 #[path = "dbs.rs"]
 mod dbs;
 
