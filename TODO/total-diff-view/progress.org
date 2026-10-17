@@ -394,3 +394,66 @@ visit, so a context body the user unfolded folds again at each save.
 *** a node that changed after the buffer opened
 If such a node is drawn only write-protected, its change is not drawn
 there, yet it counts as shown, because its pid is in the buffer.
+* Slice 7: deviations
+** what view completion draws from
+The step at each visit needs the buffer's own U and C, not those of
+all changes, so the completion context's 'graph_pair' became
+'tdv_drawing : Option<TdvDrawing>' (the pair and the 'TdvBuffer';
+'server/pcsvf.rs'), and 'complete_viewforest_with_graph_pair' and
+'pcsvf_viewforest' take one. 'GraphPair::pcsvf_sets_of_buffer' caches
+each buffer's sets beside 'pcsvf_sets'. A save reconciles a buffer
+over its own sets, since 'ViewState' records its 'TdvBuffer'.
+** the text preserver
+The pair records no link from an acquiree to its text preserver, so
+'pcsvf_sets_for_merges' takes it to be a node new in the acquirer's
+content titled as a nodeMerge titles it ("MERGED: " and the
+acquiree's old title; 'acquiree_text_preserver_title', shared with
+the nodeMerge code). A preserver retitled since the merge is still
+drawn, as a new member of the acquirer's content, but not as a node
+of C. The acquirees are the members of rightward C that
+'acquirer_of' answers.
+** the home move on the vognode
+*** where it sits
+In '(viewStats ...)', beside '(homeRepoHerald ...)':
+'(homeMove (old A) (new B))', the form of the property (slice 4), and
+'(movedLikeAncestor LETTER)'. Both are display facts, set after
+completion by 'set_home_move_facts_in_viewforest' (only in the
+skgrepo-changes buffer) and discarded by the parser. They are
+'ViewnodeStats::home_move' and 'moved_like_ancestor'.
+*** a letter, not GEN
+The plan writes '(movedLikeAncestor GEN)' and the herald 'Δ⌂=a'. The
+lens engine cannot turn a number into a letter, and matching numeric
+atoms by label is fragile in both clients, so the server sends the
+letter itself: a for generation 1, '{N}' past z, as the clients
+letter the relationship heralds. Generations count every viewnode
+between, a folder included, as the relationship heralds do.
+*** which vognodes
+Every unrestricted vognode in the buffer whose home moved,
+write-protected occurrences included. Its nearest moved ancestor is
+the nearest unrestricted vognode ancestor whose home moved; Δ⌂ shows
+when that move has the same (old, new).
+** the order-only buffer
+Its roots are editable stubs; completion over empty sets folds their
+bodies, draws their content as write-protected leaves in the new
+order, draws no change folders, and (in this buffer only) puts the
+order-only marker first. No container folder is drawn for a
+multiply-contained root, as it is a flat list, not a PCSVF.
+** a slice-5 bug the round trip exposed
+A save reattached each pair-drawn folder member's continuation (and
+relRepo move) beside the old one, duplicating it. The kinds fixture
+never showed it: its folder members had no containers.
+'attach_continuations_under_pair_folder_members' detaches the old
+ones first.
+** tests
+The 'buffers' fixture ('tests/pcsvf/other_buffers.rs') covers the
+three buffers and the round trip of all four. "The one-command
+behavior end to end" is tested at the handler
+('tests/pcsvf/request.rs'): the four requests in order, each nonempty
+buffer registered as itself and each empty one answered
+'(empty . t)'. The clients needed no change; their slice-5 tests
+cover skipping the empty answers. The new heralds are in the shared
+rendering cases, so both clients' herald tests cover them.
+** imperfect
+A folder member's continuation is redrawn at each save, so any
+folding the user gave its headlines is lost, as with the context
+bodies (slice 6).

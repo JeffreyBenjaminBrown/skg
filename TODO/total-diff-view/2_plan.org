@@ -686,7 +686,7 @@ Clients: the gesture writes the right request on a leaf, a member with
 two axes, and an aggregate; the recursive form touches only matching
 descendants; the summary message is shown.
 
-** Slice 7: merges, skgrepo changes, order-only buffers
+** DONE Slice 7: merges, skgrepo changes, order-only buffers
 'pcsvf_sets_for_merges (pair)' (acquiree, acquirer, text preserver per
 acquired pid) and 'pcsvf_sets_for_home_moves (pair)' feed the same
 builder. The skgrepo-changes buffer adds the "-old +new" herald on the
