@@ -1,14 +1,15 @@
 -- Coverage for the rerender stream and its consumers (skgrepo
--- sets), plus the report-shaped requests (diff report, stage
--- moves, export). Mirrors tests/elisp/test-skg-diff-report.el's
--- wiring cases and test-skg-warning-channel.el's rerender-done
+-- sets), plus the report-shaped requests (investigate unknown node,
+-- stage moves, export). Mirrors
+-- tests/elisp/test-skg-investigate-unknown-node.el's wiring cases and
+-- test-skg-warning-channel.el's rerender-done
 -- channel, end-to-end through the loopback fake server.
 
 local helpers = dofile(
   debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
 
 local buffer = require('skg.buffer')
-local diff_report = require('skg.diff_report')
+local investigate_unknown_node = require('skg.investigate_unknown_node')
 local lock = require('skg.lock')
 local rerender = require('skg.rerender')
 local repo_sets = require('skg.repo_sets')
@@ -37,7 +38,7 @@ describe('skg stream consumers', function ()
     helpers.wipe_skg_buffers()
     lock.end_stream()
     wipe_named('skg://messages/rerender')
-    wipe_named('skg://diff-report')
+    wipe_named('skg://unknown-node')
     wipe_named('skg://stage-moves')
   end)
 
@@ -105,44 +106,72 @@ describe('skg stream consumers', function ()
       seen)
   end)
 
-  it('shows the diff report with the navigation keymap',
-     function ()
-    -- Mirrors test-skg-diff-report.el's wiring: stage flags on the
-    -- wire, report buffer, keymap attached.
+  it('investigates the unknown headline at point and shows the answer'
+     .. ' read-only, with the navigation keymap', function ()
+    -- Mirrors test-skg-investigate-unknown-node.el.
     local seen = nil
     server = helpers.connect_to_fake_server(function (line, respond)
-      if line:find('diff report', 1, true) then
+      if line:find('investigate unknown node', 1, true) then
         seen = line
         respond(helpers.framed(
-          '((response-type diff-report)'
-          .. ' (content "* changed nodes\\n** some node")'
-          .. ' (errors ()) (warnings ("one warning")))'))
+          '((response-type investigate-unknown-node)'
+          .. ' (content "* gone-id\\n** never present in the git history'
+          .. ' of any skgrepo") (errors ()) (warnings ()))'))
       end
     end)
-    diff_report.diff_report(true, false)
+    local view = buffer.open_org_buffer_from_text(
+      '* (skg (node (id p))) p\n** (skg (unknown (id gone-id))) ',
+      'skg://p', 'view_id-p')
+    vim.api.nvim_set_current_buf(view)
+    vim.api.nvim_win_set_cursor(0, { 2, 0 })
+    investigate_unknown_node.investigate_unknown_node()
     vim.wait(3000, function () return seen ~= nil end, 10)
-    assert.is_truthy(seen:find('(include-staged . "true")', 1, true))
-    assert.is_truthy(seen:find('(include-unstaged . "false")', 1,
-                               true))
-    local report = nil
+    assert.are.equal(
+      '((request . "investigate unknown node") (id . "gone-id"))', seen)
+    local answer = nil
     vim.wait(2000, function ()
       for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-        if vim.api.nvim_buf_get_name(buf) == 'skg://diff-report'
-        then report = buf end
+        if vim.api.nvim_buf_get_name(buf) == 'skg://unknown-node'
+        then answer = buf end
       end
-      return report ~= nil
+      return answer ~= nil
     end, 10)
-    assert.is_truthy(report)
+    assert.is_truthy(answer)
+    assert.are.equal('org', vim.bo[answer].filetype)
+    assert.is_false(vim.bo[answer].modifiable)
     assert.is_truthy(table.concat(
-      vim.api.nvim_buf_get_lines(report, 0, -1, false), '\n')
-      :find('changed nodes', 1, true))
-    -- The navigation subset is attached buffer-locally.
+      vim.api.nvim_buf_get_lines(answer, 0, -1, false), '\n')
+      :find('never present', 1, true))
     local has_goto = false
-    for _, map in ipairs(vim.api.nvim_buf_get_keymap(report, 'n')) do
+    for _, map in ipairs(vim.api.nvim_buf_get_keymap(answer, 'n')) do
       if map.desc and map.desc:find('Open a view') then
         has_goto = true end
     end
     assert.is_true(has_goto)
+  end)
+
+  it('prompts for the ID away from an unknown headline', function ()
+    local seen = nil
+    server = helpers.connect_to_fake_server(function (line, respond)
+      if line:find('investigate unknown node', 1, true) then
+        seen = line
+        respond(helpers.framed(
+          '((response-type investigate-unknown-node)'
+          .. ' (content "typed-id resolves to node t (typed-id) in main")'
+          .. ' (errors ()) (warnings ()))'))
+      end
+    end)
+    local view = buffer.open_org_buffer_from_text(
+      '* (skg (node (id p))) p', 'skg://p', 'view_id-p')
+    vim.api.nvim_set_current_buf(view)
+    local original_input = vim.fn.input
+    local prompted = nil
+    vim.fn.input = function (prompt) prompted = prompt return 'typed-id' end
+    investigate_unknown_node.investigate_unknown_node()
+    vim.fn.input = original_input
+    assert.are.equal('Investigate ID: ', prompted)
+    vim.wait(3000, function () return seen ~= nil end, 10)
+    assert.is_truthy(seen:find('(id . "typed-id")', 1, true))
   end)
 
   it('shows the stage-moves script as a shell buffer', function ()

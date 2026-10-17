@@ -170,8 +170,9 @@ M.commands = {
                      desc = 'Stage and git-commit every owned skgrepo with changes, with one message' },
   StageMoves = { module = 'skg.stage_moves', fn = 'stage_moves',
                  desc = 'Script staging cross-repo node moves' },
-  DiffReport = { module = 'skg.diff_report', fn = 'diff_report',
-                 desc = 'Semantic report of git-visible graph changes' },
+  InvestigateUnknownNode = { module = 'skg.investigate_unknown_node',
+                             fn = 'investigate_unknown_node',
+                             desc = 'Show what git history says about an unknown node' },
   ExportToOrg = { module = 'skg.export', fn = 'export_some_to_org',
                   desc = 'Export a repo-set to plain .org files' },
   ImportMdAndOrg = { module = 'skg.import_md_and_org', fn = 'import_md_and_org',
@@ -295,7 +296,7 @@ M.content_view_bindings = {
   { 'tA', 'GitAddIfNewRecursive' },      -- C-c t A
   { 'ta', 'GitAddIfNewRecursivePreview' }, -- C-c t a
   { 'tm', 'StageMoves' },                -- C-c t m
-  { 'tr', 'DiffReport' },                -- C-c t r
+  { 'tr', 'InvestigateUnknownNode' },    -- C-c t r
 }
 
 ---The subset used by .skg file buffers (the file-minor-mode analog).

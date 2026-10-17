@@ -17,7 +17,8 @@ local function remove_unfired (types)
   end
 end
 
-local function unknown_id_at_point ()
+---@return string|nil the ID of the Unknown headline at point
+function M.unknown_id_at_point ()
   local split = metadata.split_as_stars_metadata_title(metadata.get_current_headline_text())
   if not split or split.metadata == '' then return nil end
   local ok, tree = pcall(sexpr.read, split.metadata)
@@ -81,7 +82,7 @@ local function send (skgid, approved_preview)
 end
 
 function M.request ()
-  local skgid = unknown_id_at_point()
+  local skgid = M.unknown_id_at_point()
   if not skgid then error('skg: point must be on an Unknown headline') end
   if any_dirty_view() then error('skg: save or revert every view before global cleanup') end
   send(skgid, nil)
