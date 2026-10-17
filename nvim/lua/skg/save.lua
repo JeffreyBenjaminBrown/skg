@@ -393,6 +393,57 @@ function M.handle_save_response (save_buf, response)
     M.show_save_errors_and_warnings(errors, warnings,
                                     content_text ~= nil)
   end
+  local summary = M.readiness_summary_from_response(response)
+  if summary then -- the saved buffer is one of the total diff view's
+    vim.notify(M.readiness_summary_message(summary)) end
+end
+
+---The save response's '(readiness-summary (ready N) (changed M)
+---(foreign F) (order-only O) (unshown K))' as a table of counts, or
+---nil when it has none.
+---@param response any
+---@return table|nil
+function M.readiness_summary_from_response (response)
+  if not sexpr.is_list(response) then return nil end
+  for _, element in ipairs(response) do
+    if sexpr.is_list(element) and element[1] ~= nil
+       and not sexpr.is_list(element[1])
+       and sexpr.atom_text(element[1]) == 'readiness-summary' then
+      local function count (key)
+        local value = payload.field_text(element, key)
+        return value and tonumber(value) or 0
+      end
+      return { ready = count('ready'), changed = count('changed'),
+               foreign = count('foreign'),
+               order_only = count('order-only'),
+               unshown = count('unshown') } end
+  end
+  return nil
+end
+
+---The line shown after a save of a buffer of the total diff view.
+---@param summary table as readiness_summary_from_response gives it
+---@return string
+function M.readiness_summary_message (summary)
+  local complete = summary.ready == summary.changed
+  local parts = {}
+  if complete then
+    table.insert(parts, string.format(
+      'COMMIT READY. All %d of %d changed files are ready',
+      summary.ready, summary.changed))
+  else
+    table.insert(parts, string.format(
+      '%d of %d changed files are ready',
+      summary.ready, summary.changed)) end
+  if summary.unshown > 0 then
+    table.insert(parts, string.format(
+      ', %d changes are not shown in this view; reopen it',
+      summary.unshown)) end
+  if summary.foreign > 0 then
+    table.insert(parts, string.format(
+      ', %d files changed in foreign skgrepos', summary.foreign)) end
+  if complete then table.insert(parts, '.') end
+  return table.concat(parts)
 end
 
 ---@param response any

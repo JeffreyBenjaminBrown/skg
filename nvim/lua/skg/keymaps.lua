@@ -156,6 +156,18 @@ M.commands = {
   GitAddIfNewRecursivePreview = { module = 'skg.git_add',
                                   fn = 'git_add_if_new_recursive_preview',
                                   desc = 'Preview the git add script for this subtree' },
+  CycleCommitReady = { module = 'skg.readiness', fn = 'cycle_commit_ready',
+                      desc = 'Toggle the commit-readiness of the change at point, and save' },
+  CycleCommitReadyRecursive = { module = 'skg.readiness',
+                                fn = 'cycle_commit_ready_recursive',
+                                desc = 'Mark every change in the subtree commit-ready, and save' },
+  MarkGnodeSkgrepoChangesCommitReady = { module = 'skg.readiness',
+                                         fn = 'mark_gnode_skgrepo_changes_commitReady',
+                                         desc = "Mark the node's home-skgrepo move commit-ready, and save" },
+  MarkGnodeSkgrepoChangesCommitReadyRecursive = {
+    module = 'skg.readiness',
+    fn = 'mark_gnode_skgrepo_changes_commitReady_recursive',
+    desc = 'Mark commit-ready every home move in the subtree like this one, and save' },
   StageMoves = { module = 'skg.stage_moves', fn = 'stage_moves',
                  desc = 'Script staging cross-repo node moves' },
   DiffReport = { module = 'skg.diff_report', fn = 'diff_report',
@@ -251,6 +263,10 @@ M.content_view_bindings = {
   { 'sm', 'SetMergeRequest' },           -- C-c s m
   { 'ss', 'SetRepo' },                 -- C-c s s
   { 'sS', 'SetRepoRecursive' },        -- C-c s S
+  { 'rr', 'CycleCommitReady' },          -- C-c r r
+  { 'rR', 'CycleCommitReadyRecursive' }, -- C-u C-c r r
+  { 'rh', 'MarkGnodeSkgrepoChangesCommitReady' }, -- C-c r h
+  { 'rH', 'MarkGnodeSkgrepoChangesCommitReadyRecursive' }, -- C-u C-c r h
   { 'sx', 'SetFlagSearchMatching' },
   { 'sX', 'SetFlagSearchMatchingRecursive' },
   { 'mc', 'ReplaceLinkWithContent' },    -- C-c m c
