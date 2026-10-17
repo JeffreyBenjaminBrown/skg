@@ -30,6 +30,7 @@ pub enum RequestType {
   ExportToOrg,
   ImportMdAndOrg,
   DeleteReferencesToAbsentNode,
+  TotalDiffView,
 }
 
 impl RequestType {
@@ -62,6 +63,7 @@ impl RequestType {
       "export to org"            => Ok (RequestType::ExportToOrg),
       "import md and org"         => Ok (RequestType::ImportMdAndOrg),
       "delete references to absent node" => Ok (RequestType::DeleteReferencesToAbsentNode),
+      "total diff view"          => Ok (RequestType::TotalDiffView),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See docs/api-and-formats.org
@@ -109,6 +111,7 @@ pub enum TcpToClient {
   ImportMdAndOrgResult,
   DeleteReferencesConfirmation,
   DeleteReferencesResult,
+  TotalDiffView, // One buffer of the total diff view, or '(empty . t)' when that buffer would show nothing.
   Error,
 }
 
@@ -157,4 +160,5 @@ impl TcpToClient {
       TcpToClient::ImportMdAndOrgResult => "import-md-and-org-result",
       TcpToClient::DeleteReferencesConfirmation => "delete-references-confirmation",
       TcpToClient::DeleteReferencesResult => "delete-references-result",
+      TcpToClient::TotalDiffView    => "total-diff-view",
       TcpToClient::Error            => "error", }} }

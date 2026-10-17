@@ -165,7 +165,8 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
       views_state . open_views . views . insert (
         view_id . clone (),
         ViewState { viewforest : tree_all . into (),
-                    pids       : HashSet::new () });
+                    pids       : HashSet::new (),
+                    tdv_buffer : None });
       let enrichment_slot
         : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
         Arc::new (Mutex::new (None));
@@ -353,7 +354,8 @@ async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment 
         view_id . clone (),
         ViewState {
           viewforest : Tree::new (viewforest_root_viewnode ()) . into (),
-          pids       : HashSet::from ([ID::from ("active-search-hit")]), });
+          pids       : HashSet::from ([ID::from ("active-search-hit")]),
+          tdv_buffer : None, });
       let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
         Arc::new (Mutex::new (Some (SearchEnrichmentPayload {
           runtime        : env . runtime_snapshot (),

@@ -176,7 +176,7 @@ pub(crate) fn process_unrestrictedVognode_diff (
 /// child follows. Returns (removed_id, anchor_id) pairs in the order the
 /// phantoms should be created, so consecutive removals before the same
 /// survivor keep their relative order.
-fn phantom_insertion_plan (
+pub(crate) fn phantom_insertion_plan (
   net_contains : &[Diff_Item<ID>],
 ) -> Vec<(ID, Option<ID>)> {
   let mut plan : Vec<(ID, Option<ID>)> = Vec::new ();

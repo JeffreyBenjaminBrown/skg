@@ -40,6 +40,7 @@
 /// folder, hence not shown *as* a subscribee: it is an ordinary
 /// self-writer parked there.
 
+use crate::types::git::Sign;
 use crate::from_text::local_fieldintent_collection::predicates::{
   unrestricted_child_counts_as_content,
   unrestricted_child_counts_as_visible_content,
@@ -270,9 +271,12 @@ fn visit_aliasFolder (
         let mut seen : HashSet<String> = HashSet::new ();
         for child in node_ref . children() {
           if let ViewnodeKind::Property (Property::Alias {
-            text, relRepo_request, .. })
+            text, relRepo_request, change_facts, .. })
             = &child . value() . kind
-          { if seen . insert (text . clone ()) {
+          { // An alias the total diff view shows as lost since HEAD
+            // ('(diff rel-)') is not an alias.
+            if change_facts . presence . rel == Some (Sign::Minus) { continue; }
+            if seen . insert (text . clone ()) {
               aliases . push (( text . clone (),
                                 relRepo_request . clone () )); }} }
         aliases };

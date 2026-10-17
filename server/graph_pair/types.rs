@@ -1,4 +1,5 @@
 use crate::change_forest::ChangeForest;
+use crate::pcsvf::{PcsvfSets, pcsvf_sets};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::git::Sign;
 use crate::types::misc::{ID, SkgrepoName};
@@ -24,6 +25,8 @@ pub struct GraphPair {
   pub(super) changed_pids : OnceLock<ChangedPids>,
   /// Computed on first use; see 'GraphPair::change_forest'.
   pub(super) change_forest : OnceLock<ChangeForest>,
+  /// Computed on first use; see 'GraphPair::pcsvf_sets'.
+  pub(super) pcsvf_sets : OnceLock<PcsvfSets>,
 }
 
 /// Which graphs of the pair hold a node or a relationship.
@@ -80,7 +83,8 @@ impl GraphPair {
   ) -> GraphPair {
     GraphPair { before, after, head_identity, foreign_changed_files,
                 changed_pids  : OnceLock::new (),
-                change_forest : OnceLock::new () } }
+                change_forest : OnceLock::new (),
+                pcsvf_sets    : OnceLock::new () } }
 
   /// The change-forest of this pair. Computed once per pair.
   pub fn change_forest (
@@ -88,6 +92,13 @@ impl GraphPair {
   ) -> &ChangeForest {
     self . change_forest . get_or_init (
       || ChangeForest::from_graph_pair (self) ) }
+
+  /// The sets of the PCSVF over all of C ('server/pcsvf.rs').
+  /// Computed once per pair.
+  pub fn pcsvf_sets (
+    &self,
+  ) -> &PcsvfSets {
+    self . pcsvf_sets . get_or_init ( || pcsvf_sets (self) ) }
 
   /// The nodes whose file changed but whose change-forest has no
   /// leaf: only the order of some list changed.

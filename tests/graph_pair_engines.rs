@@ -83,6 +83,8 @@ fn children_with_presence (
           (&t . skgid, &t . change_facts),
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
           (&u . skgid, &u . change_facts),
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
+          (&h . skgid, &h . change_facts),
         _ => return None, };
       Some (( skgid . 0 . clone (), facts . presence )) } )
     . collect () }

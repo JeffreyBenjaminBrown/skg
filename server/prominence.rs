@@ -343,16 +343,28 @@ fn climb_containerward_to_cycle (
   start             : &ID,
   map_to_containers : &MapToContainers,
 ) -> ( Vec<ID>, HashSet<ID> ) {
+  climb_containerward_to_cycle_via (
+    &|skgid : &ID| map_to_containers . get (skgid)
+      . cloned () . unwrap_or_default (),
+    start ) }
+
+/// 'climb_containerward_to_cycle', with each node's distinct
+/// containers from 'containers_of'. The climb follows single
+/// containers, so it stops at the first content origin: a node with
+/// no container or several (returned alone as the "cycle"), or the
+/// members of a rootlike cycle.
+pub fn climb_containerward_to_cycle_via (
+  containers_of : &dyn Fn (&ID) -> Vec<ID>,
+  start         : &ID,
+) -> ( Vec<ID>, HashSet<ID> ) {
   let mut path : Vec<ID> = vec![ start . clone () ];
   let mut path_set : HashSet<ID> =
     HashSet::from ( [ start . clone () ] );
   let mut current : ID = start . clone ();
   loop {
-    let containers : &[ID] =
-      map_to_containers . get (&current)
-      . map ( |v| v . as_slice () )
-      . unwrap_or (&[]);
-    if containers . len () != 1 { // Should not happen, because roots and multiply-contained nodes were already handled.
+    let containers : Vec<ID> =
+      containers_of (&current);
+    if containers . len () != 1 { // A content origin. (Prominence never reaches one here: it handled roots and multiply-contained nodes first.)
       return ( path, HashSet::from ( [current . clone () ] )); }
     let container : &ID = &containers[0];
     if path_set . contains (container) {

@@ -17,6 +17,9 @@ pub fn handle_close_view_request (
   match view_id_from_request (request) {
     Ok (view_id) => {
       views_state . open_views . unregister_view (&view_id);
+      if ! views_state . open_views . has_tdv_views () {
+        // The graph pair lives while a total diff view is open.
+        views_state . graph_pair = None; }
       send_response_with_length_prefix (
         stream,
         & tag_text_response (

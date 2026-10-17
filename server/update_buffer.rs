@@ -14,6 +14,7 @@ pub use viewnodestats::set_viewnodestats_in_viewforest;
 
 use complete::{complete_viewforest, CompletionContext};
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::graph_pair::types::GraphPair;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
@@ -434,13 +435,49 @@ pub fn render_initial_view (
     diff_tantivy_index : if diff_mode { Some (&runtime . tantivy_index) }
                          else         { None },
     substitute_existing_content_overrides : false,
-    warning_sink : Some (&mut sink), };
+    warning_sink : Some (&mut sink),
+    graph_pair   : None, };
   complete_viewforest ( &mut viewforest, &mut context ) ?;
   // De-novo rendering REPAIRS silently: the sink's ColRepairs do not
   // correspond to edits the user just made, so a fresh view carries no
   // completion warnings.
   drop (sink);
   Ok (( viewforest, Vec::new () )) }
+
+/// Complete a stub viewforest of the total diff view
+/// ('server/pcsvf.rs') over 'pair': view completion with 'graph_pair'
+/// set, which draws the union of the pair's content, the change
+/// folders and markers, and the removed members. It creates no
+/// default partner folders, spends no node budget, and never
+/// restricts by skgrepo (the total diff view requires the set 'all').
+pub fn complete_viewforest_with_graph_pair (
+  runtime    : &RuntimeGeneration,
+  pair       : &GraphPair,
+  viewforest : &mut ViewForest,
+) -> Result<(), Box<dyn Error>> {
+  let graph_snap : Arc<InRustGraph> = runtime . graph . clone ();
+  let mut editable_map : EditableMap = EditableMap::new ();
+  let mut errors : Vec<String> = Vec::new ();
+  let mut context : CompletionContext = CompletionContext {
+    editable_map                   : &mut editable_map,
+    skgrepo_diffs                  : &None,
+    runtime,
+    graph_snap                     : &graph_snap,
+    errors                         : &mut errors,
+    deleted_since_head_pid_src_map : &HashMap::new (),
+    deleted_by_this_save_pids      : &HashSet::new (),
+    deleted_by_this_save_extra_ids : &HashMap::new (),
+    skgrepo_restriction            : None,
+    node_budget                    : runtime . config . initial_node_limit,
+    create_partnerFolders_for_fresh_nodes : false,
+    diff_tantivy_index             : None,
+    substitute_existing_content_overrides : false,
+    warning_sink                   : None,
+    graph_pair                     : Some (pair), };
+  complete_viewforest ( viewforest, &mut context ) ?;
+  if ! errors . is_empty () {
+    return Err ( errors . join ("\n") . into () ); }
+  Ok (( )) }
 
 /// Strip stale diff data, re-complete the viewforest,
 /// set graph/view stats, and render to string.
@@ -479,7 +516,8 @@ pub fn rerender_view (
       // (the de-novo path passes the tantivy index instead).
       diff_tantivy_index : None,
       substitute_existing_content_overrides,
-      warning_sink, };
+      warning_sink,
+      graph_pair : None, };
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "complete_viewforest" ). entered();
       complete_viewforest (

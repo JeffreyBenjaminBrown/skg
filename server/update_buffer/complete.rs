@@ -16,7 +16,9 @@ use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_bra
 use crate::update_buffer::ancestry::{ folder_is_generalized_orphan, deaden_generalized_orphan_folder, is_folder_kind};
 use crate::update_buffer::util::detach_viewnode_transferring_focus;
 use crate::update_buffer::warnings::CompletionWarning;
+use crate::to_org::render::changes::process_unrestrictedVognode_changes;
 use crate::to_org::render::diff::process_unrestrictedVognode_diff;
+use crate::graph_pair::types::GraphPair;
 use crate::types::tree::viewnode_graphnode::{
   pid_and_skgrepo_from_viewnode_at, write_at_unrestrictedVognode_in_tree};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder, ViewRequest, Editability};
@@ -80,6 +82,12 @@ pub(super) struct CompletionContext<'a> {
   /// de-novo renders, collateral rerenders and rerender-all, whose
   /// repairs do not correspond to edits the user just made.
   pub(super) warning_sink : Option<&'a mut Vec<CompletionWarning>>,
+  /// Some only when completing a total diff view ('server/pcsvf.rs').
+  /// It replaces 'skgrepo_diffs' (None then): each unrestricted
+  /// vognode's visit ends with 'process_unrestrictedVognode_changes',
+  /// the partner folders draw the union of the pair, the node budget
+  /// is not spent, and no default folders are created.
+  pub(super) graph_pair : Option<&'a GraphPair>,
 }
 
 pub(super) fn complete_viewforest (
@@ -152,7 +160,8 @@ fn dispatch_node_update (
   match &kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (_)) =>
       visit_normal_node (tree, treeid, context) ?,
-    ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) =>
+    ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)
+      if context . graph_pair . is_none () =>
       // A folder fills its members WHOLE and is budget-neutral (TODO/DONE/local-view-update/plan_v2.org §5.5): the owning
       // vognode already spent its 1 budget unit when it expanded, so drawing all
       // the members here costs nothing more and never truncates a group.
@@ -181,8 +190,13 @@ fn dispatch_node_update (
       // FolderPolicy::WriteProtectedSet folder. The reconciler branches on
       // 'PartnerFolder::policy' where their treatment differs.
       if role . relation_member_role () . is_some () =>
+      // In a total diff view (graph_pair set) the folder draws the
+      // union of the pair; the Subscribee folder comes here too.
       reconcile_partnerFolder_children (
-        treeid, tree, *role, PartnerFolderGoalSource::LiveGraph,
+        treeid, tree, *role,
+        match context . graph_pair {
+          Some (pair) => PartnerFolderGoalSource::GraphPair (pair),
+          None        => PartnerFolderGoalSource::LiveGraph, },
         context . skgrepo_diffs,
         context . runtime, context . graph_snap,
         context . deleted_since_head_pid_src_map,
@@ -193,6 +207,10 @@ fn dispatch_node_update (
     // process_unrestrictedVognode_diff at the recorder's BFS visit, so their reconcilers must
     // see the real diffs (repo_diffs) or they would clobber the just-created
     // diff entries. Diffs flow inline for both de-novo and post-save.
+    // In a total diff view, the node's visit fills its alias, ID and
+    // flags folders from the graph pair
+    // ('process_unrestrictedVognode_changes').
+    ViewnodeKind::PropertyFolder (_) if context . graph_pair . is_some () => {},
     ViewnodeKind::PropertyFolder (PropertyFolder::Alias) =>
       super::reconcile::aliasfolder::reconcile_aliasFolder_children (
         tree, treeid, &context . runtime . graph,
@@ -254,6 +272,7 @@ fn visit_normal_node (
   // the node the user explicitly opened, so it always expands -- never truncated.
   // (The ancestor read is short-circuited to only run when the budget is spent.)
   if context . node_budget == 0
+    && context . graph_pair . is_none () // a total diff view has no node budget
     && ! read_at_ancestor_in_tree ( tree, treeid, 1,
            |vn : &Viewnode| matches! ( &vn . kind, ViewnodeKind::BufferRoot ) )
          . unwrap_or (false) {
@@ -283,7 +302,7 @@ fn visit_normal_node (
     context . deleted_by_this_save_extra_ids,
     context . skgrepo_restriction,
     settled, cascade, &mut context . node_budget,
-    context . skgrepo_diffs . is_none (), // substitution is off in diff mode: diff surfaces show raw graph facts
+    context . skgrepo_diffs . is_none () && context . graph_pair . is_none (), // substitution is off in diff mode and the total diff view: diff surfaces show raw graph facts
     context . substitute_existing_content_overrides ) ?;
   // The steps below apply only while the node is still an Unrestricted vognode.
   // The flip to a Diff phantom happens at the END of this visit
@@ -312,12 +331,19 @@ fn visit_normal_node (
     context . errors, context . skgrepo_restriction,
     context . skgrepo_diffs ) ?;
   // Ensure an editable subscribee's HiddenInSubscribeeFolder exists; the BFS
-  // reconciles it on reaching it.
-  super::reconcile::view_requests::ensure_hiddenInFolder_under_editable_subscribee (
-    tree, treeid, &context . runtime . graph,
-    &context . runtime . config,
-    context . skgrepo_restriction,
-    context . skgrepo_diffs ) ?;
+  // reconciles it on reaching it. (A default folder, so not in a
+  // total diff view.)
+  if context . graph_pair . is_none () {
+    super::reconcile::view_requests::ensure_hiddenInFolder_under_editable_subscribee (
+      tree, treeid, &context . runtime . graph,
+      &context . runtime . config,
+      context . skgrepo_restriction,
+      context . skgrepo_diffs ) ?; }
+  if let Some (pair) = context . graph_pair {
+    // The total diff view's counterpart of the git diff below: tag
+    // the content, draw what was removed, and add the change
+    // folders, markers and properties.
+    process_unrestrictedVognode_changes (tree, treeid, pair) ?; }
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3 / Jeff): compute this node's content+non-vognode diff LOCALLY,
   // at its own BFS visit. Runs last, after the node is fully completed as a
   // worktree Unrestricted node (content, folders, view requests), so process_unrestrictedVognode_diff

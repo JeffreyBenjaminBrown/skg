@@ -1,5 +1,6 @@
 pub mod contradictory_instructions;
 
+use crate::types::git::Sign;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::{
   carrier_on_owned_chain, resolve_override};
@@ -145,8 +146,10 @@ fn idFolder_membership_errors (
     let mut buffer_skgids : Vec<ID> =
       node_ref . children ()
       . filter_map ( |child| match &child . value () . kind {
-          MpViewnodeKind::Property (Property::ID { skgid, relationship_axes, .. })
+          MpViewnodeKind::Property (Property::ID { skgid, relationship_axes, change_facts, .. })
             if relationship_axes . net_is_present ()
+               // the total diff view's lost IDs
+               && change_facts . presence . rel != Some (Sign::Minus)
             => Some ( skgid . clone () ),
           _ => None } )
       . collect ();

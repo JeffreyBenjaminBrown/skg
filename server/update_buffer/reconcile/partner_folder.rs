@@ -1,6 +1,11 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use crate::graph_pair::types::{GraphPair, Partner};
+use crate::graph_pair::types::{GraphPair, Partner, Presence};
+use crate::to_org::expand::role_tree::{
+  RoleTreePartners, attach_full_containerward_role_trees_at_treeids_with_skgrepo_set,
+  build_and_integrate_role_tree_with_skgrepo_set};
+use crate::to_org::render::change_viewnodes::{
+  mk_historical_viewnode, mk_relRepo_move_viewnode};
 use crate::to_org::complete::partner_folder::child_data::{
   build_child_data,
   ChildData,
@@ -22,7 +27,7 @@ use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::{CompletionWarning, RepairKind};
-use crate::types::viewnode::{DiffPresence, FolderPolicy, AffectsParent, PartnerFolder, Viewnode, ViewnodeKind, Vognode};
+use crate::types::viewnode::{DiffPresence, Editability, FolderPolicy, AffectsParent, PartnerFolder, Phantom, Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -276,9 +281,93 @@ fn reconcile_partnerFolder_children_from_graph_pair (
       rel  : partner . presence . diff_sign (), } ))
     . collect ();
   apply_presence_to_folder_members (tree, node, &presence_by_skgid) ?;
+  redraw_removed_members_of_pair_folder (tree, node, kind, pair) ?;
+  attach_continuations_under_pair_folder_members (
+    tree, node, kind, member_role, pair, &partners, runtime ) ?;
   if kind . policy () != FolderPolicy::EditableSet {
     if let Some (sink) = warning_sink {
       push_repair_warnings (sink, kind, recorder_pid, summary); }}
+  Ok (( )) }
+
+/// The members of a pair-drawn folder whose relationship is only in
+/// the before-graph: one whose node the after-graph lacks becomes a
+/// historical phantom; in a folder whose membership the save reads
+/// (an EditableSet), a surviving one is demoted to a write-protected
+/// non-member and a dangling one is dropped, so saving the buffer
+/// does not restore them.
+fn redraw_removed_members_of_pair_folder (
+  tree   : &mut Tree<Viewnode>,
+  folder : NodeId,
+  kind   : PartnerFolder,
+  pair   : &GraphPair,
+) -> Result<(), Box<dyn Error>> {
+  let editable_set : bool = kind . policy () == FolderPolicy::EditableSet;
+  let members : Vec<NodeId> =
+    tree . get (folder) . ok_or ("redraw_removed_members_of_pair_folder: folder not found") ?
+    . children () . map ( |child| child . id () ) . collect ();
+  for member in members {
+    let (skgid, rel) : (ID, Option<Sign>) =
+      match &tree . get (member) . unwrap () . value () . kind {
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+          ( t . skgid . clone (), t . change_facts . presence . rel ),
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
+          ( u . skgid . clone (), u . change_facts . presence . rel ),
+        _ => continue, };
+    if pair . node_presence (&skgid) == Some (Presence::OnlyBefore) {
+      if let Some (historical) = mk_historical_viewnode (pair, &skgid, rel) {
+        tree . get_mut (member) . unwrap () . value () . kind = historical . kind; }
+      continue; }
+    if ! editable_set || rel != Some (Sign::Minus) { continue; }
+    let mut member_mut = tree . get_mut (member) . unwrap ();
+    match &mut member_mut . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
+        t . affectsParent = AffectsParent::False;
+        t . editability = Editability::WriteProtected; },
+      _ => { member_mut . detach (); }, }}
+  Ok (( )) }
+
+/// Under each member of a pair-drawn folder, the role-tree engine's
+/// continuation over the union of the pair: under a container, its
+/// full containerward tree; under any other member, the role tree of
+/// the folder's role, with a full containerward tree under each
+/// graft. In a folder of the anchor's own relationships, only under
+/// the members whose relationship changed. A member whose
+/// relationship moved to another skgrepo gets that move.
+fn attach_continuations_under_pair_folder_members (
+  tree        : &mut Tree<Viewnode>,
+  folder      : NodeId,
+  kind        : PartnerFolder,
+  member_role : RelationRole,
+  pair        : &GraphPair,
+  partners    : &[Partner],
+  runtime     : &RuntimeGeneration,
+) -> Result<(), Box<dyn Error>> {
+  let by_id : HashMap<&ID, &Partner> =
+    partners . iter () . map ( |partner| (&partner . id, partner) ) . collect ();
+  let outbound : bool = ! member_role . is_first_role ();
+  let members : Vec<(NodeId, &Partner)> =
+    tree . get (folder) . ok_or ("attach_continuations_under_pair_folder_members: folder not found") ?
+    . children ()
+    . filter_map ( |child| match &child . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+        by_id . get (&t . skgid) . map ( |partner| (child . id (), *partner) ),
+      _ => None, } )
+    . filter ( |(_, partner)| ! outbound || partner . changed () )
+    . collect ();
+  for (member, partner) in &members {
+    if let Some (moved) = mk_relRepo_move_viewnode (partner) {
+      tree . get_mut (*member) . unwrap () . prepend (moved); }}
+  let member_treeids : Vec<NodeId> =
+    members . iter () . map ( |(member, _)| *member ) . collect ();
+  if kind == PartnerFolder::Container {
+    attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
+      tree, &member_treeids, &runtime . graph, &runtime . config, None,
+      RoleTreePartners::GraphPair (pair) ) ?;
+  } else {
+    for member in member_treeids {
+      build_and_integrate_role_tree_with_skgrepo_set (
+        tree, member, &runtime . graph, member_role, &runtime . config,
+        None, RoleTreePartners::GraphPair (pair) ) ?; }}
   Ok (( )) }
 
 /// Translate a RepairSummary into per-repair-kind CompletionWarnings.

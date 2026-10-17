@@ -1,0 +1,6 @@
+pid: del
+title: del
+body: |-
+  the body del had
+contains:
+- delc

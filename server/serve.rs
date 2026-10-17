@@ -38,6 +38,7 @@ use crate::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_
 use crate::serve::handlers::text_search::render_enriched_search_buffer::{insert_full_containerward_role_trees_into_search_view, insert_overrideward_view_subtrees};
 use crate::serve::handlers::text_search::{ abandon_search_enrichment, handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
 use crate::serve::handlers::titles_by_skgids::handle_titles_by_skgids_request_with_skgrepo_set;
+use crate::serve::handlers::total_diff_view::handle_total_diff_view_request;
 use crate::serve::handlers::link_statuses::handle_link_statuses_request;
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
@@ -255,6 +256,10 @@ fn handle_emacs (
               &mut skgrepo_restriction,
               &enrichment_slot,
               &search_cancelled ),
+          Ok (RequestType::TotalDiffView) =>
+            handle_total_diff_view_request (
+              &mut stream, &request_header, &env, &mut views_state,
+              &skgrepo_restriction ),
           Ok (RequestType::HeraldRules) =>
             handle_herald_rules_request ( &mut stream ),
           Ok (RequestType::GitDiffModeToggle) =>

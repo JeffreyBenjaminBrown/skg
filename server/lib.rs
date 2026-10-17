@@ -17,6 +17,7 @@ pub(crate) mod body_view_escape;
 pub mod metadata_canon;
 pub mod nodeMerge;
 pub mod org_to_text;
+pub mod pcsvf;
 pub mod readiness_store;
 pub mod save;
 pub mod serve;

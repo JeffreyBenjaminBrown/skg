@@ -17,10 +17,11 @@ use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ChangesetMarkerKind, Phantom, Property, ReadinessAxis, ReadinessRequest,
-  Viewnode, ViewnodeKind, Vognode};
+  ChangeFacts, ChangesetMarkerKind, Phantom, Property, ReadinessAxis,
+  ReadinessRequest, Viewnode, ViewnodeKind, Vognode};
 
-use ego_tree::NodeRef;
+use ego_tree::{NodeId, NodeRef};
+use std::collections::BTreeSet;
 use std::sync::{Arc, MutexGuard};
 
 /// After a save's graph edits succeeded: apply the saved buffer's
@@ -81,78 +82,200 @@ pub fn readiness_requests_in_viewforest (
   viewforest . root () . descendants ()
     . filter_map ( |node| {
       let request : &ReadinessRequest = readiness_request_of (node . value ()) ?;
-      let mut leaves : Vec<LeafKey> = Vec::new ();
-      let mut all_of : Vec<ID> = Vec::new ();
-      let mut content_relationships_of : Vec<(ID, RelationshipAspect)> =
-        Vec::new ();
-      match &node . value () . kind {
-        ViewnodeKind::Vognode (vognode) => {
-          let pid : ID = vognode_leaf_pid (node . value (), &pid_of) ?;
-          let is_unknown : bool =
-            matches! (vognode, Vognode::Phantom (Phantom::Unknown (_)));
-          let axes : Vec<ReadinessAxis> =
-            if ! request . axes . is_empty () {
-              request . axes . iter () . copied () . collect ()
-            } else if is_unknown { vec! [ ReadinessAxis::Rel ] }
-            else { vec! [ ReadinessAxis::Node, ReadinessAxis::Rel ] };
-          for axis in axes {
-            match axis {
-              ReadinessAxis::Node if ! is_unknown =>
-                leaves . push ( LeafKey::Node {
-                  pid : pid . clone (), aspect : NodeAspect::Existence } ),
-              ReadinessAxis::Node => {},
-              ReadinessAxis::Rel =>
-                leaves . extend ( relationship_to_viewparent (
-                  node, &pid, &pid_of, RelationshipAspect::Existence )),
-              ReadinessAxis::All =>
-                all_of . push (pid . clone ()), }} },
-        ViewnodeKind::Property (property) => {
-          // A folder's leaf belongs to the folder's viewparent; the
-          // total diff view's properties hang under their node.
-          let owner_of_folder = || -> Option<ID> {
-            Some ( pid_of ( &grandparent_pid (node) ? )) };
-          let parent : NodeRef<Viewnode> = node . parent () ?;
-          let parent_pid = || -> Option<ID> {
-            vognode_leaf_pid (parent . value (), &pid_of) };
-          match property {
-            Property::Alias { text, .. } =>
-              leaves . push ( LeafKey::Node {
-                pid : owner_of_folder () ?,
-                aspect : NodeAspect::Alias (text . clone ()) } ),
-            Property::ID { skgid, .. } =>
-              leaves . push ( LeafKey::Node {
-                pid : owner_of_folder () ?,
-                aspect : NodeAspect::ExtraId (skgid . clone ()) } ),
-            Property::Flag { flag, .. } =>
-              leaves . push ( LeafKey::Node {
-                pid : owner_of_folder () ?,
-                aspect : NodeAspect::Flag (*flag) } ),
-            Property::OldText { .. } =>
-              leaves . push ( LeafKey::Node {
-                pid : parent_pid () ?, aspect : NodeAspect::Text } ),
-            Property::HomeSkgrepoMove { .. } =>
-              leaves . push ( LeafKey::Node {
-                pid : parent_pid () ?, aspect : NodeAspect::Home } ),
-            Property::RelRepoMove { .. } =>
-              leaves . extend ( relationship_to_viewparent (
-                parent, &parent_pid () ?, &pid_of,
-                RelationshipAspect::RelRepo )),
-            Property::ChangesetMarker { kind, .. } => match kind {
-              ChangesetMarkerKind::Content =>
-                content_relationships_of . push ((
-                  parent_pid () ?, RelationshipAspect::Existence )),
-              ChangesetMarkerKind::RelRepo =>
-                content_relationships_of . push ((
-                  parent_pid () ?, RelationshipAspect::RelRepo )),
-              ChangesetMarkerKind::OrderOnly => {}, }, // always ready
-            Property::TextChanged { .. } | Property::BodyDiff { .. } =>
-              return None, }},
-        _ => return None, }
+      let named : NamedLeaves = leaves_named_at (node, &request . axes, &pid_of) ?;
       Some ( RequestedReadiness {
         ready    : request . ready,
-        leaves, all_of, content_relationships_of,
+        leaves   : named . leaves,
+        all_of   : named . all_of,
+        content_relationships_of : named . content_relationships_of,
         headline : node . value () . title () . to_string (), } ) } )
     . collect () }
+
+/// What a request on a viewnode names (see 'RequestedReadiness').
+struct NamedLeaves {
+  leaves                   : Vec<LeafKey>,
+  all_of                   : Vec<ID>,
+  content_relationships_of : Vec<(ID, RelationshipAspect)>,
+}
+
+/// The leaves that a request on the axes 'axes' at 'node' names. No
+/// axes on a vognode means both of its axes (only 'rel' on an unknown
+/// phantom); a property leaf has one axis. None for a viewnode that
+/// names no leaf.
+fn leaves_named_at (
+  node   : NodeRef<Viewnode>,
+  axes   : &BTreeSet<ReadinessAxis>,
+  pid_of : &dyn Fn (&ID) -> ID,
+) -> Option<NamedLeaves> {
+  let mut leaves : Vec<LeafKey> = Vec::new ();
+  let mut all_of : Vec<ID> = Vec::new ();
+  let mut content_relationships_of : Vec<(ID, RelationshipAspect)> =
+    Vec::new ();
+  match &node . value () . kind {
+    ViewnodeKind::Vognode (vognode) => {
+      let pid : ID = vognode_leaf_pid (node . value (), pid_of) ?;
+      let is_unknown : bool =
+        matches! (vognode, Vognode::Phantom (Phantom::Unknown (_)));
+      let axes : Vec<ReadinessAxis> =
+        if ! axes . is_empty () {
+          axes . iter () . copied () . collect ()
+        } else if is_unknown { vec! [ ReadinessAxis::Rel ] }
+        else { vec! [ ReadinessAxis::Node, ReadinessAxis::Rel ] };
+      for axis in axes {
+        match axis {
+          ReadinessAxis::Node if ! is_unknown =>
+            leaves . push ( LeafKey::Node {
+              pid : pid . clone (), aspect : NodeAspect::Existence } ),
+          ReadinessAxis::Node => {},
+          ReadinessAxis::Rel =>
+            leaves . extend ( relationship_to_viewparent (
+              node, &pid, pid_of, RelationshipAspect::Existence )),
+          ReadinessAxis::All =>
+            all_of . push (pid . clone ()), }} },
+    ViewnodeKind::Property (property) => {
+      // A folder's leaf belongs to the folder's viewparent; the
+      // total diff view's properties hang under their node.
+      let owner_of_folder = || -> Option<ID> {
+        Some ( pid_of ( &grandparent_pid (node) ? )) };
+      let parent : NodeRef<Viewnode> = node . parent () ?;
+      let parent_pid = || -> Option<ID> {
+        vognode_leaf_pid (parent . value (), pid_of) };
+      match property {
+        Property::Alias { text, .. } =>
+          leaves . push ( LeafKey::Node {
+            pid : owner_of_folder () ?,
+            aspect : NodeAspect::Alias (text . clone ()) } ),
+        Property::ID { skgid, .. } =>
+          leaves . push ( LeafKey::Node {
+            pid : owner_of_folder () ?,
+            aspect : NodeAspect::ExtraId (skgid . clone ()) } ),
+        Property::Flag { flag, .. } =>
+          leaves . push ( LeafKey::Node {
+            pid : owner_of_folder () ?,
+            aspect : NodeAspect::Flag (*flag) } ),
+        Property::OldText { .. } =>
+          leaves . push ( LeafKey::Node {
+            pid : parent_pid () ?, aspect : NodeAspect::Text } ),
+        Property::HomeSkgrepoMove { .. } =>
+          leaves . push ( LeafKey::Node {
+            pid : parent_pid () ?, aspect : NodeAspect::Home } ),
+        Property::RelRepoMove { .. } =>
+          leaves . extend ( relationship_to_viewparent (
+            parent, &parent_pid () ?, pid_of,
+            RelationshipAspect::RelRepo )),
+        Property::ChangesetMarker { kind, .. } => match kind {
+          ChangesetMarkerKind::Content =>
+            content_relationships_of . push ((
+              parent_pid () ?, RelationshipAspect::Existence )),
+          ChangesetMarkerKind::RelRepo =>
+            content_relationships_of . push ((
+              parent_pid () ?, RelationshipAspect::RelRepo )),
+          ChangesetMarkerKind::OrderOnly => {}, }, // always ready
+        Property::TextChanged { .. } | Property::BodyDiff { .. } =>
+          return None, }},
+    _ => return None, }
+  Some ( NamedLeaves { leaves, all_of, content_relationships_of } ) }
+
+/// The leaves of 'forest' that 'named' names.
+fn keys_in_forest (
+  named  : &NamedLeaves,
+  forest : &ChangeForest,
+) -> Vec<LeafKey> {
+  named . leaves . iter () . cloned ()
+    . chain ( named . all_of . iter () . flat_map ( |pid|
+      forest . leaves_under (pid) . iter ()
+        . map ( |leaf| leaf . key . clone () )) )
+    . chain ( named . content_relationships_of . iter ()
+      . flat_map ( |(pid, aspect)|
+        forest . leaves_under (pid) . iter ()
+          . map ( |leaf| leaf . key . clone () )
+          . filter ( move |key| matches! ( key,
+            LeafKey::Relationship {
+              relation : NodeRelation::Contains, recorder,
+              aspect : leaf_aspect, .. }
+            if recorder == pid && leaf_aspect == aspect )) ))
+    . filter ( |key| forest . leaf (key) . is_some () )
+    . collect () }
+
+/// Set the '(ready ...)' display fact of every viewnode that carries
+/// one, from 'store': an axis is ready when it names some leaf of
+/// 'forest' and every leaf it names is marked at its current
+/// fingerprint. The order-only marker is always ready.
+pub fn set_ready_facts_in_viewforest (
+  viewforest : &mut ViewForest,
+  forest     : &ChangeForest,
+  store      : &ReadinessStore,
+  graph      : &InRustGraph,
+) {
+  let pid_of = |skgid : &ID| -> ID {
+    graph . pid_of (skgid) . unwrap_or_else ( || skgid . clone () ) };
+  let axis_is_ready = |node : NodeRef<Viewnode>, axes : &[ReadinessAxis]| -> bool {
+    let Some (named) = leaves_named_at (
+      node, &axes . iter () . copied () . collect (), &pid_of ) else {
+        return false; };
+    let keys : Vec<LeafKey> = keys_in_forest (&named, forest);
+    ! keys . is_empty () && forest . readiness_of_leaves (store, &keys) };
+  let ready_facts : Vec<(NodeId, Option<BTreeSet<ReadinessAxis>>)> =
+    viewforest . root () . descendants ()
+    . filter_map ( |node| {
+      let ready : Option<BTreeSet<ReadinessAxis>> =
+        match &node . value () . kind {
+          ViewnodeKind::Vognode (
+            Vognode::Unrestricted (_)
+            | Vognode::Phantom (Phantom::Historical (_)) ) => {
+            let axes : BTreeSet<ReadinessAxis> =
+              [ ReadinessAxis::Node, ReadinessAxis::Rel ] . into_iter ()
+              . filter ( |axis| axis_is_ready (node, &[ *axis ]) )
+              . collect ();
+            ( ! axes . is_empty () ) . then_some (axes) },
+          ViewnodeKind::Vognode (
+            Vognode::Phantom (Phantom::Deleted (_) | Phantom::Unknown (_)) ) =>
+            axis_is_ready (node, &[]) . then (BTreeSet::new),
+          ViewnodeKind::Property ( Property::ChangesetMarker {
+            kind : ChangesetMarkerKind::OrderOnly, .. } ) =>
+            Some (BTreeSet::new ()),
+          ViewnodeKind::Property (property)
+            if property . readiness_request () . is_some ()
+               || change_facts_of_property (property) . is_some () =>
+            axis_is_ready (node, &[]) . then (BTreeSet::new),
+          _ => return None, };
+      Some (( node . id (), ready )) } )
+    . collect ();
+  for (treeid, ready) in ready_facts {
+    if let Some (change_facts) =
+      change_facts_mut ( viewforest . get_mut (treeid) . unwrap () . value () ) {
+      change_facts . ready = ready; }}}
+
+fn change_facts_of_property (
+  property : &Property,
+) -> Option<&ChangeFacts> {
+  match property {
+    Property::Alias { change_facts, .. }
+    | Property::ID { change_facts, .. }
+    | Property::Flag { change_facts, .. }
+    | Property::OldText { change_facts, .. }
+    | Property::HomeSkgrepoMove { change_facts, .. }
+    | Property::RelRepoMove { change_facts, .. }
+    | Property::ChangesetMarker { change_facts, .. } => Some (change_facts),
+    Property::TextChanged { .. } | Property::BodyDiff { .. } => None, } }
+
+fn change_facts_mut (
+  viewnode : &mut Viewnode,
+) -> Option<&mut ChangeFacts> {
+  match &mut viewnode . kind {
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some (&mut t . change_facts),
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) => Some (&mut d . change_facts),
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) => Some (&mut u . change_facts),
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) => Some (&mut h . change_facts),
+    ViewnodeKind::Property (
+      Property::Alias { change_facts, .. }
+      | Property::ID { change_facts, .. }
+      | Property::Flag { change_facts, .. }
+      | Property::OldText { change_facts, .. }
+      | Property::HomeSkgrepoMove { change_facts, .. }
+      | Property::RelRepoMove { change_facts, .. }
+      | Property::ChangesetMarker { change_facts, .. } ) => Some (change_facts),
+    _ => None, } }
 
 /// The ID a vognode's leaves are keyed by: a historical phantom's as
 /// written (a node of the before-graph), any other's resolved by
@@ -178,22 +301,12 @@ pub fn apply_readiness_requests (
 ) -> Vec<String> {
   let mut warnings : Vec<String> = Vec::new ();
   for request in requests {
-    let keys : Vec<LeafKey> =
-      request . leaves . iter () . cloned ()
-      . chain ( request . all_of . iter () . flat_map ( |pid|
-        forest . leaves_under (pid) . iter ()
-          . map ( |leaf| leaf . key . clone () )) )
-      . chain ( request . content_relationships_of . iter ()
-        . flat_map ( |(pid, aspect)|
-          forest . leaves_under (pid) . iter ()
-            . map ( |leaf| leaf . key . clone () )
-            . filter ( move |key| matches! ( key,
-              LeafKey::Relationship {
-                relation : NodeRelation::Contains, recorder,
-                aspect : leaf_aspect, .. }
-              if recorder == pid && leaf_aspect == aspect )) ))
-      . filter ( |key| forest . leaf (key) . is_some () )
-      . collect ();
+    let keys : Vec<LeafKey> = keys_in_forest (
+      &NamedLeaves {
+        leaves                   : request . leaves . clone (),
+        all_of                   : request . all_of . clone (),
+        content_relationships_of : request . content_relationships_of . clone (), },
+      forest );
     if keys . is_empty () {
       warnings . push ( format! (
         "The readiness request on \"{}\" names no current change; it was dropped.",
