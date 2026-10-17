@@ -1,0 +1,2120 @@
+* [Jeff] vision : a total diff view
+** how to read this
+In all of the following, hopefully (i.e. if I haven't screwed up),
+angle brackets wrap descriptors,
+and quotation marks wrap special herald text.
+
+Sometimes I'll say gnode and vnode (graphnode and viewnode) here,
+because it's important to bear in mind the distinction:
+A gnode can be represented by a vnode,
+but not every vnode represents a gnode;
+a vnode might instead represent an aspect of a gnode.
+Child and parent is meaningless in the graph,
+but meaningful in a viewforest.
+
+Sometimes I'll talk about a vnode's gnode.
+When I do that I mean the gnode that a vnode represents.
+(If the vnode is a folder, or anything but a vognode,
+then I'm probably accidentally talking nonsense.)
+Similarly, maybe I'll talk about a gnode's vnode(s);
+that would be all the vnodes that represent the gnode.
+** problems and motivation
+*** Changes must be committed to all skgrepos at once.
+Magit is already not a great graph interface.
+But it's particualarly terrible when changes span repos.
+One problem the total diff view will solve is that
+it will let the user see all changes at once.
+*** A user needs to be able to mark changed aspects of a node commit-ready.
+In the diff, a node might come up in multiple different places.
+The user (me) has in the past needed to see all those spots
+before deciding whether a node is ready to commit.
+This required manual note-taking in some side channel; painful.
+The user should therefore be able to represent commit-readiness
+in skg, and granularly: not just that the whole node is ready,
+but that some aspect (its aliases, say) is ready.
+
+If two vnodes V and V' represent the same gnode G,
+and the user marks one of them commit-ready,
+the other should be updated to show the same thing.
+Stated declaratively rather than procedurally,
+commit-readiness is a property of gnodes, not vnodes.
+
+It is also a property of *aspects* of gnodes,
+such as a gnode's list of aliases.
+The same logic (share it across vnodes)
+applies to two folders representing
+the same aspect of the same gnode.
+**** [Claude] agreed, and the store should be keyed that way
+I will use two terms throughout my replies. A mark is the recorded
+fact that the user has declared one change commit-ready. The store is
+the server-side table that holds the marks. If the store keys each
+mark by graphnode or by relationship, and never by occurrence, then
+every image of the same change reads the same entry, and the sharing
+you describe needs no propagation code. The details sit under "derive,
+don't store", beneath "automatic commit-readiness aggregation".
+** prerequisites
+*** folder the non-content trees
+Currently, commands like "C-c p C" draw a viewforest
+by making its roots children of the vnode it was called at.
+That's fine. But we should also be able to draw those same
+viewforests under folders. That is, where
+skg-show-containerward-tree would show:
+#+begin_example
+  * node A
+  ** node C which contains A, with a special herald
+  *** node C' which contains C
+  ** node B, ordinary content
+#+end_example
+skg-show-containerward-tree-in-folder would instead show
+#+begin_example
+  * node A
+  ** "these nodes contain it"
+  *** node C which contains A, with a special herald
+  **** node C' which contains C
+  ** node B, ordinary content
+#+end_example
+The heralds on C would be the same in both cases,
+as would the heralds on C'.
+**** [Claude] this is two partner folders plus the engine that exists
+A role tree's first generation is exactly the set that a partner
+folder lists: the nodes that play one role toward the folder's parent.
+So a containerward tree in a folder is a container folder whose
+members each continue into their own containerward role tree. The
+continuation already exists. 'attach_full_containerward_role_trees_at_treeids'
+in [[file:../../server/to_org/expand/role_tree.rs][server/to_org/expand/role_tree.rs]] hangs a full containerward tree under any list of
+viewnodes, and every non-container role tree already does this under
+its grafts. (That full tree comes from
+'full_containerward_role_tree_from_in_rust_graph', which stops at the
+depth 'max_role_tree_depth'.) What is missing is the folder for the
+two roles that have none. Glossary footnote 3 already says "A
+containerFolder or mentionerFolder might be a good idea". I would add
+'PartnerFolder::Container' and 'PartnerFolder::Mentioner', both with
+the 'WriteProtectedSet' policy, reading the graph's 'contained_by' and
+'mentioners_of' maps. Then one new view request, say
+'(viewRequests (folderTree ROLENAME))', would build the folder and run
+the role-tree engine from each member. The subscriber, overrider and
+hider folders would get the same request for free, since their
+folders exist.
+***** the heralds on C will differ by one letter
+Ancestor flags count folders as generations. docs/heralds.org says
+"the ancestor generation, counting folders", and the subscribee
+folder's members show it today: they read 'bS'. So C under "these
+nodes contain it" would read 'Cb', where the unfoldered C reads 'Ca'.
+Making folders transparent to generation counting would be a wider
+change than this feature. I would accept 'Cb', because it is
+consistent with every other folder.
+****** DONE [Jeff] agreed
+The transparency idea is attractive,
+but I won't pull the trigger unless
+dogfooding makes me really want it.
+***** DONE [Jeff] the depth bound / node limit is a problem
+For the TDV to be total, it can't get truncated.
+I doubt this will bite in practice, because it is so pruned.
+But still we should disable those things when unfolding the TDV.
+****** [Claude] agreed; both limits should be off while the TDV is drawn
+I agree. The node budget is 'initial_node_limit' (default 1000; the
+skgconfig table in docs/api-and-formats.org documents it), and the
+depth bound is the one my next answer describes. Both should be
+disabled while the TDV is unfolded. A precedent exists: diff phantoms
+already bypass the node budget. If a TDV still turns out too large to
+draw, the server should report that the view is incomplete rather
+than truncate it silently. I have folded this decision into
+"uniqueness, the node budget and the depth bound" under the PCSVF
+definition.
+***** DONE [Jeff] What is the depth bound?
+I knew there was a node limit when drawing a content tree.
+I don't remember a depth bound.
+****** [Claude] it is 'max_role_tree_depth', and it bounds only containerward role trees
+The depth bound is the config field 'max_role_tree_depth' in
+'SkgConfig' ([[file:../../server/types/misc.rs][server/types/misc.rs]]). Its default is 20. The skgconfig table in
+docs/api-and-formats.org does not list it; only the glossary mentions
+it, under "role tree". It bounds only the FULL containerward role
+tree, which 'full_containerward_role_tree_from_in_rust_graph' in
+[[file:../../server/dbs/in_rust_graph/containerward_role_tree.rs][containerward_role_tree.rs]] builds. Two callers use that tree: the role-tree
+engine, for the containerward ancestry above a view root in a de-novo
+render and for the trees it attaches under role grafts, and search
+enrichment. A node at that depth comes back as 'DepthTruncated', and
+the renderer draws it without its containers. Ordinary content
+expansion has no depth bound; it has only the node budget.
+******* [Jeff]
+******** let's rename
+full_containerward_role_tree_from_in_rust_graph
+-> full_containerward_role_tree_from_inRustGraph
+Otherwise it's confusing ("from in"?).
+********* [Claude] agreed; it goes into the housekeeping slice of the plan
+I agree. Three functions carry the 'from_in_rust_graph' suffix:
+'full_containerward_role_tree_from_in_rust_graph',
+'full_containerward_ancestry_from_in_rust_graph' and
+'prominence_sources_for_saved_from_in_rust_graph'. All three should
+end in 'from_inRustGraph', to match the type 'InRustGraph'. I have
+added a housekeeping slice to the prerequisites (item 11) that
+collects the renames you have asked for in this document, so that
+they land as one small first commit of the execution phase rather
+than now, while we are still planning.
+********** DONE [Jeff] What's wrong with 'graphnode_and_viewnode_from_skgid'?
+*********** [Claude] nothing; my sentence was wrong
+Nothing is wrong with it. My earlier sentence named it by mistake,
+because its name does not contain 'in_rust_graph' at all. I have
+corrected the text above: the three functions that carry the suffix
+are listed there, and item 11 renames exactly those three.
+******** DONE let's have sure api-and-formats list it
+and every other config option.
+********* [Claude] two fields are missing today
+I compared 'SkgConfig' in [[file:../../server/types/misc.rs][server/types/misc.rs]] with the table in [[file:../../docs/api-and-formats.org][docs/api-and-formats.org]]. The
+table lists 'tantivy_folder', 'port', 'initial_node_limit',
+'timing_log', 'beep_when_server_becomes_available' and
+'default_repo_set'. It omits 'owned_folder' and 'max_role_tree_depth'.
+The '[[repos]]' entries are described in the "Skgrepos" section below
+the table. The housekeeping slice (item 11) adds the two missing rows,
+under whatever names the renames settle on.
+********** [Jeff]
+*********** let's also rename max_role_tree_depth
+-> max_roleTree_depth,
+so nobody expects a tree of max roles, whatever that would be.
+************ [Claude] folded into item 11
+Item 11 already lists this rename, because you asked for it under
+"changes to a gnode's container set" too.
+*********** how does 'beep_when_server_becomes_available' work?
+Does it default to true or false?
+(I think I might need to enable that in my configs.)
+************ [Claude] it defaults to true, and it needs a sound file and 'pw-play'
+It defaults to true, both in the code
+('default_beep_when_server_becomes_available' in [[file:../../server/types/misc.rs][server/types/misc.rs]]) and in
+the config table of [[file:../../docs/api-and-formats.org][docs/api-and-formats.org]], so you do not need to set it. The
+mechanism is 'play_ready_sound_in_background' in [[file:../../server/main.rs][server/main.rs]]. After
+initialization finishes and the server logs "Server ready.", it looks
+for the file '/home/sound/beep-glorious.wav'. If that file is
+missing, it logs one debug-level message and plays nothing. Otherwise
+it spawns a thread that runs 'pw-play' on the file with the player's
+output discarded, and a failure of the player is also logged only at
+debug level. So silence has three possible causes: the option is
+false in your config, the sound file is absent on that machine, or
+'pw-play' (PipeWire's player) is not on the server's PATH. In this
+container the file exists and 'pw-play' is at /bin/pw-play. Both the
+path and the player are hard-coded; a config field for the sound path
+would be a small improvement, but I have not added it to item 11.
+*** folder the content
+The special treatment of content relationships is
+problematic for marking changes commit-ready.
+
+The changes to other aspects of a gnode -- its aliases, say,
+or even its containers (once non-content trees are folderable)
+-- can be collected under a folder.
+Its contents, though, are presented as immediate children.
+There is thus no content folder that one can mark 'done'
+after verifying that the content relationships are commit-ready.
+
+Skg therefore needs two equivalent ways of presenting content:
+As immediate children, or under a "content folder",
+which would bear the herald text "its content" in the system font.
+**** [Claude] the most invasive prerequisite, and three ways to do it
+'contains' is the one list that save extraction reads from a node's
+direct children; 'content_members' in [[file:../../server/from_text/local_fieldintent_collection/traverse.rs][traverse.rs]] does that
+reading. Many other sites also look for content directly under the
+vognode: the content reconciler, the editable draw rule and its
+cascade, the node budget, the collected IDs of override substitution,
+the hidden-in-subscribee filter, the ancestry checks, 'org_to_text',
+the parser, and the client's subtree walkers ('skg-set-repo-recursive',
+'skg-git-add-if-new-recursive', 'skg-delete-recursive'). Any second
+shape for content would have to be honored at every one of those
+sites. I see three ways to get what you want.
+***** A1: an optional folder (your proposal, literally)
+A1 adds a 'PartnerFolder::Content' kind, with the 'EditableSet' policy
+and the contains relation's second role as its member role, and the
+folder is either present or absent under a node. The save rule would
+be: when a node has a content folder, its direct vognode children must
+be non-members ('affectsParent false'), and the folder's members
+define 'contains'. Every consumer would learn to look through the
+folder. The code would carry two shapes everywhere, forever.
+***** A2: always foldered internally, two serializations
+A2 gives every vognode a content folder in the viewforest, always. The
+renderer writes the folder as a headline only when the folder is
+flagged explicit, and the parser inserts an implicit folder under
+every vognode whose text lacks one. Internally the code then has one
+shape; the two shapes exist only at the text boundary. The leak sits
+at the edges: an implicit folder must not count as an ancestor
+generation, must not take focus or fold state, and must not appear in
+error messages. A2 touches fewer sites than A1, but each site is
+subtler.
+***** B: no content folder; a changeset marker carries the aggregate
+The TDV needs the content folder for three things: a place to mark
+the whole content list ready, a place for the aggregate ∃ and ~
+heralds, and a way to order the content among the rightward folders
+ahead of the leftward ones. B keeps the content as direct children and
+gives the first two things to one changeset marker instead. A
+changeset marker is a childless non-vognode line that stands for a set
+of changes recorded in its parent's files and carries their derived
+commit-readiness; the term is yours, from "changed a relationship's
+skgrepo". You settled the shape of this one in your reply below: a
+non-vognode child labelled "its content changed", drawn beside the
+folders, which carries the aggregate heralds and is the headline the
+user marks. (I first proposed carrying the aggregate on the vognode's
+own headline; your changeset marker is better, because it leaves the
+vognode's heralds as they are.) Only the ordering is lost: the content
+members stay after every folder, because the reconciler parks
+non-vognode children first. B is the cheapest option by far, and it
+changes nothing in save extraction.
+***** my opinion
+B gets the TDV built soonest, and it touches nothing load-bearing. A2
+is the right end state if you ever want foldered content as a general
+view feature, and it is cleaner than A1 because the code keeps one
+shape. I would start with B and schedule A2 as its own project, with
+the content test matrix run in both presentations, unless the
+ordering argument matters more to you than the delay.
+***** DONE [Jeff] let's go with B
+I realize now that we can do for content like we do with the
+"some content relationships changed skgrepo" viewnode:
+#+begin_example
+  * <node N>
+  ** "its content changed"
+  ** "new" <node A>
+  *** <node B>
+  *** "deleted" <node C>
+  *** ...
+#+end_example
+That way the user has something to mark,
+and the interface doesn't have to change radically.
+****** [Claude] folded into option B above, and into the open question
+I rewrote option B to describe your "its content changed" changeset
+marker, and I answered the open question "Content folder: A1, A2 or
+B?" with it. The changeset marker also appears now in the heralds
+inventory, the viewnode-kind inventory and the metadata proposal.
+*** [Claude] prerequisites, expanded: general-purpose tools, in build order
+Everything below comes from reading the diff machinery
+([[file:../../server/git_ops/diff.rs][server/git_ops/diff.rs]], [[file:../../server/to_org/render/diff.rs][server/to_org/render/diff.rs]], [[file:../../server/diff_report/][server/diff_report/]]), view
+completion ([[file:../../server/update_buffer/complete.rs][server/update_buffer/complete.rs]]), the folder engine ([[file:../../server/to_org/complete/partner_folder/][server/to_org/complete/partner_folder/]])
+and the role-tree engine ([[file:../../server/to_org/expand/role_tree.rs][server/to_org/expand/role_tree.rs]]). I list the tools in the
+order in which I would build them. Each tool is useful on its own,
+and each later one leans on the earlier ones. Your two prerequisites
+are items 4 and 5; items 9 to 11 came from your second pass. My later
+replies refer to these items as "tool 1" through "tool 11".
+**** 1. a graph pair: the before-graph, built from a git snapshot
+This tool is the foundation, and it is cheap, because both halves
+exist. The diff report already reads every '.skg' blob at HEAD (or at
+the index) into a 'GraphSnapshot' of composed telescopes;
+'read_graph_snapshot' in [[file:../../server/diff_report/git_snapshot.rs][server/diff_report/git_snapshot.rs]] does that reading, and a
+cache keyed by the HEAD commit id keeps it from repeating the work.
+'InRustGraph::from_graphnodes' in [[file:../../server/dbs/in_rust_graph.rs][server/dbs/in_rust_graph.rs]] builds a graph,
+with all of its recorderward relmaps, from a list of Graphnodes.
+Gluing those two together gives exactly the "two inRustGraphs" you
+propose under "deleted a gnode". I will call the result a graph pair:
+#+begin_example
+  struct GraphPair { before : Arc<InRustGraph>, after : Arc<InRustGraph> }
+#+end_example
+Here 'before' is the graph built from the last commits, and 'after'
+is the live graph. On top of the pair, a small API answers questions
+about the union of the two graphs. I will call that API the union
+walk:
+#+begin_example
+  enum Presence { Both, OnlyBefore, OnlyAfter }
+  node_presence (id)   -> Option<Presence>
+  node_changes  (id)   -> text? aliases± extraIds± flags± home (old, new)?
+  partners (id, role)  -> Vec<(ID, Presence, relRepo before?, relRepo after?)>
+  changed_pids ()      -> { rightward : HashSet<ID>, leftward : HashSet<ID> }
+#+end_example
+'Presence' says whether a node or a relationship exists in both
+graphs, only in the before-graph, or only in the after-graph.
+'partners' walks the UNION of the two graphs, so one call reaches a
+removed container, a deleted node's former content and a new
+relationship alike, and it tags each one with its presence. The
+containerward tracing in the PCSVF, the diffed containerward forests,
+the diffed partner folders and the alias and ID folders all reduce to
+this API.
+***** why not extend today's 'SkgrepoDiff'
+Today's diff view works per file and per stage. (A stage is one of
+git's two halves: the staged half compares HEAD to the index, and the
+unstaged half compares the index to the worktree.)
+'compute_diff_for_skgrepo' yields, for each changed file, one
+'NodeChanges' per stage, and the renderer first reconciles the
+worktree view and then patches diff facts onto it, in
+'process_unrestrictedVognode_diff'. Three things make that the wrong
+base for the TDV. First, it cannot answer containerward questions
+about the old graph, because no recorderward relmaps exist for HEAD;
+that is why removed containers today need an "inverse scan" over
+every changed file. Second, it compares members by ID only, and so it
+drops relRepo (see item 2). Third, the per-stage split doubles every
+rule; the reorder-as-remove-plus-add bug in [[file:../diff-render-roundtrip.org][TODO/diff-render-roundtrip.org]] was a
+symptom. A pair of graphs answers all of these questions uniformly.
+The staged/unstaged distinction is the one thing the pair does NOT
+give for free, and you decided to drop it: the TDV compares HEAD with
+the worktree only, and the index never enters.
+***** lifetime and cost
+The server would build the before-graph when a TDV is opened, keep it
+in the view's state while the TDV stays open, and rebuild it when
+HEAD moves; the snapshot cache key already detects that move. On the
+28k-node dataset the HEAD read is the slow part, and it is already
+cached; the graph build is a linear pass. The memory cost is one more
+graph while a TDV is open.
+**** 2. relationship diffs that see relRepo
+'compare_graphnodes' in [[file:../../server/git_ops/diff.rs][server/git_ops/diff.rs]] diffs 'members_of (contains)',
+which is a list of IDs, so a relationship whose only change is its
+relRepo is invisible to today's diff view. The diff report's
+'relationship_diffs_for_pid' likewise compares sets of IDs. Your
+"changed a relationship's skgrepo" needs a comparison at the level of
+'RelPartner', which pairs a member with its relRepo. With the graph
+pair, that comparison is one check per (recorder, relation, member)
+triple. The node's home skgrepo, as an (old, new) pair, is needed too,
+and it is equally cheap.
+**** 3. the commit-readiness store, its metadata and the marking gesture
+This tool is independent of the PCSVF. It could have been prototyped
+against the EXISTING diff view, which already carries the atoms
+'addedN', 'deletedN', 'addedR' and 'removedR', but you have no use for
+a halfway point, and the prototype would have needed a throwaway
+adapter for the old view's per-stage atoms, so it is built against
+the TDV directly. It comprises the store (persisted to a small file
+under the data root; see "where the store lives"), the readiness
+metadata, the heralds, and the marking gesture in both clients, Emacs
+and Neovim, from the start. The design sits under "automatic
+commit-readiness aggregation" and in my answer to "How will the
+metadata for these things be represented?".
+**** 4. partner folders for containers and mentioners; role trees under folders
+This item is your "folder the non-content trees". The details sit
+under that heading. In short, it adds two new write-protected
+'PartnerFolder' kinds and one request that runs the existing
+role-tree engine from each member of a folder.
+**** 5. foldered content
+This item is your "folder the content". It is the most invasive
+prerequisite, and three ways exist to get it; that heading describes
+them, and you have chosen B there.
+**** 6. historical phantoms: a deleted node with its body and old content
+'PhantomDiff' in [[file:../../server/types/viewnode.rs][server/types/viewnode.rs]] carries a title but no body. Today's
+renderer draws no phantoms under a write-protected node, and it never
+draws a deleted node's old content. Your "deleted a gnode" wants the
+title, the body and the recursive old content. With the before-graph
+the data is at hand. What is missing is a phantom kind that carries a
+body and may have children drawn from the before-graph; my reply
+under that heading describes it.
+**** 7. old-text and body-diff property viewnodes
+In the viewforest, a property viewnode is a non-vognode viewnode that
+describes its parent: an alias line, an ID line, a flag row, or
+today's "text changed" line. (Its kind is 'ViewnodeKind::Property' in
+[[file:../../server/types/viewnode.rs][server/types/viewnode.rs]]. It lives only in the view; nothing about it is written
+to a '.skg' file or stored in either graph.) I propose two new
+property kinds that carry a body, which 'Property::Flag' already does.
+One shows the old title and body; the other shows the line diff of
+the body. The diff report already computes that diff with the
+'similar' crate, in 'text_diff_option' in [[file:../../server/diff_report/diff.rs][server/diff_report/diff.rs]]. A
+body inside a property needs the existing body escaping
+([[file:../../server/body_view_escape.rs][server/body_view_escape.rs]]), so that a diff line beginning with '*' cannot
+become a headline.
+**** 8. a save rule for diff views: reconcile, at each node's visit
+A TDV is saved like any other view: the save writes the graph edits,
+and the collateral images of the touched nodes update as they do
+today. Then the TDV buffer itself is reconciled, not rebuilt. The
+pattern exists already: at each vognode's visit in the completion
+pass ([[file:../../server/update_buffer/complete.rs][server/update_buffer/complete.rs]]), 'process_unrestrictedVognode_diff' recomputes
+that node's diff facts from the diff data and adds or removes its
+diff-only children. The TDV generalizes that visit: the node's
+presence and change facts come from the graph pair, its changeset markers and
+change folders are added when a change appears and removed when a
+change disappears, its phantoms are re-derived, and its readiness
+heralds are refreshed from the store. The roots and the editability of
+the buffer stay as the saved buffer has them, so the user's
+arrangement survives. One thing reconciliation cannot do is draw a
+change that lies outside the buffer, such as a change that a merge or
+a deletion causes in a node the buffer never showed. The save
+response therefore counts the changes the buffer does not show,
+reports that count, and suggests reopening the view. The old diff view's lesson
+still stands: whatever the server renders must re-parse and save
+cleanly, as the round-trip test in tests/git_diff_view/roundtrip/
+checks.
+***** DONE [Jeff] no, it needs reconciliation
+Checking the diff will involve changing more than the commit-readiness markers:
+things will be moved around, copies will be placed in other containers,
+text will be edited, etc.
+Saving needs to propagate those changes into the graph,
+and then into other affected vnode images of the same gnode.
+****** [Claude] agreed; I have rewritten item 8 as reconciliation
+You are right, and I had described the wrong half. The graph edits a
+save carries (moves, copies into other containers, text edits) go into
+the graph exactly as they do from any view, and the collateral images
+update as they do today; my "rebuild" only concerned how the TDV buffer
+itself is redrawn afterward, and even there the existing pattern is
+better. Today's diff view already reconciles: at each vognode's visit
+in the completion pass, 'process_unrestrictedVognode_diff' recomputes
+that node's diff facts and adds or removes its diff-only children. The
+TDV's changeset markers, change folders and phantoms can be reconciled the same
+way, at the owning node's visit. Item 8 now says that, and it names
+the one thing reconciliation cannot do: draw a change that lies
+outside the buffer. For that the save response can count the changes
+the buffer does not show and suggest reopening the view.
+******* [Jeff] seems good, yes: count, report, suggest
+******** [Claude] folded into item 8
+Item 8 now states the three steps as the rule.
+**** 9. server-side computation of the relationships a skgrepo move strands
+You asked for this under "changed a relationship's skgrepo". Today the
+Emacs client computes, from the buffer alone, which relationships a
+home-skgrepo move leaves stuck at a more private relRepo, and
+[[file:../repo-move-graph-logic/1_discussion.org][TODO/repo-move-graph-logic]] lists the ways that computation diverges from the
+server's rules. The TDV shows exactly those strandings as relRepo
+moves and as "relationship moved from X to Y" lines, so the two must
+agree, and the server is the only place where they can. Which of that
+discussion's options to take (a preview request, or a save that
+decides and confirms) is decided there.
+**** 10. every herald's tier in the shared styles file
+Your herald-coloring note asked for this. Today [[file:../../shared/herald-styles.json][shared/herald-styles.json]] defines
+the ten styles, the relationship-herald tiers and the view faces, and
+both clients build their faces from it at load time. But the tiers of
+the non-relationship heralds ('☮', 'B', '⊥', '⟳', the labels, the
+requests and the diff facts) live in the Rust rule table in
+[[file:../../server/heralds.rs][server/heralds.rs]], as the 'HeraldStyle' argument of each rule, and a
+test ('herald_styles_match_the_shared_style_file') only checks that
+the enum and the file name the same ten styles.
+
+You chose one source of truth over a conformance check, so this item
+makes the file the only place that names a tier. The file gains a
+'node_heralds' table that maps each styled atom of the rule table to
+a style name: 'writeProtected', 'omittedBody', the false case of
+'affectsParent', 'cycle', 'restrictedNode', the diff atoms, the
+request atoms, 'relRepo', 'homeRepoHerald' and the folder labels. The
+server embeds the file at compile time with 'include_str!' and parses
+it once, so it needs no runtime path; the clients can read the file
+from disk only because they live inside the repo. The rule table then
+looks each tier up by atom name, and the 'HeraldStyle' enum goes
+away, because the served rule sexp already carries style names, which
+the clients map to faces. The conformance test gives way to an
+internal check that every tier named anywhere in the file is one of
+the file's own styles; that check can run both as a test and at
+startup. The glyphs stay in Rust, because they are part of the view's
+grammar, not its coloring.
+
+The tiers you settled are these. '☮' (write-protected), '⊥' (affects
+not its parent, your "ignored by parent") and 'ĥ' (overrides here)
+stay crucial. 'B' (hidden body) drops to high. '⟳' (cycle) stays
+medium. The birth letter drops from high to low. The property counts
+(A, I, F) move to an eleventh style, 'boring', defined as white text
+on dark gray (say "#3a3a3a"); no existing style is white on gray,
+since white sits today on blue, burnt orange, dark olive, red and
+violet. Adding the style is one entry in the file, and both clients
+pick it up without code changes. The 'what_it_looks_like'
+descriptions are already in the file.
+***** DONE [Jeff]
+Yes, let's have one source of truth rather than checking conformance.
+Write-protected, ignored by parent and ovverridden-here remain crucial-colored;
+hidden body is hig-interest; cycle is medium-interest.
+I do want a new 'boring' style. Let's go with white on dark gray.
+(There's no white on gray of any variety yet, right?)
+****** DONE That h with a hat does mean "overridden here", right?
+******* [Claude] yes
+Yes. 'ĥ' is the crucial glyph for the 'overridesHere' fact, and the
+client draws it immediately after the 'O' of the override token, as
+in '2Oĥ3' ([[file:../../docs/heralds.org][docs/heralds.org]], "Immediately after O"). It says that this
+occurrence substitutes for a node it overrides. A plain 'h' in the
+same token is the eighth ancestor flag, so 'Oĥh' can show both.
+****** [Claude] folded into item 10
+Item 10 now describes the single source of truth (the file, embedded
+at compile time), your five tiers, and the 'boring' style as white on
+dark gray. You are right that no white-on-gray style exists yet.
+**** 11. housekeeping: the renames and documentation you asked for
+These are small, agreed, and best landed together as the first slice
+of the plan. They are the renames of the three functions ending in
+'from_in_rust_graph' ('full_containerward_role_tree_...',
+'full_containerward_ancestry_...' and
+'prominence_sources_for_saved_...') to end in 'from_inRustGraph'; the
+rename of 'max_role_tree_depth' to 'max_roleTree_depth' in the code,
+the config files and the docs; two new rows in the skgconfig table of
+[[file:../../docs/api-and-formats.org][docs/api-and-formats.org]], 'owned_folder' and 'max_roleTree_depth'; and the removal of
+the two merge-commit refusals ('validate_skgrepos_for_selection' in
+[[file:../../server/diff_report/git_snapshot.rs][server/diff_report/git_snapshot.rs]] and 'validate_no_merge_commits' in [[file:../../server/serve/handlers/save_buffer.rs][server/serve/handlers/save_buffer.rs]]),
+with their tests, which you approved in the open questions.
+**** not general-purpose, so not prerequisites
+Merge detection, the four buffers, the skgrepo-move heralds and
+'movedLikeNearestAncestor' are specific to the TDV, so they come after
+the tools above.
+** desired behavior
+*** overarching goal : build a total diff view (TDV)
+**** in brief
+The total diff view will show all aspects (except order)
+that have changed in the graph,
+with enough context to understand them,
+and a minimum of extraneous context.
+(I'm saying "total" to distinguish it from the two extant
+lesser implementations, the diff-view and the diff-report.)
+It will let the user mark aspects of gnodes,
+as well as whole gnodes, commit-ready.
+**** "pruned change-spanning viewforest" (PCSVF)
+A pruned change-spanning viewforest is built when the user
+requests the total diff view.
+The total diff view's purpose is to show all changes,
+and all the context necessary to understand them,
+with a minimum of other stuff.
+
+Let C be the set of changes:
+Each gnode that was changed, including new and deleted gnodes.
+We trace each c in C containerward to find
+the set R of "pseudo-root(s)" that contain it.
+WHen tracing containerward to compute R,
+we stop at any node that is multi-contained --
+this is the sense in which the roots are pseudo.
+Oh and also anything that is part of a cycle.
+Tantivy already does something like this to define search rank.
+
+If any r in R is within the contentward tree
+from some other r' in R, then the view from r' will contain
+the view from r. We should therefore define a second set D,
+the 'deduplicated pseudo-roots' of the view,
+which is R minus all such redundant values r.
+
+From D we will build a contentward viewforest.
+Each d in D will be a root of the viewforest.
+
+In order to minimize unnecessary context, we
+prune branches from the viewforest that would show no changes.
+To compute the pruned view,
+we build a set U of nodes to unfold contentward.
+U starts with the union of R and C.
+We then augment it by tracing each c in C contentward to R,
+and adding every node from that path to U.
+
+Once we know U, we can unfold the view contentward from D.
+Every node reached contentward from D that is in U,
+we draw writable. Every other node, we draw write-protected.
+
+Every node in C, we draw not just writable,
+but with its content foldered.
+The other nodes in U do not need their content foldered.
+However, by modifying a node (the total diff view can be saved,
+just like any other skg view) the user can move that node
+into the changed set C. When they do so,
+the view should be redrawn to folder that node's content.
+
+Even though this "total diff view"
+is constructed using only the content relation,
+it will still reveal changes to other relationships.
+Each node that was changed will be drawn with
+subscribee, overridden and hidden folders,
+in the way already used for ordinary contentward views.
+The only difference is that those folders will now
+have diff heralds indicating new, deleted and modified nodes,
+as described below.
+***** [Claude] making the definition precise
+The sketch is right. The headings below name the places where it
+needs a decision or a correction, and they say what I would decide.
+****** DONE which graph is traced: the union
+Deleted nodes have no containers in the new graph, and you want them
+shown under their former containers. So the containerward tracing and
+the contentward unfolding should both run over the union of the
+before-graph and the after-graph, through tool 1's 'partners', with
+each node and each relationship tagged by its presence. A removed
+relationship then lands as a ~- member at its old position, the way
+today's phantoms do.
+****** DONE C includes leftward changes
+Your examples show "its containers changed" on "node N, which may not
+even have itself changed". But a node outside U is drawn
+write-protected, and write-protected nodes carry no folders. So N
+must be in C. I would define C as the union of two sets, both
+computed by tool 1. The rightward set holds every node with a change
+recorded in its own files: its text, aliases, extra IDs, flags or
+home skgrepo; any of its contains, subscribesTo, overrides or
+hidesFromSubs lists; any relRepo of those; and every new or deleted
+node. The leftward set holds every node whose set of containers,
+mentioners, subscribers, overriders or hiders changed. The leftward
+set makes the same relationship appear under both of its ends. That
+is what you asked for when you wrote "one image ... should propagate
+to other images", and the shared mark keeps the duplication cheap to
+review.
+****** DONE R is the set of prominence origins
+Your stop rule, "stop at any node that is multi-contained, or part of
+a cycle", is the stop rule of [[file:../../server/prominence.rs][server/prominence.rs]]. That file calls its
+stopping nodes origins: the roots, the multiply-contained nodes and
+the cycle members. Its functions 'find_roots_and_multiply_contained'
+and 'climb_containerward_to_cycle' perform the walk you describe. I
+would reuse them over the union graph, and I would call R the origins
+rather than the pseudo-roots, so that the two features share one name
+for one idea. In user-facing text and wherever the code introduces the
+term, the full name is "content origin", since other kinds of origin
+may appear someday. A changed node c that is itself an origin is its
+own root.
+******* [Jeff]
+Agreed. 'Origin' is a little opaque, though; the user-facing term should be
+'content origin'. We can still use 'origin' in the code,
+but wherever it is introduced we should clarify that it means
+content-origin. (It is conceivable that we'll need to talk about
+other kinds of origins someday.)
+******** [Claude] folded
+The section above now says "content origin" for user-facing text and
+"origin" in code, with the clarification at the point of introduction.
+****** DONE "tracing each c contentward to R" should read containerward
+The sentence "tracing each c in C contentward to R" should say
+containerward. Then U is the union of R, C and every node on some
+containerward path from a c to an origin, and the unfolding goes
+contentward from D.
+****** D, defined by the pruned unfolding rather than the full closure
+Your phrase "r is within the contentward tree from r'" must mean the
+PRUNED tree. Otherwise a root could be declared redundant on the
+strength of a path that the view never draws. Concretely, r is
+redundant iff some containerward path from r to another root r' lies
+entirely in U, because that is exactly when unfolding r' reaches r.
+The cheap way to compute that is your walk: from each r in R, walk
+containerward through nodes of U only, and discard r if the walk
+reaches another origin. The walk needs one tie-break: two origins on
+one cycle reach each other, so R is processed in a fixed order (sorted
+by ID), and an origin is discarded only when it reaches an origin that
+is still kept.
+******* DONE [Jeff]
+Right! But we don't need the simplest (more expensive) implementation,
+right? Since things typically have more content than containers,
+building a forest contentward costs more than building it containerward.
+We can just read "containerward within U" from every r in R,
+and discard r if it reaches some other r' in R.
+******** [Claude] yes; folded above, with one tie-break
+Your walk is cheaper and I have folded it into the section above. It
+needs one tie-break: two origins that are members of the same cycle
+reach each other, so each would discard the other and the cycle would
+vanish from the view. Processing R in a fixed order (sorted by ID) and
+discarding an origin only when it reaches an origin that is still
+kept gives a deterministic survivor.
+********* [Jeff] Good lord that was a good catch. Well done.
+****** DONE what a U-node shows
+A node in U is drawn editable, and its content list is drawn WHOLE,
+because the ∃ and ~ marks need their neighbors for position and
+sense. Its members that are in U expand further; the rest are
+write-protected leaves. Only nodes in C get their change folders. In
+the TDV an editable node should NOT get the ordinary default folders
+(the nonempty subscribee folder); the view should show context only
+where something changed.
+****** DONE context nodes: editable, but with bodies folded
+The nodes in U but not in C are context. Drawing them editable shows
+their bodies, which is noise on a long path. I would draw them
+editable with 'body_folded' set, and I would draw the changed nodes
+with their bodies open.
+****** origins that are not roots lose their context
+A multiply-contained origin is drawn at the top level with nothing
+above it. You decided below that it should carry a container folder
+(tool 4) holding its whole containerward forest, drawn folded, so that
+the context is one line until the user opens it. The depth bound
+'max_role_tree_depth' applies to that forest.
+******* DONE [Jeff] I like it.
+Even better, though: Let's show its whole containerward forest
+under a folder. That way the noise is easily silenced (well,
+reduced to one line) by folding the folder.
+******** [Claude] folded: the whole containerward forest, in a folder, folded by default
+I have folded this into the section above and answered the open
+question with it. The folder is the container folder of tool 4, with
+the full containerward forest under each member, drawn folded; the
+depth bound applies to it, as you decided below under "changes to a
+gnode's container set".
+****** uniqueness, the node budget and the depth bound
+The first occurrence that the BFS reaches wins editability. (The BFS
+is the level-order traversal that view completion uses, and the
+'EditableMap' records the winner.) That rule gives your "The TDV
+uniquifies writable nodes" for free. The per-buffer node budget
+('initial_node_limit', default 1000) is off while a TDV is drawn; diff
+phantoms already bypass it. The depth bound ('max_role_tree_depth',
+default 20) stays on, because it bounds only the containerward role
+trees under the container folders, as you decided under "changes to a
+gnode's container set"; the contentward unfolding of the PCSVF has no
+depth bound. A TDV has no size cap.
+******* DONE [Jeff] When would it be too big to draw?
+Emacs will happily display a 20 Mb text file, although it does ask
+"Are you sure?" first.
+******** [Claude] I withdraw that clause
+The node budget exists to bound the latency of an initial render, not
+to protect Emacs; a root with twenty thousand descendants would
+otherwise take seconds to draw and to parse. A TDV draws only changes
+and their context, so its size is proportional to the review the user
+has to do anyway, and Emacs copes with the text. So the TDV should
+have no cap, and no "incomplete" message. I have removed the clause
+from the section above.
+**** a note on terminology and permanence
+The acronym PCSVF will need to persist in the codebase.
+TDV is temporary, though -- I'm only using that to distinguish it
+from the diff view that already exists. Once we have
+replaced the partial diff view with the TDV,
+we can just call it the diff view again.
+***** [Claude] on the names
+You decided below to keep the acronym. So the type is 'PCSVF', the
+functions use 'pcsvf', the type's doc comment spells the name out
+once, and [[file:../../docs/glossary.org][docs/glossary.org]] gets an entry. On "pseudo-root", my reply "R
+is the set of prominence origins" above explains why I would say
+origin; you refined that to "content origin" for user-facing text.
+****** DONE [Jeff] I feel you but no.
+I agree with the spirit of what you're saying,
+but PrunedChangeSpanningViewforest is 31 characters, practically half a line.
+For at least a human reader, PCSVF really is lower friction.
+(Let's make sure it's in the glossary, of course.)
+******* [Claude] accepted
+The type is 'PCSVF' and functions use 'pcsvf', with the expansion in
+the type's doc comment and a glossary entry. I have updated the
+section above.
+**** DONE a separate PCSVF only for merges
+This would start with C, the set of changed nodes,
+including only those nodes that were involved in merges.
+***** [Claude] detecting merges from the graph pair
+A nodeMerge leaves three traces. The acquiree's file is gone; its pid
+is now an extra ID of the acquirer; and a new node holds its old
+title and body (that node is the 'acquiree_text_preserver' of
+'NodeMerge' in [[file:../../server/types/save.rs][server/types/save.rs]]). The diff report already uses the second
+trace, in the bucket "deleted nodes, probably via merger" of
+'bucket_reports'. So C for this branch consists of the acquiree, the
+acquirer and the text preserver, for each deleted pid that some
+surviving node lists as an extra ID. Nothing new needs to be stored.
+**** DONE a separate PCSVF only for skgrepo changes
+Similarly, this would start with C, the set of changed nodes,
+being only those nodes whose skgrepo changed.
+
+For this to be truly convenient,
+since skgrepo changes are often contentward-recursive,
+we will need a command, 'skg-mark-skgrepo-changes-commitReady',
+that can be applied to a viewnode (rather than from its
+"its skgrepo changed" child, which can be cycled via a simple
+shift-left/shift-right), or, via the C-u prefix,
+to every child whose skgrepo changed the same way
+(same way = same source, same dest)
+and each of their children as well, recursively.
+***** [Claude] the recursive mark can be a client-side walk
+A readiness request is a metadata atom that the client writes on a
+headline and that the save consumes to record a mark; the metadata
+answer at the end gives its shape. 'skg-set-repo-recursive' already
+walks a subtree in the buffer and edits each headline's metadata, and
+the TDV draws everything the gesture should reach. So "every child
+whose skgrepo changed the same way, recursively" is a filtered version
+of that walk, writing one readiness request per headline. The server
+then needs no recursive request form, and the user sees exactly which
+headlines got marked. The command's name is settled under "changed a
+relationship's skgrepo": it is
+'skg-mark-gnode-skgrepo-changes-commitReady'.
+**** The TDV will consist of three branches.
+One called 'all changes',
+one called 'skgrepo changes',
+and one called 'merges'.
+***** [Claude] three buffers, one per branch
+You decided below that the three branches are three buffers, named by
+the buffer ("diff-view: all changes", "diff-view: merges", "diff-view:
+skgrepo changes"), rather than three roots of one buffer, and that a
+fourth buffer, "diff-view: order-only changes", lists the nodes whose
+only change is the order of a list (see "changes of order"). Each
+buffer is then an ordinary view with its own editable occurrences,
+nothing in it is write-protected merely because of another buffer,
+and no new kind of view root is needed. One command opens them all,
+and it skips every buffer that would be empty: the client sends one
+request per buffer, in the order above, and the server answers each
+with either a buffer or an empty reply, which the client does not
+open. The subset buffers duplicate nodes that the full buffer also
+shows, so a mark made in one is visible in the others after their
+next rerender, through the shared store.
+****** DONE [Jeff] I need to walk that back.
+It's awkward that everything in the two small branches will be write-protected.
+Let's instead open three buffers.
+That also obviates the need for the new kind of root.
+The buffer's name can perform that function:
+- diff-view: all changes
+- diff-view: merges
+- diff-view: source changes
+******* [Claude] agreed; three buffers, and three consequences
+Three buffers are better, and I have rewritten the section above.
+Three consequences follow. First, the glossary asks for "skgrepo"
+rather than "source" everywhere, so the third buffer is "diff-view:
+skgrepo changes". Second, each buffer has its own editable occurrence
+of a node, which today's per-buffer uniqueness rule allows. If
+[[file:../one-editable-view/vision.org][TODO/one-editable-view]] is ever implemented, the "all changes" buffer, opened
+first, would claim editability, and the occurrences in the other
+buffers would become write-protected; review would still work there,
+because readiness requests are honored on write-protected occurrences
+(next section). Third, that exception therefore matters both for the
+repeated occurrences inside one buffer and, under one-editable-view,
+across buffers.
+****** DONE [Jeff]
+Let's open all three buffers with one command,
+but don't open any of them that would be empty.
+(Closing extraneous buffers is easier than learning three commands.)
+
+You talked about a fourth kind of view, for order changes.
+That would need to be a fourth buffer, then.
+
+Yes, we should still make write-protected vnodes
+capable of sending readiness requests.
+******* [Claude] folded: one command, up to four buffers, and the exception stays
+The section above now says that one command opens every non-empty
+buffer, that the order-only list is the fourth buffer, and that
+write-protected occurrences keep accepting readiness requests. The
+open question on the order-only list is answered.
+**** DONE The TDV uniquifies writable nodes the usual way.
+If writable vognode V represents gnode G,
+any other vognode V' representing G is write-protected.
+***** [Claude] yes, with one exception: readiness requests on write-protected occurrences
+Edits to a write-protected occurrence change nothing, but a readiness
+mark is not a graph edit. A node that repeats inside one TDV buffer has
+one editable occurrence and the rest write-protected, and the user
+should be able to mark a change at whichever occurrence they are
+looking at, so the save must honor readiness requests on any
+occurrence. A precedent exists: '(editRequest (relRepo NAME))' is
+accepted on a write-protected headline, and docs/api-and-formats.org
+says so ("a write-protected headline may carry this request too").
+*** Once the total diff view is implemented, we can retire
+both the diff report (which builds a non-skg org buffer)
+and the simpler diff mode.
+**** [Claude] agreed; what the old diff view knows that the TDV must inherit
+Three things from the old diff view should survive as the TDV's spec.
+The first is the phantom placement rule in 'phantom_insertion_plan'
+([[file:../../server/to_org/render/diff.rs][server/to_org/render/diff.rs]]): a removed member goes immediately before the next
+surviving member of the old order. The second is the rule that a
+removed member is a phantom while a moved member is live at its new
+slot. The third is the round-trip invariant and its tests in
+tests/git_diff_view/. The diff report's duplicate-ID and vanished-id
+investigations are not diff-view features, so they can stay until the
+report goes. The per-stage machinery ('SkgrepoDiff', 'NodeAxes',
+'RelationshipAxes', the inverse scan and the three-snapshot comparison
+for the filter folders) goes with the old view, since the TDV keeps no
+stages.
+***** DONE [Jeff] What's the round-trip invariant?
+And what's a round-trip in this context?
+****** [Claude] the server must accept its own output
+A round trip is one pass of a buffer out of the server and back in:
+the server renders a view as text, the client shows it, and a save
+sends that text back to the server, which parses and validates it.
+The round-trip invariant says that a buffer the server rendered, sent
+back UNCHANGED, must pass validation and save as a no-op. The old
+diff view violated it twice (the two bugs in diff-render-roundtrip.org
+rendered text that the validator then rejected), and the tests in
+tests/git_diff_view/roundtrip/ now check it for those two cases. Every
+TDV structure (changeset markers, change folders, historical phantoms, property
+viewnodes) must satisfy it too, and a test should render a TDV and
+save it back for each.
+***** DONE [Jeff] Is there any other mechanism to catch duplicate IDs?
+They're an egregious data model violation.
+They should be caught as soon as the user tries to make them,
+and as soon as they are read from disk if disk already has that problem.
+****** [Claude] yes, at both moments you name
+At load time, 'validated_graph' in [[file:../../server/dbs/in_rust_graph/complete_validation.rs][complete_validation.rs]] rejects a
+pid with two home sections ('DuplicatePrimaryId') and an extra ID
+carried by two nodes ('DuplicateExtraId'), so the server refuses to
+start on such data; 'error_unless_each_skgid_names_one_node' in
+[[file:../../server/dbs/filesystem/multiple_nodes.rs][multiple_nodes.rs]] is the file-level form of the same check, and it
+writes 'initialization-error_ids-claimed-by-two-nodes.org' into the
+data root. At save time, 'prepare_graph_update' in [[file:../../server/dbs/in_rust_graph/prepared_update.rs][prepared_update.rs]]
+runs the same validation over the candidate graph, so a save that
+would create a duplicate is refused before anything is written. Inside
+one buffer, 'contradictory_instructions.rs' rejects two editable
+occurrences of one ID, and 'nonignored_children_have_distinct_ids'
+rejects a repeated content member. So the diff report's duplicate-ID
+bucket adds nothing for the worktree. It could still catch a
+duplicate that exists only at HEAD, for instance after files were
+committed by hand; the before-graph build should run the same
+validation and refuse with the same message, which costs nothing
+extra.
+*** The total diff view includes all skgrepos.
+Refuse the view if that conflicts with the set of active skgrepos,
+i.e. the current maximum privacy level shown.
+(I am here violating my one-thing-one-name rule.
+What is the codebase's term for that?)
+**** [Claude] the term is the skgrepo restriction
+The codebase's term is the skgrepo restriction, 'SkgrepoRestriction'.
+The glossary defines it as "the skgrepo-set a connection currently
+shows", and 'is_all' names the unrestricted case. Both the diff report
+('handle_diff_report_request_with_repo_set') and the diff-mode toggle
+already refuse unless the restriction is 'all', so the TDV can reuse
+that refusal verbatim.
+
+The diff report also refuses when any skgrepo is not a gitrepo, has
+no HEAD commit, or has a merge commit at HEAD;
+'validate_skgrepos_for_selection' in [[file:../../server/diff_report/git_snapshot.rs][server/diff_report/git_snapshot.rs]] performs those
+checks, and 'validate_no_merge_commits' in [[file:../../server/serve/handlers/save_buffer.rs][server/serve/handlers/save_buffer.rs]] repeats
+the merge-commit check for every save made in diff mode. The first
+two checks are your "refuse if any repo is not version-controlled".
+The third check has no purpose for a comparison of HEAD's snapshot
+with the worktree; my reply to your question below explains why, and
+I recommend dropping it.
+
+Two scope questions followed from this, and you answered both at the
+end: foreign skgrepos are excluded from C and from readiness, and the
+staged/unstaged distinction does not survive.
+***** [Jeff] I don't understand 'For a HEAD-vs-worktree view a merge commit is just a tree'
+HEAD-vs-worktree is the normal case, right?
+What's a 'tree' mean in 'just a tree'?
+****** [Claude] a commit is a snapshot plus parents; the comparison only reads the snapshot
+In git, a commit holds two things: a tree, which is the complete
+snapshot of every file at that commit, and a list of parent commits
+(one parent for an ordinary commit, two or more for a merge). "HEAD vs
+worktree" compares HEAD's tree with the files on disk, so the number
+of parents never enters the comparison; that is what I meant by "just
+a tree". The refusal was added with the first diff view
+(TODO/DONE/from-dot-claude/git-diff-view/0-git-diff-view.org, "Pre-save
+checks"), with the rationale "which parent to compare against?". That
+question arises only when one asks what HEAD itself changed, which is
+HEAD compared with its parents; neither the diff report nor the TDV
+asks that. I had also misdescribed its scope: 'validate_skgrepos_for_selection'
+in [[file:../../server/diff_report/git_snapshot.rs][server/diff_report/git_snapshot.rs]] applies the refusal to every selection whose
+endpoint is HEAD, including HEAD vs worktree, and 'validate_no_merge_commits'
+in [[file:../../server/serve/handlers/save_buffer.rs][server/serve/handlers/save_buffer.rs]] applies it to every save made in diff mode. So
+today, after any git merge, the diff report and diff-mode saves refuse
+to run until the next ordinary commit. I recommend removing both
+refusals; the open question at the end asks you to confirm.
+*** how to show and mark commit-ready each kind of edit
+**** DONE changes to a gnode's text
+If its title and body both changed:
+#+begin_example
+  * <new title>
+  <new body if present>
+  ** "old title and body" <old title>
+  <old body if present>
+  *** "body diff"
+  <the body diff>
+#+end_example
+No title diff is ever needed -- it would just be two lines,
+and we're already showing both.
+
+If the body changed but not the title:
+#+begin_example
+  * <title>
+  <new body if present>
+  ** "old body"
+  <old body>
+  ** "body diff"
+  <body diff>
+#+end_example
+
+If the title changed but not the body:
+#+begin_example
+  * <new title>
+  <new body if present>
+  ** "old title" <old title>
+#+end_example
+***** [Claude] as property viewnodes with bodies; the mark lives on the old-text line
+Your "old title and body", "old title" and "old body" lines are one
+new property viewnode kind, 'Property::OldText { title : Option, body
+: Option }', and your "body diff" line is a 'Property::BodyDiff' child
+of it whose body is the line diff; tool 7 describes both. A change
+leaf is the smallest thing the user can mark. The node's text is one
+change leaf, so its ✓ sits on the old-text headline, and marking that
+headline marks the node's text. The editable node above shows the NEW
+text, as it does today. Editing that text in the TDV is an ordinary
+edit; on save it changes the diff, and so it lapses the mark (see
+"stale marks" under aggregation).
+**** changes to a gnode's content list
+Recall that a prerequisite is that content can be foldered.
+When a total diff view is built, the content of all edited nodes
+are shown that way.
+
+Each member of that folder represents two things:
+the contained gnode, and the containment relationship to it.
+It should show whether the node is new or deleted
+(showing nothing if it is neither),
+and whether the relationship is new or deleted
+(again showing nothing if it is neither).
+
+The most succinct way to do that is probably
+- ∃+ ∃- if the node is new or deleted.
+- ~+ ~- if the relationship is new or deleted.
+
+Each of those marks should be separately cycleable
+commit-ready and not-commit-ready.
+When marked commit-ready, it has a green check next to it.
+
+Once all changes of either kind are manually marked commit-ready,
+the entire content folder should be automatically marked the same.
+It therefore needs two heralds, ∃ and ~, to be so marked.
+
+The user can also cycle the commit-ready status
+of the whole collection, which in turn would propagate
+to each change among its children, but not recursively.
+Note that some children have no change to cycle the status of.
+***** [Claude] both axes already exist as atoms; the marks are per axis
+An axis is one of the two things a content member can change: its
+node, or its relationship to the parent. Today's diff view already
+puts the atoms 'addedN', 'deletedN', 'addedR' and 'removedR' on a
+content member, and the client draws them as 'N -N R -R' from the
+herald rule table in [[file:../../server/heralds.rs][server/heralds.rs]]. You renamed the atoms below to
+'node+', 'node-', 'rel+' and 'rel-', and the client draws them as ∃+
+∃- ~+ ~-. A member can carry both axes (a new node under a new
+relationship), and each axis gets its own ✓; the metadata answer gives
+the shape. The "its content changed" changeset marker (option B) aggregates only
+the ~ marks of the members, because a member's existence is the
+member's own file's fact, as you argue in the heralds inventory below;
+the ∃ mark on a member line belongs to that member's own readiness.
+Cycling the changeset marker is a gesture, by which I mean a command that writes
+marks on several leaves at once; the gesture writes the members' ~
+marks, as "automatic commit-readiness aggregation" describes.
+****** reorders must not look like changes
+'compute_interleaved_diff' is an LCS, a longest-common-subsequence
+diff, so a member that moved within the list comes out as Removed at
+the old slot plus New at the new slot; the bug in [[file:../diff-render-roundtrip.org][TODO/diff-render-roundtrip.org]] made
+both slots render. Under your "changes of order: don't even bother",
+the TDV must decide membership by set difference, and it must use the
+LCS only to POSITION the genuinely removed members.
+****** [Jeff] let's change that wire format
++ and - are shorter and no less clear than 'added', 'removed' or 'deleted',
+and 'rel' and 'node' are clearer than 'N' and 'R',
+so let's make them rel+, rel-, node+, node-,
+roughly matching the 2-character heralds like "~-".
+(I'm the only user and only dev; no backward compat needed.)
+
+I imagine those are already bundled in a sexp that indicates
+we're talking about diff properties?
+******* [Claude] folded into the metadata proposal
+The atoms are now 'node+', 'node-', 'rel+' and 'rel-' throughout my
+text. Yes, they sit inside a form that names the subject: today the
+two forms '(staged ...)' and '(unstaged ...)', and in my proposal one
+form '(diff ...)'. The symbols parse as ordinary atoms in both the
+'sexp' crate and Emacs 'read'.
+**** changes to a gnode's container set
+For each node whose set of containers changed --
+including deleted nodes --
+show a foldered, diffed containerward forest.
+This forest is strange, because it should include (recursively)
+not just current container relatinoships, but removed ones:
+#+begin_example
+  * <node N, which may not even have itself changed>
+  ** "its containers changed"
+  *** "∃+" <node A, which is new and contains N>
+  **** "~+" <node A', which already existed but newly contains A>
+  ***** <node A'', a root that contains A'> (no diff herald)
+  ***** "~-" <node A2, which used to contain A' and still exists>
+  ***** "∃-" <node A3, which used to contain A and was deleted>
+  ****** "∃-" <node A3', which used to contain A3 and was deleted>
+  *** <Node B, which contained N and still does>
+  **** <B's container>
+  ***** ...
+  *** "~-" <Node C, which contained N but doesn't now>
+  **** ...
+  *** "∃-" <Node D, which has been deleted entirely>
+  **** <Node E, which used to contain D and has also been deleted>
+  ***** <Node F, which still exists and used to contain E>
+  ****** ...
+#+end_example
+
+Even though a node does not define its containers
+(its containers do),
+from a view like this the user can mark those
+containment relationships commit-ready.
+Earlier I said that one vnode image of a gnode marked commit-ready
+should propagate that mark to other images of the same gnode.
+The same logic applies to relationships: One image of a relationship,
+marked commit-ready, should propagate to other images of that relationship,
+which could go in either direction
+(i.e. in the case of containment, containerward or contentward).
+***** [Claude] the forest is the diffed full containerward tree under a container folder
+This forest is tool 4 run over the union graph. A
+'PartnerFolder::Container' holds the containers that N has in either
+graph, each tagged with its presence. Under each member,
+'full_containerward_role_tree_from_in_rust_graph' walks through tool
+1's 'partners' instead of 'contained_by', so removed containers of
+containers appear too. The depth bound 'max_role_tree_depth' would
+apply here unless it is disabled, as you decided above; a deleted
+subtree above N can be long.
+****** DONE [Jeff] max_role_tree_depth
+is fine to apply here. But let's rename that, too:
+max_roleTree_depth.
+******* [Claude] agreed on both
+The depth bound stays on for these forests, and "uniqueness, the node
+budget and the depth bound" under the PCSVF definition now says so.
+The rename to 'max_roleTree_depth' joins the housekeeping slice (item
+11), together with its row in the config table.
+****** one relationship, one mark, two images
+N's container folder shows the relationship "A contains N" as a member
+A with ~+. A's content list shows the same relationship as a member N
+with ~+. If the store keys marks by (relation, recorder, member),
+those two images read one mark. That is the propagation you ask for,
+in both directions and across buffers, and it needs no propagation
+code.
+**** DONE changes to a gnode's set of mentioners, subscribers, overriders, hiders
+Show these almost just like changes to its containers.
+The difference is that for containers we show
+a full containerward forest, and only that direction.
+These other three use two directions, where containerward is the other.
+For instance, for the override relationship,
+we show a mixed forest,
+unfolding in both the overriderward and containerward directinos,
+using both the new graph and the old graph:
+#+begin_example
+  * <node N, which may not even have changed>
+  ** "its overriders changed"
+  *** "~+" <node A, which newly overrides N>
+  **** <node Ac, which contains A>
+  ***** "∃-" <node Ac', which contained Ac but is now gone>
+  ***** <node Acc, which still contains Ac>
+  **** <node Ao, which overrides A>
+#+end_example
+When I say N may not even have changed,
+I mean it may not have changed in itself (text, aliases, IDs)
+or in the rightward direction (content, subscribees, etc.)
+
+Note that the roots of the overrierward-containerward forest
+drawn under N's "its overriders changed" includes only nodes
+O for which O overrides or overrode N.
+That is, the first generation is reached from N
+through only the override relation, not the contains relation.
+In subsequent generations, though,
+to draw those roots' descendents, we use both.
+
+We need to include the contains relation
+because nodes are only meaningful
+in their containment context. (If we needed the user to
+ask for a contentward forest under each node manually
+that they're looking at, it would mean a lot of typing.)
+***** [Claude] the engine already mixes exactly these two directions
+'build_and_integrate_role_tree_with_skgrepo_set' draws the role tree
+for one role, and then it hangs a full containerward tree under every
+graft of that role, and only under those; under a container graft
+only containers follow. That is your rule ("the first generation is
+reached from N through only the override relation; in subsequent
+generations we use both"): the containerward attach gives Ac, Ac' and
+Acc, and the role tree gives Ao. The TDV version is that same engine,
+started from a folder's members (tool 4) and walked over the union
+graph (tool 1). Mentioners come from the graph's 'mentioners_of' map.
+A mentioner whose links changed is in C anyway, because its text
+changed.
+**** DONE changes to a gnode's subscribees, overridden, hidden
+These we show just like changes to subscribers, etc.
+Confusingly, that means we'll be mixing two directions:
+We always use the containerward direction, which is leftward,
+but for the other relationships we use the rightward direction.
+
+So, for instance, the changes to its subscribees might look like:
+#+begin_example
+  * <node N, which definitely changed, because its subscribee list changed>
+  ** "its subscribees changed"
+  *** "~+" <node A, which N newly subscribes to>
+  **** <node Ac, which contains A>
+  ***** "∃-" <node Ac', which contained Ac but is now gone>
+  ***** <node Acc, which still contains Ac>
+  **** <node Ao, which overrides A>
+#+end_example
+Again, the roots of the "its subscribees changed"
+are reached from N only through the subscribe relation,
+but subsequent generations are unfolded using both.
+***** [Claude] these are the existing writable folders in diff dress
+'subscribeeFolder', 'overriddenFolder' and 'hiddenFolder' already list
+these members, and in diff mode they already show removed members as
+phantoms with 'removedR' and new members with 'addedR'. The TDV adds
+two things: the containerward and relation-ward continuation under
+each changed member, using the same engine as above, and a label
+variant ("its subscribees changed") that the folder shows when it is
+drawn because of a change. I would keep the existing folder kinds and
+put the diff state on the folder, rather than add parallel "changed"
+kinds; the label would then be a herald rule on that state. Hiding is
+editable only from a subscribee-as-such, so the hidden folder stays
+write-protected here, as it is today.
+**** changes to a gnode's set of mentioned : omit
+Omit this, because it's obvious from the gnode's text.
+**** changes to a gnode's set of aliases
+Rather than the usual aliases folder, show an "aliases chnaged"
+folder. Since aliases are a set, the order doesn't matter;
+put all removals first, then all unchanged ones, then all new ones.
+#+begin_example
+  * <the node with alias changes>
+  ** "its aliases changed"
+  *** - <removed alias>
+  *** <unchanged alias>
+  *** + <new alias>
+#+end_example
+Just like the content list,
+the user can mark individual alias changes commit-ready.
+They can also mark the entire collection commit-ready,
+which then propagates to each individual one.
+***** [Claude] today's diff-mode alias folder is this
+In diff mode, 'reconcile_aliasFolder_children' already fills the alias
+folder from the diff, and each alias property carries 'rel+' or 'rel-'
+(in today's atoms, 'addedR' or 'removedR'); the client renders those
+as 'R' and '-R', and the TDV would render them as + and -. You decided
+below that aliases keep their list order in the diff, so a removed
+alias sits where the LCS places it, as a removed content member does.
+The ID folder uses the same code path, 'reconcile_idFolder_children',
+so "changes to a gnode's IDs" and "added IDs to a gnode" need nothing
+beyond the label and the marks.
+****** [Jeff] let me walk back the part about order
+I forgot that aliases are ordered. Showing the diff in order is cheap;
+we might as well.
+******* [Claude] folded
+The alias and ID folders then show the diff in list order, placing a
+removed entry where the LCS puts it, exactly as the content list does.
+I have updated the section above.
+**** DONE changes to a gnode's IDs
+Same as aliases.
+**** DONE deleted a gnode
+Show it in each of its former containers --
+even the ones that were themselves deleted.
+***** Show text, content.
+It should show the title, body and content it used to have.
+The content can include more such deleted nodes.
+This suggests keeping two inRustGraphs: one that matches the .skg files on disk,
+and the other that matches the graph obtained from the union of
+the last commit of each skgrepo.
+(Refuse to construct the diff if any repo is not version-controlled.)
+****** [Claude] needs a phantom with a body and old content; the two graphs are tool 1
+Today a phantom is bodyless by construction, and the renderer draws no
+phantoms under a write-protected node, so a deleted node shows as one
+titled line. The TDV wants what I will call a historical vognode: a
+write-protected viewnode whose title and body come from the
+before-graph, with its old 'contains' drawn beneath it as ~- members,
+recursing into members that are themselves deleted. I would make it
+one new phantom kind, 'Phantom::Historical', carrying a presence
+instead of per-stage axes, and I would let it replace 'PhantomDiff'
+when the old view goes, rather than add a fourth kind beside it. A
+deleted subtree of a thousand nodes draws a thousand lines. The
+recursive marking gesture is what makes that reviewable. The
+existence mark on a deleted node could also imply that its removed
+outbound relationships are ready, since they vanish with its file;
+that rule would cut the leaves to mark by a lot. Your "refuse the
+diff if any repo is not version-controlled" already exists; see "The
+total diff view includes all skgrepos".
+***** If it was acquired, show that in a folder.
+If the deleted graphnode was the acquiree in a merger,
+the viewnode representing its deletion
+should mention the acquirer.
+This seems most easily shown via an intermediary folder:
+#+begin_example
+  * <deleted node>
+  ** "it was acquired by"
+  *** <acquirer>
+#+end_example
+****** [Claude] derivable; see "a separate PCSVF only for merges"
+The acquirer is the surviving node whose extra IDs now include the
+deleted pid. "it was acquired by" and "it acquired" are two
+write-protected, save-inert folders with derived membership, like the
+filter folders.
+***** Show a deleted gnode also under its acquirer.
+#+begin_example
+  * <the acquirer>
+  ** "it acquired"
+  *** <the deleted node>
+#+end_example
+**** DONE added IDs to a gnode
+Show an "id changes" folder, like the "alias changes" folder.
+(It should never have subtractions,
+but it can be constructed with the same machinery,
+even though that machinery knows how to handle subtractions.)
+***** [Claude] agreed; and the usual cause is a merge
+A node gains an ID only through a nodeMerge, so an "IDs changed"
+folder in the "all changes" branch is a second view of the event that
+the merges branch shows. That is fine, as long as the mark is one
+store entry.
+**** DONE changes to a gnode's skgrepo
+***** in the "all changes" and "merges" branches of the TDV
+We folder the change:
+#+begin_example
+  * <moved node>
+  ** "its skgrepo changed"
+  *** "old skgrepo <reponame>"
+  *** "new skgrepo <reponame>"
+#+end_example
+****** [Claude] one leaf may serve better than a folder with two leaves
+The home skgrepo is one aspect with one mark, and the "skgrepo
+changes" branch already shows it as one token ("-old +new"). A single
+property line under the node, rendered the same way, is one markable
+leaf, and it reads the same in both branches; the folder adds a level
+with nothing to aggregate. I would use the single leaf, unless you
+want the folder for uniformity with the other rightward folders.
+******* [Jeff] agreed, that's better
+******** [Claude] folded into the open question
+The open question "Home-skgrepo move: one leaf, or a folder with two
+leaves?" is now answered.
+***** in the "skgrepo changes only" branch of the TDV
+To increase readability, we'll show the same information
+in the heralds themselves:
+#+begin_example
+  * "-<oldrepo> +<newrepo>" <moved node>
+#+end_example
+***** in both
+Include a "movedLikeNearestAncestor" herald, to indicate
+that a vnode's skgrepo move matches (in both oldrepo and newrepo)
+that of its parent (or more generally nearest ancestor,
+in case its parent is a folder).
+Omit that herald where it doesn't apply.
+
+The movedLikeNearestAncestor herald will appear as
+a (purple? where are the colors named?)
+house character (I don't know the name of that character,
+but the herald system already uses it for skgrepos)
+conjoined with an ancestor character
+(a for parent, b for grandparent, etc.)
+****** [Claude] the glyph, the color, and how to compute it
+The house is '⌂' (U+2302 HOUSE), the glyph of the 'homeRepoHerald'
+('⌂:LABEL'). The styles are named in [[file:../../shared/herald-styles.json][shared/herald-styles.json]], and they are tiers
+rather than hues; the purple one is 'nonstandard', "requests and diff
+facts", which is the right style for this herald. The fact can be
+computed like 'homeSkgrepoAtBoundary', which compares a node's
+skgrepo with that of its nearest unrestricted-vognode ancestor: the
+server would emit '(movedLikeAncestor GEN)' when the nearest moved
+vognode ancestor has the same (old, new) pair, and the client would
+render '⌂' plus the generation letter.
+***** to record commit-readiness
+'skg-mark-skgrepo-changes-commitReady' can be done to
+a skgrepo folder or the vognode that owns that folder,
+and can be called recursively (also from either point,
+to the same effect).
+
+But in the "skgrepo changes" branch of the TDV,
+there is no folder to mark. Therefore,
+commit-readiness of the source change must be recordable
+in the metadata of a vognode. Doing that should have the same
+effect as recording it in the folder.
+(We will use the MSV type here: If one of those metadata items
+is absent from a viewnode, it indicates that the viewnode
+expresses no opinion.)
+****** [Claude] fine, because readiness is not a graph edit
+My reply "yes, with one exception" under "The TDV uniquifies
+writable nodes" covers this: the request is honored on any
+occurrence, including a write-protected one. MSV-style absence is
+exactly how 'relRepo_request' already works, where None means no
+opinion. The metadata answer gives the shape.
+**** changed a relationship's skgrepo
+#+begin_example
+  * <container>
+  ** "some content relationships changed skgrepo"
+  ** <unchanged content>
+  ** <content>
+  *** "relationship moved from <skgrepo> to <skgrepo>"
+#+end_example
+The quoted text should be system-font, except for the two skgrepos,
+which should be the usual (blue?) color.
+
+This same shape can be used to show changes to other kinds of relationships,
+with the exception of mention relationships.
+Mentions are defined by the text,
+so they are always defined in the skgrepo that defines the text.
+
+I toyed with the idea of letting these changes
+be heraldable in the vognode, in addition to in one of its folders,
+but the heralds would be too noisy.
+
+The purpose of the empty
+"some content relationships changed skgrepo"
+folder is to give a place to indicate that all such
+changes have been marked commit-ready.
+
+We'll want two separate commands,
+'skg-mark-gnode-skgrepo-changes-commitReady' and
+'skg-mark-rel-skgrepo-changes-commitReady'.
+(So where I wrote 'skg-mark-skgrepo-changes-commitReady'
+I was in error.)
+***** [Claude] today's diff cannot see this; the empty line stays, as a changeset marker
+Tool 2 is the enabling change, because 'compare_graphnodes' compares
+member IDs only. Once the pair reports (relRepo before, relRepo after)
+for each relationship, "relationship moved from X to Y" becomes a
+property viewnode under the member. It is markable, and the store
+keys it by the relationship, so the same move seen from the other end
+(in a container or partner folder) is the same mark.
+
+The empty "some content relationships changed skgrepo" line is a
+place to see and set the aggregate. I had proposed folding it into a
+third herald on the content changeset marker; you decided below to
+keep it as its own line, so that users with one skgrepo never meet
+it, and I agree. The term, which you chose below, is changeset
+marker: a childless property viewnode that stands for a set of
+changes recorded in its parent's files and carries their derived
+readiness. The TDV has two changeset markers, the content changeset
+marker ("its content changed") and this one, the relRepo changeset
+marker. Mentions are excluded, as you say, because their relRepo is
+the text's.
+
+A related discussion exists: [[file:../repo-move-graph-logic/1_discussion.org][TODO/repo-move-graph-logic]] proposes moving the
+"which relationships does a skgrepo move strand" logic to the server.
+You decided below to make that a prerequisite (item 9); the TDV is
+where the user would review exactly those strandings, so the two must
+share vocabulary (sticky, floor, default).
+****** DONE [Jeff]
+That third herald would require the user to learn a new command,
+for a relatively niche use case. I think the empty 'folder'
+(what's a better name for it? since it's empty) is better.
+
+That said, in the "skgrepo changes only" view, that third command will be needed,
+because there's no empty not-really-a-folder to mark done.
+So we do need the command. I just don't want to force new users,
+who are likely to have only one repo at least for a while,
+to know it immediately.
+
+I believe I have seen the stranded relationship logic go awry in the client.
+Let's add computing it in the server to the prerequisites.
+******* [Claude] agreed; the empty line stays, and I propose calling it a marker
+I agree on both counts, and I have rewritten the section above. For
+the name, you settled "changeset marker" below: a changeset marker is
+a childless property viewnode that stands for a set of changes
+recorded in its parent's files and carries their derived
+commit-readiness. The TDV has two: the content changeset marker ("its
+content changed", aggregating the ~ marks of the content
+relationships) and the relRepo changeset marker ("some content
+relationships changed skgrepo", aggregating their relRepo moves). In
+code they are one 'Property::ChangesetMarker' with a kind, and the
+"order-only change" line of the fourth buffer can be a third kind,
+which is always ready. The relRepo changeset marker is drawn only
+when some relationship's relRepo changed, so a user with one skgrepo
+never meets it or its command. Server-side computation of the
+relationships a skgrepo move strands is now prerequisite item 9;
+which of the options in [[file:../repo-move-graph-logic/1_discussion.org][TODO/repo-move-graph-logic]] to take is decided in that
+discussion, not here.
+******** [Jeff] let's call it a 'changeset marker'
+There might be other future kinds of marker,
+or even as far as I know present ones.
+********* [Claude] folded: 'changeset marker' throughout
+My text now says "changeset marker" wherever it named the concept,
+the code name is 'Property::ChangesetMarker', and the plan's glossary
+entry will define it. The "order-only change" line of the fourth
+buffer is a third kind, which is always ready.
+**** DONE changes of order
+Don't even bother showing them.
+(If the user wanst this they can see it in magit,
+via skg-readable-ids-mode.)
+
+In the TDV, show things in the current order,
+ignoring the old order --
+except deleted things, which are not part of the new order,
+and should be wherever the minus sign would show up
+in a git diff of the relevant list.
+***** [Claude] agreed, with one gap: files whose only change is order
+If a node's only change is the order of its contents (or the order of
+a private section's anchors), then it is not in C, and no change
+buffer mentions it; yet its file is modified and must be committed.
+The TDV would then report "everything is commit-ready" while an
+unreviewed file remained. You decided (under "three buffers") that
+such nodes get a fourth buffer, "diff-view: order-only changes": a
+flat list of those nodes, bodies folded, each with a childless
+"order-only change" line under it. These nodes have nothing to mark,
+so their files count as ready without a mark, and the readiness
+summary counts them among the changed files. Your rule that deleted
+items sit "where the minus sign would show up" is today's
+'phantom_insertion_plan'.
+**** distinguish rightward ("carried"?) changes from leftward ("passenger"?) changes
+Changes to something's list of content are,
+from the filesystem's perspective, changes to it.
+These I'm calling rightward changes.
+Changes to something's set of containers are,
+from the filesystem's perspective,
+changes to its relationship partners.
+The first kind of folder is more important,
+so it should rank higher (earlier) in a vnode's of children.
+We'll suffix (R) (including the parens)
+to the rightward ones, and (L) to the leftward ones.
+***** [Claude] the codebase's words, and the file as the real boundary
+The codebase already has words for these two sides. The '(rels ...)'
+form calls them in and out: in means "N nodes RELATION it", and out
+means "it RELATIONs N nodes". The glossary calls the two ends of a
+relationship the recorder and the member, and it calls folders inbound
+or outbound. Rightward therefore equals out, recorded in this node's
+files; leftward equals in, recorded in partners' files. You decided
+below to drop the left/right terminology in favor of in/out, and to
+suffix the folders "(this file)" for out-folders and "(other files)"
+for in-folders, because that is why the distinction matters for
+committing. The two changeset markers ("its content changed" and "some content
+relationships changed skgrepo") carry no suffix. Ordering out-folders
+before in-folders is a sort in the reconciler; the content members
+themselves stay after the folders, and the changeset markers sort among the
+out-folders.
+****** DONE [Jeff]
+Yes, scrap the left/right terminology, in/out is good.
+(this file) and (other files) is perfect.
+The content change aggregator ("empty folder") viewnode
+shouldn't say either; that would be confusing.
+******* [Claude] folded
+The section above now records the decision: in/out as the words,
+"(this file)" and "(other files)" as the folder suffixes, and no
+suffix on either changeset marker. The open question is answered.
+**** automatic commit-readiness aggregation
+(Is "aggregation" the best word for this?)
+
+When all changes in a folder have been (manually) marked commit-ready,
+skg should (automatically) mark that folder commit-ready.
+
+Similarly, when all of a node's
+change-bearing folders have been so marked,
+that node should be marked commit-ready.
+
+Once everything in the buffer has been marked commit-ready,
+skg should inform the user in the minibuffer.
+At that point the user knows they can
+stage and commit all changes to all skgrepos.
+***** [Claude] derive, don't store: marks live on change-forest leaves only
+The change-forest is the tree of everything commit-readiness can be
+asked about, built from the graph pair and independent of any view;
+it is distinct from the viewforest, which draws some of it. Its roots
+are the changed graphnodes. Under each graphnode come its changed
+aspects: its text, its home skgrepo, its aliases, its extra IDs, its
+flags, each of its outbound relation lists, and the relRepos of those
+relationships. Its leaves, the change-forest leaves, are the
+individual changes the user marks: one text change, one alias, one
+extra ID, one flag, one home-skgrepo move, one relationship's
+existence (keyed by (relation, recorder, member)), one relationship's
+relRepo move, and one node's existence (new or deleted). A
+relationship's leaf lives under its recorder, whose file records it;
+an in-folder such as "its containers changed (other files)" displays
+leaves that live under other graphnodes. I would reify this as a
+'ChangeForest' type.
+
+The store holds a mark only for a change-forest leaf. A folder, a
+changeset marker or a node is ready iff every one of its leaves that CAN be
+ready is ready; an unchanged content member has no leaf, so it is
+never asked. That derived value is the derived commit-readiness
+aggregate; where the context is clear, "the folder's derived
+commit-readiness" says the same thing. Marking a folder, a changeset marker or a
+node is then a GESTURE that writes its leaves (one level down, or
+recursively with C-u), never a stored fact, and the same key both
+marks and unmarks (it cycles). No state exists in which an aggregate
+is ready while one of its leaves is not, so the aggregate needs no
+propagation code and no invalidation code.
+****** DONE [Jeff]
+******* [Claude] folded, and I would reify the change-forest
+All four points are folded into the section above: "change-forest
+leaf", readiness over the leaves that CAN be ready, one key for mark
+and unmark, and "derived commit-readiness aggregate" (shortened where
+the context is clear). On reification I agree with your suspicion. The
+change-forest is exactly the key space of the store and the thing
+derived readiness is computed over, and it is independent of any
+view, so a 'ChangeForest' type built from the graph pair gives three
+things one home: the leaves and their fingerprints, the derived
+aggregates, and the per-file readiness that the status message and a
+stage-and-commit command need. The glossary definition I propose is in
+the section above.
+******* leaves
+I love the term 'leaf' for this, but it could be confused with other kinds;
+let's use the more specific term 'change-forest leaf',
+and define the change-forest in the glossary as a concept,
+even if it's not code-reified (but I suspect it should be so reified),
+distinct from the concept of viewforest.
+******* "the _ is ready if all of its _s are"
+More precisely, the _ is ready if all of its _s that *can be* ready are.
+For instance, a node might have content that was unchanged;
+in that case those content can't be marked ready;
+we have to make sure we're not asking them to be.
+******* the user needs both the mark gesture and the unmark gesture
+They can be the same key shortcut.
+******* "derived commit-readiness aggregate"
+seems like a good name.
+It's wordy, but omitting any word in it could lead to confusion.
+When already talking about the aggregate, though,
+we could omit the word 'aggregate' -- for instance,
+we derive the commit-readiness of a folder from its members.
+***** [Claude] stale marks
+A mark approves one specific change. If the user edits the node
+again, the approved change is gone. So the store keeps, with each
+mark, a fingerprint of the change it approved: a hash of the aspect's
+before and after values. A mark whose fingerprint no longer matches
+the current change counts as absent, and nothing signals that an
+earlier version was approved. This rule also clears marks on commit
+for free: the change disappears, so nothing matches.
+****** [Jeff] brilliant
+No need to signal that an earlier version was approved.
+******* [Claude] folded
+A lapsed mark is simply absent; the ✗ idea is gone from the section
+above, from the heralds inventory and from the metadata proposal, and
+the open question is answered.
+***** [Claude] the unit git commits is the section file
+Each section file holds a node's text, aliases, extra IDs, flags and
+every outbound relationship recorded at that relRepo, and nothing
+else. So "this file is ready" means that every change-forest leaf
+recorded in it is ready. That is computable from the store, because
+every aspect knows its skgrepo (its home, or its relRepo). After every
+save of a TDV buffer the client therefore shows a readiness summary.
+While work remains it reads "12 of 14 changed files are ready", and
+when everything is ready it reads "COMMIT READY. All 14 of 14 changed
+files are ready.", so that the final state stands out; your
+minibuffer message is that case. Files whose only change is order
+count as ready in both numbers, and the summary adds the changed-file
+count of foreign skgrepos, which are never committed. One follow-on
+command then suggests itself, the one you asked for: stage and commit
+everything, in every owned skgrepo that has changes, with one commit
+message that the client prompts for once and the server applies to
+each skgrepo's commit. When the summary is not complete, the command
+asks for confirmation the high-friction way: the user must type the
+word "yes", and a bare "y" is refused. I had also proposed a command
+that stages only the ready files, but it would reintroduce the
+partial staging you decided against, so it is gone.
+****** [Jeff]
+I don't understand:
+How would it be the final message, if only 12 of 14 files are ready?
+
+There are already stage-all and commit-all scripts in data/bash.
+I see that I'm gitignoring ./data; that's bad.
+Could you add an exception for ./data/bash,
+and remind me how that's done?
+(I just tried adding this line to .gitignore:
+ /data
++!/data/bash
+but my test file "hey" in data/bash
+still doesn't show up in unstaged changes.)
+
+A single 'stage and commit' command would be good.
+It should ask for a single commit message, and apply that to each repo.
+(The user can amend individual repos' commit messages
+manually if they want by hand.)
+******* [Claude] the message after every save; the gitignore is fixed; a command, with one question
+I misnamed it. I meant the readiness summary that the client shows
+after every save of a TDV buffer ("12 of 14 changed files are ready");
+when it reads "14 of 14", everything is ready, and your original
+minibuffer message is that case. I have reworded the section above.
+
+The gitignore is fixed in [[file:../../.gitignore][.gitignore]]: '/data' excluded the
+directory itself, and git cannot re-include a file whose parent
+directory is excluded, so the '!/data/bash' line never matched
+anything. The rule is now '/data/*', which excludes the CONTENTS of
+data/ while leaving the directory itself unexcluded, followed by
+'!/data/bash/'. 'git status' now shows data/bash/ as untracked, with
+your test file "hey" in it; the backup file ending in '~' stays ignored
+by the '*~' rule. I did not stage anything.
+
+A single stage-and-commit command is a good fit, and I have added it
+to the follow-on commands under "the unit git commits is the section
+file". [[file:../../data/bash/stage-all.sh][data/bash/stage-all.sh]] and [[file:../../data/bash/commit-all.sh][data/bash/commit-all.sh]] already loop over the
+owned skgrepos (the latter with the fixed message "more"); the server
+has git2 and the per-skgrepo loop, so the command belongs on the
+server, with the client prompting once for the message. One question
+goes to the open questions: should it refuse, warn, or proceed when
+not everything is ready?
+******** [Jeff]
+Ah. We should make sure the final message stands out,
+so rather than "14 of 14 ready",
+say "COMMIT READY. All 14 of 14 changed files are ready."
+********* [Claude] folded
+The section above now gives both forms of the summary, with "COMMIT
+READY." as the complete one, and it records the "yes" confirmation
+you chose in the open questions. I also dropped the "stage every
+ready file" command, because it would reintroduce the partial staging
+you decided against.
+**** [Claude] where the store lives
+The store is server-side and keyed as above, like the in-Rust graph;
+it describes uncommitted work, which the next commit makes moot. You
+asked in the open questions for it to survive a server restart if that
+is cheap, and it is. The store is a map from leaf key to fingerprint,
+both plain data, so persistence is one 'serde' struct written to a
+file after every mark gesture and read once at startup; the map holds
+at most a few hundred entries, so the write costs nothing noticeable.
+Lapsed marks need no cleanup, because the fingerprint check already
+treats them as absent, and a commit makes every mark lapse. The file
+must sit outside every skgrepo, or it would itself be a change;
+'<data_root>/readiness-marks.json', beside the 'logs/' directory,
+satisfies that in the intended layout data/AUTHOR/REPO, and its row
+goes into [[file:../../docs/api-and-formats.org][docs/api-and-formats.org]]. I estimate the whole thing at under a hundred
+lines of Rust plus one test, so tool 3 includes it from the start.
+** questions
+*** What new heralds does this introduce? What are all the heralds it involves?
+Some of the heralds
+(new here, removed here, removed entirely, etc.)
+overlap somewhat or entirely heralds already implemented
+in the current (partial) diff view.
+**** [Claude] inventory of heralds
+Every token below is a client-side rule on a metadata atom;
+[[file:../../server/heralds.rs][server/heralds.rs]] serves the rule table. So most "new heralds" are new
+display text on existing atoms.
+***** reused unchanged
+These glyphs stay as they are: '☮' for write-protected, 'B' for an
+omitted body, '⟳' for a cycle, '⌂:LABEL' for the home skgrepo, '~NAME'
+for a relRepo, 'ĥ', the relationship tokens and birth letters,
+'DELETED', the folder labels, 'alias', 'ID' and the flag rows. Item 10
+lowers the tiers of 'B' (to high) and of the birth letter (to low),
+and it moves the property counts to the new 'boring' style.
+****** [Jeff] regarding herald coloring
+Let's lower the interest level of the birth relation character
+from medium to low, and change the property heralds
+from low to unusual. That will collide with the diff stuff,
+which is better than colliding with (as is true now) every low-interest thing,
+but I wish there were a 'boring' font for them.
+I just looked at herald-styles.json but some of the colors are in hex,
+so I don't know what they mean. I believe .json doesn't permit comments,
+so could you add a field 'what it looks like' to that file,
+with an english description of the color?
+It should have no effect on the code's behavior.
+
+It looks like not every herald has its color defined in that file.
+It ought to be so. I believe some things (body hidden? cycle?)
+are being treated as if they were as important as write-protection,
+when they should be lower, but they're not in that file.
+
+This can go in 'prerequisites'.
+******* [Claude] the field is added; the rest is prerequisite item 10, with two questions
+I added 'what_it_looks_like' to every style and every view face in
+[[file:../../shared/herald-styles.json][shared/herald-styles.json]], with a top-level comment saying that no code reads it;
+the Rust conformance test and the Emacs view-faces test both pass.
+
+Two facts came first. The birth letter was 'high', not medium
+("birth_letter": "high" in the file, and docs/heralds.org agrees), so
+your "from medium to low" is a drop of two tiers; you confirmed low in
+the open questions. And you were right that the file did not define
+every herald's style: the tiers of '☮', 'B', '⊥' and 'ĥ' (crucial)
+and of '⟳' (medium) lived in the Rust rule table in [[file:../../server/heralds.rs][server/heralds.rs]],
+not in the file, which is why 'B' and '⟳' sat at write-protection's
+level. Item 10 of the prerequisites makes the file the only source of
+every herald's tier, and it applies the tiers you settled there.
+
+On the property counts: moving them to 'nonstandard' would make them
+look like requests and diff facts, so item 10 gives them the eleventh
+style you chose, 'boring', white text on dark gray.
+***** existing atoms with new text
+'addedN' becomes ∃+ and 'deletedN' becomes ∃- (today they read 'N'
+and '-N'); 'addedR' becomes ~+ and 'removedR' becomes ~- (today 'R'
+and '-R'). These four cover your new, removed, newHere and
+removedHere. On an alias or ID property the same two atoms render as
+'+' and '-'. The old-text property subsumes 'textChanged'.
+***** repurposed
+'✓' (the go style) today means staged. It would come to mean
+"commit-ready", drawn after the axis it approves: '∃+✓ ~+✓' on a
+member, or '~✓' on the content changeset marker. '✗' (the stop style) today
+means unstaged; the TDV would stop using it, since a lapsed mark is
+simply absent. The TDV drops the staged/unstaged distinction, so the
+repurposing is safe.
+***** new display facts and labels
+The new labels are these.
+****** "its content changed", the changeset marker of option B,
+carries the derived ~ mark only; see your point below about ∃.
+******** DONE [Jeff] It shouldn't have an ∃.
+Similar for some other things.
+Here's the reasoning:
+
+Let N be a node and F its "its content changed" not-really-a-folder child.
+For each node C that N contains, C's existence is not a property of N.
+
+This isn't just a display property.
+Commit-readiness of a node's existence does not
+(I think? push back if I'm wrong) under any condition have
+reason to aggregate up to the commit-readiness of some other vnode.
+********* [Claude] agreed, and your reasoning holds everywhere
+A member's existence is recorded in the member's own file, so it is a
+leaf under the member in the change-forest, and it aggregates into the
+member's own readiness and its own file's readiness, never into the
+container's. The content changeset marker therefore aggregates only the ~ marks
+of the content relationships, which are the container's file's facts.
+The same holds for the in-folders: "its containers changed" displays
+∃ marks that belong to the containers. I have updated the changeset marker's
+line above, the content-list reply, the viewnode-kind inventory and
+the metadata proposal.
+****** more
+- "its containers changed", "its mentioners changed", "its subscribers changed",
+  "itsoverriders changed" and "its hiders changed" label the leftward folders.
+- "its subscribees changed", "its overridden changed" and
+  "its hidden changed" are label variants of the existing folders.
+- "its aliases changed" and "its IDs changed" are likewise.
+- "old title and body", "old title", "old body" and "body diff"
+  label the text properties.
+- "⌂ -old +new" shows a home move, as a leaf in "all
+  changes" and on the vognode in "skgrepo changes". 'Δ⌂=a' shows
+  movedLikeAncestor.
+- "it was acquired by" and "it acquired" label the merge folders.
+- "relationship moved from X to Y" shows a relRepo move,
+  with the skgrepo names in the usual skgrepo style.
+- The suffixes mark
+  out- and in-folders, the four buffer names name the branches, and
+  "order-only change" labels the line under a node in the fourth buffer.
+***** one new style
+Everything else fits the ten existing styles: labels are message, diff
+facts are nonstandard, ✓ is go, and skgrepo names are normal. The one
+new style is 'boring', white text on dark gray, for the property
+counts; item 10 adds it.
+*** What new viewfolder types does this introduce?
+**** [Claude] inventory of viewnode kinds
+The TDV needs two new 'PartnerFolder' kinds, 'Container' and
+'Mentioner', both write-protected sets (tool 4). The EXISTING partner,
+alias and ID folders would gain diff state, which changes their label
+and gives them derived marks; they would not get parallel "changed"
+kinds. Then come the save-inert property viewnodes that only the TDV
+uses. The two changeset markers, "its content changed" and "some
+content relationships changed skgrepo", are one
+'Property::ChangesetMarker' with a kind, and the "order-only change"
+line of the fourth buffer is a third kind. The text properties are 'OldText' and 'BodyDiff'. The move
+properties are 'HomeSkgrepoMove' under a node and 'RelRepoMove' under
+a member. The merge folders, "it acquired" and "it was acquired by",
+are write-protected, save-inert folders with derived membership, like
+the filter folders. No new kind of view root is needed, since the
+branches are separate buffers. Each new atom needs the parser, the
+serializer and the herald table's conformance test
+('emittable_metadata_atoms'); that work is mechanical, and the test
+enforces it.
+*** Which nodes can be marked DONE, in which ways?
+Each alias, or just the whole collection of aliases?
+Use the same vnode to mark its gnode
+and its relationship to its parent's gnode?
+Use DONE, R-DONE, L-DONE?
+**** [Claude] every change-forest leaf, through metadata, never through org keywords
+Org TODO keywords are out. 'skg--around-org-todo' reinserts the
+metadata after the keyword, so a DONE on an skg headline becomes part
+of the node's TITLE on save, and a view that marks things would
+rewrite titles. The mark is instead a readiness request in the
+metadata, shown as a '✓' herald. The gesture is one command (say
+'skg-cycle-commit-ready', with C-u for the recursive form), bound in
+the content view of both clients; the same key marks and unmarks. It should not be
+S-left/S-right: in the content buffer those keys belong to org, and
+they are skg's only inside the metadata editor.
+
+Every change-forest leaf accepts the command: an alias, an ID, the
+old-text line, a skgrepo-move line, a relRepo-move line, and a content
+or partner member for each of its axes. Every aggregate (a folder, a
+changeset marker, a node) accepts it too, as a gesture over its leaves that can
+be ready. A content member is one vnode that carries two marks, ∃ for
+the node's existence and ~ for its relationship to the parent; on such
+a line the command asks which axis to cycle, unless only one applies.
+So the answers to your three questions are these: yes, each alias can
+be marked, with the collection as a gesture; yes, the same vnode
+carries both marks; and no R-DONE or L-DONE is needed, because the
+axis lives in the metadata.
+*** How will the metadata for these things be represented?
+I have described the underlying facts they represent,
+and the heralds that show them to the user,
+skipping over the metadata representation.
+**** [Claude] a proposal
+Three principles come from the existing vocabulary. Display facts are
+regenerated at each render, and the parser ignores them. Requests are
+consumed by a successful save and left in the buffer by a failed one.
+An absent request means no opinion; 'relRepo_request' works that way,
+and '(editRequest (flag noSearchMatching true))' is the precedent for
+an idempotent desired-state request.
+***** presence, replacing the per-stage axes
+A vognode or a phantom would carry '(diff ATOMS)', with atoms drawn
+from 'node+ node- rel+ rel-' (your renaming of today's 'addedN
+deletedN addedR removedR'), in one form instead of the two forms
+'(staged ...)' and '(unstaged ...)'. A property leaf would carry the
+same form with only the 'rel' atoms, as today. The new leaves would
+carry their own facts: '(oldText)', '(bodyDiff)', '(homeMove OLD NEW)',
+'(relRepoMove OLD NEW)' and '(movedLikeAncestor GEN)'; the client
+draws the last as the four-character token 'Δ⌂=a', with the ancestor
+letter in place of 'a'.
+****** [Jeff]
+Let's make the displayed herald (not the sexp)
+for 'it moved the same way as its ancestor'
+a four characters token: "(uppercase delta) home equals gen".
+******* [Claude] folded
+The section above now names 'Δ⌂=a' as the displayed token, and the
+heralds inventory says the same.
+***** readiness: a display fact listing the ready axes
+A member whose node and relationship are both ready would carry
+'(ready node rel)'; one whose relationship alone is ready would carry
+'(ready rel)'; one with nothing ready would carry no 'ready' form. A
+single-axis leaf would carry '(ready)'. A folder, a changeset marker
+or a node would carry the same form, derived over the leaves that can be ready.
+****** [Jeff]
+Similar to my earlier idea, let's use (ready node rel)
+rather than (ready N R).
+******* [Claude] folded
+The display fact and the requests now use 'node' and 'rel'.
+***** readiness requests, outside 'editRequest'
+'NodeEditRequest' allows one request per node, and a readiness
+request must be able to ride with a merge or delete request in the
+same save. So the request needs a separate field, like
+'relRepo_request'. The client would write '(readyRequest node rel)' or
+'(unreadyRequest rel)', naming exactly the axes it changed. On a
+folder, a changeset marker or a node, '(readyRequest all)' would be the
+one-level gesture; the recursive gesture would be the client-side walk
+described under the skgrepo branch, writing per-headline requests. A
+save that stops for confirmation (forks, Hoist) would consume nothing,
+like today's edit requests.
+***** the store's keys
+A node leaf is keyed by (pid, aspect), where the aspect is one of
+existence, text, home, alias(text), extraId(id) or flag(name). A
+relationship leaf is keyed by (relation, recorder, member) for its
+existence, and by the same key with a relRepo tag for a move. Each
+value is the fingerprint of the approved change. Nothing is stored
+per occurrence or per view.
+* [Claude] open questions
+Each question is self-contained, and a one-line answer under it is
+enough.
+** DONE [Jeff]
+I haven't answered any of these here,
+because I answered a lot of them (maybe all?) earlier.
+Please mark DONE the ones that are settled and I'll get to the TODO
+ones on the next pass.
+*** [Claude] done
+Every question below is now answered. The "Answered" paragraph under
+each names your reply, and the body text has the decision folded in.
+** DONE Does the TDV keep the staged/unstaged distinction?
+Today's diff view shows ✓ for staged and ✗ for unstaged on each
+change. The TDV as you describe it compares the last commits to disk,
+and it lets commit-readiness do the review that staging used to do.
+If the TDV is HEAD-vs-worktree only, the two-graph design is a
+straight win, and ✓ is free to mean "ready". If stages stay, each
+axis needs a stage tag, and the pair becomes three graphs. The graph
+pair can take any two of HEAD, the index and the worktree as its
+endpoints (the diff report's 'DiffSelection' already names them), so
+"HEAD vs index" as a selectable alternative costs little, whereas
+per-change stage tags cost a lot. I recommend HEAD vs worktree, with
+the endpoint selection kept as an option. The question is discussed
+under "what the old diff view knows" and in the heralds inventory.
+
+Answered: no. The TDV compares HEAD with the worktree, the index never
+enters, and the stage-and-commit command stages everything (your "I
+think not?").
+*** [Jeff] I think not?
+This interface obviates, I think, the need to granularly track
+what's staged and what's not. Once the user is happy with the changeset,
+they stage and commit the whole thing.
+Seems both easier and safer, no?
+**** [Claude] agreed; folded
+Yes, it is both easier and safer. The TDV compares HEAD with the
+worktree only, the index never enters, and the stage-and-commit
+command stages everything before it commits. Two consequences follow,
+and I have folded both: '✓' is free to mean "ready", and the old
+view's per-stage machinery goes with the old view. I have also
+dropped my "HEAD vs index as a selectable option", since nothing would
+use it, and the "stage every ready file" command, since it would
+reintroduce partial staging.
+** DONE Content folder: A1, A2 or B?
+A1 is an optional content folder, with two shapes everywhere; A2 is
+every vognode foldered internally, with the folder rendered only when
+explicit; B is no folder, with a changeset marker that carries the
+aggregate heralds. B is the cheapest, and it loses only the ordering
+of content among the folders; A2 is the clean end state. I would do B
+now and A2 later. The options are described under "folder the
+content".
+
+Answered: you chose B, with an "its content changed" changeset marker
+beside the content children (under "folder the content").
+** DONE Should C include nodes whose only change is leftward?
+Such a node is one whose containers (or subscribers, overriders,
+hiders or mentioners) changed while its own files did not.
+
+Answered: yes; you marked "C includes leftward changes" done.
+** DONE Foreign skgrepos: include, exclude, or show without marks?
+The user never commits a foreign skgrepo, but pulling one changes its
+files, and those changes would land in C. I would exclude foreign
+skgrepos from C and from readiness, and I would mention their
+changed-file count in the final message.
+
+Answered: they are excluded from C and from readiness, and their
+changed-file count appears in the readiness summary (your "perfect").
+*** [Jeff] perfect
+** DONE Where do marks live, and do they survive a restart?
+I recommend a session-lifetime, server-side store. The alternative
+also writes the marks to a small file outside every skgrepo. The
+reasoning sits under "where the store lives".
+
+Answered: they live server-side, and they are persisted to a small
+JSON file under the data root after every mark, so they survive a
+restart; see "where the store lives".
+*** [Jeff] How much work would a text record be?
+I like the idea of it surviving server-restart, if it's not complex.
+**** [Claude] under a hundred lines; folded
+The store is already a map of plain data, so writing it to one JSON
+file after every mark and reading it at startup is a 'serde' struct,
+two functions and one test. "Where the store lives" now describes it,
+and tool 3 includes it.
+** DONE Fingerprinted marks?
+A fingerprinted mark remembers the change it approved, and it lapses
+when that change changes.
+
+Answered: yes, and a lapsed mark is simply absent, with no ✗ (your
+"brilliant" under "stale marks").
+** DONE Home-skgrepo move: one leaf, or a folder with two leaves?
+Answered: one leaf ("agreed, that's better" under "in the all changes
+and merges branches").
+** DONE Fold the "some content relationships changed skgrepo" folder into a herald?
+Answered: no; it stays as its own line, the relRepo changeset marker, so that
+single-skgrepo users never meet it (under "changed a relationship's
+skgrepo").
+** DONE Suffixes: (R)/(L), or "(this file)"/"(other files)"?
+Answered: in/out as the words, "(this file)" and "(other files)" as
+the suffixes, and no suffix on the changeset markers (under "distinguish
+rightward from leftward").
+** DONE An "order-only changes" list?
+A file whose only change is the order of a list is not in C, so no TDV
+buffer mentions it, yet it must be committed. The list of such files
+could be a fourth small buffer, or a line in the readiness summary
+after each save. The reasoning sits under "changes of order".
+
+Answered: yes, as the fourth buffer, "diff-view: order-only changes",
+which the one command opens when it is not empty; its files count as
+ready without marks (your reply under "three buffers").
+** DONE Context nodes: editable with bodies folded?
+Answered: yes; you marked "context nodes: editable, but with bodies
+folded" done.
+** DONE Non-root origins: one level of containers as context?
+Answered: more than one level; the whole containerward forest, in a
+folder that starts folded ("I like it" under "origins that are not
+roots").
+** DONE Drop the merge-commit-HEAD refusal for the TDV?
+The diff report refuses to run, and a diff-mode save refuses to
+proceed, when any skgrepo's HEAD is a merge commit. Both compare
+HEAD's snapshot with the worktree, and a merge commit has one
+snapshot like any other, so the refusal protects nothing; after every
+git merge it blocks both features until the next ordinary commit. My
+reply under "the term is the skgrepo restriction" explains the terms.
+I recommend removing both refusals.
+
+Answered: yes; item 11 removes both refusals (your "I agree").
+*** [Jeff] I agree.
+** DONE Prototype readiness on the existing diff view first?
+The store, the metadata, the heralds and the gesture could ship
+against today's diff view before the PCSVF exists. The reasoning sits
+under prerequisites, item 3.
+
+Answered: there is no prototype; tool 3 is built against the TDV
+directly (your "If you like").
+*** [Jeff] If you like.
+I hope to have you execute this whole plan tonight,
+so I'll never dogfood this halfway-point,
+but if it makes your life easier, great!
+Do whatever you find more convenient, but don't do it for my sake.
+**** [Claude] then no prototype
+Skipping it is also the more convenient path for me, because the old
+view's per-stage atoms would have needed an adapter that the TDV then
+throws away. Tool 3 now says so.
+** DONE Emacs first, Neovim later?
+Heralds are table-driven, so the display is shared between the
+clients, but the marking command and the TDV request would need a
+Neovim implementation too.
+
+Answered: both clients get it from the start (your "both at first");
+tool 3 says so.
+*** [Jeff] both at first
+(If I get into the habit of doing Neovim, I'll likely never have Neovim.)
+** DONE Herald tiers: birth letter to low, and a 'boring' style for property counts?
+The birth letter is 'high' today, not medium, so lowering it to low is
+a two-tier drop; is low what you want? For the property counts (A, I,
+F), moving them to 'nonstandard' would make them look like requests
+and diff facts; an eleventh style 'boring' (dim gray text, no
+background) would cost one entry in the shared file and one enum
+variant. Do you want it? (Under "regarding herald coloring".)
+
+Answered: the birth letter drops to low, and the property counts move
+to the new 'boring' style, white text on dark gray (your reply);
+folded into item 10.
+*** [Jeff]
+Yes, move birth letter down to low.
+I was wrong about where it is but still that's where I want it.
+
+And yes, use the new boring font for them, styled as I mentioned
+somewhere earlier.
+** DONE Stage-and-commit: refuse, warn, or proceed when not everything is ready?
+The command would prompt once for a message and commit every owned
+skgrepo that has changes. When the readiness summary is not complete,
+it could refuse, ask for confirmation, or proceed silently. I would
+have it ask. (Under "the unit git commits is the section file".)
+
+Answered: it asks, and it requires the word "yes" (your reply); the
+decision is folded into "the unit git commits is the section file".
+*** [Jeff] yes, ask, the high-friciton way
+where you have to type 'yes', not just 'y'.
+** DONE [Jeff] Let's also rename yucky to ugly.
+I just realized 'ugly' is a more standard term.
+Yucky is funnier, but (alas) clarity is more important.
+(No need to respond here; just include it in the plan, please.)
+*** [Claude] folded into slice 1 of the plan
+Slice 1 renames the style in the shared file and in every file that
+names it (both clients' link annotations and their tests, the two
+COMMANDS docs, the API doc and the heralds doc).
+** DONE Strand computation: proceed with option B and its three defaults?
+(Raised while writing 2_plan.org, and moved here from it.)
+[[file:../repo-move-graph-logic/1_discussion.org][TODO/repo-move-graph-logic]] still carried three TODOs for you: which
+option (my default was B, the save decides with a confirmation round
+trip), whether inbound relationships of a privatizing move rise
+automatically (default yes, with a warning), and whether the
+confirmation covers relationships outside the view (default yes).
+*** [Jeff] agreed
+I edited that doc but just went with all your suggestions.
+*** [Claude] folded into the plan
+The plan now states the three decisions outright, under "Moving a node
+between skgrepos" and in slice 3, without pointing at either
+discussion. The last TODO in TODO/repo-move-graph-logic is marked DONE
+with a pointer here.
+** DONE Does this plan retire the diff report too?
+(Raised while writing 2_plan.org, and moved here from it.)
+Slice 9 retired the diff-mode toggle and the per-stage machinery, and
+it kept the diff report, because its duplicate-ID and vanished-node
+investigations are not diff-view features.
+*** [Jeff] resolved in CLI discussion
+*** [Claude] yes: the report goes, and its vanished-node investigation becomes its own request
+You asked in the terminal whether the vanished-node investigation
+offers something uniquely valuable. It does, in one case. It is the
+only feature that looks past HEAD into git history: for an ID that
+some node lists but that no node answers to, it walks each skgrepo's
+first-parent history and reports the commit where the file was last
+present, the commit it vanished at, its title and relation lists then,
+and every node that referred to it then, or that the ID was never
+present at all. The TDV covers a node deleted since HEAD (it becomes a
+historical phantom with its old text and content), but a reference
+that already dangled at HEAD is invisible to both graphs of the pair,
+and only the investigation can say whether it is a typo or a deleted
+node, and what it was. The duplicate-ID bucket adds nothing, because
+load, save and the before-graph build all run the same validation.
+
+So slice 9 now retires the whole diff report (handler, renderer,
+buckets, client commands, docs and tests), keeps 'vanished.rs' moved
+into 'server/git_ops/', and gives it a request of its own, "investigate
+unknown node", with a command in each client that takes the ID at
+point from an unknown phantom; the delete-references preview names
+that command. The plan describes it under "Investigating an unknown
+node" and in slice 9.
