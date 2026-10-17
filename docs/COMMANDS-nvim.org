@@ -532,10 +532,17 @@ whose title is an =[[id:...][...]]= link to the original node.
 If the original headline title already contains a link, the
 command asks "Are you sure?" before proceeding.
 ** <localleader>v : view-level commands
-*** <localleader>vd : :SkgViewDiffMode
+*** <localleader>vd : :SkgDiffView
 If you use git to manage your data,
-enable this view to see what you've changed since your last commit,
-i.e. how your worktree differs from HEAD.
+this opens the total diff view: every change in the owned skgrepos
+since their last commits (how each worktree differs from HEAD), with
+the context needed to understand it. It opens up to four buffers,
+"skg://diff-view: all changes", "...: merges", "...: skgrepo changes"
+and "...: order-only changes", skipping any that would be empty. It
+refuses unless the skgrepo restriction is 'all'.
+*** :SkgViewDiffMode
+The older diff view, unbound: it toggles git diff annotations in all
+views.
 Refuses while any skg buffer has unsaved edits.
 
 If toggling the mode would rerender overPrivateText telescope text under a

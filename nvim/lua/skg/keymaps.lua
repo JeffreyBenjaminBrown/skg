@@ -112,6 +112,8 @@ M.commands = {
                              desc = 'Turn the branch at point into a link (saves)' },
   ViewDiffMode = { module = 'skg.diff_mode', fn = 'toggle',
                    desc = 'Toggle git diff annotations in all views' },
+  DiffView = { module = 'skg.total_diff_view', fn = 'diff_view',
+               desc = 'Open the total diff view: every change since the last commits' },
   ViewNewEmpty = { module = 'skg.view_new_empty', fn = 'view_new_empty',
                    desc = 'Open a fresh root node in a chosen repo' },
   HeraldsToggle = { module = 'skg.heralds', fn = 'toggle',
@@ -254,7 +256,7 @@ M.content_view_bindings = {
   { 'mc', 'ReplaceLinkWithContent' },    -- C-c m c
   { 'mf', 'Fork' },                      -- C-c m f
   { 'ml', 'ReplaceContentWithLink' },    -- C-c m l
-  { 'vd', 'ViewDiffMode' },              -- C-c v d
+  { 'vd', 'DiffView' },                  -- C-c v d
   { 've', 'ViewNewEmpty' },              -- C-c v e
   { 'vh', 'HeraldsToggle' },             -- C-c v h
   { 'vl', 'RestrictRepoSet' },            -- C-c v l

@@ -38,7 +38,7 @@ report)."
   (when (and (zerop path-count)
              (not skg--git-diff-mode-enabled))
     (message
-     "Git diff mode is off, so new files cannot be recognized: this command looks for the addedN atoms only a diff-mode view carries. Toggle diff mode (C-c v d), then retry.")
+     "Git diff mode is off, so new files cannot be recognized: this command looks for the addedN atoms only a diff-mode view carries. Toggle diff mode (M-x skg-view-diff-mode), then retry.")
     t))
 
 (defun skg-git-add-if-new-recursive ()

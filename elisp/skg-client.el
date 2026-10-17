@@ -21,6 +21,7 @@
 (require 'skg-request-export-org)
 (require 'skg-request-import-md-and-org)
 (require 'skg-request-git-diff-mode)
+(require 'skg-request-total-diff-view)
 (require 'skg-request-rebuild-session-lifetime-stores)
 (require 'skg-request-rerender-all-views)
 (require 'skg-recovery)

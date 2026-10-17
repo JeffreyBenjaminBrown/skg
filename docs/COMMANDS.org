@@ -658,10 +658,17 @@ this brings you to a new view showing only that ancestry.
 This actually works in org-mode outside of skg.
 (skg uses org-mode, but org-mode can be used without skg.)
 ** C-c v : view changes, global
-*** C-c v d : skg-view-diff-mode
+*** C-c v d : skg-diff-view
 If you use git to manage your data,
-enable this view to see what you've changed since your last commit,
-i.e. how your worktree differs from HEAD.
+this opens the total diff view: every change in the owned skgrepos
+since their last commits (how each worktree differs from HEAD), with
+the context needed to understand it. It opens up to four buffers,
+"diff-view: all changes", "diff-view: merges", "diff-view: skgrepo
+changes" and "diff-view: order-only changes", skipping any that would
+be empty. It refuses unless the skgrepo restriction is 'all'.
+*** M-x skg-view-diff-mode
+The older diff view, unbound: it toggles git diff annotations in all
+views.
 
 If toggling the mode would rerender overPrivateText telescope text under a
 restricted skgrepo-set, Skg asks before changing the mode or any view.
