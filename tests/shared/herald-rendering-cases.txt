@@ -342,3 +342,11 @@
 (skg (subscribeeFolder changed))
 ---- text: its subscribees changed (this file)
 ---- styles: message*35
+==== tdv: a node in the skgrepo-changes buffer whose home moved
+(skg (node (id x) (viewStats (homeMove (old pub) (new priv)))))
+---- text: -pub +priv
+---- styles: normal*4 -*1 normal*5
+==== tdv: a node that moved like its grandparent
+(skg (node (id x) (viewStats (homeMove (old pub) (new priv)) (movedLikeAncestor b))))
+---- text: -pub +priv Δ⌂=b
+---- styles: normal*4 -*1 normal*5 -*1 nonstandard*4

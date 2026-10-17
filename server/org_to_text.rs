@@ -433,6 +433,15 @@ fn unrestrictedVognode_metadata_to_string (
             "(homeRepoHerald {})",
             metadata_value_atom (
               & format! ("⌂:{}", src_config . herald_label ()) ) ) ); }}
+      if let Some ((old, new)) =
+        &unrestrictedVognode . viewStats . home_move {
+        parts . push ( format! (
+          "(homeMove (old {}) (new {}))",
+          metadata_value_atom (old), metadata_value_atom (new) )); }
+      if let Some (letter) =
+        &unrestrictedVognode . viewStats . moved_like_ancestor {
+        parts . push ( format! (
+          "(movedLikeAncestor {})", metadata_value_atom (letter) )); }
       if parts . is_empty () { None }
       else { Some ( format! (
                "(viewStats {})", parts . join (" ") )) }}

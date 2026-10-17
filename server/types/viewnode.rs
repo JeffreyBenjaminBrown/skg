@@ -466,6 +466,18 @@ pub struct ViewnodeStats {
   /// Herald: red "~NAME" immediately before the ⌂ homeRepoHerald
   /// (server/heralds.rs).
   pub relRepo            : Option<SkgrepoName>,
+  /// Some((OLD, NEW)) in the skgrepo-changes buffer of the total diff
+  /// view, for a node whose home skgrepo moved from OLD to NEW since
+  /// HEAD. Display-only; the buffer's pass sets it after completion
+  /// ('set_home_move_facts_in_viewforest'), and the parser discards
+  /// it. Herald "-OLD +NEW".
+  pub home_move          : Option<(SkgrepoName, SkgrepoName)>,
+  /// Some(LETTER) beside 'home_move' when the nearest vognode
+  /// ancestor whose home moved moved the same way. LETTER names that
+  /// ancestor as the relationship heralds name ancestors: a for the
+  /// viewparent, b for the grandparent, and so on. Display-only.
+  /// Herald "Δ⌂=LETTER".
+  pub moved_like_ancestor : Option<String>,
 }
 
 #[derive( Debug, Clone, PartialEq, Eq, Hash )]
@@ -1183,6 +1195,8 @@ impl Default for ViewnodeStats {
       overridesHere     : None,
       omitted_body      : false,
       relRepo        : None,
+      home_move         : None,
+      moved_like_ancestor : None,
     }} }
 
 //

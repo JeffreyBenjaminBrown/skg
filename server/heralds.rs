@@ -537,7 +537,17 @@ pub fn herald_rule_table () -> HeraldRule {
           // per the module doc, so placing this rule first guarantees
           // that regardless of the atoms' order in the raw sexp).
           crule ("relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
-          crule ("homeRepoHerald", vec! [ any (vec! [RuleChild::It]) ]) ]),
+          crule ("homeRepoHerald", vec! [ any (vec! [RuleChild::It]) ]),
+          // The skgrepo-changes buffer of the total diff view: the
+          // node's home move, "-OLD +NEW", then "Δ⌂=a" when its
+          // nearest moved vognode ancestor (here a) moved the same way.
+          rule ("homeMove", vec! [
+            crule_styled_as ("homeMove_skgrepo", "old", vec! [
+              s ("-"), any (vec! [ RuleChild::It ]) ]),
+            crule_styled_as ("homeMove_skgrepo", "new", vec! [
+              s ("+"), any (vec! [ RuleChild::It ]) ]) ]),
+          crule ("movedLikeAncestor", vec! [
+            any (vec! [ s ("Δ⌂="), RuleChild::It ]) ]) ]),
         rule ("editRequest", vec! [
           leaf ("delete", "delete"),
           crule ("merge", vec! [
@@ -818,9 +828,12 @@ fn viewstats_atoms () -> Vec<&'static str> {
       overridesHere : _,    // keyed form (a viewStats sub-form)
       omitted_body : _,      // -> the node-level omittedBody atom
       relRepo : _,       // -> the relRepo display-fact atom and herald
+      home_move : _,           // -> the homeMove atom
+      moved_like_ancestor : _, // -> the movedLikeAncestor atom
     } = v; }
   let _ = guard;
-  vec! [ "cycle", "homeRepoHerald", "overridesHere", "relRepo" ] }
+  vec! [ "cycle", "homeRepoHerald", "overridesHere", "relRepo",
+         "homeMove", "movedLikeAncestor" ] }
 
 /// AffectsParent values the serializer can emit (True stays implicit).
 fn affectsParent_emitted_atoms () -> Vec<&'static str> {

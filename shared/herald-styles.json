@@ -40,7 +40,7 @@
   ],
   "tier_order": [ "normal", "low", "medium", "high", "crucial" ],
   "node_heralds": {
-    "comment": "The style of each styled atom in the server's herald rule table (server/heralds.rs), keyed by atom name. Where one atom takes different styles in different places, a qualified key names the other place: affectsParent_false is the false under affectsParent, and editRequest_X is the atom X under editRequest; homeMove_skgrepo and relRepoMove_skgrepo are the skgrepo names those properties show. The ☮ on a write-protected label or flag takes writeProtected's style. See docs/heralds.org.",
+    "comment": "The style of each styled atom in the server's herald rule table (server/heralds.rs), keyed by atom name. Where one atom takes different styles in different places, a qualified key names the other place: affectsParent_false is the false under affectsParent, and editRequest_X is the atom X under editRequest; homeMove_skgrepo and relRepoMove_skgrepo are the skgrepo names those properties show, as is homeMove_skgrepo in a moved node's own heralds. The ☮ on a write-protected label or flag takes writeProtected's style. See docs/heralds.org.",
     "writeProtected":                  "crucial",
     "affectsParent_false":             "crucial",
     "omittedBody":                     "high",
@@ -91,6 +91,7 @@
     "bodyDiff":                        "message",
     "homeMove":                        "message",
     "homeMove_skgrepo":                "normal",
+    "movedLikeAncestor":               "nonstandard",
     "relRepoMove":                     "message",
     "relRepoMove_skgrepo":             "normal",
     "changesetMarker":                 "message"

@@ -923,8 +923,8 @@ fn parse_deleted_sexp (
 
 
 /// Parse the (viewStats ...) s-expression contents: the bare-atom
-/// 'cycle' stat and the keyed 'overridesHere' / 'homeRepoHerald'
-/// sub-forms. Relationship stats are semantic display-only '(rels ...)'
+/// 'cycle' stat and the keyed 'overridesHere' / 'homeRepoHerald' /
+/// 'homeMove' / 'movedLikeAncestor' sub-forms. Relationship stats are semantic display-only '(rels ...)'
 /// facts, parsed and discarded at node level instead.
 fn parse_viewstats_sexp (
   items : &[Sexp],
@@ -940,6 +940,12 @@ fn parse_viewstats_sexp (
           _ => {
             return Err ( format! ( "Unknown viewStats value: {}",
                                     bare_value )); }} },
+      Sexp::List (form) if form . first () . is_some_and (
+        |head| matches! ( atom_to_string (head) . as_deref (),
+                          Ok ("homeMove") | Ok ("movedLikeAncestor") )) => {
+        // Output-only facts of the total diff view's skgrepo-changes
+        // buffer, recomputed after completion: silently discard.
+      },
       Sexp::List (kv_pair) if kv_pair . len () == 2 => {
         let key : String = atom_to_string ( &kv_pair[0] ) ?;
         match key . as_str () {
