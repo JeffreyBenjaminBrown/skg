@@ -104,7 +104,8 @@ async fn run_overrides_view_test (
        (folder hidesFromSubs))" );
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : true,
-      open_views        : OpenViews::new (), };
+      open_views        : OpenViews::new (),
+      graph_pair        : None, };
     let rendered = {
       let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
       update_from_and_rerender_buffer (
@@ -165,7 +166,8 @@ async fn emptied_requested_folders_still_render_in_diff_mode (
            (viewRequests (folder overrides))" );
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views        : OpenViews::new (), };
+        open_views        : OpenViews::new (),
+        graph_pair        : None, };
       let response = {
         let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
         update_from_and_rerender_buffer (
@@ -232,7 +234,8 @@ async fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
 ";
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : true,
-      open_views        : OpenViews::new (), };
+      open_views        : OpenViews::new (),
+      graph_pair        : None, };
     let first = {
       let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
       update_from_and_rerender_buffer (

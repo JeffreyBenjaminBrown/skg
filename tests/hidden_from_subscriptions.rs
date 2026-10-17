@@ -377,7 +377,8 @@ async fn test_deleting_foreign_subscribee_content_preserves_branch_edit (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
-      open_views        : OpenViews::new (),};
+      open_views        : OpenViews::new (),
+      graph_pair        : None,};
 
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
@@ -409,7 +410,8 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
-      open_views        : OpenViews::new (),};
+      open_views        : OpenViews::new (),
+      graph_pair        : None,};
 
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
@@ -455,7 +457,8 @@ async fn test_removing_subscribee_content_from_subscriber_contains_infers_hide (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
-      open_views        : OpenViews::new (),};
+      open_views        : OpenViews::new (),
+      graph_pair        : None,};
     let buffer : &str = indoc! {"
       * (skg (node (id f) (repo owned))) f
       "};
@@ -487,7 +490,8 @@ async fn test_readding_subscribee_content_to_subscriber_contains_unhides (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
-      open_views        : OpenViews::new (),};
+      open_views        : OpenViews::new (),
+      graph_pair        : None,};
     let buffer : &str = indoc! {"
       * (skg (node (id g) (repo owned))) g
       ** (skg (node (id c) (repo foreign) writeProtected)) c
@@ -514,7 +518,8 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
-      open_views        : OpenViews::new (),};
+      open_views        : OpenViews::new (),
+      graph_pair        : None,};
     let saved_view_id : ViewId =
       ViewId::ContentView (
         "collateral-hide-saved" . to_string());
@@ -589,7 +594,8 @@ async fn test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
-      open_views        : OpenViews::new (),};
+      open_views        : OpenViews::new (),
+      graph_pair        : None,};
 
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
@@ -631,7 +637,8 @@ async fn test_moving_foreign_subscribee_content_elsewhere_still_hides (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
-      open_views        : OpenViews::new (),};
+      open_views        : OpenViews::new (),
+      graph_pair        : None,};
 
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
@@ -668,7 +675,8 @@ async fn test_extra_view_child_under_foreign_subscribee_is_deleted (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
-      open_views        : OpenViews::new (),};
+      open_views        : OpenViews::new (),
+      graph_pair        : None,};
 
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
@@ -720,7 +728,8 @@ async fn test_extra_view_child_under_owned_subscribee_is_deleted (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
-      open_views        : OpenViews::new (),};
+      open_views        : OpenViews::new (),
+      graph_pair        : None,};
     let edited : String =
       indoc! {"
               * (skg (node (id a) (repo owned))) a
@@ -803,7 +812,8 @@ async fn test_subscribee_and_filter_folders (
           graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
           &mut stream,
@@ -873,7 +883,8 @@ async fn test_hidden_within_but_none_without (
           graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
           &mut stream,
@@ -910,7 +921,8 @@ async fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
-      open_views        : OpenViews::new (),};
+      open_views        : OpenViews::new (),
+      graph_pair        : None,};
 
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
@@ -960,7 +972,8 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
-      open_views        : OpenViews::new (),};
+      open_views        : OpenViews::new (),
+      graph_pair        : None,};
     let saved_view_id : ViewId =
       ViewId::ContentView (
         "collateral-unhide-saved" . to_string());
@@ -1028,7 +1041,8 @@ async fn test_deleting_from_hiddenin_folder_does_not_unhide (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
-      open_views        : OpenViews::new (),};
+      open_views        : OpenViews::new (),
+      graph_pair        : None,};
 
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
@@ -1103,7 +1117,8 @@ async fn test_hidden_without_but_none_within (
           graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
         &mut stream,
@@ -1139,7 +1154,8 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
-      open_views        : OpenViews::new (),};
+      open_views        : OpenViews::new (),
+      graph_pair        : None,};
 
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
@@ -1241,7 +1257,8 @@ async fn test_overlapping_hidden_within (
           graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
         &mut stream,

@@ -86,7 +86,8 @@ async fn no_match_search_ends_with_contentless_enrichment (
   let mut views_state : ViewsState =
     ViewsState {
       diff_mode_enabled : false,
-      open_views        : OpenViews::new (), };
+      open_views        : OpenViews::new (),
+      graph_pair        : None, };
   let all : SkgrepoRestriction =
     SkgrepoRestriction::named (config, SkgrepoSetName::from ("all"))?;
   let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
@@ -126,7 +127,8 @@ async fn abandoned_enrichment_ends_with_contentless_enrichment (
   let mut views_state : ViewsState =
     ViewsState {
       diff_mode_enabled : false,
-      open_views        : OpenViews::new (), };
+      open_views        : OpenViews::new (),
+      graph_pair        : None, };
   let all : SkgrepoRestriction =
     SkgrepoRestriction::named (config, SkgrepoSetName::from ("all"))?;
   let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =

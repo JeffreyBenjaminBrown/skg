@@ -38,7 +38,8 @@ async fn test_delete_removed_node_respawns (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
           &mut stream,
@@ -79,7 +80,8 @@ async fn test_delete_removed_here_node_respawns (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -118,7 +120,8 @@ async fn test_delete_new_here_updates_disk (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -163,7 +166,8 @@ async fn test_add_new_child_creates_on_disk (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -217,7 +221,8 @@ async fn test_diff_mode_as_subscribee_regenerates_phantom_children (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -257,7 +262,8 @@ async fn test_diff_mode_removed_subscribee_shows_removedR (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views        : OpenViews::new (),};
+        open_views        : OpenViews::new (),
+        graph_pair        : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -293,7 +299,8 @@ async fn test_diff_mode_removed_subscribee_staged_shows_stagedM (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views        : OpenViews::new (),};
+        open_views        : OpenViews::new (),
+        graph_pair        : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -330,7 +337,8 @@ async fn test_diff_mode_added_subscribee_shows_addedR (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views        : OpenViews::new (),};
+        open_views        : OpenViews::new (),
+        graph_pair        : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -368,7 +376,8 @@ async fn test_delete_removed_node_respawns_staged (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
           &mut stream,

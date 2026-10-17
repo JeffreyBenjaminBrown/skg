@@ -36,7 +36,8 @@ async fn test_delete_text_changed_property_respawns (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -74,7 +75,8 @@ async fn test_edit_text_changed_node_updates_disk (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -114,7 +116,8 @@ async fn test_edit_text_changed_property_respawns (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -156,7 +159,8 @@ async fn test_move_text_changed_property_respawns (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -193,7 +197,8 @@ async fn test_move_text_changed_to_unedited_node_respawns (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -237,7 +242,8 @@ async fn test_delete_text_changed_property_respawns_staged (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,

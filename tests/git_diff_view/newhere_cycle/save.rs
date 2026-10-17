@@ -31,7 +31,8 @@ fn test_newhere_cycle_survives_save()
       graph_handle_from_config (&config)?;
     let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
     let (mut stream, _) = mk_test_tcp_stream_pair ();
     let response = update_from_and_rerender_buffer(
       &mut stream,
@@ -77,7 +78,8 @@ fn test_newhere_cycle_survives_save_staged()
       graph_handle_from_config (&config)?;
     let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
     let (mut stream, _) = mk_test_tcp_stream_pair ();
     let response = update_from_and_rerender_buffer(
       &mut stream,

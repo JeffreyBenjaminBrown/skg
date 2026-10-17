@@ -102,7 +102,8 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
     config, tantivy, &graph );
   let restriction     : SkgrepoRestriction = SkgrepoRestriction::default_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (), };
+    diff_mode_enabled : false, open_views : OpenViews::new (),
+    graph_pair : None };
   for (view_id, root) in [("affected", "owner"),
                       ("clean-unrelated", "unrelated"),
                       ("dirty-unrelated", "unrelated-dirty")] {
@@ -224,6 +225,7 @@ async fn delete_preserves_foreign_referencer (
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false,
     open_views        : OpenViews::new (),
+    graph_pair        : None,
   };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") ?;
@@ -267,7 +269,8 @@ async fn delete_in_foreign_subscribee_rerenders_as_unknown (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (), };
+    diff_mode_enabled : false, open_views : OpenViews::new (),
+    graph_pair : None };
   let listener = std::net::TcpListener::bind ("127.0.0.1:0") ?;
   let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
   let response = update_from_and_rerender_buffer (
@@ -295,7 +298,8 @@ async fn delete_in_foreign_overridden_rerenders_as_unknown (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (), };
+    diff_mode_enabled : false, open_views : OpenViews::new (),
+    graph_pair : None };
   let listener = std::net::TcpListener::bind ("127.0.0.1:0") ?;
   let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
   let response = update_from_and_rerender_buffer (
@@ -324,7 +328,8 @@ async fn delete_in_foreign_hiddenoutside_rerenders_as_unknown (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (), };
+    diff_mode_enabled : false, open_views : OpenViews::new (),
+    graph_pair : None };
   let listener = std::net::TcpListener::bind ("127.0.0.1:0") ?;
   let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
   let response = update_from_and_rerender_buffer (
@@ -368,6 +373,7 @@ async fn delete_strips_references_impl (
   let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views            : OpenViews::new (),
+        graph_pair            : None,
         };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
@@ -520,6 +526,7 @@ async fn strip_pass_handles_extra_ids_impl (
   let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views            : OpenViews::new (),
+        graph_pair            : None,
         };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();

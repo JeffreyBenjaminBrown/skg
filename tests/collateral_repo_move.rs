@@ -67,7 +67,8 @@ fn test_skgrepo_move_updates_collateral_view_metadata (
 
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
-        open_views        : OpenViews::new (), };
+        open_views        : OpenViews::new (),
+        graph_pair        : None, };
       let view_id_1 : ViewId =
         ViewId::ContentView ( "repo-move-buffer-1" . to_string() );
       let view_id_2 : ViewId =
@@ -157,7 +158,8 @@ fn successful_save_consumes_relRepo_edit_request (
 
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
-      open_views        : OpenViews::new (), };
+      open_views        : OpenViews::new (),
+      graph_pair        : None, };
     let (mut stream, _read_end) = mk_test_tcp_stream_pair ();
     let response : SaveResponse = update_from_and_rerender_buffer (
       &mut stream, &save_input, &config, &tantivy, &graph, false,

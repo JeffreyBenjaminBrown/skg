@@ -57,6 +57,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views        : OpenViews::new (),
+        graph_pair        : None,
       };
       let saved_view_id : ViewId = ViewId::ContentView ("saved-a" . into ());
       let (a_view, _, _) = single_root_view (
@@ -155,6 +156,7 @@ fn missing_or_unparseable_dirty_baseline_refuses () -> Result<(), Box<dyn Error>
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views        : OpenViews::new (),
+          graph_pair        : None,
         };
         let (mut stream, _) = mk_pair ();
         let result = update_from_and_rerender_buffer_with_snapshots_test (

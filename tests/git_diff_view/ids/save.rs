@@ -41,7 +41,8 @@ async fn test_delete_id_folder_respawns (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -83,7 +84,8 @@ async fn test_delete_id_properties_aborts (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let result = update_from_and_rerender_buffer(
         &mut stream,
@@ -122,7 +124,8 @@ async fn test_edit_id_property_aborts (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let result = update_from_and_rerender_buffer(
         &mut stream,
@@ -165,7 +168,8 @@ async fn test_reorder_id_properties_saves (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -201,7 +205,8 @@ async fn test_move_id_properties_to_child_aborts (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let result = update_from_and_rerender_buffer(
         &mut stream,
@@ -250,7 +255,8 @@ async fn test_delete_id_folder_respawns_staged (
         graph_handle_from_config (&config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+        open_views            : OpenViews::new (),
+        graph_pair            : None,};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,

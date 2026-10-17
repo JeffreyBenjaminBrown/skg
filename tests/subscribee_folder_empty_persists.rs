@@ -62,6 +62,7 @@ async fn empty_subscribee_folder_persists_impl (
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false,
     open_views        : OpenViews::new (),
+    graph_pair        : None,
   };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
@@ -110,6 +111,7 @@ async fn empty_subscriber_folder_removed_impl (
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false,
     open_views        : OpenViews::new (),
+    graph_pair        : None,
   };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();

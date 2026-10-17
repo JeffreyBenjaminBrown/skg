@@ -106,7 +106,8 @@ async fn run_filter_folder_test (
     let graph = graph_handle_from_config (&config)?;
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : true,
-      open_views        : OpenViews::new (), };
+      open_views        : OpenViews::new (),
+      graph_pair        : None, };
     let first = {
       let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
       update_from_and_rerender_buffer (
@@ -162,7 +163,8 @@ async fn emptied_filter_folders_still_render_in_diff_mode (
     let graph = graph_handle_from_config (&config)?;
     { let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        open_views        : OpenViews::new (), };
+        open_views        : OpenViews::new (),
+        graph_pair        : None, };
       let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer (
         &mut stream, input, &config, &tantivy, &graph,
@@ -177,7 +179,8 @@ async fn emptied_filter_folders_still_render_in_diff_mode (
     { // The same save outside diff mode creates neither folder.
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
-        open_views        : OpenViews::new (), };
+        open_views        : OpenViews::new (),
+        graph_pair        : None, };
       let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer (
         &mut stream, input, &config, &tantivy, &graph,

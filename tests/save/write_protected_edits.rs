@@ -29,7 +29,8 @@ fn deleting_the_flags_folder_is_accepted_and_inert (
       let graph : InRustGraphHandle = graph_handle_from_config (config)?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
-        open_views        : OpenViews::new (), };
+        open_views        : OpenViews::new (),
+        graph_pair        : None, };
       let listener : std::net::TcpListener =
         std::net::TcpListener::bind ("127.0.0.1:0")?;
       let mut stream : TcpStream =
@@ -92,7 +93,8 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
   let graph : InRustGraphHandle = graph_handle_from_config (config)?;
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false,
-    open_views        : OpenViews::new (), };
+    open_views        : OpenViews::new (),
+    graph_pair        : None, };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0")?;
   let mut stream : TcpStream =

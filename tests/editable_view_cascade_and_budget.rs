@@ -90,7 +90,8 @@ async fn test_editable_view_ample_budget (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          open_views            : OpenViews::new (),};
+          open_views            : OpenViews::new (),
+          graph_pair            : None,};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
@@ -158,7 +159,8 @@ async fn test_editable_view_limit_5_or_6 (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          open_views            : OpenViews::new (),};
+          open_views            : OpenViews::new (),
+          graph_pair            : None,};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_5 = update_from_and_rerender_buffer (
           &mut stream,
@@ -174,7 +176,8 @@ async fn test_editable_view_limit_5_or_6 (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          open_views            : OpenViews::new (),};
+          open_views            : OpenViews::new (),
+          graph_pair            : None,};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_6 = update_from_and_rerender_buffer (
           &mut stream,
@@ -261,7 +264,8 @@ async fn test_editable_view_limit_1_to_4 (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          open_views            : OpenViews::new (),};
+          open_views            : OpenViews::new (),
+          graph_pair            : None,};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_1 = update_from_and_rerender_buffer (
           &mut stream,
@@ -276,7 +280,8 @@ async fn test_editable_view_limit_1_to_4 (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          open_views            : OpenViews::new (),};
+          open_views            : OpenViews::new (),
+          graph_pair            : None,};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_4 = update_from_and_rerender_buffer (
           &mut stream,
@@ -357,7 +362,8 @@ async fn test_editable_view_conflicting (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          open_views            : OpenViews::new (),};
+          open_views            : OpenViews::new (),
+          graph_pair            : None,};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
@@ -410,7 +416,8 @@ async fn test_editable_view_with_cycle (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          open_views            : OpenViews::new (),};
+          open_views            : OpenViews::new (),
+          graph_pair            : None,};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
@@ -457,7 +464,8 @@ async fn test_editable_view_with_repeat (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          open_views            : OpenViews::new (),};
+          open_views            : OpenViews::new (),
+          graph_pair            : None,};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
@@ -514,7 +522,8 @@ async fn test_editable_view_request_cleared (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          open_views            : OpenViews::new (),};
+          open_views            : OpenViews::new (),
+          graph_pair            : None,};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
@@ -566,7 +575,8 @@ async fn test_budget_aliasfolder_is_neutral (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          open_views            : OpenViews::new (),};
+          open_views            : OpenViews::new (),
+          graph_pair            : None,};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,

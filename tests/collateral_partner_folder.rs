@@ -86,7 +86,8 @@ fn collateral_partner_folder_update_and_warning_scoping
         graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
-        open_views        : OpenViews::new (), };
+        open_views        : OpenViews::new (),
+        graph_pair        : None, };
       let n_view_id : ViewId = ViewId::ContentView ("collat-N" . into ());
       let s_view_id : ViewId = ViewId::ContentView ("collat-S" . into ());
 

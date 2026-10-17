@@ -91,7 +91,8 @@ async fn toggle_refused_under_restricted_set_and_allowed_at_all (
       let mut views_state : ViewsState =
         ViewsState {
           diff_mode_enabled : false,
-          open_views        : OpenViews::new (), };
+          open_views        : OpenViews::new (),
+          graph_pair        : None, };
       let toggle = |views_state : &mut ViewsState,
                     restriction : &SkgrepoRestriction| -> Vec<String> {
         let (mut server, client) =
@@ -185,7 +186,8 @@ async fn switch_refusals_take_the_unwinding_shape (
       let mut views_state : ViewsState =
         ViewsState {
           diff_mode_enabled : true,
-          open_views        : OpenViews::new (), };
+          open_views        : OpenViews::new (),
+          graph_pair        : None, };
       let mut restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           config, SkgrepoSetName::from ("all"))?;
@@ -284,7 +286,8 @@ async fn refusal_first_messages_parse_and_read_as_documented (
       let mut views_state : ViewsState =
         ViewsState {
           diff_mode_enabled : false,
-          open_views        : OpenViews::new (), };
+          open_views        : OpenViews::new (),
+          graph_pair        : None, };
       let restricted : SkgrepoRestriction =
         SkgrepoRestriction::named (
           config, SkgrepoSetName::from ("public"))?;

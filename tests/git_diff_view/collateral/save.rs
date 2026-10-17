@@ -51,7 +51,8 @@ async fn test_collateral_view_preserves_diff_annotations (
     graph_handle_from_config (&config)?;
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : true,
-    open_views            : OpenViews::new (),};
+    open_views            : OpenViews::new (),
+    graph_pair            : None,};
 
   // 3. Register buffer 1 and buffer 2,
   //    both viewing the same viewforest rooted at "a".
@@ -158,7 +159,8 @@ async fn test_collateral_view_staged_text_and_unstaged_add (
     graph_handle_from_config (&config)?;
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : true,
-    open_views            : OpenViews::new (),};
+    open_views            : OpenViews::new (),
+    graph_pair            : None,};
 
   let view_id_1 : ViewId = ViewId::ContentView ( "buffer-1" . to_string() );
   let view_id_2 : ViewId = ViewId::ContentView ( "buffer-2" . to_string() );

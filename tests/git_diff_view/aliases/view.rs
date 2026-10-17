@@ -61,7 +61,8 @@ fn test_saving_a_diff_view_with_aliases_shown_does_not_duplicate_them()
     let graph : InRustGraphHandle = graph_handle_from_config (&config)?;
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : true,
-      open_views        : OpenViews::new (), };
+      open_views        : OpenViews::new (),
+      graph_pair        : None, };
     let (mut stream, _) = mk_test_tcp_stream_pair ();
     let response = update_from_and_rerender_buffer (
       &mut stream,

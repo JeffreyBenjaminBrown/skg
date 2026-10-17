@@ -115,7 +115,8 @@ async fn save (
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false,
-    open_views        : OpenViews::new (), };
+    open_views        : OpenViews::new (),
+    graph_pair        : None, };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
   let mut stream : TcpStream =

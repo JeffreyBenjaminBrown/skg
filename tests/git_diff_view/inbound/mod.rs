@@ -122,7 +122,8 @@ async fn run_inbound_save_test (
     let graph = graph_handle_from_config (&config)?;
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : true,
-      open_views        : OpenViews::new (), };
+      open_views        : OpenViews::new (),
+      graph_pair        : None, };
     let first = {
       let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
       update_from_and_rerender_buffer (
