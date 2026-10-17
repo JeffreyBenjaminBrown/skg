@@ -437,6 +437,15 @@ as a headline, with that skgrepo's path as the headline body.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward (':w') to apply the move.
+
+What the move does to the relationships touching the moved nodes, the
+save decides, whether or not the view shows them. One it would leave
+more public than a node's new home (an inbound relationship of a move
+to a more private skgrepo) is raised to that home, and the save's
+warnings say so. If it would leave others at their old, more private
+skgrepos, it saves nothing yet: it lists them and asks whether to
+re-level all of them to their new defaults, none, or each in turn;
+then it saves with that answer, or not at all if you quit.
 *** <localleader>sS : :SkgSetRepoRecursive
 Like 'SetRepo', but it also
 changes the skgrepo of every content descendent of the node at point

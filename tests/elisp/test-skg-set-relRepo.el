@@ -675,11 +675,10 @@ window plumbing are stubbed as in the other handler tests."
          (when (get-buffer "*skg-relationship-kinds*")
            (kill-buffer "*skg-relationship-kinds*")))))))
 
-;; --- set-repo stuck-relationship offer and write-protected warning ---
+;; --- set-repo and write-protected occurrences ---
 ;; (Here rather than in test-skg-metadata.el because these need the
-;; config harness: the stuck-relationship analysis reads the privacy ladder.
-;; In test--config-public-private-trusted the order is public,
-;; private, trusted -- so private -> public publicizes.)
+;; config harness. What a move strands, the save decides; see
+;; tests/strands.rs and tests/unit/strands.rs.)
 
 (defun test--messages-during (fn)
   "Run FN with `message' captured; return (RESULT . MESSAGES)."
@@ -691,82 +690,10 @@ window plumbing are stubbed as in the other handler tests."
                  nil)))
       (cons (funcall fn) (nreverse messages)))))
 
-(ert-deftest test-set-repo-recursive-offers-stuck-relationship-fix ()
-  "A publicizing recursive move detects the content relationships it would
-leave behind, and on acceptance writes (relRepo NEW) atoms on them."
-  (test--with-skg-content-view
-   (concat
-    "* (skg (node (id r) (repo private))) r\n"
-    "** (skg (node (id a) (repo private))) a\n"
-    "*** (skg (node (id b) (repo private))) b\n")
-   test--config-public-private-trusted
-   (lambda ()
-     (goto-char (point-min))
-     (let (offer-prompt)
-       (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
-                  (lambda (_current) "public"))
-                 ((symbol-function 'y-or-n-p)
-                  (lambda (prompt) (setq offer-prompt prompt) t)))
-         (let ((msgs (cdr (test--messages-during
-                           (lambda () (skg-set-repo t))))))
-           (should (string-match-p "2 content relationships" offer-prompt))
-           (should (seq-find (lambda (m)
-                               (string-match-p "Also publicized 2" m))
-                             msgs))))
-       (dolist (skgid '("r" "a" "b"))
-         (should (string-match-p "(repo public)"
-                                 (test--line-of-id skgid))))
-       (dolist (skgid '("a" "b"))
-         (should (string-match-p "(relRepo public)"
-                                 (test--line-of-id skgid))))
-       (should-not (string-match-p "relRepo"
-                                   (test--line-of-id "r")))))))
-
-(ert-deftest test-set-repo-recursive-decline-mentions-recursive-relrepo ()
-  "Declining the stuck-relationship offer leaves the relationships alone and points
-at C-c s R."
-  (test--with-skg-content-view
-   (concat
-    "* (skg (node (id r) (repo private))) r\n"
-    "** (skg (node (id a) (repo private))) a\n")
-   test--config-public-private-trusted
-   (lambda ()
-     (goto-char (point-min))
-     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
-                (lambda (_current) "public"))
-               ((symbol-function 'y-or-n-p)
-                (lambda (_prompt) nil)))
-       (let ((msgs (cdr (test--messages-during
-                         (lambda () (skg-set-repo t))))))
-         (should (seq-find (lambda (m) (string-match-p "C-c s R" m))
-                           msgs))))
-     (should-not (string-match-p "relRepo" (test--line-of-id "a"))))))
-
-(ert-deftest test-set-repo-recursive-no-offer-when-privatizing ()
-  "A privatizing move strands nothing (relationships rise automatically), so
-no offer is made."
-  (test--with-skg-content-view
-   (concat
-    "* (skg (node (id r) (repo public))) r\n"
-    "** (skg (node (id a) (repo public))) a\n")
-   test--config-public-private-trusted
-   (lambda ()
-     (goto-char (point-min))
-     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
-                (lambda (_current) "trusted"))
-               ((symbol-function 'y-or-n-p)
-                (lambda (_prompt)
-                  (error "Should not offer a stuck-relationship fix"))))
-       (test--messages-during (lambda () (skg-set-repo t))))
-     (should (string-match-p "(repo trusted)" (test--line-of-id "a")))
-     (should-not (string-match-p "relRepo" (test--line-of-id "a"))))))
-
 (ert-deftest test-set-repo-recursive-warns-about-write-protected ()
   "A write-protected matching instance is NOT edited; its ID goes to
-*Messages* and the summary carries a loud WARNING. Relationships touching
-it are not offered: it does not move (its editable occurrence is not
-in the buffer), so its inbound relationship's default stays private, and
-its own relationships are not written by a write-protected parent."
+*Messages* and the summary carries a loud WARNING. Nothing is asked:
+what a move strands, the save decides."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id r) (repo private))) r\n"
@@ -779,7 +706,7 @@ its own relationships are not written by a write-protected parent."
                 (lambda (_current) "public"))
                ((symbol-function 'y-or-n-p)
                 (lambda (_prompt)
-                  (error "Should not offer: both relationships touch the write-protected node"))))
+                  (error "set-repo should ask nothing"))))
        (let ((msgs (cdr (test--messages-during
                          (lambda () (skg-set-repo t))))))
          (should (seq-find (lambda (m)
@@ -825,116 +752,6 @@ the node does move."
                 (search-forward "x again")
                 (buffer-substring (line-beginning-position)
                                   (line-end-position))))))))
-
-(ert-deftest test-set-repo-recursive-offers-a-repeats-relationship ()
-  "A write-protected repeat moves with its editable occurrence, so a
-publicizing move offers the relationship into the repeat too, and writes
-its relRepo request on the repeat's headline."
-  (test--with-skg-content-view
-   (concat
-    "* (skg (node (id r) (repo private))) r\n"
-    "** (skg (node (id a) (repo private))) a\n"
-    "*** (skg (node (id x) (repo private))) x\n"
-    "** (skg (node (id b) (repo private))) b\n"
-    "*** (skg (node (id x) (repo private) writeProtected)) x again\n")
-   test--config-public-private-trusted
-   (lambda ()
-     (goto-char (point-min))
-     (let (offer-prompt)
-       (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
-                  (lambda (_current) "public"))
-                 ((symbol-function 'y-or-n-p)
-                  (lambda (prompt) (setq offer-prompt prompt) t)))
-         (test--messages-during (lambda () (skg-set-repo t))))
-       ;; r->a, a->x, r->b, b->(x again)
-       (should (string-match-p "4 content relationships" offer-prompt)))
-     (should (string-match-p
-              "writeProtected (editRequest (relRepo public))"
-              (save-excursion
-                (goto-char (point-min))
-                (search-forward "x again")
-                (buffer-substring (line-beginning-position)
-                                  (line-end-position))))))))
-
-(ert-deftest test-set-repo-single-offers-a-repeats-relationship-outside-the-subtree ()
-  "Moving a node's editable occurrence also strands the relationship into
-its write-protected repeat elsewhere in the buffer; the offer includes it."
-  (test--with-skg-content-view
-   (concat
-    "* (skg (node (id r) (repo public))) r\n"
-    "** (skg (node (id a) (repo public))) a\n"
-    "*** (skg (node (id x) (repo private))) x\n"
-    "** (skg (node (id b) (repo public))) b\n"
-    "*** (skg (node (id x) (repo private) writeProtected)) x again\n")
-   test--config-public-private-trusted
-   (lambda ()
-     (goto-char (point-min))
-     (search-forward "(id x)")
-     (beginning-of-line)
-     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
-                (lambda (_current) "public"))
-               ((symbol-function 'y-or-n-p)
-                (lambda (prompt)
-                  ;; a->x and b->(x again)
-                  (should (string-match-p "2 content relationships" prompt))
-                  t)))
-       (test--messages-during (lambda () (skg-set-repo))))
-     (should (string-match-p "(relRepo public)" (test--line-of-id "x")))
-     (should (string-match-p
-              "(relRepo public)"
-              (save-excursion
-                (goto-char (point-min))
-                (search-forward "x again")
-                (buffer-substring (line-beginning-position)
-                                  (line-end-position))))))))
-
-(ert-deftest test-set-repo-single-publicizes-a-public-parents-child-relationship ()
-  "Moving a private child into public offers its public parent's relationship too."
-  (test--with-skg-content-view
-   (concat
-    "* (skg (node (id parent) (repo public))) parent\n"
-    "** (skg (node (id child) (repo private))) child\n")
-   test--config-public-private-trusted
-   (lambda ()
-     (goto-char (point-min))
-     (search-forward "(id child)")
-     (beginning-of-line)
-     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
-                (lambda (_current) "public"))
-               ((symbol-function 'y-or-n-p)
-                (lambda (prompt)
-                  (should (string-match-p "1 content relationship " prompt))
-                  t)))
-       (test--messages-during (lambda () (skg-set-repo))))
-     (should (string-match-p "(repo public)" (test--line-of-id "child")))
-     (should (string-match-p "(relRepo public)"
-                             (test--line-of-id "child"))))))
-
-(ert-deftest test-set-repo-single-offers-direct-child-relationships ()
-  "A single (non-recursive) publicizing move offers only the relationships it
-actually changes: its direct children's inbound relationships whose default
-rises. A child still more private than the new repo is left alone."
-  (test--with-skg-content-view
-   (concat
-    "* (skg (node (id r) (repo private))) r\n"
-    "** (skg (node (id a) (repo public))) a\n"
-    "** (skg (node (id c) (repo trusted))) c\n")
-   test--config-public-private-trusted
-   (lambda ()
-     (goto-char (point-min))
-     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
-                (lambda (_current) "public"))
-               ((symbol-function 'y-or-n-p)
-                (lambda (prompt)
-                  (should (string-match-p "1 content relationship "
-                                          prompt))
-                  t)))
-       (test--messages-during (lambda () (skg-set-repo))))
-     (should (string-match-p "(repo public)" (test--line-of-id "r")))
-     ;; a's relationship default rose private->public; c's stayed trusted.
-     (should (string-match-p "(relRepo public)" (test--line-of-id "a")))
-     (should-not (string-match-p "relRepo" (test--line-of-id "c")))
-     (should (string-match-p "(repo trusted)" (test--line-of-id "c"))))))
 
 (ert-deftest test-set-repo-single-write-protected-warns-and-skips ()
   "A single move of a write-protected instance edits nothing and warns."

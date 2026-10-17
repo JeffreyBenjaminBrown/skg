@@ -72,6 +72,103 @@ describe('skg.save request strings', function ()
   end)
 end)
 
+describe('skg.save strand review requests', function ()
+  local position = { lines_below_focused_headline = 0, column = 0,
+                     screen_lines_below_window_start = 0 }
+
+  it('carries a strand review and the relationships it re-levels',
+     function ()
+    local line = save.save_request_string('view_id-1', position,
+      nil, nil, nil, nil, { { 'contains', 'q', 'n' } })
+    assert.is_truthy(line:find('(strands-reviewed . "true")', 1, true))
+    assert.is_truthy(line:find(
+      '(relevel-strands ("contains" "q" "n"))', 1, true))
+  end)
+
+  it('a review that re-levels nothing still says it was reviewed',
+     function ()
+    local line = save.save_request_string('view_id-1', position,
+      nil, nil, nil, nil, {})
+    assert.is_truthy(line:find('(strands-reviewed . "true")', 1, true))
+    assert.is_falsy(line:find('relevel-strands', 1, true))
+    assert.is_falsy(save.save_request_string('view_id-1', position)
+                      :find('strands-reviewed', 1, true))
+  end)
+
+  it('turns each choice into a review', function ()
+    local strands = {
+      { relation = 'contains', recorder = 'q', member = 'n' },
+      { relation = 'contains', recorder = 'r', member = 'n' } }
+    assert.are.same({ { 'contains', 'q', 'n' }, { 'contains', 'r', 'n' } },
+                    save.strand_review_from_choice(strands, 'all'))
+    assert.are.same({}, save.strand_review_from_choice(strands, 'none'))
+    assert.are.same({ { 'contains', 'r', 'n' } },
+      save.strand_review_from_choice(strands, 'choose', function (question)
+        return question:find('^Re%-level r ') ~= nil end))
+    assert.is_nil(save.strand_review_from_choice(strands, nil))
+  end)
+end)
+
+describe('skg.save strand confirmation', function ()
+  local server
+  local real_list_uis = vim.api.nvim_list_uis
+  local real_confirm = vim.fn.confirm
+
+  before_each(function ()
+    helpers.install_fixture_herald_rules()
+    helpers.wipe_skg_buffers()
+    lock.end_stream()
+  end)
+
+  after_each(function ()
+    vim.api.nvim_list_uis = real_list_uis
+    vim.fn.confirm = real_confirm
+    if server then server.close() server = nil end
+    helpers.reset_client_state()
+    helpers.wipe_skg_buffers()
+    lock.end_stream()
+  end)
+
+  it('re-saves with the relationships the user chose to re-level',
+     function ()
+    local requests = {}
+    server = helpers.connect_to_fake_server(function (line, respond)
+      if line:find('save buffer', 1, true) then
+        table.insert(requests, line)
+        respond(helpers.framed(
+          '((response-type save-lock) (lock-views ()))'))
+        if #requests == 1 then
+          respond(helpers.framed(
+            '((response-type strand-confirmation)'
+            .. ' (strands (((relation "contains") (recorder "q")'
+            .. ' (member "n") (relRepo "private") (default "public"))))'
+            .. ' (prompt "Re-level them?"))'))
+        else
+          respond(helpers.framed(
+            '((response-type save-result)'
+            .. ' (content "* (skg (node (id n) (repo public))) n")'
+            .. ' (errors ()) (warnings ()))'))
+        end
+      end
+    end)
+    vim.api.nvim_list_uis = function () return { {} } end
+    vim.fn.confirm = function () return 1 end -- All
+    open_view('* (skg (node (id n) (repo public))) n',
+              'skg://strands', 'view_id-strands')
+    save.request_save_buffer()
+    vim.wait(3000, function () return #requests >= 2 end, 10)
+    assert.are.equal(2, #requests)
+    assert.is_falsy(requests[1]:find('strands-reviewed', 1, true))
+    assert.is_truthy(requests[2]:find(
+      '(strands-reviewed . "true")', 1, true))
+    assert.is_truthy(requests[2]:find(
+      '(relevel-strands ("contains" "q" "n"))', 1, true))
+    vim.wait(3000, function ()
+      return lock.stream_in_progress == nil end, 10)
+    assert.are.equal(0, state.lp_pending_count)
+  end)
+end)
+
 describe('skg.save pipeline', function ()
   local server
 

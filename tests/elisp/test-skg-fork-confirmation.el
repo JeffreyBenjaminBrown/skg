@@ -87,7 +87,7 @@
              t '(("N" . "owned")))))
       (kill-buffer source))
     (should (equal called
-                   '(t (("N" . "owned")) ("A" "B") nil)))
+                   '(t (("N" . "owned")) ("A" "B") nil nil)))
     (should (= skg-lp--pending-count 0))
     (should-not (assoc 'save-result skg-response-handler-map))))
 
@@ -125,7 +125,7 @@
              t '(("N" . "owned")) '("H"))))
       (kill-buffer source))
     (should (equal called
-                   '(t (("N" . "owned")) ("H") ("U1" "U2"))))
+                   '(t (("N" . "owned")) ("H") ("U1" "U2") nil)))
     (should (= skg-lp--pending-count 0))
     (should-not (assoc 'save-result skg-response-handler-map))))
 
@@ -206,7 +206,7 @@ ordinary-save refusal on C-x C-s."
               (should (string-match-p
                        "Fork confirmed; saving\\.\\.\\."
                        (buffer-string))))
-            (should (equal called '(t (("N" . "owned")))))
+            (should (equal called '(t (("N" . "owned")) nil nil nil)))
             (skg--finish-pending-fork-result
              source "((content \"saved\") (errors ()) (warnings ()))")
             (with-current-buffer result

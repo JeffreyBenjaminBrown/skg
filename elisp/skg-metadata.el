@@ -140,14 +140,10 @@ Only descendents for which affectsParent=true are traversed.
 On a headline that has no metadata yet, instead populates it minimally
 via `skg--populate-minimal-node-metadata' (RECURSIVE is then moot).
 
-When the move would leave content relationships stuck at their old,
-more private repos (the sticky rule never lowers an relationship's privacy
-without an explicit gesture; see
-TODO/DONE/MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org),
-offers to publicize them in the same go by writing
-`(editRequest (relRepo ...))' requests; declining leaves them and mentions that
-`skg-set-relRepo-recursive' (C-c s R) can publicize them
-later.
+What the move strands, the save decides: relationships it would leave
+at their old, more private repos come back for review before anything
+is written (see `skg--strand-confirmation-handler'), and those it would
+leave more public than a node's new home are raised automatically.
 
 Write-protected occurrences are NOT changed -- the save would silently
 ignore their repo edits -- and produce a loud warning, with the
@@ -164,7 +160,7 @@ Does NOT save; call `skg-request-save-buffer' afterward."
         (skg--validate-repo-name new-skgrepo)
         (if (string= current-skgrepo new-skgrepo)
             (message "Repo unchanged: %s" current-skgrepo)
-          (skg--set-repo-and-handle-stuck-relationships
+          (skg--change-repo-and-report
            current-skgrepo new-skgrepo recursive))))))
 
 (defun skg-set-repo-recursive ()
@@ -176,29 +172,17 @@ Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive)
   (skg-set-repo t))
 
-(defun skg--set-repo-and-handle-stuck-relationships (old-skgrepo new-skgrepo recursive)
-  "The body of `skg-set-repo' once a real move is requested:
-analyze which content relationships the move would leave stuck at more
-private repos, retarget the repos (skipping write-protected
-occurrences), offer to publicize the stuck relationships in the same go, and
-report -- loudly, when write-protected occurrences were skipped."
-  (let* ((stuck ;; analyzed BEFORE any rewrite: it needs the old skgrepos
-          (skg--analyze-move-stuck-relationships old-skgrepo new-skgrepo recursive))
-         (change-result (if recursive
+(defun skg--change-repo-and-report (old-skgrepo new-skgrepo recursive)
+  "The body of `skg-set-repo' once a real move is requested: retarget
+the repos (skipping write-protected occurrences) and report -- loudly,
+when write-protected occurrences were skipped."
+  (let* ((change-result (if recursive
                             (skg--change-repo-recursive old-skgrepo
                                                           new-skgrepo)
                           (skg--change-repo-at-point-unless-write-protected
                            new-skgrepo)))
          (changed-count (car change-result))
-         (write-protected-skgids (cdr change-result))
-         (fixed-count
-          (when (and stuck
-                     (y-or-n-p
-                      (format "This move would leave %d content relationship%s in their old, more private repo%s. Publicize them too? "
-                              (length stuck)
-                              (if (= (length stuck) 1) "" "s")
-                              (if (= (length stuck) 1) "" "s"))))
-            (skg--apply-stuck-relRepos stuck))))
+         (write-protected-skgids (cdr change-result)))
     (dolist (skgid write-protected-skgids)
       (message "skg-set-repo: write-protected occurrence NOT changed (the save would ignore it): %s"
                skgid))
@@ -207,135 +191,10 @@ report -- loudly, when write-protected occurrences were skipped."
               (format "Repo changed from %s to %s on %d node%s. Save to apply."
                       old-skgrepo new-skgrepo changed-count
                       (if (= changed-count 1) "" "s"))
-              (cond
-               (fixed-count
-                (format " Also publicized %d relationship%s."
-                        fixed-count (if (= fixed-count 1) "" "s")))
-               (stuck
-                " Relationships kept their old, more private repos; C-c s R can publicize them later."))
               (when write-protected-skgids
                 (format "  WARNING: %d write-protected node%s NOT changed -- the save would silently ignore them. See *Messages* for the ID list."
                         (length write-protected-skgids)
                         (if (= (length write-protected-skgids) 1) "" "s")))))))
-
-(defun skg--analyze-move-stuck-relationships (old-skgrepo new-skgrepo recursive)
-  "With point on the node a `skg-set-repo' move starts from, and
-BEFORE any repo is rewritten: return the true content relationships
-the move would leave stuck in a more private repo than their new
-default, as a list of (MARKER . REPO) -- MARKER at the child
-headline, REPO the relationship's new default. Only relationships without an
-existing `(relRepo ...)' atom qualify: an atom-carrying relationship was
-already assigned a deliberate relRepo.
-An endpoint with an ID moves iff the move retargets that ID's editable
-occurrence, so a write-protected repeat moves with it; an endpoint
-without one (not yet saved) moves iff the walk retargets it in place.
-The walk's root itself is always retargeted (unless write-protected);
-its viewparent lies outside the move, so its repo counts as
-unchanging. With RECURSIVE nil only the point node moves, so only its
-own relationship and its direct children's relationships are examined
-in its subtree. Elsewhere in the buffer, the relationships into
-write-protected repeats of moved nodes are examined too."
-  (save-excursion
-    (let* ((stuck '())
-           (considered '()) ;; line starts of the child headlines already examined
-           (moved-skgids (skg--skgids-moved-by-repo-move
-                          old-skgrepo recursive))
-           (start-level (org-outline-level))
-           (moves-p ;; whether the occurrence META is about to change repo; RETARGETS-P says whether the walk retargets it in place
-            (lambda (meta retargets-p)
-              (let ((skgid (skg--node-id meta)))
-                (if skgid
-                    (and (member skgid moved-skgids) t)
-                  (and retargets-p
-                       (not (skg--node-write-protected-p meta)))))))
-           (consider ;; point on a candidate child C, whose inbound relationship is examined; the arguments say whether the walk retargets each endpoint in place
-            (lambda (parent-retargets-p child-retargets-p)
-              (when (skg--relationship-kind-matches-p 'content)
-                (push (line-beginning-position) considered)
-                (let* ((child-meta (skg--metadata-sexp-at-point-or-nil))
-                       (child-skgrepo (skg--node-repo child-meta))
-                       (parent-meta
-                        (save-excursion
-                          (org-up-heading-safe)
-                          (skg--metadata-sexp-at-point-or-nil)))
-                       (parent-skgrepo (skg--node-repo parent-meta))
-                       (eff (lambda (skgrepo moves)
-                              (if (and moves
-                                       (equal skgrepo old-skgrepo))
-                                  new-skgrepo
-                                skgrepo)))
-                       (skgrepo (skg--content-relationship-stuck-repo
-                               parent-skgrepo
-                               (funcall eff parent-skgrepo
-                                        (funcall moves-p parent-meta
-                                                 parent-retargets-p))
-                               child-skgrepo
-                               (funcall eff child-skgrepo
-                                        (funcall moves-p child-meta
-                                                 child-retargets-p)))))
-                  (when skgrepo
-                    (push (cons (copy-marker (line-beginning-position))
-                                skgrepo)
-                          stuck)))))))
-      (funcall consider nil t) ;; the root's own inbound relationship
-      (outline-next-heading)
-      (while (and (not (eobp))
-                  (> (org-outline-level) start-level))
-        (let ((meta (skg--metadata-sexp-at-point-or-nil)))
-          (if (not (and (skg--unrestrictedNode-sexp-p meta)
-                        (skg--node-affectsParent-content-of-p meta)))
-              (skg--goto-next-headline-after-subtree)
-            (if recursive
-                (funcall consider t t)
-              (when (= (org-outline-level) (1+ start-level))
-                ;; Single move: only the point node moves, so only
-                ;; its direct children's inbound relationships can change.
-                (funcall consider t nil)))
-            (outline-next-heading))))
-      (goto-char (point-min))
-      (while (not (eobp))
-        (when (org-at-heading-p)
-          (let ((meta (skg--metadata-sexp-at-point-or-nil)))
-            (when (and (skg--unrestrictedNode-sexp-p meta)
-                       (skg--node-write-protected-p meta)
-                       (member (skg--node-id meta) moved-skgids)
-                       (not (memq (line-beginning-position) considered)))
-              ;; Both endpoints are judged by ID: a parent without one
-              ;; that the walk retargets in place was considered above.
-              (funcall consider nil nil))))
-        (outline-next-heading))
-      (nreverse stuck))))
-
-(defun skg--content-relationship-stuck-repo (parent-eff-old parent-eff-new
-                                      child-eff-old child-eff-new)
-  "The repo to which the content relationship at point (from its view-parent
-to the headline at point) should be publicized after a repo move,
-or nil when the move does not strand it: nil when the relationship carries
-an explicit `(editRequest (relRepo ...))' request (deliberately
-repo-specified), when a
-default cannot be computed (a repo unknown to the config -- the
-save validates anyway), or when the relationship's default does not become
-more public. The four arguments are the endpoints' repos before
-and after the move."
-  (unless (skg--relRepo-requested-value)
-    (let ((old-default (skg--more-private-of-repos
-                        parent-eff-old child-eff-old))
-          (new-default (skg--more-private-of-repos
-                        parent-eff-new child-eff-new)))
-      (when (and old-default new-default
-                 (skg--strictly-more-public-repo-p new-default
-                                                     old-default))
-        new-default))))
-
-(defun skg--apply-stuck-relRepos (stuck)
-  "Write a relRepo request at each (MARKER . REPO) in
-STUCK, then free the markers. Returns the number of requests written."
-  (save-excursion
-    (dolist (entry stuck)
-      (goto-char (car entry))
-      (skg--apply-relRepo-choice (cdr entry))
-      (set-marker (car entry) nil))
-    (length stuck)))
 
 (defun skg--change-repo-at-point-unless-write-protected (new-skgrepo)
   "Set the repo at point to NEW-REPO, unless the occurrence is
@@ -345,28 +204,6 @@ write-protected -- the save would silently ignore that edit. Returns
     (if (skg--node-write-protected-p meta)
         (cons 0 (list (or (skg--node-id meta) "(no id)")))
       (cons (skg--change-repo-at-point new-skgrepo) nil))))
-
-(defun skg--more-private-of-repos (a b)
-  "The more private of repos A and B per the config's privacy
-order (later in the ladder = more private), or nil when either
-names no configured repo."
-  (let ((pa (skg--repo-privacy-position a))
-        (pb (skg--repo-privacy-position b)))
-    (when (and pa pb)
-      (if (> pa pb) a b))))
-
-(defun skg--strictly-more-public-repo-p (a b)
-  "Non-nil iff repo A is strictly more public than repo B per
-the config's privacy order. Nil when either is unknown."
-  (let ((pa (skg--repo-privacy-position a))
-        (pb (skg--repo-privacy-position b)))
-    (and pa pb (< pa pb))))
-
-(defun skg--repo-privacy-position (skgrepo)
-  "REPO's index in the config's privacy order (0 = most public),
-or nil when REPO is nil or names no configured repo."
-  (and skgrepo
-       (seq-position (skg--repo-names) skgrepo #'string=)))
 
 (defconst skg--relRepo-unsupported-folder-atoms
   '(subscriberFolder overriderFolder hiderFolder hiddenFolder
@@ -947,22 +784,6 @@ OLD-REPO. Restores point afterward."
             (when (equal (skg--node-repo metadata-sexp) old-skgrepo)
               (save-excursion (funcall fn)))
             (outline-next-heading)))))))
-
-(defun skg--skgids-moved-by-repo-move (old-skgrepo recursive)
-  "The IDs whose editable occurrence a `skg-set-repo' move from the
-headline at point retargets: that headline's own (unless write-protected),
-and with RECURSIVE those of the matching viewdescendants too."
-  (let* ((skgids '())
-         (collect
-          (lambda ()
-            (let ((meta (skg--metadata-sexp-at-point-or-nil)))
-              (when (and (skg--node-id meta)
-                         (not (skg--node-write-protected-p meta)))
-                (push (skg--node-id meta) skgids))))))
-    (if recursive
-        (skg--do-at-recursive-repo-move-occurrences old-skgrepo collect)
-      (funcall collect))
-    skgids))
 
 (defun skg--goto-next-headline-after-subtree ()
   "Move to the next headline after the current subtree."
