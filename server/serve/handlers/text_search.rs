@@ -14,7 +14,7 @@ use crate::prominence::ProminenceSource;
 use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
 use crate::dbs::tantivy::search::{
   SearchOptions, has_overPrivateText_telescope, search_index};
-use crate::dbs::in_rust_graph::containerward_role_tree::{ ContainerwardRoleTree, containerward_role_trees_by_skgid_from_skgids};
+use crate::dbs::in_rust_graph::containerward_role_tree::{ ContainerwardRoleTree, containerward_role_trees_by_skgid_from_skgids, containers_in_inRustGraph};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::in_rust_graph::stats::{
@@ -378,7 +378,7 @@ fn spawn_enrichment_thread (
       "search enrichment thread started");
     let containerward_role_trees_by_skgid : HashMap<ID, ContainerwardRoleTree> =
       containerward_role_trees_by_skgid_from_skgids (
-        &runtime . graph, &ids_clone, max_depth );
+        &containers_in_inRustGraph (&runtime . graph), &ids_clone, max_depth );
     tracing::info! ("search enrichment: role tree computed ({} entries)",
               containerward_role_trees_by_skgid . len ());
     if cancel_clone . load (Ordering::SeqCst) {

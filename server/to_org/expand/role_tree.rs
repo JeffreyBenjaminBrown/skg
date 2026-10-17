@@ -10,10 +10,12 @@
 /// I say 'integrate' rather than 'insert' because some of the tree,
 /// maybe even all of it, might already be there.
 
-use crate::dbs::in_rust_graph::containerward_role_tree::{ ContainerwardRoleTree, containerward_role_trees_by_skgid_from_skgids};
+use crate::dbs::in_rust_graph::containerward_role_tree::{ ContainerwardRoleTree, containerward_role_trees_by_skgid_from_skgids, containers_in_inRustGraph};
 use crate::dbs::in_rust_graph::paths::{
-  paths_to_first_nonlinearities_in_graph, PathToFirstNonlinearity};
+  paths_to_first_nonlinearities_via, role_partners_in_graph_gated,
+  PathToFirstNonlinearity};
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::graph_pair::types::GraphPair;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::util::{ get_skgid_from_viewnode_at, graphnode_and_viewnode_from_skgid, remove_completed_view_request};
 
@@ -28,6 +30,62 @@ use ego_tree::{NodeId,Tree};
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
 
+
+/// Where the role-tree engine finds a node's partners: in the live
+/// graph, or in the union of a graph pair, so the same engine draws a
+/// role tree over either. Viewnodes are built from the live graph
+/// either way.
+#[derive(Clone, Copy)]
+pub enum RoleTreePartners<'a> {
+  /// The role tree's steps see only what the skgrepo restriction
+  /// does; the containerward trees attached beneath are walked
+  /// ungated, and gated where they are drawn.
+  LiveGraph,
+  GraphPair (&'a GraphPair),
+}
+
+impl RoleTreePartners<'_> {
+  /// The partners one step from 'node' in a role tree, playing 'role'.
+  fn role_partners (
+    &self,
+    graph       : &InRustGraph,
+    restriction : Option<&SkgrepoRestriction>,
+    node        : &ID,
+    role        : RelationRole,
+  ) -> HashSet<ID> {
+    match self {
+      RoleTreePartners::LiveGraph =>
+        role_partners_in_graph_gated (graph, restriction, node, role),
+      RoleTreePartners::GraphPair (pair) =>
+        union_partner_ids (pair, node, role), } }
+
+  /// The containerward role trees of 'skgids'.
+  fn containerward_role_trees (
+    &self,
+    graph     : &InRustGraph,
+    skgids    : &[ID],
+    max_depth : usize,
+  ) -> HashMap<ID, ContainerwardRoleTree> {
+    match self {
+      RoleTreePartners::LiveGraph =>
+        containerward_role_trees_by_skgid_from_skgids (
+          &containers_in_inRustGraph (graph), skgids, max_depth ),
+      RoleTreePartners::GraphPair (pair) =>
+        containerward_role_trees_by_skgid_from_skgids (
+          &|node : &ID, role : RelationRole|
+            union_partner_ids (pair, node, role),
+          skgids, max_depth ), } }
+}
+
+/// The partners playing 'role' toward 'node' in either graph of the pair.
+fn union_partner_ids (
+  pair : &GraphPair,
+  node : &ID,
+  role : RelationRole,
+) -> HashSet<ID> {
+  pair . partners (node, role) . into_iter ()
+    . map ( |partner| partner . id )
+    . collect () }
 
 /// Fulfill a '(viewRequests (roleTree ROLENAME))' request: build the
 /// role tree for 'role' and drop the request. Relation-generic -- the
@@ -45,7 +103,8 @@ pub fn build_and_integrate_role_tree_then_drop_request (
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
     build_and_integrate_role_tree_with_skgrepo_set (
-      tree, treeid, graph, role, config, restriction );
+      tree, treeid, graph, role, config, restriction,
+      RoleTreePartners::LiveGraph );
   remove_completed_view_request (
     tree, treeid,
     ViewRequest::RoleTree (role),
@@ -65,18 +124,15 @@ pub fn build_and_integrate_role_tree_with_skgrepo_set (
   role      : RelationRole,
   config    : &SkgConfig,
   restriction : Option<&SkgrepoRestriction>,
+  partners  : RoleTreePartners,
 ) -> Result < (), Box<dyn Error> > {
-  let (relation, input_role, output_role)
-    : (&'static str, &'static str, &'static str) =
-    role . role_tree_triple ();
   let _ : Vec<ID> = build_and_integrate_role_trees (
-    tree, treeid, graph, config,
-    relation, input_role, output_role,
+    tree, treeid, graph, config, role,
     Birth::RoleGraft (role),
-    restriction ) ?;
+    restriction, partners ) ?;
   if role != RelationRole::CONTAINER {
     attach_full_containerward_role_trees_for_birth_role (
-      tree, treeid, role, graph, config, restriction ) ?; }
+      tree, treeid, role, graph, config, restriction, partners ) ?; }
   Ok (( )) }
 
 /// Integrate a containerward role tree into a Viewnode tree (no role tree
@@ -89,7 +145,8 @@ pub fn build_and_integrate_containerward_role_tree (
   config    : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   build_and_integrate_role_tree_with_skgrepo_set (
-    tree, treeid, graph, RelationRole::CONTAINER, config, None ) }
+    tree, treeid, graph, RelationRole::CONTAINER, config, None,
+    RoleTreePartners::LiveGraph ) }
 
 pub fn build_and_integrate_containerward_role_tree_with_skgrepo_set (
   tree      : &mut Tree<Viewnode>,
@@ -99,7 +156,8 @@ pub fn build_and_integrate_containerward_role_tree_with_skgrepo_set (
   restriction : Option<&SkgrepoRestriction>,
 ) -> Result < (), Box<dyn Error> > {
   build_and_integrate_role_tree_with_skgrepo_set (
-    tree, treeid, graph, RelationRole::CONTAINER, config, restriction ) }
+    tree, treeid, graph, RelationRole::CONTAINER, config, restriction,
+    RoleTreePartners::LiveGraph ) }
 
 /// Integrate mentionerward paths (link skgrepos of the node), attaching
 /// each skgrepo's containerward role tree. Thin wrapper over the generic
@@ -111,7 +169,8 @@ pub fn build_and_integrate_mentionerward_role_tree (
   config    : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   build_and_integrate_role_tree_with_skgrepo_set (
-    tree, treeid, graph, RelationRole::MENTIONER, config, None ) }
+    tree, treeid, graph, RelationRole::MENTIONER, config, None,
+    RoleTreePartners::LiveGraph ) }
 
 /// Plural 'role trees' because if the origin
 /// immediately branches in the backward direction,
@@ -127,17 +186,17 @@ fn build_and_integrate_role_trees (
   treeid      : NodeId,
   graph       : &InRustGraph,
   config      : &SkgConfig,
-  relation    : &str,
-  input_role  : &str,
-  output_role : &str,
+  role        : RelationRole,
   birth       : Birth,
   restriction : Option<&SkgrepoRestriction>,
+  partners    : RoleTreePartners,
 ) -> Result < Vec<ID>, Box<dyn Error> > {
   let terminus_pid : ID =
     get_skgid_from_viewnode_at ( tree, treeid ) ?;
   let paths : Vec<PathToFirstNonlinearity> =
-    paths_to_first_nonlinearities_in_graph (
-      graph, restriction, &terminus_pid, relation, input_role, output_role )?;
+    paths_to_first_nonlinearities_via (
+      &|node : &ID| partners . role_partners (graph, restriction, node, role),
+      &terminus_pid );
   let pids : Vec<ID> =
     extract_pids_from_paths ( &paths );
   integrate_role_trees (
@@ -326,6 +385,7 @@ fn attach_full_containerward_role_trees_for_birth_role (
   graph   : &InRustGraph,
   config  : &SkgConfig,
   restriction : Option<&SkgrepoRestriction>,
+  partners : RoleTreePartners,
 ) -> Result<(), Box<dyn Error>> {
   // Collect the role's grafted partner nodes before mutating the tree.
   let role_treeids : Vec<NodeId> = {
@@ -338,7 +398,7 @@ fn attach_full_containerward_role_trees_for_birth_role (
             result . push ( node_ref . id () ); }} }}
     result };
   attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
-    tree, &role_treeids, graph, config, restriction ) }
+    tree, &role_treeids, graph, config, restriction, partners ) }
 
 /// For each NodeId, look up its UnrestrictedVognode pid in the tree, fetch
 /// every such pid's containerward role tree from the graph (in
@@ -354,7 +414,7 @@ pub fn attach_full_containerward_role_trees_at_treeids (
   config  : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
-    tree, treeids, graph, config, None )
+    tree, treeids, graph, config, None, RoleTreePartners::LiveGraph )
 }
 
 pub fn attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
@@ -363,6 +423,7 @@ pub fn attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
   graph   : &InRustGraph,
   config  : &SkgConfig,
   restriction : Option<&SkgrepoRestriction>,
+  partners : RoleTreePartners,
 ) -> Result<(), Box<dyn Error>> {
   let pairs : Vec<(NodeId, ID)> =
     treeids . iter ()
@@ -377,7 +438,7 @@ pub fn attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
   let skgids : Vec<ID> =
     pairs . iter () . map ( |(_, skgid)| skgid . clone () ) . collect ();
   let role_trees_by_skgid : HashMap<ID, ContainerwardRoleTree> =
-    containerward_role_trees_by_skgid_from_skgids (
+    partners . containerward_role_trees (
       graph, &skgids, config . max_roleTree_depth );
   attach_full_containerward_role_trees_from_map (
     tree, &pairs, &role_trees_by_skgid, graph, config, restriction ) }

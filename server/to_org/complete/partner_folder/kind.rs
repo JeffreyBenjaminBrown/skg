@@ -35,7 +35,9 @@ impl PartnerFolder {
         | PartnerFolder::Overridden
         | PartnerFolder::Overrider
         | PartnerFolder::Hider
-        | PartnerFolder::Hidden =>
+        | PartnerFolder::Hidden
+        | PartnerFolder::Container
+        | PartnerFolder::Mentioner =>
         "reconcile_partnerFolder_children",
       PartnerFolder::HiddenInSubscribee =>
         "reconcile_hiddenInSubscribeeFolder_children",
@@ -62,6 +64,12 @@ impl PartnerFolder {
       PartnerFolder::Hidden =>
         Some (RelationRole::new (
           NodeRelation::HidesFromSubs, BinaryRolePosition::Second)),
+      PartnerFolder::Container =>
+        Some (RelationRole::new (
+          NodeRelation::Contains, BinaryRolePosition::First)),
+      PartnerFolder::Mentioner =>
+        Some (RelationRole::new (
+          NodeRelation::LinksTo, BinaryRolePosition::First)),
       PartnerFolder::HiddenInSubscribee |
       PartnerFolder::HiddenOutsideOfSubscribee =>
         None,

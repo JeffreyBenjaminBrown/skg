@@ -1,5 +1,6 @@
 /// Fulfill a '(viewRequests (folder RELNAME))' request: build BOTH folders of
-/// the relation, each POPULATED from the graph, reusing the de-novo
+/// the relation (one, for 'containers' and 'mentioners', whose other side
+/// is the node's content or its links), each POPULATED from the graph, reusing the de-novo
 /// PartnerFolder generators. The EDITABLE folder of the relation is created
 /// even when empty (its editable "add here" surface); the WRITE-PROTECTED
 /// folders are built only when populated in the worktree or, in diff mode,
@@ -86,5 +87,15 @@ fn build_and_integrate_folder (
         skgrepo_restriction, skgrepo_diffs, true ) ?;
       maybe_add_one_partnerFolder (
         tree, treeid, PartnerFolder::Subscriber, config, graph,
-        skgrepo_restriction, skgrepo_diffs, false ) ?; }, }
+        skgrepo_restriction, skgrepo_diffs, false ) ?; },
+    FolderRelation::Containers =>
+      // The other side, its content, is drawn without a folder.
+      maybe_add_one_partnerFolder (
+        tree, treeid, PartnerFolder::Container, config, graph,
+        skgrepo_restriction, skgrepo_diffs, false ) ?,
+    FolderRelation::Mentioners =>
+      // The other side, its links, lives in its text.
+      maybe_add_one_partnerFolder (
+        tree, treeid, PartnerFolder::Mentioner, config, graph,
+        skgrepo_restriction, skgrepo_diffs, false ) ?, }
   Ok (( )) }

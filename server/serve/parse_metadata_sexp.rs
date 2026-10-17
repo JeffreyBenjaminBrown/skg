@@ -481,6 +481,10 @@ pub fn parse_metadata_to_viewnodemd (
             result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Hidden)),
           "hiderFolder" =>
             result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Hider)),
+          "containerFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Container)),
+          "mentionerFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Mentioner)),
           "overriddenFolder" =>
             result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Overridden)),
           "overriderFolder" =>

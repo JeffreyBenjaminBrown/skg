@@ -324,7 +324,8 @@ on the node at point; it reports moves across all skgrepos.
 These commands don't edit the graph. Each inserts a request into the
 metadata of the node at point that, on save, causes the server to
 render the relation's folder viewnodes into the view, POPULATED from
-the graph. Each builds BOTH folders of its relation. The write-protected folder ☮
+the graph. Each builds BOTH folders of its relation (but containers and
+mentioners build one). The write-protected folder ☮
 marks a folder you cannot change from here. Every command auto-saves.
 Without such a request, an editable node shows only its nonempty
 subscribeeFolder (plus the nonempty hiddenInSubscribeeFolder on an editable
@@ -353,6 +354,15 @@ order, and remains visible when none are true.
 are provenance; =No search matching= is the user setting. Edit none of these
 generated viewnodes directly. Delete the whole folder branch to dismiss this
 optional view; doing so does not change any flag.
+*** C-c l c : skg-show-folderOf-containers
+The containerFolder -- the nodes that contain this one. Write-protected (☮):
+containment is edited from the container. Its other side, the node's
+content, is drawn without a folder. On a node nothing contains, nothing
+appears.
+*** C-c l m : skg-show-folderOf-mentioners
+The mentionerFolder -- the nodes that link to this one. Write-protected
+(☮): a link lives in the linking node's text. On a node nothing links to,
+nothing appears.
 ** C-c p : show a role tree (through one relation role)
 Like the folders, each inserts a request that, on save, grafts the
 partners reached through one relation role as inverted, write-protected

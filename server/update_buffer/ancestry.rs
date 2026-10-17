@@ -76,7 +76,9 @@ fn required_ancestry (
       | ViewnodeKind::PartnerFolder (PartnerFolder::Overridden)
       | ViewnodeKind::PartnerFolder (PartnerFolder::Overrider)
       | ViewnodeKind::PartnerFolder (PartnerFolder::Hider)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Hidden) => ANC_NORMAL,
+      | ViewnodeKind::PartnerFolder (PartnerFolder::Hidden)
+      | ViewnodeKind::PartnerFolder (PartnerFolder::Container)
+      | ViewnodeKind::PartnerFolder (PartnerFolder::Mentioner) => ANC_NORMAL,
     ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
       ANC_HIDDEN_OUTSIDE,
     ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee) =>

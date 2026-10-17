@@ -65,6 +65,10 @@ M.commands = {
                           desc = 'Request the hide folders (auto-saves)' },
   ShowFolderOfSubscribesTo = { module = 'skg.view_requests', fn = 'show_folderOf_subscribesTo',
                                desc = 'Request the subscribe folders (auto-saves)' },
+  ShowFolderOfContainers = { module = 'skg.view_requests', fn = 'show_folderOf_containers',
+                             desc = 'Request the container folder (auto-saves)' },
+  ShowFolderOfMentioners = { module = 'skg.view_requests', fn = 'show_folderOf_mentioners',
+                             desc = 'Request the mentioner folder (auto-saves)' },
   ShowFolderOfFlags = { module = 'skg.view_requests', fn = 'show_folderOf_flags',
                              desc = 'Request the flags folder (auto-saves)' },
   ShowContainerwardTree = { module = 'skg.view_requests', fn = 'show_containerward_tree',
@@ -229,6 +233,8 @@ M.content_view_bindings = {
   { 'ch', 'ShowFolderOfHidesFromSubs' },
   { 'cs', 'ShowFolderOfSubscribesTo' },
   { 'cp', 'ShowFolderOfFlags' },
+  { 'cc', 'ShowFolderOfContainers' },
+  { 'cm', 'ShowFolderOfMentioners' },
   { 'pC', 'ShowContainerwardTree' }, -- C-c p C
   { 'pL', 'ShowMentionerwardTree' }, -- C-c p L
   { 'pl', 'ShowMentionedwardTree' }, -- C-c p l

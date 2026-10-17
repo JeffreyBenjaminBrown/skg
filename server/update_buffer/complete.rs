@@ -23,7 +23,8 @@ use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder, ViewRequest,
 use crate::types::viewnode::{Vognode, Phantom, PropertyFolder};
 use super::reconcile::hiddeninsubscribee_folder::reconcile_hiddenInSubscribeeFolder_children;
 use super::reconcile::hiddenoutsideof_subscribeefolder::reconcile_hiddenoutsideSubscribeeFolder_children;
-use super::reconcile::partner_folder::reconcile_partnerFolder_children;
+use super::reconcile::partner_folder::{
+  PartnerFolderGoalSource, reconcile_partnerFolder_children};
 use super::reconcile::subscribee_folder::reconcile_subscribeeFolder_children;
 use super::reconcile::content::{
   expand_true_content_at_unrestrictedVognode, mutate_unrestrictedVognode_to_deletednode};
@@ -181,7 +182,8 @@ fn dispatch_node_update (
       // 'PartnerFolder::policy' where their treatment differs.
       if role . relation_member_role () . is_some () =>
       reconcile_partnerFolder_children (
-        treeid, tree, *role, context . skgrepo_diffs,
+        treeid, tree, *role, PartnerFolderGoalSource::LiveGraph,
+        context . skgrepo_diffs,
         context . runtime, context . graph_snap,
         context . deleted_since_head_pid_src_map,
         context . deleted_by_this_save_extra_ids,
@@ -339,7 +341,8 @@ fn visit_normal_node (
 /// one place self-deletion lives -- per-kind reconcilers no longer detach
 /// themselves when empty.
 /// - DeadViewnode and a childless Vognode::Deleted (TODO/DONE/local-view-update/plan_v2.org §6.6).
-/// - the write-protected PartnerFolders Subscriber/Overrider/Hider/Hidden (a graph
+/// - the write-protected PartnerFolders Subscriber/Overrider/Hider/Hidden/
+///   Container/Mentioner (a graph
 ///   relationship the user cannot edit from this side, so an emptied one is
 ///   just noise) -- but NOT Overridden (the editable interface for adding
 ///   overrides, preserved when empty like AliasFolder).
@@ -358,6 +361,8 @@ fn is_self_deletable_when_empty (
     | ViewnodeKind::PartnerFolder (PartnerFolder::Overrider)
     | ViewnodeKind::PartnerFolder (PartnerFolder::Hider)
     | ViewnodeKind::PartnerFolder (PartnerFolder::Hidden)
+    | ViewnodeKind::PartnerFolder (PartnerFolder::Container)
+    | ViewnodeKind::PartnerFolder (PartnerFolder::Mentioner)
     | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)
     | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee)
     | ViewnodeKind::PropertyFolder (PropertyFolder::ID) ) }

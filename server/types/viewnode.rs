@@ -483,6 +483,8 @@ pub enum PartnerFolder {
   Hidden,
   HiddenInSubscribee, // Child of a subscribee-as-such. Collects children of the subscribee that the subscriber hides. Write-protected (but these relationships are editable by modifying the listed contents of the subscribee-as-such).
   HiddenOutsideOfSubscribee, // Child of a SubscribeeFolder. Collects things hidden by the SubscribeeFolder's parent but absent from every subscribee's content. This derived filter is editable as an exclusive visible-outside subset; its hide skgrepos remain derived. Shown after all Subscribees, under the same SubscribeeFolder.
+  Container, // Collects nodes that contain its parent. Write-protected (editable from the other side of the relationship).
+  Mentioner, // Collects nodes that link to its parent. Write-protected (a link lives in the linking node's text).
 }
 
 /// How a PartnerFolder's membership relates to user edits.
@@ -532,14 +534,20 @@ pub enum FolderRelation {
   Overrides,
   HidesFromSubs,
   SubscribesTo,
+  // These two build one write-protected folder each: their other
+  // side is the node's content, or its links, drawn without a folder.
+  Containers,
+  Mentioners,
 }
 
 impl FolderRelation {
-  pub const ALL : [FolderRelation; 4] = [
+  pub const ALL : [FolderRelation; 6] = [
     FolderRelation::Aliases,
     FolderRelation::Overrides,
     FolderRelation::HidesFromSubs,
-    FolderRelation::SubscribesTo ];
+    FolderRelation::SubscribesTo,
+    FolderRelation::Containers,
+    FolderRelation::Mentioners ];
 
   pub fn relname (
     self,
@@ -548,7 +556,9 @@ impl FolderRelation {
       FolderRelation::Aliases                   => "aliases",
       FolderRelation::Overrides                 => "overrides",
       FolderRelation::HidesFromSubs             => "hidesFromSubs",
-      FolderRelation::SubscribesTo              => "subscribesTo", } }
+      FolderRelation::SubscribesTo              => "subscribesTo",
+      FolderRelation::Containers                => "containers",
+      FolderRelation::Mentioners                => "mentioners", } }
 
   pub fn from_relname (
     s : &str,
@@ -658,6 +668,8 @@ impl PartnerFolder {
         | PartnerFolder::Overrider
         | PartnerFolder::Hider
         | PartnerFolder::Hidden
+        | PartnerFolder::Container
+        | PartnerFolder::Mentioner
         => FolderPolicy::WriteProtectedSet,
       PartnerFolder::HiddenInSubscribee
         => FolderPolicy::WriteProtectedFilter,
@@ -675,6 +687,8 @@ impl PartnerFolder {
       PartnerFolder::Hidden                    => "hiddenFolder",
       PartnerFolder::HiddenInSubscribee        => "hiddenInSubscribeeFolder",
       PartnerFolder::HiddenOutsideOfSubscribee => "hiddenOutsideOfSubscribeeFolder",
+      PartnerFolder::Container                 => "containerFolder",
+      PartnerFolder::Mentioner                 => "mentionerFolder",
     }}
 
   pub fn from_client_string (s : &str) -> Option<PartnerFolder> {
@@ -687,6 +701,8 @@ impl PartnerFolder {
       "hiddenFolder"                    => Some (PartnerFolder::Hidden),
       "hiddenInSubscribeeFolder"        => Some (PartnerFolder::HiddenInSubscribee),
       "hiddenOutsideOfSubscribeeFolder" => Some (PartnerFolder::HiddenOutsideOfSubscribee),
+      "containerFolder"                 => Some (PartnerFolder::Container),
+      "mentionerFolder"                 => Some (PartnerFolder::Mentioner),
       _                              => None,
     } }
 

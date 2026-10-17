@@ -319,7 +319,8 @@ fn birth_facts_for_folder (
   match folder {
     PartnerFolder::Subscribee | PartnerFolder::Subscriber
     | PartnerFolder::Overridden | PartnerFolder::Overrider
-    | PartnerFolder::Hider | PartnerFolder::Hidden =>
+    | PartnerFolder::Hider | PartnerFolder::Hidden
+    | PartnerFolder::Container | PartnerFolder::Mentioner =>
       match folder . relation_member_role () {
         Some (role) => vec![ BirthFact::new (
           role . relation, side_of_role (role), Some (2) ) ],

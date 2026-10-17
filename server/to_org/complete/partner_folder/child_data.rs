@@ -24,7 +24,7 @@ use crate::types::git::{NodeAxes, RelationshipAxes, Sign, SkgrepoDiff};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::phantom::title_for_phantom;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
-use crate::types::viewnode::{ChangeFacts, Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{ChangeFacts, DiffPresence, Phantom, Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{complete_relevant_children_in_viewforest, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
 
@@ -317,10 +317,37 @@ pub fn apply_relationship_axes_to_folder_members (
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (( )) }
 
+/// Stamp each member of a folder with the presence of its node and of
+/// its relationship to the folder's anchor, from 'presence_by_skgid'.
+/// Members are unrestricted vognodes or, for a node only in the
+/// before-graph, unknown phantoms.
+pub fn apply_presence_to_folder_members (
+  tree              : &mut Tree<Viewnode>,
+  folder_node       : NodeId,
+  presence_by_skgid : &HashMap<ID, DiffPresence>,
+) -> Result<(), Box<dyn Error>> {
+  treat_certain_children (
+    tree, folder_node,
+    |vn : &Viewnode| matches! (
+      &vn . kind,
+      ViewnodeKind::Vognode (
+        Vognode::Unrestricted (_) | Vognode::Phantom (Phantom::Unknown (_)) )),
+    |vn : &mut Viewnode| {
+      let (skgid, change_facts) : (&ID, &mut ChangeFacts) = match &mut vn . kind {
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+          (&t . skgid, &mut t . change_facts),
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
+          (&u . skgid, &mut u . change_facts),
+        _ => return, };
+      change_facts . presence =
+        presence_by_skgid . get (skgid) . copied () . unwrap_or_default (); } )
+    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+  Ok (( )) }
+
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::types::viewnode::{mk_writeProtected_viewnode, Phantom};
+  use crate::types::viewnode::mk_writeProtected_viewnode;
 
   fn skgid (text : &str) -> ID { ID::from (text) }
   fn skgrepo (text : &str) -> SkgrepoName { SkgrepoName::from (text) }

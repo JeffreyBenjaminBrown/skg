@@ -370,6 +370,7 @@ or nil when REPO is nil or names no configured repo."
 
 (defconst skg--relRepo-unsupported-folder-atoms
   '(subscriberFolder overriderFolder hiderFolder hiddenFolder
+    containerFolder mentionerFolder
     hiddenInSubscribeeFolder hiddenOutsideOfSubscribeeFolder)
   "The PartnerFolder atoms where an explicit relRepo
 request is unsupported from this side.  HiddenOutside membership is

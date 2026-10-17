@@ -54,6 +54,8 @@ pub fn validate_local_structure (
       MpViewnodeKind::PartnerFolder (
         role @ (PartnerFolder::Hidden
           | PartnerFolder::Hider
+          | PartnerFolder::Container
+          | PartnerFolder::Mentioner
           | PartnerFolder::Overridden
           | PartnerFolder::Overrider
           | PartnerFolder::Subscriber))

@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::paths::PartnersOf;
+use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::misc::ID;
 
 /// A node in the full containerward role tree.
@@ -63,12 +65,36 @@ fn assemble(
       ContainerwardRoleTree::Inner ( skgid, children ) }, } }
 
 /// In-Rust-graph containerward role tree, walking the 'contained_by'
-/// recorderward relmap. Uses breadth-first traversal with no
-/// async / no parallel queries / no frontier-batching.
+/// recorderward relmap.
 pub fn full_containerward_role_tree_from_inRustGraph (
   graph     : &InRustGraph,
   origin    : &ID,
   max_depth : usize,
+) -> ContainerwardRoleTree {
+  full_containerward_role_tree (
+    &containers_in_inRustGraph (graph), origin, max_depth ) }
+
+/// The containers of a node, through the graph's 'contained_by'
+/// recorderward relmap, as the partners function of the containerward
+/// role tree. Ungated: the caller gates what it draws.
+pub fn containers_in_inRustGraph (
+  graph : &InRustGraph,
+) -> impl Fn (&ID, RelationRole) -> HashSet<ID> + '_ {
+  move |skgid : &ID, _role : RelationRole| -> HashSet<ID> {
+    let empty : im::HashSet<ID> = im::HashSet::new ();
+    graph . contained_by . get (skgid)
+      . unwrap_or (&empty)
+      . iter () . cloned () . collect () } }
+
+/// The containerward role tree of 'origin', walking the containers
+/// that 'partners_of' gives (asked for the CONTAINER role), so it can
+/// walk the live graph or a graph pair's union. Uses breadth-first
+/// traversal with no async / no parallel queries / no
+/// frontier-batching.
+pub fn full_containerward_role_tree (
+  partners_of : PartnersOf,
+  origin      : &ID,
+  max_depth   : usize,
 ) -> ContainerwardRoleTree {
   let mut children_of : HashMap<usize, Vec<(ID, NodeFate)>> =
     HashMap::new ();
@@ -93,11 +119,8 @@ pub fn full_containerward_role_tree_from_inRustGraph (
     let mut next_frontier : Vec<(usize, ID)> =
       Vec::new ();
     for (parent_key, current_skgid) in & frontier {
-      let containers : HashSet<ID> = {
-        let empty : im::HashSet<ID> = im::HashSet::new ();
-        graph . contained_by . get (current_skgid)
-          . unwrap_or (&empty)
-          . iter () . cloned () . collect () };
+      let containers : HashSet<ID> =
+        partners_of (current_skgid, RelationRole::CONTAINER);
       if containers . is_empty () {
         children_of . insert ( *parent_key, vec![] );
       } else {
@@ -124,17 +147,18 @@ pub fn full_containerward_role_tree_from_inRustGraph (
     origin_key, & id_of, & children_of,
     & depth_truncated_keys ) }
 
-/// Compute full containerward role tree for each ID.
+/// Compute full containerward role tree for each ID, walking the
+/// containers that 'partners_of' gives.
 pub fn containerward_role_trees_by_skgid_from_skgids (
-  graph     : &InRustGraph,
-  skgids    : &[ID],
-  max_depth : usize,
+  partners_of : PartnersOf,
+  skgids      : &[ID],
+  max_depth   : usize,
 ) -> HashMap<ID, ContainerwardRoleTree> {
   let mut map : HashMap<ID, ContainerwardRoleTree> =
     HashMap::new ();
   for skgid in skgids {
     map . insert (
       skgid . clone (),
-      full_containerward_role_tree_from_inRustGraph (
-        graph, skgid, max_depth ) ); }
+      full_containerward_role_tree (
+        partners_of, skgid, max_depth ) ); }
   map }

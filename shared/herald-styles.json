@@ -81,7 +81,9 @@
     "hiddenFolder":                    "message",
     "hiderFolder":                     "message",
     "hiddenInSubscribeeFolder":        "message",
-    "hiddenOutsideOfSubscribeeFolder": "message"
+    "hiddenOutsideOfSubscribeeFolder": "message",
+    "containerFolder":                 "message",
+    "mentionerFolder":                 "message"
   },
   "relationship_heralds": {
     "comment": "How the clients style relationship heralds. A side's tier is shown by its carrier: its numeral if it shows one, else its ancestor flags. See docs/heralds.org.",

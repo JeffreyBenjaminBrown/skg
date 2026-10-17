@@ -1,5 +1,6 @@
 use crate::change_forest::ChangeForest;
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::types::git::Sign;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 
@@ -107,6 +108,16 @@ impl Presence {
       (true,  false) => Some (Presence::OnlyBefore),
       (false, true)  => Some (Presence::OnlyAfter),
       (false, false) => None, } }
+
+  /// The sign of the '(diff ...)' atom for this presence: + for only
+  /// after, - for only before, none for both.
+  pub fn diff_sign (
+    self,
+  ) -> Option<Sign> {
+    match self {
+      Presence::Both       => None,
+      Presence::OnlyBefore => Some (Sign::Minus),
+      Presence::OnlyAfter  => Some (Sign::Plus), } }
 }
 
 impl NodeChanges {

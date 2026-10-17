@@ -24,7 +24,8 @@ use crate::serve::handlers::text_release::{
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::skgrepo_sets::{SkgrepoRestriction, apply_skgrepo_set_to_viewforest};
-use crate::to_org::expand::role_tree::attach_full_containerward_role_trees_at_treeids_with_skgrepo_set;
+use crate::to_org::expand::role_tree::{
+  RoleTreePartners, attach_full_containerward_role_trees_at_treeids_with_skgrepo_set};
 use crate::to_org::util::EditableMap;
 use crate::types::git::{NodeAxes, RelationshipAxes, SkgrepoDiff};
 use crate::types::views_state::ViewId;
@@ -764,7 +765,8 @@ fn fulfill_root_containerward_requests (
       . collect ();
   if requesting_root_treeids . is_empty () { return Ok (( )); }
   attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
-    viewforest, &requesting_root_treeids, graph, config, restriction ) ?;
+    viewforest, &requesting_root_treeids, graph, config, restriction,
+    RoleTreePartners::LiveGraph ) ?;
   for treeid in requesting_root_treeids { // drop the now-fulfilled request
     if let Some (mut node_mut) = viewforest . get_mut (treeid) {
       if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
@@ -795,4 +797,5 @@ fn attach_full_containerward_role_trees_to_removedhere_phantoms (
         { result . push ( node_ref . id () ); }} }
     result };
   attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
-    viewforest, &phantom_treeids, graph, config, restriction ) }
+    viewforest, &phantom_treeids, graph, config, restriction,
+    RoleTreePartners::LiveGraph ) }

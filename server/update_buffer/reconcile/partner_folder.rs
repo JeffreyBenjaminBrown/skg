@@ -1,7 +1,10 @@
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
+use crate::graph_pair::types::{GraphPair, Partner};
 use crate::to_org::complete::partner_folder::child_data::{
   build_child_data,
   ChildData,
+  apply_presence_to_folder_members,
   apply_relationship_axes_to_folder_members,
   reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds,
 };
@@ -19,16 +22,26 @@ use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::{CompletionWarning, RepairKind};
-use crate::types::viewnode::{FolderPolicy, AffectsParent, PartnerFolder, Viewnode, ViewnodeKind, Vognode};
+use crate::types::viewnode::{DiffPresence, FolderPolicy, AffectsParent, PartnerFolder, Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::sync::Arc;
 
+/// Where a partner folder's goal list comes from.
+#[derive(Clone, Copy)]
+pub enum PartnerFolderGoalSource<'a> {
+  /// The live graph (and, in the git diff view, the per-stage diffs).
+  LiveGraph,
+  /// The union of a graph pair: the members of either graph, each
+  /// tagged with the presence of its node and of its relationship.
+  GraphPair (&'a GraphPair),
+}
+
 /// Reconciles one PartnerFolder (TODO/DONE/local-view-update/plan_v2.org §19 terminology: a folder = a collecting non-vognode)
 /// from a node in the viewforest with the current in-Rust graph snapshot's data
-/// about that node.
+/// about that node, or with a graph pair's ('goal_source').
 /// Makes the folder's UnrestrictedVognode children marked affectsParent=true match a goal list,
 /// preserving reusable children and creating missing ones,
 /// then demotes stale children marked affectsParent=true to 'affectsParent=false'.
@@ -36,6 +49,7 @@ pub fn reconcile_partnerFolder_children (
   node         : NodeId, // The PartnerFolder. Its parent is an UnrestrictedVognode.
   tree         : &mut Tree<Viewnode>,
   kind         : PartnerFolder,
+  goal_source  : PartnerFolderGoalSource,
   skgrepo_diffs : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
   runtime      : &RuntimeGeneration,
   graph_snap   : &Arc<InRustGraph>,
@@ -55,6 +69,10 @@ pub fn reconcile_partnerFolder_children (
     return Err (format!(
       "{} called for PartnerFolder {:?}, which has no relation member role",
       kind . caller_label (), kind) . into ()); };
+  if let PartnerFolderGoalSource::GraphPair (pair) = goal_source {
+    return reconcile_partnerFolder_children_from_graph_pair (
+      node, tree, kind, pair, &recorder_pid, member_role, runtime,
+      deleted_by_this_save_extra_ids, warning_sink ); }
   let recorder_role =
     member_role . opposite_role ();
   let skgrepo_resolver = |skgid : &ID| -> Option<SkgrepoName> {
@@ -215,6 +233,52 @@ pub fn reconcile_partnerFolder_children (
     // sink, i.e. when this completion serves the just-saved view).
     if let Some (sink) = warning_sink {
       push_repair_warnings (sink, kind, &recorder_pid, summary); }}
+  Ok (( )) }
+
+/// 'reconcile_partnerFolder_children' with its goal list from the union
+/// of a graph pair: the partners in either graph, each member tagged
+/// with its presence. A member whose node is only in the before-graph
+/// is drawn as an unknown phantom.
+fn reconcile_partnerFolder_children_from_graph_pair (
+  node         : NodeId,
+  tree         : &mut Tree<Viewnode>,
+  kind         : PartnerFolder,
+  pair         : &GraphPair,
+  recorder_pid : &ID,
+  member_role  : RelationRole,
+  runtime      : &RuntimeGeneration,
+  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
+  warning_sink : Option<&mut Vec<CompletionWarning>>,
+) -> Result<(), Box<dyn Error>> {
+  let partners : Vec<Partner> =
+    pair . partners (recorder_pid, member_role);
+  let members : Vec<ID> =
+    partners . iter () . map ( |partner| partner . id . clone () ) . collect ();
+  let goal_list : Vec<ID> = match kind . policy () {
+    FolderPolicy::WriteProtectedSet =>
+      view_order_preserving_goal_list (tree, node, &members) ?,
+    _ => members, };
+  let child_data : HashMap<ID, ChildData> =
+    build_child_data (
+      tree, node, &goal_list, &HashSet::new (),
+      &|_skgid : &ID, _skgrepo : &SkgrepoName| (
+        NodeAxes::default (), RelationshipAxes::default () ),
+      &None, &HashMap::new (), &HashMap::new (), runtime ) ?;
+  let summary : RepairSummary<ID> =
+    reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
+      tree, node, kind, &goal_list, &child_data,
+      deleted_by_this_save_extra_ids ) ?;
+  let presence_by_skgid : HashMap<ID, DiffPresence> =
+    partners . iter ()
+    . map ( |partner| ( partner . id . clone (), DiffPresence {
+      node : pair . node_presence (&partner . id)
+             . and_then ( |presence| presence . diff_sign () ),
+      rel  : partner . presence . diff_sign (), } ))
+    . collect ();
+  apply_presence_to_folder_members (tree, node, &presence_by_skgid) ?;
+  if kind . policy () != FolderPolicy::EditableSet {
+    if let Some (sink) = warning_sink {
+      push_repair_warnings (sink, kind, recorder_pid, summary); }}
   Ok (( )) }
 
 /// Translate a RepairSummary into per-repair-kind CompletionWarnings.

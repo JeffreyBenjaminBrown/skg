@@ -186,7 +186,7 @@ struct FolderSpec {
   intruder : &'static str, // a public non-member to park in the folder
 }
 
-const WRITE_PROTECTED_FOLDERS : [FolderSpec; 4] = [
+const WRITE_PROTECTED_FOLDERS : [FolderSpec; 6] = [
   FolderSpec { atom : "subscriberFolder", recorder : "roSub-owner",
             relation : "subscribesTo",
             member_a : "roSub-a", member_b : "roSub-b",
@@ -203,6 +203,14 @@ const WRITE_PROTECTED_FOLDERS : [FolderSpec; 4] = [
             relation : "hidesFromSubs",
             member_a : "roHidden-a", member_b : "roHidden-b",
             intruder : "roHidden-x" },
+  FolderSpec { atom : "containerFolder", recorder : "roCont-owner",
+            relation : "containers",
+            member_a : "roCont-a", member_b : "roCont-b",
+            intruder : "roCont-x" },
+  FolderSpec { atom : "mentionerFolder", recorder : "roMent-owner",
+            relation : "mentioners",
+            member_a : "roMent-a", member_b : "roMent-b",
+            intruder : "roMent-x" },
 ];
 
 async fn write_protected_reorder (
@@ -314,7 +322,7 @@ async fn write_protected_delete (
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
-// De-novo omission of the four unrequested write-protected folders
+// De-novo omission of the six unrequested write-protected folders
 //////////////////////////////////////////////////////////////
 
 async fn denovo_omits_unrequested_write_protected_folders (
@@ -324,7 +332,8 @@ async fn denovo_omits_unrequested_write_protected_folders (
   let s : &str = "denovo/write-protected-folders";
   let buf : String = render ("dn-owner", config) . await ?;
   for atom in ["subscriberFolder", "overriderFolder",
-               "hiderFolder", "hiddenFolder"] {
+               "hiderFolder", "hiddenFolder",
+               "containerFolder", "mentionerFolder"] {
     fails . want_absent (s, &buf, &format! ("(skg {})", atom)); }
   Ok (( )) }
 

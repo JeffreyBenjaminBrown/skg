@@ -348,6 +348,10 @@ pub fn herald_rule_table () -> HeraldRule {
             "It overrides the view of these.") ],
       write_protected_leaves (PartnerFolder::Overrider . repr_in_client (),
             "These override the view of it."),
+      write_protected_leaves (PartnerFolder::Container . repr_in_client (),
+            "These contain it."),
+      write_protected_leaves (PartnerFolder::Mentioner . repr_in_client (),
+            "These link to it."),
       vec! [
       leaf (PropertyFolder::ID . repr_in_client (), "IDs"),
       leaf ("id", "ID") ], // Property::ID
@@ -747,14 +751,16 @@ fn property_and_folder_atoms () -> Vec<&'static str> {
       | PartnerFolder::Overridden | PartnerFolder::Overrider
       | PartnerFolder::Hider | PartnerFolder::Hidden
       | PartnerFolder::HiddenInSubscribee
-      | PartnerFolder::HiddenOutsideOfSubscribee => () }}
+      | PartnerFolder::HiddenOutsideOfSubscribee
+      | PartnerFolder::Container | PartnerFolder::Mentioner => () }}
   let _ = partnerFolder_guard;
-  let all_partnerFolders : [PartnerFolder; 8] = [
+  let all_partnerFolders : [PartnerFolder; 10] = [
     PartnerFolder::Subscribee, PartnerFolder::Subscriber,
     PartnerFolder::Overridden, PartnerFolder::Overrider,
     PartnerFolder::Hider, PartnerFolder::Hidden,
     PartnerFolder::HiddenInSubscribee,
-    PartnerFolder::HiddenOutsideOfSubscribee ];
+    PartnerFolder::HiddenOutsideOfSubscribee,
+    PartnerFolder::Container, PartnerFolder::Mentioner ];
   fn propertyFolder_guard ( c : &PropertyFolder ) { // ditto
     match c {
       PropertyFolder::ID | PropertyFolder::Alias

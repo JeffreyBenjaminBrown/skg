@@ -125,6 +125,8 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c l h") #'skg-show-folderOf-hidesFromSubs)
     (define-key map (kbd "C-c l s") #'skg-show-folderOf-subscribesTo)
     (define-key map (kbd "C-c l p") #'skg-show-folderOf-flags)
+    (define-key map (kbd "C-c l c") #'skg-show-folderOf-containers)
+    (define-key map (kbd "C-c l m") #'skg-show-folderOf-mentioners)
     ;; UPPER = the partner's active (first) role; lower = passive (second).
     (define-key map (kbd "C-c p C") #'skg-show-containerward-tree)
     (define-key map (kbd "C-c p L") #'skg-show-mentionerward-tree)

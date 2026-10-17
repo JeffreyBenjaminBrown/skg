@@ -4,7 +4,7 @@
 ;;; atom to the headline at point and saving, letting Rust fulfill the
 ;;; request during completion. Two families, both auto-saving (Q10):
 ;;;   - FOLDERS, `skg-show-folder-*' : (folder RELNAME), builds
-;;;     BOTH folders of the relation;
+;;;     BOTH folders of the relation (one for containers and mentioners);
 ;;;   - ROLE TREES, `skg-show-*ward-tree' : (roleTree ROLENAME), the
 ;;;     role tree for that one partner role.
 ;;; (`skg-request-editable-view', a different concept, is also here.)
@@ -52,6 +52,10 @@ an interactive command NAME that requests REQUEST-FORM and auto-saves."
     "Show the subscription folders (subscribeeFolder + subscriberFolder).")
   (skg-show-folderOf-flags flags
     "Show the write-protected flags folder for the node at point.")
+  (skg-show-folderOf-containers    (folder containers)
+    "Show the write-protected containerFolder: the nodes that contain this one.")
+  (skg-show-folderOf-mentioners    (folder mentioners)
+    "Show the write-protected mentionerFolder: the nodes that link to this one.")
   ;; Role trees ('C-c p'): the role tree for one partner role. UPPER = the
   ;; partner's active (first) role, lower = its passive (second) role.
   (skg-show-containerward-tree   (roleTree container)

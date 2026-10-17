@@ -8,6 +8,9 @@ mod diff_mode_refusals;
 #[path = "graph_pair.rs"]
 mod graph_pair;
 
+#[path = "graph_pair_engines.rs"]
+mod graph_pair_engines;
+
 #[path = "leak_battery.rs"]
 mod leak_battery;
 
