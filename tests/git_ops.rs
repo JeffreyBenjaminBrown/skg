@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 use skg::git_ops::find_and_stage_moves::stage_moves_script;
-use skg::git_ops::read_gitrepo::{ head_is_merge_commit, get_file_content_at_head };
+use skg::git_ops::read_gitrepo::get_file_content_at_head;
 use skg::types::list::{compute_interleaved_diff, Diff_Item};
 use skg::types::misc::{ SkgConfig, Skgrepo, SkgrepoName };
 
@@ -45,13 +45,6 @@ fn create_initial_commit (
       "Initial commit",
       &tree,
       &[] ) . unwrap(); }}
-
-#[test]
-fn test_head_is_merge_commit() {
-  let (dir, gitrepo) : (TempDir, Repository) =
-    setup_gitrepo();
-  create_initial_commit ( &gitrepo, dir . path() );
-  assert! ( ! head_is_merge_commit (&gitrepo) . unwrap() ); } // Single-parent commit is not a merge commit
 
 #[test]
 fn test_get_file_content_at_head() {

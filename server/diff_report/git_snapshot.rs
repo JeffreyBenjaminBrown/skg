@@ -9,7 +9,7 @@ use crate::diff_report::types::{
 use crate::git_ops::misc::path_relative_to_gitrepo;
 use crate::git_ops::read_gitrepo::{
   get_staged_changed_skg_files, get_unstaged_changed_skg_files,
-  head_is_merge_commit, open_gitrepo};
+  open_gitrepo};
 use crate::types::misc::{
   ID, SkgConfig, Skgrepo, SkgrepoName, members_msv, members_of};
 use crate::types::nodes::complete::Graphnode;
@@ -36,7 +36,7 @@ pub fn read_git_snapshot_pair (
 ) -> Result<GitSnapshotPair, String> {
   let (before_kind, after_kind) : (GitSnapshotKind, GitSnapshotKind) =
     endpoint_kinds (selection) ?;
-  validate_skgrepos_for_selection (config, before_kind, after_kind) ?;
+  validate_skgrepos_for_selection (config) ?;
   let (before_result, after_result) :
     (Result<GraphSnapshot, String>, Result<GraphSnapshot, String>) =
     thread::scope ( |scope| {
@@ -65,7 +65,7 @@ pub fn read_changed_git_snapshot_pair (
 ) -> Result<Option<ChangedGitSnapshotPair>, String> {
   let (before_kind, after_kind) : (GitSnapshotKind, GitSnapshotKind) =
     endpoint_kinds (selection) ?;
-  validate_skgrepos_for_selection (config, before_kind, after_kind) ?;
+  validate_skgrepos_for_selection (config) ?;
   let changed_paths : HashMap<SkgrepoName, BTreeSet<PathBuf>> =
     changed_paths_by_skgrepo (config, before_kind, after_kind) ?;
   if changed_paths . values () . all ( |paths| paths . is_empty () ) {
@@ -98,13 +98,8 @@ fn endpoint_kinds (
         . to_string () ), } }
 
 fn validate_skgrepos_for_selection (
-  config      : &SkgConfig,
-  before_kind : GitSnapshotKind,
-  after_kind  : GitSnapshotKind,
+  config : &SkgConfig,
 ) -> Result<(), String> {
-  let needs_head : bool =
-    before_kind == GitSnapshotKind::Head ||
-    after_kind  == GitSnapshotKind::Head;
   for (skgrepo_name, skgrepo) in &config . skgrepos {
     let skgrepo_path : &Path =
       Path::new ( &skgrepo . path );
@@ -114,13 +109,7 @@ fn validate_skgrepos_for_selection (
         skgrepo_name )) ?;
     gitrepo . head () . map_err ( |e| format! (
       "Cannot compute diff report: Skg repo '{}' has no HEAD commit: {}",
-      skgrepo_name, e )) ?;
-    if needs_head && head_is_merge_commit (&gitrepo) . map_err ( |e| format! (
-      "Cannot compute diff report: could not inspect HEAD for Skg repo '{}': {}",
-      skgrepo_name, e )) ? {
-      return Err ( format! (
-        "Cannot compute diff report: HEAD is a merge commit in repo '{}'.",
-        skgrepo_name )); }} 
+      skgrepo_name, e )) ?; }
   Ok (( )) }
 
 fn read_graph_snapshot (

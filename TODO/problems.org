@@ -16,8 +16,9 @@
   both features are blocked until the next ordinary commit. Removing
   both checks is proposed in the TDV discussion
   ([[file:total-diff-view/1_discussion.org][TODO/total-diff-view]], open question on the
-  merge-commit refusal). Decided 2026-10-17: Jeff agreed, and the
-  removal is prerequisite item 11 of that plan.
+  merge-commit refusal). Decided 2026-10-17: Jeff agreed. Fixed
+  2026-10-17 in slice 0 of [[file:total-diff-view/2_plan.org][the TDV plan]]: both refusals are gone,
+  along with 'head_is_merge_commit', which nothing else used.
 ** Diff view and diff report are blind to relRepo changes
   'compare_graphnodes' in 'server/git_ops/diff.rs' diffs each relation
   as a list of member IDs ('members_of'), and the diff report's

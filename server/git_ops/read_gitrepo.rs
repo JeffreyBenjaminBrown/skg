@@ -178,12 +178,3 @@ pub fn get_file_content_at_index (
           . ok ();
       Ok (content) },
     None => Ok (None) }}
-
-/// Check if HEAD is a merge commit (has multiple parents).
-/// This is used to abort saves when the comparison baseline is ambiguous.
-pub fn head_is_merge_commit (
-  gitrepo : &Repository
-) -> Result<bool, Error> {
-  let head_commit : git2::Commit =
-    gitrepo . head() ? . peel_to_commit() ?;
-  Ok ( head_commit . parent_count() > 1 ) }

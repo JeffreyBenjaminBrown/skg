@@ -4,7 +4,6 @@ use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::from_text
   ::buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_graph;
 use crate::git_ops::diff::compute_diff_for_skgrepo;
-use crate::git_ops::read_gitrepo::{open_gitrepo, head_is_merge_commit};
 use crate::save::{
   apply_delete_propagation_cleanup,
   PreparedSave, prepare_save_under_mutation_gate,
@@ -616,11 +615,6 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   let runtime = env . runtime_snapshot ();
   let working_graph = new_handle ((*runtime . graph) . clone ());
   let mut working_tantivy = runtime . tantivy_index . clone ();
-  if diff_mode_enabled { // diff mode is undefined for merge commits
-    let skgrepos : Vec<SkgrepoName> =
-      runtime . config . skgrepos . keys() . cloned() . collect();
-    validate_no_merge_commits ( &skgrepos, &runtime . config )
-      . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
 
   let ( viewforest, save_plan, parse_warnings )
     : ( ViewForest, SavePlan, Vec<String> ) =
@@ -852,29 +846,6 @@ fn post_skgsave_commit_hiddenoutside_warnings (
         label (member), containing_subscribees . join (", ") )); }}
   warnings
 }
-
-/// Check if any skgrepo's HEAD is a merge commit.
-/// Returns an error message if so,
-/// as diff computation is ambiguous for merge commits.
-pub fn validate_no_merge_commits (
-  skgrepos : &[SkgrepoName],
-  config   : &SkgConfig,
-) -> Result<(), String> {
-  for skgrepo in skgrepos { // Get the skgrepo path from config
-    if let Some (skgrepo_config) = config . skgrepos . get (skgrepo) {
-      let skgrepo_path : &Path =
-        Path::new ( &skgrepo_config . path );
-      if let Some (gitrepo) = open_gitrepo (skgrepo_path) {
-        match head_is_merge_commit (&gitrepo) {
-          Ok (true) => {
-            return Err ( format! (
-              "Cannot compute diff: HEAD is a merge commit in repo '{}'.",
-              skgrepo )); },
-          Ok (false) => {},
-          Err (e) => { // Git error - log but continue
-            tracing::warn! ( "Could not check merge commit status for '{}': {}",
-                        skgrepo, e ); }} }} }
-  Ok (( )) }
 
 pub fn compute_diff_for_every_skgrepo (
   config : &SkgConfig
