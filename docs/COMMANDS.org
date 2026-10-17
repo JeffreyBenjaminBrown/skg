@@ -607,6 +607,14 @@ Marks commit-ready the home-skgrepo move of the node at point (or of
 the move at point), then saves. With a prefix argument (C-u C-c r h),
 also every descendant whose home moved between the same two
 skgrepos. Works on write-protected headlines too.
+*** C-c r c : skg-stage-and-commit
+Prompts once for a commit message, then stages every change and
+git-commits it, in every owned skgrepo that has changes, with that
+message. If not every changed file is ready, it first shows the
+readiness summary and proceeds only if you type the word "yes". Every
+open view must be saved or reverted first. Afterward the open buffers
+of the total diff view are redrawn: emptied, or shrunk to what was not
+committed. The commit lapses the marks of everything it committed.
 ** C-c m : other graph modifications
 *** C-c m c : skg-replace-link-with-content
 Replace the leaf at point with a content relationship to the

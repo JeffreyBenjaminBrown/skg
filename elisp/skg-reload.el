@@ -96,6 +96,7 @@ rather than via `unload-feature'."
             skg-request-save
             skg-request-single-root-content-view
             skg-request-repo-sets
+            skg-request-stage-and-commit
             skg-request-stage-moves
             skg-request-strip-body-whitespace
             skg-request-text-search

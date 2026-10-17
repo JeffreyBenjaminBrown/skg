@@ -28,6 +28,7 @@
 (require 'skg-recovery)
 (require 'skg-request-save)
 (require 'skg-request-repo-sets)
+(require 'skg-request-stage-and-commit)
 (require 'skg-request-stage-moves)
 (require 'skg-request-strip-body-whitespace)
 (require 'skg-search-make-link)

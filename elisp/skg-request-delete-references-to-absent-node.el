@@ -8,10 +8,6 @@
 (require 'skg-request-rerender-all-views)
 (require 'skg-request-save)
 
-;; A cleanup confirmation arrives inside an otherwise empty stream.  The
-;; rerender handler consumes that stream before invoking this one-shot retry.
-(defvar skg--rerender-after-empty-stream nil)
-
 (defun skg-delete-references-to-absent-node ()
   "Remove owned structured references to the Unknown headline at point."
   (interactive)
@@ -33,7 +29,7 @@
     (skg--begin-stream "delete absent references")
     (skg--lock-all-skg-buffers)
     (skg--register-rerender-stream-handlers)
-    (skg--delete-absent-wrap-rerender-done)
+    (skg--wrap-rerender-done-with-after-empty-stream)
     (skg-register-response-handler
      'delete-references-confirmation
      (lambda (_tcp payload)
@@ -92,24 +88,5 @@
       (setq skg-response-handler-map
             (assoc-delete-all type skg-response-handler-map)
             skg-lp--pending-count (max 0 (1- skg-lp--pending-count))))))
-
-(defun skg--delete-absent-wrap-rerender-done ()
-  "Run a pending cleanup retry after rerender's empty-stream cleanup.
-This keeps the cleanup's confirmation retry local rather than changing the
-generic rerender protocol while its privacy-vocabulary migration is pending."
-  (let* ((entry (assoc 'rerender-done skg-response-handler-map))
-         (handler (cadr entry)))
-    (unless handler (error "Missing rerender-done handler"))
-    ;; Replace in place: the existing one-shot registration owns the pending
-    ;; count, so registering it again would leave a stale pending response.
-    (setq skg-response-handler-map
-          (cons (cons 'rerender-done
-                      (cons (lambda (tcp payload)
-                              (funcall handler tcp payload)
-                              (let ((after-empty skg--rerender-after-empty-stream))
-                                (setq skg--rerender-after-empty-stream nil)
-                                (when after-empty (run-at-time 0 nil after-empty))))
-                            t))
-                (assoc-delete-all 'rerender-done skg-response-handler-map)))))
 
 (provide 'skg-request-delete-references-to-absent-node)

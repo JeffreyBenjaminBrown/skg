@@ -133,4 +133,29 @@ Shared by 'skg-request-rerender-all-views' and 'skg-view-diff-mode'."
        (when retry (run-at-time 0 nil retry))))
    t))
 
+;; A confirmation can arrive inside an otherwise empty rerender stream (the
+;; delete-references and stage-and-commit commands).  The rerender handler
+;; consumes that stream before invoking this one-shot retry.
+(defvar skg--rerender-after-empty-stream nil)
+
+(defun skg--wrap-rerender-done-with-after-empty-stream ()
+  "Run a pending confirmation retry after rerender's empty-stream cleanup.
+This keeps a command's confirmation retry local to the commands that ask
+for it, rather than changing the generic rerender protocol while its
+privacy-vocabulary migration is pending."
+  (let* ((entry (assoc 'rerender-done skg-response-handler-map))
+         (handler (cadr entry)))
+    (unless handler (error "Missing rerender-done handler"))
+    ;; Replace in place: the existing one-shot registration owns the pending
+    ;; count, so registering it again would leave a stale pending response.
+    (setq skg-response-handler-map
+          (cons (cons 'rerender-done
+                      (cons (lambda (tcp payload)
+                              (funcall handler tcp payload)
+                              (let ((after-empty skg--rerender-after-empty-stream))
+                                (setq skg--rerender-after-empty-stream nil)
+                                (when after-empty (run-at-time 0 nil after-empty))))
+                            t))
+                (assoc-delete-all 'rerender-done skg-response-handler-map)))))
+
 (provide 'skg-request-rerender-all-views)
