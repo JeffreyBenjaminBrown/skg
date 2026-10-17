@@ -103,6 +103,31 @@ impl GraphPair {
       partners . sort_by ( |a, b| a . id . cmp (&b . id) ); }
     partners }
 
+  /// The node that acquired 'pid' by a nodeMerge since HEAD: the
+  /// after-graph node that lists 'pid' as an extra ID, when 'pid' is
+  /// a node of the before-graph only.
+  pub fn acquirer_of (
+    &self,
+    pid : &ID,
+  ) -> Option<ID> {
+    if self . node_presence (pid) != Some (Presence::OnlyBefore) {
+      return None; }
+    self . after . pid_of (pid) }
+
+  /// The nodes 'pid' acquired by nodeMerges since HEAD: those of its
+  /// after-graph extra IDs that name a node of the before-graph only.
+  pub fn acquirees_of (
+    &self,
+    pid : &ID,
+  ) -> Vec<ID> {
+    self . after . get (pid)
+      . map ( |node| node . extra_ids . iter ()
+              . filter ( |extra_id| self . node_presence (extra_id)
+                                    == Some (Presence::OnlyBefore) )
+              . cloned ()
+              . collect () )
+      . unwrap_or_default () }
+
   /// C, split into its rightward and leftward halves. Computed once
   /// per pair.
   pub fn changed_pids (

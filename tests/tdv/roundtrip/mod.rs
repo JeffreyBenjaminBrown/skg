@@ -5,3 +5,4 @@
 // saves back unchanged with no graph change and no validation error.
 
 mod metadata;
+mod view;
