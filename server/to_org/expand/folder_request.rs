@@ -3,9 +3,8 @@
 /// is the node's content or its links), each POPULATED from the graph, reusing the de-novo
 /// PartnerFolder generators. The EDITABLE folder of the relation is created
 /// even when empty (its editable "add here" surface); the WRITE-PROTECTED
-/// folders are built only when populated in the worktree or, in diff mode,
-/// on the HEAD side (decision A -- a write-protected folder empty on both sides is
-/// pruned by 'is_self_deletable_when_empty').
+/// folders are built only when populated (an empty write-protected
+/// folder is pruned by 'is_self_deletable_when_empty').
 ///
 /// 'aliases' is handled by the AliasFolder builder ('expand/aliases.rs'),
 /// not here -- the dispatch in 'execute_view_requests' routes it there.

@@ -221,10 +221,10 @@ fn profile_log (
   label    : &str,
   duration : Duration,
 ) {
-  if std::env::var_os ("SKG_PROFILE_DIFF_REPORT") . is_none () {
+  if std::env::var_os ("SKG_PROFILE_GIT_SNAPSHOT") . is_none () {
     return; }
   eprintln! (
-    "diff-report profile: {}: {}.{:03}s",
+    "git-snapshot profile: {}: {}.{:03}s",
     label,
     duration . as_secs (),
     duration . subsec_millis ()); }

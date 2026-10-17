@@ -20,7 +20,6 @@ use skg::skgrepo_sets::{
   SkgrepoSetName,
   filter_path_to_unrestricted_skgrepos_for_test,
   filter_branches_to_unrestricted_skgrepos_for_test,
-  prepare_git_diff_fixture,
   run_with_skgrepo_set_test_db};
 use skg::dbs::node_lookup::graphnode_from_graph;
 use skg::to_org::render::content_view::multi_root_view;
@@ -66,13 +65,6 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("content_view_omits_restricted_contained_nodes", fixtures) ?;
       content_view_omits_restricted_contained_nodes (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset_with_fixture_prep (
-        // prepare_git_diff_fixture leaves the public skgrepo with a
-        // real worktree-vs-HEAD diff, which this sub-test renders.
-        "diff_view_omits_restricted_members_without_content_leak", fixtures,
-        |root| prepare_git_diff_fixture (root) ) ?;
-      diff_view_omits_restricted_members_without_content_leak (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("search_filters_restricted_repos_before_ranking_and_truncation", fixtures) ?;
       search_filters_restricted_skgrepos_before_ranking_and_truncation (
@@ -424,44 +416,6 @@ async fn content_view_omits_restricted_contained_nodes (
         ! pids . contains (&ID::from ("private-a")),
         "an omitted restricted node is not in the view, so not in its pid set: {:?}",
         pids );
-      Ok (( )) }
-
-async fn diff_view_omits_restricted_members_without_content_leak (
-  config : &SkgConfig,
-  _tantivy : &mut TantivyIndex,
-) -> Result<(), Box<dyn Error>> {
-      let restriction : SkgrepoRestriction =
-        SkgrepoRestriction::named (
-          &config,
-          SkgrepoSetName::from ("public"))?;
-      let (actual, _pids, _viewforest) : (String, Vec<ID>, Tree<Viewnode>) =
-        multi_root_view_with_skgrepo_set (
-          config, None,
-          &[ID::from ("diff-root")],
-          &restriction ) ?;
-      // Defense in depth: the connection-level refusals
-      // (TODO/DONE/full-schema/DONE/12-2_diff-mode-policy_discussion.org) keep
-      // diff mode and restricted skgrepo-sets from combining through
-      // the two state doors, but this render seam remains directly
-      // constructible (as this test does), so when the modes mix,
-      // restricted members are omitted from restricted diff views
-      // entirely -- current members and removed-member phantoms
-      // alike -- and nothing private leaks.
-      for forbidden in [
-        "private-new",
-        "private-removed",
-        "private new title must not leak",
-        "private removed title must not leak",
-        "private body must not leak",
-        "repo private) private",
-      ] {
-        assert! (
-          ! actual . contains (forbidden),
-          "restricted diff view leaked '{}': {}",
-          forbidden,
-          actual ); }
-      assert! ( actual . contains ("active-a"),
-        "unrestricted content still renders: {}", actual );
       Ok (( )) }
 
 async fn search_filters_restricted_skgrepos_before_ranking_and_truncation (

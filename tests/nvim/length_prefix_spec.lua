@@ -85,10 +85,10 @@ describe('skg.length_prefix dispatch', function ()
 
   it('accepts a quoted response-type spelling too', function ()
     local seen = false
-    state.register_response_handler('git-diff-mode',
+    state.register_response_handler('skgrepo-restriction',
       function () seen = true end, true)
     length_prefix.handle_generic_chunk(
-      framed('(("response-type" "git-diff-mode") ("content" "on"))'))
+      framed('(("response-type" "skgrepo-restriction") ("content" "on"))'))
     assert.is_true(seen)
   end)
 

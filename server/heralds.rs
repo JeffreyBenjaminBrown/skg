@@ -350,13 +350,6 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///     are consumed positionally; 'any' in a child position matches
 ///     any leaf/atom.
 ///
-///   * INTERC rules -- used when the server emits a parent whose
-///     children should be glued together with a separator, preserving
-///     each child's own style. Labelled INTERCs match a child of the
-///     object bearing that label; unlabelled INTERCs run their
-///     sub-rules against the current object's own children. Empty
-///     slots and their separators are skipped.
-///
 ///   * 'leaf_abut' -- the emitted token glues onto the preceding
 ///     token with no space (used so the write-protected glyph "☮" sits
 ///     directly on its affectsParent glyph).

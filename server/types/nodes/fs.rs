@@ -19,8 +19,9 @@
 //! - 'GraphnodeOnDisk::into_complete_as_single_section (repo)' treats ONE
 //!   section as a whole node. Used only where a single FILE is the
 //!   honest unit: historical blobs (the vanished-node search) and
-//!   diff MODE's per-file reads (safe because diff mode requires
-//!   the skgrepo restriction "all", so no composition is hidden).
+//!   the git fallback of "titles by ids" ('server/git_ops/diff.rs'),
+//!   which reads only titles and filters them by the skgrepo
+//!   restriction.
 
 use serde::{Serialize, Deserialize};
 

@@ -6,9 +6,8 @@
 // two views: changing its subscriptions in one view and saving must
 // refresh the OTHER (collateral) view's subscribeeFolder from the graph,
 // not leave it showing the old subscription. Before the fix,
-// reconcile_subscribeeFolder_children skipped an editable subscriber
-// outside diff mode (the `parent_write-protected || repo_diffs.is_some()`
-// gate), so the collateral subscribeeFolder kept stale members.
+// reconcile_subscribeeFolder_children skipped an editable subscriber,
+// so the collateral subscribeeFolder kept stale members.
 //
 // Installs the explicit graph handle (the subscribee lookups read
 // the captured graph), so it lives among the grouped_overrides installers.
@@ -120,7 +119,7 @@ fn collateral_editable_subscriber_subscribeeFolder_refreshes
 
       // The collateral view B must refresh from the just-saved graph:
       // its subscribeeFolder now shows M but NOT N, even though S is
-      // EDITABLE there (the root) and diff mode is off. Before the
+      // EDITABLE there (the root). Before the
       // fix, B kept N stale.
       assert_eq! ( collateral_views . len (), 1,
         "exactly view B should be collateral: {:?}", collateral_views );

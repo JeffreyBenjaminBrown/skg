@@ -1138,8 +1138,9 @@ COLUMN is a character offset from the line's start; nil means column 0."
         (recenter screen-line)))))
 
 (define-minor-mode skg-report-mode
-  "Minor mode for read-only skg report buffers, such as the diff report
-and the import result: links in them can be followed, and IDs used."
+  "Minor mode for read-only skg report buffers, such as an unknown node's
+investigation and the import result: links in them can be followed,
+and IDs used."
   :lighter " skg-report"
   :keymap skg-report-mode-map)
 

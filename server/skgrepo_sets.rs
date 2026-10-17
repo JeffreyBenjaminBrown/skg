@@ -19,7 +19,6 @@ use std::future::Future;
 use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::process::Command;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SkgrepoRestriction {
@@ -205,7 +204,6 @@ fn prepare_skgrepo_set_fixture_copy (
   if target_root . exists () {
     fs::remove_dir_all (&target_root)?; }
   copy_dir_recursively (skgrepo_root, &target_root)?;
-  prepare_git_diff_fixture (&target_root)?;
   Ok (target_root . join (
     skgrepo_config_path . file_name ()
     . ok_or ("repo set fixture config has no filename")?)) }
@@ -227,52 +225,3 @@ fn copy_dir_recursively (
       fs::copy (&skgrepo_path, &target_path)?; }}
   Ok (( )) }
 
-/// Public so repo-set diff tests can replay this prep on a
-/// SharedStoreSession's fixture copy (reset_with_fixture_prep).
-pub fn prepare_git_diff_fixture (
-  fixture_root : &Path,
-) -> Result<(), Box<dyn Error>> {
-  let public_skgrepo : PathBuf =
-    fixture_root . join ("owned/public");
-  let diff_root : PathBuf =
-    public_skgrepo . join ("diff-root.skg");
-  if ! diff_root . exists () {
-    return Ok (( )); }
-  fs::write (&diff_root, indoc::indoc! {"
-    pid: diff-root
-    title: diff-root
-    contains:
-    - active-a
-    - private-removed
-  "})?;
-  run_git (&public_skgrepo, &["init"])?;
-  run_git (&public_skgrepo, &["config", "user.email", "tests@example.invalid"])?;
-  run_git (&public_skgrepo, &["config", "user.name", "skg tests"])?;
-  run_git (&public_skgrepo, &["add", "."])?;
-  run_git (&public_skgrepo, &["commit", "-m", "baseline"])?;
-  fs::write (&diff_root, indoc::indoc! {"
-    pid: diff-root
-    title: diff-root
-    contains:
-    - active-a
-    - private-new
-  "})?;
-  Ok (( )) }
-
-fn run_git (
-  dir  : &Path,
-  args : &[&str],
-) -> Result<(), Box<dyn Error>> {
-  let output : std::process::Output =
-    Command::new ("git")
-    . args (args)
-    . current_dir (dir)
-    . output ()?;
-  if output . status . success () {
-    Ok (( ))
-  } else {
-    Err (format! (
-      "git {:?} failed: {}{}",
-      args,
-      String::from_utf8_lossy (&output . stdout),
-      String::from_utf8_lossy (&output . stderr)) . into ()) }}

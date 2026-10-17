@@ -307,8 +307,8 @@ M.file_bindings = {
   { 'Oi', 'PopId' }, { 'Ol', 'PopLink' }, { 'On', 'PopNode' },
 }
 
----The subset used by read-only report buffers: the diff report and the
----import result.
+---The subset used by read-only report buffers: an unknown node's
+---investigation and the import result.
 M.report_bindings = {
   { 'ff', 'Search' }, { 'fi', 'SearchInteractive' },
   { 'gg', 'Goto' }, { 'GG', 'GotoAndCloseThis' },
