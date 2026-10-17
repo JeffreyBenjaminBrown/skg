@@ -27,7 +27,7 @@ use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::{CompletionWarning, RepairKind};
-use crate::types::viewnode::{DiffPresence, Editability, FolderPolicy, AffectsParent, PartnerFolder, Phantom, Viewnode, ViewnodeKind, Vognode};
+use crate::types::viewnode::{DiffPresence, Editability, FolderPolicy, AffectsParent, PartnerFolder, Phantom, Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode};
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -255,6 +255,7 @@ fn reconcile_partnerFolder_children_from_graph_pair (
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   warning_sink : Option<&mut Vec<CompletionWarning>>,
 ) -> Result<(), Box<dyn Error>> {
+  restore_removed_members_of_pair_folder (tree, node, kind) ?;
   let partners : Vec<Partner> =
     pair . partners (recorder_pid, member_role);
   let members : Vec<ID> =
@@ -287,6 +288,36 @@ fn reconcile_partnerFolder_children_from_graph_pair (
   if kind . policy () != FolderPolicy::EditableSet {
     if let Some (sink) = warning_sink {
       push_repair_warnings (sink, kind, recorder_pid, summary); }}
+  Ok (( )) }
+
+/// Undo what 'redraw_removed_members_of_pair_folder' did when the
+/// folder was last drawn: a historical phantom becomes the unknown
+/// phantom the reconciler drew it as, and a demoted member a member
+/// again. The reconciler then matches them where they stand, instead
+/// of drawing them a second time, and the redraw redoes the rest.
+fn restore_removed_members_of_pair_folder (
+  tree   : &mut Tree<Viewnode>,
+  folder : NodeId,
+  kind   : PartnerFolder,
+) -> Result<(), Box<dyn Error>> {
+  let editable_set : bool = kind . policy () == FolderPolicy::EditableSet;
+  let members : Vec<NodeId> =
+    tree . get (folder) . ok_or ("restore_removed_members_of_pair_folder: folder not found") ?
+    . children () . map ( |child| child . id () ) . collect ();
+  for member in members {
+    let mut member_mut = tree . get_mut (member) . unwrap ();
+    let restored : Option<ViewnodeKind> = match &mut member_mut . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
+        Some ( mk_unknown_viewnode ( h . skgid . clone () ) . kind ),
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+        if editable_set && t . affectsParent == AffectsParent::False
+           && t . change_facts . presence . rel == Some (Sign::Minus) => {
+        t . affectsParent = AffectsParent::True;
+        t . change_facts . presence = DiffPresence::default ();
+        None },
+      _ => None, };
+    if let Some (restored) = restored {
+      member_mut . value () . kind = restored; }}
   Ok (( )) }
 
 /// The members of a pair-drawn folder whose relationship is only in

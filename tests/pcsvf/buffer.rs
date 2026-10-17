@@ -5,7 +5,8 @@
 // a3; flg gains a flag; ct drops k1 and gains k2 (ctx, with its
 // content, is unchanged); sub subscribes to s2 instead of s1; mv
 // moves from public to private; rr's containment of rm moves to
-// private; acq acquired acqd by a nodeMerge.
+// private; acq acquired acqd by a nodeMerge; gone, which subscribed
+// to orph, is deleted.
 
 use crate::pcsvf::common::{
   Fixture, all_changes_buffer, all_changes_buffer_with_marks, save,
@@ -211,6 +212,15 @@ fn marks_in_the_store_show_as_ready (
     assert! ( buffer . contains ("** (skg (aliasFolder changed) (ready))"),
               "{}", buffer );
     Ok (( )) }) }
+
+#[test]
+fn a_deleted_subscriber_is_drawn_in_the_changed_subscriber_folder (
+) -> Result<(), Box<dyn Error>> {
+  assert_lines_in_order ( &kinds_buffer () ?, &[
+    "* (skg (node (id orph)",
+    "** (skg (subscriberFolder changed))",
+    "*** (skg (historical (id gone) (repo public) (diff node- rel-))) gone" ] );
+  Ok (( )) }
 
 /// The round-trip invariant for a full buffer: saved unchanged, it
 /// changes no file and reports no error.
