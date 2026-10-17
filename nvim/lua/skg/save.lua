@@ -339,17 +339,36 @@ function M.apply_streamed_view_update (_payload_text, response,
   local ok, err = pcall(function ()
     local view_id = payload.field_text(response, 'view-id')
     local content = payload.field(response, 'content')
+    local content_text = nil
+    if content ~= nil and not sexpr.is_list(content) then
+      content_text = sexpr.atom_text(content)
+    elseif content == nil and M.has_empty_field(response, 'content') then
+      content_text = '' end -- The server writes an empty view as '(content )'.
     local buf = view_id and buffer.find_buffer_by_view_id(view_id) or nil
-    if buf and content ~= nil and not sexpr.is_list(content) then
+    if buf and content_text ~= nil then
       lock.unlock_after_save(buf)
-      M.replace_buffer_with_new_content(
-        buf, sexpr.atom_text(content), nil)
+      M.replace_buffer_with_new_content(buf, content_text, nil)
     end
   end)
   if not ok then
     log.log('error', log_category, '%s handler error: %s',
             handler_name, tostring(err))
   end
+end
+
+---Whether RESPONSE holds the bare element '(KEY)'.
+---@param response any
+---@param key string
+---@return boolean
+function M.has_empty_field (response, key)
+  if not sexpr.is_list(response) then return false end
+  for _, element in ipairs(response) do
+    if sexpr.is_list(element) and #element == 1
+       and not sexpr.is_list(element[1])
+       and sexpr.atom_text(element[1]) == key then
+      return true end
+  end
+  return false
 end
 
 ---Handle the terminal save-result: remove the streaming handlers and

@@ -353,7 +353,9 @@ streams; LOG-CATEGORY and HANDLER-NAME label any error."
   (condition-case err
       (let* ((response (read payload))
              (view-id (cadr (assoc 'view-id response)))
-             (content (cadr (assoc 'content response)))
+             (content (or (cadr (assoc 'content response))
+                          ;; The server writes an empty view as '(content )'.
+                          ""))
              (buf (skg-find-buffer-by-view-id view-id)))
         (when buf
           (with-current-buffer buf
