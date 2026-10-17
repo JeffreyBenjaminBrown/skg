@@ -1,5 +1,5 @@
 use crate::diff_report::diff_report_as_org_with_overPrivateText_pids;
-use crate::diff_report::types::DiffSelection;
+use crate::git_ops::git_snapshot_types::DiffSelection;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision, decide_for_overPrivateText_pids};

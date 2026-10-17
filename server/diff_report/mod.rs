@@ -1,14 +1,14 @@
 pub mod diff;
 pub mod render;
-pub mod git_snapshot;
 pub mod types;
 pub mod vanished;
 
 use crate::diff_report::diff::{diff_git_snapshots, diff_git_snapshots_for_pids};
 use crate::diff_report::render::render_report;
-use crate::diff_report::git_snapshot::{read_changed_git_snapshot_pair, read_git_snapshot_pair};
-use crate::diff_report::types::{
-  ChangedGitSnapshotPair, DiffReport, DiffSelection, GraphSnapshot, GitSnapshotPair};
+use crate::diff_report::types::DiffReport;
+use crate::git_ops::git_snapshot::{read_changed_git_snapshot_pair, read_git_snapshot_pair};
+use crate::git_ops::git_snapshot_types::{
+  ChangedGitSnapshotPair, DiffSelection, GraphSnapshot, GitSnapshotPair};
 use crate::diff_report::vanished::{
   dangling_skgids_in_git_snapshot, investigate_vanished_skgids};
 use crate::types::misc::SkgConfig;

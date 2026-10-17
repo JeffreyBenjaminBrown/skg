@@ -4,7 +4,7 @@ use crate::telescope::compose::compose_telescope;
 use crate::telescope::types::{
   Telescope, retain_owned_sections_when_pid_folderlides,
 };
-use crate::diff_report::types::{
+use crate::git_ops::git_snapshot_types::{
   ChangedGitSnapshotPair, DiffSelection, GraphSnapshot, GitSnapshotKind, GitSnapshotPair};
 use crate::git_ops::misc::path_relative_to_gitrepo;
 use crate::git_ops::read_gitrepo::{
@@ -740,7 +740,7 @@ fn read_skgrepo_from_index (
   Ok (sections)
 }
 
-pub(super) fn repo_prefix_in_gitrepo (
+pub(crate) fn repo_prefix_in_gitrepo (
   gitrepo        : &Repository,
   skgrepo_path   : &Path,
 ) -> Result<PathBuf, String> {
@@ -752,7 +752,7 @@ pub(super) fn repo_prefix_in_gitrepo (
       "Skg repo path {:?} is not inside its Git repository", skgrepo_path ))
 }
 
-pub(super) fn path_is_skgrepo_skg (
+pub(crate) fn path_is_skgrepo_skg (
   rel_path : &Path,
   prefix   : &Path,
 ) -> bool {
@@ -763,7 +763,7 @@ pub(super) fn path_is_skgrepo_skg (
 
 /// One FILE's contents as a section (pid-checked against the file
 /// stem). The snapshot composes same-pid sections into one telescope.
-pub(super) fn parse_blob_section (
+pub(crate) fn parse_blob_section (
   bytes    : &[u8],
   rel_path : &Path,
 ) -> Result<GraphnodeOnDisk, String> {
@@ -787,7 +787,7 @@ pub(super) fn parse_blob_section (
 /// One FILE as a whole node -- the per-blob view the vanished-node
 /// history search uses (it inspects one historical blob at a time,
 /// so there is no telescope to compose).
-pub(super) fn parse_blob_node (
+pub(crate) fn parse_blob_node (
   bytes        : &[u8],
   skgrepo_name : &SkgrepoName,
   rel_path     : &Path,

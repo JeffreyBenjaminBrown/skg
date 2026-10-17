@@ -1,5 +1,5 @@
-use skg::diff_report::git_snapshot::read_git_snapshot_pair;
-use skg::diff_report::types::{DiffSelection, GitSnapshotPair};
+use skg::git_ops::git_snapshot::read_git_snapshot_pair;
+use skg::git_ops::git_snapshot_types::{DiffSelection, GitSnapshotPair};
 use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
 
 use git2::Repository;

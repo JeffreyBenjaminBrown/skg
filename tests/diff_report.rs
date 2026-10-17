@@ -1,5 +1,5 @@
 use skg::diff_report::diff_report_as_org;
-use skg::diff_report::types::DiffSelection;
+use skg::git_ops::git_snapshot_types::DiffSelection;
 use skg::serve::handlers::diff_report::handle_diff_report_request;
 use skg::test_utils::read_lp_message;
 use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName};

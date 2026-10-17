@@ -1,7 +1,7 @@
 use skg::diff_report::diff::diff_git_snapshots;
 use skg::diff_report::types::{
-  DiffReport, GraphSnapshot, NodeBucket, NodeDiffReport, RelationshipDiff,
-  GitSnapshotPair, ValueSetDiff};
+  DiffReport, NodeBucket, NodeDiffReport, RelationshipDiff, ValueSetDiff};
+use skg::git_ops::git_snapshot_types::{GraphSnapshot, GitSnapshotPair};
 use skg::types::misc::{ID, MSV, SkgrepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 

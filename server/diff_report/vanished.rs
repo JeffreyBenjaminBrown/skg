@@ -8,10 +8,11 @@
 //! which it vanished and what it was connected to (in every possible
 //! way, links included) when last present.
 
-use crate::diff_report::git_snapshot::{
-  parse_blob_node, path_is_skgrepo_skg, repo_prefix_in_gitrepo};
 use crate::diff_report::types::{
-  CommitStamp, GraphSnapshot, VanishedNodeReport, VanishedNodeSighting};
+  CommitStamp, VanishedNodeReport, VanishedNodeSighting};
+use crate::git_ops::git_snapshot::{
+  parse_blob_node, path_is_skgrepo_skg, repo_prefix_in_gitrepo};
+use crate::git_ops::git_snapshot_types::GraphSnapshot;
 use crate::git_ops::read_gitrepo::open_gitrepo;
 use crate::types::misc::{ID, MSV, SkgConfig, SkgrepoName, members_msv, members_of};
 use crate::types::nodes::complete::Graphnode;

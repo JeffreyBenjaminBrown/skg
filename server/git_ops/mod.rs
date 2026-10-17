@@ -5,3 +5,5 @@ pub mod misc;
 pub mod read_gitrepo;
 pub mod diff;
 pub mod find_and_stage_moves;
+pub mod git_snapshot;
+pub mod git_snapshot_types;

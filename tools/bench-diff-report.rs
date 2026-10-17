@@ -2,8 +2,9 @@ use skg::dbs::filesystem::not_nodes::load_config;
 use skg::diff_report::diff_report_as_org;
 use skg::diff_report::diff::diff_git_snapshots;
 use skg::diff_report::render::render_report;
-use skg::diff_report::git_snapshot::read_git_snapshot_pair;
-use skg::diff_report::types::{DiffReport, DiffSelection, GitSnapshotPair};
+use skg::diff_report::types::DiffReport;
+use skg::git_ops::git_snapshot::read_git_snapshot_pair;
+use skg::git_ops::git_snapshot_types::{DiffSelection, GitSnapshotPair};
 use skg::types::misc::SkgConfig;
 
 use std::env;

@@ -1,7 +1,8 @@
 use crate::diff_report::types::{
-  DiffReport, DuplicateIDReport, GraphSnapshot, ListDiffItem, NodeBucket,
-  NodeDiffReport, RelationshipDiff, GitSnapshotPair, RepoForReport,
+  DiffReport, DuplicateIDReport, ListDiffItem, NodeBucket,
+  NodeDiffReport, RelationshipDiff, RepoForReport,
   TextDiffLine, ValueSetDiff};
+use crate::git_ops::git_snapshot_types::{GraphSnapshot, GitSnapshotPair};
 use crate::types::list::{Diff_Item, compute_interleaved_diff};
 use crate::types::misc::{
   ID, MSV, RelPartner, SkgrepoName, members_of, members_msv};
