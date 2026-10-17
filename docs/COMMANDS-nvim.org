@@ -72,7 +72,8 @@ show a changed recorder or that exact raw ID.
 The command refuses while a view is dirty.  Text links are reported but left
 unchanged, and require confirmation before the structural cleanup.  If the
 scan changes before confirmation, the command refuses the stale approval;
-run it again to rescan.
+run it again to rescan.  The warning ends by naming the Emacs command
+skg-investigate-unknown-node, whose twin here is <localleader>tr.
 ** <localleader>f : text search
 The 'f' is for 'find'.
 *** <localleader>ff : :SkgSearch
@@ -282,8 +283,10 @@ Brings up a buffer (=skg://git-add-new-files=) with the text of a
 shell script which, if run, 'git add's some nodes. The nodes
 should consist only of nodes new to git, and only of nodes in
 the recursive content (inclusive) of the node from which
-GitAddIfNewRecursivePreview was called. The buffer has readable
-ids enabled.
+GitAddIfNewRecursivePreview was called. A node is recognized as
+new by the total diff view's '(diff node+)', so call it from a
+buffer of the total diff view (<localleader>vd); a file already in
+the git index is skipped. The buffer has readable ids enabled.
 
 Unlike the Emacs client, which shows executable elisp you run in
 place with C-x C-e, this is a plain shell script: review it, then
@@ -295,15 +298,19 @@ but it doesn't show you the script;
 it instead runs that logic for you directly.
 *** <localleader> (g|G)(m|M) : :SkgGotoInGit*
 These four commands are described elsewhere in this document.
-*** <localleader>tr         : :SkgDiffReport
-Asks whether to include staged changes and, if so,
-whether to include unstaged changes.
-Then opens an org report (=skg://diff-report=) summarizing
-semantic graph changes across all configured skgrepos.
-
-The report is based on git HEAD/index/worktree state,
-so the command refuses to run while any Skg view buffer
-has unsaved edits.
+*** <localleader>tr         : :SkgInvestigateUnknownNode
+The twin of Emacs's skg-investigate-unknown-node. Says what an
+unknown node is: a reference that no node answers to, drawn as
+"Reference to unknown node.". On such a headline it takes that ID;
+anywhere else it asks for one. The answer opens read-only in
+=skg://unknown-node=, as Org text. If the ID resolves to a node, it
+names that node, its ID and its home skgrepo. Otherwise it searches
+the git history (first parents, from HEAD) of every skgrepo, and
+reports the most recent commit that held the ID's file, the commit it
+vanished at, its title then, its own relation lists then, and every
+node that referred to it then, links included; or that the ID was
+never in any skgrepo's history. It refuses unless the skgrepo
+restriction is 'all'.
 *** <localleader>tm         : :SkgStageMoves
 Scans the git status of every configured skgrepo and finds each
 node whose .skg file "moved": it vanished from exactly one skgrepo
@@ -586,15 +593,6 @@ heralds read "-OLD +NEW", followed by "Δ⌂=a" when its nearest moved
 ancestor (a, the viewparent; b, the grandparent; ...) moved the same
 way. The order-only buffer lists the nodes whose only change is the
 order of a list, each with its content in the new order.
-*** :SkgViewDiffMode
-The older diff view, unbound: it toggles git diff annotations in all
-views.
-Refuses while any skg buffer has unsaved edits.
-
-If toggling the mode would rerender overPrivateText telescope text under a
-restricted skgrepo-set, Skg asks before changing the mode or any view.
-Declining leaves the mode and buffers unchanged; the protocol still sends
-an empty rerender stream so preemptive client locks are released.
 *** <localleader>ve : :SkgViewNewEmpty
 Asks you to pick a skgrepo,
 and then provides a root node with that skgrepo.

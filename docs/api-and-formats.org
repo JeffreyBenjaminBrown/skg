@@ -281,33 +281,6 @@ So far there are these endpoints:
     skgrepo restriction, the server refuses to expose the path. Direct
     file visits outside Skg are not intercepted.
 
-** Git diff mode toggle
-  - Request: ((request . "git diff mode toggle"))
-  - Response: Multiple length-prefixed messages, sent sequentially:
-    1. Git diff mode response:
-       =Content-Length: N\r\n\r\n(("response-type" "git-diff-mode") ("content" "Git diff mode enabled"))=
-       Includes warnings if any skgrepos are not git-tracked.
-    2. Rerender lock, per-view, and done messages (same as "rerender all views"):
-       rerender-lock → rerender-view* → rerender-done.
-  - Behavior: Toggles per-connection diff mode and re-renders all open views.
-    When enabled, subsequent =single root content view= and =save buffer=
-    responses include diff annotations showing changes
-    between git HEAD and the worktree.
-  - Refusal: ENABLING diff mode requires the skgrepo restriction =all=.
-    Under a restricted set the server refuses: the git-diff-mode
-    response carries the refusal text as =content=, followed by an
-    EMPTY rerender stream (a rerender-lock naming no views, then
-    rerender-done with no errors or warnings), so the client's
-    preemptive buffer locks and stream guard unwind. Nothing else
-    changes. Disabling diff mode is always allowed.
-  - Before changing mode or streaming view text, a restricted request
-    that would rerender an overPrivateText telescope instead receives LP
-    =overPrivateText-telescope-confirmation= with
-    =(operation diff-mode-rerender)= and
-    the exact PIDs, followed by the same EMPTY rerender stream. A retry
-    adds =(approved-overPrivateText-pids "PID" ...)=; declining leaves the mode
-    and open-view registry unchanged.
-
 ** Herald rules
   - Request: ((request . "herald rules"))
   - Response: LP response-type "herald-rules" with =((content "RULES_SEXP"))=.
@@ -339,33 +312,6 @@ So far there are these endpoints:
     current in-Rust graph snapshot and skgrepo restriction, independently
     of Tantivy title-index commits. =request-id= associates asynchronous
     responses with their requesting buffer and its buffer generation.
-
-** Diff report
-  - Request: =((request . "diff report") (include-staged . "BOOL") (include-unstaged . "BOOL"))=
-    - ~include-staged=true~, ~include-unstaged=true~: compare HEAD to worktree.
-    - ~include-staged=true~, ~include-unstaged=false~: compare HEAD to index.
-    - ~include-staged=false~, ~include-unstaged=true~: compare index to worktree.
-    - Both false is rejected.
-  - Response: LP response-type "diff-report" with =((content "ORG") (errors ("..." ...)) (warnings ("..." ...)))=.
-  - Behavior: Builds a semantic org report of affected nodes across all skgrepos,
-    including title/body node fields, aliases, extra IDs, all five schema relations
-    in both role directions, text diffs for title/body, and
-    root/new/deleted/modified buckets. Nodes are compared as whole
-    telescopes: each endpoint's section files are grouped by pid and
-    composed, so a change to one section reports against the node's
-    full composition. A separate bucket ("IDs claimed by more than one
-    node") reports duplicate-ID VIOLATIONS — an id claimed by two
-    distinct pids at either endpoint. An id merely present in
-    several skgrepos is the normal telescope shape and is not
-    reported.
-  - Refuses to produce an ordinary report if any configured skgrepo is not a
-    gitrepo, has no HEAD commit, has a selected merge-commit HEAD baseline,
-    or contains an unreadable =.skg= blob in the selected git snapshots.
-  - Refuses to run unless the skgrepo restriction is =all=; restricted
-    skgrepo-set diff reports are not defined yet.
-  - Because it runs only under =all=, a report involving an overPrivateText
-    telescope is returned with the shared text-release warning; this
-    endpoint has no approval retry.
 
 ** Stage moves
   - Request: ((request . "stage moves"))
@@ -431,6 +377,35 @@ So far there are these endpoints:
     contribute nothing. When no moves are found, the script body is a
     single =# No moves detected.= comment.
 
+** Total diff view
+  - Request: =((request . "total diff view") (buffer . "BUFFER") (view-id . "VIEW_ID"))=,
+    where BUFFER is ="all changes"=, ="merges"=, ="skgrepo changes"= or
+    ="order-only changes"=. The client sends one request per buffer, in
+    that order, each after the previous answer.
+  - Response: LP response-type "total-diff-view", one of:
+    - =((content "ORG") (errors ()) (warnings ()))=: the buffer, now
+      registered under VIEW_ID as a buffer of the total diff view.
+    - =((empty . t) (errors ()) (warnings ()))=: the buffer would show
+      nothing, so the client does not open it.
+    - =((content ) (errors ("REFUSAL")) (warnings ()))=: refused, when
+      the skgrepo restriction is not =all=, when an owned skgrepo is
+      not a gitrepo or has no HEAD commit, or for an unknown BUFFER. A
+      refusal applies to every buffer, so the client stops.
+  - What each buffer draws: the "all changes" buffer is the PCSVF over
+    every change in the owned skgrepos since HEAD; the merges and
+    skgrepo-changes buffers are PCSVFs over the nodeMerges and the home
+    moves; the order-only buffer lists the nodes whose only change is
+    the order of a list. Foreign skgrepos are excluded. See the
+    glossary's "Terms of the total diff view", and "Metadata of the
+    total diff view" below.
+  - The server compares HEAD with the worktree through a graph pair it
+    keeps per connection, brought up to date at each request and at
+    each save of a buffer of the total diff view. Closing the last such
+    buffer drops it. Saving such a buffer is ordinary (see "Save
+    buffer"), and its response carries the readiness summary.
+  - Logic: =server/serve/handlers/total_diff_view.rs=, =server/pcsvf.rs=,
+    =server/to_org/render/changes.rs=.
+
 ** Stage and commit
   - Request: =((request . "stage and commit") (message . "MESSAGE"))=,
     optionally with =(confirmed . t)=.
@@ -455,6 +430,23 @@ So far there are these endpoints:
       pair cannot be built. The rerender stream is empty.
   - Logic: =server/serve/handlers/stage_and_commit.rs=,
     =server/git_ops/stage_and_commit.rs=.
+
+** Investigate unknown node
+  - Request: =((request . "investigate unknown node") (id . "ID"))=.
+  - Response: LP response-type "investigate-unknown-node" with
+    =((content "ORG") (errors (...)) (warnings (...)))=. The content is:
+    - =ID resolves to node TITLE (PID) in SKGREPO= when ID resolves
+      (as primary or extra ID) to a node of the live graph;
+    - otherwise what git history says, as Org text headed =* ID=: for
+      each skgrepo whose first-parent history from HEAD holds the ID's
+      file, the most recent commit that held it, the commit it vanished
+      at, its title then, its own relation lists then, and every node of
+      that tree that referred to it (links included); or
+      =** never present in the git history of any skgrepo=.
+  - Refused, with the reason as an error, unless the skgrepo
+    restriction is =all=: history can hold the text of any skgrepo.
+  - Logic: =server/serve/handlers/investigate_unknown_node.rs=,
+    =server/git_ops/vanished.rs=.
 
 ** Rebuild session-lifetime stores
   - Request: ((request . "rebuild session-lifetime stores"))
@@ -624,6 +616,8 @@ one automatically.
     =delete-references-confirmation= carries =(id ...)=, an opaque
     =(approved-preview ...)=, =(content "ORG WARNING")=, and a prompt,
     followed by an empty rerender stream.  A retry echoes the exact preview.
+    The warning ends with a line naming the command that investigates
+    the ID ("Investigate unknown node").
   - Success response type =delete-references-result= carries Org =content=,
     =changed-nodes=, and =changed-memberships=, followed by rerender-lock,
     rerender-view*, and rerender-done for every open view.
@@ -645,10 +639,10 @@ one automatically.
     3. Done message:
        =Content-Length: N\r\n\r\n((response-type rerender-done) (errors ("..." ...)) (warnings ("..." ...)))=
        Emacs removes the rerender-view handler and unlocks any remaining buffers.
-  - Behavior: Re-renders every open view from server memory,
-    applying diff annotations if diff mode is enabled.
-    Does not save or modify the graph. Used after toggling
-    git diff mode to refresh all views without requiring a save.
+  - Behavior: Re-renders every open view from server memory; a buffer
+    of the total diff view is reconciled over the graph pair.
+    Does not save or modify the graph. Refreshes all views without
+    requiring a save.
   - All view text is prepared in memory before the release decision.
     Under a restricted set, overPrivateText content without exact approval returns
     LP =overPrivateText-telescope-confirmation= with
@@ -689,18 +683,12 @@ one automatically.
     written back to the config. Changing it requires confirmation in
     Emacs, re-renders (not closes) all active Skg buffers for that
     connection, and cancels any in-flight search enrichment.
-  - Refusal: switching to a set other than =all= while git diff mode
-    is on is refused, before any side effect (no enrichment
-    cancellation, no set change, no rerendering). The refusal — and
-    likewise the endpoint's error paths (missing or unknown set
-    name) — answers in the normal skgrepo-restriction response-type,
+  - Refusal: the endpoint's error paths (missing or unknown set
+    name) answer in the normal skgrepo-restriction response-type,
     carrying the explanatory text as =content= and the UNCHANGED set
     as =restriction=, followed by an EMPTY rerender stream (a
     rerender-lock naming no views, then rerender-done), so the
     client's preemptive buffer locks and stream guard unwind.
-    Switching TO =all= is always allowed. The resulting
-    per-connection invariant: diff mode on implies skgrepo restriction
-    =all=.
   - Rerender authorization precedes both the set change and release of
     view text. If the proposed set would render an overPrivateText telescope, the
     first reply is LP =overPrivateText-telescope-confirmation= with
@@ -820,8 +808,7 @@ node's heralds.
   =hidesFromSubs=, or =subscribesTo=.
   The editable folder (=overriddenFolder= / =subscribeeFolder= / =aliasFolder=)
   appears even when empty (its editable "add here" surface); an empty
-  write-protected folder is pruned. In diff mode, removed members count as content,
-  so a requested folder containing only removed-member phantoms still appears.
+  write-protected folder is pruned.
   Emitted by the =C-c l= commands.
 - =(roleTree ROLENAME)= — build the role tree for one partner role, grafting
   the partners as inverted write-protected children, the role grafts. ROLENAME
@@ -904,10 +891,9 @@ and the per-relation view-position flags (=containsParent=,
 =overridesParent= / =parentOverrides=, =subscribesParent= /
 =parentSubscribes=, =hidesParent= / =parentHides=, =grandparentOverrides= /
 =grandparentSubscribes=) are gone — those facts are the
-ancestor-lettered tokens now. (A phantom, which has graphStats but no
-view position, still carries a counts-only =(rels ...)= from
-=assemble_counts_only=, and the bare =omittedBody= atom documented above
-still rides a write-protected node whose graphnode has an omitted body.)
+ancestor-lettered tokens now. (The bare =omittedBody= atom documented
+above still rides a write-protected node whose graphnode has an omitted
+body.)
 
 =(viewStats ...)= still carries the position facts that are NOT
 relationship tokens (the same graphnode can warrant different ones
@@ -972,7 +958,7 @@ When view completion would CREATE a viewnode for node N as
 recursive content, and an owned overrider R of N is visible
 under the skgrepo restriction, it draws R instead -- transitively (a
 owned chain D overrides C overrides N is legal and resolves to
-the last visible link), cycle-guarded, and never in diff mode.
+the last visible link), cycle-guarded, and never in the total diff view.
 Ordinary completion does not rewrite an existing raw viewnode merely because
 an overrider is visible (closing and reopening normalizes). In a de-novo
 render, only content substitutes: PartnerFolder members, view roots, search
@@ -1210,8 +1196,7 @@ The metadata grammar (which keys are recognized and how they're
 parsed) lives in =server/serve/parse_metadata_sexp.rs=. The
 in-memory types those keys correspond to are in
 =server/types/viewnode.rs= (=ViewnodeKind=, =Vognode=, =PropertyFolder=,
-=Property=, =PartnerFolder=)
-and =server/types/git.rs= (=NodeAxes=, =RelationshipAxes=, =Sign=).
+=Property=, =PartnerFolder=, =ChangeFacts=, =ReadinessRequest=).
 
 Metadata is not WYSIWYG; its appearance in the client
 is determined by =elisp/heralds-minor-mode=, whose rule table is
@@ -1225,54 +1210,72 @@ remains the established bare non-vognode atom:
 =hiderFolder=, =hiddenFolder=, =hiddenInSubscribeeFolder=, or
 =hiddenOutsideOfSubscribeeFolder=.
 
-** Diff-related metadata
+** Metadata of the total diff view
 
-When git diff mode is on, additional keys decorate nodes and
-non-vognodes with per-stage diff information. The 'staged' stage
-compares HEAD to the index; 'unstaged' compares the index to the
-worktree.
+The buffers of the total diff view (see "Total diff view") draw
+changes with the forms below. All are display facts except the
+readiness requests, which the save consumes; saving a buffer reads
+none of the new viewnodes, which are save-inert. The glossary's "Terms
+of the total diff view" defines the vocabulary.
 
-Inside a =(node ...)= form (unrestricted vognodes):
-- =(staged AXES)= and/or =(unstaged AXES)=, where =AXES= is a sequence
-  of bare atoms drawn from ={addedN, deletedN, addedR, removedR}=. =N= =
-  node (the node's =.skg= file appeared/disappeared in this
-  stage); =R= = relationship (the node's appearance at this position in
-  its parent's membership appeared/disappeared in this stage).
-- bare atom =notInGit= if the node's skgrepo is not a gitrepo.
+*** Presence: =(diff ATOMS)=
+ATOMS are drawn from =node+ node- rel+ rel-=: the node HEAD lacks (=node+=)
+or the worktree lacks (=node-=); the relationship to the viewparent
+that HEAD lacks (=rel+=) or the worktree lacks (=rel-=). It sits inside
+=(node ...)=, =(deleted ...)=, =(unknown ...)= and =(historical ...)=, and
+at top level on alias, id and flag leaves, whose single axis is
+written =rel+= or =rel-=.
 
-PartnerFolder members carry the same axes, in both directions, for
-every folder: a member removed since HEAD appears as a phantom with
-per-stage =removedR=; a member added since HEAD carries per-stage
-=addedR=; =N= axes describe the member's own file as usual. For an
-outbound folder (subscribeeFolder, overriddenFolder, hiddenFolder) the signs
-come from the recorder's relation diff; for an inbound folder
-(subscriberFolder, overriderFolder, hiderFolder) from the members' files'
-diffs (the inverse scan), with phantoms appended after the real
-members in sorted-ID order; for the filter folders
-(hiddenInSubscribeeFolder, hiddenOutsideOfSubscribeeFolder) from comparing
-the derived membership at HEAD, index and worktree. A folder whose
-worktree membership is empty but whose HEAD-side membership is not
-still renders in diff mode, holding only phantoms. Phantoms define
-nothing: saving a buffer ignores them, and an editable folder's phantom
-is never collected as a member.
+*** Readiness: =(ready AXES)=, =(readyRequest AXES)=, =(unreadyRequest AXES)=
+=(ready AXES)= lists the axes (=node=, =rel=) whose change-forest leaves
+are all marked commit-ready; a bare =(ready)= marks a single-axis leaf,
+or an aggregate (a folder or changeset marker) that is ready. It is
+absent when nothing is ready. =(readyRequest AXES)= and
+=(unreadyRequest AXES)= ask the save to set or clear the marks of those
+leaves; the axis =all= names every leaf of an aggregate, one level
+down. These sit where =(diff ...)= sits, and also at top level on the
+properties below other than =bodyDiff=.
 
-At top level inside =(skg ...)= (Non-vognodes for Alias / ID):
-- =(staged AXES)= and/or =(unstaged AXES)= with =AXES= drawn only
-  from ={addedR, removedR}= (non-vognodes have no =.skg= file of their
-  own and so no N axis).
+*** The total diff view's viewnodes
+- =(historical (id ID) (repo REPO) ...)= -- a historical phantom: a node
+  HEAD has and the worktree lacks, with HEAD's title and body; the
+  grammar of =(deleted ...)=.
+- =(oldText titleAndBody)=, =(oldText title)=, =(oldText body)= -- the
+  node's text at HEAD, under a node whose text changed; its headline is
+  the old title, its body the old body.
+- =bodyDiff= -- under an old text: the line diff of the body, each line
+  prefixed by a space, =-= or =+=.
+- =(homeMove (old REPO) (new REPO))= -- the node's home skgrepo moved.
+- =(relRepoMove (old REPO) (new REPO))= -- under a member: the skgrepo
+  recording its relationship to its viewparent moved.
+- =(changesetMarker content)=, =(changesetMarker relRepo)=,
+  =(changesetMarker orderOnly)= -- a changeset marker.
+- =acquiredByFolder=, =acquiredFolder= -- under a historical phantom, the
+  node that acquired it by a nodeMerge; under an acquirer, the
+  historical phantoms of the nodes it acquired. Both are write-protected
+  and derived.
 
-Also at top level, for the TextChanged property:
-- =(textChanged STAGE_TAGS)= where =STAGE_TAGS= is a subset of
-  ={staged, unstaged}= indicating which side(s) the node's title or
-  body changed on.
+*** Changed folders
+A partner, alias, ID or flags folder drawn because some relationship of
+it changed is written =(FOLDER changed)=, e.g. =(containerFolder changed)=,
+in place of the bare atom, and is followed by =(ready)= when every
+changed member is ready. Its herald reads "its X changed (this file)"
+or "(other files)" (see the glossary's "in, out").
+
+*** In view stats
+=(homeMove (old OLD) (new NEW))= and =(movedLikeAncestor LETTER)= may sit
+in a vognode's =(viewStats ...)= in the skgrepo-changes buffer; see
+"Stats metadata" above.
 
 Examples:
 #+begin_example
-(skg (node (id 7) (repo main) (unstaged addedN addedR)))
-(skg (node (id 9) (repo main) writeProtected (staged removedR) (unstaged addedR)))
-(skg alias (staged addedR))
-(skg id (unstaged removedR))
-(skg (textChanged staged unstaged))
+(skg (node (id 7) (repo main) (diff node+ rel+) (ready node)))
+(skg (node (id 9) (repo main) (affectsParent false) writeProtected (diff rel-)))
+(skg alias (diff rel+) (readyRequest))
+(skg (historical (id 4) (repo main) (diff node- rel-)))
+(skg (oldText title) (ready))
+(skg (changesetMarker content) (readyRequest all))
+(skg (subscriberFolder changed) (ready))
 #+end_example
 
 ** Restricted-skgrepo nodes: omission, retention, and save preservation

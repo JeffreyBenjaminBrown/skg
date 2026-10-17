@@ -25,7 +25,7 @@
   shared helper that detaches first, used everywhere, would remove
   the trap.
 * Problems noticed while discussing the total diff view (2026-10-16)
-** Diff tools refuse to run after any git merge
+** RESOLVED Diff tools refuse to run after any git merge
   'validate_skgrepos_for_selection' ('server/diff_report/git_snapshot.rs')
   refuses the diff report, and 'validate_no_merge_commits'
   ('server/serve/handlers/save_buffer.rs') refuses every diff-mode
@@ -40,7 +40,9 @@
   merge-commit refusal). Decided 2026-10-17: Jeff agreed. Fixed
   2026-10-17 in slice 0 of [[file:total-diff-view/2_plan.org][the TDV plan]]: both refusals are gone,
   along with 'head_is_merge_commit', which nothing else used.
-** Diff view and diff report are blind to relRepo changes
+  Resolved 2026-10-17: slice 9 retired both tools; the total diff
+  view, which replaces them, does not refuse a merge commit at HEAD.
+** RESOLVED Diff view and diff report are blind to relRepo changes
   'compare_graphnodes' in 'server/git_ops/diff.rs' diffs each relation
   as a list of member IDs ('members_of'), and the diff report's
   'relationship_diffs_for_pid' compares ID sets, so a relationship
@@ -50,6 +52,10 @@
   'RelPartner' (relRepo, member) pairs would fix both; the TDV
   discussion ([[file:total-diff-view/1_discussion.org][TODO/total-diff-view]], "relationship diffs that
   see relRepo") depends on the same fix.
+  Resolved 2026-10-17: the graph pair of the total diff view (slice 2)
+  compares relationships with their relRepos, and draws a relRepo move
+  as "relationship moved from X to Y"; slice 9 retired the old diff
+  view and the diff report.
 * Problems noticed while fixing repo moves over repeated nodes (2026-10-07)
 ** Repo moves do graph logic in the client
 The Emacs client computes which relationships a repo move strands, from

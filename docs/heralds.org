@@ -65,10 +65,11 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | home-repo heralds    | normal      | =⌂:LABEL=                                                                     |
 |                      | ugly        | =~NAME=, a relRepo more private than the default                              |
 | labels               | message     | folder labels, =alias=, =ID=, flag rows                                       |
-| requests             | nonstandard | =delete=, =merge:...=, =request:~NAME=, =request:...= flags, =req:...= views  |
-| diff facts           | nonstandard | =N -N R -R=, =text changed=, =diff:not-in-git=                                |
-|                      | go          | =✓= staged                                                                    |
-|                      | stop        | =✗= unstaged                                                                  |
+| requests             | nonstandard | =delete=, =merge:...=, =request:~NAME=, =request:...= flags, =req:...= views, =request:ready...= |
+| diff facts           | nonstandard | =∃+ ∃- ~+ ~-=, =+ -= on a leaf, ~Δ⌂=a~                                          |
+|                      | go          | =✓= commit-ready                                                              |
+|                      | normal      | the skgrepo names in =⌂ -OLD +NEW= and =relationship moved from OLD to NEW=   |
+| diff labels          | message     | =old title=, =body diff=, =its content changed=, =its X changed (this file)=  |
 | phantoms, restricted   | message     | =Reference to unknown node.=, =node from restricted skgrepo=, =DELETED=            |
 | link annotations     | normal      | a resolved target's =[⌂:pub]=                                                 |
 |                      | ugly        | =[⌂:restricted]=, =[⌂:…]=, =[⌂:lookup failed]=, a dangling link's label           |
@@ -186,11 +187,29 @@ reveals no node title or skgrepo. =DELETED= marks a deleted node, or a
 viewnode whose node was deleted.
 
 ** Diff heralds
-In Git diff mode, =✓= introduces staged changes and =✗= unstaged ones.
-=N= and =-N= mark a node added or deleted; =R= and =-R= a relationship
-added or removed. =text changed ✓ ✗= reports a title or body change,
-showing whichever marks apply. =diff:not-in-git= marks a node without a
-Git counterpart.
+In the total diff view (see the glossary's "Terms of the total diff
+view"), a vognode's =∃+= or =∃-= says that HEAD lacks it or the
+worktree does, and =~+= or =~-= the same of its relationship to its
+viewparent. On an alias, ID or flag leaf, which has one axis, the same
+facts read =+= and =-=. A =✓= after an axis says its changes are marked
+commit-ready, so =∃+✓ ~+= is a new node, approved, in a new
+relationship that is not. An aggregate (a folder or changeset marker)
+shows a =✓= when everything under it is ready. =request:ready= and
+=request:unready=, with =:node=, =:rel= or =:all=, are pending readiness
+requests, consumed by the next save.
+
+A historical phantom (a node the worktree lacks, drawn with HEAD's
+text) carries =☮=. The properties the view adds are labels: =old title
+and body= (or =old title=, =old body=) with its =body diff=, =⌂ -OLD
++NEW= for a home move, =relationship moved from OLD to NEW=, and the
+changeset markers =its content changed=, =some content relationships
+changed skgrepo= and =order-only change=. A folder drawn because its
+membership changed reads =its X changed (this file)= or =(other files)=;
+the nodeMerge folders read =it was acquired by= and =it acquired=.
+
+In the skgrepo-changes buffer a moved node's own heralds add =-OLD
++NEW=, and ~Δ⌂=a~ when the nearest moved ancestor (here the parent, a)
+moved the same way.
 
 ** Link annotations
 The current buffer can display a suffix after each literal

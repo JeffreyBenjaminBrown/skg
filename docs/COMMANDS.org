@@ -60,7 +60,9 @@ structural cleanup; otherwise it runs immediately.  The confirmation is
 bound to the scanned relationships and text links: if they change before
 confirmation, Skg refuses the stale approval and requires a rescan.  Before
 running, save or revert every open skg view.  Afterward, Skg refreshes only
-views which show a changed recorder or the exact absent raw ID.
+views which show a changed recorder or the exact absent raw ID.  The
+warning ends by naming skg-investigate-unknown-node (C-c t r), which
+shows what git history knows of the ID.
 ** C-c f : text search
 The 'f' is for 'find'.
 *** how search works
@@ -288,22 +290,28 @@ if executed (C-x C-e), runs 'git add' on some nodes.
 The nodes should consist only of nodes new to git,
 and only of nodes in the recursive content (inclusive)
 of the node from which skg-git-add-if-new-recursive-preview
-was called. The buffer uses skg-readable-ids-mode.
+was called. A node is recognized as new by the total diff view's
+'(diff node+)', so call it from a buffer of the total diff view
+(C-c v d); the command skips a file already in the git index.
+The buffer uses skg-readable-ids-mode.
 *** C-c t A         : skg-git-add-if-new-recursive
 Like skg-git-add-if-new-recursive-preview,
 but it doesn't show you the command;
 it instead runs that command for you.
 *** C-c (g|G) (m|M) : skg-goto-in-magit-*
 These four commands are described elsewhere in this document.
-*** C-c t r         : skg-diff-report
-Asks whether to include staged changes and, if so,
-whether to include unstaged changes.
-Then opens an org report summarizing semantic graph changes
-across all configured skgrepos.
-
-The report is based on git HEAD/index/worktree state,
-so the command refuses to run while any Skg view buffer
-has unsaved edits.
+*** C-c t r         : skg-investigate-unknown-node
+Says what an unknown node is: a reference that no node answers to,
+drawn as "Reference to unknown node.". On such a headline it takes
+that ID; anywhere else it asks for one. The answer opens read-only in
+"*skg unknown node*", as Org text. If the ID resolves to a node, it
+names that node, its ID and its home skgrepo. Otherwise it searches
+the git history (first parents, from HEAD) of every skgrepo, and
+reports the most recent commit that held the ID's file, the commit it
+vanished at, its title then, its own relation lists then, and every
+node that referred to it then, links included; or that the ID was
+never in any skgrepo's history. It refuses unless the skgrepo
+restriction is 'all'.
 *** C-c t m         : skg-stage-moves
 Scans the git status of every configured skgrepo and finds each
 node whose .skg file "moved": it vanished from exactly one skgrepo
@@ -711,14 +719,6 @@ heralds read "-OLD +NEW", followed by "Δ⌂=a" when its nearest moved
 ancestor (a, the viewparent; b, the grandparent; ...) moved the same
 way. The order-only buffer lists the nodes whose only change is the
 order of a list, each with its content in the new order.
-*** M-x skg-view-diff-mode
-The older diff view, unbound: it toggles git diff annotations in all
-views.
-
-If toggling the mode would rerender overPrivateText telescope text under a
-restricted skgrepo-set, Skg asks before changing the mode or any view.
-Declining leaves the mode and buffers unchanged; the protocol still sends
-an empty rerender stream so preemptive client locks are released.
 *** C-c v e : skg-view-new-empty
 Opens a blank Skg content view in which to create new nodes.
 **** why
