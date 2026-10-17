@@ -1,9 +1,11 @@
 use crate::change_forest::ChangeForest;
-use crate::pcsvf::{PcsvfSets, pcsvf_sets};
+use crate::pcsvf::{
+  PcsvfSets, pcsvf_sets, pcsvf_sets_for_home_moves, pcsvf_sets_for_merges};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::git::Sign;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
+use crate::types::views_state::TdvBuffer;
 
 use std::collections::BTreeSet;
 use std::sync::{Arc, OnceLock};
@@ -27,6 +29,9 @@ pub struct GraphPair {
   pub(super) change_forest : OnceLock<ChangeForest>,
   /// Computed on first use; see 'GraphPair::pcsvf_sets'.
   pub(super) pcsvf_sets : OnceLock<PcsvfSets>,
+  /// Computed on first use; see 'GraphPair::pcsvf_sets_of_buffer'.
+  pub(super) merges_pcsvf_sets     : OnceLock<PcsvfSets>,
+  pub(super) home_moves_pcsvf_sets : OnceLock<PcsvfSets>,
 }
 
 /// Which graphs of the pair hold a node or a relationship.
@@ -84,7 +89,9 @@ impl GraphPair {
     GraphPair { before, after, head_identity, foreign_changed_files,
                 changed_pids  : OnceLock::new (),
                 change_forest : OnceLock::new (),
-                pcsvf_sets    : OnceLock::new () } }
+                pcsvf_sets    : OnceLock::new (),
+                merges_pcsvf_sets     : OnceLock::new (),
+                home_moves_pcsvf_sets : OnceLock::new () } }
 
   /// The change-forest of this pair. Computed once per pair.
   pub fn change_forest (
@@ -99,6 +106,25 @@ impl GraphPair {
     &self,
   ) -> &PcsvfSets {
     self . pcsvf_sets . get_or_init ( || pcsvf_sets (self) ) }
+
+  /// The sets of the PCSVF that a buffer of the total diff view
+  /// draws. The order-only buffer draws no PCSVF: its sets are empty,
+  /// so each of its roots is drawn with its content as
+  /// write-protected leaves. Computed once per pair.
+  pub fn pcsvf_sets_of_buffer (
+    &self,
+    tdv_buffer : TdvBuffer,
+  ) -> &PcsvfSets {
+    static NO_SETS : PcsvfSets = PcsvfSets {
+      c : BTreeSet::new (), r : BTreeSet::new (),
+      u : BTreeSet::new (), d : BTreeSet::new () };
+    match tdv_buffer {
+      TdvBuffer::AllChanges => self . pcsvf_sets (),
+      TdvBuffer::Merges => self . merges_pcsvf_sets . get_or_init (
+        || pcsvf_sets_for_merges (self) ),
+      TdvBuffer::SkgrepoChanges => self . home_moves_pcsvf_sets . get_or_init (
+        || pcsvf_sets_for_home_moves (self) ),
+      TdvBuffer::OrderOnlyChanges => &NO_SETS, } }
 
   /// The nodes whose file changed but whose change-forest has no
   /// leaf: only the order of some list changed.

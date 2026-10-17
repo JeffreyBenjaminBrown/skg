@@ -1,0 +1,147 @@
+// The merges, skgrepo-changes and order-only buffers of the total
+// diff view. In the 'buffers' fixture (owned skgrepos public and
+// private):
+// - top contains acq, which acquired acqd by a nodeMerge; pres, new
+//   in acq's content, is acqd's text preserver. txt is retitled.
+// - mvp moved from public to private. It contains mvc (moved the same
+//   way, as did mvc's content mvg), mvr (moved the other way) and mvs
+//   (unmoved), whose content mvt moved like mvp.
+// - ord's content changed only in order: o1, o2 became o2, o1.
+
+use crate::pcsvf::common::{
+  Fixture, graph_pair, ids, open_buffer, saves_back_unchanged, with_fixture};
+
+use skg::graph_pair::types::GraphPair;
+use skg::pcsvf::{PcsvfSets, pcsvf_sets_for_home_moves, pcsvf_sets_for_merges};
+use skg::types::views_state::TdvBuffer;
+
+use std::error::Error;
+
+const SKGREPOS : [&str; 2] = [ "public", "private" ];
+
+/// The text of a buffer of the 'buffers' fixture.
+fn buffer (
+  tdv_buffer : TdvBuffer,
+) -> Result<String, Box<dyn Error>> {
+  let mut text : String = String::new ();
+  with_fixture ("buffers", &SKGREPOS, |f : &mut Fixture| {
+    text = open_buffer (f, tdv_buffer) ?
+      . ok_or ("the fixture's buffer is empty") ?;
+    Ok (( )) }) ?;
+  Ok (text) }
+
+fn roots (
+  text : &str,
+) -> Vec<&str> {
+  text . lines () . filter ( |line| line . starts_with ("* ") ) . collect () }
+
+/// The headline of the node 'id', which the buffer must hold.
+fn headline_of<'a> (
+  text : &'a str,
+  id   : &str,
+) -> &'a str {
+  let node : String = format! ( "(node (id {}) ", id );
+  text . lines () . find ( |line| line . contains (&node) )
+    . unwrap_or_else ( || panic! ( "no headline of {} in\n{}", id, text )) }
+
+#[test]
+fn the_merges_sets_hold_the_acquiree_the_acquirer_and_the_text_preserver (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("buffers", &SKGREPOS, |f| {
+    let pair : GraphPair = graph_pair (f) ?;
+    let sets : PcsvfSets = pcsvf_sets_for_merges (&pair);
+    assert_eq! ( sets . c, ids (&[ "acq", "acqd", "pres" ]) );
+    assert_eq! ( sets . d, ids (&[ "acqd", "top" ]) );
+    Ok (( )) }) }
+
+#[test]
+fn the_home_move_sets_hold_the_moved_nodes (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("buffers", &SKGREPOS, |f| {
+    let pair : GraphPair = graph_pair (f) ?;
+    let sets : PcsvfSets = pcsvf_sets_for_home_moves (&pair);
+    assert_eq! ( sets . c, ids (&[ "mvc", "mvg", "mvp", "mvr", "mvt" ]) );
+    assert_eq! ( sets . d, ids (&[ "mvp" ]) );
+    assert! ( sets . u . contains (&"mvs" . into ()),
+              "mvs is on the walk from mvt to mvp" );
+    Ok (( )) }) }
+
+#[test]
+fn the_merges_buffer_draws_only_the_merge (
+) -> Result<(), Box<dyn Error>> {
+  let text : String = buffer (TdvBuffer::Merges) ?;
+  let roots : Vec<&str> = roots (&text);
+  assert_eq! ( roots . len (), 2, "{}", text );
+  assert! ( roots [0] . contains ("(historical (id acqd)"), "{}", text );
+  assert! ( roots [1] . contains ("(node (id top)"), "{}", text );
+  assert! ( headline_of (&text, "pres") . contains ("(diff node+ rel+)"),
+            "the text preserver is new in acq's content:\n{}", text );
+  assert! ( text . contains ("acquiredByFolder")
+            && text . contains ("acquiredFolder"), "{}", text );
+  for unrelated in [ "txt", "mvp", "ord" ] {
+    assert! ( ! text . contains (&format! ( "(id {})", unrelated )),
+              "{} is not involved in a merge:\n{}", unrelated, text ); }
+  Ok (( )) }
+
+#[test]
+fn the_skgrepo_changes_buffer_heralds_each_move_and_moves_like_an_ancestor (
+) -> Result<(), Box<dyn Error>> {
+  let text : String = buffer (TdvBuffer::SkgrepoChanges) ?;
+  assert_eq! ( roots (&text) . len (), 1, "{}", text );
+  for (id, facts) in [
+    ( "mvp", "(homeMove (old public) (new private)))" ),
+    ( "mvc", "(homeMove (old public) (new private)) (movedLikeAncestor a))" ),
+    ( "mvg", "(homeMove (old public) (new private)) (movedLikeAncestor a))" ),
+    ( "mvr", "(homeMove (old private) (new public)))" ),
+    ( "mvt", "(homeMove (old public) (new private)) (movedLikeAncestor b))" ),
+  ] {
+    assert! ( headline_of (&text, id) . contains (facts),
+              "{} should carry {}:\n{}", id, facts, text ); }
+  assert! ( ! headline_of (&text, "mvs") . contains ("homeMove"),
+            "mvs did not move:\n{}", text );
+  for unrelated in [ "txt", "acq", "ord" ] {
+    assert! ( ! text . contains (&format! ( "(id {})", unrelated )),
+              "{} did not move:\n{}", unrelated, text ); }
+  Ok (( )) }
+
+#[test]
+fn the_home_move_heralds_are_only_in_the_skgrepo_changes_buffer (
+) -> Result<(), Box<dyn Error>> {
+  let text : String = buffer (TdvBuffer::AllChanges) ?;
+  assert! ( ! headline_of (&text, "mvc") . contains ("homeMove"), "{}", text );
+  Ok (( )) }
+
+#[test]
+fn the_order_only_buffer_is_a_flat_list_with_markers (
+) -> Result<(), Box<dyn Error>> {
+  let text : String = buffer (TdvBuffer::OrderOnlyChanges) ?;
+  let lines : Vec<&str> = text . lines () . collect ();
+  assert_eq! ( roots (&text) . len (), 1, "{}", text );
+  assert! ( lines [0] . starts_with ("* (skg bodyFolded (node (id ord)"),
+            "{}", text );
+  assert_eq! ( lines [1], "** (skg (changesetMarker orderOnly) (ready))" );
+  assert! ( lines [2] . contains ("(node (id o2) (repo public) writeProtected")
+            && lines [3] . contains ("(node (id o1) (repo public) writeProtected"),
+            "the content is drawn in its new order, as leaves:\n{}", text );
+  assert_eq! ( lines . len (), 4, "{}", text );
+  Ok (( )) }
+
+#[test]
+fn the_merges_buffer_saves_back_unchanged (
+) -> Result<(), Box<dyn Error>> {
+  saves_back_unchanged ("buffers", &SKGREPOS, TdvBuffer::Merges) }
+
+#[test]
+fn the_skgrepo_changes_buffer_saves_back_unchanged (
+) -> Result<(), Box<dyn Error>> {
+  saves_back_unchanged ("buffers", &SKGREPOS, TdvBuffer::SkgrepoChanges) }
+
+#[test]
+fn the_order_only_buffer_saves_back_unchanged (
+) -> Result<(), Box<dyn Error>> {
+  saves_back_unchanged ("buffers", &SKGREPOS, TdvBuffer::OrderOnlyChanges) }
+
+#[test]
+fn the_all_changes_buffer_of_this_fixture_saves_back_unchanged (
+) -> Result<(), Box<dyn Error>> {
+  saves_back_unchanged ("buffers", &SKGREPOS, TdvBuffer::AllChanges) }

@@ -14,13 +14,15 @@
 //! folders whose membership changed (which the BFS fills from the
 //! pair), and its changeset markers. A node in U but not in C is
 //! context: its body is folded. A write-protected occurrence gets
-//! none of this; its viewparent tags it.
+//! none of this; its viewparent tags it. U and C are those of the
+//! buffer being drawn ('TdvDrawing::sets'); in the order-only buffer
+//! both are empty, and each node there gets an order-only marker.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole};
 use crate::graph_pair::types::{GraphPair, NodeChanges, Partner, Presence};
-use crate::pcsvf::PcsvfSets;
+use crate::pcsvf::{PcsvfSets, TdvDrawing};
 use crate::to_org::render::change_viewnodes::{
   append_acquired_folder, append_historical_phantom, append_old_text,
   mk_changeset_marker_viewnode, mk_home_move_viewnode,
@@ -31,6 +33,7 @@ use crate::types::list::{Diff_Item, compute_interleaved_diff};
 use crate::types::misc::{ID, members_msv};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::nodes::complete::Flag;
+use crate::types::views_state::TdvBuffer;
 use crate::types::viewnode::{
   AffectsParent, ChangeFacts, ChangesetMarkerKind, DiffPresence,
   Editability, PartnerFolder, Phantom, Property, PropertyFolder,
@@ -58,10 +61,11 @@ const OUT_FOLDERS : [PartnerFolder; 3] = [
 
 /// See the module comment.
 pub(crate) fn process_unrestrictedVognode_changes (
-  tree   : &mut Tree<Viewnode>,
-  treeid : NodeId,
-  pair   : &GraphPair,
+  tree    : &mut Tree<Viewnode>,
+  treeid  : NodeId,
+  drawing : TdvDrawing,
 ) -> Result<(), Box<dyn Error>> {
+  let pair : &GraphPair = drawing . pair;
   let (pid, editable) : (ID, bool) =
     match &tree . get (treeid)
       . ok_or ("process_unrestrictedVognode_changes: node not found") ?
@@ -70,13 +74,18 @@ pub(crate) fn process_unrestrictedVognode_changes (
         ( t . skgid . clone (), ! t . is_writeProtected () ),
       _ => return Ok (( )), };
   if ! editable { return Ok (( )); }
-  let sets : &PcsvfSets = pair . pcsvf_sets ();
+  let sets : &PcsvfSets = drawing . sets ();
   remove_change_viewnodes (tree, treeid);
   tree . get_mut (treeid) . unwrap () . value () . body_folded =
     ! sets . c . contains (&pid);
   let content : Vec<Partner> = pair . partners (&pid, CONTENT);
   tag_content_members (tree, treeid, pair, &content, &sets . u);
   insert_removed_content_members (tree, treeid, pair, &pid) ?;
+  if drawing . tdv_buffer == TdvBuffer::OrderOnlyChanges
+    && pair . order_only_pids () . contains (&pid) {
+    let marker : NodeId = append ( tree, treeid,
+      mk_changeset_marker_viewnode (ChangesetMarkerKind::OrderOnly) );
+    move_to_front (tree, treeid, marker); }
   if ! sets . c . contains (&pid) { return Ok (( )); }
   let mut heads : Vec<NodeId> = Vec::new ();
   heads . extend ( append_old_text (tree, treeid, pair, &pid) );

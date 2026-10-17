@@ -247,10 +247,16 @@ fn skgids_shown_through_subscriptions (
       { shown . insert ( skgid ); }} }
   Ok (shown) }
 
+/// The title a nodeMerge gives the acquiree's text preserver.
+pub fn acquiree_text_preserver_title (
+  acquiree_title : &str,
+) -> String {
+  format! ( "MERGED: {}", acquiree_title ) }
+
 /// Create an acquiree_text_preserver from the acquiree's data
 fn create_acquiree_text_preserver(acquiree: &Graphnode) -> Graphnode {
   Graphnode {
-    title: format!("MERGED: {}", acquiree . title),
+    title: acquiree_text_preserver_title (&acquiree . title),
     overPrivateText_telescope: false,
     aliases: MSV::Unspecified,
     home_skgrepo: acquiree . home_skgrepo . clone(),

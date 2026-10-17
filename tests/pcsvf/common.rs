@@ -119,16 +119,28 @@ pub fn all_changes_buffer_with_marks (
     TotalDiffViewBuffer::Empty => None,
     TotalDiffViewBuffer::Content { text, .. } => Some (text), } ) }
 
-/// The view id under which 'open_all_changes_buffer' registers the
-/// buffer, and 'save' saves it.
-pub const ALL_CHANGES_VIEW_ID : &str = "diff-view: all changes";
+/// The view id under which 'open_buffer' registers a buffer: its
+/// client's name for it.
+pub fn view_id_of (
+  tdv_buffer : TdvBuffer,
+) -> ViewId {
+  ViewId::ContentView ( format! ( "diff-view: {}", tdv_buffer . wire_name () )) }
 
-/// Open the "all changes" buffer as the "total diff view" request
-/// does: drawn from the connection's graph pair with the marks on
-/// disk, and registered as a view of the total diff view.
+/// Open the "all changes" buffer; see 'open_buffer'.
 pub fn open_all_changes_buffer (
   f : &mut Fixture,
 ) -> Result<String, Box<dyn Error>> {
+  open_buffer (f, TdvBuffer::AllChanges) ?
+    . ok_or_else ( || "the all-changes buffer is empty" . into () ) }
+
+/// Open a buffer of the total diff view as the "total diff view"
+/// request does: drawn from the connection's graph pair with the
+/// marks on disk, and registered as a view of the total diff view.
+/// None when it would be empty.
+pub fn open_buffer (
+  f          : &mut Fixture,
+  tdv_buffer : TdvBuffer,
+) -> Result<Option<String>, Box<dyn Error>> {
   let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
   let pair : Arc<GraphPair> = current_graph_pair_in_slot (
@@ -136,27 +148,56 @@ pub fn open_all_changes_buffer (
   let buffer : TotalDiffViewBuffer = {
     let store : MutexGuard<ReadinessStore> =
       env . runtime . readiness_store . lock () . unwrap ();
-    total_diff_view_buffer (&runtime, &pair, &store, TdvBuffer::AllChanges) ? };
-  match buffer {
-    TotalDiffViewBuffer::Empty =>
-      Err ( "the all-changes buffer is empty" . into () ),
+    total_diff_view_buffer (&runtime, &pair, &store, tdv_buffer) ? };
+  Ok ( match buffer {
+    TotalDiffViewBuffer::Empty => None,
     TotalDiffViewBuffer::Content { text, pids, viewforest } => {
       f . views_state . open_views . register_tdv_view (
-        &runtime . graph,
-        ViewId::ContentView ( ALL_CHANGES_VIEW_ID . to_string () ),
-        viewforest, &pids, TdvBuffer::AllChanges );
-      Ok (text) }, } }
+        &runtime . graph, view_id_of (tdv_buffer),
+        viewforest, &pids, tdv_buffer );
+      Some (text) }, } ) }
 
+/// Save the "all changes" buffer; see 'save_buffer'.
 pub fn save (
   f      : &mut Fixture,
   buffer : &str,
 ) -> Result<SaveResponse, Box<dyn Error>> {
+  save_buffer (f, TdvBuffer::AllChanges, buffer) }
+
+/// Save 'text' as the buffer 'open_buffer' registered.
+pub fn save_buffer (
+  f          : &mut Fixture,
+  tdv_buffer : TdvBuffer,
+  text       : &str,
+) -> Result<SaveResponse, Box<dyn Error>> {
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   Ok ( block_on ( update_from_and_rerender_buffer_test (
-    &mut stream, buffer, &f . config, &f . tantivy, &f . graph, false,
-    &Ok ( ViewId::ContentView ( ALL_CHANGES_VIEW_ID . to_string () )),
-    &mut f . views_state )) ? ) }
+    &mut stream, text, &f . config, &f . tantivy, &f . graph, false,
+    &Ok ( view_id_of (tdv_buffer) ), &mut f . views_state )) ? ) }
+
+/// The round-trip invariant for a buffer of the total diff view:
+/// saved unchanged, it changes no file, reports no error, and is
+/// reconciled to itself.
+pub fn saves_back_unchanged (
+  case       : &str,
+  skgrepos   : &[&str],
+  tdv_buffer : TdvBuffer,
+) -> Result<(), Box<dyn Error>> {
+  with_fixture (case, skgrepos, |f| {
+    let text : String = open_buffer (f, tdv_buffer) ?
+      . ok_or ("the fixture's buffer is empty") ?;
+    let files_before : BTreeMap<String, String> = skg_files (f) ?;
+    let response : SaveResponse = save_buffer (f, tdv_buffer, &text) ?;
+    assert! ( response . errors . is_empty (),
+              "the buffer must save without errors, got {:?}\n\nbuffer:\n{}",
+              response . errors, text );
+    assert_eq! ( skg_files (f) ?, files_before,
+                 "saving the buffer unchanged must not change the graph:\n{}",
+                 text );
+    assert_eq! ( response . saved_view, text,
+                 "the reconciled buffer must be the buffer saved" );
+    Ok (( )) }) }
 
 /// Every '.skg' file of the fixture's skgrepos, by path, with its
 /// contents.

@@ -17,9 +17,9 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::change_forest::BufferReadinessSummary;
 use crate::graph_pair::build::current_graph_pair_in_slot;
 use crate::graph_pair::types::GraphPair;
-use crate::pcsvf::nodes_drawn_in_viewforest;
+use crate::pcsvf::{
+  TdvDrawing, nodes_drawn_in_viewforest, set_tdv_facts_in_viewforest};
 use crate::readiness_store::ReadinessStore;
-use crate::serve::handlers::readiness_requests::set_ready_facts_in_viewforest;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
@@ -474,7 +474,7 @@ pub fn render_initial_view (
                          else         { None },
     substitute_existing_content_overrides : false,
     warning_sink : Some (&mut sink),
-    graph_pair   : None, };
+    tdv_drawing  : None, };
   complete_viewforest ( &mut viewforest, &mut context ) ?;
   // De-novo rendering REPAIRS silently: the sink's ColRepairs do not
   // correspond to edits the user just made, so a fresh view carries no
@@ -483,14 +483,14 @@ pub fn render_initial_view (
   Ok (( viewforest, Vec::new () )) }
 
 /// Complete a stub viewforest of the total diff view
-/// ('server/pcsvf.rs') over 'pair': view completion with 'graph_pair'
-/// set, which draws the union of the pair's content, the change
+/// ('server/pcsvf.rs') as 'drawing' says: view completion with
+/// 'tdv_drawing' set, which draws the union of the pair's content, the change
 /// folders and markers, and the removed members. It creates no
 /// default partner folders, spends no node budget, and never
 /// restricts by skgrepo (the total diff view requires the set 'all').
 pub fn complete_viewforest_with_graph_pair (
   runtime    : &RuntimeGeneration,
-  pair       : &GraphPair,
+  drawing    : TdvDrawing,
   viewforest : &mut ViewForest,
 ) -> Result<(), Box<dyn Error>> {
   let graph_snap : Arc<InRustGraph> = runtime . graph . clone ();
@@ -511,7 +511,7 @@ pub fn complete_viewforest_with_graph_pair (
     diff_tantivy_index             : None,
     substitute_existing_content_overrides : false,
     warning_sink                   : None,
-    graph_pair                     : Some (pair), };
+    tdv_drawing                    : Some (drawing), };
   complete_viewforest ( viewforest, &mut context ) ?;
   if ! errors . is_empty () {
     return Err ( errors . join ("\n") . into () ); }
@@ -580,7 +580,8 @@ pub fn rerender_view (
       substitute_existing_content_overrides : // off in a total diff view
         substitute_existing_content_overrides && graph_pair . is_none (),
       warning_sink,
-      graph_pair : graph_pair . as_deref (), };
+      tdv_drawing : graph_pair . as_deref () . zip (tdv_buffer)
+        . map ( |(pair, tdv_buffer)| TdvDrawing { pair, tdv_buffer } ), };
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "complete_viewforest" ). entered();
       complete_viewforest (
@@ -588,14 +589,15 @@ pub fn rerender_view (
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the content/non-vognode diff was applied INLINE during the
   // BFS above (process_unrestrictedVognode_diff at each Unrestricted node's visit, driven by
   // repo_diffs = the real diffs).
-  if let Some (pair) = &graph_pair {
+  if let ( Some (pair), Some (tdv_buffer) ) = ( &graph_pair, tdv_buffer ) {
     redraw_deleted_phantoms_as_historical (
       viewforest . as_internal_tree_mut (), pair );
     let store : MutexGuard<ReadinessStore> =
       context . env . runtime . readiness_store . lock ()
       . unwrap_or_else ( |poisoned| poisoned . into_inner () );
-    set_ready_facts_in_viewforest (
-      viewforest, pair . change_forest (), &store, &context . runtime . graph ); }
+    set_tdv_facts_in_viewforest (
+      viewforest, TdvDrawing { pair, tdv_buffer }, &store,
+      &context . runtime . graph ); }
   let result : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "finish_viewforest" ). entered();

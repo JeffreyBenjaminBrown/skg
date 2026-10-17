@@ -5,7 +5,7 @@
 
 use crate::graph_pair::build::current_graph_pair_in_slot;
 use crate::graph_pair::types::GraphPair;
-use crate::pcsvf::pcsvf_viewforest;
+use crate::pcsvf::{TdvDrawing, pcsvf_viewforest};
 use crate::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
@@ -75,20 +75,22 @@ pub fn handle_total_diff_view_request (
     stream, &tag_sexp_response (TcpToClient::TotalDiffView, &sexp) ); }
 
 /// The named buffer, drawn from 'pair'. The "all changes" buffer is
-/// the PCSVF over all of C. The other three buffers are empty until
-/// they are drawn.
+/// the PCSVF over all of C; the merges and skgrepo-changes buffers
+/// are PCSVFs over subsets of it ('GraphPair::pcsvf_sets_of_buffer').
+/// The order-only buffer lists the nodes whose only change is the
+/// order of a list, in ID order.
 pub fn total_diff_view_buffer (
   runtime    : &RuntimeGeneration,
   pair       : &GraphPair,
   store      : &ReadinessStore,
   tdv_buffer : TdvBuffer,
 ) -> Result<TotalDiffViewBuffer, Box<dyn std::error::Error>> {
+  let drawing : TdvDrawing = TdvDrawing { pair, tdv_buffer };
   let roots : Vec<ID> = match tdv_buffer {
-    TdvBuffer::AllChanges =>
-      pair . pcsvf_sets () . d . iter () . cloned () . collect (),
-    TdvBuffer::Merges | TdvBuffer::SkgrepoChanges
-      | TdvBuffer::OrderOnlyChanges => Vec::new (), };
+    TdvBuffer::OrderOnlyChanges =>
+      pair . order_only_pids () . iter () . cloned () . collect (),
+    _ => drawing . sets () . d . iter () . cloned () . collect (), };
   if roots . is_empty () { return Ok (TotalDiffViewBuffer::Empty); }
   let (text, pids, viewforest) : (String, Vec<ID>, ViewForest) =
-    pcsvf_viewforest (runtime, pair, store, &roots) ?;
+    pcsvf_viewforest (runtime, drawing, store, &roots) ?;
   Ok ( TotalDiffViewBuffer::Content { text, pids, viewforest } ) }

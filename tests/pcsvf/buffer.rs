@@ -10,13 +10,12 @@
 
 use crate::pcsvf::common::{
   Fixture, all_changes_buffer, all_changes_buffer_with_marks,
-  open_all_changes_buffer, save, skg_files, with_fixture};
+  saves_back_unchanged, with_fixture};
 
 use skg::change_forest::{LeafKey, NodeAspect};
-use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::misc::ID;
+use skg::types::views_state::TdvBuffer;
 
-use std::collections::BTreeMap;
 use std::error::Error;
 
 fn buffer_of (
@@ -222,32 +221,12 @@ fn a_deleted_subscriber_is_drawn_in_the_changed_subscriber_folder (
     "*** (skg (historical (id gone) (repo public) (diff node- rel-))) gone" ] );
   Ok (( )) }
 
-/// The round-trip invariant for a full buffer: saved unchanged, it
-/// changes no file, reports no error, and is reconciled to itself.
-fn saves_back_unchanged (
-  case     : &str,
-  skgrepos : &[&str],
-) -> Result<(), Box<dyn Error>> {
-  with_fixture (case, skgrepos, |f| {
-    let buffer : String = open_all_changes_buffer (f) ?;
-    let files_before : BTreeMap<String, String> = skg_files (f) ?;
-    let response : SaveResponse = save (f, &buffer) ?;
-    assert! ( response . errors . is_empty (),
-              "the buffer must save without errors, got {:?}\n\nbuffer:\n{}",
-              response . errors, buffer );
-    assert_eq! ( skg_files (f) ?, files_before,
-                 "saving the buffer unchanged must not change the graph:\n{}",
-                 buffer );
-    assert_eq! ( response . saved_view, buffer,
-                 "the reconciled buffer must be the buffer saved" );
-    Ok (( )) }) }
-
 #[test]
 fn the_sets_buffer_saves_back_unchanged (
 ) -> Result<(), Box<dyn Error>> {
-  saves_back_unchanged ("sets", &["main"]) }
+  saves_back_unchanged ("sets", &["main"], TdvBuffer::AllChanges) }
 
 #[test]
 fn the_kinds_buffer_saves_back_unchanged (
 ) -> Result<(), Box<dyn Error>> {
-  saves_back_unchanged ("kinds", &["public", "private"]) }
+  saves_back_unchanged ("kinds", &["public", "private"], TdvBuffer::AllChanges) }
