@@ -15,3 +15,55 @@ atoms, the labels) add entries the same way.
 The plan names 'ready' go, so 'node_heralds' has it now. The check only
 requires that every styled rule has an entry, not the converse. The
 retiring 'staged' and 'unstaged' keep go and stop until slice 9.
+* Slice 2: deviations
+** foreign skgrepos: read at the worktree in both halves
+The plan excludes foreign skgrepos from both halves. Excluding them
+literally would leave every owned-to-foreign relationship dangling in
+both graphs, and a foreign-home node with owned sections titleless. So
+the before-graph reads each foreign skgrepo from its worktree, as the
+live graph does. Foreign sections are then the same in both halves and
+never produce a change; foreign skgrepos need not be gitrepos.
+*** consequence: a sibling of the HEAD reader
+'read_graph_snapshot_maybe_cached (config, Head)' reads every skgrepo
+at HEAD. The pair instead uses 'read_owned_head_graph_snapshot_maybe_cached',
+which shares that reader's per-skgrepo loop and its cache, keyed by
+'owned_head_identity' (the owned skgrepos' HEAD commits). That key
+ignores foreign files. A foreign file changed on disk after the server
+started but before the first pair is built would differ from the live
+graph, and its node would enter C. Nothing in the session writes
+foreign files.
+*** quasi-duplication
+'owned_head_identity' resembles 'validate_skgrepos_for_selection' plus
+'head_cache_identity', with the refusal text the plan wants. Those two
+retire with the diff report in slice 9.
+** 'from_head_and_live (config, live_graph)'
+It takes the live graph rather than the runtime generation, so tests
+need no Tantivy index.
+** partner identity and role naming
+'partners (pid, role)': 'role' is the role the PARTNER plays, as in
+role trees ('CONTAINER' gives the containers, '(Contains, Second)' the
+content). Each graph identifies a member by its own resolution of the
+stored ID, as its recorderward relmaps do, so the outbound and inbound
+answers agree. The queried ID is a primary ID, unresolved.
+*** consequence for nodeMerges
+A node that lists an acquiree B by B's old ID resolves that ID to B at
+HEAD and to the acquirer A in the live graph. Its content then shows
+B as OnlyBefore and A as OnlyAfter, and the node is rightward in C,
+although its file did not change.
+** what 'node_changes' and 'changed_pids' report
+'NodeChanges' has 'title_changed' and 'body_changed' ('text_changed'
+is their disjunction), so slice 6 can choose "old title", "old body"
+or both. Aliases are compared by text. A node not in both graphs has
+empty 'NodeChanges'; its change is its existence. Leftward excludes
+IDs that neither graph has as a node (dangling references).
+** deferred to later slices
+'order_only_pids' needs the change-forest, so slice 3 adds it. The
+pair lives in 'ViewsState::graph_pair', and 'current_graph_pair_in_slot'
+reuses it, re-pairs it with a newer live graph, or rebuilds it when an
+owned HEAD moved (which covers stage-and-commit). Building it on a TDV
+request and dropping it when the last TDV buffer closes come with the
+TDV buffers (slice 5).
+** the test helpers were moved, not copied
+'tests/git_diff_view/common.rs' is now 'tests/shared/git_fixture_helpers.rs',
+used by both the git diff view tests and 'tests/graph_pair.rs', so it
+is not duplicated. The fixtures are in 'tests/graph_pair/fixtures/'.

@@ -519,7 +519,7 @@ code; 'yucky' is named explicitly in 'elisp/skg-link-annotations.el',
 tests and the nvim herald specs; update 'docs/heralds.org' (the tiers
 table, the new style, the rename, where the tiers live).
 
-** Slice 2: the graph pair and relRepo-aware diffs
+** DONE Slice 2: the graph pair and relRepo-aware diffs
 *** module
 New module 'server/graph_pair/' with 'GraphPair { before : Arc<InRustGraph>,
 after : Arc<InRustGraph> }', built by 'GraphPair::from_head_and_live
