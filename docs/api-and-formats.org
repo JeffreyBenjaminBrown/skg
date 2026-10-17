@@ -431,6 +431,31 @@ So far there are these endpoints:
     contribute nothing. When no moves are found, the script body is a
     single =# No moves detected.= comment.
 
+** Stage and commit
+  - Request: =((request . "stage and commit") (message . "MESSAGE"))=,
+    optionally with =(confirmed . t)=.
+  - Response: LP response-type "stage-and-commit", then a rerender
+    stream (rerender-lock, rerender-view*, rerender-done). The
+    response is one of:
+    - =((needs-confirmation . t) (readiness-summary ...) (errors ()) (warnings ()))=
+      when the readiness summary (the save response's form, with
+      =(unshown 0)=) is incomplete and the request is not confirmed.
+      Nothing changes, and the rerender stream is empty.
+    - =((commits (("SKGREPO" "COMMIT-ID") ...)) (errors (...)) (warnings ()))=
+      otherwise: every owned skgrepo with changes had its =.skg= files
+      staged (deletions included) and git-committed with MESSAGE, by
+      the gitrepo's configured user. A skgrepo without changes is in
+      neither list; one that failed is an error. When something was
+      committed, the rerender stream redraws each open buffer of the
+      total diff view afresh from the rebuilt graph pair; one with
+      nothing left is sent empty (=(content )=). The marks of the
+      changes committed are dropped from the readiness store.
+    - =((errors ("REFUSAL")) (warnings ()))= when the skgrepo
+      restriction is not =all=, the message is blank, or the graph
+      pair cannot be built. The rerender stream is empty.
+  - Logic: =server/serve/handlers/stage_and_commit.rs=,
+    =server/git_ops/stage_and_commit.rs=.
+
 ** Rebuild session-lifetime stores
   - Request: ((request . "rebuild session-lifetime stores"))
   - Response: LP response-type "rebuild-session-lifetime-stores" with =((content "..."))=.

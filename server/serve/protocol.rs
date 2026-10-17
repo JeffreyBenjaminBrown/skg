@@ -31,6 +31,7 @@ pub enum RequestType {
   ImportMdAndOrg,
   DeleteReferencesToAbsentNode,
   TotalDiffView,
+  StageAndCommit,
 }
 
 impl RequestType {
@@ -64,6 +65,7 @@ impl RequestType {
       "import md and org"         => Ok (RequestType::ImportMdAndOrg),
       "delete references to absent node" => Ok (RequestType::DeleteReferencesToAbsentNode),
       "total diff view"          => Ok (RequestType::TotalDiffView),
+      "stage and commit"         => Ok (RequestType::StageAndCommit),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See docs/api-and-formats.org
@@ -112,6 +114,7 @@ pub enum TcpToClient {
   DeleteReferencesConfirmation,
   DeleteReferencesResult,
   TotalDiffView, // One buffer of the total diff view, or '(empty . t)' when that buffer would show nothing.
+  StageAndCommit, // The per-skgrepo git-commits, or the readiness summary with '(needs-confirmation . t)'. A rerender stream follows.
   Error,
 }
 
@@ -161,4 +164,5 @@ impl TcpToClient {
       TcpToClient::DeleteReferencesConfirmation => "delete-references-confirmation",
       TcpToClient::DeleteReferencesResult => "delete-references-result",
       TcpToClient::TotalDiffView    => "total-diff-view",
+      TcpToClient::StageAndCommit   => "stage-and-commit",
       TcpToClient::Error            => "error", }} }

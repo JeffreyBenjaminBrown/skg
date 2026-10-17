@@ -16,3 +16,5 @@ mod request;
 mod readiness;
 #[path = "pcsvf/other_buffers.rs"]
 mod other_buffers;
+#[path = "pcsvf/stage_and_commit.rs"]
+mod stage_and_commit;
