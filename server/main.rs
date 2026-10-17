@@ -10,6 +10,7 @@ use skg::consts::{BUSYSIGNAL_POLL_INTERVAL_MS, BUSYSIGNAL_READ_TIMEOUT_MS};
 use skg::prominence::{compute_and_store_prominence_sources, MapToContent, MapToContainers};
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::filesystem::not_nodes::load_config;
+use skg::heralds::herald_styles_inconsistencies;
 use skg::export_org::{
   export_candidate_pids, export_to_org, ExportReport};
 use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
@@ -78,6 +79,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     Err (e) => die_bad_config (&config_path, e) };
 
   init_tracing (&config);
+
+  { // shared/herald-styles.json is embedded at compile time, so an
+    // inconsistency in it is a build defect, not a runtime condition.
+    let herald_style_problems : Vec<String> =
+      herald_styles_inconsistencies ();
+    assert! ( herald_style_problems . is_empty (),
+              "shared/herald-styles.json is inconsistent:\n{}",
+              herald_style_problems . join ("\n") ); }
 
   { // Log which binary this is and how old it is, so a stale
     // long-running server (one predating a code change) is obvious

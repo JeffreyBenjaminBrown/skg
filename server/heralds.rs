@@ -6,9 +6,10 @@
 /// engine, 'elisp/skg-sexpr/skg-lens.el') lives entirely in Emacs.
 /// Emacs fetches the table over the "herald rules" endpoint at
 /// connect time and hands it, unchanged, to that engine. Rust never
-/// interprets styles or labels; it only guarantees, via the
-/// conformance test in 'tests/unit/heralds.rs', that the table and
-/// the metadata vocabulary the server emits stay in sync.
+/// interprets labels, and takes each rule's style by name from
+/// 'shared/herald-styles.json'; the conformance test in
+/// 'tests/unit/heralds.rs' guarantees that the table and the metadata
+/// vocabulary the server emits stay in sync.
 ///
 /// GRAMMAR (mirrored one-to-one by 'HeraldRule'; full display
 /// semantics are documented in skg-lens.el):
@@ -22,40 +23,37 @@
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{PartnerFolder, Property, PropertyFolder, ViewRequest};
 
-/// A herald's style: its importance tier, or for a few heralds a
-/// polarity or kind. The clients define each style's look from
-/// 'shared/herald-styles.json'; see docs/heralds.org.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum HeraldStyle {
-  Crucial, High, Medium, Low, Normal,
-  Message, Stop, Go, Nonstandard, Ugly }
+use serde_json::Value;
+use std::collections::HashSet;
+use std::sync::OnceLock;
 
-impl HeraldStyle {
-  pub const ALL : [HeraldStyle; 10] = [
-    HeraldStyle::Crucial, HeraldStyle::High, HeraldStyle::Medium,
-    HeraldStyle::Low, HeraldStyle::Normal, HeraldStyle::Message,
-    HeraldStyle::Stop, HeraldStyle::Go, HeraldStyle::Nonstandard,
-    HeraldStyle::Ugly ];
+/// 'shared/herald-styles.json', embedded at compile time. Its
+/// 'node_heralds' table gives the style of each styled atom in the rule
+/// table below; the clients define each style's look from its 'styles'.
+/// See docs/heralds.org.
+const HERALD_STYLES_JSON : &str =
+  include_str! ("../shared/herald-styles.json");
 
-  /// The style's name, as in 'shared/herald-styles.json'.
-  pub fn name (self) -> &'static str {
-    match self {
-      HeraldStyle::Crucial     => "crucial",
-      HeraldStyle::High        => "high",
-      HeraldStyle::Medium      => "medium",
-      HeraldStyle::Low         => "low",
-      HeraldStyle::Normal      => "normal",
-      HeraldStyle::Message     => "message",
-      HeraldStyle::Stop        => "stop",
-      HeraldStyle::Go          => "go",
-      HeraldStyle::Nonstandard => "nonstandard",
-      HeraldStyle::Ugly       => "ugly", } }
+static HERALD_STYLES : OnceLock<Value> = OnceLock::new ();
 
-  /// The style directive in the served rule table: the style's name in
-  /// capitals, like the table's other directives (ANY, IT, ABUT, INTERC).
-  pub fn repr_in_client (self) -> String {
-    self . name () . to_uppercase () }
-}
+/// The parsed 'shared/herald-styles.json'.
+pub fn herald_styles () -> &'static Value {
+  HERALD_STYLES . get_or_init ( || {
+    serde_json::from_str (HERALD_STYLES_JSON)
+      . expect ("shared/herald-styles.json should parse as JSON") } ) }
+
+/// The style named by KEY in 'node_heralds', if any.
+fn node_herald_style (
+  key : &str,
+) -> Option<&'static str> {
+  herald_styles () ["node_heralds"] [key] . as_str () }
+
+/// The style directive in the served rule table: the style's name in
+/// capitals, like the table's other directives (ANY, IT, ABUT, INTERC).
+pub fn style_repr_in_client (
+  style_name : &str,
+) -> String {
+  style_name . to_uppercase () }
 
 /// One element of a rule's tail.
 #[derive(Debug, Clone, PartialEq)]
@@ -68,18 +66,27 @@ pub enum RuleChild {
 /// One rule, mirroring the sexp grammar above one-to-one.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HeraldRule {
-  pub style    : Option<HeraldStyle>,
+  pub node_heralds_key : Option<&'static str>, // where 'node_heralds' gives the style
   pub interc   : Option<&'static str>, // Some(separator) makes this an INTERC rule
   pub label    : Option<&'static str>, // None only for unlabeled INTERC rules
   pub abut     : bool,                 // glue output to the preceding token
   pub children : Vec<RuleChild>,
 }
 
+impl HeraldRule {
+  /// The rule's style name, from 'node_heralds'. Startup asserts that
+  /// every key the table uses is present ('herald_styles_inconsistencies').
+  pub fn style (&self) -> Option<&'static str> {
+    self . node_heralds_key . map ( |key| {
+      node_herald_style (key)
+        . unwrap_or_else ( || panic! (
+          "shared/herald-styles.json: node_heralds has no entry {}",
+          key )) } ) }
+}
+
 //
 // Constructor sugar, so the table below stays close to the sexp it serializes to.
 //
-
-use HeraldStyle::{Crucial, Medium, Normal, Message, Stop, Go, Nonstandard, Ugly};
 
 /// (label children...)
 fn rule (
@@ -87,38 +94,54 @@ fn rule (
   children : Vec<RuleChild>,
 ) -> RuleChild {
   RuleChild::Rule ( HeraldRule {
-    style : None, interc : None, label : Some (label),
+    node_heralds_key : None, interc : None, label : Some (label),
     abut : false, children } ) }
 
-/// (STYLE label children...)
+/// (STYLE label children...), with STYLE from 'node_heralds' under the label
 fn crule (
-  style    : HeraldStyle,
   label    : &'static str,
   children : Vec<RuleChild>,
 ) -> RuleChild {
+  crule_styled_as ( label, label, children ) }
+
+/// (STYLE label children...), with STYLE from 'node_heralds' under
+/// NODE_HERALDS_KEY, for an atom styled differently in different places
+fn crule_styled_as (
+  node_heralds_key : &'static str,
+  label            : &'static str,
+  children         : Vec<RuleChild>,
+) -> RuleChild {
   RuleChild::Rule ( HeraldRule {
-    style : Some (style), interc : None, label : Some (label),
+    node_heralds_key : Some (node_heralds_key),
+    interc : None, label : Some (label),
     abut : false, children } ) }
 
 /// (STYLE label "text") -- a one-token leaf
 fn leaf (
-  style : HeraldStyle,
   label : &'static str,
   text  : &'static str,
 ) -> RuleChild {
-  crule ( style, label, vec! [ s (text) ] ) }
+  crule ( label, vec! [ s (text) ] ) }
 
-/// The two rules for a write-protected label: one emits the crucial ☮,
-/// meaning "this cannot be changed from here" -- the sense ☮
-/// ('writeProtected') carries on a node -- and the other the label's
-/// text, as a message. Both match the same atom; the renderer's
-/// ordinary space separates their tokens.
+/// (STYLE label "text"), with STYLE from 'node_heralds' under NODE_HERALDS_KEY
+fn leaf_styled_as (
+  node_heralds_key : &'static str,
+  label            : &'static str,
+  text             : &'static str,
+) -> RuleChild {
+  crule_styled_as ( node_heralds_key, label, vec! [ s (text) ] ) }
+
+/// The two rules for a write-protected label: one emits ☮, styled
+/// like 'writeProtected', meaning "this cannot be changed from here"
+/// -- the sense ☮ carries on a node -- and the other the label's
+/// text, styled under the label. Both match the same atom; the
+/// renderer's ordinary space separates their tokens.
 fn write_protected_leaves (
   label : &'static str,
   text  : &'static str,
 ) -> Vec<RuleChild> {
-  vec! [ leaf (Crucial, label, "☮"),
-         leaf (Message, label, text) ] }
+  vec! [ leaf_styled_as ("writeProtected", label, "☮"),
+         leaf (label, text) ] }
 
 /// (label) -- matches and emits nothing; consumes the atom so the
 /// table documents it. (The engine ignores unmatched atoms anyway;
@@ -130,12 +153,11 @@ fn vac (
 
 /// (STYLE label ABUT "text")
 fn leaf_abut (
-  style : HeraldStyle,
   label : &'static str,
   text  : &'static str,
 ) -> RuleChild {
   RuleChild::Rule ( HeraldRule {
-    style : Some (style), interc : None, label : Some (label),
+    node_heralds_key : Some (label), interc : None, label : Some (label),
     abut : true, children : vec! [ s (text) ] } ) }
 
 /// (ANY children...)
@@ -144,16 +166,16 @@ fn any (
 ) -> RuleChild {
   rule ( "ANY", children ) }
 
-/// ([STYLE] INTERC "sep" [label] children...)
+/// (STYLE INTERC "sep" label children...), with STYLE from
+/// 'node_heralds' under the label
 fn interc (
-  style    : Option<HeraldStyle>,
   sep      : &'static str,
-  label    : Option<&'static str>,
+  label    : &'static str,
   children : Vec<RuleChild>,
 ) -> RuleChild {
   RuleChild::Rule ( HeraldRule {
-    style, interc : Some (sep), label,
-    abut : false, children } ) }
+    node_heralds_key : Some (label), interc : Some (sep),
+    label : Some (label), abut : false, children } ) }
 
 fn s ( text : &'static str ) -> RuleChild { RuleChild::Str (text) }
 
@@ -216,19 +238,20 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///     true)', which the parser accepts, stays quiet.
 pub fn herald_rule_table () -> HeraldRule {
   HeraldRule {
-    style : None, interc : None, label : Some ("skg"), abut : false,
+    node_heralds_key : None, interc : None, label : Some ("skg"),
+    abut : false,
     children : [ vec! [
       vac ("focused"),
       vac ("folded"),
       vac ("bodyFolded"),
-      leaf (Message, PropertyFolder::Alias . repr_in_client (), "aliases"),
-      leaf (Message, "alias", "alias"), // Property::Alias
+      leaf (PropertyFolder::Alias . repr_in_client (), "aliases"),
+      leaf ("alias", "alias"), // Property::Alias
       // An alias's stored relRepo is a display fact.  A
       // requested replacement lives under editRequest below, so the
       // two values can be rendered side by side without conflation.
-      crule (Ugly, "relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
+      crule ("relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
       rule ("editRequest", vec! [
-        crule (Nonstandard, "relRepo", vec! [
+        crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
           any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ],
       // The six WRITE-PROTECTED folders carry ☮ ("cannot be changed
       // from here"); the editable folders (subscribeeFolder, overriddenFolder,
@@ -236,9 +259,9 @@ pub fn herald_rule_table () -> HeraldRule {
       write_protected_leaves (PartnerFolder::HiddenInSubscribee . repr_in_client (),
             "It contains these, but the subscribing ancestor hides them."),
       vec! [
-      leaf (Message, PartnerFolder::HiddenOutsideOfSubscribee . repr_in_client (),
+      leaf (PartnerFolder::HiddenOutsideOfSubscribee . repr_in_client (),
             "The subscriber ancestor hides these, but subscribes to nothing that contains them."),
-      leaf (Message, PartnerFolder::Subscribee . repr_in_client (),
+      leaf (PartnerFolder::Subscribee . repr_in_client (),
             "It subscribes to these.") ],
       write_protected_leaves (PartnerFolder::Subscriber . repr_in_client (),
             "These subscribe to it."),
@@ -247,70 +270,70 @@ pub fn herald_rule_table () -> HeraldRule {
       write_protected_leaves (PartnerFolder::Hider . repr_in_client (),
             "These hide it from their subscriptions."),
       vec! [
-      leaf (Message, PartnerFolder::Overridden . repr_in_client (),
+      leaf (PartnerFolder::Overridden . repr_in_client (),
             "It overrides the view of these.") ],
       write_protected_leaves (PartnerFolder::Overrider . repr_in_client (),
             "These override the view of it."),
       vec! [
-      leaf (Message, PropertyFolder::ID . repr_in_client (), "IDs"),
-      leaf (Message, "id", "ID") ], // Property::ID
+      leaf (PropertyFolder::ID . repr_in_client (), "IDs"),
+      leaf ("id", "ID") ], // Property::ID
       write_protected_leaves (PropertyFolder::flags () . repr_in_client (),
                 "flags"),
       vec! [
       // A flag row is write-protected too: one rule emits its ☮, the
       // other its text.
-      crule (Crucial, "flag", vec! [ any (vec! [ s ("☮") ]) ]),
-      crule (Message, "flag", Flag::ALL . into_iter ()
+      crule_styled_as ("writeProtected", "flag", vec! [ any (vec! [ s ("☮") ]) ]),
+      crule ("flag", Flag::ALL . into_iter ()
         . map (|flag| rule (
           flag . wire_name (), vec! [s (flag . herald_text ())]))
         . collect ()),
       // A text change reads "text changed ✓ ✗", showing whichever
       // stages it is in: ✓ staged, ✗ unstaged.
-      interc (Some (Nonstandard), " ", Some ("textChanged"), vec! [
+      interc (" ", "textChanged", vec! [
         s ("text changed "),
-        leaf (Go,   "staged",   "✓"),
-        leaf (Stop, "unstaged", "✗") ]),
-      crule (Message, "deadViewnode", vec! [ s ("DELETED") ]),
-      crule (Message, "deleted", vec! [
+        leaf ("staged",   "✓"),
+        leaf ("unstaged", "✗") ]),
+      crule ("deadViewnode", vec! [ s ("DELETED") ]),
+      crule ("deleted", vec! [
         s ("DELETED"),
         vac ("id"),
         vac ("repo") ]),
-      crule (Message, "unknown", vec! [
+      crule ("unknown", vec! [
         s ("Reference to unknown node."),
         vac ("id"),
         rule ("viewStats", vec! [
-          crule (Ugly, "relRepo", vec! [
+          crule ("relRepo", vec! [
             any (vec! [ s ("~"), RuleChild::It ]) ]) ]),
         rule ("editRequest", vec! [
-          crule (Nonstandard, "relRepo", vec! [
+          crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
             any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ]),
       // A restricted vognode is anonymous and dataless: the bare
       // atom 'restrictedNode' (see RestrictedVognode), like the other dataless
       // non-vognode atoms. Its id/repo would leak hidden content, so
       // they are not emitted.
-      crule (Message, "restrictedNode", vec! [
+      crule ("restrictedNode", vec! [
         s ("node from restricted skgrepo") ]),
-      interc (Some (Go), "", Some ("staged"), vec! [
+      interc ("", "staged", vec! [
         s ("✓"),
-        leaf (Nonstandard, "addedR", "R"),
-        leaf (Nonstandard, "removedR", "-R") ]),
-      interc (Some (Stop), "", Some ("unstaged"), vec! [
+        leaf ("addedR", "R"),
+        leaf ("removedR", "-R") ]),
+      interc ("", "unstaged", vec! [
         s ("✗"),
-        leaf (Nonstandard, "addedR", "R"),
-        leaf (Nonstandard, "removedR", "-R") ]),
+        leaf ("addedR", "R"),
+        leaf ("removedR", "-R") ]),
       rule ("node", vec! [
         vac ("id"),
         vac ("repo"),
         rule ("affectsParent", vec! [
           vac ("na"),
           vac ("true"),
-          leaf (Crucial, "false", "⊥") ]),
+          leaf_styled_as ("affectsParent_false", "false", "⊥") ]),
         // The server emits the atom 'writeProtected'
         // (see org_to_text.rs); we match that here.
-        leaf_abut (Crucial, "writeProtected", "☮"),
+        leaf_abut ("writeProtected", "☮"),
         // Emitted only on a write-protected node whose graphnode has a
         // body -- one the rendering hides. ABUT so the B rides the ☮.
-        leaf_abut (Crucial, "omittedBody", "B"),
+        leaf_abut ("omittedBody", "B"),
         // The relationship heralds are per-CHARACTER styled spans that
         // the lens cannot style, so the server assembles semantic
         // (rels ...) facts and the CLIENT renders them. This rule only POSITIONS them: the
@@ -319,7 +342,7 @@ pub fn herald_rule_table () -> HeraldRule {
         // client swaps for the rendered spans.
         rule ("rels", vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
         rule ("viewStats", vec! [
-          leaf (Medium, "cycle", "⟳"),
+          leaf ("cycle", "⟳"),
           // overridesHere is displayed as a crucial ĥ inside the O token
           // by the client relationship renderer. The atom's
           // ID payload is load-bearing save metadata, never displayed.
@@ -330,15 +353,15 @@ pub fn herald_rule_table () -> HeraldRule {
           // homeRepoHerald below (table ORDER is presentation order,
           // per the module doc, so placing this rule first guarantees
           // that regardless of the atoms' order in the raw sexp).
-          crule (Ugly, "relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
-          crule (Normal, "homeRepoHerald", vec! [ any (vec! [RuleChild::It]) ]) ]),
+          crule ("relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
+          crule ("homeRepoHerald", vec! [ any (vec! [RuleChild::It]) ]) ]),
         rule ("editRequest", vec! [
-          leaf (Nonstandard, "delete", "delete"),
-          crule (Nonstandard, "merge", vec! [
+          leaf ("delete", "delete"),
+          crule ("merge", vec! [
             any ( vec! [ s ("merge:"), RuleChild::It ] ) ]),
-          crule (Nonstandard, "relRepo", vec! [
+          crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
             any (vec! [ s ("request:~"), RuleChild::It ]) ]),
-          crule (Nonstandard, "flag", vec! [
+          crule_styled_as ("editRequest_flag", "flag", vec! [
             // A flag request is flat metadata:
             //   (flag noSearchMatching true|false)
             // Matching the literal boolean child lets the existing rule
@@ -348,24 +371,24 @@ pub fn herald_rule_table () -> HeraldRule {
             vac (Flag::NoSearchMatching . wire_name ()),
             rule ("true",  vec! [s ("request:no search matching")]),
             rule ("false", vec! [s ("request:search matching")]) ]) ]),
-        crule (Nonstandard, "viewRequests", vec! [
+        crule ("viewRequests", vec! [
           rule ("folder",  vec! [ any (vec! [ s ("req:folder:"),  RuleChild::It ]) ]),
           rule ("roleTree", vec! [ any (vec! [ s ("req:roleTree:"), RuleChild::It ]) ]),
           rule ("flags", vec! [ s ("req:flags") ]),
           rule ("editableView", vec! [ s ("req:editable") ]) ]),
-        interc (Some (Go), "", Some ("staged"), vec! [
+        interc ("", "staged", vec! [
           s ("✓"),
-          leaf (Nonstandard, "addedN", "N"),
-          leaf (Nonstandard, "deletedN", "-N"),
-          leaf (Nonstandard, "addedR", "R"),
-          leaf (Nonstandard, "removedR", "-R") ]),
-        interc (Some (Stop), "", Some ("unstaged"), vec! [
+          leaf ("addedN", "N"),
+          leaf ("deletedN", "-N"),
+          leaf ("addedR", "R"),
+          leaf ("removedR", "-R") ]),
+        interc ("", "unstaged", vec! [
           s ("✗"),
-          leaf (Nonstandard, "addedN", "N"),
-          leaf (Nonstandard, "deletedN", "-N"),
-          leaf (Nonstandard, "addedR", "R"),
-          leaf (Nonstandard, "removedR", "-R") ]),
-        leaf (Nonstandard, "notInGit", "diff:not-in-git") ]),
+          leaf ("addedN", "N"),
+          leaf ("deletedN", "-N"),
+          leaf ("addedR", "R"),
+          leaf ("removedR", "-R") ]),
+        leaf ("notInGit", "diff:not-in-git") ]),
       // A PhantomDiff (a moved/removed node in git-diff mode) emits its
       // own root atom 'diffPhantom', not 'node'. Its grammar is the
       // strict subset of node's that phantomDiff_metadata_to_string can
@@ -375,21 +398,21 @@ pub fn herald_rule_table () -> HeraldRule {
       rule ("diffPhantom", vec! [
         vac ("id"),
         vac ("repo"),
-        leaf_abut (Crucial, "writeProtected", "☮"),
+        leaf_abut ("writeProtected", "☮"),
         rule ("rels", vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
-        interc (Some (Go), "", Some ("staged"), vec! [
+        interc ("", "staged", vec! [
           s ("✓"),
-          leaf (Nonstandard, "addedN", "N"),
-          leaf (Nonstandard, "deletedN", "-N"),
-          leaf (Nonstandard, "addedR", "R"),
-          leaf (Nonstandard, "removedR", "-R") ]),
-        interc (Some (Stop), "", Some ("unstaged"), vec! [
+          leaf ("addedN", "N"),
+          leaf ("deletedN", "-N"),
+          leaf ("addedR", "R"),
+          leaf ("removedR", "-R") ]),
+        interc ("", "unstaged", vec! [
           s ("✗"),
-          leaf (Nonstandard, "addedN", "N"),
-          leaf (Nonstandard, "deletedN", "-N"),
-          leaf (Nonstandard, "addedR", "R"),
-          leaf (Nonstandard, "removedR", "-R") ]),
-        leaf (Nonstandard, "notInGit", "diff:not-in-git") ]) ] ] . concat (),
+          leaf ("addedN", "N"),
+          leaf ("deletedN", "-N"),
+          leaf ("addedR", "R"),
+          leaf ("removedR", "-R") ]),
+        leaf ("notInGit", "diff:not-in-git") ]) ] ] . concat (),
   }}
 
 //
@@ -408,8 +431,8 @@ fn serialize_rule (
   rule : &HeraldRule,
 ) -> String {
   let mut parts : Vec<String> = Vec::new ();
-  if let Some (style) = rule . style {
-    parts . push ( style . repr_in_client () ); }
+  if let Some (style) = rule . style () {
+    parts . push ( style_repr_in_client (style) ); }
   if let Some (sep) = rule . interc {
     parts . push ( "INTERC" . to_string () );
     parts . push ( quote_string (sep) ); }
@@ -431,6 +454,85 @@ fn quote_string (
             text . replace ('\\', "\\\\") . replace ('"', "\\\"") ) }
 
 //
+// Consistency of shared/herald-styles.json
+//
+
+/// Every way 'shared/herald-styles.json' disagrees with itself or with
+/// the rule table. Run as a unit test, and asserted at startup.
+pub fn herald_styles_inconsistencies () -> Vec<String> {
+  herald_styles_inconsistencies_of ( herald_styles () ) }
+
+/// Every tier FILE names (in 'tier_order', 'node_heralds' or
+/// 'relationship_heralds') that is not a key of its 'styles', and
+/// every styled atom of the rule table that has no entry in its
+/// 'node_heralds'.
+pub fn herald_styles_inconsistencies_of (
+  file : &Value,
+) -> Vec<String> {
+  let styles : HashSet<&str> =
+    file ["styles"] . as_object ()
+    . map ( |styles| styles . keys () . map (String::as_str) . collect () )
+    . unwrap_or_default ();
+  let undefined_tiers : Vec<String> =
+    tiers_named_in_herald_styles (file) . into_iter ()
+    . filter ( |(_, tier)| ! styles . contains (tier) )
+    . map ( |(place, tier)| format! (
+      "{} names {}, which is not a key of 'styles'", place, tier ))
+    . collect ();
+  let unstyled_atoms : Vec<String> =
+    node_heralds_keys_in_rule_table () . into_iter ()
+    . filter ( |key| file ["node_heralds"] [*key] . as_str () . is_none () )
+    . map ( |key| format! (
+      "the rule table styles {}, which has no entry in 'node_heralds'",
+      key ))
+    . collect ();
+  [ undefined_tiers, unstyled_atoms ] . concat () }
+
+/// Each tier FILE names, with the path where it does so.
+fn tiers_named_in_herald_styles (
+  file : &Value,
+) -> Vec<(String, &str)> {
+  fn collect<'a> (
+    place : String,
+    value : &'a Value,
+    out   : &mut Vec<(String, &'a str)>,
+  ) {
+    match value {
+      Value::String (tier) => out . push (( place, tier . as_str () )),
+      Value::Array (tiers) =>
+        for (i, tier) in tiers . iter () . enumerate () {
+          collect ( format! ("{}[{}]", place, i), tier, out ); },
+      Value::Object (entries) =>
+        for (key, entry) in entries {
+          if ! key . ends_with ("comment") {
+            collect ( format! ("{}.{}", place, key), entry, out ); }},
+      _ => () }}
+  let mut out : Vec<(String, &str)> = Vec::new ();
+  for field in [ "tier_order", "node_heralds", "relationship_heralds" ] {
+    collect ( field . to_string (), &file [field], &mut out ); }
+  out }
+
+/// The 'node_heralds' key of every styled rule in the table.
+pub fn node_heralds_keys_in_rule_table () -> HashSet<&'static str> {
+  rules_in_rule_table () . into_iter ()
+    . filter_map ( |rule| rule . node_heralds_key )
+    . collect () }
+
+/// The root rule and every rule nested in it.
+fn rules_in_rule_table () -> Vec<HeraldRule> {
+  fn collect (
+    rule : &HeraldRule,
+    out  : &mut Vec<HeraldRule>,
+  ) {
+    out . push ( rule . clone () );
+    for child in & rule . children {
+      if let RuleChild::Rule (r) = child {
+        collect (r, out); }}}
+  let mut out : Vec<HeraldRule> = Vec::new ();
+  collect ( &herald_rule_table (), &mut out );
+  out }
+
+//
 // Vocabulary enumeration, for the conformance test
 //
 
@@ -438,20 +540,10 @@ fn quote_string (
 /// excluding the engine directives (ANY; IT is not a label) and the
 /// root label "skg".
 pub fn atoms_in_rule_table () -> std::collections::HashSet<&'static str> {
-  fn collect (
-    rule : &HeraldRule,
-    out  : &mut std::collections::HashSet<&'static str>,
-  ) {
-    if let Some (label) = rule . label {
-      if label != "ANY" && label != "skg" {
-        out . insert (label); }}
-    for child in & rule . children {
-      if let RuleChild::Rule (r) = child {
-        collect (r, out); }}}
-  let mut out : std::collections::HashSet<&'static str> =
-    std::collections::HashSet::new ();
-  collect ( &herald_rule_table (), &mut out );
-  out }
+  rules_in_rule_table () . into_iter ()
+    . filter_map ( |rule| rule . label )
+    . filter ( |label| *label != "ANY" && *label != "skg" )
+    . collect () }
 
 /// Every metadata atom the server can emit in a MATCH (label)
 /// position. Value-position data (counts, IDs, skgrepo names,

@@ -65,44 +65,23 @@ fn elisp_fixture_matches_the_live_table () {
                "tests/shared/herald-rules.sexp is stale. Regenerate with: \
                 cargo run --bin emit-herald-rules > tests/shared/herald-rules.sexp" ); }
 
-fn shared_json (
-  file_name : &str,
-) -> serde_json::Value {
-  let path : std::path::PathBuf =
-    std::path::Path::new ( env! ("CARGO_MANIFEST_DIR") )
-    . join ("shared") . join (file_name);
-  let text : String = std::fs::read_to_string (&path)
-    . unwrap_or_else ( |e| panic! ("could not read {:?}: {}", path, e) );
-  serde_json::from_str (&text)
-    . unwrap_or_else ( |e| panic! ("could not parse {:?}: {}", path, e) ) }
-
-fn styles_in_rule_table () -> HashSet<HeraldStyle> {
-  fn collect (
-    rule : &HeraldRule,
-    out  : &mut HashSet<HeraldStyle>,
-  ) {
-    if let Some (style) = rule . style { out . insert (style); }
-    for child in & rule . children {
-      if let RuleChild::Rule (r) = child { collect (r, out); }}}
-  let mut out : HashSet<HeraldStyle> = HashSet::new ();
-  collect ( &herald_rule_table (), &mut out );
-  out }
-
-// The ten styles are defined in shared/herald-styles.json, which both
-// clients read, and every style the rule table names is one of them.
+// shared/herald-styles.json names only styles it defines, and gives a
+// style to every styled atom of the rule table. The server asserts the
+// same at startup.
 #[test]
-fn herald_styles_match_the_shared_style_file () {
-  let file : serde_json::Value = shared_json ("herald-styles.json");
-  let defined : HashSet<String> =
-    file ["styles"] . as_object ()
-    . expect ("herald-styles.json: 'styles' should be an object")
-    . keys () . cloned () . collect ();
-  let enumerated : HashSet<String> =
-    HeraldStyle::ALL . iter ()
-    . map ( |style| style . name () . to_string () )
-    . collect ();
-  assert_eq! ( defined, enumerated,
-               "HeraldStyle and shared/herald-styles.json disagree" );
-  for style in styles_in_rule_table () {
-    assert! ( defined . contains ( style . name () ),
-              "the rule table names undefined style {}", style . name () ); }}
+fn herald_styles_file_is_internally_consistent () {
+  let problems : Vec<String> = herald_styles_inconsistencies ();
+  assert! ( problems . is_empty (), "{}", problems . join ("\n") ); }
+
+// The consistency check notices an undefined tier and an unstyled atom.
+#[test]
+fn herald_styles_consistency_check_reports_problems () {
+  let mut file : serde_json::Value = herald_styles () . clone ();
+  file ["relationship_heralds"] ["birth_letter"] =
+    serde_json::Value::from ("no_such_style");
+  file ["node_heralds"] . as_object_mut () . unwrap ()
+    . remove ("cycle");
+  let problems : Vec<String> = herald_styles_inconsistencies_of (&file);
+  assert_eq! ( problems, vec! [
+    "relationship_heralds.birth_letter names no_such_style, which is not a key of 'styles'" . to_string (),
+    "the rule table styles cycle, which has no entry in 'node_heralds'" . to_string () ] ); }

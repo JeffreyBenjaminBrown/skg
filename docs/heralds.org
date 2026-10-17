@@ -18,7 +18,7 @@ style, so two occurrences of the same node can have different heralds.
 
 ** Styles
 A herald's style states its importance tier, or for a few heralds a
-polarity or kind, never its hue. There are ten styles.
+polarity or kind, never its hue. There are eleven styles.
 
 | Style       | Look                           | Meaning                         |
 |-------------+--------------------------------+---------------------------------|
@@ -32,11 +32,19 @@ polarity or kind, never its hue. There are ten styles.
 | go          | black on green                 | polarity: good, done            |
 | nonstandard | white on purple                | requests and diff facts         |
 | ugly        | pink foreground, no background | error-flavored, but not too bad |
+| boring      | white on dark gray             | counts seldom worth reading     |
 
 The tiers, least to greatest, are normal, low, medium, high and crucial.
 
 Each style has one name everywhere. The looks are defined in
-[[file:../shared/herald-styles.json][shared/herald-styles.json]], which both clients read. In Emacs the
+[[file:../shared/herald-styles.json][shared/herald-styles.json]], which both clients read. That file also
+says which style each herald takes: 'relationship_heralds' for the
+relationship heralds, which the clients render themselves, and
+'node_heralds' for every other herald, keyed by the atom it renders.
+The server embeds the file at compile time and serves the herald rule
+table with each rule's style taken from 'node_heralds'; it refuses to
+start if the file names a style it does not define, or if a styled
+rule has no entry. In Emacs the
 style's face is 'heralds-STYLE-face' (for example 'heralds-high-face');
 customize it with 'customize-face'. In Neovim its highlight group is
 'SkgHeraldSTYLE' (for example 'SkgHeraldHigh'); override it with
@@ -48,10 +56,11 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | Kind                 | Style       | Glyphs                                                                        |
 |----------------------+-------------+-------------------------------------------------------------------------------|
 | relationship letters | normal      | =C L S O H=                                                                   |
-| the birth letter     | high        | the letter of a relation that put this occurrence here                       |
+| the birth letter     | low         | the letter of a relation that put this occurrence here                       |
 | relationship sides   | their tier  | counts and ancestor flags; see [[*Relationship heralds][Relationship heralds]]                     |
-| property counts      | low         | =A3= aliases, =I1= extra IDs, =F2= true flags                                 |
-| position glyphs      | crucial     | =☮= write-protected, =B= omitted body, =⊥= affects not its parent, =ĥ= overrides here |
+| property counts      | boring      | =A3= aliases, =I1= extra IDs, =F2= true flags                                 |
+| position glyphs      | crucial     | =☮= write-protected, =⊥= affects not its parent, =ĥ= overrides here           |
+|                      | high        | =B= omitted body                                                              |
 |                      | medium      | =⟳= cycle                                                                     |
 | home-repo heralds    | normal      | =⌂:LABEL=                                                                     |
 |                      | ugly        | =~NAME=, a relRepo more private than the default                              |
@@ -137,7 +146,7 @@ numeral. =a/bL= says both ancestors link here and only 'a' is
 substantive.
 
 *** Birth
-The letter of a relation that put this occurrence here is drawn high;
+The letter of a relation that put this occurrence here is drawn low;
 its counts keep their own styles. An occurrence can have more than one
 birth relation. A side whose only members are ancestors that the birth
 relation already accounts for has tier low: =aC= (the parent is the sole

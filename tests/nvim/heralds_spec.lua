@@ -107,7 +107,7 @@ describe('skg.heralds', function ()
      function ()
     -- rels payload (contains (in 2 (ancestors 1))), birth contains
     -- renders as the C token 2aC: the in-side numeral "2" (medium), the
-    -- ancestor "a" at its floor (low), and the birth letter "C" (high).
+    -- ancestor "a" at its floor (low), and the birth letter "C" (low).
     local buf = scratch_buffer_with({
       'Line with (skg (node (id 123) (affectsParent false)'
       .. ' (rels (contains (in 2 (ancestors 1))) (birth (contains in 1)))'
@@ -132,7 +132,7 @@ describe('skg.heralds', function ()
     -- per-span highlight groups on the 2aC token
     assert.are.equal('SkgHeraldMedium', hl_of['2'])
     assert.are.equal('SkgHeraldLow', hl_of['a'])
-    assert.are.equal('SkgHeraldHigh', hl_of['C'])
+    assert.are.equal('SkgHeraldLow', hl_of['C'])
     heralds.disable(buf)
     assert.are.equal(0, #herald_extmarks(buf))
   end)
