@@ -613,7 +613,7 @@ of 'tests/collateral_repo_move.rs', including one privatizing move that
 raises an inbound relationship and one move whose confirmation lists a
 relationship recorded by a node outside the view.
 
-** Slice 4: new viewnodes
+** DONE Slice 4: new viewnodes
 Add 'Property::ChangesetMarker { kind }', 'Property::OldText { title,
 body }', 'Property::BodyDiff', 'Property::HomeSkgrepoMove { old, new }',
 'Property::RelRepoMove { old, new }', 'Phantom::Historical

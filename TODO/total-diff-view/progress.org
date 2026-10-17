@@ -159,3 +159,78 @@ quit. Documented in 'docs/api-and-formats.org' and 'docs/COMMANDS*.org'.
 'NodeRelation' derives serde and gains 'from_relation_name', which
 replaced a private copy in 'paths.rs'. The folder commands are 'C-c l
 c' and 'C-c l m' in Emacs, '<localleader>cc' and 'cm' in Neovim.
+* Slice 4: deviations
+** wire forms
+*** '(oldText ASPECT)'
+The label ("old title and body", "old title", "old body") needs to
+know which aspects changed, and an empty headline or body cannot say,
+so the form names it: '(oldText titleAndBody)', '(oldText title)' or
+'(oldText body)'. A body HEAD lacked is the empty string.
+*** '(homeMove (old A) (new B))' and '(relRepoMove (old A) (new B))'
+not '(homeMove OLD NEW)'. The herald engine's ANY/IT gives every
+value of a form the same prefix, so two positional names cannot
+render as "⌂ -A +B" or "relationship moved from A to B". The names
+are styled 'normal' through the 'node_heralds' keys
+'homeMove_skgrepo' and 'relRepoMove_skgrepo'.
+*** the phantom
+'(historical (id X) (repo R) ...)', the grammar of '(deleted ...)'.
+Its heralds are a ☮, then ∃- and ~- with a ✓ after each ready axis.
+** what the kinds carry
+'Phantom::Historical' carries 'change_facts' (presence and ready) and
+'readiness_request', like the deleted and unknown phantoms, in place
+of the plan's 'presence'. Every new property but 'BodyDiff' does too;
+'BodyDiff' is '{ diff }', its body. 'ChangesetMarkerKind' is 'Content',
+'RelRepo' or 'OrderOnly'.
+** the save consumes their readiness requests
+'server/serve/handlers/readiness_requests.rs' names, for an
+old text, its node's text leaf; for a home move, its node's home
+leaf; for a relRepo move, the relRepo leaf of the relationship
+between the member it hangs under and that member's viewparent; for
+the content or relRepo changeset marker, the leaves of that aspect of
+the content relationships its node records ('content_relationships_of');
+for the order-only marker, nothing. A historical phantom's leaves are
+keyed by its ID as written, a node of the before-graph: the
+after-graph would resolve an acquiree to its acquirer.
+** the builders
+'server/to_org/render/change_viewnodes.rs' draws each kind from the
+graph pair, for slice 5 to place: 'append_old_text' (with the body
+diff, a ' '/'-'/'+' line diff), 'mk_home_move_viewnode',
+'mk_relRepo_move_viewnode', 'mk_changeset_marker_viewnode',
+'mk_historical_viewnode', 'append_historical_phantom' and
+'append_acquired_folder'. 'GraphPair::acquirer_of' and 'acquirees_of'
+derive the acquisition folders' members from the after-graph's extra
+IDs.
+*** a historical phantom's old content
+A deleted member is a historical phantom with its own old content; a
+surviving member is a write-protected vognode tagged rel-; a dangling
+one is an unknown phantom tagged rel-. A node already drawn above
+itself in the recursion is drawn without content. The vognodes under
+a historical phantom keep affectsParent true (under a deleted phantom
+they are demoted): they are drawn as its old content, and the save
+reads nothing under a phantom.
+*** the acquisition folders
+"it was acquired by" (under the historical phantom) holds the
+acquirer, write-protected. "it acquired" (under the acquirer) holds
+bare historical phantoms, without their content, which is drawn where
+the acquiree itself is drawn. The labels are lower-case, as the plan
+writes them, unlike the other folders' sentences.
+** where the validator allows them
+A historical phantom may be a view root or a vognode's child, and may
+hold vognodes and an "it was acquired by" folder. An old text, a move
+or a changeset marker needs a vognode parent and is unique among its
+siblings (a marker per kind); a body diff needs an old-text parent.
+The acquisition folders need a historical phantom or an ordinary
+vognode for a parent, as above.
+** the rerender until slice 5
+View completion leaves the new viewnodes alone (the acquisition
+folders have no 'relation_member_role', so no reconciler runs on
+them), except that the content reconciler moves a historical phantom
+ahead of the live members it stood among. Positioning removed members
+is slice 5's 'process_unrestrictedVognode_changes'. So the round-trip
+test ('tests/tdv/roundtrip/view.rs') checks that the first save
+changes no file and drops none of the new viewnodes, and that its
+result is a fixed point of a second save.
+** clients
+Both clients read the ID and skgrepo of a historical phantom at point,
+as they do a deleted one's. Emacs refuses a relRepo request on a
+member of either acquisition folder.
