@@ -178,6 +178,14 @@ So far there are these endpoints:
     4. Final save response:
        =Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))=
        =content= is the re-rendered saved buffer (nil on failure). =errors= is a list of failure-explaining strings. =warnings= is a list of nonfatal messages. Both lists are present and empty if none.
+       When the saved buffer is one of the total diff view's, the response
+       ends with =(readiness-summary (ready N) (changed M) (foreign F) (order-only O) (unshown K))=:
+       of the M changed files of the owned skgrepos (O of them changed only
+       in order, and so ready), N are commit-ready; F files changed in
+       foreign skgrepos; and K changes are owned by nodes the buffer does
+       not draw. The buffer is reconciled over the graph pair, not
+       rebuilt: its roots and editability stay as saved, and its change
+       facts, change folders, markers and removed members are redrawn.
   - Before mutation, the server computes the update-relevant neighborhood of
     every prepared write/delete identity independently in the before and
     candidate graphs. Other registered views containing an affected unrestricted ID

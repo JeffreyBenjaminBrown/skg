@@ -13,7 +13,8 @@ use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::ViewId;
 use crate::types::views_state::pids_from_viewforest;
-use crate::update_buffer::{rerender_view, RerenderAfterSaveContext};
+use crate::update_buffer::{
+  rerender_view, tdv_buffer_of_view, RerenderAfterSaveContext};
 
 use futures::executor::block_on;
 use std::net::TcpStream;
@@ -205,6 +206,10 @@ fn prepare_rerender_views_where (
   let mut context : RerenderAfterSaveContext =
     RerenderAfterSaveContext::without_save_with_runtime (
       env, runtime, diff_mode_enabled, skgrepo_restriction );
+  // A buffer of the total diff view is reconciled over a graph pair
+  // brought up to date from the connection's, which it does not
+  // replace.
+  context . graph_pair = views_state . graph_pair . clone ();
   let mut rendered_views : Vec<PreparedView> = Vec::new ();
   for view_id in &view_ids {
     let mut viewforest : ViewForest = match
@@ -231,7 +236,8 @@ fn prepare_rerender_views_where (
         &mut context,
         None, // streamed rerenders repair silently.
         create_partnerFolders,
-        false
+        false,
+        tdv_buffer_of_view (views_state, view_id)
       ) } )
     { Ok (text) => {
         rendered_views . push ( PreparedView {

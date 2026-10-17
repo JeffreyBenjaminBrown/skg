@@ -14,7 +14,12 @@ pub use viewnodestats::set_viewnodestats_in_viewforest;
 
 use complete::{complete_viewforest, CompletionContext};
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::change_forest::BufferReadinessSummary;
+use crate::graph_pair::build::current_graph_pair_in_slot;
 use crate::graph_pair::types::GraphPair;
+use crate::pcsvf::nodes_drawn_in_viewforest;
+use crate::readiness_store::ReadinessStore;
+use crate::serve::handlers::readiness_requests::set_ready_facts_in_viewforest;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
@@ -27,9 +32,10 @@ use crate::serve::util::{ format_single_view_sexp, send_response_with_length_pre
 use crate::skgrepo_sets::{SkgrepoRestriction, apply_skgrepo_set_to_viewforest};
 use crate::to_org::expand::role_tree::{
   RoleTreePartners, attach_full_containerward_role_trees_at_treeids_with_skgrepo_set};
+use crate::to_org::render::changes::redraw_deleted_phantoms_as_historical;
 use crate::to_org::util::EditableMap;
 use crate::types::git::{NodeAxes, RelationshipAxes, SkgrepoDiff};
-use crate::types::views_state::ViewId;
+use crate::types::views_state::{TdvBuffer, ViewId};
 use crate::types::misc::{ID, SkgrepoName, SkgConfig};
 use crate::types::save::{NodeInstruction, ForkSpec};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
@@ -43,7 +49,7 @@ use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::sync::Arc;
+use std::sync::{Arc, MutexGuard};
 use std::time::Instant;
 
 pub struct RerenderAfterSaveContext<'a> {
@@ -62,6 +68,11 @@ pub struct RerenderAfterSaveContext<'a> {
   /// these IDs after the pid itself has disappeared.
   pub deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
   pub skgrepo_restriction            : Option<&'a SkgrepoRestriction>,
+  /// The graph pair a buffer of the total diff view is completed
+  /// over, brought up to date by 'current_graph_pair_in_slot' when
+  /// the first such buffer is rerendered. A caller that holds the
+  /// connection's pair sets it, and keeps what it becomes.
+  pub graph_pair                     : Option<Arc<GraphPair>>,
 }
 
 impl<'a> RerenderAfterSaveContext<'a> {
@@ -114,6 +125,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
       deleted_by_this_save_pids,
       deleted_by_this_save_extra_ids,
       skgrepo_restriction,
+      graph_pair : None,
     }}
 
   pub fn without_save (
@@ -174,6 +186,10 @@ pub fn update_views_after_save (
       RerenderAfterSaveContext::for_save_with_runtime (
         env, runtime, diff_mode_enabled, &node_instructions,
         deleted_by_this_save_extra_ids, skgrepo_restriction ) };
+  context . graph_pair = views_state . graph_pair . clone ();
+  let saved_tdv_buffer : Option<TdvBuffer> =
+    viewid_from_request_result . as_ref () . ok ()
+    . and_then ( |view_id| tdv_buffer_of_view (views_state, view_id) );
   let mut saved_view_mut : ViewForest = saved_view;
   replace_saved_view_fork_roots (&mut saved_view_mut, fork_specs) ?;
   // The skgsave-commit has happened, so every `(editRequest ...)` in the
@@ -209,6 +225,7 @@ pub fn update_views_after_save (
         hoist_confirmation  : None,
         strand_confirmation : None,
         text_release_confirmation : challenge_response (&release),
+        readiness_summary   : None,
       } ); }}
   let mut repair_warnings : Vec<CompletionWarning> = Vec::new ();
   let saved_text : String =
@@ -219,7 +236,16 @@ pub fn update_views_after_save (
         &mut context,
         Some (&mut repair_warnings),
         false,
-        true ) } ?;
+        true,
+        saved_tdv_buffer ) } ?;
+  let readiness_summary : Option<BufferReadinessSummary> =
+    saved_tdv_buffer . and ( context . graph_pair . as_ref () )
+    . map ( |pair| {
+      let store : MutexGuard<ReadinessStore> =
+        env . runtime . readiness_store . lock ()
+        . unwrap_or_else ( |poisoned| poisoned . into_inner () );
+      pair . change_forest () . buffer_readiness_summary (
+        &store, &nodes_drawn_in_viewforest (&saved_view_mut) ) } );
   context . warnings . extend (
     // Repairs the completion pass made to write-protected PartnerFolders in
     // the saved view, batched per (folder, recorder).
@@ -252,11 +278,13 @@ pub fn update_views_after_save (
           hoist_confirmation  : None,
           strand_confirmation : None,
           text_release_confirmation : challenge_response (&decision),
+          readiness_summary   : None,
         } ); }
       TextReleaseDecision::AllowWithWarning { warning } =>
         context . warnings . push (warning),
       TextReleaseDecision::Allow => {}, }}
-
+  if context . graph_pair . is_some () {
+    views_state . graph_pair = context . graph_pair . clone (); }
   if let Ok (view_id) = viewid_from_request_result {
     views_state . open_views . update_view (
       &context . graph_snap, view_id, saved_view_mut);
@@ -278,7 +306,16 @@ pub fn update_views_after_save (
     fork_confirmation   : None,
     hoist_confirmation  : None,
     strand_confirmation : None,
-    text_release_confirmation : None, } ) }
+    text_release_confirmation : None,
+    readiness_summary, } ) }
+
+/// The buffer of the total diff view that 'view_id' is, if it is one.
+pub fn tdv_buffer_of_view (
+  views_state : &ViewsState,
+  view_id     : &ViewId,
+) -> Option<TdvBuffer> {
+  views_state . open_views . views . get (view_id)
+    . and_then ( |state| state . tdv_buffer ) }
 
 fn unrestricted_skgids_in_viewforest (
   viewforest : &ViewForest,
@@ -354,7 +391,8 @@ fn rerender_collateral_view (
         context,
         None, // Collateral views repair silently.
         false,
-        false
+        false,
+        tdv_buffer_of_view (views_state, &view_id)
       ) . map_err (
         |e| format!( "Collateral view {}: {}",
                       view_id . repr_in_client (), e)) ? };
@@ -481,16 +519,32 @@ pub fn complete_viewforest_with_graph_pair (
 
 /// Strip stale diff data, re-complete the viewforest,
 /// set graph/view stats, and render to string.
+/// .
+/// A buffer of the total diff view ('tdv_buffer' Some) is reconciled
+/// over the graph pair, brought up to date in 'context': view
+/// completion recomputes each editable node's change facts, change
+/// folders, markers and removed members from the pair, as it drew
+/// them ('process_unrestrictedVognode_changes'), and its readiness
+/// facts are then read from the store. Its roots and editability stay
+/// as the buffer has them.
 pub fn rerender_view (
   viewforest    : &mut ViewForest,
   context       : &mut RerenderAfterSaveContext<'_>,
   warning_sink  : Option<&mut Vec<CompletionWarning>>, // Some only for the view the user just saved.
   create_partnerFolders : bool, // false post-save (folders round-trip from the buffer); true for the repo-switch rerender, where pruning removed them and the new set decides which return.
   substitute_existing_content_overrides : bool, // true only for the view whose edit created the override.
+  tdv_buffer    : Option<TdvBuffer>, // Some for a buffer of the total diff view
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
   { tracing::debug!("rerender_view: starting");
     strip_stale_diff_state (viewforest) ?; }
+  let graph_pair : Option<Arc<GraphPair>> =
+    match tdv_buffer {
+      Some (_) => Some ( current_graph_pair_in_slot (
+        &mut context . graph_pair, &context . runtime . config,
+        context . runtime . graph . clone () ) ? ),
+      None => None, };
+  let no_skgrepo_diffs : Option<HashMap<SkgrepoName, SkgrepoDiff>> = None;
   { tracing::debug!("rerender_view: starting complete_viewforest");
     let mut editable_map       : EditableMap = EditableMap::new ();
     let mut completion_context : CompletionContext = CompletionContext {
@@ -499,25 +553,34 @@ pub fn rerender_view (
       // (content axes + phantom flip + TextChanged/IDFolder/AliasFolder) and the
       // diff-aware PropertyFolder / PartnerFolder reconcilers, each at its own BFS visit
       // (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3). The content reconcile itself stays worktree-only.
-      skgrepo_diffs                  : &context . skgrepo_diffs,
+      // A total diff view is drawn from the graph pair instead.
+      skgrepo_diffs                  : if graph_pair . is_some () { &no_skgrepo_diffs }
+                                       else { &context . skgrepo_diffs },
       runtime                        : &context . runtime,
       graph_snap                     : &context . graph_snap,
       errors                         : &mut context . errors,
       deleted_since_head_pid_src_map : &context . deleted_since_head_pid_src_map,
       deleted_by_this_save_pids      : &context . deleted_by_this_save_pids,
       deleted_by_this_save_extra_ids : &context . deleted_by_this_save_extra_ids,
-      skgrepo_restriction            : context . skgrepo_restriction,
+      // A total diff view, like its first drawing
+      // ('complete_viewforest_with_graph_pair'), is not restricted by
+      // skgrepo while it is completed.
+      skgrepo_restriction            : if graph_pair . is_some () { None }
+                                       else { context . skgrepo_restriction },
       node_budget                    : context . runtime . config . initial_node_limit,
       // Post-save (and rerender-all) reuse the saved buffer's PartnerFolders
       // and pass false. The repo-switch rerender passes true: its prune
       // removed the folders, and the new set decides which defaults return.
-      create_partnerFolders_for_fresh_nodes : create_partnerFolders,
+      // A total diff view draws no default folders.
+      create_partnerFolders_for_fresh_nodes :
+        create_partnerFolders && graph_pair . is_none (),
       // Post-save: phantom skgrepos resolve via the deleted-id map + disk scan
       // (the de-novo path passes the tantivy index instead).
       diff_tantivy_index : None,
-      substitute_existing_content_overrides,
+      substitute_existing_content_overrides : // off in a total diff view
+        substitute_existing_content_overrides && graph_pair . is_none (),
       warning_sink,
-      graph_pair : None, };
+      graph_pair : graph_pair . as_deref (), };
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "complete_viewforest" ). entered();
       complete_viewforest (
@@ -525,6 +588,14 @@ pub fn rerender_view (
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the content/non-vognode diff was applied INLINE during the
   // BFS above (process_unrestrictedVognode_diff at each Unrestricted node's visit, driven by
   // repo_diffs = the real diffs).
+  if let Some (pair) = &graph_pair {
+    redraw_deleted_phantoms_as_historical (
+      viewforest . as_internal_tree_mut (), pair );
+    let store : MutexGuard<ReadinessStore> =
+      context . env . runtime . readiness_store . lock ()
+      . unwrap_or_else ( |poisoned| poisoned . into_inner () );
+    set_ready_facts_in_viewforest (
+      viewforest, pair . change_forest (), &store, &context . runtime . graph ); }
   let result : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "finish_viewforest" ). entered();

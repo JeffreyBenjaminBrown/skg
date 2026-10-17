@@ -9,8 +9,8 @@
 // to orph, is deleted.
 
 use crate::pcsvf::common::{
-  Fixture, all_changes_buffer, all_changes_buffer_with_marks, save,
-  skg_files, with_fixture};
+  Fixture, all_changes_buffer, all_changes_buffer_with_marks,
+  open_all_changes_buffer, save, skg_files, with_fixture};
 
 use skg::change_forest::{LeafKey, NodeAspect};
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -223,13 +223,13 @@ fn a_deleted_subscriber_is_drawn_in_the_changed_subscriber_folder (
   Ok (( )) }
 
 /// The round-trip invariant for a full buffer: saved unchanged, it
-/// changes no file and reports no error.
+/// changes no file, reports no error, and is reconciled to itself.
 fn saves_back_unchanged (
   case     : &str,
   skgrepos : &[&str],
 ) -> Result<(), Box<dyn Error>> {
   with_fixture (case, skgrepos, |f| {
-    let buffer : String = buffer_of (f) ?;
+    let buffer : String = open_all_changes_buffer (f) ?;
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let response : SaveResponse = save (f, &buffer) ?;
     assert! ( response . errors . is_empty (),
@@ -238,6 +238,8 @@ fn saves_back_unchanged (
     assert_eq! ( skg_files (f) ?, files_before,
                  "saving the buffer unchanged must not change the graph:\n{}",
                  buffer );
+    assert_eq! ( response . saved_view, buffer,
+                 "the reconciled buffer must be the buffer saved" );
     Ok (( )) }) }
 
 #[test]

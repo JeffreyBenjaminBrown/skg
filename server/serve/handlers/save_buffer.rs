@@ -1,3 +1,4 @@
+use crate::change_forest::{BufferReadinessSummary, ReadinessSummary};
 use crate::dbs::in_rust_graph::{
   in_rust_graph_coherent_with_nodeInstructions_in, new_handle };
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
@@ -87,6 +88,9 @@ pub struct SaveResponse {
   /// handler sends a 'strand-confirmation' listing these. Checked
   /// before every other confirmation.
   pub strand_confirmation : Option<Vec<StrandedRelationship>>,
+  /// Some when the saved buffer is one of the total diff view's: the
+  /// readiness summary the client shows after the save.
+  pub readiness_summary   : Option<BufferReadinessSummary>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -125,7 +129,25 @@ impl SaveResponse {
       ( &mut response, &self . save_point_position )
     { push_save_point_position_to_sexp_items (
         items, point_position ); }
+    if let ( Sexp::List (items),
+             Some (readiness_summary) ) =
+      ( &mut response, &self . readiness_summary )
+    { items . push ( sexp::parse (
+        &readiness_summary_sexp (readiness_summary) )
+        . expect ( "readiness_summary_sexp should produce valid sexp" )); }
     response . to_string () }}
+
+/// '(readiness-summary (ready N) (changed M) (foreign F)
+/// (order-only O) (unshown K))'.
+pub fn readiness_summary_sexp (
+  readiness_summary : &BufferReadinessSummary,
+) -> String {
+  let summary : &ReadinessSummary = &readiness_summary . summary;
+  format! (
+    "(readiness-summary (ready {}) (changed {}) (foreign {}) (order-only {}) (unshown {}))",
+    summary . ready_files, summary . changed_files,
+    summary . foreign_changed_files, summary . order_only_files,
+    readiness_summary . unshown_changes ) }
 
 /// Handles save buffer requests from Emacs.
 /// - Reads the buffer content (with length prefix).
@@ -751,7 +773,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
           hoist_confirmation  : None,
           text_release_confirmation : None,
           strand_confirmation : Some (
-            asked . into_iter () . cloned () . collect () ), } ),
+            asked . into_iter () . cloned () . collect () ),
+          readiness_summary   : None, } ),
       StrandReview::NotReviewed => {},
       StrandReview::Reviewed (chosen) => {
         let chosen : Vec<&StrandedRelationship> = asked . into_iter ()
@@ -776,6 +799,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       hoist_confirmation  : Some (hoist_candidates),
       text_release_confirmation : None,
       strand_confirmation : None,
+      readiness_summary   : None,
     } ); }
   // In particular, make a dirty nodeMerge acquiree clean before the merge
   // copies its text into a fresh preservation node and deletes it.
@@ -799,7 +823,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
                   fork_specs . len () )),
       hoist_confirmation  : None,
       text_release_confirmation : None,
-      strand_confirmation : None, } ); }
+      strand_confirmation : None,
+      readiness_summary   : None, } ); }
   // Forks detected this save (approved, or none): editing a foreign node
   // N is a request to clone it. The clone C is skgsave-committed with the rest of the
   // save -- its 'overrides = [N]' relationship rides in the same

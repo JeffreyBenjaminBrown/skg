@@ -103,6 +103,40 @@ pub(crate) fn process_unrestrictedVognode_changes (
     move_to_front (tree, treeid, *head); }
   Ok (( )) }
 
+/// After view completion over the pair: draw a node that a save
+/// deleted, and that HEAD had, as the PCSVF draws a deleted node.
+/// Completion turned each of its occurrences into a deleted phantom.
+/// One that stands beside a historical phantom of the same node (its
+/// viewparent drew the removed member) goes; any other becomes a
+/// historical phantom with its old content.
+pub(crate) fn redraw_deleted_phantoms_as_historical (
+  tree : &mut Tree<Viewnode>,
+  pair : &GraphPair,
+) {
+  let deleted : Vec<(NodeId, ID)> =
+    tree . root () . descendants ()
+    . filter_map ( |node| match &node . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d)))
+        if pair . node_presence (&d . skgid) == Some (Presence::OnlyBefore) =>
+        Some (( node . id (), d . skgid . clone () )),
+      _ => None, } )
+    . collect ();
+  for (treeid, skgid) in deleted {
+    let Some (parent) : Option<NodeId> =
+      tree . get (treeid) . unwrap () . parent () . map ( |p| p . id () )
+      else { continue; };
+    let drawn_beside : bool =
+      tree . get (parent) . unwrap () . children ()
+      . any ( |sibling| matches! ( &sibling . value () . kind,
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))
+          if h . skgid == skgid ));
+    if ! drawn_beside {
+      if let Some (historical) =
+        append_historical_phantom (tree, parent, pair, &skgid, None) {
+        tree . get_mut (historical) . unwrap () . detach (); // see 'move_to_front'
+        tree . get_mut (treeid) . unwrap () . insert_id_before (historical); }}
+    tree . get_mut (treeid) . unwrap () . detach (); }}
+
 /// Make 'child' the first child of 'treeid'.
 /// PITFALL: ego_tree's 'prepend_id' and 'insert_id_before' read the
 /// current first child (or previous sibling) before detaching the

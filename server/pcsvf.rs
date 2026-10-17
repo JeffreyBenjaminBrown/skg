@@ -21,7 +21,8 @@ use crate::to_org::util::{EditableMap, build_node_branch_minus_content};
 use crate::types::env::RuntimeGeneration;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{PartnerFolder, Viewnode, ViewnodeKind};
+use crate::types::viewnode::{
+  PartnerFolder, Phantom, Viewnode, ViewnodeKind, Vognode};
 use crate::types::views_state::pids_from_viewforest;
 use crate::update_buffer::{complete_viewforest_with_graph_pair, finish_viewforest};
 
@@ -117,6 +118,20 @@ pub fn pcsvf_viewforest (
   let pids : Vec<ID> =
     pids_from_viewforest (&viewforest) . into_iter () . collect ();
   Ok (( text, pids, viewforest )) }
+
+/// The nodes a buffer of the total diff view draws: its pids, and
+/// the deleted nodes it draws as historical phantoms. The leaves they
+/// own are the changes it shows.
+pub fn nodes_drawn_in_viewforest (
+  viewforest : &ViewForest,
+) -> HashSet<ID> {
+  let mut drawn : HashSet<ID> = pids_from_viewforest (viewforest);
+  drawn . extend (
+    viewforest . nodes () . filter_map ( |node| match &node . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
+        Some ( h . skgid . clone () ),
+      _ => None, } ));
+  drawn }
 
 /// The stub the PCSVF's view completion starts from: each root as an
 /// editable stub, or, when the after-graph lacks it, as a historical

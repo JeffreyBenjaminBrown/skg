@@ -18,7 +18,7 @@ use crate::types::nodes::complete::Flag;
 use crate::types::nodes::rust::GraphnodeInRust;
 
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -71,6 +71,15 @@ pub struct ReadinessSummary {
   pub changed_files         : usize,
   pub foreign_changed_files : usize,
   pub order_only_files      : usize,
+}
+
+/// The readiness summary a save of a TDV buffer reports: that of the
+/// whole changeset, and how many of its leaves the buffer does not
+/// show (their owning node is not drawn in it).
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BufferReadinessSummary {
+  pub summary         : ReadinessSummary,
+  pub unshown_changes : usize,
 }
 
 /// See the module comment.
@@ -222,6 +231,20 @@ impl ChangeForest {
       changed_files         : files . len (),
       foreign_changed_files : self . foreign_changed_files,
       order_only_files      : self . order_only_files . len (), } }
+
+  /// The readiness summary, with the count of leaves whose owning
+  /// node is not among 'shown' (the nodes a buffer draws).
+  pub fn buffer_readiness_summary (
+    &self,
+    store : &ReadinessStore,
+    shown : &HashSet<ID>,
+  ) -> BufferReadinessSummary {
+    BufferReadinessSummary {
+      summary         : self . readiness_summary (store),
+      unshown_changes : self . leaves_by_owner . iter ()
+        . filter ( |(owner, _)| ! shown . contains (*owner) )
+        . map ( |(_, leaves)| leaves . len () )
+        . sum (), } }
 }
 
 impl ReadinessSummary {

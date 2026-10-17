@@ -11,6 +11,7 @@ use git_fixture_helpers::{mk_test_tcp_stream_pair, setup_gitrepo_with_fixtures};
 use skg::change_forest::LeafKey;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::init::create_empty_tantivy_index;
+use skg::graph_pair::build::current_graph_pair_in_slot;
 use skg::graph_pair::types::GraphPair;
 use skg::readiness_store::ReadinessStore;
 use skg::serve::ViewsState;
@@ -30,7 +31,7 @@ use std::error::Error;
 use std::fs;
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, MutexGuard};
 use tempfile::TempDir;
 
 const FIXTURES : &str = "tests/pcsvf/fixtures";
@@ -118,6 +119,34 @@ pub fn all_changes_buffer_with_marks (
     TotalDiffViewBuffer::Empty => None,
     TotalDiffViewBuffer::Content { text, .. } => Some (text), } ) }
 
+/// The view id under which 'open_all_changes_buffer' registers the
+/// buffer, and 'save' saves it.
+pub const ALL_CHANGES_VIEW_ID : &str = "diff-view: all changes";
+
+/// Open the "all changes" buffer as the "total diff view" request
+/// does: drawn from the connection's graph pair with the marks on
+/// disk, and registered as a view of the total diff view.
+pub fn open_all_changes_buffer (
+  f : &mut Fixture,
+) -> Result<String, Box<dyn Error>> {
+  let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
+  let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
+  let pair : Arc<GraphPair> = current_graph_pair_in_slot (
+    &mut f . views_state . graph_pair, &f . config, runtime . graph . clone () ) ?;
+  let buffer : TotalDiffViewBuffer = {
+    let store : MutexGuard<ReadinessStore> =
+      env . runtime . readiness_store . lock () . unwrap ();
+    total_diff_view_buffer (&runtime, &pair, &store, TdvBuffer::AllChanges) ? };
+  match buffer {
+    TotalDiffViewBuffer::Empty =>
+      Err ( "the all-changes buffer is empty" . into () ),
+    TotalDiffViewBuffer::Content { text, pids, viewforest } => {
+      f . views_state . open_views . register_tdv_view (
+        &runtime . graph,
+        ViewId::ContentView ( ALL_CHANGES_VIEW_ID . to_string () ),
+        viewforest, &pids, TdvBuffer::AllChanges );
+      Ok (text) }, } }
+
 pub fn save (
   f      : &mut Fixture,
   buffer : &str,
@@ -126,7 +155,7 @@ pub fn save (
     mk_test_tcp_stream_pair ();
   Ok ( block_on ( update_from_and_rerender_buffer_test (
     &mut stream, buffer, &f . config, &f . tantivy, &f . graph, false,
-    &Ok ( ViewId::ContentView ("diff-view: all changes" . to_string ()) ),
+    &Ok ( ViewId::ContentView ( ALL_CHANGES_VIEW_ID . to_string () )),
     &mut f . views_state )) ? ) }
 
 /// Every '.skg' file of the fixture's skgrepos, by path, with its
