@@ -33,9 +33,10 @@ branch is not pushed) rather than adding one.
 ** Scope
 Six changes, three to the total diff view (TDV) and three deletions:
 a save that would leave a changed node with no editable instance is
-refused; an editable-view request on a node of U behaves as in any
-other view; a change counts as shown only where it is editable; the
-YAML corpus check, a dead alias collector and an unused dependency go.
+refused; an editable-view request behaves the same in every view,
+which takes two old save rules away; a change counts as shown only
+where it is editable; the YAML corpus check, a dead alias collector
+and an unused dependency go.
 
 ** Vocabulary
 The terms this plan relies on, one line each; 'docs/glossary.org' has
@@ -73,7 +74,12 @@ more.
   request then passes to the node's content children (the cascade),
   and the node budget ('initial_node_limit', charged once per
   expansion) bounds how far that goes. In a TDV the budget is charged
-  only for request-driven expansions of nodes outside U.
+  only for request-driven expansions of nodes outside U. The save
+  validates requests in 'validate_editable_view_requests'
+  ('server/from_text/buffer_to_viewnodes/validate_tree.rs'), which
+  today refuses a request on an editable node, a request on a node with
+  content children, and two requests for the same node in one buffer;
+  slice 2 deletes the first two rules and keeps the third.
 - 'skg-set-write-protected' (C-c s w; Neovim 'sw') puts
   'writeProtected' in a headline's metadata; the save applies it. The
   server checks a saved buffer's write-protected occurrences against
@@ -99,14 +105,27 @@ write-protecting this one." The Neovim message names its binding. The
 same save with an editable-view request on another occurrence of the
 node is allowed: that is how editability moves. Ordinary views are
 unaffected.
-** An editable-view request on a node of U behaves as in any view
-It takes the ordinary path: the draw rule makes the requested
-occurrence editable and write-protects the one that was editable by
-default, with its content subtree; the request passes to the content
-children. The node budget is charged only for the expansion of a node
-outside U, as today; a node of U is never charged, whether the TDV's
-rule or a request made it editable. So a request on an already
-editable node of U unfolds its subtree: its members outside U become
+** An editable-view request behaves the same in every view, and two save rules go
+A save no longer refuses an editable-view request because the node is
+editable, nor because the node has content children. The one rule
+that stays is that a buffer carries at most one editable-view request
+per node (the other kinds of view request are not its concern). So, in
+every view: a request on a write-protected occurrence makes it the
+editable one, and the occurrence that was editable by default is
+write-protected with its content subtree, which stays drawn; a request
+on that write-protected occurrence later moves editability back, and
+its drawn children are reconciled, not redrawn; a request on an
+already editable node passes to its content children (the cascade), so
+it means "unfold this subtree editable, within the node budget". The
+children a user types under a write-protected occurrence in the same
+save as a request are still refused, by the validator of edits to
+write-protected occurrences, which is where that protection has lived
+all along.
+
+In a TDV the request takes this same path, and the node budget is
+charged only for the expansion of a node outside U; a node of U is
+never charged, whether the TDV's rule or a request made it editable.
+So a request on an editable node of U makes its members outside U
 editable, within the budget, and its members in U pass the request on.
 The pre-pass is unchanged; it acts only when a node of U has no
 editable occurrence at all.
@@ -161,6 +180,16 @@ Since the fixes plan it write-protects only a member outside U that
 the visit created, and it never strips 'ViewRequest::Editable'. The
 request reaches the member's own visit, where the draw rule consumes
 it.
+** typed children under a write-protected node are already refused
+'errors_and_normalize_new_writeProtected_occurrences' compares each
+write-protected occurrence of the saved buffer with the one at the
+same parent path in the last rendering, and reports a changed content
+list as an edit to a write-protected occurrence; children typed under
+a write-protected occurrence the last rendering lacked are made
+non-members. That is the protection the deleted "content children"
+rule was for, and it stays. A write-protected occurrence whose drawn
+children are unchanged (as after editability moved away from it) is
+not an edit, so a request on it now passes.
 ** the validator matches occurrences by parent path and ID
 'errors_and_normalize_new_writeProtected_occurrences' pairs each
 write-protected occurrence of the saved buffer with the one at the
@@ -190,9 +219,23 @@ not by this function.
   'budgeted'), 'server/to_org/expand/editable.rs'
   ('apply_editable_draw_rule', 'writeProtect_content_subtree'),
   'server/to_org/render/changes.rs' ('tag_content_members'),
-  'tests/pcsvf/fresh_sets.rs' (helpers 'save_cleanly', 'drawn_editable',
-  'root_ids', 'subtree_starting'; the test
-  'an_editable_view_request_cascades_within_the_node_budget').
+  'server/from_text/buffer_to_viewnodes/validate_tree.rs'
+  ('validate_editable_view_requests'), the variants
+  'EditableViewRequestOnEditableNode' and
+  'EditableViewRequestOnNodeWithContentChildren' in
+  'server/types/errors.rs' and their messages in 'server/types/save.rs',
+  their tests in 'tests/new/buffer_to_viewnodes/validate_tree.rs' and
+  'tests/editable_view_cascade_and_budget.rs', the docstrings of
+  'skg-request-editable-view' ('elisp/skg-request-views.el') and of
+  the Neovim command in 'nvim/lua/skg/view_requests.lua' (both say
+  "write-protected and childless"), the 'C-c s d : skg-set-editable'
+  entry of 'docs/COMMANDS.org' and '<localleader>sd : :SkgSetEditable'
+  of 'docs/COMMANDS-nvim.org', 'tests/pcsvf/fresh_sets.rs' (helpers
+  'save_cleanly', 'drawn_editable', 'root_ids', 'subtree_starting'; the
+  tests 'an_editable_view_request_cascades_within_the_node_budget',
+  'an_editable_view_request_moves_editability_between_occurrences' and
+  the ignored 'an_editable_view_request_on_a_node_of_u_unfolds_its_members',
+  with the fixtures 'shared' and 'fresh').
 - Drawn: 'server/pcsvf.rs' ('nodes_drawn_in_viewforest',
   'contentOrigins_missing_from_buffer', 'content_occurrences_in_level_order',
   'make_freshU_editable_at_first_occurrences'), 'server/update_buffer.rs'
@@ -254,23 +297,44 @@ nothing; a change under a new origin with no occurrence still appends
 that origin (the existing test); a change the merges buffer's C leaves
 out is still counted unshown (the existing summary test).
 
-** Slice 2: a request on a node of U takes the ordinary path
-In 'visit_normal_node': delete the branch that removes the request
-from a node of U; let 'editableViewRequest_applies' be
-'had_editableViewRequest'; keep 'budgeted' as "not a TDV, or a
-requested node outside U", so a node of U is never charged. Nothing
-else changes. Update the sentence in both COMMANDS files that says
-what an editable-view request does in a TDV buffer: it now also moves
-editability between instances and unfolds an editable node's members.
-Tests in 'tests/pcsvf/fresh_sets.rs': with V and W two occurrences of
-a node of U and V editable, a request on W makes W editable and V
-write-protected, every node of U under V is editable again somewhere
-after the save, and a further save that changes nothing leaves all of
-that as it is; a request on an editable node of U makes its members
-outside U editable, recursively, until 'initial_node_limit' expansions
-are spent (small limit in the test's config), and charges nothing for
-the members in U; a request on a node outside U behaves as before (the
-existing test).
+** Slice 2: the editable-view request, the same in every view
+The first run of this plan left half of this slice in the working
+tree, uncommitted: 'visit_normal_node' no longer removes the request
+from a node of U ('editableViewRequest_applies' is
+'had_editableViewRequest'; 'budgeted' is "not a TDV, or a requested
+node outside U"), the fixture 'tests/pcsvf/fixtures/shared' and the
+passing test 'an_editable_view_request_moves_editability_between_occurrences',
+and the test 'an_editable_view_request_on_a_node_of_u_unfolds_its_members',
+marked ignored because the save refused its request. Keep all of it.
+Then, in 'validate_editable_view_requests', delete the rule that a
+requested node must be write-protected and the rule that it must have
+no content children; keep the rule that a buffer carries at most one
+editable-view request per node. Delete the two error variants from
+'server/types/errors.rs' and their messages from 'server/types/save.rs',
+and their tests in 'tests/new/buffer_to_viewnodes/validate_tree.rs'
+and 'tests/editable_view_cascade_and_budget.rs' (a test that asserted
+a refusal now asserts the behavior the request produces). Rewrite the
+docstrings of 'skg-request-editable-view' and of the Neovim command,
+and the 'skg-set-editable' entries of both COMMANDS files: a request on
+a write-protected occurrence makes it the editable one (and the other
+occurrence write-protected, keeping its drawn subtree); on an
+already-editable node it unfolds the node's content editable within
+'initial_node_limit' expansions; the TDV paragraph of both COMMANDS
+files gains the one sentence that in a TDV only members outside U are
+charged. Un-ignore the unfolding test. Add tests: in
+'tests/pcsvf/fresh_sets.rs', after editability moved from V to W, a
+request on V moves it back, V's drawn children are kept (same
+viewnodes, same fold state) and are editable again where U says, and
+a further save changes nothing; in 'tests/editable_view_cascade_and_budget.rs'
+(an ordinary content view), a request on an editable node makes its
+write-protected content descendants editable within the budget, and a
+request on a write-protected occurrence whose drawn children are
+unchanged moves editability to it; in 'tests/new/buffer_to_viewnodes/validate_tree.rs',
+two editable-view requests for one node are still refused; and a save
+that types a new child under a write-protected occurrence and requests
+it in the same save is still refused, by
+'errors_and_normalize_new_writeProtected_occurrences' (find or add that
+test beside the validator's own).
 
 ** Slice 3: refuse a save that leaves a changed node without an editable instance
 Give 'errors_and_normalize_new_writeProtected_occurrences' (or a

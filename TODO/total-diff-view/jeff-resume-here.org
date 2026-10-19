@@ -2,10 +2,12 @@
 
 * Before starting it
 Commit the plan ('6_plan-more.org') and anything else you want
-tracked: the script refuses to start while
-tracked files have uncommitted changes, and every slice's last commit
-edits the plan (its DONE keyword rides in that commit, never in a
-commit of its own). Then, from a plain shell in the container:
+tracked: every slice's last commit edits the plan (its DONE keyword
+rides in that commit, never in a commit of its own). Tracked files with
+uncommitted changes do not stop the script; it takes them for the work
+a stopped slice left behind and hands them to that slice's agent to
+finish and commit, so commit or stash edits of your own first. Then,
+from a plain shell in the container:
 #+begin_example
 nohup bash/run-plan-slices.sh > TODO/total-diff-view/run-logs/run.out 2>&1 &
 #+end_example
@@ -21,9 +23,10 @@ Everything it writes is under 'run-logs/' in this directory.
 * First look: three files
 ** run-logs/run.out
 The script's own output. Its last line tells you how the run ended:
-"all requested slices are DONE", "slice N ended without DONE", "slice
-N: claude exited nonzero", or the refusal "tracked files have
-uncommitted changes" (then nothing ran; see "If nothing ran").
+"all requested slices are DONE", "slice N ended without DONE" or
+"slice N: claude exited nonzero". A first line "tracked files are
+modified and will be handed to the first slice run" means a stopped
+slice's work was picked up.
 ** run-logs/sessions.log
 One line per slice start ("slice N  session UUID") and one per slice
 finish ("slice N DONE"). The UUID is what you need to resume a session.
@@ -67,11 +70,6 @@ Read 'run-logs/slice-N.err'. Usual causes are a network or
 authentication failure, or a crash. Resume the same session as above;
 if it has no useful context, delete nothing and just rerun the script,
 which starts that slice afresh.
-
-* If nothing ran
-The script refuses to start while tracked files have uncommitted
-changes. Commit (or stash) and start it again with the 'nohup' line
-above. Untracked files do not block it.
 
 * Where things are
 - 'run-logs/slice-N.json' is the raw result of each run; 'slice-N.txt'

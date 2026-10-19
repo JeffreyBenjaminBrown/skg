@@ -978,3 +978,78 @@ The test now expects eleven.
 'tests/pcsvf/fixtures/folder_member': m, the one root, contains a,
 whose body changed; c1 and c2 contain m, so they are drawn only in
 m's container folder.
+** Slice 2: stopped, the save refuses the unfolding request
+The plan's unfolding goal contradicts a save validation that holds in
+every view, so slice 2 stops before its commit. The work is in the
+working tree, uncommitted, and the slice is not marked DONE.
+*** What's done and went well
+**** the request takes the ordinary path
+'visit_normal_node' ('server/update_buffer/complete.rs') no longer
+removes the request from a node of U. 'editableViewRequest_applies'
+is 'had_editableViewRequest', and 'budgeted' is "not a TDV, or a
+requested node outside U", so a node of U is never charged.
+**** moving editability works
+'an_editable_view_request_moves_editability_between_occurrences'
+('tests/pcsvf/fresh_sets.rs') passes. It uses a new fixture,
+'tests/pcsvf/fixtures/shared': x and y, whose bodies changed, each
+contain n; n contains a, whose body changed, and b, unchanged. So x
+and y are roots, and n is editable under x and write-protected under
+y. A request on n under y makes that occurrence editable and the one
+under x write-protected with its content. a is editable again under
+y, with its change drawn there, and a further save changes nothing.
+The cascade also makes b editable under y, charged to the budget,
+because b is outside U.
+**** the suites
+'cargo nextest run' passes (748 tests, 1 skipped: the test below).
+In the first full run, 'save::none_node_fields_are_noops' failed
+once. It passed in isolation and in a second full run, so it is the
+known collision between concurrent runs. The Emacs and Neovim suites
+were not run, since no client code changed.
+*** What's imperfect about what's done
+**** the unfolding test is ignored
+'an_editable_view_request_on_a_node_of_u_unfolds_its_members' puts a
+request on r, an editable root of U in the 'fresh' fixture, and
+expects w and w1 to become editable within a budget of 2. The save
+refuses it before completion:
+'EditableViewRequestOnEditableNode (r)' and
+'EditableViewRequestOnNodeWithContentChildren (r)', from
+'validate_editable_view_requests'
+('server/from_text/buffer_to_viewnodes/validate_tree.rs', around line
+300). Every view has these two rules: a request must be on a
+write-protected node, and on a node with no content children. The
+clients' 'skg-request-editable-view' docstring says the same: "The
+node must be write-protected and childless." So no save can carry a
+request on an already editable node, in a TDV or anywhere else. The
+draw rule's same-occurrence branch and its cascade apply only to
+requests the cascade itself hands to freshly drawn children. The
+review's premise ("a request on an already-editable node hands the
+request to its content children") holds inside completion but not
+at the save boundary. The test is marked '#[ignore]' and points
+here.
+*** Choices determining the future
+**** how to make unfolding reachable
+The plan says "Nothing else changes", so this choice is Jeff's.
+Options, in the order I recommend:
+***** relax both rules for a node of U in a TDV buffer
+The validator would need the buffer's U, as slice 3 already plans
+for 'errors_and_normalize_new_writeProtected_occurrences': an
+'Option<&BTreeSet<ID>>' threaded from 'server/from_text.rs' into
+'validate_editable_view_requests'. The rule about content children
+exists because "the expansion would clobber those children". For an
+editable node, the save applies the children's edits before the
+rerender redraws them, so nothing the user typed is lost. That claim
+needs a test. The clients' docstrings and COMMANDS entries would
+mention the exception.
+***** relax them everywhere
+This makes "unfold this subtree editable" an ordinary-view gesture
+too. It is a larger contract change: it affects every view's save,
+and the error messages in 'server/types/save.rs'.
+***** drop unfolding from slice 2
+Moving editability ships as it is, and the unfolding test and the
+COMMANDS sentence's "unfolds an editable node's members" go. A user
+can still unfold a member outside U by requesting it, which cascades
+within the budget, as the existing test
+'an_editable_view_request_cascades_within_the_node_budget' shows.
+**** the docs wait for that choice
+The COMMANDS sentences that slice 2 updates describe unfolding, so
+they are not yet edited in either COMMANDS file.

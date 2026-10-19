@@ -1,0 +1,252 @@
+#+title: Unblocking slice 2 of the "more fixes" plan
+#+TODO: TODO ONGOING | DONE
+
+* What happened, in short
+The run of [[file:6_plan-more.org][6_plan-more.org]] finished slices 0 and 1 and stopped in slice 2,
+on purpose and correctly. Slice 2 asked for two things. The first,
+moving editability between two instances of a changed node, is built,
+tested and green, but uncommitted. The second, "unfold this subtree
+editable" by requesting an already-editable node, cannot be reached
+from a buffer at all, because a save rule that has always held in
+every view refuses a request on an editable node. The agent could not
+settle that without you, so it wrote its report, left the work in the
+working tree, and ended. Nothing is committed for slice 2, and the
+slice is not marked DONE. The decision is in "Your decision" below.
+
+* The pieces, from the ground up
+** The total diff view and its set U
+The total diff view (TDV) is a set of buffers that show everything in
+your graph that differs between the last commit and the working tree.
+Its main buffer is built from a few sets of nodes. C is the changed
+nodes. From each changed node the server walks up through containers
+to a content origin, a node with no container or with several. U is
+every node on those walks, changed nodes and origins included. The
+TDV's drawing rule: a node of U is editable, with its whole content
+list drawn; a content member that is not in U is drawn as a
+write-protected leaf. After every save the sets are recomputed from
+the new state of the graph, so U can grow or shrink.
+** Occurrences, editable and write-protected
+One graphnode can appear in a buffer several times, as several
+headlines. Each headline is an occurrence of the node. At most one
+occurrence of a node is editable in a buffer; the others are
+write-protected, which means the server ignores edits to them and
+draws no content under them. Which occurrence is editable is decided
+when the buffer is drawn: the first occurrence the drawing meets wins,
+and later ones are write-protected. In a TDV, every node of U gets an
+editable occurrence this way, and nothing editable is ever
+write-protected again by the server on its own.
+** The pre-pass
+Because U grows after saves, a node can enter U while the buffer shows
+it only as a write-protected leaf. Before the rerender draws the
+buffer, a step the plans call the pre-pass looks for every node of U
+that has no editable occurrence and makes one of its occurrences
+editable, so the drawing can then expand it. Since slice 1 of this
+plan, that may be a folder member if the node has no other
+occurrence. The pre-pass never touches a node that already has an
+editable occurrence.
+** The editable-view request
+This is the user's way of saying "make this occurrence the editable
+one". In Emacs it is 'skg-request-editable-view' (also reached as
+C-c s d, 'skg-set-editable'); it writes '(viewRequests editableView)'
+into the headline's metadata, and the next save carries it to the
+server. The server honors it during the rerender: the requested
+occurrence becomes editable, the occurrence that was editable by
+default becomes write-protected together with its content subtree,
+and the request is then handed on to the newly editable node's content
+children (the cascade), each of which becomes editable in turn, and so
+on down, until the node budget is spent. The node budget is a counter,
+'initial_node_limit' in the config, charged once per node expanded;
+when it reaches zero, further nodes are left write-protected. In a TDV
+the budget is charged only for nodes outside U, since U is drawn in
+full regardless.
+** The two save rules that refuse some requests
+Before any of that, the save validates the buffer, and two of its
+rules concern this request ('validate_editable_view_requests',
+'server/from_text/buffer_to_viewnodes/validate_tree.rs'). A request
+is refused when the node is already editable ("The node already shows
+its content; no expansion needed."), and when the node has content
+children drawn under it ("The expansion would clobber those
+children."). The second exists because a write-protected node can have
+children a user typed under it in the buffer, which the expansion
+would redraw over. Both clients' docstrings state the same: the node
+must be write-protected and childless. These rules hold in every view,
+and they are older than the TDV.
+*** DONE [Jeff] Can you find some reason for the refusals?
+I vaguely remember asking for it, but maybe just because I was in a hurry.
+I don't see a principled reason for it.
+The first rule prevents something harmless.
+The second rule prevents something that, admittedly, takes some work,
+but it seems like work we already do in other situations:
+If we're unfolding a contentward view from N,
+and some C that N contains is among N's children,
+we keep that one, make sure it's writable, and recurse into it;
+if one isn't, we add it writable and recurse into it;
+and all N's children that aren't content are unaffected.
+**** [Claude] the history gives none worth keeping; and the second rule now blocks the moving half too
+What the record says. Both rules are older than the TDV and older
+than the local-view-update work. The second began as "the node must be
+write-protected and childless"; on 2026-04-24 (commit 'e337d40e',
+"definitive view request is now possible on an indefinitive node with
+children, as long as none of those children has Birth=ContentOf") it
+was narrowed to content children, with the comment that non-content
+children "won't be clobbered by it". No design note says more. The
+messages in 'server/types/save.rs' are the whole stated rationale: for
+the first rule, "The node already shows its content; no expansion
+needed"; for the second, "The expansion would clobber those children.
+Save without the request first, then delete children and retry."
+
+What each rule protects today. The first protects nothing: a request
+on an editable occurrence is either the occurrence the draw rule would
+choose anyway, or, if it cascades, the unfolding you describe. You are
+right that it is harmless. The second has one real target, children a
+user typed under a write-protected node in the same save as the
+request, which the expansion would redraw over. But that case is
+already refused by another validator,
+'errors_and_normalize_new_writeProtected_occurrences': typing children
+under a write-protected occurrence that the last rendering had is an
+edit to it ("changed content membership"), and children typed under a
+brand-new write-protected occurrence are made non-members. So the
+second rule adds no protection there.
+
+Where the second rule fires alone, it does harm, and slice 2 has just
+made that case common. When editability moves from V to W, V is
+write-protected together with its content subtree, and that subtree
+stays drawn under V ('writeProtect_content_subtree' marks, it does not
+detach). V is then exactly "a write-protected node with content
+children", so a request to move editability back to V is refused, and
+the message tells the user to delete V's children by hand first. The
+moving half built in slice 2 therefore works in one direction only
+while the second rule stands. Your description of the work is what
+the content reconciler already does at every editable node's visit:
+a child that is a content member is kept and recursed into, a missing
+member is created, a stale one goes, and non-content children are left
+alone. Expanding V runs that on children that are already V's content,
+so nothing is clobbered.
+
+So: delete both rules, keep the third (at most one editable-view
+request per node in a buffer; the other kinds of view request, for
+folders, role trees, flags and forks, are not its concern).
+A request on an editable node then means "unfold this
+subtree editable, within the budget", and a request on a
+write-protected node with drawn children means "edit here", with the
+children reconciled, not redrawn. The "Which of the three" decision
+below collapses into its first option, made smaller: no narrowing, two
+deletions, the message texts, both clients' docstrings (they say
+"write-protected and childless"), the COMMANDS entries, and three
+tests: unfolding in a TDV (the ignored one), unfolding in an ordinary
+view, and moving editability back to the first occurrence.
+* What slice 2 asked for
+In the review of the previous run, I argued that a request on a node
+of U should take the ordinary path, for two reasons. One, moving: if
+V and W are two occurrences of a changed node and V is editable, a
+request on W should make W editable and V write-protected, as in any
+view; the previous run had made the TDV drop every request on a node
+of U, so this did not work. Two, unfolding: I wrote that a request on
+an already editable node hands the request to its content children,
+so in a TDV it would mean "unfold this subtree editable within the
+budget", which members outside U would benefit from. You agreed, and
+slice 2 says both.
+
+* What the agent found
+The moving half is right. It is built, and the test shows editability
+moving from V to W, the changed node under it editable again at the
+new place, and a further save changing nothing.
+
+The unfolding half rests on a premise that is true only inside the
+server. During a rerender, a request can indeed sit on an editable
+node, because the cascade itself puts requests on freshly drawn
+editable children. But a request written in a buffer by a user never
+reaches the rerender if the node is editable: the first save rule
+refuses it, and, since an editable node of U has its content drawn,
+the second rule refuses it too. So the gesture I described cannot be
+made, in a TDV or anywhere, without changing a save rule that is not
+the TDV's. The plan said "nothing else changes", so the agent stopped,
+rightly. Its test for unfolding is in the tree, marked ignored, and
+points at its report in 'progress.org' under "More fixes".
+
+* Your decision
+** DONE Which of the three
+*** [Claude] after the history, it is one choice
+The reply above argues for deleting both rules everywhere. If you
+agree, say so here and I will rewrite slice 2 of the plan to that; the
+options below stay for the record.
+**** [Claude] decided: delete both rules everywhere
+Jeff decided so in conversation on 2026-10-19 ("Yes please, delete
+both rules everywhere"). Slice 2 of the plan now says it; see "What to
+do now" at the end.
+*** Allow a request on an editable node, in every view
+Change the first save rule so that a request on an editable node is
+allowed, and narrow the second so that it still refuses a request on
+a write-protected node with content children, but not on an editable
+one. For an editable node the children are its real content, and the
+save writes them to disk before the rerender redraws anything, so the
+clobbering the second rule guards against cannot happen there; the
+executor would prove that with a test. The request on an editable node
+then means, everywhere, "unfold this subtree editable, within the
+budget". In an ordinary view that is close to a no-op, since content
+under an editable node is editable by default until the budget ran
+out; in a TDV it is the one gesture that opens many write-protected
+members at once. One rule, one meaning, in every view, which is the
+principle you have asked for. It is the largest of the three: the
+validator, its message in 'server/types/save.rs', both clients'
+docstrings, the COMMANDS entries, a test in an ordinary view and the
+TDV test now ignored. I recommend this one.
+*** Drop unfolding from slice 2
+Keep the save rules as they are. Moving editability ships as built;
+the ignored test and the COMMANDS sentence about unfolding go. A user
+of a TDV who wants to edit several write-protected members requests
+them one by one, and each request still cascades down its own subtree
+within the budget. This is the smallest change and loses nothing that
+exists today; it only leaves the convenience unbuilt. Choose it if you
+would rather not touch an ordinary-view save rule now.
+*** Allow it only for a node of U in a TDV buffer
+The agent's first suggestion: thread U into the validator (slice 3
+already does that for its own rule) and exempt nodes of U. I advise
+against it. The same gesture would then be legal in one kind of
+buffer and refused in another, and the refusal message would be wrong
+for the TDV. You have said more than once that the TDV should not
+behave differently from other views in matters like this.
+
+** The uncommitted work
+'server/update_buffer/complete.rs' (the request no longer dropped for
+a node of U; the budget charged only outside U) and
+'tests/pcsvf/fresh_sets.rs' (the moving test, which passes, and the
+unfolding test, ignored) are modified in the working tree, with the
+agent's report in 'progress.org'. Whichever you choose, this work
+stands; the choice decides what is added to it.
+
+* What to do now
+Slice 2 of the plan is rewritten: it keeps the uncommitted work,
+deletes the two save rules everywhere, keeps the one-request-per-node
+rule, and names the docstrings, COMMANDS entries and tests to change.
+The runner now runs the remaining slices by itself: it skips slices 0
+and 1 (DONE), hands the modified files of the working tree to the
+slice-2 agent as the work a stopped run left, and goes on to slice 3.
+Commit the rewritten plan and this document first, then:
+#+begin_example
+nohup bash/run-plan-slices.sh > TODO/total-diff-view/run-logs/run.out 2>&1 &
+#+end_example
+The alternative, with the stopped session's context intact, is
+#+begin_example
+claude --resume bdba0930-0565-4480-bd08-a2167cf820af --dangerously-skip-permissions
+#+end_example
+and telling it that slice 2 of 6_plan-more.org is rewritten and to
+finish the slice as it now says; then the runner for slice 3.
+
+* What I checked
+Slices 0 and 1 are committed and marked DONE; slice 1's log records
+three things worth knowing. No step re-protects an editable folder
+member after all, so slice 1 had nothing to exempt and pinned that
+with a test. A historical phantom drawn inside another historical
+phantom's old content counts as shown, which the plan's wording had
+missed. And the merges buffer's unshown count rose by one, because the
+text preserver, drawn write-protected outside that buffer's U, now
+counts as unshown, which is the new rule applied honestly. My own
+suite run on the working tree and the per-commit build check are
+recorded below.
+** results
+The Rust suite on the working tree, with slice 2's uncommitted work in
+it: 748 of 748 pass, 1 ignored (the unfolding test). The three commits
+of this run all compile ('cargo check --all-targets' at each). The
+Emacs and Neovim suites were not touched by slices 0 to 2 and were not
+rerun. The log is 'tests/results/review6/checks.txt'.

@@ -7,14 +7,19 @@
 # Usage: bash/run-plan-slices.sh [FIRST_SLICE] [LAST_SLICE]   (defaults 0 3)
 #   SKG_PLAN_MODEL  (default claude-opus-5-5, i.e. Opus 5.5)  and
 #   SKG_PLAN_EFFORT (default high)  override what is passed to claude.
+# More elaborate:
+#   nohup bash/run-plan-slices.sh > TODO/total-diff-view/run-logs/run.out 2>&1 &
 #
 # Run it from a plain shell in the container, not from inside a Claude
 # Code session (claude refuses to nest). Detach it, e.g.
 #   nohup bash/run-plan-slices.sh > TODO/total-diff-view/run-logs/run.out 2>&1 &
 #
-# Commit the plan first: the script refuses to start while tracked files
-# have uncommitted changes, and each slice's last commit edits the plan
-# (its DONE keyword rides in that commit, never in one of its own).
+# Commit the plan first: each slice's last commit edits the plan (its
+# DONE keyword rides in that commit, never in one of its own). Tracked
+# files with uncommitted changes do not stop the run: they are taken to
+# be the work a stopped earlier slice left behind, the agent is told
+# which files they are, and it commits them with its slice. So commit
+# or stash edits of your own before starting.
 #
 # The loop stops when a slice ends without its headline marked DONE (the
 # agent stopped for a question; read progress.org) or when claude exits
@@ -33,9 +38,11 @@ FIRST="${1:-0}"
 LAST="${2:-3}"
 mkdir -p "$LOG_DIR"
 
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "run-plan-slices: tracked files have uncommitted changes; commit or stash them first." >&2
-  exit 3
+dirty_files=$(git status --porcelain | grep -v '^??' | sed 's/^...//' | tr '\n' ' ')
+dirty_note=""
+if [ -n "$dirty_files" ]; then
+  echo "run-plan-slices: tracked files are modified and will be handed to the first slice run: $dirty_files" >&2
+  dirty_note=" Tracked files with uncommitted changes when you started: $dirty_files. Unless $PLAN_DIR/progress.org says otherwise, they are the work a stopped earlier run of this slice left behind; keep what the plan says to keep, finish the slice on top of them, and commit them with it."
 fi
 
 slice_done () { grep -qE "^\*\* DONE Slice $1:" "$PLAN"; }
@@ -52,7 +59,7 @@ for n in $(seq "$FIRST" "$LAST"); do
   fi
   session=$(new_uuid)
   echo "$(date -Is) slice $n  session $session" | tee -a "$LOG_DIR/sessions.log"
-  prompt="Read coding-advice/ORIENTATION.org and the advice it names for code changes, tests and execution. Then implement slice $n of $PLAN, and only that slice. Read $PLAN_DIR/progress.org first if it exists. The plan is a settled specification; do not reopen its decisions or edit its text except the keyword of the slice headline. Commit as the plan's Commits section says: the slice's last code-modifying commit also carries the slice's documentation changes and the change of its headline in $PLAN from TODO to DONE. Never make a separate commit for those; if something is left over after your last code commit, amend that commit. Resolve ordinary implementation choices yourself; stopping is only for the rare conditions that coding-advice/when-to-stop.org describes. If one of those arises, write the report into $PLAN_DIR/progress.org under its top-level headline '$PROGRESS_HEADLINE', do not mark the slice DONE, and end your turn. Write any log or scratch file of your own under tests/results/, never under TODO/."
+  prompt="Read coding-advice/ORIENTATION.org and the advice it names for code changes, tests and execution. Then implement slice $n of $PLAN, and only that slice. Read $PLAN_DIR/progress.org first if it exists.$dirty_note The plan is a settled specification; do not reopen its decisions or edit its text except the keyword of the slice headline. Commit as the plan's Commits section says: the slice's last code-modifying commit also carries the slice's documentation changes and the change of its headline in $PLAN from TODO to DONE. Never make a separate commit for those; if something is left over after your last code commit, amend that commit. Resolve ordinary implementation choices yourself; stopping is only for the rare conditions that coding-advice/when-to-stop.org describes. If one of those arises, write the report into $PLAN_DIR/progress.org under its top-level headline '$PROGRESS_HEADLINE', do not mark the slice DONE, and end your turn. Write any log or scratch file of your own under tests/results/, never under TODO/."
   if ! claude -p "$prompt" \
          --model "$MODEL" --effort "$EFFORT" \
          --session-id "$session" \
@@ -68,5 +75,6 @@ for n in $(seq "$FIRST" "$LAST"); do
     exit 2
   fi
   echo "$(date -Is) slice $n DONE" | tee -a "$LOG_DIR/sessions.log"
+  dirty_note="" # whatever was handed over is committed, or the loop has stopped
 done
 echo "all requested slices are DONE"

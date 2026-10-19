@@ -244,6 +244,76 @@ fn an_editable_view_request_cascades_within_the_node_budget (
     assert_eq! ( again, saved, "the nodes made editable stay editable" );
     Ok (( )) }) }
 
+/// The 'shared' fixture (one skgrepo, main): x and y, whose bodies
+/// changed, each contain n, which contains a, whose body changed, and
+/// b, unchanged. So x and y are the buffer's roots, and n is drawn
+/// editable under x and write-protected under y. An editable-view
+/// request on n under y makes that occurrence editable and the one
+/// under x write-protected, with its content; a, a node of U under
+/// it, is editable again under y, its change drawn there. A further
+/// save changes nothing.
+#[test]
+fn an_editable_view_request_moves_editability_between_occurrences (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("shared", &["main"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let n_under_y : &str = "** (skg (node (id n) (repo main) writeProtected ";
+    assert! ( subtree_starting (&buffer, "* (skg (node (id y) ") . iter ()
+                . any ( |line| line . starts_with (n_under_y) ),
+              "n must be write-protected under y:\n{}", buffer );
+    let requested : String = {
+      let at : usize = buffer . find (n_under_y) . unwrap ();
+      format! ( "{}{}", &buffer [.. at],
+                buffer [at ..] . replacen (
+                  "writeProtected", "writeProtected (viewRequests editableView)", 1 )) };
+    let saved : String = save_cleanly (f, &requested) ? . saved_view;
+    let x_subtree : Vec<&str> = subtree_starting (&saved, "* (skg (node (id x) ");
+    let y_subtree : Vec<&str> = subtree_starting (&saved, "* (skg (node (id y) ");
+    for (subtree, editable) in [ (&x_subtree, false), (&y_subtree, true) ] {
+      for node in [ "n", "a" ] {
+        let atom : String = format! ("(node (id {}) ", node);
+        let line : &str = subtree . iter ()
+          . find ( |line| line . contains (&atom) )
+          . unwrap_or_else ( || panic! ( "{} must be drawn:\n{}", node, saved ));
+        assert_eq! ( ! line . contains ("writeProtected"), editable,
+                     "{}:\n{}", node, saved ); }}
+    assert! ( y_subtree . contains (&"**** (skg (oldText body))"),
+              "a's change must be drawn under y:\n{}", saved );
+    assert! ( ! saved . contains ("viewRequests"), "{}", saved );
+    let again : String = save_cleanly (f, &saved) ? . saved_view;
+    assert_eq! ( again, saved, "the editability moved stays where it is" );
+    Ok (( )) }) }
+
+/// An editable-view request on r, an editable node of U, cascades
+/// through its content as in an ordinary view: its members outside U
+/// expand until the node budget (2 here) is spent, so w and w1 become
+/// editable while w2 and w1a stay write-protected. r and a, in U,
+/// are not charged; were either charged, w1 would stay
+/// write-protected. A further save changes nothing.
+#[test]
+#[ignore = "the save refuses a request on an editable node; see 'More fixes', slice 2, in TODO/total-diff-view/progress.org"]
+fn an_editable_view_request_on_a_node_of_u_unfolds_its_members (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("fresh", &["main"], |f| {
+    f . config . initial_node_limit = 2;
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let requested : String = buffer . replacen (
+      "* (skg bodyFolded (node (id r) (repo main) ",
+      "* (skg bodyFolded (node (id r) (repo main) (viewRequests editableView) ", 1 );
+    assert_ne! ( requested, buffer );
+    let saved : String = save_cleanly (f, &requested) ? . saved_view;
+    for node in [ "r", "a", "w", "w1" ] {
+      assert! ( drawn_editable (&saved, node),
+                "{} must be editable:\n{}", node, saved ); }
+    for node in [ "w2", "w1a" ] {
+      assert! ( ! node_lines (&saved, node) . is_empty ()
+                && ! drawn_editable (&saved, node),
+                "{} must be write-protected:\n{}", node, saved ); }
+    assert! ( ! saved . contains ("viewRequests"), "{}", saved );
+    let again : String = save_cleanly (f, &saved) ? . saved_view;
+    assert_eq! ( again, saved, "the nodes made editable stay editable" );
+    Ok (( )) }) }
+
 /// U (a, p, q and r) exceeds the node budget, here 1; the buffer is
 /// drawn in full regardless, when opened and after a save.
 #[test]

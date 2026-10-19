@@ -278,16 +278,10 @@ fn visit_normal_node (
   let in_u : bool = // of the total diff view being drawn
     context . tdv_drawing . is_some_and (
       |drawing| drawing . sets () . u . contains (&pid) );
-  if had_editableViewRequest && in_u {
-    // A node of U is editable by the total diff view's own rule, so
-    // a request there does nothing.
-    write_at_unrestrictedVognode_in_tree (
-      tree, treeid,
-      |t| { t . view_requests . remove (& ViewRequest::Editable); } )
-      . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
-  let editableViewRequest_applies : bool = had_editableViewRequest && ! in_u;
-  let budgeted : bool = // In a total diff view the budget bounds only the expansions requests make.
-    context . tdv_drawing . is_none () || editableViewRequest_applies;
+  let editableViewRequest_applies : bool = had_editableViewRequest;
+  let budgeted : bool = // In a total diff view the budget bounds only the expansions requests make outside U.
+    context . tdv_drawing . is_none ()
+    || ( editableViewRequest_applies && ! in_u );
   let mut settled : bool = false; // TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule already ran
   let mut cascade : bool = false; // node is Final -> hand EVRs to children
   // TODO/DONE/local-view-update/plan_v2.org §5.5: the budget counts vognode *expansions* (each costs 1, charged in
