@@ -513,7 +513,7 @@ fn later_text_reports_the_repo_that_actually_won (
 #[test]
 fn pre_october_2026_keys_still_load () {
   use crate::types::nodes::fs::GraphnodeOnDisk;
-  let old : GraphnodeOnDisk = serde_yaml::from_str (
+  let old : GraphnodeOnDisk = yaml_serde::from_str (
     "pid: p\ntitle: t\nsubscribes_to:\n- s\nhides_from_its_subscriptions:\n- h\noverrides_view_of:\n- o\nmisc:\n- NoSearchMatching\n"
   ) . unwrap ();
   assert_eq! (old . hidesFromSubs, vec! [ID::from ("h")]);

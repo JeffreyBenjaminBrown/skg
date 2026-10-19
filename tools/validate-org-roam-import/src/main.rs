@@ -1,6 +1,6 @@
 use git2::{Commit, ObjectType, Oid, Repository, Tree, TreeWalkMode, TreeWalkResult};
 use serde::Deserialize;
-use serde_yaml::Value;
+use yaml_serde::Value;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::env;
@@ -870,7 +870,7 @@ fn headline_title(line: &str) -> String {
 }
 
 fn parse_skg_blob(blob: &GitBlob) -> Result<SkgNode, String> {
-    let raw: RawSkgNode = serde_yaml::from_str(&blob.content).map_err(|e| e.to_string())?;
+    let raw: RawSkgNode = yaml_serde::from_str(&blob.content).map_err(|e| e.to_string())?;
     let pid: String = raw
         .pid
         .or_else(|| first_id_from_value(raw.ids))

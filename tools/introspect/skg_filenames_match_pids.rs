@@ -109,7 +109,7 @@ fn get_skg_files_in_dir(dir: &str) -> Vec<String> {
 fn extract_primary_id(skgfile_path: &str) -> Result<String, String> {
   let contents = fs::read_to_string(skgfile_path)
     .map_err(|e| e.to_string())?;
-  let yaml: serde_yaml::Value = serde_yaml::from_str(&contents)
+  let yaml: yaml_serde::Value = yaml_serde::from_str(&contents)
     .map_err(|e| e.to_string())?;
   let ids = yaml.get("ids")
     .ok_or_else(|| "No 'ids' field found".to_string())?;

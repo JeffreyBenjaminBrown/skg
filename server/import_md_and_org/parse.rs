@@ -1,7 +1,7 @@
 //! Format-aware, source-preserving document parsing for interactive import.
 
 use pulldown_cmark::{Event, LinkType, Options, Parser, Tag, TagEnd};
-use serde_yaml::Value;
+use yaml_serde::Value;
 use crate::export_org::export_header_length;
 use crate::types::links::org_literal_ranges::{
   HeadlineInsideBlock, headlines_inside_blocks,
@@ -370,7 +370,7 @@ fn parse_markdown_front_matter (
         message : "Unclosed YAML front matter" . to_string (), });
       return (None, Vec::new ()); };
   let yaml : &str = &text [4..end];
-  let parsed : Value = match serde_yaml::from_str (yaml) {
+  let parsed : Value = match yaml_serde::from_str (yaml) {
     Ok (value) => value,
     Err (error) => {
       document . diagnostics . push (Diagnostic {

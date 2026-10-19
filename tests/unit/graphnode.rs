@@ -92,8 +92,8 @@ fn setting_one_flag_preserves_the_others_and_repairs_duplicates () {
 
 #[test]
 fn no_search_matching_has_the_exact_persisted_yaml_spelling () {
-  assert_eq! (serde_yaml::to_string (&Flag::NoSearchMatching)
+  assert_eq! (yaml_serde::to_string (&Flag::NoSearchMatching)
               . unwrap (), "NoSearchMatching\n");
-  assert_eq! (serde_yaml::from_str::<Flag> ("NoSearchMatching")
+  assert_eq! (yaml_serde::from_str::<Flag> ("NoSearchMatching")
               . unwrap (), Flag::NoSearchMatching);
 }

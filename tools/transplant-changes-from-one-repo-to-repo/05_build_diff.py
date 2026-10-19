@@ -96,7 +96,7 @@ def map_uuid(uuid_map: dict, added: set[str], u: str) -> str:
 
 def render_field(key: str, value) -> str:
     """Emit a single YAML field as '<key>: <value>\\n' (possibly multi-line for
-    lists), matching what serde_yaml produces in skg."""
+    lists), matching what yaml_serde produces in skg."""
     return yaml.safe_dump(
         {key: value},
         default_flow_style=False,

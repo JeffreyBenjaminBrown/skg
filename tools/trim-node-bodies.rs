@@ -56,7 +56,7 @@ fn trim_one_file (
   path : &Path,
 ) -> Result<bool, Box<dyn std::error::Error>> {
   let contents : String = fs::read_to_string (path) ?;
-  let mut node : GraphnodeOnDisk = serde_yaml::from_str (&contents) ?;
+  let mut node : GraphnodeOnDisk = yaml_serde::from_str (&contents) ?;
   let before : Option<String> = node . body . clone ();
   let after  : Option<String> = normalize_body (before . clone ());
   if before == after { return Ok (false); }

@@ -913,3 +913,33 @@ pointer's 'mutability' is now a 'PointerMutability' enum rather than
 an 'Option'. The plan bumps 'syn' only if the tools build unchanged,
 so every manifest keeps 'syn' 2. 'proc-macro2' was already at its
 latest, 1.0.107. 'tantivy' 0.27 needed no code changes.
+*** dependency slice 6: 'yaml_serde' replaces 'serde_yaml'
+**** the corpus
+62,339 '.skg' files: 731 under 'tests/' and 61,608 under 'data/'.
+serde_yaml read all of them.
+**** the candidates
+'yaml_serde' 0.10.7, 'serde_yaml_ng' 0.10.0 and 'serde_yaml_bw'
+2.5.8 each parsed every file as serde_yaml did and re-serialized it
+byte for byte as serde_yaml did. 'serde-saphyr' 2.0.0 differed on
+17,125 files, all in quoting: it double-quotes plain scalars ('pid:
+"N"', '- "N"') and uses double quotes where serde_yaml uses single
+('"[[id:X][to X]]"'). It also parsed 24 files differently. 'yaml_serde'
+is first in the plan's order and is a drop-in, so the server, its
+tests, the two root tools that read '.skg' files, and
+'tools/validate-org-roam-import' use it. The corpus check, run again
+against the new code, finds the server's 'to_yaml' identical to
+serde_yaml's on every file.
+**** where it is
+'tests/yaml-corpus/' is a workspace member of its own (it needs
+serde_yaml beside every candidate), run with 'cargo run -p yaml-corpus
+-- PATH ...'. Its 'to_yaml' replicas copy the private
+'block_scalar_for_body' from 'server/types/nodes/fs.rs'. serde-saphyr
+has no 'Value', so its replica splits the node into fields with
+serde_yaml's and renders each field with serde-saphyr.
+**** the one remaining 'serde_yaml'
+The root 'Cargo.toml' names no deprecated crate. The corpus check's
+own manifest still names 'serde_yaml', as its reference, so
+'Cargo.lock' still lists it; nothing the server builds uses it.
+**** more call sites than the plan counted
+The plan says seven files use it; fourteen Rust files did (six in
+'server/', five test files, three tools).

@@ -141,19 +141,19 @@ impl GraphnodeOnDisk {
   /// double-quoted string with `\n` escapes.
   ///
   /// Field order matches the struct declaration, matching what a
-  /// plain `serde_yaml::to_string(self)` would produce. Reads
-  /// (`serde_yaml::from_str`) already accept every scalar style, so
+  /// plain `yaml_serde::to_string(self)` would produce. Reads
+  /// (`yaml_serde::from_str`) already accept every scalar style, so
   /// existing .skg files need no migration.
   ///
-  /// Falls back to the default `serde_yaml` rendering for body strings
+  /// Falls back to the default `yaml_serde` rendering for body strings
   /// that cannot be losslessly represented in block form (e.g. ones
   /// containing carriage returns or NUL bytes).
   pub fn to_yaml (
     &self,
-  ) -> Result<String, serde_yaml::Error> {
-    let value : serde_yaml::Value =
-      serde_yaml::to_value (self)?;
-    let mapping : &serde_yaml::Mapping =
+  ) -> Result<String, yaml_serde::Error> {
+    let value : yaml_serde::Value =
+      yaml_serde::to_value (self)?;
+    let mapping : &yaml_serde::Mapping =
       value . as_mapping ()
       . expect ("GraphnodeOnDisk serializes as a YAML mapping");
     let mut out : String = String::new();
@@ -168,13 +168,13 @@ impl GraphnodeOnDisk {
       match block {
         Some (rendered) => out . push_str (&rendered),
         None => {
-          // Singleton mapping, so 'serde_yaml::to_string'
+          // Singleton mapping, so 'yaml_serde::to_string'
           // renders just this one key-value pair.
-          let singleton : serde_yaml::Mapping =
+          let singleton : yaml_serde::Mapping =
             [(key . clone (), val . clone ())]
             . into_iter () . collect ();
           out . push_str (
-            & serde_yaml::to_string (&singleton)?); } } }
+            & yaml_serde::to_string (&singleton)?); } } }
     Ok (out) }
 }
 
@@ -211,7 +211,7 @@ pub fn graphnode_on_disk_from_section (
 
 /// Render BODY as a YAML block-literal key-value of the form
 /// `body: |2…\n  line\n  line\n`. Returns Some only when the result
-/// round-trips exactly through `serde_yaml::from_str`; otherwise None,
+/// round-trips exactly through `yaml_serde::from_str`; otherwise None,
 /// signalling the caller to fall back to the default rendering.
 fn block_scalar_for_body (
   body : &str,
@@ -223,7 +223,7 @@ fn block_scalar_for_body (
     else       { body };
   let chomp : &str = if ends_nl { "" } else { "-" };
   // Indentation indicator first, then chomping indicator -- matches
-  // serde_yaml's own emitter style (e.g. `|2-`).
+  // yaml_serde's own emitter style (e.g. `|2-`).
   let mut out : String =
     format! ("body: |2{}\n", chomp);
   for line in inner . split ('\n') {
@@ -234,8 +234,8 @@ fn block_scalar_for_body (
       out . push ('\n'); } }
   // Round-trip guard: parse what we emitted and accept only if the
   // decoded body is bit-for-bit identical to the input.
-  let parsed : Result<serde_yaml::Value, _> =
-    serde_yaml::from_str (&out);
+  let parsed : Result<yaml_serde::Value, _> =
+    yaml_serde::from_str (&out);
   match parsed {
     Ok (v) => {
       let got : Option<&str> =

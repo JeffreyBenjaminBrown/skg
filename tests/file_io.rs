@@ -46,7 +46,7 @@ fn save_filesystem_preparation_writes_normalized_skgids (
     &[NodeInstruction::Save (SaveNode (node))], &[], config ) ?;
 
   let yaml : String = fs::read_to_string (dir . path () . join ("P.skg")) ?;
-  let on_disk : GraphnodeOnDisk = serde_yaml::from_str (&yaml) ?;
+  let on_disk : GraphnodeOnDisk = yaml_serde::from_str (&yaml) ?;
   assert_eq! (on_disk . extra_ids, vec![ID::from ("B"), ID::from ("A")]);
   Ok (( ))
 }
@@ -97,14 +97,14 @@ fn test_node_io() {
   let expected_reversed : String =
     fs::read_to_string (expected_reversed_path) . unwrap();
 
-  let parsed_generated_example: serde_yaml::Value =
-    serde_yaml::from_str (&generated_example) . unwrap();
-  let parsed_expected_example: serde_yaml::Value =
-    serde_yaml::from_str (&expected_example) . unwrap();
-  let parsed_generated_reversed: serde_yaml::Value =
-    serde_yaml::from_str (&generated_reversed) . unwrap();
-  let parsed_expected_reversed: serde_yaml::Value =
-    serde_yaml::from_str (&expected_reversed) . unwrap();
+  let parsed_generated_example: yaml_serde::Value =
+    yaml_serde::from_str (&generated_example) . unwrap();
+  let parsed_expected_example: yaml_serde::Value =
+    yaml_serde::from_str (&expected_example) . unwrap();
+  let parsed_generated_reversed: yaml_serde::Value =
+    yaml_serde::from_str (&generated_reversed) . unwrap();
+  let parsed_expected_reversed: yaml_serde::Value =
+    yaml_serde::from_str (&expected_reversed) . unwrap();
 
   assert_eq!(parsed_generated_example, parsed_expected_example,
              "Generated example file doesn't match expected");
@@ -136,13 +136,13 @@ fn verify_body_not_needed() {
   write_graphnode_to_skgrepo(
     &node, &config ) . unwrap();
   // Parse both files as YAML for semantic comparison
-  let generated_yaml: serde_yaml::Value =
-    serde_yaml::from_str (
+  let generated_yaml: yaml_serde::Value =
+    yaml_serde::from_str (
       &fs::read_to_string (
         "/tmp/file_io_test/no_unindexed.skg"
       ) . unwrap () ) . unwrap ();
-  let expected_yaml: serde_yaml::Value =
-    serde_yaml::from_str (
+  let expected_yaml: yaml_serde::Value =
+    yaml_serde::from_str (
       &fs::read_to_string (
         "tests/file_io/fixtures/golden/no_unindexed.skg"
       ) . unwrap () ) . unwrap ();

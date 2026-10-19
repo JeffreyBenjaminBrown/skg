@@ -2,8 +2,8 @@
 //
 // Tests that GraphnodeOnDisk::to_yaml emits the 'body' field as a YAML block
 // literal (readable in diffs) even when the body contains tabs, and
-// that the output round-trips exactly via serde_yaml::from_str.
-// Also verifies field order is unchanged from the default serde_yaml
+// that the output round-trips exactly via yaml_serde::from_str.
+// Also verifies field order is unchanged from the default yaml_serde
 // rendering.
 
 use skg::types::nodes::fs::GraphnodeOnDisk;
@@ -33,7 +33,7 @@ fn assert_roundtrip (
   let node : GraphnodeOnDisk = node_with_body (body);
   let yaml : String = node . to_yaml () . expect ("serializes");
   let back : GraphnodeOnDisk =
-    serde_yaml::from_str (&yaml)
+    yaml_serde::from_str (&yaml)
     . unwrap_or_else (|e| panic! (
       "{}: re-parse failed: {}\n----\n{}\n----", label, e, yaml));
   assert_eq! (
@@ -56,7 +56,7 @@ fn block_scalar_for_body_without_tabs () {
 
 #[test]
 fn block_scalar_for_body_with_tabs () {
-  // Regression guard: serde_yaml's default emitter falls back to a
+  // Regression guard: yaml_serde's default emitter falls back to a
   // double-quoted scalar (with \n escapes) whenever the body contains
   // a tab character. GraphnodeOnDisk::to_yaml must avoid that fallback.
   let body : &str =
@@ -123,7 +123,7 @@ fn body_with_only_literal_backslash_n_not_newlines () {
   let body : &str = "foo\\nbar\\nbaz";
   let node : GraphnodeOnDisk = node_with_body (body);
   let yaml : String = node . to_yaml () . unwrap ();
-  let back : GraphnodeOnDisk = serde_yaml::from_str (&yaml) . unwrap ();
+  let back : GraphnodeOnDisk = yaml_serde::from_str (&yaml) . unwrap ();
   assert_eq! (back . body . as_deref (), Some (body));
   // The file should contain the literal bytes on disk.
   assert! (

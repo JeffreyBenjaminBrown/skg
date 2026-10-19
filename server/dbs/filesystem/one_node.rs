@@ -15,7 +15,7 @@ use std::error::Error;
 use std::io;
 use std::path::Path;
 use std::fs;
-use serde_yaml;
+use yaml_serde;
 
 pub fn graphnode_from_skgid (
   config : &SkgConfig,
@@ -378,7 +378,7 @@ pub(super) fn read_graphnode
   let file_path : &Path = file_path . as_ref ();
   let node_fs   : GraphnodeOnDisk = {
     let contents : String = fs::read_to_string (file_path)?;
-    serde_yaml::from_str (&contents)
+    yaml_serde::from_str (&contents)
     . map_err (
       |e| io::Error::new (
         io::ErrorKind::InvalidData,

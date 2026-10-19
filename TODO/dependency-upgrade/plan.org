@@ -101,7 +101,7 @@ cover it. Then 'syn' and 'proc-macro2' to their latest, for 'tools/'
 only, if they build without changes to the tools; otherwise leave them
 and note it in 'progress.org'.
 
-** Slice 6: replace 'serde_yaml'
+** DONE Slice 6: replace 'serde_yaml'
 *** the candidates
 Maintained forks or alternatives with a serde API: 'yaml_serde'
 (0.10.x, "maintained by The YAML Organization"), 'serde_yaml_ng'

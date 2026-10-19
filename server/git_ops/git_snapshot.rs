@@ -458,7 +458,7 @@ pub(crate) fn parse_blob_section (
     from_utf8 (bytes) . map_err ( |e| format! (
       "Blob {:?} is not UTF-8: {}", rel_path, e )) ?;
   let node_fs : GraphnodeOnDisk =
-    serde_yaml::from_str (yaml) . map_err ( |e| format! (
+    yaml_serde::from_str (yaml) . map_err ( |e| format! (
       "Parsing {:?}: {}", rel_path, e )) ?;
   let stem : String =
     rel_path . file_stem ()

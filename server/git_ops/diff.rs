@@ -104,7 +104,7 @@ fn graphnode_on_disk_as_graphnode_with_default_skgrepo (
   origin  : &str,
   context : &Path,
 ) -> Option<Graphnode> {
-  match serde_yaml::from_str::<GraphnodeOnDisk> (yaml) {
+  match yaml_serde::from_str::<GraphnodeOnDisk> (yaml) {
     Ok (node_fs) =>
       Some ( node_fs . into_complete_as_single_section ( SkgrepoName::default ())),
     Err (e) => {

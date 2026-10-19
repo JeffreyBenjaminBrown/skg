@@ -267,11 +267,11 @@ mod tests {
     assert_eq! (reread . title, "lower title");
     assert_eq! (reread . body . as_deref (), Some ("lower body"));
 
-    let home : GraphnodeOnDisk = serde_yaml::from_str (&fs::read_to_string (
+    let home : GraphnodeOnDisk = yaml_serde::from_str (&fs::read_to_string (
       paths ["public"] . join ("P.skg") ) . unwrap ()) . unwrap ();
-    let middle : GraphnodeOnDisk = serde_yaml::from_str (&fs::read_to_string (
+    let middle : GraphnodeOnDisk = yaml_serde::from_str (&fs::read_to_string (
       paths ["middle"] . join ("P.skg") ) . unwrap ()) . unwrap ();
-    let lower : GraphnodeOnDisk = serde_yaml::from_str (&fs::read_to_string (
+    let lower : GraphnodeOnDisk = yaml_serde::from_str (&fs::read_to_string (
       paths ["private"] . join ("P.skg") ) . unwrap ()) . unwrap ();
     assert_eq! (home . title . as_deref (), Some ("lower title"));
     assert_eq! (home . body . as_deref (), Some ("lower body"));

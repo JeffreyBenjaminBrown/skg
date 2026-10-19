@@ -5,7 +5,7 @@
 # block-literal (|-) on disk — not a double-quoted single line full
 # of "\n" escape sequences.
 #
-# Bug before the fix: serde_yaml's default emitter falls back to
+# Bug before the fix: yaml_serde's default emitter falls back to
 # a double-quoted scalar whenever the body contains any tab, so
 # tab-bearing bodies landed on disk as unreadable one-liners.
 
