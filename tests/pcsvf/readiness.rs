@@ -5,10 +5,11 @@
 // ('TODO/total-diff-view/2_plan.org', "Saving a TDV buffer").
 
 use crate::pcsvf::common::{
-  Fixture, open_all_changes_buffer, save, with_fixture};
+  Fixture, open_all_changes_buffer, open_buffer, save, save_buffer, with_fixture};
 
 use skg::change_forest::{BufferReadinessSummary, ReadinessSummary};
 use skg::serve::handlers::save_buffer::{SaveResponse, readiness_summary_sexp};
+use skg::types::views_state::TdvBuffer;
 
 use std::error::Error;
 
@@ -110,28 +111,20 @@ fn editing_a_node_lapses_its_mark (
 /// not draw. The "sets" fixture changes six files: cy2 and mc
 /// (retitled), del and delc (deleted), ln (gains lo) and r (loses
 /// del); their seven leaves are the two text changes, the two
-/// deletions, and the relationships ln-lo, r-del and del-delc.
+/// deletions, and the relationships ln-lo, r-del and del-delc. Roots
+/// the user drops from the buffer are origins it no longer draws, so
+/// the save appends them again, and every change stays shown.
 #[test]
 fn the_save_reports_the_readiness_summary (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("sets", &["main"], |f| {
-    let summary_of = |response : &SaveResponse| -> BufferReadinessSummary {
-      response . readiness_summary . clone ()
-      . expect ("a save of a TDV buffer reports the readiness summary") };
-    let summary = |ready_files : usize, unshown_changes : usize|
-      -> BufferReadinessSummary {
-      BufferReadinessSummary {
-        summary : ReadinessSummary {
-          ready_files, changed_files : 6,
-          foreign_changed_files : 0, order_only_files : 0 },
-        unshown_changes } };
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert_eq! ( summary_of ( &save_cleanly (f, &buffer) ? ), summary (0, 0) );
+    assert_eq! ( summary_of ( &save_cleanly (f, &buffer) ? ), summary (0, 6, 0) );
     let marked : String = edit_line (
       &buffer, "** (skg (oldText title)) mc",
       |_| "** (skg (oldText title) (readyRequest)) mc" . to_string () );
     let response : SaveResponse = save_cleanly (f, &marked) ?;
-    assert_eq! ( summary_of (&response), summary (1, 0),
+    assert_eq! ( summary_of (&response), summary (1, 6, 0),
                  "mc's file records only its text change" );
     let only_r : String = { // drop the roots cy2, ln and mc, which precede r
       let lines : Vec<&str> = response . saved_view . lines () . collect ();
@@ -140,11 +133,51 @@ fn the_save_reports_the_readiness_summary (
         . expect ("r is a root");
       lines [start ..] . join ("\n") + "\n" };
     let response : SaveResponse = save_cleanly (f, &only_r) ?;
-    assert_eq! ( summary_of (&response), summary (1, 3),
-                 "the leaves of cy2, ln and mc are not shown" );
-    assert_eq! ( readiness_summary_sexp (&summary_of (&response)),
-                 "(readiness-summary (ready 1) (changed 6) (foreign 0) (order-only 0) (unshown 3))" );
+    let roots : Vec<&str> = response . saved_view . lines ()
+      . filter ( |line| line . starts_with ("* ") ) . collect ();
+    assert! ( roots . len () == 4 && roots [0] . starts_with ("* (skg (node (id r)")
+              && roots [1] . contains ("(id cy2)") && roots [2] . contains ("(id ln)")
+              && roots [3] . contains ("(id mc)"),
+              "the dropped roots return, after r:\n{}", response . saved_view );
+    assert_eq! ( summary_of (&response), summary (1, 6, 0) );
     Ok (( )) }) }
+
+/// A save of the merges buffer of the 'buffers' fixture (described in
+/// 'other_buffers.rs') leaves unshown the ten leaves of the nodes only
+/// the other buffers draw: txt's text, and the home and relRepo moves
+/// of mvc, mvg, mvp, mvr and mvt.
+#[test]
+fn the_summary_counts_the_changes_the_saved_buffer_does_not_show (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("buffers", &["public", "private"], |f| {
+    let text : String = open_buffer (f, TdvBuffer::Merges) ?
+      . ok_or ("the merges buffer is empty") ?;
+    let response : SaveResponse = save_buffer (f, TdvBuffer::Merges, &text) ?;
+    assert! ( response . errors . is_empty (), "{:?}", response . errors );
+    let summary : BufferReadinessSummary = summary_of (&response);
+    assert_eq! ( summary . unshown_changes, 10, "{:?}", summary );
+    assert_eq! ( readiness_summary_sexp (&summary),
+                 format! ( "(readiness-summary (ready {}) (changed {}) (foreign 0) (order-only 1) (unshown 10))",
+                           summary . summary . ready_files,
+                           summary . summary . changed_files ));
+    Ok (( )) }) }
+
+fn summary_of (
+  response : &SaveResponse,
+) -> BufferReadinessSummary {
+  response . readiness_summary . clone ()
+    . expect ("a save of a TDV buffer reports the readiness summary") }
+
+fn summary (
+  ready_files     : usize,
+  changed_files   : usize,
+  unshown_changes : usize,
+) -> BufferReadinessSummary {
+  BufferReadinessSummary {
+    summary : ReadinessSummary {
+      ready_files, changed_files,
+      foreign_changed_files : 0, order_only_files : 0 },
+    unshown_changes } }
 
 /// Save 'buffer' with 'pid' (an editable occurrence on a line
 /// starting 'prefix') marked for deletion; return the reconciled

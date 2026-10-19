@@ -67,7 +67,8 @@ struct ChildData {
 ///   ViewRequest::Editable to each of its affected content children so the
 ///   BFS draws each Final (clobbering competing Tentative occurrences).
 /// - `node_budget`: the TODO/DONE/local-view-update/plan_v2.org §5.5 remaining budget of new Viewnodes; content-child
-///   creation is capped against it.
+///   creation is capped against it. None when this expansion is not
+///   charged (in a total diff view, all but a request's).
 pub fn expand_true_content_at_unrestrictedVognode (
   node               : NodeId,
   tree               : &mut Tree<Viewnode>,
@@ -78,7 +79,7 @@ pub fn expand_true_content_at_unrestrictedVognode (
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
   settled                        : bool,
   cascade                        : bool,
-  node_budget                    : &mut usize,
+  node_budget                    : Option<&mut usize>,
   substitution_enabled           : bool, // false in the total diff view: it shows raw graph facts.
   substitute_existing_content_overrides : bool,
 ) -> Result<(), Box<dyn Error>> {
@@ -112,7 +113,8 @@ pub fn expand_true_content_at_unrestrictedVognode (
   // unit; a write-protected node (returned above) costs nothing, and a folder fills
   // for free. visit_normal_node already forced this node write-protected if the
   // budget was 0, so here it is > 0; saturating_sub is defensive.
-  *node_budget = node_budget . saturating_sub (1);
+  if let Some (node_budget) = node_budget {
+    *node_budget = node_budget . saturating_sub (1); }
   let graphnode : Graphnode =
     graphnode_graphFirst_by_pid_and_skgrepo (
       graph_snap, config, &pid, &initial_skgrepo ) ?;

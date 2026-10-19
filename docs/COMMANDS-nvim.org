@@ -487,8 +487,9 @@ git-commits it, in every owned skgrepo that has changes, with that
 message. If not every changed file is ready, it first shows the
 readiness summary and proceeds only if you type the word "yes". Every
 open view must be saved or reverted first. Afterward the open buffers
-of the total diff view are rerendered: each keeps its roots and its
-folding, and what was committed no longer shows as a change. The
+of the total diff view are rerendered: each keeps its roots, its
+folding and what it drew editable, and what was committed no longer
+shows as a change. The
 commit lapses the marks of everything it committed.
 ** <localleader>m : other graph modifications
 *** <localleader>mc : :SkgReplaceLinkWithContent
@@ -558,7 +559,15 @@ since their last commits (how each worktree differs from HEAD), with
 the context needed to understand it. It opens up to four buffers,
 "skg://diff-view: all changes", "...: merges", "...: skgrepo changes"
 and "...: order-only changes", skipping any that would be empty. It
-refuses unless the skgrepo restriction is 'all'.
+refuses unless the skgrepo restriction is 'all'. A buffer keeps its
+roots until you close it. Each save (of it or of another view) also
+draws what changed since it opened: a node that changed is made
+editable where the buffer first draws it, and when a change is under
+a root the buffer lacks, that root is appended at the end. Nothing
+the buffer draws editable is write-protected again. An editable-view
+request on a write-protected headline expands it and its content as
+in any view, up to 'initial_node_limit' expansions; nothing else in
+the buffer is bounded by that limit.
 Why the total diff view commits all skgrepos, and offers nothing
 more granular: a single-skgrepo commit is dangerous. The graph is one
 structure spread over many files in many repos. Committing some changed files

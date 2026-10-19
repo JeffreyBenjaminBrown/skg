@@ -507,7 +507,7 @@ nothing on refusal. Tests: a single-leaf unmark asks nothing; a
 recursive unmark asks and a refusal writes nothing; the home-move
 gesture unmarks a ready node.
 
-** Slice 5: the view follows its fresh sets
+** DONE Slice 5: the view follows its fresh sets
 *** new editable occurrences
 In the TDV branch of 'rerender_view', after the straddle is refreshed
 and before 'complete_viewforest', for each node of the fresh U

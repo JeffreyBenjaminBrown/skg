@@ -23,18 +23,21 @@ use crate::prominence::climb_containerward_to_cycle_via;
 use crate::readiness_store::ReadinessStore;
 use crate::serve::handlers::readiness_requests::set_ready_facts_in_viewforest;
 use crate::to_org::render::change_viewnodes::mk_historical_viewnode;
-use crate::to_org::util::{EditableMap, build_node_branch_minus_content};
+use crate::to_org::util::{
+  EditableMap, build_node_branch_minus_content, graphnode_and_viewnode_from_skgid};
 use crate::types::env::RuntimeGeneration;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, SkgrepoName};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::nodes::complete::Graphnode;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  PartnerFolder, Phantom, Viewnode, ViewnodeKind, Vognode};
+  AffectsParent, Editability, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
+  Vognode};
 use crate::types::views_state::{TdvBuffer, pids_from_viewforest};
 use crate::update_buffer::{complete_viewforest_with_graph_straddle, finish_viewforest};
 
 use ego_tree::{NodeId, NodeRef};
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashSet, VecDeque};
 use std::error::Error;
 
 /// The sets that define a PCSVF. See the module comment.
@@ -82,7 +85,8 @@ pub fn pcsvf_sets_over (
     u . extend (walk);
     r . extend (origins); }
   u . extend ( r . iter () . cloned () );
-  let d : BTreeSet<ID> = kept_origins (&r, &u, &containers_of);
+  let d : BTreeSet<ID> =
+    kept_origins (&r, &u, &containers_of, &BTreeSet::new ());
   PcsvfSets { c, r, u, d } }
 
 /// The sets of the merges buffer's PCSVF, over the nodes involved in
@@ -145,14 +149,17 @@ pub fn union_containers (
 
 /// D: process R sorted by ID; discard each origin whose containerward
 /// walk within U reaches an origin still kept. Of two origins on a
-/// shared cycle, exactly one is kept.
+/// shared cycle, exactly one is kept. The 'pinned' nodes (a buffer's
+/// standing roots, at a rerender) are kept before the rest is
+/// processed, and never discarded; those not in R are not returned.
 fn kept_origins (
   r             : &BTreeSet<ID>,
   u             : &BTreeSet<ID>,
   containers_of : &dyn Fn (&ID) -> Vec<ID>,
+  pinned        : &BTreeSet<ID>,
 ) -> BTreeSet<ID> {
-  let mut kept : BTreeSet<ID> = r . clone ();
-  for origin in r {
+  let mut kept : BTreeSet<ID> = r . union (pinned) . cloned () . collect ();
+  for origin in r . difference (pinned) {
     let reaches_a_kept_origin : bool = {
       let mut seen : HashSet<ID> = HashSet::from ([ origin . clone () ]);
       let mut frontier : Vec<ID> = vec! [ origin . clone () ];
@@ -168,7 +175,7 @@ fn kept_origins (
       found };
     if reaches_a_kept_origin {
       kept . remove (origin); }}
-  kept }
+  kept . intersection (r) . cloned () . collect () }
 
 /// The buffer 'drawing' names, with roots 'roots' (for a PCSVF, its
 /// D in order), drawn with readiness from 'store': the buffer text,
@@ -272,40 +279,153 @@ pub fn nodes_drawn_in_viewforest (
       _ => None, } ));
   drawn }
 
-/// The stub the PCSVF's view completion starts from: each root as an
-/// editable stub, or, when the after-graph lacks it, as a historical
-/// phantom, whose visit draws its old content. In a PCSVF, a multiply-contained
-/// root gets a folded container folder, which completion fills with
-/// its containers in either graph and their containerward forest.
-/// The order-only buffer, a flat list, draws none.
+/// The stub the PCSVF's view completion starts from: each root drawn
+/// as 'append_stub_root' draws one.
 fn stub_viewforest_of_roots (
   runtime : &RuntimeGeneration,
   drawing : TdvDrawing,
   roots   : &[ID],
 ) -> Result<ViewForest, Box<dyn Error>> {
-  let straddle : &GraphStraddle = drawing . straddle;
   let mut viewforest : ViewForest = ViewForest::new ();
-  let buffer_root : NodeId = viewforest . internal_root_skgid ();
   let mut stub_editable_map : EditableMap = EditableMap::new ();
   for root in roots {
-    if straddle . after . get (root) . is_none () {
-      let phantom : Viewnode = mk_historical_viewnode (straddle, root, None)
-        . ok_or_else ( || format! (
-          "pcsvf_viewforest: root {} is in neither graph", root )) ?;
-      viewforest . as_internal_tree_mut () . get_mut (buffer_root)
-        . ok_or ("pcsvf_viewforest: no buffer root") ?
-        . append (phantom);
-      continue; }
-    let root_treeid : NodeId = build_node_branch_minus_content (
-      Some (( viewforest . as_internal_tree_mut (), buffer_root )),
-      root, &runtime . graph, &runtime . config, &mut stub_editable_map,
-      None ) ?;
-    if drawing . tdv_buffer != TdvBuffer::OrderOnlyChanges
-      && union_containers (straddle, root) . len () > 1 {
-      viewforest . as_internal_tree_mut () . get_mut (root_treeid)
-        . ok_or ("pcsvf_viewforest: a stub root vanished") ?
-        . append ( Viewnode {
-          focused : false, folded : true, body_folded : false,
-          kind : ViewnodeKind::PartnerFolder (PartnerFolder::Container) } ); }}
+    append_stub_root (
+      runtime, drawing, &mut viewforest, root, &mut stub_editable_map ) ?; }
   Ok (viewforest) }
 
+/// Append 'root' to the viewforest as an editable stub, or, when the
+/// after-graph lacks it, as a historical phantom, whose visit draws
+/// its old content. In a PCSVF, a multiply-contained root gets a
+/// folded container folder, which completion fills with its
+/// containers in either graph and their containerward forest. The
+/// order-only buffer, a flat list, draws none. Returns the root's
+/// treeid.
+fn append_stub_root (
+  runtime           : &RuntimeGeneration,
+  drawing           : TdvDrawing,
+  viewforest        : &mut ViewForest,
+  root              : &ID,
+  stub_editable_map : &mut EditableMap,
+) -> Result<NodeId, Box<dyn Error>> {
+  let straddle : &GraphStraddle = drawing . straddle;
+  let buffer_root : NodeId = viewforest . internal_root_skgid ();
+  if straddle . after . get (root) . is_none () {
+    let phantom : Viewnode = mk_historical_viewnode (straddle, root, None)
+      . ok_or_else ( || format! (
+        "pcsvf_viewforest: root {} is in neither graph", root )) ?;
+    return Ok ( viewforest . as_internal_tree_mut () . get_mut (buffer_root)
+                . ok_or ("pcsvf_viewforest: no buffer root") ?
+                . append (phantom) . id () ); }
+  let root_treeid : NodeId = build_node_branch_minus_content (
+    Some (( viewforest . as_internal_tree_mut (), buffer_root )),
+    root, &runtime . graph, &runtime . config, stub_editable_map,
+    None ) ?;
+  if drawing . tdv_buffer != TdvBuffer::OrderOnlyChanges
+    && union_containers (straddle, root) . len () > 1 {
+    viewforest . as_internal_tree_mut () . get_mut (root_treeid)
+      . ok_or ("pcsvf_viewforest: a stub root vanished") ?
+      . append ( Viewnode {
+        focused : false, folded : true, body_folded : false,
+        kind : ViewnodeKind::PartnerFolder (PartnerFolder::Container) } ); }
+  Ok (root_treeid) }
+
+/// The origins of the buffer's fresh D that no viewnode in it draws,
+/// in ID order. The fresh R is deduplicated with the buffer's
+/// 'standing_roots' pinned as kept, so that a change to a rootlike
+/// cycle's membership never adds a second root for a cycle that
+/// already stands.
+pub fn contentOrigins_missing_from_buffer (
+  drawing        : TdvDrawing,
+  viewforest     : &ViewForest,
+  standing_roots : &BTreeSet<ID>,
+) -> Vec<ID> {
+  let sets : &PcsvfSets = drawing . sets ();
+  let containers_of = |skgid : &ID| -> Vec<ID> {
+    union_containers (drawing . straddle, skgid) };
+  let drawn : HashSet<ID> = nodes_drawn_in_viewforest (viewforest);
+  kept_origins (&sets . r, &sets . u, &containers_of, standing_roots)
+    . into_iter ()
+    . filter ( |origin| ! drawn . contains (origin)
+                        && ! standing_roots . contains (origin) )
+    . collect () }
+
+/// Append 'origins' at the end of the buffer, each drawn as the first
+/// drawing draws a root ('append_stub_root'), for view completion to
+/// complete. Returns their treeids.
+pub fn append_contentOrigins_to_buffer (
+  runtime    : &RuntimeGeneration,
+  drawing    : TdvDrawing,
+  viewforest : &mut ViewForest,
+  origins    : &[ID],
+) -> Result<Vec<NodeId>, Box<dyn Error>> {
+  let mut stub_editable_map : EditableMap = EditableMap::new ();
+  origins . iter ()
+    . map ( |origin| append_stub_root (
+      runtime, drawing, viewforest, origin, &mut stub_editable_map ) )
+    . collect () }
+
+/// The IDs of the buffer's roots, whatever kind of vognode each is.
+pub fn root_skgids_of_buffer (
+  viewforest : &ViewForest,
+) -> BTreeSet<ID> {
+  viewforest . roots ()
+    . filter_map ( |root| match &root . value () . kind {
+      ViewnodeKind::Vognode (vognode) => vognode . skgid () . cloned (),
+      _ => None, } )
+    . collect () }
+
+/// Before a rerender's view completion: each node of the buffer's
+/// fresh U that has no editable occurrence becomes editable at its
+/// BFS-first content occurrence (a root, or a member of a vognode's
+/// content), with its body from the live graph, as a freshly drawn
+/// editable viewnode has it. Completion then draws its content list.
+/// A node of U with no occurrence is reached through the node above
+/// it on its walk, once that one is editable.
+pub fn make_freshU_editable_at_first_occurrences (
+  drawing    : TdvDrawing,
+  viewforest : &mut ViewForest,
+  graph      : &InRustGraph,
+  config     : &SkgConfig,
+) -> Result<(), Box<dyn Error>> {
+  let u : &BTreeSet<ID> = & drawing . sets () . u;
+  let mut editable : HashSet<ID> =
+    viewforest . nodes () . filter_map ( |node| match &node . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+        if ! t . is_writeProtected () => Some ( t . skgid . clone () ),
+      _ => None, } )
+    . collect ();
+  for treeid in content_occurrences_in_level_order (viewforest) {
+    let skgid : ID = match &viewforest . get (treeid) . unwrap () . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t . skgid . clone (),
+      _ => continue, };
+    if ! u . contains (&skgid) || editable . contains (&skgid) { continue; }
+    let Some ((graphnode, _)) : Option<(Graphnode, Viewnode)> =
+      graphnode_and_viewnode_from_skgid (graph, config, &skgid) ? else { continue; };
+    if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+      &mut viewforest . get_mut (treeid) . unwrap () . value () . kind {
+      t . editability = Editability::Editable {
+        body : graphnode . body, edit_request : None }; }
+    editable . insert (skgid); }
+  Ok (( )) }
+
+/// The viewforest's unrestricted vognodes in content position (a root,
+/// or a member of an unrestricted vognode's content), in level order.
+fn content_occurrences_in_level_order (
+  viewforest : &ViewForest,
+) -> Vec<NodeId> {
+  let mut occurrences : Vec<NodeId> = Vec::new ();
+  let mut queue : VecDeque<NodeRef<Viewnode>> =
+    viewforest . roots () . collect ();
+  while let Some (node) = queue . pop_front () {
+    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+      &node . value () . kind else { continue; };
+    let in_content_position : bool =
+      match node . parent () . map ( |parent| &parent . value () . kind ) {
+        Some (ViewnodeKind::BufferRoot) => true,
+        Some (ViewnodeKind::Vognode (Vognode::Unrestricted (_))) =>
+          t . affectsParent == AffectsParent::True,
+        _ => false, };
+    if ! in_content_position { continue; }
+    occurrences . push ( node . id () );
+    queue . extend ( node . children () ); }
+  occurrences }

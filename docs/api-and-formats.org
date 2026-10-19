@@ -184,8 +184,15 @@ So far there are these endpoints:
        in order, and so ready), N are commit-ready; F files changed in
        foreign skgrepos; and K changes are owned by nodes the buffer does
        not draw. The buffer is reconciled over the graph straddle, not
-       rebuilt: its roots and editability stay as saved, and its change
-       facts, change folders, markers and removed members are redrawn.
+       rebuilt: its roots, and every headline it drew editable, stay as
+       saved, and its change facts, change folders, markers and removed
+       members are redrawn. It follows its fresh PCSVF sets: each node
+       of U without an editable occurrence becomes editable at its
+       first occurrence, and each origin of D the buffer does not draw
+       is appended as a root, at the end, in ID order. An editable-view
+       request on a write-protected node outside U cascades as in any
+       view, bounded by =initial_node_limit=; nothing else in the
+       buffer spends that budget.
   - Before mutation, the server computes the update-relevant neighborhood of
     every prepared write/delete identity independently in the before and
     candidate graphs. Other registered views containing an affected unrestricted ID
@@ -369,8 +376,8 @@ So far there are these endpoints:
       neither list; one that failed is an error. When something was
       committed, the rerender stream rerenders each open buffer of
       the total diff view over the rebuilt graph straddle, as any
-      rerender does: its roots stay, and what was committed loses its
-      change facts. The marks of the changes committed are dropped
+      rerender does: its roots and what it drew editable stay, and what
+      was committed loses its change facts. The marks of the changes committed are dropped
       from the readiness store.
     - =((errors ("REFUSAL")) (warnings ()))= when the skgrepo
       restriction is not =all=, the message is blank, or the graph

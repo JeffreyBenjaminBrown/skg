@@ -749,3 +749,64 @@ text and proceeds only on the typed word "yes".
 'mark_gnode_skgrepo_changes_commitReady', ':SkgMarkGnodeSkgrepoChangesCommitReady')
 now toggle, but keep the names the plan uses. Its message says
 "Unmarked N home move(s)." when it unmarks.
+** Slice 5: deviations
+*** what "created by this visit" means in 'tag_content_members'
+A member outside U is write-protected unless it was editable when
+completion began ('CompletionContext::writable_before_completion').
+For a member the content reconciler just created, that is the plan's
+rule. It also covers a historical phantom that
+'align_content_members_with_straddle' turns, in place, into an
+editable vognode because its node is back: the viewnode existed
+before, but was not writable, so outside U it is write-protected,
+as before this slice.
+*** which occurrence the pre-pass makes editable
+'make_freshU_editable_at_first_occurrences' ('server/pcsvf.rs')
+considers only content occurrences: a root, or a member
+(affectsParent true) of an unrestricted vognode's content. A folder
+member, a removed member and a historical phantom's old content are
+drawn write-protected by their own steps, so making one editable
+would not last.
+*** a request on a node of U is dropped
+The plan says a node of U "takes none of" the request path. Its
+request is removed at its visit, so it does not linger in the
+buffer, and it does not cascade from there.
+*** how the new roots are completed
+'complete_appended_roots' ('server/update_buffer/complete.rs') runs
+the same level-order walk from the appended roots, with the
+completion context of the main pass, so its editable map and node
+budget continue. Their facts are set by the one
+'set_tdv_facts_in_viewforest' pass over the whole buffer, which now
+runs after the appending.
+*** pinned origins
+'kept_origins' returns only members of R, so a pinned standing root
+that is no longer an origin is not in D. The new roots also exclude
+the standing roots themselves: 'nodes_drawn_in_viewforest' does not
+count a deleted phantom, so a deleted root would otherwise be
+appended again.
+*** a test whose expectation changed
+'the_save_reports_the_readiness_summary' dropped three roots from the
+buffer to make changes unshown. The save now appends them again, so
+the test checks that, with nothing unshown. The nonzero count and its
+sexp are tested on a save of the merges buffer of the 'buffers'
+fixture ('the_summary_counts_the_changes_the_saved_buffer_does_not_show').
+*** tests
+In 'tests/pcsvf/fresh_sets.rs', over the new 'fresh' fixture. A
+change after the buffer opened is made by saving a content view of
+the node, as another buffer would, and then the buffer is saved as
+it was. The handler-driving code of the stage-and-commit test moved
+into 'tests/pcsvf/common.rs' ('send_stage_and_commit_request',
+'rerendered_view_content'), shared with the commit case here. The
+integration run passes but for 'import-md-and-org', which fails at
+baseline ('TODO/problems.org').
+*** imperfect
+**** a node of D drawn only in a folder
+A node of D whose only occurrence is a folder member (a container in
+a container folder, say) counts as drawn, so it is not appended as a
+root, and the pre-pass does not make a folder member editable. Its
+change is then not drawn, yet counts as shown. The plan's rule ("no
+viewnode in the buffer draws") reads it this way.
+**** pinning rarely decides
+In every case the tests build, including the changed cycle, the
+cycle's new origin is drawn already, so it would not be appended even
+unpinned. I found no case where pinning alone prevents a second root,
+but it is there as the plan asks.

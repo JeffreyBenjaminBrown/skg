@@ -74,13 +74,18 @@ pub(super) struct CompletionContext<'a> {
   /// Each unrestricted vognode's visit then ends with
   /// 'process_unrestrictedVognode_changes', each historical phantom's
   /// draws its old content ('process_historical_phantom_visit'),
-  /// the partner folders draw the union of the straddle, the node budget
-  /// is not spent, and no default folders are created.
+  /// the partner folders draw the union of the straddle, the node
+  /// budget bounds only the expansions an editable-view request makes
+  /// outside U, and no default folders are created.
   pub(super) tdv_drawing : Option<TdvDrawing<'a>>,
   /// The viewnodes the viewforest held before this completion began.
   /// In a total diff view, a fold state is set only on a viewnode
   /// not among them.
   pub(super) nodes_before_completion : &'a HashSet<NodeId>,
+  /// The editable unrestricted vognodes among them. In a total diff
+  /// view, a content member outside U is write-protected only when it
+  /// is not among these: nothing writable is write-protected again.
+  pub(super) writable_before_completion : &'a HashSet<NodeId>,
 }
 
 pub(super) fn complete_viewforest (
@@ -96,7 +101,19 @@ pub(super) fn complete_viewforest (
   // content children created during a node's visit are reached later in the
   // same BFS.
   complete_nodes_in_level_order (
-    viewforest, root_treeid, context ) ?;
+    viewforest, &[root_treeid], context ) ?;
+  prune_self_deletable_when_empty (viewforest) ?;
+  Ok(( )) }
+
+/// Complete the subtrees at 'roots', appended to a viewforest that
+/// 'context' has already completed, in level order among themselves,
+/// continuing that completion's editable map and node budget.
+pub(super) fn complete_appended_roots (
+  viewforest : &mut Tree<Viewnode>,
+  roots      : &[NodeId],
+  context    : &mut CompletionContext<'_>,
+) -> Result<(), Box<dyn Error>> {
+  complete_nodes_in_level_order (viewforest, roots, context) ?;
   prune_self_deletable_when_empty (viewforest) ?;
   Ok(( )) }
 
@@ -112,12 +129,12 @@ pub(super) fn complete_viewforest (
 /// node's expansion depends only on its ancestors and the graph, never on
 /// siblings or descendants, so it can be processed the moment it is dequeued.
 fn complete_nodes_in_level_order (
-  tree     : &mut Tree<Viewnode>,
-  root_treeid : NodeId,
-  context  : &mut CompletionContext<'_>,
+  tree             : &mut Tree<Viewnode>,
+  starting_treeids : &[NodeId],
+  context          : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
-  let mut queue : VecDeque<NodeId> = VecDeque::new ();
-  queue . push_back (root_treeid);
+  let mut queue : VecDeque<NodeId> =
+    starting_treeids . iter () . copied () . collect ();
   while let Some (treeid) = queue . pop_front () {
     dispatch_node_update (tree, treeid, context) ?;
     // Enqueue the node's *current* children -- including any this visit
@@ -258,6 +275,19 @@ fn visit_normal_node (
         ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
           t . view_requests . contains (& ViewRequest::Editable),
         _ => false } ) ?;
+  let in_u : bool = // of the total diff view being drawn
+    context . tdv_drawing . is_some_and (
+      |drawing| drawing . sets () . u . contains (&pid) );
+  if had_editableViewRequest && in_u {
+    // A node of U is editable by the total diff view's own rule, so
+    // a request there does nothing.
+    write_at_unrestrictedVognode_in_tree (
+      tree, treeid,
+      |t| { t . view_requests . remove (& ViewRequest::Editable); } )
+      . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
+  let editableViewRequest_applies : bool = had_editableViewRequest && ! in_u;
+  let budgeted : bool = // In a total diff view the budget bounds only the expansions requests make.
+    context . tdv_drawing . is_none () || editableViewRequest_applies;
   let mut settled : bool = false; // TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule already ran
   let mut cascade : bool = false; // node is Final -> hand EVRs to children
   // TODO/DONE/local-view-update/plan_v2.org §5.5: the budget counts vognode *expansions* (each costs 1, charged in
@@ -268,7 +298,7 @@ fn visit_normal_node (
   // the node the user explicitly opened, so it always expands -- never truncated.
   // (The ancestor read is short-circuited to only run when the budget is spent.)
   if context . node_budget == 0
-    && context . tdv_drawing . is_none () // a total diff view has no node budget
+    && budgeted
     && ! read_at_ancestor_in_tree ( tree, treeid, 1,
            |vn : &Viewnode| matches! ( &vn . kind, ViewnodeKind::BufferRoot ) )
          . unwrap_or (false) {
@@ -281,7 +311,7 @@ fn visit_normal_node (
             t . editability = Editability::WriteProtected; } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
     settled = true;
-  } else if had_editableViewRequest {
+  } else if editableViewRequest_applies {
     match apply_editable_draw_rule (
       tree, treeid, &context . runtime . graph,
       &context . runtime . config, context . editable_map ) ? {
@@ -298,7 +328,8 @@ fn visit_normal_node (
     &context . runtime . config, context . graph_snap,
     context . deleted_by_this_save_extra_ids,
     context . skgrepo_restriction,
-    settled, cascade, &mut context . node_budget,
+    settled, cascade,
+    if budgeted { Some (&mut context . node_budget) } else { None },
     context . tdv_drawing . is_none (), // substitution is off in the total diff view: it shows raw graph facts
     context . substitute_existing_content_overrides ) ?;
   // The steps below apply only while the node is still an Unrestricted vognode.
@@ -312,7 +343,9 @@ fn visit_normal_node (
   // just expanded an existing occurrence.  Folder members are included;
   // hid*/overrid*-as-such nodes get the same defaults as ordinary nodes, and
   // the subscribee-specific HiddenIn folder is added by the pass below.
-  if context . create_partnerFolders_for_fresh_nodes || had_editableViewRequest {
+  // A total diff view draws no default folders.
+  if ( context . create_partnerFolders_for_fresh_nodes || editableViewRequest_applies )
+    && context . tdv_drawing . is_none () {
     maybe_add_default_partnerFolder_branches (
       tree, treeid, &context . runtime . graph,
       &context . runtime . config,
@@ -336,7 +369,8 @@ fn visit_normal_node (
     // folders, markers and properties.
     process_unrestrictedVognode_changes (
       tree, treeid, drawing,
-      ! context . nodes_before_completion . contains (&treeid) ) ?; }
+      ! context . nodes_before_completion . contains (&treeid),
+      context . writable_before_completion ) ?; }
   Ok(( )) }
 
 /// Whether a node of this kind is *self-deletable when empty* (TODO/DONE/local-view-update/plan_v2.org §3.4): the

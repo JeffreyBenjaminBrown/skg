@@ -12,13 +12,15 @@ pub use graphnodestats::{
   set_graphnodestats_in_viewforest_with_skgrepo_set};
 pub use viewnodestats::set_viewnodestats_in_viewforest;
 
-use complete::{complete_viewforest, CompletionContext};
+use complete::{complete_appended_roots, complete_viewforest, CompletionContext};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::change_forest::BufferReadinessSummary;
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::pcsvf::{
-  TdvDrawing, nodes_drawn_in_viewforest, set_tdv_facts_in_viewforest};
+  TdvDrawing, append_contentOrigins_to_buffer, contentOrigins_missing_from_buffer,
+  make_freshU_editable_at_first_occurrences, nodes_drawn_in_viewforest,
+  root_skgids_of_buffer, set_tdv_facts_in_viewforest};
 use crate::readiness_store::ReadinessStore;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
@@ -45,7 +47,7 @@ use crate::types::viewnode::{Vognode, PropertyFolder, ViewRequest};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 
 use ego_tree::{Tree, NodeId, NodeMut};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::sync::{Arc, MutexGuard};
 use std::time::Instant;
@@ -436,7 +438,8 @@ pub fn render_initial_view (
     substitute_existing_content_overrides : false,
     warning_sink : Some (&mut sink),
     tdv_drawing  : None,
-    nodes_before_completion : &HashSet::new (), };
+    nodes_before_completion    : &HashSet::new (),
+    writable_before_completion : &HashSet::new (), };
   complete_viewforest ( &mut viewforest, &mut context ) ?;
   // De-novo rendering REPAIRS silently: the sink's ColRepairs do not
   // correspond to edits the user just made, so a fresh view carries no
@@ -448,8 +451,10 @@ pub fn render_initial_view (
 /// ('server/pcsvf.rs') as 'drawing' says: view completion with
 /// 'tdv_drawing' set, which draws the union of the straddle's content, the change
 /// folders and markers, and the removed members. It creates no
-/// default partner folders, spends no node budget, and never
-/// restricts by skgrepo (the total diff view requires the set 'all').
+/// default partner folders, spends no node budget (only an
+/// editable-view request spends it, and a first drawing carries
+/// none), and never restricts by skgrepo (the total diff view
+/// requires the set 'all').
 pub fn complete_viewforest_with_graph_straddle (
   runtime    : &RuntimeGeneration,
   drawing    : TdvDrawing,
@@ -472,7 +477,8 @@ pub fn complete_viewforest_with_graph_straddle (
     warning_sink                   : None,
     tdv_drawing                    : Some (drawing),
     // Every viewnode of a first drawing is created by it.
-    nodes_before_completion        : &HashSet::new (), };
+    nodes_before_completion        : &HashSet::new (),
+    writable_before_completion     : &HashSet::new (), };
   complete_viewforest ( viewforest, &mut context ) ?;
   if ! errors . is_empty () {
     return Err ( errors . join ("\n") . into () ); }
@@ -488,8 +494,13 @@ pub fn complete_viewforest_with_graph_straddle (
 /// with a fresh drawing from the straddle
 /// ('process_unrestrictedVognode_changes'), keeping every viewnode
 /// that stays and its fold state, and its readiness facts are then
-/// read from the store. Its roots and editability stay as the buffer
-/// has them.
+/// read from the store. It follows the buffer's fresh sets
+/// ('TODO/total-diff-view/4_plan-fixes.org', "The view follows its
+/// fresh sets after a save"): before completion each node of the
+/// fresh U is made editable at its first occurrence if it has no
+/// editable one, nothing editable is write-protected again, and after
+/// completion the origins of the fresh D that the buffer does not
+/// draw are appended as roots and completed. Its standing roots stay.
 pub fn rerender_view (
   viewforest    : &mut ViewForest,
   context       : &mut RerenderAfterSaveContext<'_>,
@@ -509,9 +520,25 @@ pub fn rerender_view (
         &mut context . graph_straddle, &context . runtime . config,
         context . runtime . graph . clone () ) ? ),
       None => None, };
+  let tdv_drawing : Option<TdvDrawing> =
+    graph_straddle . as_deref () . zip (tdv_buffer)
+    . map ( |(straddle, tdv_buffer)| TdvDrawing { straddle, tdv_buffer } );
+  let standing_roots : BTreeSet<ID> = root_skgids_of_buffer (viewforest);
+  if let Some (drawing) = tdv_drawing {
+    // Before any visit, so that a node of U is editable before its
+    // parent's visit can see it.
+    make_freshU_editable_at_first_occurrences (
+      drawing, viewforest,
+      &context . runtime . graph, &context . runtime . config ) ?; }
   { tracing::debug!("rerender_view: starting complete_viewforest");
     let nodes_before_completion : HashSet<NodeId> =
       viewforest . nodes () . map ( |node| node . id () ) . collect ();
+    let writable_before_completion : HashSet<NodeId> =
+      viewforest . nodes ()
+      . filter ( |node| matches! ( &node . value () . kind,
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+          if ! t . is_writeProtected () ))
+      . map ( |node| node . id () ) . collect ();
     let mut editable_map       : EditableMap = EditableMap::new ();
     let mut completion_context : CompletionContext = CompletionContext {
       editable_map                         : &mut editable_map,
@@ -535,20 +562,26 @@ pub fn rerender_view (
       substitute_existing_content_overrides : // off in a total diff view
         substitute_existing_content_overrides && graph_straddle . is_none (),
       warning_sink,
-      tdv_drawing : graph_straddle . as_deref () . zip (tdv_buffer)
-        . map ( |(straddle, tdv_buffer)| TdvDrawing { straddle, tdv_buffer } ),
-      nodes_before_completion : &nodes_before_completion, };
+      tdv_drawing,
+      nodes_before_completion    : &nodes_before_completion,
+      writable_before_completion : &writable_before_completion, };
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "complete_viewforest" ). entered();
       complete_viewforest (
-        viewforest, &mut completion_context ) ? }; }
-  if let ( Some (straddle), Some (tdv_buffer) ) = ( &graph_straddle, tdv_buffer ) {
+        viewforest, &mut completion_context ) ? };
+    if let Some (drawing) = tdv_drawing {
+      let new_roots : Vec<ID> =
+        contentOrigins_missing_from_buffer (drawing, viewforest, &standing_roots);
+      let appended : Vec<NodeId> = append_contentOrigins_to_buffer (
+        &context . runtime, drawing, viewforest, &new_roots ) ?;
+      complete_appended_roots (
+        viewforest, &appended, &mut completion_context ) ?; }}
+  if let Some (drawing) = tdv_drawing {
     let store : MutexGuard<ReadinessStore> =
       context . env . runtime . readiness_store . lock ()
       . unwrap_or_else ( |poisoned| poisoned . into_inner () );
     set_tdv_facts_in_viewforest (
-      viewforest, TdvDrawing { straddle, tdv_buffer }, &store,
-      &context . runtime . graph ); }
+      viewforest, drawing, &store, &context . runtime . graph ); }
   let result : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "finish_viewforest" ). entered();

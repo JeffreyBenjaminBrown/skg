@@ -5,8 +5,9 @@
 //!
 //! On an editable occurrence: the content members (which the content
 //! reconciler drew from the after-graph) are tagged with the presence
-//! of their node and of their relationship, members outside U become
-//! write-protected leaves, and the removed members stand where
+//! of their node and of their relationship, members outside U that
+//! were not editable already become write-protected leaves, and the
+//! removed members stand where
 //! 'phantom_insertion_plan' places them. A node in C also gets, ahead
 //! of its content, its old text, its home move, its "it acquired"
 //! folder, the alias, ID and flags folders that changed, the partner
@@ -49,7 +50,7 @@ use crate::types::views_state::TdvBuffer;
 use crate::types::viewnode::{
   AffectsParent, Birth, ChangeFacts, ChangesetMarkerKind, DiffPresence,
   Editability, PartnerFolder, Phantom, PhantomDeleted, Property,
-  PropertyFolder, ViewRequest, Viewnode, ViewnodeKind, Vognode,
+  PropertyFolder, Viewnode, ViewnodeKind, Vognode,
   mk_editable_viewnode, mk_writeProtected_viewnode};
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
@@ -74,12 +75,14 @@ const OUT_FOLDERS : [PartnerFolder; 3] = [
 
 /// See the module comment. 'created_in_this_completion' is whether
 /// view completion created the viewnode at 'treeid': only then does
-/// its body's fold state come from C.
+/// its body's fold state come from C. 'writable_before_completion'
+/// holds the viewnodes that were editable when completion began.
 pub(crate) fn process_unrestrictedVognode_changes (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
   drawing : TdvDrawing,
   created_in_this_completion : bool,
+  writable_before_completion : &HashSet<NodeId>,
 ) -> Result<(), Box<dyn Error>> {
   let straddle : &GraphStraddle = drawing . straddle;
   let (pid, editable) : (ID, bool) =
@@ -100,7 +103,9 @@ pub(crate) fn process_unrestrictedVognode_changes (
   let in_c : bool = sets . c . contains (&pid);
   if created_in_this_completion {
     tree . get_mut (treeid) . unwrap () . value () . body_folded = ! in_c; }
-  tag_content_members (tree, treeid, straddle, &content, Some (&sets . u)) ?;
+  tag_content_members (
+    tree, treeid, straddle, &content,
+    Some (( &sets . u, writable_before_completion )) ) ?;
   reconcile_removed_content_members (tree, treeid, straddle, &pid) ?;
   let fresh : Tree<Viewnode> = fresh_front_change_viewnodes (
     straddle, &pid, &content, in_c,
@@ -374,15 +379,18 @@ fn changed_partner_folders (
   folders }
 
 /// Tag each content member with the presence of its node and of its
-/// relationship, draw a member outside 'u' (when given) as a
-/// write-protected leaf, and keep a relRepo move under exactly the
-/// members whose relationship moved.
+/// relationship, draw a member outside U as a write-protected leaf
+/// unless it was editable before completion ('u_and_writable', when
+/// given), and keep a relRepo move under exactly the members whose
+/// relationship moved. A member's view requests stay: one that
+/// carries an editable-view request is drawn as the request says at
+/// its own visit.
 fn tag_content_members (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
   straddle : &GraphStraddle,
   content  : &[Partner],
-  u        : Option<&BTreeSet<ID>>,
+  u_and_writable : Option<( &BTreeSet<ID>, &HashSet<NodeId> )>,
 ) -> Result<(), Box<dyn Error>> {
   let by_id : HashMap<&ID, &Partner> =
     content . iter () . map ( |partner| (&partner . id, partner) ) . collect ();
@@ -400,8 +408,8 @@ fn tag_content_members (
             node : straddle . node_presence (&t . skgid)
                    . and_then ( |presence| presence . diff_sign () ),
             rel  : partner . and_then ( |p| p . presence . diff_sign () ), };
-          if u . is_some_and ( |u| ! u . contains (&t . skgid) ) {
-            t . view_requests . remove (&ViewRequest::Editable);
+          if u_and_writable . is_some_and ( |(u, writable)|
+            ! u . contains (&t . skgid) && ! writable . contains (&member) ) {
             t . editability = Editability::WriteProtected; }
           moved = partner . and_then ( |p| mk_relRepo_move_viewnode (p) ); },
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
