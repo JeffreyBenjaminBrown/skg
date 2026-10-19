@@ -63,7 +63,7 @@ changed only when the new behavior is correct.
 Slice 0 of the fixes plan has done this; mark this slice DONE and move
 on.
 
-** Slice 1: small majors
+** DONE Slice 1: small majors
 One commit each, in this order: 'itertools' to 0.15, 'similar' to 3,
 'zstd' to 0.14, 'rand' to 0.10 (the server's own uses; 'Cargo.toml'
 pins 0.8 today), 'time' to the latest 0.3. For each: edit the version

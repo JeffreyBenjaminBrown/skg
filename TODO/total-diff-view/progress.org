@@ -877,3 +877,11 @@ gone, and its callers (the generic goal-list reconciler, the content
 reconciler's ordering and the subscribee folder) call
 'move_to_last_child'. Two direct moves in a test fixture builder
 ('tests/tdv/roundtrip/view.rs') call the helpers too.
+** Slice 10: deviations
+*** dependency slice 1: nothing uses 'rand'
+No Rust source in the repository names 'rand', so its bump to 0.10
+changed only the lockfile. It stays in 'Cargo.toml' (removing it is
+outside this plan); proptest pulls its own copy.
+*** dependency slice 1: 'time' was already at the latest
+'cargo update' had locked 'time' 0.3.55, the latest 0.3; the slice
+raised the floor in 'Cargo.toml' from 0.3.47 to match.
