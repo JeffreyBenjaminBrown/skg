@@ -39,8 +39,8 @@ end
 describe('skg.readiness', function ()
   it('toggles a leaf', function ()
     assert.are.same(
-      { '** (skg alias (diff rel-) (readyRequest)) a1' },
-      run({ '** (skg alias (diff rel-)) a1' }, 1,
+      { '** (skg removedAlias (diff rel-) (readyRequest)) a1' },
+      run({ '** (skg removedAlias (diff rel-)) a1' }, 1,
           readiness.cycle_commit_ready))
     assert.are.same(
       { '** (skg (oldText title) (ready) (unreadyRequest)) txt' },
@@ -63,12 +63,12 @@ describe('skg.readiness', function ()
     assert.are.same({
       '* (skg (node (id ali) (repo r))) ali',
       '** (skg (aliasFolder changed))',
-      '*** (skg alias (diff rel-) (ready) (readyRequest)) a1',
+      '*** (skg removedAlias (diff rel-) (ready) (readyRequest)) a1',
       '*** (skg alias) a2',
       '*** (skg alias (diff rel+) (readyRequest)) a3' },
       run({ '* (skg (node (id ali) (repo r))) ali',
             '** (skg (aliasFolder changed))',
-            '*** (skg alias (diff rel-) (ready)) a1',
+            '*** (skg removedAlias (diff rel-) (ready)) a1',
             '*** (skg alias) a2',
             '*** (skg alias (diff rel+)) a3' },
           2, readiness.cycle_commit_ready))

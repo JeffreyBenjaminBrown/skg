@@ -306,7 +306,8 @@ impl MpViewnode {
       MpViewnodeKind::Property (Property::Flag { flag, .. }) =>
         format!("property:flag({})", flag . wire_name ()),
       MpViewnodeKind::Property (
-        property @ ( Property::OldText { .. }
+        property @ ( Property::RemovedAlias { .. } | Property::RemovedID { .. }
+                     | Property::OldText { .. }
                      | Property::BodyDiff { .. } | Property::HomeSkgrepoMove { .. }
                      | Property::RelRepoMove { .. } | Property::ChangesetMarker { .. } )) =>
         format! ("property:{}", property . repr_in_client ()),

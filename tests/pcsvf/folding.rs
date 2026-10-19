@@ -91,7 +91,7 @@ fn fold_kinds_buffer (
   buffer : &str,
 ) -> String {
   let mut folded : String = buffer . to_string ();
-  for entry in [ "*** (skg alias (diff rel-)) a1",
+  for entry in [ "*** (skg removedAlias (diff rel-)) a1",
                  "*** (skg alias) a2",
                  "*** (skg alias (diff rel+)) a3",
                  "*** (skg bodyDiff)" ] {
@@ -101,7 +101,7 @@ fn fold_kinds_buffer (
 fn assert_kinds_folds_stay (
   saved : &str,
 ) {
-  for line in [ "*** (skg folded alias (diff rel-)) a1",
+  for line in [ "*** (skg folded removedAlias (diff rel-)) a1",
                 "*** (skg folded alias) a2",
                 "*** (skg folded alias (diff rel+)) a3",
                 "** (skg bodyFolded (oldText titleAndBody)) txt",

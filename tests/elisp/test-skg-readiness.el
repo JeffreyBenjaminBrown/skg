@@ -31,9 +31,9 @@ in a space, as 'skg-format-headline' writes it."
 
 (ert-deftest test-skg-cycle-commit-ready-toggles-a-leaf ()
   (should (equal (test-skg-readiness--run
-                  '("** (skg alias (diff rel-)) a1")
+                  '("** (skg removedAlias (diff rel-)) a1")
                   1 #'skg-cycle-commit-ready)
-                 '("** (skg alias (diff rel-) (readyRequest)) a1")))
+                 '("** (skg removedAlias (diff rel-) (readyRequest)) a1")))
   (should (equal (test-skg-readiness--run
                   '("** (skg (oldText title) (ready)) txt")
                   1 #'skg-cycle-commit-ready)
@@ -55,13 +55,13 @@ in a space, as 'skg-format-headline' writes it."
   (should (equal (test-skg-readiness--run
                   '("* (skg (node (id ali) (repo r))) ali"
                     "** (skg (aliasFolder changed))"
-                    "*** (skg alias (diff rel-) (ready)) a1"
+                    "*** (skg removedAlias (diff rel-) (ready)) a1"
                     "*** (skg alias) a2"
                     "*** (skg alias (diff rel+)) a3")
                   2 #'skg-cycle-commit-ready)
                  '("* (skg (node (id ali) (repo r))) ali"
                    "** (skg (aliasFolder changed))"
-                   "*** (skg alias (diff rel-) (ready) (readyRequest)) a1"
+                   "*** (skg removedAlias (diff rel-) (ready) (readyRequest)) a1"
                    "*** (skg alias) a2"
                    "*** (skg alias (diff rel+) (readyRequest)) a3")))
   ;; A changed node: one request naming every leaf it owns.

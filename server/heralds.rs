@@ -380,6 +380,7 @@ pub fn herald_rule_table () -> HeraldRule {
       vac ("bodyFolded"),
       leaf (PropertyFolder::Alias . repr_in_client (), "aliases"),
       leaf ("alias", "alias"), // Property::Alias
+      leaf ("removedAlias", "alias"), // Property::RemovedAlias
       // An alias's stored relRepo is a display fact.  A
       // requested replacement lives under editRequest below, so the
       // two values can be rendered side by side without conflation.
@@ -418,7 +419,8 @@ pub fn herald_rule_table () -> HeraldRule {
             "it acquired"),
       vec! [
       leaf (PropertyFolder::ID . repr_in_client (), "IDs"),
-      leaf ("id", "ID") ], // Property::ID
+      leaf ("id", "ID"), // Property::ID
+      leaf ("removedID", "ID") ], // Property::RemovedID
       write_protected_leaves (PropertyFolder::flags () . repr_in_client (),
                 "flags"),
       vec! [
@@ -797,16 +799,18 @@ fn property_and_folder_atoms () -> Vec<&'static str> {
   let all_propertyFolders : [PropertyFolder; 3] = [
     PropertyFolder::ID, PropertyFolder::Alias, PropertyFolder::flags () ];
   for c in &all_propertyFolders { propertyFolder_guard (c); }
-  let all_property_atoms : [&'static str; 8] = {
+  let all_property_atoms : [&'static str; 10] = {
     fn property_guard ( q : &Property ) { // ditto
       match q {
         Property::Alias { .. } | Property::ID { .. }
-          | Property::Flag { .. } | Property::OldText { .. }
+          | Property::Flag { .. }
+          | Property::RemovedAlias { .. } | Property::RemovedID { .. }
+          | Property::OldText { .. }
           | Property::BodyDiff { .. } | Property::HomeSkgrepoMove { .. }
           | Property::RelRepoMove { .. } | Property::ChangesetMarker { .. }
           => () }}
     let _ = property_guard;
-    [ "alias", "id", "flag", "oldText", "bodyDiff",
+    [ "alias", "id", "flag", "removedAlias", "removedID", "oldText", "bodyDiff",
       "homeMove", "relRepoMove", "changesetMarker" ] };
   // The arguments the total diff view's properties take in match
   // position (org_to_text.rs's 'property_metadata_to_string').

@@ -553,7 +553,8 @@ fn removed_by_set_difference<T : Clone + Eq + Hash + Ord> (
 
 /// Under 'treeid', the node's alias, ID and flags folders, those whose
 /// list changed, each holding the union of the list: the old order where the LCS
-/// puts a removed entry, + on a gained entry, - on a lost one.
+/// puts a removed entry, + on a gained entry, - on a lost one. A lost
+/// alias or ID is a 'Property::RemovedAlias' or 'Property::RemovedID'.
 fn append_changed_property_folders (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
@@ -570,9 +571,12 @@ fn append_changed_property_folders (
     append_property_folder (
       tree, treeid, PropertyFolder::Alias,
       signed_union ( &aliases (before), &aliases (after) ) . into_iter ()
-      . map ( |(text, sign)| Property::Alias {
-        text, relRepo : None, relRepo_request : None,
-        change_facts : facts_of_entry (sign), readiness_request : None } )
+      . map ( |(text, sign)| match sign {
+        Some (Sign::Minus) => Property::RemovedAlias {
+          text, change_facts : facts_of_entry (sign), readiness_request : None },
+        _ => Property::Alias {
+          text, relRepo : None, relRepo_request : None,
+          change_facts : facts_of_entry (sign), readiness_request : None }, } )
       . collect () ); }
   if ! changes . extra_ids_gained . is_empty () || ! changes . extra_ids_lost . is_empty () {
     let ids = |node : &GraphnodeInRust| -> Vec<ID> {
@@ -581,9 +585,11 @@ fn append_changed_property_folders (
     append_property_folder (
       tree, treeid, PropertyFolder::ID,
       signed_union ( &ids (before), &ids (after) ) . into_iter ()
-      . map ( |(skgid, sign)| Property::ID {
-        skgid,
-        change_facts : facts_of_entry (sign), readiness_request : None } )
+      . map ( |(skgid, sign)| match sign {
+        Some (Sign::Minus) => Property::RemovedID {
+          skgid, change_facts : facts_of_entry (sign), readiness_request : None },
+        _ => Property::ID {
+          skgid, change_facts : facts_of_entry (sign), readiness_request : None }, } )
       . collect () ); }
   if ! changes . flags_gained . is_empty () || ! changes . flags_lost . is_empty () {
     append_property_folder (

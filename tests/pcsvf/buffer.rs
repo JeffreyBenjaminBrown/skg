@@ -2,7 +2,7 @@
 // fixture is described in 'sets.rs'. In the 'kinds' fixture (owned
 // skgrepos public and private) each root shows one kind of change:
 // txt is retitled and its body edited; ali loses alias a1 and gains
-// a3; flg gains a flag; ct drops k1 and gains k2 (ctx, with its
+// a3, and loses its extra ID ali-old; flg gains a flag; ct drops k1 and gains k2 (ctx, with its
 // content, is unchanged); sub subscribes to s2 instead of s1; mv
 // moves from public to private; rr's containment of rm moves to
 // private; acq acquired acqd by a nodeMerge; gone, which subscribed
@@ -136,9 +136,12 @@ fn alias_id_and_flag_changes_fill_their_folders (
   let buffer : String = kinds_buffer () ?;
   assert_lines_in_order ( &buffer, &[
     "** (skg (aliasFolder changed))",
-    "*** (skg alias (diff rel-)) a1",
+    "*** (skg removedAlias (diff rel-)) a1",
     "*** (skg alias) a2",
-    "*** (skg alias (diff rel+)) a3" ] );
+    "*** (skg alias (diff rel+)) a3",
+    "** (skg (idFolder changed))",
+    "*** (skg id) ali",
+    "*** (skg removedID (diff rel-)) ali-old" ] );
   assert_lines_in_order ( &buffer, &[
     "** (skg (idFolder changed))",
     "*** (skg id) acq",
@@ -204,7 +207,7 @@ fn marks_in_the_store_show_as_ready (
               "{}", buffer );
     assert_lines_in_order ( &buffer, &[
       "** (skg (aliasFolder changed))", // a3 is not ready, so neither is the folder
-      "*** (skg alias (diff rel-) (ready)) a1",
+      "*** (skg removedAlias (diff rel-) (ready)) a1",
       "*** (skg alias (diff rel+)) a3" ] );
     let buffer : String = all_changes_buffer_with_marks (
       f, &[ alias ("a1"), alias ("a3") ] ) ? . unwrap ();

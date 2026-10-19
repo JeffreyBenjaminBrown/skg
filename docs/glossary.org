@@ -695,8 +695,9 @@ references.
 
 *** save-inert
 
-A viewnode is *save-inert* if it emits no fieldIntents: phantoms and
-restricted vognodes. Its descendants may still emit them, so save
+A viewnode is *save-inert* if it emits no fieldIntents: phantoms,
+restricted vognodes, and the total diff view's properties, among
+them removed aliases and IDs. Its descendants may still emit them, so save
 extraction still visits them.
 
 *** title != headline
@@ -784,6 +785,15 @@ their derived readiness. There are three kinds: the content changeset
 marker ("its content changed"), the relRepo changeset marker ("some
 content relationships changed skgrepo") and the order-only marker
 ("order-only change", which is always ready).
+
+*** removed alias, removed ID
+
+An alias or extra ID of a node that HEAD has and the worktree lacks.
+The TDV draws it in the node's alias or ID folder as its own kind
+('Property::RemovedAlias', 'Property::RemovedID'), where the LCS of
+the two lists puts it, with the '-' herald. It is save-inert by kind:
+the save reads no alias from it and does not count it among the
+node's IDs. Marking it marks the leaf of the lost alias or ID.
 
 *** readiness summary
 

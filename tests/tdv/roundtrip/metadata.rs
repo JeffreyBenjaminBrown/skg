@@ -101,6 +101,22 @@ fn changeset_markers_round_trip () {
       expected ); }}
 
 #[test]
+fn removed_aliases_and_ids_round_trip () {
+  let removed : ChangeFacts = ChangeFacts {
+    presence : DiffPresence { node : None, rel : Some (Sign::Minus) },
+    ready    : Some (BTreeSet::new ()) };
+  assert_round_trip (
+    property ( Property::RemovedAlias {
+      text : "an old alias" . into (),
+      change_facts : removed . clone (), readiness_request : None } ),
+    "removedAlias (diff rel-) (ready)" );
+  assert_round_trip (
+    property ( Property::RemovedID {
+      skgid : ID::from ("old-id"),
+      change_facts : removed, readiness_request : request_all () } ),
+    "removedID (diff rel-) (ready) (readyRequest all)" ); }
+
+#[test]
 fn a_historical_phantom_round_trips () {
   assert_round_trip (
     viewnode ( ViewnodeKind::Vognode ( Vognode::Phantom (

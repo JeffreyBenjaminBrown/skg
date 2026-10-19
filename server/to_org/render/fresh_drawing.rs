@@ -59,8 +59,12 @@ fn property_kind (
   property : &Property,
 ) -> String {
   match property {
-    Property::Alias { text, .. }   => format! ("alias {}", text),
-    Property::ID { skgid, .. }     => format! ("id {}", skgid . 0),
+    // A removed entry has its live twin's key, so an entry the
+    // worktree regains (or loses) keeps its viewnode.
+    Property::Alias { text, .. } | Property::RemovedAlias { text, .. } =>
+      format! ("alias {}", text),
+    Property::ID { skgid, .. } | Property::RemovedID { skgid, .. } =>
+      format! ("id {}", skgid . 0),
     Property::Flag { flag, .. }    => format! ("flag {:?}", flag),
     Property::OldText { .. }       => "oldText" . to_string (),
     Property::BodyDiff { .. }      => "bodyDiff" . to_string (),

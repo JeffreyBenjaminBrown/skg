@@ -685,3 +685,27 @@ gitrepo whose worktree edits two committed nodes, and end with a
 scenario on the "all changes" buffer. The 'total-diff-view'
 integration test now expects, after the commit, its buffers to keep
 their roots and show no change.
+** Slice 2: deviations
+*** bare atoms on the wire
+The plan writes '(removedAlias ...)' and '(removedID ...)', mirroring
+the live forms. The live forms are the bare atoms 'alias' and 'id',
+followed by their top-level facts, so the removed ones are the bare
+atoms 'removedAlias' and 'removedID' the same way:
+'(skg removedAlias (diff rel-) (ready)) a1'. Each has its own
+'node_heralds' entry (message), and renders "alias" or "ID" with the
+'-' herald, as before.
+*** a removed entry shares its live twin's match key
+'fresh_drawing.rs' keys a removed alias as "alias TEXT" and a removed
+ID as "id ID", like the live entries. An entry the worktree regains,
+or loses, keeps its viewnode and its fold state; its kind is replaced.
+*** a removed ID is still a save dependency
+'save_dependencies' collects a removed ID as it collects a live one,
+as it did when the removed ID was an ID with '(diff rel-)'.
+*** the 'kinds' fixture loses an extra ID
+ali's HEAD file has the extra ID ali-old, which its worktree lacks, so
+the fixture draws a removed ID. 'a_deleted_id_folder_respawns' now
+strips that line too.
+*** a dead alias collector
+'collect_grandchild_aliases_for_viewnode' ('types/tree/viewnode_graphnode.rs')
+has no caller. It rejects an alias folder holding anything but
+'Property::Alias', which would now include a removed alias. Left as is.

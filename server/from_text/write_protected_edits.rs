@@ -431,7 +431,8 @@ fn path_step (
     ViewnodeKind::Property (Property::Flag { .. }) =>
       OccurrencePathStep::Flag,
     ViewnodeKind::Property (
-      property @ ( Property::OldText { .. } | Property::BodyDiff { .. }
+      property @ ( Property::RemovedAlias { .. } | Property::RemovedID { .. }
+                   | Property::OldText { .. } | Property::BodyDiff { .. }
                    | Property::HomeSkgrepoMove { .. } | Property::RelRepoMove { .. }
                    | Property::ChangesetMarker { .. } )) =>
       OccurrencePathStep::TotalDiffViewProperty (property . repr_in_client ()),

@@ -1,4 +1,6 @@
 pid: ali
+extra_ids:
+- ali-old
 title: ali
 aliases:
 - a1

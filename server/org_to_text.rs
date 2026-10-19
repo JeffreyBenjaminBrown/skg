@@ -153,7 +153,9 @@ pub fn folder_change_facts (
         ViewnodeKind::Property (
           Property::Alias { change_facts, .. }
           | Property::ID { change_facts, .. }
-          | Property::Flag { change_facts, .. } ) =>
+          | Property::Flag { change_facts, .. }
+          | Property::RemovedAlias { change_facts, .. }
+          | Property::RemovedID { change_facts, .. } ) =>
           single_change_ready (change_facts),
         _ => None, };
       match (presence_ready, relRepo_move_ready) {
@@ -323,6 +325,10 @@ fn property_metadata_to_string (
       parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
     Property::Flag { flag, change_facts, readiness_request, .. } => {
       parts . push ( format! ("(flag {})", flag . wire_name ()) );
+      parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
+    Property::RemovedAlias { change_facts, readiness_request, .. }
+      | Property::RemovedID { change_facts, readiness_request, .. } => {
+      parts . push ( property . repr_in_client () . to_string () );
       parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
     Property::OldText { title, body, change_facts, readiness_request } => {
       parts . push ( format! ( "(oldText {})",

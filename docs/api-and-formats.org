@@ -1235,7 +1235,8 @@ or the worktree lacks (=node-=); the relationship to the viewparent
 that HEAD lacks (=rel+=) or the worktree lacks (=rel-=). It sits inside
 =(node ...)=, =(deleted ...)=, =(unknown ...)= and =(historical ...)=, and
 at top level on alias, id and flag leaves, whose single axis is
-written =rel+= or =rel-=.
+written =rel+= or =rel-=. A lost alias or ID is a =removedAlias= or
+=removedID= leaf (below), whose =rel-= is display only.
 
 *** Readiness: =(ready AXES)=, =(readyRequest AXES)=, =(unreadyRequest AXES)=
 =(ready AXES)= lists the axes (=node=, =rel=) whose change-forest leaves
@@ -1248,6 +1249,10 @@ down. These sit where =(diff ...)= sits, and also at top level on the
 properties below other than =bodyDiff=.
 
 *** The total diff view's viewnodes
+- =removedAlias=, =removedID= -- in an alias or ID folder: an alias or
+  extra ID that HEAD has and the worktree lacks, its headline the alias
+  or the ID, carrying =(diff rel-)=. Saving reads no alias from it and
+  does not count it among the node's IDs.
 - =(historical (id ID) (repo REPO) ...)= -- a historical phantom: a node
   HEAD has and the worktree lacks, with HEAD's title and body; the
   grammar of =(deleted ...)=.
@@ -1283,6 +1288,7 @@ Examples:
 (skg (node (id 7) (repo main) (diff node+ rel+) (ready node)))
 (skg (node (id 9) (repo main) (affectsParent false) writeProtected (diff rel-)))
 (skg alias (diff rel+) (readyRequest))
+(skg removedAlias (diff rel-) (ready))
 (skg (historical (id 4) (repo main) (diff node- rel-)))
 (skg (oldText title) (ready))
 (skg (changesetMarker content) (readyRequest all))

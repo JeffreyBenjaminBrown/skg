@@ -43,15 +43,16 @@ fn insert_after_line_starting (
   assert! ( inserted, "no line starts {:?}:\n{}", prefix, buffer );
   lines . join ("\n") + "\n" }
 
-/// Deleting the changed ID folder changes nothing: the save writes no
-/// file, and the reconciled buffer draws the folder again.
+/// Deleting the changed ID folders changes nothing: the save writes
+/// no file, and the reconciled buffer draws the folders again.
 #[test]
 fn a_deleted_id_folder_respawns (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    let edited : String = without_lines_containing (
-      &without_lines_containing (&buffer, "(skg id"), "(skg (idFolder" );
+    let edited : String = [ "(skg id", "(skg removedID", "(skg (idFolder" ]
+      . into_iter () . fold ( buffer . clone (), |edited, atom|
+        without_lines_containing (&edited, atom) );
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let response : SaveResponse = save (f, &edited) ?;
     assert! ( response . errors . is_empty (),
@@ -80,6 +81,44 @@ fn editing_the_id_folder_aborts_the_save (
               "the error should be IDFolder_Edited: {}", error );
     assert_eq! ( skg_files (f) ?, files_before,
                  "an aborted save must change no file" );
+    Ok (( )) }) }
+
+/// A save does not restore a removed alias: ali's removed alias a1
+/// is not an alias, so ali keeps a2 and a3, and the reconciled buffer
+/// draws a1 as removed again.
+#[test]
+fn a_removed_alias_is_not_restored_by_a_save (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("kinds", &["public", "private"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    assert! ( buffer . contains ("*** (skg removedAlias (diff rel-)) a1"),
+              "{}", buffer );
+    let response : SaveResponse = save (f, &buffer) ?;
+    assert! ( response . errors . is_empty (),
+              "the save must succeed, got {:?}", response . errors );
+    let ali : Graphnode =
+      read_graphnode ( &f . root . path () . join ("public"), "ali" ) ?;
+    assert_eq! ( ali . aliases . or_default () . iter ()
+                 . map ( |alias| alias . member . as_str () ) . collect::<Vec<&str>> (),
+                 vec! ["a2", "a3"] );
+    assert_eq! ( response . saved_view, buffer );
+    Ok (( )) }) }
+
+/// A removed ID does not abort the save: ali's lost extra ID ali-old
+/// is not one of its IDs, so its ID folder matches the node's.
+#[test]
+fn a_removed_id_does_not_abort_the_save (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("kinds", &["public", "private"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    assert! ( buffer . contains ("*** (skg removedID (diff rel-)) ali-old"),
+              "{}", buffer );
+    let files_before : BTreeMap<String, String> = skg_files (f) ?;
+    let response : SaveResponse = save (f, &buffer) ?;
+    assert! ( response . errors . is_empty (),
+              "the save must succeed, got {:?}", response . errors );
+    assert_eq! ( skg_files (f) ?, files_before );
+    assert_eq! ( response . saved_view, buffer );
     Ok (( )) }) }
 
 /// Deleting the save-inert images of removed things changes nothing:

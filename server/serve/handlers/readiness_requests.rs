@@ -141,11 +141,11 @@ fn leaves_named_at (
       let parent_pid = || -> Option<ID> {
         vognode_leaf_pid (parent . value (), pid_of) };
       match property {
-        Property::Alias { text, .. } =>
+        Property::Alias { text, .. } | Property::RemovedAlias { text, .. } =>
           leaves . push ( LeafKey::Node {
             pid : owner_of_folder () ?,
             aspect : NodeAspect::Alias (text . clone ()) } ),
-        Property::ID { skgid, .. } =>
+        Property::ID { skgid, .. } | Property::RemovedID { skgid, .. } =>
           leaves . push ( LeafKey::Node {
             pid : owner_of_folder () ?,
             aspect : NodeAspect::ExtraId (skgid . clone ()) } ),
@@ -253,6 +253,8 @@ fn change_facts_of_property (
     Property::Alias { change_facts, .. }
     | Property::ID { change_facts, .. }
     | Property::Flag { change_facts, .. }
+    | Property::RemovedAlias { change_facts, .. }
+    | Property::RemovedID { change_facts, .. }
     | Property::OldText { change_facts, .. }
     | Property::HomeSkgrepoMove { change_facts, .. }
     | Property::RelRepoMove { change_facts, .. }
@@ -271,6 +273,8 @@ fn change_facts_mut (
       Property::Alias { change_facts, .. }
       | Property::ID { change_facts, .. }
       | Property::Flag { change_facts, .. }
+      | Property::RemovedAlias { change_facts, .. }
+      | Property::RemovedID { change_facts, .. }
       | Property::OldText { change_facts, .. }
       | Property::HomeSkgrepoMove { change_facts, .. }
       | Property::RelRepoMove { change_facts, .. }

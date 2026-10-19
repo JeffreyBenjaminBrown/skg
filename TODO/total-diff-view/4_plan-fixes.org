@@ -477,7 +477,7 @@ is byte-identical to itself; after a commit the roots remain and carry
 no change facts. Client tests: the fold-preservation integration tests
 ('fold-preservation', 'body-fold-preservation') gain a TDV variant.
 
-** Slice 2: removed alias and ID entries as kinds
+** DONE Slice 2: removed alias and ID entries as kinds
 Add 'Property::RemovedAlias { text }' and 'Property::RemovedID { skgid }':
 parse, serialize ('(removedAlias ...)', '(removedID ...)' mirroring
 the live forms), 'emittable_metadata_atoms', herald rules (the '-'

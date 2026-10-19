@@ -63,6 +63,27 @@ fn a_mark_shows_on_both_images_of_a_relationship (
               "the request was consumed:\n{}", saved );
     Ok (( )) }) }
 
+/// Marking a removed alias or a removed ID marks its leaf: ali's lost
+/// alias a1 and lost extra ID ali-old show ready after the save.
+#[test]
+fn marking_a_removed_entry_marks_its_leaf (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("kinds", &["public", "private"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let marked : String = [ "*** (skg removedAlias (diff rel-)) a1",
+                            "*** (skg removedID (diff rel-)) ali-old" ]
+      . into_iter () . fold ( buffer, |marked, line|
+        edit_line ( &marked, line, |line| line . replacen (
+          "(diff rel-))", "(diff rel-) (readyRequest))", 1 )) );
+    let saved : String = save_cleanly (f, &marked) ? . saved_view;
+    for line in [ "*** (skg removedAlias (diff rel-) (ready)) a1",
+                  "*** (skg removedID (diff rel-) (ready)) ali-old" ] {
+      assert! ( saved . lines () . any ( |l| l == line ),
+                "{:?} must be ready:\n{}", line, saved ); }
+    assert! ( ! saved . contains ("readyRequest"),
+              "the requests were consumed:\n{}", saved );
+    Ok (( )) }) }
+
 /// A mark approves one version of a change. Editing the node changes
 /// the change, and the mark lapses.
 #[test]

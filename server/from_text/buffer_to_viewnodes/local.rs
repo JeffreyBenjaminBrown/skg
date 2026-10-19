@@ -42,7 +42,8 @@ pub fn validate_local_structure (
         validate_unrestrictedVognode(tree, treeid, t, config),
       MpViewnodeKind::BufferRoot =>
         Vec::new (),
-      MpViewnodeKind::Property (Property::Alias { .. }) =>
+      MpViewnodeKind::Property (
+        Property::Alias { .. } | Property::RemovedAlias { .. }) =>
           validate_alias(tree, treeid),
       MpViewnodeKind::PropertyFolder (PropertyFolder::Alias) =>
           validate_aliasfolder(tree, treeid),
@@ -63,7 +64,8 @@ pub fn validate_local_structure (
           validate_subscribeefolder(tree, treeid),
       MpViewnodeKind::PropertyFolder (PropertyFolder::ID) =>
           validate_idFolder(tree, treeid),
-      MpViewnodeKind::Property (Property::ID { .. }) =>
+      MpViewnodeKind::Property (
+        Property::ID { .. } | Property::RemovedID { .. }) =>
           validate_id_property(tree, treeid),
       MpViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }) =>
           validate_flags_folder (tree, treeid),
@@ -125,7 +127,8 @@ fn validate_aliasfolder (
   if !generation_includes_only(
     tree, treeid, 1, true,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::Property (Property::Alias { .. } )))
+                    MpViewnodeKind::Property (
+                      Property::Alias { .. } | Property::RemovedAlias { .. } )))
     { errors . push("AliasFolder's (non-ignored) children must include only Aliases."
                     . to_string()); }
   if !generation_exists_and_includes(
@@ -528,7 +531,8 @@ fn validate_idFolder (
   if !generation_includes_only(
     tree, treeid, 1, true,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::Property (Property::ID { .. } )) )
+                    MpViewnodeKind::Property (
+                      Property::ID { .. } | Property::RemovedID { .. } )) )
     { errors . push("IDFolder's (non-ignored) children can only be ID properties."
                     . to_string() ); }
   if !siblings_cannot_include(
@@ -642,7 +646,8 @@ fn cannot_be_child_of_vognode (
   matches!(&node . kind,
     MpViewnodeKind::BufferRoot |
     MpViewnodeKind::Property (
-      Property::Alias { .. } | Property::ID { .. } | Property::Flag { .. }) |
+      Property::Alias { .. } | Property::ID { .. } | Property::Flag { .. }
+      | Property::RemovedAlias { .. } | Property::RemovedID { .. }) |
     MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee))
   || ( ! affects_parent_subscribee_as_such
        // validate_hiddenin REQUIRES a vognode parent; a

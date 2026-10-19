@@ -423,6 +423,20 @@ pub enum Property {
   // save-inert: the validator ignores them, and the total diff view's
   // reconciler owns them. Each but BodyDiff is a change-forest leaf or
   // aggregate, so it carries '(ready ...)' and a readiness request.
+  /// In an alias folder: an alias the worktree lost since HEAD. The
+  /// alias reader never reads it. Its leaf is that alias.
+  RemovedAlias {
+    text              : String,
+    change_facts      : ChangeFacts,
+    readiness_request : Option<ReadinessRequest>,
+  },
+  /// In an ID folder: an extra ID the worktree lost since HEAD. The
+  /// ID check never counts it. Its leaf is that ID.
+  RemovedID {
+    skgid             : ID,
+    change_facts      : ChangeFacts,
+    readiness_request : Option<ReadinessRequest>,
+  },
   /// The node's text at HEAD, under a node whose text changed.
   /// 'title' is Some iff the title changed, 'body' Some iff the body
   /// changed (the empty string for a body HEAD lacked). Its leaf is
@@ -716,6 +730,8 @@ impl Property {
       Property::Alias { .. }       => "alias",
       Property::ID { .. }          => "id",
       Property::Flag { .. }    => "flag",
+      Property::RemovedAlias { .. }    => "removedAlias",
+      Property::RemovedID { .. }       => "removedID",
       Property::OldText { .. }         => "oldText",
       Property::BodyDiff { .. }        => "bodyDiff",
       Property::HomeSkgrepoMove { .. } => "homeMove",
@@ -728,6 +744,8 @@ impl Property {
       Property::Alias { text, .. } => text,
       Property::ID    { skgid, .. }   => skgid,
       Property::Flag { title, .. } => title,
+      Property::RemovedAlias { text, .. } => text,
+      Property::RemovedID { skgid, .. }   => skgid,
       Property::OldText { title, .. } =>
         title . as_deref () . unwrap_or (""),
       Property::BodyDiff { .. }
@@ -752,6 +770,8 @@ impl Property {
       Property::Alias { readiness_request, .. }
         | Property::ID { readiness_request, .. }
         | Property::Flag { readiness_request, .. }
+        | Property::RemovedAlias { readiness_request, .. }
+        | Property::RemovedID { readiness_request, .. }
         | Property::OldText { readiness_request, .. }
         | Property::HomeSkgrepoMove { readiness_request, .. }
         | Property::RelRepoMove { readiness_request, .. }
@@ -766,6 +786,8 @@ impl Property {
       Property::Alias { readiness_request, .. }
         | Property::ID { readiness_request, .. }
         | Property::Flag { readiness_request, .. }
+        | Property::RemovedAlias { readiness_request, .. }
+        | Property::RemovedID { readiness_request, .. }
         | Property::OldText { readiness_request, .. }
         | Property::HomeSkgrepoMove { readiness_request, .. }
         | Property::RelRepoMove { readiness_request, .. }

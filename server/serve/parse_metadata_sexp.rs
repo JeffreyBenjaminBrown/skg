@@ -238,6 +238,16 @@ pub fn viewnode_from_metadata (
                               skgid: title . clone () . into (),
                               change_facts: metadata . change_facts . clone (),
                               readiness_request: metadata . readiness_request . clone () }),
+          MpViewnodeKind::Property (Property::RemovedAlias { .. }) =>
+            MpViewnodeKind::Property (Property::RemovedAlias {
+              text              : title . clone (),
+              change_facts      : metadata . change_facts . clone (),
+              readiness_request : metadata . readiness_request . clone () }),
+          MpViewnodeKind::Property (Property::RemovedID { .. }) =>
+            MpViewnodeKind::Property (Property::RemovedID {
+              skgid             : title . clone () . into (),
+              change_facts      : metadata . change_facts . clone (),
+              readiness_request : metadata . readiness_request . clone () }),
           MpViewnodeKind::Property (Property::Flag { flag, .. }) =>
             MpViewnodeKind::Property (Property::Flag {
               flag : *flag,
@@ -534,6 +544,18 @@ pub fn parse_metadata_to_viewnodemd (
           "bodyDiff" =>
             result . non_vognode = Some (MpViewnodeKind::Property (
               Property::BodyDiff { diff : String::new () } )),
+          // The total diff view's removed entries; their text, like an
+          // alias's or an ID's, comes from the headline.
+          "removedAlias" =>
+            result . non_vognode = Some (MpViewnodeKind::Property (
+              Property::RemovedAlias {
+                text : String::new (), change_facts : ChangeFacts::default (),
+                readiness_request : None } )),
+          "removedID" =>
+            result . non_vognode = Some (MpViewnodeKind::Property (
+              Property::RemovedID {
+                skgid : ID::default (), change_facts : ChangeFacts::default (),
+                readiness_request : None } )),
           "overriddenFolder" =>
             result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Overridden)),
           "overriderFolder" =>
@@ -567,7 +589,9 @@ pub fn parse_metadata_to_viewnodemd (
      && ! matches! ( result . non_vognode,
                      Some (MpViewnodeKind::Property (
                        Property::Alias { .. } | Property::ID { .. }
-                       | Property::Flag { .. } | Property::OldText { .. }
+                       | Property::Flag { .. }
+                       | Property::RemovedAlias { .. } | Property::RemovedID { .. }
+                       | Property::OldText { .. }
                        | Property::HomeSkgrepoMove { .. }
                        | Property::RelRepoMove { .. }
                        | Property::ChangesetMarker { .. } )) )
