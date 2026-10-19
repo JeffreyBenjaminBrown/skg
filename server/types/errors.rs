@@ -57,11 +57,11 @@ pub enum BufferValidationError {
     skgid   : ID,
     title   : String,
     changes : Vec<String>,
-  }, // This occurrence was changed since the server rendered it, but a write-protected occurrence emits no fieldIntent for the changed data.
-  NodeOfU_LeftWithoutEditableOccurrence {
+  }, // This occurrence differs from the graph, but a write-protected occurrence emits no fieldIntent for the differing data.
+  MemberChildOfWriteProtectedOccurrence {
     skgid : ID,
     title : String,
-  }, // In a buffer of the total diff view, the save write-protects the only editable occurrence of a node of U and requests no other occurrence editable.
+  }, // A write-protected occurrence has a child that affects its parent, but a write-protected occurrence cannot write its content.
   FlagsSurfaceEdited {
     recorder_skgid : ID,
     recorder_title : String,
@@ -150,11 +150,11 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Edit request on write-protected (phantom) node {:?}. Phantoms are write-protected; write-protected nodes cannot carry write instructions. Visit a editable view of the node first (C-c g RET).", skgid),
       BufferValidationError::EditedWriteProtectedOccurrence {
         skgid, title, changes } =>
-        write!(f, "The write-protected occurrence of node {:?} ({:?}) was edited ({}) but is write-protected. Re-render, then edit a editable occurrence instead.",
+        write!(f, "The write-protected occurrence of node {:?} ({:?}) differs from the graph ({}). A write-protected occurrence saves nothing of its own; edit an editable occurrence instead, or request this one editable (C-c s d).",
                skgid, title, changes . join ("; ")),
-      BufferValidationError::NodeOfU_LeftWithoutEditableOccurrence {
+      BufferValidationError::MemberChildOfWriteProtectedOccurrence {
         skgid, title } =>
-        write!(f, "In a total diff view every changed node stays editable somewhere. {} ({}) would have no editable instance left; to edit it elsewhere, request another instance editable (C-c s d) instead of write-protecting this one.",
+        write!(f, "A child typed under the write-protected occurrence of {} ({}) cannot become its content. Request an editable occurrence of it (C-c s d), or mark the child as not affecting its parent.",
                title, skgid . 0),
       BufferValidationError::FlagsSurfaceEdited {
         recorder_skgid, recorder_title, changes } =>

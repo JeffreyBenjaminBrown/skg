@@ -357,10 +357,7 @@ So far there are these endpoints:
     every view. Closing the last such buffer drops it, as does a
     rebuild of the session-lifetime stores, so the next request reads
     both halves from the disk the rebuilt live graph was read from. Saving such a buffer is ordinary (see "Save
-    buffer"), and its response carries the readiness summary, except
-    that a save which write-protects the only editable occurrence of a
-    node of U, and requests no other occurrence of it editable, is
-    refused with a validation error naming the node.
+    buffer"), and its response carries the readiness summary.
   - A rerender of such a buffer (after a save, collateral, or after a
     commit) reconciles what it holds with a fresh drawing from the
     straddle: a viewnode the fresh drawing also produces is kept, with
@@ -785,7 +782,8 @@ node's heralds.
   is one of the nine in =PARTNER_ROLE_VOCAB=. Emitted by the =C-c p= commands.
 - =editableView= — on a write-protected occurrence, make it the node's
   editable one (the occurrence that was editable is write-protected,
-  keeping its drawn content); on an editable node, unfold its content
+  keeping its drawn content, each member of which, there and below,
+  becomes a non-member); on an editable node, unfold its content
   editable, within =initial_node_limit= expansions. A buffer carries at
   most one per node.
 - =flags= — add one write-protected =flagsFolder=, retained even when empty.

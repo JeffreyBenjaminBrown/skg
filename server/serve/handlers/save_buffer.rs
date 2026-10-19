@@ -4,13 +4,12 @@ use crate::dbs::in_rust_graph::{
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::from_text
-  ::buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_graph;
+  ::buffer_to_validated_saveplan_with_fork_skgrepos_in_graph;
 use crate::from_text::strands::{
   RelationshipKey, StrandReview, StrandedRelationship,
   raised_relationship_warning, relevel_relationships,
   stranded_relationships};
 use crate::git_ops::diff::compute_diff_for_skgrepo;
-use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::save::{
   apply_delete_propagation_cleanup,
   PreparedSave, prepare_save_under_mutation_gate,
@@ -52,11 +51,11 @@ use crate::types::save::{
   NodeInstruction, PostSkgsaveCommitNoticeCandidate, SavePlan, format_save_error_as_org };
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::ViewId;
-use crate::update_buffer::{tdv_buffer_of_view, update_views_after_save};
+use crate::update_buffer::update_views_after_save;
 
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
@@ -716,28 +715,14 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   let working_graph = new_handle ((*runtime . graph) . clone ());
   let mut working_tantivy = runtime . tantivy_index . clone ();
 
-  let nodes_of_u : Option<BTreeSet<ID>> =
-    // U of the saved buffer, if it is one of the total diff view.
-    match viewid_from_request_result . as_ref () . ok ()
-      . and_then ( |view_id| tdv_buffer_of_view (views_state, view_id) )
-    { Some (tdv_buffer) => Some (
-        current_graph_straddle_in_slot (
-          &mut views_state . graph_straddle, &runtime . config,
-          runtime . graph . clone () ) ?
-        . pcsvf_sets_of_buffer (tdv_buffer) . u . clone () ),
-      None => None, };
   let ( viewforest, save_plan, parse_warnings )
     : ( ViewForest, SavePlan, Vec<String> ) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
             "buffer_to_validated_saveplan"
           ) . entered();
-        buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_graph (
+        buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
           org_buffer_text, &runtime . graph, &runtime . config,
-          skgrepo_restriction, fork_skgrepos,
-          viewid_from_request_result . as_ref () . ok ()
-            . and_then ( |view_id| views_state . open_views
-              . viewid_to_view (view_id) ),
-          nodes_of_u . as_ref () )
+          skgrepo_restriction, fork_skgrepos )
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
   if viewforest . is_empty ()

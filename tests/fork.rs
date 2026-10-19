@@ -92,7 +92,7 @@ const FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER : &str = indoc! {"
 /// snapshot.
 const EXPLICIT_FORK_BUFFER : &str = indoc! {"
   * (skg (node (id P) (repo owned) (viewRequests fork))) P-container
-  ** (skg (node (id N) (repo foreign) writeProtected)) N
+  ** (skg (node (id N) (repo foreign) writeProtected)) N-original
   "};
 
 /// An explicit fork request on a brand-new (id-less) headline: enrichment
@@ -478,12 +478,12 @@ async fn clone_skgrepo_inferred_from_a_moved_writeProtected_ancestor (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let buffer : &str = indoc! {"
-    * (skg (node (id P) (repo owned) writeProtected)) P-container again
-    ** (skg (node (id N) (repo foreign))) N-edited
+    * (skg (node (id P) (repo owned) writeProtected)) P-container
+    ** (skg (node (id N) (repo foreign) (affectsParent false))) N-edited
     *** (skg (node (id N1) (repo foreign) writeProtected)) N1
     *** (skg (node (id N2) (repo foreign) writeProtected)) N2
     * (skg (node (id P) (repo owned2))) P-container
-    ** (skg (node (id N) (repo foreign) writeProtected)) N
+    ** (skg (node (id N) (repo foreign) writeProtected)) N-original
     "};
   let fork_specs : Vec<ForkSpec> =
     fork_specs_from (buffer, config) . await ?;

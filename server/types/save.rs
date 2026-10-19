@@ -240,11 +240,11 @@ fn format_buffer_validation_error (
               skgid . 0) },
     BufferValidationError::EditedWriteProtectedOccurrence {
       skgid, title, changes } => {
-      format!("Edited write-protected occurrence:\n- ID: {}\n- Title: {}\n- Changes: {}\n- This occurrence is write-protected; no changes were saved.\n- Re-render, then edit a editable occurrence instead.\n",
+      format!("Write-protected occurrence differs from the graph:\n- ID: {}\n- Title: {}\n- Differences: {}\n- A write-protected occurrence saves nothing of its own; no changes were saved.\n- Edit an editable occurrence instead, or request this one editable (C-c s d).\n",
               skgid . 0, title, changes . join ("; ")) },
-    BufferValidationError::NodeOfU_LeftWithoutEditableOccurrence {
+    BufferValidationError::MemberChildOfWriteProtectedOccurrence {
       skgid, title } => {
-      format!("In a total diff view every changed node stays editable somewhere. {} ({}) would have no editable instance left; to edit it elsewhere, request another instance editable (C-c s d) instead of write-protecting this one.\n",
+      format!("A child typed under the write-protected occurrence of {} ({}) cannot become its content.\n- Request an editable occurrence of it (C-c s d), or mark the child as not affecting its parent.\n",
               title, skgid . 0) },
     BufferValidationError::FlagsSurfaceEdited {
       recorder_skgid, recorder_title, changes } => {

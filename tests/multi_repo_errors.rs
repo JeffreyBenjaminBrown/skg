@@ -275,15 +275,17 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
 
     // Test 2: A write-protected occurrence's skgrepo is not an instruction.
     // Save ignores it, so it cannot disagree with the editable occurrence.
-    // (This arises after a skgrepo move: the move edits only the
+    // (This arises with a skgrepo move: the move edits only the
     // editable occurrence, leaving its write-protected repeats as rendered.)
+    // A write-protected occurrence must agree with the graph, though, so
+    // one whose skgrepo is stale is refused.
     {
-      let buffer_with_stale_write_protected_skgrepo: &str = indoc! {"
-        * (skg (node (id pub-1) (repo public))) pub-1                # editable instance with 'public'
-        * (skg (node (id pub-1) (repo private) writeProtected)) pub-1  # write-protected instance with 'private'
+      let buffer_moving_with_a_write_protected_repeat: &str = indoc! {"
+        * (skg (node (id pub-1) (repo private))) pub-1               # editable instance moved to 'private'
+        * (skg (node (id pub-1) (repo public) writeProtected)) pub-1  # write-protected instance as rendered
       "};
       let buffer_text: String =
-        strip_org_comments (buffer_with_stale_write_protected_skgrepo);
+        strip_org_comments (buffer_moving_with_a_write_protected_repeat);
       let result = buffer_to_validated_saveplan(
         &buffer_text,
         &config,
@@ -292,8 +294,24 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
               "A write-protected occurrence's skgrepo should be ignored, got: {:?}",
               result . err());
       let ( _viewforest, save_plan, _warnings ) = result?;
-      assert!(save_plan . skgrepo_moves . is_empty(),
-              "The write-protected occurrence's skgrepo should not move pub-1");
+      assert_eq!(save_plan . skgrepo_moves . len(), 1,
+                 "Only the editable occurrence should move pub-1");
+      assert_eq!(save_plan . skgrepo_moves[0] . new_skgrepo . as_str(), "private");
+      let buffer_with_stale_write_protected_skgrepo: &str = indoc! {"
+        * (skg (node (id pub-1) (repo public))) pub-1
+        * (skg (node (id pub-1) (repo private) writeProtected)) pub-1
+      "};
+      let result = buffer_to_validated_saveplan(
+        buffer_with_stale_write_protected_skgrepo,
+        &config,
+        None ) ;
+      assert!(matches!(
+                &result,
+                Err (SaveError::BufferValidationErrors { errors, .. })
+                if matches!(&errors[..],
+                  [BufferValidationError::EditedWriteProtectedOccurrence { .. }])),
+              "A stale write-protected skgrepo should be refused, got: {:?}",
+              result . err());
     }
 
     // Cleanup

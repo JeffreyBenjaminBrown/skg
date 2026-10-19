@@ -1,246 +1,93 @@
-//! Detect changes that a save would otherwise ignore because their recorder is
-//! rendered write-protected. The server keeps the last rendered `ViewForest`
-//! for every open view, so this compares the incoming forest with that image
-//! rather than guessing from the graph (which cannot represent view-local
-//! folder occurrences).
+//! Detect edits that a save would otherwise ignore because the occurrence
+//! carrying them is write-protected (or, for a flags folder, server-owned).
+//! A write-protected occurrence emits nothing at save extraction, so each is
+//! judged by the graph alone: it must say what the graph says.
 
-use crate::from_text::local_fieldintent_collection::predicates::{
-  unrestricted_child_counts_as_content, member_counts_for_partnerFolder};
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, SkgrepoName};
-use crate::types::nodes::complete::Flag;
+use crate::types::misc::{ID, SkgrepoName, members_of};
+use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{PartnerFolder, Property, PropertyFolder, Phantom, ViewRequest, Viewnode, ViewnodeKind, Vognode};
+use crate::types::viewnode::{AffectsParent, Property, PropertyFolder, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::types::nodes::complete::flag_is_true;
 
-use ego_tree::{NodeId, NodeRef};
-use std::collections::{BTreeSet, HashSet};
+use ego_tree::NodeRef;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum OccurrencePathStep {
-  Unrestricted (ID),
-  Restricted,
-  DeletedPhantom (ID),
-  UnknownPhantom (ID),
-  HistoricalPhantom (ID),
-  PropertyFolder (PropertyFolder),
-  Alias,
-  ID,
-  Flag,
-  TotalDiffViewProperty (&'static str), // its 'repr_in_client'
-  PartnerFolder (PartnerFolder),
-  DeadViewnode,
-}
-
-/// The parts of a write-protected occurrence that save extraction does not read.
-/// Descendant vognodes deliberately do not contribute their own title/body
-/// here: an editable descendant remains a self-writer even below an
-/// write-protected ancestor. The occurrence's own folders do contribute,
-/// because their recorder emits no `SetContains` or defining-folder instruction.
-#[derive(Debug, PartialEq)]
-struct WriteProtectedOccurrence {
-  skgid       : ID,
-  title    : String,
-  home_skgrepo : SkgrepoName,
-  content  : Vec<(ID, Option<SkgrepoName>)>,
-  aliases  : Option<Vec<(String, Option<SkgrepoName>)>>,
-  subscribes : Option<Vec<(ID, Option<SkgrepoName>)>>,
-  overrides  : Option<Vec<(ID, Option<SkgrepoName>)>>,
-  hidden_outside : Option<Vec<ID>>,
-}
-
-struct LocatedWriteProtectedOccurrence {
-  treeid      : NodeId,
-  parent_path : Vec<OccurrencePathStep>,
-  state       : WriteProtectedOccurrence,
-}
-
-/// Reject edits to write-protected occurrences that were present at the same
-/// location in the server's last rendering. An unmatched current occurrence
-/// is new, so it is allowed; its direct Unrestricted-node children are made
-/// non-members because that new occurrence cannot write a contains relation.
-pub fn errors_and_normalize_new_writeProtected_occurrences (
-  current  : &mut ViewForest,
-  previous : &ViewForest,
+/// Every write-protected occurrence of the saved view must agree with
+/// the graph: its title and home skgrepo, and its alias folder when
+/// present, equal the node's, and it has no member child, since a
+/// write-protected occurrence cannot write its content. Non-member
+/// children are the user's own and are not checked. (Its ID folder is
+/// checked for every recorder, by 'find_buffer_errors_for_saving'.)
+/// Every present flags folder, under any recorder, is server-owned and
+/// must equal the node's flags.
+pub fn errors_for_writeProtected_occurrences (
+  viewforest : &ViewForest,
+  graph      : &InRustGraph,
 ) -> Vec<BufferValidationError> {
   let mut errors : Vec<BufferValidationError> =
-    flags_surface_errors (current, previous);
-  let current_occurrences : Vec<LocatedWriteProtectedOccurrence> =
-    occurrences_in (current);
-  let previous_occurrences : Vec<LocatedWriteProtectedOccurrence> =
-    occurrences_in (previous);
-  let mut current_is_matched : Vec<bool> =
-    vec! [false; current_occurrences . len ()];
-  let mut previous_is_matched : Vec<bool> =
-    vec! [false; previous_occurrences . len ()];
-  let mut reported : HashSet<ID> = HashSet::new ();
+    flags_surface_errors_against_graph (viewforest, graph);
+  for node in viewforest . roots () . flat_map ( |root| root . descendants () ) {
+    let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+      &node . value () . kind else { continue; };
+    if ! occurrence . is_writeProtected () { continue; }
+    if let Some (graphnode) = graphnode_from_graph (graph, &occurrence . skgid) {
+      let differences : Vec<String> =
+        writeProtected_differences_from_graph (node, occurrence, &graphnode);
+      if ! differences . is_empty () {
+        errors . push (BufferValidationError::EditedWriteProtectedOccurrence {
+          skgid   : occurrence . skgid . clone (),
+          title   : graphnode . title . clone (),
+          changes : differences, }); }}
+    if node . children () . any ( |child| is_member (child . value ()) ) {
+      errors . push (BufferValidationError::MemberChildOfWriteProtectedOccurrence {
+        skgid : occurrence . skgid . clone (),
+        title : occurrence . title . clone (), }); }}
+  errors }
 
-  // First preserve exact occurrence identity (same parent path and ID),
-  // preferring an unchanged duplicate if more than one candidate exists.
-  for (previous_index, previous_occurrence)
-    in previous_occurrences . iter () . enumerate ()
-  { let matching_indices : Vec<usize> = current_occurrences . iter ()
-      . enumerate ()
-      . filter ( |(current_index, current_occurrence)|
-        ! current_is_matched [*current_index]
-        && current_occurrence . parent_path
-           == previous_occurrence . parent_path
-        && current_occurrence . state . skgid
-           == previous_occurrence . state . skgid )
-      . map ( |(index, _)| index )
-      . collect ();
-    let chosen : Option<usize> = matching_indices . iter ()
-      . find ( |index| current_occurrences [**index] . state
-                       == previous_occurrence . state )
-      . copied ()
-      . or_else ( || matching_indices . first () . copied () );
-    if let Some (current_index) = chosen {
-      current_is_matched [current_index] = true;
-      previous_is_matched [previous_index] = true;
-      let current_occurrence : &LocatedWriteProtectedOccurrence =
-        & current_occurrences [current_index];
-      if current_occurrence . state != previous_occurrence . state
-         && reported . insert (current_occurrence . state . skgid . clone ())
-      { errors . push (BufferValidationError::EditedWriteProtectedOccurrence {
-          skgid   : previous_occurrence . state . skgid . clone (),
-          title   : previous_occurrence . state . title . clone (),
-          changes : write_protected_changes (
-            &previous_occurrence . state, &current_occurrence . state),
-        }); }} }
-
-  // If an occurrence's ID itself changed, its parent path is the remaining
-  // stable location signal. Pair unmatched old/current occurrences there.
-  for (previous_index, previous_occurrence)
-    in previous_occurrences . iter () . enumerate ()
-  { if previous_is_matched [previous_index] { continue; }
-    let Some (current_index) = current_occurrences . iter ()
-      . enumerate ()
-      . find ( |(current_index, current_occurrence)|
-        ! current_is_matched [*current_index]
-        && current_occurrence . parent_path
-           == previous_occurrence . parent_path )
-      . map ( |(index, _)| index )
-      else { continue; };
-    current_is_matched [current_index] = true;
-    previous_is_matched [previous_index] = true;
-    let skgid : ID = previous_occurrence . state . skgid . clone ();
-    if reported . insert (skgid . clone ()) {
-      errors . push (BufferValidationError::EditedWriteProtectedOccurrence {
-        skgid,
-        title   : previous_occurrence . state . title . clone (),
-        changes : write_protected_changes (
-          &previous_occurrence . state,
-          &current_occurrences [current_index] . state),
-      }); }}
-
-  let new_occurrence_skgids : Vec<NodeId> = current_occurrences . iter ()
-    . enumerate ()
-    . filter ( |(index, _)| ! current_is_matched [*index] )
-    . map ( |(_, occurrence)| occurrence . treeid )
-    . collect ();
-  make_direct_unrestricted_children_independent (current, &new_occurrence_skgids);
-  errors
-}
-
-/// An unrestricted vognode of a forest, where it stands.
-struct LocatedUnrestrictedOccurrence {
-  parent_path       : Vec<OccurrencePathStep>,
-  skgid             : ID,
-  title             : String,
-  writeProtected    : bool,
-  requests_editable : bool,
-}
-
-/// In a buffer of the total diff view every node of U stays editable
-/// somewhere. For each node of 'u' that the last rendering drew
-/// editable, refuse a save that leaves it no editable occurrence by
-/// write-protecting one it drew editable, unless some occurrence of
-/// the node requests to become the editable one.
-pub fn errors_for_nodes_of_u_left_without_editable_occurrence (
-  current  : &ViewForest,
-  previous : &ViewForest,
-  u        : &BTreeSet<ID>,
-) -> Vec<BufferValidationError> {
-  let current_occurrences : Vec<LocatedUnrestrictedOccurrence> =
-    unrestricted_occurrences_in (current);
-  let previous_occurrences : Vec<LocatedUnrestrictedOccurrence> =
-    unrestricted_occurrences_in (previous);
-  u . iter ()
-    . filter_map ( |node| {
-      let current_of_node : Vec<&LocatedUnrestrictedOccurrence> =
-        current_occurrences . iter ()
-        . filter ( |occurrence| occurrence . skgid == *node )
-        . collect ();
-      if current_of_node . iter () . any ( |occurrence|
-           ! occurrence . writeProtected || occurrence . requests_editable )
-      { return None; }
-      previous_occurrences . iter ()
-        . filter ( |occurrence| occurrence . skgid == *node
-                                && ! occurrence . writeProtected )
-        . find ( |previously_editable| current_of_node . iter ()
-                 . any ( |occurrence| occurrence . parent_path
-                                      == previously_editable . parent_path ))
-        . map ( |previously_editable|
-          BufferValidationError::NodeOfU_LeftWithoutEditableOccurrence {
-            skgid : node . clone (),
-            title : previously_editable . title . clone (), } ) } )
-    . collect () }
-
-fn unrestricted_occurrences_in (
-  viewforest : &ViewForest,
-) -> Vec<LocatedUnrestrictedOccurrence> {
-  let mut occurrences : Vec<LocatedUnrestrictedOccurrence> = Vec::new ();
-  for root in viewforest . roots () {
-    collect_unrestricted_occurrences (root, &[], &mut occurrences); }
-  occurrences }
-
-fn collect_unrestricted_occurrences (
-  node        : NodeRef<Viewnode>,
-  parent_path : &[OccurrencePathStep],
-  occurrences : &mut Vec<LocatedUnrestrictedOccurrence>,
-) {
-  let mut own_path : Vec<OccurrencePathStep> = parent_path . to_vec ();
-  own_path . push (path_step (node . value ()));
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =
-    &node . value () . kind
-  { occurrences . push (LocatedUnrestrictedOccurrence {
-      parent_path       : parent_path . to_vec (),
-      skgid             : restriction . skgid . clone (),
-      title             : restriction . title . clone (),
-      writeProtected    : restriction . is_writeProtected (),
-      requests_editable : restriction . view_requests
-                          . contains (&ViewRequest::Editable), }); }
-  for child in node . children () {
-    collect_unrestricted_occurrences (child, &own_path, occurrences); }
-}
-
-fn write_protected_changes (
-  previous : &WriteProtectedOccurrence,
-  current  : &WriteProtectedOccurrence,
+/// What the occurrence says that the graph does not.
+fn writeProtected_differences_from_graph (
+  node       : NodeRef<Viewnode>,
+  occurrence : &UnrestrictedVognode,
+  graphnode  : &Graphnode,
 ) -> Vec<String> {
-  let mut changes : Vec<String> = Vec::new ();
-  if previous . skgid != current . skgid { changes . push (format! (
-    "changed ID from {} to {}", previous . skgid, current . skgid)); }
-  if previous . title != current . title { changes . push (format! (
-    "changed title from {:?} to {:?}", previous . title, current . title)); }
-  if previous . home_skgrepo != current . home_skgrepo { changes . push (format! (
-    "changed repo from {} to {}", previous . home_skgrepo, current . home_skgrepo)); }
-  if previous . content != current . content {
-    changes . push ("changed content membership" . to_string ()); }
-  if previous . aliases != current . aliases {
-    changes . push ("changed aliases" . to_string ()); }
-  if previous . subscribes != current . subscribes {
-    changes . push ("changed subscriptions" . to_string ()); }
-  if previous . overrides != current . overrides {
-    changes . push ("changed overrides" . to_string ()); }
-  if previous . hidden_outside != current . hidden_outside {
-    changes . push ("changed hidden subscription content" . to_string ()); }
-  if changes . is_empty () {
-    changes . push ("changed occurrence identity or placement" . to_string ()); }
-  changes
-}
+  let mut differences : Vec<String> = Vec::new ();
+  if occurrence . title != graphnode . title {
+    differences . push (format! (
+      "title {:?} differs from the graph's {:?}",
+      occurrence . title, graphnode . title )); }
+  if occurrence . home_skgrepo != graphnode . home_skgrepo {
+    differences . push (format! (
+      "home skgrepo {} differs from the graph's {}",
+      occurrence . home_skgrepo, graphnode . home_skgrepo )); }
+  if let Some (aliases_in_view) = aliases_of_occurrence (node) {
+    let aliases_in_graph : Vec<(String, Option<SkgrepoName>)> =
+      members_of (graphnode . aliases . or_default ())
+      . into_iter () . map ( |alias| (alias, None) ) . collect ();
+    if aliases_in_view != aliases_in_graph {
+      differences . push ("aliases differ from the graph's" . to_string ()); }}
+  differences }
+
+/// The aliases in the occurrence's alias folder, in order, each with
+/// its relRepo request; None if it has no alias folder.
+fn aliases_of_occurrence (
+  node : NodeRef<Viewnode>,
+) -> Option<Vec<(String, Option<SkgrepoName>)>> {
+  node . children () . find ( |child| matches! (
+    &child . value () . kind, ViewnodeKind::PropertyFolder (PropertyFolder::Alias)))
+    . map ( |alias_folder| alias_folder . children () . filter_map ( |alias| {
+      let ViewnodeKind::Property (Property::Alias { text, relRepo_request, .. }) =
+        &alias . value () . kind else { return None; };
+      Some ((text . clone (), relRepo_request . clone ()))
+    }) . collect () ) }
+
+fn is_member (
+  viewnode : &Viewnode,
+) -> bool {
+  matches! ( &viewnode . kind,
+             ViewnodeKind::Vognode (Vognode::Unrestricted (child))
+             if child . affectsParent == AffectsParent::True ) }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct FlagsFolderSurface {
@@ -253,25 +100,20 @@ struct FlagsFolderSurface {
 #[derive(Clone, Debug)]
 struct LocatedFlagsSurface {
   recorder_skgid : ID,
-  recorder_title : String,
-  recorder_path  : Vec<OccurrencePathStep>,
   folders        : Vec<FlagsFolderSurface>,
 }
 
 fn flags_surfaces_in (forest : &ViewForest) -> Vec<LocatedFlagsSurface> {
   let mut result : Vec<LocatedFlagsSurface> = Vec::new ();
   for root in forest . roots () {
-    collect_flags_surfaces (root, &[], &mut result); }
+    collect_flags_surfaces (root, &mut result); }
   result
 }
 
 fn collect_flags_surfaces (
-  node        : NodeRef<Viewnode>,
-  parent_path : &[OccurrencePathStep],
-  result      : &mut Vec<LocatedFlagsSurface>,
+  node   : NodeRef<Viewnode>,
+  result : &mut Vec<LocatedFlagsSurface>,
 ) {
-  let mut own_path : Vec<OccurrencePathStep> = parent_path . to_vec ();
-  own_path . push (path_step (node . value ()));
   if let ViewnodeKind::Vognode (Vognode::Unrestricted (recorder)) = &node . value () . kind {
     let folders : Vec<FlagsFolderSurface> = node . children ()
       . filter_map (|child| {
@@ -286,62 +128,23 @@ fn collect_flags_surfaces (
               flag, title, body, .. }) =>
               viewnodes . push ((*flag, title . clone (), body . clone ())),
             other => other_children . push (format! ("{:?}", other)), } }
+        viewnodes . sort_by_key ( |(flag, _, _)| // The flags are a set.
+          Flag::ALL . iter () . position ( |each| each == flag ) );
         Some (FlagsFolderSurface {
           title : title . clone (), body : body . clone (),
           viewnodes, other_children }) })
       . collect ();
     result . push (LocatedFlagsSurface {
-      recorder_skgid    : recorder . skgid . clone (),
-      recorder_title : recorder . title . clone (),
-      recorder_path  : parent_path . to_vec (),
+      recorder_skgid : recorder . skgid . clone (),
       folders, }); }
   for child in node . children () {
-    collect_flags_surfaces (child, &own_path, result); }
+    collect_flags_surfaces (child, result); }
 }
 
-fn flags_surface_errors (
-  current  : &ViewForest,
-  previous : &ViewForest,
-) -> Vec<BufferValidationError> {
-  let current_surfaces = flags_surfaces_in (current);
-  let previous_surfaces = flags_surfaces_in (previous);
-  let mut errors : Vec<BufferValidationError> = Vec::new ();
-  for before in &previous_surfaces {
-    let Some (after) = current_surfaces . iter () . find (|surface|
-      surface . recorder_skgid == before . recorder_skgid
-      && surface . recorder_path == before . recorder_path)
-    else { continue; };
-    // Like an aliases or role tree branch, this is an optional viewbranch:
-    // deleting the whole folder dismisses it from the view and says nothing
-    // about the recorder's flags.  A retained folder is still
-    // server-owned, so edits within it remain validation errors.
-    if ! before . folders . is_empty () && after . folders . is_empty () {
-      continue; }
-    if before . folders == after . folders { continue; }
-    let changes : Vec<String> = flags_surface_changes (
-      &before . folders, &after . folders);
-    errors . push (BufferValidationError::FlagsSurfaceEdited {
-      recorder_skgid    : before . recorder_skgid . clone (),
-      recorder_title : before . recorder_title . clone (),
-      changes, }); }
-  for after in &current_surfaces {
-    if after . folders . is_empty () { continue; }
-    let existed_before = previous_surfaces . iter () . any (|surface|
-      surface . recorder_skgid == after . recorder_skgid
-      && surface . recorder_path == after . recorder_path);
-    if ! existed_before {
-      errors . push (BufferValidationError::FlagsSurfaceEdited {
-        recorder_skgid : after . recorder_skgid . clone (),
-        recorder_title : after . recorder_title . clone (),
-        changes        : vec!["added flagsFolder" . to_string ()], }); }
-  }
-  errors
-}
-
-/// Direct/internal save callers may have no last-rendered forest.  In that
-/// case validate every present flags folder against graph state.  Absence
-/// is fine (the user never requested the view); presence must be canonical.
-pub fn flags_surface_errors_against_graph (
+/// Validate every present flags folder against graph state. Absence is
+/// fine (it expresses no opinion); presence must be canonical, up to the
+/// order of the flags.
+fn flags_surface_errors_against_graph (
   current : &ViewForest,
   graph   : &InRustGraph,
 ) -> Vec<BufferValidationError> {
@@ -444,164 +247,14 @@ fn describe_body_change (
   changes . push (description);
 }
 
-fn occurrences_in (
-  viewforest : &ViewForest,
-) -> Vec<LocatedWriteProtectedOccurrence> {
-  let mut occurrences : Vec<LocatedWriteProtectedOccurrence> = Vec::new ();
-  for root in viewforest . roots () {
-    collect_occurrences (root, &[], &mut occurrences); }
-  occurrences
-}
-
-fn collect_occurrences (
-  node        : NodeRef<Viewnode>,
-  parent_path : &[OccurrencePathStep],
-  occurrences : &mut Vec<LocatedWriteProtectedOccurrence>,
-) {
-  let mut own_path : Vec<OccurrencePathStep> = parent_path . to_vec ();
-  own_path . push (path_step (node . value ()));
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =
-    &node . value () . kind
-  { if restriction . is_writeProtected () {
-    occurrences . push (LocatedWriteProtectedOccurrence {
-      treeid      : node . id (),
-      parent_path : parent_path . to_vec (),
-      state       : WriteProtectedOccurrence {
-        skgid       : restriction . skgid . clone (),
-        title    : restriction . title . clone (),
-        home_skgrepo   : restriction . home_skgrepo . clone (),
-        content  : content_members (node),
-        aliases  : aliases (node),
-        subscribes : partner_members (node, PartnerFolder::Subscribee),
-        overrides  : partner_members (node, PartnerFolder::Overridden),
-        hidden_outside : hidden_outside_members (node),
-      }}); }}
-  for child in node . children () {
-    collect_occurrences (child, &own_path, occurrences); }
-}
-
-fn path_step (
-  node : &Viewnode,
-) -> OccurrencePathStep {
-  match &node . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =>
-      OccurrencePathStep::Unrestricted (restriction . skgid . clone ()),
-    ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
-      OccurrencePathStep::Restricted,
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (phantom))) =>
-      OccurrencePathStep::DeletedPhantom (phantom . skgid . clone ()),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (phantom))) =>
-      OccurrencePathStep::UnknownPhantom (phantom . skgid . clone ()),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (phantom))) =>
-      OccurrencePathStep::HistoricalPhantom (phantom . skgid . clone ()),
-    ViewnodeKind::PropertyFolder (folder) =>
-      OccurrencePathStep::PropertyFolder (folder . clone ()),
-    ViewnodeKind::Property (Property::Alias { .. }) =>
-      OccurrencePathStep::Alias,
-    ViewnodeKind::Property (Property::ID { .. }) =>
-      OccurrencePathStep::ID,
-    ViewnodeKind::Property (Property::Flag { .. }) =>
-      OccurrencePathStep::Flag,
-    ViewnodeKind::Property (
-      property @ ( Property::RemovedAlias { .. } | Property::RemovedID { .. }
-                   | Property::OldText { .. } | Property::BodyDiff { .. }
-                   | Property::HomeSkgrepoMove { .. } | Property::RelRepoMove { .. }
-                   | Property::ChangesetMarker { .. } )) =>
-      OccurrencePathStep::TotalDiffViewProperty (property . repr_in_client ()),
-    ViewnodeKind::PartnerFolder (folder) =>
-      OccurrencePathStep::PartnerFolder (*folder),
-    ViewnodeKind::DeadViewnode =>
-      OccurrencePathStep::DeadViewnode,
-    ViewnodeKind::BufferRoot => unreachable! (
-      "the internal forest root is not traversed as an occurrence"),
-  }
-}
-
-fn make_direct_unrestricted_children_independent (
-  viewforest            : &mut ViewForest,
-  new_occurrence_skgids : &[NodeId],
-) {
-  let child_skgids : Vec<NodeId> = new_occurrence_skgids . iter ()
-    . flat_map ( |treeid| viewforest . get (*treeid)
-      . into_iter ()
-      . flat_map ( |node| node . children () . map ( |child| child . id ()) ))
-    . collect ();
-  for child_skgid in child_skgids {
-    if let Some (mut child) = viewforest . get_mut (child_skgid) {
-      if let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =
-        &mut child . value () . kind
-      { restriction . affectsParent = crate::types::viewnode::AffectsParent::False; }} }
-}
-
-fn content_members (
-  node : NodeRef<Viewnode>,
-) -> Vec<(ID, Option<SkgrepoName>)> {
-  node . children () . filter_map ( |child| match &child . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (restriction))
-      if unrestricted_child_counts_as_content (restriction) =>
-        Some ((restriction . collected_skgid (), restriction . relRepo_request . clone ())),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
-      Some ((unknown . skgid . clone (), unknown . relRepo_request . clone ())),
-    _ => None,
-  }) . collect ()
-}
-
-fn aliases (
-  node : NodeRef<Viewnode>,
-) -> Option<Vec<(String, Option<SkgrepoName>)>> {
-  node . children () . find ( |child| matches! (
-    &child . value () . kind, ViewnodeKind::PropertyFolder (PropertyFolder::Alias)))
-    . map ( |alias_folder| alias_folder . children () . filter_map ( |alias| {
-      let ViewnodeKind::Property (Property::Alias { text, relRepo_request, .. }) =
-        &alias . value () . kind else { return None; };
-      Some ((text . clone (), relRepo_request . clone ()))
-    }) . collect () )
-}
-
-fn partner_members (
-  node : NodeRef<Viewnode>,
-  wanted : PartnerFolder,
-) -> Option<Vec<(ID, Option<SkgrepoName>)>> {
-  node . children () . find ( |child| matches! (
-    &child . value () . kind, ViewnodeKind::PartnerFolder (folder) if *folder == wanted))
-    . map ( |folder| folder . children () . filter_map ( |member| {
-      match &member . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (restriction))
-          if member_counts_for_partnerFolder (restriction) =>
-            Some ((restriction . skgid . clone (), restriction . relRepo_request . clone ())),
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
-          Some ((unknown . skgid . clone (), unknown . relRepo_request . clone ())),
-        _ => None,
-      }
-    }) . collect () )
-}
-
-fn hidden_outside_members (
-  node : NodeRef<Viewnode>,
-) -> Option<Vec<ID>> {
-  node . children () . find ( |child| matches! (
-    &child . value () . kind,
-    ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)))
-    . and_then ( |subscribee_folder| subscribee_folder . children () . find ( |child|
-      matches! (&child . value () . kind,
-        ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee))))
-    . map ( |hidden_outside| hidden_outside . children () . filter_map ( |member|
-      match &member . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (restriction))
-          if member_counts_for_partnerFolder (restriction) => Some (restriction . skgid . clone ()),
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
-          Some (unknown . skgid . clone ()),
-        _ => None,
-      }) . collect () )
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
   use crate::from_text::buffer_to_viewnodes::uninterpreted
     ::org_to_uninterpreted_viewforest;
   use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
-  use crate::types::viewnode::AffectsParent;
+  use crate::types::misc::{MSV, rel_partners_at_relRepo};
+  use crate::types::nodes::complete::empty_graphnode;
   use indoc::indoc;
 
   fn forest (text : &str) -> ViewForest {
@@ -611,73 +264,124 @@ mod tests {
     maybePlaced_to_placed_viewforest (forest) . unwrap ()
   }
 
-  #[test]
-  fn catches_title_content_and_writable_folder_edits_but_not_child_text () {
-    let original = forest (indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected)) recorder
-      ** (skg (node (id content) (repo main))) content
-      ** (skg subscribeeFolder)
-      *** (skg (node (id subscribee) (repo main))) subscribee
-    "});
-    let mut child_text_changed = forest (indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected (viewRequests editableView))) recorder
-      ** (skg (node (id content) (repo main))) changed child text
-      ** (skg subscribeeFolder)
-      *** (skg (node (id subscribee) (repo main))) subscribee
-    "});
-    assert! (errors_and_normalize_new_writeProtected_occurrences (
-      &mut child_text_changed, &original) . is_empty ());
+  /// root contains recorder, which contains c1 then c2, and has the
+  /// alias "another name" and the flag noSearchMatching.
+  fn graph () -> InRustGraph {
+    let main : SkgrepoName = SkgrepoName::from ("main");
+    let node = |pid : &str| -> Graphnode { Graphnode {
+      pid          : ID::from (pid),
+      title        : pid . to_string (),
+      home_skgrepo : main . clone (),
+      .. empty_graphnode () }};
+    InRustGraph::from_graphnodes (&[
+      Graphnode {
+        contains : rel_partners_at_relRepo (&main, vec! [ID::from ("recorder")]),
+        .. node ("root") },
+      Graphnode {
+        contains : rel_partners_at_relRepo (
+          &main, vec! [ID::from ("c1"), ID::from ("c2")]),
+        aliases  : MSV::Specified (rel_partners_at_relRepo (
+          &main, vec! ["another name" . to_string ()])),
+        flags    : vec! [Flag::NoSearchMatching],
+        .. node ("recorder") },
+      node ("c1"),
+      node ("c2"),
+      node ("typed") ]) }
 
-    let mut changed = forest (indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected)) changed recorder
-      ** (skg (node (id other) (repo main))) other content
-      ** (skg subscribeeFolder)
-      *** (skg (node (id other-subscribee) (repo main))) other subscribee
-    "});
-    let errors = errors_and_normalize_new_writeProtected_occurrences (
-      &mut changed, &original);
-    assert! (matches! (&errors[..],
-      [BufferValidationError::EditedWriteProtectedOccurrence {
-        skgid, title, changes }] if skgid == &ID::from ("recorder")
-          && title == "recorder" && changes . len () >= 2));
+  fn errors_in (text : &str) -> Vec<BufferValidationError> {
+    errors_for_writeProtected_occurrences (&forest (text), &graph ()) }
+
+  #[test]
+  fn an_occurrence_that_agrees_with_the_graph_passes () {
+    assert_eq! (errors_in (indoc! {"
+      * (skg (node (id root) (repo main))) root
+      ** (skg (node (id recorder) (repo main) writeProtected)) recorder
+      *** (skg aliasFolder)
+      **** (skg alias) another name
+      *** (skg flagsFolder)
+      **** (skg (flag noSearchMatching))
+    "}), vec! []);
   }
 
   #[test]
-  fn a_child_typed_under_a_requested_writeProtected_occurrence_is_an_edit () {
-    // The editable-view request does not license the typed child.
-    let original = forest (indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected)) recorder
+  fn a_member_child_under_a_writeProtected_occurrence_is_refused () {
+    let errors : Vec<BufferValidationError> = errors_in (indoc! {"
+      * (skg (node (id root) (repo main))) root
+      ** (skg (node (id recorder) (repo main) writeProtected)) recorder
+      *** (skg (node (id typed) (repo main))) typed
     "});
-    let mut typed = forest (indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected (viewRequests editableView))) recorder
-      ** (skg (node (id typed) (repo main))) typed child
-    "});
-    let errors = errors_and_normalize_new_writeProtected_occurrences (
-      &mut typed, &original);
     assert! (matches! (&errors[..],
-      [BufferValidationError::EditedWriteProtectedOccurrence {
+      [BufferValidationError::MemberChildOfWriteProtectedOccurrence {
+        skgid, title }] if skgid == &ID::from ("recorder") && title == "recorder"),
+      "{:?}", errors);
+    assert! (errors [0] . to_string () . contains ("C-c s d"), "{}", errors [0]);
+  }
+
+  #[test]
+  fn a_member_child_under_a_requested_writeProtected_occurrence_is_refused () {
+    // The editable-view request does not license the typed child.
+    let errors : Vec<BufferValidationError> = errors_in (indoc! {"
+      * (skg (node (id recorder) (repo main) writeProtected (viewRequests editableView))) recorder
+      ** (skg (node (id typed) (repo main))) typed
+    "});
+    assert! (matches! (&errors[..],
+      [BufferValidationError::MemberChildOfWriteProtectedOccurrence {
         skgid, .. }] if skgid == &ID::from ("recorder")),
       "{:?}", errors);
   }
 
   #[test]
-  fn allows_a_new_writeProtected_occurrence_and_parks_its_viewnode_children () {
-    let original = forest (indoc! {"
-      * (skg (node (id root) (repo main))) root
+  fn reordered_non_member_children_pass () {
+    // The graph has c1 before c2; non-members are the user's own.
+    assert_eq! (errors_in (indoc! {"
+      * (skg (node (id recorder) (repo main) writeProtected)) recorder
+      ** (skg (node (id c2) (repo main) (affectsParent false))) c2
+      ** (skg (node (id c1) (repo main) (affectsParent false))) c1
+    "}), vec! []);
+  }
+
+  #[test]
+  fn a_changed_title_is_refused () {
+    let errors : Vec<BufferValidationError> = errors_in (indoc! {"
+      * (skg (node (id recorder) (repo main) writeProtected)) changed
     "});
-    let mut current = forest (indoc! {"
-      * (skg (node (id root) (repo main))) root
-      ** (skg (node (id root) (repo main) writeProtected)) new self occurrence
-      *** (skg (node (id child) (repo main))) child
-    "});
-    assert! (errors_and_normalize_new_writeProtected_occurrences (
-      &mut current, &original) . is_empty ());
-    let child = current . nodes () . find_map ( |node| match
-      &node . value () . kind
-    { ViewnodeKind::Vognode (Vognode::Unrestricted (restriction))
-        if restriction . skgid == ID::from ("child") => Some (restriction),
-      _ => None, }) . unwrap ();
-    assert_eq! (child . affectsParent, AffectsParent::False);
+    assert! (matches! (&errors[..],
+      [BufferValidationError::EditedWriteProtectedOccurrence {
+        skgid, title, changes }] if skgid == &ID::from ("recorder")
+          && title == "recorder"
+          && changes == &vec! ["title \"changed\" differs from the graph's \"recorder\"" . to_string ()]),
+      "{:?}", errors);
+    assert! (errors [0] . to_string () . contains ("differs from the graph"),
+             "{}", errors [0]);
+  }
+
+  #[test]
+  fn an_alias_folder_that_differs_is_refused_and_an_absent_one_passes () {
+    for differing in [
+      "*** (skg alias) other name\n",
+      "*** (skg alias) another name\n*** (skg alias) one more\n",
+      "*** (skg alias (editRequest (relRepo main))) another name\n", ]
+    { let text : String = format! (
+        "* (skg (node (id recorder) (repo main) writeProtected)) recorder\n** (skg aliasFolder)\n{}",
+        differing);
+      let errors : Vec<BufferValidationError> = errors_in (&text);
+      assert! (matches! (&errors[..],
+        [BufferValidationError::EditedWriteProtectedOccurrence {
+          changes, .. }] if changes == &vec! ["aliases differ from the graph's" . to_string ()]),
+        "{}: {:?}", text, errors); }
+    assert_eq! (errors_in (
+      "* (skg (node (id recorder) (repo main) writeProtected)) recorder\n"),
+      vec! []);
+  }
+
+  #[test]
+  fn an_editable_occurrence_is_not_judged_by_the_graph () {
+    assert_eq! (errors_in (indoc! {"
+      * (skg (node (id recorder) (repo main))) changed
+      ** (skg aliasFolder)
+      *** (skg alias) other name
+      ** (skg (node (id typed) (repo main))) typed
+    "}), vec! []);
   }
 
   #[test]
@@ -695,63 +399,29 @@ mod tests {
 
   #[test]
   fn flags_surface_edits_report_recorder_identity_and_concrete_changes () {
-    let original = forest (indoc! {"
-      * (skg (node (id recorder) (repo main))) Recorder title
-      ** (skg flagsFolder)
-      *** (skg (flag hadId))
-      *** (skg (flag noSearchMatching))
-    "});
-    let mut changed = forest (indoc! {"
-      * (skg (node (id recorder) (repo main))) Recorder title
+    let errors : Vec<BufferValidationError> = errors_in (indoc! {"
+      * (skg (node (id recorder) (repo main))) recorder
       ** (skg flagsFolder) edited folder headline
       added folder body
       *** (skg (flag noSearchMatching)) renamed
       added leaf body
       *** (skg (flag wasOverloaded))
     "});
-    let errors = errors_and_normalize_new_writeProtected_occurrences (
-      &mut changed, &original);
     assert! (matches! (&errors[..],
       [BufferValidationError::FlagsSurfaceEdited {
         recorder_skgid, recorder_title, changes }]
       if recorder_skgid == &ID::from ("recorder")
-        && recorder_title == "Recorder title"
-        && changes . iter () . any (|c| c . contains ("removed hadId"))
+        && recorder_title == "recorder"
         && changes . iter () . any (|c| c . contains ("added wasOverloaded"))
         && changes . iter () . any (|c| c . contains ("headline"))
         && changes . iter () . any (|c| c == "added body text to flagsFolder")
-        && changes . iter () . any (|c| c == "added body text to noSearchMatching")));
+        && changes . iter () . any (|c| c == "added body text to noSearchMatching")),
+      "{:?}", errors);
   }
 
   #[test]
-  fn deleting_the_flags_viewbranch_is_inert () {
-    let original = forest (indoc! {"
-      * (skg (node (id recorder) (repo main))) Recorder title
-      ** (skg flagsFolder)
-      *** (skg (flag noSearchMatching))
-    "});
-    let mut without_viewbranch = forest (indoc! {"
-      * (skg (node (id recorder) (repo main))) Recorder title
-    "});
-    assert! (errors_and_normalize_new_writeProtected_occurrences (
-      &mut without_viewbranch, &original) . is_empty ());
-  }
-
-  #[test]
-  fn deleting_an_optional_sibling_does_not_make_the_flags_surface_edited () {
-    let original = forest (indoc! {"
-      * (skg (node (id recorder) (repo main))) Recorder title
-      ** (skg aliasFolder) aliases
-      *** (skg alias) Another name
-      ** (skg flagsFolder)
-      *** (skg (flag noSearchMatching))
-    "});
-    let mut without_alias_viewbranch = forest (indoc! {"
-      * (skg (node (id recorder) (repo main))) Recorder title
-      ** (skg flagsFolder)
-      *** (skg (flag noSearchMatching))
-    "});
-    assert! (errors_and_normalize_new_writeProtected_occurrences (
-      &mut without_alias_viewbranch, &original) . is_empty ());
+  fn an_absent_flags_folder_passes () {
+    assert_eq! (errors_in (
+      "* (skg (node (id recorder) (repo main))) recorder\n"), vec! []);
   }
 }

@@ -357,7 +357,7 @@ async fn test_editable_view_conflicting (
         * (skg (node (id 1) (repo main))) 1
         ** (skg (node (id 12))) 12
         *** (skg (node (id 122) writeProtected omittedBody)) 122
-        * (skg (node (id 12) (repo main) writeProtected (viewRequests editableView))) 12 copy
+        * (skg (node (id 12) (repo main) writeProtected (viewRequests editableView))) 12
       "};
 
       let result = {
@@ -379,13 +379,14 @@ async fn test_editable_view_conflicting (
       println!("Result with conflict:\n{}", result);
 
       let expected = indoc! {
-        // The first 12 (child of 1) should become write-protected.
+        // The first 12 (child of 1) should become write-protected,
+        // its child 122 no longer a member.
         // The second 12 (root with request) should be expanded.
         // NOTE: The first 12 redefines the children of 12 as [122]
         // rather than [121,122,123,124].
         "* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 1))))) 1
          ** (skg (node (id 12) (repo main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 12
-         *** (skg (node (id 122) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 122
+         *** (skg (node (id 122) (repo main) (affectsParent false) writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 1))))) 122
          * (skg (node (id 12) (repo main) (affectsParent na) (rels (contains (in 1) (out 1))))) 12
          ** (skg (node (id 122) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 122
          122 body
@@ -631,9 +632,10 @@ async fn test_editable_view_request_on_an_editable_node (
 // A view of 1 and 12 draws root 12 editable, with its content, and
 // the 12 under 1 as a write-protected leaf. A request on that leaf
 // moves editability to it; root 12 is write-protected and keeps its
-// drawn content. A request on root 12, whose drawn children are
-// unchanged, moves editability back: root 12 is editable again with
-// the same content, and the 12 under 1 is write-protected. A further
+// drawn content, no longer as members. A request on root 12, whose
+// drawn children are unchanged, moves editability back: root 12 is
+// editable again with the same content, adopted as members again,
+// and the 12 under 1 is write-protected. A further
 // save changes nothing.
 async fn test_editable_view_request_moves_editability_back (
   config : &SkgConfig,
@@ -669,7 +671,10 @@ async fn test_editable_view_request_moves_editability_back (
           . skip_while ( |line| ! line . starts_with (root_12) ) . skip (1)
           . filter ( |line| line . starts_with ("*") )
           . map ( |line| line . replace ("writeProtected ", "")
-                              . replace ("omittedBody ", "") )
+                              . replace ("omittedBody ", "")
+                              // write-protected, the content stops being members
+                              . replace ("(affectsParent false) ", "")
+                              . replace (" (birth (contains in 1))", "") )
           . collect () };
       let moved : String = save (
         &requesting_editable_at (&opened, "(node (id 12) (repo main) writeProtected")

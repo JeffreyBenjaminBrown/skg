@@ -1038,3 +1038,78 @@ the refusal.
 Write-protecting n under x while requesting n under y draws a and b
 twice under x. The gesture was allowed before this slice; it is
 recorded in 'TODO/problems.org'.
+* Yet more fixes
+** Slice 0: deviations
+*** slice 1's server-side half came forward
+The member-child rule refuses every write-protected occurrence with a
+member, and the draw rule's subtree write-protection
+('writeProtect_content_subtree') left members under what it
+write-protected. So after any editable-view request that moved
+editability, the next save was refused; three suites' tests showed
+it. Slice 0 therefore also does what the plan gives slice 1 on the
+server's drawing side:
+- 'writeProtect_content_subtree' makes the members it passes
+  non-members ('make_member_children_nonMembers', 'server/to_org/util.rs').
+- 'tag_content_members' tags a non-member child whose node is
+  content, as the pitfall on it says.
+- The content reconciler adopts a non-member child that is content
+  ('adopt_nonMember_children_that_are_content',
+  'server/update_buffer/reconcile/content.rs'). Without it, moving
+  editability back drew the content twice.
+Slice 1 keeps the requests: the parser, the serializer, the
+application in 'visit_normal_node', and the client commands.
+**** repeats too
+'make_writeProtected_if_repeat_then_extend_editable_map' write-protects
+an occurrence that repeats an editable one, and kept its members; it
+now makes them non-members too, so that no write-protected
+occurrence the server draws holds a member. (A pasted copy of an
+editable subtree saves, and the rerender write-protects the copy.)
+*** the unshown count waits for slice 2
+The plan's slice 0 test has the summary count the write-protected
+node unshown. Until slice 2, the rerender after a save still makes a
+node of U editable where it has no editable occurrence
+('make_freshU_editable_at_first_occurrences'), so it is shown again.
+The test asserts the save and the readiness facts; slice 2 should add
+the count.
+*** the test node is a created one
+'(ready ...)' facts on a vognode name the node and relationship axes;
+the 'shared' fixture changes only bodies. The test types c under a,
+marks its creation ready, and write-protects c, a leaf. A
+hand-written write-protect of n would need its body and its members'
+membership removed, as 'write_protecting_at' in the test does for
+the editability-moving test.
+*** what the graph check covers
+- IDs: 'find_buffer_errors_for_saving' already refuses an edited ID
+  folder under any recorder ('IDFolder_Edited'), so the new function
+  does not repeat it.
+- Flags: as before, under every recorder, now compared as a set.
+- Aliases: as a list; an alias carrying a relRepo request differs too
+  (validation already refuses that request under a write-protected
+  recorder).
+- Partner folders are not checked, as the plan names none. A
+  subscribee or overridden folder edited under a write-protected
+  occurrence is now neither saved nor refused, and the rerender puts
+  the graph's members back. The old comparison refused it.
+- A child that is an Unknown phantom does not count as a member.
+*** the save handler and 'server/from_text.rs'
+With no previous viewforest and no U, the save variant that took them
+equals 'buffer_to_validated_saveplan_with_fork_skgrepos_in_graph', so
+it is gone and the save handler calls that. The straddle refresh the
+handler did for U is gone too; 'rerender_view' refreshes the straddle
+itself.
+*** fixtures that disagreed with the graph
+Several tests hand-wrote write-protected headlines whose titles,
+skgrepos or members differed from the graph ('tests/fork.rs',
+'tests/editable_view_cascade_and_budget.rs', 'tests/multi_repo_errors.rs',
+'tests/save/'). They now agree with it, or, in 'multi_repo_errors.rs',
+assert the refusal of a stale skgrepo beside a move that saves.
+*** docs beyond the refusal
+The C-c s d entries in both COMMANDS files, the 'editableView'
+request in 'docs/api-and-formats.org' and the glossary's "editable,
+write-protected" now say that the members of what is write-protected
+stop being members, and that a save refuses a write-protected
+occurrence that differs from the graph. The C-c s w entries wait for
+slice 1.
+*** seen along the way
+'ViewForest::nodes' yields every root twice; recorded in
+'TODO/problems.org'.

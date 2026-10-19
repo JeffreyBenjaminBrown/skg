@@ -1,3 +1,22 @@
+* Write-protecting a drawn TDV occurrence duplicates its children (2026-10-19; fixed 2026-10-19)
+  In the total diff view's 'shared' fixture (x and y each contain n),
+  a save that write-protects n under x and requests n under y
+  editable draws a and b twice under x: once demoted to non-members
+  ('(affectsParent false)'), once as the members the rerender draws
+  for n's content list. The save validator
+  ('errors_and_normalize_new_writeProtected_occurrences') finds no
+  write-protected occurrence of n at that path in the last rendering,
+  so it treats n as a new one and demotes its drawn children
+  ('make_direct_unrestricted_children_independent'), though the server
+  drew them as n's members. In an ordinary content view the same
+  gesture only demotes them. Seen over TCP while verifying slice 3
+  of 'TODO/total-diff-view/6_plan-more.org'; the gesture was allowed
+  before that slice too.
+  Fixed 2026-10-19 in slice 0 of [[file:../total-diff-view/8_plan_yet-more.org][the TDV yet-more-fixes plan]]: the save
+  no longer compares with the last rendering, nor demotes anything; a
+  write-protected occurrence with a member is refused; and the server
+  makes the members of what it write-protects non-members, which an
+  editable occurrence adopts again ('adopt_nonMember_children_that_are_content').
 * ego_tree's node moves can link a node to itself (2026-10-17; fixed 2026-10-19)
   In ego-tree 0.6.3, 'NodeMut::prepend_id' reads the parent's first
   child, and 'insert_id_before' the anchor's previous sibling, before

@@ -347,7 +347,7 @@ Each slice ends with the three suites passing ('cargo nextest run',
 'bash/emacs-tests.sh', 'bash/nvim-tests.sh'), its docs updated, and
 its last commit made as the Commits section says.
 
-** Slice 0: write-protected occurrences are validated against the graph; the TDV refusal goes
+** DONE Slice 0: write-protected occurrences are validated against the graph; the TDV refusal goes
 Rewrite 'errors_and_normalize_new_writeProtected_occurrences' as a
 pure check against the graph, as the behavior section says, and
 rename it 'errors_for_writeProtected_occurrences'; fold

@@ -37,12 +37,13 @@ fn test_birth_and_write_protected(
       |config, _tantivy| Box::pin ( async move {
         // Simulate user saving this org buffer:
         // Node 1 contains node 2 (which has affectsParent=false and write-protected)
-        // Node 2 contains node 3 (already) and should contain node 4 (new)
+        // Node 2 contains node 3 (already); node 4 (new) sits under it
+        // without affecting it, as a write-protected node holds no member.
         // Node 2 should NOT affect node 1 because affectsParent=false
         let org_text = indoc! {"
           * (skg (node (id 1) (repo main))) 1
           ** (skg (node (id 2) (repo main) (affectsParent false) writeProtected)) 2
-          *** (skg (node (id 4) (repo main))) 4
+          *** (skg (node (id 4) (repo main) (affectsParent false))) 4
         "};
         let ( _viewforest, save_plan, _warnings ) =
           buffer_to_validated_saveplan(
@@ -61,7 +62,7 @@ fn test_birth_and_write_protected(
         assert_eq!(
           members_of (&node2 . contains),
           vec![ ID("3" . to_string()) ],
-          "Node 2 should only contain [3]. It might look like 4 was appended, but because node 2 is 'writeProtected', that node 4 child should be ignored by node 2." ); }
+          "Node 2 should only contain [3]. Node 2 is 'writeProtected', so it writes no content." ); }
 
         { // verify affectsParent=false is treated correctly
           let node1 : Graphnode =

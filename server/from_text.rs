@@ -40,7 +40,7 @@ use validate::{validate_and_filter_foreign_instructions, validate_no_simultaneou
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{ViewnodeKind, Vognode, ViewRequest};
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use crate::types::misc::SkgrepoName;
 use crate::types::save::ForkSpec;
 
@@ -82,24 +82,6 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   fork_skgrepos      : &HashMap<ID, SkgrepoName>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
-  buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_graph (
-    buffer_text, graph, config, skgrepo_restriction, fork_skgrepos,
-    None, None ) }
-
-/// As 'buffer_to_validated_saveplan_with_fork_repos_in_graph', while also
-/// comparing an open view's last server-rendered forest. This detects edits to
-/// data that a write-protected occurrence would otherwise silently ignore,
-/// and, in a buffer of the total diff view, a node of U left with no
-/// editable occurrence.
-pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_graph (
-  buffer_text : &str,
-  graph       : &crate::dbs::in_rust_graph::InRustGraph,
-  config      : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
-  fork_skgrepos : &HashMap<ID, SkgrepoName>,
-  previous_viewforest : Option<&ViewForest>,
-  nodes_of_u : Option<&BTreeSet<ID>>, // Some only for a buffer of the total diff view
-) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   let skgrepo_restriction : Option<&SkgrepoRestriction> =
     // The set 'all' restricts nothing; downstream stages treat None
     // as "no restriction", so normalize here, once.
@@ -137,28 +119,14 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_grap
       return Err ( SaveError::BufferValidationErrors {
         errors   : validation_errors,
         warnings : parsing_warnings, } ); }}
-  let mut viewforest : ViewForest =
+  let viewforest : ViewForest =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "maybePlaced_to_placed_viewforest" ). entered();
       maybePlaced_to_placed_viewforest (maybePlaced_viewforest) }
         . map_err ( |e| SaveError::ParseError (e) ) ?;
-  if let Some (previous) = previous_viewforest {
-    let mut errors : Vec<BufferValidationError> =
-      nodes_of_u . map ( |u| write_protected_edits
-        ::errors_for_nodes_of_u_left_without_editable_occurrence (
-          &viewforest, previous, u ))
-      . unwrap_or_default ();
-    errors . extend (
-      write_protected_edits
-      ::errors_and_normalize_new_writeProtected_occurrences (
-        &mut viewforest, previous ));
-    if ! errors . is_empty () {
-      return Err ( SaveError::BufferValidationErrors {
-        errors,
-        warnings : parsing_warnings, } ); }}
-  else {
-    let errors = write_protected_edits
-      ::flags_surface_errors_against_graph (&viewforest, graph);
+  { let errors : Vec<BufferValidationError> =
+      write_protected_edits::errors_for_writeProtected_occurrences (
+        &viewforest, graph );
     if ! errors . is_empty () {
       return Err ( SaveError::BufferValidationErrors {
         errors,

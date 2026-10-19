@@ -3,21 +3,17 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
+* Problems noticed while validating write-protected occurrences (2026-10-19)
+** 'ViewForest::nodes' yields every root twice
+  'nodes' ('server/types/tree/forest.rs') chains each root with
+  'root . descendants ()', but ego_tree's 'descendants' already
+  starts with the node itself. A caller that counts, or reports once
+  per node, sees each root twice: the write-protected-occurrence
+  validator reported a root's error twice until it iterated
+  'descendants' itself. Callers in 'server/pcsvf.rs',
+  'server/from_text/fork.rs', 'server/serve/handlers/save_dependencies/mod.rs'
+  and elsewhere were not audited.
 * Problems noticed while refusing TDV saves (2026-10-19)
-** Write-protecting a drawn TDV occurrence duplicates its children
-  In the total diff view's 'shared' fixture (x and y each contain n),
-  a save that write-protects n under x and requests n under y
-  editable draws a and b twice under x: once demoted to non-members
-  ('(affectsParent false)'), once as the members the rerender draws
-  for n's content list. The save validator
-  ('errors_and_normalize_new_writeProtected_occurrences') finds no
-  write-protected occurrence of n at that path in the last rendering,
-  so it treats n as a new one and demotes its drawn children
-  ('make_direct_unrestricted_children_independent'), though the server
-  drew them as n's members. In an ordinary content view the same
-  gesture only demotes them. Seen over TCP while verifying slice 3
-  of 'TODO/total-diff-view/6_plan-more.org'; the gesture was allowed
-  before that slice too.
 ** Neovim shows Emacs chords in most server messages
   Server messages name Emacs chords: C-c s s (fork errors), C-c g RET
   (edit requests on write-protected nodes, the overridesHere

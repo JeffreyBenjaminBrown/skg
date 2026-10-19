@@ -107,12 +107,12 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
     &mut stream, rendered, config, tantivy, &graph,
     &view_id, &mut views_state ) . await ?;
 
-  // A second, newly inserted occurrence of node 1 is not an edit to a
-  // previously rendered write-protected occurrence. It may therefore express
-  // the root's new self-content relationship.
+  // A newly inserted write-protected occurrence of node 1 that agrees
+  // with the graph is no edit. It may therefore express the root's new
+  // self-content relationship.
   let with_new_self_occurrence : String = first . saved_view . replacen (
     '\n',
-    "\n** (skg (node (id 1) (repo main) writeProtected)) new self occurrence\n",
+    "\n** (skg (node (id 1) (repo main) writeProtected)) 1\n",
     1);
   let second = update_from_and_rerender_buffer (
     &mut stream, &with_new_self_occurrence, config, tantivy, &graph,
@@ -124,7 +124,7 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
   assert! (members_of (&saved_root . contains) . contains (&ID::from ("1")),
     "the accepted new occurrence should make node 1 content of itself");
 
-  // The old occurrence of node 2 is still protected at its rendered location.
+  // Retitling the occurrence of node 2 makes it differ from the graph.
   let old_line : &str = second . saved_view . lines ()
     . find ( |line| line . contains ("(id 2)") )
     . expect ("the rendered view should still contain node 2");

@@ -660,8 +660,10 @@ to the occurrence; graphStats belong to the graphnode.
 Each occurrence of an unrestricted vognode is either *editable* or
 *write-protected* ('Editability' in 'server/types/viewnode.rs'). Edits to
 an editable occurrence's title, body and children are saved; a
-write-protected occurrence shows no body, and edits to it change
-nothing. A buffer may hold at most one editable occurrence of a node,
+write-protected occurrence shows no body and saves nothing of its own,
+so a save is refused if one differs from the graph (in its title,
+skgrepo, aliases or flags) or has a child that affects its parent.
+The server leaves no such child under one it draws. A buffer may hold at most one editable occurrence of a node,
 so that two occurrences cannot contradict each other. Make one
 editable with =skg-set-editable= (=C-c s d=), which writes a
 =editableView= view request.
