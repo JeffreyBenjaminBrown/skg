@@ -58,7 +58,7 @@ compilation is fixed in the same commit by following the crate's
 changelog; a bump that breaks a test is investigated, and the test is
 changed only when the new behavior is correct.
 
-** Slice 0: compatible bumps
+** DONE Slice 0: compatible bumps
 'cargo update' (no edit to 'Cargo.toml'), suites, commit the lockfile.
 Slice 0 of the fixes plan has done this; mark this slice DONE and move
 on.
