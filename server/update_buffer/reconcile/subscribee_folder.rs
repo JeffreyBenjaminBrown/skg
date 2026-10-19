@@ -5,11 +5,11 @@ use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::misc::{ID, RelPartner, SkgrepoName};
 use crate::types::tree::generic::{read_at_node_in_tree, with_node_mut};
+use crate::types::tree::moves::move_to_last_child;
 use crate::types::tree::viewnode_graphnode::{ unique_non_vognode_child_of_viewnode, insert_non_vognode_as_child};
 use crate::update_buffer::ancestry::required_ancestor;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, PartnerFolder};
 use crate::types::viewnode::Vognode;
-use crate::update_buffer::util::move_child_to_end;
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -148,7 +148,7 @@ fn ensure_hiddenOutsideOfSubscribeeFolder_is_last (
       tree, node,
       &ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) ) ?;
   match hidden_outside {
-    Some (child) => { move_child_to_end( tree, node, child ) ?; },
+    Some (child) => { move_to_last_child( tree, node, child ) ?; },
     None => {
       let new_folder : NodeId =
         insert_non_vognode_as_child(

@@ -1,3 +1,18 @@
+* ego_tree's node moves can link a node to itself (2026-10-17; fixed 2026-10-19)
+  In ego-tree 0.6.3, 'NodeMut::prepend_id' reads the parent's first
+  child, and 'insert_id_before' the anchor's previous sibling, before
+  detaching the node being moved ('append_id' likewise reads the last
+  child). Moving a node that already occupies that place links it to
+  itself, and every later traversal of the tree loops forever. Found
+  while drawing the total diff view (slice 5), whose
+  'server/to_org/render/changes.rs' now detaches before moving. Other
+  callers are safe today only because of where they move nodes; a
+  shared helper that detaches first, used everywhere, would remove
+  the trap.
+  Fixed 2026-10-19 in slice 9 of [[file:../total-diff-view/4_plan-fixes.org][the TDV fixes plan]]: every move of
+  a node already in a tree goes through 'server/types/tree/moves.rs',
+  whose helpers detach first and do nothing when the node is already
+  in place.
 * The sexp crate writes an empty string as nothing (2026-10-17; fixed 2026-10-19)
   'sexp' 1.1.4 quotes a string atom only when it contains a quote,
   whitespace, or parses as a number, so 'Atom::S ("")' prints as

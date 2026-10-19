@@ -15,6 +15,7 @@ use crate::types::viewnode::{
     Viewnode, ViewnodeKind, PhantomDeleted, Editability,
     AffectsParent, ViewRequest, mk_editable_viewnode};
 use crate::types::viewnode::{Vognode, Phantom, PartnerFolder};
+use crate::types::tree::moves::move_to_last_child;
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_skgrepo_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_graphnode::{
     pid_and_skgrepo_from_viewnode_at,
@@ -23,8 +24,7 @@ use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::util::{
     complete_relevant_children_in_viewforest,
     partition_children,
-    treat_certain_children,
-    move_child_to_end};
+    treat_certain_children};
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -732,7 +732,7 @@ fn order_children_as_non_vognodes_then_ignored_then_content (
   for &cid in groups . get( &0 ) . unwrap_or (&empty) . iter()
     . chain( groups . get( &1 ) . unwrap_or (&empty) . iter() )
     . chain( groups . get( &2 ) . unwrap_or (&empty) . iter() )
-  { move_child_to_end( tree, node, cid ) ?; }
+  { move_to_last_child( tree, node, cid ) ?; }
   Ok(( )) }
 
 

@@ -580,7 +580,7 @@ empty content serialize quoted; the stage-and-commit client tests,
 which exercise an empty view, still pass with the workaround gone.
 Move the entry in 'TODO/problems.org' to 'TODO/DONE/problems.org'.
 
-** Slice 9: tree moves detach first
+** DONE Slice 9: tree moves detach first
 Add 'server/types/tree/moves.rs' with 'move_to_front', 'move_to_back',
 'move_before', 'move_after' over 'Tree<Viewnode>': each detaches the
 moved node first (or returns when it is already in place), then

@@ -35,6 +35,7 @@ use skg::to_org::render::change_viewnodes::{
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::git::Sign;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
+use skg::types::tree::moves::{move_before, move_to_first_child};
 use skg::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, Phantom, Property, Viewnode, ViewnodeKind,
   Vognode};
@@ -157,7 +158,7 @@ fn buffer_with_every_new_viewnode (
     let gone : NodeId = append_historical_phantom (
       &mut tree, p, &straddle, &ID::from ("gone"), Some (Sign::Minus) )
       . expect ("gone is in the before-graph only");
-    tree . get_mut (b) . unwrap () . insert_id_before (gone); }
+    move_before (&mut tree, b, gone) ?; }
   for kind in ChangesetMarkerKind::ALL . into_iter () . rev () {
     tree . get_mut (p) . unwrap () . prepend (
       mk_changeset_marker_viewnode (kind) ); }
@@ -179,7 +180,7 @@ fn buffer_with_every_new_viewnode (
     let folder : NodeId =
       append_acquired_folder (&mut tree, acq, &straddle, &ID::from ("acq"))
       . expect ("acq acquired 'acquired'");
-    tree . get_mut (acq) . unwrap () . prepend_id (folder); }
+    move_to_first_child (&mut tree, acq, folder) ?; }
   { // The acquiree, a second root.
     let root : NodeId = tree . root () . id ();
     append_historical_phantom (

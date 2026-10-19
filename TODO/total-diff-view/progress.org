@@ -864,3 +864,16 @@ to the streamed-view handler. With the workaround gone, they feed
 *** the integration run
 Every integration test passes but 'import-md-and-org', which fails at
 baseline, as 'TODO/problems.org' records.
+** Slice 9: deviations
+*** the helpers' names
+Slice 1 built the helpers, naming the plan's 'move_to_front' and
+'move_to_back' 'move_to_first_child' and 'move_to_last_child', so a
+caller reads which end of whose children the node goes to.
+*** what was left to convert
+Slice 1 had already removed 'changes.rs''s 'move_to_front'. Under
+'server/' only 'move_child_to_end' ('server/update_buffer/util.rs')
+still called 'append_id'. It detached first, so it was safe; it is
+gone, and its callers (the generic goal-list reconciler, the content
+reconciler's ordering and the subscribee folder) call
+'move_to_last_child'. Two direct moves in a test fixture builder
+('tests/tdv/roundtrip/view.rs') call the helpers too.

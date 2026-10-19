@@ -3,17 +3,6 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
-* ego_tree's node moves can link a node to itself (2026-10-17)
-  In ego-tree 0.6.3, 'NodeMut::prepend_id' reads the parent's first
-  child, and 'insert_id_before' the anchor's previous sibling, before
-  detaching the node being moved ('append_id' likewise reads the last
-  child). Moving a node that already occupies that place links it to
-  itself, and every later traversal of the tree loops forever. Found
-  while drawing the total diff view (slice 5), whose
-  'server/to_org/render/changes.rs' now detaches before moving. Other
-  callers are safe today only because of where they move nodes; a
-  shared helper that detaches first, used everywhere, would remove
-  the trap.
 * Problems noticed while fixing repo moves over repeated nodes (2026-10-07)
 ** Repo moves do graph logic in the client
 The Emacs client computes which relationships a repo move strands, from

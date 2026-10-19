@@ -1,6 +1,7 @@
 use crate::types::viewnode::{AffectsParent, Viewnode, ViewnodeKind};
 use crate::types::viewnode::Vognode;
 use crate::types::tree::generic::{with_node_mut, write_at_ancestor_in_tree};
+use crate::types::tree::moves::move_to_last_child;
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -112,21 +113,6 @@ pub fn detach_viewnode_transferring_focus (
                   |mut n| { n . detach (); } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (()) }
-
-/// Move an existing child to the end of its parent's children list.
-/// Uses detach() + append_id() to move without cloning.
-pub fn move_child_to_end<Node> (
-  tree         : &mut Tree<Node>,
-  parent_skgid : NodeId,
-  child_skgid  : NodeId,
-) -> Result<(), Box<dyn Error>> {
-  with_node_mut( tree, child_skgid,
-                 |mut n| { n . detach(); } )
-    . map_err( |e| -> Box<dyn Error> { e . into() } )?;
-  with_node_mut( tree, parent_skgid,
-                 |mut p| { p . append_id (child_skgid); } )
-    . map_err( |e| -> Box<dyn Error> { e . into() } )?;
-  Ok( () ) }
 
 /// What 'complete_relevant_children' changed while reconciling: the
 /// orderkeys it created, demoted to non-member (stale branches),
@@ -326,12 +312,12 @@ where
       ) . map_err( |e| -> Box<dyn Error> { e . into() } )?; }
   for &child_skgid in &irrelevant_skgids {
     // Move irrelevant children to end. (They will precede the relevant ones.)
-    move_child_to_end( tree, parent_skgid, child_skgid )?; }
+    move_to_last_child( tree, parent_skgid, child_skgid )?; }
   for orderkey in goal_list {
     // Move/create relevant children in desired order
     match orderkey_to_treeid . get (orderkey) {
       Some (&child_skgid) => {
-        move_child_to_end( tree, parent_skgid, child_skgid )?; },
+        move_to_last_child( tree, parent_skgid, child_skgid )?; },
       None => {
         let node : Node = create_child (orderkey) ?;
         with_node_mut(
