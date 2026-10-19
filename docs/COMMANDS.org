@@ -390,7 +390,12 @@ by visiting a metadata buffer for the node (skg-view-metadata).
 If you want to see the editable view of that node
 from a place where it is currently shown in a write-protected form,
 call this function. It will make the current editable view
-(if it exists) write-protected, and then draw an editable view here.
+(if it exists) write-protected, keeping what it draws,
+and then draw an editable view here.
+Called on a node that is already editable,
+it unfolds the node's content editable,
+up to 'initial_node_limit' expansions.
+A buffer may carry only one such request per node.
 *** C-c s w : skg-set-write-protected
 This marks a node as 'write-protected',
 as described above.
@@ -699,9 +704,11 @@ made editable where the buffer first draws it, in content or else
 in a partner folder (a container folder, say), and when a change is
 under a root the buffer lacks, that root is appended at the end.
 Nothing the buffer draws editable is write-protected again. An
-editable-view request on a write-protected headline expands it and
-its content as in any view, up to 'initial_node_limit' expansions;
-nothing else in the buffer is bounded by that limit.
+editable-view request (C-c s d) works as in any view, except that
+only the expansion of a node outside U (the nodes the buffer unfolds
+anyway: those that changed and those leading to them) is charged to
+'initial_node_limit'; nothing else in the buffer is bounded by that
+limit.
 Why the total diff view commits whole skgrepos, and offers nothing
 smaller: in skg a partial commit is dangerous. The graph is one
 structure spread over many files, so committing some changed files

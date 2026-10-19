@@ -79,7 +79,11 @@ an interactive command NAME that requests REQUEST-FORM and auto-saves."
 
 (defun skg-request-editable-view ()
   "Edit metadata to request a editable view for the headline at point.
-The node must be write-protected and childless. Does NOT auto-save."
+On a write-protected headline, the save makes it the node's editable
+occurrence and write-protects the one that was, which keeps what it
+draws. On an editable headline, the save unfolds its content editable,
+up to the server's initial_node_limit expansions. A buffer may carry
+one such request per node. Does NOT auto-save."
   (interactive)
   (save-excursion
     (org-back-to-heading t)

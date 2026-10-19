@@ -297,7 +297,7 @@ nothing; a change under a new origin with no occurrence still appends
 that origin (the existing test); a change the merges buffer's C leaves
 out is still counted unshown (the existing summary test).
 
-** Slice 2: the editable-view request, the same in every view
+** DONE Slice 2: the editable-view request, the same in every view
 The first run of this plan left half of this slice in the working
 tree, uncommitted: 'visit_normal_node' no longer removes the request
 from a node of U ('editableViewRequest_applies' is
