@@ -406,6 +406,10 @@ Then whenever you want to start a new piece of work from exactly that point, whi
 /rename whatever-this-task-is
 ** work through TODO/problems.org
 ** try neovim
+** maybe
+*** ? make a partial diff-mode
+This would behave just like the TDV, except it would not unfold a new view;
+it would instead just provide a lens onto an existing view.
 * skg-show-definition
 Implement a function 'skg-define' that prompts for a phrase
 and brings them to the relevant line in

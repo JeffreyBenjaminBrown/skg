@@ -1,0 +1,610 @@
+#+title: Total diff view, fixes after the first run — execution plan
+#+TODO: TODO ONGOING | DONE
+
+* Assignment and authority
+Implement this plan. It is a complete, settled specification, and
+nothing here is open for discussion. Writing it has implemented
+nothing. It stands on its own: every term it uses is defined below or
+in 'docs/glossary.org', and the review that produced it
+([[file:3_review.org][3_review.org]]) is background that nobody needs to read; where the two
+differ, this document wins.
+
+Read [[file:../../coding-advice/ORIENTATION.org][the orientation]] and its code-change, architecture, testing and
+execution advice before starting. Preserve unrelated edits. Do not
+change branches or git configuration. Build every client-facing piece
+for Emacs and Neovim in the same slice. Finish the agreed work and its
+verification without stopping for routine choices; stopping to ask is
+for the rare conditions that [[file:../../coding-advice/when-to-stop.org][when-to-stop.org]] describes, and slice 10
+names the one such condition this plan expects. Record meaningful
+deviations, and any such question, in [[file:progress.org][progress.org]] beside this plan,
+under a top-level headline "Fixes plan" with one subheadline per
+slice. This plan's text stays as it is, except the keyword of a
+slice's headline. Write any log or scratch file of your own under
+'tests/results/', never under 'TODO/'.
+
+** Commits
+Commit granularly, one or a few commits per slice, each message naming
+the slice. A slice's last code-modifying commit also carries the
+slice's documentation changes and the change of its headline here from
+TODO to DONE; neither stands as a commit of its own. So update the
+docs and the keyword before making that last commit, and if something
+is left over after it, amend that commit ('git commit --amend'; the
+branch is not pushed) rather than adding one.
+
+** Scope
+Ten changes, nine of them to the total diff view (TDV) as the first
+run left it: fold preservation through real reconciliation; removed
+alias and ID entries as save-inert kinds; the deletion of the
+partial-staging commands; readiness gestures that unmark with a
+warning; a view that follows its fresh sets after a save (new editable
+occurrences, new roots, and a user's editable-view request that
+cascades within the node budget); a merges buffer without the text
+preserver; the graph straddle dropped on a store rebuild and written
+back after a rerender-all; empty strings quoted on the wire; and tree
+moves that detach first. The tenth is the dependency upgrade, which
+has a plan of its own that slice 10 points to. Before all of them
+comes a housekeeping slice, which renames 'GraphPair' to
+'GraphStraddle' and retires two "dvr" names.
+
+** Vocabulary
+The terms this plan relies on, one line each; 'docs/glossary.org' has
+more.
+- The TDV (total diff view) is up to four buffers (all changes,
+  merges, skgrepo changes, order-only changes) that show the graph's
+  uncommitted changes, HEAD against the worktree.
+- The graph pair, called the graph straddle after slice 0
+  ('GraphStraddle { before, after }'), is what the TDV compares: the
+  before-graph is read from HEAD, the after-graph is the live graph. A
+  straddle stands with one foot in the committed graph and one in the
+  live graph. Each node and relationship it reports carries a
+  presence: both, only-before or only-after.
+- The PCSVF (pruned change-spanning viewforest) is what the
+  all-changes buffer draws, defined by four sets. C is the changed
+  nodes. R is the content origins reached from C by the containerward
+  walk; the walk follows single containers only, so a node with no
+  container, or with two or more, is an origin, and a rootlike cycle
+  contributes one origin, chosen by ID
+  ('climb_containerward_to_cycle_via', 'kept_origins'). D is the
+  deduplicated content origins, the roots the buffer opens with. U is
+  the nodes to unfold contentward: C, R and every node on the walks. A
+  node of U is drawn editable at its first occurrence with its whole
+  content list; a member outside U is a write-protected leaf. The
+  merges and skgrepo-changes buffers draw PCSVFs over subsets of C
+  ('pcsvf_sets_of_buffer'); the order-only buffer draws a flat list.
+- Where a set's name appears inside a snake_case function name, it is
+  one camelCased token ('contentOrigins', 'freshU'), so that it reads
+  as a single noun: 'append_contentOrigins_to_buffer', not
+  'append_content_origins_to_buffer'.
+- The fresh sets are the sets recomputed from the refreshed straddle
+  at a rerender ('GraphPair::pcsvf_sets_of_buffer' computes them once
+  per straddle). A buffer's standing roots are the roots it has when a
+  rerender begins.
+- A change-forest leaf is one atomic change to a node (its title, its
+  body, one relationship, its home skgrepo, and so on). A mark is the
+  user's statement that a leaf is commit-ready; readiness is the state
+  of the marks; a gesture is a client command that marks or unmarks.
+- A changeset marker is a one-line viewnode that summarizes a node's
+  small changes (kinds: content, relRepo, order-only). A historical
+  phantom is the TDV's image of a node that HEAD has and the worktree
+  lacks. A removed member is a content member drawn write-protected
+  with presence only-before. A continuation is the containerward tree
+  or role tree drawn under a member of a changed folder.
+- Change viewnodes are the viewnodes the TDV draws for a node beyond
+  its ordinary content: old-text properties, home moves, relRepo
+  moves, changeset markers, change folders and their members,
+  continuations, historical phantoms, and removed members.
+- View completion is the level-order walk ('complete_viewforest') that
+  brings a viewforest up to date with the graph. In a TDV it runs with
+  'tdv_drawing' set, and each editable node's visit ends in
+  'process_unrestrictedVognode_changes', the per-visit TDV step. The
+  node budget is a per-completion counter that starts at
+  'initial_node_limit'; an ordinary view checks it before expanding an
+  editable node and charges one per expansion; a TDV skips the check
+  today.
+
+* Agreed behavior
+** Folding survives, because nothing that exists is recreated
+The server never changes the fold state ('folded', 'body_folded') of a
+viewnode that already exists. Defaults apply only when a viewnode is
+created: a context node's body starts folded, a container folder
+starts folded, everything else starts open. A context node that later
+becomes a changed node keeps whatever fold state the user gave it.
+
+Every change viewnode is reconciled, never detached and redrawn. At a
+node's visit, each existing child is matched to what the fresh drawing
+would produce. The match key for a viewnode that stands for a
+graphnode is (parent, skgid), where the parent is the particular
+viewnode it sits under; within one parent a graphnode appears at most
+once, so the key is unique. Its kind is a fact updated in place: a
+deleted phantom whose node the straddle holds as only-before becomes
+the historical phantom, a historical phantom whose node is back
+becomes a live member, a live member becomes a removed member and
+back, each keeping its viewnode and its fold state, with its children
+then reconciled by the same rule. The match key for a viewnode that
+stands for no graphnode (an old text, a home move, each marker kind,
+each folder kind) is (parent, kind). A matched viewnode is kept and
+its facts updated; an unmatched existing one is detached; what the
+fresh drawing produces and nothing matches is created. A removed
+member or historical phantom is matched and kept too, and only
+repositioned to its LCS slot. "Produced by the fresh drawing" is
+defined over the union of the two graphs: a node only in the
+before-graph is still produced, as a historical phantom or a
+write-protected rel- member; a viewnode is detached only when the
+relationship it stands for is in neither graph any more.
+'redraw_deleted_phantoms_as_historical' is deleted; the matching
+covers it.
+
+Continuations under a changed folder's members are reconciled the same
+way, through the goal-list reconciler, which gains presence-tagged
+goal items so that a removed member or a historical phantom is a
+first-class goal entry; the restore-then-redraw pair for folders
+('restore_removed_members_of_pair_folder',
+'redraw_removed_members_of_pair_folder') goes.
+
+Roots linger: a root stays until the user closes the buffer, whatever
+happens to the changes under it. A commit is an ordinary rerender
+under these rules: after it, the roots stand as plain context with
+their decorations gone; 'redraw_tdv_views' is deleted. No buffer is
+ever sent empty because of a commit.
+
+** Removed alias and ID entries
+A removed alias is drawn as 'Property::RemovedAlias { text }' and a
+removed extra ID as 'Property::RemovedID { skgid }', both save-inert by
+kind: the alias reader never reads them and the ID check never counts
+them. They sit in list order where the LCS puts them, carry the '-'
+herald and the '(diff rel-)' presence fact as display, and carry their
+readiness leaf and requests as the live entries do. No save code reads
+a presence fact any more.
+
+** Partial staging is gone
+'skg-git-add-if-new-recursive', its preview, 'skg-stage-moves', and
+their Neovim twins are deleted, with their server support, tests,
+bindings and documentation. The magit navigation commands and the
+"titles by ids" git fallback stay. Both COMMANDS files already explain
+why partial commits are dangerous.
+
+** Unmarking warns
+Every readiness gesture toggles: it unmarks when the thing at point is
+ready, else it marks, and a recursive form applies that one direction
+to every matching descendant. When a gesture would unmark more than
+one leaf, it first asks, with a typed answer ('yes-or-no-p' in Emacs,
+an input that must equal "yes" in Neovim): "Unmarking this node
+commit-ready will unmark every contributing decision. You might
+discard a lot of hard-won information. Continue (yes/no)?". An unmark
+of a single leaf proceeds silently. This applies to
+'skg-cycle-commit-ready' and to 'skg-mark-gnode-skgrepo-changes-commitReady',
+which thereby gains unmarking.
+
+** The view follows its fresh sets after a save
+A TDV buffer keeps the rule it was drawn by, "a node of U is editable
+at its first occurrence, with its whole content list", as U changes.
+After any rerender the writable viewnodes are those of the fresh U
+plus whatever was already writable: nothing writable is ever
+write-protected again, and this drawing is never bounded by the node
+budget.
+*** new editable occurrences
+Before completion of a TDV buffer, for every node of the fresh U with
+no editable occurrence in the buffer, the server sets 'editability' to
+editable on the node's BFS-first occurrence, directly, with the body
+read from the live graph as a freshly drawn editable viewnode has it.
+It does NOT use 'ViewRequest::Editable'. Completion then draws that
+occurrence's content list: members of the fresh U editable and
+expanded, the rest as write-protected leaves, and so on down to the
+change, so a node of U with no occurrence at all is reached through
+the node above it on its walk. The unshown count keeps counting nodes
+of C with no occurrence after completion.
+*** new roots
+After completion, the origins of the fresh D that no viewnode in the
+buffer draws are appended at the end, in ID order, as stubs drawn as
+'stub_viewforest_of_roots' draws a root (a historical phantom when the
+after-graph lacks the node; a folded container folder when the node
+has several containers), and completed. Before that, the
+deduplication of the fresh R runs with the buffer's standing roots
+pinned as kept, so that a change to a rootlike cycle's membership
+never appends a second root for a cycle that already stands. A new
+root is the origin the walk reaches, never the changed node itself.
+*** a user's editable-view request cascades, within the node budget
+In a TDV buffer, 'ViewRequest::Editable' on a write-protected
+occurrence behaves as in an ordinary view: the occurrence becomes
+editable (or defers to an existing editable occurrence), its content
+list is drawn, and the request passes to its content children, each of
+which repeats this when visited. The node budget bounds these
+request-driven expansions and nothing else: a node of U is never
+charged against it. The request adds no default partner folders,
+because a TDV draws none. Nodes made editable this way stay editable
+at later rerenders, as anything already writable does.
+
+** The merges buffer draws acquirees and acquirers only
+C of the merges buffer is each acquiree and its acquirer. The text
+preserver is no longer sought; it appears as a new member (∃+) in the
+acquirer's content.
+
+** The straddle is dropped on a store rebuild, and written back after a rerender-all
+The "rebuild session-lifetime stores" request sets the connection's
+cached straddle to None, so the next TDV request rebuilds both halves
+from the same disk state as the rebuilt live graph. A rerender-all (an
+absent-reference cleanup, the skgrepo switch) writes the straddle it
+refreshed back to the connection, as a save does.
+
+** Empty strings on the wire
+Every response the server serializes prints an empty string atom as
+'""'. Non-empty atoms print as the 'sexp' crate prints them today,
+because the server relies on a non-empty 'Atom::S' printing as a bare
+symbol. The clients' workaround that reads a bare '(content)' as an
+empty view is removed.
+
+** Tree moves detach first
+Every move of an existing viewnode within a tree goes through one
+module of helpers that detach the node first and do nothing when it is
+already in place. No code calls ego-tree's 'prepend_id', 'append_id',
+'insert_id_before' or 'insert_id_after' directly on a node that may
+already be in the tree.
+
+** Dependencies are current
+Every dependency is at its latest version, and 'serde_yaml', which is
+deprecated, is replaced by a maintained crate whose output on every
+'.skg' file is byte-identical, or the plan stops to ask. The
+dependency plan that slice 10 points to states the rest.
+
+* Pitfalls in view completion that the slices must respect
+These were found by reading 'server/update_buffer/complete.rs',
+'server/update_buffer/reconcile/content.rs',
+'server/update_buffer/reconcile/partner_folder.rs',
+'server/to_org/render/changes.rs', 'server/pcsvf.rs' and
+'server/update_buffer.rs'.
+** the per-visit step is destructive today
+'process_unrestrictedVognode_changes' begins with
+'remove_change_viewnodes', which detaches every old text, home move,
+changeset marker, "it acquired" folder, historical phantom (with its
+subtree) and removed member, and 'tag_content_members' detaches relRepo
+moves; only partner folders are reused ('child_folder_or_new'). It
+also sets 'body_folded' from C at every visit, which is why context
+bodies refold. Slice 1 replaces all of this with matching.
+** the content reconciler runs first and reorders
+'expand_true_content_at_unrestrictedVognode' runs before the TDV step
+and ends with 'order_children_as_non_vognodes_then_ignored_then_content',
+which moves removed members (affectsParent false) ahead of the content.
+The TDV step must reposition kept removed members to their LCS slots
+after it, every time, by moving them (slice 9's helpers), not by
+recreating them.
+** the generic goal-list reconciler knows only live members
+'reconcile_partnerFolder_children_against_goal_list' matches children
+to skgids and treats a demoted member or a historical phantom as
+stale, which is why the folders needed the restore/redraw pair. Slice 1
+teaches it presence-tagged goal items instead.
+** 'tag_content_members' demotes at every visit and never promotes
+At each visit of an editable node it write-protects every content
+member outside U, including one that was editable, and strips any
+'ViewRequest::Editable' from it, before the member itself is visited.
+Three consequences. A member that U has grown to include stays
+write-protected, and nothing is ever drawn under a write-protected
+node ('clobberWriteProtectedViewnode' only resyncs title and home;
+children already there survive, which continuations under
+write-protected folder members rely on). A commit, which shrinks U,
+would write-protect the lingering context. And a user's request on a
+member outside U is a no-op, as are the requests the cascade puts on
+children. Slice 5 narrows the function to members this visit created
+and lets requests through.
+** a requested node skips the budget and gains folders
+'apply_editable_draw_rule' makes a requested node editable and
+'attach_cascade_dvrs_to_affected_content' hands the request to its
+content children; the node budget is what bounds this in an ordinary
+view, and 'visit_normal_node' skips the budget check in a TDV.
+'maybe_add_default_partnerFolder_branches' also runs for a requested
+node ('had_dvr'), and a TDV draws no default folders. Slice 5 restores
+the check for requested nodes outside U and skips the folders. No
+slice uses the request to make a node of U editable.
+** editability is recomputed from a fresh 'EditableMap' every rerender
+BFS-first occurrence wins. Anything a slice makes editable must be the
+first occurrence of its node in BFS order, or the map will
+write-protect it again.
+** a root with several containers has a container folder
+'stub_viewforest_of_roots' gives a multiply-contained root a folded
+container folder, which completion fills with its containers in either
+graph. A root that slice 5 appends gets the same.
+** fold state travels only on viewnodes the client saw
+The client writes '(folded)' and 'bodyFolded' before saving; the
+parser puts them on the viewnodes. A viewnode the server creates is
+open. No client change is needed for folding.
+
+* Code map
+** Folding
+'server/to_org/render/changes.rs' ('process_unrestrictedVognode_changes',
+'remove_change_viewnodes', 'tag_content_members',
+'insert_removed_content_members', 'changed_property_folders',
+'fill_property_folder', 'viewnode_of', 'move_to_front',
+'redraw_deleted_phantoms_as_historical'),
+'server/update_buffer/reconcile/partner_folder.rs'
+('reconcile_partnerFolder_children_from_graph_pair',
+'restore_removed_members_of_pair_folder',
+'redraw_removed_members_of_pair_folder',
+'attach_continuations_under_pair_folder_members'),
+'server/to_org/complete/partner_folder/child_data.rs'
+('reconcile_partnerFolder_children_against_goal_list',
+'build_child_data'), 'server/to_org/expand/role_tree.rs'
+('attach_full_containerward_role_trees_at_treeids_with_skgrepo_set',
+'build_and_integrate_role_tree_with_skgrepo_set', 'RoleTreePartners'),
+'server/serve/handlers/stage_and_commit.rs' ('redraw_tdv_views'),
+'server/update_buffer.rs' ('rerender_view', 'complete_viewforest_with_graph_pair',
+'update_views_after_save', 'rerender_collateral_view'),
+'server/types/views_state.rs' ('ViewState', 'TdvBuffer').
+** Removed entries
+'server/types/viewnode.rs' ('Property'), 'server/serve/parse_metadata_sexp.rs',
+the serializer in 'server/org_to_text.rs', 'server/heralds.rs',
+'server/from_text/local_fieldintent_collection/traverse.rs'
+('visit_aliasFolder'), 'server/from_text/buffer_to_viewnodes/validate_tree.rs'
+('idFolder_membership_errors'), 'server/to_org/render/changes.rs'
+('fill_property_folder', 'facts_of_entry'),
+'server/serve/handlers/readiness_requests.rs' (leaf naming).
+** Partial staging
+'elisp/skg-git-add.el', 'nvim/lua/skg/git_add.lua', 'tests/elisp/test-skg-git-add.el',
+'tests/nvim/git_tier_spec.lua', 'elisp/skg-request-stage-moves.el',
+'nvim/lua/skg/stage_moves.lua', 'server/serve/handlers/stage_moves.rs',
+'server/git_ops/find_and_stage_moves.rs', 'RequestType::StageMoves',
+'TcpToClient::StageMoves', the bindings in 'elisp/skg-keymaps-and-aliases.el'
+and 'nvim/lua/skg/keymaps.lua', the "Stage moves" section of
+'docs/api-and-formats.org', and the entries in 'docs/COMMANDS.org' and
+'docs/COMMANDS-nvim.org'.
+** Gestures
+'elisp/skg-readiness.el', 'nvim/lua/skg/readiness.lua',
+'tests/elisp/test-skg-readiness.el', the nvim readiness spec.
+** The fresh sets
+'server/pcsvf.rs' ('pcsvf_sets_over', 'kept_origins',
+'stub_viewforest_of_roots', 'pcsvf_viewforest', 'PcsvfSets',
+'nodes_drawn_in_viewforest'), 'server/graph_pair/types.rs'
+('pcsvf_sets_of_buffer'), 'server/update_buffer.rs' ('rerender_view',
+the TDV branch), 'server/update_buffer/complete.rs'
+('visit_normal_node', 'had_dvr', 'apply_editable_draw_rule'),
+'server/update_buffer/reconcile/content.rs'
+('attach_cascade_dvrs_to_affected_content',
+'expand_true_content_at_unrestrictedVognode'),
+'server/to_org/render/changes.rs' ('tag_content_members'),
+'server/to_org/util.rs' ('EditableMap',
+'make_writeProtected_if_repeat_then_extend_editable_map',
+'build_node_branch_minus_content').
+** Merges, store rebuild
+'server/pcsvf.rs' ('pcsvf_sets_for_merges', 'acquiree_text_preservers'),
+'server/serve/handlers/rebuild_session_lifetime_stores.rs',
+'server/serve/handlers/rerender_all_views.rs' (the comment "which it
+does not replace"), 'server/serve.rs' ('ViewsState').
+** Wire and tree
+'server/serve/util.rs' ('tag_sexp_response', 'send_response_with_length_prefix'),
+'elisp/skg-request-save.el' and 'nvim/lua/skg/save.lua' (each reads
+a bare '(content )' as an empty view, with a comment saying so),
+'tests/elisp/test-skg-stage-and-commit.el' and
+'tests/nvim/stage_and_commit_spec.lua' (which exercise an empty view),
+'server/to_org/render/changes.rs' ('move_to_front'), and every call of
+'prepend_id', 'append_id', 'insert_id_before', 'insert_id_after' under
+'server/' (grep).
+** The renames
+'server/graph_pair/' (module, 'GraphPair', 'current_graph_pair_in_slot',
+'from_head_identity_and_live', 'with_after'), 'ViewsState::graph_pair',
+'RerenderAfterSaveContext::graph_pair', 'TdvDrawing::pair',
+'RoleTreePartners::GraphPair', 'PartnerFolderGoalSource::GraphPair',
+'reconcile_partnerFolder_children_from_graph_pair',
+'complete_viewforest_with_graph_pair', 'tests/graph_pair.rs' and
+'tests/graph_pair/', the glossary entry "graph pair, before-graph,
+after-graph", and the mentions in 'docs/api-and-formats.org' and
+'docs/heralds.org' (grep 'graph pair', 'graph_pair' and 'GraphPair'
+across 'server/', 'tests/', 'docs/', 'elisp/', 'nvim/'). Then
+'had_dvr' in 'server/update_buffer/complete.rs' and
+'attach_cascade_dvrs_to_affected_content' in
+'server/update_buffer/reconcile/content.rs'.
+** Dependencies
+The dependency plan has its own code map.
+
+* Implementation sequence
+Each slice ends with the three suites passing ('cargo nextest run',
+'bash/emacs-tests.sh', 'bash/nvim-tests.sh'), its docs updated, and
+its last commit made as the Commits section says. Slice 9 comes early
+in practice: slice 1 needs its helpers, so build the helpers first
+inside slice 1 if slice 9 has not run, and mark slice 9 DONE when the
+remaining call sites are converted.
+
+** Slice 0: housekeeping
+Run 'cargo update' (semver-compatible bumps only; no edit to
+'Cargo.toml'), run the three suites, commit the lockfile alone. Then
+rename 'GraphPair' to 'GraphStraddle' everywhere the code map's "The
+renames" lists: module 'server/graph_pair/' to 'server/graph_straddle/',
+fields, functions and variants to match ('straddle',
+'current_graph_straddle_in_slot', 'RoleTreePartners::GraphStraddle',
+'PartnerFolderGoalSource::GraphStraddle',
+'reconcile_partnerFolder_children_from_graph_straddle',
+'complete_viewforest_with_graph_straddle', 'tests/graph_straddle.rs').
+Put the one-sentence metaphor at the type's doc comment and in the
+glossary entry, which is renamed "graph straddle, before-graph,
+after-graph" with "graph pair" noted as the old name. Commit the rename
+alone. Then rename 'had_dvr' to 'had_editableViewRequest' and
+'attach_cascade_dvrs_to_affected_content' to
+'pass_editableViewRequest_to_content_children'; that commit is the
+slice's last.
+
+** Slice 1: folding survives saves, rerenders and commits
+*** fold state is set only at creation
+In 'process_unrestrictedVognode_changes', set 'body_folded' only on a
+viewnode created in this visit, never on one that already exists. The
+container folder of a multiply-contained root keeps 'folded : true' at
+creation only.
+*** change viewnodes are matched, not recreated
+Replace 'remove_change_viewnodes' and the recreation that follows it
+with a reconcile by the match key of the behavior section: compute
+what the fresh drawing produces for the node (old text and its aspect,
+home move, markers by kind, change folders by kind, removed members
+and historical phantoms by skgid, relRepo moves under members by the
+member's skgid), match each to an existing child, update the matched
+viewnode's kind, facts and title in place, detach the unmatched
+existing ones, create the rest, and reposition every kept or created
+change viewnode to its place (markers and folders to the front in
+today's order, removed members to their LCS slots) by moving, through
+slice 9's helpers. A phantom's old content and a member's live content
+are reconciled recursively the same way. 'tag_content_members' updates
+an existing relRepo move instead of detaching it. Delete
+'redraw_deleted_phantoms_as_historical': a deleted phantom that the
+straddle holds as only-before is matched by skgid and becomes the
+historical phantom in place.
+*** presence-tagged goal lists
+Give 'reconcile_partnerFolder_children_against_goal_list' (and
+'build_child_data') goal items that carry a presence and, for a node
+only in the before-graph, the fact that it is drawn as a historical
+phantom: a goal item matches an existing historical phantom or demoted
+member of the same skgid, and creates one of the right shape when
+nothing matches. Delete 'restore_removed_members_of_pair_folder' and
+'redraw_removed_members_of_pair_folder'. The ordinary live-graph path
+passes items with no presence and behaves as today.
+*** continuations are reconciled
+Replace the detach-and-redraw in 'attach_continuations_under_pair_folder_members'
+with a reconcile: for each member, match the existing continuation
+viewnodes to the freshly walked tree by (parent, skgid), keep matched
+viewnodes with their fold state, detach unmatched ones, append new
+ones in walk order, recursively down the tree; the relRepo-move
+property under a member is matched by kind. Reuse the goal-list
+reconciler of the previous step where its shape fits.
+*** roots linger, and no redraw after a commit
+Never remove a root. Delete 'redraw_tdv_views'; after a commit, the
+stage-and-commit handler rerenders open TDV buffers through the
+ordinary rerender path.
+*** tests
+In 'tests/pcsvf/': a context body unfolded by the client (the save
+carries no 'bodyFolded') stays open after the save; a folded headline
+inside a continuation, a folded change folder, a folded historical
+phantom and a folded old-text line all stay folded after a save that
+changes nothing and after one that adds a container above them; a
+removed member keeps its fold state and its LCS slot across two saves;
+a node deleted by a save becomes a historical phantom whose subtree
+keeps its folding; a node restored after deletion becomes a live
+member whose subtree keeps its folding; a buffer saved twice unchanged
+is byte-identical to itself; after a commit the roots remain and carry
+no change facts. Client tests: the fold-preservation integration tests
+('fold-preservation', 'body-fold-preservation') gain a TDV variant.
+
+** Slice 2: removed alias and ID entries as kinds
+Add 'Property::RemovedAlias { text }' and 'Property::RemovedID { skgid }':
+parse, serialize ('(removedAlias ...)', '(removedID ...)' mirroring
+the live forms), 'emittable_metadata_atoms', herald rules (the '-'
+glyph as now), validator placement (alias folder, ID folder), leaf
+naming for readiness requests. 'fill_property_folder' creates them for
+removed entries, matching existing ones by text or ID as slice 1
+matches everything else. 'visit_aliasFolder' and 'idFolder_membership_errors'
+skip them by kind and stop looking at '(diff rel-)'. Round-trip tests:
+a removed alias is not restored by a save; a removed ID does not abort
+the save; marking the removed entry marks its leaf.
+
+** Slice 3: delete the partial-staging commands
+Delete the git-add commands, their preview, and stage moves, in both
+clients and on the server (handler, 'find_and_stage_moves.rs', request
+and response types), with their tests, bindings and documentation
+(the "Stage moves" API section; the 'C-c t a', 'C-c t A', 'C-c t m'
+entries and their Neovim twins). Keep 'skg-goto-in-magit*' and the
+"titles by ids" fallback. The COMMANDS files' explanation of why
+partial commits are dangerous already exists; leave it.
+
+** Slice 4: gestures toggle, and warn before a wide unmark
+In 'skg-readiness.el' and 'readiness.lua': make the home-move gesture
+a toggle driven by the home leaf at point (its recursive form follows
+that direction); before any gesture writes unmark requests on more
+than one leaf, ask with the agreed text and a typed answer, and do
+nothing on refusal. Tests: a single-leaf unmark asks nothing; a
+recursive unmark asks and a refusal writes nothing; the home-move
+gesture unmarks a ready node.
+
+** Slice 5: the view follows its fresh sets
+*** new editable occurrences
+In the TDV branch of 'rerender_view', after the straddle is refreshed
+and before 'complete_viewforest', for each node of the fresh U
+('pcsvf_sets_of_buffer' of the refreshed straddle) with no editable
+occurrence in the viewforest, set 'editability' to editable on its
+BFS-first occurrence, with the body from the live graph, as
+'build_node_branch_minus_content' sets it for a fresh editable node.
+No 'ViewRequest::Editable'. In 'pcsvf_viewforest' (the first drawing)
+this pre-pass would be a no-op and is not run.
+*** new roots
+After completion in the same branch: compute the new roots as the
+fresh D minus the nodes drawn anywhere in the viewforest
+('nodes_drawn_in_viewforest'), where 'kept_origins' gains a parameter
+of pinned origins (the buffer's standing roots) that it marks kept
+before processing the rest; append each new root at the end of the
+buffer in ID order as 'stub_viewforest_of_roots' draws one, complete
+it, and set its facts as the rest of the buffer's. Factor the stub
+drawing of one root out of 'stub_viewforest_of_roots' for this.
+*** the writable set, and requests within the budget
+In 'tag_content_members', write-protect only a member that is outside
+U and that this visit's content reconciliation created; leave an
+existing editable member editable, and leave every request in place.
+In 'visit_normal_node', when 'tdv_drawing' is Some: a node that
+carries a request and is outside U takes the ordinary budget path (the
+check, the charge in 'expand_true_content_at_unrestrictedVognode', the
+draw rule, the cascade); a node of U takes none of it and is never
+charged; and 'maybe_add_default_partnerFolder_branches' is not called.
+The pre-pass above runs before any of this, so a node of U is editable
+before its parent's visit can see it.
+*** tests
+In 'tests/pcsvf/': a node changed after the buffer opened, present
+only as a write-protected leaf, is editable with its changes drawn
+after the next save, and its content members outside U are not made
+editable by that; a change two levels under a write-protected leaf is
+drawn after the next save, with the intermediate node editable; the
+summary's unshown count excludes both; a new change under a new origin
+appends that origin as a root, with the change drawn under it, and
+appends nothing when the origin is already drawn; a changed cycle's
+membership appends no second root; a user's editable-view request on
+a write-protected member outside U makes it and its content editable
+recursively, stops when 'initial_node_limit' expansions are spent
+(with a small limit in the test's config), adds no partner folders,
+and leaves the nodes it made editable editable after the next save; a
+buffer whose U exceeds that limit is drawn in full regardless; after a
+commit the lingering nodes remain editable.
+
+** Slice 6: the merges buffer without the text preserver
+Remove 'acquiree_text_preservers' from 'pcsvf_sets_for_merges'; C is
+each acquiree and its acquirer. Update the test fixture's expectations
+and the sentence in both COMMANDS files and the API doc that names the
+preserver. Test: the preserver is drawn as a new member of the
+acquirer's content, not as a root.
+
+** Slice 7: the straddle is dropped on a store rebuild, and written back after a rerender-all
+In the rebuild handler, set the connection's straddle to None before
+answering. In 'rerender_all_views.rs', write the refreshed straddle
+back to 'ViewsState' as the save path does ('update_buffer.rs' already
+does it after a save). Tests: after a rebuild that changed a foreign
+file on disk, the next TDV request shows no foreign node in C; after a
+rerender-all, the connection holds the refreshed straddle.
+
+** Slice 8: empty strings on the wire
+In 'server/serve/util.rs', serialize responses through one function
+that prints an empty 'Atom::S' as '""' and everything else as the
+crate does; route 'tag_sexp_response' and 'send_response_with_length_prefix'
+through it, and any other place that calls 'to_string' on a 'Sexp'
+bound for the client (grep). Remove the clients' reading of a bare
+'(content)' as empty. Tests: a unit test that an empty title and an
+empty content serialize quoted; the stage-and-commit client tests,
+which exercise an empty view, still pass with the workaround gone.
+Move the entry in 'TODO/problems.org' to 'TODO/DONE/problems.org'.
+
+** Slice 9: tree moves detach first
+Add 'server/types/tree/moves.rs' with 'move_to_front', 'move_to_back',
+'move_before', 'move_after' over 'Tree<Viewnode>': each detaches the
+moved node first (or returns when it is already in place), then
+attaches. Replace every direct call of the four ego-tree methods on a
+node already in the tree (grep under 'server/'); 'changes.rs''s
+'move_to_front' becomes the shared helper. Unit tests: moving a node
+to where it already is, and next to itself, leaves the tree intact and
+every traversal finite. Move the ego-tree entry in 'TODO/problems.org'
+to 'TODO/DONE/problems.org'.
+
+** Slice 10: the dependency upgrade
+Implement [[file:../dependency-upgrade/plan.org][TODO/dependency-upgrade/plan.org]], its slices 1 to 6 in order,
+as that plan says; its slice 0 is slice 0 of this plan, already done.
+Its slice 4 ('ego-tree' 0.11) relies on slice 9 here. Its slice 6
+holds the one stop this plan expects: if no replacement for
+'serde_yaml' re-serializes every '.skg' file byte for byte, report as
+that plan says in 'progress.org' here, do not mark this slice DONE,
+and end. Mark this slice DONE when every slice of that plan is DONE.
+
+* Verification and completion
+'cargo nextest run', 'bash/emacs-tests.sh' and 'bash/nvim-tests.sh'
+after every slice; 'bash/integration-tests.sh' after slices 1, 3, 5, 8
+and 10 (the TDV scenario, the removed commands, the fresh sets, the
+wire change, the upgraded crates). Done when every slice is committed,
+every suite passes, the docs named above are updated, the two problems
+entries are moved to the archive, and 'Cargo.toml' names no deprecated
+crate or 'progress.org' says why it still does.

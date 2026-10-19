@@ -1,0 +1,133 @@
+#+title: Dependency upgrade — execution plan
+#+TODO: TODO ONGOING | DONE
+
+* Assignment and authority
+Implement this plan. It is a complete, settled specification, and
+nothing here is open for discussion. Writing it has implemented nothing.
+It is slice 10 of [[file:../total-diff-view/4_plan-fixes.org][the fixes plan]], whose assignment section applies
+here too.
+
+Read [[file:../../coding-advice/ORIENTATION.org][the orientation]] and its code-change, testing and execution advice
+before starting. Preserve unrelated edits. Commit granularly, one
+commit per dependency or per slice, each message naming the slice; a
+slice's last code-modifying commit also carries its documentation
+changes and the change of its headline here to DONE, and neither
+stands as a commit of its own. Do not change branches or git
+configuration. Finish the agreed work and its verification without
+stopping for routine choices; stopping to ask is for the rare
+conditions that [[file:../../coding-advice/when-to-stop.org][when-to-stop.org]] describes, and slice 6 names the one
+such condition this plan expects. Record meaningful deviations, and
+any such question, in 'TODO/total-diff-view/progress.org', under its
+top-level headline "Fixes plan", as the fixes plan says. Write any log
+or scratch file of your own under 'tests/results/', never under
+'TODO/'.
+
+** Why
+The project is eighteen months old. Most dependencies are a patch or
+two behind; a few are a major version behind; and 'serde_yaml', which
+parses and writes every '.skg' file, is deprecated and unmaintained
+(its last release is 0.9.34+deprecated). Retiring it deliberately beats
+retiring it by surprise.
+
+** What stays as it is
+The '.skg' file format, byte for byte: slice 6 may replace the YAML
+library only if every existing file re-serializes identically. The
+save meaning of every view, and the protocol with the clients.
+
+* Versions as of 2026-10-17
+Locked in 'Cargo.lock' against the latest on crates.io:
+| crate      | locked | latest | note                                  |
+|------------+--------+--------+---------------------------------------|
+| ego-tree   |  0.6.3 | 0.11.0 | API changes; see slice 4              |
+| git2       | 0.18.3 | 0.21.0 | libgit2 bump                          |
+| tantivy    | 0.26.1 | 0.27.0 | index is rebuilt at startup           |
+| toml       | 0.8.23 |  1.1.8 | config parsing                        |
+| similar    |  2.7.0 |  3.2.0 | text diffs                            |
+| zstd       | 0.13.3 | 0.14.3 |                                       |
+| itertools  | 0.14.0 | 0.15.0 |                                       |
+| rand       |    0.8 | 0.10.3 | 'Cargo.toml' says 0.8; lock has 0.8.5 |
+| syn        |      2 |  3.0.9 | used only by 'tools/'                 |
+| serde_yaml | 0.9.34 |   none | deprecated; slice 6                   |
+Everything else is within its current major version and moves with
+'cargo update'.
+
+* Implementation sequence
+Each slice ends with 'cargo nextest run', 'bash/emacs-tests.sh' and
+'bash/nvim-tests.sh' passing and a commit. A bump that breaks
+compilation is fixed in the same commit by following the crate's
+changelog; a bump that breaks a test is investigated, and the test is
+changed only when the new behavior is correct.
+
+** Slice 0: compatible bumps
+'cargo update' (no edit to 'Cargo.toml'), suites, commit the lockfile.
+Slice 0 of the fixes plan has done this; mark this slice DONE and move
+on.
+
+** Slice 1: small majors
+One commit each, in this order: 'itertools' to 0.15, 'similar' to 3,
+'zstd' to 0.14, 'rand' to 0.10 (the server's own uses; 'Cargo.toml'
+pins 0.8 today), 'time' to the latest 0.3. For each: edit the version
+in 'Cargo.toml', 'cargo build --all-targets', fix what the compiler
+names, run the suites.
+
+** Slice 2: 'toml' to 1.x
+The config loaders in 'server/types/misc.rs' and the error path
+'load_config' uses. Check that a malformed 'skgconfig.toml' still
+produces the bold-red terminal message, and that 'OTHER_SKGREPO_DEPENDENCIES.toml'
+still parses. The config tests in 'tests/' cover both.
+
+** Slice 3: 'git2' to 0.21
+The call sites are in 'server/git_ops/' (snapshot reading, stage and
+commit, the vanished-node investigation, 'titles by ids'). Check the
+signatures of 'Index::add_all', 'Index::update_all', 'Repository::commit',
+'Repository::signature', 'revwalk' and 'TreeWalkMode'. The graph-pair,
+stage-and-commit and investigation tests cover them.
+
+** Slice 4: 'ego-tree' to 0.11
+The viewforest is an 'ego_tree::Tree<Viewnode>'. Follow the changelog
+for renamed or changed methods ('NodeMut', 'NodeRef', traversal
+iterators). The adjacent-move trap ('insert_id_before' and
+'insert_id_after' still self-link in 0.11; Jeff reported it upstream
+on ego-tree's issue tracker on 2026-10-18) is already isolated behind
+the project's own move helpers by the fixes plan; keep every move
+going through them. The whole Rust suite covers the tree.
+
+** Slice 5: 'tantivy' to 0.27
+The search index is a session-lifetime store rebuilt from the '.skg'
+files at startup, so an index-format change costs nothing. Follow the
+changelog for the query, schema and writer APIs in 'server/dbs/' and
+'server/serve/handlers/text_search.rs'. The search and enrichment tests
+cover it. Then 'syn' and 'proc-macro2' to their latest, for 'tools/'
+only, if they build without changes to the tools; otherwise leave them
+and note it in 'progress.org'.
+
+** Slice 6: replace 'serde_yaml'
+*** the candidates
+Maintained forks or alternatives with a serde API: 'yaml_serde'
+(0.10.x, "maintained by The YAML Organization"), 'serde_yaml_ng'
+(0.10.x), 'serde_yaml_bw' (2.x, panic-free parsing), 'serde-saphyr'
+(2.x, a serde layer over the YAML 1.2 library 'saphyr'). Prefer, in
+this order: identical output, a drop-in API, an active maintainer.
+*** the corpus test
+Before touching the server, write a test binary or test under 'tests/'
+that, for every '.skg' file under 'tests/' and under a path given on
+the command line (Jeff's data, read only), parses with 'serde_yaml',
+re-serializes with 'serde_yaml', and does the same with the candidate,
+then compares the candidate's output with serde_yaml's byte for byte
+and reports every difference. Run it for each candidate.
+*** the choice
+Take the first candidate in preference order whose output is identical
+on the whole corpus. Replace 'serde_yaml' with it at the seven files
+that use it, run the suites, and run the corpus test once more against
+the new code. If no candidate is identical, STOP (this is the
+architectural decision this plan anticipates): report in
+'TODO/total-diff-view/progress.org' which candidates differ and how
+(whitespace, key order, quoting, line width), so that Jeff can choose
+between a candidate with a one-time reformat commit of every data repo
+and keeping the deprecated crate.
+
+* Verification and completion
+The three suites after every slice; 'bash/integration-tests.sh' after
+slices 3, 5 and 6. Done when every slice is committed, every suite
+passes, and 'Cargo.toml' names no deprecated crate or
+'TODO/total-diff-view/progress.org' says why it still does.

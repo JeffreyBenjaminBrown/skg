@@ -1,0 +1,909 @@
+#+title: Review of the overnight TDV run (2026-10-17)
+
+* Verdict
+It did not go off the rails. All ten slices finished, in order, in 50
+commits over 3h40m (about 137 dollars). I reran every suite on the
+branch this morning: Rust 721/721, Emacs 365/365, Neovim 17/17. The
+deviations in progress.org are many, but they fall into three groups:
+the agents correcting mistakes in the plan (mine), the agents filling
+gaps the plan left, and a handful of genuine design choices. Only the
+third group needs you, and it is short.
+
+* What I checked myself
+The three suites, above. The core modules, read against the plan:
+'server/pcsvf.rs' (C, R, U, D, with the cycle tie-break exactly as
+decided), 'server/from_text/strands.rs' (the save-time strand analysis
+and the automatic raise), 'server/git_ops/stage_and_commit.rs' (stages
+only '.skg' files under the skgrepo's folder, deletions included,
+commits with the repo's configured author, skips a skgrepo whose tree
+equals HEAD), 'server/change_forest.rs' (the leaf keys and fingerprints
+as specified). The docs: 'api-and-formats.org' has sections for the
+three new requests, the readiness-marks file and the TDV metadata; the
+glossary, heralds and both COMMANDS files mention the new features. The
+integration scenario exists ('tests/integration/total-diff-view'). No
+agent left a stash behind; the five stashes are your older ones.
+
+What I did not do: run the TDV on your data, build each of the 50
+commits, or read all 15k changed lines.
+
+* Decide: design choices you may want to change
+** DONE [Jeff] Let's not lose folding in the TDV after every save.
+*** [Claude] agreed; the decisions are under "Folding is lost on save" below
+The decision list for fold preservation sits under your reply to
+"Folding is lost on save", so that it is in one place.
+** DONE A nodeMerge makes every container of the acquiree look changed
+The union walk resolves a listed ID in each graph separately. After a
+merge, a container that lists the acquiree B by B's old ID resolves it
+to B at HEAD and to the acquirer A now, so its content shows B as
+removed and A as added, and the container enters C, although its file
+did not change. Every container of every acquiree shows this, and each
+such relationship is a leaf to mark. The alternative is to resolve
+listed IDs through the after-graph in both halves, which removes the
+noise; the merges buffer would still show the merge, because it keys
+on the acquiree node itself. (progress.org, "consequence for nodeMerges")
+*** [Jeff] seems good
+I actually want that information. Merges are rare,
+and a node's containers are few; it won't get in the way.
+** DONE The save reads one display fact
+A removed alias or ID is drawn inside the editable alias or ID folder,
+so the save would restore it. The agents made the save skip entries
+tagged '(diff rel-)'. It is the one place where a save reads a display
+fact, which the design otherwise forbids; the old diff view did the
+same for IDs. The clean alternative is to draw removed entries as
+non-members, the way a removed content member is drawn. (slice 5,
+"lost aliases and IDs")
+*** [Jeff]
+**** Is the ID folder really editable?
+And if so, is that just a TDV property,
+or are all of them editable? I thought they weren't.
+***** [Claude] no; the alias folder is, the ID folder is validated
+The alias folder is editable everywhere, not only in the TDV: it is
+how aliases are edited ('C-c l a' shows it, and the save reads its
+entries in 'visit_aliasFolder'). The ID folder is not editable
+anywhere: the save compares its entries with the node's IDs and
+aborts on any difference ('idFolder_membership_errors',
+'IDFolder_Edited'), so it is write-protected in effect, though not
+by kind. The TDV changed neither. The problem was that a removed
+alias entry in the alias folder would be read back as a live alias,
+and a removed ID entry would fail the ID check, so both the reader
+and the check were taught to skip an entry tagged '(diff rel-)'. My
+sentence "editable alias or ID folder" was wrong about the ID folder.
+**** Yes, definitely, let's draw them as non-members.
+***** [Claude] agreed; two decisions
+A removed content member is a non-member because its viewnode kind
+says so (write-protected, 'affectsParent false'), not because of a
+display fact. Removed alias and ID entries should work the same way.
+****** DONE Decision: new save-inert kinds, named 'RemovedAlias' and 'RemovedID'
+'Property::RemovedAlias { text }' and 'Property::RemovedID { skgid }',
+which the alias reader and the ID check ignore by kind, so the save
+reads no display fact. I prefer "Removed" to "Old" (as in 'OldText'):
+an old text is the previous value of something that still exists,
+while these entries are gone. The '-' herald and the readiness leaf
+stay as they are. Say so if you prefer other names; the plan assumes
+these.
+******* [Jeff] agreed
+****** DONE Decision: drawn in list order, where the LCS puts them
+As now, and as removed content members are. The alternative, all
+removals first, you walked back in the discussion. The plan keeps
+list order.
+******* [Jeff] agreed
+** DONE The git-add commands now work only in a TDV buffer
+'skg-git-add-if-new-recursive' and its preview found new files by the
+old '(unstaged addedN)' atom. They now look for '(diff node+)', which
+only the TDV emits. If you used them from ordinary views in diff mode,
+that path is gone; the stage-and-commit command covers the common
+case. (slice 9)
+*** [Jeff] Let's delete that wholesale.
+I won't use it any more. Partial commits are dangerous, I decided.
+(That danger should be documented in the motivation section for the
+TDV in COMMANDS.org.)
+**** [Claude] agreed; the danger is now documented, and one more candidate
+Both COMMANDS files now say, in the total diff view's section, why
+partial commits are dangerous in skg. The deletion itself is slice 3
+of 4_plan-fixes.org.
+***** DONE Decision: delete 'skg-stage-moves' too?
+It is the other partial-staging tool: it writes a script that
+'git rm's a moved node's file in one skgrepo and 'git add's it in
+another, and nothing else. Stage-and-commit stages every '.skg'
+change in every owned skgrepo, deletions included, so it does
+exactly that as part of a whole commit. Keeping stage-moves keeps a
+way to make the partial commits you decided against. I would delete
+it, with its handler, 'find_and_stage_moves.rs', both client
+commands, its tests and its API section. The plan includes it; say
+no and the executor skips that part.
+****** [Jeff] agreed
+***** DONE Decision: keep the magit navigation commands
+'skg-goto-in-magit' and its variants only move point to a file in
+magit; they stage nothing. They stay, as does the "titles by ids" git
+fallback that gives magit readable titles.
+****** [Jeff] agreed
+** DONE The home-move gesture marks but does not unmark
+Everything else toggles; 'skg-mark-gnode-skgrepo-changes-commitReady'
+only marks. Probably fine, but it breaks the one-key rule. (slice 6)
+*** [Jeff] It should unmark too, but with a warning.
+"Ummarking this node commit-ready will unmark every contributing decision. You might discard a lot of hard-won information. Continue (yes/no)?"
+**** [Claude] agreed; four decisions
+The gesture becomes a toggle like the others, with your warning text
+("Unmarking this node commit-ready will unmark every contributing
+decision. You might discard a lot of hard-won information. Continue
+(yes/no)?").
+***** DONE Decision: warn only when more than one leaf would be unmarked
+The non-recursive form touches one leaf, and redoing one mark is
+cheap, so it needs no warning; the recursive form, and any aggregate,
+can unmark many, so they ask. If you would rather every unmark asks,
+say so; the plan assumes "more than one".
+****** [Jeff] agreed
+***** DONE Decision: the same warning for 'skg-cycle-commit-ready'
+Today the general gesture unmarks a whole folder or a whole subtree
+without asking, which is the same danger. I would apply one rule to
+every gesture: an unmark that would touch more than one leaf asks
+first. The plan assumes yes.
+****** [Jeff] agreed
+***** DONE Decision: direction follows the thing at point
+Like the cycle gesture: if the node's home leaf is ready, the gesture
+unmarks, else it marks, and the recursive form applies that one
+direction to every matching descendant. No alternative seems better.
+***** DONE Decision: the answer is typed
+'yes-or-no-p' in Emacs, which wants the whole word, and an input that
+must equal "yes" in Neovim, as stage-and-commit does. A one-key 'y'
+would defeat the warning's purpose.
+* Know: limitations you will feel while dogfooding
+** DONE Folding is lost on save
+A context node's body refolds at every save, and the containerward
+trees under changed-folder members are redrawn, so folding inside them
+is lost too. After a commit, open TDV buffers are redrawn from scratch
+rather than reconciled, so a fully committed buffer comes back empty,
+and all its folding goes. (slices 6, 7, 8)
+*** [Jeff] This cannot stand.
+It's too much work, reconstructing the fold structure one was using
+after every save. We need reconciliation. I imagine there are a lot
+of decisions to be made about how to do that, which is why the agents
+skipped it. Let's you and I handle them.
+**** [Claude] agreed; here is what breaks, and the decisions
+Folding already round-trips in ordinary views: before a save the
+client writes '(folded)' and 'bodyFolded' into each headline's
+metadata, the server parses them into the viewnode's 'folded' and
+'body_folded' fields, reconciliation keeps the viewnode objects, and
+the rendered buffer carries the facts back, so the client refolds.
+The TDV loses folding in three places, and each is a specific bug
+rather than a missing design: 'process_unrestrictedVognode_changes'
+sets 'body_folded' on every visit, so a context body the user opened
+refolds; 'attach_continuations_under_pair_folder_members' detaches
+the continuation under each changed-folder member and redraws it, so
+the new viewnodes have no fold state; and after a commit
+'redraw_tdv_views' rebuilds each buffer from scratch, because a plain
+reconcile keeps the roots and so could never empty a buffer. The
+decisions below fix all three.
+***** DONE Decision: the server never changes the fold state of an existing viewnode
+Defaults apply only when a viewnode is created: a context node's body
+starts folded, a container folder starts folded, everything else
+starts open. After that the user's folding is law, even when a
+context node becomes a changed node (its body stays as the user left
+it). I see no case for the server refolding anything; the plan
+assumes this.
+***** DONE Decision: continuations are reconciled, not redrawn
+The containerward trees and role trees under a changed folder's
+members are reconciled like the folder's own members: existing
+viewnodes are matched by (parent, skgid, kind), kept with their fold
+state, and re-walked; nodes that vanished are removed; new ones are
+appended. This reuses the goal-list reconciler the folders already
+use. The cheap alternative, redraw and then copy fold flags across by
+matching paths, gives the same visible result with less code but two
+passes over every tree; I prefer the reconcile, and the plan assumes
+it, with the copy as the fallback if the reconcile turns out to be
+invasive.
+****** DONE [Jeff]
+******* Reconciliation may need more specification.
+You wrote "nodes that vanished are removed",
+but they should become phantoms, no?
+Unless they weren't part of the older half of the graph pair.
+Oh that reminds me: let's rename GraphPair to GraphFootstep,
+explaining the metaphor (it's obvious, right?) at the definition.
+
+This implies some kind of view-completion.
+Currently, for instance, if a node A is added to a content list
+of container C in one buffer, other buffers will be updated
+so that C contains A in them, too. Similarly if content is deleted.
+THe TDV will need similar reconciliation,
+but beefed up to draw phantoms (and maybe other stuff?) too.
+
+Reconciliation is maybe the most complex aspect of the program.
+I'm worried skeletons we didn't anticipate are
+going to jump out at us. Please scour the view-completion logic
+for pitfalls.
+******** [Claude] "vanished" meant produced by neither graph; the rename is in; the pitfalls follow
+A continuation is walked over the union of the two graphs, with each
+node and relationship tagged by presence, so a node that exists only
+in the before-graph is drawn as a historical phantom (or, if it still
+exists, as a write-protected rel- member), and the fresh walk still
+produces it; it is matched and kept. By "vanished" I meant a viewnode
+the fresh walk no longer produces at all: the relationship is in
+neither graph any more, or a commit moved HEAD so that the deletion is
+no longer visible. Only those are removed. I have made the plan say
+exactly that.
+
+'GraphPair' becomes 'GraphFootstep' in slice 0 of the plan, with the
+metaphor stated at the definition: a footstep spans where the foot was
+and where it is now; the before-graph is the committed graph, the
+after-graph the live one, and one footstep is one HEAD-to-worktree
+interval. It reads well once said, so I say it there and in the
+glossary.
+
+You are right that this is view completion, and that reconciliation
+is where skeletons hide. I read the completion and reconcile code
+with the TDV's needs in mind ('complete.rs', 'content.rs',
+'partner_folder.rs', 'changes.rs', 'update_buffer.rs'), and the
+pitfalls I found are below, each with what the plan does about it.
+********* DONE pitfall: the per-visit step is destructive by design
+'process_unrestrictedVognode_changes' starts with 'remove_change_viewnodes',
+which detaches and later recreates every old-text property, home move,
+changeset marker, "it acquired" folder, historical phantom (with its
+whole old-content subtree) and removed member; 'tag_content_members'
+does the same to relRepo moves. Only partner folders are reused. So
+folding is lost on every save for all of those, not only for context
+bodies and continuations. The plan replaces recreation with matching:
+an existing change viewnode is matched by kind, and by skgid where it
+has one, kept with its fold state, and its facts updated; only what the
+fresh drawing no longer produces is detached.
+********* DONE pitfall: the content reconciler runs first and knows nothing of removed members
+It reorders a node's children into non-vognodes, then affectsParent
+false, then content, so removed members drift to the front at every
+pass and the TDV step moves them back; and in folders the agents needed
+a restore-then-reconcile-then-redraw dance ('restore_removed_members_of_pair_folder',
+'redraw_removed_members_of_pair_folder'), because the generic goal-list
+reconciler cannot match a demoted member or a historical phantom. Every
+new kind of removed thing would need its own restore. The plan gives
+the goal-list reconciler presence-tagged goal items, so a removed
+member or a historical phantom is a first-class goal entry that it
+matches directly, and the restore/redraw pair goes.
+********* pitfall: an editable-view request cascades
+Editability is recomputed at every rerender from a fresh 'EditableMap'
+(BFS-first occurrence wins), which is stable while the structure is
+stable. But the way to make an occurrence editable is not
+'ViewRequest::Editable': the draw rule hands that request on to every
+content child of the newly final node ('attach_cascade_dvrs_to_affected_content'),
+so the whole subtree would become editable and expand past U. Your
+"unprincipled fix" therefore flips the occurrence's 'editability'
+directly before completion; it is BFS-first among the node's
+occurrences, so the fresh map keeps it. The plan says so.
+********** DONE [Jeff]
+*********** expanding past U occasionally is fine
+If we were doing it everywhere, that would be a lot of noise.
+Maybe I'm wrong --
+did I ask for these editable view requests to be lots of places? --
+but if we're just talking about the few EVRs a user issues manually,
+it won't be a hindrance.
+************ [Claude] the requests I meant were the server's, and in a TDV a cascade has no bound
+The editable-view requests I meant were not the user's. Slice 5 as I
+first wrote it had the server put one on every changed node that
+lacked an editable occurrence, at every save, so they would have been
+many and automatic. Your incremental proposal below removes them
+altogether: a node of U gets its editable occurrence directly, and no
+request is involved.
+
+What remains is the user's own request, and there one fact matters: a
+request cascades without limit in a TDV. In an ordinary view the draw
+rule hands the request to every content child of the node it has just
+made editable, each child hands it on when it is made editable in
+turn, and the node budget ('initial_node_limit') stops the expansion.
+A TDV has no node budget ("a total diff view has no node budget", in
+'visit_normal_node'), so one request on a high node would draw its
+whole contentward subgraph. I would make a user's request in a TDV
+expand one level: the node becomes editable and its content list is
+drawn, members of U as U is drawn and the rest as write-protected
+leaves; another request on a child goes one level further. The
+alternative keeps the cascade and gives TDV buffers the ordinary
+budget for request-driven expansion only, which is more code for a
+less predictable result.
+************* DONE Decision: a user's editable-view request in a TDV expands one level
+The plan assumes it. Say so if you would rather keep the cascade, with
+the budget.
+************** DONE [Jeff]
+Incremental expansions of the TDV should be unbounded,
+and should only draw writable the set (U' + anything already writable).
+If the user explicitly requests writable at a node, though,
+let's expand that recursively writable, the normal way,
+subject to the node limit (also the normal way).
+
+If this is problematic, let me know!
+*************** [Claude] adopted, and not problematic; one finding changes what slice 5 must build
+The plan now says what you wrote: after any rerender the writable
+viewnodes are those of the fresh U plus whatever was already writable,
+drawn without bound; a request the user puts on a node cascades the
+normal way, and the node budget ('initial_node_limit') bounds it. The
+one-level decision is withdrawn.
+
+The finding: in a TDV today, a user's request on a member outside U is
+a no-op. The parent is visited first (the walk is BFS), and its visit
+ends in 'tag_content_members', which strips 'ViewRequest::Editable'
+from every content member outside U and write-protects it, before the
+member itself is visited. Only a member of U, or a root, keeps its
+request; and the cascade's own requests, which the draw rule puts on
+the children of a node it has just made editable, are stripped the
+same way in the same visit. So the behavior you want has to be built,
+not merely left alone. I found no test of a user's request in a TDV,
+which fits.
+
+What it takes, all in slice 5. 'tag_content_members' write-protects
+only a member that is outside U and that this visit created, and it
+never strips a request, so an already-writable member stays writable
+(also after a commit, when U shrinks and the roots linger as context).
+A node outside U that carries a request takes the ordinary budget
+path, check and charge, while a node of U is never charged, so the
+budget counts request-driven expansions only. And the request must not
+add the default partner folders that an ordinary view gives a node it
+has just made editable ('maybe_add_default_partnerFolder_branches'
+runs on 'had_dvr'), because a TDV draws none.
+*********** DONE I don't feel strongly about BFS-first.
+Just as long as the editable one is unique, it doesn't really matter
+where it goes. Near to where a user made an edit would be ideal,
+but I don't know whether there's a lightweight way to know that.
+************ [Claude] BFS-first stays, because nearness would need remembered state
+The 'EditableMap' is rebuilt from nothing at every rerender, in BFS
+order, so the first occurrence wins without anyone choosing it. The
+save does know which viewnode carried an edit (its text differs from
+the graph), so "nearest to the edit" is possible for the saving
+buffer. But that choice would have to be remembered per view and per
+node, or the next rerender's fresh map would undo it. I would not add
+that state now; the plan keeps BFS-first.
+*********** DONE 'attach_cascade_dvrs_to_affected_content' seems a bad name
+Does DVR stand for 'definitive view request'?
+If so, 'definitive' is a retired term; we should use 'editableViewRequest'
+(one token, so it reads clearly) instead.
+And what does it mean to 'attach cascade' something?
+************ [Claude] yes; the rename joins slice 0
+DVR did stand for "definitive view request". 'had_dvr' in
+'visit_normal_node' is the other survivor; 'api-and-formats.org' says
+"definitive source of truth" once, in its ordinary English sense, and
+that stays. The function puts 'ViewRequest::Editable' on each content
+child of a node the draw rule has just made editable, so that the
+request flows down one level at each visit: "attach" meant "put the
+request on the child viewnode", and "cascade" named that flow. Slice 0
+renames it 'pass_editableViewRequest_to_content_children' and
+'had_dvr' to 'had_editableViewRequest'. If the one-level decision
+above stands, a TDV never calls it.
+********* pitfall: nothing is drawn under a write-protected node
+A write-protected node's children are not removed by completion
+('clobberWriteProtectedViewnode' only resyncs title and home), which
+is why continuations under write-protected folder members survive;
+but no content is ever drawn under one. So a new change deep under a
+write-protected leaf has no occurrence at all, and the fix above
+cannot reach it; the summary's unshown count and its "reopen" are the
+right answer there. A member write-protected because it was outside U
+also stays write-protected when U later grows to include it; the same
+count covers that.
+********** [Jeff] We can do better.
+(Here I might be contradicting some earlier acquiesence to the limitation.)
+Consider a save that changes nodes S. Any s in S that is already in U
+don't need additional treatment to add to U.
+Let S' be the remainder. We can increment the PCSVF to include S'.
+Trace each s in S' containerward. If it finds another s' in S', drop s;
+the result is S''. Each s in S'', trace containerward looking for U.
+If it's not found, s becomes a new viewroot.
+Let R' = R + those new viewroots.
+
+Trace every s in S' containerward toward U+R'.
+Collect every node from the trace, including endpoings (it's cheap so why not)
+to a set A we will add to U.
+Let U' = U+A.
+
+When we refresh the view, we render the first
+(reached in whatever order is convenient; maybe that's BFS, whatever)
+instance of every node in U' writable.
+
+Does this work?
+
+We'll need better names for those sets. I propose:
+C = changes already in diff view
+R = pseudo-roots
+D = deduplicated pseudo-roots
+U = to unfold contentward
+S = changes from save
+S' = novel changes nodes from save
+S'' = deduplicated novel changes from save
+A = paths from save to old diff view
+U' = to unfold contentward post-save
+
+Wherever these names appear in a function name,
+they need to be camel-cased together within the larger snake-cased name,
+so that they read as a single noun,
+to avoid confusing the reader about bind order.
+*********** [Claude] it works; the sets already do it; the viewforest is what lags
+Your procedure computes the same sets as a fresh PCSVF over the whole
+changed set, and the server already recomputes those at every
+rerender: the sets are a function of the graph pair
+('GraphPair::pcsvf_sets_of_buffer', computed once per pair), and the
+pair is refreshed at the first TDV request after any save. Call the
+recomputed sets the fresh sets, C1 and U1. C1 contains your S. The
+containerward walk from each s in S' either meets a node of U, and
+from there follows that node's own walk, which U already holds, or
+reaches a new origin; so U1 is U plus your A plus the walks through
+the new origins, and the new origins are your R'. S, S', S'' and A
+therefore need no code of their own: the fresh sets are the
+increment.
+
+Two details of the walk matter, and both are already the code's. The
+walk follows single containers only, so a node with two or more
+containers is itself an origin ('climb_containerward_to_cycle_via'),
+and a rootlike cycle contributes one origin, chosen by ID. One
+difference remains between your sketch and the code: when the walk
+from s reaches no node of U, your sketch makes s the new root, while
+the fresh sets make the origin the walk reaches the root, as the
+initial unfold does, with s drawn under it. I prefer the origin, for
+consistency with what the user has learned to read; the decision is
+below.
+
+What does lag is the viewforest. A member drawn write-protected
+because it was outside U is not re-examined when U grows to include
+it ('tag_content_members' write-protects, never the reverse), and
+nothing is drawn under a write-protected node, so a new change under
+such a member has no occurrence. The fix is your last paragraph taken
+literally: before completion of a TDV buffer, for every node of U1
+with no editable occurrence in the buffer, set its BFS-first
+occurrence editable, directly, with the body read from the graph and
+no view request; completion then draws its content list, members of
+U1 editable and expanded, the rest as write-protected leaves, and so
+on down to the change. A node of U1 with no occurrence at all is
+reached by induction, because some node on its walk has one. This
+replaces slice 5's "unprincipled" fix, which did the same for C only.
+Applied to U it is the TDV's own rule, "a node of U is editable at its
+first occurrence", made to hold after saves as it holds on the first
+drawing.
+
+Your names go into the plan's vocabulary where the sets exist (C, R,
+D, U), with "pseudo-root" as the synonym of "content origin", and the
+camel-casing rule for set names inside snake_case function names goes
+there too. New roots are under your "append is good" reply below.
+************ DONE Decision: a new root is the origin the walk reaches, not the changed node itself
+With the origin, the buffer shows the new change under its containers,
+as the initial unfold would; with s, the user sees s alone and must
+open its containers. The plan assumes the origin.
+************* [Jeff] agreed
+************ DONE [Jeff] Scratch 'pseud-root'
+I forgot about 'content origin'. Let's use that.
+************* [Claude] done: content origin throughout
+The plan's vocabulary names R the content origins and D the
+deduplicated content origins, its camel-casing example reads
+'contentOrigins', and the glossary gets no synonym.
+********* pitfall: the pair is refreshed per save, but not written back everywhere
+'current_graph_pair_in_slot' re-pairs the before-graph with the new
+live graph at the first TDV buffer of a save and writes it back to the
+connection; a rerender-all (stage moves, absent-reference cleanup, the
+skgrepo switch) refreshes it too but does not write it back, so the
+next request re-pairs again. Harmless, one line to fix; the plan fixes
+it in slice 7.
+********** DONE [Jeff] I didn't understand.
+But also it sounds like this is an open-and-shut issue for you?
+*********** [Claude] a plain restatement; and yes, open and shut
+The connection holds one graph pair: the before-graph, read from HEAD,
+and the after-graph, which is the live graph. After a save the live
+graph is a new object, so the pair's after-graph is stale.
+'current_graph_pair_in_slot' notices that, pairs the old before-graph
+with the new live graph, and stores the result in the slot it was
+given. A save hands it the connection's slot, so the connection keeps
+the refreshed pair. A rerender-all (after an absent-reference cleanup
+or a skgrepo switch) hands it a copy of the connection's pair in a
+temporary context and, by design ("which it does not replace", in
+'rerender_all_views.rs'), never copies the refreshed pair back.
+Nothing wrong is shown; the next TDV request pairs the two graphs once
+more, which costs one full comparison of them. Slice 7 copies the
+refreshed pair back, as the save path does.
+********* pitfall: fold state travels only on viewnodes the client saw
+The client writes '(folded)' and 'bodyFolded' into the metadata of the
+headlines in its buffer before saving, and the parser puts them on the
+viewnodes. Anything the server creates afresh is open. So "never
+recreate what already exists" is the whole fix; no client change is
+needed, and none is planned.
+********* two one-time losses I would accept
+'redraw_deleted_phantoms_as_historical' replaces a deleted phantom
+(a node this save deleted) with a fresh historical phantom, so that
+one subtree's folding is lost once, at the deletion. And a node
+restored after being deleted turns from a historical phantom back into
+a live member, likewise once. Both are rare events, not every save.
+********** DONE [Jeff] I don't understand.
+Among other things, are the first two present-tense sentences
+in that a description of current reality, or of the plan?
+*********** [Claude] both sentences described the code as it stands; the plan now removes both losses
+'redraw_deleted_phantoms_as_historical' exists today, from the first
+run. When a save deletes a node, completion turns each occurrence of
+the node into a deleted phantom ('Phantom::Deleted', the ordinary
+view's image of a node the user has just deleted). In a TDV that
+function then detaches each deleted phantom and puts a fresh
+historical phantom, with the node's old content, in its place. The
+fresh phantom and its subtree start open, so the folding the user had
+given the deleted node's subtree was lost, once, at the save that
+deleted it. The second sentence described the symmetric case: when a
+deleted node is restored, the historical phantom is detached and a
+fresh live member appears, again open. I had proposed to accept both
+as rare.
+
+They fall out of the matching rule for free. Within one parent a
+graphnode appears at most once, so the match key for a viewnode that
+stands for a graphnode is (parent, skgid), and its kind is one more
+fact to update in place. A deleted phantom whose node the pair holds
+as only-before becomes the historical phantom, keeping its viewnode
+and its fold state, and its children are reconciled against the old
+content by skgid; a historical phantom whose node is back becomes a
+live member the same way. The plan says so, and
+'redraw_deleted_phantoms_as_historical' goes.
+********* DONE [Jeff]
+The metaphor is a little mangled :) Maybe I should say 'stride'?
+What I mean is we hhave one foot in each camp: The past and the present.
+Can you think of a clearer word yet for that?
+********** [Claude] "straddle" says it exactly
+To straddle is to stand with one foot on each side, which is the
+picture you describe: one foot in the committed graph, one in the
+live graph. 'GraphStraddle { before, after }' reads well in code ("the
+straddle's before-graph"), and its one-sentence definition writes
+itself. "Stride" names the step between two footfalls, so it suggests
+movement from the past to the present rather than standing in both,
+and it has the problem "footstep" had. "Stance" is both feet planted,
+but it suggests an opinion. If you want no metaphor, "GraphSpan" is
+the plain word. The plan now says 'GraphStraddle'.
+*********** DONE Decision: the name is 'GraphStraddle'
+Say another and one word of the plan changes.
+************ [Jeff] beautiful
+******* Please explain the (parent, skgid, kind) matching
+Is this dancing around the problem that
+viewnodes don't have their own IDs, and maybe ought to?
+******** [Claude] it is the identity the reconcilers already use; viewnode IDs would not buy much
+A viewnode has no identity of its own; it is "this graphnode, in this
+role, under that viewnode", and that is how the existing reconcilers
+already treat it: the content reconciler matches a node's children to
+its goal list by skgid, and the folder reconciler does the same. So
+(parent, skgid, kind) names what the code already considers the same
+viewnode, and within one parent the triple is unique: content members
+are distinct (the save validates it), a folder lists each partner once,
+and a containerward tree lists each container once under a given node.
+
+Viewnode IDs (a UUID in every headline's metadata) would make matching
+exact across moves, so a headline dragged under another parent could
+keep its fold state, and the client could key its own state on them.
+They would cost metadata on every headline, an ID minted for every
+viewnode the server creates, and they would still leave the policy
+question of when the same graphnode under a new parent counts as the
+same viewnode. For the TDV the triple is enough, so I would not add
+them now; the day drag-and-drop fold preservation matters, this is the
+place to revisit.
+********* DONE [Jeff] Is there no danger here?
+Suppose vognodes V and W represent gnodes Vg and Vw,
+and both have a content folder F containing node C,
+respectively imaged with vognodes Cn and Cm.
+(parent, skgid, kind) doesn't distinguish between C's two images.
+
+It seems safer if, rather than parent,
+we kept a path up to the nearest vognode --
+e..g in Vg's case, it would be (content folder, V)
+instead of just (content folder).
+
+That's still not a true viewnode ID, but it buys more safety,
+and it doesn't cost much more space, because if the parent is itself a vognode
+the path is length 1, and that's the usual case.
+********** [Claude] no danger, because the parent is a particular viewnode, not a kind
+In the triple, "parent" is the viewnode under which the child sits:
+one node of the viewforest, V or W in your example, not the kind
+"content folder". Matching happens inside one parent at a time: the
+reconciler visits V, computes V's goal list, and matches it against
+V's own children only; then it visits W and does the same. Cn and Cm
+are never in the same comparison, so they cannot be confused. The
+parent's own identity was settled one level up by the same rule, and
+so on up to the buffer's root, so the full path you propose is
+implicit in the triple; the nearest-vognode prefix would add nothing
+the tree does not already hold. (With the kind now updated in place,
+the key is (parent, skgid); see the reply about the one-time losses
+above.) The one thing the key cannot do is follow a viewnode the user
+has dragged to a new parent, and there the buffer the client saved is
+itself the record of where everything now sits, so the fresh walk
+meets the viewnode where the save put it.
+*********** DONE [Jeff]
+So the parent is identified by an egotree id?
+************ [Claude] within one completion, yes; across saves, by its place in the tree the client sent
+While a viewforest is completed, the parent is its ego-tree 'NodeId',
+the tree's own handle for that viewnode, and the children are matched
+under that handle. The handles do not outlive the tree. A save parses
+the buffer's text into a fresh viewforest, so the saved buffer's
+viewnodes get new handles at every save; a collateral buffer keeps its
+stored viewforest, so its handles last until the client next saves it.
+Across saves, then, a viewnode's identity is its place in the tree the
+client sent, which the top-down walk re-derives: the roots by skgid,
+and under each matched parent the children by skgid. No identifier is
+stored, and none is needed, because the walk never compares children
+of different parents.
+***** DONE Decision: roots are reconciled on every save, by one rule
+After any save or rerender of a TDV buffer, its D is recomputed. A
+root that is still in D stays. A root no longer in D stays as long as
+some node in its subtree is still in C (it still shows a change);
+when nothing under it is in C any more, it is removed. Roots of D
+that the buffer does not draw anywhere are appended at the end,
+sorted by ID. The alternative, roots exactly equal to D, would move
+your roots around after your own edits (an edit that makes one root
+reachable from another would fold the first into the second). A
+commit is then just another rerender: 'redraw_tdv_views' goes, and a
+fully committed buffer comes back empty because every root lost its
+changes.
+****** DONE [Jeff] I don't think we need root reconciliation.
+It's harmless for a root to linger once it no longer
+recursively contains any of C, and kind of confusing
+for it to disappear.
+
+If we just let them be, would we still have the problem
+you describe with "roots exactly equal to D, would move
+your roots around after your own edits"?
+******* [Claude] agreed: roots linger; one smaller decision remains
+The problem I described came only from removing roots, so with no
+removal it does not arise. The plan now says: a root stays until the
+user closes the buffer, whatever happens to its changes; a commit is an
+ordinary rerender, after which the roots stand as plain context with
+their decorations gone; 'redraw_tdv_views' goes.
+******** Decision: new roots are appended on save
+A save can create a change that no existing root reaches: a strand
+re-leveling writes another node's file, a deletion changes containers
+the buffer never showed, a nodeMerge touches the acquirer. Appending a
+root for each origin of D that the buffer draws nowhere, at the end,
+sorted by ID, shows those changes without moving anything the user
+arranged; the alternative leaves them to the unshown count and its
+"reopen". I would append; the plan assumes it. Say no and the plan
+drops that paragraph.
+********* DONE [Jeff] Append is good. While we're at it
+we might as well dedup the things to be appended,
+similarly to how we dedup pseudo-roots when initially unfolding the TDV.
+The set to be deduplicated in this case would include only the
+would-be new pseudo-roots, presumably disjoint from the set R
+of psuedo-roots that was processed during the initial unfold.
+********** [Claude] agreed; the dedup runs with the standing roots pinned
+D is already deduplicated: an origin whose walk reaches another kept
+origin is dropped ('kept_origins'), and the new roots are the origins
+of the fresh D that no viewnode in the buffer draws, so they are
+disjoint from the standing roots, as you expect. One case needs the
+pinning you describe. A rootlike cycle contributes one origin, chosen
+by ID among its members; if an edit changes the cycle's membership,
+the fresh choice may fall on another member while the old choice
+stands as a root, and the cycle would then stand twice. So the dedup
+runs with the buffer's standing roots pinned as kept before the rest
+are processed, and the new roots are what survives among the rest,
+appended at the end in ID order. The plan says so.
+***** DONE Decision: an emptied buffer stays open
+As now, a buffer with no roots left is sent empty and left open; the
+readiness summary and the stage-and-commit response say what
+happened. Closing it for you would be a surprise, and reopening is
+one command. If you would rather it close, say so.
+****** DONE [Jeff] I suspect this will be moot.
+pending the previous item's conclusion
+******* [Claude] moot indeed
+With roots lingering, a buffer never empties; after a commit it shows
+its roots as plain context. The plan's sentence about empty buffers is
+gone.
+***** Decision: the order-only buffer follows the same rules
+Its roots are the order-only nodes; the same root rule applies (a
+node whose order change was committed leaves). Nothing special.
+** DONE A node that changes after the buffer opened
+If the buffer shows it only write-protected, its new change is not
+drawn there but still counts as shown, so the summary's "K changes not
+shown" undercounts. (slice 6)
+*** [Jeff] an unprincipled solution, which I want,
+would be to simply check whether anything write-protected in the TDV
+is in the change set, and if so, put a writable request on its BFS-first instance.
+This is unprincipled in the sense that other changes would still be missed,
+but it will likely catch a lot of edits.
+**** [Claude] agreed; it is less unprincipled than it sounds
+At each save or rerender of a TDV buffer, for every node of the
+buffer's C that has no editable occurrence in the buffer, the server
+puts an editable-view request on its BFS-first write-protected
+occurrence; completion then makes it editable and the per-visit step
+draws its changes and its whole content list, as for any node of U.
+The summary's unshown count stays honest, because a changed node that
+is in no occurrence at all is still counted. The one cost is that the
+buffer grows at that spot, which is what you want. No decision here
+beyond doing it; the plan has it as slice 5.
+** DONE The merges buffer finds the text preserver by title
+Nothing links an acquiree to its text preserver, so the agent takes a
+new member of the acquirer's content titled "MERGED: <old title>". A
+retitled preserver stays drawn as new content but leaves the merge
+set. (slice 7)
+*** [Jeff]
+I hadn't realized that the preserver is part of the merge set.
+I don't think it needs to be.
+If in the merges buffer we show each acquirer and each acquiree,
+then since we can see their (in particular the acquirer's) children,
+we'll see the preserver, unless (as is usually the case)
+the user has manually merged its text into the acquirer.
+**** [Claude] agreed; folded into the plan
+The preserver leaves C of the merges buffer; 'acquiree_text_preservers'
+and its title heuristic go. The preserver is a new node in the
+acquirer's content, so the acquirer's whole content list shows it
+with its ∃+ leaf, which is markable on that line. The docs' sentence
+about the preserver changes accordingly. No decision needed; slice 6.
+** DONE Foreign skgrepos are read from the worktree in both graphs
+The plan said to exclude them; that would have left every
+owned-to-foreign relationship dangling, so the agent read them at the
+worktree on both sides. They never show a change and need not be
+gitrepos. The pair's cache key ignores foreign files, so a foreign file
+changed on disk mid-session could appear as a spurious change until the
+pair is rebuilt. (slice 2)
+*** [Jeff] I don't understand about the spurious change. Please elaborate.
+**** [Claude] the before-graph's foreign half can go stale
+The before-graph is built from the owned skgrepos at HEAD plus the
+foreign skgrepos as they are on disk, and it is cached under a key
+made only of the owned skgrepos' HEAD commit ids. The live graph is
+also built from disk, at startup, and it learns of a change to a
+foreign file only when the session-lifetime stores are rebuilt (saves
+never touch foreign files). Now suppose you 'git pull' a friend's
+skgrepo while the server runs, and then rebuild the session-lifetime
+stores. The live graph gets the new foreign content; the cached
+before-graph keeps the old, because its key did not change. The two
+halves now differ on foreign nodes, so those nodes enter C and the
+TDV draws "changes" in a skgrepo you cannot commit, until an owned
+HEAD moves and the pair is rebuilt. It is a narrow window, and
+nothing in a normal session opens it, but it is real.
+***** Decision: drop the cached pair when the session-lifetime stores are rebuilt
+That rebuild is the only path by which the live graph picks up a
+foreign change, so dropping 'ViewsState::graph_pair' there closes the
+window exactly, and the next TDV request rebuilds both halves from
+the same disk. One line, plus a test. The alternative, hashing the
+foreign files into the cache key, costs a disk walk on every TDV
+request for no further benefit. Slice 7 of the plan; no decision
+needed unless you dislike it.
+****** [Jeff] agreed
+** DONE The investigation request refuses under a skgrepo restriction
+Git history can hold any skgrepo's text, so it answers only under
+'all', as the report did. (slice 9)
+* Sound: plan corrections and gap fills, no action needed
+The agents fixed several things the plan got wrong, and each fix is
+right: the unshown-change count must treat a deleted node drawn as a
+historical phantom as shown, or the summary would always say "reopen";
+'rerender_view' cannot see which buffer it draws, so callers pass the
+buffer kind in; the herald engine cannot style two positional values
+differently or turn a number into a letter, so the move forms are
+'(homeMove (old A) (new B))' and 'movedLikeAncestor' carries the letter;
+a folder's '(changed)' is written as '(containerFolder changed)' so the
+changed label replaces the ordinary one; one of the three functions
+slice 0 was to rename existed only in a stray '~' backup file. The
+'(ready ...)' facts are set in one pass after completion rather than at
+each visit, which is simpler and equivalent. The role-tree engine takes
+a "live graph or pair" source rather than a bare function, to keep the
+live graph's two privacy gates. Readiness marks persist as a JSON list,
+since JSON object keys must be strings.
+
+* Found along the way
+Two real hazards in libraries we use, both worked around and logged in
+'TODO/problems.org': the 'sexp' crate writes an empty string as nothing,
+so an empty view arrived as '(content )' (any other empty string the
+server sends has the same problem; a quoting helper would fix it for
+good); and ego-tree 0.6.3 links a node to itself when it is moved to
+the place it already occupies, after which every traversal loops
+forever. Three slice-5 bugs (removed folder members drawn twice, a
+historical phantom in a partner folder failing validation, folder
+continuations duplicated on save) were caught by later slices' round
+trips and fixed.
+** DONE [Jeff] Please plan the quoting helper fix.
+*** [Claude] planned, with one trap avoided
+The 'sexp' crate has one atom type for symbols and strings, and it
+prints an atom bare unless it contains a quote, whitespace or reads
+as a number. The server relies on that: 'Atom::S ("node")' must print
+as the symbol 'node'. So "always quote strings" would turn every
+symbol into a string and break both clients' parsers. The safe rule
+is narrow: an empty string atom prints as '""', since an empty symbol
+means nothing. Slice 8 puts that rule in the one place every response
+is serialized ('tag_sexp_response' and 'send_response_with_length_prefix'
+in 'server/serve/util.rs'), rather than touching the 83 'Atom::S'
+sites, and it removes the clients' workaround for '(content )'. A
+server that wanted a real symbol/string distinction would need its
+own atom type, which is a larger change than this bug deserves.
+** DONE [Jeff] Is there a clean fix for that strange ego-tree behavior?
+This project is now 18 months old;
+could I be using any out-of-date libraries?
+*** [Claude] a local helper fixes it; an upgrade alone would not
+ego-tree is at 0.6.3 here; the latest is 0.11.0. I read the current
+upstream source: 'append_id' and 'prepend_id' now check whether the
+node is already the last or first child and do nothing if so, which
+is the fix for those two; but 'insert_id_before' and 'insert_id_after'
+still read the anchor's neighbor before detaching the moved node, so
+moving a node next to itself still links it to itself. So upgrading
+would fix half the trap. The clean fix is ours: one small module of
+tree moves ('move_before', 'move_after', 'move_to_front',
+'move_to_back') that detach first and do nothing when the node is
+already in place, used at every call of the four ego-tree methods,
+with a unit test for the adjacent case. That is slice 9 of the plan.
+Upstream deserves a one-paragraph issue; that is your GitHub account,
+so I have not filed it.
+**** [Jeff]
+***** DONE please prepare something for me to report to them
+a separate document, in this folder
+****** [Claude] written: ego-tree-upstream-issue.md, in this folder
+It is paste-ready for a GitHub issue: a minimal program, the output I
+got on 0.6.3 (all four methods self-link) and on 0.11.0 ('append_id'
+and 'prepend_id' fixed, 'insert_id_before' and 'insert_id_after' still
+self-link, and 'children()' then never ends), the cause in the source,
+and the one-line guard that would fix it.
+******* [Claude] filed upstream on 2026-10-18; the local draft is gone
+The dependency plan's slice 4 now points at the upstream issue instead
+of the file.
+***** that fix sounds perfect
+*** [Claude] the libraries: mostly a little behind, one of them unmaintained
+I compared every dependency's locked version with crates.io today.
+Most are a patch or two behind, which 'cargo update' fixes without
+code changes. The gaps that would take work: ego-tree 0.6 to 0.11,
+git2 0.18 to 0.21, tantivy 0.26 to 0.27, toml 0.8 to 1.1, similar 2
+to 3, zstd 0.13 to 0.14, syn 2 to 3, itertools 0.14 to 0.15, rand 0.8
+to 0.10. The one that matters is 'serde_yaml': its last release is
+0.9.34+deprecated, and it is unmaintained; it parses every '.skg'
+file. Nothing is broken, but a dead parser under the data format is
+a risk to retire on purpose rather than by surprise. Candidate
+replacements exist (maintained forks such as 'serde_yaml_ng'); I have
+not evaluated them.
+**** Decision: a dependency-upgrade pass as its own small plan, after these fixes
+Not inside 4_plan-fixes.org: upgrading ego-tree, git2 and tantivy
+touches APIs across the server, and the yaml replacement deserves its
+own look at the '.skg' round trip. I would do it next, with the three
+suites as the net. Say yes and I will write that plan; 'cargo update'
+alone (compatible bumps) can go into slice 0 of the fixes plan
+meanwhile, and the plan assumes that much.
+***** DONE [Jeff] yes
+****** [Claude] written: TODO/dependency-upgrade/plan.org
+Compatible bumps first, then the majors one at a time with the suites
+between them, and the yaml parser last, chosen by a corpus test: the
+candidate must re-serialize every '.skg' file byte for byte as
+'serde_yaml' does, or the executor stops and we decide about a one-time
+reformat. 'cargo update' itself stays in slice 0 of the fixes plan.
+* Housekeeping
+** DONE The two TDV entries in 'TODO/problems.org' were marked RESOLVED in
+  place; that file's own rule says done entries move to
+  'TODO/DONE/problems.org'.
+*** [Jeff] please fix
+**** [Claude] done
+The section "Problems noticed while discussing the total diff view"
+with its two resolved entries now heads 'TODO/DONE/problems.org', and
+'TODO/problems.org' no longer has it.
+** DONE The 'stop' herald style is defined but unused, since ✗ is retired.
+*** [Jeff] not a problem
+** DONE Slice 2's agent rewrote its own commits once (a soft reset of
+  unpushed work) and did not build each intermediate commit; slice 4's
+  agent stashed and restored its files once. Both reported it, and
+  nothing was lost, but a git bisect through slice 2 may hit a commit
+  that does not compile.
+*** [Jeff] please modify the commit messages to warn anyone doing such a bisection
+**** [Claude] the warning would be false, so I did not rewrite
+I checked out each of the four intermediate slice-2 commits
+(59ffb792, 0cddbd7e, c76e23b9, 34f04de4) in a temporary worktree and
+ran 'cargo check --all-targets' at each: all four compile, tests
+included. The agent's worry did not come true, so a bisector hits
+nothing there, and a warning would mislead. Rewording would also have
+renumbered the 45 commits after them (the branch is 50 ahead of
+origin, so nothing is pushed yet and a rewrite is still possible). I
+did not run the test suites at each commit, which is normal for any
+series.
+***** DONE Decision: leave the history as it is
+That is my recommendation. If you still want a note in those four
+messages, say so and I will reword them.
+** DONE 'run-logs/' and 'progress.org' are untracked, as intended; the slice
+  agents also left 'run-logs/slice2-nextest.log' and similar logs there.
+*** [Jeff] Tests should not write into TODO/.
+See tests/ for prior art to follow.
+**** [Claude] cleaned up; the tests themselves were innocent
+No test writes under 'TODO/': the suites write to 'tests/results/'
+(the prior art), and the integration tests write beside themselves
+under 'tests/integration/'. The files in 'run-logs/' were the slice
+agents' own ad-hoc test logs and probe scripts, piped there by hand.
+I deleted them (emacs-slice4.log, nextest-slice4.log, nvim-1.log,
+nvim-slice4.log, slice2-nextest.log, slice3-*.log, slice7-*.log,
+emit.err, herald-probe.el, rep.py, run.out~), and the run script's
+prompt now tells each agent to write any log of its own under
+'tests/results/' and never under 'TODO/'.
+***** Decision: the run harness's own logs stay in 'run-logs/'
+'sessions.log', 'run.out' and the per-slice result files are the
+overnight harness's bookkeeping, not test output, and the resume doc
+points at them. I would leave them where they are; say so if you want
+them under 'tests/results/' too.
+****** DONE [Jeff] They're useless now, no?
+And they were never tracked, right?
+I imagine we should delete them.
+******* [Claude] deleted
+They were never tracked. 'run-logs/' is gone; the run script recreates
+it when it next runs, and 'jeff-resume-here.org' still describes it for
+that occasion.
+* Suggested first dogfood
+Use a scratch copy of your data: the strand analysis rewrites other
+nodes' files on a privatizing move, and stage-and-commit commits for
+real. Open the TDV with 'C-c v d'; mark a few leaves with 'C-c r r';
+save and read the summary; try a privatizing move to see the automatic
+raise and its warning; then 'C-c r c' and type "yes".

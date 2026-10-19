@@ -586,6 +586,16 @@ the context needed to understand it. It opens up to four buffers,
 "skg://diff-view: all changes", "...: merges", "...: skgrepo changes"
 and "...: order-only changes", skipping any that would be empty. It
 refuses unless the skgrepo restriction is 'all'.
+Why the total diff view commits all skgrepos, and offers nothing
+more granular: a single-skgrepo commit is dangerous. The graph is one
+structure spread over many files in many repos. Committing some changed files
+and not others leaves HEAD inconsistent: it can reference nodes it
+does not contain, record a relationship from one end only, or hold a
+moved node in two skgrepos at once. Such a HEAD cannot be reasoned
+about, and the next diff view against it reports changes that are
+only its own inconsistency. Review with the readiness marks
+(<localleader>r) instead, and commit everything at once with
+:SkgStageAndCommit.
 The merges buffer shows each nodeMerge since HEAD: the acquiree, its
 acquirer and the acquiree's text preserver, in context. The skgrepo
 changes buffer shows the nodes whose home skgrepo changed; each one's

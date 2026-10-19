@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
-# Run the slices of TODO/total-diff-view/2_plan.org unattended, one FRESH
-# Claude Code session per slice, so that each slice starts with an empty
-# context. The plan, progress.org, git and the auto-memory directory are
-# the memory between slices.
+# Run the slices of TODO/total-diff-view/4_plan-fixes.org unattended, one
+# FRESH Claude Code session per slice, so that each slice starts with an
+# empty context. The plan, progress.org, git and the auto-memory
+# directory are the memory between slices.
 #
-# Usage: bash/run-plan-slices.sh [FIRST_SLICE] [LAST_SLICE]   (defaults 0 9)
+# Usage: bash/run-plan-slices.sh [FIRST_SLICE] [LAST_SLICE]   (defaults 0 10)
 #   SKG_PLAN_MODEL  (default claude-opus-5-5, i.e. Opus 5.5)  and
 #   SKG_PLAN_EFFORT (default high)  override what is passed to claude.
 #
 # Run it from a plain shell in the container, not from inside a Claude
 # Code session (claude refuses to nest). Detach it, e.g.
 #   nohup bash/run-plan-slices.sh > TODO/total-diff-view/run-logs/run.out 2>&1 &
+#
+# Commit the plan first: the script refuses to start while tracked files
+# have uncommitted changes, and each slice's last commit edits the plan
+# (its DONE keyword rides in that commit, never in one of its own).
 #
 # The loop stops when a slice ends without its headline marked DONE (the
 # agent stopped for a question; read progress.org) or when claude exits
@@ -19,13 +23,13 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-PLAN=TODO/total-diff-view/2_plan.org
+PLAN=TODO/total-diff-view/4_plan-fixes.org
 PLAN_DIR=$(dirname "$PLAN")
 LOG_DIR=$PLAN_DIR/run-logs
 MODEL="${SKG_PLAN_MODEL:-claude-opus-5-5}"
 EFFORT="${SKG_PLAN_EFFORT:-high}"
 FIRST="${1:-0}"
-LAST="${2:-9}"
+LAST="${2:-10}"
 mkdir -p "$LOG_DIR"
 
 if ! git diff --quiet || ! git diff --cached --quiet; then
@@ -47,7 +51,7 @@ for n in $(seq "$FIRST" "$LAST"); do
   fi
   session=$(new_uuid)
   echo "$(date -Is) slice $n  session $session" | tee -a "$LOG_DIR/sessions.log"
-  prompt="Read coding-advice/ORIENTATION.org and the advice it names for code changes, tests and execution. Then implement slice $n of $PLAN, and only that slice. If $PLAN_DIR/progress.org exists, read it first. The plan is a settled specification; do not reopen its decisions or edit its text except the keyword of the slice headline. When the slice's tests pass and its commits are made, change the slice's headline keyword in $PLAN to DONE and commit that change too. Resolve ordinary implementation choices yourself; stopping is only for the rare conditions that coding-advice/when-to-stop.org describes. If one of those arises, write the report into $PLAN_DIR/progress.org as that file describes, do not mark the slice DONE, and end your turn."
+  prompt="Read coding-advice/ORIENTATION.org and the advice it names for code changes, tests and execution. Then implement slice $n of $PLAN, and only that slice. Read $PLAN_DIR/progress.org first if it exists. The plan is a settled specification; do not reopen its decisions or edit its text except the keyword of the slice headline. Commit as the plan's Commits section says: the slice's last code-modifying commit also carries the slice's documentation changes and the change of its headline in $PLAN from TODO to DONE. Never make a separate commit for those; if something is left over after your last code commit, amend that commit. Resolve ordinary implementation choices yourself; stopping is only for the rare conditions that coding-advice/when-to-stop.org describes. If one of those arises, write the report into $PLAN_DIR/progress.org under its top-level headline 'Fixes plan', do not mark the slice DONE, and end your turn. Write any log or scratch file of your own under tests/results/, never under TODO/."
   if ! claude -p "$prompt" \
          --model "$MODEL" --effort "$EFFORT" \
          --session-id "$session" \
