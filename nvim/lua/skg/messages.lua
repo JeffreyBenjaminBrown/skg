@@ -24,6 +24,24 @@ function M.messages_to_org_string (messages)
   return '* ' .. tostring(messages)
 end
 
+---The Emacs chords that server messages name, each with the Neovim
+---binding that plays it (skg.keymaps).
+M.neovim_bindings_of_emacs_chords = {
+  ['C-c s d'] = '<localleader>sd',
+}
+
+---MESSAGE with each Emacs chord it names replaced by its Neovim
+---binding.
+---@param message string
+---@return string
+function M.with_neovim_bindings (message)
+  for chord, binding in pairs(M.neovim_bindings_of_emacs_chords) do
+    message = message:gsub(vim.pesc(chord),
+                           function () return binding end)
+  end
+  return message
+end
+
 ---ERRORS and WARNINGS as one org document with two sections.
 ---@param errors string[]|nil
 ---@param warnings string[]|nil
@@ -33,13 +51,13 @@ function M.errors_and_warnings_to_org_string (errors, warnings)
   if M.message_list_nonempty_p(errors) then
     local lines = { '* errors' }
     for _, message in ipairs(errors) do
-      table.insert(lines, '** ' .. message) end
+      table.insert(lines, '** ' .. M.with_neovim_bindings(message)) end
     table.insert(sections, table.concat(lines, '\n'))
   end
   if M.message_list_nonempty_p(warnings) then
     local lines = { '* warnings' }
     for _, message in ipairs(warnings) do
-      table.insert(lines, '** ' .. message) end
+      table.insert(lines, '** ' .. M.with_neovim_bindings(message)) end
     table.insert(sections, table.concat(lines, '\n'))
   end
   return table.concat(sections, '\n')

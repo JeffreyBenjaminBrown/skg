@@ -336,7 +336,7 @@ it in the same save is still refused, by
 'errors_and_normalize_new_writeProtected_occurrences' (find or add that
 test beside the validator's own).
 
-** Slice 3: refuse a save that leaves a changed node without an editable instance
+** DONE Slice 3: refuse a save that leaves a changed node without an editable instance
 Give 'errors_and_normalize_new_writeProtected_occurrences' (or a
 sibling called beside it from 'server/from_text.rs') the nodes of U of
 the saved buffer when it is a TDV buffer ('Option<&BTreeSet<ID>>',

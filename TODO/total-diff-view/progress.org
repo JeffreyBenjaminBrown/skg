@@ -1000,3 +1000,41 @@ the others for 'errors_and_normalize_new_writeProtected_occurrences'.
 The 'editableView' entry said "a write-protected, childless node", and
 the TDV save paragraph said a request is "on a write-protected node
 outside U". Both now say what the request does.
+** Slice 3: deviations
+*** where U comes from
+The save handler ('update_from_and_rerender_buffer_with_approvals')
+refreshes the connection's straddle against the live graph before the
+save, with 'current_graph_straddle_in_slot', and passes the buffer's
+U to 'buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_graph',
+which calls the new sibling
+'errors_for_nodes_of_u_left_without_editable_occurrence'
+('server/from_text/write_protected_edits.rs') beside
+'errors_and_normalize_new_writeProtected_occurrences'. The error is
+'BufferValidationError::NodeOfU_LeftWithoutEditableOccurrence'.
+*** how the Neovim message names its binding
+The server sends one message, which names C-c s d. The Neovim client
+replaces each Emacs chord it knows with its binding when it shows
+save errors and warnings ('with_neovim_bindings',
+'nvim/lua/skg/messages.lua'); the table holds only C-c s d. Other
+server messages that name an Emacs chord (C-c s s, C-c g RET, C-c s r)
+still show it verbatim in Neovim; 'TODO/problems.org' records that.
+*** five tests now save the buffer a client would hold
+The 'tests/pcsvf/fresh_sets.rs' tests that retitle a node in a content
+view saved the "all changes" buffer's text from before that save.
+But the content view's save rerenders the buffer collaterally, which
+the client applies, and the server registers that rendering. Where it
+made a node of U editable that the old text drew write-protected,
+the new rule saw that occurrence write-protected and refused the save
+(three tests). 'retitle_in_a_content_view' now returns the collateral
+rendering when the save sent one, and the tests save that.
+*** 'docs/api-and-formats.org' needed an edit
+Its TDV section called saving such a buffer ordinary; it now names
+the refusal.
+*** shared test helpers
+'node_lines' and 'requesting_editable_at' moved from
+'tests/pcsvf/fresh_sets.rs' to 'tests/pcsvf/common.rs', since the new
+'tests/pcsvf/write_protecting.rs' uses them too.
+*** seen while verifying over TCP
+Write-protecting n under x while requesting n under y draws a and b
+twice under x. The gesture was allowed before this slice; it is
+recorded in 'TODO/problems.org'.

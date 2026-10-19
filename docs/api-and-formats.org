@@ -357,7 +357,10 @@ So far there are these endpoints:
     every view. Closing the last such buffer drops it, as does a
     rebuild of the session-lifetime stores, so the next request reads
     both halves from the disk the rebuilt live graph was read from. Saving such a buffer is ordinary (see "Save
-    buffer"), and its response carries the readiness summary.
+    buffer"), and its response carries the readiness summary, except
+    that a save which write-protects the only editable occurrence of a
+    node of U, and requests no other occurrence of it editable, is
+    refused with a validation error naming the node.
   - A rerender of such a buffer (after a save, collateral, or after a
     commit) reconciles what it holds with a fresh drawing from the
     straddle: a viewnode the fresh drawing also produces is kept, with

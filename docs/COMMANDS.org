@@ -404,6 +404,12 @@ In brief, it means edits to its title, body or
 will not affect it
   (although edits to its children will affect those children,
   unless they are also write-protected).
+In a total diff view, a save that write-protects
+the only editable occurrence of a node of U
+(one that changed or leads to a change),
+and requests no other occurrence of it editable, is refused:
+there every such node stays editable somewhere.
+To edit it elsewhere, request that occurrence editable (C-c s d) instead.
 *** C-c s s : skg-set-repo
 Changes the skgrepo of the node at point.
 The prompt starts with the current skgrepo as editable minibuffer text.
@@ -709,6 +715,8 @@ only the expansion of a node outside U (the nodes the buffer unfolds
 anyway: those that changed and those leading to them) is charged to
 'initial_node_limit'; nothing else in the buffer is bounded by that
 limit.
+A save that write-protects the only editable occurrence of a node of
+U, and requests no other occurrence of it editable (C-c s d), is refused.
 Why the total diff view commits whole skgrepos, and offers nothing
 smaller: in skg a partial commit is dangerous. The graph is one
 structure spread over many files, so committing some changed files
