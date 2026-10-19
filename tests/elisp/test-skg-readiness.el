@@ -7,12 +7,14 @@
 (require 'org)
 (require 'skg-readiness)
 
-(defun test-skg-readiness--run (lines line-number command &optional prefix axis)
+(defun test-skg-readiness--run (lines line-number command
+                                       &optional prefix axis answer)
   "Insert LINES, run COMMAND (with PREFIX) on line LINE-NUMBER, and
 return the buffer's lines. The save is stubbed; it must be called
-once. AXIS answers the prompt for a member's axis; without it, the
-prompt must not be shown. A rewritten headline without a title ends
-in a space, as 'skg-format-headline' writes it."
+once, or never when ANSWER is 'no. AXIS answers the prompt for a
+member's axis, and ANSWER ('yes or 'no) the question before a wide
+unmark; without them, those must not be asked. A rewritten headline
+without a title ends in a space, as 'skg-format-headline' writes it."
   (with-temp-buffer
     (org-mode)
     (insert (mapconcat #'identity lines "\n") "\n")
@@ -24,9 +26,15 @@ in a space, as 'skg-format-headline' writes it."
                 ((symbol-function 'completing-read)
                  (lambda (&rest _)
                    (should axis)
-                   axis)))
+                   axis))
+                ((symbol-function 'yes-or-no-p)
+                 (lambda (prompt)
+                   (should answer)
+                   (should (string-prefix-p "Unmarking this node commit-ready will unmark every contributing decision."
+                                            prompt))
+                   (eq answer 'yes))))
         (funcall command prefix))
-      (should (= saves 1)))
+      (should (= saves (if (eq answer 'no) 0 1))))
     (split-string (buffer-string) "\n" t)))
 
 (ert-deftest test-skg-cycle-commit-ready-toggles-a-leaf ()
@@ -114,6 +122,59 @@ in a space, as 'skg-format-headline' writes it."
                      "*** (skg (homeMove (old x) (new b)) (readyRequest)) "
                      "** (skg (node (id e) (repo b))) e"
                      "*** (skg (homeMove (old y) (new b)))")))))
+
+(ert-deftest test-skg-readiness-a-single-leaf-unmark-asks-nothing ()
+  ;; The folder's one leaf is its only unmark: nothing is asked.
+  (should (equal (test-skg-readiness--run
+                  '("** (skg (aliasFolder changed) (ready))"
+                    "*** (skg removedAlias (diff rel-) (ready)) a1"
+                    "*** (skg alias) a2")
+                  1 #'skg-cycle-commit-ready)
+                 '("** (skg (aliasFolder changed) (ready))"
+                   "*** (skg removedAlias (diff rel-) (ready) (unreadyRequest)) a1"
+                   "*** (skg alias) a2"))))
+
+(ert-deftest test-skg-readiness-a-wide-unmark-asks-first ()
+  (let ((lines '("* (skg (historical (id d) (repo r) (diff node- rel-) (ready node rel))) d"
+                 "** (skg (oldText title) (ready)) d")))
+    ;; Refused: nothing is written, nothing saved.
+    (should (equal (test-skg-readiness--run
+                    lines 1 #'skg-cycle-commit-ready '(4) nil 'no)
+                   lines))
+    (should (equal (test-skg-readiness--run
+                    lines 1 #'skg-cycle-commit-ready '(4) nil 'yes)
+                   '("* (skg (historical (id d) (repo r) (diff node- rel-) (ready node rel) (unreadyRequest node rel))) d"
+                     "** (skg (oldText title) (ready) (unreadyRequest)) d"))))
+  ;; Unmarking a changed node unmarks every leaf it owns.
+  (should (equal (test-skg-readiness--run
+                  '("* (skg (node (id txt) (repo r))) txt"
+                    "** (skg (oldText title) (ready)) txt")
+                  1 #'skg-cycle-commit-ready nil nil 'no)
+                 '("* (skg (node (id txt) (repo r))) txt"
+                   "** (skg (oldText title) (ready)) txt"))))
+
+(ert-deftest test-skg-mark-gnode-skgrepo-changes-commitReady-unmarks ()
+  (let ((lines '("* (skg (node (id a) (repo b))) a"
+                 "** (skg (homeMove (old x) (new b)) (ready))"
+                 "** (skg (node (id c) (repo b) writeProtected)) c"
+                 "*** (skg (homeMove (old x) (new b)) (ready))")))
+    ;; One move, from the node or the move: nothing is asked.
+    (dolist (line-number '(1 2))
+      (should (equal (test-skg-readiness--run
+                      lines line-number
+                      #'skg-mark-gnode-skgrepo-changes-commitReady)
+                     '("* (skg (node (id a) (repo b))) a"
+                       "** (skg (homeMove (old x) (new b)) (ready) (unreadyRequest)) "
+                       "** (skg (node (id c) (repo b) writeProtected)) c"
+                       "*** (skg (homeMove (old x) (new b)) (ready))"))))
+    ;; Recursively, two moves: asked first.
+    (should (equal (test-skg-readiness--run
+                    lines 1 #'skg-mark-gnode-skgrepo-changes-commitReady
+                    '(4) nil 'yes)
+                   '("* (skg (node (id a) (repo b))) a"
+                     "** (skg (homeMove (old x) (new b)) (ready) (unreadyRequest)) "
+                     "** (skg (node (id c) (repo b) writeProtected)) c"
+                     "*** (skg (homeMove (old x) (new b)) (ready) (unreadyRequest)) ")))))
 
 (ert-deftest test-skg-readiness-summary-is-shown-after-a-save ()
   (let ((shown '()))

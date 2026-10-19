@@ -456,6 +456,13 @@ notification shows the readiness summary: "12 of 14 changed files are
 ready", or "COMMIT READY. All 14 of 14 changed files are ready.". It
 adds how many changes the buffer does not show (reopen the view to see
 them) and how many files changed in foreign skgrepos.
+
+A gesture that would unmark more than one change (a recursive one, one
+on a folder of changes, or one on a changed node, which unmarks every
+change the node owns) first asks "Unmarking this node commit-ready
+will unmark every contributing decision. You might discard a lot of
+hard-won information. Continue (yes/no)?", and does nothing unless
+you type "yes". Unmarking a single change asks nothing.
 *** <localleader>rr : :SkgCycleCommitReady
 Toggles the commit-readiness of the change at point, then saves.
 On a headline that is one change (an old text, an alias, a move, a
@@ -468,12 +475,12 @@ the node owns. Works on write-protected headlines too.
 Marks every change in the subtree at point, or unmarks them if the
 headline at point is ready, then saves. (Emacs: C-u C-c r r.)
 *** <localleader>rh : :SkgMarkGnodeSkgrepoChangesCommitReady
-Marks commit-ready the home-skgrepo move of the node at point (or of
-the move at point), then saves. Works on write-protected headlines
-too.
+Toggles the commit-readiness of the home-skgrepo move of the node at
+point (or of the move at point), then saves: it unmarks the move if
+it is ready, else marks it. Works on write-protected headlines too.
 *** <localleader>rH : :SkgMarkGnodeSkgrepoChangesCommitReadyRecursive
-Also marks every descendant whose home moved between the same two
-skgrepos. (Emacs: C-u C-c r h.)
+Also toggles, in the same direction, every descendant whose home
+moved between the same two skgrepos. (Emacs: C-u C-c r h.)
 *** <localleader>rc : :SkgStageAndCommit
 Prompts once for a commit message, then stages every change and
 git-commits it, in every owned skgrepo that has changes, with that

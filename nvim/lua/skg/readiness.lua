@@ -234,13 +234,16 @@ function M.children_ready_p (line_number)
   return some
 end
 
----The one-level gesture on the headline at LINE_NUMBER. Returns how
----many requests it wrote.
+-- A gesture first gathers its requests, each { line, ready, axes },
+-- then writes them all or none.
+
+---The requests of the one-level gesture on the headline at
+---LINE_NUMBER. Empty when the axis prompt is dismissed.
 ---@param line_number integer
----@return integer
-function M.cycle_at_line (line_number)
+---@return table[]
+function M.requests_at_line (line_number)
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
-  if not metadata_sexp then return 0 end
+  if not metadata_sexp then return {} end
   local axes = M.leaf_axes(metadata_sexp)
   if #axes > 0 then
     local chosen = axes
@@ -248,38 +251,38 @@ function M.cycle_at_line (line_number)
       local axis = picker.completing_read_with_cycle(
         'Which change (node = ∃ its existence, rel = ~ its relationship here)? ',
         { 'node', 'rel' }, { require_match = true })
-      if axis ~= 'node' and axis ~= 'rel' then return 0 end
+      if axis ~= 'node' and axis ~= 'rel' then return {} end
       chosen = { axis } end
-    M.write_request(line_number,
-                    not M.axes_ready_p(metadata_sexp, chosen), chosen)
-    return 1 end
+    return { { line = line_number,
+               ready = not M.axes_ready_p(metadata_sexp, chosen),
+               axes = chosen } } end
   if M.changed_folder_p(metadata_sexp) then
     local ready = not M.ready_p(metadata_sexp)
-    local written = 0
+    local requests = {}
     for _, line in ipairs(M.child_lines(line_number)) do
       local child = metadata.metadata_sexp_at_line_or_nil(line)
       local child_axes = child and M.leaf_axes(child) or {}
       if #child_axes > 0 then
-        M.write_request(line, ready, child_axes)
-        written = written + 1 end
+        table.insert(requests,
+                     { line = line, ready = ready, axes = child_axes }) end
     end
-    return written end
+    return requests end
   if M.vognode_p(metadata_sexp) then
-    M.write_request(line_number, not M.children_ready_p(line_number),
-                    { 'all' })
-    return 1 end
-  return 0
+    return { { line = line_number,
+               ready = not M.children_ready_p(line_number),
+               axes = { 'all' } } } end
+  return {}
 end
 
----The recursive gesture on the headline at LINE_NUMBER: a request on
----every leaf named in the subtree, readying them unless the headline
----is ready. On a changed node, also one naming every leaf it owns.
----Returns how many requests it wrote.
+---The requests of the recursive gesture on the headline at
+---LINE_NUMBER: one on every leaf named in the subtree, readying them
+---unless the headline is ready. On a changed node, also one naming
+---every leaf it owns.
 ---@param line_number integer
----@return integer
-function M.cycle_subtree_at_line (line_number)
+---@return table[]
+function M.requests_for_subtree_at_line (line_number)
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
-  if not metadata_sexp then return 0 end
+  if not metadata_sexp then return {} end
   local aggregate_node = M.vognode_p(metadata_sexp)
                          and #M.leaf_axes(metadata_sexp) == 0
   local headline_ready
@@ -288,40 +291,78 @@ function M.cycle_subtree_at_line (line_number)
   else
     headline_ready = M.ready_p(metadata_sexp) end
   local ready = not headline_ready
-  local written = 0
+  local requests = {}
   if aggregate_node then
-    M.write_request(line_number, ready, { 'all' })
-    written = 1 end
+    table.insert(requests,
+                 { line = line_number, ready = ready, axes = { 'all' } }) end
   for _, line in ipairs(M.subtree_lines(line_number)) do
     local headline = metadata.metadata_sexp_at_line_or_nil(line)
     local axes = headline and M.leaf_axes(headline) or {}
     if #axes > 0 then
-      M.write_request(line, ready, axes)
-      written = written + 1 end
+      table.insert(requests, { line = line, ready = ready, axes = axes }) end
   end
-  return written
+  return requests
 end
 
----Save, or report that nothing was written.
----@param written integer
-local function save_if_written (written)
-  if written == 0 then
+---Whether the unmark requests among REQUESTS name more than one
+---leaf. A request naming 'all' names every leaf its node owns.
+---@param requests table[]
+---@return boolean
+function M.unmarks_several_leaves_p (requests)
+  local leaves = 0
+  for _, request in ipairs(requests) do
+    if not request.ready then
+      if vim.tbl_contains(request.axes, 'all') then return true end
+      leaves = leaves + #request.axes end
+  end
+  return leaves > 1
+end
+
+M.WIDE_UNMARK_QUESTION =
+  'Unmarking this node commit-ready will unmark every contributing'
+  .. ' decision. You might discard a lot of hard-won information.'
+  .. ' Continue (yes/no)? '
+
+---Write REQUESTS, first asking when they unmark more than one leaf;
+---only the typed word "yes" proceeds. On refusal, write nothing and
+---return false.
+---@param requests table[]
+---@return boolean
+function M.write_requests_if_confirmed (requests)
+  if M.unmarks_several_leaves_p(requests)
+     and vim.fn.input(M.WIDE_UNMARK_QUESTION) ~= 'yes' then
+    return false end
+  for _, request in ipairs(requests) do
+    M.write_request(request.line, request.ready, request.axes)
+  end
+  return true
+end
+
+---Write REQUESTS if confirmed, then save; or report that there were
+---none.
+---@param requests table[]
+local function write_and_save (requests)
+  if #requests == 0 then
     error('Nothing here can be marked commit-ready') end
-  require('skg.save').request_save_buffer()
+  if M.write_requests_if_confirmed(requests) then
+    require('skg.save').request_save_buffer() end
 end
 
 ---Toggle the commit-readiness of the change at point, then save. On a
 ---headline that names one leaf, toggle it; on a content member that
 ---names two (∃ and ~), ask which. On a changed folder, toggle each
----leaf one level down; on a changed node, every leaf it owns.
+---leaf one level down; on a changed node, every leaf it owns. Before
+---unmarking more than one leaf, ask.
 function M.cycle_commit_ready ()
-  save_if_written(M.cycle_at_line(metadata.current_line_number()))
+  write_and_save(M.requests_at_line(metadata.current_line_number()))
 end
 
 ---Mark (or, if the headline at point is ready, unmark) every leaf
----named in the subtree at point, then save.
+---named in the subtree at point, then save. Before unmarking more
+---than one leaf, ask.
 function M.cycle_commit_ready_recursive ()
-  save_if_written(M.cycle_subtree_at_line(metadata.current_line_number()))
+  write_and_save(
+    M.requests_for_subtree_at_line(metadata.current_line_number()))
 end
 
 ---The line of the home move at LINE_NUMBER (that headline, or the
@@ -340,20 +381,23 @@ function M.home_move_at_line (line_number)
   return nil, nil
 end
 
----Mark commit-ready the home-skgrepo move of the node at point (or of
----the move at point); with RECURSIVE, also the move of every
----descendant that moved between the same two skgrepos. Then save.
+---Toggle the commit-readiness of the home-skgrepo move of the node at
+---point (or of the move at point): unmark it if it is ready, else
+---mark it. With RECURSIVE, do the same to the move of every
+---descendant that moved between the same two skgrepos. Before
+---unmarking more than one move, ask. Then save.
 ---@param recursive boolean|nil
 function M.mark_gnode_skgrepo_changes_commitReady (recursive)
   local move_line, pair =
     M.home_move_at_line(metadata.current_line_number())
   if not move_line then
     error("This node's home skgrepo did not change") end
-  local written = 1
+  local ready = not M.ready_p(
+    metadata.metadata_sexp_at_line_or_nil(move_line))
+  local requests = {}
   if not recursive then
-    M.write_request(move_line, true, { 'single' })
+    requests = { { line = move_line, ready = ready, axes = { 'single' } } }
   else
-    written = 0
     local node_line =
       metadata.parent_headline_line(move_line,
                                     metadata.outline_level(move_line))
@@ -361,11 +405,15 @@ function M.mark_gnode_skgrepo_changes_commitReady (recursive)
       local headline = metadata.metadata_sexp_at_line_or_nil(line)
       local other = headline and M.home_move(headline)
       if other and other[1] == pair[1] and other[2] == pair[2] then
-        M.write_request(line, true, { 'single' })
-        written = written + 1 end
+        table.insert(requests,
+                     { line = line, ready = ready, axes = { 'single' } }) end
     end
   end
-  vim.notify(string.format('Marked %d home move(s) ready.', written))
+  if not M.write_requests_if_confirmed(requests) then return end
+  if ready then
+    vim.notify(string.format('Marked %d home move(s) ready.', #requests))
+  else
+    vim.notify(string.format('Unmarked %d home move(s).', #requests)) end
   require('skg.save').request_save_buffer()
 end
 

@@ -568,6 +568,13 @@ minibuffer shows the readiness summary: "12 of 14 changed files are
 ready", or "COMMIT READY. All 14 of 14 changed files are ready.". It
 adds how many changes the buffer does not show (reopen the view to see
 them) and how many files changed in foreign skgrepos.
+
+A gesture that would unmark more than one change (a recursive one, one
+on a folder of changes, or one on a changed node, which unmarks every
+change the node owns) first asks "Unmarking this node commit-ready
+will unmark every contributing decision. You might discard a lot of
+hard-won information. Continue?", and does nothing unless you answer
+"yes". Unmarking a single change asks nothing.
 *** C-c r r : skg-cycle-commit-ready
 Toggles the commit-readiness of the change at point, then saves.
 On a headline that is one change (an old text, an alias, a move, a
@@ -581,10 +588,11 @@ With a prefix argument (C-u C-c r r), it marks every change in the
 subtree at point, or unmarks them if the headline at point is ready.
 Works on write-protected headlines too.
 *** C-c r h : skg-mark-gnode-skgrepo-changes-commitReady
-Marks commit-ready the home-skgrepo move of the node at point (or of
-the move at point), then saves. With a prefix argument (C-u C-c r h),
-also every descendant whose home moved between the same two
-skgrepos. Works on write-protected headlines too.
+Toggles the commit-readiness of the home-skgrepo move of the node at
+point (or of the move at point), then saves: it unmarks the move if
+it is ready, else marks it. With a prefix argument (C-u C-c r h), it
+does the same to every descendant whose home moved between the same
+two skgrepos. Works on write-protected headlines too.
 *** C-c r c : skg-stage-and-commit
 Prompts once for a commit message, then stages every change and
 git-commits it, in every owned skgrepo that has changes, with that

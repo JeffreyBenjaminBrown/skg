@@ -28,49 +28,64 @@
 (defconst skg--readiness-property-heads '(oldText homeMove relRepoMove)
   "The heads of the properties that name one leaf without a diff fact.")
 
+(defconst skg--readiness-wide-unmark-question
+  "Unmarking this node commit-ready will unmark every contributing decision. You might discard a lot of hard-won information. Continue? "
+  "Asked before a gesture unmarks more than one leaf.
+`yes-or-no-p' appends the \"(yes or no)\".")
+
 (defun skg-cycle-commit-ready (&optional recursive)
   "Toggle the commit-readiness of the change at point, then save.
 On a headline that names one leaf, toggle it; on a content member
 that names two (∃ and ~), ask which. On a changed folder, toggle
 each leaf one level down; on a changed node, every leaf it owns.
 With a prefix argument RECURSIVE, mark (or, if the headline at point
-is ready, unmark) every leaf named in the subtree at point. Works
-on write-protected occurrences too."
+is ready, unmark) every leaf named in the subtree at point. Before
+unmarking more than one leaf, ask. Works on write-protected
+occurrences too."
   (interactive "P")
   (unless (org-at-heading-p)
     (user-error "Not on a headline"))
-  (let ((written (save-excursion
-                   (if recursive
-                       (skg--readiness-cycle-subtree)
-                     (skg--readiness-cycle-at-point)))))
-    (when (= written 0)
+  (let ((requests (save-excursion
+                    (if recursive
+                        (skg--readiness-requests-for-subtree)
+                      (skg--readiness-requests-at-point)))))
+    (unless requests
       (user-error "Nothing here can be marked commit-ready"))
-    (skg-request-save-buffer)))
+    (when (skg--readiness-write-requests-if-confirmed requests)
+      (skg-request-save-buffer))))
 
 (defun skg-mark-gnode-skgrepo-changes-commitReady (&optional recursive)
-  "Mark commit-ready the home-skgrepo move of the node at point, then
-save. With a prefix argument RECURSIVE, also mark the move of every
-descendant that moved between the same two skgrepos. Point may be on
-the node or on its move. Works on write-protected occurrences too."
+  "Toggle the commit-readiness of the home-skgrepo move of the node at
+point, then save: unmark it if it is ready, else mark it. With a
+prefix argument RECURSIVE, do the same to the move of every
+descendant that moved between the same two skgrepos. Before
+unmarking more than one move, ask. Point may be on the node or on
+its move. Works on write-protected occurrences too."
   (interactive "P")
   (unless (org-at-heading-p)
     (user-error "Not on a headline"))
-  (let ((written
-         (save-excursion
-           (let* ((move (or (skg--readiness-home-move-at-point)
-                            (user-error "This node's home skgrepo did not change")))
-                  (pair (cdr move)))
-             (goto-char (car move))
-             (if (not recursive)
-                 (progn (skg--write-readiness-request t '(single)) 1)
-               (org-up-heading-safe)
-               (skg--readiness-walk-subtree
-                (lambda (metadata-sexp)
-                  (when (equal (skg--readiness-home-move metadata-sexp) pair)
-                    (skg--write-readiness-request t '(single))
-                    t))))))))
-    (message "Marked %d home move(s) ready." written)
-    (skg-request-save-buffer)))
+  (let* ((move (or (skg--readiness-home-move-at-point)
+                   (user-error "This node's home skgrepo did not change")))
+         (ready (save-excursion
+                  (goto-char (car move))
+                  (not (skg--readiness-ready-p
+                        (skg--current-headline-metadata-sexp)))))
+         (requests
+          (save-excursion
+            (goto-char (car move))
+            (if (not recursive)
+                (list (skg--readiness-request-here ready '(single)))
+              (org-up-heading-safe)
+              (skg--readiness-walk-subtree
+               (lambda (metadata-sexp)
+                 (when (equal (skg--readiness-home-move metadata-sexp)
+                              (cdr move))
+                   (skg--readiness-request-here ready '(single)))))))))
+    (when (skg--readiness-write-requests-if-confirmed requests)
+      (if ready
+          (message "Marked %d home move(s) ready." (length requests))
+        (message "Unmarked %d home move(s)." (length requests)))
+      (skg-request-save-buffer))))
 
 ;;; Reading a headline's change facts
 
@@ -165,41 +180,44 @@ point, or the child of the node at point that is its home move."
 
 (defun skg--readiness-do-children (fn)
   "Call FN, with point on each, on the metadata of the headlines one
-level below the headline at point. Returns how many calls returned
-non-nil."
+level below the headline at point. Returns the non-nil results, in
+buffer order."
   (let ((level (org-outline-level))
-        (count 0))
+        (results '()))
     (outline-next-heading)
     (while (and (not (eobp)) (> (org-outline-level) level))
-      (let ((metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
-        (when (and metadata-sexp (= (org-outline-level) (1+ level))
-                   (save-excursion (funcall fn metadata-sexp)))
-          (setq count (1+ count))))
+      (let* ((metadata-sexp (skg--metadata-sexp-at-point-or-nil))
+             (result (and metadata-sexp (= (org-outline-level) (1+ level))
+                          (save-excursion (funcall fn metadata-sexp)))))
+        (when result
+          (push result results)))
       (outline-next-heading))
-    count))
+    (nreverse results)))
 
 (defun skg--readiness-walk-subtree (fn)
   "Call FN, with point on each, on the metadata of the headline at
-point and of every headline below it. Returns how many calls
-returned non-nil."
+point and of every headline below it. Returns the non-nil results,
+in buffer order."
   (let ((level (org-outline-level))
-        (count 0)
+        (results '())
         (first t))
     (while (and (not (eobp))
                 (or first (> (org-outline-level) level)))
       (setq first nil)
-      (let ((metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
-        (when (and metadata-sexp
-                   (save-excursion (funcall fn metadata-sexp)))
-          (setq count (1+ count))))
+      (let* ((metadata-sexp (skg--metadata-sexp-at-point-or-nil))
+             (result (and metadata-sexp
+                          (save-excursion (funcall fn metadata-sexp)))))
+        (when result
+          (push result results)))
       (outline-next-heading))
-    count))
+    (nreverse results)))
 
 ;;; The gestures
+;;; A gesture first gathers its requests, each '(MARKER READY AXES)'
+;;; for the headline at MARKER, then writes them all or none.
 
-(defun skg--readiness-cycle-at-point ()
-  "The one-level gesture on the headline at point. Returns how many
-requests it wrote."
+(defun skg--readiness-requests-at-point ()
+  "The requests of the one-level gesture on the headline at point."
   (let* ((metadata-sexp (skg--current-headline-metadata-sexp))
          (axes (skg--readiness-leaf-axes metadata-sexp)))
     (cond
@@ -207,46 +225,67 @@ requests it wrote."
       (let ((chosen (if (cdr axes)
                         (list (skg--readiness-ask-axis))
                       axes)))
-        (skg--write-readiness-request
-         (not (skg--readiness-axes-ready-p metadata-sexp chosen))
-         chosen)
-        1))
+        (list (skg--readiness-request-here
+               (not (skg--readiness-axes-ready-p metadata-sexp chosen))
+               chosen))))
      ((skg--readiness-changed-folder-p metadata-sexp)
       (let ((ready (not (skg--readiness-ready-p metadata-sexp))))
         (skg--readiness-do-children
          (lambda (child-sexp)
            (let ((child-axes (skg--readiness-leaf-axes child-sexp)))
              (when child-axes
-               (skg--write-readiness-request ready child-axes)
-               t))))))
+               (skg--readiness-request-here ready child-axes)))))))
      ((skg--readiness-vognode-p metadata-sexp)
-      (skg--write-readiness-request
-       (not (skg--readiness-children-ready-p)) '(all))
-      1)
-     (t 0))))
+      (list (skg--readiness-request-here
+             (not (skg--readiness-children-ready-p)) '(all)))))))
 
-(defun skg--readiness-cycle-subtree ()
-  "The recursive gesture on the headline at point: a request on every
-leaf named in the subtree, readying them unless the headline at point
-is ready. On a changed node, also one naming every leaf it owns.
-Returns how many requests it wrote."
+(defun skg--readiness-requests-for-subtree ()
+  "The requests of the recursive gesture on the headline at point: one
+on every leaf named in the subtree, readying them unless the headline
+at point is ready. On a changed node, also one naming every leaf it
+owns."
   (let* ((metadata-sexp (skg--current-headline-metadata-sexp))
          (aggregate-node (and (skg--readiness-vognode-p metadata-sexp)
                               (not (skg--readiness-leaf-axes metadata-sexp))))
          (ready (not (if aggregate-node
                          (save-excursion (skg--readiness-children-ready-p))
-                       (skg--readiness-ready-p metadata-sexp))))
-         (count 0))
-    (when aggregate-node
-      (skg--write-readiness-request ready '(all))
-      (setq count 1))
-    (+ count
-       (skg--readiness-walk-subtree
-        (lambda (headline-sexp)
-          (let ((axes (skg--readiness-leaf-axes headline-sexp)))
-            (when axes
-              (skg--write-readiness-request ready axes)
-              t)))))))
+                       (skg--readiness-ready-p metadata-sexp)))))
+    (append
+     (when aggregate-node
+       (list (skg--readiness-request-here ready '(all))))
+     (skg--readiness-walk-subtree
+      (lambda (headline-sexp)
+        (let ((axes (skg--readiness-leaf-axes headline-sexp)))
+          (when axes
+            (skg--readiness-request-here ready axes))))))))
+
+(defun skg--readiness-request-here (ready axes)
+  "A request that marks (READY non-nil) or unmarks the leaves on AXES
+of the headline at point."
+  (list (copy-marker (line-beginning-position)) ready axes))
+
+(defun skg--readiness-unmarks-several-leaves-p (requests)
+  "Non-nil when the unmark requests among REQUESTS name more than one
+leaf. A request naming `all' names every leaf its node owns."
+  (let ((unmarks (seq-remove #'cadr requests)))
+    (or (seq-some (lambda (request) (memq 'all (nth 2 request)))
+                  unmarks)
+        (> (apply #'+ (mapcar (lambda (request) (length (nth 2 request)))
+                              unmarks))
+           1))))
+
+(defun skg--readiness-write-requests-if-confirmed (requests)
+  "Write REQUESTS, first asking when they unmark more than one leaf.
+On refusal, write nothing and return nil."
+  (let ((confirmed (or (not (skg--readiness-unmarks-several-leaves-p requests))
+                       (yes-or-no-p skg--readiness-wide-unmark-question))))
+    (save-excursion
+      (dolist (request requests)
+        (when confirmed
+          (goto-char (car request))
+          (skg--write-readiness-request (nth 1 request) (nth 2 request)))
+        (set-marker (car request) nil)))
+    confirmed))
 
 (defun skg--readiness-children-ready-p ()
   "Non-nil when every child of the headline at point that names a

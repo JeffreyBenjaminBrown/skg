@@ -498,7 +498,7 @@ entries and their Neovim twins). Keep 'skg-goto-in-magit*' and the
 "titles by ids" fallback. The COMMANDS files' explanation of why
 partial commits are dangerous already exists; leave it.
 
-** Slice 4: gestures toggle, and warn before a wide unmark
+** DONE Slice 4: gestures toggle, and warn before a wide unmark
 In 'skg-readiness.el' and 'readiness.lua': make the home-move gesture
 a toggle driven by the home leaf at point (its recursive form follows
 that direction); before any gesture writes unmark requests on more

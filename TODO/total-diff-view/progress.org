@@ -727,3 +727,25 @@ discussion, not the command, so it stays.
 *** the integration run
 Every integration test passes but 'import-md-and-org', which fails
 at baseline (an entry in 'TODO/problems.org' already says so).
+** Slice 4: deviations
+*** what counts as unmarking more than one leaf
+The clients cannot see how many leaves a request names on the server,
+so they count the axes of the unmark requests a gesture would write:
+a property, an alias or ID entry, and a changeset marker count as one,
+a member's '(node rel)' as two. A request naming 'all' (a changed
+node's every leaf) always counts as more than one, since the warning's
+"every contributing decision" describes exactly that. A leaf is
+counted whether or not it is marked now.
+*** a gesture gathers its requests, then writes all or none
+Each gesture first collects its requests (marker or line, direction,
+axes), asks if they unmark more than one leaf, and only then writes
+them. A refusal writes nothing, does not save, and shows nothing.
+*** the Emacs question
+'yes-or-no-p' appends "(yes or no) " itself, so the Emacs prompt ends
+"Continue? " in place of "Continue (yes/no)?". Neovim shows the agreed
+text and proceeds only on the typed word "yes".
+*** the home-move gesture keeps its name
+'skg-mark-gnode-skgrepo-changes-commitReady' (and the Neovim
+'mark_gnode_skgrepo_changes_commitReady', ':SkgMarkGnodeSkgrepoChangesCommitReady')
+now toggle, but keep the names the plan uses. Its message says
+"Unmarked N home move(s)." when it unmarks.
