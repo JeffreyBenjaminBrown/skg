@@ -11,13 +11,20 @@ use git_fixture_helpers::{commit_all, setup_gitrepo_with_fixtures};
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole};
+use skg::dbs::filesystem::not_nodes::load_config;
+use skg::dbs::init::create_empty_tantivy_index;
 use skg::graph_straddle::build::current_graph_straddle_in_slot;
 use skg::graph_straddle::types::{GraphStraddle, Partner, Presence};
-use skg::test_utils::graph_handle_from_config;
-use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
+use skg::serve::ViewsState;
+use skg::serve::handlers::rebuild_session_lifetime_stores::rebuild_session_lifetime_stores_in_place;
+use skg::test_utils::{graph_handle_from_config, skg_env_from_parts};
+use skg::types::env::{RuntimeGeneration, SkgEnv};
+use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
+use skg::types::views_state::OpenViews;
 
 use git2::Repository;
 use std::collections::{BTreeSet, HashMap};
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -220,3 +227,49 @@ fn the_slot_reuses_repairs_or_rebuilds_the_straddle () {
     . unwrap ();
   assert! ( ! Arc::ptr_eq (&built . before, &rebuilt . before) );
   assert_eq! ( rebuilt . changed_pids () . all (), ids (&[]) ); }
+
+/// A rebuild of the session-lifetime stores drops the connection's
+/// straddle, and the next one reads both halves from the disk the
+/// rebuilt live graph was read from: a foreign file edited since the
+/// straddle was built changes neither, so no foreign node is in C.
+#[test]
+fn a_rebuild_drops_the_straddle_and_the_next_reads_foreign_files_afresh (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let root : TempDir = TempDir::new () ?;
+  setup_gitrepo_with_fixtures (
+    &root . path () . join ("owned/main"),
+    &format! ("{}/foreign_skgrepo/main/head", FIXTURES),
+    &format! ("{}/foreign_skgrepo/main/worktree", FIXTURES) ) ?;
+  git_fixture_helpers::copy_dir_all (
+    &Path::new (FIXTURES) . join ("foreign_skgrepo/foreign"),
+    &root . path () . join ("foreign") ) ?;
+  fs::write ( root . path () . join ("skgconfig.toml"), concat! (
+    "tantivy_folder = \"tantivy\"\n",
+    "port = 1730\n",
+    "beep_when_server_becomes_available = false\n",
+    "[[repos]]\nname = \"main\"\npath = \"owned/main\"\n",
+    "[[repos]]\nname = \"foreign\"\npath = \"foreign\"\n" )) ?;
+  let config : SkgConfig = load_config (
+    root . path () . join ("skgconfig.toml") . to_str () . unwrap () ) ?;
+  let tantivy : TantivyIndex =
+    create_empty_tantivy_index (&config . tantivy_folder) ?;
+  let mut env : SkgEnv = skg_env_from_parts (
+    &config, &tantivy, &graph_handle_from_config (&config) ? );
+  let mut views_state : ViewsState = ViewsState {
+    open_views     : OpenViews::new (),
+    graph_straddle : None, };
+  let built : Arc<GraphStraddle> = current_graph_straddle_in_slot (
+    &mut views_state . graph_straddle, &config,
+    env . runtime_snapshot () . graph . clone () ) ?;
+  assert_eq! ( built . changed_pids () . all (), ids (&[]) );
+  fs::write ( root . path () . join ("foreign/F.skg"),
+              "pid: F\ntitle: F, edited\n" ) ?;
+  rebuild_session_lifetime_stores_in_place (&mut env, &mut views_state) ?;
+  assert! ( views_state . graph_straddle . is_none () );
+  let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
+  let rebuilt : Arc<GraphStraddle> = current_graph_straddle_in_slot (
+    &mut views_state . graph_straddle, &runtime . config,
+    runtime . graph . clone () ) ?;
+  assert_eq! ( rebuilt . changed_pids () . all (), ids (&[]),
+               "a foreign file edited before the rebuild is in neither half" );
+  Ok (( )) }

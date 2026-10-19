@@ -144,6 +144,20 @@ fn git_snapshot_from_cache_or_read (
   Ok (git_snapshot)
 }
 
+/// Empty the snapshot cache, so the next read of each snapshot reads
+/// disk. A key names HEAD commits only, so an entry that read a
+/// worktree (the foreign skgrepos of 'read_owned_head_graph_snapshot_maybe_cached')
+/// can be stale under its key; a rebuild of the session-lifetime
+/// stores, which rereads every skgrepo, calls this.
+pub fn forget_cached_git_snapshots (
+) -> Result<(), String> {
+  git_snapshot_cache ()
+    . lock ()
+    . map_err ( |e| format! (
+      "Git snapshot cache lock failed: {}", e )) ?
+    . clear ();
+  Ok (( )) }
+
 fn git_snapshot_cache (
 ) -> &'static Mutex<HashMap<String, GraphSnapshot>> {
   SNAPSHOT_CACHE . get_or_init ( || Mutex::new (HashMap::new ()) )

@@ -6,6 +6,7 @@ use crate::prominence::{
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos_collecting_violations;
 use crate::dbs::filesystem::not_nodes::load_config;
 use crate::dbs::init::rebuild_tantivy_as_generation;
+use crate::git_ops::git_snapshot::forget_cached_git_snapshots;
 use crate::telescope::invariants::{TelescopeViolation, report_telescope_violations};
 use crate::dbs::in_rust_graph::complete_validation::validated_graph;
 use crate::types::env::SkgEnv;
@@ -92,6 +93,7 @@ pub fn rebuild_session_lifetime_stores_in_place (
       &mentioned_skgids, &map_to_content, &map_to_containers )
       . map_err ( |e| format! ("Context computation failed: {}", e) ) ?;
     tracing::info!("Context rankings recomputed.");
+    forget_cached_git_snapshots () ?;
     { // Swap in config, graph, and replacement search index as one generation.
       env . runtime . swap_in (
         Arc::new (fresh_config), Arc::new (fresh_graph), new_tantivy);
@@ -99,5 +101,9 @@ pub fn rebuild_session_lifetime_stores_in_place (
     Ok (())
   })();
   if result . is_ok () {
-    views_state . open_views . clear (); }
+    views_state . open_views . clear ();
+    // The next request of the total diff view rebuilds both halves
+    // of its straddle from the disk state the rebuilt live graph was
+    // read from.
+    views_state . graph_straddle = None; }
   result }
