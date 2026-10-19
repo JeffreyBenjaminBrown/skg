@@ -149,11 +149,6 @@ M.commands = {
               desc = 'Paste a link to the top-of-stack node and pop it' },
   PopNode = { module = 'skg.linkstack', fn = 'pop_node',
               desc = 'Paste the top-of-stack node and pop it' },
-  GitAddIfNewRecursive = { module = 'skg.git_add', fn = 'git_add_if_new_recursive',
-                           desc = "git add this subtree's new .skg files" },
-  GitAddIfNewRecursivePreview = { module = 'skg.git_add',
-                                  fn = 'git_add_if_new_recursive_preview',
-                                  desc = 'Preview the git add script for this subtree' },
   CycleCommitReady = { module = 'skg.readiness', fn = 'cycle_commit_ready',
                       desc = 'Toggle the commit-readiness of the change at point, and save' },
   CycleCommitReadyRecursive = { module = 'skg.readiness',
@@ -168,8 +163,6 @@ M.commands = {
     desc = 'Mark commit-ready every home move in the subtree like this one, and save' },
   StageAndCommit = { module = 'skg.stage_and_commit', fn = 'stage_and_commit',
                      desc = 'Stage and git-commit every owned skgrepo with changes, with one message' },
-  StageMoves = { module = 'skg.stage_moves', fn = 'stage_moves',
-                 desc = 'Script staging cross-repo node moves' },
   InvestigateUnknownNode = { module = 'skg.investigate_unknown_node',
                              fn = 'investigate_unknown_node',
                              desc = 'Show what git history says about an unknown node' },
@@ -293,9 +286,6 @@ M.content_view_bindings = {
   { 'Oi', 'PopId' },                     -- C-c O i
   { 'Ol', 'PopLink' },                   -- C-c O l
   { 'On', 'PopNode' },                   -- C-c O n
-  { 'tA', 'GitAddIfNewRecursive' },      -- C-c t A
-  { 'ta', 'GitAddIfNewRecursivePreview' }, -- C-c t a
-  { 'tm', 'StageMoves' },                -- C-c t m
   { 'tr', 'InvestigateUnknownNode' },    -- C-c t r
 }
 

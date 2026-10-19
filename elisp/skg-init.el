@@ -32,4 +32,3 @@
 (require 'skg-view-ancestry)
 (require 'skg-readable-ids)
 (require 'skg-file-minor-mode)
-(require 'skg-git-add)

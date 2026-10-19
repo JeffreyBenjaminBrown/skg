@@ -709,3 +709,21 @@ strips that line too.
 'collect_grandchild_aliases_for_viewnode' ('types/tree/viewnode_graphnode.rs')
 has no caller. It rejects an alias folder holding anything but
 'Property::Alias', which would now include a removed alias. Left as is.
+** Slice 3: deviations
+*** consumers the code map did not list
+'tests/git_ops.rs' lost its three stage-moves tests and the helpers
+only they used; 'tests/nvim/stream_consumers_spec.lua' lost its
+stage-moves case. 'elisp/skg-init.el', 'elisp/skg-client.el' and
+'elisp/skg-reload.el' no longer require or unload the two deleted
+features. 'docs/nvim-client-deviations.org' lost its note on the
+git-add preview and its mention of 'skg://stage-moves'.
+*** the "C-c t" block keeps one binding
+Its comment said "git add ops"; it now holds only
+'skg-investigate-unknown-node', so it says "git history".
+*** a citation keeps the old name
+'server/telescope/types.rs' cites the "stage-moves thread" of a
+discussion about the serialization of relation lists. It names a
+discussion, not the command, so it stays.
+*** the integration run
+Every integration test passes but 'import-md-and-org', which fails
+at baseline (an entry in 'TODO/problems.org' already says so).

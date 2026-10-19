@@ -278,24 +278,6 @@ doesn't, so this variant uses a plain diff buffer instead of a
 neogit view -- same information, different chrome.)
 *** <localleader>GM : :SkgGotoInGitParentAndCloseThis
 ** <localleader>t : git operations
-*** <localleader>ta         : :SkgGitAddIfNewRecursivePreview
-Brings up a buffer (=skg://git-add-new-files=) with the text of a
-shell script which, if run, 'git add's some nodes. The nodes
-should consist only of nodes new to git, and only of nodes in
-the recursive content (inclusive) of the node from which
-GitAddIfNewRecursivePreview was called. A node is recognized as
-new by the total diff view's '(diff node+)', so call it from a
-buffer of the total diff view (<localleader>vd); a file already in
-the git index is skipped. The buffer has readable ids enabled.
-
-Unlike the Emacs client, which shows executable elisp you run in
-place with C-x C-e, this is a plain shell script: review it, then
-run it yourself (copy it into a shell, or write the buffer to a
-file and execute that).
-*** <localleader>tA         : :SkgGitAddIfNewRecursive
-Like GitAddIfNewRecursivePreview,
-but it doesn't show you the script;
-it instead runs that logic for you directly.
 *** <localleader> (g|G)(m|M) : :SkgGotoInGit*
 These four commands are described elsewhere in this document.
 *** <localleader>tr         : :SkgInvestigateUnknownNode
@@ -311,23 +293,6 @@ vanished at, its title then, its own relation lists then, and every
 node that referred to it then, links included; or that the ID was
 never in any skgrepo's history. It refuses unless the skgrepo
 restriction is 'all'.
-*** <localleader>tm         : :SkgStageMoves
-Scans the git status of every configured skgrepo and finds each
-node whose .skg file "moved": it vanished from exactly one skgrepo
-(committed there in git HEAD, now gone from that skgrepo's worktree)
-and appeared in exactly one other skgrepo (present in that skgrepo's
-worktree, not yet committed). A node that vanished from, or appeared
-in, more than one skgrepo is ambiguous and is skipped.
-
-Opens a buffer (=skg://stage-moves=) holding a bash script: a list
-of the moves followed by one loop that 'git rm's each file in its
-old skgrepo and 'git add's it in the new one. Before removing, the
-loop checks that the file is already gone from the old skgrepo's
-worktree (that is how the move was detected); a file still present
-there is skipped, not deleted, since 'git rm' would silently remove
-it. Review the script, then run it from the skg data root. Unlike
-most commands here, this one does not depend on the node at point;
-it reports moves across all skgrepos.
 ** <localleader>c : show a folder (both folders of a relation)
 These commands don't edit the graph. Each inserts a request into the
 metadata of the node at point that, on save, causes the server to

@@ -1,6 +1,6 @@
 -- Coverage for the rerender stream and its consumers (skgrepo
 -- sets), plus the report-shaped requests (investigate unknown node,
--- stage moves, export). Mirrors
+-- export). Mirrors
 -- tests/elisp/test-skg-investigate-unknown-node.el's wiring cases and
 -- test-skg-warning-channel.el's rerender-done
 -- channel, end-to-end through the loopback fake server.
@@ -13,7 +13,6 @@ local investigate_unknown_node = require('skg.investigate_unknown_node')
 local lock = require('skg.lock')
 local rerender = require('skg.rerender')
 local repo_sets = require('skg.repo_sets')
-local stage_moves = require('skg.stage_moves')
 
 local function wipe_named (name)
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
@@ -39,7 +38,6 @@ describe('skg stream consumers', function ()
     lock.end_stream()
     wipe_named('skg://messages/rerender')
     wipe_named('skg://unknown-node')
-    wipe_named('skg://stage-moves')
   end)
 
   it('drives the rerender stream: lock, per-view update, done with'
@@ -172,29 +170,5 @@ describe('skg stream consumers', function ()
     assert.are.equal('Investigate ID: ', prompted)
     vim.wait(3000, function () return seen ~= nil end, 10)
     assert.is_truthy(seen:find('(id . "typed-id")', 1, true))
-  end)
-
-  it('shows the stage-moves script as a shell buffer', function ()
-    server = helpers.connect_to_fake_server(function (line, respond)
-      if line:find('stage moves', 1, true) then
-        respond(helpers.framed(
-          '((response-type stage-moves)'
-          .. ' (content "# No moves detected.") (errors ())'
-          .. ' (warnings ()))'))
-      end
-    end)
-    stage_moves.stage_moves()
-    local script = nil
-    vim.wait(3000, function ()
-      for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-        if vim.api.nvim_buf_get_name(buf) == 'skg://stage-moves' then
-          script = buf end
-      end
-      return script ~= nil
-    end, 10)
-    assert.is_truthy(script)
-    assert.are.equal('sh', vim.bo[script].filetype)
-    assert.are.equal('# No moves detected.',
-      vim.api.nvim_buf_get_lines(script, 0, 1, false)[1])
   end)
 end)

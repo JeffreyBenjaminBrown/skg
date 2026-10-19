@@ -489,7 +489,7 @@ skip them by kind and stop looking at '(diff rel-)'. Round-trip tests:
 a removed alias is not restored by a save; a removed ID does not abort
 the save; marking the removed entry marks its leaf.
 
-** Slice 3: delete the partial-staging commands
+** DONE Slice 3: delete the partial-staging commands
 Delete the git-add commands, their preview, and stage moves, in both
 clients and on the server (handler, 'find_and_stage_moves.rs', request
 and response types), with their tests, bindings and documentation

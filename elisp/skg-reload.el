@@ -96,7 +96,6 @@ rather than via `unload-feature'."
             skg-request-single-root-content-view
             skg-request-repo-sets
             skg-request-stage-and-commit
-            skg-request-stage-moves
             skg-request-strip-body-whitespace
             skg-request-text-search
             skg-request-verify-connection
@@ -114,7 +113,6 @@ rather than via `unload-feature'."
             skg-readable-ids
             skg-link-annotations
             skg-file-minor-mode
-            skg-git-add
             skg-view-ancestry
             heralds-minor-mode )))
     (dolist (feat skg-features)

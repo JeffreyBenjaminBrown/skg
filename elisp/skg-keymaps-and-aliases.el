@@ -178,10 +178,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c O n") #'skg-pop-node)
     (define-key map (kbd "C-c O i") #'skg-pop-id)
     (define-key map (kbd "C-c O l") #'skg-pop-link))
-  (progn;; git add ops (only fire if the .skg file is not yet in HEAD)
-    (define-key map (kbd "C-c t A") #'skg-git-add-if-new-recursive)
-    (define-key map (kbd "C-c t a") #'skg-git-add-if-new-recursive-preview)
-    (define-key map (kbd "C-c t m") #'skg-stage-moves)
+  (progn;; git history
     (define-key map (kbd "C-c t r") #'skg-investigate-unknown-node)))
 
 (defvar skg-linkstack-mode-map (make-sparse-keymap)

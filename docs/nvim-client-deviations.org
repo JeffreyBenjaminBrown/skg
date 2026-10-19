@@ -83,10 +83,6 @@
   git-diff buffer ('skg://git-diff/FILE', readable-ids enabled) with
   the cursor on the first changed line containing the node's id --
   the same information magit showed, without the status chrome.
-- The git-add PREVIEW is a shell script (run it from anywhere; each
-  file is re-checked against the git index before adding) rather than
-  Emacs's evaluable elisp buffer. The non-preview command runs the
-  same logic directly, as before.
 
 * Display details
 - Heralds conceal the metadata rather than covering it with a display
@@ -99,8 +95,7 @@
   server round-trip, different mechanism.
 - View buffers are named 'skg://TITLE' (search: 'skg://?TERMS');
   Emacs used '*TITLE*'. Message/report buffers live under
-  'skg://messages/...', 'skg://diff-analysis', 'skg://stage-moves',
-  etc.
+  'skg://messages/...', 'skg://diff-analysis', etc.
 
 * Small semantic notes
 - 'point-column' in the save round-trip is a byte offset here and a
