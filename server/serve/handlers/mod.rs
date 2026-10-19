@@ -16,7 +16,6 @@ pub mod text_release;
 pub mod single_root_view;
 pub mod skgrepo_sets;
 pub mod stage_and_commit;
-pub mod stage_moves;
 pub mod strip_body_whitespace;
 pub mod telescope_hoist;
 pub mod text_search;

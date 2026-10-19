@@ -34,7 +34,6 @@ use crate::serve::handlers::text_release::{
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
 use crate::serve::handlers::stage_and_commit::handle_stage_and_commit_request;
-use crate::serve::handlers::stage_moves::handle_stage_moves_request;
 use crate::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
 use crate::serve::handlers::text_search::render_enriched_search_buffer::{insert_full_containerward_role_trees_into_search_view, insert_overrideward_view_subtrees};
 use crate::serve::handlers::text_search::{ abandon_search_enrichment, handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
@@ -234,9 +233,6 @@ fn handle_emacs (
             handle_investigate_unknown_node_request (
               &mut stream, &request_header, &runtime,
               &skgrepo_restriction ),
-          Ok (RequestType::StageMoves) =>
-            handle_stage_moves_request (
-              &mut stream, &runtime . config ),
           Ok (RequestType::RelRepoInfo) =>
             handle_relRepo_info_request (
               &mut stream, &request_header, &env ),
