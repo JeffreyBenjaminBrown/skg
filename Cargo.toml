@@ -73,7 +73,7 @@ path = "tests/grouped_repos.rs"
 [dependencies]
 arc-swap = "1"
 ctrlc = { version = "3.4", features = ["termination"] }
-ego-tree = "0.6"
+ego-tree = "0.11"
 filetime = "0.2"
 futures = "0.3"
 git2 = "0.21"

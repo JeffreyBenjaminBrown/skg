@@ -1,9 +1,10 @@
 //! Moving a node that may already be in the tree.
-//! PITFALL: ego_tree's 'prepend_id', 'append_id', 'insert_id_before'
-//! and 'insert_id_after' read the neighbor they link to before
-//! detaching the node they move, so moving a node next to itself
-//! links it to itself. Each helper here detaches first, and does
-//! nothing when the node is already in place.
+//! PITFALL: ego_tree's 'insert_id_before' and 'insert_id_after' read
+//! the neighbor they link to before detaching the node they move, so
+//! moving a node next to itself links it to itself. (Its 'prepend_id'
+//! and 'append_id' check for a node already in place.) Each helper
+//! here detaches first, and does nothing when the node is already in
+//! place.
 
 use ego_tree::{NodeId, NodeRef, Tree};
 

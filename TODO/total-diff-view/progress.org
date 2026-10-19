@@ -899,3 +899,10 @@ fetches, pushes or clones, so it needs neither.
 *** the integration runs
 Every integration test passes but 'import-md-and-org', which fails at
 baseline, as 'TODO/problems.org' records.
+*** dependency slice 4: ego-tree 0.11 needed no code changes
+The project compiled and passed unchanged. 0.11's 'prepend_id' and
+'append_id' do nothing for a node already at that end, and all four
+'_id' methods panic when asked to attach a node beside or under
+itself; 'insert_id_before' and 'insert_id_after' still read the
+neighbor before detaching. The pitfall comment in
+'server/types/tree/moves.rs' now says so.
