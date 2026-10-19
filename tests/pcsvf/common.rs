@@ -16,11 +16,13 @@ use skg::graph_straddle::types::GraphStraddle;
 use skg::readiness_store::ReadinessStore;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::serve::handlers::stage_and_commit::handle_stage_and_commit_request;
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::serve::handlers::total_diff_view::{
   TotalDiffViewBuffer, total_diff_view_buffer};
 use skg::test_utils::{
-  cleanup_test_tantivy, graph_handle_from_config, skg_env_from_parts,
-  update_from_and_rerender_buffer_test};
+  cleanup_test_tantivy, extract_string_field_from_sexp, graph_handle_from_config,
+  skg_env_from_parts, update_from_and_rerender_buffer_test};
 use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
 use skg::types::views_state::{OpenViews, TdvBuffer, ViewId};
@@ -29,6 +31,7 @@ use futures::executor::block_on;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::error::Error;
 use std::fs;
+use std::io::Read;
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, MutexGuard};
@@ -218,3 +221,32 @@ pub fn ids (
   list : &[&str],
 ) -> BTreeSet<ID> {
   list . iter () . map ( |s| ID::from (*s) ) . collect () }
+
+/// Send 'request' to the "stage and commit" handler, under the
+/// skgrepo set 'all'; return everything it wrote.
+pub fn send_stage_and_commit_request (
+  f       : &mut Fixture,
+  env     : &SkgEnv,
+  request : &str,
+) -> Result<String, Box<dyn Error>> {
+  let all_skgrepos : SkgrepoRestriction =
+    SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+  let (mut stream, mut read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  handle_stage_and_commit_request (
+    &mut stream, request, env, &mut f . views_state, &all_skgrepos );
+  drop (stream);
+  let mut response : String = String::new ();
+  read_end . read_to_string (&mut response) ?;
+  Ok (response) }
+
+/// The content of the first rerendered view in 'response'.
+pub fn rerendered_view_content (
+  response : &str,
+) -> String {
+  let message : &str = response . split ("Content-Length")
+    . find ( |message| message . contains ("rerender-view") )
+    . expect ("a view is rerendered");
+  extract_string_field_from_sexp (
+    &message [ message . find ('(') . unwrap () .. ], "content" )
+    . expect ("the rerendered view has content") }

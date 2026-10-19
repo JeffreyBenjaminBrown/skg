@@ -3,26 +3,23 @@
 // owned skgrepos public and private both have changes, deletions
 // among them.
 
-use crate::pcsvf::common::git_fixture_helpers::mk_test_tcp_stream_pair;
 use crate::pcsvf::common::{
   Fixture, all_changes_buffer, graph_straddle, open_all_changes_buffer,
-  view_id_of, with_fixture};
+  rerendered_view_content, send_stage_and_commit_request, view_id_of,
+  with_fixture};
 
 use skg::change_forest::{ChangeForest, LeafKey};
 use skg::graph_straddle::types::GraphStraddle;
 use skg::readiness_store::ReadinessStore;
 use skg::serve::handlers::stage_and_commit::{
-  StageAndCommitAnswer, handle_stage_and_commit_request, stage_and_commit,
-  stage_and_commit_response_sexp};
+  StageAndCommitAnswer, stage_and_commit, stage_and_commit_response_sexp};
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::{extract_string_field_from_sexp, skg_env_from_parts};
+use skg::test_utils::skg_env_from_parts;
 use skg::types::env::SkgEnv;
 use skg::types::views_state::TdvBuffer;
 
 use git2::{Oid, Repository, Status, StatusOptions};
 use std::error::Error;
-use std::io::Read;
-use std::net::TcpStream;
 use std::sync::MutexGuard;
 
 const SKGREPOS : [&str; 2] = [ "public", "private" ];
@@ -183,17 +180,7 @@ fn a_confirmed_resend_commits_and_redraws_the_open_buffers (
   with_fixture ("buffers", &SKGREPOS, |f| {
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let buffer : String = open_all_changes_buffer (f) ?;
-    let send = |f : &mut Fixture, request : &str| -> Result<String, Box<dyn Error>> {
-      let all_skgrepos : SkgrepoRestriction = all (f) ?;
-      let (mut stream, mut read_end) : (TcpStream, TcpStream) =
-        mk_test_tcp_stream_pair ();
-      handle_stage_and_commit_request (
-        &mut stream, request, &env, &mut f . views_state, &all_skgrepos );
-      drop (stream);
-      let mut response : String = String::new ();
-      read_end . read_to_string (&mut response) ?;
-      Ok (response) };
-    let first : String = send ( f,
+    let first : String = send_stage_and_commit_request ( f, &env,
       "((request . \"stage and commit\") (message . \"one message\"))\n" ) ?;
     assert! ( first . contains ("stage-and-commit")
               && first . contains ("(needs-confirmation . t)")
@@ -203,19 +190,14 @@ fn a_confirmed_resend_commits_and_redraws_the_open_buffers (
     let roots : Vec<String> =
       buffer . lines () . filter ( |line| line . starts_with ("* ") )
       . map ( |line| root_id (line) ) . collect ();
-    let second : String = send ( f,
+    let second : String = send_stage_and_commit_request ( f, &env,
       "((request . \"stage and commit\") (message . \"one message\") (confirmed . t))\n" ) ?;
     assert! ( second . contains ("(commits ((public ")
               && second . contains ("(lock-views (\"diff-view: all changes\"))")
               && second . contains ("(view-id \"diff-view: all changes\") (content \"* "),
               "{}", second );
     assert_everything_committed (f, "one message") ?;
-    let content : String = {
-      let message : &str = second . split ("Content-Length")
-        . find ( |message| message . contains ("rerender-view") ) . unwrap ();
-      extract_string_field_from_sexp (
-        &message [ message . find ('(') . unwrap () .. ], "content" )
-        . unwrap () };
+    let content : String = rerendered_view_content (&second);
     let roots_after : Vec<String> =
       content . lines () . filter ( |line| line . starts_with ("* ") )
       . map ( |line| root_id (line) ) . collect ();
