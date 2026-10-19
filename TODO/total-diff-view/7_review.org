@@ -1,0 +1,813 @@
+#+title: Review of the "more fixes" run, second half (2026-10-19)
+#+TODO: TODO ONGOING | DONE
+
+* Verdict
+The run finished the plan: slices 2 and 3 of [[file:6_plan-more.org][6_plan-more.org]] are DONE
+and committed, in four commits over seventeen minutes (05:32 to
+05:49). Slice 2 was finished by a fresh agent on top of the work the
+stopped one left, as the rewritten plan asked; slice 3 built the
+refusal. Both did what the plan says, and the deviations in
+[[file:progress.org][progress.org]] are placements and test repairs, not changes of behavior.
+One thing deserves your attention: while verifying slice 3 over TCP,
+the agent found a real bug in a gesture that slice 3 explicitly
+allows, write-protecting one occurrence of a changed node while
+requesting editability at another. It draws that node's children
+twice. It is
+recorded in 'TODO/problems.org'; the cause and a small fix are under
+"Decide" below.
+
+* What I checked myself
+- The suites after the run, and a build check of every commit: see
+  "Results" at the end of this section.
+- The two save rules are gone: no trace of
+  'EditableViewRequestOnEditableNode' or
+  'EditableViewRequestOnNodeWithContentChildren' in the server, the
+  tests, the clients or the docs. 'validate_editable_view_requests'
+  keeps only the one-request-per-node rule, and its doc comment says
+  why the other two went and where typed children are still refused.
+- The unfolding test is no longer ignored, and the moving-back test
+  the plan asked for exists ('an_editable_view_request_moves_editability_back').
+- The refusal ('errors_for_nodes_of_u_left_without_editable_occurrence',
+  'server/from_text/write_protected_edits.rs') checks the four
+  conditions the plan states, for each node of U: some occurrence in
+  the saved buffer is editable or carries a request (then no error);
+  else an occurrence that was editable in the last rendering still
+  stands at the same path (then the error, naming the node). U comes
+  from the connection's straddle, refreshed against the live graph
+  before the save. The message is the agreed one; Neovim rewrites the
+  Emacs chord in it.
+- The docs: the 'skg-set-editable' entries, the TDV paragraph of both
+  COMMANDS files, and three places in 'docs/api-and-formats.org' say
+  what the request now does and name the refusal.
+** Results
+Rust 755 of 755 (up from 748, none ignored), Emacs 362 of 362, Neovim
+17 of 17. All five commits since slice 1 compile ('cargo check
+--all-targets' at each, in a throwaway worktree), your "plans" commit
+included. The log is 'tests/results/review7/checks.txt'.
+
+* Decide: one bug worth a small follow-up
+** TODO Write-protecting a drawn occurrence while requesting editability at another draws its children twice
+The gesture: in a TDV buffer, n is drawn editable under x and
+write-protected under y; the user puts 'writeProtected' on n under x
+(C-c s w) and an editable-view request on n under y (C-c s d), and
+saves. Slice 3 allows this save, rightly: it moves editability. But
+the result shows n's children a and b twice under x. Two causes meet.
+
+The first is in the save validator of write-protected occurrences
+('errors_and_normalize_new_writeProtected_occurrences'). It pairs
+each write-protected occurrence of the saved buffer with a
+write-protected occurrence at the same path in the last rendering.
+n under x was editable in the last rendering, so nothing pairs, the
+occurrence counts as new, and its drawn children are made non-members
+('make_direct_unrestricted_children_independent'), as if the user had
+typed them under a write-protected headline. In an ordinary view that
+is the whole effect: the children a and b turn into non-members under
+n, which is already wrong, since they are n's real content. It only
+went unnoticed because the gesture was rare.
+
+The second is the editable-occurrences step (the step that, before
+completion, makes sure every node of U has an editable occurrence).
+Before completion, n has no editable occurrence (the one under x is
+now write-protected, the one under y only carries a request), so the
+step makes the first content occurrence, n under x, editable again.
+Completion then draws n's
+content list there, a and b as members, beside the two non-members
+the validator left. The request on n under y then moves editability
+there and write-protects n under x with everything under it, four
+children where there were two.
+
+The fix is two small changes:
+(1) In the validator, an occurrence that
+was editable at the same path in the last rendering and is
+write-protected now is the same occurrence, not a new one; its
+children stay members (the server's own move of editability keeps
+them that way, through 'writeProtect_content_subtree'). (2) In the
+editable-occurrences step, a node that has an occurrence carrying an
+editable-view request is skipped, since the request will make that
+occurrence editable; the user's choice should win over the default.
+
+The first change alone ends the duplication; the second stops the
+step from making n under x editable only for the request to
+write-protect it again in the same completion. Tests:
+the gesture in a TDV yields a and b once, as members, under a
+write-protected n under x; the same gesture in an ordinary content
+view keeps a and b as members. A plan for this is a page; say so and I
+will write it.
+*** [Jeff]
+**** DONE In "the children a and b turn into non-members under n, which is already wrong"
+What does non-members mean here? They are no longer its content
+(a graph property?) Or they no longer affect the parent (a view property)?
+if the latter, that seems right, albeit awkward: Since the parent
+is write-protected, they can't affect it.
+***** [Claude] the view property; and it is wrong as information and as identity, not as permission
+"Non-member" means the view property: the child's 'affectsParent'
+flag is set to false, which the buffer shows as '(affectsParent
+false)'. The graph is untouched; n's file still lists a and b as its
+content. You are right that, with n write-protected, a and b cannot
+affect it either way, so as a permission the flag changes nothing.
+It is wrong on two other counts.
+
+As information: 'affectsParent false' under a node means "this child
+is not in the node's content" (a role-tree member, a node the user
+parked here to look at). Under n it says that of a and b, which are
+n's content. The server's own move of editability, through a request,
+keeps them members for this reason: 'writeProtect_content_subtree'
+write-protects without touching the flag.
+
+As identity: when editability later moves back to n under x, the
+content reconciler matches n's content list against n's member
+children only; non-member children are left alone as the user's own.
+So it draws a and b again as members, beside the two non-member
+copies, and the duplication returns even without the second cause.
+Keeping them members is what lets the move back find them, with
+their fold state.
+**** DONE Remind me (again!) what the pre-pass is?
+***** [Claude] the step that gives every node of U an editable occurrence before the drawing
+Before view completion draws a TDV buffer after a save, one step walks
+the buffer and, for every node of U that has no editable occurrence,
+makes one of its occurrences editable (the first content occurrence,
+else the first folder occurrence), so that completion then draws its
+content there. It exists because U grows after saves: a node drawn as
+a write-protected leaf can become a changed node, and completion never
+promotes a write-protected viewnode by itself. It never touches a node
+that already has an editable occurrence. It is
+'make_freshU_editable_at_first_occurrences' in 'server/pcsvf.rs'.
+
+The name is the problem; "pre-pass" says when it runs and not what it
+does, and you have had to ask three times. From here on I will call
+it the editable-occurrence step, in documents and, if you like, in the
+code: 'give_freshU_an_editable_occurrence'.
+****** [Jeff]
+******* DONE Is 'promote' widely used in the codebase?
+Every time you say it I have to think for a while to determine what you mean.
+Right now I remember you mean write-protected < editable.
+But the word is ambiguous. Let's (have an Opus 5.5 subagent) collect all uses
+of the word and list their meanings, so I can invent an unambiguous
+way to say each one.
+******** [Claude] not widely in code; an Opus 5.5 agent is listing every use and meaning
+A quick count before the survey: 'promote' appears five times in the
+code and docs, none of them in the sense I used (one is an org
+heading promotion in the importer, one a viewnode rewritten into a
+deleted phantom, the rest prose); 'demote' appears about forty times
+in code, nearly always meaning "set a child's 'affectsParent' to
+false". The sense you had to decode, "make a write-protected
+occurrence editable", is mine alone, from the recent TDV documents.
+The survey is [[file:7_1_uses-of-promote-and-demote.org][7_1_uses-of-promote-and-demote.org]]: every use of both
+words, grouped by meaning, with the collisions listed.
+******** [Claude] what the survey found
+228 uses in all (40 of "promote", 188 of "demote"), none in the Emacs
+or Neovim clients, carrying 17 distinct meanings. One meaning accounts
+for 164 of them: "demote" as setting a child's 'affectsParent' to
+false while keeping it and its subtree, which is the only sense of
+"demote" in live code and docs. The pair "promote = make editable,
+demote = make write-protected" occurs nowhere in code or docs; it
+lives in the recent TDV documents ('4_plan-fixes.org', '5_review.org',
+this file) and, under the old words "definitive" and "indefinitive",
+in the historical local-view-update plans. The other fifteen meanings
+are scattered and mostly historical (org heading levels, an error's
+severity, a merge turning a pid into an extra ID, and so on). The
+collisions section lists where one file uses a word in two senses;
+two of those are mine, in the fixes plan and here. So the live
+vocabulary problem is small: "demote" has one meaning in the code,
+and my two documents are where a second one crept in.
+
+One side finding: the doc comment on 'PhantomDeleted'
+('server/types/viewnode.rs', about line 163) speaks of a deleted
+phantom "promoted from a Restricted node", while the same comment
+says a Restricted node is never turned into one. The parenthetical
+describes a path that no longer exists; the follow-up plan's
+housekeeping can delete it.
+******* DONE yes please
+More precisely, let's call it "ensuring editable occurrences exist".
+******** [Claude] adopted
+In documents: "ensuring editable occurrences exist", or "the
+editable-occurrences step" when a noun is needed. In code:
+'ensure_editableOccurrences_exist' for
+'make_freshU_editable_at_first_occurrences', in the follow-up plan's
+housekeeping.
+**** DONE a simple fix
+would seem to be to ensure that each change is represented
+by an editable occurrence only after having processed edit requests.
+Would that be problematic?
+***** [Claude] not problematic, and the cheapest form of it is to let the step see the requests
+What you describe is right: the editable-occurrences step should act
+only for a node that no request is about to make editable. Two ways
+to get there.
+
+Literally reordering, running the step after completion has processed
+the requests, would leave the occurrences it makes editable with no
+content drawn, since completion is the walk that draws content and it
+has already passed. The appended roots have the same shape and get a
+second walk of their own ('complete_appended_roots'), so the step
+could too. It works, at the cost of a second walk.
+
+The equivalent without reordering: the step runs where it is, before
+completion, and counts an occurrence that carries an editable-view
+request as the editable one to be, so it skips that node. Completion
+then honors the request at that occurrence's visit, as it does now.
+Same effect, no second walk; this is the second of the two changes
+the Decide item proposes. (The requests in question are editable-view
+requests, '(viewRequests editableView)'; the edit requests, such as a
+deletion, are a different thing and are not involved.)
+**** DONE Why do we need to know if an occurrence is "the same" as one before saving?
+***** [Claude] to tell drawn children from typed children
+When a save arrives with a write-protected headline that has children
+under it, the server has to decide what those children are. If the
+server itself drew them there, as the node's content, they are
+members and should stay so. If the user typed them under a
+write-protected headline, they cannot become its content (a
+write-protected occurrence accepts no edits), so the save turns them
+into non-members rather than lose them. The buffer alone does not say
+which; the server's last rendering of that buffer does. So the
+validator looks for the same occurrence in the last rendering, by its
+node and its path from the buffer root, and compares the two. If it
+finds a counterpart whose children match, the children were drawn by
+the server, and they stay members. If it finds a counterpart whose
+children differ, the user has edited a write-protected occurrence,
+and the save is refused. If it finds no counterpart, the occurrence
+is new, the user typed its children, and the save makes them
+non-members.
+
+The bug is that it looks for counterparts only among the last
+rendering's write-protected occurrences. An occurrence the user has
+just write-protected by hand was editable in the last rendering, so
+it finds no counterpart, treats the occurrence as new, and demotes
+children the server drew. The fix widens the search to previously
+editable occurrences at the same path; nothing else about the check
+changes.
+****** [Jeff]
+******* DONE Why is it trying to write-protect children?
+Is it to keep the tree pruned?
+If so, that's not necessary. The initial draw,
+and unfoldings from extensions of U due to new chnages,
+should be pruned. But any extension the user specifically requests --
+via an edit request, or by copying a branch somewhere (C-c o n),
+or maybe some other way -- should be treated the same as it would be
+in an ordinary content view.
+******** [Claude] it does not; and the subtree write-protection you may mean is the one-editable-occurrence rule, not pruning
+The check in question write-protects nothing. What it does to the
+children of a brand-new write-protected headline is set their
+'affectsParent' to false, so that the save does not read them as that
+node's content, which the headline cannot write. Nothing is removed.
+
+The write-protecting of a whole subtree happens elsewhere, in the
+draw rule: when editability moves from V to W, V's content subtree is
+write-protected because W draws that same content editable under
+itself, and a node has one editable occurrence per buffer. That is
+ordinary-view behavior ('writeProtect_content_subtree', older than
+the TDV), the copies under V stay drawn, and nothing is pruned.
+
+Your principle holds as things stand: an editable-view request, a
+pasted node (C-c o n), typed children, a moved headline, all go
+through the same save code in a TDV as in a content view. U decides
+only what the initial drawing unfolds and what the
+editable-occurrences step makes editable after a save.
+******* DONE "If the user typed them under a write-protected headline ... the save turns them into non-members rather than lose them"
+I hope skg warns the user if they do that?
+(Everywhere, not just in the TDV.)
+******** [Claude] no, it does not warn, anywhere
+'make_direct_unrestricted_children_independent' flips the flag and
+says nothing; the user learns of it when the rerender shows
+'(affectsParent false)' on those headlines. That is a gap in every
+view. The stateless rule below replaces this silent demotion by a
+refusal with a message, which is what I would do rather than add a
+warning to the current behavior.
+******* DONE "If it finds a counterpart whose children differ, the user has edited a write-protected occurrence, and the save is refused."
+This seems to contradict "If the user typed them under a write-protected headline ... the save turns them into non-members rather than lose them".
+******** [Claude] two situations today, which the stateless rule merges
+Today the check distinguishes an occurrence the server drew (it has a
+counterpart in the last rendering) from one the user created (a
+headline pasted with C-c o n, or typed by hand with 'writeProtected'
+in its metadata). Children that differ under the first are an
+attempted edit, and the save is refused. Children under the second
+have nothing to be compared with, so the save keeps them as the
+user's own non-members, silently. Not a contradiction, but an
+asymmetry chosen for leniency, and an unannounced one. Under the rule
+below, both cases are judged the same way, against the graph.
+******* DONE Looking for counterparts, let alone via the path to a viewroot, feels fragile. I hope we don't need it.
+More generally, tracking history is procedural, dangerous, hard to reason about.
+Let's not think about how things got there, just what they are.
+There is U, the things that need writable unfolding.
+There are editable nodes and write-protected ones.
+The vognode children of a node (or of its content folder)
+can be in its content or not.
+
+The path to the root feels fragile, too --
+the user could, for instance, move that root to be an
+affectsParent=False child of some other node.
+
+In an ordinary content view, when the user
+adds affectsParent=True children to a write-protected node,
+does the server accept that? I thought that was rejected.
+If so, it should be rejected in the TDV, too.
+
+If the user adds content to an editable node E,
+it seems like we should treat that the same way as in an ordinary save,
+regardless of whether E is in U.
+
+Does that cover every case?
+******** [Claude] we do not need it; your rules cover every case I can find, and they are better
+Yes, the server accepts typed members under a write-protected
+occurrence in no view: in a content view that is "Edited
+write-protected occurrence ... changed content membership", refused.
+And yes, content added to an editable node is saved the same way
+whether or not the node is in U; U never reaches the save code.
+
+********* Stated without history, the rules are these.
+********** 1. A write-protected occurrence shows either no members or exactly
+   the live graph's content list of its node, as a set; and its
+   title, home skgrepo, aliases, subscriptions, overrides and hidden
+   list equal the graph's. Anything else is an attempted edit of a
+   write-protected node, refused with the node and the difference
+   named. (A removed member in a TDV has 'affectsParent' false and a
+   historical phantom is not an unrestricted vognode, so neither
+   counts.)
+*********** DONE [Jeff] Showing all content or none seems too strict.
+The user might ask to see containerward paths from N, and if there's a cycle,
+find one of N's contents C as N's container. In that case C is a child of N
+(I'm mixing viewnodes and graphnodes in a sloppy manner), shown without
+the other content of N. That should be okay.
+
+Simpler yet, the user may have put content node C under N,
+even when there's no cycle, just because they want to work on C.
+That too should be okay.
+
+All of the children of a write-protected node have affectsParent=False,
+so they can safely be anything -- content, mentioners, whatever.
+Whether a child is content of its parent can be inferred by the user
+from the herald, and by skg from the inRustGraph and their IDs
+(the server should not have to trust the view properties like
+'its parent contains it' in the metadata).
+
+I believe this is both less (if anything) to code than the all-or-nothing
+proposal, and is in keeping with the treatment of ordinary content views.
+************ [Claude] agreed: under a write-protected occurrence every child is a non-member and none is checked; two things must change for that to hold
+Your rule is simpler and it is the right one: the save never reads
+anything under a write-protected occurrence as content, so the
+comparison of its children with the graph goes, and a partial list, a
+container found through a cycle, or a content node parked there to
+work on are all fine. The heralds already tell the user what the
+graph says: 'aC' on a child means its parent contains it, and '⊥'
+marks a child that does not affect its parent on save.
+
+Two things in the code contradict "all children of a write-protected
+node are non-members" today, and the plan must change them.
+
+First, when editability moves from V to W, 'writeProtect_content_subtree'
+write-protects V and its content subtree but leaves every child's
+'affectsParent' true. Under your rule it sets them false, all the way
+down, since each of those children now sits under a write-protected
+parent.
+
+Second, the content reconciler matches a node's content list against
+its member children only ('complete_relevant_children_in_viewforest'
+with the relevance "affectsParent is true"); non-member children are
+left alone as the user's own. So when editability moves back to V,
+its children, now non-members, would be ignored and V's content drawn
+again beside them. The reconciler must adopt a non-member child whose
+node is in the content list as the member, keeping the viewnode and
+its fold state, instead of creating a second one. That also repairs
+a quirk that exists today in ordinary views: park a content node C
+under an editable N and the rerender shows C twice, once as your
+non-member and once as the member it draws.
+
+With those, the rules of my list collapse to this. A write-protected
+occurrence's own fields that the view shows (title, body if shown,
+and its alias, ID and flags folders if present) equal the graph's, or
+the save is refused as an edit to a write-protected node; its
+children are all non-members and are not checked against its content;
+a member child under it is the one error (your next item).
+An editable occurrence is
+saved as in any view. The TDV's own rule about a node of U with no
+editable instance is the item after. Nothing else.
+*********** DONE [Jeff] Those other collections must equal the graph *if*
+if the view shows them, but they might be absent from the viewnode's children,
+in which case it expresses no opinion.
+************ [Claude] yes: present means checked, absent means no opinion
+That is how the editable-set folders already work ("an absent folder
+means no opinion; a present-but-empty folder means an explicit empty
+set"), and the rule for a write-protected occurrence follows it: an
+alias, ID or flags folder that is present under it must equal the
+graph, or the save is refused as an attempted edit; a folder that is
+absent says nothing. Title and body are always present, so they are
+always compared.
+*********** DONE [Jeff] An affectsParent=False child can be freely added.
+The only problem would be an affectsParent=True one.
+************ [Claude] agreed; the member child is refused, and the server never produces one
+A headline typed under any node arrives with 'affectsParent' true,
+since that is the parser's default. Under a write-protected
+occurrence that is the one thing the save cannot honor, so it refuses
+with a message naming the node: this occurrence is write-protected, a
+child typed under it cannot become its content; request an editable
+occurrence (C-c s d), or mark the child as not affecting its parent.
+This answers your earlier wish that typing under a write-protected
+headline be rejected rather than silently demoted, in every view. The
+server's own children under a write-protected occurrence are
+non-members by the first change above, so they never trip it; a
+pasted node (C-c o n) is a leaf.
+
+The alternative is to set the flag false and warn. I prefer the
+refusal: a child typed there is nearly always a mistake, and the user
+is better told before the headline drifts out of sight.
+************* [Jeff] yes, better the refusal
+************** DONE [Claude] one refinement, forced by how C-c s w works
+'skg-set-write-protected' writes 'writeProtected' into the headline's
+metadata and touches nothing else, so when the user write-protects an
+occurrence whose content was drawn, its children still say
+'affectsParent' true in the text. A rule that refuses every member
+child under a write-protected occurrence would refuse exactly the
+gesture you have just allowed. The stateless way out is the graph: a
+member child whose node the parent's content list contains becomes a
+non-member silently, since the flag is only catching up with the
+parent; a member child whose node is not in the content list is a
+typed attempt to add content, refused with the message above. So
+"write-protect this instance" works with no client change, and
+"type a child under a write-protected headline" is still rejected.
+*************** DONE [Jeff] simpler and safer, I think, would be
+to change set-write-protected to request-write-protected.
+Then the server can figure out how to handle the children
+(I think all it needs to do is make not affect their parent).
+
+Am I right -- is this both simpler and safer?
+**************** DONE [Claude] yes, both; and it removes the graph comparison I had just added
+Yes. Today C-c s w writes the state ('writeProtected') into the
+headline, so the server receives an occurrence that claims to be
+write-protected while its children still claim to be members, and it
+has to work out which of the two to believe. As a request
+('(viewRequests writeProtectedView)', say), the occurrence arrives
+still editable, the save applies whatever edits it carries as usual,
+and the rerender then does the write-protecting itself at the
+occurrence's visit: the occurrence becomes write-protected and every
+child under it becomes a non-member, all the way down, which is what
+'writeProtect_content_subtree' already does for the draw rule once it
+sets the flag. The request is consumed, as the editable-view request
+is.
+
+Simpler, because the rule for member children under a write-protected
+occurrence loses its graph clause: the server never leaves a member
+there, so a member child in a saved buffer can only have been typed,
+and it is refused outright. Safer, because the server controls the
+transition and the buffer never holds the half-state the bug came
+from. The request also tells the server, from the buffer alone, that
+the write-protection is the user's doing, which the previous item
+needed and could not have without history.
+
+What it costs: a 'ViewRequest' variant and its wire atom, the branch
+in 'visit_normal_node' (reusing 'writeProtect_content_subtree'), both
+clients' commands writing the request instead of the flag, and their
+docs. The hand-edit path the COMMANDS entry mentions ("you can also
+do it yourself" in the metadata buffer) keeps working for a leaf and
+is refused for an occurrence with drawn members, with a message that
+names the command; I would drop that sentence from the docs.
+***************** DONE [Jeff]
+It sounds like the command should be called, then,
+request-subtree-write-protected, because it's recursive, right?
+****************** TODO [Claude] as I described it, yes; but I would offer both forms, as the repo and relRepo commands do
+What I described write-protects the occurrence and its whole content
+subtree, as the draw rule does when editability moves, because that
+code exists. But the user's own gesture does not need the recursion.
+The one new thing a write-protected occurrence requires is that its
+direct children stop being members; the children themselves are
+other nodes, and nothing says they must stop being editable. A child
+left editable under a write-protected parent is a non-member editable
+node, which skg allows anywhere, and in a TDV it keeps showing its
+own changes there. So the smaller command, "write-protect this
+occurrence; its children become non-members and stay as they are",
+is consistent with every rule in this thread and closer to what
+C-c s w did before.
+
+The project already pairs a command with its recursive form on the
+shifted key: C-c s r and C-c s R for the relRepo, C-c s s and C-c s S
+for the repo. I would follow that: 'skg-request-write-protected' on
+C-c s w, for the occurrence alone, and 'skg-request-write-protected-recursive'
+on C-c s W, for the subtree, with the Neovim twins on 'sw' and 'sW';
+one request atom with a flag, or two atoms, whichever the parser
+prefers. If you want a single command, the recursive one with your
+name is the right one, since the move of editability already has
+that shape.
+******************* TODO [Jeff] agreed
+********** 2. Non-member children, under any node, are the user's own and are not checked against the node's content list.
+********** 3. An editable occurrence is saved as in any view.
+********** 4. In a TDV buffer, a node of U that has occurrences but none editable and none carrying an editable-view request
+refuses the save, with slice 3's message.
+*********** DONE [Jeff]
+What was slice 3's message?
+Why do we want to refuse this?
+Last I remember we were making the first instance editable if none were.
+If I asked to change that I've forgotten both that I did and why.
+************ DONE [Claude] the message, the reason you gave, and the choice that is open again
+The message: "In a total diff view every changed node stays editable
+somewhere. TITLE (ID) would have no editable instance left; to edit it
+elsewhere, request another instance editable (C-c s d) instead of
+write-protecting this one."
+
+You did ask for it, in two steps. In 5_review you agreed to the
+Decide item "Write-protecting the only editable instance of a changed
+node is silently undone" with "agreed, let's refuse", and in
+conversation on 2026-10-19 you said it would be a bad idea to let the
+user write-protect the only editable instance of a change, because
+they could then no longer see all changes in that view, so the save
+should refuse with an explanation.
+
+The two mechanisms are different. The editable-occurrences step gives
+a node of U an editable instance when it has none, as a default: a
+node that just entered U, or one whose editable instance is gone. The
+refusal is for the user's explicit gesture of write-protecting the
+last editable instance; without it, the step undoes that gesture at
+the same save and says nothing, which is what you did not want.
+
+Stated without history, the rule is what I wrote as 4: a node of U
+that has occurrences in the buffer, none editable and none requesting
+to be, refuses the save. That also covers deleting the headline of
+the only editable instance while a write-protected one stands, since
+the message fits that too. The alternative is no refusal at all: the
+step quietly makes an instance editable again, with a warning that
+says so. Both are stateless. I still prefer the refusal, for the
+reason you gave; but it is your call again.
+************* DONE [Jeff] ah. I retract that, then.
+Refusal will make more work for us and more for them.
+Let's just let them make it uneditable if they want.
+It will still show its commit-readiness in the herald, right?
+************** ONGOING [Claude] agreed; the refusal goes, and three things follow
+Yes, the herald still shows it. The '(ready ...)' facts are set on
+every unrestricted occurrence of a node, editable or not
+('set_ready_facts_in_viewforest' does not look at editability), and
+the readiness gestures work on write-protected occurrences too (their
+docstrings say so). What a write-protected instance does not show is
+the node's change decorations (old text, markers, removed members)
+and its content, and the readiness summary counts such a node as
+unshown, by slice 1's rule. So the user who write-protects the last
+editable instance keeps the readiness mark and loses the view of the
+change, and the summary says so.
+
+Three things follow from dropping the refusal.
+
+First, slice 3's check ('errors_for_nodes_of_u_left_without_editable_occurrence'),
+its error variant and message, its tests, and the sentences the docs
+gained for it go. The Neovim client's rewriting of Emacs chords in
+server messages stays; it is harmless and useful elsewhere.
+
+Second, for the write-protection to stick, the editable-occurrences
+step must not undo it at the same save, which it would today, since
+the node of U then has no editable occurrence. The step cannot know
+who write-protected an occurrence, and must not keep history to find
+out; but it can see what the occurrence is. A write-protected
+occurrence with children under it was drawn editable once (only an
+editable occurrence gets content drawn), so its write-protection is
+deliberate, the user's or the draw rule's; the step leaves it alone.
+A childless write-protected occurrence is a leaf the server drew for
+a member outside U; the step may make it editable. One edge: a node
+with no content has childless instances only, so write-protecting its
+last editable instance is undone at the next save; folding it is the
+way to get such a node out of sight. I would accept that edge rather
+than add a marker to tell the two apart.
+
+Third, this closes the duplicate-children bug by itself. The
+write-protect validator no longer demotes anything, and the step no
+longer makes the user's write-protected instance editable again, so
+the gesture that showed a and b twice shows them once, as non-members
+under n under x; the Decide item at the top is superseded.
+*************** DONE [Jeff] I'm unsure ensuring editable occurrences is worth it.
+This algorithm really wants to get hairy, but nobody in future
+is going to appreciate all that hair -- even I'll forget why it's there --
+ and it will be hard to maintain.
+
+Rather than automatically pulling in new changes to U,
+let's leave them out, report them, and provide a command
+that lets the user pull them in. When the user runs that command,
+any change without an editable occurrence gets one.
+
+Is this safe? Does it cover all our bases?
+**************** TODO [Claude] safe, and it covers every case; it also deletes most of the hair
+Yes. The step was the hair: which occurrence to pick, what a
+requested occurrence means to it, what a childless one means, what
+happens in the same completion as a request. All of that exists only
+because the view tried to follow U by itself after every save.
+Without that, what remains is simple.
+
+After a save, the sets are still recomputed, and completion still
+draws the buffer by the fresh U where it draws anything new (a new
+member outside U is a write-protected leaf; nothing editable is ever
+write-protected again). But no occurrence is made editable and no
+root is appended on the server's initiative. A node of C with no
+editable occurrence is simply unshown, and the readiness summary
+already counts those; its line becomes the signal.
+
+The command ("show the unshown changes", on the TDV buffer; the
+client saves first, as the fork command insists) does on demand what
+the step did always, with one rule: for every node of C that has no
+editable occurrence, make its first content occurrence editable, else
+its first folder occurrence, else append its content origin as a new
+root; then rerender. Completion draws the content under each, with
+members of U editable, down to the change, as the first drawing does.
+Because the user asked for everything, the command does not care who
+write-protected an instance; it makes one editable, and the user who
+wanted that node out of the way folds it.
+
+Every case I can enumerate: a changed node drawn only as a
+write-protected leaf (unshown until the command, then editable
+there); a change under an origin the buffer lacks (unshown until the
+command appends the root); the last editable instance write-protected
+by the user (unshown, by their choice, until they ask); a node whose
+change was committed or undone (its instances linger as context, as
+decided; nothing to pull); the merges and skgrepo-changes buffers
+(the same command, over their own C); an editable-view request on a
+leaf (the ordinary way, unchanged). The duplicate-children bug has no
+step left to cause it.
+
+What goes: the editable-occurrences step and its criteria, the
+automatic appending of roots, slice 5's "the view follows its fresh
+sets" paragraph in the docs, and the tests that assert the following;
+their fixtures serve the command's tests instead. What stays: the
+"drawn means an editable occurrence" rule for the count, the
+write-protected-leaf drawing for members outside U, and the
+lingering roots.
+********** 5. One editable-view request per node per buffer.
+*********** DONE [Jeff]
+I believe skg already enforces this for ordinary content view saves.
+We do all the same verifications on saves of a TDV buffer, right?
+************ DONE [Claude] yes on both
+'validate_editable_view_requests' runs on every saved buffer, and
+after slice 2 it holds only this rule. A TDV buffer goes through every
+validation an ordinary buffer does, plus its own; none is skipped. I
+listed the rule only so the list was complete.
+********* What changes against today.
+The counterpart search and the path from
+the root go away, with the fragility you name (a root moved under
+another node as a non-member no longer confuses anything). A new
+write-protected headline with typed children is refused instead of
+silently demoted, which is what you asked for above; a pasted node
+alone (C-c o n inserts a leaf) is unaffected. Reordering the children
+of a write-protected occurrence stops being refused, since the
+comparison is of sets; order under such a node is view-local anyway.
+The first cause of the duplicate-children bug disappears with the
+counterpart search, so the fix shrinks to rule 1 plus the
+editable-occurrences step skipping a requested node. Rule 4 also
+covers a user who deletes the headline of the only editable
+occurrence while a write-protected one remains; the message fits.
+
+The one trade. Today's check compares with the last rendering, so a
+buffer that has not yet received a collateral rerender passes; the
+graph-based check would refuse it, saying the occurrence differs from
+the node's content. Clients apply a rerender before the user can
+type, so I know of no way to reach that, and the refusal would be
+true if it were reached.
+
+********* Every occurrence I can enumerate
+falls under one of the five: an
+editable one (3); a write-protected one drawn with its full content,
+or as a leaf (1, passes); one with typed, deleted or foreign members
+(1, refused); a pasted or hand-typed one (1, by the same test); one
+the user moved under another parent (an edit to the parents, as in
+any view); folder members, removed members and phantoms (2, or not
+occurrences); a node of U left without an editable occurrence (4).
+If you confirm, the follow-up plan replaces
+'errors_and_normalize_new_writeProtected_occurrences' and slice 3's
+check with these rules, and the Decide item above is superseded.
+**** DONE What does "the validator" validate?
+Are you talking about *the* validator (which does millions of things),
+or some TDV-specific validator?
+***** [Claude] a specific one, and not TDV-specific
+The save runs many checks on a buffer; the entry point is
+'find_buffer_errors_for_saving'
+('server/from_text/buffer_to_viewnodes/validate_tree.rs'),
+and "the validator" without more is that whole collection. The one I
+meant is one of its parts,
+'errors_and_normalize_new_writeProtected_occurrences'
+('server/from_text/write_protected_edits.rs'), which runs for every
+buffer of every kind: it compares the saved buffer's write-protected
+occurrences with the last rendering, refuses edits to them, and makes
+the children of a new write-protected occurrence non-members. The
+first cause of the bug is there, so the fix applies to ordinary views
+too. The TDV-specific check is its new sibling from slice 3,
+'errors_for_nodes_of_u_left_without_editable_occurrence', which is
+not involved in the bug. A third part, 'validate_editable_view_requests',
+is the one slice 2 reduced to the one-request-per-node rule. I will
+name the part each time from now on.
+**** DONE Why do we need to use editability as part of the identifying information for a viewnode? Why do we need to identify viewnodes at all?
+***** [Claude] we do not, and the bug is that the check used it as a filter; identity is needed to read a save at all
+Editability is not part of a viewnode's identity, and the fix does
+not make it one. The identity the server uses is the pair (node, path
+from the buffer root),
+which is what 'errors_and_normalize_new_writeProtected_occurrences'
+pairs the saved buffer's occurrences with the last rendering's by. The
+bug is that it narrowed its search of the last rendering to
+occurrences that were write-protected then, as if an occurrence could
+not change its editability between two saves; the fix drops that
+narrowing, so a previously editable occurrence at the same path pairs
+as the same occurrence. That is less use of editability, not more.
+
+Why identify at all: a save is text, and the server has to work out
+what the user changed. For an editable occurrence it does not need
+the last rendering; the headline's content list is the edit, compared
+against the graph. For a write-protected occurrence it does: the
+buffer cannot carry edits to it, so the only way to tell "this is
+what the server drew here" from "the user typed this under a
+write-protected headline" (refused as an edit, or kept as a
+non-member) is to find what the server drew here last time. That
+needs a correspondence between the buffer's occurrences and the
+registered view's, and (node, path) is it. The same correspondence is
+what lets the fold-preservation work of the fixes plan keep a
+viewnode's fold state across saves: it matches each child to the one
+the server drew before by node under the same parent.
+****** DONE [Jeff] distinguishing "this is what the server drew here" from "the user typed this under a write-protected headline"
+is something we won't need if we implment the stateless fix I proposed?
+******* DONE [Claude] yes, it goes away
+Under your rule nothing beneath a write-protected occurrence is
+content to the save, so there is nothing to tell apart: drawn and
+typed children alike are non-members, and a typed one that claims
+membership is refused on its own evidence. The counterpart search and
+the path from the root go with it. What stays is the matching the
+rerender does within one parent, between the buffer's children and
+the fresh drawing, by node; it looks at the buffer in hand and the
+graph, keeps nothing across saves, and is what preserves fold state.
+* Know: what you will meet while dogfooding
+** TODO The editable-view request, now
+On a write-protected occurrence it moves editability there, and the
+occurrence that was editable keeps its drawn subtree, write-protected;
+a request on that one later moves editability back, and its children
+are reconciled, not redrawn. On an already-editable node it unfolds
+the node's content editable, up to 'initial_node_limit' expansions; in
+a TDV only nodes outside U are charged. One request per node per
+buffer. Children typed under a write-protected headline in the same
+save as a request are still refused, by the write-protected-edit
+validator.
+** TODO The refusal
+A save of a TDV buffer that write-protects the only editable
+occurrence of a node of U, and requests no other occurrence of it
+editable, is refused with a message naming the node and the
+alternative. Write-protecting a node outside U saves, and in an
+ordinary content view the old behavior stands.
+** TODO A stale buffer can meet the refusal
+Three existing tests saved the "all changes" buffer's text from before
+a collateral rerender, and the new rule refused them: the server's
+registered view had made a node editable (the editable-occurrences
+step) that the old text still drew write-protected. The agent fixed the tests to save
+what a client holds. A client does hold the rerendered text, so this
+should not arise in use; if it ever does, the message will speak of
+write-protecting a node you did not touch.
+** TODO The Neovim client rewrites one Emacs chord
+Server messages name Emacs bindings. Neovim now replaces 'C-c s d' by
+its own binding when it shows save errors and warnings; the other
+chords in server messages (C-c s s, C-c g RET, C-c s r) still show
+verbatim, as 'TODO/problems.org' records. Extending that table is a
+few lines.
+
+* Sound: placements and repairs, no action needed
+** Slice 2 finished on top of the stopped run's work
+The fresh agent kept the stopped agent's change to 'visit_normal_node',
+the 'shared' fixture and the moving test, deleted the two rules and
+their variants, messages and tests, and rewrote the docstrings and
+the docs; the typed-child test sits in the validator's own module.
+'tests/editable_view_cascade_and_budget.rs' had no refusal test to
+convert. The cascade after a move also makes b, a member outside U,
+editable under the new occurrence, charged to the budget, which is
+the rule applied.
+** Where U reaches the validator
+The save handler refreshes the connection's straddle against the live
+graph before the save and passes the buffer's U into the validation
+entry point, which calls the new sibling of the write-protected-edit
+validator. Test helpers 'node_lines' and 'requesting_editable_at'
+moved to 'tests/pcsvf/common.rs', shared with the new
+'tests/pcsvf/write_protecting.rs' (four tests: refused; allowed with a
+request on another occurrence; a node outside U saves; an ordinary
+content view saves).
+** The stopped run's report was replaced
+The slice-2 entry in 'progress.org' is now the finishing agent's,
+with one sentence saying the first run stopped and why. The stop
+report itself is gone from the file; its substance lives in
+[[file:6_1_unblocking-slice-2.org][6_1_unblocking-slice-2.org]].
+
+* Housekeeping
+** DONE The commit rule was followed
+Each slice's last commit carries the plan's DONE keyword, the
+'progress.org' entry and the docs it changed; the first commit of each
+slice is code only.
+** TODO Your "plans" commit carries the stopped agent's code
+'6640c47c plans' includes 'server/update_buffer/complete.rs' and
+'tests/pcsvf/fresh_sets.rs', the uncommitted slice-2 work, beside the
+plan files. Harmless, since it compiles and the slice-2 commits build
+on it, but the history reads as if the plans commit changed code. Not
+worth rewriting.
+** The runner's handover worked
+Its first line listed the modified files and handed them to the
+slice-2 agent; the agent read 'progress.org' and the rewritten slice
+and finished without a question.
+** The run's own files
+'run-logs/' is untracked; 'tests/results/review7/' holds this
+review's suite outputs and per-commit log.
+** The branch
+'total-diff-view' is now far ahead of 'origin/main' and unpushed.
+With the plan done, this is a natural point to dogfood and then merge.
+
+* Suggested dogfood, in this order
+1. In a TDV buffer, request a write-protected occurrence of a changed
+   node editable and save: editability moves, and the old occurrence
+   keeps its subtree. Request it back: it returns, children intact.
+2. Request an editable node of U editable: its write-protected members
+   open, up to the node limit.
+3. Write-protect the only editable occurrence of a changed node and
+   save: the refusal names the node. Add a request on another
+   occurrence and save again: it goes through. (Expect the duplicated
+   children from the Decide item until that fix lands.)
+4. Write-protect a context node outside U: it saves.

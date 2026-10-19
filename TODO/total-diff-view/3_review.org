@@ -864,7 +864,7 @@ with its two resolved entries now heads 'TODO/DONE/problems.org', and
 *** [Jeff] please modify the commit messages to warn anyone doing such a bisection
 **** [Claude] the warning would be false, so I did not rewrite
 I checked out each of the four intermediate slice-2 commits
-(59ffb792, 0cddbd7e, c76e23b9, 34f04de4) in a temporary worktree and
+(2aa8401d, 828080bf, 3a2ec4a6, 8a2ba4c0) in a temporary worktree and
 ran 'cargo check --all-targets' at each: all four compile, tests
 included. The agent's worry did not come true, so a bisector hits
 nothing there, and a warning would mislead. Rewording would also have

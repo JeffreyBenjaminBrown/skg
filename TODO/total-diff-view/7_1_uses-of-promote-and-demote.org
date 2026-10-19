@@ -1,0 +1,304 @@
+#+title: Uses of "promote" and "demote"
+
+* Summary
+A case-insensitive search for the stems "promot" and "demot" in 'server/', 'elisp/', 'nvim/', 'tests/' (without 'tests/results/'), 'docs/', 'coding-advice/' and 'TODO/' (with 'TODO/DONE/'), skipping backup files ending in "~", finds 228 uses on 218 lines: 40 of "promote" and its forms, and 188 of "demote" and its forms; 'elisp/' and 'nvim/' contain none. They carry 17 distinct meanings, 6 for "demote" and 11 for "promote", plus 8 uses in 'TODO/total-diff-view/7_review.org' that mention the words themselves. One meaning dominates: "demote" as "set a child's 'affectsParent' to false" accounts for 164 uses, and it is the only sense of "demote" in live code and docs (59 uses in code, 3 in docs). Live code and docs also use "promote" in four other senses: lifting the sole top heading of an imported org file to its root ('parse.rs'), turning a viewnode into a deleted-node phantom ('viewnode.rs'), raising a search term to MUST ('docs/COMMANDS-nvim.org'), and two plain-English senses, raising something's prominence ('docs/this-is-awesome.org') and adopting something as a standard ('coding-advice/'). The pair "demote = make write-protected" and "promote = make editable" never occurs in code or docs; it occurs in the historical 'TODO/DONE/local-view-update/' plans under the old names "indefinitive" and "definitive", in one line of 'TODO/DONE/rename-indef-to-writeprotected.org', and in the recent TDV documents ('4_plan-fixes.org', '5_review.org', '7_review.org'). The open TODO files outside 'TODO/DONE/' and 'TODO/total-diff-view/' add the 'affectsParent' sense ('TODO/problems.org'), "focus-promotion" ('TODO/lying-names.org') and an async-to-sync sense ('TODO/from-dot-claude/obsolete-skgnodemap.org'). Every other meaning (deadening a viewnode, resetting a 'birth' claim, demoting org headings, lowering an error's severity, injecting a node into search results, turning a merged node's ID into an extra ID, and refactoring code to a broader home) occurs only in historical 'TODO/DONE/' documents.
+
+Terms used below. A /viewnode/ is one node of the tree the server draws into a buffer (an org headline in Emacs); it is a drawing of a stored node, not the stored node itself. An /occurrence/ is one viewnode that shows a given stored node; a node can occur several times in one view. 'affectsParent' is a flag on a viewnode: true means the child is a /member/ of its parent (it belongs to the parent's content list or to the folder's set, and a save reads it as such); false means the child sits under the parent only in the view, and a save does not add it to the parent. Older documents call these two values 'parentIs=Affected' and 'parentIs=Independent', and say "independent" or "non-member" for the second. A /stale/ member is a child marked as a member whose node the graph no longer lists in its parent's list or set. A /write-protected/ occurrence shows no body, accepts no edits, and has no content children drawn under it; older documents call it "indefinitive". An /editable/ occurrence is the opposite; older documents call it "definitive", and a "DVR" (definitive view request) is the user's request to make an occurrence editable. A /phantom/ is a viewnode standing for a node that is absent from the current graph (deleted, historical, or unknown). "TDV" is the total diff view.
+
+* "demote": set a child viewnode's 'affectsParent' to false, keeping it and its subtree in the view instead of deleting it
+This meaning turns a member into a non-member: the child stays where it is, with its children, but a save no longer reads it as belonging to its parent. Older documents say "demote to Independent" or "demote to 'parentIs=Independent'" for the same act. The uses fall into four groups by what triggers the act; all four groups set the same flag. (124 + 32 + 4 + 4 = 164 uses.)
+** Trigger: a child that claims membership but that the graph does not list (a stale member, or an intruder the user inserted into a set), when the child has children of its own
+This is the reconciler's "demote-not-discard" rule, decided 2026-06-10: a stale or intruding member that is a leaf is deleted, and one with children is demoted. (124 uses.)
+- 'server/to_org/complete/partner_folder/child_data.rs:18' (code): "///   or otherwise demoted by the caller-specific cleanup step."
+- 'server/types/viewnode.rs:514' (code): "/// with children is demoted to affectsParent=false, whatever the"
+- 'server/update_buffer/reconcile/content.rs:693' (code): "// original, and must not be demoted to non-member."
+- 'server/update_buffer/reconcile/content.rs:769' (code): "// containerward ancestor, or a TODO/DONE/local-view-update/plan_v2.org §6.0-demoted branch), so its goal id"
+- 'server/update_buffer/reconcile/hiddeninsubscribee_folder.rs:74' (code): "// is a view-leaf -- the common case for hidden members -- and demoted to"
+- 'server/update_buffer/reconcile/hiddenoutsideof_subscribeefolder.rs:78' (code): "// (the common case) and demoted to non-member only if it has a user"
+- 'server/update_buffer/reconcile/partner_folder.rs:50' (code): "/// then demotes stale children marked affectsParent=true to 'affectsParent=false'."
+- 'server/update_buffer/reconcile/partner_folder.rs:142' (code): "// demotes one that is a branch, so a write-protected PartnerFolder"
+- 'server/update_buffer/reconcile/partner_folder.rs:313' (code): "(RepairKind::DemotedNonMember, summary . demoted),"
+- 'server/update_buffer/util.rs:118' (code): "/// orderkeys it created, demoted to non-member (stale branches),"
+- 'server/update_buffer/util.rs:125' (code): "pub demoted            : Vec<Orderkey>,"
+- 'server/update_buffer/util.rs:134' (code): "demoted            : Vec::new (),"
+- 'server/update_buffer/util.rs:163' (code): "// that is an Unrestricted, affectsParent=true *branch* (has children) is demoted to"
+- 'server/update_buffer/util.rs:166' (code): "// affectsParent to demote; the orphan handling then preserves its"
+- 'server/update_buffer/util.rs:170' (code): "let demote_invalid ="
+- 'server/update_buffer/util.rs:173' (code): "enum StaleTreatment { Demote, Deaden, Detach }"
+- 'server/update_buffer/util.rs:176' (code): ". ok_or ('demote_invalid: node not found') ?;"
+- 'server/update_buffer/util.rs:181' (code): "=> StaleTreatment::Demote,"
+- 'server/update_buffer/util.rs:188' (code): "StaleTreatment::Demote => {"
+- 'server/update_buffer/util.rs:209' (code): "demote_invalid ) }"
+- 'server/update_buffer/util.rs:222' (code): "///   - A stale member is offered to 'demote_invalid'; if that keeps it (returns"
+- 'server/update_buffer/util.rs:223' (code): "///     true, e.g. TODO/DONE/local-view-update/plan_v2.org §6.0 demote-a-branch-to-non-member) it survives, otherwise it"
+- 'server/update_buffer/util.rs:235' (code): "/// - Returns a RepairSummary of what it created, demoted and detached."
+- 'server/update_buffer/util.rs:237' (code): "<Node, Orderkey, Relevant, View, ProblemDiscard, ProblemResponse, DemoteInvalid> ("
+- 'server/update_buffer/util.rs:246' (code): "demote_invalid           : DemoteInvalid,"
+- 'server/update_buffer/util.rs:257' (code): "DemoteInvalid   : Fn(&mut Tree<Node>, NodeId) -> Result<bool, Box<dyn Error>>,"
+- 'server/update_buffer/util.rs:296' (code): "// Stale members: demote_invalid may keep one (TODO/DONE/local-view-update/plan_v2.org §6.0 demote-a-branch); only a"
+- 'server/update_buffer/util.rs:299' (code): "if demote_invalid( tree, *treeid )? {"
+- 'server/update_buffer/util.rs:300' (code): "summary . demoted . push( orderkey . clone() );"
+- 'server/update_buffer/warnings.rs:18' (code): "DemotedNonMember,  // a child claiming membership was not a real member; its branch was demoted to affectsParent=false"
+- 'server/update_buffer/warnings.rs:65' (code): "RepairKind::DemotedNonMember =>"
+- 'server/update_buffer/warnings.rs:66' (code): "format! ('demoted {} non-member(s) to false: {}',"
+- 'tests/hidden_from_subscriptions.rs:561' (code): "// in-view subtree (e11) is a user branch, so §6.0 DEMOTES the visible"
+- 'tests/hidden_from_subscriptions.rs:575' (code): "'Expected hidden branch e1 demoted to non-member (subtree preserved):\n{}',"
+- 'tests/partner_folder_matrix.rs:159' (code): "/// is a demotion-to-independent rather than a removal. Built fresh"
+- 'tests/partner_folder_matrix.rs:271' (code): "// The intruder is demoted to affectsParent=false in the rerendered view."
+- 'tests/partner_folder_matrix.rs:276' (code): "'intruder must be demoted to affectsParent=false: {}',"
+- 'tests/partner_folder_warnings.rs:10' (code): "//   demoted to affectsParent false, with a warning."
+- 'tests/partner_folder_warnings.rs:98' (code): "// (new) child so the repair is a demotion, not a removal."
+- 'tests/partner_folder_warnings.rs:132' (code): "assert! ( warning . contains ('demoted 1 non-member(s) to false: x'),"
+- 'tests/unit/completion_warnings.rs:14' (code): "repair   : RepairKind::DemotedNonMember,"
+- 'tests/unit/completion_warnings.rs:34' (code): "assert! ( rendered [0] . contains ('demoted 1 non-member(s)') );"
+- 'docs/glossary.org:303' (docs): "2026-06-10, demote-not-discard): a stale ~affectsParent=true~ member"
+- 'docs/glossary.org:304' (docs): "that is a leaf is deleted; one with children is demoted to"
+- 'docs/sharing-model.org:58' (docs): "...n a save repairs such a folder (restoring a deleted member, demoting an inserted non-member), it says so in a warning, but on..."
+- 'TODO/DONE/full-schema/7_saving-readonly-cols.org:122' (historical TODO): "5. demotes generated-looking nonmembers to independent before"
+- 'TODO/DONE/full-schema/DONE/11_override-rendering-and-navigation.org:193' (historical TODO): "list gets the stale treatment (deleted if leaf, demoted if"
+- 'TODO/DONE/full-schema/DONE/11_override-rendering-and-navigation.org:201' (historical TODO): "and the existing R looks STALE (so it is deleted or demoted)."
+- 'TODO/DONE/full-schema/DONE/12-1_diff-mode-policy.org:169' (historical TODO): "missing ones, and deleting or demoting stale ones."
+- 'TODO/DONE/full-schema/DONE/12-2_diff-mode-policy_discussion.org:166' (historical TODO): "missing ones, and deleting or demoting stale ones."
+- 'TODO/DONE/full-schema/DONE/13_test-rel-matrix.org:94' (historical TODO): "- 'demotion' :: reconciliation's treatment of a stale member that"
+- 'TODO/DONE/full-schema/DONE/13_test-rel-matrix.org:248' (historical TODO): "tests/partner_col_warnings.rs (an inserted non-member is demoted"
+- 'TODO/DONE/full-schema/DONE/13_test-rel-matrix.org:251' (historical TODO): "member restored, with a warning); demotion-vs-deletion of stale"
+- 'TODO/DONE/full-schema/DONE/13_test-rel-matrix.org:453' (historical TODO): "('readonly_col_repairs_warn': restored member, demoted intruder,"
+- 'TODO/DONE/full-schema/DONE/13_test-rel-matrix.org:607' (historical TODO): "- insertion: a non-member into each read-only set (demoted to"
+- 'TODO/DONE/full-schema/DONE/13_test-rel-matrix_discussion.org:80' (historical TODO): "- 'demotion' :: reconciliation's treatment of a stale member that"
+- 'TODO/DONE/full-schema/DONE/13_test-rel-matrix_discussion.org:234' (historical TODO): "tests/partner_col_warnings.rs (an inserted non-member is demoted"
+- 'TODO/DONE/full-schema/DONE/13_test-rel-matrix_discussion.org:237' (historical TODO): "member restored, with a warning); demotion-vs-deletion of stale"
+- 'TODO/DONE/full-schema/DONE/13_test-rel-matrix_discussion.org:440' (historical TODO): "('readonly_col_repairs_warn': restored member, demoted intruder,"
+- 'TODO/DONE/full-schema/DONE/13_test-rel-matrix_discussion.org:544' (historical TODO): "- insertion: a non-member into each read-only set (demoted to"
+- 'TODO/DONE/full-schema/DONE/14_document.org:45' (historical TODO): "uniform demote-not-discard stale rule, and the"
+- 'TODO/DONE/full-schema/DONE/8_readonly-set-ergonomics.org:32' (historical TODO): "demote, not discard -- the uniform rule (delete a stale leaf,"
+- 'TODO/DONE/full-schema/DONE/8_readonly-set-ergonomics.org:33' (historical TODO): "demote a stale branch to independent) stands for ALL col kinds,"
+- 'TODO/DONE/full-schema/DONE/8_readonly-set-ergonomics.org:118' (historical TODO): "demote-not-discard decision, so per-file drift cannot recur."
+- 'TODO/DONE/full-schema/DONE/8_readonly-set-ergonomics.org:141' (historical TODO): "was demoted to independent (branch) or removed (leaf),"
+- 'TODO/DONE/full-schema/DONE/8_readonly-set-ergonomics.org:147' (historical TODO): "demoted 1 non-member to independent.'"
+- 'TODO/DONE/full-schema/DONE/8_readonly-set-ergonomics.org:199' (historical TODO): "demote-not-discard decision."
+- 'TODO/DONE/full-schema/DONE/8_readonly-set-ergonomics.org:243' (historical TODO): "return a repair summary: which orderkeys it created, demoted,"
+- 'TODO/DONE/full-schema/DONE/8_readonly-set-ergonomics.org:250' (historical TODO): "with 'RepairKind { RestoredMember, DemotedNonMember,"
+- 'TODO/DONE/full-schema/DONE/8_readonly-set-ergonomics.org:336' (historical TODO): "succeeds, child is demoted to independent, warning present."
+- 'TODO/DONE/full-schema/metaplan_2.org:66' (historical TODO): "is demoted to 'parentIs=Independent'; duplicates are deleted."
+- 'TODO/DONE/full-schema/metaplan_2.org:72' (historical TODO): "marked 'Affected' (the default); demotion targets 'Independent'."
+- 'TODO/DONE/full-schema/metaplan_2.org:103' (historical TODO): "(restore missing members, delete stale leaves, demote stale"
+- 'TODO/DONE/full-schema/metaplan_2.org:121' (historical TODO): "already restores missing members, deletes stale leaves, demotes"
+- 'TODO/DONE/full-schema/metaplan_2.org:142' (historical TODO): "Stale-member policy, decided 2026-06-10: demote, not discard.  The"
+- 'TODO/DONE/full-schema/metaplan_2.org:143' (historical TODO): "current reconciler's uniform rule (delete a stale leaf, demote a"
+- 'TODO/DONE/full-schema/metaplan_2.org:173' (historical TODO): "'Repaired subscriberCol under <owner>: restored 2 members, demoted 1"
+- 'TODO/DONE/full-schema/metaplan_2.org:514' (historical TODO): "***  reconciliation behavior (order preservation, demotion, restoring,"
+- 'TODO/DONE/full-schema/metaplan_2.org:620' (historical TODO): "(demote stale branches, delete stale leaves).  Maybe an improvement,"
+- 'TODO/DONE/full-schema/metaplan_2.org:622' (historical TODO): "decision (2026-06-10): demote, not discard -- the uniform rule is"
+- 'TODO/DONE/full-schema/progress.org:220' (historical TODO): "no repair warning), insertion of a non-member (demoted to"
+- 'TODO/DONE/full-schema/progress.org:659' (historical TODO): "keys and stale-demotion compare COLLECTED ids;"
+- 'TODO/DONE/full-schema/progress.org:1266' (historical TODO): "demote-not-discard decision recorded); view-local order"
+- 'TODO/DONE/full-schema/progress.org:1297' (historical TODO): "the demote-not-discard decision documented at the definition."
+- 'TODO/DONE/local-view-update/plan-critique.org:210' (historical TODO): "org-children, so presumably not-a-leaf -> demote-not-delete. Worth stating,"
+- 'TODO/DONE/local-view-update/plan.org:414' (historical TODO): "- *Delete* a stale member iff it is a view-leaf (org-leaf). Otherwise *demote"
+- 'TODO/DONE/local-view-update/plan.org:457' (historical TODO): "*** *Stale*: §6.0 (delete stale leaves, demote stale branches to independent)."
+- 'TODO/DONE/local-view-update/plan.org:474' (historical TODO): "subscribee's =contains=): delete if childless, else demote to Independent"
+- 'TODO/DONE/local-view-update/plan.org:651' (historical TODO): "instead *deletes* stale leaves, only demoting stale nodes that have children."
+- 'TODO/DONE/local-view-update/plan.org:690' (historical TODO): "*branches*, demote to independent (the new uniform rule; today it deletes"
+- 'TODO/DONE/local-view-update/plan.org:720' (historical TODO): "demote-to-independent net too (Jeff below), with validation as the real"
+- 'TODO/DONE/local-view-update/plan.org:722' (historical TODO): "**** DONE let's keep that dead-but-safe demotion"
+- 'TODO/DONE/local-view-update/plan.org:796' (historical TODO): "See §6.0. Delete stale leaves; demote stale branches to independent;"
+- 'TODO/DONE/local-view-update/plan.org:961' (historical TODO): "demote to Independent. (And drop the separate"
+- 'TODO/DONE/local-view-update/plan.org:1089' (historical TODO): "** *Stale handling*: stale leaf deleted, stale branch demoted to independent,"
+- 'TODO/DONE/local-view-update/plan_v2.org:331' (historical TODO): "- *Delete* a stale member iff it is a view-leaf (org-leaf). Otherwise *demote it"
+- 'TODO/DONE/local-view-update/plan_v2.org:369' (historical TODO): "*** *Stale*: §6.0 (delete stale leaves, demote stale branches to independent)."
+- 'TODO/DONE/local-view-update/plan_v2.org:387' (historical TODO): "subscribee's =contains=): delete if childless, else demote to Independent"
+- 'TODO/DONE/local-view-update/plan_v2.org:515' (historical TODO): "instead *deletes* stale leaves, only demoting stale nodes that have children)."
+- 'TODO/DONE/local-view-update/plan_v2.org:530' (historical TODO): "demote stale branches to independent (§6.0; today it deletes outright -- §16)."
+- 'TODO/DONE/local-view-update/plan_v2.org:556' (historical TODO): "*wrong-kind* -> validation error; keep the dead-but-safe demote-to-independent"
+- 'TODO/DONE/local-view-update/plan_v2.org:612' (historical TODO): "See §6.0: delete stale leaves; demote stale branches to independent; wrong-kind"
+- 'TODO/DONE/local-view-update/plan_v2.org:754' (historical TODO): "unconditionally. Generalize the discard to: delete iff view-leaf, else demote"
+- 'TODO/DONE/local-view-update/plan_v2.org:881' (historical TODO): "** *Stale handling*: stale leaf deleted, stale branch demoted to independent, for"
+- 'TODO/DONE/local-view-update/plan_v2.org:1006' (historical TODO): "the old code did. The §6.0 unified delete-if-leaf/demote-if-branch for ALL"
+- 'TODO/DONE/local-view-update/plan_v2.org:1013' (historical TODO): "generalized: complete_relevant_children takes a demote_invalid closure; the"
+- 'TODO/DONE/local-view-update/plan_v2.org:1014' (historical TODO): "ViewNode wrapper demotes a stale member that is a Normal/Affected *branch* to"
+- 'TODO/DONE/local-view-update/plan_v2.org:1027' (historical TODO): "demoted by §6.0 (else a hidden node stays visible, sometimes twice). Added"
+- 'TODO/DONE/local-view-update/plan_v2.org:1029' (historical TODO): "only the truly-extra (not-in-contains) children. Principle: demote-to-"
+- 'TODO/DONE/local-view-update/problems.org:1007' (historical TODO): "*** Should read-only generated collections delete stale affected members, while editable collections demote them?"
+- 'TODO/DONE/local-view-update/problems.org:1012' (historical TODO): "members are demoted, while HiddenInSubscribeeCol and"
+- 'TODO/DONE/local-view-update/problems.org:1325' (historical TODO): "- right-kind stale members: delete if view-leaf, otherwise demote to"
+- 'TODO/DONE/local-view-update/problems.org:1337' (historical TODO): "reconcile. The =treat_certain_children= call that would demote a Normal"
+- 'TODO/DONE/local-view-update/problems.org:1473' (historical TODO): "error, warning, placeholder, deletion, or independent demotion."
+- 'TODO/DONE/local-view-update/progress.org:1267' (historical TODO): "**** REALITY (what I've checked so far): there IS demotion machinery --"
+- 'TODO/DONE/local-view-update/progress.org:1268' (historical TODO): "content reconcile demotes stale content children to Independent"
+- 'TODO/DONE/local-view-update/progress.org:1269' (historical TODO): "(truenode.rs ~523), the relation/alias cols demote stale members, and"
+- 'TODO/DONE/local-view-update/review-2.org:102' (historical TODO): "child as Independent), and (b) from the §6.0 'demote a stale Affected branch to"
+- 'TODO/DONE/local-view-update/review-2_left-open.org:52' (historical TODO): "demoting stale ones."
+- 'TODO/DONE/split-parentIs-from-birth.org:235' (historical TODO): "- demote non-goal scaffold children to 'Independent' rather than"
+** Trigger: a member child whose parent is dead or deleted (an orphan under a deleted phantom, a dead viewnode, or a deadened folder)
+(32 uses.)
+- 'server/to_org/util.rs:341' (code): "/// Demote it to non-member so it renders as its own graph-contains root rather"
+- 'server/to_org/util.rs:345' (code): "/// - PARENT is Diff phantom / Deleted / DeadViewnode -> demote a member child."
+- 'server/to_org/util.rs:352' (code): "/// Belt-and-suspenders: most cases are already demoted during the BFS"
+- 'server/types/viewnode.rs:155' (code): "/// (which `mark_orphans_under_dead_parents_false` demotes to non-member)"
+- 'server/update_buffer/ancestry.rs:206' (code): "/// reconcile. The BFS still visits the (disposed) children; a demoted-"
+- 'server/update_buffer/ancestry.rs:225' (code): "/// - a member branch (has children) -> demote to affectsParent=false, so"
+- 'server/update_buffer/reconcile/content.rs:251' (code): "// is preserved (demoted), and a now-childless PhantomDeleted is removed by the"
+- 'tests/unit/ancestry.rs:146' (code): "// Member branch (has a child) -> demote to non-member, keep."
+- 'tests/unit/ancestry.rs:162' (code): "'a member branch is demoted to non-member and kept' );"
+- 'tests/unit/to_org_util.rs:140' (code): "fn orphan_under_dead_parent_demoted_member_under_folder_kept () {"
+- 'tests/unit/to_org_util.rs:142' (code): "// parent (Deleted phantom / DeadViewnode) demotes to non-member; a legitimate"
+- 'tests/unit/to_org_util.rs:175' (code): "'A member child under a Deleted phantom must demote to non-member');"
+- 'tests/unit/to_org_util.rs:177' (code): "'A member child under a DeadViewnode must demote to non-member');"
+- 'TODO/total-diff-view/progress.org:209' (recent TDV documents): "they are demoted): they are drawn as its old content, and the save"
+- 'TODO/DONE/local-view-update/progress.org:993' (historical TODO): "member via this path (other mechanisms -- the prune sweep, ParentIs demotion --"
+- 'TODO/DONE/local-view-update/progress.org:1252' (historical TODO): "mark_orphans_under_dead_parents_independent demotes exactly those (col members"
+- 'TODO/DONE/local-view-update/progress.org:1505' (historical TODO): "parentIs Absent and demote orphans-under-dead-parents, set viewnodestats, apply"
+- 'TODO/DONE/local-view-update/propagate-death-leafward/discussion.org:33' (historical TODO): "such user descendants (demote) while killing only the now-meaningless"
+- 'TODO/DONE/local-view-update/propagate-death-leafward/discussion.org:44' (historical TODO): "demoted to Independent), so the user never loses authored content."
+- 'TODO/DONE/local-view-update/propagate-death-leafward/discussion.org:144' (historical TODO): "*demote* (rather than the stopgap's detach), 11 must end up a *childless*"
+- 'TODO/DONE/local-view-update/propagate-death-leafward/discussion.org:174' (historical TODO): "branch is demoted to Independent. A demoted-Independent vognode then gets"
+- 'TODO/DONE/local-view-update/propagate-death-leafward/discussion.org:180' (historical TODO): "One residual I want your call on: a demoted-Independent vognode survivor stays a"
+- 'TODO/DONE/local-view-update/propagate-death-leafward/discussion.org:185' (historical TODO): "surviving demoted child be left *as the col it was* (not deadened) so the"
+- 'TODO/DONE/local-view-update/propagate-death-leafward/discussion.org:269' (historical TODO): "- Affected branch, vognode -> demote to parentIs=Independent (survives)."
+- 'TODO/DONE/local-view-update/propagate-death-leafward/discussion.org:274' (historical TODO): "Independent, and visiting a demoted-Independent node normally is correct."
+- 'TODO/DONE/local-view-update/propagate-death-leafward/discussion.org:282' (historical TODO): "subtree demotes/dies leafward instead of being detached wholesale."
+- 'TODO/DONE/local-view-update/propagate-death-leafward/discussion.org:292' (historical TODO): "OPEN for Jeff: the §4.5 residual (a demoted-Independent survivor left hanging"
+- 'TODO/DONE/local-view-update/propagate-death-leafward/plan.org:71' (historical TODO): "- vognode, parentIs=Affected, has children   -> demote to"
+- 'TODO/DONE/local-view-update/propagate-death-leafward/plan.org:89' (historical TODO): "demoted-Independent survivor stays (an accepted, rare shape -- a dead col with"
+- 'TODO/DONE/local-view-update/propagate-death-leafward/plan.org:99' (historical TODO): "mechanism a deleted node N (e.g. 11): is demoted by §6.0 (stale branch) -> at"
+- 'TODO/DONE/local-view-update/propagate-death-leafward/plan.org:129' (historical TODO): "*its* Affected member leaves deleted / member branches demoted to Independent"
+** Trigger: the save validator takes an occurrence to be newly write-protected and makes its drawn children non-members
+(4 uses.)
+- 'TODO/problems.org:10' (live TODO): "editable draws a and b twice under x: once demoted to non-members"
+- 'TODO/problems.org:15' (live TODO): "so it treats n as a new one and demotes its drawn children"
+- 'TODO/problems.org:18' (live TODO): "gesture only demotes them. Seen over TCP while verifying slice 3"
+- 'TODO/total-diff-view/7_review.org:207' (recent TDV documents): "it finds no counterpart, treats the occurrence as new, and demotes"
+** Trigger: the TDV draws a member removed since the base as a non-member of its editable folder
+(4 uses.)
+- 'TODO/total-diff-view/3_review.org:254' (recent TDV documents): "reconciler cannot match a demoted member or a historical phantom. Every"
+- 'TODO/total-diff-view/4_plan-fixes.org:272' (recent TDV documents): "to skgids and treats a demoted member or a historical phantom as"
+- 'TODO/total-diff-view/4_plan-fixes.org:449' (recent TDV documents): "phantom: a goal item matches an existing historical phantom or demoted"
+- 'TODO/total-diff-view/progress.org:363' (recent TDV documents): "The redraw demotes a removed member of an editable set (Subscribee,"
+
+* "demote": reset a viewnode's 'birth' claim to its default value, 'Unremarkable'
+The 'birth' field records why a child appears under its parent (for example, that it contains or links to the parent); this meaning replaces a stale claim with the value that claims nothing. It is the same move as the 'affectsParent' meaning applied to a different field. (1 use.)
+- 'TODO/DONE/split-and-extend-paths-and-cols/discussion.org:426' (historical TODO): "contain / link-to the parent?) and, if stale, DEMOTES it to"
+
+* "demote": make an occurrence write-protected (formerly "indefinitive")
+This meaning takes an occurrence that was editable (formerly "definitive") and makes it write-protected, so that it shows no body, accepts no edits and has no content children drawn under it; in the historical plans this happens when a deeper DVR for the same node claims the single editable occurrence. (13 uses.)
+- 'TODO/total-diff-view/4_plan-fixes.org:275' (recent TDV documents): "** 'tag_content_members' demotes at every visit and never promotes"
+- 'TODO/DONE/local-view-update/plan-critique.org:165' (historical TODO): "buffer's own *root could be demoted to indefinitive* -- its body and"
+- 'TODO/DONE/local-view-update/plan.org:281' (historical TODO): "Jeff's call: the invisible BufferRoot (§6.14) carries no data, so demotion"
+- 'TODO/DONE/local-view-update/plan.org:284' (historical TODO): "**** DONE residual: a visible origin can still be demoted"
+- 'TODO/DONE/local-view-update/plan.org:298' (historical TODO): "origin registers Tentative; only a DVR (=Final=) can demote it; and once an ID"
+- 'TODO/DONE/local-view-update/plan.org:326' (historical TODO): "DVR elsewhere (or its cascade) can demote it to indefinitive. That is"
+- 'TODO/DONE/local-view-update/plan_v2.org:229' (historical TODO): "no data, so demotion changes nothing there. A visible *origin* registers"
+- 'TODO/DONE/local-view-update/plan_v2.org:232' (historical TODO): "with a user DVR, the origin is demoted to indefinitive (body hidden, read-only)."
+- 'TODO/DONE/local-view-update/plan_v2.org:234' (historical TODO): "DVR can demote it; once Final, later DVRs are kept out), and is correct: the"
+- 'TODO/DONE/local-view-update/plan_v2.org:261' (historical TODO): "DVR elsewhere (or its cascade) can demote it to indefinitive. Correct --"
+- 'TODO/DONE/local-view-update/plan_v2.org:994' (historical TODO): "- §5.3 cascade-steal now demotes a Tentative origin/root when a deeper"
+- 'TODO/DONE/local-view-update/plan_v2.org:996' (historical TODO): "Updated the `repeat` test to the new (root-demoted) expectation."
+- 'TODO/DONE/local-view-update/problems.org:403' (historical TODO): "DVR elsewhere -- or its cascade -- can demote it to indefinitive."
+
+* "promote": make a write-protected occurrence editable (formerly "definitive")
+This meaning is the inverse of the previous one: an occurrence that was write-protected becomes the editable occurrence of its node, so the server draws its body and content children. In the TDV documents it names what the step now called "ensuring editable occurrences exist" does: after a save, for every changed node that has no editable occurrence, it makes one of that node's occurrences editable. (5 uses.)
+- 'TODO/total-diff-view/4_plan-fixes.org:275' (recent TDV documents): "** 'tag_content_members' demotes at every visit and never promotes"
+- 'TODO/total-diff-view/5_review.org:76' (recent TDV documents): "pre-pass re-promote, and send a completion warning that says so."
+- 'TODO/total-diff-view/5_review.org:157' (recent TDV documents): "promotes only those (a member of a write-protected folder would be"
+- 'TODO/total-diff-view/7_review.org:130' (recent TDV documents): "promotes a write-protected viewnode by itself. It never touches a node"
+- 'TODO/DONE/rename-indef-to-writeprotected.org:662' (historical TODO): "=definitiveView= request still promotes a write-protected childless node."
+
+* "demote": change a viewnode's kind to 'DeadScaffold', a dead placeholder that only holds its children
+This meaning replaces a phantom or an orphaned viewnode with a dead kind instead of detaching it, so that a real subtree under it survives. Current code calls this act "deaden" and keeps it separate from "demote" ('StaleTreatment { Demote, Deaden, Detach }' in 'server/update_buffer/util.rs:173'). (5 uses.)
+- 'TODO/DONE/local-view-update/progress.org:440' (historical TODO): "If they have children, they should be demoted to DeadScaffold;"
+- 'TODO/DONE/local-view-update/progress.org:448' (historical TODO): "detached, with-children -> demoted to DeadScaffold (real subtree preserved,"
+- 'TODO/DONE/local-view-update/progress.org:583' (historical TODO): "-> demoted to DeadScaffold so a real subtree survives). See §9 inline note."
+- 'TODO/DONE/phantom-enum/1_plan.org:816' (historical TODO): "...e phantom children under a deadened orphan col are silently demoted to DeadScaffold instead of kept untouched. Flag in the co..."
+- 'TODO/DONE/phantom-enum/1_plan.org:1115' (historical TODO): "demoted to 'DeadScaffold' instead of kept untouched. Broaden the test to"
+
+* "promote": change a viewnode's kind into a 'PhantomDeleted', the phantom for a node a save deleted
+This meaning describes a viewnode whose kind was rewritten in place into a deleted-node phantom. The comment says the phantom's title is empty when it was made from a Restricted viewnode (an anonymous viewnode for a node the viewer may not see); ten lines earlier, 'server/types/viewnode.rs:147' says a Restricted node is never turned into a 'PhantomDeleted', so the remark may describe a path that no longer exists. (1 use.)
+- 'server/types/viewnode.rs:163' (code): "/// still worth showing. (The title is empty for one promoted from a Restricted"
+
+* "demote": move org headings one level deeper
+This is org-mode's own sense: each heading gains a star so that the block nests under a new parent heading. (1 use.)
+- 'TODO/DONE/local-view-update/progress.org:831' (historical TODO): "that heading levels are demoted one step to nest under this section. This is the"
+
+* "promote": make the sole top-level heading of an imported org or Markdown document the file's root node
+This is close to org-mode's own sense (a heading moves up to level 0): when nothing precedes a document's only top-level heading, the importer makes that heading the root instead of a child of a root named after the file. (2 uses.)
+- 'server/import_md_and_org/parse.rs:146' (code): "promote_sole_top_heading_to_root (&mut document);"
+- 'server/import_md_and_org/parse.rs:155' (code): "fn promote_sole_top_heading_to_root ("
+
+* "promote": raise a search-query piece from optional to required (MUST)
+In the title search, an 'AND' next to a piece makes that piece required in every result. (2 uses.)
+- 'docs/COMMANDS-nvim.org:184' (docs): "=AND= adjacent to a piece on either side promotes that piece"
+- 'TODO/DONE/fork-fixes/fork-fixes.org:257' (historical TODO): "the old flat rule where a piece adjacent to AND was promoted to"
+
+* "promote": put a node that is not a search hit into the top-level search results
+This meaning adds a node that did not match the query to the results, as the carrier of a hit it overrides or as an overrider. (6 uses.)
+- 'TODO/DONE/BUG_reciprocal-subscribe.org:190' (historical TODO): "hit; (b) always promote the chain-top into the results as the carrier"
+- 'TODO/DONE/BUG_reciprocal-subscribe.org:224' (historical TODO): "order, whether to promote a non-hit user-owned overrider, graft depth"
+- 'TODO/DONE/override-ancestry-in-search-results.org:188' (historical TODO): "*** DONE O3. A user-owned overrider that is NOT itself a search hit -- promote it?"
+- 'TODO/DONE/override-ancestry-in-search-results.org:192' (historical TODO): "Recommendation: do NOT auto-promote U. Promotion would inject"
+- 'TODO/DONE/override-ancestry-in-search-results.org:194' (historical TODO): "descendant already makes U reachable. Default: no promotion."
+
+* "promote": on a merge, turn the acquired node's primary ID ('pid') into an extra ID of the acquiring node
+An extra ID is a second ID that resolves to the same node; this meaning keeps old references to the merged node working. (4 uses.)
+- 'TODO/DONE/ditch-typedb/1_discussion.org:405' (historical TODO): "- Preserve and strengthen tests for acquiree-pid promotion to an extra"
+- 'TODO/DONE/ditch-typedb/1_discussion.org:592' (historical TODO): "- Extra-ID resolution: primary wins, merge promotion resolves old raw"
+- 'TODO/DONE/from-dot-claude/separate-extraid-map-from-other-maps-in-memory.org:51' (historical TODO): "No migration needed on Delete -- we're not promoting anything to an alias."
+- 'TODO/DONE/from-dot-claude/separate-extraid-map-from-other-maps-in-memory.org:209' (historical TODO): "...es here: they exercise 'apply_definenodes' with merges that promote pids to extraids, and the audit verifies memory-vs-TypeDB..."
+
+* "promote": move a function or an enum variant to a more general type during a refactor
+(4 uses.)
+- 'TODO/DONE/phantom-enum/1_plan.org:684' (historical TODO): "...e with focused 'Vognode::active_id' (Active/Inactive only). Promote the diff-phantom-reaching job to 'ViewNode::active_or_diff..."
+- 'TODO/DONE/phantom-enum/progress.org:28' (historical TODO): "Split the id/source accessors (added 'impl Phantom'), promoted the old"
+- 'TODO/DONE/phantom-enum/progress.org:142' (historical TODO): "The plan added 'Vognode::active_id', but after promoting the cross-enum reach to"
+- 'TODO/DONE/vnode/investigation.org:312' (historical TODO): "*** Stage 2: Promote scaffold variants into VnodeKind"
+
+* "promote": switch a caller from an async read to a sync read
+(1 use.)
+- 'TODO/from-dot-claude/obsolete-skgnodemap.org:450' (live TODO): "...r use the sync helper. Audit would be useful during Step 2; promoting a few callers from async to sync reads reduces 'Pin<Box<..."
+
+* "promote": adopt something as the standard (a technical term, a status, a field kind, a file of record)
+This is the plain-English sense of raising something to an official standing. (6 uses.)
+- 'coding-advice/consider-experimenting.org:10' (docs): "Maybe the experiment will deserve to be promoted to test status,"
+- 'TODO/DONE/full-schema/metaplan_2.org:727' (historical TODO): "Solved by decision (2026-06-10): promoted to TODO/problems.org as a"
+- 'TODO/DONE/homogenize-language/1_reconnaissance.org:674' (historical TODO): "also means a cursor position (173 elisp lines). Recommendation: promote"
+- 'TODO/DONE/rename-indef-to-writeprotected.org:37' (historical TODO): "Do not promote =inert= to the new technical term."
+- 'TODO/DONE/rename-indef-to-writeprotected.org:161' (historical TODO): "things share the broad property but not this ActiveNode state.  Promoting it"
+- 'TODO/DONE/split-parentIs-from-birth.org:310' (historical TODO): "promoted as an ordinary editable/cycleable field.  If enforcing"
+
+* "demote": lower a message's severity (an error to a debug log line)
+(1 use.)
+- 'TODO/DONE/fable-cleans-up/deferring-for-verification.org:112' (historical TODO): "differently. (a) Demote the 'no viewforest found' error to a"
+
+* "promote": give people or person-topic pairs more prominence in one's own view
+This is the plain-English curation sense, from the project's pitch. (1 use.)
+- 'docs/this-is-awesome.org:23' (docs): "...to the collective information. You curate what you see, can promote and render invisible (to yourself and anyone who wants you..."
+
+* "promotion": move the editor's focus rootward when a node detaches itself from the tree
+In "focus-promotion", the cursor's focus passes from a viewnode that removes itself to its parent. (3 uses.)
+- 'TODO/lying-names.org:1286' (live TODO): "- Omits?: It omits the self-detach branch and the focus-promotion side effect."
+- 'TODO/lying-names.org:1315' (live TODO): "- Omits?: It omits the self-detach + focus-promotion side effect and the erroneous-content-child birth rewrite."
+- 'TODO/lying-names.org:1326' (live TODO): "- Omits?: It omits the self-detach + focus-promotion side effect and the erroneous-content-child birth rewrite."
+
+* Uses that mention the words themselves
+These lines in the current discussion talk about the words rather than use them; line 148's phrase "heading promotion in the importer" refers to the 'parse.rs' meaning above. (8 uses.)
+- 'TODO/total-diff-view/7_review.org:139' (recent TDV documents): "******* ONGOING Is 'promote' widely used in the codebase?"
+- 'TODO/total-diff-view/7_review.org:146' (recent TDV documents): "A quick count before the survey: 'promote' appears five times in the"
+- 'TODO/total-diff-view/7_review.org:148' (recent TDV documents): "heading promotion in the importer, one a restricted viewnode shown as"
+- 'TODO/total-diff-view/7_review.org:149' (recent TDV documents): "unrestricted, the rest prose); 'demote' appears about forty times,"
+- 'TODO/total-diff-view/7_review.org:153' (recent TDV documents): "survey is going to [[file:7_1_uses-of-promote-and-demote.org][7_1_uses-of-promote-and-demote.org]]: every use of"
+
+* Collisions
+** Same file, same word, different meanings
+- 'TODO/total-diff-view/4_plan-fixes.org': lines 272 and 449 say "demoted member" for a member made a non-member ('affectsParent' false), and line 275, three lines after the first, says "'tag_content_members' demotes at every visit and never promotes" for making an occurrence write-protected (and, with "promotes", editable).
+- 'TODO/total-diff-view/7_review.org': line 130 uses "promotes" for making a write-protected viewnode editable, and line 207 uses "demotes children the server drew" for setting their 'affectsParent' to false; the second is not the inverse of the first.
+- 'TODO/total-diff-view/progress.org' (lines 209 and 363, 'affectsParent' false) and '5_review.org' (lines 76 and 157, make editable): the TDV documents taken together use "demote" for one axis and "promote" for another, so a reader expects an inverse that is not there.
+- 'TODO/DONE/local-view-update/plan_v2.org': lines 229, 232, 234, 261, 994 and 996 use "demote" for making an origin indefinitive (write-protected), while lines 331 through 1029 use it for setting a stale branch's 'parentIs' to 'Independent'.
+- 'TODO/DONE/local-view-update/plan.org': lines 281, 284, 298 and 326 (make indefinitive) collide in the same way with lines 414 through 1089 ('parentIs' to 'Independent').
+- 'TODO/DONE/local-view-update/plan-critique.org': line 165 ("root could be demoted to indefinitive") and line 210 ("demote-not-delete", the stale-member rule) are 45 lines apart.
+- 'TODO/DONE/local-view-update/problems.org': line 403 (demote to indefinitive) and lines 1007 through 1473 (demote to independent).
+- 'TODO/DONE/local-view-update/progress.org': one file holds three meanings of "demote": change a phantom's kind to 'DeadScaffold' (lines 440, 448, 583), move org headings one level deeper (line 831), and set 'parentIs' to 'Independent' (lines 993, 1252, 1267 to 1269, 1505).
+- 'TODO/DONE/rename-indef-to-writeprotected.org': lines 37 and 161 use "promote" for adopting a word as the technical term, and line 662 uses it for making a write-protected node editable.
+** Different files, same word, meanings a reader could confuse
+- "demote" as "deaden": 'TODO/DONE/local-view-update/progress.org' (lines 440, 448, 583) and 'TODO/DONE/phantom-enum/1_plan.org' (lines 816, 1115) call the change to 'DeadScaffold' a demotion, while current code ('server/update_buffer/util.rs:173') names 'Demote' and 'Deaden' as two different treatments of a stale child.
+- "promote" in live code means two unrelated things: lifting an org heading to the file root ('server/import_md_and_org/parse.rs:146' and ':155') and rewriting a viewnode into a 'PhantomDeleted' ('server/types/viewnode.rs:163'); neither is the TDV sense, making an occurrence editable.
+- "promote" in search: 'docs/COMMANDS-nvim.org:184' raises a query piece to MUST, while 'TODO/DONE/override-ancestry-in-search-results.org' and 'TODO/DONE/BUG_reciprocal-subscribe.org' use it for adding a non-hit node to the results; both concern search, so a reader can take one for the other.
+- "demote" on two claim fields: 'TODO/DONE/split-and-extend-paths-and-cols/discussion.org:426' demotes a 'birth' claim to 'Unremarkable', while everywhere else "demote" resets 'affectsParent' (formerly 'parentIs').

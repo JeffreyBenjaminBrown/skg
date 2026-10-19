@@ -1,0 +1,460 @@
+#+title: Total diff view, yet more fixes — execution plan
+#+TODO: TODO ONGOING | DONE
+
+* Assignment and authority
+Implement this plan. It is a complete, settled specification, and
+nothing here is open for discussion. Writing it has implemented
+nothing. It stands on its own: every term it uses is defined below or
+in 'docs/glossary.org', and the review that produced it
+([[file:7_review.org][7_review.org]]) is background that nobody needs to read; where the two
+differ, this document wins.
+
+Read [[file:../../coding-advice/ORIENTATION.org][the orientation]] and its code-change, architecture, testing and
+execution advice before starting. Preserve unrelated edits. Do not
+change branches or git configuration. Build every client-facing piece
+for Emacs and Neovim in the same slice. Finish the agreed work and its
+verification without stopping for routine choices; stopping to ask is
+for the rare conditions that [[file:../../coding-advice/when-to-stop.org][when-to-stop.org]] describes, and this plan
+expects none. Record meaningful deviations, and any such question, in
+[[file:progress.org][progress.org]] beside this plan, under a top-level headline "Yet more
+fixes" with one subheadline per slice. This plan's text stays as it
+is, except the keyword of a slice's headline. Write any log or scratch
+file of your own under 'tests/results/', never under 'TODO/'.
+
+** Commits
+Commit granularly, one or a few commits per slice, each message naming
+the slice and this document ("Slice 2 of
+TODO/total-diff-view/8_plan_yet-more.org: ..."). A slice's last
+code-modifying commit also carries the slice's documentation changes
+and the change of its headline here from TODO to DONE; neither stands
+as a commit of its own. So update the docs and the keyword before
+making that last commit, and if something is left over after it,
+amend that commit ('git commit --amend'; the branch is not pushed)
+rather than adding one.
+
+** Scope
+Four changes, which together remove every piece of save-time and
+rerender-time logic that depended on what a buffer looked like
+before: a write-protected occurrence is validated against the graph
+alone; write-protection becomes something the user requests and the
+server performs; the total diff view no longer makes occurrences
+editable or appends roots on its own after a save, and a command does
+both on demand; and a short housekeeping list. The refusal that the
+previous plan's slice 3 added is removed.
+
+** Words this plan uses
+Terms from 'docs/glossary.org', one line each, and three this plan
+settles.
+- The TDV (total diff view) is up to four buffers that show the
+  graph's uncommitted changes, HEAD against the worktree. The graph
+  straddle ('GraphStraddle { before, after }') is what it compares:
+  the before-graph read from HEAD, the after-graph the live graph.
+- The sets of a buffer's PCSVF ('pcsvf_sets_of_buffer'): C is the
+  changed nodes, R the content origins the containerward walk reaches
+  from C, D the deduplicated origins (the buffer's first roots), U the
+  nodes to unfold contentward (C, R and the walks). The sets are
+  recomputed from the refreshed straddle at every rerender; this plan
+  calls those the fresh sets. A buffer's standing roots are its roots
+  when a rerender begins.
+- An occurrence of a graphnode is a viewnode that stands for it
+  (an unrestricted vognode). A buffer has at most one editable
+  occurrence of a node; the others are write-protected. An editable
+  occurrence has its content list drawn under it; the server adds
+  nothing under a write-protected one. A content occurrence is a root
+  or a child of an unrestricted vognode; a folder occurrence is a
+  member of a partner folder.
+- A member is a child viewnode whose 'affectsParent' is true: the
+  save reads it as part of its parent's content. A non-member has
+  'affectsParent' false; it sits under the node without belonging to
+  its content, and the client shows '⊥' on it. A headline the user
+  types arrives as a member (the parser's default, and
+  'na_affectsParent_under_visible_parent_becomes_isContainer').
+- An editable-view request ('ViewRequest::Editable', the metadata
+  atom 'editableView', C-c s d) asks for an occurrence to become the
+  editable one. The draw rule ('apply_editable_draw_rule') grants it
+  at the occurrence's visit, write-protecting the occurrence that was
+  editable by default together with its content subtree
+  ('writeProtect_content_subtree'), and passes the request to the
+  content children (the cascade), bounded by the node budget
+  ('initial_node_limit'); in a TDV only a node outside U is charged
+  against the node limit.
+- The write-protected-occurrence validator is
+  'errors_and_normalize_new_writeProtected_occurrences'
+  ('server/from_text/write_protected_edits.rs'), one of the checks a
+  save runs on every buffer; today it compares the saved buffer's
+  write-protected occurrences with the server's last rendering of
+  that buffer. Its sibling 'errors_for_nodes_of_u_left_without_editable_occurrence'
+  is the TDV-only refusal the previous plan added. Both go.
+- The editable-occurrences step is 'make_freshU_editable_at_first_occurrences'
+  ('server/pcsvf.rs'): before completion of a TDV buffer after a
+  save, it makes an occurrence editable for every node of the fresh U
+  that has none. With it, 'contentOrigins_missing_from_buffer' and
+  'append_contentOrigins_to_buffer' append roots for origins the
+  buffer draws nowhere, and 'complete_appended_roots' draws them. This
+  plan stops running all of that after saves and keeps it for a
+  command.
+- Three settled words: this plan says "make editable" and
+  "write-protect", never "promote" or "demote"; it says "non-member"
+  for 'affectsParent' false; and it never says "pre-pass".
+
+* Agreed behavior
+** A write-protected occurrence is validated against the graph alone
+The save judges each write-protected occurrence of the saved buffer
+by the live graph, with no reference to any earlier rendering.
+- Its title and its home skgrepo equal the node's in the graph, or
+  the save is refused as an edit to a write-protected occurrence,
+  naming the node and the field.
+- Its alias, ID and flags folders, when present under it, equal the
+  node's in the graph (aliases as a list, IDs and flags as sets), or
+  the save is refused the same way. A folder that is absent expresses
+  no opinion, as the editable-set folders already work.
+- Its children: a member child is refused, with a message that names
+  the node and says a child typed under a write-protected occurrence
+  cannot become its content, and that the user may request an
+  editable occurrence (C-c s d) or mark the child as not affecting
+  its parent. Non-member children are the user's own and are not
+  checked.
+- Nothing is normalized: the save never changes a child's
+  'affectsParent'.
+The matching of occurrences with the last rendering, by node and path
+from the buffer root, is deleted, and with it the notion of a "new"
+write-protected occurrence. 'flags_surface_errors_against_graph',
+which already does the graph-based version of the flags check, is the
+model.
+
+** The TDV no longer refuses a save for leaving a node without an editable occurrence
+The user may write-protect the only editable occurrence of a changed
+node. The readiness facts and gestures work on write-protected
+occurrences, so the node keeps its readiness herald; its change
+decorations and content are no longer shown there, and the readiness
+summary counts the node as unshown. The check, its error variant
+'NodeOfU_LeftWithoutEditableOccurrence', its message, its tests and
+the sentences the docs gained for it go.
+
+** Write-protection is requested, and the server performs it
+'skg-set-write-protected' no longer writes 'writeProtected' into a
+headline. In its place, two commands write view requests:
+- 'skg-request-write-protected' (C-c s w; Neovim
+  ':SkgRequestWriteProtected', 'sw') writes '(viewRequests
+  writeProtectedView)': at the occurrence's visit in the next
+  rerender, the server makes the occurrence write-protected (title and
+  body resynced from the graph, as 'clobberWriteProtectedViewnode'
+  does), makes each of its direct unrestricted children a non-member,
+  and consumes the request. The children keep their own editability
+  and their own subtrees.
+- 'skg-request-write-protected-recursive' (C-c s W; Neovim
+  ':SkgRequestWriteProtectedRecursive', 'sW') writes '(viewRequests
+  writeProtectedSubtreeView)': the same, applied to the occurrence
+  and its whole content subtree, as 'writeProtect_content_subtree'
+  does for the draw rule, every child under every write-protected
+  node in it becoming a non-member.
+The occurrence arrives at the save still editable, so edits it
+carries are saved first; the write-protection follows in the
+rerender. A request on an already write-protected occurrence is a
+no-op. A write-protect request and an editable-view request on the
+same occurrence contradict each other and are refused; on different
+occurrences of the same node they are the move of editability, and
+are allowed. 'writeProtect_content_subtree', wherever it is used, now
+also makes the children it passes non-members, so that no
+write-protected occurrence the server draws ever holds a member.
+Hand-editing 'writeProtected' into a headline's metadata keeps
+working for a leaf and is refused for an occurrence with members, by
+the rule above; the docs stop suggesting it.
+
+** An editable node adopts a non-member child that is its content
+When the content reconciler draws an editable node's content list and
+finds, for an entry of that list, no member child but a non-member
+child standing for the same node, it makes that child the member,
+keeping the viewnode and its fold state, instead of creating a second
+one beside it. Where a member child for the entry exists, non-member
+children are left alone as today. This is what lets editability move
+back to an occurrence whose children were made non-members when it
+was write-protected, and it also ends the double drawing that parking
+a content node under an editable parent produces today.
+
+The adopted child will in most cases need to be moved,
+to reflect its order among the other content.
+** The view follows U only on command
+After a save, a TDV buffer's sets are recomputed and completion draws
+by the fresh U wherever it draws something new (a member outside U is
+a write-protected leaf; nothing the server drew editable is
+write-protected again by the server). But the server no longer makes
+any occurrence editable, and no longer appends roots, on its own. A
+node of C with no editable occurrence is unshown, and the readiness
+summary counts it; the summary line in both clients names the command
+instead of saying "reopen it".
+
+The command, 'skg-tdv-show-unshown-changes' (C-c r u; Neovim
+':SkgTdvShowUnshownChanges', 'ru'), works on a TDV buffer. The client
+refuses with "Save the buffer first." if the buffer has unsaved
+changes, else sends the request "show unshown changes" with the view
+ID. The server refreshes the straddle ('current_graph_straddle_in_slot':
+the after-graph becomes the connection's current live graph, and the
+before-graph is read again from the owned skgrepos' HEAD only if HEAD
+has moved since it was read; otherwise the cached pair is reused),
+takes the buffer's registered viewforest, and for every node of the
+buffer's C that has no editable occurrence:
+makes its first content occurrence in level order
+editable (body from the live graph), else its first folder
+occurrence, else, when it has no occurrence at all, remembers it. For
+the remembered nodes it appends their content origins that the buffer
+draws nowhere, as stub roots in ID order, deduplicated with the
+standing roots pinned ('contentOrigins_missing_from_buffer' with the
+standing roots), and completes them. It then rerenders the buffer
+through the ordinary TDV rerender path, which draws the content under
+each newly editable occurrence by the rule for U, and streams the
+rerendered buffer and the readiness summary as a save does. The
+command does not care who write-protected an occurrence: the user
+asked for every change, and gets one editable occurrence per node of
+C.
+
+** What stays as it is
+Roots linger. "Drawn", for the readiness summary, means the node has
+an editable occurrence or a historical phantom in content position.
+A node of U is editable with its whole content list when the buffer
+is first drawn and after the command. The editable-view request
+behaves as the previous plan left it. Readiness, marks and the
+stage-and-commit command are untouched.
+
+** Housekeeping
+'make_freshU_editable_at_first_occurrences' is renamed
+'ensure_editableOccurrences_exist' and serves the command. The
+parenthetical on 'PhantomDeleted' in 'server/types/viewnode.rs' that
+speaks of a phantom "promoted from a Restricted node" describes a
+path the same comment says no longer exists; it goes. The Neovim
+client's table of Emacs chords it rewrites in server messages
+('nvim/lua/skg/messages.lua') gains the chords that have a Neovim
+binding (C-c s s, C-c g RET, C-c s r). The two entries this review
+cycle added to 'TODO/problems.org' move to 'TODO/DONE/problems.org'
+when their slices land.
+
+* Pitfalls the slices must respect
+** the editable map and 'writeProtect_content_subtree'
+The draw rule's subtree write-protection removes the nodes it
+write-protects from the editable map ('visited'), so that their
+editable copies can be drawn elsewhere in the same completion. The
+request's non-recursive form must do the same for the one occurrence
+it write-protects, and the recursive form for the subtree, or a later
+visit will treat them as the editable copies.
+** the content reconciler matches members only
+'complete_relevant_children_in_viewforest' is called with the
+relevance "affectsParent is true", so a non-member child is never
+matched to a goal entry and a member is created beside it. The
+adoption of slice 1 happens before that call: for each goal entry
+with no member child, a non-member child standing for the entry's
+node becomes the member.
+** typed headlines are members by default
+A headline the user types under any node carries no 'affectsParent'
+and is made a member by the parser, so a child typed under a
+write-protected occurrence is exactly the case slice 0 refuses. A
+child the user marks '(affectsParent false)' by hand passes.
+** the write-protect request must be applied before the occurrence expands
+In 'visit_normal_node', the editable-view request is handled before
+'expand_true_content_at_unrestrictedVognode'. The write-protect
+request goes in the same place: once applied, the occurrence is
+write-protected and the expansion takes the write-protected path
+('clobberWriteProtectedViewnode'), drawing nothing under it. In a
+TDV, 'tag_content_members' then runs on the write-protected path with
+no sets; it tags members only, so it must be extended to tag
+non-member children whose node the straddle lists as content, or the
+'(diff ...)' presence facts vanish from the children at the moment
+they become non-members.
+** the save handler refreshes the straddle and threads U into validation
+'update_from_and_rerender_buffer_with_approvals' refreshes the
+connection's straddle before the save and passes the buffer's U into
+'buffer_to_validated_saveplan_with_fork_skgrepos_and_previous_view_in_graph',
+and 'server/from_text.rs' passes the previous viewforest to the two
+validators. After slice 0 no validator needs the previous viewforest
+or U; remove the parameters down to 'server/from_text.rs', keeping
+the straddle refresh if the save's own TDV path still needs it (the
+rerender does).
+** the command runs on the registered viewforest
+The server's copy of a view is what the client holds only after the
+client applied the last rerender, which is why the client saves
+first. The command mutates the registered viewforest and rerenders it
+through 'rerender_view' with the TDV buffer kind, then registers and
+streams the result as 'stream_prepared_rerenders' does for other
+rerenders.
+** the TDV's write-protected titles come from the live graph
+A write-protected occurrence in a TDV buffer shows the after-graph's
+title for a node in both graphs; slice 0's comparison uses the live
+graph, which is the after-graph. Historical phantoms and removed
+members are not unrestricted vognodes and are not checked.
+
+* Code map
+- Validation: 'server/from_text/write_protected_edits.rs'
+  ('errors_and_normalize_new_writeProtected_occurrences',
+  'flags_surface_errors', 'flags_surface_errors_against_graph',
+  'errors_for_nodes_of_u_left_without_editable_occurrence',
+  'occurrences_in', 'unrestricted_occurrences_in',
+  'LocatedWriteProtectedOccurrence', 'LocatedUnrestrictedOccurrence',
+  'OccurrencePathStep', 'make_direct_unrestricted_children_independent',
+  'write_protected_changes'), 'server/from_text.rs' (the calls and
+  the 'previous_viewforest' and 'nodes_of_u' parameters),
+  'server/serve/handlers/save_buffer.rs'
+  ('update_from_and_rerender_buffer_with_approvals'),
+  'server/types/errors.rs' and 'server/types/save.rs' (the variants
+  'EditedWriteProtectedOccurrence' and
+  'NodeOfU_LeftWithoutEditableOccurrence' and their messages),
+  'tests/pcsvf/write_protecting.rs', 'tests/new/buffer_to_viewnodes/validate_tree.rs',
+  the unit tests inside 'write_protected_edits.rs'.
+- Requests: 'server/types/viewnode.rs' ('ViewRequest'),
+  'server/serve/parse_metadata_sexp.rs' (the 'viewRequests' parser,
+  near "editableView"), the metadata serializer in
+  'server/org_to_text.rs', 'server/from_text/buffer_to_viewnodes/validate_tree.rs'
+  ('validate_editable_view_requests'), 'server/update_buffer/complete.rs'
+  ('visit_normal_node'), 'server/to_org/expand/editable.rs'
+  ('apply_editable_draw_rule', 'writeProtect_content_subtree',
+  'makeWriteProtectedAndClobber'), 'server/to_org/render/changes.rs'
+  ('tag_content_members'), 'elisp/skg-metadata.el'
+  ('skg-set-write-protected'), 'elisp/skg-request-views.el',
+  'elisp/skg-keymaps-and-aliases.el', 'nvim/lua/skg/metadata.lua'
+  ('set_write_protected'), 'nvim/lua/skg/view_requests.lua',
+  'nvim/lua/skg/keymaps.lua' ('SetWriteProtected').
+- Adoption: 'server/update_buffer/reconcile/content.rs'
+  ('reconcile_content_children', the call of
+  'complete_relevant_children_in_viewforest'), 'server/update_buffer/util.rs'.
+- The command and the removed step: 'server/pcsvf.rs'
+  ('make_freshU_editable_at_first_occurrences',
+  'content_occurrences_in_level_order', 'contentOrigins_missing_from_buffer',
+  'append_contentOrigins_to_buffer', 'root_skgids_of_buffer',
+  'kept_origins'), 'server/update_buffer.rs' ('rerender_view', the
+  TDV branch, 'complete_appended_roots'), 'server/update_buffer/complete.rs'
+  ('complete_appended_roots'), 'server/serve/protocol.rs'
+  ('RequestType' and its names), 'server/serve.rs' (the dispatch),
+  'server/serve/handlers/total_diff_view.rs' and
+  'server/serve/handlers/stage_and_commit.rs' (the models for a
+  request that rerenders TDV buffers), 'server/serve/handlers/rerender_all_views.rs'
+  ('stream_prepared_rerenders'), 'elisp/skg-request-save.el' (the
+  summary line, near "reopen it"), 'nvim/lua/skg/save.lua' (its
+  twin), 'elisp/skg-readiness.el', 'nvim/lua/skg/readiness.lua',
+  'tests/pcsvf/fresh_sets.rs' (its fixtures 'fresh', 'shared',
+  'folder_member'), 'tests/pcsvf/common.rs'.
+- Docs: 'docs/COMMANDS.org' and 'docs/COMMANDS-nvim.org' (the 'C-c s
+  w' and 'C-c s d' entries and their Neovim twins, the TDV section's
+  paragraph on what a save draws and on the refusal, the readiness
+  commands), 'docs/api-and-formats.org' ("View requests", "Total diff
+  view", the save paragraph that names the refusal, a new "Show
+  unshown changes" section beside "Stage and commit"),
+  'docs/glossary.org' (grep "fresh sets", "editable occurrence",
+  "unshown").
+- Housekeeping: 'server/types/viewnode.rs' (the 'PhantomDeleted'
+  comment), 'nvim/lua/skg/messages.lua', 'TODO/problems.org',
+  'TODO/DONE/problems.org'.
+
+* Implementation sequence
+Each slice ends with the three suites passing ('cargo nextest run',
+'bash/emacs-tests.sh', 'bash/nvim-tests.sh'), its docs updated, and
+its last commit made as the Commits section says.
+
+** Slice 0: write-protected occurrences are validated against the graph; the TDV refusal goes
+Rewrite 'errors_and_normalize_new_writeProtected_occurrences' as a
+pure check against the graph, as the behavior section says, and
+rename it 'errors_for_writeProtected_occurrences'; fold
+'flags_surface_errors' into it on the model of
+'flags_surface_errors_against_graph', so that one function serves
+both the saved view and a view with no previous rendering. Delete
+the counterpart matching and everything only it used
+('occurrences_in', 'LocatedWriteProtectedOccurrence', 'OccurrencePathStep',
+'make_direct_unrestricted_children_independent', 'write_protected_changes'
+if nothing else needs it). Delete 'errors_for_nodes_of_u_left_without_editable_occurrence',
+'unrestricted_occurrences_in', 'LocatedUnrestrictedOccurrence', the
+variant 'NodeOfU_LeftWithoutEditableOccurrence' and its message.
+Remove the 'previous_viewforest' and 'nodes_of_u' parameters from
+'server/from_text.rs' and the save handler up to where they were
+produced; keep the straddle refresh where the TDV rerender needs it.
+Add the member-child error (a new variant or a case of
+'EditedWriteProtectedOccurrence', with the agreed message) and update
+the edited-occurrence message to say the occurrence differs from the
+graph. Docs: remove the refusal's sentences from both COMMANDS files
+and 'docs/api-and-formats.org'. Tests: in 'tests/pcsvf/write_protecting.rs',
+write-protecting the only editable occurrence of a node of U now
+saves, the node keeps its '(ready ...)' facts, and the summary counts
+it unshown; in 'tests/new/buffer_to_viewnodes/validate_tree.rs' or
+the validator's unit tests, a member child typed under a
+write-protected occurrence is refused in a content view and in a TDV
+buffer, a non-member child passes, a changed title on a
+write-protected occurrence is refused, an alias folder that differs
+is refused and an absent one passes, and reordered children under a
+write-protected occurrence pass.
+
+** Slice 1: write-protection is a request; an editable node adopts its non-member content
+Add 'ViewRequest::WriteProtected' and 'ViewRequest::WriteProtectedSubtree',
+the atoms 'writeProtectedView' and 'writeProtectedSubtreeView' in
+the parser and the serializer, and the refusal of both requests
+together with 'editableView' on one occurrence
+('validate_editable_view_requests'). In 'visit_normal_node', before
+the expansion, apply a write-protect request: write-protect the
+occurrence ('makeWriteProtectedAndClobber' or the equivalent), remove
+it from the editable map, make its direct unrestricted children
+non-members, consume the request; for the subtree form do this to the
+whole content subtree through 'writeProtect_content_subtree', which
+itself now makes the children it passes non-members in every use.
+Extend 'tag_content_members' to tag non-member children whose node
+the straddle lists as content. Then the adoption in
+'reconcile_content_children', as the behavior section says. Clients:
+replace 'skg-set-write-protected' by 'skg-request-write-protected'
+and add 'skg-request-write-protected-recursive', on C-c s w and
+C-c s W; the Neovim twins and their commands and keymaps ('sw',
+'sW'); docstrings. Docs: the 'C-c s w' entries in both COMMANDS files
+describe the two commands and drop the "do it yourself" sentence;
+the 'C-c s d' entry's sentence on what happens to the occurrence that
+was editable; the "View requests" section of 'docs/api-and-formats.org'
+gains the two atoms. Tests: in a content view, the request
+write-protects the occurrence and its children become non-members
+and stay editable, the subtree form write-protects all of it, edits
+on the occurrence in the same save are applied first, and a request on
+a write-protected occurrence is a no-op; the move of editability
+(write-protect V, request W editable, in one save) yields a and b once
+under V as non-members and editable under W, and a request to move
+back adopts them as V's members with their fold state kept; in
+'tests/pcsvf/', the same in a TDV buffer, with the presence facts
+still on the children under V; parking a content node under an
+editable parent no longer draws it twice (an ordinary-view test).
+
+** Slice 2: the view follows U only on command
+Remove from the TDV branch of 'rerender_view' the call of the
+editable-occurrences step and the appending and completion of roots;
+remove 'complete_appended_roots' from the save path (keep the
+function if the command uses it). Add the request "show unshown
+changes" ('RequestType', the protocol name, the dispatch, a handler
+beside 'total_diff_view.rs') that does what the behavior section
+says, on the registered viewforest of the named view, and streams the
+rerender and the summary as a save does. Clients: 'skg-tdv-show-unshown-changes'
+on C-c r u, refusing while the buffer is modified; the Neovim command
+and 'ru'; the readiness summary line names the command instead of
+"reopen it". Docs: the TDV paragraph of both COMMANDS files describes
+what a save draws now (new members as write-protected leaves; nothing
+made editable; the summary and the command), the readiness commands
+list the new one, 'docs/api-and-formats.org' gains the request's
+section and loses the sentence on the view following its sets.
+Tests: in 'tests/pcsvf/fresh_sets.rs', a changed node drawn only as a
+write-protected leaf stays a leaf after a save and is counted
+unshown; the command makes it editable with its change drawn and the
+count zero; a change under an origin the buffer lacks is unshown
+after the save and appended as a root by the command; a node whose
+only editable occurrence the user write-protected stays so through
+saves and becomes editable again by the command; a changed cycle's
+membership appends no second root through the command; the command
+on a buffer with nothing unshown changes nothing. Client tests: the
+command refuses on a modified buffer and sends the request on a
+clean one.
+
+** Slice 3: housekeeping
+Rename 'make_freshU_editable_at_first_occurrences' to
+'ensure_editableOccurrences_exist'. Delete the stale parenthetical in
+the 'PhantomDeleted' doc comment. Extend 'nvim/lua/skg/messages.lua'
+with the chords C-c s s, C-c g RET and C-c s r and their Neovim
+bindings, with a test. Move the two entries of 'TODO/problems.org'
+from 2026-10-19 (the duplicated children, the Emacs chords) to the
+top of 'TODO/DONE/problems.org', each with one line saying which
+slice of this plan closed it.
+
+* Verification and completion
+'cargo nextest run', 'bash/emacs-tests.sh' and 'bash/nvim-tests.sh'
+after every slice; 'bash/integration-tests.sh' after slices 1 and 2
+(the 'import-md-and-org' test fails at baseline, as 'TODO/problems.org'
+records). Done when every slice is committed, every suite passes, the
+docs named above are updated, no validator reads a previous
+rendering, and no TDV rerender makes an occurrence editable or
+appends a root except through the command.

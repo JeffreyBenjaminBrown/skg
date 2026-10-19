@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the slices of TODO/total-diff-view/6_plan-more.org unattended, one
+# Run the slices of TODO/total-diff-view/8_plan_yet-more.org unattended, one
 # FRESH Claude Code session per slice, so that each slice starts with an
 # empty context. The plan, progress.org, git and the auto-memory
 # directory are the memory between slices.
@@ -28,8 +28,8 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-PLAN=TODO/total-diff-view/6_plan-more.org
-PROGRESS_HEADLINE='More fixes'
+PLAN=TODO/total-diff-view/8_plan_yet-more.org
+PROGRESS_HEADLINE='Yet more fixes'
 PLAN_DIR=$(dirname "$PLAN")
 LOG_DIR=$PLAN_DIR/run-logs
 MODEL="${SKG_PLAN_MODEL:-claude-opus-5-5}"
@@ -38,7 +38,10 @@ FIRST="${1:-0}"
 LAST="${2:-3}"
 mkdir -p "$LOG_DIR"
 
-dirty_files=$(git status --porcelain | grep -v '^??' | sed 's/^...//' | tr '\n' ' ')
+# Modified tracked files, space-separated; empty on a clean tree. (awk, not
+# grep: under 'set -o pipefail' a grep that matches nothing would exit 1
+# and 'set -e' would end the script before it started.)
+dirty_files=$(git status --porcelain | awk '!/^\?\?/ { print substr($0, 4) }' | tr '\n' ' ')
 dirty_note=""
 if [ -n "$dirty_files" ]; then
   echo "run-plan-slices: tracked files are modified and will be handed to the first slice run: $dirty_files" >&2
