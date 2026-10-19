@@ -1,0 +1,303 @@
+#+title: Total diff view, more fixes — execution plan
+#+TODO: TODO ONGOING | DONE
+
+* Assignment and authority
+Implement this plan. It is a complete, settled specification, and
+nothing here is open for discussion. Writing it has implemented
+nothing. It stands on its own: every term it uses is defined below or
+in 'docs/glossary.org', and the review that produced it
+([[file:5_review.org][5_review.org]]) is background that nobody needs to read; where the two
+differ, this document wins.
+
+Read [[file:../../coding-advice/ORIENTATION.org][the orientation]] and its code-change, architecture, testing and
+execution advice before starting. Preserve unrelated edits. Do not
+change branches or git configuration. Build every client-facing piece
+for Emacs and Neovim in the same slice. Finish the agreed work and its
+verification without stopping for routine choices; stopping to ask is
+for the rare conditions that [[file:../../coding-advice/when-to-stop.org][when-to-stop.org]] describes, and this plan
+expects none. Record meaningful deviations, and any such question, in
+[[file:progress.org][progress.org]] beside this plan, under a top-level headline "More fixes"
+with one subheadline per slice. This plan's text stays as it is,
+except the keyword of a slice's headline. Write any log or scratch
+file of your own under 'tests/results/', never under 'TODO/'.
+
+** Commits
+Commit granularly, one or a few commits per slice, each message naming
+the slice. A slice's last code-modifying commit also carries the
+slice's documentation changes and the change of its headline here from
+TODO to DONE; neither stands as a commit of its own. So update the
+docs and the keyword before making that last commit, and if something
+is left over after it, amend that commit ('git commit --amend'; the
+branch is not pushed) rather than adding one.
+
+** Scope
+Six changes, three to the total diff view (TDV) and three deletions:
+a save that would leave a changed node with no editable instance is
+refused; an editable-view request on a node of U behaves as in any
+other view; a change counts as shown only where it is editable; the
+YAML corpus check, a dead alias collector and an unused dependency go.
+
+** Vocabulary
+The terms this plan relies on, one line each; 'docs/glossary.org' has
+more.
+- The TDV (total diff view) is up to four buffers that show the
+  graph's uncommitted changes, HEAD against the worktree. The graph
+  straddle ('GraphStraddle { before, after }') is what it compares.
+- The sets of a buffer's PCSVF: C is the changed nodes, R the content
+  origins the containerward walk reaches from C, D the deduplicated
+  origins (the buffer's first roots), U the nodes to unfold
+  contentward (C, R and the walks). The fresh sets are those
+  recomputed from the refreshed straddle at a rerender
+  ('pcsvf_sets_of_buffer'). The TDV's rule is that a node of U is
+  editable at some occurrence, with its whole content list drawn.
+- An occurrence of a graphnode is a viewnode that stands for it. A
+  buffer has at most one editable occurrence of a node. A content
+  occurrence is a root or a member of an unrestricted vognode's
+  content; a folder occurrence is a member of a partner folder.
+  Members of the subscribee and overridden folders can be editable
+  ('FolderPolicy::EditableSet'); members of the other partner folders
+  are write-protected by policy.
+- The pre-pass ('make_freshU_editable_at_first_occurrences',
+  'server/pcsvf.rs') runs before view completion of a TDV buffer and,
+  for every node of the fresh U that has no editable occurrence, makes
+  one occurrence editable: today the first content occurrence in level
+  order, and none if the node has only folder occurrences. It never
+  touches a node that has an editable occurrence.
+- An editable-view request ('ViewRequest::Editable', the client's
+  'editableView' metadata; 'skg-set-editable', C-c s d) asks for a
+  write-protected occurrence to become the editable one. The draw rule
+  ('apply_editable_draw_rule') grants it, write-protecting a
+  default-editable occurrence elsewhere with its content subtree
+  ('writeProtect_content_subtree'), and defers only to an occurrence
+  that another request made editable in the same completion; the
+  request then passes to the node's content children (the cascade),
+  and the node budget ('initial_node_limit', charged once per
+  expansion) bounds how far that goes. In a TDV the budget is charged
+  only for request-driven expansions of nodes outside U.
+- 'skg-set-write-protected' (C-c s w; Neovim 'sw') puts
+  'writeProtected' in a headline's metadata; the save applies it. The
+  server checks a saved buffer's write-protected occurrences against
+  its last rendering in 'errors_and_normalize_new_writeProtected_occurrences'
+  ('server/from_text/write_protected_edits.rs'), which returns
+  'BufferValidationError's; any error refuses the save.
+- "Drawn" (or "shown"), of a change: counted by
+  'nodes_drawn_in_viewforest' ('server/pcsvf.rs'), which feeds the
+  readiness summary's unshown count ('buffer_readiness_summary') and
+  the new-roots step ('contentOrigins_missing_from_buffer').
+
+* Agreed behavior
+** A save may not leave a changed node without an editable instance
+In a TDV buffer, a node of U always has an editable occurrence. A save
+of a TDV buffer that write-protects the node's only editable
+occurrence, and requests no other occurrence of the node editable, is
+refused, with the other buffer validation errors, by a message that
+names the node and says what to do instead:
+"In a total diff view every changed node stays editable somewhere.
+<title> (<id>) would have no editable instance left; to edit it
+elsewhere, request another instance editable (C-c s d) instead of
+write-protecting this one." The Neovim message names its binding. The
+same save with an editable-view request on another occurrence of the
+node is allowed: that is how editability moves. Ordinary views are
+unaffected.
+** An editable-view request on a node of U behaves as in any view
+It takes the ordinary path: the draw rule makes the requested
+occurrence editable and write-protects the one that was editable by
+default, with its content subtree; the request passes to the content
+children. The node budget is charged only for the expansion of a node
+outside U, as today; a node of U is never charged, whether the TDV's
+rule or a request made it editable. So a request on an already
+editable node of U unfolds its subtree: its members outside U become
+editable, within the budget, and its members in U pass the request on.
+The pre-pass is unchanged; it acts only when a node of U has no
+editable occurrence at all.
+** A change is shown where its node is editable
+'nodes_drawn_in_viewforest' counts a node as drawn when the buffer has
+an editable occurrence of it, wherever that sits (a content occurrence
+or an editable folder member), or a historical phantom of it in
+content position (under the buffer root or an unrestricted vognode).
+A node of U that has occurrences but no editable one gets one of them
+made editable by the pre-pass, where it stands: its first content
+occurrence in level order if it has one, else its first folder
+occurrence. An editable folder member stays editable at the folder's
+later visits, whatever the folder's policy, and draws its content list
+as the members of the subscribee folder already do. A root is appended
+only for an origin of the fresh D with no occurrence at all; the
+standing roots stay excluded from the appending, as today. So after a
+rerender every node of the fresh U that has an occurrence is editable
+somewhere.
+** Three deletions
+'tests/yaml-corpus/' is deleted with its workspace membership; the
+format guard is 'tests/body_yaml_format.rs', which pins field order,
+the block-scalar form of bodies and the spelling of flags.
+'collect_grandchild_aliases_for_viewnode' has no caller and goes.
+'rand' is removed from 'Cargo.toml'; no Rust source names it.
+
+* Pitfalls the slices must respect
+** the draw rule write-protects the prior occurrence's whole subtree
+'writeProtect_content_subtree' write-protects the default-editable
+occurrence and every editable node under it, and removes them from
+the editable map. In a TDV those may be nodes of U. They get their
+editable occurrences back in the same completion: the newly editable
+occurrence draws its content list, a created member registers afresh
+in the map and is editable, and 'tag_content_members' leaves a member
+of U editable. The test in slice 2 must show that every node of U
+under the moved subtree is editable after the save, and again after a
+save that changes nothing.
+** the pre-pass runs before completion
+It cannot see the draw rule write-protect an occurrence during
+completion, and it must not undo that afterwards: a request is the
+user's choice of occurrence. Slice 2 does not change the pre-pass;
+slice 1 changes only which occurrence it picks.
+** write-protected-set folders re-protect their members
+A member of a container, mentioner, subscriber, overrider, hider,
+hidden or acquired folder is drawn write-protected ('FolderPolicy::WriteProtectedSet'),
+and the fixes run's log says an occurrence made editable there "would
+not last", so some step at the folder's visit or the member's own
+visit write-protects it again. Slice 1 finds that step and, in a TDV,
+exempts a member that is already editable; members a visit creates are
+write-protected as today.
+** 'tag_content_members' leaves requests in place
+Since the fixes plan it write-protects only a member outside U that
+the visit created, and it never strips 'ViewRequest::Editable'. The
+request reaches the member's own visit, where the draw rule consumes
+it.
+** the validator matches occurrences by parent path and ID
+'errors_and_normalize_new_writeProtected_occurrences' pairs each
+write-protected occurrence of the saved buffer with the one at the
+same parent path and ID in the server's last rendering. The new rule
+needs the complement: a node whose last rendering had an editable
+occurrence and whose saved buffer has none. The last rendering is the
+stored viewforest ('views_state.open_views.viewid_to_view'), and the
+buffer is a TDV buffer when 'tdv_buffer_of_view' says so; U comes from
+the connection's straddle ('ViewsState::graph_straddle', refreshed by
+'current_graph_straddle_in_slot') for that buffer.
+** 'nodes_drawn_in_viewforest' runs after completion
+Both callers use it after the buffer is completed, so an occurrence
+the pre-pass or a request made editable counts. A deleted phantom
+standing as a root is excluded from appending by the standing roots,
+not by this function.
+
+* Code map
+- Refusal: 'server/from_text/write_protected_edits.rs'
+  ('errors_and_normalize_new_writeProtected_occurrences',
+  'occurrences_in', 'BufferValidationError'), its caller in
+  'server/from_text.rs', the save path in 'server/update_buffer.rs'
+  ('update_views_after_save', 'tdv_buffer_of_view') and
+  'server/serve/handlers/save_buffer.rs', the refusal test pattern in
+  'tests/tdv/roundtrip/view.rs' ('the_new_viewnodes_are_refused_out_of_place').
+- Requests: 'server/update_buffer/complete.rs' ('visit_normal_node':
+  'had_editableViewRequest', 'in_u', 'editableViewRequest_applies',
+  'budgeted'), 'server/to_org/expand/editable.rs'
+  ('apply_editable_draw_rule', 'writeProtect_content_subtree'),
+  'server/to_org/render/changes.rs' ('tag_content_members'),
+  'tests/pcsvf/fresh_sets.rs' (helpers 'save_cleanly', 'drawn_editable',
+  'root_ids', 'subtree_starting'; the test
+  'an_editable_view_request_cascades_within_the_node_budget').
+- Drawn: 'server/pcsvf.rs' ('nodes_drawn_in_viewforest',
+  'contentOrigins_missing_from_buffer', 'content_occurrences_in_level_order',
+  'make_freshU_editable_at_first_occurrences'), 'server/update_buffer.rs'
+  (the 'buffer_readiness_summary' call), 'server/change_forest.rs'
+  ('buffer_readiness_summary'), the folder reconcilers in
+  'server/update_buffer/reconcile/partner_folder.rs' and
+  'server/to_org/complete/partner_folder/child_data.rs'
+  ('reconcile_partnerFolder_children',
+  'reconcile_partnerFolder_children_against_goal_list', 'build_child_data'),
+  and 'visit_normal_node' in 'server/update_buffer/complete.rs'.
+- Deletions: 'tests/yaml-corpus/', the 'members' line of 'Cargo.toml',
+  'rand' in 'Cargo.toml', 'server/types/tree/viewnode_graphnode.rs'
+  ('collect_grandchild_aliases_for_viewnode').
+- Docs: 'docs/COMMANDS.org' (the TDV section's paragraph on saves and
+  requests, near "An editable-view request on a write-protected
+  headline"; the 'C-c s w : skg-set-write-protected' entry),
+  'docs/COMMANDS-nvim.org' (the twins), 'docs/api-and-formats.org'
+  (the '(unshown K)' field of the readiness summary),
+  'docs/glossary.org' (the "readiness summary" entry, if it defines
+  shown).
+
+* Implementation sequence
+Each slice ends with the three suites passing ('cargo nextest run',
+'bash/emacs-tests.sh', 'bash/nvim-tests.sh'), its docs updated, and
+its last commit made as the Commits section says.
+
+** Slice 0: deletions
+Remove 'tests/yaml-corpus/' and its entry in the workspace 'members'
+of 'Cargo.toml'; the next build drops 'serde_yaml', 'serde_yaml_ng',
+'serde_yaml_bw' and 'serde-saphyr' from 'Cargo.lock' (check that it
+did). Remove 'rand' from 'Cargo.toml'. Delete
+'collect_grandchild_aliases_for_viewnode' and anything only it used.
+Run the suites; commit.
+
+** Slice 1: a change is shown where its node is editable
+Three changes, in this order. First, extend the pre-pass: after the
+content occurrences in level order, consider the folder occurrences in
+level order ('content_occurrences_in_level_order' gains a sibling or a
+flag), so that a node of U with only folder occurrences gets its first
+one made editable, with the body from the live graph as now. Second,
+make that last: find the step that write-protects an existing member
+of a write-protected-set folder again (see the pitfall), and when
+'tdv_drawing' is Some leave a member that is already editable alone;
+members the visit creates are write-protected as today. Third, rewrite
+'nodes_drawn_in_viewforest' as the behavior section says: an
+unrestricted vognode counts when it is not write-protected; a
+historical phantom counts when its parent is the buffer root or an
+unrestricted vognode. Both callers stay as they are; with the pre-pass
+extended, 'contentOrigins_missing_from_buffer' thereby appends only an
+origin with no occurrence at all. Update the '(unshown K)' sentence in
+'docs/api-and-formats.org', the glossary if it defines shown, and the
+TDV paragraph of both COMMANDS files (its "made editable where the
+buffer first draws it" now covers folder members). Tests in
+'tests/pcsvf/fresh_sets.rs': a changed node whose only occurrence is a
+member of a container folder is editable there after the next save,
+with its content list drawn under it, counts as shown, is not appended
+as a root, and stays editable after a further save that changes
+nothing; a change under a new origin with no occurrence still appends
+that origin (the existing test); a change the merges buffer's C leaves
+out is still counted unshown (the existing summary test).
+
+** Slice 2: a request on a node of U takes the ordinary path
+In 'visit_normal_node': delete the branch that removes the request
+from a node of U; let 'editableViewRequest_applies' be
+'had_editableViewRequest'; keep 'budgeted' as "not a TDV, or a
+requested node outside U", so a node of U is never charged. Nothing
+else changes. Update the sentence in both COMMANDS files that says
+what an editable-view request does in a TDV buffer: it now also moves
+editability between instances and unfolds an editable node's members.
+Tests in 'tests/pcsvf/fresh_sets.rs': with V and W two occurrences of
+a node of U and V editable, a request on W makes W editable and V
+write-protected, every node of U under V is editable again somewhere
+after the save, and a further save that changes nothing leaves all of
+that as it is; a request on an editable node of U makes its members
+outside U editable, recursively, until 'initial_node_limit' expansions
+are spent (small limit in the test's config), and charges nothing for
+the members in U; a request on a node outside U behaves as before (the
+existing test).
+
+** Slice 3: refuse a save that leaves a changed node without an editable instance
+Give 'errors_and_normalize_new_writeProtected_occurrences' (or a
+sibling called beside it from 'server/from_text.rs') the nodes of U of
+the saved buffer when it is a TDV buffer ('Option<&BTreeSet<ID>>',
+None otherwise). For each node of U: if the previous rendering has an
+editable occurrence of it, the saved buffer has none, the saved buffer
+still contains the occurrence that was editable (same parent path and
+ID, now write-protected), and no occurrence of the node in the saved
+buffer carries 'ViewRequest::Editable', push a 'BufferValidationError'
+with the agreed message. The save path already turns those errors into
+a refusal. Both clients already show validation errors; the Neovim
+message names its binding ('sd'). Update the 'C-c s w' entry in both
+COMMANDS files with the refusal and its reason, and the TDV section's
+paragraph with one sentence. Tests: in a new 'tests/pcsvf/write_protecting.rs',
+a save that write-protects the only editable occurrence of a node of U
+is refused with a message naming the node, and the buffer's registered
+viewforest is unchanged; the same save with a request on another
+occurrence succeeds and moves editability; write-protecting a context
+node outside U succeeds; in an ordinary content view (not a TDV
+buffer) write-protecting the only editable occurrence succeeds, as
+today.
+
+* Verification and completion
+'cargo nextest run', 'bash/emacs-tests.sh' and 'bash/nvim-tests.sh'
+after every slice; 'bash/integration-tests.sh' after slice 3 (the
+'import-md-and-org' test fails at baseline, as 'TODO/problems.org'
+records). Done when every slice is committed, every suite passes, the
+docs named above are updated, and 'Cargo.lock' names no YAML crate
+but 'yaml_serde'.

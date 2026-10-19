@@ -1,0 +1,371 @@
+#+title: Review of the fixes-plan run (2026-10-19)
+#+TODO: TODO ONGOING | DONE
+
+* Verdict
+The run did not go off the rails. It implemented all ten slices of
+[[file:4_plan-fixes.org][4_plan-fixes.org]] and the six slices of the dependency plan in two hours
+(00:27 to 02:24), in 29 commits, and every slice is marked DONE in
+both plans. The one stop the plan allowed for did not happen: three of
+the four 'serde_yaml' replacements re-serialize all 62,339 '.skg'
+files byte for byte, and the first in the plan's order, 'yaml_serde',
+is in. The deviations the agents recorded in [[file:progress.org][progress.org]] (under "Fixes
+plan") are of three kinds: better placements of what the plan asked
+for, bugs the plan did not know about, and two small limitations that
+I think you will want fixed. None reopens a decision. The commit rule
+was followed: every slice's last commit carries its docs, its
+'progress.org' entry and its DONE keyword, and no docs-only or
+keyword-only commit exists.
+
+* What I checked myself
+** The three suites, after the run:
+Rust 745 of 745 (up from 721),
+Emacs 362 of 362 (down from 365: slice 3 deleted the git-add
+tests), Neovim 17 of 17. My first Rust run had one failure,
+'merge::merge_nodes::all_tests'; it passed alone and in a second
+full run, and it uses a fixed fixture path, so it matches the
+intermittent cleanup problem already in 'TODO/problems.org'.
+** Every commit of the run compiles ('cargo check --all-targets' at
+  each of the 30 commits, in a throwaway worktree), so the branch
+  bisects.
+** The names the plan deletes are gone from 'server/', 'tests/',
+  'elisp/', 'nvim/' and 'docs/': 'GraphPair', 'graph_pair', the two
+  "dvr" names, 'remove_change_viewnodes',
+  'redraw_deleted_phantoms_as_historical', the restore/redraw pair,
+  'redraw_tdv_views', stage moves and git-add. No direct call of the
+  four ego-tree insertion methods remains outside
+  'server/types/tree/moves.rs'.
+** The code of slices 1 and 5 does what the plan says, in the shapes
+  'progress.org' describes: one matcher for every change viewnode
+  ('server/to_org/render/fresh_drawing.rs'), 'body_folded' set only
+  when the visit created the viewnode, 'tag_content_members' narrowed
+  to members outside U that were not writable when completion began,
+  the pre-pass over the fresh U at content occurrences in level
+  order, 'kept_origins' with the standing roots pinned, a request on a
+  node of U dropped, the budget applied only to a requested node
+  outside U, and no default folders in a TDV.
+** 'Cargo.toml' names the new versions and no deprecated crate; the
+  corpus check's own manifest still names 'serde_yaml' as its
+  reference, so 'Cargo.lock' still lists it.
+** The corpus check read 61,608 files under 'data/' and 731 under
+  'tests/'. It only reads. The one modified file in
+  'data/as-if-another-skg-user' dates from 2026-10-07, before the
+  run.
+
+* Decide: four small limitations worth fixing
+** DONE Write-protecting the only editable instance of a changed node is silently undone
+'skg-set-write-protected' (C-c s w; Neovim 'sw') puts 'writeProtected'
+in a headline's metadata, and the save applies it. In an ordinary view
+the node then stays write-protected there. In a TDV buffer, the save's
+rerender runs the pre-pass before completion, and a node of U with no
+editable occurrence left gets its BFS-first content occurrence made
+editable again, often the very headline the user just marked. Nothing
+tells the user. A node of U never has two editable occurrences, so
+write-protecting one always removes the only one.
+
+I would refuse the save with an explanation, as the other save
+validations do, since letting it through would hide a change from the
+view whose purpose is to show every change. The rule, checked on the
+server after the saved buffer is parsed, since only the server knows U
+and the stored view: a node of U that had an editable occurrence in
+the stored view, has none in the saved buffer, still has that
+occurrence in it, and carries no editable-view request on any
+occurrence, refuses the save, naming the node and saying to request
+another instance editable instead. The request clause keeps the
+legitimate move (write-protect V, request W in the same save)
+allowed. The cheaper alternative is to accept the save, let the
+pre-pass re-promote, and send a completion warning that says so.
+*** [Jeff] agreed, let's refuse
+**** [Claude] into the follow-up plan
+The refusal rule as written above, checked on the server after the
+saved buffer is parsed, with the request clause that keeps a move of
+editability allowed.
+** DONE A request on a node of U does nothing, where the normal way would move or unfold editability
+'visit_normal_node' removes 'ViewRequest::Editable' from any node of
+U at its visit, and nothing follows. The agents read the plan's "a
+node of U takes none of it" as "drop the request", which also keeps a
+stale request from lingering in the headline's metadata. That makes
+two things impossible that an ordinary view allows.
+
+Moving editability. If V and W both show graphnode G, with V
+editable, a request on W makes W editable and write-protects V: the
+draw rule yields a default-editable occurrence to a requested one, and
+defers only to another occurrence requested in the same completion
+('apply_editable_draw_rule'). On the next rerender W stays editable,
+because only an editable occurrence claims its ID in the editable map
+('make_writeProtected_if_repeat_then_extend_editable_map'); a
+write-protected first occurrence does not. In a TDV the request on W
+is dropped, so G can be edited only at the occurrence the pre-pass
+chose.
+
+Unfolding. A request on an already-editable node hands the request to
+its content children, so it means "unfold this subtree editable,
+within the node limit". A node of U is editable with its members
+outside U as write-protected leaves, so that is exactly what a user
+would want from a request there; today they must request each member.
+
+I would make a request on a node of U take the ordinary path: the
+draw rule, which moves editability as above, then the cascade, with
+the budget charged only for children outside U, since the node's own
+expansion is the TDV's and free. One branch in 'visit_normal_node' and
+two tests in 'tests/pcsvf/fresh_sets.rs': editability moves from V to
+W and stays there across a save; a request on a node of U unfolds its
+members within the limit. The pre-pass is unaffected, since it acts
+only when a node of U has no editable occurrence at all. The plan's
+pitfall "anything made editable must be the BFS-first occurrence" was
+overstated, for the reason above; it did no harm, but a later plan
+should not repeat it.
+** DONE A changed node drawn only inside a folder counts as shown
+The agents flagged this themselves (slice 5, "imperfect"). "Drawn" is
+computed by 'nodes_drawn_in_viewforest', which counts every
+unrestricted vognode in the buffer, including members of partner
+folders. So a node of D whose only occurrence is, say, a container in
+a container folder is not appended as a root, and the pre-pass (which
+rightly considers only content occurrences) never makes it editable;
+its change is not drawn, yet the unshown count does not count it. The
+same function feeds that count. I would define "drawn" as "has an
+editable occurrence, or is a historical phantom in content position",
+and use that in both places; a change's decorations and gestures exist
+only at an editable occurrence, so this is what "shown" has meant all
+along. The pre-pass runs before completion and the new-roots step
+after it, so an origin with a content occurrence is editable by then
+and is not appended, while one with only folder occurrences is. Every
+node of the fresh U is then reached: the top of its walk is an origin
+that is either editable or appended, and each node below is drawn by
+the editable node above it. It is a
+small change in 'server/pcsvf.rs', with one test in
+'tests/pcsvf/fresh_sets.rs'. The plan's wording ("no viewnode in the
+buffer draws") invited the agents' reading, so this is a plan
+correction, not a fault of theirs.
+*** DONE [Jeff] The key distinction
+seems to me to be whether it is editable,
+not whether it is in a folder.
+It could be editable in a content folder; that ought to count as drawn,
+since it's just a different way of looking at its containers content.
+Or it could be editbale in a subscribee folder,
+assuming someone owns both subscriber and subscribee (say,
+a private subscriber following a public subscribee).
+Am I right?
+**** [Claude] you are right, and that is the definition the item now uses
+"Drawn" means "has an editable occurrence", wherever that occurrence
+sits. A member of a subscribee or overridden folder can be editable
+(those two folders have the 'EditableSet' policy), and an editable
+folder member is visited as any editable node is, so the per-visit
+step draws its changes there; it counts. A member of a container or
+mentioner folder is write-protected by policy, so it never counts,
+whichever way one reads it. The folder was never the distinction; I
+first wrote the rule around content occurrences because the pre-pass
+promotes only those (a member of a write-protected folder would be
+write-protected again at the folder's next visit), and your reading
+is the simpler and the right one: the pre-pass creates editable
+occurrences only in content position, but any editable occurrence,
+however it came to be, counts as drawn.
+** DONE The corpus check stays in the workspace
+'tests/yaml-corpus' is a workspace member, so 'serde_yaml' and the
+three other candidates compile on every 'cargo nextest run' (the crate
+has no tests, but its binary is built for the test harness), and
+'serde_yaml' stays in 'Cargo.lock'. Nothing the server builds uses it.
+I would move the crate out of the workspace ('exclude' it, with its
+own lockfile) so that the project's lockfile and build name no
+deprecated crate; it is run by hand, rarely, and loses nothing. The
+alternative is to leave it, which costs a few seconds per test build.
+*** DONE [Jeff] This seems way too defensive.
+At this point we know the library works, don't we?
+They're not going to change what it does.
+A new version might behave differently but these versions we've checked won't.
+Unless I'm missing something, let's delete those tests entirely.
+**** [Claude] agreed: delete it
+You are missing nothing. The check answered a one-time question, and
+the versions it compared will not change under us. Delete
+'tests/yaml-corpus/' (its two files and its line in the workspace
+members), and 'serde_yaml' leaves 'Cargo.lock' with it. The guard
+against a future 'yaml_serde' version changing the format already
+exists in the suite: 'tests/body_yaml_format.rs' pins the field order,
+the block-scalar form of bodies and the spelling of flags, so a
+version that printed differently would fail there.
+* Know: what you will meet while dogfooding
+** After a commit, roots linger as context, and a deleted root as a deleted phantom
+As decided. A root whose node is in neither graph after a commit of
+its deletion stays as the deleted phantom of the node, with HEAD's
+last title and body and its old content gone (slice 1).
+** A request on a node of U is dropped
+An editable-view request on any occurrence of a node of U is removed
+at its visit and does nothing: it neither moves editability to that
+occurrence nor unfolds the subtree. On a node outside U it cascades
+the normal way, bounded by 'initial_node_limit' (slice 5). The first
+Decide item above recommends changing this.
+*** DONE [Jeff] This will change, though, right?
+**** [Claude] yes
+It is the first Decide item above, which you marked DONE, so the
+follow-up plan changes it: a request on a node of U takes the ordinary
+path, moving editability or unfolding the subtree within the budget.
+** The pre-pass makes only content occurrences editable
+A folder member, a removed member and a historical phantom's old
+content are drawn write-protected by their own steps, so the pre-pass
+leaves them alone; a change under one of them is shown through the
+node's content occurrence elsewhere, or counted as unshown. The Decide
+item above closes the one gap.
+** Unmarking asks before touching more than one leaf
+The clients count the leaves a gesture would unmark by the axes of the
+requests it writes (a member's '(node rel)' counts as two; a request
+naming 'all' always counts as more than one), gather every request
+first, and write all or nothing. In Emacs the prompt reads "Continue?
+(yes or no)", since 'yes-or-no-p' appends its own suffix; Neovim shows
+the agreed text and wants the typed word "yes" (slice 4).
+** The home-move gesture keeps its name
+'skg-mark-gnode-skgrepo-changes-commitReady' and its Neovim twin now
+toggle, and say "Unmarked N home move(s)." when they unmark.
+** The merges buffer draws the text preserver as a leaf
+Outside U it is a write-protected leaf in the acquirer's content,
+tagged '(diff node+ rel+)' (slice 6).
+** Empty metadata values print as '""' in buffer text
+The serializer quotes an empty string atom everywhere a response is
+printed, and 'metadata_value_atom' goes through it too, so an empty
+value reads as '""' rather than vanishing (slice 8). You may see that
+in a headline's metadata.
+** 'syn' stays at 2
+Under 'syn' 3 the code-map tool ('tools/introspect/code-map') no
+longer compiles ('ItemImpl::trait_' and pointer mutability changed).
+The plan said to bump 'syn' only if the tools build unchanged, so it
+did not. Porting that tool is a small job if you want it.
+** git2 0.21 dropped its 'https' and 'ssh' features by default
+libssh2, OpenSSL and 'url' left the lockfile. The server never
+fetches, pushes or clones, so nothing changes; if it ever should, the
+features must be turned back on.
+** The integration test 'import-md-and-org' fails at baseline
+Every slice's integration run passed except this one, which was
+failing before the run and is in 'TODO/problems.org'.
+
+* Sound: gap fills and corrections, no action needed
+** A rebuild of the stores also empties the git snapshot cache
+Dropping the straddle alone would not have made the next TDV request
+read what the rebuild read: the before-graph's cache is keyed by the
+owned skgrepos' HEAD commits, and the foreign skgrepos it holds were
+read from their worktrees, so a foreign file edited before the rebuild
+would have come back stale and entered C. The rebuild now empties that
+cache too (slice 7). Only a rebuild that succeeds drops the straddle.
+** The straddle rides back to the connection with the rerenders
+'PreparedRerenders' carries the refreshed straddle and
+'stream_prepared_rerenders' writes it back as it registers the views,
+so a refused text release writes nothing, and the skgrepo switch, the
+cleanup and the rerender after a commit all write it back (slice 7).
+** Stale home-move facts are cleared
+After a commit, a rerendered skgrepo-changes buffer kept "-OLD +NEW";
+'set_home_move_facts_in_viewforest' now clears the facts of a vognode
+whose home did not move (slice 1).
+** Members are aligned with the straddle before the content reconciler runs
+'align_content_members_with_straddle' sets a member whose relationship
+is only in the before-graph aside, restores a removed member whose
+relationship is back, and turns a historical phantom whose node is
+back into an editable vognode, so the content reconciler keeps each
+viewnode instead of drawing another (slice 1).
+** A historical phantom draws its old content at its own visit
+One level per visit, so a historical root, one a deleted phantom
+became, and one matched under a live node all take the same path; in a
+folder it draws none, as before (slice 1).
+** ID folders are no longer stripped before a TDV rerender
+They are reconciled like the other change folders and keep their fold
+state (slice 1). A folder entry is matched by the entry itself, since
+its 'folded' is how the client records that the folder is folded.
+** Removed aliases and IDs are bare atoms, like the live forms
+'(skg removedAlias (diff rel-) (ready)) a1', with their own
+'node_heralds' entries; a removed entry shares its live twin's match
+key, so an entry the worktree regains or loses keeps its viewnode
+(slice 2). A removed ID is still a save dependency.
+** The move helpers were built in slice 1 and read better
+'move_to_first_child' and 'move_to_last_child' rather than the plan's
+'move_to_front' and 'move_to_back', plus two that arrange a run of
+children. Slice 9 found one caller left ('move_child_to_end', already
+safe) and converted it. ego-tree 0.11 needed no code change; its
+'_id' methods now panic on a self-attach, and the helpers detach first.
+** git2 0.21's string accessors return 'Result'
+'Commit::summary', 'Commit::message', 'Remote::url', 'StatusEntry::path'
+and 'StringArray' items; each call site discards the error as it
+discarded the 'None'. The signatures the plan named compiled unchanged.
+** The YAML choice
+'yaml_serde' 0.10.7, 'serde_yaml_ng' and 'serde_yaml_bw' were all
+identical on the whole corpus; 'serde-saphyr' differed on 17,125 files,
+all in quoting, and parsed 24 differently. Fourteen Rust files used
+'serde_yaml', not the seven the plan counted. The corpus check runs
+with 'cargo run -p yaml-corpus -- PATH ...' and reports per candidate.
+** 'rand' is unused
+No Rust source names it; its bump changed only the lockfile. See
+Housekeeping.
+
+* Found along the way
+** DONE A dead alias collector
+'collect_grandchild_aliases_for_viewnode' ('server/types/tree/viewnode_graphnode.rs')
+has no caller and would reject an alias folder holding a removed alias.
+The agents left it (slice 2). I would delete it.
+*** [Jeff] agreed
+** DONE One transient Rust failure
+See "What I checked myself": 'merge_nodes' failed once in a full
+parallel run and passed twice after. It fits the known intermittent
+cleanup problem; nothing in this run touched that test.
+** DONE A dirty foreign data repo, from before the run
+'data/as-if-another-skg-user' has one modified '.skg' file, last
+touched 2026-10-07. The corpus check only reads, and no test writes
+there, so this is older state of yours to look at or discard.
+
+* Housekeeping
+** DONE The commit rule was followed
+Each slice's last commit carries '4_plan-fixes.org' (the keyword),
+'progress.org' and the docs it changed; the dependency sub-slices each
+carry 'TODO/dependency-upgrade/plan.org'. Slice 0's lockfile commit is
+alone, as the plan asked.
+** DONE Per-commit build check
+All 30 commits compile, the dependency bumps included. The log is
+'tests/results/review5/per-commit.txt'.
+** DONE Remove 'rand' from 'Cargo.toml'
+Nothing uses it; proptest pulls its own copy. One line.
+*** [Jeff] agreed, remove
+** The run's own files
+'run-logs/' is untracked, as intended. 'tests/results/' holds the
+agents' suite logs per slice and my 'review5/' directory (the suite
+outputs and the per-commit log; the throwaway worktree and its target
+directory are removed).
+** The branch
+'total-diff-view' is 80 commits ahead of 'origin/main' and unpushed.
+After dogfooding, a merge to 'main' is the natural next step.
+** A citation keeps the old name
+'server/graph_straddle/mod.rs' cites the "graph pair" heading of
+'2_plan.org', which still has that name. Fine as history.
+
+* The follow-up work, as decided here
+Six items, small enough for one plan:
+1. A save that write-protects the only editable instance of a node of
+   U, without requesting another instance, is refused with an
+   explanation (server-side rule above).
+2. A request on a node of U takes the ordinary path: the draw rule
+   moves editability, the cascade unfolds, the budget is charged only
+   for children outside U.
+3. "Drawn", for the unshown count and the new-roots step, means "has
+   an editable occurrence, or is a historical phantom in content
+   position". A node of U shown only write-protected gets one of those
+   instances made editable, where it stands; a root is appended only
+   for an origin with no instance at all (your decision in
+   conversation, 2026-10-19).
+4. 'tests/yaml-corpus/' is deleted.
+5. 'collect_grandchild_aliases_for_viewnode' is deleted.
+6. 'rand' leaves 'Cargo.toml'.
+
+* Suggested first dogfood
+1. Open the TDV on a worktree with a few uncommitted edits. Fold a
+   context body, a change folder and a headline inside a
+   containerward tree; save the buffer unchanged; everything should
+   stay as you left it, and the buffer should be byte-identical.
+2. In another buffer, edit a node the TDV shows only as a
+   write-protected leaf, and save it. The TDV should rerender with
+   that node editable and its change drawn, and the readiness summary
+   should not count it as unshown.
+3. Edit a node under no root of the TDV (a different content origin).
+   On save, a new root should appear at the end.
+4. Put an editable-view request on a write-protected member outside U
+   and save; it should expand recursively until the node limit, and
+   stay editable on the next save.
+5. Mark a few leaves ready, then unmark a node recursively: the
+   warning should appear, and "no" should change nothing.
+6. Stage and commit. The roots should remain, as plain context, with
+   their decorations gone; a deleted node's root should stand as a
+   deleted phantom.
+7. Rebuild the session-lifetime stores and reopen the TDV; nothing
+   foreign should appear in C.
