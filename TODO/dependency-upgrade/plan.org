@@ -70,7 +70,7 @@ pins 0.8 today), 'time' to the latest 0.3. For each: edit the version
 in 'Cargo.toml', 'cargo build --all-targets', fix what the compiler
 names, run the suites.
 
-** Slice 2: 'toml' to 1.x
+** DONE Slice 2: 'toml' to 1.x
 The config loaders in 'server/types/misc.rs' and the error path
 'load_config' uses. Check that a malformed 'skgconfig.toml' still
 produces the bold-red terminal message, and that 'OTHER_SKGREPO_DEPENDENCIES.toml'
