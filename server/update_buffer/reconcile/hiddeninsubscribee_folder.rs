@@ -1,6 +1,6 @@
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::to_org::complete::partner_folder::child_data::{ChildData, build_child_data, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
+use crate::to_org::complete::partner_folder::child_data::{ChildData, FolderGoalItem, build_child_data, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
 use crate::to_org::complete::partner_folder::goal_list::goal_list_for_hiddenInSubscribee_folder;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
@@ -62,9 +62,11 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
   // TODO/DONE/local-view-update/plan_v2.org §5.5: a folder fills its members WHOLE and is budget-neutral -- the owning
   // subscribee already spent its budget unit when it expanded, so drawing all
   // the hidden members here costs nothing and never truncates the group.
+  let goal_items : Vec<FolderGoalItem> =
+    FolderGoalItem::live_members (&goal_list);
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
-      tree, node, &goal_list, &context . relRepos, runtime ) ?;
+      tree, node, &goal_items, &context . relRepos, runtime ) ?;
   let summary =
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       // TODO/DONE/local-view-update/plan_v2.org §6.0: a HiddenInSubscribeeFolder child that becomes stale (e.g. the user
@@ -73,7 +75,7 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
       // non-member only if it has a user subtree to preserve. The reconciler
       // applies this uniformly.
       tree, node, kind,
-      &goal_list, &child_data, deleted_by_this_save_extra_ids ) ?;
+      &goal_items, &child_data, deleted_by_this_save_extra_ids ) ?;
   if let Some (sink) = warning_sink {
     push_repair_warnings (
       sink, kind, &context . subscribee_pid, summary ); }

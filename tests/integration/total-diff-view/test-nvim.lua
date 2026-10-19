@@ -7,7 +7,8 @@
 --          gesture on each root of the "all changes" buffer, and see
 --          "COMMIT READY".
 -- Phase 3: Stage and commit; every owned skgrepo is committed, the
---          foreign one is not, and the buffers are emptied.
+--          foreign one is not, and the buffers keep their roots,
+--          which show no change any more.
 -- Phase 4: With d referenced again by hand, open a view of r and
 --          investigate the unknown node d.
 
@@ -135,10 +136,15 @@ T.check(git_head_summary('foreign/gamma') == 'Initial commit',
         'the foreign skgrepo was not committed')
 T.check(T.wait_for(function ()
   for _, buf in ipairs(total_diff_view_buffers()) do
-    if vim.trim(T.buffer_text(buf)) ~= '' then return nil end
+    local text = T.buffer_text(buf)
+    if not text:find('^%* ') then return nil end
+    for _, change in ipairs({ '(diff ', 'changed)', 'changesetMarker',
+                              'oldText', 'homeMove', 'acquiredFolder' }) do
+      if text:find(change, 1, true) then return nil end
+    end
   end
   return true
-end, 10), 'the buffers of the total diff view were emptied')
+end, 10), 'the buffers of the total diff view keep their roots, unchanged')
 
 -- PHASE 4: reference d again, by hand; have the server reread the
 -- files; open a view of r; investigate d there.

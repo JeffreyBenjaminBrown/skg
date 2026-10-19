@@ -1,6 +1,6 @@
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::to_org::complete::partner_folder::child_data::{ChildData, build_child_data, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
+use crate::to_org::complete::partner_folder::child_data::{ChildData, FolderGoalItem, build_child_data, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::misc::{ID, RelPartner, SkgrepoName};
@@ -74,12 +74,14 @@ pub fn reconcile_subscribeeFolder_children (
   { // TODO/DONE/local-view-update/plan_v2.org §5.5: a folder fills its members WHOLE and is budget-neutral -- the owning
     // subscriber already spent its budget unit when it expanded, so drawing all
     // its subscribees here costs nothing and never truncates the group.
+    let goal_items : Vec<FolderGoalItem> =
+      FolderGoalItem::live_members (&goal_list);
     let child_data : HashMap<ID, ChildData> =
       build_child_data (
-        tree, node, &goal_list, &context . relRepos, runtime ) ?;
+        tree, node, &goal_items, &context . relRepos, runtime ) ?;
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       tree, node, kind,
-      &goal_list, &child_data, deleted_by_this_save_extra_ids ) ?; }
+      &goal_items, &child_data, deleted_by_this_save_extra_ids ) ?; }
 
   ensure_hiddenOutsideOfSubscribeeFolder_is_last (tree, node) ?;
   Ok(( )) }

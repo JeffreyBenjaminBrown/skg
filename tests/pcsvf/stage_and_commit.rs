@@ -15,7 +15,7 @@ use skg::serve::handlers::stage_and_commit::{
   StageAndCommitAnswer, handle_stage_and_commit_request, stage_and_commit,
   stage_and_commit_response_sexp};
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::skg_env_from_parts;
+use skg::test_utils::{extract_string_field_from_sexp, skg_env_from_parts};
 use skg::types::env::SkgEnv;
 use skg::types::views_state::TdvBuffer;
 
@@ -175,14 +175,14 @@ fn a_request_without_changes_commits_nothing (
     Ok (( )) }) }
 
 /// At the handler: the confirmed resend commits, and the open "all
-/// changes" buffer is redrawn empty in the rerender stream that
-/// follows.
+/// changes" buffer is rerendered in the rerender stream that follows:
+/// its roots remain, and carry no change facts.
 #[test]
 fn a_confirmed_resend_commits_and_redraws_the_open_buffers (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &SKGREPOS, |f| {
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
-    open_all_changes_buffer (f) ?;
+    let buffer : String = open_all_changes_buffer (f) ?;
     let send = |f : &mut Fixture, request : &str| -> Result<String, Box<dyn Error>> {
       let all_skgrepos : SkgrepoRestriction = all (f) ?;
       let (mut stream, mut read_end) : (TcpStream, TcpStream) =
@@ -200,20 +200,42 @@ fn a_confirmed_resend_commits_and_redraws_the_open_buffers (
               && first . contains ("(lock-views ())")
               && ! first . contains ("rerender-view"),
               "{}", first );
+    let roots : Vec<String> =
+      buffer . lines () . filter ( |line| line . starts_with ("* ") )
+      . map ( |line| root_id (line) ) . collect ();
     let second : String = send ( f,
       "((request . \"stage and commit\") (message . \"one message\") (confirmed . t))\n" ) ?;
     assert! ( second . contains ("(commits ((public ")
               && second . contains ("(lock-views (\"diff-view: all changes\"))")
-              // The sexp crate writes an empty string as nothing.
-              && second . contains (
-                "(view-id \"diff-view: all changes\") (content ))" ),
+              && second . contains ("(view-id \"diff-view: all changes\") (content \"* "),
               "{}", second );
     assert_everything_committed (f, "one message") ?;
+    let content : String = {
+      let message : &str = second . split ("Content-Length")
+        . find ( |message| message . contains ("rerender-view") ) . unwrap ();
+      extract_string_field_from_sexp (
+        &message [ message . find ('(') . unwrap () .. ], "content" )
+        . unwrap () };
+    let roots_after : Vec<String> =
+      content . lines () . filter ( |line| line . starts_with ("* ") )
+      . map ( |line| root_id (line) ) . collect ();
+    assert_eq! ( roots_after, roots, "the roots remain:\n{}", content );
+    for fact in [ "(diff ", "changed)", "changesetMarker", "oldText",
+                  "historical", "homeMove", "(ready" ] {
+      assert! ( ! content . contains (fact),
+                "no change fact {:?} remains:\n{}", fact, content ); }
     assert! ( f . views_state . open_views . views
               . get (&view_id_of (TdvBuffer::AllChanges))
-              . is_some_and ( |state| state . pids . is_empty ()
+              . is_some_and ( |state| ! state . pids . is_empty ()
                               && state . tdv_buffer == Some (TdvBuffer::AllChanges) ));
     Ok (( )) }) }
+
+/// The ID of a root line, whatever kind of vognode it is.
+fn root_id (
+  line : &str,
+) -> String {
+  let start : usize = line . find ("(id ") . expect ("a root has an ID") + 4;
+  line [start ..] . split (')') . next () . unwrap () . to_string () }
 
 #[test]
 fn a_request_is_refused_under_a_skgrepo_restriction (

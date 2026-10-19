@@ -6,7 +6,8 @@
 ;;;          gesture on each root of the "all changes" buffer, and see
 ;;;          "COMMIT READY".
 ;;; Phase 3: Stage and commit; every owned skgrepo is committed, the
-;;;          foreign one is not, and the buffers are emptied.
+;;;          foreign one is not, and the buffers keep their roots,
+;;;          which show no change any more.
 ;;; Phase 4: With d referenced again by hand, open a view of r and
 ;;;          investigate the unknown node d.
 
@@ -144,15 +145,18 @@
   (unless (skg-test-wait-for
            (lambda ()
              (cl-every (lambda (b)
-                         (string-empty-p
-                          (string-trim (with-current-buffer b (buffer-string)))))
+                         (let ((text (with-current-buffer b (buffer-string))))
+                           (and (string-match-p "^\\* " text)
+                                (not (string-match-p
+                                      "(diff \\|changed)\\|changesetMarker\\|oldText\\|homeMove\\|acquiredFolder"
+                                      text)))))
                        (total-diff-view-buffers)))
            10)
-    (test-fail "The buffers of the total diff view were not emptied: %S"
+    (test-fail "The buffers of the total diff view did not keep their roots without their changes: %S"
                (mapcar (lambda (b) (cons (buffer-name b)
                                          (with-current-buffer b (buffer-string))))
                        (total-diff-view-buffers))))
-  (test-pass "Committed alpha and beta, and the buffers are empty"))
+  (test-pass "Committed alpha and beta, and the buffers keep their roots, unchanged"))
 
 (defun phase-4-investigate-the-deleted-node ()
   (setq integration-test-phase "phase-4")

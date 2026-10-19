@@ -32,7 +32,6 @@ use crate::serve::util::{ format_single_view_sexp, send_response_with_length_pre
 use crate::skgrepo_sets::{SkgrepoRestriction, apply_skgrepo_set_to_viewforest};
 use crate::to_org::expand::role_tree::{
   RoleTreePartners, attach_full_containerward_role_trees_at_treeids_with_skgrepo_set};
-use crate::to_org::render::changes::redraw_deleted_phantoms_as_historical;
 use crate::to_org::util::EditableMap;
 use crate::types::views_state::{TdvBuffer, ViewId};
 use crate::types::misc::{ID, SkgrepoName, SkgConfig};
@@ -436,7 +435,8 @@ pub fn render_initial_view (
     create_partnerFolders_for_fresh_nodes : true,
     substitute_existing_content_overrides : false,
     warning_sink : Some (&mut sink),
-    tdv_drawing  : None, };
+    tdv_drawing  : None,
+    nodes_before_completion : &HashSet::new (), };
   complete_viewforest ( &mut viewforest, &mut context ) ?;
   // De-novo rendering REPAIRS silently: the sink's ColRepairs do not
   // correspond to edits the user just made, so a fresh view carries no
@@ -470,7 +470,9 @@ pub fn complete_viewforest_with_graph_straddle (
     create_partnerFolders_for_fresh_nodes : false,
     substitute_existing_content_overrides : false,
     warning_sink                   : None,
-    tdv_drawing                    : Some (drawing), };
+    tdv_drawing                    : Some (drawing),
+    // Every viewnode of a first drawing is created by it.
+    nodes_before_completion        : &HashSet::new (), };
   complete_viewforest ( viewforest, &mut context ) ?;
   if ! errors . is_empty () {
     return Err ( errors . join ("\n") . into () ); }
@@ -481,11 +483,13 @@ pub fn complete_viewforest_with_graph_straddle (
 /// .
 /// A buffer of the total diff view ('tdv_buffer' Some) is reconciled
 /// over the graph straddle, brought up to date in 'context': view
-/// completion recomputes each editable node's change facts, change
-/// folders, markers and removed members from the straddle, as it drew
-/// them ('process_unrestrictedVognode_changes'), and its readiness
-/// facts are then read from the store. Its roots and editability stay
-/// as the buffer has them.
+/// completion reconciles each editable node's change facts, change
+/// folders, markers and removed members, its ID folder among them,
+/// with a fresh drawing from the straddle
+/// ('process_unrestrictedVognode_changes'), keeping every viewnode
+/// that stays and its fold state, and its readiness facts are then
+/// read from the store. Its roots and editability stay as the buffer
+/// has them.
 pub fn rerender_view (
   viewforest    : &mut ViewForest,
   context       : &mut RerenderAfterSaveContext<'_>,
@@ -495,7 +499,9 @@ pub fn rerender_view (
   tdv_buffer    : Option<TdvBuffer>, // Some for a buffer of the total diff view
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
-  { tracing::debug!("rerender_view: starting");
+  if tdv_buffer . is_none () {
+    // A total diff view's step reconciles its ID folders instead.
+    tracing::debug!("rerender_view: starting");
     remove_id_folders (viewforest) ?; }
   let graph_straddle : Option<Arc<GraphStraddle>> =
     match tdv_buffer {
@@ -504,6 +510,8 @@ pub fn rerender_view (
         context . runtime . graph . clone () ) ? ),
       None => None, };
   { tracing::debug!("rerender_view: starting complete_viewforest");
+    let nodes_before_completion : HashSet<NodeId> =
+      viewforest . nodes () . map ( |node| node . id () ) . collect ();
     let mut editable_map       : EditableMap = EditableMap::new ();
     let mut completion_context : CompletionContext = CompletionContext {
       editable_map                         : &mut editable_map,
@@ -528,14 +536,13 @@ pub fn rerender_view (
         substitute_existing_content_overrides && graph_straddle . is_none (),
       warning_sink,
       tdv_drawing : graph_straddle . as_deref () . zip (tdv_buffer)
-        . map ( |(straddle, tdv_buffer)| TdvDrawing { straddle, tdv_buffer } ), };
+        . map ( |(straddle, tdv_buffer)| TdvDrawing { straddle, tdv_buffer } ),
+      nodes_before_completion : &nodes_before_completion, };
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "complete_viewforest" ). entered();
       complete_viewforest (
         viewforest, &mut completion_context ) ? }; }
   if let ( Some (straddle), Some (tdv_buffer) ) = ( &graph_straddle, tdv_buffer ) {
-    redraw_deleted_phantoms_as_historical (
-      viewforest . as_internal_tree_mut (), straddle );
     let store : MutexGuard<ReadinessStore> =
       context . env . runtime . readiness_store . lock ()
       . unwrap_or_else ( |poisoned| poisoned . into_inner () );
@@ -662,9 +669,8 @@ fn rewriteInPlace_viewnodes_whose_skgid_is_newly_extra (
   Ok (( )) }
 
 /// Remove every ID folder. A view draws one only in the total diff
-/// view, where the step at its node's visit
-/// ('process_unrestrictedVognode_changes') draws it again if the
-/// node's IDs still differ from HEAD's.
+/// view, whose step at its node's visit
+/// ('process_unrestrictedVognode_changes') reconciles it instead.
 fn remove_id_folders (
   viewforest : &mut ViewForest
 ) -> Result<(), Box<dyn Error>> {

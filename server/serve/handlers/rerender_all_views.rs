@@ -9,7 +9,7 @@ use crate::serve::util::{ format_errors_warnings_sexp, format_lock_views_sexp, f
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::tree::forest::ViewForest;
-use crate::types::views_state::ViewId;
+use crate::types::views_state::{ViewId, ViewState};
 use crate::types::views_state::pids_from_viewforest;
 use crate::update_buffer::{
   rerender_view, tdv_buffer_of_view, RerenderAfterSaveContext};
@@ -146,8 +146,27 @@ pub fn stream_rerender_views_after_absent_reference_cleanup (
   let prepared = prepare_rerender_views_where (
     env, env . runtime_snapshot (), views_state,
     Some (skgrepo_restriction), None, false,
-    |viewforest| view_can_display_absent_reference_change (
-      viewforest, raw_skgid, affected_recorder_pids ));
+    |state| view_can_display_absent_reference_change (
+      &state . viewforest, raw_skgid, affected_recorder_pids ));
+  stream_prepared_rerenders (stream, views_state, prepared);
+}
+
+/// After a git-commit: rerender each open buffer of the total diff
+/// view as any rerender does, over the graph straddle the commit
+/// rebuilt. Its roots stay ('TODO/total-diff-view/4_plan-fixes.org',
+/// "Roots linger"), and what the commit made unchanged loses its
+/// decorations. The commit requires the skgrepo-set all, so no text
+/// is withheld and no release is asked for.
+pub fn stream_rerender_tdv_views (
+  stream              : &mut TcpStream,
+  env                 : &SkgEnv,
+  views_state         : &mut ViewsState,
+  skgrepo_restriction : &SkgrepoRestriction,
+) {
+  let prepared : PreparedRerenders = prepare_rerender_views_where (
+    env, env . runtime_snapshot (), views_state,
+    Some (skgrepo_restriction), None, false,
+    |state| state . tdv_buffer . is_some () );
   stream_prepared_rerenders (stream, views_state, prepared);
 }
 
@@ -180,7 +199,7 @@ pub(crate) fn prepare_rerender_views_with_runtime (
     create_partnerFolders, |_| true )
 }
 
-/// Prepare only open views selected from their already-held ViewForest.
+/// Prepare only open views selected from their already-held state.
 /// The selector is deliberately evaluated before cloning or rerendering, so a
 /// command can leave unrelated clean *and dirty* buffers entirely untouched.
 fn prepare_rerender_views_where (
@@ -190,10 +209,10 @@ fn prepare_rerender_views_where (
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
   create_partnerFolders  : bool,
-  include             : impl Fn (&ViewForest) -> bool,
+  include             : impl Fn (&ViewState) -> bool,
 ) -> PreparedRerenders {
   let view_ids : Vec<ViewId> = views_state . open_views . views . iter ()
-    .filter (|(_, state)| include (&state . viewforest))
+    .filter (|(_, state)| include (state))
     .map (|(view_id, _)| view_id . clone ()) . collect ();
   let mut context : RerenderAfterSaveContext =
     RerenderAfterSaveContext::without_save_with_runtime (

@@ -15,7 +15,11 @@ use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_bra
 use crate::update_buffer::ancestry::{ folder_is_generalized_orphan, deaden_generalized_orphan_folder, is_folder_kind};
 use crate::update_buffer::util::detach_viewnode_transferring_focus;
 use crate::update_buffer::warnings::CompletionWarning;
-use crate::to_org::render::changes::process_unrestrictedVognode_changes;
+use crate::to_org::render::changes::{
+  HistoricalPhantomVisit, align_content_members_with_straddle,
+  deleted_phantom_becomes_historical, process_historical_phantom_visit,
+  process_unrestrictedVognode_changes};
+use crate::graph_straddle::types::GraphStraddle;
 use crate::pcsvf::TdvDrawing;
 use crate::types::tree::viewnode_graphnode::{
   pid_and_skgrepo_from_viewnode_at, write_at_unrestrictedVognode_in_tree};
@@ -68,10 +72,15 @@ pub(super) struct CompletionContext<'a> {
   pub(super) warning_sink : Option<&'a mut Vec<CompletionWarning>>,
   /// Some only when completing a total diff view ('server/pcsvf.rs').
   /// Each unrestricted vognode's visit then ends with
-  /// 'process_unrestrictedVognode_changes',
+  /// 'process_unrestrictedVognode_changes', each historical phantom's
+  /// draws its old content ('process_historical_phantom_visit'),
   /// the partner folders draw the union of the straddle, the node budget
   /// is not spent, and no default folders are created.
   pub(super) tdv_drawing : Option<TdvDrawing<'a>>,
+  /// The viewnodes the viewforest held before this completion began.
+  /// In a total diff view, a fold state is set only on a viewnode
+  /// not among them.
+  pub(super) nodes_before_completion : &'a HashSet<NodeId>,
 }
 
 pub(super) fn complete_viewforest (
@@ -198,6 +207,14 @@ fn dispatch_node_update (
       super::reconcile::flags_folder::reconcile_flags_folder_children (
         tree, treeid, &context . runtime . graph,
         &context . runtime . config ) ?,
+    // In a total diff view, a historical phantom where content stands
+    // draws its old content.
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_)))
+      if context . tdv_drawing . is_some () => {
+      let straddle : &GraphStraddle = context . tdv_drawing . unwrap () . straddle;
+      if process_historical_phantom_visit (tree, treeid, straddle) ?
+        == HistoricalPhantomVisit::RootIsLive {
+        visit_normal_node (tree, treeid, context) ?; }},
     _ => {
       // No-op for: Restricted (an anonymous restricted vognode -- it carries no
       // identity, and flipping it to a "DELETED" placeholder would leak that
@@ -230,6 +247,10 @@ fn visit_normal_node (
   if context . deleted_by_this_save_pids . contains (&pid) {
     mutate_unrestrictedVognode_to_deletednode (
       tree, treeid, &pid, &skgrepo ) ?;
+    if let Some (drawing) = context . tdv_drawing {
+      // In a total diff view, a node HEAD has is drawn as history.
+      if deleted_phantom_becomes_historical (tree, treeid, drawing . straddle) ? {
+        process_historical_phantom_visit (tree, treeid, drawing . straddle) ?; }}
     return Ok (( )); }
   let had_editableViewRequest : bool =
     read_at_node_in_tree ( tree, treeid,
@@ -270,6 +291,8 @@ fn visit_normal_node (
         settled = true; }
       DrawOutcome::MadeFinal => {
         settled = true; cascade = true; } } }
+  if let Some (drawing) = context . tdv_drawing {
+    align_content_members_with_straddle (tree, treeid, drawing . straddle) ?; }
   expand_true_content_at_unrestrictedVognode (
     treeid, tree, context . editable_map,
     &context . runtime . config, context . graph_snap,
@@ -311,7 +334,9 @@ fn visit_normal_node (
   if let Some (drawing) = context . tdv_drawing {
     // Tag the content, draw what was removed, and add the change
     // folders, markers and properties.
-    process_unrestrictedVognode_changes (tree, treeid, drawing) ?; }
+    process_unrestrictedVognode_changes (
+      tree, treeid, drawing,
+      ! context . nodes_before_completion . contains (&treeid) ) ?; }
   Ok(( )) }
 
 /// Whether a node of this kind is *self-deletable when empty* (TODO/DONE/local-view-update/plan_v2.org §3.4): the

@@ -117,6 +117,50 @@ ACTUAL:
           ;; Don't kill emacs yet — we want all scenarios to report.
           (format "Scenario %s: BEFORE/AFTER differ" name))))))
 
+(defun bfp-tdv-all-changes-buffer ()
+  "The \"all changes\" buffer of the total diff view, once it draws tdvr."
+  (cl-find-if
+   (lambda (b)
+     (and (string-match-p "diff-view: all changes" (buffer-name b))
+          (with-current-buffer b
+            (string-match-p "(id tdvr)" (buffer-string)))))
+   (buffer-list)))
+
+(defun bfp-run-tdv-scenario ()
+  "The total diff view variant, over the data run-test.sh makes: in the
+\"all changes\" buffer, two `org-cycle's on tdvr leave its children's
+headlines visible and their bodies (tdvc's, and tdvr's old text's)
+hidden. After save the snapshot should be unchanged.
+Returns a short diagnostic string on failure, nil on success."
+  (message "")
+  (message "=== Scenario TDV : 2 org-cycles on tdvr ===")
+  (skg-diff-view)
+  (let ((buf (skg-test-wait-for #'bfp-tdv-all-changes-buffer 20)))
+    (unless buf (fail "Scenario TDV: timeout waiting for the \"all changes\" buffer"))
+    (skg-test-wait-for-response 20)
+    (switch-to-buffer buf)
+    (goto-char (point-min))
+    (re-search-forward "(id tdvr)")
+    (beginning-of-line)
+    (dotimes (_ 2) (org-cycle))
+    (let ((before (bfp-snapshot)))
+      (message "--- snapshot BEFORE save ---\n%s" before)
+      (dolist (expected '("[H] root body line two\n" ; the old text's body
+                          "[V] ** the tdv child, edited\n[H] child body line one\n"))
+        (unless (string-match-p (regexp-quote expected) before)
+          (fail "Scenario TDV: BEFORE snapshot lacks %S:\n%s" expected before)))
+      (setq integration-test-phase "TDV-saving")
+      (condition-case err
+          (skg-request-save-buffer)
+        (error (fail "Scenario TDV: save raised: %S" err)))
+      (skg-test-wait-for-response 20)
+      (let ((after (bfp-snapshot)))
+        (message "--- snapshot AFTER save ---\n%s" after)
+        (if (equal before after)
+            (progn (pass "Scenario TDV: fold state preserved") nil)
+          (message "DIFF in scenario TDV.\nBEFORE:\n%s\nAFTER:\n%s" before after)
+          "Scenario TDV: BEFORE/AFTER differ")))))
+
 (defun run-all-tests ()
   (message "=== SKG Body-Fold-Preservation Integration Test ===")
   (let ((test-port (getenv "SKG_TEST_PORT")))
@@ -141,7 +185,8 @@ ACTUAL:
                    "[V] ** child\n"
                    "[H] child body line\n")
                   2))
-         (diffs  (delq nil (list diff-a diff-b))))
+         (diff-tdv (bfp-run-tdv-scenario))
+         (diffs  (delq nil (list diff-a diff-b diff-tdv))))
     (if diffs
         (fail "Scenarios with broken fold-preservation: %s"
               (mapconcat #'identity diffs "; "))

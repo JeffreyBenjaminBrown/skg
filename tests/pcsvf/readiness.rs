@@ -146,7 +146,8 @@ fn save_deleting (
 
 /// A node deleted in the buffer is drawn as the PCSVF draws a
 /// deleted node: where it stood among its container's content, and
-/// in the changed container folder of what it contained.
+/// in the changed container folder of what it contained. Where it
+/// stood, its viewnode stays, with its folded body.
 #[test]
 fn a_member_deleted_in_the_buffer_is_redrawn_as_removed (
 ) -> Result<(), Box<dyn Error>> {
@@ -156,9 +157,11 @@ fn a_member_deleted_in_the_buffer_is_redrawn_as_removed (
       f, &buffer, "** (skg bodyFolded (node (id cy1)", "cy1" ) ?;
     assert! ( ! saved . contains ("(deleted (id cy1)"), "{}", saved );
     let historical : &str =
-      "(skg (historical (id cy1) (repo main) (diff node- rel-))) cy1";
+      "(historical (id cy1) (repo main) (diff node- rel-))) cy1";
     assert_eq! ( saved . matches (historical) . count (), 2,
                  "in cy2's content and in its container folder:\n{}", saved );
+    assert! ( saved . contains ( &format! ("** (skg bodyFolded {}", historical) ),
+              "cy1, context before, keeps its folded body:\n{}", saved );
     Ok (( )) }) }
 
 #[test]

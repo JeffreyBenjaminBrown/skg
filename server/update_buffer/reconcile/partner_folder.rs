@@ -6,14 +6,17 @@ use crate::to_org::expand::role_tree::{
   build_and_integrate_role_tree_with_skgrepo_set};
 use crate::to_org::render::change_viewnodes::{
   mk_historical_viewnode, mk_relRepo_move_viewnode};
+use crate::to_org::render::fresh_drawing::{
+  is_unrestricted_removed_member, match_key,
+  reconcile_children_with_fresh_drawing};
 use crate::to_org::complete::partner_folder::child_data::{
   build_child_data,
   ChildData,
-  apply_presence_to_folder_members,
+  FolderGoalItem,
+  FolderGoalShape,
   reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds,
 };
 use crate::types::env::RuntimeGeneration;
-use crate::types::git::Sign;
 use crate::types::misc::{ID, RelPartner, SkgrepoName};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::phantom::home_from_disk;
@@ -21,7 +24,8 @@ use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::{CompletionWarning, RepairKind};
-use crate::types::viewnode::{DiffPresence, Editability, FolderPolicy, AffectsParent, PartnerFolder, Phantom, Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode};
+use crate::types::tree::moves::arrange_last_children;
+use crate::types::viewnode::{DiffPresence, FolderPolicy, AffectsParent, PartnerFolder, Phantom, Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -109,7 +113,8 @@ pub fn reconcile_partnerFolder_children (
         // The user may have reordered this generated folder; the
         // order is view-local and respected (metaplan_2.org,
         // "preserve user-visible order in write-protected sets").
-        view_order_preserving_goal_list (tree, node, &graph_members) ?,
+        view_order_preserving_goal_list (
+          tree, node, &graph_members, &live_member_skgid ) ?,
       FolderPolicy::WriteProtectedFilter =>
         // Unreachable: the let-else above already returned,
         // because the filter folders have no relation member role.
@@ -128,15 +133,17 @@ pub fn reconcile_partnerFolder_children (
       . filter (|member| member . relRepo != recorder_skgrepo)
       . map (|member| (member . member . clone (), member . relRepo . clone ()))
       . collect ();
+  let goal_items : Vec<FolderGoalItem> =
+    FolderGoalItem::live_members (&goal_list);
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
-      tree, node, &goal_list, &relRepos, runtime ) ?;
+      tree, node, &goal_items, &relRepos, runtime ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §6.0/§16: the reconciler deletes a stale member that is a view-leaf and
   // demotes one that is a branch, so a write-protected PartnerFolder
   // drops a stale leaf member instead of preserving it.
   let summary : RepairSummary<ID> =
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
-      tree, node, kind, &goal_list, &child_data,
+      tree, node, kind, &goal_items, &child_data,
       deleted_by_this_save_extra_ids ) ?;
   if kind . policy () != FolderPolicy::EditableSet {
     // Repairs to an editable folder are not repairs: its membership IS
@@ -147,9 +154,10 @@ pub fn reconcile_partnerFolder_children (
   Ok (( )) }
 
 /// 'reconcile_partnerFolder_children' with its goal list from the union
-/// of a graph straddle: the partners in either graph, each member tagged
-/// with its presence. A member whose node is only in the before-graph
-/// is drawn as an unknown phantom.
+/// of a graph straddle: the partners in either graph, each item tagged
+/// with its presence and shaped as 'straddle_goal_item' says. A child
+/// standing for an item is kept whatever it stood as before, and
+/// takes the item's shape.
 fn reconcile_partnerFolder_children_from_graph_straddle (
   node         : NodeId,
   tree         : &mut Tree<Viewnode>,
@@ -161,31 +169,32 @@ fn reconcile_partnerFolder_children_from_graph_straddle (
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   warning_sink : Option<&mut Vec<CompletionWarning>>,
 ) -> Result<(), Box<dyn Error>> {
-  restore_removed_members_of_straddle_folder (tree, node, kind) ?;
   let partners : Vec<Partner> =
     straddle . partners (recorder_pid, member_role);
-  let members : Vec<ID> =
-    partners . iter () . map ( |partner| partner . id . clone () ) . collect ();
-  let goal_list : Vec<ID> = match kind . policy () {
-    FolderPolicy::WriteProtectedSet =>
-      view_order_preserving_goal_list (tree, node, &members) ?,
-    _ => members, };
+  let editable_set : bool = kind . policy () == FolderPolicy::EditableSet;
+  let items : Vec<FolderGoalItem> =
+    partners . iter ()
+    . filter_map ( |partner| straddle_goal_item (straddle, partner, editable_set) )
+    . collect ();
+  let goal_items : Vec<FolderGoalItem> = match kind . policy () {
+    FolderPolicy::WriteProtectedSet => {
+      let members : Vec<ID> =
+        items . iter () . map ( |item| item . skgid . clone () ) . collect ();
+      let ordered : Vec<ID> = view_order_preserving_goal_list (
+        tree, node, &members, &straddle_member_skgid ) ?;
+      let by_skgid : HashMap<&ID, &FolderGoalItem> =
+        items . iter () . map ( |item| (&item . skgid, item) ) . collect ();
+      ordered . iter ()
+        . filter_map ( |skgid| by_skgid . get (skgid) . map ( |item| (*item) . clone () ))
+        . collect () },
+    _ => items, };
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
-      tree, node, &goal_list, &HashMap::new (), runtime ) ?;
+      tree, node, &goal_items, &HashMap::new (), runtime ) ?;
   let summary : RepairSummary<ID> =
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
-      tree, node, kind, &goal_list, &child_data,
+      tree, node, kind, &goal_items, &child_data,
       deleted_by_this_save_extra_ids ) ?;
-  let presence_by_skgid : HashMap<ID, DiffPresence> =
-    partners . iter ()
-    . map ( |partner| ( partner . id . clone (), DiffPresence {
-      node : straddle . node_presence (&partner . id)
-             . and_then ( |presence| presence . diff_sign () ),
-      rel  : partner . presence . diff_sign (), } ))
-    . collect ();
-  apply_presence_to_folder_members (tree, node, &presence_by_skgid) ?;
-  redraw_removed_members_of_straddle_folder (tree, node, kind, straddle) ?;
   attach_continuations_under_straddle_folder_members (
     tree, node, kind, member_role, straddle, &partners, runtime ) ?;
   if kind . policy () != FolderPolicy::EditableSet {
@@ -193,72 +202,51 @@ fn reconcile_partnerFolder_children_from_graph_straddle (
       push_repair_warnings (sink, kind, recorder_pid, summary); }}
   Ok (( )) }
 
-/// Undo what 'redraw_removed_members_of_straddle_folder' did when the
-/// folder was last drawn: a historical phantom becomes the unknown
-/// phantom the reconciler drew it as, and a demoted member a member
-/// again. The reconciler then matches them where they stand, instead
-/// of drawing them a second time, and the redraw redoes the rest.
-fn restore_removed_members_of_straddle_folder (
-  tree   : &mut Tree<Viewnode>,
-  folder : NodeId,
-  kind   : PartnerFolder,
-) -> Result<(), Box<dyn Error>> {
-  let editable_set : bool = kind . policy () == FolderPolicy::EditableSet;
-  let members : Vec<NodeId> =
-    tree . get (folder) . ok_or ("restore_removed_members_of_straddle_folder: folder not found") ?
-    . children () . map ( |child| child . id () ) . collect ();
-  for member in members {
-    let mut member_mut = tree . get_mut (member) . unwrap ();
-    let restored : Option<ViewnodeKind> = match &mut member_mut . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
-        Some ( mk_unknown_viewnode ( h . skgid . clone () ) . kind ),
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-        if editable_set && t . affectsParent == AffectsParent::False
-           && t . change_facts . presence . rel == Some (Sign::Minus) => {
-        t . affectsParent = AffectsParent::True;
-        t . change_facts . presence = DiffPresence::default ();
-        None },
-      _ => None, };
-    if let Some (restored) = restored {
-      member_mut . value () . kind = restored; }}
-  Ok (( )) }
+/// The goal item of a partner of a straddle-drawn folder: a node only
+/// in the before-graph is its historical phantom; in a folder whose
+/// membership the save reads (an EditableSet), a member whose
+/// relationship is only in the before-graph is removed, and not drawn
+/// at all when it is dangling, so that saving the buffer does not
+/// restore it; any other is a member.
+fn straddle_goal_item (
+  straddle     : &GraphStraddle,
+  partner      : &Partner,
+  editable_set : bool,
+) -> Option<FolderGoalItem> {
+  let node_presence : Option<Presence> = straddle . node_presence (&partner . id);
+  let presence : DiffPresence = DiffPresence {
+    node : node_presence . and_then ( |presence| presence . diff_sign () ),
+    rel  : partner . presence . diff_sign (), };
+  let shape : FolderGoalShape = match node_presence {
+    Some (Presence::OnlyBefore) => FolderGoalShape::Historical (
+      mk_historical_viewnode (straddle, &partner . id, presence . rel) ? ),
+    _ if editable_set && partner . presence == Presence::OnlyBefore => {
+      node_presence ?; // dangling
+      FolderGoalShape::Removed },
+    _ => FolderGoalShape::Member, };
+  Some ( FolderGoalItem {
+    skgid : partner . id . clone (), presence : Some (presence), shape } ) }
 
-/// The members of a straddle-drawn folder whose relationship is only in
-/// the before-graph: one whose node the after-graph lacks becomes a
-/// historical phantom; in a folder whose membership the save reads
-/// (an EditableSet), a surviving one is demoted to a write-protected
-/// non-member and a dangling one is dropped, so saving the buffer
-/// does not restore them.
-fn redraw_removed_members_of_straddle_folder (
-  tree     : &mut Tree<Viewnode>,
-  folder   : NodeId,
-  kind     : PartnerFolder,
-  straddle : &GraphStraddle,
-) -> Result<(), Box<dyn Error>> {
-  let editable_set : bool = kind . policy () == FolderPolicy::EditableSet;
-  let members : Vec<NodeId> =
-    tree . get (folder) . ok_or ("redraw_removed_members_of_straddle_folder: folder not found") ?
-    . children () . map ( |child| child . id () ) . collect ();
-  for member in members {
-    let (skgid, rel) : (ID, Option<Sign>) =
-      match &tree . get (member) . unwrap () . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-          ( t . skgid . clone (), t . change_facts . presence . rel ),
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
-          ( u . skgid . clone (), u . change_facts . presence . rel ),
-        _ => continue, };
-    if straddle . node_presence (&skgid) == Some (Presence::OnlyBefore) {
-      if let Some (historical) = mk_historical_viewnode (straddle, &skgid, rel) {
-        tree . get_mut (member) . unwrap () . value () . kind = historical . kind; }
-      continue; }
-    if ! editable_set || rel != Some (Sign::Minus) { continue; }
-    let mut member_mut = tree . get_mut (member) . unwrap ();
-    match &mut member_mut . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
-        t . affectsParent = AffectsParent::False;
-        t . editability = Editability::WriteProtected; },
-      _ => { member_mut . detach (); }, }}
-  Ok (( )) }
+/// The ID a member of a live-graph folder stands for.
+fn live_member_skgid (
+  viewnode : &Viewnode,
+) -> Option<ID> {
+  match &viewnode . kind {
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+      if t . affectsParent == AffectsParent::True => Some ( t . skgid . clone () ),
+    _ => None, }}
+
+/// The ID a member of a straddle-drawn folder stands for: a live
+/// member, a removed one, or a historical phantom.
+fn straddle_member_skgid (
+  viewnode : &Viewnode,
+) -> Option<ID> {
+  match &viewnode . kind {
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
+      Some ( h . skgid . clone () ),
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+      if is_unrestricted_removed_member (viewnode) => Some ( t . skgid . clone () ),
+    _ => live_member_skgid (viewnode), }}
 
 /// Under each member of a straddle-drawn folder, the role-tree engine's
 /// continuation over the union of the straddle: under a container, its
@@ -266,9 +254,11 @@ fn redraw_removed_members_of_straddle_folder (
 /// the folder's role, with a full containerward tree under each
 /// graft. In a folder of the anchor's own relationships, only under
 /// the members whose relationship changed. A member whose
-/// relationship moved to another skgrepo gets that move. What an
-/// earlier drawing hung under the members goes first, so that drawing
-/// again is idempotent.
+/// relationship moved to another skgrepo gets that move. Each
+/// member's continuation is drawn afresh in a scratch tree and
+/// reconciled with what the member holds, by skgid (and the move by
+/// its kind) at each level, so that a continuation that stays keeps
+/// its viewnodes and their fold state, in the order of the walk.
 fn attach_continuations_under_straddle_folder_members (
   tree        : &mut Tree<Viewnode>,
   folder      : NodeId,
@@ -281,7 +271,7 @@ fn attach_continuations_under_straddle_folder_members (
   let by_id : HashMap<&ID, &Partner> =
     partners . iter () . map ( |partner| (&partner . id, partner) ) . collect ();
   let outbound : bool = ! member_role . is_first_role ();
-  let all_members : Vec<(NodeId, &Partner)> =
+  let members : Vec<(NodeId, &Partner)> =
     tree . get (folder) . ok_or ("attach_continuations_under_straddle_folder_members: folder not found") ?
     . children ()
     . filter_map ( |child| match &child . value () . kind {
@@ -289,32 +279,25 @@ fn attach_continuations_under_straddle_folder_members (
         by_id . get (&t . skgid) . map ( |partner| (child . id (), *partner) ),
       _ => None, } )
     . collect ();
-  { // The previous drawing's continuations and moves.
-    let stale : Vec<NodeId> =
-      all_members . iter ()
-      . flat_map ( |(member, _)| tree . get (*member) . unwrap () . children ()
-                   . map ( |child| child . id () ) . collect::<Vec<NodeId>> () )
-      . collect ();
-    for treeid in stale {
-      tree . get_mut (treeid) . unwrap () . detach (); }}
-  let members : Vec<(NodeId, &Partner)> =
-    all_members . into_iter ()
-    . filter ( |(_, partner)| ! outbound || partner . changed () )
-    . collect ();
-  for (member, partner) in &members {
-    if let Some (moved) = mk_relRepo_move_viewnode (partner) {
-      tree . get_mut (*member) . unwrap () . prepend (moved); }}
-  let member_treeids : Vec<NodeId> =
-    members . iter () . map ( |(member, _)| *member ) . collect ();
-  if kind == PartnerFolder::Container {
-    attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
-      tree, &member_treeids, &runtime . graph, &runtime . config, None,
-      RoleTreePartners::GraphStraddle (straddle) ) ?;
-  } else {
-    for member in member_treeids {
-      build_and_integrate_role_tree_with_skgrepo_set (
-        tree, member, &runtime . graph, member_role, &runtime . config,
-        None, RoleTreePartners::GraphStraddle (straddle) ) ?; }}
+  for (member, partner) in members {
+    let mut fresh : Tree<Viewnode> = // its root stands in for the member
+      Tree::new ( tree . get (member) . unwrap () . value () . clone () );
+    let fresh_member : NodeId = fresh . root () . id ();
+    if ! outbound || partner . changed () {
+      if let Some (moved) = mk_relRepo_move_viewnode (partner) {
+        fresh . root_mut () . prepend (moved); }
+      if kind == PartnerFolder::Container {
+        attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
+          &mut fresh, &[fresh_member], &runtime . graph, &runtime . config, None,
+          RoleTreePartners::GraphStraddle (straddle) ) ?;
+      } else {
+        build_and_integrate_role_tree_with_skgrepo_set (
+          &mut fresh, fresh_member, &runtime . graph, member_role,
+          &runtime . config, None, RoleTreePartners::GraphStraddle (straddle) ) ?; }}
+    let kept : Vec<NodeId> = reconcile_children_with_fresh_drawing (
+      tree, member, &fresh, fresh_member,
+      &|viewnode| match_key (viewnode) . is_some (), &|_| true ) ?;
+    arrange_last_children (tree, member, &kept) ?; }
   Ok (( )) }
 
 /// Translate a RepairSummary into per-repair-kind CompletionWarnings.
@@ -339,7 +322,8 @@ pub fn push_repair_warnings (
         children } ); }}}
 
 /// The effective goal list for a FolderPolicy::WriteProtectedSet folder:
-/// the folder's existing Unrestricted affectsParent=true children, in their
+/// the folder's existing members ('member_skgid' says which children
+/// are, and which ID each stands for), in their
 /// current view order, filtered to graph-real members (first
 /// occurrence of a duplicate wins; the reconciler detaches the
 /// duplicates themselves), then every graph member not yet listed,
@@ -351,6 +335,7 @@ fn view_order_preserving_goal_list (
   tree          : &Tree<Viewnode>,
   folder           : NodeId,
   graph_members : &[ID],
+  member_skgid  : &dyn Fn (&Viewnode) -> Option<ID>,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
   let member_set : HashSet<&ID> =
     graph_members . iter () . collect ();
@@ -360,12 +345,10 @@ fn view_order_preserving_goal_list (
       tree . get (folder)
       . ok_or ("view_order_preserving_goal_list: folder not found") ?;
     for child in folder_ref . children () {
-      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-        = & child . value () . kind
-      { if t . affectsParent == AffectsParent::True
-          && member_set . contains (&t . skgid)
-          && seen . insert (t . skgid . clone ())
-        { goal . push (t . skgid . clone ()); }}}}
+      if let Some (skgid) = member_skgid ( child . value () ) {
+        if member_set . contains (&skgid)
+          && seen . insert (skgid . clone ())
+        { goal . push (skgid); }}}}
   for member in graph_members {
     if seen . insert (member . clone ()) {
       goal . push (member . clone ()); }}

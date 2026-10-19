@@ -19,7 +19,6 @@ use crate::types::viewnode::{
 
 use ego_tree::{NodeId, Tree};
 use similar::{ChangeTag, TextDiff};
-use std::collections::HashSet;
 
 /// Under 'parent', the old text of the node 'pid', with a body diff
 /// under it when the body changed. None (and nothing appended) when
@@ -123,54 +122,34 @@ pub fn mk_historical_viewnode (
         ready    : None },
       readiness_request : None } )))) ) }
 
-/// Under 'parent', the historical phantom of 'pid' (see
-/// 'mk_historical_viewnode'), with, if a nodeMerge acquired it, an
-/// "it was acquired by" folder, and then its old content as removed
-/// members: a deleted member as a historical phantom with its own
-/// old content, a surviving one as a write-protected vognode, and a
-/// dangling one as an unknown phantom. A node already drawn above
-/// itself in this recursion is drawn without its content. None if
-/// the before-graph lacks 'pid'.
-pub fn append_historical_phantom (
+/// Under 'phantom', the historical phantom of 'pid' standing where
+/// content stands, what it holds: if a nodeMerge acquired it, an "it
+/// was acquired by" folder, and then its old content as removed
+/// members: a deleted member as a historical phantom (whose own visit
+/// draws its old content), a surviving one as a write-protected
+/// vognode, and a dangling one as an unknown phantom.
+pub fn append_historical_phantom_content (
   tree     : &mut Tree<Viewnode>,
-  parent   : NodeId,
+  phantom  : NodeId,
   straddle : &GraphStraddle,
   pid      : &ID,
-  rel      : Option<Sign>,
-) -> Option<NodeId> {
-  fn append_with_content (
-    tree      : &mut Tree<Viewnode>,
-    parent    : NodeId,
-    straddle  : &GraphStraddle,
-    pid       : &ID,
-    rel       : Option<Sign>,
-    ancestors : &mut HashSet<ID>,
-  ) -> Option<NodeId> {
-    let treeid : NodeId = tree . get_mut (parent) ? . append (
-      mk_historical_viewnode (straddle, pid, rel) ? ) . id ();
-    if ! ancestors . insert (pid . clone ()) {
-      return Some (treeid); }
-    if let Some (acquirer) = straddle . acquirer_of (pid) {
-      if let Some (acquirer_viewnode) =
-        mk_member_viewnode (straddle, &acquirer, None) {
-        let folder : NodeId = tree . get_mut (treeid) ? . append (
-          viewnode_of ( ViewnodeKind::PartnerFolder (
-            PartnerFolder::AcquiredBy ))) . id ();
-        tree . get_mut (folder) ? . append (acquirer_viewnode); }}
-    for partner in straddle . partners (pid, CONTENT) {
+) -> Option<()> {
+  if let Some (acquirer) = straddle . acquirer_of (pid) {
+    if let Some (acquirer_viewnode) =
+      mk_member_viewnode (straddle, &acquirer, None) {
+      let folder : NodeId = tree . get_mut (phantom) ? . append (
+        viewnode_of ( ViewnodeKind::PartnerFolder (
+          PartnerFolder::AcquiredBy ))) . id ();
+      tree . get_mut (folder) ? . append (acquirer_viewnode); }}
+  for partner in straddle . partners (pid, CONTENT) {
+    let member : Option<Viewnode> =
       match straddle . node_presence (&partner . id) {
-        Some (Presence::OnlyBefore) => {
-          append_with_content (
-            tree, treeid, straddle, &partner . id, Some (Sign::Minus),
-            ancestors ); },
-        _ => {
-          if let Some (member) =
-            mk_member_viewnode (straddle, &partner . id, Some (Sign::Minus)) {
-            tree . get_mut (treeid) ? . append (member); }}, }}
-    ancestors . remove (pid);
-    Some (treeid) }
-  append_with_content (
-    tree, parent, straddle, pid, rel, &mut HashSet::new () ) }
+        Some (Presence::OnlyBefore) =>
+          mk_historical_viewnode (straddle, &partner . id, Some (Sign::Minus)),
+        _ => mk_member_viewnode (straddle, &partner . id, Some (Sign::Minus)), };
+    if let Some (member) = member {
+      tree . get_mut (phantom) ? . append (member); }}
+  Some (( )) }
 
 /// Under 'parent' (the acquirer 'pid'), an "it acquired" folder of
 /// the historical phantoms of the nodes it acquired since HEAD. None

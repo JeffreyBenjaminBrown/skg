@@ -616,3 +616,72 @@ matching 'graph_straddle_slot' beside them.
 'TODO/total-diff-view/2_plan.org', which still has that name.
 *** 'docs/heralds.org' needed nothing
 It no longer mentioned the graph pair.
+** Slice 1: deviations
+*** one matcher for every change viewnode
+The plan names the match keys; the code builds each fresh drawing in
+a scratch tree and reconciles the node's children with it in one
+place, 'server/to_org/render/fresh_drawing.rs'
+('reconcile_children_with_fresh_drawing'). The per-visit step, the
+historical phantom's visit, the relRepo moves under members and the
+continuations all use it. A folder entry (an alias, an ID, a flag) is
+matched by the entry, since its 'folded' is how the client records
+that its folder is folded.
+*** members are aligned before the content reconciler runs
+The content reconciler detaches a stale leaf member, and draws a new
+viewnode for a member that stands set aside or as a historical
+phantom. So, before it runs at an editable node of a TDV, a new step
+('align_content_members_with_straddle') sets a member whose
+relationship is only in the before-graph aside (affectsParent false),
+sets a removed member whose relationship is back to be a member, and
+turns a historical phantom whose node is back into an editable
+vognode. The reconciler then keeps each viewnode; the per-visit step
+after it matches and repositions them.
+*** a historical phantom draws its old content at its own visit
+The plan has a phantom's old content reconciled recursively by the
+step that matched the phantom. The code does it at the phantom's own
+visit in the BFS instead ('process_historical_phantom_visit'), one
+level at a time, so that a historical root, one a deleted phantom
+became, and one matched under a live node take the same path. A
+historical phantom draws its old content only where content stands
+(under a vognode, or as a root); in a folder, including the "it
+acquired" folder, it draws none, as before. A historical root whose
+node is back becomes an editable vognode, and is visited as one.
+*** a historical root whose node is in neither graph becomes a deleted phantom
+After a commit of a deletion, a historical root's node is in neither
+graph. Roots linger, so it stays, as the deleted phantom of the node
+(title and body as HEAD last had them), with its old content gone.
+*** what a write-protected node holds
+A node an earlier visit drew editable can be write-protected now
+(after a commit, 'tag_content_members' still write-protects every
+member outside U; slice 5 narrows that). At its visit the step
+detaches the change viewnodes it drew there while editable (old text,
+home move, markers, the alias, ID and flags folders, the "it
+acquired" folder, removed members, historical phantoms), and tags the
+members it still holds with their presence and relRepo moves, without
+write-protecting them. Partner folders are never detached, as before,
+since one the user requested may be among them; after a commit a
+changed partner folder stays as a plain one.
+*** ID folders are no longer stripped before a TDV rerender
+'rerender_view' strips every ID folder before completion only outside
+a TDV; in a TDV the step reconciles it like the other change folders,
+so it keeps its fold state.
+*** continuation order
+New continuation viewnodes are placed in walk order among the kept
+ones (each level is ordered as the fresh walk orders it), not
+appended after them.
+*** the move helpers are built
+'server/types/tree/moves.rs' holds slice 9's helpers ('move_to_first_child',
+'move_to_last_child', 'move_before', 'move_after', and two that
+arrange a run of children). Slice 1's code uses them; the other call
+sites are slice 9's.
+*** stale home-move facts are cleared
+'set_home_move_facts_in_viewforest' set a vognode's home move but
+never cleared it, so after a commit a rerendered skgrepo-changes
+buffer kept "-OLD +NEW". It now clears the facts of a vognode whose
+home did not move.
+*** the TDV variants of the fold tests
+'fold-preservation' and 'body-fold-preservation' make their skgrepo a
+gitrepo whose worktree edits two committed nodes, and end with a
+scenario on the "all changes" buffer. The 'total-diff-view'
+integration test now expects, after the commit, its buffers to keep
+their roots and show no change.

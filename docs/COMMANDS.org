@@ -621,8 +621,9 @@ git-commits it, in every owned skgrepo that has changes, with that
 message. If not every changed file is ready, it first shows the
 readiness summary and proceeds only if you type the word "yes". Every
 open view must be saved or reverted first. Afterward the open buffers
-of the total diff view are redrawn: emptied, or shrunk to what was not
-committed. The commit lapses the marks of everything it committed.
+of the total diff view are rerendered: each keeps its roots and its
+folding, and what was committed no longer shows as a change. The
+commit lapses the marks of everything it committed.
 ** C-c m : other graph modifications
 *** C-c m c : skg-replace-link-with-content
 Replace the leaf at point with a content relationship to the
@@ -711,7 +712,9 @@ since their last commits (how each worktree differs from HEAD), with
 the context needed to understand it. It opens up to four buffers,
 "diff-view: all changes", "diff-view: merges", "diff-view: skgrepo
 changes" and "diff-view: order-only changes", skipping any that would
-be empty. It refuses unless the skgrepo restriction is 'all'.
+be empty. It refuses unless the skgrepo restriction is 'all'. A
+buffer keeps its roots until you close it, and saving it (or
+committing) keeps what you folded.
 Why the total diff view commits whole skgrepos, and offers nothing
 smaller: in skg a partial commit is dangerous. The graph is one
 structure spread over many files, so committing some changed files

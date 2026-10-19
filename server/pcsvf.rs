@@ -22,7 +22,7 @@ use crate::nodeMerge::nodeMergeInstructionTriple::acquiree_text_preserver_title;
 use crate::prominence::climb_containerward_to_cycle_via;
 use crate::readiness_store::ReadinessStore;
 use crate::serve::handlers::readiness_requests::set_ready_facts_in_viewforest;
-use crate::to_org::render::change_viewnodes::append_historical_phantom;
+use crate::to_org::render::change_viewnodes::mk_historical_viewnode;
 use crate::to_org::util::{EditableMap, build_node_branch_minus_content};
 use crate::types::env::RuntimeGeneration;
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -207,29 +207,32 @@ pub fn set_tdv_facts_in_viewforest (
 /// On each unrestricted vognode whose home skgrepo moved: the move,
 /// and, when the nearest vognode ancestor whose home moved moved the
 /// same way, that ancestor's letter. Computed like
-/// 'homeSkgrepoAtBoundary', against the nearest moved ancestor.
+/// 'homeSkgrepoAtBoundary', against the nearest moved ancestor. On
+/// every other unrestricted vognode, neither (a rerender may follow
+/// a commit that made a move part of HEAD).
 pub fn set_home_move_facts_in_viewforest (
   viewforest : &mut ViewForest,
   straddle   : &GraphStraddle,
 ) {
-  let facts : Vec<(NodeId, (SkgrepoName, SkgrepoName), Option<String>)> =
+  let facts : Vec<(NodeId, Option<(SkgrepoName, SkgrepoName)>, Option<String>)> =
     viewforest . nodes ()
     . filter_map ( |node| {
       let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
         &node . value () . kind else { return None; };
-      let home_move : (SkgrepoName, SkgrepoName) =
-        straddle . node_changes (&t . skgid) . home ?;
+      let home_move : Option<(SkgrepoName, SkgrepoName)> =
+        straddle . node_changes (&t . skgid) . home;
       let moved_like_ancestor : Option<String> =
-        nearest_moved_vognode_ancestor (node, straddle)
-        . filter ( |(_, ancestor_move)| *ancestor_move == home_move )
-        . map ( |(generation, _)| ancestor_letter (generation) );
+        home_move . as_ref () . and_then ( |home_move|
+          nearest_moved_vognode_ancestor (node, straddle)
+          . filter ( |(_, ancestor_move)| ancestor_move == home_move )
+          . map ( |(generation, _)| ancestor_letter (generation) ));
       Some (( node . id (), home_move, moved_like_ancestor )) } )
     . collect ();
   for (treeid, home_move, moved_like_ancestor) in facts {
     if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       &mut viewforest . as_internal_tree_mut () . get_mut (treeid)
       . unwrap () . value () . kind {
-      t . viewStats . home_move = Some (home_move);
+      t . viewStats . home_move = home_move;
       t . viewStats . moved_like_ancestor = moved_like_ancestor; }}}
 
 /// The ancestor generation (1 = viewparent, counting every viewnode
@@ -271,7 +274,7 @@ pub fn nodes_drawn_in_viewforest (
 
 /// The stub the PCSVF's view completion starts from: each root as an
 /// editable stub, or, when the after-graph lacks it, as a historical
-/// phantom with its old content. In a PCSVF, a multiply-contained
+/// phantom, whose visit draws its old content. In a PCSVF, a multiply-contained
 /// root gets a folded container folder, which completion fills with
 /// its containers in either graph and their containerward forest.
 /// The order-only buffer, a flat list, draws none.
@@ -286,10 +289,12 @@ fn stub_viewforest_of_roots (
   let mut stub_editable_map : EditableMap = EditableMap::new ();
   for root in roots {
     if straddle . after . get (root) . is_none () {
-      append_historical_phantom (
-        viewforest . as_internal_tree_mut (), buffer_root, straddle, root, None )
+      let phantom : Viewnode = mk_historical_viewnode (straddle, root, None)
         . ok_or_else ( || format! (
           "pcsvf_viewforest: root {} is in neither graph", root )) ?;
+      viewforest . as_internal_tree_mut () . get_mut (buffer_root)
+        . ok_or ("pcsvf_viewforest: no buffer root") ?
+        . append (phantom);
       continue; }
     let root_treeid : NodeId = build_node_branch_minus_content (
       Some (( viewforest . as_internal_tree_mut (), buffer_root )),

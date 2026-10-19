@@ -18,6 +18,7 @@ cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
 
 cleanup_test_data() {
     find "$TEST_DIR/data/owned/skg-data" -name "*.skg" -delete 2>/dev/null || true
+    rm -rf "$TEST_DIR/data/owned/skg-data/.git"
     cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
 }
 
@@ -39,6 +40,29 @@ beep_when_server_becomes_available = false
 name = "main"
 path = "$TEST_DIR/data/owned/skg-data"
 EOF
+
+# The total diff view variant: the skgrepo is a gitrepo. At HEAD,
+# tdvr (with a body) contains tdvc (with a body); in the worktree
+# tdvr's body and tdvc's title are edited, so the "all changes"
+# buffer draws both, each with its old text.
+set_up_tdv_data() {
+    local repo="$TEST_DIR/data/owned/skg-data"
+    rm -rf "$repo/.git"
+    find "$repo" -name "*.skg" -delete 2>/dev/null || true
+    printf 'pid: tdvr\ntitle: the tdv root\nbody: |-\n  root body line one\n  root body line two\ncontains:\n- tdvc\n' > "$repo/tdvr.skg"
+    printf 'pid: tdvc\ntitle: the tdv child\nbody: |-\n  child body line one\n  child body line two\n' > "$repo/tdvc.skg"
+    ( cd "$repo"
+      git init -q
+      git config user.email "test@test.com"
+      git config user.name "Test"
+      git add -A
+      git commit -q -m "Initial commit" )
+    printf 'pid: tdvr\ntitle: the tdv root\nbody: |-\n  root body line one\n  root body line 2\ncontains:\n- tdvc\n' > "$repo/tdvr.skg"
+    printf 'pid: tdvc\ntitle: the tdv child, edited\nbody: |-\n  child body line one\n  child body line two\n' > "$repo/tdvc.skg"
+    echo "✓ Total diff view data ready"
+}
+
+set_up_tdv_data
 
 start_skg_server
 

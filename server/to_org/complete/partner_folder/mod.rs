@@ -8,7 +8,7 @@ use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::to_org::complete::partner_folder::child_data::{
-  ChildData, reconcile_partnerFolder_children_against_goal_list };
+  ChildData, FolderGoalItem, reconcile_partnerFolder_children_against_goal_list };
 use crate::to_org::util::graphnode_and_viewnode_from_skgid;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
@@ -173,7 +173,7 @@ pub fn maybe_add_subscribeeFolder_branch (
     reconcile_partnerFolder_children_against_goal_list (
       tree, subscribee_folder_treeid,
       PartnerFolder::Subscribee,
-      &goal, &data ) ?; }
+      &FolderGoalItem::live_members (&goal), &data ) ?; }
   if ! hidden_outside_content . is_empty () {
     // HiddenOutsideOfSubscribeeFolder presents last, if it exists.
     let hidden_outside_folder_treeid : NodeId =
@@ -196,7 +196,7 @@ pub fn maybe_add_subscribeeFolder_branch (
     reconcile_partnerFolder_children_against_goal_list (
       tree, hidden_outside_folder_treeid,
       PartnerFolder::HiddenOutsideOfSubscribee,
-      &goal, &data ) ?; }
+      &FolderGoalItem::live_members (&goal), &data ) ?; }
   Ok (( )) }
 
 /// Add the PartnerFolders that an editable node shows without an explicit
@@ -283,7 +283,7 @@ pub fn maybe_add_one_partnerFolder (
     build_initial_render_child_data (
       &member_skgids, graph, config ) ?;
   reconcile_partnerFolder_children_against_goal_list (
-    tree, folder_treeid, kind, &goal, &data ) ?;
+    tree, folder_treeid, kind, &FolderGoalItem::live_members (&goal), &data ) ?;
   Ok (( )) }
 
 /// If this node is a Subscribee,
@@ -356,5 +356,5 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
   reconcile_partnerFolder_children_against_goal_list (
     tree, hidden_folder_treeid,
     PartnerFolder::HiddenInSubscribee,
-    &goal, &data ) ?;
+    &FolderGoalItem::live_members (&goal), &data ) ?;
   Ok (( )) }

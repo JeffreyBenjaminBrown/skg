@@ -5,9 +5,10 @@
 ///
 /// Vocabulary for this module:
 ///
-/// - A `goal_list` is the ordered list of node IDs that a folder
-///   should present after completion.  The list is computed from the
-///   graph.
+/// - A `goal_list` is the ordered list of goal items, one per node
+///   ID, that a folder should present after completion.  The list is
+///   computed from the graph, or from the union of a graph straddle,
+///   whose items carry a presence and a shape ('FolderGoalItem').
 /// - A goal child is a child Viewnode whose UnrestrictedVognode ID appears in
 ///   that `goal_list`, whether it already existed in the buffer or
 ///   was created during reconciliation.
@@ -22,11 +23,13 @@
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
-use crate::types::viewnode::{ChangeFacts, DiffPresence, Phantom, Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
+use crate::to_org::render::fresh_drawing::{
+  adopt_fresh_facts, is_unrestricted_removed_member};
+use crate::types::viewnode::{ChangeFacts, DiffPresence, Editability, Phantom, ViewRequest, Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{complete_relevant_children_in_viewforest, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
 
-use ego_tree::{NodeId, NodeRef, Tree};
+use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::io;
@@ -44,15 +47,71 @@ pub struct ChildData {
   pub relRepo : Option<SkgrepoName>,
 }
 
+/// One item of a folder's goal list.
+#[derive(Clone, Debug)]
+pub struct FolderGoalItem {
+  pub skgid    : ID,
+  /// The presence of its node and of its relationship to the
+  /// folder's anchor, when the folder draws the union of a graph
+  /// straddle; None from the live graph.
+  pub presence : Option<DiffPresence>,
+  pub shape    : FolderGoalShape,
+}
+
+/// How a goal item is drawn.
+#[derive(Clone, Debug)]
+pub enum FolderGoalShape {
+  /// A member: a write-protected vognode marked affectsParent=true,
+  /// or an unknown phantom when the live graph lacks its node.
+  Member,
+  /// A member whose relationship is only in the before-graph, in a
+  /// folder whose membership the save reads: a write-protected
+  /// vognode marked affectsParent=false, so that saving the buffer
+  /// does not restore it.
+  Removed,
+  /// A node only in the before-graph: this historical phantom.
+  Historical (Viewnode),
+}
+
+impl FolderGoalItem {
+  /// The goal items of a goal list from the live graph.
+  pub fn live_members (
+    skgids : &[ID],
+  ) -> Vec<FolderGoalItem> {
+    skgids . iter ()
+      . map ( |skgid| FolderGoalItem {
+        skgid    : skgid . clone (),
+        presence : None,
+        shape    : FolderGoalShape::Member, } )
+      . collect () }
+}
+
+/// The ID of a folder child that a goal item can match: a member, an
+/// unknown phantom, a historical phantom, or a removed member.
+fn goal_matchable_skgid (
+  viewnode : &Viewnode,
+) -> Option<ID> {
+  match &viewnode . kind {
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+      if t . affectsParent == AffectsParent::True
+         || is_unrestricted_removed_member (viewnode) =>
+      Some ( t . skgid . clone () ),
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
+      Some ( u . skgid . clone () ),
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
+      Some ( h . skgid . clone () ),
+    _ => None, }}
+
 /// Build a map from child ID to ChildData for the create-child
-/// closure of `complete_relevant_children_in_viewforest`.
+/// closure of `complete_relevant_children_in_viewforest`, for every
+/// goal item but a historical phantom.
 /// The sharing completers build this before mutation so their flow
 /// stays explicit: read tree and graph facts, compute the goal list,
 /// prepare child data, then reconcile folder children.
 pub fn build_child_data (
   tree                           : &Tree<Viewnode>,
   folder_node                       : NodeId,
-  goal_list                      : &[ID],
+  goal_list                      : &[FolderGoalItem],
   relRepos                       : &HashMap<ID, SkgrepoName>,
   runtime                        : &RuntimeGeneration,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
@@ -69,7 +128,10 @@ pub fn build_child_data (
                          t . title . clone () )); }}
     m };
   let mut result : HashMap<ID, ChildData> = HashMap::new ();
-  for child_skgid in goal_list {
+  for item in goal_list {
+    // A historical phantom is drawn from the before-graph.
+    if let FolderGoalShape::Historical (_) = item . shape { continue; }
+    let child_skgid : &ID = &item . skgid;
     if result . contains_key (child_skgid) { continue; }
     match SkgEnv::find_skgrepo_in_generation (runtime, child_skgid) {
       None => { result . insert ( child_skgid . clone (),
@@ -116,14 +178,17 @@ pub fn build_child_data (
 /// HiddenOutsideOfSubscribeeFolder) share the same call shape: build
 /// per-child data before mutation, then call
 /// `complete_relevant_children_in_viewforest` with identical
-/// relevance/key/create closures. An unknown ChildData entry produces
-/// an unknown phantom; any other, a write-protected viewnode marked
-/// AffectsParent::True.
+/// relevance/key/create closures. A member with an unknown ChildData
+/// entry produces an unknown phantom; any other, a write-protected
+/// viewnode marked AffectsParent::True. An item with another shape
+/// is drawn as its shape says, and matches an existing child of the
+/// same skgid whatever its shape, which then takes the item's
+/// ('apply_goal_shapes').
 pub fn reconcile_partnerFolder_children_against_goal_list (
   tree          : &mut Tree<Viewnode>,
   folder_node      : NodeId,
   kind          : PartnerFolder,
-  goal_list     : &[ID],
+  goal_list     : &[FolderGoalItem],
   child_data    : &HashMap<ID, ChildData>,
 ) -> Result<RepairSummary<ID>, Box<dyn Error>> {
   reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
@@ -136,11 +201,15 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
   tree          : &mut Tree<Viewnode>,
   folder_node      : NodeId,
   kind          : PartnerFolder,
-  goal_list     : &[ID],
+  goal_list     : &[FolderGoalItem],
   child_data    : &HashMap<ID, ChildData>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
 ) -> Result<RepairSummary<ID>, Box<dyn Error>> {
   let label : &'static str = kind . caller_label ();
+  let goal_skgids : Vec<ID> =
+    goal_list . iter () . map ( |item| item . skgid . clone () ) . collect ();
+  let items_by_skgid : HashMap<&ID, &FolderGoalItem> =
+    goal_list . iter () . map ( |item| (&item . skgid, item) ) . collect ();
   normalize_relationship_backed_partner_unknowns (
     tree, folder_node, child_data, deleted_by_this_save_extra_ids ) ?;
   let summary : RepairSummary<ID> =
@@ -151,40 +220,103 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
     // every restricted member, and a retained placeholder already in the
     // folder survives as an irrelevant child (preserved as-is, not
     // goal-matched), so it needs no id.
-    |vn : &Viewnode| match &vn . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-        => t . affectsParent == AffectsParent::True,
-      ViewnodeKind::Vognode (Vognode::Phantom (crate::types::viewnode::Phantom::Unknown (_)))
-        => true,
-      _ => false },
-    |vn : &Viewnode| match &vn . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-        => Ok ( t . skgid . clone () ),
-      ViewnodeKind::Vognode (Vognode::Phantom (crate::types::viewnode::Phantom::Unknown (u)))
-        => Ok ( u . skgid . clone () ),
-      _ => Err ( format! (
-        "{}: relevant child not a normal graphnode", label )) },
-    goal_list,
+    |vn : &Viewnode| goal_matchable_skgid (vn) . is_some (),
+    |vn : &Viewnode| goal_matchable_skgid (vn) . ok_or_else ( || format! (
+      "{}: relevant child not a normal graphnode", label )),
+    &goal_skgids,
     |skgid : &ID| {
-      let d : &ChildData =
-        child_data . get (skgid) . ok_or_else (
-          || format! ( "{}: child data not pre-fetched for {}",
-                       label, skgid . 0 )) ?;
-      Ok (
-        if d . unknown {
-          let mut unknown : Viewnode = mk_unknown_viewnode (skgid . clone ());
-          if let ViewnodeKind::Vognode (Vognode::Phantom (
-            crate::types::viewnode::Phantom::Unknown (u))) = &mut unknown . kind
-          { u . relRepo = d . relRepo . clone (); }
-          unknown
-        } else { mk_writeProtected_viewnode ( skgid . clone (),
-                                              d . home_skgrepo . clone (),
-                                              d . title . clone (),
-                                              AffectsParent::True ) } ) },
+      let item : &FolderGoalItem = items_by_skgid . get (skgid) . ok_or_else (
+        || format! ( "{}: no goal item for {}", label, skgid . 0 )) ?;
+      drawing_of_goal_item (item, child_data, label) },
   ) ?;
+  apply_goal_shapes (
+    tree, folder_node, &items_by_skgid, child_data, label ) ?;
   mark_goal_children_as_folder_members (
     tree, folder_node, goal_list) ?;
   Ok (summary) }
+
+/// How a goal item is drawn when no child matches it. See
+/// 'FolderGoalShape'.
+fn drawing_of_goal_item (
+  item       : &FolderGoalItem,
+  child_data : &HashMap<ID, ChildData>,
+  label      : &str,
+) -> Result<Viewnode, String> {
+  let mut drawn : Viewnode = match &item . shape {
+    FolderGoalShape::Historical (phantom) => phantom . clone (),
+    shape => {
+      let d : &ChildData =
+        child_data . get (&item . skgid) . ok_or_else (
+          || format! ( "{}: child data not pre-fetched for {}",
+                       label, item . skgid . 0 )) ?;
+      if d . unknown {
+        let mut unknown : Viewnode = mk_unknown_viewnode (item . skgid . clone ());
+        if let ViewnodeKind::Vognode (Vognode::Phantom (
+          Phantom::Unknown (u))) = &mut unknown . kind
+        { u . relRepo = d . relRepo . clone (); }
+        unknown
+      } else { mk_writeProtected_viewnode (
+        item . skgid . clone (), d . home_skgrepo . clone (),
+        d . title . clone (),
+        match shape { FolderGoalShape::Removed => AffectsParent::False,
+                      _ => AffectsParent::True, } ) } }, };
+  if let Some (presence) = item . presence {
+    set_presence (&mut drawn, presence); }
+  Ok (drawn) }
+
+/// Give each child that a goal item matched the item's shape, keeping
+/// the viewnode and its fold state, and the item's presence. A member
+/// keeps what it is (an editable subscribee stays editable), unless
+/// it stood as a historical phantom; a removed member is
+/// write-protected and set aside (affectsParent=false).
+fn apply_goal_shapes (
+  tree           : &mut Tree<Viewnode>,
+  folder_node    : NodeId,
+  items_by_skgid : &HashMap<&ID, &FolderGoalItem>,
+  child_data     : &HashMap<ID, ChildData>,
+  label          : &str,
+) -> Result<(), Box<dyn Error>> {
+  let children : Vec<(NodeId, ID)> =
+    tree . get (folder_node)
+    . ok_or ("apply_goal_shapes: folder not found") ?
+    . children ()
+    . filter_map ( |child| goal_matchable_skgid ( child . value () )
+                   . map ( |skgid| (child . id (), skgid) ))
+    . collect ();
+  for (child, skgid) in children {
+    let Some (item) : Option<&&FolderGoalItem> = items_by_skgid . get (&skgid)
+      else { continue; };
+    let mut child_mut : NodeMut<Viewnode> = tree . get_mut (child) . unwrap ();
+    let viewnode : &mut Viewnode = child_mut . value ();
+    let historical : bool = matches! ( &viewnode . kind,
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) );
+    let unrestricted : bool = matches! ( &viewnode . kind,
+      ViewnodeKind::Vognode (Vognode::Unrestricted (_)) );
+    match &item . shape {
+      FolderGoalShape::Member if ! historical => {},
+      FolderGoalShape::Removed if unrestricted => {
+        if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut viewnode . kind {
+          t . affectsParent = AffectsParent::False;
+          t . view_requests . remove (&ViewRequest::Editable);
+          t . editability = Editability::WriteProtected; }},
+      _ => adopt_fresh_facts (
+        viewnode, &drawing_of_goal_item (item, child_data, label) ? ), }
+    if let Some (presence) = item . presence {
+      set_presence (viewnode, presence); }}
+  Ok (( )) }
+
+fn set_presence (
+  viewnode : &mut Viewnode,
+  presence : DiffPresence,
+) {
+  match &mut viewnode . kind {
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+      t . change_facts . presence = presence,
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
+      u . change_facts . presence = presence,
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
+      h . change_facts . presence = presence,
+    _ => {}, }}
 
 /// An already-open PartnerFolder can still hold an Unrestricted occurrence after its
 /// graphnode was deleted.  When the rebuilt raw goal retains that membership,
@@ -231,33 +363,6 @@ fn normalize_relationship_backed_partner_unknowns (
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }
 
-/// Stamp each member of a folder with the presence of its node and of
-/// its relationship to the folder's anchor, from 'presence_by_skgid'.
-/// Members are unrestricted vognodes or, for a node only in the
-/// before-graph, unknown phantoms.
-pub fn apply_presence_to_folder_members (
-  tree              : &mut Tree<Viewnode>,
-  folder_node       : NodeId,
-  presence_by_skgid : &HashMap<ID, DiffPresence>,
-) -> Result<(), Box<dyn Error>> {
-  treat_certain_children (
-    tree, folder_node,
-    |vn : &Viewnode| matches! (
-      &vn . kind,
-      ViewnodeKind::Vognode (
-        Vognode::Unrestricted (_) | Vognode::Phantom (Phantom::Unknown (_)) )),
-    |vn : &mut Viewnode| {
-      let (skgid, change_facts) : (&ID, &mut ChangeFacts) = match &mut vn . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-          (&t . skgid, &mut t . change_facts),
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
-          (&u . skgid, &mut u . change_facts),
-        _ => return, };
-      change_facts . presence =
-        presence_by_skgid . get (skgid) . copied () . unwrap_or_default (); } )
-    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
-  Ok (( )) }
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -288,7 +393,8 @@ mod tests {
       primary, [raw_extra . clone ()] . into_iter () . collect ());
 
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
-      &mut tree, folder, PartnerFolder::Subscribee, &[raw_extra . clone ()],
+      &mut tree, folder, PartnerFolder::Subscribee,
+      &FolderGoalItem::live_members (&[raw_extra . clone ()]),
       &child_data, &deleted_extra_ids ) . unwrap ();
 
     let rendered = tree . get (child_treeid) . unwrap () . value ();
@@ -310,10 +416,12 @@ mod tests {
 fn mark_goal_children_as_folder_members (
   tree          : &mut Tree<Viewnode>,
   folder_node      : NodeId,
-  goal_list     : &[ID],
+  goal_list     : &[FolderGoalItem],
 ) -> Result<(), Box<dyn Error>> {
-  let goal_set : HashSet<ID> =
-    goal_list . iter () . cloned () . collect ();
+  let goal_set : HashSet<ID> = // a removed member is set aside
+    goal_list . iter ()
+    . filter ( |item| ! matches! ( item . shape, FolderGoalShape::Removed ))
+    . map ( |item| item . skgid . clone () ) . collect ();
   treat_certain_children (
     tree, folder_node,
     |vn : &Viewnode| match &vn . kind {

@@ -6,11 +6,33 @@
 -- 4. Verifying folding is preserved and point is at the right location.
 
 local T = dofile('../test-nvim-lib.lua')
-T.arm_timeout(30) -- the elisp test's run-at-time timeout was 30s
+T.arm_timeout(60) -- the elisp test's run-at-time timeout is 60s
 
 local buffer = require('skg.buffer')
 local folds = require('skg.folds')
 local save = require('skg.save')
+
+---@return integer|nil the "all changes" buffer, once it draws tdvr
+local function tdv_all_changes_buffer ()
+  for _, b in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_valid(b)
+       and vim.api.nvim_buf_get_name(b):find('diff-view: all changes', 1, true)
+       and T.buffer_text(b):find('(id tdvr)', 1, true) then
+      return b end
+  end
+  return nil
+end
+
+---@param buf integer
+---@param needle string
+---@return integer the number of BUF's first line containing NEEDLE
+local function line_containing (buf, needle)
+  for line_number, line in ipairs(vim.api.nvim_buf_get_lines(buf, 0, -1, false)) do
+    if line:find(needle, 1, true) then return line_number end
+  end
+  T.fail('no line contains ' .. needle)
+  return 0
+end
 
 print('=== SKG Fold Preservation Integration Test ===')
 
@@ -78,5 +100,26 @@ T.check(cursor_2[1] == 7,
 local line_7_text = vim.api.nvim_get_current_line()
 T.check(line_7_text:match('%*%* .* e') ~= nil,
         "now on line with '** e' (got: " .. line_7_text .. ')')
+
+-- PHASE 5: the total diff view variant (see run-test.sh for the
+-- data): tdvr's old-text line, folded, stays folded -- its body and
+-- its body diff hidden -- after the "all changes" buffer is saved.
+print('=== PHASE 5: The total diff view ===')
+require('skg.total_diff_view').diff_view()
+local tdv = T.wait_for(tdv_all_changes_buffer, 20)
+if not tdv then T.fail('Timeout waiting for the "all changes" buffer') end
+T.wait_for_response(20)
+vim.api.nvim_set_current_buf(tdv)
+folds.close_fold_at(line_containing(tdv, '(oldText body)'))
+local function old_text_folded ()
+  local old_text = line_containing(tdv, '(oldText body)')
+  return not folds.line_invisible_p(old_text)
+     and folds.line_invisible_p(old_text + 1)
+     and folds.line_invisible_p(line_containing(tdv, 'bodyDiff'))
+end
+T.check(old_text_folded(), 'the old text folded')
+save.request_save_buffer()
+T.wait_for_response(20)
+T.check(old_text_folded(), 'the folded old text stays folded after the save')
 
 T.pass('PASS: Integration test successful!')

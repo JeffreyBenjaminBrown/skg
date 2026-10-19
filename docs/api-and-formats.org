@@ -403,6 +403,16 @@ So far there are these endpoints:
     each save of a buffer of the total diff view. Closing the last such
     buffer drops it. Saving such a buffer is ordinary (see "Save
     buffer"), and its response carries the readiness summary.
+  - A rerender of such a buffer (after a save, collateral, or after a
+    commit) reconciles what it holds with a fresh drawing from the
+    straddle: a viewnode the fresh drawing also produces is kept, with
+    its =folded= and =bodyFolded=, its kind and facts updated in place
+    (a member that loses its relationship becomes a removed member, a
+    deleted node a historical phantom, and back); one it does not is
+    removed; the rest is created. The server sets a fold state only on
+    a viewnode it creates: a context node's body starts folded. A
+    root stays until the buffer is closed; a root whose node a commit
+    deleted is drawn as a deleted phantom.
   - Logic: =server/serve/handlers/total_diff_view.rs=, =server/pcsvf.rs=,
     =server/to_org/render/changes.rs=.
 
@@ -421,10 +431,11 @@ So far there are these endpoints:
       staged (deletions included) and git-committed with MESSAGE, by
       the gitrepo's configured user. A skgrepo without changes is in
       neither list; one that failed is an error. When something was
-      committed, the rerender stream redraws each open buffer of the
-      total diff view afresh from the rebuilt graph straddle; one with
-      nothing left is sent empty (=(content )=). The marks of the
-      changes committed are dropped from the readiness store.
+      committed, the rerender stream rerenders each open buffer of
+      the total diff view over the rebuilt graph straddle, as any
+      rerender does: its roots stay, and what was committed loses its
+      change facts. The marks of the changes committed are dropped
+      from the readiness store.
     - =((errors ("REFUSAL")) (warnings ()))= when the skgrepo
       restriction is not =all=, the message is blank, or the graph
       pair cannot be built. The rerender stream is empty.

@@ -419,7 +419,7 @@ alone. Then rename 'had_dvr' to 'had_editableViewRequest' and
 'pass_editableViewRequest_to_content_children'; that commit is the
 slice's last.
 
-** Slice 1: folding survives saves, rerenders and commits
+** DONE Slice 1: folding survives saves, rerenders and commits
 *** fold state is set only at creation
 In 'process_unrestrictedVognode_changes', set 'body_folded' only on a
 viewnode created in this visit, never on one that already exists. The

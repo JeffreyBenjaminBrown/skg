@@ -7,9 +7,10 @@
 //!
 //! Every answer is followed by a rerender stream, as the
 //! delete-references command's is: empty unless something was
-//! committed, else one redrawn view per open buffer of the total diff
-//! view, drawn afresh from the rebuilt graph straddle, so a buffer whose
-//! changes were all committed comes back empty.
+//! committed, else one view per open buffer of the total diff view,
+//! rerendered as any rerender is, over the rebuilt graph straddle
+//! ('stream_rerender_tdv_views'). Its roots stay, so a buffer whose
+//! changes were all committed comes back as plain context.
 
 use crate::change_forest::{BufferReadinessSummary, ReadinessSummary};
 use crate::git_ops::stage_and_commit::{
@@ -18,20 +19,16 @@ use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
-use crate::serve::handlers::rerender_all_views::stream_empty_rerender;
+use crate::serve::handlers::rerender_all_views::{
+  stream_empty_rerender, stream_rerender_tdv_views};
 use crate::serve::handlers::save_buffer::readiness_summary_sexp;
-use crate::serve::handlers::total_diff_view::{
-  TotalDiffViewBuffer, total_diff_view_buffer};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
-  format_errors_warnings_sexp, format_lock_views_sexp,
-  format_single_view_sexp, send_response_with_length_prefix,
+  format_errors_warnings_sexp, send_response_with_length_prefix,
   tag_sexp_response, value_from_request_sexp};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgrepoName;
-use crate::types::tree::forest::ViewForest;
-use crate::types::views_state::{TdvBuffer, ViewId};
 
 use sexp::{Atom, Sexp};
 use std::net::TcpStream;
@@ -73,10 +70,9 @@ pub fn handle_stage_and_commit_request (
   match answer {
     StageAndCommitAnswer::Committed { outcomes, .. }
       if outcomes . iter () . any (
-        |(_, outcome)| matches! (outcome, Ok (Some (_))) ) => {
-      let (redrawn, errors) : (Vec<(ViewId, String)>, Vec<String>) =
-        redraw_tdv_views (env, views_state);
-      stream_redrawn_views (stream, &redrawn, &errors); },
+        |(_, outcome)| matches! (outcome, Ok (Some (_))) ) =>
+      stream_rerender_tdv_views (
+        stream, env, views_state, skgrepo_restriction ),
     _ => stream_empty_rerender (stream), }}
 
 /// See the module comment. Refused unless the skgrepo restriction is
@@ -177,62 +173,3 @@ pub fn stage_and_commit_response_sexp (
         Sexp::List (commits) ] ))
         . chain ( errors_and_warnings (&all_errors) ) . collect () }, };
   Sexp::List (items) . to_string () }
-
-/// Draw each open buffer of the total diff view afresh from the
-/// connection's graph straddle, as the "total diff view" request draws
-/// it, and register the result in its place: an empty viewforest when
-/// the buffer would now be empty. Returns each view's new text, in
-/// view-id order, and the errors met.
-pub fn redraw_tdv_views (
-  env         : &SkgEnv,
-  views_state : &mut ViewsState,
-) -> ( Vec<(ViewId, String)>, Vec<String> ) {
-  let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
-  let mut tdv_views : Vec<(ViewId, TdvBuffer)> =
-    views_state . open_views . views . iter ()
-    . filter_map ( |(view_id, state)|
-      state . tdv_buffer . map ( |tdv_buffer| ( view_id . clone (), tdv_buffer )) )
-    . collect ();
-  tdv_views . sort_by_key ( |(view_id, _)| view_id . repr_in_client () );
-  if tdv_views . is_empty () { return ( Vec::new (), Vec::new () ); }
-  let straddle : Arc<GraphStraddle> = match current_graph_straddle_in_slot (
-    &mut views_state . graph_straddle, &runtime . config,
-    runtime . graph . clone () ) {
-    Ok (straddle) => straddle,
-    Err (e) => return ( Vec::new (), vec! [ e ] ), };
-  let store : MutexGuard<ReadinessStore> = lock_store (env);
-  let mut redrawn : Vec<(ViewId, String)> = Vec::new ();
-  let mut errors : Vec<String> = Vec::new ();
-  for (view_id, tdv_buffer) in tdv_views {
-    match total_diff_view_buffer (&runtime, &straddle, &store, tdv_buffer) {
-      Err (e) => errors . push ( format! (
-        "View {}: {}", view_id . repr_in_client (), e )),
-      Ok (buffer) => {
-        let (text, viewforest) : (String, ViewForest) = match buffer {
-          TotalDiffViewBuffer::Empty => ( String::new (), ViewForest::new () ),
-          TotalDiffViewBuffer::Content { text, viewforest, .. } =>
-            ( text, viewforest ), };
-        views_state . open_views . update_view (
-          &runtime . graph, &view_id, viewforest );
-        redrawn . push (( view_id, text )); }, }}
-  ( redrawn, errors ) }
-
-/// The rerender stream: rerender-lock naming the redrawn views, one
-/// rerender-view each, then rerender-done with 'errors'.
-fn stream_redrawn_views (
-  stream  : &mut TcpStream,
-  redrawn : &[(ViewId, String)],
-  errors  : &[String],
-) {
-  let view_ids : Vec<ViewId> =
-    redrawn . iter () . map ( |(view_id, _)| view_id . clone () ) . collect ();
-  send_response_with_length_prefix (
-    stream, &tag_sexp_response (
-      TcpToClient::RerenderLock, &format_lock_views_sexp (&view_ids) ));
-  for (view_id, text) in redrawn {
-    send_response_with_length_prefix (
-      stream, &tag_sexp_response (
-        TcpToClient::RerenderView, &format_single_view_sexp (view_id, text) )); }
-  send_response_with_length_prefix (
-    stream, &tag_sexp_response (
-      TcpToClient::RerenderDone, &format_errors_warnings_sexp (errors, &[]) )); }

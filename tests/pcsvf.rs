@@ -20,3 +20,5 @@ mod other_buffers;
 mod stage_and_commit;
 #[path = "pcsvf/editing.rs"]
 mod editing;
+#[path = "pcsvf/folding.rs"]
+mod folding;

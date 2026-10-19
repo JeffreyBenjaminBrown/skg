@@ -30,13 +30,13 @@ use skg::test_utils::{
   cleanup_test_tantivy, graph_handle_from_config, setup_test_tantivy,
   update_from_and_rerender_buffer_test};
 use skg::to_org::render::change_viewnodes::{
-  append_acquired_folder, append_historical_phantom, append_old_text,
-  mk_changeset_marker_viewnode, mk_relRepo_move_viewnode};
+  append_acquired_folder, append_historical_phantom_content, append_old_text,
+  mk_changeset_marker_viewnode, mk_historical_viewnode, mk_relRepo_move_viewnode};
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::git::Sign;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use skg::types::viewnode::{
-  ChangeFacts, ChangesetMarkerKind, Property, Viewnode, ViewnodeKind,
+  ChangeFacts, ChangesetMarkerKind, Phantom, Property, Viewnode, ViewnodeKind,
   Vognode};
 use skg::types::views_state::{OpenViews, ViewId};
 
@@ -118,6 +118,29 @@ fn treeid_of (
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) if t . skgid . 0 == skgid ))
     . unwrap_or_else ( || panic! ("no vognode {} in the view", skgid) )
     . id () }
+
+/// Under 'parent', the historical phantom of 'pid' with its old
+/// content, a deleted member of which with its own.
+fn append_historical_phantom (
+  tree     : &mut Tree<Viewnode>,
+  parent   : NodeId,
+  straddle : &GraphStraddle,
+  pid      : &ID,
+  rel      : Option<Sign>,
+) -> Option<NodeId> {
+  let phantom : NodeId = tree . get_mut (parent) ? . append (
+    mk_historical_viewnode (straddle, pid, rel) ? ) . id ();
+  append_historical_phantom_content (tree, phantom, straddle, pid) ?;
+  let deleted_members : Vec<(NodeId, ID)> =
+    tree . get (phantom) ? . children ()
+    . filter_map ( |child| match &child . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
+        Some (( child . id (), h . skgid . clone () )),
+      _ => None, } )
+    . collect ();
+  for (member, skgid) in deleted_members {
+    append_historical_phantom_content (tree, member, straddle, &skgid) ?; }
+  Some (phantom) }
 
 /// The view of p, with every one of the total diff view's viewnodes
 /// added where the total diff view draws it.

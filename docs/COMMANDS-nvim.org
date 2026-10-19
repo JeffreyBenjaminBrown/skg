@@ -515,8 +515,9 @@ git-commits it, in every owned skgrepo that has changes, with that
 message. If not every changed file is ready, it first shows the
 readiness summary and proceeds only if you type the word "yes". Every
 open view must be saved or reverted first. Afterward the open buffers
-of the total diff view are redrawn: emptied, or shrunk to what was not
-committed. The commit lapses the marks of everything it committed.
+of the total diff view are rerendered: each keeps its roots and its
+folding, and what was committed no longer shows as a change. The
+commit lapses the marks of everything it committed.
 ** <localleader>m : other graph modifications
 *** <localleader>mc : :SkgReplaceLinkWithContent
 Replace the leaf at point with a content relationship to the
