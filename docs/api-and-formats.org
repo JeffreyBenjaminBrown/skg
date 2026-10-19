@@ -183,7 +183,7 @@ So far there are these endpoints:
        of the M changed files of the owned skgrepos (O of them changed only
        in order, and so ready), N are commit-ready; F files changed in
        foreign skgrepos; and K changes are owned by nodes the buffer does
-       not draw. The buffer is reconciled over the graph pair, not
+       not draw. The buffer is reconciled over the graph straddle, not
        rebuilt: its roots and editability stay as saved, and its change
        facts, change folders, markers and removed members are redrawn.
   - Before mutation, the server computes the update-relevant neighborhood of
@@ -398,7 +398,7 @@ So far there are these endpoints:
     the order of a list. Foreign skgrepos are excluded. See the
     glossary's "Terms of the total diff view", and "Metadata of the
     total diff view" below.
-  - The server compares HEAD with the worktree through a graph pair it
+  - The server compares HEAD with the worktree through a graph straddle it
     keeps per connection, brought up to date at each request and at
     each save of a buffer of the total diff view. Closing the last such
     buffer drops it. Saving such a buffer is ordinary (see "Save
@@ -422,7 +422,7 @@ So far there are these endpoints:
       the gitrepo's configured user. A skgrepo without changes is in
       neither list; one that failed is an error. When something was
       committed, the rerender stream redraws each open buffer of the
-      total diff view afresh from the rebuilt graph pair; one with
+      total diff view afresh from the rebuilt graph straddle; one with
       nothing left is sent empty (=(content )=). The marks of the
       changes committed are dropped from the readiness store.
     - =((errors ("REFUSAL")) (warnings ()))= when the skgrepo
@@ -640,7 +640,7 @@ one automatically.
        =Content-Length: N\r\n\r\n((response-type rerender-done) (errors ("..." ...)) (warnings ("..." ...)))=
        Emacs removes the rerender-view handler and unlocks any remaining buffers.
   - Behavior: Re-renders every open view from server memory; a buffer
-    of the total diff view is reconciled over the graph pair.
+    of the total diff view is reconciled over the graph straddle.
     Does not save or modify the graph. Refreshes all views without
     requiring a save.
   - All view text is prepared in memory before the release decision.

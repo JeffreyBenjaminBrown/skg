@@ -601,3 +601,18 @@ two resolved entries, so they are marked RESOLVED in place.
 ** imperfect
 The 'stop' herald style is now used by no herald ('✗' retired); the
 plan does not retire it, so it stays defined.
+* Fixes plan
+** Slice 0: deviations
+*** the bare 'pair' became 'straddle' too
+Beyond the names the code map lists, every variable, parameter, test
+helper and comment that called a 'GraphStraddle' "the pair" now calls
+it "the straddle" ('TdvDrawing::straddle', 'one_skgrepo_straddle',
+'redraw_removed_members_of_straddle_folder', and so on). Pairs that
+are tuples or key-value pairs keep the word. 'ViewsState::graph_pair'
+and 'RerenderAfterSaveContext::graph_pair' became 'graph_straddle',
+matching 'graph_straddle_slot' beside them.
+*** a citation keeps the old name
+'server/graph_straddle/mod.rs' cites the heading "graph pair" of
+'TODO/total-diff-view/2_plan.org', which still has that name.
+*** 'docs/heralds.org' needed nothing
+It no longer mentioned the graph pair.

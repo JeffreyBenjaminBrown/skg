@@ -503,7 +503,7 @@ wire strings, where only nodes can merge.
 A /graph snapshot/ is one immutable state of the in-Rust graph
 ('GraphSnapshot'). A /git snapshot/ is one of HEAD, the git index or
 the worktree, as 'server/git_ops/git_snapshot.rs' reads them (the
-graph pair's before-graph reads HEAD). A /buffer snapshot/ is a
+graph straddle's before-graph reads HEAD). A /buffer snapshot/ is a
 buffer's text as a client sends it: for search enrichment, or for a
 dirty view in the save envelope. The wire atoms 'request-snapshot' and
 'snapshot response' predate the rule and mean buffer snapshots.
@@ -722,16 +722,18 @@ The viewforest the "all changes" buffer draws ('server/pcsvf.rs',
 functions 'pcsvf_...'). The merges and skgrepo-changes buffers draw
 PCSVFs over subsets of the changes.
 
-*** graph pair, before-graph, after-graph
+*** graph straddle, before-graph, after-graph
 
-The *graph pair* ('GraphPair { before, after }', 'server/graph_pair/')
-is what the TDV compares. The *before-graph* is an in-Rust graph built
-from each owned skgrepo at HEAD (each foreign skgrepo at its
-worktree); the *after-graph* is the live graph.
+The *graph straddle* ('GraphStraddle { before, after }',
+'server/graph_straddle/') is what the TDV compares. A straddle stands
+with one foot in the committed graph and one in the live graph. The
+*before-graph* is an in-Rust graph built from each owned skgrepo at
+HEAD (each foreign skgrepo at its worktree); the *after-graph* is the
+live graph. Its old name is the *graph pair*.
 
 *** union walk, presence
 
-The *union walk* is the API over the graph pair that answers
+The *union walk* is the API over the graph straddle that answers
 questions about the union of its two graphs. Each node and each
 relationship it reports carries a *presence*: 'Both', 'OnlyBefore' or
 'OnlyAfter'. A view shows a presence as '(diff ...)' atoms: 'node+' and
@@ -754,7 +756,7 @@ origin reaches containerward inside U.
 
 The *change-forest* ('ChangeForest', 'server/change_forest.rs') is
 the tree of everything commit-readiness can be asked about, built
-from the graph pair, independent of any view. Its roots are the
+from the graph straddle, independent of any view. Its roots are the
 changed graphnodes; under each come its changed aspects; its leaves,
 the *change-forest leaves*, are the individual changes a user marks.
 

@@ -401,7 +401,7 @@ in practice: slice 1 needs its helpers, so build the helpers first
 inside slice 1 if slice 9 has not run, and mark slice 9 DONE when the
 remaining call sites are converted.
 
-** Slice 0: housekeeping
+** DONE Slice 0: housekeeping
 Run 'cargo update' (semver-compatible bumps only; no edit to
 'Cargo.toml'), run the three suites, commit the lockfile alone. Then
 rename 'GraphPair' to 'GraphStraddle' everywhere the code map's "The

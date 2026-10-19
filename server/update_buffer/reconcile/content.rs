@@ -128,7 +128,7 @@ pub fn expand_true_content_at_unrestrictedVognode (
     substitution_enabled,
     substitute_existing_content_overrides ) ?;
   if cascade {
-    attach_cascade_dvrs_to_affected_content( tree, node ) ?; }
+    pass_editableViewRequest_to_content_children( tree, node ) ?; }
   order_children_as_non_vognodes_then_ignored_then_content(
     tree, node ) ?;
   Ok(( )) }
@@ -138,7 +138,7 @@ pub fn expand_true_content_at_unrestrictedVognode (
 /// alike -- so the main BFS draws each Final (and it in turn cascades to its
 /// own content). The cascade does *not* flow through non-vognodes, so only
 /// affectsParent=true content children receive it.
-fn attach_cascade_dvrs_to_affected_content (
+fn pass_editableViewRequest_to_content_children (
   tree : &mut Tree<Viewnode>,
   node : NodeId,
 ) -> Result<(), Box<dyn Error>> {

@@ -231,7 +231,7 @@ fn visit_normal_node (
     mutate_unrestrictedVognode_to_deletednode (
       tree, treeid, &pid, &skgrepo ) ?;
     return Ok (( )); }
-  let had_dvr : bool =
+  let had_editableViewRequest : bool =
     read_at_node_in_tree ( tree, treeid,
       |vn : &Viewnode| match &vn . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
@@ -260,7 +260,7 @@ fn visit_normal_node (
             t . editability = Editability::WriteProtected; } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
     settled = true;
-  } else if had_dvr {
+  } else if had_editableViewRequest {
     match apply_editable_draw_rule (
       tree, treeid, &context . runtime . graph,
       &context . runtime . config, context . editable_map ) ? {
@@ -289,7 +289,7 @@ fn visit_normal_node (
   // just expanded an existing occurrence.  Folder members are included;
   // hid*/overrid*-as-such nodes get the same defaults as ordinary nodes, and
   // the subscribee-specific HiddenIn folder is added by the pass below.
-  if context . create_partnerFolders_for_fresh_nodes || had_dvr {
+  if context . create_partnerFolders_for_fresh_nodes || had_editableViewRequest {
     maybe_add_default_partnerFolder_branches (
       tree, treeid, &context . runtime . graph,
       &context . runtime . config,
