@@ -89,7 +89,7 @@ async fn buffer_with_unknownnode_child_saves_cleanly_impl (
     new_handle (InRustGraph::new ());
   let mut views_state : ViewsState = ViewsState {
         open_views            : OpenViews::new (),
-        graph_pair            : None,
+        graph_straddle        : None,
         };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();

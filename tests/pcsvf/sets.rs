@@ -4,9 +4,9 @@
 // contains del, which is deleted with its content delc), and a
 // leftward-only change (ln now contains lo, which lp contains too).
 
-use crate::pcsvf::common::{graph_pair, ids, with_fixture};
+use crate::pcsvf::common::{graph_straddle, ids, with_fixture};
 
-use skg::graph_pair::types::GraphPair;
+use skg::graph_straddle::types::GraphStraddle;
 use skg::pcsvf::PcsvfSets;
 
 use std::error::Error;
@@ -15,8 +15,8 @@ fn sets_fixture_sets (
 ) -> Result<PcsvfSets, Box<dyn Error>> {
   let mut sets : Option<PcsvfSets> = None;
   with_fixture ("sets", &["main"], |f| {
-    let pair : GraphPair = graph_pair (f) ?;
-    sets = Some ( pair . pcsvf_sets () . clone () );
+    let straddle : GraphStraddle = graph_straddle (f) ?;
+    sets = Some ( straddle . pcsvf_sets () . clone () );
     Ok (( )) }) ?;
   Ok ( sets . unwrap () ) }
 

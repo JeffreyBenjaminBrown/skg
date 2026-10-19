@@ -51,7 +51,7 @@ async fn merge_preserves_acquiree_child_bodies_impl (
     graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
     open_views        : OpenViews::new (),
-    graph_pair        : None,
+    graph_straddle    : None,
   };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();

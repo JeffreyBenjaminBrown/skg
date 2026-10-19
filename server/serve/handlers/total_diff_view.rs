@@ -3,8 +3,8 @@
 //! The client sends one request per buffer, in order, and opens each
 //! one the server does not answer with '(empty . t)'.
 
-use crate::graph_pair::build::current_graph_pair_in_slot;
-use crate::graph_pair::types::GraphPair;
+use crate::graph_straddle::build::current_graph_straddle_in_slot;
+use crate::graph_straddle::types::GraphStraddle;
 use crate::pcsvf::{TdvDrawing, pcsvf_viewforest};
 use crate::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
@@ -29,7 +29,7 @@ pub enum TotalDiffViewBuffer {
 
 /// Answer a "total diff view" request with the named buffer, register
 /// it under the request's view-id, or answer '(empty . t)'. Refused
-/// unless the skgrepo restriction is 'all', and when the graph pair
+/// unless the skgrepo restriction is 'all', and when the graph straddle
 /// cannot be built (an owned skgrepo outside git, or without a HEAD
 /// commit).
 pub fn handle_total_diff_view_request (
@@ -51,14 +51,14 @@ pub fn handle_total_diff_view_request (
       let tdv_buffer : TdvBuffer = TdvBuffer::from_wire_name (&buffer_name)
         . ok_or_else ( || format! (
           "Unknown total diff view buffer: {}", buffer_name )) ?;
-      let pair : Arc<GraphPair> = current_graph_pair_in_slot (
-        &mut views_state . graph_pair, &runtime . config,
+      let straddle : Arc<GraphStraddle> = current_graph_straddle_in_slot (
+        &mut views_state . graph_straddle, &runtime . config,
         runtime . graph . clone () ) ?;
       let store : MutexGuard<ReadinessStore> =
         env . runtime . readiness_store . lock ()
         . unwrap_or_else ( |poisoned| poisoned . into_inner () );
       let buffer : TotalDiffViewBuffer =
-        total_diff_view_buffer (&runtime, &pair, &store, tdv_buffer)
+        total_diff_view_buffer (&runtime, &straddle, &store, tdv_buffer)
         . map_err ( |e| format! ( "Error generating the total diff view: {}", e )) ?;
       Ok (( buffer, tdv_buffer, view_id )) } ) ();
   let sexp : String = match response {
@@ -74,21 +74,21 @@ pub fn handle_total_diff_view_request (
   send_response_with_length_prefix (
     stream, &tag_sexp_response (TcpToClient::TotalDiffView, &sexp) ); }
 
-/// The named buffer, drawn from 'pair'. The "all changes" buffer is
+/// The named buffer, drawn from 'straddle'. The "all changes" buffer is
 /// the PCSVF over all of C; the merges and skgrepo-changes buffers
-/// are PCSVFs over subsets of it ('GraphPair::pcsvf_sets_of_buffer').
+/// are PCSVFs over subsets of it ('GraphStraddle::pcsvf_sets_of_buffer').
 /// The order-only buffer lists the nodes whose only change is the
 /// order of a list, in ID order.
 pub fn total_diff_view_buffer (
   runtime    : &RuntimeGeneration,
-  pair       : &GraphPair,
+  straddle   : &GraphStraddle,
   store      : &ReadinessStore,
   tdv_buffer : TdvBuffer,
 ) -> Result<TotalDiffViewBuffer, Box<dyn std::error::Error>> {
-  let drawing : TdvDrawing = TdvDrawing { pair, tdv_buffer };
+  let drawing : TdvDrawing = TdvDrawing { straddle, tdv_buffer };
   let roots : Vec<ID> = match tdv_buffer {
     TdvBuffer::OrderOnlyChanges =>
-      pair . order_only_pids () . iter () . cloned () . collect (),
+      straddle . order_only_pids () . iter () . cloned () . collect (),
     _ => drawing . sets () . d . iter () . cloned () . collect (), };
   if roots . is_empty () { return Ok (TotalDiffViewBuffer::Empty); }
   let (text, pids, viewforest) : (String, Vec<ID>, ViewForest) =

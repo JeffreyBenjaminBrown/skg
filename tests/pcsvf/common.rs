@@ -11,8 +11,8 @@ use git_fixture_helpers::{mk_test_tcp_stream_pair, setup_gitrepo_with_fixtures};
 use skg::change_forest::LeafKey;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::init::create_empty_tantivy_index;
-use skg::graph_pair::build::current_graph_pair_in_slot;
-use skg::graph_pair::types::GraphPair;
+use skg::graph_straddle::build::current_graph_straddle_in_slot;
+use skg::graph_straddle::types::GraphStraddle;
 use skg::readiness_store::ReadinessStore;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -74,7 +74,7 @@ pub fn fixture (
     config, tantivy, graph,
     views_state : ViewsState {
       open_views        : OpenViews::new (),
-      graph_pair        : None, } } ) }
+      graph_straddle    : None, } } ) }
 
 /// Run 'body' on the fixture, then remove its search index.
 pub fn with_fixture (
@@ -87,10 +87,10 @@ pub fn with_fixture (
   cleanup_test_tantivy ( Some (&f . config . tantivy_folder) ) ?;
   result }
 
-pub fn graph_pair (
+pub fn graph_straddle (
   f : &Fixture,
-) -> Result<GraphPair, Box<dyn Error>> {
-  Ok ( GraphPair::from_head_and_live (&f . config, f . graph . load_full ()) ? ) }
+) -> Result<GraphStraddle, Box<dyn Error>> {
+  Ok ( GraphStraddle::from_head_and_live (&f . config, f . graph . load_full ()) ? ) }
 
 /// The text of the "all changes" buffer, with no marks; None when it
 /// would be empty.
@@ -107,14 +107,14 @@ pub fn all_changes_buffer_with_marks (
 ) -> Result<Option<String>, Box<dyn Error>> {
   let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
-  let pair : GraphPair = graph_pair (f) ?;
+  let straddle : GraphStraddle = graph_straddle (f) ?;
   let mut store : ReadinessStore = ReadinessStore::default ();
   for key in marked {
     store . mark ( key . clone (),
-                   pair . change_forest () . leaf_fingerprint (key)
+                   straddle . change_forest () . leaf_fingerprint (key)
                    . expect ("a marked key is a leaf") ); }
   Ok ( match total_diff_view_buffer (
-    &runtime, &pair, &store, TdvBuffer::AllChanges ) ? {
+    &runtime, &straddle, &store, TdvBuffer::AllChanges ) ? {
     TotalDiffViewBuffer::Empty => None,
     TotalDiffViewBuffer::Content { text, .. } => Some (text), } ) }
 
@@ -133,7 +133,7 @@ pub fn open_all_changes_buffer (
     . ok_or_else ( || "the all-changes buffer is empty" . into () ) }
 
 /// Open a buffer of the total diff view as the "total diff view"
-/// request does: drawn from the connection's graph pair with the
+/// request does: drawn from the connection's graph straddle with the
 /// marks on disk, and registered as a view of the total diff view.
 /// None when it would be empty.
 pub fn open_buffer (
@@ -142,12 +142,12 @@ pub fn open_buffer (
 ) -> Result<Option<String>, Box<dyn Error>> {
   let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
-  let pair : Arc<GraphPair> = current_graph_pair_in_slot (
-    &mut f . views_state . graph_pair, &f . config, runtime . graph . clone () ) ?;
+  let straddle : Arc<GraphStraddle> = current_graph_straddle_in_slot (
+    &mut f . views_state . graph_straddle, &f . config, runtime . graph . clone () ) ?;
   let buffer : TotalDiffViewBuffer = {
     let store : MutexGuard<ReadinessStore> =
       env . runtime . readiness_store . lock () . unwrap ();
-    total_diff_view_buffer (&runtime, &pair, &store, tdv_buffer) ? };
+    total_diff_view_buffer (&runtime, &straddle, &store, tdv_buffer) ? };
   Ok ( match buffer {
     TotalDiffViewBuffer::Empty => None,
     TotalDiffViewBuffer::Content { text, pids, viewforest } => {

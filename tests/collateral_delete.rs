@@ -47,7 +47,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
         graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         open_views        : OpenViews::new (),
-        graph_pair        : None, };
+        graph_straddle    : None, };
       let p_view_id : ViewId = ViewId::ContentView ("collat-del-P" . into ());
       let l_view_id : ViewId = ViewId::ContentView ("collat-del-L" . into ());
 

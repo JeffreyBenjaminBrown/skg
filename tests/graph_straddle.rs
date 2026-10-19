@@ -1,5 +1,5 @@
-// The graph pair and its union walk, over git fixtures in
-// 'tests/graph_pair/fixtures/'. Each case is a HEAD commit and a
+// The graph straddle and its union walk, over git fixtures in
+// 'tests/graph_straddle/fixtures/'. Each case is a HEAD commit and a
 // worktree state per skgrepo.
 
 #[path = "shared/git_fixture_helpers.rs"]
@@ -11,8 +11,8 @@ use git_fixture_helpers::{commit_all, setup_gitrepo_with_fixtures};
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole};
-use skg::graph_pair::build::current_graph_pair_in_slot;
-use skg::graph_pair::types::{GraphPair, Partner, Presence};
+use skg::graph_straddle::build::current_graph_straddle_in_slot;
+use skg::graph_straddle::types::{GraphStraddle, Partner, Presence};
 use skg::test_utils::graph_handle_from_config;
 use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
 
@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::TempDir;
 
-const FIXTURES : &str = "tests/graph_pair/fixtures";
+const FIXTURES : &str = "tests/graph_straddle/fixtures";
 
 const CONTENT : RelationRole =
   RelationRole { relation : NodeRelation::Contains,
@@ -76,16 +76,16 @@ fn live_graph (
 ) -> Arc<InRustGraph> {
   graph_handle_from_config (config) . unwrap () . load_full () }
 
-fn one_skgrepo_pair (
+fn one_skgrepo_straddle (
   case : &str,
-) -> (TempDir, GraphPair) {
+) -> (TempDir, GraphStraddle) {
   let root : TempDir = TempDir::new () . unwrap ();
   gitrepos_for_case (root . path (), case, &[None]);
   let config : SkgConfig = config_for (root . path (), &["main"], &[]);
-  let pair : GraphPair =
-    GraphPair::from_head_and_live (&config, live_graph (&config))
+  let straddle : GraphStraddle =
+    GraphStraddle::from_head_and_live (&config, live_graph (&config))
     . unwrap ();
-  (root, pair) }
+  (root, straddle) }
 
 fn id (s : &str) -> ID { ID::from (s) }
 
@@ -109,23 +109,23 @@ fn partner (
 #[test]
 fn removed_containers_are_reachable_from_the_deleted_node () {
   // D is deleted. K survives without it; K2 is deleted too.
-  let (_root, pair) : (TempDir, GraphPair) =
-    one_skgrepo_pair ("deleted_node");
-  assert_eq! ( pair . node_presence (&id ("D")),
+  let (_root, straddle) : (TempDir, GraphStraddle) =
+    one_skgrepo_straddle ("deleted_node");
+  assert_eq! ( straddle . node_presence (&id ("D")),
                Some (Presence::OnlyBefore) );
-  assert_eq! ( pair . node_presence (&id ("K2")),
+  assert_eq! ( straddle . node_presence (&id ("K2")),
                Some (Presence::OnlyBefore) );
-  assert_eq! ( pair . node_presence (&id ("nonexistent")), None );
+  assert_eq! ( straddle . node_presence (&id ("nonexistent")), None );
   assert_eq! (
-    pair . partners (&id ("D"), RelationRole::CONTAINER),
+    straddle . partners (&id ("D"), RelationRole::CONTAINER),
     vec! [ partner ("K",  Presence::OnlyBefore, Some ("main"), None),
            partner ("K2", Presence::OnlyBefore, Some ("main"), None) ] );
   assert_eq! ( // surviving content first, then the removed member
-    pair . partners (&id ("K"), CONTENT),
+    straddle . partners (&id ("K"), CONTENT),
     vec! [ partner ("E", Presence::Both, Some ("main"), Some ("main")),
            partner ("D", Presence::OnlyBefore, Some ("main"), None) ] );
-  assert_eq! ( pair . changed_pids () . rightward, ids (&["D", "K", "K2"]) );
-  assert_eq! ( pair . changed_pids () . leftward,  ids (&["D"]) ); }
+  assert_eq! ( straddle . changed_pids () . rightward, ids (&["D", "K", "K2"]) );
+  assert_eq! ( straddle . changed_pids () . leftward,  ids (&["D"]) ); }
 
 #[test]
 fn a_relRepo_only_change_is_reported_from_both_ends () {
@@ -136,35 +136,35 @@ fn a_relRepo_only_change_is_reported_from_both_ends () {
     root . path (), "relRepo_move", &[Some ("public"), Some ("private")] );
   let config : SkgConfig =
     config_for (root . path (), &["public", "private"], &[]);
-  let pair : GraphPair =
-    GraphPair::from_head_and_live (&config, live_graph (&config))
+  let straddle : GraphStraddle =
+    GraphStraddle::from_head_and_live (&config, live_graph (&config))
     . unwrap ();
   let moved : Partner =
     partner ("C", Presence::Both, Some ("public"), Some ("private"));
-  assert_eq! ( pair . partners (&id ("N"), CONTENT), vec! [moved] );
-  assert! ( pair . partners (&id ("N"), CONTENT) [0] . relRepo_moved () );
+  assert_eq! ( straddle . partners (&id ("N"), CONTENT), vec! [moved] );
+  assert! ( straddle . partners (&id ("N"), CONTENT) [0] . relRepo_moved () );
   assert_eq! (
-    pair . partners (&id ("C"), RelationRole::CONTAINER),
+    straddle . partners (&id ("C"), RelationRole::CONTAINER),
     vec! [ partner ("N", Presence::Both, Some ("public"), Some ("private")) ] );
-  assert! ( pair . node_changes (&id ("N")) . is_empty () );
+  assert! ( straddle . node_changes (&id ("N")) . is_empty () );
   // N's file records the move; C's set of containers is unchanged.
-  assert_eq! ( pair . changed_pids () . rightward, ids (&["N"]) );
-  assert_eq! ( pair . changed_pids () . leftward,  ids (&[]) ); }
+  assert_eq! ( straddle . changed_pids () . rightward, ids (&["N"]) );
+  assert_eq! ( straddle . changed_pids () . leftward,  ids (&[]) ); }
 
 #[test]
 fn changed_pids_splits_rightward_and_leftward () {
   // A gains content Y; X's title changes; New is created; O only
   // reorders its content.
-  let (_root, pair) : (TempDir, GraphPair) =
-    one_skgrepo_pair ("rightward_and_leftward");
-  assert_eq! ( pair . changed_pids () . rightward,
+  let (_root, straddle) : (TempDir, GraphStraddle) =
+    one_skgrepo_straddle ("rightward_and_leftward");
+  assert_eq! ( straddle . changed_pids () . rightward,
                ids (&["A", "New", "X"]) );
-  assert_eq! ( pair . changed_pids () . leftward, ids (&["Y"]) );
-  assert_eq! ( pair . changed_pids () . all (),
+  assert_eq! ( straddle . changed_pids () . leftward, ids (&["Y"]) );
+  assert_eq! ( straddle . changed_pids () . all (),
                ids (&["A", "New", "X", "Y"]) );
-  assert! ( pair . node_changes (&id ("X")) . title_changed );
-  assert! ( ! pair . node_changes (&id ("X")) . body_changed );
-  assert_eq! ( pair . node_presence (&id ("New")),
+  assert! ( straddle . node_changes (&id ("X")) . title_changed );
+  assert! ( ! straddle . node_changes (&id ("X")) . body_changed );
+  assert_eq! ( straddle . node_presence (&id ("New")),
                Some (Presence::OnlyAfter) ); }
 
 #[test]
@@ -173,7 +173,7 @@ fn a_duplicate_id_at_head_refuses () {
   gitrepos_for_case (root . path (), "duplicate_id_at_head", &[None]);
   let config : SkgConfig = config_for (root . path (), &["main"], &[]);
   let refusal : String =
-    GraphPair::from_head_and_live (&config, live_graph (&config))
+    GraphStraddle::from_head_and_live (&config, live_graph (&config))
     . err () . expect ("a duplicate ID at HEAD should refuse");
   assert! ( refusal . contains ("duplicate extra id 'dup'"),
             "unexpected refusal: {}", refusal ); }
@@ -188,35 +188,35 @@ fn a_foreign_skgrepo_needs_no_gitrepo_and_contributes_no_change () {
     &root . path () . join ("foreign") ) . unwrap ();
   let config : SkgConfig =
     config_for (root . path (), &["main"], &["foreign"]);
-  let pair : GraphPair =
-    GraphPair::from_head_and_live (&config, live_graph (&config))
+  let straddle : GraphStraddle =
+    GraphStraddle::from_head_and_live (&config, live_graph (&config))
     . unwrap ();
-  assert_eq! ( pair . node_presence (&id ("F")), Some (Presence::Both) );
-  assert_eq! ( pair . changed_pids () . all (), ids (&[]) ); }
+  assert_eq! ( straddle . node_presence (&id ("F")), Some (Presence::Both) );
+  assert_eq! ( straddle . changed_pids () . all (), ids (&[]) ); }
 
 #[test]
-fn the_slot_reuses_repairs_or_rebuilds_the_pair () {
+fn the_slot_reuses_repairs_or_rebuilds_the_straddle () {
   let root : TempDir = TempDir::new () . unwrap ();
   let gitrepos : Vec<Repository> =
     gitrepos_for_case (root . path (), "rightward_and_leftward", &[None]);
   let config : SkgConfig = config_for (root . path (), &["main"], &[]);
-  let mut slot : Option<Arc<GraphPair>> = None;
+  let mut slot : Option<Arc<GraphStraddle>> = None;
   let live : Arc<InRustGraph> = live_graph (&config);
-  let built : Arc<GraphPair> =
-    current_graph_pair_in_slot (&mut slot, &config, live . clone ())
+  let built : Arc<GraphStraddle> =
+    current_graph_straddle_in_slot (&mut slot, &config, live . clone ())
     . unwrap ();
-  let reused : Arc<GraphPair> =
-    current_graph_pair_in_slot (&mut slot, &config, live . clone ())
+  let reused : Arc<GraphStraddle> =
+    current_graph_straddle_in_slot (&mut slot, &config, live . clone ())
     . unwrap ();
   assert! ( Arc::ptr_eq (&built, &reused) );
-  let repaired : Arc<GraphPair> = // a save swaps in a new live graph
-    current_graph_pair_in_slot (&mut slot, &config, live_graph (&config))
+  let repaired : Arc<GraphStraddle> = // a save swaps in a new live graph
+    current_graph_straddle_in_slot (&mut slot, &config, live_graph (&config))
     . unwrap ();
   assert! ( ! Arc::ptr_eq (&built, &repaired) );
   assert! ( Arc::ptr_eq (&built . before, &repaired . before) );
   commit_all (&gitrepos [0], "commit the worktree");
-  let rebuilt : Arc<GraphPair> =
-    current_graph_pair_in_slot (&mut slot, &config, live . clone ())
+  let rebuilt : Arc<GraphStraddle> =
+    current_graph_straddle_in_slot (&mut slot, &config, live . clone ())
     . unwrap ();
   assert! ( ! Arc::ptr_eq (&built . before, &rebuilt . before) );
   assert_eq! ( rebuilt . changed_pids () . all (), ids (&[]) ); }

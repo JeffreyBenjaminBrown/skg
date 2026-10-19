@@ -928,7 +928,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     let readiness_warnings : Vec<String> =
       // The graph edits succeeded, so the readiness requests are consumed.
       consume_readiness_requests (
-        &viewforest, env, &swapped_in, &mut views_state . graph_pair );
+        &viewforest, env, &swapped_in, &mut views_state . graph_straddle );
     let mut response : SaveResponse =
       update_views_after_save (
         stream,

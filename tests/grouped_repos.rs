@@ -2,11 +2,11 @@
 // and skgrepo/storage-layer tests. See tests/grouped_unit.rs for why test
 // files are grouped into a few [[test]] targets.
 
-#[path = "graph_pair.rs"]
-mod graph_pair;
+#[path = "graph_straddle.rs"]
+mod graph_straddle;
 
-#[path = "graph_pair_engines.rs"]
-mod graph_pair_engines;
+#[path = "graph_straddle_engines.rs"]
+mod graph_straddle_engines;
 
 #[path = "leak_battery.rs"]
 mod leak_battery;

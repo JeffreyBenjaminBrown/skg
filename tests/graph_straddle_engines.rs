@@ -1,14 +1,14 @@
-// cargo nextest run --test grouped_repos -E 'test(graph_pair_engines::)'
+// cargo nextest run --test grouped_repos -E 'test(graph_straddle_engines::)'
 //
 // The partner-folder reconciler and the role-tree engine, run over the
-// union of a graph pair instead of the live graph. The pair is built
+// union of a graph straddle instead of the live graph. The straddle is built
 // in memory: before, c1 and c2 contain r; after, c1 and c3 do, and c2
 // is gone.
 
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 use skg::dbs::init::create_empty_tantivy_index;
-use skg::graph_pair::types::GraphPair;
+use skg::graph_straddle::types::GraphStraddle;
 use skg::to_org::expand::role_tree::{
   RoleTreePartners, build_and_integrate_role_tree_with_skgrepo_set};
 use skg::types::env::{RuntimeGeneration, SkgEnv};
@@ -41,9 +41,9 @@ fn node (
     .. empty_graphnode () }}
 
 struct Fixture {
-  _dir    : TempDir,
-  pair    : GraphPair,
-  runtime : Arc<RuntimeGeneration>,
+  _dir     : TempDir,
+  straddle : GraphStraddle,
+  runtime  : Arc<RuntimeGeneration>,
 }
 
 fn fixture () -> Result<Fixture, Box<dyn Error>> {
@@ -61,9 +61,9 @@ fn fixture () -> Result<Fixture, Box<dyn Error>> {
     config, after . clone (),
     create_empty_tantivy_index (&dir . path () . join ("tantivy")) ? );
   Ok ( Fixture {
-    _dir    : dir,
-    pair    : GraphPair::new (before, after, String::new (), 0),
-    runtime : env . runtime_snapshot (), } ) }
+    _dir     : dir,
+    straddle : GraphStraddle::new (before, after, String::new (), 0),
+    runtime  : env . runtime_snapshot (), } ) }
 
 /// A tree holding the editable root r, and its treeid.
 fn tree_with_r () -> (Tree<Viewnode>, NodeId) {
@@ -90,7 +90,7 @@ fn children_with_presence (
     . collect () }
 
 #[test]
-fn a_container_folder_from_a_graph_pair_holds_both_graphs_containers (
+fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
 ) -> Result<(), Box<dyn Error>> {
   let f : Fixture = fixture () ?;
   let (mut tree, r) : (Tree<Viewnode>, NodeId) = tree_with_r ();
@@ -99,7 +99,7 @@ fn a_container_folder_from_a_graph_pair_holds_both_graphs_containers (
     kind : ViewnodeKind::PartnerFolder (PartnerFolder::Container) } ) . id ();
   reconcile_partnerFolder_children (
     folder, &mut tree, PartnerFolder::Container,
-    PartnerFolderGoalSource::GraphPair (&f . pair),
+    PartnerFolderGoalSource::GraphStraddle (&f . straddle),
     &f . runtime, &f . runtime . graph,
     &HashMap::new (), None, None ) ?;
   let both : DiffPresence = DiffPresence::default ();
@@ -112,7 +112,7 @@ fn a_container_folder_from_a_graph_pair_holds_both_graphs_containers (
   Ok (( )) }
 
 #[test]
-fn the_role_tree_engine_walks_a_graph_pairs_union (
+fn the_role_tree_engine_walks_a_graph_straddles_union (
 ) -> Result<(), Box<dyn Error>> {
   let f : Fixture = fixture () ?;
   let child_ids = |tree : &Tree<Viewnode>, node : NodeId| -> Vec<String> {
@@ -127,10 +127,10 @@ fn the_role_tree_engine_walks_a_graph_pairs_union (
       &mut tree, r, &f . runtime . graph, RelationRole::CONTAINER,
       &f . runtime . config, None, RoleTreePartners::LiveGraph ) ?;
     assert_eq! ( child_ids (&tree, r), vec! [ "c1", "c3" ] ); }
-  { // Over the pair: the containers in either graph.
+  { // Over the straddle: the containers in either graph.
     let (mut tree, r) : (Tree<Viewnode>, NodeId) = tree_with_r ();
     build_and_integrate_role_tree_with_skgrepo_set (
       &mut tree, r, &f . runtime . graph, RelationRole::CONTAINER,
-      &f . runtime . config, None, RoleTreePartners::GraphPair (&f . pair) ) ?;
+      &f . runtime . config, None, RoleTreePartners::GraphStraddle (&f . straddle) ) ?;
     assert_eq! ( child_ids (&tree, r), vec! [ "c1", "c2", "c3" ] ); }
   Ok (( )) }

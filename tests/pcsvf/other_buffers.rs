@@ -9,9 +9,9 @@
 // - ord's content changed only in order: o1, o2 became o2, o1.
 
 use crate::pcsvf::common::{
-  Fixture, graph_pair, ids, open_buffer, saves_back_unchanged, with_fixture};
+  Fixture, graph_straddle, ids, open_buffer, saves_back_unchanged, with_fixture};
 
-use skg::graph_pair::types::GraphPair;
+use skg::graph_straddle::types::GraphStraddle;
 use skg::pcsvf::{PcsvfSets, pcsvf_sets_for_home_moves, pcsvf_sets_for_merges};
 use skg::types::views_state::TdvBuffer;
 
@@ -48,8 +48,8 @@ fn headline_of<'a> (
 fn the_merges_sets_hold_the_acquiree_the_acquirer_and_the_text_preserver (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &SKGREPOS, |f| {
-    let pair : GraphPair = graph_pair (f) ?;
-    let sets : PcsvfSets = pcsvf_sets_for_merges (&pair);
+    let straddle : GraphStraddle = graph_straddle (f) ?;
+    let sets : PcsvfSets = pcsvf_sets_for_merges (&straddle);
     assert_eq! ( sets . c, ids (&[ "acq", "acqd", "pres" ]) );
     assert_eq! ( sets . d, ids (&[ "acqd", "top" ]) );
     Ok (( )) }) }
@@ -58,8 +58,8 @@ fn the_merges_sets_hold_the_acquiree_the_acquirer_and_the_text_preserver (
 fn the_home_move_sets_hold_the_moved_nodes (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &SKGREPOS, |f| {
-    let pair : GraphPair = graph_pair (f) ?;
-    let sets : PcsvfSets = pcsvf_sets_for_home_moves (&pair);
+    let straddle : GraphStraddle = graph_straddle (f) ?;
+    let sets : PcsvfSets = pcsvf_sets_for_home_moves (&straddle);
     assert_eq! ( sets . c, ids (&[ "mvc", "mvg", "mvp", "mvr", "mvt" ]) );
     assert_eq! ( sets . d, ids (&[ "mvp" ]) );
     assert! ( sets . u . contains (&"mvs" . into ()),

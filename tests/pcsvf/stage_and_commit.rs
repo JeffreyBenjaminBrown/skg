@@ -5,11 +5,11 @@
 
 use crate::pcsvf::common::git_fixture_helpers::mk_test_tcp_stream_pair;
 use crate::pcsvf::common::{
-  Fixture, all_changes_buffer, graph_pair, open_all_changes_buffer,
+  Fixture, all_changes_buffer, graph_straddle, open_all_changes_buffer,
   view_id_of, with_fixture};
 
 use skg::change_forest::{ChangeForest, LeafKey};
-use skg::graph_pair::types::GraphPair;
+use skg::graph_straddle::types::GraphStraddle;
 use skg::readiness_store::ReadinessStore;
 use skg::serve::handlers::stage_and_commit::{
   StageAndCommitAnswer, handle_stage_and_commit_request, stage_and_commit,
@@ -63,8 +63,8 @@ fn mark_every_leaf (
   f   : &Fixture,
   env : &SkgEnv,
 ) -> Result<(), Box<dyn Error>> {
-  let pair : GraphPair = graph_pair (f) ?;
-  let forest : &ChangeForest = pair . change_forest ();
+  let straddle : GraphStraddle = graph_straddle (f) ?;
+  let forest : &ChangeForest = straddle . change_forest ();
   let mut store : MutexGuard<ReadinessStore> =
     env . runtime . readiness_store . lock () . unwrap ();
   let keys : Vec<LeafKey> = forest . owners ()

@@ -2,7 +2,7 @@
 //! ('TODO/total-diff-view/2_plan.org', "metadata"): after the graph
 //! edits succeed, each '(readyRequest ...)' or '(unreadyRequest ...)'
 //! sets or clears the marks of the change-forest leaves it names, at
-//! their fingerprints in the fresh graph pair. A save that stops for
+//! their fingerprints in the fresh graph straddle. A save that stops for
 //! a confirmation consumes nothing.
 
 use crate::change_forest::{
@@ -10,8 +10,8 @@ use crate::change_forest::{
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   NodeRelation, RelationRole};
-use crate::graph_pair::build::current_graph_pair_in_slot;
-use crate::graph_pair::types::GraphPair;
+use crate::graph_straddle::build::current_graph_straddle_in_slot;
+use crate::graph_straddle::types::GraphStraddle;
 use crate::readiness_store::ReadinessStore;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::ID;
@@ -25,30 +25,30 @@ use std::collections::BTreeSet;
 use std::sync::{Arc, MutexGuard};
 
 /// After a save's graph edits succeeded: apply the saved buffer's
-/// readiness requests to the store, against the graph pair in
-/// 'graph_pair_slot' brought up to date with 'runtime', and write the
-/// store back. Returns the warnings to show. Builds no pair when the
+/// readiness requests to the store, against the graph straddle in
+/// 'graph_straddle_slot' brought up to date with 'runtime', and write the
+/// store back. Returns the warnings to show. Builds no straddle when the
 /// buffer carries no request.
 pub fn consume_readiness_requests (
-  viewforest      : &ViewForest,
-  env             : &SkgEnv,
-  runtime         : &RuntimeGeneration,
-  graph_pair_slot : &mut Option<Arc<GraphPair>>,
+  viewforest          : &ViewForest,
+  env                 : &SkgEnv,
+  runtime             : &RuntimeGeneration,
+  graph_straddle_slot : &mut Option<Arc<GraphStraddle>>,
 ) -> Vec<String> {
   let requests : Vec<RequestedReadiness> =
     readiness_requests_in_viewforest (viewforest, &runtime . graph);
   if requests . is_empty () { return Vec::new (); }
-  let pair : Arc<GraphPair> =
-    match current_graph_pair_in_slot (
-      graph_pair_slot, &runtime . config, runtime . graph . clone () ) {
-      Ok (pair) => pair,
+  let straddle : Arc<GraphStraddle> =
+    match current_graph_straddle_in_slot (
+      graph_straddle_slot, &runtime . config, runtime . graph . clone () ) {
+      Ok (straddle) => straddle,
       Err (e) => return vec! [ format! (
         "Readiness requests were not applied: {}", e ) ], };
   let mut store : MutexGuard<ReadinessStore> =
     env . runtime . readiness_store . lock ()
     . unwrap_or_else ( |poisoned| poisoned . into_inner () );
   let mut warnings : Vec<String> =
-    apply_readiness_requests (&requests, pair . change_forest (), &mut store);
+    apply_readiness_requests (&requests, straddle . change_forest (), &mut store);
   if let Err (e) = store . save (&runtime . config . data_root) {
     warnings . push ( format! (
       "The readiness marks were applied but not written to disk: {}", e )); }

@@ -1,5 +1,5 @@
 //! The change-forest: the tree of everything commit-readiness can be
-//! asked about, built from the graph pair, independent of any view
+//! asked about, built from the graph straddle, independent of any view
 //! ('TODO/total-diff-view/2_plan.org', "change-forest"). Its roots
 //! are the changed graphnodes that own a change; under each come its
 //! changed aspects; its leaves are the individual changes a user
@@ -10,8 +10,8 @@
 
 use crate::dbs::in_rust_graph::relation_accessors::{
   NodeRelation, RelationRole};
-use crate::graph_pair::types::{GraphPair, NodeChanges, Partner, Presence};
-use crate::graph_pair::union_walk::ROLES_OF_LISTED_MEMBERS;
+use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner, Presence};
+use crate::graph_straddle::union_walk::ROLES_OF_LISTED_MEMBERS;
 use crate::readiness_store::ReadinessStore;
 use crate::types::misc::{ID, SkgrepoName, members_msv};
 use crate::types::nodes::complete::Flag;
@@ -95,13 +95,13 @@ pub struct ChangeForest {
 }
 
 impl ChangeForest {
-  pub fn from_graph_pair (
-    pair : &GraphPair,
+  pub fn from_graph_straddle (
+    straddle : &GraphStraddle,
   ) -> ChangeForest {
     let mut leaves_by_owner : BTreeMap<ID, Vec<ChangeLeaf>> =
       BTreeMap::new ();
-    for pid in & pair . changed_pids () . rightward {
-      let leaves : Vec<ChangeLeaf> = leaves_owned_by (pair, pid);
+    for pid in & straddle . changed_pids () . rightward {
+      let leaves : Vec<ChangeLeaf> = leaves_owned_by (straddle, pid);
       if ! leaves . is_empty () {
         leaves_by_owner . insert (pid . clone (), leaves); }}
     let index : HashMap<LeafKey, (ID, usize)> =
@@ -112,21 +112,21 @@ impl ChangeForest {
           ( leaf . key . clone (), (owner . clone (), position) )) )
       . collect ();
     let order_only_pids : BTreeSet<ID> =
-      pair . after . nodes . iter ()
+      straddle . after . nodes . iter ()
       . filter ( |(pid, after)|
         ! leaves_by_owner . contains_key (*pid)
-        && pair . before . nodes . get (*pid)
+        && straddle . before . nodes . get (*pid)
              . is_some_and ( |before| before != *after ))
       . map ( |(pid, _)| pid . clone () )
       . collect ();
     let order_only_files : BTreeSet<(SkgrepoName, ID)> =
       order_only_pids . iter ()
-      . filter_map ( |pid| pair . after . nodes . get (pid) )
+      . filter_map ( |pid| straddle . after . nodes . get (pid) )
       . map ( |node| ( node . home_skgrepo . clone (), node . pid . clone () ))
       . collect ();
     ChangeForest { leaves_by_owner, index, order_only_pids,
                    order_only_files,
-                   foreign_changed_files : pair . foreign_changed_files } }
+                   foreign_changed_files : straddle . foreign_changed_files } }
 
   /// The nodes that own a leaf (the forest's roots).
   pub fn owners (
@@ -259,11 +259,11 @@ impl ReadinessSummary {
 /// deleted, else its changed aspects; then the relationships it
 /// records whose existence or relRepo changed.
 fn leaves_owned_by (
-  pair : &GraphPair,
-  pid  : &ID,
+  straddle : &GraphStraddle,
+  pid      : &ID,
 ) -> Vec<ChangeLeaf> {
-  let before : Option<&GraphnodeInRust> = pair . before . get (pid);
-  let after  : Option<&GraphnodeInRust> = pair . after  . get (pid);
+  let before : Option<&GraphnodeInRust> = straddle . before . get (pid);
+  let after  : Option<&GraphnodeInRust> = straddle . after  . get (pid);
   let home_file = |node : &GraphnodeInRust| -> Vec<(SkgrepoName, ID)> {
     vec! [ ( node . home_skgrepo . clone (), pid . clone () ) ] };
   let node_leaf = |aspect : NodeAspect, fingerprint : u64,
@@ -273,7 +273,7 @@ fn leaves_owned_by (
   let mut leaves : Vec<ChangeLeaf> = Vec::new ();
   match (before, after) {
     (Some (before), Some (after)) => {
-      let changes : NodeChanges = pair . node_changes (pid);
+      let changes : NodeChanges = straddle . node_changes (pid);
       if changes . text_changed () {
         leaves . push ( node_leaf (
           NodeAspect::Text,
@@ -319,7 +319,7 @@ fn leaves_owned_by (
                            after  . map (own_content_of) )),
         home_file (existing) )); }}
   for role in ROLES_OF_LISTED_MEMBERS {
-    for partner in pair . partners (pid, role) {
+    for partner in straddle . partners (pid, role) {
       leaves . extend ( relationship_leaves (pid, role, &partner) ); }}
   leaves }
 

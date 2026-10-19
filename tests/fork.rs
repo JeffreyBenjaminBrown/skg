@@ -278,8 +278,8 @@ async fn explicit_fork_round_trip_and_monogamy (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
-    open_views : OpenViews::new (),
-    graph_pair : None };
+    open_views     : OpenViews::new (),
+    graph_straddle : None };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer_with_fork_approval_test (
     &mut stream, EXPLICIT_FORK_BUFFER, config, tantivy, &graph,
@@ -367,8 +367,8 @@ async fn fork_no_owned_ancestor_defaults (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
-    open_views : OpenViews::new (),
-    graph_pair : None };
+    open_views     : OpenViews::new (),
+    graph_straddle : None };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer (
     &mut stream, FORK_ROOT_BUFFER, config, tantivy, &graph,
@@ -400,8 +400,8 @@ async fn fork_user_set_skgrepo_overrides (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
-    open_views : OpenViews::new (),
-    graph_pair : None };
+    open_views     : OpenViews::new (),
+    graph_straddle : None };
   let fork_skgrepos : HashMap<ID, SkgrepoName> =
     HashMap::from ([ ( ID::from ("N"), SkgrepoName::from ("owned2") ) ]);
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
@@ -504,8 +504,8 @@ async fn fork_confirmation_gates_skgsave_commit (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
-    open_views : OpenViews::new (),
-    graph_pair : None };
+    open_views     : OpenViews::new (),
+    graph_straddle : None };
 
   // Unapproved save -> fork-confirmation, nothing skgsave-committed.
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
@@ -603,8 +603,8 @@ async fn fork_from_bare_new_child_skgsave_commits (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
-    open_views : OpenViews::new (),
-    graph_pair : None };
+    open_views     : OpenViews::new (),
+    graph_straddle : None };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer_with_fork_approval_test (
     &mut stream, FORK_WITH_BARE_NEW_CHILD_BUFFER, config, tantivy,
@@ -658,8 +658,8 @@ async fn fork_monogamy (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
-    open_views : OpenViews::new (),
-    graph_pair : None };
+    open_views     : OpenViews::new (),
+    graph_straddle : None };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   update_from_and_rerender_buffer (
     &mut stream, FORK_BUFFER, config, tantivy, &graph,
@@ -750,8 +750,8 @@ async fn fork_fixture_files (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
-    open_views : OpenViews::new (),
-    graph_pair : None };
+    open_views     : OpenViews::new (),
+    graph_straddle : None };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer (
     &mut stream, FORK_BUFFER, config, tantivy, &graph,
@@ -789,8 +789,8 @@ async fn fork_round_trip (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
-    open_views : OpenViews::new (),
-    graph_pair : None };
+    open_views     : OpenViews::new (),
+    graph_straddle : None };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   update_from_and_rerender_buffer (
     &mut stream, FORK_BUFFER, config, tantivy, &graph,
@@ -836,8 +836,8 @@ async fn fork_collateral_rerender_without_substitution (
   let collateral_view_id : ViewId = ViewId::SearchView (
     "P before fork" . to_string ());
   let mut views_state : ViewsState = ViewsState {
-    open_views : OpenViews::new (),
-    graph_pair : None };
+    open_views     : OpenViews::new (),
+    graph_straddle : None };
   let graph_snap = graph . load_full ();
   views_state . open_views . register_view (
     &graph_snap, saved_view_id . clone (), p_view . clone (), &pids );

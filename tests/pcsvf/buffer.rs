@@ -1,4 +1,4 @@
-// The "all changes" buffer, drawn from the graph pair. The 'sets'
+// The "all changes" buffer, drawn from the graph straddle. The 'sets'
 // fixture is described in 'sets.rs'. In the 'kinds' fixture (owned
 // skgrepos public and private) each root shows one kind of change:
 // txt is retitled and its body edited; ali loses alias a1 and gains

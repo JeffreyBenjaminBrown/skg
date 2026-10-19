@@ -68,7 +68,7 @@ fn fixture (
     graph : new_handle ( InRustGraph::from_graphnodes (&nodes) ),
     views_state : ViewsState {
       open_views        : OpenViews::new (),
-      graph_pair        : None, } } ) }
+      graph_straddle    : None, } } ) }
 
 /// Render a view of 'roots', registered under 'view_id'.
 fn open_view (

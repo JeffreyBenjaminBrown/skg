@@ -25,7 +25,7 @@ use std::time::{Duration, Instant};
 static SNAPSHOT_CACHE : OnceLock<Mutex<HashMap<String, GraphSnapshot>>> =
   OnceLock::new ();
 
-/// The before endpoint of the graph pair: every owned skgrepo at
+/// The before endpoint of the graph straddle: every owned skgrepo at
 /// HEAD, every foreign skgrepo at its worktree. The live graph reads
 /// foreign skgrepos from their worktrees too, so their sections are
 /// the same at both endpoints and contribute no change.
@@ -72,7 +72,7 @@ pub fn owned_head_identity (
 }
 
 /// How many '.skg' files of the foreign skgrepos differ between HEAD
-/// and the worktree. The graph pair reads foreign skgrepos at their
+/// and the worktree. The graph straddle reads foreign skgrepos at their
 /// worktrees, so their changes never reach it; the readiness summary
 /// reports this count instead. A foreign skgrepo that is not in a
 /// gitrepo, or has no HEAD commit, counts nothing.

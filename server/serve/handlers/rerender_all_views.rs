@@ -198,10 +198,10 @@ fn prepare_rerender_views_where (
   let mut context : RerenderAfterSaveContext =
     RerenderAfterSaveContext::without_save_with_runtime (
       env, runtime, skgrepo_restriction );
-  // A buffer of the total diff view is reconciled over a graph pair
+  // A buffer of the total diff view is reconciled over a graph straddle
   // brought up to date from the connection's, which it does not
   // replace.
-  context . graph_pair = views_state . graph_pair . clone ();
+  context . graph_straddle = views_state . graph_straddle . clone ();
   let mut rendered_views : Vec<PreparedView> = Vec::new ();
   for view_id in &view_ids {
     let mut viewforest : ViewForest = match

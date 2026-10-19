@@ -1,6 +1,6 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use crate::graph_pair::types::{GraphPair, Partner, Presence};
+use crate::graph_straddle::types::{GraphStraddle, Partner, Presence};
 use crate::to_org::expand::role_tree::{
   RoleTreePartners, attach_full_containerward_role_trees_at_treeids_with_skgrepo_set,
   build_and_integrate_role_tree_with_skgrepo_set};
@@ -33,14 +33,14 @@ use std::sync::Arc;
 pub enum PartnerFolderGoalSource<'a> {
   /// The live graph.
   LiveGraph,
-  /// The union of a graph pair: the members of either graph, each
+  /// The union of a graph straddle: the members of either graph, each
   /// tagged with the presence of its node and of its relationship.
-  GraphPair (&'a GraphPair),
+  GraphStraddle (&'a GraphStraddle),
 }
 
 /// Reconciles one PartnerFolder (TODO/DONE/local-view-update/plan_v2.org §19 terminology: a folder = a collecting non-vognode)
 /// from a node in the viewforest with the current in-Rust graph snapshot's data
-/// about that node, or with a graph pair's ('goal_source').
+/// about that node, or with a graph straddle's ('goal_source').
 /// Makes the folder's UnrestrictedVognode children marked affectsParent=true match a goal list,
 /// preserving reusable children and creating missing ones,
 /// then demotes stale children marked affectsParent=true to 'affectsParent=false'.
@@ -66,9 +66,9 @@ pub fn reconcile_partnerFolder_children (
     return Err (format!(
       "{} called for PartnerFolder {:?}, which has no relation member role",
       kind . caller_label (), kind) . into ()); };
-  if let PartnerFolderGoalSource::GraphPair (pair) = goal_source {
-    return reconcile_partnerFolder_children_from_graph_pair (
-      node, tree, kind, pair, &recorder_pid, member_role, runtime,
+  if let PartnerFolderGoalSource::GraphStraddle (straddle) = goal_source {
+    return reconcile_partnerFolder_children_from_graph_straddle (
+      node, tree, kind, straddle, &recorder_pid, member_role, runtime,
       deleted_by_this_save_extra_ids, warning_sink ); }
   let recorder_role =
     member_role . opposite_role ();
@@ -147,23 +147,23 @@ pub fn reconcile_partnerFolder_children (
   Ok (( )) }
 
 /// 'reconcile_partnerFolder_children' with its goal list from the union
-/// of a graph pair: the partners in either graph, each member tagged
+/// of a graph straddle: the partners in either graph, each member tagged
 /// with its presence. A member whose node is only in the before-graph
 /// is drawn as an unknown phantom.
-fn reconcile_partnerFolder_children_from_graph_pair (
+fn reconcile_partnerFolder_children_from_graph_straddle (
   node         : NodeId,
   tree         : &mut Tree<Viewnode>,
   kind         : PartnerFolder,
-  pair         : &GraphPair,
+  straddle     : &GraphStraddle,
   recorder_pid : &ID,
   member_role  : RelationRole,
   runtime      : &RuntimeGeneration,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   warning_sink : Option<&mut Vec<CompletionWarning>>,
 ) -> Result<(), Box<dyn Error>> {
-  restore_removed_members_of_pair_folder (tree, node, kind) ?;
+  restore_removed_members_of_straddle_folder (tree, node, kind) ?;
   let partners : Vec<Partner> =
-    pair . partners (recorder_pid, member_role);
+    straddle . partners (recorder_pid, member_role);
   let members : Vec<ID> =
     partners . iter () . map ( |partner| partner . id . clone () ) . collect ();
   let goal_list : Vec<ID> = match kind . policy () {
@@ -180,32 +180,32 @@ fn reconcile_partnerFolder_children_from_graph_pair (
   let presence_by_skgid : HashMap<ID, DiffPresence> =
     partners . iter ()
     . map ( |partner| ( partner . id . clone (), DiffPresence {
-      node : pair . node_presence (&partner . id)
+      node : straddle . node_presence (&partner . id)
              . and_then ( |presence| presence . diff_sign () ),
       rel  : partner . presence . diff_sign (), } ))
     . collect ();
   apply_presence_to_folder_members (tree, node, &presence_by_skgid) ?;
-  redraw_removed_members_of_pair_folder (tree, node, kind, pair) ?;
-  attach_continuations_under_pair_folder_members (
-    tree, node, kind, member_role, pair, &partners, runtime ) ?;
+  redraw_removed_members_of_straddle_folder (tree, node, kind, straddle) ?;
+  attach_continuations_under_straddle_folder_members (
+    tree, node, kind, member_role, straddle, &partners, runtime ) ?;
   if kind . policy () != FolderPolicy::EditableSet {
     if let Some (sink) = warning_sink {
       push_repair_warnings (sink, kind, recorder_pid, summary); }}
   Ok (( )) }
 
-/// Undo what 'redraw_removed_members_of_pair_folder' did when the
+/// Undo what 'redraw_removed_members_of_straddle_folder' did when the
 /// folder was last drawn: a historical phantom becomes the unknown
 /// phantom the reconciler drew it as, and a demoted member a member
 /// again. The reconciler then matches them where they stand, instead
 /// of drawing them a second time, and the redraw redoes the rest.
-fn restore_removed_members_of_pair_folder (
+fn restore_removed_members_of_straddle_folder (
   tree   : &mut Tree<Viewnode>,
   folder : NodeId,
   kind   : PartnerFolder,
 ) -> Result<(), Box<dyn Error>> {
   let editable_set : bool = kind . policy () == FolderPolicy::EditableSet;
   let members : Vec<NodeId> =
-    tree . get (folder) . ok_or ("restore_removed_members_of_pair_folder: folder not found") ?
+    tree . get (folder) . ok_or ("restore_removed_members_of_straddle_folder: folder not found") ?
     . children () . map ( |child| child . id () ) . collect ();
   for member in members {
     let mut member_mut = tree . get_mut (member) . unwrap ();
@@ -223,21 +223,21 @@ fn restore_removed_members_of_pair_folder (
       member_mut . value () . kind = restored; }}
   Ok (( )) }
 
-/// The members of a pair-drawn folder whose relationship is only in
+/// The members of a straddle-drawn folder whose relationship is only in
 /// the before-graph: one whose node the after-graph lacks becomes a
 /// historical phantom; in a folder whose membership the save reads
 /// (an EditableSet), a surviving one is demoted to a write-protected
 /// non-member and a dangling one is dropped, so saving the buffer
 /// does not restore them.
-fn redraw_removed_members_of_pair_folder (
-  tree   : &mut Tree<Viewnode>,
-  folder : NodeId,
-  kind   : PartnerFolder,
-  pair   : &GraphPair,
+fn redraw_removed_members_of_straddle_folder (
+  tree     : &mut Tree<Viewnode>,
+  folder   : NodeId,
+  kind     : PartnerFolder,
+  straddle : &GraphStraddle,
 ) -> Result<(), Box<dyn Error>> {
   let editable_set : bool = kind . policy () == FolderPolicy::EditableSet;
   let members : Vec<NodeId> =
-    tree . get (folder) . ok_or ("redraw_removed_members_of_pair_folder: folder not found") ?
+    tree . get (folder) . ok_or ("redraw_removed_members_of_straddle_folder: folder not found") ?
     . children () . map ( |child| child . id () ) . collect ();
   for member in members {
     let (skgid, rel) : (ID, Option<Sign>) =
@@ -247,8 +247,8 @@ fn redraw_removed_members_of_pair_folder (
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
           ( u . skgid . clone (), u . change_facts . presence . rel ),
         _ => continue, };
-    if pair . node_presence (&skgid) == Some (Presence::OnlyBefore) {
-      if let Some (historical) = mk_historical_viewnode (pair, &skgid, rel) {
+    if straddle . node_presence (&skgid) == Some (Presence::OnlyBefore) {
+      if let Some (historical) = mk_historical_viewnode (straddle, &skgid, rel) {
         tree . get_mut (member) . unwrap () . value () . kind = historical . kind; }
       continue; }
     if ! editable_set || rel != Some (Sign::Minus) { continue; }
@@ -260,8 +260,8 @@ fn redraw_removed_members_of_pair_folder (
       _ => { member_mut . detach (); }, }}
   Ok (( )) }
 
-/// Under each member of a pair-drawn folder, the role-tree engine's
-/// continuation over the union of the pair: under a container, its
+/// Under each member of a straddle-drawn folder, the role-tree engine's
+/// continuation over the union of the straddle: under a container, its
 /// full containerward tree; under any other member, the role tree of
 /// the folder's role, with a full containerward tree under each
 /// graft. In a folder of the anchor's own relationships, only under
@@ -269,12 +269,12 @@ fn redraw_removed_members_of_pair_folder (
 /// relationship moved to another skgrepo gets that move. What an
 /// earlier drawing hung under the members goes first, so that drawing
 /// again is idempotent.
-fn attach_continuations_under_pair_folder_members (
+fn attach_continuations_under_straddle_folder_members (
   tree        : &mut Tree<Viewnode>,
   folder      : NodeId,
   kind        : PartnerFolder,
   member_role : RelationRole,
-  pair        : &GraphPair,
+  straddle    : &GraphStraddle,
   partners    : &[Partner],
   runtime     : &RuntimeGeneration,
 ) -> Result<(), Box<dyn Error>> {
@@ -282,7 +282,7 @@ fn attach_continuations_under_pair_folder_members (
     partners . iter () . map ( |partner| (&partner . id, partner) ) . collect ();
   let outbound : bool = ! member_role . is_first_role ();
   let all_members : Vec<(NodeId, &Partner)> =
-    tree . get (folder) . ok_or ("attach_continuations_under_pair_folder_members: folder not found") ?
+    tree . get (folder) . ok_or ("attach_continuations_under_straddle_folder_members: folder not found") ?
     . children ()
     . filter_map ( |child| match &child . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
@@ -309,12 +309,12 @@ fn attach_continuations_under_pair_folder_members (
   if kind == PartnerFolder::Container {
     attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
       tree, &member_treeids, &runtime . graph, &runtime . config, None,
-      RoleTreePartners::GraphPair (pair) ) ?;
+      RoleTreePartners::GraphStraddle (straddle) ) ?;
   } else {
     for member in member_treeids {
       build_and_integrate_role_tree_with_skgrepo_set (
         tree, member, &runtime . graph, member_role, &runtime . config,
-        None, RoleTreePartners::GraphPair (pair) ) ?; }}
+        None, RoleTreePartners::GraphStraddle (straddle) ) ?; }}
   Ok (( )) }
 
 /// Translate a RepairSummary into per-repair-kind CompletionWarnings.

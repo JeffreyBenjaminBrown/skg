@@ -15,8 +15,8 @@ pub use viewnodestats::set_viewnodestats_in_viewforest;
 use complete::{complete_viewforest, CompletionContext};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::change_forest::BufferReadinessSummary;
-use crate::graph_pair::build::current_graph_pair_in_slot;
-use crate::graph_pair::types::GraphPair;
+use crate::graph_straddle::build::current_graph_straddle_in_slot;
+use crate::graph_straddle::types::GraphStraddle;
 use crate::pcsvf::{
   TdvDrawing, nodes_drawn_in_viewforest, set_tdv_facts_in_viewforest};
 use crate::readiness_store::ReadinessStore;
@@ -64,11 +64,11 @@ pub struct RerenderAfterSaveContext<'a> {
   /// these IDs after the pid itself has disappeared.
   pub deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
   pub skgrepo_restriction            : Option<&'a SkgrepoRestriction>,
-  /// The graph pair a buffer of the total diff view is completed
-  /// over, brought up to date by 'current_graph_pair_in_slot' when
+  /// The graph straddle a buffer of the total diff view is completed
+  /// over, brought up to date by 'current_graph_straddle_in_slot' when
   /// the first such buffer is rerendered. A caller that holds the
-  /// connection's pair sets it, and keeps what it becomes.
-  pub graph_pair                     : Option<Arc<GraphPair>>,
+  /// connection's straddle sets it, and keeps what it becomes.
+  pub graph_straddle                 : Option<Arc<GraphStraddle>>,
 }
 
 impl<'a> RerenderAfterSaveContext<'a> {
@@ -107,7 +107,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
       deleted_by_this_save_pids,
       deleted_by_this_save_extra_ids,
       skgrepo_restriction,
-      graph_pair : None,
+      graph_straddle : None,
     }}
 
   pub fn without_save (
@@ -165,7 +165,7 @@ pub fn update_views_after_save (
       RerenderAfterSaveContext::for_save_with_runtime (
         env, runtime, &node_instructions,
         deleted_by_this_save_extra_ids, skgrepo_restriction ) };
-  context . graph_pair = views_state . graph_pair . clone ();
+  context . graph_straddle = views_state . graph_straddle . clone ();
   let saved_tdv_buffer : Option<TdvBuffer> =
     viewid_from_request_result . as_ref () . ok ()
     . and_then ( |view_id| tdv_buffer_of_view (views_state, view_id) );
@@ -218,12 +218,12 @@ pub fn update_views_after_save (
         true,
         saved_tdv_buffer ) } ?;
   let readiness_summary : Option<BufferReadinessSummary> =
-    saved_tdv_buffer . and ( context . graph_pair . as_ref () )
-    . map ( |pair| {
+    saved_tdv_buffer . and ( context . graph_straddle . as_ref () )
+    . map ( |straddle| {
       let store : MutexGuard<ReadinessStore> =
         env . runtime . readiness_store . lock ()
         . unwrap_or_else ( |poisoned| poisoned . into_inner () );
-      pair . change_forest () . buffer_readiness_summary (
+      straddle . change_forest () . buffer_readiness_summary (
         &store, &nodes_drawn_in_viewforest (&saved_view_mut) ) } );
   context . warnings . extend (
     // Repairs the completion pass made to write-protected PartnerFolders in
@@ -262,8 +262,8 @@ pub fn update_views_after_save (
       TextReleaseDecision::AllowWithWarning { warning } =>
         context . warnings . push (warning),
       TextReleaseDecision::Allow => {}, }}
-  if context . graph_pair . is_some () {
-    views_state . graph_pair = context . graph_pair . clone (); }
+  if context . graph_straddle . is_some () {
+    views_state . graph_straddle = context . graph_straddle . clone (); }
   if let Ok (view_id) = viewid_from_request_result {
     views_state . open_views . update_view (
       &context . graph_snap, view_id, saved_view_mut);
@@ -446,11 +446,11 @@ pub fn render_initial_view (
 
 /// Complete a stub viewforest of the total diff view
 /// ('server/pcsvf.rs') as 'drawing' says: view completion with
-/// 'tdv_drawing' set, which draws the union of the pair's content, the change
+/// 'tdv_drawing' set, which draws the union of the straddle's content, the change
 /// folders and markers, and the removed members. It creates no
 /// default partner folders, spends no node budget, and never
 /// restricts by skgrepo (the total diff view requires the set 'all').
-pub fn complete_viewforest_with_graph_pair (
+pub fn complete_viewforest_with_graph_straddle (
   runtime    : &RuntimeGeneration,
   drawing    : TdvDrawing,
   viewforest : &mut ViewForest,
@@ -480,9 +480,9 @@ pub fn complete_viewforest_with_graph_pair (
 /// set graph/view stats, and render to string.
 /// .
 /// A buffer of the total diff view ('tdv_buffer' Some) is reconciled
-/// over the graph pair, brought up to date in 'context': view
+/// over the graph straddle, brought up to date in 'context': view
 /// completion recomputes each editable node's change facts, change
-/// folders, markers and removed members from the pair, as it drew
+/// folders, markers and removed members from the straddle, as it drew
 /// them ('process_unrestrictedVognode_changes'), and its readiness
 /// facts are then read from the store. Its roots and editability stay
 /// as the buffer has them.
@@ -497,10 +497,10 @@ pub fn rerender_view (
   let t_rerender : Instant = Instant::now ();
   { tracing::debug!("rerender_view: starting");
     remove_id_folders (viewforest) ?; }
-  let graph_pair : Option<Arc<GraphPair>> =
+  let graph_straddle : Option<Arc<GraphStraddle>> =
     match tdv_buffer {
-      Some (_) => Some ( current_graph_pair_in_slot (
-        &mut context . graph_pair, &context . runtime . config,
+      Some (_) => Some ( current_graph_straddle_in_slot (
+        &mut context . graph_straddle, &context . runtime . config,
         context . runtime . graph . clone () ) ? ),
       None => None, };
   { tracing::debug!("rerender_view: starting complete_viewforest");
@@ -513,9 +513,9 @@ pub fn rerender_view (
       deleted_by_this_save_pids      : &context . deleted_by_this_save_pids,
       deleted_by_this_save_extra_ids : &context . deleted_by_this_save_extra_ids,
       // A total diff view, like its first drawing
-      // ('complete_viewforest_with_graph_pair'), is not restricted by
+      // ('complete_viewforest_with_graph_straddle'), is not restricted by
       // skgrepo while it is completed.
-      skgrepo_restriction            : if graph_pair . is_some () { None }
+      skgrepo_restriction            : if graph_straddle . is_some () { None }
                                        else { context . skgrepo_restriction },
       node_budget                    : context . runtime . config . initial_node_limit,
       // Post-save (and rerender-all) reuse the saved buffer's PartnerFolders
@@ -523,24 +523,24 @@ pub fn rerender_view (
       // removed the folders, and the new set decides which defaults return.
       // A total diff view draws no default folders.
       create_partnerFolders_for_fresh_nodes :
-        create_partnerFolders && graph_pair . is_none (),
+        create_partnerFolders && graph_straddle . is_none (),
       substitute_existing_content_overrides : // off in a total diff view
-        substitute_existing_content_overrides && graph_pair . is_none (),
+        substitute_existing_content_overrides && graph_straddle . is_none (),
       warning_sink,
-      tdv_drawing : graph_pair . as_deref () . zip (tdv_buffer)
-        . map ( |(pair, tdv_buffer)| TdvDrawing { pair, tdv_buffer } ), };
+      tdv_drawing : graph_straddle . as_deref () . zip (tdv_buffer)
+        . map ( |(straddle, tdv_buffer)| TdvDrawing { straddle, tdv_buffer } ), };
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "complete_viewforest" ). entered();
       complete_viewforest (
         viewforest, &mut completion_context ) ? }; }
-  if let ( Some (pair), Some (tdv_buffer) ) = ( &graph_pair, tdv_buffer ) {
+  if let ( Some (straddle), Some (tdv_buffer) ) = ( &graph_straddle, tdv_buffer ) {
     redraw_deleted_phantoms_as_historical (
-      viewforest . as_internal_tree_mut (), pair );
+      viewforest . as_internal_tree_mut (), straddle );
     let store : MutexGuard<ReadinessStore> =
       context . env . runtime . readiness_store . lock ()
       . unwrap_or_else ( |poisoned| poisoned . into_inner () );
     set_tdv_facts_in_viewforest (
-      viewforest, TdvDrawing { pair, tdv_buffer }, &store,
+      viewforest, TdvDrawing { straddle, tdv_buffer }, &store,
       &context . runtime . graph ); }
   let result : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(

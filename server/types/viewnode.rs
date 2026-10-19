@@ -48,7 +48,7 @@ pub enum Birth {
 }
 
 /// The total diff view's facts about one viewnode: which graphs of
-/// the graph pair hold its node and its relationship to its
+/// the graph straddle hold its node and its relationship to its
 /// viewparent ('(diff ...)'), and which of its change-forest leaves
 /// are marked commit-ready ('(ready ...)'). Display facts: the view
 /// derives them, and a save reads nothing from them.
@@ -62,7 +62,7 @@ pub struct ChangeFacts {
 
 /// The '(diff ATOMS)' of a viewnode, from 'node+ node- rel+ rel-'.
 /// None on an axis means the node (or relationship) is in both
-/// graphs of the pair, or that the axis does not apply.
+/// graphs of the straddle, or that the axis does not apply.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DiffPresence {
   pub node : Option<Sign>,
@@ -207,10 +207,10 @@ pub struct PhantomUnknown {
 }
 
 /// A phantom for a node that the before-graph of the total diff
-/// view's graph pair has and the after-graph lacks: a node deleted
+/// view's graph straddle has and the after-graph lacks: a node deleted
 /// (or acquired by a nodeMerge) since HEAD.
 ///
-/// ARISES: only in a total diff view, built from the graph pair
+/// ARISES: only in a total diff view, built from the graph straddle
 /// ('server/to_org/render/change_viewnodes.rs'): under each former
 /// container as a removed member, or as a view root. Its own old
 /// content hangs beneath it, recursing into deleted members.
@@ -482,7 +482,7 @@ pub enum PartnerFolder {
   HiddenOutsideOfSubscribee, // Child of a SubscribeeFolder. Collects things hidden by the SubscribeeFolder's parent but absent from every subscribee's content. This derived filter is editable as an exclusive visible-outside subset; its hide skgrepos remain derived. Shown after all Subscribees, under the same SubscribeeFolder.
   Container, // Collects nodes that contain its parent. Write-protected (editable from the other side of the relationship).
   Mentioner, // Collects nodes that link to its parent. Write-protected (a link lives in the linking node's text).
-  // The total diff view's two derived folders. Their membership comes from the extra IDs of the graph pair's after-graph; both are save-inert.
+  // The total diff view's two derived folders. Their membership comes from the extra IDs of the graph straddle's after-graph; both are save-inert.
   AcquiredBy, // Child of a historical phantom: the node that acquired it by a nodeMerge.
   Acquired, // Child of an acquirer: the historical phantoms of the nodes it acquired.
 }

@@ -10,31 +10,32 @@ use crate::types::views_state::TdvBuffer;
 use std::collections::BTreeSet;
 use std::sync::{Arc, OnceLock};
 
-/// See 'server/graph_pair/mod.rs'.
-pub struct GraphPair {
+/// A straddle stands with one foot in the committed graph and one in
+/// the live graph. See 'server/graph_straddle/mod.rs'.
+pub struct GraphStraddle {
   pub before        : Arc<InRustGraph>,
   pub after         : Arc<InRustGraph>,
   /// The owned skgrepos' HEAD commits that 'before' was read from
   /// ('owned_head_identity'). When it differs from the current one,
-  /// the pair is stale.
+  /// the straddle is stale.
   pub head_identity : String,
   /// How many '.skg' files of the foreign skgrepos changed since
   /// HEAD ('foreign_changed_skg_file_count'). Foreign skgrepos are
-  /// read at their worktrees in both halves, so the pair shows none
+  /// read at their worktrees in both halves, so the straddle shows none
   /// of those changes.
   pub foreign_changed_files : usize,
-  /// Computed on first use; see 'GraphPair::changed_pids'.
+  /// Computed on first use; see 'GraphStraddle::changed_pids'.
   pub(super) changed_pids : OnceLock<ChangedPids>,
-  /// Computed on first use; see 'GraphPair::change_forest'.
+  /// Computed on first use; see 'GraphStraddle::change_forest'.
   pub(super) change_forest : OnceLock<ChangeForest>,
-  /// Computed on first use; see 'GraphPair::pcsvf_sets'.
+  /// Computed on first use; see 'GraphStraddle::pcsvf_sets'.
   pub(super) pcsvf_sets : OnceLock<PcsvfSets>,
-  /// Computed on first use; see 'GraphPair::pcsvf_sets_of_buffer'.
+  /// Computed on first use; see 'GraphStraddle::pcsvf_sets_of_buffer'.
   pub(super) merges_pcsvf_sets     : OnceLock<PcsvfSets>,
   pub(super) home_moves_pcsvf_sets : OnceLock<PcsvfSets>,
 }
 
-/// Which graphs of the pair hold a node or a relationship.
+/// Which graphs of the straddle hold a node or a relationship.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Presence {
   Both,
@@ -43,7 +44,7 @@ pub enum Presence {
 }
 
 /// The changes to a node present in both graphs that its own files
-/// record, other than its relationships (see 'GraphPair::partners').
+/// record, other than its relationships (see 'GraphStraddle::partners').
 /// Gained items are in the after-graph's order, lost ones in the
 /// before-graph's.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -79,29 +80,29 @@ pub struct ChangedPids {
   pub leftward  : BTreeSet<ID>,
 }
 
-impl GraphPair {
+impl GraphStraddle {
   pub fn new (
     before                : Arc<InRustGraph>,
     after                 : Arc<InRustGraph>,
     head_identity         : String,
     foreign_changed_files : usize,
-  ) -> GraphPair {
-    GraphPair { before, after, head_identity, foreign_changed_files,
+  ) -> GraphStraddle {
+    GraphStraddle { before, after, head_identity, foreign_changed_files,
                 changed_pids  : OnceLock::new (),
                 change_forest : OnceLock::new (),
                 pcsvf_sets    : OnceLock::new (),
                 merges_pcsvf_sets     : OnceLock::new (),
                 home_moves_pcsvf_sets : OnceLock::new () } }
 
-  /// The change-forest of this pair. Computed once per pair.
+  /// The change-forest of this straddle. Computed once per straddle.
   pub fn change_forest (
     &self,
   ) -> &ChangeForest {
     self . change_forest . get_or_init (
-      || ChangeForest::from_graph_pair (self) ) }
+      || ChangeForest::from_graph_straddle (self) ) }
 
   /// The sets of the PCSVF over all of C ('server/pcsvf.rs').
-  /// Computed once per pair.
+  /// Computed once per straddle.
   pub fn pcsvf_sets (
     &self,
   ) -> &PcsvfSets {
@@ -110,7 +111,7 @@ impl GraphPair {
   /// The sets of the PCSVF that a buffer of the total diff view
   /// draws. The order-only buffer draws no PCSVF: its sets are empty,
   /// so each of its roots is drawn with its content as
-  /// write-protected leaves. Computed once per pair.
+  /// write-protected leaves. Computed once per straddle.
   pub fn pcsvf_sets_of_buffer (
     &self,
     tdv_buffer : TdvBuffer,

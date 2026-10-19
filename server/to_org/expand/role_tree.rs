@@ -15,7 +15,7 @@ use crate::dbs::in_rust_graph::paths::{
   paths_to_first_nonlinearities_via, role_partners_in_graph_gated,
   PathToFirstNonlinearity};
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::graph_pair::types::GraphPair;
+use crate::graph_straddle::types::GraphStraddle;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::util::{ get_skgid_from_viewnode_at, graphnode_and_viewnode_from_skgid, remove_completed_view_request};
 
@@ -32,7 +32,7 @@ use std::error::Error;
 
 
 /// Where the role-tree engine finds a node's partners: in the live
-/// graph, or in the union of a graph pair, so the same engine draws a
+/// graph, or in the union of a graph straddle, so the same engine draws a
 /// role tree over either. Viewnodes are built from the live graph
 /// either way.
 #[derive(Clone, Copy)]
@@ -41,7 +41,7 @@ pub enum RoleTreePartners<'a> {
   /// does; the containerward trees attached beneath are walked
   /// ungated, and gated where they are drawn.
   LiveGraph,
-  GraphPair (&'a GraphPair),
+  GraphStraddle (&'a GraphStraddle),
 }
 
 impl RoleTreePartners<'_> {
@@ -56,8 +56,8 @@ impl RoleTreePartners<'_> {
     match self {
       RoleTreePartners::LiveGraph =>
         role_partners_in_graph_gated (graph, restriction, node, role),
-      RoleTreePartners::GraphPair (pair) =>
-        union_partner_ids (pair, node, role), } }
+      RoleTreePartners::GraphStraddle (straddle) =>
+        union_partner_ids (straddle, node, role), } }
 
   /// The containerward role trees of 'skgids'.
   fn containerward_role_trees (
@@ -70,20 +70,20 @@ impl RoleTreePartners<'_> {
       RoleTreePartners::LiveGraph =>
         containerward_role_trees_by_skgid_from_skgids (
           &containers_in_inRustGraph (graph), skgids, max_depth ),
-      RoleTreePartners::GraphPair (pair) =>
+      RoleTreePartners::GraphStraddle (straddle) =>
         containerward_role_trees_by_skgid_from_skgids (
           &|node : &ID, role : RelationRole|
-            union_partner_ids (pair, node, role),
+            union_partner_ids (straddle, node, role),
           skgids, max_depth ), } }
 }
 
-/// The partners playing 'role' toward 'node' in either graph of the pair.
+/// The partners playing 'role' toward 'node' in either graph of the straddle.
 fn union_partner_ids (
-  pair : &GraphPair,
-  node : &ID,
-  role : RelationRole,
+  straddle : &GraphStraddle,
+  node     : &ID,
+  role     : RelationRole,
 ) -> HashSet<ID> {
-  pair . partners (node, role) . into_iter ()
+  straddle . partners (node, role) . into_iter ()
     . map ( |partner| partner . id )
     . collect () }
 

@@ -8,14 +8,14 @@
 //! Every answer is followed by a rerender stream, as the
 //! delete-references command's is: empty unless something was
 //! committed, else one redrawn view per open buffer of the total diff
-//! view, drawn afresh from the rebuilt graph pair, so a buffer whose
+//! view, drawn afresh from the rebuilt graph straddle, so a buffer whose
 //! changes were all committed comes back empty.
 
 use crate::change_forest::{BufferReadinessSummary, ReadinessSummary};
 use crate::git_ops::stage_and_commit::{
   SkgrepoCommitOutcome, stage_and_commit_owned_skgrepos};
-use crate::graph_pair::build::current_graph_pair_in_slot;
-use crate::graph_pair::types::GraphPair;
+use crate::graph_straddle::build::current_graph_straddle_in_slot;
+use crate::graph_straddle::types::GraphStraddle;
 use crate::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
 use crate::serve::handlers::rerender_all_views::stream_empty_rerender;
@@ -81,7 +81,7 @@ pub fn handle_stage_and_commit_request (
 
 /// See the module comment. Refused unless the skgrepo restriction is
 /// 'all', as the total diff view is. After the git-commits, the
-/// connection's graph pair is rebuilt (each committed HEAD moved), and
+/// connection's graph straddle is rebuilt (each committed HEAD moved), and
 /// the marks of the changes committed are dropped from the store: a
 /// commit lapses every mark.
 pub fn stage_and_commit (
@@ -99,24 +99,24 @@ pub fn stage_and_commit (
     return StageAndCommitAnswer::Refused (
       "A commit message is required." . to_string () ); }
   let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
-  let pair : Arc<GraphPair> = match current_graph_pair_in_slot (
-    &mut views_state . graph_pair, &runtime . config,
+  let straddle : Arc<GraphStraddle> = match current_graph_straddle_in_slot (
+    &mut views_state . graph_straddle, &runtime . config,
     runtime . graph . clone () ) {
-    Ok (pair) => pair,
+    Ok (straddle) => straddle,
     Err (e) => return StageAndCommitAnswer::Refused (e), };
   { let store : MutexGuard<ReadinessStore> = lock_store (env);
     let summary : ReadinessSummary =
-      pair . change_forest () . readiness_summary (&store);
+      straddle . change_forest () . readiness_summary (&store);
     if ! summary . is_complete () && ! confirmed {
       return StageAndCommitAnswer::NeedsConfirmation (summary); }}
   let outcomes : Vec<(SkgrepoName, SkgrepoCommitOutcome)> =
     stage_and_commit_owned_skgrepos (&runtime . config, message);
   let mut errors : Vec<String> = Vec::new ();
-  match current_graph_pair_in_slot (
-    &mut views_state . graph_pair, &runtime . config,
+  match current_graph_straddle_in_slot (
+    &mut views_state . graph_straddle, &runtime . config,
     runtime . graph . clone () ) {
     Err (e) => errors . push ( format! (
-      "The graph pair could not be rebuilt after the commits: {}", e )),
+      "The graph straddle could not be rebuilt after the commits: {}", e )),
     Ok (rebuilt) => {
       let mut store : MutexGuard<ReadinessStore> = lock_store (env);
       store . marks . retain ( |key, _|
@@ -179,7 +179,7 @@ pub fn stage_and_commit_response_sexp (
   Sexp::List (items) . to_string () }
 
 /// Draw each open buffer of the total diff view afresh from the
-/// connection's graph pair, as the "total diff view" request draws
+/// connection's graph straddle, as the "total diff view" request draws
 /// it, and register the result in its place: an empty viewforest when
 /// the buffer would now be empty. Returns each view's new text, in
 /// view-id order, and the errors met.
@@ -195,16 +195,16 @@ pub fn redraw_tdv_views (
     . collect ();
   tdv_views . sort_by_key ( |(view_id, _)| view_id . repr_in_client () );
   if tdv_views . is_empty () { return ( Vec::new (), Vec::new () ); }
-  let pair : Arc<GraphPair> = match current_graph_pair_in_slot (
-    &mut views_state . graph_pair, &runtime . config,
+  let straddle : Arc<GraphStraddle> = match current_graph_straddle_in_slot (
+    &mut views_state . graph_straddle, &runtime . config,
     runtime . graph . clone () ) {
-    Ok (pair) => pair,
+    Ok (straddle) => straddle,
     Err (e) => return ( Vec::new (), vec! [ e ] ), };
   let store : MutexGuard<ReadinessStore> = lock_store (env);
   let mut redrawn : Vec<(ViewId, String)> = Vec::new ();
   let mut errors : Vec<String> = Vec::new ();
   for (view_id, tdv_buffer) in tdv_views {
-    match total_diff_view_buffer (&runtime, &pair, &store, tdv_buffer) {
+    match total_diff_view_buffer (&runtime, &straddle, &store, tdv_buffer) {
       Err (e) => errors . push ( format! (
         "View {}: {}", view_id . repr_in_client (), e )),
       Ok (buffer) => {

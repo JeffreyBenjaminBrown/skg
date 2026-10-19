@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_repos -E 'test(readiness_requests::)'
 //
 // A save consumes the readiness requests of the buffer it saves, at
-// the fingerprints of the fresh graph pair, over a git fixture whose
+// the fingerprints of the fresh graph straddle, over a git fixture whose
 // HEAD and worktree differ: r is retitled and gains the member a, and
 // a gains the alias "ay".
 
@@ -58,7 +58,7 @@ fn fixture (
     _root : root, config, tantivy, graph,
     views_state : ViewsState {
       open_views        : OpenViews::new (),
-      graph_pair        : None, } } ) }
+      graph_straddle    : None, } } ) }
 
 fn save (
   f      : &mut Fixture,
@@ -112,12 +112,12 @@ fn a_save_marks_and_unmarks_the_leaves_its_requests_name (
                 "the save consumes its requests:\n{}", response . saved_view );
       assert! ( response . warnings . is_empty (), "{:?}", response . warnings );
       { // Each mark holds the fingerprint of the change it approved.
-        let pair = f . views_state . graph_pair . clone ()
-          . expect ("consuming requests built the graph pair");
+        let straddle = f . views_state . graph_straddle . clone ()
+          . expect ("consuming requests built the graph straddle");
         let store : ReadinessStore = ReadinessStore::load (&f . config . data_root);
         for key in [ r_contains_a (), a_alias () ] {
           assert! ( store . is_ready (
-            &key, pair . change_forest () . leaf_fingerprint (&key) . unwrap () )); }} }
+            &key, straddle . change_forest () . leaf_fingerprint (&key) . unwrap () )); }} }
     { // 'all' on a node names every leaf it owns.
       save (&mut f, "\
 * (skg (node (id r) (repo main) (readyRequest all))) r, retitled

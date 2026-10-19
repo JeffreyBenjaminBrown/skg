@@ -23,7 +23,7 @@ pub struct PathToFirstNonlinearity {
 /// 'role' toward it (the role the PARTNER plays, as in
 /// 'PARTNER_ROLE_VOCAB'). The role-tree engine walks any such
 /// function: the live graph's ('role_partners_in_graph_gated'), or the
-/// union of a graph pair's ('GraphPair::partners').
+/// union of a graph straddle's ('GraphStraddle::partners').
 pub type PartnersOf<'a> = &'a dyn Fn (&ID, RelationRole) -> HashSet<ID>;
 
 /// The partners playing 'role' toward 'node' in 'graph' whose

@@ -69,7 +69,7 @@ pub(super) struct CompletionContext<'a> {
   /// Some only when completing a total diff view ('server/pcsvf.rs').
   /// Each unrestricted vognode's visit then ends with
   /// 'process_unrestrictedVognode_changes',
-  /// the partner folders draw the union of the pair, the node budget
+  /// the partner folders draw the union of the straddle, the node budget
   /// is not spent, and no default folders are created.
   pub(super) tdv_drawing : Option<TdvDrawing<'a>>,
 }
@@ -172,18 +172,18 @@ fn dispatch_node_update (
       // 'PartnerFolder::policy' where their treatment differs.
       if role . relation_member_role () . is_some () =>
       // In a total diff view (tdv_drawing set) the folder draws the
-      // union of the pair; the Subscribee folder comes here too.
+      // union of the straddle; the Subscribee folder comes here too.
       reconcile_partnerFolder_children (
         treeid, tree, *role,
         match context . tdv_drawing {
-          Some (drawing) => PartnerFolderGoalSource::GraphPair (drawing . pair),
+          Some (drawing) => PartnerFolderGoalSource::GraphStraddle (drawing . straddle),
           None        => PartnerFolderGoalSource::LiveGraph, },
         context . runtime, context . graph_snap,
         context . deleted_by_this_save_extra_ids,
         context . skgrepo_restriction,
         context . warning_sink . as_deref_mut () ) ?,
     // In a total diff view, the node's visit fills its alias, ID and
-    // flags folders from the graph pair
+    // flags folders from the graph straddle
     // ('process_unrestrictedVognode_changes').
     ViewnodeKind::PropertyFolder (_) if context . tdv_drawing . is_some () => {},
     ViewnodeKind::PropertyFolder (PropertyFolder::Alias) =>

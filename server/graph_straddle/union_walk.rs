@@ -1,4 +1,4 @@
-//! The union walk: questions about the union of the graph pair.
+//! The union walk: questions about the union of the graph straddle.
 //!
 //! Each graph identifies a relationship member by its own resolution
 //! of the stored ID ('InRustGraph::pid_of'; an unresolvable ID stays
@@ -11,8 +11,8 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole};
-use crate::graph_pair::types::{
-  ChangedPids, GraphPair, NodeChanges, Partner, Presence};
+use crate::graph_straddle::types::{
+  ChangedPids, GraphStraddle, NodeChanges, Partner, Presence};
 use crate::types::misc::{ID, RelPartner, SkgrepoName, members_msv};
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -41,7 +41,7 @@ const ROLES_OF_RECORDED_PARTNERS : [RelationRole; 5] = [
   RelationRole::HIDDEN,
   RelationRole::OVERRIDDEN, ];
 
-impl GraphPair {
+impl GraphStraddle {
   /// Which graphs hold a node with this primary ID; None if neither.
   pub fn node_presence (
     &self,
@@ -129,7 +129,7 @@ impl GraphPair {
       . unwrap_or_default () }
 
   /// C, split into its rightward and leftward halves. Computed once
-  /// per pair.
+  /// per straddle.
   pub fn changed_pids (
     &self,
   ) -> &ChangedPids {

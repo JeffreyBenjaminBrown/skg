@@ -151,7 +151,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
       let mut views_state : ViewsState =
         ViewsState { 
                      open_views        : OpenViews::new (),
-                     graph_pair        : None };
+                     graph_straddle    : None };
       let view_id : ViewId =
         ViewId::SearchView ("ovr-sub" . to_string ());
       views_state . open_views . views . insert (
@@ -336,7 +336,7 @@ async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment 
       let mut views_state : ViewsState =
         ViewsState {
           open_views        : OpenViews::new (),
-          graph_pair        : None, };
+          graph_straddle    : None, };
       let view_id : ViewId =
         ViewId::SearchView ("shared ranking term" . to_string ());
       views_state . open_views . views . insert (

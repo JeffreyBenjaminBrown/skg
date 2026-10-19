@@ -1,6 +1,6 @@
 // Saving a buffer of the total diff view: the save consumes its
 // readiness requests, the buffer is reconciled over the fresh graph
-// pair with its readiness read from the store, and the response
+// straddle with its readiness read from the store, and the response
 // carries the readiness summary
 // ('TODO/total-diff-view/2_plan.org', "Saving a TDV buffer").
 

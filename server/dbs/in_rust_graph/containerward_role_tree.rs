@@ -88,7 +88,7 @@ pub fn containers_in_inRustGraph (
 
 /// The containerward role tree of 'origin', walking the containers
 /// that 'partners_of' gives (asked for the CONTAINER role), so it can
-/// walk the live graph or a graph pair's union. Uses breadth-first
+/// walk the live graph or a graph straddle's union. Uses breadth-first
 /// traversal with no async / no parallel queries / no
 /// frontier-batching.
 pub fn full_containerward_role_tree (

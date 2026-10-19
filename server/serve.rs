@@ -12,7 +12,7 @@ pub mod protocol;
 pub mod util;
 
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use crate::graph_pair::types::GraphPair;
+use crate::graph_straddle::types::GraphStraddle;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::delete_references_to_absent_node::handle_delete_references_to_absent_node_request;
@@ -71,8 +71,8 @@ use std::time::Duration;
 pub struct ViewsState {
   pub open_views        : OpenViews,
   // Built when a total-diff-view buffer is requested, and brought up
-  // to date by 'current_graph_pair_in_slot'.
-  pub graph_pair        : Option<Arc<GraphPair>>,
+  // to date by 'current_graph_straddle_in_slot'.
+  pub graph_straddle    : Option<Arc<GraphStraddle>>,
   // If Emacs crashes or the TCP connection drops without sending close-view messages, OpenViews is still freed, because ViewsState is owned by handle_emacs and dropped when the connection loop exits (n == 0). There's no leak.
 }
 
@@ -105,7 +105,7 @@ fn handle_emacs (
   let mut views_state : ViewsState =
     ViewsState {
       open_views        : OpenViews::new (),
-      graph_pair        : None, };
+      graph_straddle    : None, };
   let mut skgrepo_restriction : SkgrepoRestriction =
     SkgrepoRestriction::default_from_config (
       &runtime . config )

@@ -1,6 +1,6 @@
 // The "total diff view" request at the handler: it registers each
 // nonempty buffer as a view of the total diff view, answers an empty
-// buffer with '(empty . t)', and the graph pair is dropped when the
+// buffer with '(empty . t)', and the graph straddle is dropped when the
 // last such view closes.
 
 use crate::pcsvf::common::git_fixture_helpers::mk_test_tcp_stream_pair;
@@ -34,7 +34,7 @@ fn response_from (
   String::from_utf8_lossy (&bytes [.. n]) . to_string () }
 
 #[test]
-fn a_request_registers_its_buffer_and_the_last_close_drops_the_pair (
+fn a_request_registers_its_buffer_and_the_last_close_drops_the_straddle (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("sets", &["main"], |f| {
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
@@ -62,13 +62,13 @@ fn a_request_registers_its_buffer_and_the_last_close_drops_the_pair (
     assert! ( ! f . views_state . open_views . views
               . contains_key (&ViewId::ContentView ("tdv-2" . to_string ())),
               "an empty buffer is not registered" );
-    assert! ( f . views_state . graph_pair . is_some () );
+    assert! ( f . views_state . graph_straddle . is_some () );
     let (mut stream, _read_end) : (TcpStream, TcpStream) =
       mk_test_tcp_stream_pair ();
     handle_close_view_request (
       &mut stream, "((request . \"close view\") (view-id . \"tdv-1\"))\n",
       &mut f . views_state );
-    assert! ( f . views_state . graph_pair . is_none () );
+    assert! ( f . views_state . graph_straddle . is_none () );
     Ok (( )) }) }
 
 #[test]

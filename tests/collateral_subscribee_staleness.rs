@@ -82,7 +82,7 @@ fn collateral_editable_subscriber_subscribeeFolder_refreshes
         graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         open_views        : OpenViews::new (),
-        graph_pair        : None, };
+        graph_straddle    : None, };
       let a_view_id : ViewId = ViewId::ContentView ("S-a" . into ());
       let b_view_id : ViewId = ViewId::ContentView ("S-b" . into ());
 

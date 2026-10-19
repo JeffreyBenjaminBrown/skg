@@ -4,7 +4,7 @@
 //!
 //! C is the set of changed graphnodes. R is the set of content
 //! origins reached from C by walking containerward through the union
-//! of the graph pair; U is R, C and every node on those walks; D is R
+//! of the graph straddle; U is R, C and every node on those walks; D is R
 //! minus the origins that another kept origin reaches containerward
 //! inside U. The view unfolds contentward from each d in D: a node in
 //! U is drawn editable with its whole content list, a member outside
@@ -17,7 +17,7 @@
 //! whose only change is the order of a list.
 
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use crate::graph_pair::types::{GraphPair, Presence};
+use crate::graph_straddle::types::{GraphStraddle, Presence};
 use crate::nodeMerge::nodeMergeInstructionTriple::acquiree_text_preserver_title;
 use crate::prominence::climb_containerward_to_cycle_via;
 use crate::readiness_store::ReadinessStore;
@@ -31,7 +31,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   PartnerFolder, Phantom, Viewnode, ViewnodeKind, Vognode};
 use crate::types::views_state::{TdvBuffer, pids_from_viewforest};
-use crate::update_buffer::{complete_viewforest_with_graph_pair, finish_viewforest};
+use crate::update_buffer::{complete_viewforest_with_graph_straddle, finish_viewforest};
 
 use ego_tree::{NodeId, NodeRef};
 use std::collections::{BTreeSet, HashSet};
@@ -47,10 +47,10 @@ pub struct PcsvfSets {
 }
 
 /// What view completion draws a buffer of the total diff view from:
-/// the graph pair, and the buffer, whose PCSVF sets it draws.
+/// the graph straddle, and the buffer, whose PCSVF sets it draws.
 #[derive(Clone, Copy)]
 pub struct TdvDrawing<'a> {
-  pub pair       : &'a GraphPair,
+  pub straddle   : &'a GraphStraddle,
   pub tdv_buffer : TdvBuffer,
 }
 
@@ -58,22 +58,22 @@ impl<'a> TdvDrawing<'a> {
   pub fn sets (
     &self,
   ) -> &'a PcsvfSets {
-    self . pair . pcsvf_sets_of_buffer (self . tdv_buffer) }
+    self . straddle . pcsvf_sets_of_buffer (self . tdv_buffer) }
 }
 
 /// The sets of the PCSVF over all of C.
 pub fn pcsvf_sets (
-  pair : &GraphPair,
+  straddle : &GraphStraddle,
 ) -> PcsvfSets {
-  pcsvf_sets_over ( pair, pair . changed_pids () . all () ) }
+  pcsvf_sets_over ( straddle, straddle . changed_pids () . all () ) }
 
 /// The sets of a PCSVF over the changed nodes 'c'.
 pub fn pcsvf_sets_over (
-  pair : &GraphPair,
-  c    : BTreeSet<ID>,
+  straddle : &GraphStraddle,
+  c        : BTreeSet<ID>,
 ) -> PcsvfSets {
   let containers_of = |skgid : &ID| -> Vec<ID> {
-    union_containers (pair, skgid) };
+    union_containers (straddle, skgid) };
   let mut r : BTreeSet<ID> = BTreeSet::new ();
   let mut u : BTreeSet<ID> = c . clone ();
   for changed in &c {
@@ -90,34 +90,34 @@ pub fn pcsvf_sets_over (
 /// before-graph only, which an after-graph node lists as an extra
 /// ID), the acquiree, its acquirer and the acquiree's text preserver.
 pub fn pcsvf_sets_for_merges (
-  pair : &GraphPair,
+  straddle : &GraphStraddle,
 ) -> PcsvfSets {
   let mut c : BTreeSet<ID> = BTreeSet::new ();
-  for acquiree in &pair . changed_pids () . rightward {
-    let Some (acquirer) : Option<ID> = pair . acquirer_of (acquiree)
+  for acquiree in &straddle . changed_pids () . rightward {
+    let Some (acquirer) : Option<ID> = straddle . acquirer_of (acquiree)
       else { continue; };
-    c . extend ( acquiree_text_preservers (pair, acquiree, &acquirer) );
+    c . extend ( acquiree_text_preservers (straddle, acquiree, &acquirer) );
     c . insert ( acquiree . clone () );
     c . insert (acquirer); }
-  pcsvf_sets_over (pair, c) }
+  pcsvf_sets_over (straddle, c) }
 
 /// The new nodes in the acquirer's content that bear the title a
 /// nodeMerge gives the acquiree's text preserver.
 fn acquiree_text_preservers (
-  pair     : &GraphPair,
+  straddle : &GraphStraddle,
   acquiree : &ID,
   acquirer : &ID,
 ) -> Vec<ID> {
   let ( Some (acquiree_node), Some (acquirer_node) ) =
-    ( pair . before . get (acquiree), pair . after . get (acquirer) )
+    ( straddle . before . get (acquiree), straddle . after . get (acquirer) )
     else { return Vec::new (); };
   let preserver_title : String =
     acquiree_text_preserver_title (&acquiree_node . title);
   acquirer_node . contains . iter ()
     . map ( |relationship| &relationship . member )
     . filter ( |member|
-      pair . node_presence (member) == Some (Presence::OnlyAfter)
-      && pair . after . get (member)
+      straddle . node_presence (member) == Some (Presence::OnlyAfter)
+      && straddle . after . get (member)
          . is_some_and ( |node| node . title == preserver_title ) )
     . cloned ()
     . collect () }
@@ -125,21 +125,21 @@ fn acquiree_text_preservers (
 /// The sets of the skgrepo-changes buffer's PCSVF, over the nodes
 /// whose home skgrepo changed.
 pub fn pcsvf_sets_for_home_moves (
-  pair : &GraphPair,
+  straddle : &GraphStraddle,
 ) -> PcsvfSets {
   let c : BTreeSet<ID> =
-    pair . changed_pids () . rightward . iter ()
-    . filter ( |pid| pair . node_changes (pid) . home . is_some () )
+    straddle . changed_pids () . rightward . iter ()
+    . filter ( |pid| straddle . node_changes (pid) . home . is_some () )
     . cloned ()
     . collect ();
-  pcsvf_sets_over (pair, c) }
+  pcsvf_sets_over (straddle, c) }
 
-/// The containers of a node in either graph of the pair, sorted by ID.
+/// The containers of a node in either graph of the straddle, sorted by ID.
 pub fn union_containers (
-  pair  : &GraphPair,
-  skgid : &ID,
+  straddle : &GraphStraddle,
+  skgid    : &ID,
 ) -> Vec<ID> {
-  pair . partners (skgid, RelationRole::CONTAINER) . into_iter ()
+  straddle . partners (skgid, RelationRole::CONTAINER) . into_iter ()
     . map ( |partner| partner . id )
     . collect () }
 
@@ -181,7 +181,7 @@ pub fn pcsvf_viewforest (
 ) -> Result<(String, Vec<ID>, ViewForest), Box<dyn Error>> {
   let mut viewforest : ViewForest =
     stub_viewforest_of_roots (runtime, drawing, roots) ?;
-  complete_viewforest_with_graph_pair (runtime, drawing, &mut viewforest) ?;
+  complete_viewforest_with_graph_straddle (runtime, drawing, &mut viewforest) ?;
   set_tdv_facts_in_viewforest (
     &mut viewforest, drawing, store, &runtime . graph );
   let text : String = finish_viewforest (
@@ -200,9 +200,9 @@ pub fn set_tdv_facts_in_viewforest (
   graph      : &InRustGraph,
 ) {
   set_ready_facts_in_viewforest (
-    viewforest, drawing . pair . change_forest (), store, graph );
+    viewforest, drawing . straddle . change_forest (), store, graph );
   if drawing . tdv_buffer == TdvBuffer::SkgrepoChanges {
-    set_home_move_facts_in_viewforest (viewforest, drawing . pair ); }}
+    set_home_move_facts_in_viewforest (viewforest, drawing . straddle ); }}
 
 /// On each unrestricted vognode whose home skgrepo moved: the move,
 /// and, when the nearest vognode ancestor whose home moved moved the
@@ -210,7 +210,7 @@ pub fn set_tdv_facts_in_viewforest (
 /// 'homeSkgrepoAtBoundary', against the nearest moved ancestor.
 pub fn set_home_move_facts_in_viewforest (
   viewforest : &mut ViewForest,
-  pair       : &GraphPair,
+  straddle   : &GraphStraddle,
 ) {
   let facts : Vec<(NodeId, (SkgrepoName, SkgrepoName), Option<String>)> =
     viewforest . nodes ()
@@ -218,9 +218,9 @@ pub fn set_home_move_facts_in_viewforest (
       let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
         &node . value () . kind else { return None; };
       let home_move : (SkgrepoName, SkgrepoName) =
-        pair . node_changes (&t . skgid) . home ?;
+        straddle . node_changes (&t . skgid) . home ?;
       let moved_like_ancestor : Option<String> =
-        nearest_moved_vognode_ancestor (node, pair)
+        nearest_moved_vognode_ancestor (node, straddle)
         . filter ( |(_, ancestor_move)| *ancestor_move == home_move )
         . map ( |(generation, _)| ancestor_letter (generation) );
       Some (( node . id (), home_move, moved_like_ancestor )) } )
@@ -236,13 +236,13 @@ pub fn set_home_move_facts_in_viewforest (
 /// between) and the home move of the nearest unrestricted vognode
 /// ancestor whose home skgrepo moved.
 fn nearest_moved_vognode_ancestor (
-  node : NodeRef<Viewnode>,
-  pair : &GraphPair,
+  node     : NodeRef<Viewnode>,
+  straddle : &GraphStraddle,
 ) -> Option<(usize, (SkgrepoName, SkgrepoName))> {
   node . ancestors () . enumerate ()
     . find_map ( |(index, ancestor)| match &ancestor . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-        pair . node_changes (&t . skgid) . home
+        straddle . node_changes (&t . skgid) . home
         . map ( |home_move| (index + 1, home_move) ),
       _ => None, } ) }
 
@@ -280,14 +280,14 @@ fn stub_viewforest_of_roots (
   drawing : TdvDrawing,
   roots   : &[ID],
 ) -> Result<ViewForest, Box<dyn Error>> {
-  let pair : &GraphPair = drawing . pair;
+  let straddle : &GraphStraddle = drawing . straddle;
   let mut viewforest : ViewForest = ViewForest::new ();
   let buffer_root : NodeId = viewforest . internal_root_skgid ();
   let mut stub_editable_map : EditableMap = EditableMap::new ();
   for root in roots {
-    if pair . after . get (root) . is_none () {
+    if straddle . after . get (root) . is_none () {
       append_historical_phantom (
-        viewforest . as_internal_tree_mut (), buffer_root, pair, root, None )
+        viewforest . as_internal_tree_mut (), buffer_root, straddle, root, None )
         . ok_or_else ( || format! (
           "pcsvf_viewforest: root {} is in neither graph", root )) ?;
       continue; }
@@ -296,7 +296,7 @@ fn stub_viewforest_of_roots (
       root, &runtime . graph, &runtime . config, &mut stub_editable_map,
       None ) ?;
     if drawing . tdv_buffer != TdvBuffer::OrderOnlyChanges
-      && union_containers (pair, root) . len () > 1 {
+      && union_containers (straddle, root) . len () > 1 {
       viewforest . as_internal_tree_mut () . get_mut (root_treeid)
         . ok_or ("pcsvf_viewforest: a stub root vanished") ?
         . append ( Viewnode {

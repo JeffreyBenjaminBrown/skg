@@ -1,5 +1,5 @@
 // A buffer holding every one of the total diff view's viewnodes,
-// drawn from the graph pair of a git fixture, saves back unchanged:
+// drawn from the graph straddle of a git fixture, saves back unchanged:
 // no graph change, no validation error, and every one of them kept.
 // The buffer the save returns is a fixed point: saved again, it comes
 // back the same. (The first save's view completion adds the display
@@ -21,7 +21,7 @@ use git_fixture_helpers::{mk_test_tcp_stream_pair, setup_gitrepo_with_fixtures};
 use skg::change_forest::{LeafKey, NodeAspect, RelationshipAspect};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use skg::graph_pair::types::{GraphPair, Partner, Presence};
+use skg::graph_straddle::types::{GraphStraddle, Partner, Presence};
 use skg::org_to_text::viewforest_tree_to_string;
 use skg::readiness_store::ReadinessStore;
 use skg::serve::ViewsState;
@@ -80,7 +80,7 @@ fn fixture (
     _root : root, skgrepo, config, tantivy, graph,
     views_state : ViewsState {
       open_views        : OpenViews::new (),
-      graph_pair        : None, } } ) }
+      graph_straddle    : None, } } ) }
 
 fn save (
   f      : &mut Fixture,
@@ -124,22 +124,22 @@ fn treeid_of (
 fn buffer_with_every_new_viewnode (
   f : &Fixture,
 ) -> Result<String, Box<dyn Error>> {
-  let pair : GraphPair =
-    GraphPair::from_head_and_live (&f . config, f . graph . load_full ()) ?;
+  let straddle : GraphStraddle =
+    GraphStraddle::from_head_and_live (&f . config, f . graph . load_full ()) ?;
   let (_, _, mut tree) : (String, Vec<ID>, Tree<Viewnode>) =
     multi_root_view (&f . config, None, &[ ID::from ("p") ]) ?;
   let p : NodeId = treeid_of (&tree, "p");
   let b : NodeId = treeid_of (&tree, "b");
   { // gone, a removed member of p, where it stood: before b.
     let gone : NodeId = append_historical_phantom (
-      &mut tree, p, &pair, &ID::from ("gone"), Some (Sign::Minus) )
+      &mut tree, p, &straddle, &ID::from ("gone"), Some (Sign::Minus) )
       . expect ("gone is in the before-graph only");
     tree . get_mut (b) . unwrap () . insert_id_before (gone); }
   for kind in ChangesetMarkerKind::ALL . into_iter () . rev () {
     tree . get_mut (p) . unwrap () . prepend (
       mk_changeset_marker_viewnode (kind) ); }
   { let a : NodeId = treeid_of (&tree, "a");
-    append_old_text (&mut tree, a, &pair, &ID::from ("a"))
+    append_old_text (&mut tree, a, &straddle, &ID::from ("a"))
       . expect ("a's text changed"); }
   { let mut b_mut = tree . get_mut (b) . unwrap ();
     b_mut . append ( Viewnode {
@@ -154,13 +154,13 @@ fn buffer_with_every_new_viewnode (
       . expect ("the relationship moved") ); }
   { let acq : NodeId = treeid_of (&tree, "acq");
     let folder : NodeId =
-      append_acquired_folder (&mut tree, acq, &pair, &ID::from ("acq"))
+      append_acquired_folder (&mut tree, acq, &straddle, &ID::from ("acq"))
       . expect ("acq acquired 'acquired'");
     tree . get_mut (acq) . unwrap () . prepend_id (folder); }
   { // The acquiree, a second root.
     let root : NodeId = tree . root () . id ();
     append_historical_phantom (
-      &mut tree, root, &pair, &ID::from ("acquired"), None )
+      &mut tree, root, &straddle, &ID::from ("acquired"), None )
       . expect ("'acquired' is in the before-graph only"); }
   Ok ( viewforest_tree_to_string (&tree, &f . config) ? ) }
 

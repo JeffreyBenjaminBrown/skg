@@ -132,7 +132,7 @@ fn a_new_child_is_created_and_drawn_as_new (
 
 /// When another view's save changes what a buffer of the total diff
 /// view shows, the buffer is rerendered as a collateral view over the
-/// fresh graph pair: it shows the new change and keeps the old ones.
+/// fresh graph straddle: it shows the new change and keeps the old ones.
 #[test]
 fn a_collateral_buffer_shows_the_new_change_and_keeps_the_old (
 ) -> Result<(), Box<dyn Error>> {

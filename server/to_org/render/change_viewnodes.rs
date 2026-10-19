@@ -1,4 +1,4 @@
-//! The total diff view's own viewnodes, drawn from the graph pair
+//! The total diff view's own viewnodes, drawn from the graph straddle
 //! ('TODO/total-diff-view/2_plan.org', "What each kind of change
 //! looks like"): the old text and its body diff, the home and relRepo
 //! moves, the changeset markers, the historical phantom of a node
@@ -8,7 +8,7 @@
 
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole};
-use crate::graph_pair::types::{GraphPair, NodeChanges, Partner, Presence};
+use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner, Presence};
 use crate::types::git::Sign;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -25,15 +25,15 @@ use std::collections::HashSet;
 /// under it when the body changed. None (and nothing appended) when
 /// its text did not change.
 pub fn append_old_text (
-  tree   : &mut Tree<Viewnode>,
-  parent : NodeId,
-  pair   : &GraphPair,
-  pid    : &ID,
+  tree     : &mut Tree<Viewnode>,
+  parent   : NodeId,
+  straddle : &GraphStraddle,
+  pid      : &ID,
 ) -> Option<NodeId> {
-  let changes : NodeChanges = pair . node_changes (pid);
+  let changes : NodeChanges = straddle . node_changes (pid);
   if ! changes . text_changed () { return None; }
   let (before, after) : (&GraphnodeInRust, &GraphnodeInRust) =
-    ( pair . before . get (pid) ?, pair . after . get (pid) ? );
+    ( straddle . before . get (pid) ?, straddle . after . get (pid) ? );
   let old_text : Viewnode = viewnode_of ( ViewnodeKind::Property (
     Property::OldText {
       title : changes . title_changed . then ( || before . title . clone () ),
@@ -69,11 +69,11 @@ pub fn mk_body_diff_viewnode (
 
 /// "⌂ -old +new", when the node's home skgrepo changed.
 pub fn mk_home_move_viewnode (
-  pair : &GraphPair,
-  pid  : &ID,
+  straddle : &GraphStraddle,
+  pid      : &ID,
 ) -> Option<Viewnode> {
   let (old, new) : (SkgrepoName, SkgrepoName) =
-    pair . node_changes (pid) . home ?;
+    straddle . node_changes (pid) . home ?;
   Some ( viewnode_of ( ViewnodeKind::Property (
     Property::HomeSkgrepoMove {
       old, new,
@@ -107,11 +107,11 @@ pub fn mk_changeset_marker_viewnode (
 /// relationship to its viewparent: Minus under a former container,
 /// None at a root or in a folder. None if the before-graph lacks it.
 pub fn mk_historical_viewnode (
-  pair : &GraphPair,
-  pid  : &ID,
-  rel  : Option<Sign>,
+  straddle : &GraphStraddle,
+  pid      : &ID,
+  rel      : Option<Sign>,
 ) -> Option<Viewnode> {
-  let before : &GraphnodeInRust = pair . before . get (pid) ?;
+  let before : &GraphnodeInRust = straddle . before . get (pid) ?;
   Some ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::Phantom (
     Phantom::Historical ( PhantomHistorical {
       skgid        : pid . clone (),
@@ -132,62 +132,62 @@ pub fn mk_historical_viewnode (
 /// itself in this recursion is drawn without its content. None if
 /// the before-graph lacks 'pid'.
 pub fn append_historical_phantom (
-  tree   : &mut Tree<Viewnode>,
-  parent : NodeId,
-  pair   : &GraphPair,
-  pid    : &ID,
-  rel    : Option<Sign>,
+  tree     : &mut Tree<Viewnode>,
+  parent   : NodeId,
+  straddle : &GraphStraddle,
+  pid      : &ID,
+  rel      : Option<Sign>,
 ) -> Option<NodeId> {
   fn append_with_content (
     tree      : &mut Tree<Viewnode>,
     parent    : NodeId,
-    pair      : &GraphPair,
+    straddle  : &GraphStraddle,
     pid       : &ID,
     rel       : Option<Sign>,
     ancestors : &mut HashSet<ID>,
   ) -> Option<NodeId> {
     let treeid : NodeId = tree . get_mut (parent) ? . append (
-      mk_historical_viewnode (pair, pid, rel) ? ) . id ();
+      mk_historical_viewnode (straddle, pid, rel) ? ) . id ();
     if ! ancestors . insert (pid . clone ()) {
       return Some (treeid); }
-    if let Some (acquirer) = pair . acquirer_of (pid) {
+    if let Some (acquirer) = straddle . acquirer_of (pid) {
       if let Some (acquirer_viewnode) =
-        mk_member_viewnode (pair, &acquirer, None) {
+        mk_member_viewnode (straddle, &acquirer, None) {
         let folder : NodeId = tree . get_mut (treeid) ? . append (
           viewnode_of ( ViewnodeKind::PartnerFolder (
             PartnerFolder::AcquiredBy ))) . id ();
         tree . get_mut (folder) ? . append (acquirer_viewnode); }}
-    for partner in pair . partners (pid, CONTENT) {
-      match pair . node_presence (&partner . id) {
+    for partner in straddle . partners (pid, CONTENT) {
+      match straddle . node_presence (&partner . id) {
         Some (Presence::OnlyBefore) => {
           append_with_content (
-            tree, treeid, pair, &partner . id, Some (Sign::Minus),
+            tree, treeid, straddle, &partner . id, Some (Sign::Minus),
             ancestors ); },
         _ => {
           if let Some (member) =
-            mk_member_viewnode (pair, &partner . id, Some (Sign::Minus)) {
+            mk_member_viewnode (straddle, &partner . id, Some (Sign::Minus)) {
             tree . get_mut (treeid) ? . append (member); }}, }}
     ancestors . remove (pid);
     Some (treeid) }
   append_with_content (
-    tree, parent, pair, pid, rel, &mut HashSet::new () ) }
+    tree, parent, straddle, pid, rel, &mut HashSet::new () ) }
 
 /// Under 'parent' (the acquirer 'pid'), an "it acquired" folder of
 /// the historical phantoms of the nodes it acquired since HEAD. None
 /// (and nothing appended) when it acquired none.
 pub fn append_acquired_folder (
-  tree   : &mut Tree<Viewnode>,
-  parent : NodeId,
-  pair   : &GraphPair,
-  pid    : &ID,
+  tree     : &mut Tree<Viewnode>,
+  parent   : NodeId,
+  straddle : &GraphStraddle,
+  pid      : &ID,
 ) -> Option<NodeId> {
-  let acquirees : Vec<ID> = pair . acquirees_of (pid);
+  let acquirees : Vec<ID> = straddle . acquirees_of (pid);
   if acquirees . is_empty () { return None; }
   let folder : NodeId = tree . get_mut (parent) ? . append (
     viewnode_of ( ViewnodeKind::PartnerFolder (
       PartnerFolder::Acquired ))) . id ();
   for acquiree in &acquirees {
-    if let Some (phantom) = mk_historical_viewnode (pair, acquiree, None) {
+    if let Some (phantom) = mk_historical_viewnode (straddle, acquiree, None) {
       tree . get_mut (folder) ? . append (phantom); }}
   Some (folder) }
 
@@ -199,12 +199,12 @@ const CONTENT : RelationRole =
 /// relationship to its viewparent has presence 'rel'; an unknown
 /// phantom if the after-graph lacks it.
 fn mk_member_viewnode (
-  pair : &GraphPair,
-  pid  : &ID,
-  rel  : Option<Sign>,
+  straddle : &GraphStraddle,
+  pid      : &ID,
+  rel      : Option<Sign>,
 ) -> Option<Viewnode> {
   let presence : DiffPresence = DiffPresence { node : None, rel };
-  let mut viewnode : Viewnode = match pair . after . get (pid) {
+  let mut viewnode : Viewnode = match straddle . after . get (pid) {
     Some (node) => mk_writeProtected_viewnode (
       pid . clone (), node . home_skgrepo . clone (), node . title . clone (),
       AffectsParent::True ),

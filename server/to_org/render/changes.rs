@@ -10,7 +10,7 @@
 //! of its content, its old text, its home move, its "it acquired"
 //! folder, the alias, ID and flags folders that changed, the partner
 //! folders whose membership changed (which the BFS fills from the
-//! pair), and its changeset markers. A node in U but not in C is
+//! straddle), and its changeset markers. A node in U but not in C is
 //! context: its body is folded. A write-protected occurrence gets
 //! none of this; its viewparent tags it. U and C are those of the
 //! buffer being drawn ('TdvDrawing::sets'); in the order-only buffer
@@ -19,7 +19,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole};
-use crate::graph_pair::types::{GraphPair, NodeChanges, Partner, Presence};
+use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner, Presence};
 use crate::pcsvf::{PcsvfSets, TdvDrawing};
 use crate::to_org::render::change_viewnodes::{
   append_acquired_folder, append_historical_phantom, append_old_text,
@@ -62,7 +62,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
   treeid  : NodeId,
   drawing : TdvDrawing,
 ) -> Result<(), Box<dyn Error>> {
-  let pair : &GraphPair = drawing . pair;
+  let straddle : &GraphStraddle = drawing . straddle;
   let (pid, editable) : (ID, bool) =
     match &tree . get (treeid)
       . ok_or ("process_unrestrictedVognode_changes: node not found") ?
@@ -75,26 +75,26 @@ pub(crate) fn process_unrestrictedVognode_changes (
   remove_change_viewnodes (tree, treeid);
   tree . get_mut (treeid) . unwrap () . value () . body_folded =
     ! sets . c . contains (&pid);
-  let content : Vec<Partner> = pair . partners (&pid, CONTENT);
-  tag_content_members (tree, treeid, pair, &content, &sets . u);
-  insert_removed_content_members (tree, treeid, pair, &pid) ?;
+  let content : Vec<Partner> = straddle . partners (&pid, CONTENT);
+  tag_content_members (tree, treeid, straddle, &content, &sets . u);
+  insert_removed_content_members (tree, treeid, straddle, &pid) ?;
   if drawing . tdv_buffer == TdvBuffer::OrderOnlyChanges
-    && pair . order_only_pids () . contains (&pid) {
+    && straddle . order_only_pids () . contains (&pid) {
     let marker : NodeId = append ( tree, treeid,
       mk_changeset_marker_viewnode (ChangesetMarkerKind::OrderOnly) );
     move_to_front (tree, treeid, marker); }
   if ! sets . c . contains (&pid) { return Ok (( )); }
   let mut heads : Vec<NodeId> = Vec::new ();
-  heads . extend ( append_old_text (tree, treeid, pair, &pid) );
-  if let Some (home_move) = mk_home_move_viewnode (pair, &pid) {
+  heads . extend ( append_old_text (tree, treeid, straddle, &pid) );
+  if let Some (home_move) = mk_home_move_viewnode (straddle, &pid) {
     heads . push ( append (tree, treeid, home_move) ); }
-  heads . extend ( append_acquired_folder (tree, treeid, pair, &pid) );
-  heads . extend ( changed_property_folders (tree, treeid, pair, &pid) );
+  heads . extend ( append_acquired_folder (tree, treeid, straddle, &pid) );
+  heads . extend ( changed_property_folders (tree, treeid, straddle, &pid) );
   for kind in IN_FOLDERS . into_iter () . chain (OUT_FOLDERS) {
     let role : RelationRole = kind . relation_member_role ()
       . expect ("a relation folder has a member role");
     let outbound : bool = OUT_FOLDERS . contains (&kind);
-    if pair . partners (&pid, role) . iter () . any ( |partner|
+    if straddle . partners (&pid, role) . iter () . any ( |partner|
       if outbound { partner . changed () }
       else { partner . presence != Presence::Both } ) {
       heads . push ( child_folder_or_new (
@@ -109,21 +109,21 @@ pub(crate) fn process_unrestrictedVognode_changes (
     move_to_front (tree, treeid, *head); }
   Ok (( )) }
 
-/// After view completion over the pair: draw a node that a save
+/// After view completion over the straddle: draw a node that a save
 /// deleted, and that HEAD had, as the PCSVF draws a deleted node.
 /// Completion turned each of its occurrences into a deleted phantom.
 /// One that stands beside a historical phantom of the same node (its
 /// viewparent drew the removed member) goes; any other becomes a
 /// historical phantom with its old content.
 pub(crate) fn redraw_deleted_phantoms_as_historical (
-  tree : &mut Tree<Viewnode>,
-  pair : &GraphPair,
+  tree     : &mut Tree<Viewnode>,
+  straddle : &GraphStraddle,
 ) {
   let deleted : Vec<(NodeId, ID)> =
     tree . root () . descendants ()
     . filter_map ( |node| match &node . value () . kind {
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d)))
-        if pair . node_presence (&d . skgid) == Some (Presence::OnlyBefore) =>
+        if straddle . node_presence (&d . skgid) == Some (Presence::OnlyBefore) =>
         Some (( node . id (), d . skgid . clone () )),
       _ => None, } )
     . collect ();
@@ -138,7 +138,7 @@ pub(crate) fn redraw_deleted_phantoms_as_historical (
           if h . skgid == skgid ));
     if ! drawn_beside {
       if let Some (historical) =
-        append_historical_phantom (tree, parent, pair, &skgid, None) {
+        append_historical_phantom (tree, parent, straddle, &skgid, None) {
         tree . get_mut (historical) . unwrap () . detach (); // see 'move_to_front'
         tree . get_mut (treeid) . unwrap () . insert_id_before (historical); }}
     tree . get_mut (treeid) . unwrap () . detach (); }}
@@ -192,11 +192,11 @@ fn is_removed_member (
 /// relationship, draw a member outside U as a write-protected leaf,
 /// and hang a relRepo move under a member whose relationship moved.
 fn tag_content_members (
-  tree    : &mut Tree<Viewnode>,
-  treeid  : NodeId,
-  pair    : &GraphPair,
-  content : &[Partner],
-  u       : &BTreeSet<ID>,
+  tree     : &mut Tree<Viewnode>,
+  treeid   : NodeId,
+  straddle : &GraphStraddle,
+  content  : &[Partner],
+  u        : &BTreeSet<ID>,
 ) {
   let by_id : HashMap<&ID, &Partner> =
     content . iter () . map ( |partner| (&partner . id, partner) ) . collect ();
@@ -211,7 +211,7 @@ fn tag_content_members (
           if t . affectsParent == AffectsParent::True => {
           let partner : Option<&&Partner> = by_id . get (&t . skgid);
           t . change_facts . presence = DiffPresence {
-            node : pair . node_presence (&t . skgid)
+            node : straddle . node_presence (&t . skgid)
                    . and_then ( |presence| presence . diff_sign () ),
             rel  : partner . and_then ( |p| p . presence . diff_sign () ), };
           if ! u . contains (&t . skgid) {
@@ -242,15 +242,15 @@ fn tag_content_members (
 /// ID is not drawn: an unknown phantom here would be read back as a
 /// member. (Its leaf is under the content changeset marker.)
 fn insert_removed_content_members (
-  tree   : &mut Tree<Viewnode>,
-  treeid : NodeId,
-  pair   : &GraphPair,
-  pid    : &ID,
+  tree     : &mut Tree<Viewnode>,
+  treeid   : NodeId,
+  straddle : &GraphStraddle,
+  pid      : &ID,
 ) -> Result<(), Box<dyn Error>> {
-  let after_list : Vec<ID> = content_list (&pair . after, pid);
+  let after_list : Vec<ID> = content_list (&straddle . after, pid);
   let diff : Vec<Diff_Item<ID>> =
     removed_by_set_difference (
-      &content_list (&pair . before, pid), &after_list );
+      &content_list (&straddle . before, pid), &after_list );
   let plan : Vec<(ID, Option<ID>)> = phantom_insertion_plan (&diff);
   if plan . is_empty () { return Ok (( )); }
   let member_treeids : HashMap<ID, NodeId> =
@@ -264,12 +264,12 @@ fn insert_removed_content_members (
       _ => None, } )
     . collect ();
   for (removed, anchor) in plan {
-    let inserted : Option<NodeId> = match pair . node_presence (&removed) {
+    let inserted : Option<NodeId> = match straddle . node_presence (&removed) {
       Some (Presence::OnlyBefore) =>
         append_historical_phantom (
-          tree, treeid, pair, &removed, Some (Sign::Minus) ),
+          tree, treeid, straddle, &removed, Some (Sign::Minus) ),
       Some (presence) => {
-        let node = pair . after . get (&removed)
+        let node = straddle . after . get (&removed)
           . ok_or ("insert_removed_content_members: a surviving member is not in the after-graph") ?;
         let mut member : Viewnode = mk_writeProtected_viewnode (
           removed . clone (), node . home_skgrepo . clone (),
@@ -334,14 +334,14 @@ fn removed_by_set_difference<T : Clone + Eq + Hash + Ord> (
 /// each holding the union of the list: the old order where the LCS
 /// puts a removed entry, + on a gained entry, - on a lost one.
 fn changed_property_folders (
-  tree   : &mut Tree<Viewnode>,
-  treeid : NodeId,
-  pair   : &GraphPair,
-  pid    : &ID,
+  tree     : &mut Tree<Viewnode>,
+  treeid   : NodeId,
+  straddle : &GraphStraddle,
+  pid      : &ID,
 ) -> Vec<NodeId> {
-  let changes : NodeChanges = pair . node_changes (pid);
+  let changes : NodeChanges = straddle . node_changes (pid);
   let (Some (before), Some (after)) =
-    ( pair . before . get (pid), pair . after . get (pid) ) else {
+    ( straddle . before . get (pid), straddle . after . get (pid) ) else {
       return Vec::new (); };
   let mut folders : Vec<NodeId> = Vec::new ();
   if ! changes . aliases_gained . is_empty () || ! changes . aliases_lost . is_empty () {
