@@ -52,7 +52,7 @@ fn changed_skg_files (
   options . include_untracked (true);
   Ok ( gitrepo . statuses ( Some (&mut options) ) ? . iter ()
        . filter ( |entry| entry . status () != Status::CURRENT
-                  && entry . path () . is_some_and ( |p| p . ends_with (".skg") ))
+                  && entry . path () . is_ok_and ( |p| p . ends_with (".skg") ))
        . count () ) }
 
 /// Mark every leaf of the change-forest ready, in the store 'env' holds.
@@ -81,7 +81,7 @@ fn assert_everything_committed (
 ) -> Result<(), Box<dyn Error>> {
   for skgrepo in SKGREPOS {
     let gitrepo : Repository = gitrepo (f, skgrepo) ?;
-    assert_eq! ( gitrepo . head () ? . peel_to_commit () ? . message (),
+    assert_eq! ( gitrepo . head () ? . peel_to_commit () ? . message () . ok (),
                  Some (message), "skgrepo {}", skgrepo );
     assert_eq! ( changed_skg_files (f, skgrepo) ?, 0,
                  "skgrepo {} has uncommitted changes", skgrepo ); }

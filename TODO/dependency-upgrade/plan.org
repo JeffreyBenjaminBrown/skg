@@ -76,7 +76,7 @@ The config loaders in 'server/types/misc.rs' and the error path
 produces the bold-red terminal message, and that 'OTHER_SKGREPO_DEPENDENCIES.toml'
 still parses. The config tests in 'tests/' cover both.
 
-** Slice 3: 'git2' to 0.21
+** DONE Slice 3: 'git2' to 0.21
 The call sites are in 'server/git_ops/' (snapshot reading, stage and
 commit, the vanished-node investigation, 'titles by ids'). Check the
 signatures of 'Index::add_all', 'Index::update_all', 'Repository::commit',

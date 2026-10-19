@@ -114,7 +114,8 @@ fn commit_stamp (
   CommitStamp {
     short_sha : commit . id () . to_string () [..8] . to_string (),
     date      : date_from_epoch ( commit . time () . seconds () ),
-    summary   : commit . summary () . unwrap_or ("") . to_string (), } }
+    summary   : commit . summary () . ok () . flatten ()
+                . unwrap_or ("") . to_string (), } }
 
 /// The whole picture of the id at 'commit' (where its file exists):
 /// its own title and outbound lists, plus every OTHER node in that

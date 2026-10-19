@@ -79,7 +79,9 @@ pub fn skgrepo_git_remote (
   let remotes : git2::string_array::StringArray =
     gitrepo . remotes () . ok () ?;
   let names : Vec<&str> =
-    remotes . iter () . flatten () . collect ();
+    remotes . iter ()
+    . filter_map ( |name| name . ok () . flatten () )
+    . collect ();
   let chosen_name : &str =
     if names . iter () . any ( |n| *n == "origin" ) {
       "origin"
@@ -88,7 +90,7 @@ pub fn skgrepo_git_remote (
   let remote : git2::Remote =
     gitrepo . find_remote (chosen_name) . ok () ?;
   let url : String =
-    remote . url () . map ( str::to_string ) ?;
+    remote . url () . ok () . map ( str::to_string ) ?;
   Some (( chosen_name . to_string (), url )) }
 
 /// Get the content of a file at HEAD.

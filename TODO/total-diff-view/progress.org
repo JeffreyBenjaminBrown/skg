@@ -885,3 +885,17 @@ outside this plan); proptest pulls its own copy.
 *** dependency slice 1: 'time' was already at the latest
 'cargo update' had locked 'time' 0.3.55, the latest 0.3; the slice
 raised the floor in 'Cargo.toml' from 0.3.47 to match.
+*** dependency slice 3: git2's string accessors return 'Result'
+In 0.21 'Commit::summary', 'Commit::message', 'Remote::url',
+'StatusEntry::path' and 'StringArray''s items return a 'Result' where
+they returned an 'Option' (an 'Err' now marks text that is not UTF-8).
+Each call site discards the error as it discarded the 'None' before.
+The signatures the plan named ('Index::add_all', 'Index::update_all',
+'Repository::commit', 'Repository::signature', 'revwalk',
+'TreeWalkMode') compiled unchanged.
+git2 0.21 no longer enables its 'https' and 'ssh' features by default,
+so libssh2, OpenSSL and 'url' left the lockfile. The server never
+fetches, pushes or clones, so it needs neither.
+*** the integration runs
+Every integration test passes but 'import-md-and-org', which fails at
+baseline, as 'TODO/problems.org' records.

@@ -76,7 +76,7 @@ ctrlc = { version = "3.4", features = ["termination"] }
 ego-tree = "0.6"
 filetime = "0.2"
 futures = "0.3"
-git2 = "0.18"
+git2 = "0.21"
 im = "15"
 indoc = "2"
 itertools = "0.15"
