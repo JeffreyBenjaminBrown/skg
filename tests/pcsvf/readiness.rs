@@ -143,9 +143,10 @@ fn the_save_reports_the_readiness_summary (
     Ok (( )) }) }
 
 /// A save of the merges buffer of the 'buffers' fixture (described in
-/// 'other_buffers.rs') leaves unshown the ten leaves of the nodes only
-/// the other buffers draw: txt's text, and the home and relRepo moves
-/// of mvc, mvg, mvp, mvr and mvt.
+/// 'other_buffers.rs') leaves unshown the eleven leaves of the nodes
+/// it does not draw editable: txt's text, the home and relRepo moves
+/// of mvc, mvg, mvp, mvr and mvt, and the creation of pres, which it
+/// draws as a write-protected member of acq's content.
 #[test]
 fn the_summary_counts_the_changes_the_saved_buffer_does_not_show (
 ) -> Result<(), Box<dyn Error>> {
@@ -155,9 +156,9 @@ fn the_summary_counts_the_changes_the_saved_buffer_does_not_show (
     let response : SaveResponse = save_buffer (f, TdvBuffer::Merges, &text) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     let summary : BufferReadinessSummary = summary_of (&response);
-    assert_eq! ( summary . unshown_changes, 10, "{:?}", summary );
+    assert_eq! ( summary . unshown_changes, 11, "{:?}", summary );
     assert_eq! ( readiness_summary_sexp (&summary),
-                 format! ( "(readiness-summary (ready {}) (changed {}) (foreign 0) (order-only 1) (unshown 10))",
+                 format! ( "(readiness-summary (ready {}) (changed {}) (foreign 0) (order-only 1) (unshown 11))",
                            summary . summary . ready_files,
                            summary . summary . changed_files ));
     Ok (( )) }) }

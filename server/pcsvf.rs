@@ -243,19 +243,36 @@ fn ancestor_letter (
     char::from ( b'a' + (generation - 1) as u8 ) . to_string ()
   } else { format! ( "{{{}}}", generation ) }}
 
-/// The nodes a buffer of the total diff view draws: its pids, and
-/// the deleted nodes it draws as historical phantoms. The leaves they
+/// The nodes a buffer of the total diff view draws: those it has an
+/// editable occurrence of, wherever it sits, and the deleted nodes it
+/// draws as historical phantoms in content position. The leaves they
 /// own are the changes it shows.
 pub fn nodes_drawn_in_viewforest (
   viewforest : &ViewForest,
 ) -> HashSet<ID> {
-  let mut drawn : HashSet<ID> = pids_from_viewforest (viewforest);
-  drawn . extend (
-    viewforest . nodes () . filter_map ( |node| match &node . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
-        Some ( h . skgid . clone () ),
-      _ => None, } ));
-  drawn }
+  viewforest . nodes () . filter_map ( |node| match &node . value () . kind {
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+      if ! t . is_writeProtected () => Some ( t . skgid . clone () ),
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))
+      if historical_phantom_in_content_position (node) =>
+      Some ( h . skgid . clone () ),
+    _ => None, } )
+    . collect () }
+
+/// Whether a historical phantom stands where content does: under the
+/// buffer root or an unrestricted vognode, or in the old content of a
+/// historical phantom that does. Not in a partner folder.
+fn historical_phantom_in_content_position (
+  node : NodeRef<Viewnode>,
+) -> bool {
+  match node . parent () {
+    Some (parent) => match &parent . value () . kind {
+      ViewnodeKind::BufferRoot
+        | ViewnodeKind::Vognode (Vognode::Unrestricted (_)) => true,
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) =>
+        historical_phantom_in_content_position (parent),
+      _ => false, },
+    None => false, }}
 
 /// The stub the PCSVF's view completion starts from: each root drawn
 /// as 'append_stub_root' draws one.
@@ -353,12 +370,13 @@ pub fn root_skgids_of_buffer (
     . collect () }
 
 /// Before a rerender's view completion: each node of the buffer's
-/// fresh U that has no editable occurrence becomes editable at its
-/// BFS-first content occurrence (a root, or a member of a vognode's
-/// content), with its body from the live graph, as a freshly drawn
-/// editable viewnode has it. Completion then draws its content list.
-/// A node of U with no occurrence is reached through the node above
-/// it on its walk, once that one is editable.
+/// fresh U that has no editable occurrence becomes editable where it
+/// stands, at its BFS-first content occurrence (a root, or a member
+/// of a vognode's content), or if it has none at its BFS-first
+/// folder occurrence, with its body from the live graph, as a freshly
+/// drawn editable viewnode has it. Completion then draws its content
+/// list. A node of U with no occurrence is reached through the node
+/// above it on its walk, once that one is editable.
 pub fn make_freshU_editable_at_first_occurrences (
   drawing    : TdvDrawing,
   viewforest : &mut ViewForest,
@@ -372,7 +390,11 @@ pub fn make_freshU_editable_at_first_occurrences (
         if ! t . is_writeProtected () => Some ( t . skgid . clone () ),
       _ => None, } )
     . collect ();
-  for treeid in content_occurrences_in_level_order (viewforest) {
+  let occurrences : Vec<NodeId> =
+    content_occurrences_in_level_order (viewforest) . into_iter ()
+    . chain ( folder_occurrences_in_level_order (viewforest) )
+    . collect ();
+  for treeid in occurrences {
     let skgid : ID = match &viewforest . get (treeid) . unwrap () . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t . skgid . clone (),
       _ => continue, };
@@ -406,4 +428,23 @@ fn content_occurrences_in_level_order (
     if ! in_content_position { continue; }
     occurrences . push ( node . id () );
     queue . extend ( node . children () ); }
+  occurrences }
+
+/// The viewforest's unrestricted vognodes that are members of a
+/// partner folder (affectsParent true), in level order.
+fn folder_occurrences_in_level_order (
+  viewforest : &ViewForest,
+) -> Vec<NodeId> {
+  let mut occurrences : Vec<NodeId> = Vec::new ();
+  let mut queue : VecDeque<NodeRef<Viewnode>> =
+    viewforest . roots () . collect ();
+  while let Some (node) = queue . pop_front () {
+    queue . extend ( node . children () );
+    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+      &node . value () . kind else { continue; };
+    let in_folder : bool =
+      t . affectsParent == AffectsParent::True
+      && matches! ( node . parent () . map ( |parent| &parent . value () . kind ),
+                    Some (ViewnodeKind::PartnerFolder (_)) );
+    if in_folder { occurrences . push ( node . id () ); }}
   occurrences }

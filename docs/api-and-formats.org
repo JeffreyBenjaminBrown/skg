@@ -187,16 +187,22 @@ So far there are these endpoints:
        of the M changed files of the owned skgrepos (O of them changed only
        in order, and so ready), N are commit-ready; F files changed in
        foreign skgrepos; and K changes are owned by nodes the buffer does
-       not draw. The buffer is reconciled over the graph straddle, not
+       not show. A node is shown where the buffer has an editable
+       occurrence of it, in content or in a partner folder, or a
+       historical phantom of it in content position: under the buffer
+       root or an unrestricted vognode, or in the old content of such a
+       phantom. The buffer is reconciled over the graph straddle, not
        rebuilt: its roots, and every headline it drew editable, stay as
        saved, and its change facts, change folders, markers and removed
        members are redrawn. It follows its fresh PCSVF sets: each node
        of U without an editable occurrence becomes editable at its
-       first occurrence, and each origin of D the buffer does not draw
-       is appended as a root, at the end, in ID order. An editable-view
-       request on a write-protected node outside U cascades as in any
-       view, bounded by =initial_node_limit=; nothing else in the
-       buffer spends that budget.
+       first content occurrence in level order, or if it has none at
+       its first partner folder occurrence, and each origin of D with
+       no occurrence in the buffer is appended as a root, at the end,
+       in ID order. An editable-view request on a write-protected node
+       outside U cascades as in any view, bounded by
+       =initial_node_limit=; nothing else in the buffer spends that
+       budget.
   - Before mutation, the server computes the update-relevant neighborhood of
     every prepared write/delete identity independently in the before and
     candidate graphs. Other registered views containing an affected unrestricted ID

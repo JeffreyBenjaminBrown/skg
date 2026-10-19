@@ -943,3 +943,38 @@ own manifest still names 'serde_yaml', as its reference, so
 **** more call sites than the plan counted
 The plan says seven files use it; fourteen Rust files did (six in
 'server/', five test files, three tools).
+* More fixes
+** Slice 1: deviations
+*** no step write-protects an editable folder member again
+The plan's pitfall expects a step, at a write-protected-set folder's
+visit or its member's, that write-protects an editable member again.
+There is none: 'apply_goal_shapes' keeps a matched member as it is,
+the continuation reconcile ('attach_continuations_under_straddle_folder_members')
+touches only the member's children, the member's own visit
+write-protects only a repeat, and the save reads an editable member
+of such a folder as a self-writer. So nothing was exempted. The test
+'an_editable_container_folder_member_outside_u_stays_editable'
+('tests/pcsvf/fresh_sets.rs') pins it: a container-folder member made
+editable while in U stays editable after its change is undone and U
+no longer holds it, through two saves.
+*** a historical phantom in another's old content is in content position
+The plan counts a historical phantom as shown when its parent is the
+buffer root or an unrestricted vognode. Taken literally, that leaves
+unshown every node below the top of a deleted subtree, though each is
+drawn in its parent's old content, which
+'process_historical_phantom_visit' draws where content stands; the
+'sets' fixture's delc, under del, broke
+'the_save_reports_the_readiness_summary'. So a historical phantom
+also counts in the old content of a historical phantom that counts
+('historical_phantom_in_content_position', 'server/pcsvf.rs'). One
+in a partner folder still does not.
+*** the merges buffer's summary counts eleven unshown
+'the_summary_counts_the_changes_the_saved_buffer_does_not_show'
+expected ten. The merges buffer draws pres, acqd's text preserver,
+as a write-protected member of acq's content, and pres is not in the
+merges buffer's U, so under the new rule its creation is unshown too.
+The test now expects eleven.
+*** the new fixture
+'tests/pcsvf/fixtures/folder_member': m, the one root, contains a,
+whose body changed; c1 and c2 contain m, so they are drawn only in
+m's container folder.

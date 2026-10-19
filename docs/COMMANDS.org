@@ -695,7 +695,8 @@ be empty. It refuses unless the skgrepo restriction is 'all'. A
 buffer keeps its roots until you close it, and saving it (or
 committing) keeps what you folded. Each save (of it or of another
 view) also draws what changed since it opened: a node that changed is
-made editable where the buffer first draws it, and when a change is
+made editable where the buffer first draws it, in content or else
+in a partner folder (a container folder, say), and when a change is
 under a root the buffer lacks, that root is appended at the end.
 Nothing the buffer draws editable is write-protected again. An
 editable-view request on a write-protected headline expands it and

@@ -227,7 +227,7 @@ did). Remove 'rand' from 'Cargo.toml'. Delete
 'collect_grandchild_aliases_for_viewnode' and anything only it used.
 Run the suites; commit.
 
-** Slice 1: a change is shown where its node is editable
+** DONE Slice 1: a change is shown where its node is editable
 Three changes, in this order. First, extend the pre-pass: after the
 content occurrences in level order, consider the folder occurrences in
 level order ('content_occurrences_in_level_order' gains a sibling or a

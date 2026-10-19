@@ -280,3 +280,51 @@ fn after_a_commit_the_lingering_nodes_remain_editable (
                 "{} must stay editable:\n{}", node, content ); }
     assert! ( ! content . contains ("(diff "), "{}", content );
     Ok (( )) }) }
+
+/// The 'folder_member' fixture (one skgrepo, main): m contains a,
+/// whose body changed; c1 and c2, unchanged, each contain m. So m is
+/// the buffer's one root, and c1 and c2 are drawn only as members of
+/// its container folder. c1 changes after the buffer opened. After
+/// the next save it is editable there, with its content list (m)
+/// drawn under it and its change shown; no root is appended, and a
+/// further save changes nothing.
+#[test]
+fn a_change_drawn_only_in_a_container_folder_becomes_editable_there (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("folder_member", &["main"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    assert! ( ! drawn_editable (&buffer, "c1"), "{}", buffer );
+    retitle_in_a_content_view (f, "c1", "c1 retitled") ?;
+    let response : SaveResponse = save_cleanly (f, &buffer) ?;
+    let saved : String = response . saved_view;
+    let c1_subtree : Vec<&str> = subtree_starting (&saved, "*** (skg (node (id c1) ");
+    assert! ( ! c1_subtree [0] . contains ("writeProtected"),
+              "c1 must be editable in the container folder:\n{}", saved );
+    assert! ( c1_subtree . contains (&"**** (skg (oldText title)) c1")
+              && c1_subtree . iter () . any ( |line|
+                   line . starts_with ("**** (skg (node (id m) ") ),
+              "c1's change and content must be drawn under it:\n{}", saved );
+    assert_eq! ( root_ids (&saved), vec! [ "m" ], "{}", saved );
+    assert_eq! ( response . readiness_summary . unwrap () . unshown_changes, 0 );
+    let again : SaveResponse = save_cleanly (f, &saved) ?;
+    assert_eq! ( again . saved_view, saved, "c1 stays editable" );
+    Ok (( )) }) }
+
+/// Once c1 is editable in m's container folder, a save that undoes
+/// its change takes it out of U; it stays editable there, as a
+/// lingering node does, after that save and a further one.
+#[test]
+fn an_editable_container_folder_member_outside_u_stays_editable (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("folder_member", &["main"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    retitle_in_a_content_view (f, "c1", "c1 retitled") ?;
+    let saved : String = save_cleanly (f, &buffer) ? . saved_view;
+    let reverted : String = saved . replacen ("c1 retitled", "c1", 1);
+    let after : String = save_cleanly (f, &reverted) ? . saved_view;
+    let c1_line : &str = subtree_starting (&after, "*** (skg (node (id c1) ") [0];
+    assert! ( c1_line . ends_with (") c1") && ! c1_line . contains ("writeProtected"),
+              "c1 must stay editable in the container folder:\n{}", after );
+    let again : String = save_cleanly (f, &after) ? . saved_view;
+    assert_eq! ( again, after );
+    Ok (( )) }) }

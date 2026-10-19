@@ -75,7 +75,8 @@ pub struct ReadinessSummary {
 
 /// The readiness summary a save of a TDV buffer reports: that of the
 /// whole changeset, and how many of its leaves the buffer does not
-/// show (their owning node is not drawn in it).
+/// show (their owning node is not drawn in it, as
+/// 'nodes_drawn_in_viewforest' says).
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct BufferReadinessSummary {
   pub summary         : ReadinessSummary,
@@ -233,7 +234,8 @@ impl ChangeForest {
       order_only_files      : self . order_only_files . len (), } }
 
   /// The readiness summary, with the count of leaves whose owning
-  /// node is not among 'shown' (the nodes a buffer draws).
+  /// node is not among 'shown' (the nodes a buffer draws,
+  /// 'nodes_drawn_in_viewforest').
   pub fn buffer_readiness_summary (
     &self,
     store : &ReadinessStore,
