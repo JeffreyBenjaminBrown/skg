@@ -3,16 +3,15 @@ use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_r
 use crate::to_org::expand::role_tree::build_and_integrate_role_tree_then_drop_request;
 use crate::to_org::expand::folder_request::build_and_integrate_folder_then_drop_request;
 use crate::to_org::expand::flags::build_and_integrate_flags_then_drop_request;
-use crate::to_org::util::{ EditableMap, Finalizable, get_skgid_from_viewnode_at, makeWriteProtectedAndClobber, unrestrictedVognode_in_tree_is_writeProtected };
+use crate::to_org::util::{ EditableMap, Finalizable, get_skgid_from_viewnode_at, makeWriteProtectedAndClobber, make_member_children_nonMembers, unrestrictedVognode_in_tree_is_writeProtected };
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
-use crate::types::viewnode::{ Viewnode, ViewnodeKind, ViewRequest, FolderRelation, Editability, AffectsParent };
-use crate::types::viewnode::Vognode;
+use crate::types::viewnode::{ Viewnode, ViewRequest, FolderRelation, Editability };
 use crate::types::nodes::complete::Graphnode;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::tree::viewnode_graphnode::{write_at_unrestrictedVognode_in_tree, pid_and_skgrepo_from_viewnode_at};
 
-use ego_tree::{Tree, NodeId, NodeRef};
+use ego_tree::{Tree, NodeId};
 use std::error::Error;
 
 pub fn execute_view_requests (
@@ -123,8 +122,10 @@ pub fn apply_editable_draw_rule (
     visited . insert ( node_pid . clone(), Finalizable::Final (treeid) ); }
   Ok ( DrawOutcome::MadeFinal ) }
 
-/// Does two things:
+/// Does three things:
 /// - Mark a node, and its entire content subtree, as write-protected.
+/// - Make each member in the subtree a non-member,
+///   since a write-protected node writes no content.
 /// - Remove them from `visited`.
 /// Only recurses into non-ignored UnrestrictedVognode children;
 ///   ignored and non-vognode children persist unchanged.
@@ -137,26 +138,13 @@ fn writeProtect_content_subtree (
   graph   : &InRustGraph,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  let (node_pid, content_child_treeids)
-    : (ID, Vec <NodeId>) =
-    { let node_ref : NodeRef < Viewnode > =
-        tree . get (treeid) . ok_or (
-          "writeProtect_content_subtree: NodeId not in tree" ) ?;
-      let node_pid : ID =
-        get_skgid_from_viewnode_at ( tree, treeid ) ?;
-      let content_child_treeids : Vec < NodeId > =
-        node_ref . children ()
-        . filter ( |c| matches! ( &c . value() . kind,
-                                  ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-                                  if t . affectsParent == AffectsParent::True ))
-        . map ( |c| c . id () )
-        . collect ();
-      (node_pid, content_child_treeids) };
+  let node_pid : ID =
+    get_skgid_from_viewnode_at ( tree, treeid ) ?;
   if ! unrestrictedVognode_in_tree_is_writeProtected ( tree, treeid ) ? {
     visited . remove (&node_pid);
     makeWriteProtectedAndClobber ( tree, treeid, graph, config ) ?; }
-  for child_treeid in content_child_treeids { // recurse
-    writeProtect_content_subtree (
+  for child_treeid in make_member_children_nonMembers ( tree, treeid ) ? {
+    writeProtect_content_subtree ( // recurse
       tree, child_treeid, visited, graph, config ) ?; }
   Ok (( )) }
 

@@ -265,6 +265,8 @@ fn reconcile_content_children (
     replace_raw_content_children_with_visible_overriders (
       tree, node, config, graph_snap, skgrepo_restriction,
       substitution_for_children ) ?; }
+  adopt_nonMember_children_that_are_content (
+    tree, node, &apparent_content_skgids ) ?;
   complete_content_children(
     tree, node, &apparent_content_skgids, &relRepos,
     &graphnode . home_skgrepo, config, graph_snap,
@@ -275,6 +277,43 @@ fn reconcile_content_children (
     tree, node, &apparent_content_skgids ) ?;
   convert_nonmember_unknown_children_to_dead(
     tree, node, &apparent_content_skgids ) ?;
+  Ok (( )) }
+
+/// For each entry of the goal list with no member child, the first
+/// non-member child standing for the entry's node becomes the member,
+/// keeping its viewnode and fold state, so that the reconciler, which
+/// matches members only, does not draw a second one beside it. (Such
+/// a non-member is typically left from when the node was
+/// write-protected.) The reconciler then moves it into goal order.
+fn adopt_nonMember_children_that_are_content (
+  tree : &mut Tree<Viewnode>,
+  node : NodeId,
+  goal : &[ID],
+) -> Result<(), Box<dyn Error>> {
+  let adoptees : Vec<NodeId> = {
+    let node_ref : NodeRef<Viewnode> = tree . get (node)
+      . ok_or ("adopt_nonMember_children_that_are_content: node not found") ?;
+    let unrestricted_children : Vec<(NodeId, &ID, AffectsParent)> =
+      node_ref . children ()
+      . filter_map ( |child| match &child . value () . kind {
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+          Some (( child . id (), &t . skgid, t . affectsParent )),
+        _ => None, } )
+      . collect ();
+    goal . iter ()
+      . filter ( |entry| ! unrestricted_children . iter () . any (
+        |(_, skgid, affectsParent)| *skgid == *entry
+                                    && *affectsParent == AffectsParent::True ))
+      . filter_map ( |entry| unrestricted_children . iter () . find (
+        |(_, skgid, affectsParent)| *skgid == entry
+                                    && *affectsParent == AffectsParent::False )
+        . map ( |(treeid, _, _)| *treeid ))
+      . collect () };
+  for adoptee in adoptees {
+    write_at_unrestrictedVognode_in_tree (
+      tree, adoptee,
+      |t| { t . affectsParent = AffectsParent::True; } )
+      . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   Ok (( )) }
 
 /// Replace already-rendered raw content children whose newly skgsave-committed

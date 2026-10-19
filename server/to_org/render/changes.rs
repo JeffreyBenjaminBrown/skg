@@ -378,11 +378,12 @@ fn changed_partner_folders (
       folders . push ( child_folder_or_new (tree, treeid, kind) ); }}
   folders }
 
-/// Tag each content member with the presence of its node and of its
-/// relationship, draw a member outside U as a write-protected leaf
-/// unless it was editable before completion ('u_and_writable', when
-/// given), and keep a relRepo move under exactly the members whose
-/// relationship moved. A member's view requests stay: one that
+/// Tag each content member, and each non-member child whose node is
+/// content, with the presence of its node and of its relationship,
+/// draw a member outside U as a write-protected leaf unless it was
+/// editable before completion ('u_and_writable', when given), and
+/// keep a relRepo move under exactly the members whose relationship
+/// moved. A member's view requests stay: one that
 /// carries an editable-view request is drawn as the request says at
 /// its own visit.
 fn tag_content_members (
@@ -402,13 +403,17 @@ fn tag_content_members (
     { let mut member_mut = tree . get_mut (member) . unwrap ();
       match &mut member_mut . value () . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          if t . affectsParent == AffectsParent::True => {
+          if t . affectsParent == AffectsParent::True
+          || by_id . contains_key (&t . skgid) => {
+          // A non-member whose node is content (as under a
+          // write-protected node) is tagged too, but never redrawn.
           let partner : Option<&&Partner> = by_id . get (&t . skgid);
           t . change_facts . presence = DiffPresence {
             node : straddle . node_presence (&t . skgid)
                    . and_then ( |presence| presence . diff_sign () ),
             rel  : partner . and_then ( |p| p . presence . diff_sign () ), };
-          if u_and_writable . is_some_and ( |(u, writable)|
+          if t . affectsParent == AffectsParent::True
+             && u_and_writable . is_some_and ( |(u, writable)|
             ! u . contains (&t . skgid) && ! writable . contains (&member) ) {
             t . editability = Editability::WriteProtected; }
           moved = partner . and_then ( |p| mk_relRepo_move_viewnode (p) ); },

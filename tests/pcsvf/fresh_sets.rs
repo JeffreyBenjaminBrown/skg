@@ -283,8 +283,9 @@ fn an_editable_view_request_moves_editability_between_occurrences (
 
 /// In the 'shared' fixture, once editability moved from n under x to
 /// n under y, a request on n under x moves it back. The children n
-/// kept drawn under x are reconciled, not redrawn: the same members,
-/// in the same order, and b, folded there, stays folded. a, a node of
+/// kept drawn under x, which stopped being members when it was
+/// write-protected, are adopted, not redrawn: the same children, in
+/// the same order, members again, and b, folded there, stays folded. a, a node of
 /// U, is editable under x again, its change drawn there, and n and a
 /// are write-protected under y. A further save changes nothing.
 #[test]
@@ -300,16 +301,17 @@ fn an_editable_view_request_moves_editability_back (
     let members_of_n_under_x = |buffer : &str| -> Vec<String> {
       subtree_starting (buffer, "* (skg (node (id x) ") . iter ()
         . filter ( |line| line . starts_with ("*** ") )
-        . map ( |line| [ "writeProtected ", "omittedBody ", "bodyFolded ", "folded " ]
+        . map ( |line| [ "writeProtected ", "omittedBody ", "bodyFolded ", "folded ",
+                         "(affectsParent false) ", " (birth (contains in 1))" ]
                          . iter () . fold ( line . to_string (),
                                             |line, atom| line . replace (atom, "") ))
         . collect () };
-    let b_under_x : &str = "(skg (node (id b) (repo main) writeProtected ";
+    let b_under_x : &str = "(skg (node (id b) (repo main) (affectsParent false) writeProtected ";
     assert! ( moved . contains (n_under_x) && moved . contains (b_under_x),
               "n and b must be write-protected under x:\n{}", moved );
     let requested : String = requesting_editable_at (
       &moved . replacen ( b_under_x,
-                          "(skg folded (node (id b) (repo main) writeProtected ",
+                          "(skg folded (node (id b) (repo main) (affectsParent false) writeProtected ",
                           1 ),
       n_under_x );
     let saved : String = save_cleanly (f, &requested) ? . saved_view;

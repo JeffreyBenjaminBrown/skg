@@ -153,7 +153,8 @@ pub fn complete_branch_minus_content (
       tree, treeid, graph, config, skgrepo_restriction ) } ?;
   Ok (( )) }
 
-/// Does only what it says -- in particular,
+/// Does only what it says, and makes the members of a write-protected
+/// node non-members -- in particular,
 /// does not clobber the node after making it write-protected.
 ///
 /// The two jobs in the name cannot be unbundled --
@@ -178,7 +179,32 @@ pub fn make_writeProtected_if_repeat_then_extend_editable_map (
   if !is_writeProtected {
     // Ordinary completed/saved editable -> Tentative (TODO/DONE/local-view-update/plan_v2.org §5.2).
     editableMap . insert ( pid, Finalizable::Tentative (treeid) ); }
+  else { make_member_children_nonMembers ( tree, treeid ) ?; }
   Ok (( )) }
+
+/// A write-protected occurrence cannot write its content, so the
+/// server leaves no member under one: each child Unrestricted vognode
+/// that is a member becomes a non-member, keeping its own editability
+/// and subtree. Returns those children.
+pub fn make_member_children_nonMembers (
+  tree   : &mut Tree<Viewnode>,
+  treeid : NodeId,
+) -> Result<Vec<NodeId>, Box<dyn Error>> {
+  let members : Vec<NodeId> =
+    tree . get (treeid)
+    . ok_or ( "make_member_children_nonMembers: NodeId not in tree" ) ?
+    . children ()
+    . filter ( |child| matches! ( &child . value () . kind,
+                                  ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+                                  if t . affectsParent == AffectsParent::True ))
+    . map ( |child| child . id () )
+    . collect ();
+  for member in &members {
+    write_at_unrestrictedVognode_in_tree (
+      tree, *member,
+      |t| { t . affectsParent = AffectsParent::False; } )
+      . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
+  Ok (members) }
 
 /// Check if the node's PID appears in its ancestors,
 /// and if so, mark viewData.cycle = true.
