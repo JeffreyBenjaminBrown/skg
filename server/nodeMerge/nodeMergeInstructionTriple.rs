@@ -248,7 +248,7 @@ fn skgids_shown_through_subscriptions (
   Ok (shown) }
 
 /// The title a nodeMerge gives the acquiree's text preserver.
-pub fn acquiree_text_preserver_title (
+fn acquiree_text_preserver_title (
   acquiree_title : &str,
 ) -> String {
   format! ( "MERGED: {}", acquiree_title ) }

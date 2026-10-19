@@ -554,7 +554,7 @@ and leaves the nodes it made editable editable after the next save; a
 buffer whose U exceeds that limit is drawn in full regardless; after a
 commit the lingering nodes remain editable.
 
-** Slice 6: the merges buffer without the text preserver
+** DONE Slice 6: the merges buffer without the text preserver
 Remove 'acquiree_text_preservers' from 'pcsvf_sets_for_merges'; C is
 each acquiree and its acquirer. Update the test fixture's expectations
 and the sentence in both COMMANDS files and the API doc that names the

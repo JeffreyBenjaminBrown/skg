@@ -810,3 +810,15 @@ In every case the tests build, including the changed cycle, the
 cycle's new origin is drawn already, so it would not be appended even
 unpinned. I found no case where pinning alone prevents a second root,
 but it is there as the plan asks.
+** Slice 6: deviations
+*** the API doc needed nothing
+'docs/api-and-formats.org' says only that the merges buffer is a
+PCSVF over the nodeMerges; it never named the text preserver. The
+sentence changed in both COMMANDS files.
+*** the preserver's title function is private again
+'acquiree_text_preserver_title' was made public for
+'pcsvf_sets_for_merges'. Its only caller is now the nodeMerge code
+beside it, so it is private.
+*** how the preserver is drawn
+Outside U, the preserver is a write-protected leaf in the acquirer's
+content, tagged '(diff node+ rel+)'.

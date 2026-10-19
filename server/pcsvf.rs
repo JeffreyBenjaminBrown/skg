@@ -17,8 +17,7 @@
 //! whose only change is the order of a list.
 
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use crate::graph_straddle::types::{GraphStraddle, Presence};
-use crate::nodeMerge::nodeMergeInstructionTriple::acquiree_text_preserver_title;
+use crate::graph_straddle::types::GraphStraddle;
 use crate::prominence::climb_containerward_to_cycle_via;
 use crate::readiness_store::ReadinessStore;
 use crate::serve::handlers::readiness_requests::set_ready_facts_in_viewforest;
@@ -92,7 +91,8 @@ pub fn pcsvf_sets_over (
 /// The sets of the merges buffer's PCSVF, over the nodes involved in
 /// nodeMerges since HEAD: for each acquiree (a node of the
 /// before-graph only, which an after-graph node lists as an extra
-/// ID), the acquiree, its acquirer and the acquiree's text preserver.
+/// ID), the acquiree and its acquirer. The acquiree's text preserver
+/// is not in C; it is drawn as a new member of the acquirer's content.
 pub fn pcsvf_sets_for_merges (
   straddle : &GraphStraddle,
 ) -> PcsvfSets {
@@ -100,31 +100,9 @@ pub fn pcsvf_sets_for_merges (
   for acquiree in &straddle . changed_pids () . rightward {
     let Some (acquirer) : Option<ID> = straddle . acquirer_of (acquiree)
       else { continue; };
-    c . extend ( acquiree_text_preservers (straddle, acquiree, &acquirer) );
     c . insert ( acquiree . clone () );
     c . insert (acquirer); }
   pcsvf_sets_over (straddle, c) }
-
-/// The new nodes in the acquirer's content that bear the title a
-/// nodeMerge gives the acquiree's text preserver.
-fn acquiree_text_preservers (
-  straddle : &GraphStraddle,
-  acquiree : &ID,
-  acquirer : &ID,
-) -> Vec<ID> {
-  let ( Some (acquiree_node), Some (acquirer_node) ) =
-    ( straddle . before . get (acquiree), straddle . after . get (acquirer) )
-    else { return Vec::new (); };
-  let preserver_title : String =
-    acquiree_text_preserver_title (&acquiree_node . title);
-  acquirer_node . contains . iter ()
-    . map ( |relationship| &relationship . member )
-    . filter ( |member|
-      straddle . node_presence (member) == Some (Presence::OnlyAfter)
-      && straddle . after . get (member)
-         . is_some_and ( |node| node . title == preserver_title ) )
-    . cloned ()
-    . collect () }
 
 /// The sets of the skgrepo-changes buffer's PCSVF, over the nodes
 /// whose home skgrepo changed.

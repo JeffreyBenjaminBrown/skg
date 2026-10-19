@@ -44,13 +44,40 @@ fn headline_of<'a> (
   text . lines () . find ( |line| line . contains (&node) )
     . unwrap_or_else ( || panic! ( "no headline of {} in\n{}", id, text )) }
 
+/// The number of leading asterisks of a headline.
+fn level_of (
+  headline : &str,
+) -> usize {
+  headline . chars () . take_while ( |c| *c == '*' ) . count () }
+
+/// The headlines of the children of the editable occurrence of the
+/// node 'id', which the buffer must hold.
+fn child_headlines_of_editable<'a> (
+  text : &'a str,
+  id   : &str,
+) -> Vec<&'a str> {
+  let node : String = format! ( "(node (id {}) ", id );
+  let headline : &str =
+    text . lines ()
+    . find ( |line| line . contains (&node)
+                    && ! line . contains ("writeProtected") )
+    . unwrap_or_else ( || panic! ( "no editable {} in\n{}", id, text ));
+  let level : usize = level_of (headline);
+  text . lines ()
+    . skip_while ( |line| *line != headline )
+    . skip (1)
+    . filter ( |line| level_of (line) > 0 )
+    . take_while ( |line| level_of (line) > level )
+    . filter ( |line| level_of (line) == level + 1 )
+    . collect () }
+
 #[test]
-fn the_merges_sets_hold_the_acquiree_the_acquirer_and_the_text_preserver (
+fn the_merges_sets_hold_the_acquiree_and_the_acquirer (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &SKGREPOS, |f| {
     let straddle : GraphStraddle = graph_straddle (f) ?;
     let sets : PcsvfSets = pcsvf_sets_for_merges (&straddle);
-    assert_eq! ( sets . c, ids (&[ "acq", "acqd", "pres" ]) );
+    assert_eq! ( sets . c, ids (&[ "acq", "acqd" ]) );
     assert_eq! ( sets . d, ids (&[ "acqd", "top" ]) );
     Ok (( )) }) }
 
@@ -74,6 +101,9 @@ fn the_merges_buffer_draws_only_the_merge (
   assert_eq! ( roots . len (), 2, "{}", text );
   assert! ( roots [0] . contains ("(historical (id acqd)"), "{}", text );
   assert! ( roots [1] . contains ("(node (id top)"), "{}", text );
+  assert! ( child_headlines_of_editable (&text, "acq") . iter ()
+            . any ( |line| line . contains ("(node (id pres)") ),
+            "the text preserver is drawn in acq's content:\n{}", text );
   assert! ( headline_of (&text, "pres") . contains ("(diff node+ rel+)"),
             "the text preserver is new in acq's content:\n{}", text );
   assert! ( text . contains ("acquiredByFolder")

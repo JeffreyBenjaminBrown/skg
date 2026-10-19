@@ -710,8 +710,9 @@ moved node in two skgrepos at once. Such a HEAD cannot be reasoned
 about, and the next diff view against it reports changes that are
 only its own inconsistency. Review with the readiness marks (C-c r)
 instead, and commit everything at once with C-c r c.
-The merges buffer shows each nodeMerge since HEAD: the acquiree, its
-acquirer and the acquiree's text preserver, in context. The skgrepo
+The merges buffer shows each nodeMerge since HEAD: the acquiree and
+its acquirer, in context. The acquiree's text preserver appears as a
+new member of the acquirer's content. The skgrepo
 changes buffer shows the nodes whose home skgrepo changed; each one's
 heralds read "-OLD +NEW", followed by "Δ⌂=a" when its nearest moved
 ancestor (a, the viewparent; b, the grandparent; ...) moved the same
