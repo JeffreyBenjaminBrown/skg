@@ -7,7 +7,8 @@
 // buffer's roots are q and r, and w is a write-protected leaf.
 
 use crate::pcsvf::common::{
-  Fixture, open_all_changes_buffer, rerendered_view_content, save,
+  Fixture, collateral_view_content, node_lines, open_all_changes_buffer,
+  requesting_editable_at, rerendered_view_content, save,
   send_stage_and_commit_request, with_fixture};
 use crate::pcsvf::common::git_fixture_helpers::mk_test_tcp_stream_pair;
 
@@ -22,6 +23,7 @@ use skg::types::viewnode::Viewnode;
 use ego_tree::Tree;
 use futures::executor::block_on;
 use std::error::Error;
+use std::io::Read;
 use std::net::TcpStream;
 
 /// Save 'buffer' as the "all changes" buffer; it must save without
@@ -37,12 +39,15 @@ fn save_cleanly (
   Ok (response) }
 
 /// Retitle 'node' to 'title' by saving a content view of it, as
-/// another buffer would.
+/// another buffer would. Returns the "all changes" buffer as its
+/// client then holds it: 'buffer', or its collateral rerendering if
+/// the save sent one.
 fn retitle_in_a_content_view (
-  f     : &mut Fixture,
-  node  : &str,
-  title : &str,
-) -> Result<(), Box<dyn Error>> {
+  f      : &mut Fixture,
+  node   : &str,
+  title  : &str,
+  buffer : &str,
+) -> Result<String, Box<dyn Error>> {
   let view_id : ViewId =
     ViewId::ContentView ( format! ("content-view-of-{}", node) );
   let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
@@ -55,7 +60,7 @@ fn retitle_in_a_content_view (
     &format! ( "{} {}", &root_line [ .. root_line . rfind (' ') . unwrap () ],
                title ),
     1 );
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+  let (mut stream, mut read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let response : SaveResponse = block_on (
     update_from_and_rerender_buffer_test (
@@ -63,15 +68,11 @@ fn retitle_in_a_content_view (
       &Ok (view_id), &mut f . views_state )) ?;
   assert! ( response . errors . is_empty (),
             "the content view must save, got {:?}", response . errors );
-  Ok (( )) }
-
-/// The lines of 'buffer' that draw an unrestricted vognode of 'node'.
-fn node_lines<'a> (
-  buffer : &'a str,
-  node   : &str,
-) -> Vec<&'a str> {
-  let atom : String = format! ("(node (id {}) ", node);
-  buffer . lines () . filter ( |line| line . contains (&atom) ) . collect () }
+  drop (stream);
+  let mut streamed : String = String::new ();
+  read_end . read_to_string (&mut streamed) ?;
+  Ok ( collateral_view_content (&streamed)
+       . unwrap_or_else ( || buffer . to_string () )) }
 
 /// Whether some line of 'buffer' draws 'node' editable.
 fn drawn_editable (
@@ -109,18 +110,6 @@ fn subtree_starting<'a> (
                              || depth (line) > own_depth ))
     . collect () }
 
-/// 'buffer' with an editable-view request at the first occurrence of
-/// 'metadata', which must draw a write-protected node.
-fn requesting_editable_at (
-  buffer   : &str,
-  metadata : &str,
-) -> String {
-  let at : usize = buffer . find (metadata)
-    . unwrap_or_else ( || panic! ( "no {:?} in:\n{}", metadata, buffer ));
-  format! ( "{}{}", &buffer [.. at],
-            buffer [at ..] . replacen (
-              "writeProtected", "writeProtected (viewRequests editableView)", 1 )) }
-
 /// w changes after the buffer opened, while the buffer draws it only
 /// as a write-protected leaf. After the next save it is editable,
 /// with its change drawn, and its members, outside U, stay
@@ -132,7 +121,7 @@ fn a_write_protected_leaf_that_changes_becomes_editable (
   with_fixture ("fresh", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( ! drawn_editable (&buffer, "w"), "{}", buffer );
-    retitle_in_a_content_view (f, "w", "w retitled") ?;
+    let buffer : String = retitle_in_a_content_view (f, "w", "w retitled", &buffer) ?;
     let response : SaveResponse = save_cleanly (f, &buffer) ?;
     let saved : &str = &response . saved_view;
     assert! ( drawn_editable (saved, "w"), "w must be editable:\n{}", saved );
@@ -155,7 +144,7 @@ fn a_change_two_levels_under_a_write_protected_leaf_is_drawn (
   with_fixture ("fresh", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( node_lines (&buffer, "w1a") . is_empty (), "{}", buffer );
-    retitle_in_a_content_view (f, "w1a", "w1a retitled") ?;
+    let buffer : String = retitle_in_a_content_view (f, "w1a", "w1a retitled", &buffer) ?;
     let response : SaveResponse = save_cleanly (f, &buffer) ?;
     let saved : &str = &response . saved_view;
     for node in [ "w", "w1", "w1a" ] {
@@ -176,7 +165,7 @@ fn a_change_under_a_new_origin_appends_the_origin_as_a_root (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("fresh", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    retitle_in_a_content_view (f, "s1", "s1 retitled") ?;
+    let buffer : String = retitle_in_a_content_view (f, "s1", "s1 retitled", &buffer) ?;
     let response : SaveResponse = save_cleanly (f, &buffer) ?;
     let saved : String = response . saved_view;
     assert_eq! ( root_ids (&saved), vec! [ "q", "r", "s" ], "{}", saved );
@@ -431,7 +420,7 @@ fn a_change_drawn_only_in_a_container_folder_becomes_editable_there (
   with_fixture ("folder_member", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( ! drawn_editable (&buffer, "c1"), "{}", buffer );
-    retitle_in_a_content_view (f, "c1", "c1 retitled") ?;
+    let buffer : String = retitle_in_a_content_view (f, "c1", "c1 retitled", &buffer) ?;
     let response : SaveResponse = save_cleanly (f, &buffer) ?;
     let saved : String = response . saved_view;
     let c1_subtree : Vec<&str> = subtree_starting (&saved, "*** (skg (node (id c1) ");
@@ -455,7 +444,7 @@ fn an_editable_container_folder_member_outside_u_stays_editable (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("folder_member", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    retitle_in_a_content_view (f, "c1", "c1 retitled") ?;
+    let buffer : String = retitle_in_a_content_view (f, "c1", "c1 retitled", &buffer) ?;
     let saved : String = save_cleanly (f, &buffer) ? . saved_view;
     let reverted : String = saved . replacen ("c1 retitled", "c1", 1);
     let after : String = save_cleanly (f, &reverted) ? . saved_view;

@@ -10,13 +10,13 @@ use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{PartnerFolder, Property, PropertyFolder, Phantom, Viewnode, ViewnodeKind, Vognode};
+use crate::types::viewnode::{PartnerFolder, Property, PropertyFolder, Phantom, ViewRequest, Viewnode, ViewnodeKind, Vognode};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::types::nodes::complete::flag_is_true;
 
 use ego_tree::{NodeId, NodeRef};
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum OccurrencePathStep {
@@ -142,6 +142,78 @@ pub fn errors_and_normalize_new_writeProtected_occurrences (
     . collect ();
   make_direct_unrestricted_children_independent (current, &new_occurrence_skgids);
   errors
+}
+
+/// An unrestricted vognode of a forest, where it stands.
+struct LocatedUnrestrictedOccurrence {
+  parent_path       : Vec<OccurrencePathStep>,
+  skgid             : ID,
+  title             : String,
+  writeProtected    : bool,
+  requests_editable : bool,
+}
+
+/// In a buffer of the total diff view every node of U stays editable
+/// somewhere. For each node of 'u' that the last rendering drew
+/// editable, refuse a save that leaves it no editable occurrence by
+/// write-protecting one it drew editable, unless some occurrence of
+/// the node requests to become the editable one.
+pub fn errors_for_nodes_of_u_left_without_editable_occurrence (
+  current  : &ViewForest,
+  previous : &ViewForest,
+  u        : &BTreeSet<ID>,
+) -> Vec<BufferValidationError> {
+  let current_occurrences : Vec<LocatedUnrestrictedOccurrence> =
+    unrestricted_occurrences_in (current);
+  let previous_occurrences : Vec<LocatedUnrestrictedOccurrence> =
+    unrestricted_occurrences_in (previous);
+  u . iter ()
+    . filter_map ( |node| {
+      let current_of_node : Vec<&LocatedUnrestrictedOccurrence> =
+        current_occurrences . iter ()
+        . filter ( |occurrence| occurrence . skgid == *node )
+        . collect ();
+      if current_of_node . iter () . any ( |occurrence|
+           ! occurrence . writeProtected || occurrence . requests_editable )
+      { return None; }
+      previous_occurrences . iter ()
+        . filter ( |occurrence| occurrence . skgid == *node
+                                && ! occurrence . writeProtected )
+        . find ( |previously_editable| current_of_node . iter ()
+                 . any ( |occurrence| occurrence . parent_path
+                                      == previously_editable . parent_path ))
+        . map ( |previously_editable|
+          BufferValidationError::NodeOfU_LeftWithoutEditableOccurrence {
+            skgid : node . clone (),
+            title : previously_editable . title . clone (), } ) } )
+    . collect () }
+
+fn unrestricted_occurrences_in (
+  viewforest : &ViewForest,
+) -> Vec<LocatedUnrestrictedOccurrence> {
+  let mut occurrences : Vec<LocatedUnrestrictedOccurrence> = Vec::new ();
+  for root in viewforest . roots () {
+    collect_unrestricted_occurrences (root, &[], &mut occurrences); }
+  occurrences }
+
+fn collect_unrestricted_occurrences (
+  node        : NodeRef<Viewnode>,
+  parent_path : &[OccurrencePathStep],
+  occurrences : &mut Vec<LocatedUnrestrictedOccurrence>,
+) {
+  let mut own_path : Vec<OccurrencePathStep> = parent_path . to_vec ();
+  own_path . push (path_step (node . value ()));
+  if let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =
+    &node . value () . kind
+  { occurrences . push (LocatedUnrestrictedOccurrence {
+      parent_path       : parent_path . to_vec (),
+      skgid             : restriction . skgid . clone (),
+      title             : restriction . title . clone (),
+      writeProtected    : restriction . is_writeProtected (),
+      requests_editable : restriction . view_requests
+                          . contains (&ViewRequest::Editable), }); }
+  for child in node . children () {
+    collect_unrestricted_occurrences (child, &own_path, occurrences); }
 }
 
 fn write_protected_changes (

@@ -244,9 +244,42 @@ pub fn send_stage_and_commit_request (
 pub fn rerendered_view_content (
   response : &str,
 ) -> String {
-  let message : &str = response . split ("Content-Length")
-    . find ( |message| message . contains ("rerender-view") )
-    . expect ("a view is rerendered");
-  extract_string_field_from_sexp (
-    &message [ message . find ('(') . unwrap () .. ], "content" )
-    . expect ("the rerendered view has content") }
+  first_streamed_view_content (response, "rerender-view")
+    . expect ("a view is rerendered") }
+
+/// The content of the first collateral view in 'response', if any.
+pub fn collateral_view_content (
+  response : &str,
+) -> Option<String> {
+  first_streamed_view_content (response, "collateral-view") }
+
+fn first_streamed_view_content (
+  response      : &str,
+  response_type : &str,
+) -> Option<String> {
+  response . split ("Content-Length")
+    . find ( |message| message . contains (response_type) )
+    . map ( |message|
+      extract_string_field_from_sexp (
+        &message [ message . find ('(') . unwrap () .. ], "content" )
+      . expect ("the streamed view has content") ) }
+
+/// The lines of 'buffer' that draw an unrestricted vognode of 'node'.
+pub fn node_lines<'a> (
+  buffer : &'a str,
+  node   : &str,
+) -> Vec<&'a str> {
+  let atom : String = format! ("(node (id {}) ", node);
+  buffer . lines () . filter ( |line| line . contains (&atom) ) . collect () }
+
+/// 'buffer' with an editable-view request at the first occurrence of
+/// 'metadata', which must draw a write-protected node.
+pub fn requesting_editable_at (
+  buffer   : &str,
+  metadata : &str,
+) -> String {
+  let at : usize = buffer . find (metadata)
+    . unwrap_or_else ( || panic! ( "no {:?} in:\n{}", metadata, buffer ));
+  format! ( "{}{}", &buffer [.. at],
+            buffer [at ..] . replacen (
+              "writeProtected", "writeProtected (viewRequests editableView)", 1 )) }

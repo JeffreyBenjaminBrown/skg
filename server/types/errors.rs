@@ -58,6 +58,10 @@ pub enum BufferValidationError {
     title   : String,
     changes : Vec<String>,
   }, // This occurrence was changed since the server rendered it, but a write-protected occurrence emits no fieldIntent for the changed data.
+  NodeOfU_LeftWithoutEditableOccurrence {
+    skgid : ID,
+    title : String,
+  }, // In a buffer of the total diff view, the save write-protects the only editable occurrence of a node of U and requests no other occurrence editable.
   FlagsSurfaceEdited {
     recorder_skgid : ID,
     recorder_title : String,
@@ -148,6 +152,10 @@ impl std::fmt::Display for BufferValidationError {
         skgid, title, changes } =>
         write!(f, "The write-protected occurrence of node {:?} ({:?}) was edited ({}) but is write-protected. Re-render, then edit a editable occurrence instead.",
                skgid, title, changes . join ("; ")),
+      BufferValidationError::NodeOfU_LeftWithoutEditableOccurrence {
+        skgid, title } =>
+        write!(f, "In a total diff view every changed node stays editable somewhere. {} ({}) would have no editable instance left; to edit it elsewhere, request another instance editable (C-c s d) instead of write-protecting this one.",
+               title, skgid . 0),
       BufferValidationError::FlagsSurfaceEdited {
         recorder_skgid, recorder_title, changes } =>
         write!(f, "The flags surface under node {:?} ({:?}) was edited: {}. It is server-owned and no changes were saved. Use skg-set-flag-search-matching for noSearchMatching; provenance flags have no setter.",

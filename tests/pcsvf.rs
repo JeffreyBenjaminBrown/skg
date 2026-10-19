@@ -24,3 +24,5 @@ mod editing;
 mod folding;
 #[path = "pcsvf/fresh_sets.rs"]
 mod fresh_sets;
+#[path = "pcsvf/write_protecting.rs"]
+mod write_protecting;

@@ -242,6 +242,10 @@ fn format_buffer_validation_error (
       skgid, title, changes } => {
       format!("Edited write-protected occurrence:\n- ID: {}\n- Title: {}\n- Changes: {}\n- This occurrence is write-protected; no changes were saved.\n- Re-render, then edit a editable occurrence instead.\n",
               skgid . 0, title, changes . join ("; ")) },
+    BufferValidationError::NodeOfU_LeftWithoutEditableOccurrence {
+      skgid, title } => {
+      format!("In a total diff view every changed node stays editable somewhere. {} ({}) would have no editable instance left; to edit it elsewhere, request another instance editable (C-c s d) instead of write-protecting this one.\n",
+              title, skgid . 0) },
     BufferValidationError::FlagsSurfaceEdited {
       recorder_skgid, recorder_title, changes } => {
       format!("Edited server-owned flags surface:\n- Recorder ID: {}\n- Recorder title: {}\n- Changes: {}\n- No changes were saved. Use skg-set-flag-search-matching for noSearchMatching. HadId and WasOverloaded are provenance and have no setter.\n",
