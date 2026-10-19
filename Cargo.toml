@@ -1,5 +1,5 @@
 [workspace]
-members = ["tools/introspect/code-map", "tools/introspect/call-graph", "tools/introspect/change-forest", "tools/scope-reducer", "tools/rust-field-tags"]
+members = ["tools/introspect/code-map", "tools/introspect/call-graph", "tools/introspect/change-forest", "tools/scope-reducer", "tools/rust-field-tags", "tests/yaml-corpus"]
 
 [package]
 name = "skg"
