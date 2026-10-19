@@ -1,3 +1,4 @@
+use crate::serve::util::sexp_to_client_string;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
@@ -17,7 +18,7 @@ use std::error::Error;
 pub(crate) fn metadata_value_atom (
   value : &str,
 ) -> String {
-  Sexp::Atom ( Atom::S (value . to_string ()) ) . to_string () }
+  sexp_to_client_string ( &Sexp::Atom ( Atom::S (value . to_string ()) )) }
 
 /// PURPOSE: Render a view forest to org-mode text.
 /// Each forest root starts at level 1.

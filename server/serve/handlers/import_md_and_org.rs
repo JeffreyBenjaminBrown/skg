@@ -2,8 +2,8 @@ use crate::import_md_and_org::batch::{
   ImportPreparation, PreparedImportBatch, prepare_import_batch};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
-  send_response_with_length_prefix, tag_sexp_response,
-  value_from_request_sexp};
+  send_response_with_length_prefix, sexp_to_client_string,
+  tag_sexp_response, value_from_request_sexp};
 use crate::types::env::SkgEnv;
 use crate::types::misc::SkgrepoName;
 use futures::executor::block_on;
@@ -137,7 +137,7 @@ fn send_import_response (
     Sexp::List (warnings . iter () . map (|warning|
       Sexp::Atom (Atom::S (warning . clone ()))) . collect ()) ]));
   let response : String = tag_sexp_response (kind,
-    &Sexp::List (fields) . to_string ());
+    &sexp_to_client_string ( &Sexp::List (fields) ));
   send_response_with_length_prefix (stream, &response);
 }
 

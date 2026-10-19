@@ -7,6 +7,7 @@
 //! confirmation response.
 
 use crate::dbs::filesystem::one_node::telescope_from_disk;
+use crate::serve::util::sexp_to_client_string;
 use crate::telescope::compose::compose_telescope_collecting_warnings;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::save::{NodeInstruction, NodeMerge, SaveNode};
@@ -138,11 +139,11 @@ pub fn confirmation_response (
   let prompt : String = format! (
     "Saving would publish title or body text selected below home for {} telescope{}. Hoist writes the selected text at home and removes lower title/body copies while preserving lower relationships and aliases. Abort writes nothing; manual repair requires editing the .skg files. Hoist?",
     count, if count == 1 { "" } else { "s" } );
-  Sexp::List ( vec! [
+  sexp_to_client_string ( &Sexp::List ( vec! [
     Sexp::List ( vec! [
       atom ("telescopes"), Sexp::List (telescope_entries) ] ),
     pair ("prompt", &prompt),
-  ] ) . to_string ()
+  ] ))
 }
 
 fn atom (value : &str) -> Sexp {

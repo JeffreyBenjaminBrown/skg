@@ -31,7 +31,7 @@ use crate::serve::handlers::text_release::{
   search_challenge_response,
   search_choice_from_request};
 use crate::serve::protocol::TcpToClient;
-use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
+use crate::serve::util::{ send_response_with_length_prefix, sexp_to_client_string, tag_text_response};
 use crate::types::views_state::ViewId;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgrepoName};
 use crate::skgrepo_sets::{SkgrepoRestriction, search_skgids_for_skgrepo_set_for_test as search_ids_for_skgrepo_set_for_test_impl};
@@ -463,7 +463,7 @@ pub fn mk_search_enrichment_sexp (
         . map ( |warning|
           Sexp::Atom ( Atom::S (warning . clone ()) ) )
         . collect () ), ] ));
-  Sexp::List (fields) . to_string () }
+  sexp_to_client_string ( &Sexp::List (fields) ) }
 
 fn mk_search_results_sexp (
   content  : &str,

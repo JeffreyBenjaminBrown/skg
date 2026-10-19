@@ -7,7 +7,7 @@ use crate::serve::handlers::text_release::{
   decide_for_overPrivateText_pids};
 use crate::serve::handlers::save_buffer::compute_diff_for_every_skgrepo;
 use crate::serve::protocol::TcpToClient;
-use crate::serve::util::send_response_with_length_prefix;
+use crate::serve::util::{send_response_with_length_prefix, sexp_to_client_string};
 use crate::skgrepo_sets::{
   SkgrepoRestriction,
   SkgrepoSetName,
@@ -193,7 +193,7 @@ fn send_error_response (
   msg    : &str,
 ) {
   let response : String =
-    Sexp::List ( vec! [
+    sexp_to_client_string ( &Sexp::List ( vec! [
       Sexp::List ( vec! [
         Sexp::Atom ( Atom::S (
           "response-type" . to_string () )),
@@ -205,5 +205,5 @@ fn send_error_response (
           "content" . to_string () )),
         Sexp::Atom ( Atom::S (
           msg . to_string () )), ] ),
-    ] ) . to_string ();
+    ] ));
   send_response_with_length_prefix (stream, &response); }

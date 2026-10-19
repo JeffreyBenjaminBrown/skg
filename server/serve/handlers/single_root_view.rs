@@ -11,6 +11,7 @@ use crate::serve::util::{
   view_id_from_request,
   send_response_with_length_prefix,
   format_buffer_response_sexp,
+  sexp_to_client_string,
   tag_sexp_response,
   tag_text_response};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
@@ -76,13 +77,12 @@ pub fn handle_single_root_view_request (
         { // Following a link to a root that is already open lands in
           // that ordinary content buffer.
           let switch_sexp : String =
-            Sexp::List ( vec! [
+            sexp_to_client_string ( &Sexp::List ( vec! [
               Sexp::List ( vec! [
                 Sexp::Atom ( Atom::S (
                   "switch-to-view" . to_string () )),
                 Sexp::Atom ( Atom::S (
-                  existing_view_id . repr_in_client () )) ] ) ] )
-            . to_string ();
+                  existing_view_id . repr_in_client () )) ] ) ] ));
           send_response_with_length_prefix (
             stream,
             & tag_sexp_response (

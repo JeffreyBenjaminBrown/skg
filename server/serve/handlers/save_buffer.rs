@@ -39,6 +39,7 @@ use crate::serve::util::{
   format_lock_views_sexp,
   read_length_prefixed_content,
   send_response_with_length_prefix,
+  sexp_to_client_string,
   tag_sexp_response,
   value_from_request_sexp };
 use crate::from_text::fork::build_fork_confirmation_buffer;
@@ -135,7 +136,7 @@ impl SaveResponse {
     { items . push ( sexp::parse (
         &readiness_summary_sexp (readiness_summary) )
         . expect ( "readiness_summary_sexp should produce valid sexp" )); }
-    response . to_string () }}
+    sexp_to_client_string (&response) }}
 
 /// '(readiness-summary (ready N) (changed M) (foreign F)
 /// (order-only O) (unshown K))'.
@@ -265,11 +266,10 @@ pub fn handle_save_buffer_request (
                   warnings,
                 _ => &[], };
               let response_sexp : String =
-                empty_response_sexp (
+                sexp_to_client_string ( &empty_response_sexp (
                   & format_save_error_as_org (save_error),
                   warnings,
-                  & save_point_position )
-                . to_string ();
+                  & save_point_position ));
               send_response_with_length_prefix (
                 stream,
                 & tag_sexp_response (
@@ -279,11 +279,10 @@ pub fn handle_save_buffer_request (
                 format!("Error processing buffer content: {}", err);
               tracing::error!("{}", error_msg);
               let response_sexp : String =
-                empty_response_sexp (
+                sexp_to_client_string ( &empty_response_sexp (
                   &error_msg,
                   &[],
-                  &save_point_position )
-                . to_string ();
+                  &save_point_position ));
               send_response_with_length_prefix (
                 stream,
                 & tag_sexp_response (
@@ -293,11 +292,10 @@ pub fn handle_save_buffer_request (
         format! ("Error reading save payload: {}", err );
       tracing::error! ( "{}", error_msg );
       let response_sexp : String =
-        empty_response_sexp (
+        sexp_to_client_string ( &empty_response_sexp (
           &error_msg,
           &[],
-          &save_point_position )
-        . to_string ();
+          &save_point_position ));
       send_response_with_length_prefix (
         stream,
         & tag_sexp_response (

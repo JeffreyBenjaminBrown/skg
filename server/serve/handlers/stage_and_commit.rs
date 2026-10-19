@@ -25,7 +25,7 @@ use crate::serve::handlers::save_buffer::readiness_summary_sexp;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   format_errors_warnings_sexp, send_response_with_length_prefix,
-  tag_sexp_response, value_from_request_sexp};
+  sexp_to_client_string, tag_sexp_response, value_from_request_sexp};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgrepoName;
@@ -172,4 +172,4 @@ pub fn stage_and_commit_response_sexp (
         Sexp::Atom ( Atom::S ( "commits" . to_string () )),
         Sexp::List (commits) ] ))
         . chain ( errors_and_warnings (&all_errors) ) . collect () }, };
-  Sexp::List (items) . to_string () }
+  sexp_to_client_string ( &Sexp::List (items) ) }

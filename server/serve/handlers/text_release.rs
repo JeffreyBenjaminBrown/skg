@@ -7,6 +7,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::protocol::TcpToClient;
+use crate::serve::util::sexp_to_client_string;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::ID;
 use crate::types::sexp::extract_string_list_from_sexp;
@@ -72,7 +73,7 @@ pub fn search_choice_from_request (
 /// matching overPrivateText telescope is part of what the search has not been allowed
 /// to reveal. The retry must choose inclusion or exclusion before querying.
 pub fn search_challenge_response () -> String {
-  Sexp::List ( vec! [
+  sexp_to_client_string ( &Sexp::List ( vec! [
     pair (
       "response-type",
       TcpToClient::OverPrivateTextTelescopeConfirmation . repr_in_client () ),
@@ -81,7 +82,7 @@ pub fn search_challenge_response () -> String {
     pair (
       "prompt",
       "Some indexed nodes have title or body text selected below home. Include or exclude those telescopes from this search?" ),
-  ] ) . to_string ()
+  ] ))
 }
 
 /// Decide whether a response involving 'candidate_pids' may cross the
@@ -133,7 +134,7 @@ pub fn challenge_response (
   let TextReleaseDecision::Challenge {
     operation, pids, prompt,
   } = decision else { return None; };
-  Some ( Sexp::List ( vec! [
+  Some ( sexp_to_client_string ( &Sexp::List ( vec! [
     pair (
       "response-type",
       TcpToClient::OverPrivateTextTelescopeConfirmation . repr_in_client () ),
@@ -145,7 +146,7 @@ pub fn challenge_response (
         . map ( |pid| atom (pid . as_str ()) )
         . collect () ) ] ),
     pair ("prompt", prompt),
-  ] ) . to_string () )
+  ] )) )
 }
 
 /// Replace overPrivateText unrestricted nodes with text-free restricted vognodes. Search
