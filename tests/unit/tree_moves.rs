@@ -17,6 +17,21 @@ fn values (
   tree . get (parent) . unwrap () . children ()
     . map ( |child| *child . value () ) . collect () }
 
+/// Walks the children of 'parent' forward and backward, and the whole
+/// tree from its root, each walk stopping after more steps than the
+/// tree has nodes; a node linked to itself would exceed that.
+fn assert_every_traversal_is_finite (
+  tree   : &Tree<u32>,
+  parent : NodeId,
+) {
+  let bound : usize = tree . values () . count () + 1;
+  let parent_ref : NodeRef<u32> = tree . get (parent) . unwrap ();
+  assert! ( parent_ref . children () . take (bound) . count () < bound );
+  assert! ( parent_ref . last_child () . unwrap ()
+            . prev_siblings () . take (bound) . count () < bound );
+  assert! ( tree . root () . descendants () . take (bound) . count ()
+            < bound ); }
+
 #[test]
 fn moving_a_node_already_in_place_changes_nothing () {
   let (mut tree, root, [a, b, c]) = three_children ();
@@ -24,7 +39,17 @@ fn moving_a_node_already_in_place_changes_nothing () {
   move_to_last_child (&mut tree, root, c) . unwrap ();
   move_before (&mut tree, b, a) . unwrap ();
   move_after (&mut tree, b, c) . unwrap ();
+  assert_every_traversal_is_finite (&tree, root);
+  assert_eq! ( values (&tree, root), vec! [1, 2, 3] ); }
+
+#[test]
+fn moving_a_node_next_to_itself_changes_nothing () {
+  let (mut tree, root, [a, b, c]) = three_children ();
   move_before (&mut tree, b, b) . unwrap ();
+  move_after (&mut tree, b, b) . unwrap ();
+  move_before (&mut tree, a, a) . unwrap ();
+  move_after (&mut tree, c, c) . unwrap ();
+  assert_every_traversal_is_finite (&tree, root);
   assert_eq! ( values (&tree, root), vec! [1, 2, 3] ); }
 
 #[test]
