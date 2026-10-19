@@ -92,7 +92,7 @@ on ego-tree's issue tracker on 2026-10-18) is already isolated behind
 the project's own move helpers by the fixes plan; keep every move
 going through them. The whole Rust suite covers the tree.
 
-** Slice 5: 'tantivy' to 0.27
+** DONE Slice 5: 'tantivy' to 0.27
 The search index is a session-lifetime store rebuilt from the '.skg'
 files at startup, so an index-format change costs nothing. Follow the
 changelog for the query, schema and writer APIs in 'server/dbs/' and

@@ -906,3 +906,10 @@ The project compiled and passed unchanged. 0.11's 'prepend_id' and
 itself; 'insert_id_before' and 'insert_id_after' still read the
 neighbor before detaching. The pitfall comment in
 'server/types/tree/moves.rs' now says so.
+*** dependency slice 5: 'syn' stays at 2
+Under 'syn' 3, 'tools/introspect/code-map/code-map.rs' no longer
+compiles: 'ItemImpl::trait_' lost its first tuple field, and a raw
+pointer's 'mutability' is now a 'PointerMutability' enum rather than
+an 'Option'. The plan bumps 'syn' only if the tools build unchanged,
+so every manifest keeps 'syn' 2. 'proc-macro2' was already at its
+latest, 1.0.107. 'tantivy' 0.27 needed no code changes.
