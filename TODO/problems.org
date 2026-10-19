@@ -3,16 +3,6 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
-* The sexp crate writes an empty string as nothing (2026-10-17)
-  'sexp' 1.1.4 quotes a string atom only when it contains a quote,
-  whitespace, or parses as a number, so 'Atom::S ("")' prints as
-  nothing: an empty view goes out as '(content )', which both clients
-  read as a missing field. Found in slice 8 of the total diff view,
-  whose stage-and-commit command redraws an emptied buffer that way;
-  both clients' streamed view update now reads a bare '(content)' as
-  empty. Any other empty string the server sends (an empty title, an
-  empty error) is read the same way. Building string atoms through
-  one helper that always quotes would remove the trap.
 * ego_tree's node moves can link a node to itself (2026-10-17)
   In ego-tree 0.6.3, 'NodeMut::prepend_id' reads the parent's first
   child, and 'insert_id_before' the anchor's previous sibling, before

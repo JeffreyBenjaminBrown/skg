@@ -48,7 +48,7 @@ describe('skg stage and commit', function ()
         respond(helpers.framed(
           '((response-type rerender-lock) (lock-views ("diff-view: all changes")))'))
         respond(helpers.framed(
-          '((response-type rerender-view) (view-id "diff-view: all changes") (content ))'))
+          '((response-type rerender-view) (view-id "diff-view: all changes") (content ""))'))
       end
       respond(helpers.framed(
         '((response-type rerender-done) (errors ()) (warnings ()))'))

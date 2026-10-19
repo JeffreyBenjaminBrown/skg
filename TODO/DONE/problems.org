@@ -1,3 +1,17 @@
+* The sexp crate writes an empty string as nothing (2026-10-17; fixed 2026-10-19)
+  'sexp' 1.1.4 quotes a string atom only when it contains a quote,
+  whitespace, or parses as a number, so 'Atom::S ("")' prints as
+  nothing: an empty view goes out as '(content )', which both clients
+  read as a missing field. Found in slice 8 of the total diff view,
+  whose stage-and-commit command redraws an emptied buffer that way;
+  both clients' streamed view update now reads a bare '(content)' as
+  empty. Any other empty string the server sends (an empty title, an
+  empty error) is read the same way. Building string atoms through
+  one helper that always quotes would remove the trap.
+  Fixed 2026-10-19 in slice 8 of [[file:../total-diff-view/4_plan-fixes.org][the TDV fixes plan]]: every response
+  is printed by 'sexp_to_client_string' ('server/serve/util.rs'),
+  which prints an empty string atom as '""', and the clients'
+  reading of a bare '(content)' as empty is gone.
 * Problems noticed while discussing the total diff view (2026-10-16)
 ** RESOLVED Diff tools refuse to run after any git merge
   'validate_skgrepos_for_selection' ('server/diff_report/git_snapshot.rs')

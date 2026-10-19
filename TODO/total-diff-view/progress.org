@@ -845,3 +845,22 @@ straddle, and 'stream_prepared_rerenders' writes it back as it
 registers the views. A refused release writes nothing. The skgrepo
 switch, the absent-reference cleanup and the rerender after a commit
 stream through the same function, so they write it back too.
+** Slice 8: deviations
+*** what goes through the serializer
+'send_response_with_length_prefix' takes a finished string, so it
+cannot itself print a Sexp. Instead every place that printed a Sexp
+bound for the client now calls 'sexp_to_client_string': the
+formatters in 'server/serve/util.rs', including 'tag_sexp_response',
+and the responses built in the save, single-root-view, text-search,
+import, stage-and-commit, titles, text-release and telescope-hoist
+handlers. Responses written with 'format!' were already quoted. The
+metadata atoms that 'metadata_value_atom' ('server/org_to_text.rs')
+writes into buffer text go through it too, so an empty value reads as
+'""' rather than vanishing.
+*** the client tests send the new form
+The stage-and-commit tests in both clients fed the old '(content )'
+to the streamed-view handler. With the workaround gone, they feed
+'(content "")', which the server now sends.
+*** the integration run
+Every integration test passes but 'import-md-and-org', which fails at
+baseline, as 'TODO/problems.org' records.

@@ -12,6 +12,10 @@ That field is just "the payload": it has nothing to do with a node's
 =contains= list or the "content view" (though a content-view response
 has one too).
 
+A string atom in a response is double-quoted when it is empty, or
+holds a double quote, whitespace, or a number; any other string atom
+is a bare symbol. So an empty view arrives as =(content "")=.
+
 The shared overPrivateText-telescope release warning is
 =OPERATION includes title or body text selected below its node's home
 skgrepo for PID P.= (or =PIDs P1, P2, ...=). A restricted request that
@@ -330,7 +334,7 @@ So far there are these endpoints:
       registered under VIEW_ID as a buffer of the total diff view.
     - =((empty . t) (errors ()) (warnings ()))=: the buffer would show
       nothing, so the client does not open it.
-    - =((content ) (errors ("REFUSAL")) (warnings ()))=: refused, when
+    - =((content "") (errors ("REFUSAL")) (warnings ()))=: refused, when
       the skgrepo restriction is not =all=, when an owned skgrepo is
       not a gitrepo or has no HEAD commit, or for an unknown BUFFER. A
       refusal applies to every buffer, so the client stops.

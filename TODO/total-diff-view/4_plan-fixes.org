@@ -569,7 +569,7 @@ does it after a save). Tests: after a rebuild that changed a foreign
 file on disk, the next TDV request shows no foreign node in C; after a
 rerender-all, the connection holds the refreshed straddle.
 
-** Slice 8: empty strings on the wire
+** DONE Slice 8: empty strings on the wire
 In 'server/serve/util.rs', serialize responses through one function
 that prints an empty 'Atom::S' as '""' and everything else as the
 crate does; route 'tag_sexp_response' and 'send_response_with_length_prefix'

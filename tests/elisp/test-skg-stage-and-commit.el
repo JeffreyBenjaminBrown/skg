@@ -87,11 +87,11 @@ first, via a function), the handlers and the prompts."
                  "Nothing was committed. Errors: skgrepo private: no git author is configured")))
 
 (ert-deftest test-stage-and-commit-redraws-an-emptied-view ()
-  "The server writes an empty view as '(content )'; it empties the buffer."
+  "The server writes an empty view as '(content \"\")'; it empties the buffer."
   (with-temp-buffer
     (skg-content-view-mode)
     (setq-local skg-view-id "diff-view: all changes")
     (insert "* (skg (node (id a))) a\n")
     (skg--apply-streamed-view-update
-     "((view-id \"diff-view: all changes\") (content ))" 'rerender "rerender-view")
+     "((view-id \"diff-view: all changes\") (content \"\"))" 'rerender "rerender-view")
     (should (equal (buffer-string) ""))))
