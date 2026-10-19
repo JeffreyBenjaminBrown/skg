@@ -5,3 +5,4 @@ pub mod generic;
 pub mod generations;
 pub mod from_org_text;
 pub mod forest;
+pub mod moves;
