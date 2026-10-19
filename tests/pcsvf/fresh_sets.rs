@@ -109,6 +109,18 @@ fn subtree_starting<'a> (
                              || depth (line) > own_depth ))
     . collect () }
 
+/// 'buffer' with an editable-view request at the first occurrence of
+/// 'metadata', which must draw a write-protected node.
+fn requesting_editable_at (
+  buffer   : &str,
+  metadata : &str,
+) -> String {
+  let at : usize = buffer . find (metadata)
+    . unwrap_or_else ( || panic! ( "no {:?} in:\n{}", metadata, buffer ));
+  format! ( "{}{}", &buffer [.. at],
+            buffer [at ..] . replacen (
+              "writeProtected", "writeProtected (viewRequests editableView)", 1 )) }
+
 /// w changes after the buffer opened, while the buffer draws it only
 /// as a write-protected leaf. After the next save it is editable,
 /// with its change drawn, and its members, outside U, stay
@@ -261,11 +273,7 @@ fn an_editable_view_request_moves_editability_between_occurrences (
     assert! ( subtree_starting (&buffer, "* (skg (node (id y) ") . iter ()
                 . any ( |line| line . starts_with (n_under_y) ),
               "n must be write-protected under y:\n{}", buffer );
-    let requested : String = {
-      let at : usize = buffer . find (n_under_y) . unwrap ();
-      format! ( "{}{}", &buffer [.. at],
-                buffer [at ..] . replacen (
-                  "writeProtected", "writeProtected (viewRequests editableView)", 1 )) };
+    let requested : String = requesting_editable_at (&buffer, n_under_y);
     let saved : String = save_cleanly (f, &requested) ? . saved_view;
     let x_subtree : Vec<&str> = subtree_starting (&saved, "* (skg (node (id x) ");
     let y_subtree : Vec<&str> = subtree_starting (&saved, "* (skg (node (id y) ");
@@ -284,6 +292,66 @@ fn an_editable_view_request_moves_editability_between_occurrences (
     assert_eq! ( again, saved, "the editability moved stays where it is" );
     Ok (( )) }) }
 
+/// In the 'shared' fixture, once editability moved from n under x to
+/// n under y, a request on n under x moves it back. The children n
+/// kept drawn under x are reconciled, not redrawn: the same members,
+/// in the same order, and b, folded there, stays folded. a, a node of
+/// U, is editable under x again, its change drawn there, and n and a
+/// are write-protected under y. A further save changes nothing.
+#[test]
+fn an_editable_view_request_moves_editability_back (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("shared", &["main"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let moved : String = save_cleanly (
+      f, &requesting_editable_at (
+        &buffer, "** (skg (node (id n) (repo main) writeProtected " )) ?
+      . saved_view;
+    let n_under_x : &str = "(node (id n) (repo main) writeProtected ";
+    let members_of_n_under_x = |buffer : &str| -> Vec<String> {
+      subtree_starting (buffer, "* (skg (node (id x) ") . iter ()
+        . filter ( |line| line . starts_with ("*** ") )
+        . map ( |line| [ "writeProtected ", "omittedBody ", "bodyFolded ", "folded " ]
+                         . iter () . fold ( line . to_string (),
+                                            |line, atom| line . replace (atom, "") ))
+        . collect () };
+    let b_under_x : &str = "(skg (node (id b) (repo main) writeProtected ";
+    assert! ( moved . contains (n_under_x) && moved . contains (b_under_x),
+              "n and b must be write-protected under x:\n{}", moved );
+    let requested : String = requesting_editable_at (
+      &moved . replacen ( b_under_x,
+                          "(skg folded (node (id b) (repo main) writeProtected ",
+                          1 ),
+      n_under_x );
+    let saved : String = save_cleanly (f, &requested) ? . saved_view;
+    let x_subtree : Vec<&str> = subtree_starting (&saved, "* (skg (node (id x) ");
+    let y_subtree : Vec<&str> = subtree_starting (&saved, "* (skg (node (id y) ");
+    for (subtree, editable) in [ (&x_subtree, true), (&y_subtree, false) ] {
+      for node in [ "n", "a" ] {
+        let atom : String = format! ("(node (id {}) ", node);
+        let line : &str = subtree . iter ()
+          . find ( |line| line . contains (&atom) )
+          . unwrap_or_else ( || panic! ( "{} must be drawn:\n{}", node, saved ));
+        assert_eq! ( ! line . contains ("writeProtected"), editable,
+                     "{}:\n{}", node, saved ); }}
+    assert_eq! ( members_of_n_under_x (&saved)
+                   . iter () . filter ( |line| line . contains ("(node ") )
+                   . cloned () . collect::<Vec<String>> (),
+                 members_of_n_under_x (&moved)
+                   . iter () . filter ( |line| line . contains ("(node ") )
+                   . cloned () . collect::<Vec<String>> (),
+                 "n's members under x are kept:\n{}", saved );
+    assert! ( x_subtree . iter ()
+                . any ( |line| line . starts_with ("*** (skg folded ")
+                               && line . contains ("(node (id b) ") ),
+              "b stays folded under x:\n{}", saved );
+    assert! ( x_subtree . contains (&"**** (skg (oldText body))"),
+              "a's change must be drawn under x:\n{}", saved );
+    assert! ( ! saved . contains ("viewRequests"), "{}", saved );
+    let again : String = save_cleanly (f, &saved) ? . saved_view;
+    assert_eq! ( again, saved, "the editability moved back stays where it is" );
+    Ok (( )) }) }
+
 /// An editable-view request on r, an editable node of U, cascades
 /// through its content as in an ordinary view: its members outside U
 /// expand until the node budget (2 here) is spent, so w and w1 become
@@ -291,7 +359,6 @@ fn an_editable_view_request_moves_editability_between_occurrences (
 /// are not charged; were either charged, w1 would stay
 /// write-protected. A further save changes nothing.
 #[test]
-#[ignore = "the save refuses a request on an editable node; see 'More fixes', slice 2, in TODO/total-diff-view/progress.org"]
 fn an_editable_view_request_on_a_node_of_u_unfolds_its_members (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("fresh", &["main"], |f| {

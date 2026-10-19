@@ -1,0 +1,6 @@
+pid: x
+title: x
+body: |-
+  new body
+contains:
+- n

@@ -571,6 +571,24 @@ mod tests {
   }
 
   #[test]
+  fn a_child_typed_under_a_requested_writeProtected_occurrence_is_an_edit () {
+    // The editable-view request does not license the typed child.
+    let original = forest (indoc! {"
+      * (skg (node (id recorder) (repo main) writeProtected)) recorder
+    "});
+    let mut typed = forest (indoc! {"
+      * (skg (node (id recorder) (repo main) writeProtected (viewRequests editableView))) recorder
+      ** (skg (node (id typed) (repo main))) typed child
+    "});
+    let errors = errors_and_normalize_new_writeProtected_occurrences (
+      &mut typed, &original);
+    assert! (matches! (&errors[..],
+      [BufferValidationError::EditedWriteProtectedOccurrence {
+        skgid, .. }] if skgid == &ID::from ("recorder")),
+      "{:?}", errors);
+  }
+
+  #[test]
   fn allows_a_new_writeProtected_occurrence_and_parks_its_viewnode_children () {
     let original = forest (indoc! {"
       * (skg (node (id root) (repo main))) root

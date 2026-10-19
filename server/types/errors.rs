@@ -49,8 +49,6 @@ pub enum BufferValidationError {
   ForkRequestOnUnknownNode       (ID),  // An explicit 'skg-fork-node' request on a node whose id is not in the graph (an unsaved headline): nothing exists to override.
   ForkRequestMultiple            (ID),  // Two headlines for the same id both carry an explicit fork request; at most one is allowed.
   OverrideInvariantViolation     (String),
-  EditableViewRequestOnEditableNode      (ID), // An editable view request on a node that is already editable
-  EditableViewRequestOnNodeWithContentChildren (ID), // An editable view request on a node that has content (affectsParent=Container) children. Non-content children (e.g. containerward role tree stubs) don't trigger this.
   MultipleEditableViewRequestsForSameId    (ID), // Multiple editable view requests for the same ID
   EmptyTitle                             (ID),
   LocalStructureViolation        (String, ID), // (error message, nearest ancestor ID)
@@ -136,10 +134,6 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Multiple fork requests for the same node {:?}. At most one fork request per node is allowed.", skgid),
       BufferValidationError::OverrideInvariantViolation(msg) =>
         write!(f, "{}", msg),
-      BufferValidationError::EditableViewRequestOnEditableNode (skgid) =>
-        write!(f, "Editable view request on a node that is already editable (ID {:?}). The node already shows its content; no expansion needed.", skgid),
-      BufferValidationError::EditableViewRequestOnNodeWithContentChildren (skgid) =>
-        write!(f, "Editable view request on a node with content children (ID {:?}). The expansion would clobber those children. Save without the request first, then delete children and retry.", skgid),
       BufferValidationError::MultipleEditableViewRequestsForSameId (skgid) =>
         write!(f, "Multiple editable view requests for the same ID {:?}. At most one request per ID is allowed.", skgid),
       BufferValidationError::EmptyTitle(skgid) =>

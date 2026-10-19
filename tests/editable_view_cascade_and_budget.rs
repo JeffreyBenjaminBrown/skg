@@ -15,8 +15,13 @@ use skg::assert_metadata_eq;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
-use skg::types::misc::{SkgConfig, TantivyIndex};
-use skg::types::views_state::OpenViews;
+use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::to_org::render::content_view::multi_root_view;
+use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::views_state::{OpenViews, ViewId};
+use skg::types::viewnode::Viewnode;
+
+use ego_tree::Tree;
 
 
 
@@ -57,6 +62,12 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_editable_view_request_cleared", fixtures) ?;
       test_editable_view_request_cleared (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_editable_view_request_on_an_editable_node", fixtures) ?;
+      test_editable_view_request_on_an_editable_node (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_editable_view_request_moves_editability_back", fixtures) ?;
+      test_editable_view_request_moves_editability_back (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_budget_aliasfolder_is_neutral",
                  "tests/editable_view_cascade_and_budget/fixtures-aliases") ?;
@@ -529,6 +540,157 @@ async fn test_editable_view_request_cleared (
       assert!(!result . contains ("viewRequests"),
         "viewRequests should be cleared after processing");
 
+      Ok (( )) }
+
+/// Open a content view of 'roots', drawn with 'config', registered
+/// in 'views_state' so that a save of it is checked against it.
+/// Returns the view's ID and text.
+fn open_content_view (
+  config      : &SkgConfig,
+  tantivy     : &TantivyIndex,
+  graph       : &InRustGraphHandle,
+  views_state : &mut ViewsState,
+  roots       : &[&str],
+) -> Result<(ViewId, String), Box<dyn Error>> {
+  let view_id : ViewId =
+    ViewId::ContentView ( "content-view".to_string () );
+  let root_ids : Vec<ID> =
+    roots . iter () . map ( |root| ID::from (*root) ) . collect ();
+  let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
+    multi_root_view (config, Some (tantivy), &root_ids) ?;
+  views_state . open_views . register_view (
+    &graph . load_full (), view_id . clone (), tree, &pids );
+  Ok (( view_id, text )) }
+
+/// 'buffer' with an editable-view request added to its first line
+/// containing 'metadata', just after it.
+fn requesting_editable_at (
+  buffer   : &str,
+  metadata : &str,
+) -> String {
+  buffer . replacen (
+    metadata,
+    &format! ( "{} (viewRequests editableView)", metadata ),
+    1 ) }
+
+// ===================================================
+// Test: a request on an editable node unfolds its content
+// ===================================================
+// Opened with a budget of 1, root 1 draws 11, 12 and 13
+// write-protected. A request on 1, already editable, passes to them
+// (the cascade). With a budget of 3, the expansions of 1, 11 and 12
+// spend it: 11 and 12 become editable, 12 draws its whole group
+// 121..124 write-protected, and 13 stays write-protected.
+async fn test_editable_view_request_on_an_editable_node (
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      let graph : InRustGraphHandle =
+        graph_handle_from_config (config) ?;
+      let mut views_state : ViewsState = ViewsState {
+        open_views     : OpenViews::new (),
+        graph_straddle : None,};
+      let (view_id, opened) : (ViewId, String) = {
+        let mut config : SkgConfig = config . clone ();
+        config . initial_node_limit = 1;
+        open_content_view (
+          &config, tantivy, &graph, &mut views_state, &["1"] ) ? };
+      let requested : String =
+        requesting_editable_at (&opened, "(node (id 1) (repo main)");
+      let result : String = {
+        let mut config : SkgConfig = config . clone ();
+        config . initial_node_limit = 3;
+        let mut stream : TcpStream = mk_test_tcp_stream ();
+        let response : SaveResponse = update_from_and_rerender_buffer (
+          &mut stream, &requested, &config, tantivy, &graph,
+          &Ok (view_id), &mut views_state ) . await ?;
+        assert! ( response . errors . is_empty (),
+                  "the request must save, got {:?}", response . errors );
+        response . saved_view };
+      println! ("Result of a request on an editable node:\n{}", result);
+      let expected = indoc! {"
+        * (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
+        1 body
+        ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
+        11 body
+        ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth (contains in 1))))) 12
+        12 body
+        *** (skg (node (id 121) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 2)) (birth (contains in 1))))) 121
+        *** (skg (node (id 122) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 122
+        *** (skg (node (id 123) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 123
+        *** (skg (node (id 124) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 124
+        ** (skg (node (id 13) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
+      "};
+      assert_metadata_eq!(result, expected,
+        "a request on editable 1 unfolds its content within the budget");
+      Ok (( )) }
+
+// ===================================================
+// Test: a request on a write-protected occurrence moves editability
+// ===================================================
+// A view of 1 and 12 draws root 12 editable, with its content, and
+// the 12 under 1 as a write-protected leaf. A request on that leaf
+// moves editability to it; root 12 is write-protected and keeps its
+// drawn content. A request on root 12, whose drawn children are
+// unchanged, moves editability back: root 12 is editable again with
+// the same content, and the 12 under 1 is write-protected. A further
+// save changes nothing.
+async fn test_editable_view_request_moves_editability_back (
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      let mut config : SkgConfig = config . clone ();
+      config . initial_node_limit = 100;
+      let graph : InRustGraphHandle =
+        graph_handle_from_config (&config) ?;
+      let mut views_state : ViewsState = ViewsState {
+        open_views     : OpenViews::new (),
+        graph_straddle : None,};
+      let (view_id, opened) : (ViewId, String) =
+        open_content_view (
+          &config, tantivy, &graph, &mut views_state, &["1", "12"] ) ?;
+      let mut save = async | buffer : &str | -> Result<String, Box<dyn Error>> {
+        let mut stream : TcpStream = mk_test_tcp_stream ();
+        let response : SaveResponse = update_from_and_rerender_buffer (
+          &mut stream, buffer, &config, tantivy, &graph,
+          &Ok (view_id . clone ()), &mut views_state ) . await ?;
+        assert! ( response . errors . is_empty (),
+                  "the buffer must save, got {:?}\n\nbuffer:\n{}",
+                  response . errors, buffer );
+        Ok (response . saved_view) };
+      let root_12 : &str = "* (skg (node (id 12) (repo main)";
+      let under_1 : &str = "** (skg (node (id 12) (repo main)";
+      let line_starting = |buffer : &str, prefix : &str| -> String {
+        buffer . lines () . find ( |line| line . starts_with (prefix) )
+          . unwrap_or_else ( || panic! ( "no line starts {:?}:\n{}", prefix, buffer ))
+          . to_string () };
+      let root_12_content = |buffer : &str| -> Vec<String> {
+        buffer . lines ()
+          . skip_while ( |line| ! line . starts_with (root_12) ) . skip (1)
+          . filter ( |line| line . starts_with ("*") )
+          . map ( |line| line . replace ("writeProtected ", "")
+                              . replace ("omittedBody ", "") )
+          . collect () };
+      let moved : String = save (
+        &requesting_editable_at (&opened, "(node (id 12) (repo main) writeProtected")
+      ) . await ?;
+      assert! ( ! line_starting (&moved, under_1) . contains ("writeProtected")
+                && line_starting (&moved, root_12) . contains ("writeProtected"),
+                "editability must move to the 12 under 1:\n{}", moved );
+      assert! ( ! root_12_content (&moved) . is_empty (),
+                "root 12 keeps its drawn content:\n{}", moved );
+      let moved_back : String = save (
+        &requesting_editable_at (
+          &moved, "* (skg (node (id 12) (repo main) (affectsParent na) writeProtected")
+      ) . await ?;
+      println! ("Result of moving editability back:\n{}", moved_back);
+      assert! ( line_starting (&moved_back, under_1) . contains ("writeProtected")
+                && ! line_starting (&moved_back, root_12) . contains ("writeProtected"),
+                "editability must move back to root 12:\n{}", moved_back );
+      assert_eq! ( root_12_content (&moved_back), root_12_content (&moved),
+                   "root 12's drawn content is kept:\n{}", moved_back );
+      let again : String = save (&moved_back) . await ?;
+      assert_eq! ( again, moved_back, "a further save changes nothing" );
       Ok (( )) }
 
 // ===================================================

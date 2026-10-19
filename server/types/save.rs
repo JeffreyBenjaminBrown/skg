@@ -226,12 +226,6 @@ fn format_buffer_validation_error (
               skgid . 0) },
     BufferValidationError::OverrideInvariantViolation(msg) => {
       format!("{}\n", msg) },
-    BufferValidationError::EditableViewRequestOnEditableNode (skgid) => {
-      format!("Editable view request on a node that is already editable:\n- ID: {}\n- The node already shows its content; no expansion needed.\n",
-              skgid . 0) },
-    BufferValidationError::EditableViewRequestOnNodeWithContentChildren (skgid) => {
-      format!("Editable view request on a node with content children:\n- ID: {}\n- The expansion would clobber those children.\n- Save without the request first, then delete children and retry.\n",
-              skgid . 0) },
     BufferValidationError::MultipleEditableViewRequestsForSameId (skgid) => {
       format!("Multiple editable view requests for the same ID:\n- ID: {}\n- At most one editable view request per ID is allowed.\n",
               skgid . 0) },

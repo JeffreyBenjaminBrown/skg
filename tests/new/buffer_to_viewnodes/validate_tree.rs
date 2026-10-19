@@ -55,11 +55,11 @@ fn all_tests
       s . reset ("test_empty_title_allowed_for_writeProtected_and_delete", fixtures) ?;
       test_empty_title_allowed_for_writeProtected_and_delete (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_editable_view_request_with_only_non_content_children_is_allowed", fixtures) ?;
-      test_editable_view_request_with_only_non_content_children_is_allowed (
+      s . reset ("test_editable_view_request_on_an_editable_node_with_content_is_allowed", fixtures) ?;
+      test_editable_view_request_on_an_editable_node_with_content_is_allowed (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_editable_view_request_with_content_child_is_rejected", fixtures) ?;
-      test_editable_view_request_with_content_child_is_rejected (
+      s . reset ("test_two_editable_view_requests_for_one_node_are_rejected", fixtures) ?;
+      test_two_editable_view_requests_for_one_node_are_rejected (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_writeProtected_relRepo_request_needs_an_editable_recorder", fixtures) ?;
       test_writeProtected_relRepo_request_needs_an_editable_recorder (
@@ -548,45 +548,40 @@ async fn test_empty_title_allowed_for_writeProtected_and_delete (
                  "WriteProtected and delete-requested nodes should not trigger empty title errors");
       Ok(( )) }
 
-async fn test_editable_view_request_with_only_non_content_children_is_allowed (
+async fn test_editable_view_request_on_an_editable_node_with_content_is_allowed (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // An editable view request on a write-protected node whose children
-  // are all NON-content (affectsParent != True) should be permitted: the
-  // expansion would fill the node with content, and non-content
-  // children (e.g. containerward role grafts) don't conflict
-  // with that. Only Container children would be clobbered.
+  // A request on an editable node with content children passes:
+  // completion hands it to those children, unfolding them editable.
+  // So does a request on a write-protected node with drawn children.
       let input : &str =
         indoc! {"
-                * (skg (node (id parent) (repo main) writeProtected (viewRequests editableView))) parent
-                ** (skg (node (id ancestor) (repo main) (affectsParent false))) non-content child
+                * (skg (node (id parent) (repo main) (viewRequests editableView))) parent
+                ** (skg (node (id c) (repo main))) content child
+                * (skg (node (id other) (repo main) writeProtected (viewRequests editableView))) other
+                ** (skg (node (id d) (repo main) writeProtected)) drawn child
             "};
       let viewforest : MpViewForest =
         org_to_uninterpreted_viewforest (input) . unwrap () . 0;
       let errors : Vec<BufferValidationError> =
         find_buffer_errors_for_saving (
           &viewforest, config ) ?;
-      let hits : Vec<&BufferValidationError> = errors . iter ()
-        . filter ( |e| matches! (
-          e, BufferValidationError::EditableViewRequestOnNodeWithContentChildren (_) ))
-        . collect ();
-      assert_eq! ( hits . len (), 0,
-        "Non-content children should not trigger \
-         EditableViewRequestOnNodeWithContentChildren. Errors: {:?}",
+      assert! ( errors . is_empty (),
+        "Requests on nodes with content children should pass. \
+         Errors: {:?}",
         errors );
       Ok (( )) }
 
-async fn test_editable_view_request_with_content_child_is_rejected (
+async fn test_two_editable_view_requests_for_one_node_are_rejected (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // Flip side: a Container child (the default when 'affectsParent' is absent)
-  // DOES conflict with expansion, so the error should fire.
+  // A buffer carries at most one editable-view request per node.
       let input : &str =
         indoc! {"
                 * (skg (node (id parent) (repo main) writeProtected (viewRequests editableView))) parent
-                ** (skg (node (id c) (repo main))) content child
+                * (skg (node (id parent) (repo main) writeProtected (viewRequests editableView))) parent again
             "};
       let viewforest : MpViewForest =
         org_to_uninterpreted_viewforest (input) . unwrap () . 0;
@@ -595,13 +590,12 @@ async fn test_editable_view_request_with_content_child_is_rejected (
           &viewforest, config ) ?;
       let hits : Vec<&BufferValidationError> = errors . iter ()
         . filter ( |e| matches! (
-          e, BufferValidationError::EditableViewRequestOnNodeWithContentChildren (skgid)
+          e, BufferValidationError::MultipleEditableViewRequestsForSameId (skgid)
             if skgid . 0 == "parent" ))
         . collect ();
       assert_eq! ( hits . len (), 1,
-        "A Container child should trigger exactly one \
-         EditableViewRequestOnNodeWithContentChildren for 'parent'. \
-         Errors: {:?}",
+        "Two requests for 'parent' should trigger exactly one \
+         MultipleEditableViewRequestsForSameId. Errors: {:?}",
         errors );
       Ok (( )) }
 

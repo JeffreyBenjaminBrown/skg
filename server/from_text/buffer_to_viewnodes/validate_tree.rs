@@ -272,15 +272,12 @@ fn validate_view_roots (
           "View roots must be UnrestrictedVognodes, restricted vognodes, deleted nodes, Unknown phantoms or historical phantoms."
           . to_string () )); }}}
 
-/// For each node in the viewforest, if it has an editable view request,
-/// verify that:
-/// - The node is write-protected.
-/// - It has no content children (UnrestrictedVognode children with affectsParent ==
-///   Container). Non-content children — containerward role tree stubs,
-///   mentioners, non-vognodes, etc. — don't block expansion:
-///   they won't be clobbered by it.
-/// - No other node with the same ID has an editable view request,
-///   because there can only be one editable view.
+/// No two nodes with the same ID may carry editable view requests,
+/// because there can only be one editable view.
+/// A request on an editable node, or on one with content children,
+/// is fine: completion hands it to the node's content children.
+/// Children typed under a write-protected occurrence are refused
+/// elsewhere, by 'errors_and_normalize_new_writeProtected_occurrences'.
 fn validate_editable_view_requests (
   viewforest : &MpViewForest,
   errors : &mut Vec<BufferValidationError>,
@@ -298,24 +295,9 @@ fn validate_editable_view_requests (
       = &viewnode . kind
       { if t . view_requests . contains (&ViewRequest::Editable)
         { if let Some (skgid) = &t . skgid {
-          { // Must be write-protected
-            if ! t . is_writeProtected ()
-            { errors . push( BufferValidationError::EditableViewRequestOnEditableNode(
-              skgid . clone() )); }}
-          { // Must have no content children.
-            let has_content_children : bool =
-              node_ref . children () . any ( |child| matches! (
-                &child . value () . kind,
-                MpViewnodeKind::Vognode (MpVognode::Unrestricted (ct))
-                  if ct . affectsParent == AffectsParent::True ));
-            if has_content_children
-            { errors . push(
-              BufferValidationError::EditableViewRequestOnNodeWithContentChildren(
-                skgid . clone() )); }}
-          { // At most one request per ID
-            if ! ids_with_requests . insert(skgid . clone())
-            { errors . push( BufferValidationError::MultipleEditableViewRequestsForSameId(
-              skgid . clone() )); }} }}} }}}
+          if ! ids_with_requests . insert(skgid . clone())
+          { errors . push( BufferValidationError::MultipleEditableViewRequestsForSameId(
+            skgid . clone() )); }} }}} }}
 
 /// A relRepo request describes the relationship from a node's view-parent
 /// to the node, so it is an instruction of the view-parent's, not of the
