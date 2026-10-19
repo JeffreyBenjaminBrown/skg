@@ -1,5 +1,5 @@
 [workspace]
-members = ["tools/introspect/code-map", "tools/introspect/call-graph", "tools/introspect/change-forest", "tools/scope-reducer", "tools/rust-field-tags", "tests/yaml-corpus"]
+members = ["tools/introspect/code-map", "tools/introspect/call-graph", "tools/introspect/change-forest", "tools/scope-reducer", "tools/rust-field-tags"]
 
 [package]
 name = "skg"
@@ -81,7 +81,6 @@ im = "15"
 indoc = "2"
 itertools = "0.15"
 libc = "0.2"
-rand = "0.10"
 regex = "1"
 serde = { version = "1.0", features = ["derive"] }
 yaml_serde = "0.10"

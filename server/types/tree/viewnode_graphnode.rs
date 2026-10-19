@@ -3,15 +3,14 @@
 use crate::to_org::util::get_skgid_from_viewnode_at;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, MSV, SkgConfig, SkgrepoName};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
     Viewnode, ViewnodeKind, UnrestrictedVognode, AffectsParent };
-use crate::types::viewnode::{Vognode, Phantom, PropertyFolder, Property, PartnerFolder};
+use crate::types::viewnode::{Vognode, Phantom, PartnerFolder};
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind };
 use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::nodes::complete::Graphnode;
-use crate::types::list::dedup_vector;
 use super::generic::{ unique_non_vognode_child, write_at_node_in_tree, with_node_mut };
 
 use ego_tree::{Tree, NodeId, NodeRef};
@@ -143,39 +142,6 @@ pub fn insert_non_vognode_as_child (
       else       { parent_mut . append  (viewnode) . id () } } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (folder_skgid) }
-
-/// Collect aliases for a node:
-/// - find the unique AliasFolder child (error if multiple)
-/// - for each Alias child of the AliasFolder, collect its title
-/// Duplicates are removed (preserving order of first occurrence).
-/// Returns None ("no opinion") if no AliasFolder found.
-/// Returns Some(vec) if AliasFolder found, even if empty.
-pub fn collect_grandchild_aliases_for_viewnode (
-  tree: &Tree<Viewnode>,
-  treeid: NodeId,
-) -> Result<MSV<String>, String> {
-  let alias_folder_skgid : Option<NodeId> =
-    unique_non_vognode_child_of_viewnode (
-      tree, treeid, &ViewnodeKind::PropertyFolder (PropertyFolder::Alias) )
-    . map_err ( |e| e . to_string() ) ?;
-  match alias_folder_skgid {
-    None => Ok (MSV::Unspecified),
-    Some (folder_skgid) => {
-      let aliases : Vec<String> = {
-        let folder_ref : NodeRef<Viewnode> =
-          tree . get (folder_skgid) . expect ("collect_grandchild_aliases_for_viewnode: AliasFolder not found");
-        let mut aliases : Vec<String> = Vec::new();
-        for alias_child in folder_ref . children() {
-          { // check for invalid state
-            if ! matches!(&alias_child . value() . kind,
-                          ViewnodeKind::Property (Property::Alias { .. } )) {
-              return Err ( format! (
-                "AliasFolder has non-Alias child with kind: {:?}",
-                alias_child . value() . kind )); }}
-          aliases . push(
-            alias_child . value() . title() . to_string() ); }
-        aliases };
-      Ok( MSV::Specified(dedup_vector (aliases)) ) }} }
 
 /// Find a child node by its ID.
 /// Returns the NodeId of the child if found, None otherwise.

@@ -219,7 +219,7 @@ Each slice ends with the three suites passing ('cargo nextest run',
 'bash/emacs-tests.sh', 'bash/nvim-tests.sh'), its docs updated, and
 its last commit made as the Commits section says.
 
-** Slice 0: deletions
+** DONE Slice 0: deletions
 Remove 'tests/yaml-corpus/' and its entry in the workspace 'members'
 of 'Cargo.toml'; the next build drops 'serde_yaml', 'serde_yaml_ng',
 'serde_yaml_bw' and 'serde-saphyr' from 'Cargo.lock' (check that it
