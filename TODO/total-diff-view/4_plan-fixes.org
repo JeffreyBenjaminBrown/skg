@@ -561,7 +561,7 @@ and the sentence in both COMMANDS files and the API doc that names the
 preserver. Test: the preserver is drawn as a new member of the
 acquirer's content, not as a root.
 
-** Slice 7: the straddle is dropped on a store rebuild, and written back after a rerender-all
+** DONE Slice 7: the straddle is dropped on a store rebuild, and written back after a rerender-all
 In the rebuild handler, set the connection's straddle to None before
 answering. In 'rerender_all_views.rs', write the refreshed straddle
 back to 'ViewsState' as the save path does ('update_buffer.rs' already

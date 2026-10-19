@@ -822,3 +822,26 @@ beside it, so it is private.
 *** how the preserver is drawn
 Outside U, the preserver is a write-protected leaf in the acquirer's
 content, tagged '(diff node+ rel+)'.
+** Slice 7: deviations
+*** the rebuild also empties the snapshot cache
+Dropping the straddle alone does not make the next request read the
+disk the rebuild read. The before-graph comes from
+'read_owned_head_graph_snapshot_maybe_cached', whose cache key names
+only the owned skgrepos' HEAD commits, while the foreign skgrepos it
+holds were read from their worktrees. A foreign file edited before
+the rebuild would come back stale from the cache, and its node would
+enter C. So the rebuild also calls the new 'forget_cached_git_snapshots'
+('server/git_ops/git_snapshot.rs'), which empties the whole cache.
+*** only a rebuild that succeeds drops the straddle
+A failed rebuild leaves the old live graph and the open views in
+place, so it leaves their straddle too. The straddle is dropped where
+a successful rebuild closes the views, in
+'rebuild_session_lifetime_stores_in_place', which the telescope
+migration shares with the handler.
+*** where the rerenders write the straddle back
+Preparing the rerenders changes nothing, so the text-release decision
+can come first. 'PreparedRerenders' therefore carries the refreshed
+straddle, and 'stream_prepared_rerenders' writes it back as it
+registers the views. A refused release writes nothing. The skgrepo
+switch, the absent-reference cleanup and the rerender after a commit
+stream through the same function, so they write it back too.

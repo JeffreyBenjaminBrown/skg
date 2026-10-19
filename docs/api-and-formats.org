@@ -342,9 +342,11 @@ So far there are these endpoints:
     glossary's "Terms of the total diff view", and "Metadata of the
     total diff view" below.
   - The server compares HEAD with the worktree through a graph straddle it
-    keeps per connection, brought up to date at each request and at
-    each save of a buffer of the total diff view. Closing the last such
-    buffer drops it. Saving such a buffer is ordinary (see "Save
+    keeps per connection, brought up to date at each request, at each
+    save of a buffer of the total diff view, and at each rerender of
+    every view. Closing the last such buffer drops it, as does a
+    rebuild of the session-lifetime stores, so the next request reads
+    both halves from the disk the rebuilt live graph was read from. Saving such a buffer is ordinary (see "Save
     buffer"), and its response carries the readiness summary.
   - A rerender of such a buffer (after a save, collateral, or after a
     commit) reconciles what it holds with a fresh drawing from the
@@ -411,7 +413,8 @@ So far there are these endpoints:
     candidate graph, builds that graph and a fresh Tantivy index from the same
     node vector, then atomically swaps in the new runtime generation. It does
     not rewrite =.skg= files. Failure leaves the old generation live. Success
-    closes existing views and recomputes context rankings for search.
+    closes existing views, drops the graph straddle of the total diff
+    view, and recomputes context rankings for search.
 
 ** relRepo info
   - Request: ((request . "relRepo info") (owner . "ID")

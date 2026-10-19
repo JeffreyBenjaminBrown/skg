@@ -1,3 +1,4 @@
+use crate::graph_straddle::types::GraphStraddle;
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
@@ -17,6 +18,7 @@ use crate::update_buffer::{
 use futures::executor::block_on;
 use std::net::TcpStream;
 use std::collections::HashSet;
+use std::sync::Arc;
 
 struct PreparedView {
   view_id    : ViewId,
@@ -30,6 +32,7 @@ pub(crate) struct PreparedRerenders {
   views    : Vec<PreparedView>,
   errors   : Vec<String>,
   warnings : Vec<String>,
+  graph_straddle : Option<Arc<GraphStraddle>>, // the connection's, as the rerenders brought it up to date
 }
 
 pub fn handle_rerender_all_views_request (
@@ -218,8 +221,8 @@ fn prepare_rerender_views_where (
     RerenderAfterSaveContext::without_save_with_runtime (
       env, runtime, skgrepo_restriction );
   // A buffer of the total diff view is reconciled over a graph straddle
-  // brought up to date from the connection's, which it does not
-  // replace.
+  // brought up to date from the connection's. Streaming the rerenders
+  // writes it back, as a save does.
   context . graph_straddle = views_state . graph_straddle . clone ();
   let mut rendered_views : Vec<PreparedView> = Vec::new ();
   for view_id in &view_ids {
@@ -263,6 +266,7 @@ fn prepare_rerender_views_where (
     views    : rendered_views,
     errors   : context . errors,
     warnings : context . warnings,
+    graph_straddle : context . graph_straddle,
   }
 }
 
@@ -323,6 +327,8 @@ pub(crate) fn stream_prepared_rerenders (
     & tag_sexp_response (
       TcpToClient::RerenderLock,
       & format_lock_views_sexp (&prepared . view_ids) ));
+  if prepared . graph_straddle . is_some () {
+    views_state . graph_straddle = prepared . graph_straddle; }
   for view in prepared . views {
     views_state . open_views . update_view (
       &prepared . runtime . graph,
