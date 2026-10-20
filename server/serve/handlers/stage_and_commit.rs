@@ -1,9 +1,9 @@
 //! The "stage and commit" request ('docs/diff-view.org',
 //! "Stage and commit"): stage everything and git-commit it,
 //! in every owned skgrepo that has changes, with one message. When the
-//! readiness summary is incomplete and the request lacks
-//! '(confirmed . t)', the answer is the summary alone and nothing
-//! changes.
+//! readiness summary is incomplete, or some owned gitrepo has entries
+//! staged already, and the request lacks '(confirmed . t)', the answer
+//! asks for confirmation and nothing changes.
 //!
 //! Every answer is followed by a rerender stream, as the
 //! delete-references command's is: empty unless something was
@@ -15,7 +15,8 @@
 use crate::change_leaves::{
   BufferReadinessSummary, ReadinessSummary, readiness_response_sexp};
 use crate::git_ops::stage_and_commit::{
-  SkgrepoCommitOutcome, stage_and_commit_owned_skgrepos};
+  PreStagedGitrepo, SkgrepoCommitOutcome,
+  pre_staged_entries_of_owned_gitrepos, stage_and_commit_owned_skgrepos};
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::readiness_store::ReadinessStore;
@@ -31,7 +32,9 @@ use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgrepoName;
 
 use sexp::{Atom, Sexp};
+use std::iter::once;
 use std::net::TcpStream;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, MutexGuard};
 
 /// What a "stage and commit" request did.
@@ -39,9 +42,11 @@ use std::sync::{Arc, MutexGuard};
 pub enum StageAndCommitAnswer {
   /// Nothing was attempted.
   Refused (String),
-  /// The readiness summary is incomplete and the request was not
-  /// confirmed. Nothing changed.
-  NeedsConfirmation (ReadinessSummary),
+  /// The readiness summary is incomplete or 'pre_staged' is not
+  /// empty, and the request was not confirmed. Nothing changed.
+  NeedsConfirmation {
+    summary    : ReadinessSummary,
+    pre_staged : Vec<PreStagedGitrepo>, },
   /// Each owned skgrepo's outcome, and any error met after the
   /// git-commits.
   Committed {
@@ -76,7 +81,8 @@ pub fn handle_stage_and_commit_request (
     _ => stream_empty_rerender (stream), }}
 
 /// See the module comment. Refused unless the skgrepo restriction is
-/// 'all', as the diff view is. After the git-commits, the
+/// 'all', as the diff view is. A confirmed request skips both checks.
+/// After the git-commits, the
 /// connection's graph straddle is rebuilt (each committed HEAD moved), and
 /// the store keeps exactly the marks whose change-forest leaves still
 /// exist in it, so the marks of the changes committed are dropped.
@@ -100,12 +106,16 @@ pub fn stage_and_commit (
     Ok (straddle) => straddle,
     Err (e) => return StageAndCommitAnswer::Refused ( format! (
       "Cannot stage and commit: {}", e )), };
-  { let store : MutexGuard<ReadinessStore> =
-      env . runtime . lock_readiness_store ();
-    let summary : ReadinessSummary =
-      straddle . change_leaves () . readiness_summary (&store);
-    if ! summary . is_complete () && ! confirmed {
-      return StageAndCommitAnswer::NeedsConfirmation (summary); }}
+  if ! confirmed {
+    let summary : ReadinessSummary = {
+      let store : MutexGuard<ReadinessStore> =
+        env . runtime . lock_readiness_store ();
+      straddle . change_leaves () . readiness_summary (&store) };
+    let pre_staged : Vec<PreStagedGitrepo> =
+      pre_staged_entries_of_owned_gitrepos (&runtime . config);
+    if ! summary . is_complete () || ! pre_staged . is_empty () {
+      return StageAndCommitAnswer::NeedsConfirmation {
+        summary, pre_staged }; }}
   let outcomes : Vec<(SkgrepoName, SkgrepoCommitOutcome)> =
     stage_and_commit_owned_skgrepos (&runtime . config, message);
   let mut errors : Vec<String> = Vec::new ();
@@ -125,10 +135,12 @@ pub fn stage_and_commit (
 
 /// Format, for each answer:
 ///   ((errors ("REFUSAL")) (warnings ()))
-///   ((needs-confirmation . t) (readiness-summary ...) (errors ()) (warnings ()))
+///   ((needs-confirmation . t) [(pre-staged ((GITREPO PATH...) ...))]
+///    (readiness-summary ...) (errors ()) (warnings ()))
 ///   ((commits (("SKGREPO" "COMMIT-ID") ...)) (errors (...)) (warnings ()))
 /// The readiness summary has the save response's form, with an
-/// not-editable count of 0. 'commits' lists the skgrepos git-committed; a
+/// not-editable count of 0. 'pre-staged' is there only when some
+/// gitrepo had entries staged already. 'commits' lists the skgrepos git-committed; a
 /// skgrepo without changes is in neither list, a failed one is an
 /// error.
 pub fn stage_and_commit_response_sexp (
@@ -138,9 +150,12 @@ pub fn stage_and_commit_response_sexp (
     StageAndCommitAnswer::Refused (error) =>
       readiness_response_sexp (
         Vec::new (), None, &[ error . clone () ], &[] ),
-    StageAndCommitAnswer::NeedsConfirmation (summary) =>
+    StageAndCommitAnswer::NeedsConfirmation { summary, pre_staged } =>
       readiness_response_sexp (
-        vec! [ true_entry_sexp ("needs-confirmation") ],
+        once ( true_entry_sexp ("needs-confirmation") )
+          . chain ( ( ! pre_staged . is_empty () ) . then (
+            || pre_staged_sexp (pre_staged) ))
+          . collect (),
         Some ( &BufferReadinessSummary {
           summary : summary . clone (), changes_not_editable_here : 0 } ),
         &[], &[] ),
@@ -164,3 +179,20 @@ pub fn stage_and_commit_response_sexp (
           Sexp::List (commits) ] ) ],
         None, &all_errors, &[] ) }, };
   sexp_to_client_string (&response) }
+
+/// Format: (pre-staged ((GITREPO PATH...) ...))
+fn pre_staged_sexp (
+  pre_staged : &[PreStagedGitrepo],
+) -> Sexp {
+  let path_atom = |path : &Path| -> Sexp {
+    Sexp::Atom ( Atom::S ( path . display () . to_string () )) };
+  Sexp::List ( vec! [
+    Sexp::Atom ( Atom::S ( "pre-staged" . to_string () )),
+    Sexp::List (
+      pre_staged . iter ()
+        . map ( |gitrepo| Sexp::List (
+          once ( gitrepo . gitrepo . as_path () )
+            . chain ( gitrepo . paths . iter () . map ( PathBuf::as_path ) )
+            . map (path_atom)
+            . collect () ))
+        . collect () ) ] ) }
