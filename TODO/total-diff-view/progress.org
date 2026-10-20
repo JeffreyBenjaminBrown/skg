@@ -1261,3 +1261,24 @@ the TDV-buffer refusal among them, are unit tests beside the
 function.
 *** the headline had no keyword
 The slice's headline carried no TODO; it now carries DONE.
+** Slice 1: deviations
+*** the audit
+Every caller of 'nodes' gathers into a set or a map, tests a
+predicate, or (the TDV home-move facts) sets the same fact twice, so
+none changed behavior. Two had worked around the double yield:
+**** the fork-spec builder deduplicated
+'explicit_fork_specs_from_viewforest' ('server/from_text.rs') kept a
+seen-set so that a forked root would not yield two specs; its comment
+blamed detached arena copies, which 'nodes' never reaches. D2's
+'validate_fork_view_requests' already refuses a second fork request
+for one node, so the seen-set is gone, and the doc comment says D2
+covers that case.
+**** the write-protected-occurrence validator walked the roots itself
+'errors_for_writeProtected_occurrences' iterated
+'roots () . flat_map (descendants)' to avoid reporting a root twice;
+it now calls 'nodes'.
+*** the unit test
+'tests/unit/tree_forest.rs' (a 'Forest<u32>', since 'nodes' is
+generic) fails on the old code.
+*** the headline had no keyword
+The slice's headline carried no TODO; it now carries DONE.

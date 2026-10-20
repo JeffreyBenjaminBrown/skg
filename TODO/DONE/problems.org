@@ -1,3 +1,13 @@
+* 'ViewForest::nodes' yields every root twice (2026-10-19; fixed 2026-10-20)
+  'nodes' ('server/types/tree/forest.rs') chains each root with
+  'root . descendants ()', but ego_tree's 'descendants' already
+  starts with the node itself. A caller that counts, or reports once
+  per node, sees each root twice: the write-protected-occurrence
+  validator reported a root's error twice until it iterated
+  'descendants' itself. Callers in 'server/pcsvf.rs',
+  'server/from_text/fork.rs', 'server/serve/handlers/save_dependencies/mod.rs'
+  and elsewhere were not audited.
+  Fixed 2026-10-20 in slice 1 of [[file:../total-diff-view/10_plan_still-more.org][the TDV still-more-fixes plan]].
 * Neovim shows Emacs chords in most server messages (2026-10-19; fixed 2026-10-20)
   Server messages name Emacs chords: C-c s s (fork errors), C-c g RET
   (edit requests on write-protected nodes, the overridesHere

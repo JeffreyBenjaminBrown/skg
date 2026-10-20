@@ -347,7 +347,8 @@ fn dead_link_warnings (
 /// carries the explicit-child and inferred-ancestor maps too, but both
 /// are keyed by FOREIGN pids, so an owned fork target never hits them.
 /// D2's 'validate_fork_view_requests' has already rejected an unsaved
-/// or already-forked target, so this only builds.
+/// or already-forked target, and a second request for one, so this
+/// only builds.
 fn explicit_fork_specs_from_viewforest (
   viewforest           : &ViewForest,
   graph                : &crate::dbs::in_rust_graph::InRustGraph,
@@ -356,16 +357,11 @@ fn explicit_fork_specs_from_viewforest (
 ) -> Result<Vec<ForkSpec>, Vec<BufferValidationError>> {
   let mut specs  : Vec<ForkSpec> = Vec::new ();
   let mut errors : Vec<BufferValidationError> = Vec::new ();
-  let mut seen   : HashSet<ID> = HashSet::new ();
   for node in viewforest . nodes () {
     let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = & node . value () . kind
       else { continue; };
     if ! t . view_requests . contains (& ViewRequest::Fork) { continue; }
     let pid : &ID = & t . skgid;
-    // 'viewforest.nodes()' walks the ego_tree arena, which retains
-    // detached copies left by placement; dedup so one forked node yields
-    // one spec. (D2 already rejected a genuine second fork request.)
-    if ! seen . insert (pid . clone ()) { continue; }
     let graph_snapshot : Graphnode =
       match graphnode_graphFirst_by_pid_and_skgrepo (
         graph, config, pid, & t . home_skgrepo ) {

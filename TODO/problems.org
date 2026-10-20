@@ -3,16 +3,6 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
-* Problems noticed while validating write-protected occurrences (2026-10-19)
-** 'ViewForest::nodes' yields every root twice
-  'nodes' ('server/types/tree/forest.rs') chains each root with
-  'root . descendants ()', but ego_tree's 'descendants' already
-  starts with the node itself. A caller that counts, or reports once
-  per node, sees each root twice: the write-protected-occurrence
-  validator reported a root's error twice until it iterated
-  'descendants' itself. Callers in 'server/pcsvf.rs',
-  'server/from_text/fork.rs', 'server/serve/handlers/save_dependencies/mod.rs'
-  and elsewhere were not audited.
 * Problems noticed while fixing repo moves over repeated nodes (2026-10-07)
 ** Repo moves do graph logic in the client
 The Emacs client computes which relationships a repo move strands, from

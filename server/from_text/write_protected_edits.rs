@@ -34,7 +34,7 @@ pub fn errors_for_writeProtected_occurrences (
 ) -> Vec<BufferValidationError> {
   let mut errors : Vec<BufferValidationError> =
     flags_surface_errors_against_graph (viewforest, graph);
-  for node in viewforest . roots () . flat_map ( |root| root . descendants () ) {
+  for node in viewforest . nodes () {
     let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
       &node . value () . kind else { continue; };
     if ! occurrence . is_writeProtected () { continue; }

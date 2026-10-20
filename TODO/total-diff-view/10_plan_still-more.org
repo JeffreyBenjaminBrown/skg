@@ -168,7 +168,7 @@ hidden members passes; and in 'tests/pcsvf/', a TDV buffer whose
 write-protected occurrence shows a removed partner with '(diff
 rel-)' saves unchanged.
 
-** Slice 1: 'ViewForest::nodes' yields each root once
+** DONE Slice 1: 'ViewForest::nodes' yields each root once
 Make 'nodes' iterate each root's descendants alone, since
 'descendants' includes the root. Add a unit test that a forest of two
 roots with children yields every viewnode exactly once. Audit every
