@@ -414,7 +414,7 @@ fn unrestrictedVognode_metadata_to_string (
             metadata_value_atom (
               & format! ("⌂:{}", src_config . herald_label ()) ) ) ); }}
       if let Some ((old, new)) =
-        &unrestrictedVognode . viewStats . home_move {
+        &unrestrictedVognode . viewStats . home_skgrepo_move {
         parts . push ( format! (
           "(homeMove (old {}) (new {}))",
           metadata_value_atom (old), metadata_value_atom (new) )); }

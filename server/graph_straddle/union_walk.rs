@@ -128,7 +128,7 @@ impl GraphStraddle {
               . collect () )
       . unwrap_or_default () }
 
-  /// C, split into its rightward and leftward halves. Computed once
+  /// C, split into its out-changed and in-changed halves. Computed once
   /// per straddle.
   pub fn changed_pids (
     &self,
@@ -143,25 +143,25 @@ impl GraphStraddle {
       self . before . nodes . keys ()
       . chain ( self . after . nodes . keys () )
       . collect ();
-    let rightward : BTreeSet<ID> =
+    let out_changed : BTreeSet<ID> =
       all_pids . into_iter ()
-      . filter ( |pid| self . changed_rightward (pid) )
+      . filter ( |pid| self . changed_out (pid) )
       . cloned ()
       . collect ();
-    let leftward : BTreeSet<ID> =
+    let in_changed : BTreeSet<ID> =
       { // Every change to a set of recorders is a change to some
         // recorder's relationships, so it is found from that recorder.
-        let mut leftward : BTreeSet<ID> = BTreeSet::new ();
-        for recorder in &rightward {
+        let mut in_changed : BTreeSet<ID> = BTreeSet::new ();
+        for recorder in &out_changed {
           for role in ROLES_OF_RECORDED_PARTNERS {
             for partner in self . partners (recorder, role) {
               if partner . presence != Presence::Both
                 && self . node_presence (&partner . id) . is_some () {
-                leftward . insert (partner . id); }} }}
-        leftward };
-    ChangedPids { rightward, leftward } }
+                in_changed . insert (partner . id); }} }}
+        in_changed };
+    ChangedPids { out_changed, in_changed } }
 
-  fn changed_rightward (
+  fn changed_out (
     &self,
     pid : &ID,
   ) -> bool {

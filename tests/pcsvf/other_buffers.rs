@@ -13,7 +13,7 @@ use crate::pcsvf::common::{
 
 use skg::graph_straddle::types::GraphStraddle;
 use skg::pcsvf::{PcsvfSets, pcsvf_sets_for_home_moves, pcsvf_sets_for_merges};
-use skg::types::views_state::TdvBuffer;
+use skg::types::views_state::DiffViewBufferKind;
 
 use std::error::Error;
 
@@ -21,7 +21,7 @@ const SKGREPOS : [&str; 2] = [ "public", "private" ];
 
 /// The text of a buffer of the 'buffers' fixture.
 fn buffer (
-  tdv_buffer : TdvBuffer,
+  tdv_buffer : DiffViewBufferKind,
 ) -> Result<String, Box<dyn Error>> {
   let mut text : String = String::new ();
   with_fixture ("buffers", &SKGREPOS, |f : &mut Fixture| {
@@ -96,7 +96,7 @@ fn the_home_move_sets_hold_the_moved_nodes (
 #[test]
 fn the_merges_buffer_draws_only_the_merge (
 ) -> Result<(), Box<dyn Error>> {
-  let text : String = buffer (TdvBuffer::Merges) ?;
+  let text : String = buffer (DiffViewBufferKind::Merges) ?;
   let roots : Vec<&str> = roots (&text);
   assert_eq! ( roots . len (), 2, "{}", text );
   assert! ( roots [0] . contains ("(historical (id acqd)"), "{}", text );
@@ -116,7 +116,7 @@ fn the_merges_buffer_draws_only_the_merge (
 #[test]
 fn the_skgrepo_changes_buffer_heralds_each_move_and_moves_like_an_ancestor (
 ) -> Result<(), Box<dyn Error>> {
-  let text : String = buffer (TdvBuffer::SkgrepoChanges) ?;
+  let text : String = buffer (DiffViewBufferKind::SkgrepoChanges) ?;
   assert_eq! ( roots (&text) . len (), 1, "{}", text );
   for (id, facts) in [
     ( "mvp", "(homeMove (old public) (new private)))" ),
@@ -137,14 +137,14 @@ fn the_skgrepo_changes_buffer_heralds_each_move_and_moves_like_an_ancestor (
 #[test]
 fn the_home_move_heralds_are_only_in_the_skgrepo_changes_buffer (
 ) -> Result<(), Box<dyn Error>> {
-  let text : String = buffer (TdvBuffer::AllChanges) ?;
+  let text : String = buffer (DiffViewBufferKind::AllChanges) ?;
   assert! ( ! headline_of (&text, "mvc") . contains ("homeMove"), "{}", text );
   Ok (( )) }
 
 #[test]
 fn the_order_only_buffer_is_a_flat_list_with_markers (
 ) -> Result<(), Box<dyn Error>> {
-  let text : String = buffer (TdvBuffer::OrderOnlyChanges) ?;
+  let text : String = buffer (DiffViewBufferKind::OrderOnlyChanges) ?;
   let lines : Vec<&str> = text . lines () . collect ();
   assert_eq! ( roots (&text) . len (), 1, "{}", text );
   assert! ( lines [0] . starts_with ("* (skg bodyFolded (node (id ord)"),
@@ -159,19 +159,19 @@ fn the_order_only_buffer_is_a_flat_list_with_markers (
 #[test]
 fn the_merges_buffer_saves_back_unchanged (
 ) -> Result<(), Box<dyn Error>> {
-  saves_back_unchanged ("buffers", &SKGREPOS, TdvBuffer::Merges) }
+  saves_back_unchanged ("buffers", &SKGREPOS, DiffViewBufferKind::Merges) }
 
 #[test]
 fn the_skgrepo_changes_buffer_saves_back_unchanged (
 ) -> Result<(), Box<dyn Error>> {
-  saves_back_unchanged ("buffers", &SKGREPOS, TdvBuffer::SkgrepoChanges) }
+  saves_back_unchanged ("buffers", &SKGREPOS, DiffViewBufferKind::SkgrepoChanges) }
 
 #[test]
 fn the_order_only_buffer_saves_back_unchanged (
 ) -> Result<(), Box<dyn Error>> {
-  saves_back_unchanged ("buffers", &SKGREPOS, TdvBuffer::OrderOnlyChanges) }
+  saves_back_unchanged ("buffers", &SKGREPOS, DiffViewBufferKind::OrderOnlyChanges) }
 
 #[test]
 fn the_all_changes_buffer_of_this_fixture_saves_back_unchanged (
 ) -> Result<(), Box<dyn Error>> {
-  saves_back_unchanged ("buffers", &SKGREPOS, TdvBuffer::AllChanges) }
+  saves_back_unchanged ("buffers", &SKGREPOS, DiffViewBufferKind::AllChanges) }

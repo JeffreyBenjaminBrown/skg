@@ -8,9 +8,9 @@ use crate::pcsvf::common::{
   Fixture, open_all_changes_buffer, open_buffer, save, save_buffer,
   show_unshown_changes, with_fixture};
 
-use skg::change_forest::{BufferReadinessSummary, ReadinessSummary};
+use skg::change_leaves::{BufferReadinessSummary, ReadinessSummary};
 use skg::serve::handlers::save_buffer::{SaveResponse, readiness_summary_sexp};
-use skg::types::views_state::TdvBuffer;
+use skg::types::views_state::DiffViewBufferKind;
 
 use std::error::Error;
 
@@ -158,12 +158,12 @@ fn the_save_reports_the_readiness_summary (
 fn the_summary_counts_the_changes_the_saved_buffer_does_not_show (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &["public", "private"], |f| {
-    let text : String = open_buffer (f, TdvBuffer::Merges) ?
+    let text : String = open_buffer (f, DiffViewBufferKind::Merges) ?
       . ok_or ("the merges buffer is empty") ?;
-    let response : SaveResponse = save_buffer (f, TdvBuffer::Merges, &text) ?;
+    let response : SaveResponse = save_buffer (f, DiffViewBufferKind::Merges, &text) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     let summary : BufferReadinessSummary = summary_of (&response);
-    assert_eq! ( summary . unshown_changes, 11, "{:?}", summary );
+    assert_eq! ( summary . changes_not_editable_here, 11, "{:?}", summary );
     assert_eq! ( readiness_summary_sexp (&summary),
                  format! ( "(readiness-summary (ready {}) (changed {}) (foreign 0) (order-only 1) (unshown 11))",
                            summary . summary . ready_files,
@@ -179,13 +179,13 @@ fn summary_of (
 fn summary (
   ready_files     : usize,
   changed_files   : usize,
-  unshown_changes : usize,
+  changes_not_editable_here : usize,
 ) -> BufferReadinessSummary {
   BufferReadinessSummary {
     summary : ReadinessSummary {
       ready_files, changed_files,
       foreign_changed_files : 0, order_only_files : 0 },
-    unshown_changes } }
+    changes_not_editable_here } }
 
 /// Save 'buffer' with 'pid' (an editable occurrence on a line
 /// starting 'prefix') marked for deletion; return the reconciled

@@ -2,7 +2,7 @@
 // cy2 contain each other; cy2 is retitled), a multiply-contained
 // node (mc, in ma and mb; retitled), a deleted subtree (r no longer
 // contains del, which is deleted with its content delc), and a
-// leftward-only change (ln now contains lo, which lp contains too).
+// in-changed-only change (ln now contains lo, which lp contains too).
 
 use crate::pcsvf::common::{graph_straddle, ids, with_fixture};
 
@@ -21,7 +21,7 @@ fn sets_fixture_sets (
   Ok ( sets . unwrap () ) }
 
 #[test]
-fn c_holds_the_rightward_and_the_leftward_changes (
+fn c_holds_the_out_changed_and_the_in_changed_halves (
 ) -> Result<(), Box<dyn Error>> {
   let sets : PcsvfSets = sets_fixture_sets () ?;
   assert_eq! ( sets . c,
@@ -61,7 +61,7 @@ fn a_deleted_subtree_is_reached_through_its_former_containers (
   Ok (( )) }
 
 #[test]
-fn a_leftward_only_change_is_drawn_under_its_new_container (
+fn an_in_changed_only_change_is_drawn_under_its_new_container (
 ) -> Result<(), Box<dyn Error>> {
   let sets : PcsvfSets = sets_fixture_sets () ?;
   // lo has two containers in the union, so it is an origin; ln, a

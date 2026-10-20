@@ -755,7 +755,7 @@ fn viewstats_atoms () -> Vec<&'static str> {
       overridesHere : _,    // keyed form (a viewStats sub-form)
       omitted_body : _,      // -> the node-level omittedBody atom
       relRepo : _,       // -> the relRepo display-fact atom and herald
-      home_move : _,           // -> the homeMove atom
+      home_skgrepo_move : _,   // -> the homeMove atom
       moved_like_ancestor : _, // -> the movedLikeAncestor atom
     } = v; }
   let _ = guard;

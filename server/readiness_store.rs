@@ -5,7 +5,7 @@
 //! change counts as absent. The store lives server-side, in
 //! '<data_root>/readiness-marks.json', rewritten after every change.
 
-use crate::change_forest::LeafKey;
+use crate::change_leaves::LeafKey;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -71,7 +71,7 @@ pub fn readiness_marks_path (
 /// JSON object keys must be strings, so the marks are stored as a
 /// list of '{ "leaf": ..., "fingerprint": ... }' entries.
 mod marks_as_list {
-  use crate::change_forest::LeafKey;
+  use crate::change_leaves::LeafKey;
 
   use serde::{Deserialize, Deserializer, Serialize, Serializer};
   use std::collections::HashMap;

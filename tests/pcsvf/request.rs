@@ -14,7 +14,7 @@ use skg::serve::handlers::total_diff_view::handle_total_diff_view_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{graph_handle_from_config, skg_env_from_parts};
 use skg::types::env::SkgEnv;
-use skg::types::views_state::{TdvBuffer, ViewId};
+use skg::types::views_state::{DiffViewBufferKind, ViewId};
 
 use std::error::Error;
 use std::io::Read;
@@ -62,7 +62,7 @@ fn a_request_registers_its_buffer_and_the_last_close_drops_the_straddle (
     let view_id : ViewId = ViewId::ContentView ("tdv-1" . to_string ());
     assert_eq! ( f . views_state . open_views . views . get (&view_id)
                  . and_then ( |state| state . tdv_buffer ),
-                 Some (TdvBuffer::AllChanges) );
+                 Some (DiffViewBufferKind::AllChanges) );
     assert! ( ! f . views_state . open_views . views
               . contains_key (&ViewId::ContentView ("tdv-2" . to_string ())),
               "an empty buffer is not registered" );
@@ -129,13 +129,13 @@ fn a_rerender_all_writes_its_refreshed_straddle_back (
 fn request_the_four_buffers (
   case     : &str,
   skgrepos : &[&str],
-  expected_nonempty : &[TdvBuffer],
+  expected_nonempty : &[DiffViewBufferKind],
 ) -> Result<(), Box<dyn Error>> {
   with_fixture (case, skgrepos, |f| {
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let all : SkgrepoRestriction =
       SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
-    for tdv_buffer in TdvBuffer::ALL {
+    for tdv_buffer in DiffViewBufferKind::ALL {
       let view_id : String = format! ( "diff-view: {}", tdv_buffer . wire_name () );
       let (mut stream, mut read_end) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
@@ -143,7 +143,7 @@ fn request_the_four_buffers (
         &mut stream, &request (tdv_buffer . wire_name (), &view_id), &env,
         &mut f . views_state, &all );
       let response : String = response_from (&mut read_end);
-      let registered : Option<TdvBuffer> =
+      let registered : Option<DiffViewBufferKind> =
         f . views_state . open_views . views
         . get (&ViewId::ContentView (view_id))
         . and_then ( |state| state . tdv_buffer );
@@ -158,9 +158,9 @@ fn request_the_four_buffers (
 #[test]
 fn the_four_requests_open_every_nonempty_buffer (
 ) -> Result<(), Box<dyn Error>> {
-  request_the_four_buffers ( "buffers", &["public", "private"], &TdvBuffer::ALL ) }
+  request_the_four_buffers ( "buffers", &["public", "private"], &DiffViewBufferKind::ALL ) }
 
 #[test]
 fn the_four_requests_skip_the_empty_buffers (
 ) -> Result<(), Box<dyn Error>> {
-  request_the_four_buffers ( "sets", &["main"], &[ TdvBuffer::AllChanges ] ) }
+  request_the_four_buffers ( "sets", &["main"], &[ DiffViewBufferKind::AllChanges ] ) }

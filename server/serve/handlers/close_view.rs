@@ -17,7 +17,7 @@ pub fn handle_close_view_request (
   match view_id_from_request (request) {
     Ok (view_id) => {
       views_state . open_views . unregister_view (&view_id);
-      if ! views_state . open_views . has_tdv_views () {
+      if ! views_state . open_views . has_diffView_views () {
         // The graph straddle lives while a total diff view is open.
         views_state . graph_straddle = None; }
       send_response_with_length_prefix (

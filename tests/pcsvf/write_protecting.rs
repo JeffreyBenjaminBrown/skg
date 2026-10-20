@@ -17,7 +17,7 @@ use skg::to_org::render::content_view::multi_root_view;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::ID;
 use skg::types::tree::forest::ViewForest;
-use skg::types::views_state::{TdvBuffer, ViewId};
+use skg::types::views_state::{DiffViewBufferKind, ViewId};
 use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
@@ -73,7 +73,7 @@ fn the_registered_viewforest (
   f : &Fixture,
 ) -> ViewForest {
   f . views_state . open_views
-    . viewid_to_view ( &view_id_of (TdvBuffer::AllChanges) )
+    . viewid_to_view ( &view_id_of (DiffViewBufferKind::AllChanges) )
     . expect ("the buffer is registered")
     . clone () }
 
@@ -118,7 +118,7 @@ fn write_protecting_the_only_editable_occurrence_of_a_node_of_u_saves (
     assert! ( node_lines (&response . saved_view, "c") . iter ()
                 . all ( |line| line . contains ("(ready ") ),
               "{}", response . saved_view );
-    assert_eq! ( response . readiness_summary . unwrap () . unshown_changes, 1 );
+    assert_eq! ( response . readiness_summary . unwrap () . changes_not_editable_here, 1 );
     Ok (( )) }) }
 
 /// A child typed under n under y, a write-protected occurrence, is a

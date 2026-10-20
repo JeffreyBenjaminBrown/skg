@@ -1,7 +1,7 @@
 //! The change-forest: the tree of everything commit-readiness can be
 //! asked about, built from the graph straddle, independent of any view
 //! ('TODO/total-diff-view/02_plan.org', "change-forest"). Its roots
-//! are the changed graphnodes that own a change; under each come its
+//! are the changed graphnodes that record a change; under each come its
 //! changed aspects; its leaves are the individual changes a user
 //! marks. A relationship's leaves live under its recorder.
 //!
@@ -41,7 +41,8 @@ pub enum LeafKey {
 pub enum NodeAspect {
   Existence,
   Text,
-  Home,
+  #[serde(rename = "Home")] // the spelling marks files already on disk use
+  HomeSkgrepo,
   Alias   (String),
   ExtraId (ID),
   Flag    (Flag),
@@ -74,48 +75,48 @@ pub struct ReadinessSummary {
 }
 
 /// The readiness summary a save of a TDV buffer reports: that of the
-/// whole changeset, and how many of its leaves the buffer does not
-/// show (their owning node is not drawn in it, as
-/// 'nodes_drawn_in_viewforest' says).
+/// whole changeset, and how many of its leaves are not editable in
+/// the buffer (their recorder is not among the nodes
+/// 'nodes_editable_in_diffView' returns for it).
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct BufferReadinessSummary {
-  pub summary         : ReadinessSummary,
-  pub unshown_changes : usize,
+  pub summary                   : ReadinessSummary,
+  pub changes_not_editable_here : usize,
 }
 
 /// See the module comment.
 #[derive(Clone, Debug, Default)]
-pub struct ChangeForest {
-  /// Each node that owns a leaf, with its leaves.
-  leaves_by_owner       : BTreeMap<ID, Vec<ChangeLeaf>>,
-  /// Where each leaf is in 'leaves_by_owner': (owner, position).
+pub struct ChangeLeaves {
+  /// Each node that records a leaf, with its leaves.
+  leaves_by_recorder    : BTreeMap<ID, Vec<ChangeLeaf>>,
+  /// Where each leaf is in 'leaves_by_recorder': (recorder, position).
   index                 : HashMap<LeafKey, (ID, usize)>,
   order_only_pids       : BTreeSet<ID>,
   order_only_files      : BTreeSet<(SkgrepoName, ID)>,
   foreign_changed_files : usize,
 }
 
-impl ChangeForest {
+impl ChangeLeaves {
   pub fn from_graph_straddle (
     straddle : &GraphStraddle,
-  ) -> ChangeForest {
-    let mut leaves_by_owner : BTreeMap<ID, Vec<ChangeLeaf>> =
+  ) -> ChangeLeaves {
+    let mut leaves_by_recorder : BTreeMap<ID, Vec<ChangeLeaf>> =
       BTreeMap::new ();
-    for pid in & straddle . changed_pids () . rightward {
-      let leaves : Vec<ChangeLeaf> = leaves_owned_by (straddle, pid);
+    for pid in & straddle . changed_pids () . out_changed {
+      let leaves : Vec<ChangeLeaf> = leaves_recorded_by (straddle, pid);
       if ! leaves . is_empty () {
-        leaves_by_owner . insert (pid . clone (), leaves); }}
+        leaves_by_recorder . insert (pid . clone (), leaves); }}
     let index : HashMap<LeafKey, (ID, usize)> =
-      leaves_by_owner . iter ()
-      . flat_map ( |(owner, leaves)|
+      leaves_by_recorder . iter ()
+      . flat_map ( |(recorder, leaves)|
         leaves . iter () . enumerate () . map (
           move |(position, leaf)|
-          ( leaf . key . clone (), (owner . clone (), position) )) )
+          ( leaf . key . clone (), (recorder . clone (), position) )) )
       . collect ();
     let order_only_pids : BTreeSet<ID> =
       straddle . after . nodes . iter ()
       . filter ( |(pid, after)|
-        ! leaves_by_owner . contains_key (*pid)
+        ! leaves_by_recorder . contains_key (*pid)
         && straddle . before . nodes . get (*pid)
              . is_some_and ( |before| before != *after ))
       . map ( |(pid, _)| pid . clone () )
@@ -125,22 +126,22 @@ impl ChangeForest {
       . filter_map ( |pid| straddle . after . nodes . get (pid) )
       . map ( |node| ( node . home_skgrepo . clone (), node . pid . clone () ))
       . collect ();
-    ChangeForest { leaves_by_owner, index, order_only_pids,
+    ChangeLeaves { leaves_by_recorder, index, order_only_pids,
                    order_only_files,
                    foreign_changed_files : straddle . foreign_changed_files } }
 
-  /// The nodes that own a leaf (the forest's roots).
-  pub fn owners (
+  /// The nodes that record a leaf (the forest's roots).
+  pub fn recorders (
     &self,
   ) -> impl Iterator<Item = &ID> {
-    self . leaves_by_owner . keys () }
+    self . leaves_by_recorder . keys () }
 
   pub fn leaf (
     &self,
     key : &LeafKey,
   ) -> Option<&ChangeLeaf> {
-    let (owner, position) : &(ID, usize) = self . index . get (key) ?;
-    self . leaves_by_owner . get (owner) ? . get (*position) }
+    let (recorder, position) : &(ID, usize) = self . index . get (key) ?;
+    self . leaves_by_recorder . get (recorder) ? . get (*position) }
 
   /// None when 'key' is not a leaf of this forest: that change does
   /// not exist (any more).
@@ -150,13 +151,13 @@ impl ChangeForest {
   ) -> Option<u64> {
     self . leaf (key) . map ( |leaf| leaf . fingerprint ) }
 
-  /// The leaves a node owns: its own aspects, and the relationships
+  /// The leaves a node records: its own aspects, and the relationships
   /// it records.
   pub fn leaves_under (
     &self,
     pid : &ID,
   ) -> &[ChangeLeaf] {
-    self . leaves_by_owner . get (pid)
+    self . leaves_by_recorder . get (pid)
       . map ( |leaves| leaves . as_slice () )
       . unwrap_or (&[]) }
 
@@ -167,7 +168,7 @@ impl ChangeForest {
     pid     : &ID,
   ) -> Vec<&ChangeLeaf> {
     let file : (SkgrepoName, ID) = ( skgrepo . clone (), pid . clone () );
-    self . leaves_by_owner . values () . flatten ()
+    self . leaves_by_recorder . values () . flatten ()
       . filter ( |leaf| leaf . files . contains (&file) )
       . collect () }
 
@@ -178,7 +179,7 @@ impl ChangeForest {
   ) -> BTreeMap<SkgrepoName, BTreeSet<ID>> {
     let mut files : BTreeMap<SkgrepoName, BTreeSet<ID>> = BTreeMap::new ();
     for (skgrepo, pid) in
-      self . leaves_by_owner . values () . flatten ()
+      self . leaves_by_recorder . values () . flatten ()
       . flat_map ( |leaf| leaf . files . iter () )
       . chain ( self . order_only_files . iter () )
     { files . entry (skgrepo . clone ()) . or_default ()
@@ -195,7 +196,7 @@ impl ChangeForest {
   /// leaves (unchanged things) are never asked.
   pub fn readiness_of_leaves<'a> (
     &self,
-    store : &ReadinessStore,
+    store         : &ReadinessStore,
     keys  : impl IntoIterator<Item = &'a LeafKey>,
   ) -> bool {
     keys . into_iter ()
@@ -217,7 +218,7 @@ impl ChangeForest {
 
   pub fn readiness_summary (
     &self,
-    store : &ReadinessStore,
+    store         : &ReadinessStore,
   ) -> ReadinessSummary {
     let files : Vec<(SkgrepoName, ID)> =
       self . files_changed () . into_iter ()
@@ -233,18 +234,18 @@ impl ChangeForest {
       foreign_changed_files : self . foreign_changed_files,
       order_only_files      : self . order_only_files . len (), } }
 
-  /// The readiness summary, with the count of leaves whose owning
-  /// node is not among 'shown' (the nodes a buffer draws,
-  /// 'nodes_drawn_in_viewforest').
+  /// The readiness summary, with the count of leaves whose recorder
+  /// is not among 'editable_here' (the nodes a buffer makes editable,
+  /// 'nodes_editable_in_diffView').
   pub fn buffer_readiness_summary (
     &self,
-    store : &ReadinessStore,
-    shown : &HashSet<ID>,
+    store         : &ReadinessStore,
+    editable_here : &HashSet<ID>,
   ) -> BufferReadinessSummary {
     BufferReadinessSummary {
-      summary         : self . readiness_summary (store),
-      unshown_changes : self . leaves_by_owner . iter ()
-        . filter ( |(owner, _)| ! shown . contains (*owner) )
+      summary                   : self . readiness_summary (store),
+      changes_not_editable_here : self . leaves_by_recorder . iter ()
+        . filter ( |(recorder, _)| ! editable_here . contains (*recorder) )
         . map ( |(_, leaves)| leaves . len () )
         . sum (), } }
 }
@@ -257,10 +258,10 @@ impl ReadinessSummary {
     self . ready_files == self . changed_files }
 }
 
-/// The leaves owned by 'pid': its existence when it is new or
+/// The leaves recorded by 'pid': its existence when it is new or
 /// deleted, else its changed aspects; then the relationships it
 /// records whose existence or relRepo changed.
-fn leaves_owned_by (
+fn leaves_recorded_by (
   straddle : &GraphStraddle,
   pid      : &ID,
 ) -> Vec<ChangeLeaf> {
@@ -284,7 +285,7 @@ fn leaves_owned_by (
           home_file (after) )); }
       if let Some ((old, new)) = &changes . home {
         leaves . push ( node_leaf (
-          NodeAspect::Home,
+          NodeAspect::HomeSkgrepo,
           fingerprint_of (&(old, new)),
           vec! [ ( old . clone (), pid . clone () ),
                  ( new . clone (), pid . clone () ) ] )); }
@@ -382,5 +383,5 @@ fn fingerprint_of<T : Hash> (
 
 #[cfg(test)]
 #[allow(non_snake_case)]
-#[path = "../tests/unit/change_forest.rs"]
+#[path = "../tests/unit/change_leaves.rs"]
 mod tests;

@@ -49,7 +49,7 @@ fn contains_key (
     aspect } }
 
 fn keys_under (
-  forest : &ChangeForest,
+  forest : &ChangeLeaves,
   pid    : &str,
 ) -> Vec<LeafKey> {
   forest . leaves_under (&ID::from (pid)) . iter ()
@@ -57,7 +57,7 @@ fn keys_under (
     . collect () }
 
 #[test]
-fn each_kind_of_change_is_a_leaf_under_its_owner () {
+fn each_kind_of_change_is_a_leaf_under_its_recorder () {
   let mut aliased : Graphnode = node ("t", "t", &[]);
   aliased . aliases = MSV::Specified ( vec! [ RelPartner::at_relRepo (
     SkgrepoName::from ("main"), "an alias" . to_string () ) ] );
@@ -70,7 +70,7 @@ fn each_kind_of_change_is_a_leaf_under_its_owner () {
            node ("a", "a, retitled", &[]),
            node ("new", "new", &[]),
            aliased ] );
-  let forest : &ChangeForest = straddle . change_forest ();
+  let forest : &ChangeLeaves = straddle . change_leaves ();
   assert_eq! ( keys_under (forest, "r"), vec! [
     contains_key ("r", "new",  RelationshipAspect::Existence),
     contains_key ("r", "gone", RelationshipAspect::Existence) ] );
@@ -90,7 +90,7 @@ fn a_relRepo_move_is_one_leaf_recorded_in_both_files () {
   let straddle : GraphStraddle = straddle (
     vec! [ node ("r", "r", &["m"]), node ("m", "m", &[]) ],
     vec! [ moved, node ("m", "m", &[]) ] );
-  let forest : &ChangeForest = straddle . change_forest ();
+  let forest : &ChangeLeaves = straddle . change_leaves ();
   let key : LeafKey = contains_key ("r", "m", RelationshipAspect::RelRepo);
   assert_eq! ( keys_under (forest, "r"), vec! [ key . clone () ] );
   assert_eq! ( forest . leaf (&key) . unwrap () . files, vec! [
@@ -104,7 +104,7 @@ fn a_reorder_has_no_leaf_but_its_file_changed () {
            node ("a", "a", &[]), node ("b", "b", &[]) ],
     vec! [ node ("r", "r", &["b", "a"]),
            node ("a", "a", &[]), node ("b", "b", &[]) ] );
-  let forest : &ChangeForest = straddle . change_forest ();
+  let forest : &ChangeLeaves = straddle . change_leaves ();
   assert! ( forest . leaves_under (&ID::from ("r")) . is_empty () );
   assert_eq! ( straddle . order_only_pids () . iter () . collect::<Vec<_>> (),
                vec! [ &ID::from ("r") ] );
@@ -125,16 +125,16 @@ fn a_mark_lapses_when_its_change_changes () {
   let key : LeafKey = node_key ("a", NodeAspect::Text);
   let mut store : ReadinessStore = ReadinessStore::default ();
   store . mark ( key . clone (),
-                 first . change_forest () . leaf_fingerprint (&key) . unwrap () );
-  assert! ( first  . change_forest () . readiness_of_leaves (&store, [&key]) );
-  assert! ( ! edited . change_forest () . readiness_of_leaves (&store, [&key]) ); }
+                 first . change_leaves () . leaf_fingerprint (&key) . unwrap () );
+  assert! ( first  . change_leaves () . readiness_of_leaves (&store, [&key]) );
+  assert! ( ! edited . change_leaves () . readiness_of_leaves (&store, [&key]) ); }
 
 #[test]
 fn readiness_aggregates_over_the_leaves_that_exist () {
   let straddle : GraphStraddle = straddle (
     vec! [ node ("r", "r", &[]), node ("a", "a", &[]) ],
     vec! [ node ("r", "r, retitled", &["a"]), node ("a", "a", &[]) ] );
-  let forest : &ChangeForest = straddle . change_forest ();
+  let forest : &ChangeLeaves = straddle . change_leaves ();
   let text   : LeafKey = node_key ("r", NodeAspect::Text);
   let member : LeafKey = contains_key ("r", "a", RelationshipAspect::Existence);
   let unchanged : LeafKey = node_key ("a", NodeAspect::Text);

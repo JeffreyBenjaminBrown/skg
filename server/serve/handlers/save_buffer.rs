@@ -1,4 +1,4 @@
-use crate::change_forest::{BufferReadinessSummary, ReadinessSummary};
+use crate::change_leaves::{BufferReadinessSummary, ReadinessSummary};
 use crate::dbs::in_rust_graph::{
   in_rust_graph_coherent_with_nodeInstructions_in, new_handle };
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
@@ -148,7 +148,7 @@ pub fn readiness_summary_sexp (
     "(readiness-summary (ready {}) (changed {}) (foreign {}) (order-only {}) (unshown {}))",
     summary . ready_files, summary . changed_files,
     summary . foreign_changed_files, summary . order_only_files,
-    readiness_summary . unshown_changes ) }
+    readiness_summary . changes_not_editable_here ) }
 
 /// Handles save buffer requests from Emacs.
 /// - Reads the buffer content (with length prefix).

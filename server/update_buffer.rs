@@ -14,13 +14,13 @@ pub use viewnodestats::set_viewnodestats_in_viewforest;
 
 use complete::{complete_appended_roots, complete_viewforest, CompletionContext};
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::change_forest::BufferReadinessSummary;
+use crate::change_leaves::BufferReadinessSummary;
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::pcsvf::{
-  TdvDrawing, append_contentOrigins_to_buffer, contentOrigins_missing_from_buffer,
-  ensure_editableOccurrences_exist, nodes_drawn_in_viewforest,
-  root_skgids_of_buffer, set_tdv_facts_in_viewforest};
+  DiffViewSource, append_contentOrigins_to_buffer, contentOrigins_missing_from_buffer,
+  ensure_editableOccurrences_exist, nodes_editable_in_diffView,
+  root_skgids_of_buffer, set_diffView_facts_in_viewforest};
 use crate::readiness_store::ReadinessStore;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
@@ -35,7 +35,7 @@ use crate::skgrepo_sets::{SkgrepoRestriction, apply_skgrepo_set_to_viewforest};
 use crate::to_org::expand::role_tree::{
   RoleTreePartners, attach_full_containerward_role_trees_at_treeids_with_skgrepo_set};
 use crate::to_org::util::EditableMap;
-use crate::types::views_state::{TdvBuffer, ViewId};
+use crate::types::views_state::{DiffViewBufferKind, ViewId};
 use crate::types::misc::{ID, SkgrepoName, SkgConfig};
 use crate::types::save::{NodeInstruction, ForkSpec};
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_prunable;
@@ -167,9 +167,9 @@ pub fn update_views_after_save (
         env, runtime, &node_instructions,
         deleted_by_this_save_extra_ids, skgrepo_restriction ) };
   context . graph_straddle = views_state . graph_straddle . clone ();
-  let saved_tdv_buffer : Option<TdvBuffer> =
+  let saved_tdv_buffer : Option<DiffViewBufferKind> =
     viewid_from_request_result . as_ref () . ok ()
-    . and_then ( |view_id| tdv_buffer_of_view (views_state, view_id) );
+    . and_then ( |view_id| diffView_buffer_kind_of_view (views_state, view_id) );
   let mut saved_view_mut : ViewForest = saved_view;
   replace_saved_view_fork_roots (&mut saved_view_mut, fork_specs) ?;
   // The skgsave-commit has happened, so every `(editRequest ...)` in the
@@ -225,8 +225,8 @@ pub fn update_views_after_save (
       let store : MutexGuard<ReadinessStore> =
         env . runtime . readiness_store . lock ()
         . unwrap_or_else ( |poisoned| poisoned . into_inner () );
-      straddle . change_forest () . buffer_readiness_summary (
-        &store, &nodes_drawn_in_viewforest (&saved_view_mut) ) } );
+      straddle . change_leaves () . buffer_readiness_summary (
+        &store, &nodes_editable_in_diffView (&saved_view_mut) ) } );
   context . warnings . extend (
     // Repairs the completion pass made to write-protected PartnerFolders in
     // the saved view, batched per (folder, recorder).
@@ -291,10 +291,10 @@ pub fn update_views_after_save (
     readiness_summary, } ) }
 
 /// The buffer of the total diff view that 'view_id' is, if it is one.
-pub fn tdv_buffer_of_view (
+pub fn diffView_buffer_kind_of_view (
   views_state : &ViewsState,
   view_id     : &ViewId,
-) -> Option<TdvBuffer> {
+) -> Option<DiffViewBufferKind> {
   views_state . open_views . views . get (view_id)
     . and_then ( |state| state . tdv_buffer ) }
 
@@ -373,7 +373,7 @@ fn rerender_collateral_view (
         None, // Collateral views repair silently.
         false,
         false,
-        tdv_buffer_of_view (views_state, &view_id),
+        diffView_buffer_kind_of_view (views_state, &view_id),
         false
       ) . map_err (
         |e| format!( "Collateral view {}: {}",
@@ -439,9 +439,9 @@ pub fn render_initial_view (
     create_partnerFolders_for_fresh_nodes : true,
     substitute_existing_content_overrides : false,
     warning_sink : Some (&mut sink),
-    tdv_drawing  : None,
+    diffView_source            : None,
     nodes_before_completion    : &HashSet::new (),
-    writable_before_completion : &HashSet::new (), };
+    editable_before_completion : &HashSet::new (), };
   complete_viewforest ( &mut viewforest, &mut context ) ?;
   // De-novo rendering REPAIRS silently: the sink's ColRepairs do not
   // correspond to edits the user just made, so a fresh view carries no
@@ -451,7 +451,7 @@ pub fn render_initial_view (
 
 /// Complete a stub viewforest of the total diff view
 /// ('server/pcsvf.rs') as 'drawing' says: view completion with
-/// 'tdv_drawing' set, which draws the union of the straddle's content, the change
+/// 'diffView_source' set, which draws the union of the straddle's content, the change
 /// folders and markers, and the removed members. It creates no
 /// default partner folders, spends no node budget (only an
 /// editable-view request spends it, and a first drawing carries
@@ -459,7 +459,7 @@ pub fn render_initial_view (
 /// requires the set 'all').
 pub fn complete_viewforest_with_graph_straddle (
   runtime    : &RuntimeGeneration,
-  drawing    : TdvDrawing,
+  drawing    : DiffViewSource,
   viewforest : &mut ViewForest,
 ) -> Result<(), Box<dyn Error>> {
   let graph_snap : Arc<InRustGraph> = runtime . graph . clone ();
@@ -477,10 +477,10 @@ pub fn complete_viewforest_with_graph_straddle (
     create_partnerFolders_for_fresh_nodes : false,
     substitute_existing_content_overrides : false,
     warning_sink                   : None,
-    tdv_drawing                    : Some (drawing),
+    diffView_source                : Some (drawing),
     // Every viewnode of a first drawing is created by it.
     nodes_before_completion        : &HashSet::new (),
-    writable_before_completion     : &HashSet::new (), };
+    editable_before_completion     : &HashSet::new (), };
   complete_viewforest ( viewforest, &mut context ) ?;
   if ! errors . is_empty () {
     return Err ( errors . join ("\n") . into () ); }
@@ -511,7 +511,7 @@ pub fn rerender_view (
   warning_sink  : Option<&mut Vec<CompletionWarning>>, // Some only for the view the user just saved.
   create_partnerFolders : bool, // false post-save (folders round-trip from the buffer); true for the repo-switch rerender, where pruning removed them and the new set decides which return.
   substitute_existing_content_overrides : bool, // true only for the view whose edit created the override.
-  tdv_buffer    : Option<TdvBuffer>, // Some for a buffer of the total diff view
+  tdv_buffer    : Option<DiffViewBufferKind>, // Some for a buffer of the total diff view
   show_unshown_changes : bool, // true only for the "show unshown changes" request; matters only in a total diff view
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
@@ -525,11 +525,11 @@ pub fn rerender_view (
         &mut context . graph_straddle, &context . runtime . config,
         context . runtime . graph . clone () ) ? ),
       None => None, };
-  let tdv_drawing : Option<TdvDrawing> =
+  let diffView_source : Option<DiffViewSource> =
     graph_straddle . as_deref () . zip (tdv_buffer)
-    . map ( |(straddle, tdv_buffer)| TdvDrawing { straddle, tdv_buffer } );
-  let drawing_to_show_unshown_changes : Option<TdvDrawing> =
-    tdv_drawing . filter ( |_| show_unshown_changes );
+    . map ( |(straddle, tdv_buffer)| DiffViewSource { straddle, tdv_buffer } );
+  let drawing_to_show_unshown_changes : Option<DiffViewSource> =
+    diffView_source . filter ( |_| show_unshown_changes );
   let standing_roots : BTreeSet<ID> = root_skgids_of_buffer (viewforest);
   if let Some (drawing) = drawing_to_show_unshown_changes {
     // Before any visit, so that a node of U is editable before its
@@ -540,7 +540,7 @@ pub fn rerender_view (
   { tracing::debug!("rerender_view: starting complete_viewforest");
     let nodes_before_completion : HashSet<NodeId> =
       viewforest . nodes () . map ( |node| node . id () ) . collect ();
-    let writable_before_completion : HashSet<NodeId> =
+    let editable_before_completion : HashSet<NodeId> =
       viewforest . nodes ()
       . filter ( |node| matches! ( &node . value () . kind,
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
@@ -569,9 +569,9 @@ pub fn rerender_view (
       substitute_existing_content_overrides : // off in a total diff view
         substitute_existing_content_overrides && graph_straddle . is_none (),
       warning_sink,
-      tdv_drawing,
+      diffView_source,
       nodes_before_completion    : &nodes_before_completion,
-      writable_before_completion : &writable_before_completion, };
+      editable_before_completion : &editable_before_completion, };
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "complete_viewforest" ). entered();
       complete_viewforest (
@@ -583,11 +583,11 @@ pub fn rerender_view (
         &context . runtime, drawing, viewforest, &new_roots ) ?;
       complete_appended_roots (
         viewforest, &appended, &mut completion_context ) ?; }}
-  if let Some (drawing) = tdv_drawing {
+  if let Some (drawing) = diffView_source {
     let store : MutexGuard<ReadinessStore> =
       context . env . runtime . readiness_store . lock ()
       . unwrap_or_else ( |poisoned| poisoned . into_inner () );
-    set_tdv_facts_in_viewforest (
+    set_diffView_facts_in_viewforest (
       viewforest, drawing, &store, &context . runtime . graph ); }
   let result : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(

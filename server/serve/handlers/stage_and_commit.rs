@@ -12,7 +12,7 @@
 //! ('stream_rerender_tdv_views'). Its roots stay, so a buffer whose
 //! changes were all committed comes back as plain context.
 
-use crate::change_forest::{BufferReadinessSummary, ReadinessSummary};
+use crate::change_leaves::{BufferReadinessSummary, ReadinessSummary};
 use crate::git_ops::stage_and_commit::{
   SkgrepoCommitOutcome, stage_and_commit_owned_skgrepos};
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
@@ -102,7 +102,7 @@ pub fn stage_and_commit (
     Err (e) => return StageAndCommitAnswer::Refused (e), };
   { let store : MutexGuard<ReadinessStore> = lock_store (env);
     let summary : ReadinessSummary =
-      straddle . change_forest () . readiness_summary (&store);
+      straddle . change_leaves () . readiness_summary (&store);
     if ! summary . is_complete () && ! confirmed {
       return StageAndCommitAnswer::NeedsConfirmation (summary); }}
   let outcomes : Vec<(SkgrepoName, SkgrepoCommitOutcome)> =
@@ -116,7 +116,7 @@ pub fn stage_and_commit (
     Ok (rebuilt) => {
       let mut store : MutexGuard<ReadinessStore> = lock_store (env);
       store . marks . retain ( |key, _|
-        rebuilt . change_forest () . leaf (key) . is_some () );
+        rebuilt . change_leaves () . leaf (key) . is_some () );
       if let Err (e) = store . save (&runtime . config . data_root) {
         errors . push ( format! (
           "The readiness marks were not written to disk: {}", e )); }}, }
@@ -151,7 +151,7 @@ pub fn stage_and_commit_response_sexp (
       [ sexp::parse ("(needs-confirmation . t)")
           . expect ("a literal sexp parses"),
         sexp::parse ( &readiness_summary_sexp ( &BufferReadinessSummary {
-          summary : summary . clone (), unshown_changes : 0 } ))
+          summary : summary . clone (), changes_not_editable_here : 0 } ))
           . expect ("readiness_summary_sexp should produce valid sexp") ]
       . into_iter () . chain ( errors_and_warnings (&[]) ) . collect (),
     StageAndCommitAnswer::Committed { outcomes, errors } => {

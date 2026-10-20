@@ -384,8 +384,8 @@ pub struct ViewnodeStats {
   /// HEAD. Display-only; the buffer's pass sets it after completion
   /// ('set_home_move_facts_in_viewforest'), and the parser discards
   /// it. Herald "-OLD +NEW".
-  pub home_move          : Option<(SkgrepoName, SkgrepoName)>,
-  /// Some(LETTER) beside 'home_move' when the nearest vognode
+  pub home_skgrepo_move  : Option<(SkgrepoName, SkgrepoName)>,
+  /// Some(LETTER) beside 'home_skgrepo_move' when the nearest vognode
   /// ancestor whose home moved moved the same way. LETTER names that
   /// ancestor as the relationship heralds name ancestors: a for the
   /// viewparent, b for the grandparent, and so on. Display-only.
@@ -1078,7 +1078,7 @@ impl Default for ViewnodeStats {
       overridesHere     : None,
       omitted_body      : false,
       relRepo        : None,
-      home_move         : None,
+      home_skgrepo_move : None,
       moved_like_ancestor : None,
     }} }
 

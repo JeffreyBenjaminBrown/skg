@@ -12,9 +12,9 @@ use crate::pcsvf::common::{
   Fixture, all_changes_buffer, all_changes_buffer_with_marks,
   saves_back_unchanged, with_fixture};
 
-use skg::change_forest::{LeafKey, NodeAspect};
+use skg::change_leaves::{LeafKey, NodeAspect};
 use skg::types::misc::ID;
-use skg::types::views_state::TdvBuffer;
+use skg::types::views_state::DiffViewBufferKind;
 
 use std::error::Error;
 
@@ -99,7 +99,7 @@ fn a_deleted_subtree_is_drawn_where_it_stood (
   Ok (( )) }
 
 #[test]
-fn a_leftward_only_change_shows_its_changed_containers (
+fn an_in_changed_only_change_shows_its_changed_containers (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &sets_buffer () ?, &[
     "* (skg (node (id ln)",
@@ -227,9 +227,9 @@ fn a_deleted_subscriber_is_drawn_in_the_changed_subscriber_folder (
 #[test]
 fn the_sets_buffer_saves_back_unchanged (
 ) -> Result<(), Box<dyn Error>> {
-  saves_back_unchanged ("sets", &["main"], TdvBuffer::AllChanges) }
+  saves_back_unchanged ("sets", &["main"], DiffViewBufferKind::AllChanges) }
 
 #[test]
 fn the_kinds_buffer_saves_back_unchanged (
 ) -> Result<(), Box<dyn Error>> {
-  saves_back_unchanged ("kinds", &["public", "private"], TdvBuffer::AllChanges) }
+  saves_back_unchanged ("kinds", &["public", "private"], DiffViewBufferKind::AllChanges) }

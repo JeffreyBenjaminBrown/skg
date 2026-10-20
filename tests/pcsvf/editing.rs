@@ -16,7 +16,7 @@ use skg::test_utils::{
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::ID;
 use skg::types::nodes::complete::Graphnode;
-use skg::types::views_state::{TdvBuffer, ViewId};
+use skg::types::views_state::{DiffViewBufferKind, ViewId};
 use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
@@ -196,7 +196,7 @@ fn a_collateral_buffer_shows_the_new_change_and_keeps_the_old (
       &mut BufReader::new (read_end) ) . into_iter ()
       . find ( |message| message . contains ("collateral-view")
                && message . contains (
-                 &view_id_of (TdvBuffer::AllChanges) . repr_in_client () ))
+                 &view_id_of (DiffViewBufferKind::AllChanges) . repr_in_client () ))
       . and_then ( |message|
         extract_string_field_from_sexp (&message, "content") )
       . expect ("the all-changes buffer is rerendered as a collateral view");

@@ -8,7 +8,7 @@ use crate::pcsvf::common::{
   rerendered_view_content, send_stage_and_commit_request, view_id_of,
   with_fixture};
 
-use skg::change_forest::{ChangeForest, LeafKey};
+use skg::change_leaves::{ChangeLeaves, LeafKey};
 use skg::graph_straddle::types::GraphStraddle;
 use skg::readiness_store::ReadinessStore;
 use skg::serve::handlers::stage_and_commit::{
@@ -16,7 +16,7 @@ use skg::serve::handlers::stage_and_commit::{
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::skg_env_from_parts;
 use skg::types::env::SkgEnv;
-use skg::types::views_state::TdvBuffer;
+use skg::types::views_state::DiffViewBufferKind;
 
 use git2::{Oid, Repository, Status, StatusOptions};
 use std::error::Error;
@@ -61,11 +61,11 @@ fn mark_every_leaf (
   env : &SkgEnv,
 ) -> Result<(), Box<dyn Error>> {
   let straddle : GraphStraddle = graph_straddle (f) ?;
-  let forest : &ChangeForest = straddle . change_forest ();
+  let forest : &ChangeLeaves = straddle . change_leaves ();
   let mut store : MutexGuard<ReadinessStore> =
     env . runtime . readiness_store . lock () . unwrap ();
-  let keys : Vec<LeafKey> = forest . owners ()
-    . flat_map ( |owner| forest . leaves_under (owner) . iter ()
+  let keys : Vec<LeafKey> = forest . recorders ()
+    . flat_map ( |recorder| forest . leaves_under (recorder) . iter ()
                  . map ( |leaf| leaf . key . clone () ) )
     . collect ();
   for key in keys {
@@ -207,9 +207,9 @@ fn a_confirmed_resend_commits_and_redraws_the_open_buffers (
       assert! ( ! content . contains (fact),
                 "no change fact {:?} remains:\n{}", fact, content ); }
     assert! ( f . views_state . open_views . views
-              . get (&view_id_of (TdvBuffer::AllChanges))
+              . get (&view_id_of (DiffViewBufferKind::AllChanges))
               . is_some_and ( |state| ! state . pids . is_empty ()
-                              && state . tdv_buffer == Some (TdvBuffer::AllChanges) ));
+                              && state . tdv_buffer == Some (DiffViewBufferKind::AllChanges) ));
     Ok (( )) }) }
 
 /// The ID of a root line, whatever kind of vognode it is.

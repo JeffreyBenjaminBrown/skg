@@ -5,7 +5,7 @@
 
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::pcsvf::{TdvDrawing, pcsvf_viewforest};
+use crate::pcsvf::{DiffViewSource, diffView_buffer_viewforest};
 use crate::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
@@ -16,7 +16,7 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
-use crate::types::views_state::{TdvBuffer, ViewId};
+use crate::types::views_state::{DiffViewBufferKind, ViewId};
 
 use std::net::TcpStream;
 use std::sync::{Arc, MutexGuard};
@@ -40,7 +40,7 @@ pub fn handle_total_diff_view_request (
   skgrepo_restriction : &SkgrepoRestriction,
 ) {
   let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
-  let response : Result<(TotalDiffViewBuffer, TdvBuffer, ViewId), String> =
+  let response : Result<(TotalDiffViewBuffer, DiffViewBufferKind, ViewId), String> =
     ( || {
       if ! skgrepo_restriction . is_all () {
         return Err ( format! (
@@ -48,7 +48,7 @@ pub fn handle_total_diff_view_request (
           skgrepo_restriction . name )); }
       let view_id : ViewId = view_id_from_request (request) ?;
       let buffer_name : String = value_from_request_sexp ("buffer", request) ?;
-      let tdv_buffer : TdvBuffer = TdvBuffer::from_wire_name (&buffer_name)
+      let tdv_buffer : DiffViewBufferKind = DiffViewBufferKind::from_wire_name (&buffer_name)
         . ok_or_else ( || format! (
           "Unknown total diff view buffer: {}", buffer_name )) ?;
       let straddle : Arc<GraphStraddle> = current_graph_straddle_in_slot (
@@ -83,14 +83,14 @@ pub fn total_diff_view_buffer (
   runtime    : &RuntimeGeneration,
   straddle   : &GraphStraddle,
   store      : &ReadinessStore,
-  tdv_buffer : TdvBuffer,
+  tdv_buffer : DiffViewBufferKind,
 ) -> Result<TotalDiffViewBuffer, Box<dyn std::error::Error>> {
-  let drawing : TdvDrawing = TdvDrawing { straddle, tdv_buffer };
+  let drawing : DiffViewSource = DiffViewSource { straddle, tdv_buffer };
   let roots : Vec<ID> = match tdv_buffer {
-    TdvBuffer::OrderOnlyChanges =>
+    DiffViewBufferKind::OrderOnlyChanges =>
       straddle . order_only_pids () . iter () . cloned () . collect (),
     _ => drawing . sets () . d . iter () . cloned () . collect (), };
   if roots . is_empty () { return Ok (TotalDiffViewBuffer::Empty); }
   let (text, pids, viewforest) : (String, Vec<ID>, ViewForest) =
-    pcsvf_viewforest (runtime, drawing, store, &roots) ?;
+    diffView_buffer_viewforest (runtime, drawing, store, &roots) ?;
   Ok ( TotalDiffViewBuffer::Content { text, pids, viewforest } ) }

@@ -131,8 +131,8 @@ fn removed_containers_are_reachable_from_the_deleted_node () {
     straddle . partners (&id ("K"), CONTENT),
     vec! [ partner ("E", Presence::Both, Some ("main"), Some ("main")),
            partner ("D", Presence::OnlyBefore, Some ("main"), None) ] );
-  assert_eq! ( straddle . changed_pids () . rightward, ids (&["D", "K", "K2"]) );
-  assert_eq! ( straddle . changed_pids () . leftward,  ids (&["D"]) ); }
+  assert_eq! ( straddle . changed_pids () . out_changed, ids (&["D", "K", "K2"]) );
+  assert_eq! ( straddle . changed_pids () . in_changed,   ids (&["D"]) ); }
 
 #[test]
 fn a_relRepo_only_change_is_reported_from_both_ends () {
@@ -155,18 +155,18 @@ fn a_relRepo_only_change_is_reported_from_both_ends () {
     vec! [ partner ("N", Presence::Both, Some ("public"), Some ("private")) ] );
   assert! ( straddle . node_changes (&id ("N")) . is_empty () );
   // N's file records the move; C's set of containers is unchanged.
-  assert_eq! ( straddle . changed_pids () . rightward, ids (&["N"]) );
-  assert_eq! ( straddle . changed_pids () . leftward,  ids (&[]) ); }
+  assert_eq! ( straddle . changed_pids () . out_changed, ids (&["N"]) );
+  assert_eq! ( straddle . changed_pids () . in_changed,   ids (&[]) ); }
 
 #[test]
-fn changed_pids_splits_rightward_and_leftward () {
+fn changed_pids_splits_out_changed_and_in_changed () {
   // A gains content Y; X's title changes; New is created; O only
   // reorders its content.
   let (_root, straddle) : (TempDir, GraphStraddle) =
-    one_skgrepo_straddle ("rightward_and_leftward");
-  assert_eq! ( straddle . changed_pids () . rightward,
+    one_skgrepo_straddle ("out_changed_and_in_changed");
+  assert_eq! ( straddle . changed_pids () . out_changed,
                ids (&["A", "New", "X"]) );
-  assert_eq! ( straddle . changed_pids () . leftward, ids (&["Y"]) );
+  assert_eq! ( straddle . changed_pids () . in_changed, ids (&["Y"]) );
   assert_eq! ( straddle . changed_pids () . all (),
                ids (&["A", "New", "X", "Y"]) );
   assert! ( straddle . node_changes (&id ("X")) . title_changed );
@@ -205,7 +205,7 @@ fn a_foreign_skgrepo_needs_no_gitrepo_and_contributes_no_change () {
 fn the_slot_reuses_repairs_or_rebuilds_the_straddle () {
   let root : TempDir = TempDir::new () . unwrap ();
   let gitrepos : Vec<Repository> =
-    gitrepos_for_case (root . path (), "rightward_and_leftward", &[None]);
+    gitrepos_for_case (root . path (), "out_changed_and_in_changed", &[None]);
   let config : SkgConfig = config_for (root . path (), &["main"], &[]);
   let mut slot : Option<Arc<GraphStraddle>> = None;
   let live : Arc<InRustGraph> = live_graph (&config);

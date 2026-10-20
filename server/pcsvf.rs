@@ -9,7 +9,7 @@
 //! inside U. The view unfolds contentward from each d in D: a node in
 //! U is drawn editable with its whole content list, a member outside
 //! U is a write-protected leaf. View completion does the drawing, its
-//! 'tdv_drawing' set ('process_unrestrictedVognode_changes').
+//! 'diffView_source' set ('process_unrestrictedVognode_changes').
 //!
 //! The merges and skgrepo-changes buffers draw PCSVFs over subsets of
 //! C ('pcsvf_sets_for_merges', 'pcsvf_sets_for_home_moves'). The
@@ -32,7 +32,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   AffectsParent, Editability, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
   Vognode};
-use crate::types::views_state::{TdvBuffer, pids_from_viewforest};
+use crate::types::views_state::{DiffViewBufferKind, pids_from_viewforest};
 use crate::update_buffer::{complete_viewforest_with_graph_straddle, finish_viewforest};
 
 use ego_tree::{NodeId, NodeRef};
@@ -51,12 +51,12 @@ pub struct PcsvfSets {
 /// What view completion draws a buffer of the total diff view from:
 /// the graph straddle, and the buffer, whose PCSVF sets it draws.
 #[derive(Clone, Copy)]
-pub struct TdvDrawing<'a> {
+pub struct DiffViewSource<'a> {
   pub straddle   : &'a GraphStraddle,
-  pub tdv_buffer : TdvBuffer,
+  pub tdv_buffer : DiffViewBufferKind,
 }
 
-impl<'a> TdvDrawing<'a> {
+impl<'a> DiffViewSource<'a> {
   pub fn sets (
     &self,
   ) -> &'a PcsvfSets {
@@ -97,7 +97,7 @@ pub fn pcsvf_sets_for_merges (
   straddle : &GraphStraddle,
 ) -> PcsvfSets {
   let mut c : BTreeSet<ID> = BTreeSet::new ();
-  for acquiree in &straddle . changed_pids () . rightward {
+  for acquiree in &straddle . changed_pids () . out_changed {
     let Some (acquirer) : Option<ID> = straddle . acquirer_of (acquiree)
       else { continue; };
     c . insert ( acquiree . clone () );
@@ -110,7 +110,7 @@ pub fn pcsvf_sets_for_home_moves (
   straddle : &GraphStraddle,
 ) -> PcsvfSets {
   let c : BTreeSet<ID> =
-    straddle . changed_pids () . rightward . iter ()
+    straddle . changed_pids () . out_changed . iter ()
     . filter ( |pid| straddle . node_changes (pid) . home . is_some () )
     . cloned ()
     . collect ();
@@ -158,16 +158,16 @@ fn kept_origins (
 /// The buffer 'drawing' names, with roots 'roots' (for a PCSVF, its
 /// D in order), drawn with readiness from 'store': the buffer text,
 /// the pids to register, and the viewforest.
-pub fn pcsvf_viewforest (
+pub fn diffView_buffer_viewforest (
   runtime : &RuntimeGeneration,
-  drawing : TdvDrawing,
+  drawing : DiffViewSource,
   store   : &ReadinessStore,
   roots   : &[ID],
 ) -> Result<(String, Vec<ID>, ViewForest), Box<dyn Error>> {
   let mut viewforest : ViewForest =
     stub_viewforest_of_roots (runtime, drawing, roots) ?;
   complete_viewforest_with_graph_straddle (runtime, drawing, &mut viewforest) ?;
-  set_tdv_facts_in_viewforest (
+  set_diffView_facts_in_viewforest (
     &mut viewforest, drawing, store, &runtime . graph );
   let text : String = finish_viewforest (
     &mut viewforest, &runtime . graph, &runtime . config, None ) ?;
@@ -178,15 +178,15 @@ pub fn pcsvf_viewforest (
 /// What a buffer of the total diff view gets after view completion:
 /// its '(ready ...)' facts, and in the skgrepo-changes buffer each
 /// moved vognode's home move ('set_home_move_facts_in_viewforest').
-pub fn set_tdv_facts_in_viewforest (
+pub fn set_diffView_facts_in_viewforest (
   viewforest : &mut ViewForest,
-  drawing    : TdvDrawing,
+  drawing    : DiffViewSource,
   store      : &ReadinessStore,
   graph      : &InRustGraph,
 ) {
   set_ready_facts_in_viewforest (
-    viewforest, drawing . straddle . change_forest (), store, graph );
-  if drawing . tdv_buffer == TdvBuffer::SkgrepoChanges {
+    viewforest, drawing . straddle . change_leaves (), store, graph );
+  if drawing . tdv_buffer == DiffViewBufferKind::SkgrepoChanges {
     set_home_move_facts_in_viewforest (viewforest, drawing . straddle ); }}
 
 /// On each unrestricted vognode whose home skgrepo moved: the move,
@@ -204,20 +204,20 @@ pub fn set_home_move_facts_in_viewforest (
     . filter_map ( |node| {
       let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
         &node . value () . kind else { return None; };
-      let home_move : Option<(SkgrepoName, SkgrepoName)> =
+      let home_skgrepo_move : Option<(SkgrepoName, SkgrepoName)> =
         straddle . node_changes (&t . skgid) . home;
       let moved_like_ancestor : Option<String> =
-        home_move . as_ref () . and_then ( |home_move|
+        home_skgrepo_move . as_ref () . and_then ( |home_skgrepo_move|
           nearest_moved_vognode_ancestor (node, straddle)
-          . filter ( |(_, ancestor_move)| ancestor_move == home_move )
+          . filter ( |(_, ancestor_move)| ancestor_move == home_skgrepo_move )
           . map ( |(generation, _)| ancestor_letter (generation) ));
-      Some (( node . id (), home_move, moved_like_ancestor )) } )
+      Some (( node . id (), home_skgrepo_move, moved_like_ancestor )) } )
     . collect ();
-  for (treeid, home_move, moved_like_ancestor) in facts {
+  for (treeid, home_skgrepo_move, moved_like_ancestor) in facts {
     if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       &mut viewforest . as_internal_tree_mut () . get_mut (treeid)
       . unwrap () . value () . kind {
-      t . viewStats . home_move = home_move;
+      t . viewStats . home_skgrepo_move = home_skgrepo_move;
       t . viewStats . moved_like_ancestor = moved_like_ancestor; }}}
 
 /// The ancestor generation (1 = viewparent, counting every viewnode
@@ -231,7 +231,7 @@ fn nearest_moved_vognode_ancestor (
     . find_map ( |(index, ancestor)| match &ancestor . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         straddle . node_changes (&t . skgid) . home
-        . map ( |home_move| (index + 1, home_move) ),
+        . map ( |home_skgrepo_move| (index + 1, home_skgrepo_move) ),
       _ => None, } ) }
 
 /// The letter the relationship heralds give an ancestor generation:
@@ -243,11 +243,13 @@ fn ancestor_letter (
     char::from ( b'a' + (generation - 1) as u8 ) . to_string ()
   } else { format! ( "{{{}}}", generation ) }}
 
-/// The nodes a buffer of the total diff view draws: those it has an
-/// editable occurrence of, wherever it sits, and the deleted nodes it
-/// draws as historical phantoms in content position. The leaves they
-/// own are the changes it shows.
-pub fn nodes_drawn_in_viewforest (
+/// The nodes a buffer of the total diff view makes editable: those it
+/// has an editable occurrence of, wherever it sits, and the deleted
+/// nodes it draws as historical phantoms in content position. A
+/// historical phantom in content position counts, since its old
+/// content is editable nowhere and shown there. The change-forest
+/// leaves these nodes record are the changes editable in the buffer.
+pub fn nodes_editable_in_diffView (
   viewforest : &ViewForest,
 ) -> HashSet<ID> {
   viewforest . nodes () . filter_map ( |node| match &node . value () . kind {
@@ -278,7 +280,7 @@ fn historical_phantom_in_content_position (
 /// as 'append_stub_root' draws one.
 fn stub_viewforest_of_roots (
   runtime : &RuntimeGeneration,
-  drawing : TdvDrawing,
+  drawing : DiffViewSource,
   roots   : &[ID],
 ) -> Result<ViewForest, Box<dyn Error>> {
   let mut viewforest : ViewForest = ViewForest::new ();
@@ -297,7 +299,7 @@ fn stub_viewforest_of_roots (
 /// treeid.
 fn append_stub_root (
   runtime           : &RuntimeGeneration,
-  drawing           : TdvDrawing,
+  drawing           : DiffViewSource,
   viewforest        : &mut ViewForest,
   root              : &ID,
   stub_editable_map : &mut EditableMap,
@@ -307,18 +309,18 @@ fn append_stub_root (
   if straddle . after . get (root) . is_none () {
     let phantom : Viewnode = mk_historical_viewnode (straddle, root, None)
       . ok_or_else ( || format! (
-        "pcsvf_viewforest: root {} is in neither graph", root )) ?;
+        "diffView_buffer_viewforest: root {} is in neither graph", root )) ?;
     return Ok ( viewforest . as_internal_tree_mut () . get_mut (buffer_root)
-                . ok_or ("pcsvf_viewforest: no buffer root") ?
+                . ok_or ("diffView_buffer_viewforest: no buffer root") ?
                 . append (phantom) . id () ); }
   let root_treeid : NodeId = build_node_branch_minus_content (
     Some (( viewforest . as_internal_tree_mut (), buffer_root )),
     root, &runtime . graph, &runtime . config, stub_editable_map,
     None ) ?;
-  if drawing . tdv_buffer != TdvBuffer::OrderOnlyChanges
+  if drawing . tdv_buffer != DiffViewBufferKind::OrderOnlyChanges
     && union_containers (straddle, root) . len () > 1 {
     viewforest . as_internal_tree_mut () . get_mut (root_treeid)
-      . ok_or ("pcsvf_viewforest: a stub root vanished") ?
+      . ok_or ("diffView_buffer_viewforest: a stub root vanished") ?
       . append ( Viewnode {
         focused : false, folded : true, body_folded : false,
         kind : ViewnodeKind::PartnerFolder (PartnerFolder::Container) } ); }
@@ -330,14 +332,14 @@ fn append_stub_root (
 /// cycle's membership never adds a second root for a cycle that
 /// already stands.
 pub fn contentOrigins_missing_from_buffer (
-  drawing        : TdvDrawing,
+  drawing        : DiffViewSource,
   viewforest     : &ViewForest,
   standing_roots : &BTreeSet<ID>,
 ) -> Vec<ID> {
   let sets : &PcsvfSets = drawing . sets ();
   let containers_of = |skgid : &ID| -> Vec<ID> {
     union_containers (drawing . straddle, skgid) };
-  let drawn : HashSet<ID> = nodes_drawn_in_viewforest (viewforest);
+  let drawn : HashSet<ID> = nodes_editable_in_diffView (viewforest);
   kept_origins (&sets . r, &sets . u, &containers_of, standing_roots)
     . into_iter ()
     . filter ( |origin| ! drawn . contains (origin)
@@ -349,7 +351,7 @@ pub fn contentOrigins_missing_from_buffer (
 /// complete. Returns their treeids.
 pub fn append_contentOrigins_to_buffer (
   runtime    : &RuntimeGeneration,
-  drawing    : TdvDrawing,
+  drawing    : DiffViewSource,
   viewforest : &mut ViewForest,
   origins    : &[ID],
 ) -> Result<Vec<NodeId>, Box<dyn Error>> {
@@ -379,7 +381,7 @@ pub fn root_skgids_of_buffer (
 /// list. A node of U with no occurrence is reached through the node
 /// above it on its walk, once that one is editable.
 pub fn ensure_editableOccurrences_exist (
-  drawing    : TdvDrawing,
+  drawing    : DiffViewSource,
   viewforest : &mut ViewForest,
   graph      : &InRustGraph,
   config     : &SkgConfig,

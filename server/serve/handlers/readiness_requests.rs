@@ -5,8 +5,8 @@
 //! their fingerprints in the fresh graph straddle. A save that stops for
 //! a confirmation consumes nothing.
 
-use crate::change_forest::{
-  ChangeForest, LeafKey, NodeAspect, RelationshipAspect};
+use crate::change_leaves::{
+  ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   NodeRelation, RelationRole};
@@ -48,7 +48,7 @@ pub fn consume_readiness_requests (
     env . runtime . readiness_store . lock ()
     . unwrap_or_else ( |poisoned| poisoned . into_inner () );
   let mut warnings : Vec<String> =
-    apply_readiness_requests (&requests, straddle . change_forest (), &mut store);
+    apply_readiness_requests (&requests, straddle . change_leaves (), &mut store);
   if let Err (e) = store . save (&runtime . config . data_root) {
     warnings . push ( format! (
       "The readiness marks were applied but not written to disk: {}", e )); }
@@ -158,7 +158,7 @@ fn leaves_named_at (
             pid : parent_pid () ?, aspect : NodeAspect::Text } ),
         Property::HomeSkgrepoMove { .. } =>
           leaves . push ( LeafKey::Node {
-            pid : parent_pid () ?, aspect : NodeAspect::Home } ),
+            pid : parent_pid () ?, aspect : NodeAspect::HomeSkgrepo } ),
         Property::RelRepoMove { .. } =>
           leaves . extend ( relationship_to_viewparent (
             parent, &parent_pid () ?, pid_of,
@@ -179,7 +179,7 @@ fn leaves_named_at (
 /// The leaves of 'forest' that 'named' names.
 fn keys_in_forest (
   named  : &NamedLeaves,
-  forest : &ChangeForest,
+  forest : &ChangeLeaves,
 ) -> Vec<LeafKey> {
   named . leaves . iter () . cloned ()
     . chain ( named . all_of . iter () . flat_map ( |pid|
@@ -203,7 +203,7 @@ fn keys_in_forest (
 /// fingerprint. The order-only marker is always ready.
 pub fn set_ready_facts_in_viewforest (
   viewforest : &mut ViewForest,
-  forest     : &ChangeForest,
+  forest     : &ChangeLeaves,
   store      : &ReadinessStore,
   graph      : &InRustGraph,
 ) {
@@ -300,7 +300,7 @@ fn vognode_leaf_pid (
 /// current change.
 pub fn apply_readiness_requests (
   requests : &[RequestedReadiness],
-  forest   : &ChangeForest,
+  forest   : &ChangeLeaves,
   store    : &mut ReadinessStore,
 ) -> Vec<String> {
   let mut warnings : Vec<String> = Vec::new ();

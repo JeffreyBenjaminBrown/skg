@@ -15,7 +15,7 @@
 //! straddle), and its changeset markers. A node in U but not in C is
 //! context: its body starts folded. A write-protected occurrence gets
 //! none of this; its viewparent tags it. U and C are those of the
-//! buffer being drawn ('TdvDrawing::sets'); in the order-only buffer
+//! buffer being drawn ('DiffViewSource::sets'); in the order-only buffer
 //! both are empty, and each node there gets an order-only marker.
 //!
 //! Nothing that exists is drawn again ('TODO/total-diff-view/04_plan-fixes.org',
@@ -30,7 +30,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole};
 use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner, Presence};
-use crate::pcsvf::{PcsvfSets, TdvDrawing};
+use crate::pcsvf::{PcsvfSets, DiffViewSource};
 use crate::to_org::render::change_viewnodes::{
   append_acquired_folder, append_historical_phantom_content, append_old_text,
   mk_changeset_marker_viewnode, mk_historical_viewnode, mk_home_move_viewnode,
@@ -46,7 +46,7 @@ use crate::types::nodes::complete::Flag;
 use crate::types::tree::moves::{
   arrange_first_children, arrange_last_children, move_before,
   move_to_first_child, move_to_last_child};
-use crate::types::views_state::TdvBuffer;
+use crate::types::views_state::DiffViewBufferKind;
 use crate::types::viewnode::{
   AffectsParent, Birth, ChangeFacts, ChangesetMarkerKind, DiffPresence,
   Editability, PartnerFolder, Phantom, PhantomDeleted, Property,
@@ -75,14 +75,14 @@ const OUT_FOLDERS : [PartnerFolder; 3] = [
 
 /// See the module comment. 'created_in_this_completion' is whether
 /// view completion created the viewnode at 'treeid': only then does
-/// its body's fold state come from C. 'writable_before_completion'
+/// its body's fold state come from C. 'editable_before_completion'
 /// holds the viewnodes that were editable when completion began.
 pub(crate) fn process_unrestrictedVognode_changes (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
-  drawing : TdvDrawing,
+  drawing : DiffViewSource,
   created_in_this_completion : bool,
-  writable_before_completion : &HashSet<NodeId>,
+  editable_before_completion : &HashSet<NodeId>,
 ) -> Result<(), Box<dyn Error>> {
   let straddle : &GraphStraddle = drawing . straddle;
   let (pid, editable) : (ID, bool) =
@@ -105,11 +105,11 @@ pub(crate) fn process_unrestrictedVognode_changes (
     tree . get_mut (treeid) . unwrap () . value () . body_folded = ! in_c; }
   tag_content_members (
     tree, treeid, straddle, &content,
-    Some (( &sets . u, writable_before_completion )) ) ?;
+    Some (( &sets . u, editable_before_completion )) ) ?;
   reconcile_removed_content_members (tree, treeid, straddle, &pid) ?;
   let fresh : Tree<Viewnode> = fresh_front_change_viewnodes (
     straddle, &pid, &content, in_c,
-    drawing . tdv_buffer == TdvBuffer::OrderOnlyChanges
+    drawing . tdv_buffer == DiffViewBufferKind::OrderOnlyChanges
       && straddle . order_only_pids () . contains (&pid) );
   let fronts : Vec<NodeId> = reconcile_children_with_fresh_drawing (
     tree, treeid, &fresh, fresh . root () . id (),
@@ -381,7 +381,7 @@ fn changed_partner_folders (
 /// Tag each content member, and each non-member child whose node is
 /// content, with the presence of its node and of its relationship,
 /// draw a member outside U as a write-protected leaf unless it was
-/// editable before completion ('u_and_writable', when given), and
+/// editable before completion ('u_and_editable', when given), and
 /// keep a relRepo move under exactly the members whose relationship
 /// moved. A member's view requests stay: one that
 /// carries an editable-view request is drawn as the request says at
@@ -391,7 +391,7 @@ fn tag_content_members (
   treeid   : NodeId,
   straddle : &GraphStraddle,
   content  : &[Partner],
-  u_and_writable : Option<( &BTreeSet<ID>, &HashSet<NodeId> )>,
+  u_and_editable : Option<( &BTreeSet<ID>, &HashSet<NodeId> )>,
 ) -> Result<(), Box<dyn Error>> {
   let by_id : HashMap<&ID, &Partner> =
     content . iter () . map ( |partner| (&partner . id, partner) ) . collect ();
@@ -413,7 +413,7 @@ fn tag_content_members (
                    . and_then ( |presence| presence . diff_sign () ),
             rel  : partner . and_then ( |p| p . presence . diff_sign () ), };
           if t . affectsParent == AffectsParent::True
-             && u_and_writable . is_some_and ( |(u, writable)|
+             && u_and_editable . is_some_and ( |(u, writable)|
             ! u . contains (&t . skgid) && ! writable . contains (&member) ) {
             t . editability = Editability::WriteProtected; }
           moved = partner . and_then ( |p| mk_relRepo_move_viewnode (p) ); },

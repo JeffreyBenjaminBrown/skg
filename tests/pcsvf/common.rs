@@ -8,7 +8,7 @@ pub mod git_fixture_helpers;
 
 use git_fixture_helpers::{mk_test_tcp_stream_pair, setup_gitrepo_with_fixtures};
 
-use skg::change_forest::LeafKey;
+use skg::change_leaves::LeafKey;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::graph_straddle::build::current_graph_straddle_in_slot;
@@ -26,7 +26,7 @@ use skg::test_utils::{
   skg_env_from_parts, update_from_and_rerender_buffer_test};
 use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
-use skg::types::views_state::{OpenViews, TdvBuffer, ViewId};
+use skg::types::views_state::{OpenViews, DiffViewBufferKind, ViewId};
 
 use futures::executor::block_on;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -115,17 +115,17 @@ pub fn all_changes_buffer_with_marks (
   let mut store : ReadinessStore = ReadinessStore::default ();
   for key in marked {
     store . mark ( key . clone (),
-                   straddle . change_forest () . leaf_fingerprint (key)
+                   straddle . change_leaves () . leaf_fingerprint (key)
                    . expect ("a marked key is a leaf") ); }
   Ok ( match total_diff_view_buffer (
-    &runtime, &straddle, &store, TdvBuffer::AllChanges ) ? {
+    &runtime, &straddle, &store, DiffViewBufferKind::AllChanges ) ? {
     TotalDiffViewBuffer::Empty => None,
     TotalDiffViewBuffer::Content { text, .. } => Some (text), } ) }
 
 /// The view id under which 'open_buffer' registers a buffer: its
 /// client's name for it.
 pub fn view_id_of (
-  tdv_buffer : TdvBuffer,
+  tdv_buffer : DiffViewBufferKind,
 ) -> ViewId {
   ViewId::ContentView ( format! ( "diff-view: {}", tdv_buffer . wire_name () )) }
 
@@ -133,7 +133,7 @@ pub fn view_id_of (
 pub fn open_all_changes_buffer (
   f : &mut Fixture,
 ) -> Result<String, Box<dyn Error>> {
-  open_buffer (f, TdvBuffer::AllChanges) ?
+  open_buffer (f, DiffViewBufferKind::AllChanges) ?
     . ok_or_else ( || "the all-changes buffer is empty" . into () ) }
 
 /// Open a buffer of the total diff view as the "total diff view"
@@ -142,7 +142,7 @@ pub fn open_all_changes_buffer (
 /// None when it would be empty.
 pub fn open_buffer (
   f          : &mut Fixture,
-  tdv_buffer : TdvBuffer,
+  tdv_buffer : DiffViewBufferKind,
 ) -> Result<Option<String>, Box<dyn Error>> {
   let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
@@ -165,12 +165,12 @@ pub fn save (
   f      : &mut Fixture,
   buffer : &str,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  save_buffer (f, TdvBuffer::AllChanges, buffer) }
+  save_buffer (f, DiffViewBufferKind::AllChanges, buffer) }
 
 /// Save 'text' as the buffer 'open_buffer' registered.
 pub fn save_buffer (
   f          : &mut Fixture,
-  tdv_buffer : TdvBuffer,
+  tdv_buffer : DiffViewBufferKind,
   text       : &str,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
@@ -185,7 +185,7 @@ pub fn save_buffer (
 pub fn saves_back_unchanged (
   case       : &str,
   skgrepos   : &[&str],
-  tdv_buffer : TdvBuffer,
+  tdv_buffer : DiffViewBufferKind,
 ) -> Result<(), Box<dyn Error>> {
   with_fixture (case, skgrepos, |f| {
     let text : String = open_buffer (f, tdv_buffer) ?
@@ -246,7 +246,7 @@ pub fn send_stage_and_commit_request (
 /// wrote.
 pub fn send_show_unshown_changes_request (
   f          : &mut Fixture,
-  tdv_buffer : TdvBuffer,
+  tdv_buffer : DiffViewBufferKind,
 ) -> Result<String, Box<dyn Error>> {
   let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let all_skgrepos : SkgrepoRestriction =
@@ -269,7 +269,7 @@ pub fn show_unshown_changes (
   f : &mut Fixture,
 ) -> Result<(String, usize), Box<dyn Error>> {
   let response : String =
-    send_show_unshown_changes_request (f, TdvBuffer::AllChanges) ?;
+    send_show_unshown_changes_request (f, DiffViewBufferKind::AllChanges) ?;
   let unshown : usize = response . split ("(unshown ") . nth (1)
     . and_then ( |rest| rest . split (')') . next () )
     . and_then ( |count| count . parse () . ok () )

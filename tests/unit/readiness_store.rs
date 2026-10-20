@@ -1,7 +1,7 @@
 // Unit tests for the readiness store's marks and its persistence.
 
 use super::*;
-use crate::change_forest::{NodeAspect, RelationshipAspect};
+use crate::change_leaves::{NodeAspect, RelationshipAspect};
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::types::misc::ID;
 use crate::types::nodes::complete::Flag;
@@ -52,3 +52,20 @@ fn a_missing_or_unreadable_file_is_an_empty_store () {
     . unwrap ();
   assert_eq! ( ReadinessStore::load (dir . path ()),
                ReadinessStore::default () ); }
+
+/// A marks file written while 'NodeAspect::HomeSkgrepo' was spelled
+/// 'Home' still loads, and saving writes that spelling back.
+#[test]
+fn a_marks_file_spelling_the_aspect_Home_still_loads () {
+  let dir : TempDir = TempDir::new () . unwrap ();
+  let fixture : &str =
+    include_str! ("readiness_store/marks_with_the_aspect_Home.json");
+  fs::write ( readiness_marks_path (dir . path ()), fixture ) . unwrap ();
+  let store : ReadinessStore = ReadinessStore::load (dir . path ());
+  let key : LeafKey = LeafKey::Node { pid    : ID::from ("moved"),
+                                      aspect : NodeAspect::HomeSkgrepo };
+  assert! ( store . is_ready (&key, 42) );
+  store . save (dir . path ()) . unwrap ();
+  let saved : String =
+    fs::read_to_string ( readiness_marks_path (dir . path ()) ) . unwrap ();
+  assert! ( saved . contains ("\"aspect\": \"Home\""), "{}", saved ); }

@@ -131,7 +131,7 @@ fn a_write_protected_leaf_that_changes_becomes_editable_by_the_command (
               && ! drawn_editable (saved, "w"),
               "w must stay a write-protected leaf:\n{}", saved );
     assert! ( node_lines (saved, "w1") . is_empty (), "{}", saved );
-    assert_eq! ( response . readiness_summary . unwrap () . unshown_changes, 1 );
+    assert_eq! ( response . readiness_summary . unwrap () . changes_not_editable_here, 1 );
     let (shown, unshown) : (String, usize) = show_unshown_changes (f) ?;
     assert! ( drawn_editable (&shown, "w"), "w must be editable:\n{}", shown );
     assert! ( shown . contains ("*** (skg (oldText title)) w"),
@@ -158,7 +158,7 @@ fn a_change_two_levels_under_a_write_protected_leaf_is_drawn_by_the_command (
     let response : SaveResponse = save_cleanly (f, &buffer) ?;
     assert! ( node_lines (&response . saved_view, "w1a") . is_empty (),
               "{}", response . saved_view );
-    assert_eq! ( response . readiness_summary . unwrap () . unshown_changes, 1 );
+    assert_eq! ( response . readiness_summary . unwrap () . changes_not_editable_here, 1 );
     let (shown, unshown) : (String, usize) = show_unshown_changes (f) ?;
     for node in [ "w", "w1", "w1a" ] {
       assert! ( drawn_editable (&shown, node),
@@ -183,7 +183,7 @@ fn a_change_under_a_new_origin_is_appended_as_a_root_by_the_command (
     let response : SaveResponse = save_cleanly (f, &buffer) ?;
     assert_eq! ( root_ids (&response . saved_view), vec! [ "q", "r" ],
                  "{}", response . saved_view );
-    assert_eq! ( response . readiness_summary . unwrap () . unshown_changes, 1 );
+    assert_eq! ( response . readiness_summary . unwrap () . changes_not_editable_here, 1 );
     let (shown, unshown) : (String, usize) = show_unshown_changes (f) ?;
     assert_eq! ( root_ids (&shown), vec! [ "q", "r", "s" ], "{}", shown );
     let s_subtree : Vec<&str> = subtree_starting (&shown, "* (skg bodyFolded (node (id s) ");
@@ -254,7 +254,7 @@ fn a_node_the_user_write_protected_stays_so_until_the_command (
                 && ! response . saved_view . contains ("(oldText body)"),
                 "a must stay write-protected:\n{}", response . saved_view );
       assert! ( response . readiness_summary . as_ref () . unwrap ()
-                . unshown_changes > 0 ); }
+                . changes_not_editable_here > 0 ); }
     let (shown, unshown) : (String, usize) = show_unshown_changes (f) ?;
     assert! ( drawn_editable (&shown, "a")
               && shown . contains ("*** (skg (oldText body))"),
@@ -485,7 +485,7 @@ fn a_change_drawn_only_in_a_container_folder_becomes_editable_there (
     let response : SaveResponse = save_cleanly (f, &buffer) ?;
     assert! ( ! drawn_editable (&response . saved_view, "c1"),
               "{}", response . saved_view );
-    assert_eq! ( response . readiness_summary . unwrap () . unshown_changes, 1 );
+    assert_eq! ( response . readiness_summary . unwrap () . changes_not_editable_here, 1 );
     let (shown, unshown) : (String, usize) = show_unshown_changes (f) ?;
     let c1_subtree : Vec<&str> = subtree_starting (&shown, "*** (skg (node (id c1) ");
     assert! ( ! c1_subtree [0] . contains ("writeProtected"),

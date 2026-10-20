@@ -1,11 +1,11 @@
-use crate::change_forest::ChangeForest;
+use crate::change_leaves::ChangeLeaves;
 use crate::pcsvf::{
   PcsvfSets, pcsvf_sets, pcsvf_sets_for_home_moves, pcsvf_sets_for_merges};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::git::Sign;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
-use crate::types::views_state::TdvBuffer;
+use crate::types::views_state::DiffViewBufferKind;
 
 use std::collections::BTreeSet;
 use std::sync::{Arc, OnceLock};
@@ -26,8 +26,8 @@ pub struct GraphStraddle {
   pub foreign_changed_files : usize,
   /// Computed on first use; see 'GraphStraddle::changed_pids'.
   pub(super) changed_pids : OnceLock<ChangedPids>,
-  /// Computed on first use; see 'GraphStraddle::change_forest'.
-  pub(super) change_forest : OnceLock<ChangeForest>,
+  /// Computed on first use; see 'GraphStraddle::change_leaves'.
+  pub(super) change_leaves : OnceLock<ChangeLeaves>,
   /// Computed on first use; see 'GraphStraddle::pcsvf_sets'.
   pub(super) pcsvf_sets : OnceLock<PcsvfSets>,
   /// Computed on first use; see 'GraphStraddle::pcsvf_sets_of_buffer'.
@@ -71,13 +71,13 @@ pub struct Partner {
 }
 
 /// The two halves of C, the set of changed graphnodes.
-/// Rightward: nodes whose own files record a change, and every new
-/// or deleted node. Leftward: nodes whose set of containers,
+/// 'out_changed': nodes whose own files record a change, and every new
+/// or deleted node. 'in_changed': nodes whose set of containers,
 /// mentioners, subscribers, overriders or hiders changed.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ChangedPids {
-  pub rightward : BTreeSet<ID>,
-  pub leftward  : BTreeSet<ID>,
+  pub out_changed : BTreeSet<ID>,
+  pub in_changed  : BTreeSet<ID>,
 }
 
 impl GraphStraddle {
@@ -89,17 +89,17 @@ impl GraphStraddle {
   ) -> GraphStraddle {
     GraphStraddle { before, after, head_identity, foreign_changed_files,
                 changed_pids  : OnceLock::new (),
-                change_forest : OnceLock::new (),
+                change_leaves : OnceLock::new (),
                 pcsvf_sets    : OnceLock::new (),
                 merges_pcsvf_sets     : OnceLock::new (),
                 home_moves_pcsvf_sets : OnceLock::new () } }
 
   /// The change-forest of this straddle. Computed once per straddle.
-  pub fn change_forest (
+  pub fn change_leaves (
     &self,
-  ) -> &ChangeForest {
-    self . change_forest . get_or_init (
-      || ChangeForest::from_graph_straddle (self) ) }
+  ) -> &ChangeLeaves {
+    self . change_leaves . get_or_init (
+      || ChangeLeaves::from_graph_straddle (self) ) }
 
   /// The sets of the PCSVF over all of C ('server/pcsvf.rs').
   /// Computed once per straddle.
@@ -114,25 +114,25 @@ impl GraphStraddle {
   /// write-protected leaves. Computed once per straddle.
   pub fn pcsvf_sets_of_buffer (
     &self,
-    tdv_buffer : TdvBuffer,
+    tdv_buffer : DiffViewBufferKind,
   ) -> &PcsvfSets {
     static NO_SETS : PcsvfSets = PcsvfSets {
       c : BTreeSet::new (), r : BTreeSet::new (),
       u : BTreeSet::new (), d : BTreeSet::new () };
     match tdv_buffer {
-      TdvBuffer::AllChanges => self . pcsvf_sets (),
-      TdvBuffer::Merges => self . merges_pcsvf_sets . get_or_init (
+      DiffViewBufferKind::AllChanges => self . pcsvf_sets (),
+      DiffViewBufferKind::Merges => self . merges_pcsvf_sets . get_or_init (
         || pcsvf_sets_for_merges (self) ),
-      TdvBuffer::SkgrepoChanges => self . home_moves_pcsvf_sets . get_or_init (
+      DiffViewBufferKind::SkgrepoChanges => self . home_moves_pcsvf_sets . get_or_init (
         || pcsvf_sets_for_home_moves (self) ),
-      TdvBuffer::OrderOnlyChanges => &NO_SETS, } }
+      DiffViewBufferKind::OrderOnlyChanges => &NO_SETS, } }
 
   /// The nodes whose file changed but whose change-forest has no
   /// leaf: only the order of some list changed.
   pub fn order_only_pids (
     &self,
   ) -> &BTreeSet<ID> {
-    self . change_forest () . order_only_pids () }
+    self . change_leaves () . order_only_pids () }
 }
 
 impl Presence {
@@ -189,5 +189,5 @@ impl ChangedPids {
   pub fn all (
     &self,
   ) -> BTreeSet<ID> {
-    self . rightward . union (&self . leftward) . cloned () . collect () }
+    self . out_changed . union (&self . in_changed) . cloned () . collect () }
 }

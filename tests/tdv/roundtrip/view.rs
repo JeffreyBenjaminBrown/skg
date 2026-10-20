@@ -18,7 +18,7 @@ mod git_fixture_helpers;
 
 use git_fixture_helpers::{mk_test_tcp_stream_pair, setup_gitrepo_with_fixtures};
 
-use skg::change_forest::{LeafKey, NodeAspect, RelationshipAspect};
+use skg::change_leaves::{LeafKey, NodeAspect, RelationshipAspect};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use skg::graph_straddle::types::{GraphStraddle, Partner, Presence};

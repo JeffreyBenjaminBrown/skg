@@ -20,7 +20,7 @@ use crate::to_org::render::changes::{
   deleted_phantom_becomes_historical, process_historical_phantom_visit,
   process_unrestrictedVognode_changes};
 use crate::graph_straddle::types::GraphStraddle;
-use crate::pcsvf::TdvDrawing;
+use crate::pcsvf::DiffViewSource;
 use crate::types::tree::viewnode_graphnode::{
   pid_and_skgrepo_from_viewnode_at, write_at_unrestrictedVognode_in_tree};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder, ViewRequest, Editability};
@@ -77,7 +77,7 @@ pub(super) struct CompletionContext<'a> {
   /// the partner folders draw the union of the straddle, the node
   /// budget bounds only the expansions an editable-view request makes
   /// outside U, and no default folders are created.
-  pub(super) tdv_drawing : Option<TdvDrawing<'a>>,
+  pub(super) diffView_source : Option<DiffViewSource<'a>>,
   /// The viewnodes the viewforest held before this completion began.
   /// In a total diff view, a fold state is set only on a viewnode
   /// not among them.
@@ -85,7 +85,7 @@ pub(super) struct CompletionContext<'a> {
   /// The editable unrestricted vognodes among them. In a total diff
   /// view, a content member outside U is write-protected only when it
   /// is not among these: nothing writable is write-protected again.
-  pub(super) writable_before_completion : &'a HashSet<NodeId>,
+  pub(super) editable_before_completion : &'a HashSet<NodeId>,
 }
 
 pub(super) fn complete_viewforest (
@@ -171,7 +171,7 @@ fn dispatch_node_update (
     ViewnodeKind::Vognode (Vognode::Unrestricted (_)) =>
       visit_normal_node (tree, treeid, context) ?,
     ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)
-      if context . tdv_drawing . is_none () =>
+      if context . diffView_source . is_none () =>
       // A folder fills its members WHOLE and is budget-neutral (TODO/DONE/local-view-update/plan_v2.org §5.5): the owning
       // vognode already spent its 1 budget unit when it expanded, so drawing all
       // the members here costs nothing more and never truncates a group.
@@ -197,11 +197,11 @@ fn dispatch_node_update (
       // FolderPolicy::WriteProtectedSet folder. The reconciler branches on
       // 'PartnerFolder::policy' where their treatment differs.
       if role . relation_member_role () . is_some () =>
-      // In a total diff view (tdv_drawing set) the folder draws the
+      // In a total diff view (diffView_source set) the folder draws the
       // union of the straddle; the Subscribee folder comes here too.
       reconcile_partnerFolder_children (
         treeid, tree, *role,
-        match context . tdv_drawing {
+        match context . diffView_source {
           Some (drawing) => PartnerFolderGoalSource::GraphStraddle (drawing . straddle),
           None        => PartnerFolderGoalSource::LiveGraph, },
         context . runtime, context . graph_snap,
@@ -211,7 +211,7 @@ fn dispatch_node_update (
     // In a total diff view, the node's visit fills its alias, ID and
     // flags folders from the graph straddle
     // ('process_unrestrictedVognode_changes').
-    ViewnodeKind::PropertyFolder (_) if context . tdv_drawing . is_some () => {},
+    ViewnodeKind::PropertyFolder (_) if context . diffView_source . is_some () => {},
     ViewnodeKind::PropertyFolder (PropertyFolder::Alias) =>
       super::reconcile::aliasfolder::reconcile_aliasFolder_children (
         tree, treeid, &context . runtime . graph,
@@ -227,8 +227,8 @@ fn dispatch_node_update (
     // In a total diff view, a historical phantom where content stands
     // draws its old content.
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_)))
-      if context . tdv_drawing . is_some () => {
-      let straddle : &GraphStraddle = context . tdv_drawing . unwrap () . straddle;
+      if context . diffView_source . is_some () => {
+      let straddle : &GraphStraddle = context . diffView_source . unwrap () . straddle;
       if process_historical_phantom_visit (tree, treeid, straddle) ?
         == HistoricalPhantomVisit::RootIsLive {
         visit_normal_node (tree, treeid, context) ?; }},
@@ -264,7 +264,7 @@ fn visit_normal_node (
   if context . deleted_by_this_save_pids . contains (&pid) {
     mutate_unrestrictedVognode_to_deletednode (
       tree, treeid, &pid, &skgrepo ) ?;
-    if let Some (drawing) = context . tdv_drawing {
+    if let Some (drawing) = context . diffView_source {
       // In a total diff view, a node HEAD has is drawn as history.
       if deleted_phantom_becomes_historical (tree, treeid, drawing . straddle) ? {
         process_historical_phantom_visit (tree, treeid, drawing . straddle) ?; }}
@@ -282,11 +282,11 @@ fn visit_normal_node (
           t . view_requests . contains (& ViewRequest::Editable),
         _ => false } ) ?;
   let in_u : bool = // of the total diff view being drawn
-    context . tdv_drawing . is_some_and (
+    context . diffView_source . is_some_and (
       |drawing| drawing . sets () . u . contains (&pid) );
   let editableViewRequest_applies : bool = had_editableViewRequest;
   let budgeted : bool = // In a total diff view the budget bounds only the expansions requests make outside U.
-    context . tdv_drawing . is_none ()
+    context . diffView_source . is_none ()
     || ( editableViewRequest_applies && ! in_u );
   let mut settled : bool = false; // TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule already ran
   let mut cascade : bool = false; // node is Final -> hand EVRs to children
@@ -321,7 +321,7 @@ fn visit_normal_node (
         settled = true; }
       DrawOutcome::MadeFinal => {
         settled = true; cascade = true; } } }
-  if let Some (drawing) = context . tdv_drawing {
+  if let Some (drawing) = context . diffView_source {
     align_content_members_with_straddle (tree, treeid, drawing . straddle) ?; }
   expand_true_content_at_unrestrictedVognode (
     treeid, tree, context . editable_map,
@@ -330,7 +330,7 @@ fn visit_normal_node (
     context . skgrepo_restriction,
     settled, cascade,
     if budgeted { Some (&mut context . node_budget) } else { None },
-    context . tdv_drawing . is_none (), // substitution is off in the total diff view: it shows raw graph facts
+    context . diffView_source . is_none (), // substitution is off in the total diff view: it shows raw graph facts
     context . substitute_existing_content_overrides ) ?;
   // The steps below apply only while the node is still an Unrestricted vognode.
   let still_normal : bool =
@@ -345,7 +345,7 @@ fn visit_normal_node (
   // the subscribee-specific HiddenIn folder is added by the pass below.
   // A total diff view draws no default folders.
   if ( context . create_partnerFolders_for_fresh_nodes || editableViewRequest_applies )
-    && context . tdv_drawing . is_none () {
+    && context . diffView_source . is_none () {
     maybe_add_default_partnerFolder_branches (
       tree, treeid, &context . runtime . graph,
       &context . runtime . config,
@@ -359,18 +359,18 @@ fn visit_normal_node (
   // Ensure an editable subscribee's HiddenInSubscribeeFolder exists; the BFS
   // reconciles it on reaching it. (A default folder, so not in a
   // total diff view.)
-  if context . tdv_drawing . is_none () {
+  if context . diffView_source . is_none () {
     super::reconcile::view_requests::ensure_hiddenInFolder_under_editable_subscribee (
       tree, treeid, &context . runtime . graph,
       &context . runtime . config,
       context . skgrepo_restriction ) ?; }
-  if let Some (drawing) = context . tdv_drawing {
+  if let Some (drawing) = context . diffView_source {
     // Tag the content, draw what was removed, and add the change
     // folders, markers and properties.
     process_unrestrictedVognode_changes (
       tree, treeid, drawing,
       ! context . nodes_before_completion . contains (&treeid),
-      context . writable_before_completion ) ?; }
+      context . editable_before_completion ) ?; }
   Ok(( )) }
 
 /// Whether a node of this kind is *self-deletable when empty* (TODO/DONE/local-view-update/plan_v2.org §3.4): the

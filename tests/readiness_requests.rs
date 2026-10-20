@@ -11,7 +11,7 @@ mod git_fixture_helpers;
 
 use git_fixture_helpers::{mk_test_tcp_stream_pair, setup_gitrepo_with_fixtures};
 
-use skg::change_forest::{LeafKey, NodeAspect, RelationshipAspect};
+use skg::change_leaves::{LeafKey, NodeAspect, RelationshipAspect};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use skg::readiness_store::ReadinessStore;
@@ -117,7 +117,7 @@ fn a_save_marks_and_unmarks_the_leaves_its_requests_name (
         let store : ReadinessStore = ReadinessStore::load (&f . config . data_root);
         for key in [ r_contains_a (), a_alias () ] {
           assert! ( store . is_ready (
-            &key, straddle . change_forest () . leaf_fingerprint (&key) . unwrap () )); }} }
+            &key, straddle . change_leaves () . leaf_fingerprint (&key) . unwrap () )); }} }
     { // 'all' on a node names every leaf it owns.
       save (&mut f, "\
 * (skg (node (id r) (repo main) (readyRequest all))) r, retitled

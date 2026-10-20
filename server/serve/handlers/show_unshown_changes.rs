@@ -9,9 +9,9 @@
 //! as a save's does, and is followed by a rerender stream: the one
 //! view, or nothing when the request was refused.
 
-use crate::change_forest::BufferReadinessSummary;
+use crate::change_leaves::BufferReadinessSummary;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::pcsvf::nodes_drawn_in_viewforest;
+use crate::pcsvf::nodes_editable_in_diffView;
 use crate::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
 use crate::serve::handlers::rerender_all_views::{
@@ -25,7 +25,7 @@ use crate::serve::util::{
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::SkgEnv;
 use crate::types::views_state::ViewId;
-use crate::update_buffer::tdv_buffer_of_view;
+use crate::update_buffer::diffView_buffer_kind_of_view;
 
 use std::net::TcpStream;
 use std::sync::{Arc, MutexGuard};
@@ -70,7 +70,7 @@ fn show_unshown_changes (
       "Showing unshown changes requires no skgrepo restriction (the skgrepo-set all); current skgrepo restriction is {}. Switch the repo-set to all first.",
       skgrepo_restriction . name )); }
   let view_id : ViewId = view_id_from_request (request) ?;
-  if tdv_buffer_of_view (views_state, &view_id) . is_none () {
+  if diffView_buffer_kind_of_view (views_state, &view_id) . is_none () {
     return Err ( format! (
       "View {} is not a buffer of the total diff view.",
       view_id . repr_in_client () )); }
@@ -86,6 +86,6 @@ fn show_unshown_changes (
     let store : MutexGuard<ReadinessStore> =
       env . runtime . readiness_store . lock ()
       . unwrap_or_else ( |poisoned| poisoned . into_inner () );
-    straddle . change_forest () . buffer_readiness_summary (
-      &store, &nodes_drawn_in_viewforest (&view . viewforest) ) };
+    straddle . change_leaves () . buffer_readiness_summary (
+      &store, &nodes_editable_in_diffView (&view . viewforest) ) };
   Ok (( prepared, summary )) }
