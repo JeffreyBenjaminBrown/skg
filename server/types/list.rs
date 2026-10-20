@@ -19,6 +19,15 @@ pub enum Diff_Item<T> {
   New (T),
 }
 
+impl<T> Diff_Item<T> {
+  /// The entry, whatever happened to it.
+  pub fn into_item (
+    self,
+  ) -> T {
+    match self {
+      Diff_Item::Unchanged (x) | Diff_Item::Removed (x) | Diff_Item::New (x) => x, }}
+}
+
 //
 // Functions
 //
@@ -48,6 +57,20 @@ where
         ChangeTag::Insert =>
           result . push ( Diff_Item::New ( change . value() )), }}}
   result }
+
+/// The interleaved diff of two lists, minus the 'Removed' items that
+/// the new list still holds (elsewhere: a reorder). So each entry of
+/// the union appears once: a kept or new one where the new list has
+/// it, a removed one where the LCS puts it in the old order.
+pub fn interleaved_diff_without_reorders<T : Clone + Eq + std::hash::Hash + Ord> (
+  old : &[T],
+  new : &[T],
+) -> Vec<Diff_Item<T>> {
+  let new_set : HashSet<&T> = new . iter () . collect ();
+  compute_interleaved_diff (old, new) . into_iter ()
+    . filter ( |item| ! matches! ( item,
+      Diff_Item::Removed (x) if new_set . contains (x) ))
+    . collect () }
 
 /// Removes duplicates from a vector.
 /// Preserves the order of first occurrence.

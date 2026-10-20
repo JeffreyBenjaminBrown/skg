@@ -14,6 +14,7 @@ use crate::dbs::in_rust_graph::relation_accessors::{
 use crate::diff_view::change_leaves::ChangeLeaves;
 use crate::graph_straddle::types::{
   ChangedPids, GraphStraddle, NodeChanges, Partner, Presence};
+use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
 use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -55,9 +56,12 @@ impl GraphStraddle {
   /// 'role' names the role the PARTNER plays, as in role trees
   /// ('PARTNER_ROLE_VOCAB'): CONTAINER gives the node's containers,
   /// '(Contains, Second)' its content. Partners the node records come
-  /// in the after-graph's list order, then those only in the
-  /// before-graph in its order; recorders of the node come sorted by
-  /// ID.
+  /// in the order of the interleaved diff of the before-graph's list
+  /// and the after-graph's ('interleaved_diff_without_reorders'): a
+  /// kept or added one where the after-graph's list has it, one only
+  /// in the before-graph where the LCS puts it, as every drawing of
+  /// the union places a removed entry. Recorders of the node come
+  /// sorted by ID.
   pub fn partners (
     &self,
     pid  : &ID,
@@ -71,26 +75,21 @@ impl GraphStraddle {
       before . iter () . map ( |(id, relRepo)| (id, relRepo) ) . collect ();
     let after_relRepos : HashMap<&ID, &SkgrepoName> =
       after . iter () . map ( |(id, relRepo)| (id, relRepo) ) . collect ();
-    let mut partners : Vec<Partner> =
-      after . iter ()
-      . chain ( before . iter ()
-                . filter ( |(id, _)| ! after_relRepos . contains_key (id) ))
-      . map ( |(id, _)| {
+    let union : Vec<ID> = union_of_partner_lists (&before, &after, role);
+    union . into_iter ()
+      . map ( |id| {
         let relRepo_before : Option<SkgrepoName> =
-          before_relRepos . get (id) . map ( |r| (*r) . clone () );
+          before_relRepos . get (&id) . map ( |r| (*r) . clone () );
         let relRepo_after : Option<SkgrepoName> =
-          after_relRepos . get (id) . map ( |r| (*r) . clone () );
+          after_relRepos . get (&id) . map ( |r| (*r) . clone () );
         Partner {
-          id : id . clone (),
           presence : Presence::from_membership (
             relRepo_before . is_some (), relRepo_after . is_some () )
             . expect ("a partner comes from one graph or the other"),
+          id,
           relRepo_before,
           relRepo_after, }} )
-      . collect ();
-    if role . is_first_role () {
-      partners . sort_by ( |a, b| a . id . cmp (&b . id) ); }
-    partners }
+      . collect () }
 
   /// The node that acquired 'pid' by a nodeMerge since HEAD: the
   /// after-graph node that lists 'pid' as an extra ID, when 'pid' is
@@ -200,6 +199,25 @@ fn partners_in_graph (
   partners . into_iter ()
     . filter ( |(id, _)| seen . insert (id . clone ()) )
     . collect () }
+
+/// The IDs of the union of a node's partners in the two graphs, in
+/// the order 'GraphStraddle::partners' gives.
+fn union_of_partner_lists (
+  before : &[(ID, SkgrepoName)],
+  after  : &[(ID, SkgrepoName)],
+  role   : RelationRole,
+) -> Vec<ID> {
+  let ids = |partners : &[(ID, SkgrepoName)]| -> Vec<ID> {
+    partners . iter () . map ( |(id, _)| id . clone () ) . collect () };
+  if role . is_first_role () { // recorders, which no list orders
+    let mut union : Vec<ID> =
+      ids (after) . into_iter () . chain ( ids (before) ) . collect ();
+    union . sort ();
+    union . dedup ();
+    union
+  } else {
+    interleaved_diff_without_reorders ( &ids (before), &ids (after) )
+      . into_iter () . map (Diff_Item::into_item) . collect () }}
 
 /// The relRepo of the relationship by which 'recorder' names 'member'
 /// (a member ID as this graph resolves it).

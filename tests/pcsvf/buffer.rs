@@ -159,8 +159,8 @@ fn a_subscription_change_shows_on_both_sides (
   assert_lines_in_order ( &buffer, &[
     "* (skg (node (id sub)",
     "** (skg (subscribeeFolder changed))",
-    "*** (skg (node (id s2)", "(diff rel+) (leaves 1 rel))) s2",
-    "*** (skg (node (id s1) (repo public) (affectsParent false) writeProtected (diff rel-) (leaves 1 rel))) s1" ] );
+    "*** (skg (node (id s1) (repo public) (affectsParent false) writeProtected (diff rel-) (leaves 1 rel))) s1",
+    "*** (skg (node (id s2)", "(diff rel+) (leaves 1 rel))) s2" ] );
   assert_lines_in_order ( &buffer, &[
     "* (skg (node (id s1)",
     "** (skg (subscriberFolder changed))",

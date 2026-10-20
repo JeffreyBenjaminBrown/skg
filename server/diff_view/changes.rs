@@ -41,7 +41,7 @@ use crate::diff_view::fresh_drawing::{
   adopt_fresh_facts, is_unrestricted_removed_member, match_key,
   reconcile_children_with_fresh_drawing};
 use crate::types::git::Sign;
-use crate::types::list::{Diff_Item, compute_interleaved_diff};
+use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
 use crate::types::misc::ID;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::nodes::complete::Flag;
@@ -631,18 +631,6 @@ fn content_list (
     pid, NodeRelation::Contains, None )
     . into_iter ()
     . map ( |member| member . member . into_id () )
-    . collect () }
-
-/// The interleaved diff of two lists, minus the 'Removed' items that
-/// the new list still holds (elsewhere: a reorder).
-fn interleaved_diff_without_reorders<T : Clone + Eq + Hash + Ord> (
-  old : &[T],
-  new : &[T],
-) -> Vec<Diff_Item<T>> {
-  let new_set : HashSet<&T> = new . iter () . collect ();
-  compute_interleaved_diff (old, new) . into_iter ()
-    . filter ( |item| ! matches! ( item,
-      Diff_Item::Removed (x) if new_set . contains (x) ))
     . collect () }
 
 /// Under 'treeid', the node's alias, ID and flags folders, those whose

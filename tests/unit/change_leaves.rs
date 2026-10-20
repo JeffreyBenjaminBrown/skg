@@ -74,8 +74,8 @@ fn each_kind_of_change_is_a_leaf_under_its_recorder () {
            aliased ] );
   let forest : &ChangeLeaves = straddle . change_leaves ();
   assert_eq! ( keys_under (forest, "r"), vec! [
-    contains_key ("r", "new",  RelationshipAspect::Existence),
-    contains_key ("r", "gone", RelationshipAspect::Existence) ] );
+    contains_key ("r", "gone", RelationshipAspect::Existence),
+    contains_key ("r", "new",  RelationshipAspect::Existence) ] );
   assert_eq! ( keys_under (forest, "a"),
                vec! [ node_key ("a", NodeAspect::Text) ] );
   assert_eq! ( keys_under (forest, "new"),

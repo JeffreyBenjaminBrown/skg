@@ -82,10 +82,10 @@ fn removed_containers_are_reachable_from_the_deleted_node () {
     straddle . partners (&id ("D"), RelationRole::CONTAINER),
     vec! [ partner ("K",  Presence::OnlyBefore, Some ("main"), None),
            partner ("K2", Presence::OnlyBefore, Some ("main"), None) ] );
-  assert_eq! ( // surviving content first, then the removed member
+  assert_eq! ( // the removed member where it stood, before E
     straddle . partners (&id ("K"), CONTENT),
-    vec! [ partner ("E", Presence::Both, Some ("main"), Some ("main")),
-           partner ("D", Presence::OnlyBefore, Some ("main"), None) ] );
+    vec! [ partner ("D", Presence::OnlyBefore, Some ("main"), None),
+           partner ("E", Presence::Both, Some ("main"), Some ("main")) ] );
   assert_eq! ( straddle . changed_pids () . out_changed, ids (&["D", "K", "K2"]) );
   assert_eq! ( straddle . changed_pids () . in_changed,   ids (&["D"]) ); }
 
@@ -227,8 +227,8 @@ fn a_nodeMerge_since_head_puts_the_acquirers_container_in_c () {
                straddle . after  . get (&id ("P")) );
   assert_eq! (
     straddle . partners (&id ("P"), CONTENT),
-    vec! [ partner ("a", Presence::OnlyAfter,  None, Some ("main")),
-           partner ("b", Presence::OnlyBefore, Some ("main"), None) ] );
+    vec! [ partner ("b", Presence::OnlyBefore, Some ("main"), None),
+           partner ("a", Presence::OnlyAfter,  None, Some ("main")) ] );
   assert_eq! ( straddle . change_leaves () . leaves_under (&id ("P")) . len (), 2 );
   assert_eq! ( straddle . changed_pids () . out_changed, ids (&["P", "a", "b"]) );
   assert_eq! ( straddle . changed_pids () . in_changed,  ids (&["a", "b"]) ); }
