@@ -6,7 +6,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::to_org::expand::editable::{ apply_editable_draw_rule, DrawOutcome};
+use crate::to_org::expand::editable::{ apply_editable_draw_rule, apply_writeProtect_request, DrawOutcome};
 use crate::to_org::util::EditableMap;
 use crate::types::env::RuntimeGeneration;
 use crate::types::misc::{ID, SkgrepoName};
@@ -269,6 +269,12 @@ fn visit_normal_node (
       if deleted_phantom_becomes_historical (tree, treeid, drawing . straddle) ? {
         process_historical_phantom_visit (tree, treeid, drawing . straddle) ?; }}
     return Ok (( )); }
+  // A write-protect request is applied before anything else reads
+  // the occurrence's editability, so that what follows -- the budget,
+  // the draw rule, the expansion -- sees it write-protected.
+  apply_writeProtect_request (
+    tree, treeid, &context . runtime . graph,
+    &context . runtime . config, context . editable_map ) ?;
   let had_editableViewRequest : bool =
     read_at_node_in_tree ( tree, treeid,
       |vn : &Viewnode| match &vn . kind {

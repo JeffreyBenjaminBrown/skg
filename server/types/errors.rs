@@ -50,6 +50,7 @@ pub enum BufferValidationError {
   ForkRequestMultiple            (ID),  // Two headlines for the same id both carry an explicit fork request; at most one is allowed.
   OverrideInvariantViolation     (String),
   MultipleEditableViewRequestsForSameId    (ID), // Multiple editable view requests for the same ID
+  WriteProtectAndEditableViewRequestsOnOneOccurrence (ID), // One occurrence asks to become both write-protected and the editable one. (On different occurrences of a node, the two requests move editability, and are allowed.)
   EmptyTitle                             (ID),
   LocalStructureViolation        (String, ID), // (error message, nearest ancestor ID)
   EditRequestOnWriteProtectedOccurrence      (ID), // Write-protected nodes -- phantoms in particular -- cannot carry write instructions like (editRequest delete) or (editRequest (merge X)). The user must visit an editable view of the node first.
@@ -140,6 +141,8 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "{}", msg),
       BufferValidationError::MultipleEditableViewRequestsForSameId (skgid) =>
         write!(f, "Multiple editable view requests for the same ID {:?}. At most one request per ID is allowed.", skgid),
+      BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (skgid) =>
+        write!(f, "An occurrence of node {:?} requests both write-protection and an editable view. Request one; to move editability, request write-protection on one occurrence (C-c s w) and an editable view on another (C-c s d).", skgid),
       BufferValidationError::EmptyTitle(skgid) =>
         write!(f, "Node {:?} has an empty title. Every editable node must have a non-empty title.", skgid),
       BufferValidationError::LocalStructureViolation(msg, skgid) =>

@@ -274,6 +274,9 @@ fn validate_view_roots (
 
 /// No two nodes with the same ID may carry editable view requests,
 /// because there can only be one editable view.
+/// Nor may one occurrence carry both an editable view request and a
+/// write-protect request; on different occurrences of a node the two
+/// move editability, and are fine.
 /// A request on an editable node, or on one with content children,
 /// is fine: completion hands it to the node's content children.
 /// Children typed under a write-protected occurrence are refused
@@ -297,6 +300,10 @@ fn validate_editable_view_requests (
         { if let Some (skgid) = &t . skgid {
           if ! ids_with_requests . insert(skgid . clone())
           { errors . push( BufferValidationError::MultipleEditableViewRequestsForSameId(
+            skgid . clone() )); }
+          if t . view_requests . contains (&ViewRequest::WriteProtected)
+             || t . view_requests . contains (&ViewRequest::WriteProtectedSubtree)
+          { errors . push( BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence(
             skgid . clone() )); }} }}} }}
 
 /// A relRepo request describes the relationship from a node's view-parent

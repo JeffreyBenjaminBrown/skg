@@ -923,7 +923,9 @@ fn parse_editrequest_sexp (
 
 
 /// Parse the (viewRequests ...) s-expression and update viewRequests.
-/// Each request is either the bare atom 'editableView', or a nested
+/// Each request is either a bare atom ('editableView',
+/// 'writeProtectedView', 'writeProtectedSubtreeView', 'fork',
+/// 'flags'), or a nested
 /// '(folder RELNAME)' / '(roleTree ROLENAME)' form.
 fn parse_viewrequests_sexp (
   items : &[Sexp],
@@ -934,6 +936,8 @@ fn parse_viewrequests_sexp (
       Sexp::Atom (_) => {
         let atom : String = atom_to_string (request_element) ?;
         if atom == "editableView" { ViewRequest::Editable }
+        else if atom == "writeProtectedView" { ViewRequest::WriteProtected }
+        else if atom == "writeProtectedSubtreeView" { ViewRequest::WriteProtectedSubtree }
         else if atom == "fork" { ViewRequest::Fork }
         else if atom == "flags" { ViewRequest::Flags }
         else { return Err ( format! (

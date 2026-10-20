@@ -587,6 +587,10 @@ impl FolderRelation {
 /// - 'Folder(rel)' builds BOTH folders of the relation, populated from the graph.
 /// - 'RoleTree(role)' builds the role tree for that one partner role.
 /// - 'Editable' makes the (write-protected) node editable.
+/// - 'WriteProtected' makes the (editable) node write-protected,
+///   and its direct unrestricted children non-members.
+/// - 'WriteProtectedSubtree' does that to the node and its whole
+///   content subtree.
 /// - 'Fork' is the explicit 'skg-fork-node' gesture: clone this (owned)
 ///   node into a private fork that overrides it. Consumed on the save
 ///   path (fork detection), not during view completion.
@@ -596,6 +600,8 @@ pub enum ViewRequest {
   RoleTree (RelationRole),
   Flags,
   Editable,
+  WriteProtected,
+  WriteProtectedSubtree,
   Fork,
 }
 
@@ -909,8 +915,9 @@ impl ViewRequest {
   /// herald's ANY/IT), so they are deliberately absent -- like IDs and
   /// counts elsewhere. Enumerated for the herald conformance test
   /// (server/heralds.rs).
-  pub const EMITTABLE_MATCH_ATOMS : [&'static str; 4] =
-    [ "folder", "roleTree", "flags", "editableView" ];
+  pub const EMITTABLE_MATCH_ATOMS : [&'static str; 6] =
+    [ "folder", "roleTree", "flags", "editableView",
+      "writeProtectedView", "writeProtectedSubtreeView" ];
 }
 
 impl AsRef<Viewnode> for Viewnode {
@@ -1046,6 +1053,8 @@ impl fmt::Display for ViewRequest {
       ViewRequest::RoleTree (role) => write! (f, "(roleTree {})", role . rolename ()),
       ViewRequest::Flags   => write! (f, "flags"),
       ViewRequest::Editable    => write! (f, "editableView"),
+      ViewRequest::WriteProtected        => write! (f, "writeProtectedView"),
+      ViewRequest::WriteProtectedSubtree => write! (f, "writeProtectedSubtreeView"),
       ViewRequest::Fork        => write! (f, "fork"), } } }
 
 //

@@ -16,8 +16,10 @@ use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::org_to_text::viewforest_to_string;
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::tree::forest::ViewForest;
 use skg::types::views_state::{OpenViews, ViewId};
 use skg::types::viewnode::Viewnode;
 
@@ -68,6 +70,21 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_editable_view_request_moves_editability_back", fixtures) ?;
       test_editable_view_request_moves_editability_back (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_writeProtect_request_keeps_children_editable", fixtures) ?;
+      test_writeProtect_request_keeps_children_editable (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_writeProtect_subtree_request", fixtures) ?;
+      test_writeProtect_subtree_request (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_writeProtect_request_on_a_writeProtected_occurrence", fixtures) ?;
+      test_writeProtect_request_on_a_writeProtected_occurrence (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_writeProtect_and_editable_requests_move_editability_and_back", fixtures) ?;
+      test_writeProtect_and_editable_requests_move_editability_and_back (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_parked_content_node_is_drawn_once", fixtures) ?;
+      test_parked_content_node_is_drawn_once (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_budget_aliasfolder_is_neutral",
                  "tests/editable_view_cascade_and_budget/fixtures-aliases") ?;
@@ -569,10 +586,43 @@ fn requesting_editable_at (
   buffer   : &str,
   metadata : &str,
 ) -> String {
+  requesting_at ( buffer, metadata, "editableView" ) }
+
+/// 'buffer' with the view request 'request' added to its first line
+/// containing 'metadata', just after it.
+fn requesting_at (
+  buffer   : &str,
+  metadata : &str,
+  request  : &str,
+) -> String {
+  assert! ( buffer . contains (metadata),
+            "no line contains {:?}:\n{}", metadata, buffer );
   buffer . replacen (
     metadata,
-    &format! ( "{} (viewRequests editableView)", metadata ),
+    &format! ( "{} (viewRequests {})", metadata, request ),
     1 ) }
+
+/// The headlines of 'buffer' that start with 'prefix'.
+fn lines_starting<'a> (
+  buffer : &'a str,
+  prefix : &str,
+) -> Vec<&'a str> {
+  buffer . lines ()
+    . filter ( |line| line . starts_with (prefix) )
+    . collect () }
+
+/// The headlines of the subtree of 'buffer' whose root is the first
+/// line starting with 'root', the root excluded.
+fn subtree_headlines<'a> (
+  buffer : &'a str,
+  root   : &str,
+) -> Vec<&'a str> {
+  let depth : usize = root . find (' ') . unwrap_or (0);
+  buffer . lines ()
+    . skip_while ( |line| ! line . starts_with (root) ) . skip (1)
+    . filter ( |line| line . starts_with ('*') )
+    . take_while ( |line| line . find (' ') . unwrap_or (0) > depth )
+    . collect () }
 
 // ===================================================
 // Test: a request on an editable node unfolds its content
@@ -754,4 +804,270 @@ async fn test_budget_aliasfolder_is_neutral (
       assert_metadata_eq!(result, expected,
         "budget 3 expands the whole content chain; the AliasFolder is whole + budget-neutral");
 
+      Ok (( )) }
+
+/// Save 'buffer' as the view 'view_id', asserting that it saves.
+async fn save_view (
+  buffer      : &str,
+  config      : &SkgConfig,
+  tantivy     : &TantivyIndex,
+  graph       : &InRustGraphHandle,
+  view_id     : &ViewId,
+  views_state : &mut ViewsState,
+) -> Result<String, Box<dyn Error>> {
+  let mut stream : TcpStream = mk_test_tcp_stream ();
+  let response : SaveResponse = update_from_and_rerender_buffer (
+    &mut stream, buffer, config, tantivy, graph,
+    &Ok (view_id . clone ()), views_state ) . await ?;
+  assert! ( response . errors . is_empty (),
+            "the buffer must save, got {:?}\n\nbuffer:\n{}",
+            response . errors, buffer );
+  Ok (response . saved_view) }
+
+// ===================================================
+// Test: a write-protect request keeps the children editable
+// ===================================================
+// A view of 12 draws it editable, with 121..124 editable under it
+// (and its containerward branch, 1).
+// A write-protect request on root 12, in a save that also retitles
+// it, saves the title first; the rerender write-protects root 12 and
+// makes 121..124 non-members, still editable, with their own
+// content (1211 under 121) still members. A further save changes
+// nothing.
+async fn test_writeProtect_request_keeps_children_editable (
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      let mut config : SkgConfig = config . clone ();
+      config . initial_node_limit = 100;
+      let graph : InRustGraphHandle =
+        graph_handle_from_config (&config) ?;
+      let mut views_state : ViewsState = ViewsState {
+        open_views     : OpenViews::new (),
+        graph_straddle : None,};
+      let (view_id, opened) : (ViewId, String) =
+        open_content_view (
+          &config, tantivy, &graph, &mut views_state, &["12"] ) ?;
+      let requested : String = requesting_at (
+        &opened . replacen ( ")))) 12\n", ")))) twelve\n", 1 ),
+        "(node (id 12) (repo main)", "writeProtectedView" );
+      let saved : String = save_view (
+        &requested, &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+      println! ("Result of a write-protect request:\n{}", saved);
+      let root : &str = saved . lines () . next () . unwrap ();
+      assert! ( root . contains ("writeProtected") && root . ends_with (" twelve"),
+                "root 12 must be write-protected, with the saved title:\n{}", saved );
+      assert! ( ! saved . contains ("viewRequests"), "{}", saved );
+      let children : Vec<&str> = // not the 1 the root's containerward branch draws
+        lines_starting (&saved, "** (skg (node (id 12");
+      assert_eq! ( children . len (), 4, "{}", saved );
+      assert! ( children . iter () . all ( |line|
+                  line . contains ("(affectsParent false)")
+                  && ! line . contains ("writeProtected") ),
+                "121..124 must be editable non-members:\n{}", saved );
+      let grandchildren : Vec<&str> = lines_starting (&saved, "*** ");
+      assert_eq! ( grandchildren . len (), 3, "{}", saved );
+      assert! ( grandchildren . iter () . all ( |line|
+                  ! line . contains ("affectsParent")
+                  && ! line . contains ("writeProtected") ),
+                "their content must stay editable members:\n{}", saved );
+      let again : String = save_view (
+        &saved, &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+      assert_eq! ( again, saved, "a further save changes nothing" );
+      Ok (( )) }
+
+// ===================================================
+// Test: the subtree form write-protects the whole content subtree
+// ===================================================
+async fn test_writeProtect_subtree_request (
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      let mut config : SkgConfig = config . clone ();
+      config . initial_node_limit = 100;
+      let graph : InRustGraphHandle =
+        graph_handle_from_config (&config) ?;
+      let mut views_state : ViewsState = ViewsState {
+        open_views     : OpenViews::new (),
+        graph_straddle : None,};
+      let (view_id, opened) : (ViewId, String) =
+        open_content_view (
+          &config, tantivy, &graph, &mut views_state, &["12"] ) ?;
+      let saved : String = save_view (
+        &requesting_at (&opened, "(node (id 12) (repo main)",
+                        "writeProtectedSubtreeView"),
+        &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+      println! ("Result of a write-protect-subtree request:\n{}", saved);
+      let headlines : Vec<&str> = lines_starting (&saved, "*");
+      assert_eq! ( headlines . len (), 9, // with the 1 of the root's containerward branch
+                   "{}", saved );
+      assert! ( headlines . iter () . all ( |line| line . contains ("writeProtected") ),
+                "everything must be write-protected:\n{}", saved );
+      assert! ( headlines [1 ..] . iter () . all ( |line|
+                  line . contains ("(affectsParent false)") ),
+                "every child must be a non-member:\n{}", saved );
+      assert! ( ! saved . contains ("viewRequests")
+                && ! saved . contains ("body\n"),
+                "no request, and no body, is left:\n{}", saved );
+      Ok (( )) }
+
+// ===================================================
+// Test: a write-protect request on a write-protected occurrence is a no-op
+// ===================================================
+// A view of 1 and 12 draws the 12 under 1 as a write-protected leaf.
+async fn test_writeProtect_request_on_a_writeProtected_occurrence (
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      let mut config : SkgConfig = config . clone ();
+      config . initial_node_limit = 100;
+      let graph : InRustGraphHandle =
+        graph_handle_from_config (&config) ?;
+      let mut views_state : ViewsState = ViewsState {
+        open_views     : OpenViews::new (),
+        graph_straddle : None,};
+      let (view_id, opened) : (ViewId, String) =
+        open_content_view (
+          &config, tantivy, &graph, &mut views_state, &["1", "12"] ) ?;
+      let plain : String = save_view (
+        &opened, &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+      for request in [ "writeProtectedView", "writeProtectedSubtreeView" ] {
+        let requested : String = save_view (
+          &requesting_at (&plain, "(node (id 12) (repo main) writeProtected", request),
+          &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+        assert_eq! ( requested, plain, "{} on a write-protected occurrence", request ); }
+      Ok (( )) }
+
+// ===================================================
+// Test: write-protecting one occurrence while requesting another moves
+// editability, and a request moves it back
+// ===================================================
+// A view of 1 and 12 draws root 12 editable, with 121..124, and the
+// 12 under 1 write-protected. One save requests root 12
+// write-protected and the 12 under 1 editable, and folds the 121
+// under root 12. 121..124 are then drawn once under root 12, as
+// write-protected non-members, and editable under the 12 under 1.
+// An editable-view request on root 12 moves editability back: root
+// 12 adopts 121..124 as its members again, keeping the fold.
+async fn test_writeProtect_and_editable_requests_move_editability_and_back (
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      let mut config : SkgConfig = config . clone ();
+      config . initial_node_limit = 100;
+      let graph : InRustGraphHandle =
+        graph_handle_from_config (&config) ?;
+      let mut views_state : ViewsState = ViewsState {
+        open_views     : OpenViews::new (),
+        graph_straddle : None,};
+      let (view_id, opened) : (ViewId, String) =
+        open_content_view (
+          &config, tantivy, &graph, &mut views_state, &["1", "12"] ) ?;
+      let root_12 : &str = "* (skg (node (id 12) (repo main)";
+      let under_1 : &str = "** (skg (node (id 12) (repo main)";
+      let folded_121 : &str = "** (skg folded (node (id 121) ";
+      let content_under = |buffer : &str, root : &str| -> Vec<String> {
+        // 12's content subtree, not root 12's containerward branch (1)
+        subtree_headlines (buffer, root) . iter ()
+          . filter ( |line| line . contains ("(id 12") )
+          . map ( |line| line . to_string () )
+          . collect () };
+      let ids_under = |buffer : &str, root : &str| -> Vec<String> {
+        content_under (buffer, root) . iter ()
+          . filter ( |line| line . len () - line . trim_start_matches ('*') . len ()
+                            == root . find (' ') . unwrap () + 1 )
+          . map ( |line| line . split ("(id ") . nth (1) . unwrap ()
+                              . split (')') . next () . unwrap () . to_string () )
+          . collect () };
+      let edited : String = requesting_editable_at (
+        &requesting_at ( &opened, "(node (id 12) (repo main) (affectsParent na)",
+                         "writeProtectedView" ),
+        "(node (id 12) (repo main) writeProtected" )
+        . replacen ( "** (skg (node (id 121) ", folded_121, 1 );
+      let moved : String = save_view (
+        &edited, &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+      println! ("Result of moving editability:\n{}", moved);
+      assert! ( lines_starting (&moved, root_12) [0] . contains ("writeProtected")
+                && ! lines_starting (&moved, under_1) [0] . contains ("writeProtected"),
+                "editability must move to the 12 under 1:\n{}", moved );
+      assert_eq! ( ids_under (&moved, root_12), [ "121", "122", "123", "124" ],
+                   "root 12 draws its content once:\n{}", moved );
+      assert! ( content_under (&moved, root_12) . iter ()
+                  . all ( |line| line . contains ("writeProtected")
+                                 && line . contains ("(affectsParent false)") ),
+                "under root 12, write-protected non-members:\n{}", moved );
+      assert_eq! ( ids_under (&moved, under_1), [ "121", "122", "123", "124" ],
+                   "{}", moved );
+      assert! ( content_under (&moved, under_1) . iter ()
+                  . all ( |line| ! line . contains ("writeProtected")
+                                 && ! line . contains ("affectsParent") ),
+                "under the 12 under 1, editable members:\n{}", moved );
+      let moved_back : String = save_view (
+        &requesting_editable_at (
+          &moved, "(node (id 12) (repo main) (affectsParent na) writeProtected" ),
+        &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+      println! ("Result of moving editability back:\n{}", moved_back);
+      assert! ( ! lines_starting (&moved_back, root_12) [0] . contains ("writeProtected")
+                && lines_starting (&moved_back, under_1) [0] . contains ("writeProtected"),
+                "editability must move back to root 12:\n{}", moved_back );
+      assert_eq! ( ids_under (&moved_back, root_12), [ "121", "122", "123", "124" ],
+                   "{}", moved_back );
+      assert! ( content_under (&moved_back, root_12) . iter ()
+                  . all ( |line| ! line . contains ("writeProtected")
+                                 && ! line . contains ("affectsParent") ),
+                "root 12's content must be editable members again:\n{}", moved_back );
+      assert! ( content_under (&moved_back, root_12) [0] . starts_with (folded_121),
+                "the adopted 121 keeps its fold:\n{}", moved_back );
+      Ok (( )) }
+
+// ===================================================
+// Test: a parked content node is drawn once
+// ===================================================
+// In a view of 1, 13 is marked as not affecting its parent and saved:
+// 1 no longer contains 13, which stays under 1 as a non-member. A
+// save of another view of 1 puts 13 back in 1's content. The first
+// view, rerendered as collateral, adopts the parked 13 as 1's member
+// instead of drawing a second 13 beside it.
+async fn test_parked_content_node_is_drawn_once (
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      let mut config : SkgConfig = config . clone ();
+      config . initial_node_limit = 100;
+      let graph : InRustGraphHandle =
+        graph_handle_from_config (&config) ?;
+      let mut views_state : ViewsState = ViewsState {
+        open_views     : OpenViews::new (),
+        graph_straddle : None,};
+      let (view_id, opened) : (ViewId, String) =
+        open_content_view (
+          &config, tantivy, &graph, &mut views_state, &["1"] ) ?;
+      let parked : String = save_view (
+        &opened . replacen ( "** (skg (node (id 13) (repo main) ",
+                             "** (skg (node (id 13) (repo main) (affectsParent false) ", 1 ),
+        &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+      assert! ( lines_starting (&parked, "** (skg (node (id 13) ") . len () == 1
+                && parked . contains ("(affectsParent false)"),
+                "13 stays under 1 as a non-member:\n{}", parked );
+      let other_view_id : ViewId = ViewId::ContentView ("other-view-of-1" . to_string ());
+      let other : String = {
+        let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
+          multi_root_view (&config, Some (tantivy), &[ ID::from ("1") ]) ?;
+        views_state . open_views . register_view (
+          &graph . load_full (), other_view_id . clone (), tree, &pids );
+        text };
+      assert! ( ! other . contains ("(id 13)"), "1 no longer contains 13:\n{}", other );
+      save_view (
+        &format! ( "{}** (skg (node (id 13) (repo main) writeProtected)) 13\n", other ),
+        &config, tantivy, &graph, &other_view_id, &mut views_state ) . await ?;
+      let collateral : String = {
+        let viewforest : &ViewForest =
+          views_state . open_views . viewid_to_view (&view_id)
+          . expect ("the first view is registered");
+        viewforest_to_string (viewforest, &config) ? };
+      println! ("The first view after the other's save:\n{}", collateral);
+      let thirteens : Vec<&str> = lines_starting (&collateral, "** (skg (node (id 13) ");
+      assert! ( thirteens . len () == 1
+                && ! thirteens [0] . contains ("affectsParent"),
+                "13 is drawn once, as 1's member:\n{}", collateral );
       Ok (( )) }

@@ -229,6 +229,9 @@ fn format_buffer_validation_error (
     BufferValidationError::MultipleEditableViewRequestsForSameId (skgid) => {
       format!("Multiple editable view requests for the same ID:\n- ID: {}\n- At most one editable view request per ID is allowed.\n",
               skgid . 0) },
+    BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (skgid) => {
+      format!("Contradictory view requests on one occurrence:\n- ID: {}\n- It requests both write-protection and an editable view.\n- To move editability, request write-protection on one occurrence (C-c s w) and an editable view on another (C-c s d).\n",
+              skgid . 0) },
     BufferValidationError::EmptyTitle(skgid) => {
       format!("Node has an empty title:\n- ID: {}\n- Every editable node must have a non-empty title.\n",
               skgid . 0) },

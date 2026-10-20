@@ -1,4 +1,5 @@
 use super::*;
+use crate::serve::parse_metadata_sexp::{ViewnodeMetadata, parse_metadata_to_viewnodemd};
 
 // 'PartnerFolder::policy' is the single source of truth for how each
 // folder's membership relates to user edits; this pins the mapping.
@@ -72,3 +73,17 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   else { panic! ("expected alias"); };
   assert_eq! (*relRepo_request, None);
 }
+
+// The write-protect requests render as their atoms, and parse back.
+#[test]
+fn writeProtect_requests_round_trip () {
+  for (request, atom) in [
+    ( ViewRequest::WriteProtected,        "writeProtectedView" ),
+    ( ViewRequest::WriteProtectedSubtree, "writeProtectedSubtreeView" ) ] {
+    assert_eq! ( request . to_string (), atom );
+    let metadata : ViewnodeMetadata =
+      parse_metadata_to_viewnodemd (
+        &format! ( "(skg (node (id x) (viewRequests {})))", atom ) )
+      . unwrap ();
+    assert_eq! ( metadata . view_requests,
+                 [request] . into_iter () . collect () ); }}

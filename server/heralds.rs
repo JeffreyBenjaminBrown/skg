@@ -532,7 +532,9 @@ pub fn herald_rule_table () -> HeraldRule {
           rule ("folder",  vec! [ any (vec! [ s ("req:folder:"),  RuleChild::It ]) ]),
           rule ("roleTree", vec! [ any (vec! [ s ("req:roleTree:"), RuleChild::It ]) ]),
           rule ("flags", vec! [ s ("req:flags") ]),
-          rule ("editableView", vec! [ s ("req:editable") ]) ]) ],
+          rule ("editableView", vec! [ s ("req:editable") ]),
+          rule ("writeProtectedView", vec! [ s ("req:write-protected") ]),
+          rule ("writeProtectedSubtreeView", vec! [ s ("req:write-protected-subtree") ]) ]) ],
         change_fact_rules_for_two_axes () ] . concat ()) ] ] . concat (),
   }}
 

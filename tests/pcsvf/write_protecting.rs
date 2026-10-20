@@ -234,3 +234,64 @@ fn in_a_content_view_write_protecting_an_occurrence_with_members_is_refused (
       if *skgid == ID::from ("n") ),
       "{:?}", errors );
     Ok (( )) }) }
+
+/// c, typed under n under x and so created, carries presence facts. A
+/// write-protect request on n under x and an editable-view request
+/// on n under y, in one save, move editability: a, b and c are drawn
+/// once under x, as non-members, c keeping its presence facts, and
+/// editable under y. An editable-view request on n under x moves it
+/// back: n under x adopts them as its members again.
+#[test]
+fn a_writeProtect_request_and_an_editable_request_move_editability_and_back (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("shared", &["main"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let b_under_x : usize = buffer . find ("*** (skg (node (id b) ")
+      . expect ("b is drawn under n under x");
+    let created : String = save ( f, &format! (
+      "{}*** (skg (node (id c) (repo main))) c\n{}",
+      &buffer [.. b_under_x], &buffer [b_under_x ..] )) ? . saved_view;
+    assert! ( node_lines (&created, "c") [0] . contains ("(diff "), "{}", created );
+    // c, new, draws its containers, so n and its content recur deeper.
+    let at_depth = |buffer : &'_ str, stars : &str, node : &str| -> Vec<String> {
+      node_lines (buffer, node) . into_iter ()
+        . filter ( |line| line . starts_with (&format! ("{} (skg ", stars)) )
+        . map ( |line| line . to_string () ) . collect () };
+    let n_under_x : &str = "\n** (skg bodyFolded (node (id n) (repo main) ";
+    let edited : String = requesting_editable_at (
+      &created . replacen (
+        n_under_x,
+        &format! ( "{}(viewRequests writeProtectedView) ", n_under_x ), 1 ),
+      &format! ("\n{}", N_UNDER_Y) );
+    let response : SaveResponse = save (f, &edited) ?;
+    assert! ( response . errors . is_empty (), "{:?}", response . errors );
+    let moved : String = response . saved_view;
+    let n_lines : Vec<String> = at_depth (&moved, "**", "n");
+    assert! ( n_lines . len () == 2
+              && n_lines [0] . contains ("writeProtected")
+              && ! n_lines [1] . contains ("writeProtected"),
+              "n must be write-protected under x and editable under y:\n{}", moved );
+    assert! ( ! moved . contains ("viewRequests"), "{}", moved );
+    for child in ["a", "b", "c"] {
+      let lines : Vec<String> = at_depth (&moved, "***", child);
+      assert! ( lines . len () == 2
+                && lines [0] . contains ("(affectsParent false)")
+                && lines [0] . contains ("writeProtected")
+                && ! lines [1] . contains ("affectsParent"),
+                "{} must be drawn once under each n:\n{}", child, moved ); }
+    assert! ( at_depth (&moved, "***", "c") [0] . contains ("(diff "),
+              "c keeps its presence facts under x:\n{}", moved );
+    let moved_back : String = save (
+      f, &requesting_editable_at (&moved, "\n** (skg bodyFolded (node (id n) (repo main) writeProtected ") ) ?
+      . saved_view;
+    let n_lines : Vec<String> = at_depth (&moved_back, "**", "n");
+    assert! ( n_lines . len () == 2
+              && ! n_lines [0] . contains ("writeProtected")
+              && n_lines [1] . contains ("writeProtected"),
+              "n must be editable under x again:\n{}", moved_back );
+    for child in ["a", "b", "c"] {
+      let lines : Vec<String> = at_depth (&moved_back, "***", child);
+      assert! ( lines . len () == 2
+                && ! lines [0] . contains ("affectsParent"),
+                "{} must be n's member under x again:\n{}", child, moved_back ); }
+    Ok (( )) }) }

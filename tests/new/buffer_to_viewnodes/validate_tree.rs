@@ -61,6 +61,9 @@ fn all_tests
       s . reset ("test_two_editable_view_requests_for_one_node_are_rejected", fixtures) ?;
       test_two_editable_view_requests_for_one_node_are_rejected (
         &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_writeProtect_and_editable_requests_on_one_occurrence_are_rejected", fixtures) ?;
+      test_writeProtect_and_editable_requests_on_one_occurrence_are_rejected (
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_writeProtected_relRepo_request_needs_an_editable_recorder", fixtures) ?;
       test_writeProtected_relRepo_request_needs_an_editable_recorder (
         &s . config, &mut s . tantivy ) . await ?;
@@ -597,6 +600,37 @@ async fn test_two_editable_view_requests_for_one_node_are_rejected (
         "Two requests for 'parent' should trigger exactly one \
          MultipleEditableViewRequestsForSameId. Errors: {:?}",
         errors );
+      Ok (( )) }
+
+async fn test_writeProtect_and_editable_requests_on_one_occurrence_are_rejected (
+  config : &SkgConfig,
+  _tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  // One occurrence cannot ask to be both write-protected and the
+  // editable one, in either form of the write-protect request. On two
+  // occurrences of a node, the requests move editability, and pass.
+      for request in [ "writeProtectedView", "writeProtectedSubtreeView" ] {
+        let contradictory : String = format! (
+          "* (skg (node (id parent) (repo main) (viewRequests editableView {}))) parent\n",
+          request );
+        let errors : Vec<BufferValidationError> =
+          find_buffer_errors_for_saving (
+            &org_to_uninterpreted_viewforest (&contradictory) . unwrap () . 0,
+            config ) ?;
+        assert! ( matches! (
+          &errors [..],
+          [ BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (skgid) ]
+            if skgid . 0 == "parent" ),
+          "{}: {:?}", request, errors );
+        let moving : String = format! (
+          "* (skg (node (id parent) (repo main) (viewRequests {}))) parent\n\
+           * (skg (node (id parent) (repo main) writeProtected (viewRequests editableView))) parent again\n",
+          request );
+        let errors : Vec<BufferValidationError> =
+          find_buffer_errors_for_saving (
+            &org_to_uninterpreted_viewforest (&moving) . unwrap () . 0,
+            config ) ?;
+        assert! ( errors . is_empty (), "{}: {:?}", request, errors ); }
       Ok (( )) }
 
 #[test]

@@ -52,6 +52,12 @@ pub fn execute_view_requests (
         return Err ( "execute_view_requests: a ViewRequest::Editable survived \
           to the view-request pass; it should have been consumed by the draw \
           rule at the node's visit" . into () ),
+      ViewRequest::WriteProtected | ViewRequest::WriteProtectedSubtree =>
+        // Like an Editable request, consumed at the node's visit
+        // (apply_writeProtect_request), before this pass.
+        return Err ( "execute_view_requests: a write-protect request survived \
+          to the view-request pass; it should have been consumed at the \
+          node's visit" . into () ),
       ViewRequest::Fork =>
         // A Fork request is consumed on the SAVE path (fork detection),
         // and 'extract_view_requests' strips it before this render-time
@@ -122,6 +128,47 @@ pub fn apply_editable_draw_rule (
     visited . insert ( node_pid . clone(), Finalizable::Final (treeid) ); }
   Ok ( DrawOutcome::MadeFinal ) }
 
+/// Apply a write-protect request -- 'ViewRequest::WriteProtected' or
+/// 'ViewRequest::WriteProtectedSubtree' -- that the occurrence at
+/// 'treeid' carries, and consume it. Call at the occurrence's visit,
+/// before it expands, so that the expansion takes the write-protected
+/// path and draws nothing under it.
+/// - The plain form write-protects the occurrence and makes each of its
+///   direct unrestricted children a non-member; the children keep
+///   their own editability and subtrees.
+/// - The subtree form does that to the whole content subtree
+///   ('writeProtect_content_subtree').
+/// An editable-view request on the same occurrence goes too: the
+/// validator refuses a user's writing both, so one here was passed
+/// down by the cascade, and the user's explicit request wins.
+/// On an already write-protected occurrence this only consumes the
+/// request, since a write-protected occurrence holds no member.
+pub fn apply_writeProtect_request (
+  tree    : &mut Tree<Viewnode>,
+  treeid  : NodeId,
+  graph   : &InRustGraph,
+  config  : &SkgConfig,
+  visited : &mut EditableMap,
+) -> Result < (), Box<dyn Error> > {
+  let (requested, subtree) : (bool, bool) =
+    write_at_unrestrictedVognode_in_tree (
+      tree, treeid,
+      |t| { let requested : bool =
+              t . view_requests . remove (& ViewRequest::WriteProtected);
+            let subtree : bool =
+              t . view_requests . remove (& ViewRequest::WriteProtectedSubtree);
+            if requested || subtree {
+              t . view_requests . remove (& ViewRequest::Editable); }
+            ( requested || subtree, subtree ) } )
+    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+  if subtree {
+    writeProtect_content_subtree (
+      tree, treeid, visited, graph, config ) ?;
+  } else if requested {
+    writeProtect_occurrence ( tree, treeid, visited, graph, config ) ?;
+    make_member_children_nonMembers ( tree, treeid ) ?; }
+  Ok (( )) }
+
 /// Does three things:
 /// - Mark a node, and its entire content subtree, as write-protected.
 /// - Make each member in the subtree a non-member,
@@ -138,14 +185,31 @@ fn writeProtect_content_subtree (
   graph   : &InRustGraph,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  let node_pid : ID =
-    get_skgid_from_viewnode_at ( tree, treeid ) ?;
-  if ! unrestrictedVognode_in_tree_is_writeProtected ( tree, treeid ) ? {
-    visited . remove (&node_pid);
-    makeWriteProtectedAndClobber ( tree, treeid, graph, config ) ?; }
+  writeProtect_occurrence ( tree, treeid, visited, graph, config ) ?;
   for child_treeid in make_member_children_nonMembers ( tree, treeid ) ? {
     writeProtect_content_subtree ( // recurse
       tree, child_treeid, visited, graph, config ) ?; }
+  Ok (( )) }
+
+/// Write-protect one editable occurrence (resyncing it from the
+/// graph), and drop its entry from `visited` if the entry names it,
+/// so that an editable copy can be drawn elsewhere. An entry naming
+/// another occurrence is that copy, and stays.
+fn writeProtect_occurrence (
+  tree    : &mut Tree<Viewnode>,
+  treeid  : NodeId,
+  visited : &mut EditableMap,
+  graph   : &InRustGraph,
+  config  : &SkgConfig,
+) -> Result < (), Box<dyn Error> > {
+  if unrestrictedVognode_in_tree_is_writeProtected ( tree, treeid ) ? {
+    return Ok (( )); }
+  let node_pid : ID =
+    get_skgid_from_viewnode_at ( tree, treeid ) ?;
+  if visited . get (&node_pid)
+       . is_some_and ( |entry| entry . treeid () == treeid ) {
+    visited . remove (&node_pid); }
+  makeWriteProtectedAndClobber ( tree, treeid, graph, config ) ?;
   Ok (( )) }
 
 /// Fetches Graphnode from the in-Rust graph or disk.
