@@ -12,7 +12,7 @@ use skg::dbs::in_rust_graph::{
   InRustGraphHandle,
   };
 use skg::assert_metadata_eq;
-use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
+use skg::test_utils::{run_with_test_stores, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -35,62 +35,128 @@ fn mk_test_tcp_stream ()
     listener . local_addr () . unwrap ();
   TcpStream::connect (addr) . unwrap () }
 
+const FIXTURES : &str =
+  "tests/editable_view_cascade_and_budget/fixtures";
+
 #[test]
-fn all_tests
-  () -> Result<(), Box<dyn Error>> {
-  let fixtures : &str =
-    "tests/editable_view_cascade_and_budget/fixtures";
-  run_with_shared_test_stores (
-    "skg-test-editable-view-cascade-and-budget",
-    |s| Box::pin ( async move {
-      s . reset ("test_editable_view_ample_budget", fixtures) ?;
-      test_editable_view_ample_budget (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_editable_view_limit_5_or_6", fixtures) ?;
-      test_editable_view_limit_5_or_6 (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_editable_view_limit_1_to_4", fixtures) ?;
-      test_editable_view_limit_1_to_4 (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_editable_view_conflicting", fixtures) ?;
-      test_editable_view_conflicting (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_editable_view_with_cycle",
-                 "tests/editable_view_cascade_and_budget/fixtures-cycle") ?;
-      test_editable_view_with_cycle (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_editable_view_with_repeat", fixtures) ?;
-      test_editable_view_with_repeat (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_editable_view_request_cleared", fixtures) ?;
-      test_editable_view_request_cleared (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_editable_view_request_on_an_editable_node", fixtures) ?;
-      test_editable_view_request_on_an_editable_node (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_editable_view_request_moves_editability_back", fixtures) ?;
-      test_editable_view_request_moves_editability_back (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_writeProtect_request_keeps_children_editable", fixtures) ?;
-      test_writeProtect_request_keeps_children_editable (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_writeProtect_subtree_request", fixtures) ?;
-      test_writeProtect_subtree_request (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_writeProtect_request_on_a_writeProtected_occurrence", fixtures) ?;
-      test_writeProtect_request_on_a_writeProtected_occurrence (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_writeProtect_and_editable_requests_move_editability_and_back", fixtures) ?;
-      test_writeProtect_and_editable_requests_move_editability_and_back (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_parked_content_node_is_drawn_once", fixtures) ?;
-      test_parked_content_node_is_drawn_once (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_budget_aliasfolder_is_neutral",
-                 "tests/editable_view_cascade_and_budget/fixtures-aliases") ?;
-      test_budget_aliasfolder_is_neutral (
-        &s . config, &mut s . tantivy ) . await ?;
-      Ok (( )) } )) }
+fn editable_view_ample_budget (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-evcb-editable-view-ample-budget", FIXTURES,
+    "/tmp/tantivy-test-evcb-editable-view-ample-budget",
+    |config, tantivy| Box::pin ( test_editable_view_ample_budget (config, tantivy) )) }
+
+#[test]
+fn editable_view_limit_5_or_6 (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-evcb-editable-view-limit-5-or-6", FIXTURES,
+    "/tmp/tantivy-test-evcb-editable-view-limit-5-or-6",
+    |config, tantivy| Box::pin ( test_editable_view_limit_5_or_6 (config, tantivy) )) }
+
+#[test]
+fn editable_view_limit_1_to_4 (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-evcb-editable-view-limit-1-to-4", FIXTURES,
+    "/tmp/tantivy-test-evcb-editable-view-limit-1-to-4",
+    |config, tantivy| Box::pin ( test_editable_view_limit_1_to_4 (config, tantivy) )) }
+
+#[test]
+fn editable_view_conflicting (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-evcb-editable-view-conflicting", FIXTURES,
+    "/tmp/tantivy-test-evcb-editable-view-conflicting",
+    |config, tantivy| Box::pin ( test_editable_view_conflicting (config, tantivy) )) }
+
+#[test]
+fn editable_view_with_cycle (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-evcb-editable-view-with-cycle", "tests/editable_view_cascade_and_budget/fixtures-cycle",
+    "/tmp/tantivy-test-evcb-editable-view-with-cycle",
+    |config, tantivy| Box::pin ( test_editable_view_with_cycle (config, tantivy) )) }
+
+#[test]
+fn editable_view_with_repeat (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-evcb-editable-view-with-repeat", FIXTURES,
+    "/tmp/tantivy-test-evcb-editable-view-with-repeat",
+    |config, tantivy| Box::pin ( test_editable_view_with_repeat (config, tantivy) )) }
+
+#[test]
+fn editable_view_request_cleared (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-evcb-editable-view-request-cleared", FIXTURES,
+    "/tmp/tantivy-test-evcb-editable-view-request-cleared",
+    |config, tantivy| Box::pin ( test_editable_view_request_cleared (config, tantivy) )) }
+
+#[test]
+fn editable_view_request_on_an_editable_node (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-evcb-editable-view-request-on-an-editable-node", FIXTURES,
+    "/tmp/tantivy-test-evcb-editable-view-request-on-an-editable-node",
+    |config, tantivy| Box::pin ( test_editable_view_request_on_an_editable_node (config, tantivy) )) }
+
+#[test]
+fn editable_view_request_moves_editability_back (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-evcb-editable-view-request-moves-editability-back", FIXTURES,
+    "/tmp/tantivy-test-evcb-editable-view-request-moves-editability-back",
+    |config, tantivy| Box::pin ( test_editable_view_request_moves_editability_back (config, tantivy) )) }
+
+#[test]
+fn writeProtect_request_keeps_children_editable (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-evcb-writeProtect-request-keeps-children-editable", FIXTURES,
+    "/tmp/tantivy-test-evcb-writeProtect-request-keeps-children-editable",
+    |config, tantivy| Box::pin ( test_writeProtect_request_keeps_children_editable (config, tantivy) )) }
+
+#[test]
+fn writeProtect_subtree_request (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-evcb-writeProtect-subtree-request", FIXTURES,
+    "/tmp/tantivy-test-evcb-writeProtect-subtree-request",
+    |config, tantivy| Box::pin ( test_writeProtect_subtree_request (config, tantivy) )) }
+
+#[test]
+fn writeProtect_request_on_a_writeProtected_occurrence (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-evcb-writeProtect-request-on-a-writeProtected-occurrence", FIXTURES,
+    "/tmp/tantivy-test-evcb-writeProtect-request-on-a-writeProtected-occurrence",
+    |config, tantivy| Box::pin ( test_writeProtect_request_on_a_writeProtected_occurrence (config, tantivy) )) }
+
+#[test]
+fn writeProtect_and_editable_requests_move_editability_and_back (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-evcb-writeProtect-and-editable-requests-move-editability-and-back", FIXTURES,
+    "/tmp/tantivy-test-evcb-writeProtect-and-editable-requests-move-editability-and-back",
+    |config, tantivy| Box::pin ( test_writeProtect_and_editable_requests_move_editability_and_back (config, tantivy) )) }
+
+#[test]
+fn parked_content_node_is_drawn_once (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-evcb-parked-content-node-is-drawn-once", FIXTURES,
+    "/tmp/tantivy-test-evcb-parked-content-node-is-drawn-once",
+    |config, tantivy| Box::pin ( test_parked_content_node_is_drawn_once (config, tantivy) )) }
+
+#[test]
+fn budget_aliasfolder_is_neutral (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-evcb-budget-aliasfolder-is-neutral", "tests/editable_view_cascade_and_budget/fixtures-aliases",
+    "/tmp/tantivy-test-evcb-budget-aliasfolder-is-neutral",
+    |config, tantivy| Box::pin ( test_budget_aliasfolder_is_neutral (config, tantivy) )) }
 
 // ===================================================
 // Test: Editable view with an ample budget -> everything expands.

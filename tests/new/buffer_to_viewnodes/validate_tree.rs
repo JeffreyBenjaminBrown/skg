@@ -8,66 +8,134 @@ use skg::types::tree::forest::MpViewForest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use skg::from_text::buffer_to_viewnodes::local::validate_local_structure;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
-use skg::test_utils::run_with_shared_test_stores;
+use skg::test_utils::run_with_test_stores;
 use std::error::Error;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use skg::types::maybe_placed_viewnode::{MpVognode, MpViewnodeKind};
 
+const FIXTURES : &str =
+  "tests/merge/merge_nodes/fixtures";
+
 #[test]
-fn all_tests
-  () -> Result<(), Box<dyn Error>> {
-  let fixtures : &str =
-    "tests/merge/merge_nodes/fixtures";
-  run_with_shared_test_stores (
-    "skg-test-new-validate-tree",
-    |s| Box::pin ( async move {
-      s . reset ("test_find_buffer_errors_for_saving", fixtures) ?;
-      test_find_buffer_errors_for_saving (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_find_buffer_errors_for_saving_valid_input", fixtures) ?;
-      test_find_buffer_errors_for_saving_valid_input (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_find_buffer_errors_for_saving_empty_input", fixtures) ?;
-      test_find_buffer_errors_for_saving_empty_input (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_multiple_aliasfolders_in_children", fixtures) ?;
-      test_multiple_aliasfolders_in_children (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_duplicated_content_error", fixtures) ?;
-      test_duplicated_content_error (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_no_duplicated_content_error_when_different_ids", fixtures) ?;
-      test_no_duplicated_content_error_when_different_skgids (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_no_duplicated_content_error_for_phantom_siblings", fixtures) ?;
-      test_no_duplicated_content_error_for_phantom_siblings (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_root_without_repo_validation", fixtures) ?;
-      test_root_without_skgrepo_validation (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_nonexistent_repo_validation", fixtures) ?;
-      test_nonexistent_skgrepo_validation (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_empty_title_rejected_for_editable_node", fixtures) ?;
-      test_empty_title_rejected_for_editable_node (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_empty_title_allowed_for_writeProtected_and_delete", fixtures) ?;
-      test_empty_title_allowed_for_writeProtected_and_delete (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_editable_view_request_on_an_editable_node_with_content_is_allowed", fixtures) ?;
-      test_editable_view_request_on_an_editable_node_with_content_is_allowed (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_two_editable_view_requests_for_one_node_are_rejected", fixtures) ?;
-      test_two_editable_view_requests_for_one_node_are_rejected (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_writeProtect_and_editable_requests_on_one_occurrence_are_rejected", fixtures) ?;
-      test_writeProtect_and_editable_requests_on_one_occurrence_are_rejected (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_writeProtected_relRepo_request_needs_an_editable_recorder", fixtures) ?;
-      test_writeProtected_relRepo_request_needs_an_editable_recorder (
-        &s . config, &mut s . tantivy ) . await ?;
-      Ok (( )) } )) }
+fn finds_buffer_errors_for_saving (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-validate-tree-find-buffer-errors-for-saving", FIXTURES,
+    "/tmp/tantivy-test-validate-tree-find-buffer-errors-for-saving",
+    |config, tantivy| Box::pin ( test_find_buffer_errors_for_saving (config, tantivy) )) }
+
+#[test]
+fn find_buffer_errors_for_saving_valid_input (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-validate-tree-find-buffer-errors-for-saving-valid-input", FIXTURES,
+    "/tmp/tantivy-test-validate-tree-find-buffer-errors-for-saving-valid-input",
+    |config, tantivy| Box::pin ( test_find_buffer_errors_for_saving_valid_input (config, tantivy) )) }
+
+#[test]
+fn find_buffer_errors_for_saving_empty_input (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-validate-tree-find-buffer-errors-for-saving-empty-input", FIXTURES,
+    "/tmp/tantivy-test-validate-tree-find-buffer-errors-for-saving-empty-input",
+    |config, tantivy| Box::pin ( test_find_buffer_errors_for_saving_empty_input (config, tantivy) )) }
+
+#[test]
+fn multiple_aliasfolders_in_children (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-validate-tree-multiple-aliasfolders-in-children", FIXTURES,
+    "/tmp/tantivy-test-validate-tree-multiple-aliasfolders-in-children",
+    |config, tantivy| Box::pin ( test_multiple_aliasfolders_in_children (config, tantivy) )) }
+
+#[test]
+fn duplicated_content_error (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-validate-tree-duplicated-content-error", FIXTURES,
+    "/tmp/tantivy-test-validate-tree-duplicated-content-error",
+    |config, tantivy| Box::pin ( test_duplicated_content_error (config, tantivy) )) }
+
+#[test]
+fn no_duplicated_content_error_when_different_skgids (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-validate-tree-no-duplicated-content-error-when-different-skgids", FIXTURES,
+    "/tmp/tantivy-test-validate-tree-no-duplicated-content-error-when-different-skgids",
+    |config, tantivy| Box::pin ( test_no_duplicated_content_error_when_different_skgids (config, tantivy) )) }
+
+#[test]
+fn no_duplicated_content_error_for_phantom_siblings (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-validate-tree-no-duplicated-content-error-for-phantom-siblings", FIXTURES,
+    "/tmp/tantivy-test-validate-tree-no-duplicated-content-error-for-phantom-siblings",
+    |config, tantivy| Box::pin ( test_no_duplicated_content_error_for_phantom_siblings (config, tantivy) )) }
+
+#[test]
+fn root_without_skgrepo_validation (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-validate-tree-root-without-skgrepo-validation", FIXTURES,
+    "/tmp/tantivy-test-validate-tree-root-without-skgrepo-validation",
+    |config, tantivy| Box::pin ( test_root_without_skgrepo_validation (config, tantivy) )) }
+
+#[test]
+fn nonexistent_skgrepo_validation (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-validate-tree-nonexistent-skgrepo-validation", FIXTURES,
+    "/tmp/tantivy-test-validate-tree-nonexistent-skgrepo-validation",
+    |config, tantivy| Box::pin ( test_nonexistent_skgrepo_validation (config, tantivy) )) }
+
+#[test]
+fn empty_title_rejected_for_editable_node (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-validate-tree-empty-title-rejected-for-editable-node", FIXTURES,
+    "/tmp/tantivy-test-validate-tree-empty-title-rejected-for-editable-node",
+    |config, tantivy| Box::pin ( test_empty_title_rejected_for_editable_node (config, tantivy) )) }
+
+#[test]
+fn empty_title_allowed_for_writeProtected_and_delete (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-validate-tree-empty-title-allowed-for-writeProtected-and-delete", FIXTURES,
+    "/tmp/tantivy-test-validate-tree-empty-title-allowed-for-writeProtected-and-delete",
+    |config, tantivy| Box::pin ( test_empty_title_allowed_for_writeProtected_and_delete (config, tantivy) )) }
+
+#[test]
+fn editable_view_request_on_an_editable_node_with_content_is_allowed (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-validate-tree-editable-view-request-on-an-editable-node-with-content-is-allowed", FIXTURES,
+    "/tmp/tantivy-test-validate-tree-editable-view-request-on-an-editable-node-with-content-is-allowed",
+    |config, tantivy| Box::pin ( test_editable_view_request_on_an_editable_node_with_content_is_allowed (config, tantivy) )) }
+
+#[test]
+fn two_editable_view_requests_for_one_node_are_rejected (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-validate-tree-two-editable-view-requests-for-one-node-are-rejected", FIXTURES,
+    "/tmp/tantivy-test-validate-tree-two-editable-view-requests-for-one-node-are-rejected",
+    |config, tantivy| Box::pin ( test_two_editable_view_requests_for_one_node_are_rejected (config, tantivy) )) }
+
+#[test]
+fn writeProtect_and_editable_requests_on_one_occurrence_are_rejected (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-validate-tree-writeProtect-and-editable-requests-on-one-occurrence-are-rejected", FIXTURES,
+    "/tmp/tantivy-test-validate-tree-writeProtect-and-editable-requests-on-one-occurrence-are-rejected",
+    |config, tantivy| Box::pin ( test_writeProtect_and_editable_requests_on_one_occurrence_are_rejected (config, tantivy) )) }
+
+#[test]
+fn writeProtected_relRepo_request_needs_an_editable_recorder (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-validate-tree-writeProtected-relRepo-request-needs-an-editable-recorder", FIXTURES,
+    "/tmp/tantivy-test-validate-tree-writeProtected-relRepo-request-needs-an-editable-recorder",
+    |config, tantivy| Box::pin ( test_writeProtected_relRepo_request_needs_an_editable_recorder (config, tantivy) )) }
 
 /// A write-protected node may carry a relRepo request for the
 /// relationship from its view-parent, unless no editable node collects
