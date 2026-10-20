@@ -21,8 +21,9 @@ use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
-use crate::serve::handlers::rerender_all_views::{
-  stream_empty_rerender, stream_rerender_diffView_views};
+use crate::serve::rerender_stream::{
+  PreparedRerenders, prepare_rerender_views_where,
+  stream_empty_rerender, stream_prepared_rerenders};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   send_response_with_length_prefix, sexp_to_client_string,
@@ -30,6 +31,7 @@ use crate::serve::util::{
 use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgrepoName;
+use crate::update_buffer::RerenderOptions;
 
 use sexp::{Atom, Sexp};
 use std::iter::once;
@@ -79,6 +81,25 @@ pub fn handle_stage_and_commit_request (
       stream_rerender_diffView_views (
         stream, env, views_state, skgrepo_restriction ),
     _ => stream_empty_rerender (stream), }}
+
+/// After a git-commit: rerender each open buffer of the diff
+/// view as any rerender does, over the graph straddle the commit
+/// rebuilt. Its roots stay ('docs/diff-view.org',
+/// "The fresh drawing, and what it keeps"), and what the commit made unchanged loses its
+/// decorations. The commit requires the skgrepo-set all, so no text
+/// is withheld and no release is asked for.
+fn stream_rerender_diffView_views (
+  stream              : &mut TcpStream,
+  env                 : &SkgEnv,
+  views_state         : &mut ViewsState,
+  skgrepo_restriction : &SkgrepoRestriction,
+) {
+  let prepared : PreparedRerenders = prepare_rerender_views_where (
+    env, env . runtime_snapshot (), views_state,
+    Some (skgrepo_restriction), None, RerenderOptions::ordinary,
+    |_, state| state . diffView_buffer_kind . is_some () );
+  stream_prepared_rerenders (stream, views_state, prepared);
+}
 
 /// See the module comment. Refused unless the skgrepo restriction is
 /// 'all', as the diff view is. A confirmed request skips both checks.

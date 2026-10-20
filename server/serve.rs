@@ -9,6 +9,7 @@
 pub mod handlers;
 pub mod parse_metadata_sexp;
 pub mod protocol;
+pub mod rerender_stream;
 pub mod util;
 
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;

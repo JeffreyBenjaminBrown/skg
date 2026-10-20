@@ -2,8 +2,9 @@ use crate::delete_references_to_absent_node::{
   preview, preview_warning_org, result_org, rewrite };
 use crate::dbs::in_rust_graph::new_handle;
 use crate::save::update_graph_minus_nodeMerges_with_hoist_approval;
-use crate::serve::handlers::rerender_all_views::{
-  stream_empty_rerender, stream_rerender_views_after_absent_reference_cleanup };
+use crate::serve::rerender_stream::{
+  PreparedRerenders, prepare_rerender_views_where,
+  stream_empty_rerender, stream_prepared_rerenders };
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   send_response_with_length_prefix, tag_sexp_response, tag_text_response,
@@ -11,6 +12,9 @@ use crate::serve::util::{
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::SkgEnv;
 use crate::types::misc::ID;
+use crate::types::tree::forest::ViewForest;
+use crate::types::views_state::pids_from_viewforest;
+use crate::update_buffer::RerenderOptions;
 use crate::serve::ViewsState;
 
 use futures::executor::block_on;
@@ -85,4 +89,80 @@ fn refuse (stream : &mut TcpStream, error : &str) {
 fn escape (text : &str) -> String {
   text . replace ('\\', "\\\\") . replace ('\"', "\\\"")
     . replace ('\n', "\\n")
+}
+
+/// The absent-reference command only removes relationships to an ID freshly proven to
+/// have no node.  It cannot introduce title/body text into any view, so this
+/// narrowly scoped post-skgsave-commit rerender bypasses the text-release challenge.
+fn stream_rerender_views_after_absent_reference_cleanup (
+  stream     : &mut TcpStream,
+  env        : &SkgEnv,
+  views_state : &mut ViewsState,
+  skgrepo_restriction : &SkgrepoRestriction,
+  raw_skgid     : &crate::types::misc::ID,
+  affected_recorder_pids : &HashSet<crate::types::misc::ID>,
+) {
+  let prepared : PreparedRerenders = prepare_rerender_views_where (
+    env, env . runtime_snapshot (), views_state,
+    Some (skgrepo_restriction), None, RerenderOptions::ordinary,
+    |_, state| view_can_display_absent_reference_change (
+      &state . viewforest, raw_skgid, affected_recorder_pids ));
+  stream_prepared_rerenders (stream, views_state, prepared);
+}
+
+/// A cleanup changes an open view only when it currently displays the exact
+/// dangling member, or when it displays a graph-member recorder whose relationship
+/// list was rewritten.  `pids_from_viewforest` intentionally excludes Unknown,
+/// so inspect both representations rather than introducing a new view index.
+fn view_can_display_absent_reference_change (
+  viewforest             : &ViewForest,
+  raw_skgid              : &crate::types::misc::ID,
+  affected_recorder_pids : &HashSet<crate::types::misc::ID>,
+) -> bool {
+  pids_from_viewforest (viewforest) . iter ()
+    .any (|pid| affected_recorder_pids . contains (pid))
+  || viewforest . nodes () . any (|node| matches! (
+       &node . value () . kind,
+       crate::types::viewnode::ViewnodeKind::Vognode (crate::types::viewnode::Vognode::Phantom (
+         crate::types::viewnode::Phantom::Unknown (unknown)))
+       if unknown . skgid == *raw_skgid ))
+}
+
+#[cfg(test)]
+mod tests {
+  use super::view_can_display_absent_reference_change;
+  use crate::types::misc::{ID, SkgrepoName};
+  use crate::types::tree::forest::ViewForest;
+  use crate::types::viewnode::{mk_editable_viewnode, mk_unknown_viewnode};
+  use std::collections::HashSet;
+
+  fn skgid (text : &str) -> ID { ID::from (text) }
+
+  fn unrestricted_view (pid : &str) -> ViewForest {
+    let mut view : ViewForest = ViewForest::new ();
+    view . append_root (mk_editable_viewnode (
+      skgid (pid), SkgrepoName::from ("main"), pid . to_string (), None ));
+    view
+  }
+
+  fn view_with_unknown (raw_skgid : &str) -> ViewForest {
+    let mut view : ViewForest = unrestricted_view ("unrelated-owner");
+    let root = view . first_root () . unwrap () . id ();
+    view . get_mut (root) . unwrap () . append (mk_unknown_viewnode (skgid (raw_skgid)));
+    view
+  }
+
+  #[test]
+  fn absent_reference_cleanup_selects_only_affected_recorder_or_raw_unknown () {
+    let recorders : HashSet<ID> = HashSet::from ([skgid ("changed-owner")]);
+    assert! (view_can_display_absent_reference_change (
+      &unrestricted_view ("changed-owner"), &skgid ("gone"), &recorders),
+      "an open recorder can display its rewritten relationship" );
+    assert! (view_can_display_absent_reference_change (
+      &view_with_unknown ("gone"), &skgid ("gone"), &recorders),
+      "Unknowns are absent from the PID index but still need removal" );
+    assert! (! view_can_display_absent_reference_change (
+      &unrestricted_view ("unrelated-owner"), &skgid ("gone"), &recorders),
+      "an unrelated view must receive neither a lock nor a replacement" );
+  }
 }

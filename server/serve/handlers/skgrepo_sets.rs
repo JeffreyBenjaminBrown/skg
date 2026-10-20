@@ -1,5 +1,5 @@
 use crate::serve::ViewsState;
-use crate::serve::handlers::rerender_all_views::{
+use crate::serve::rerender_stream::{
   authorize_prepared_rerenders,
   prepare_rerender_views_with_runtime,
   stream_empty_rerender,

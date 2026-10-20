@@ -14,7 +14,7 @@ use crate::graph_straddle::types::GraphStraddle;
 use crate::diff_view::pcsvf::nodes_editable_in_diffView;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
-use crate::serve::handlers::rerender_all_views::{
+use crate::serve::rerender_stream::{
   PreparedRerenders, PreparedView, prepare_rerender_views_where,
   stream_empty_rerender, stream_prepared_rerenders};
 use crate::serve::protocol::TcpToClient;
