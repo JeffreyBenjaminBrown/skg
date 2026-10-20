@@ -12,14 +12,14 @@ use skg::serve::handlers::close_view::handle_close_view_request;
 use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use skg::serve::handlers::diff_view::handle_diffView_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::{graph_handle_from_config, skg_env_from_parts};
+use skg::test_utils::{graph_handle_from_config, read_all_lp_messages, skg_env_from_parts};
 use skg::types::env::SkgEnv;
 use skg::types::views_state::{DiffViewBufferKind, ViewId};
 
 use git2::{Commit, Oid, Repository, Signature};
 use std::error::Error;
 use std::fs;
-use std::io::Read;
+use std::io::BufReader;
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -31,14 +31,15 @@ fn request (
   format! ( "((request . \"diff view\") (buffer . \"{}\") (view-id . \"{}\"))\n",
             buffer, view_id ) }
 
-/// The response the handler wrote to 'stream''s peer.
-fn response_from (
-  read_end : &mut TcpStream,
+/// Everything a handler wrote to 'writer', read from its peer
+/// 'read_end': 'writer' is dropped first, so the read ends after the
+/// last message. The messages are joined by newlines.
+fn everything_written (
+  writer   : TcpStream,
+  read_end : TcpStream,
 ) -> String {
-  read_end . set_read_timeout ( Some (std::time::Duration::from_secs (5)) ) . unwrap ();
-  let mut bytes : Vec<u8> = vec! [ 0; 1 << 20 ];
-  let n : usize = read_end . read (&mut bytes) . unwrap ();
-  String::from_utf8_lossy (&bytes [.. n]) . to_string () }
+  drop (writer);
+  read_all_lp_messages ( &mut BufReader::new (read_end) ) . join ("\n") }
 
 #[test]
 fn a_request_registers_its_buffer_and_the_last_close_drops_the_straddle (
@@ -47,20 +48,20 @@ fn a_request_registers_its_buffer_and_the_last_close_drops_the_straddle (
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let all : SkgrepoRestriction =
       SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
-    { let (mut stream, mut read_end) : (TcpStream, TcpStream) =
+    { let (mut stream, read_end) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       handle_diffView_request (
         &mut stream, &request ("all changes", "diff-view-1"), &env,
         &mut f . views_state, &all );
-      let response : String = response_from (&mut read_end);
+      let response : String = everything_written (stream, read_end);
       assert! ( response . contains ("diff-view")
                 && response . contains ("(content"), "{}", response ); }
-    { let (mut stream, mut read_end) : (TcpStream, TcpStream) =
+    { let (mut stream, read_end) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       handle_diffView_request (
         &mut stream, &request ("merges", "diff-view-2"), &env,
         &mut f . views_state, &all );
-      let response : String = response_from (&mut read_end);
+      let response : String = everything_written (stream, read_end);
       assert! ( response . contains ("(empty . t)"), "{}", response ); }
     let view_id : ViewId = ViewId::ContentView ("diff-view-1" . to_string ());
     assert_eq! ( f . views_state . open_views . views . get (&view_id)
@@ -86,12 +87,12 @@ fn a_request_is_refused_under_a_skgrepo_restriction (
     let mut restriction : SkgrepoRestriction =
       SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
     restriction . name = "some" . into ();
-    let (mut stream, mut read_end) : (TcpStream, TcpStream) =
+    let (mut stream, read_end) : (TcpStream, TcpStream) =
       mk_test_tcp_stream_pair ();
     handle_diffView_request (
       &mut stream, &request ("all changes", "diff-view-1"), &env,
       &mut f . views_state, &restriction );
-    let response : String = response_from (&mut read_end);
+    let response : String = everything_written (stream, read_end);
     assert! ( response . contains ("requires no skgrepo restriction"), "{}", response );
     assert! ( f . views_state . open_views . views . is_empty () );
     Ok (( )) }) }
@@ -109,14 +110,12 @@ fn a_rerender_all_writes_its_refreshed_straddle_back (
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let all : SkgrepoRestriction =
       SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
-    let (mut stream, mut read_end) : (TcpStream, TcpStream) =
+    let (mut stream, read_end) : (TcpStream, TcpStream) =
       mk_test_tcp_stream_pair ();
     handle_rerender_all_views_request (
       &mut stream, "((request . \"rerender all views\"))\n", &env,
       &mut f . views_state, &all );
-    drop (stream);
-    let mut response : String = String::new ();
-    read_end . read_to_string (&mut response) ?;
+    let response : String = everything_written (stream, read_end);
     assert! ( response . contains ("rerender-view"), "{}", response );
     let held : Arc<GraphStraddle> =
       f . views_state . graph_straddle . clone ()
@@ -140,12 +139,12 @@ fn request_the_four_buffers (
       SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
     for diffView_buffer_kind in DiffViewBufferKind::ALL {
       let view_id : String = format! ( "diff-view: {}", diffView_buffer_kind . wire_name () );
-      let (mut stream, mut read_end) : (TcpStream, TcpStream) =
+      let (mut stream, read_end) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       handle_diffView_request (
         &mut stream, &request (diffView_buffer_kind . wire_name (), &view_id), &env,
         &mut f . views_state, &all );
-      let response : String = response_from (&mut read_end);
+      let response : String = everything_written (stream, read_end);
       let registered : Option<DiffViewBufferKind> =
         f . views_state . open_views . views
         . get (&ViewId::ContentView (view_id))
@@ -176,12 +175,12 @@ fn request_all_changes (
   let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let all : SkgrepoRestriction =
     SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
-  let (mut stream, mut read_end) : (TcpStream, TcpStream) =
+  let (mut stream, read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   handle_diffView_request (
     &mut stream, &request ("all changes", "diff-view-1"), &env,
     &mut f . views_state, &all );
-  let response : String = response_from (&mut read_end);
+  let response : String = everything_written (stream, read_end);
   let registered : bool = f . views_state . open_views . views
     . contains_key ( &ViewId::ContentView ("diff-view-1" . to_string ()) );
   Ok (( response, registered )) }
