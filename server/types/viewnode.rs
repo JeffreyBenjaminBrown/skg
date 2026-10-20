@@ -211,7 +211,7 @@ pub struct PhantomUnknown {
 /// (or acquired by a nodeMerge) since HEAD.
 ///
 /// ARISES: only in a diff view, built from the graph straddle
-/// ('server/to_org/render/change_viewnodes.rs'): under each former
+/// ('server/diff_view/change_viewnodes.rs'): under each former
 /// container as a former member, or as a view root. Its own old
 /// content hangs beneath it, recursing into deleted members.
 ///

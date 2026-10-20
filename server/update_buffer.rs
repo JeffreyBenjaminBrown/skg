@@ -29,14 +29,14 @@ pub use viewnodestats::set_viewnodestats_in_viewforest;
 
 use complete::{complete_appended_roots, complete_viewforest, CompletionContext};
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::change_leaves::BufferReadinessSummary;
+use crate::diff_view::change_leaves::BufferReadinessSummary;
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::pcsvf::{
+use crate::diff_view::pcsvf::{
   DiffViewSource, append_contentOrigins_to_buffer, contentOrigins_missing_from_buffer,
   ensure_editableOccurrences_exist, nodes_editable_in_diffView,
   root_skgids_of_buffer, set_diffView_facts_in_viewforest};
-use crate::readiness_store::ReadinessStore;
+use crate::diff_view::readiness_store::ReadinessStore;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;

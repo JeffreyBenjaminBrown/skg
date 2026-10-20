@@ -7,9 +7,9 @@
 
 use crate::git_fixture::{Fixture, OwnedSkgrepos, save_view, with_git_fixture};
 
-use skg::change_leaves::{LeafKey, NodeAspect, RelationshipAspect};
+use skg::diff_view::change_leaves::{LeafKey, NodeAspect, RelationshipAspect};
 use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
-use skg::readiness_store::ReadinessStore;
+use skg::diff_view::readiness_store::ReadinessStore;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::misc::ID;
 use skg::types::views_state::ViewId;

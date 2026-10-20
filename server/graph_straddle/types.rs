@@ -5,8 +5,8 @@
 //! changes ('NodeChanges'); a partner over the union of the two graphs
 //! ('Partner'); and the two halves of C ('ChangedPids').
 
-use crate::change_leaves::ChangeLeaves;
-use crate::pcsvf::{
+use crate::diff_view::change_leaves::ChangeLeaves;
+use crate::diff_view::pcsvf::{
   PcsvfSets, pcsvf_sets, pcsvf_sets_for_home_moves, pcsvf_sets_for_merges};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::git::Sign;

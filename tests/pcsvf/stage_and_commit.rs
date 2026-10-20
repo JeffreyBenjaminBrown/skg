@@ -8,10 +8,10 @@ use crate::pcsvf::common::{
   all_changes_buffer, open_all_changes_buffer, rerendered_view_content,
   send_stage_and_commit_request, view_id_of, with_fixture};
 
-use skg::change_leaves::{ChangeLeaves, LeafKey};
+use skg::diff_view::change_leaves::{ChangeLeaves, LeafKey};
 use skg::git_ops::stage_and_commit::PreStagedGitrepo;
 use skg::graph_straddle::types::GraphStraddle;
-use skg::readiness_store::ReadinessStore;
+use skg::diff_view::readiness_store::ReadinessStore;
 use skg::serve::handlers::stage_and_commit::{
   StageAndCommitAnswer, stage_and_commit, stage_and_commit_response_sexp};
 use skg::skgrepo_sets::SkgrepoRestriction;

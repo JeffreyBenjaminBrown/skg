@@ -7,14 +7,14 @@ use crate::git_fixture::{
   with_git_fixture};
 use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 
-use skg::change_leaves::LeafKey;
+use skg::diff_view::change_leaves::LeafKey;
 use skg::graph_straddle::build::current_graph_straddle_in_slot;
 use skg::graph_straddle::types::GraphStraddle;
-use skg::readiness_store::ReadinessStore;
+use skg::diff_view::readiness_store::ReadinessStore;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::serve::handlers::integrate_unshown_changes::handle_integrate_unshown_changes_request;
 use skg::serve::handlers::stage_and_commit::handle_stage_and_commit_request;
-use skg::pcsvf::DrawnDiffViewBuffer;
+use skg::diff_view::pcsvf::DrawnDiffViewBuffer;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::test_utils::{

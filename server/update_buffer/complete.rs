@@ -15,12 +15,12 @@ use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_bra
 use crate::update_buffer::ancestry::{ folder_is_generalized_orphan, deaden_generalized_orphan_folder, is_folder_kind};
 use crate::update_buffer::util::detach_viewnode_transferring_focus;
 use crate::update_buffer::warnings::CompletionWarning;
-use crate::to_org::render::changes::{
+use crate::diff_view::changes::{
   HistoricalPhantomVisit, align_content_members_with_straddle,
   deleted_phantom_becomes_historical, process_historical_phantom_visit,
   process_unrestrictedVognode_changes};
 use crate::graph_straddle::types::GraphStraddle;
-use crate::pcsvf::DiffViewSource;
+use crate::diff_view::pcsvf::DiffViewSource;
 use crate::types::tree::viewnode_graphnode::{
   pid_and_skgrepo_from_viewnode_at, write_at_unrestrictedVognode_in_tree};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder, ViewRequest};

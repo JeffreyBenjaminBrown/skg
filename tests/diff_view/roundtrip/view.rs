@@ -15,13 +15,13 @@
 use crate::git_fixture::{
   Fixture, OwnedSkgrepos, save_view, skg_files, with_git_fixture};
 
-use skg::change_leaves::{LeafKey, NodeAspect, RelationshipAspect};
+use skg::diff_view::change_leaves::{LeafKey, NodeAspect, RelationshipAspect};
 use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
 use skg::graph_straddle::types::{GraphStraddle, Partner, Presence};
 use skg::org_to_text::viewforest_tree_to_string;
-use skg::readiness_store::ReadinessStore;
+use skg::diff_view::readiness_store::ReadinessStore;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::to_org::render::change_viewnodes::{
+use skg::diff_view::change_viewnodes::{
   append_acquired_folder, append_historical_phantom_content, append_old_text,
   mk_changeset_marker_viewnode, mk_historical_viewnode, mk_relRepo_move_viewnode};
 use skg::to_org::render::content_view::multi_root_view;

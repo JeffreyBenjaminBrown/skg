@@ -20,9 +20,9 @@
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::prominence::climb_containerward_to_content_origins_via;
-use crate::readiness_store::ReadinessStore;
-use crate::serve::handlers::readiness_requests::set_ready_facts_in_viewforest;
-use crate::to_org::render::change_viewnodes::mk_historical_viewnode;
+use crate::diff_view::readiness_store::ReadinessStore;
+use crate::diff_view::readiness_requests::set_ready_facts_in_viewforest;
+use crate::diff_view::change_viewnodes::mk_historical_viewnode;
 use crate::to_org::util::{
   EditableMap, append_plain_stub_root, graphnode_and_viewnode_from_skgid};
 use crate::types::env::RuntimeGeneration;

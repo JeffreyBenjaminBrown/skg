@@ -21,7 +21,7 @@
 //! Nothing that exists is drawn again ('docs/diff-view.org',
 //! "The fresh drawing, and what it keeps"):
 //! each step builds a fresh drawing and reconciles what the node
-//! holds with it ('server/to_org/render/fresh_drawing.rs'), so every
+//! holds with it ('server/diff_view/fresh_drawing.rs'), so every
 //! viewnode that stays keeps its fold state, and is moved, not
 //! recreated, to where it belongs. The server sets a fold state only
 //! on a viewnode it creates.
@@ -30,12 +30,12 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   NodeRelation, RelationRole};
 use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner, Presence};
-use crate::pcsvf::{PcsvfSets, DiffViewSource};
-use crate::to_org::render::change_viewnodes::{
+use crate::diff_view::pcsvf::{PcsvfSets, DiffViewSource};
+use crate::diff_view::change_viewnodes::{
   append_acquired_folder, append_historical_phantom_content, append_old_text,
   mk_changeset_marker_viewnode, mk_historical_viewnode, mk_home_move_viewnode,
   mk_relRepo_move_viewnode};
-use crate::to_org::render::fresh_drawing::{
+use crate::diff_view::fresh_drawing::{
   adopt_fresh_facts, is_unrestricted_removed_member, match_key,
   reconcile_children_with_fresh_drawing};
 use crate::types::git::Sign;
@@ -689,5 +689,5 @@ fn append (
   tree . get_mut (treeid) . unwrap () . append (viewnode) . id () }
 
 #[cfg(test)]
-#[path = "../../../tests/unit/render_changes.rs"]
+#[path = "../../tests/unit/render_changes.rs"]
 mod phantom_insertion_plan_tests;

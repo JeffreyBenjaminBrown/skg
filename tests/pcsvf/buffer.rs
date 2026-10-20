@@ -13,7 +13,7 @@ use crate::pcsvf::common::{
   all_changes_buffer, all_changes_buffer_with_marks, saves_back_unchanged,
   with_fixture};
 
-use skg::change_leaves::{LeafKey, NodeAspect};
+use skg::diff_view::change_leaves::{LeafKey, NodeAspect};
 use skg::types::misc::ID;
 use skg::types::views_state::DiffViewBufferKind;
 

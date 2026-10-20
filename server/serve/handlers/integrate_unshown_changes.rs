@@ -9,10 +9,10 @@
 //! as a save's does, and is followed by a rerender stream: the one
 //! view, or nothing when the request was refused.
 
-use crate::change_leaves::{BufferReadinessSummary, readiness_response_sexp};
+use crate::diff_view::change_leaves::{BufferReadinessSummary, readiness_response_sexp};
 use crate::graph_straddle::types::GraphStraddle;
-use crate::pcsvf::nodes_editable_in_diffView;
-use crate::readiness_store::ReadinessStore;
+use crate::diff_view::pcsvf::nodes_editable_in_diffView;
+use crate::diff_view::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
 use crate::serve::handlers::rerender_all_views::{
   PreparedRerenders, PreparedView, prepare_rerender_views_where,

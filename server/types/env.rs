@@ -5,7 +5,7 @@
 
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
 use crate::dbs::tantivy::title_and_skgrepo_by_skgid;
-use crate::readiness_store::ReadinessStore;
+use crate::diff_view::readiness_store::ReadinessStore;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use crate::types::phantom::home_from_disk;
 

@@ -1,7 +1,7 @@
 // Unit tests for the readiness store's marks and its persistence.
 
 use super::*;
-use crate::change_leaves::{NodeAspect, RelationshipAspect};
+use crate::diff_view::change_leaves::{NodeAspect, RelationshipAspect};
 use crate::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
 use crate::types::misc::ID;
 use crate::types::nodes::complete::Flag;

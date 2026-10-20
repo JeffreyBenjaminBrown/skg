@@ -8,7 +8,7 @@ use crate::git_fixture::graph_straddle;
 use crate::pcsvf::common::{ids, with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
-use skg::pcsvf::PcsvfSets;
+use skg::diff_view::pcsvf::PcsvfSets;
 
 use std::error::Error;
 

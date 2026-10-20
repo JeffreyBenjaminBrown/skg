@@ -12,14 +12,14 @@
 //! ('stream_rerender_diffView_views'). Its roots stay, so a buffer whose
 //! changes were all committed comes back as plain context.
 
-use crate::change_leaves::{
+use crate::diff_view::change_leaves::{
   BufferReadinessSummary, ReadinessSummary, readiness_response_sexp};
 use crate::git_ops::stage_and_commit::{
   PreStagedGitrepo, SkgrepoCommitOutcome,
   pre_staged_entries_of_owned_gitrepos, stage_and_commit_owned_skgrepos};
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::readiness_store::ReadinessStore;
+use crate::diff_view::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
 use crate::serve::handlers::rerender_all_views::{
   stream_empty_rerender, stream_rerender_diffView_views};

@@ -13,7 +13,7 @@ use crate::pcsvf::common::{
   ids, open_buffer, saves_back_unchanged, with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
-use skg::pcsvf::{PcsvfSets, pcsvf_sets_for_home_moves, pcsvf_sets_for_merges};
+use skg::diff_view::pcsvf::{PcsvfSets, pcsvf_sets_for_home_moves, pcsvf_sets_for_merges};
 use skg::types::views_state::DiffViewBufferKind;
 
 use std::error::Error;

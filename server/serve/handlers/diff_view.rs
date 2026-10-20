@@ -3,11 +3,11 @@
 //! The client sends one request per buffer, in order, and opens each
 //! one the server does not answer with '(empty . t)'.
 
-use crate::change_leaves::readiness_response_sexp;
+use crate::diff_view::change_leaves::readiness_response_sexp;
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::pcsvf::{DiffViewSource, DrawnDiffViewBuffer, diffView_buffer_viewforest};
-use crate::readiness_store::ReadinessStore;
+use crate::diff_view::pcsvf::{DiffViewSource, DrawnDiffViewBuffer, diffView_buffer_viewforest};
+use crate::diff_view::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{

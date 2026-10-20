@@ -1,4 +1,4 @@
-use crate::change_leaves::BufferReadinessSummary;
+use crate::diff_view::change_leaves::BufferReadinessSummary;
 use crate::dbs::in_rust_graph::{
   in_rust_graph_coherent_with_nodeInstructions_in, new_handle };
 use crate::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
@@ -25,7 +25,7 @@ use crate::serve::handlers::telescope_hoist::{
   needs_confirmation as hoist_needs_confirmation,
   repair_saves_for_unwritten_candidates,
 };
-use crate::serve::handlers::readiness_requests::consume_readiness_requests;
+use crate::diff_view::readiness_requests::consume_readiness_requests;
 use crate::serve::handlers::text_release::{
   approved_pids_from_request as text_approved_pids_from_request,
 };

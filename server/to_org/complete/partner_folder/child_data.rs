@@ -24,7 +24,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
-use crate::to_org::render::fresh_drawing::{
+use crate::diff_view::fresh_drawing::{
   adopt_fresh_facts, is_unrestricted_removed_member};
 use crate::types::viewnode::{ChangeFacts, DiffPresence, Phantom, Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{complete_managed_children_in_viewforest, RepairSummary};

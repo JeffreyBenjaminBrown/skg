@@ -1,5 +1,5 @@
 use super::*;
-use crate::types::viewnode::{AffectsParent, mk_writeProtected_viewnode, viewforest_root_viewnode};
+use crate::types::viewnode::{AffectsParent, ViewnodeKind, mk_writeProtected_viewnode, viewforest_root_viewnode};
 
 fn unrestricted_affected (id_str : &str) -> Viewnode {
   mk_writeProtected_viewnode (

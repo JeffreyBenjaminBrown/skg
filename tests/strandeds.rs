@@ -12,7 +12,7 @@ use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::from_text::strandeds::StrandedsReview;
-use skg::readiness_store::readiness_marks_path;
+use skg::diff_view::readiness_store::readiness_marks_path;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::{
   SaveResponse, update_from_and_rerender_buffer_with_approvals};

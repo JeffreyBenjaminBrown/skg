@@ -9,7 +9,7 @@ use crate::pcsvf::common::{
   all_changes_view, integrate_unshown_changes, open_all_changes_buffer,
   open_buffer, save_buffer, with_fixture, with_fixture_and_foreign};
 
-use skg::change_leaves::{BufferReadinessSummary, ReadinessSummary};
+use skg::diff_view::change_leaves::{BufferReadinessSummary, ReadinessSummary};
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::serve::util::sexp_to_client_string;
 use skg::types::views_state::DiffViewBufferKind;

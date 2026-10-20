@@ -16,8 +16,8 @@ use crate::pcsvf::common::{
   retitle_in_a_content_view, send_stage_and_commit_request, with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
-use skg::pcsvf::{DiffViewSource, ensure_editableOccurrences_exist};
-use skg::readiness_store::ReadinessStore;
+use skg::diff_view::pcsvf::{DiffViewSource, ensure_editableOccurrences_exist};
+use skg::diff_view::readiness_store::ReadinessStore;
 use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::skg_env_from_parts;

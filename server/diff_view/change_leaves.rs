@@ -12,7 +12,7 @@ use crate::dbs::in_rust_graph::relation_accessors::{
   RelationRole, RelationshipKey};
 use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner, Presence};
 use crate::graph_straddle::union_walk::ROLES_OF_LISTED_MEMBERS;
-use crate::readiness_store::ReadinessStore;
+use crate::diff_view::readiness_store::ReadinessStore;
 use crate::serve::util::format_string_list_sexp;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
@@ -420,5 +420,5 @@ fn fingerprint_of<T : Hash> (
 
 #[cfg(test)]
 #[allow(non_snake_case)]
-#[path = "../tests/unit/change_leaves.rs"]
+#[path = "../../tests/unit/change_leaves.rs"]
 mod tests;

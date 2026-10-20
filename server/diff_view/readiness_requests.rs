@@ -15,14 +15,14 @@
 //! '(ready ...)' display facts are set from the store
 //! ('set_ready_facts_in_viewforest').
 
-use crate::change_leaves::{
+use crate::diff_view::change_leaves::{
   ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   NodeRelation, RelationRole, RelationshipKey};
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::readiness_store::ReadinessStore;
+use crate::diff_view::readiness_store::ReadinessStore;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
