@@ -6,7 +6,6 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum GitSnapshotKind {
   Head,
-  Index,
   Worktree,
 }
 
@@ -17,8 +16,7 @@ pub struct GraphSnapshot {
   /// id -> claiming pid -> skgrepos whose section for that pid
   /// claims the id (as its pid or among its extra_ids). One pid
   /// claiming an id from several skgrepos is the normal telescope
-  /// shape; TWO pids claiming one id is the duplicate-ID VIOLATION
-  /// the report warns about.
+  /// shape; TWO pids claiming one id is a duplicate-ID VIOLATION.
   pub id_claims : HashMap<ID, BTreeMap<ID, BTreeSet<SkgrepoName>>>,
 }
 

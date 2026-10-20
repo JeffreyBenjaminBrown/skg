@@ -1,3 +1,6 @@
+//! The before-graph of the straddle: owned skgrepos read at HEAD,
+//! cached by HEAD identity.
+
 use crate::dbs::filesystem::multiple_nodes::{
   read_skg_sections_from_folder};
 use crate::telescope::compose::compose_telescope;
@@ -87,8 +90,7 @@ pub fn foreign_changed_skg_file_count (
       let gitrepo : Repository = open_gitrepo (skgrepo_path) ?;
       let prefix : PathBuf =
         repo_prefix_in_gitrepo (&gitrepo, skgrepo_path) . ok () ?;
-      changed_paths_for_skgrepo (
-        &gitrepo, &prefix, GitSnapshotKind::Head, GitSnapshotKind::Worktree )
+      changed_paths_for_skgrepo (&gitrepo, &prefix)
         . ok ()
         . map ( |paths| paths . len () ) } )
     . sum () }
@@ -109,8 +111,6 @@ fn read_graph_snapshot_per_skgrepo (
       profile_step_result (&label, || match kind {
         GitSnapshotKind::Head =>
           read_skgrepo_from_head (config, &skgrepo_name),
-        GitSnapshotKind::Index =>
-          read_skgrepo_from_index (config, &skgrepo_name),
         GitSnapshotKind::Worktree =>
           read_skg_sections_from_folder (&skgrepo_name, config)
             . map_err ( |e| format! (
@@ -163,41 +163,24 @@ fn git_snapshot_cache (
   SNAPSHOT_CACHE . get_or_init ( || Mutex::new (HashMap::new ()) )
 }
 
+/// The skgrepo's '.skg' files that differ between HEAD and the
+/// worktree, staged or not.
 fn changed_paths_for_skgrepo (
-  gitrepo        : &Repository,
-  prefix      : &Path,
-  before_kind : GitSnapshotKind,
-  after_kind  : GitSnapshotKind,
+  gitrepo : &Repository,
+  prefix  : &Path,
 ) -> Result<BTreeSet<PathBuf>, String> {
   let mut paths : BTreeSet<PathBuf> =
     BTreeSet::new ();
-  match (before_kind, after_kind) {
-    (GitSnapshotKind::Head, GitSnapshotKind::Index) => {
-      for entry in get_staged_changed_skg_files (gitrepo)
-        . map_err ( |e| format! (
-          "Reading staged changed .skg files: {}", e )) ? {
-        if path_is_skgrepo_skg (&entry . path, prefix) {
-          paths . insert (entry . path); }}}
-    (GitSnapshotKind::Index, GitSnapshotKind::Worktree) => {
-      for entry in get_unstaged_changed_skg_files (gitrepo)
-        . map_err ( |e| format! (
-          "Reading unstaged changed .skg files: {}", e )) ? {
-        if path_is_skgrepo_skg (&entry . path, prefix) {
-          paths . insert (entry . path); }}}
-    (GitSnapshotKind::Head, GitSnapshotKind::Worktree) => {
-      for entry in get_staged_changed_skg_files (gitrepo)
-        . map_err ( |e| format! (
-          "Reading staged changed .skg files: {}", e )) ?
-        . into_iter ()
-        . chain (get_unstaged_changed_skg_files (gitrepo)
-          . map_err ( |e| format! (
-            "Reading unstaged changed .skg files: {}", e )) ?
-          . into_iter ()) {
-        if path_is_skgrepo_skg (&entry . path, prefix) {
-          paths . insert (entry . path); }}}
-    _ => return Err ( format! (
-      "Unsupported endpoints for comparing changed paths: {:?} to {:?}",
-      before_kind, after_kind )), }
+  for entry in get_staged_changed_skg_files (gitrepo)
+    . map_err ( |e| format! (
+      "Reading staged changed .skg files: {}", e )) ?
+    . into_iter ()
+    . chain (get_unstaged_changed_skg_files (gitrepo)
+      . map_err ( |e| format! (
+        "Reading unstaged changed .skg files: {}", e )) ?
+      . into_iter ()) {
+    if path_is_skgrepo_skg (&entry . path, prefix) {
+      paths . insert (entry . path); }}
   Ok (paths)
 }
 
@@ -390,40 +373,6 @@ fn read_skgrepo_from_head (
     return Err (error); }
   walk_result . map_err ( |e| format! (
     "Walking HEAD tree for repo '{}': {}", skgrepo_name, e )) ?;
-  Ok (sections)
-}
-
-fn read_skgrepo_from_index (
-  config       : &SkgConfig,
-  skgrepo_name : &SkgrepoName,
-) -> Result<Vec<(SkgrepoName, GraphnodeOnDisk)>, String> {
-  let skgrepo : &Skgrepo =
-    config . skgrepos . get (skgrepo_name) . ok_or_else ( || format! (
-      "Repo '{}' not found in config", skgrepo_name )) ?;
-  let skgrepo_path : &Path =
-    Path::new ( &skgrepo . path );
-  let gitrepo : Repository =
-    open_gitrepo (skgrepo_path) . ok_or_else ( || format! (
-      "Could not open Git repo for Skg repo '{}'", skgrepo_name )) ?;
-  let prefix : PathBuf =
-    repo_prefix_in_gitrepo (&gitrepo, skgrepo_path) ?;
-  let index : git2::Index =
-    gitrepo . index () . map_err ( |e| format! (
-      "Reading index for repo '{}': {}", skgrepo_name, e )) ?;
-  let mut sections : Vec<(SkgrepoName, GraphnodeOnDisk)> =
-    Vec::new ();
-  for entry in index . iter () {
-    let rel_path : PathBuf =
-      PathBuf::from (String::from_utf8_lossy (&entry . path) . to_string ());
-    if ! path_is_skgrepo_skg (&rel_path, &prefix) {
-      continue; }
-    let blob : git2::Blob =
-      gitrepo . find_blob (entry . id) . map_err ( |e| format! (
-        "Reading index blob {:?} for repo '{}': {}",
-        rel_path, skgrepo_name, e )) ?;
-    let node_fs : GraphnodeOnDisk =
-      parse_blob_section (blob . content (), &rel_path) ?;
-    sections . push (( skgrepo_name . clone (), node_fs )); }
   Ok (sections)
 }
 
