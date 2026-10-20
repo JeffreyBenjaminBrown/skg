@@ -49,8 +49,9 @@ pub enum Birth {
 
 /// The diff view's facts about one viewnode: which graphs of
 /// the graph straddle hold its node and its relationship to its
-/// viewparent ('(diff ...)'), and which of its change-forest leaves
-/// are marked commit-ready ('(ready ...)'). Display facts: the view
+/// viewparent ('(diff ...)'), which of its change-forest leaves
+/// are marked commit-ready ('(ready ...)'), and which leaves a
+/// request on it may name ('(leaves ...)'). Display facts: the view
 /// derives them, and a save reads nothing from them.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ChangeFacts {
@@ -58,6 +59,20 @@ pub struct ChangeFacts {
   /// None when nothing is ready. 'Some' of an empty set is the bare
   /// '(ready)' of a leaf with a single object.
   pub ready    : Option<BTreeSet<DiffObject>>,
+  /// None when the viewnode names no change-forest leaf.
+  pub leaves   : Option<LeavesFact>,
+}
+
+/// '(leaves N OBJECT...)': the change-forest leaves a readiness
+/// request on a viewnode may name ('docs/diff-view.org', "Facts on
+/// the wire"). The OBJECTs are 'node' and/or 'rel' on a vognode or
+/// historical phantom, each worth one leaf; 'all' on an aggregate;
+/// none where a bare request names them all.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct LeavesFact {
+  /// How many leaves a request naming every one of 'objects' touches.
+  pub count   : usize,
+  pub objects : BTreeSet<DiffObject>,
 }
 
 /// The '(diff ATOMS)' of a viewnode, from 'node+ node- rel+ rel-'.

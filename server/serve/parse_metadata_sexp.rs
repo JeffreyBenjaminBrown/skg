@@ -469,7 +469,7 @@ pub fn parse_metadata_to_viewnodemd (
                            . to_string () ); }
             result . property_relRepo_request =
               request_metadata . relRepo_request; },
-          "diff" | "ready" | "readyRequest" | "unreadyRequest" => {
+          "diff" | "ready" | "leaves" | "readyRequest" | "unreadyRequest" => {
             // At top level, valid only on a property leaf, or as
             // '(ready)' on a folder (checked below).
             parse_change_fact_form (
@@ -595,7 +595,7 @@ pub fn parse_metadata_to_viewnodemd (
                        | Property::HomeSkgrepoMove { .. }
                        | Property::RelRepoMove { .. }
                        | Property::ChangesetMarker { .. } )) )
-  { return Err ( "Top-level diff, ready and readiness requests are valid only on alias, id and flag properties and the diff view's properties other than bodyDiff (and ready on folders)"
+  { return Err ( "Top-level diff, ready, leaves and readiness requests are valid only on alias, id and flag properties and the diff view's properties other than bodyDiff (and ready on folders)"
                  . to_string () ); }
   Ok (result) }
 
@@ -659,7 +659,7 @@ fn parse_node_sexp (
               "na"    => AffectsParent::NA,
               _ => return Err ( format! (
                 "Invalid affectsParent value: {}", value )), }; },
-          "diff" | "ready" | "readyRequest" | "unreadyRequest" =>
+          "diff" | "ready" | "leaves" | "readyRequest" | "unreadyRequest" =>
             parse_change_fact_form (
               &key, &subitems[1..], metadata ) ?,
           _ => { return Err ( format! ( "Unknown node key: {}",
@@ -726,7 +726,7 @@ fn parse_unknownnode_sexp (
                            . to_string () ); }
             metadata . unknown_relRepo_request =
               request_metadata . relRepo_request; },
-          "diff" | "ready" | "readyRequest" | "unreadyRequest" =>
+          "diff" | "ready" | "leaves" | "readyRequest" | "unreadyRequest" =>
             parse_change_fact_form (
               &key, &subitems[1..], metadata ) ?,
           _ => { return Err ( format! (
@@ -805,7 +805,7 @@ fn parse_deleted_sexp (
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
             metadata . home_skgrepo = Some ( SkgrepoName::from (value)); },
-          "diff" | "ready" | "readyRequest" | "unreadyRequest" =>
+          "diff" | "ready" | "leaves" | "readyRequest" | "unreadyRequest" =>
             parse_change_fact_form (
               &key, &subitems[1..], metadata ) ?,
           _ => { return Err ( format! ( "Unknown deleted key: {}",
@@ -964,10 +964,12 @@ fn parse_viewrequests_sexp (
 
 
 /// Parse one of the diff view's forms -- '(diff PRESENCE...)',
-/// '(ready OBJECT...)', '(readyRequest OBJECT...)' or
-/// '(unreadyRequest OBJECT...)' -- whose head is 'key' and whose
-/// arguments are 'args', into 'metadata'. Each may appear once; a
-/// viewnode carries at most one readiness request.
+/// '(ready OBJECT...)', '(leaves N OBJECT...)', '(readyRequest
+/// OBJECT...)' or '(unreadyRequest OBJECT...)' -- whose head is 'key'
+/// and whose arguments are 'args', into 'metadata'. Each may appear
+/// once; a viewnode carries at most one readiness request.
+/// '(leaves ...)' is accepted and ignored: it serves only the
+/// clients' gestures, and the view derives it again.
 fn parse_change_fact_form (
   key      : &str,
   args     : &[Sexp],
@@ -998,6 +1000,7 @@ fn parse_change_fact_form (
         return Err ( "ready cannot name the object all; only a request can"
                      . to_string () ); }
       metadata . change_facts . ready = Some (objects); },
+    "leaves" => {},
     _ => { // readyRequest or unreadyRequest
       if metadata . readiness_request . is_some () {
         return Err ( "A viewnode may carry only one readiness request"

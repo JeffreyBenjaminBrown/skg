@@ -72,7 +72,7 @@ fn editing_the_id_folder_aborts_the_save (
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let edited : String =
-      without_lines_containing (&buffer, "(skg id (diff rel+)) acqd");
+      without_lines_containing (&buffer, "(skg id (diff rel+) (leaves 1)) acqd");
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let error : String = format! ( "{:?}",
       save (f, &edited) . err ()
@@ -91,7 +91,7 @@ fn a_removed_alias_is_not_restored_by_a_save (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert! ( buffer . contains ("*** (skg removedAlias (diff rel-)) a1"),
+    assert! ( buffer . contains ("*** (skg removedAlias (diff rel-) (leaves 1)) a1"),
               "{}", buffer );
     let response : SaveResponse = save (f, &buffer) ?;
     assert! ( response . errors . is_empty (),
@@ -111,7 +111,7 @@ fn a_removed_id_does_not_abort_the_save (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert! ( buffer . contains ("*** (skg removedID (diff rel-)) ali-old"),
+    assert! ( buffer . contains ("*** (skg removedID (diff rel-) (leaves 1)) ali-old"),
               "{}", buffer );
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let response : SaveResponse = save (f, &buffer) ?;
@@ -204,9 +204,9 @@ fn a_collateral_buffer_shows_the_new_change_and_keeps_the_old (
       line . contains ("(diff node+ rel+)")
       && line . ends_with ("a new child") ),
       "the new child must be drawn as new:\n{}", collateral );
-    assert! ( collateral . contains ("** (skg (oldText titleAndBody)) txt"),
+    assert! ( collateral . contains ("** (skg (oldText titleAndBody) (leaves 1)) txt"),
               "txt's old text must stay:\n{}", collateral );
-    assert! ( collateral . contains ("(diff rel-))) k1"),
+    assert! ( collateral . contains ("(diff rel-) (leaves 1 rel))) k1"),
               "the removed member k1 must stay:\n{}", collateral );
     Ok (( )) }) }
 

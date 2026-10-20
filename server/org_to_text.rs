@@ -11,6 +11,7 @@ use crate::types::viewnode::{
 use ego_tree::{NodeRef, Tree};
 use sexp::{Atom, Sexp};
 use std::error::Error;
+use std::iter::once;
 
 /// Render a metadata value as one S-expression atom. Most IDs and skgrepo
 /// names print in the familiar bare form; values containing whitespace or
@@ -354,7 +355,8 @@ fn property_metadata_to_string (
   Ok ( parts . join (" ")) }
 
 /// The diff view's forms for one viewnode: '(diff ...)',
-/// '(ready ...)', and its readiness request. Empty outside the diff view.
+/// '(ready ...)', '(leaves ...)', and its readiness request. Empty
+/// outside the diff view.
 fn change_fact_forms (
   facts   : &ChangeFacts,
   request : &Option<ReadinessRequest>,
@@ -369,6 +371,12 @@ fn change_fact_forms (
   if let Some (objects) = &facts . ready {
     forms . push ( form ( "ready",
       objects . iter () . map ( |object| object . wire_name () ) . collect () )); }
+  if let Some (leaves) = &facts . leaves {
+    let count : String = leaves . count . to_string ();
+    forms . push ( form ( "leaves",
+      once ( count . as_str () )
+      . chain ( leaves . objects . iter () . map ( |object| object . wire_name () ))
+      . collect () )); }
   if let Some (request) = request {
     forms . push ( form ( request . form_head (),
       request . objects . iter () . map ( |object| object . wire_name () )

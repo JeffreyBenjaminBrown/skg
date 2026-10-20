@@ -270,7 +270,8 @@ fn changed_folder_rules (
 /// The diff view's facts on a vognode: '(diff ...)' as ∃+ ∃-
 /// (the node itself) and ~+ ~- (its relationship to its viewparent),
 /// each followed by a ✓ when '(ready ...)' names that diff object,
-/// then the readiness request. The same form is matched once per object, so each ✓ lands
+/// then the readiness request. '(leaves ...)' is for the clients'
+/// gestures and shows nothing. The same form is matched once per object, so each ✓ lands
 /// after its own object whatever the raw order.
 fn change_fact_rules_for_two_objects (
 ) -> Vec<RuleChild> {
@@ -283,6 +284,7 @@ fn change_fact_rules_for_two_objects (
       leaf_styled_as ("diff", "rel+", "~+"),
       leaf_styled_as ("diff", "rel-", "~-") ]),
     rule ("ready", vec! [ leaf_abut_styled_as ("ready", "rel", "✓") ]),
+    vac ("leaves"),
     readiness_request_rule ("readyRequest",   "request:ready"),
     readiness_request_rule ("unreadyRequest", "request:unready") ] }
 
@@ -300,6 +302,7 @@ fn change_fact_rules_for_one_object (
       leaf_styled_as ("diff", "rel+",  plus),
       leaf_styled_as ("diff", "rel-",  minus) ]),
     rule ("ready", vec! [ any_abut_styled_as ("ready", "✓") ]),
+    vac ("leaves"),
     readiness_request_rule ("readyRequest",   "request:ready"),
     readiness_request_rule ("unreadyRequest", "request:unready") ] }
 
@@ -716,11 +719,12 @@ fn change_fact_atoms () -> Vec<&'static str> {
     let ChangeFacts {
       presence : _, // -> diff, with DiffPresence::EMITTABLE_ATOMS
       ready : _,    // -> ready, with the objects
+      leaves : _,   // -> leaves, with the objects
     } = facts;
     match object { // compile error here = update DiffObject::ALL
       DiffObject::Node | DiffObject::Rel | DiffObject::All => () }}
   let _ = guard;
-  [ vec! [ "diff", "ready", "readyRequest", "unreadyRequest",
+  [ vec! [ "diff", "ready", "leaves", "readyRequest", "unreadyRequest",
            "changed" ], // the head of a changed folder's form
     DiffPresence::EMITTABLE_ATOMS . to_vec (),
     DiffObject::ALL . into_iter () . map (DiffObject::wire_name)

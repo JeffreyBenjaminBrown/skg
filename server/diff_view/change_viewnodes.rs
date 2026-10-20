@@ -120,7 +120,8 @@ pub fn mk_historical_viewnode (
       body         : before . body . clone (),
       change_facts : ChangeFacts {
         presence : DiffPresence { node : Some (Sign::Minus), rel },
-        ready    : None },
+        ready    : None,
+        leaves   : None },
       readiness_request : None } )))) ) }
 
 /// Under 'phantom', the historical phantom of 'pid' standing where

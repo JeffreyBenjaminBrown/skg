@@ -654,7 +654,8 @@ fn facts_of_entry (
   sign : Option<Sign>,
 ) -> ChangeFacts {
   ChangeFacts { presence : DiffPresence { node : None, rel : sign },
-                ready    : None } }
+                ready    : None,
+                leaves   : None } }
 
 /// Under 'treeid', a folder 'kind' holding 'entries'.
 fn append_property_folder (

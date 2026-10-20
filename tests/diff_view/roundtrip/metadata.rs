@@ -18,7 +18,8 @@ fn ready (
   objects : &[DiffObject],
 ) -> ChangeFacts {
   ChangeFacts { presence : DiffPresence::default (),
-                ready    : Some ( objects . iter () . copied () . collect () ) } }
+                ready    : Some ( objects . iter () . copied () . collect () ),
+                leaves   : None } }
 
 fn request_all () -> Option<ReadinessRequest> {
   Some ( ReadinessRequest {
@@ -106,7 +107,8 @@ fn changeset_markers_round_trip () {
 fn removed_aliases_and_ids_round_trip () {
   let removed : ChangeFacts = ChangeFacts {
     presence : DiffPresence { node : None, rel : Some (Sign::Minus) },
-    ready    : Some (BTreeSet::new ()) };
+    ready    : Some (BTreeSet::new ()),
+    leaves   : None };
   assert_round_trip (
     property ( Property::RemovedAlias {
       text : "an old alias" . into (),
@@ -128,7 +130,8 @@ fn a_historical_phantom_round_trips () {
         change_facts : ChangeFacts {
           presence : DiffPresence { node : Some (Sign::Minus),
                                     rel  : Some (Sign::Minus) },
-          ready    : Some ( [ DiffObject::Node ] . into_iter () . collect () ) },
+          ready    : Some ( [ DiffObject::Node ] . into_iter () . collect () ),
+          leaves   : None },
         readiness_request : request_all () } )))),
     "(historical (id gone) (repo main) (diff node- rel-) (ready node) (readyRequest all))" ); }
 

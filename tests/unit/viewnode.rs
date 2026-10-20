@@ -143,7 +143,8 @@ fn editable_occurrences_are_the_editable_unrestricted_vognodes () {
 fn the_change_facts_and_readiness_request_accessors_cover_every_kind () {
   let facts : ChangeFacts = ChangeFacts {
     presence : DiffPresence { node : Some (Sign::Plus), rel : None },
-    ready    : None };
+    ready    : None,
+    leaves   : None };
   let request : ReadinessRequest = ReadinessRequest {
     ready : true, objects : [DiffObject::Node] . into_iter () . collect () };
   let unrestricted : ViewnodeKind = {

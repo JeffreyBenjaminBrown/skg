@@ -69,20 +69,20 @@ fn fold_kinds_buffer (
   buffer : &str,
 ) -> String {
   let mut folded : String = buffer . to_string ();
-  for entry in [ "*** (skg removedAlias (diff rel-)) a1",
+  for entry in [ "*** (skg removedAlias (diff rel-) (leaves 1)) a1",
                  "*** (skg alias) a2",
-                 "*** (skg alias (diff rel+)) a3",
+                 "*** (skg alias (diff rel+) (leaves 1)) a3",
                  "*** (skg bodyDiff)" ] {
     folded = with_atom (&folded, entry, "folded"); }
-  with_atom (&folded, "** (skg (oldText titleAndBody)) txt", "bodyFolded") }
+  with_atom (&folded, "** (skg (oldText titleAndBody) (leaves 1)) txt", "bodyFolded") }
 
 fn assert_kinds_folds_stay (
   saved : &str,
 ) {
-  for line in [ "*** (skg folded removedAlias (diff rel-)) a1",
+  for line in [ "*** (skg folded removedAlias (diff rel-) (leaves 1)) a1",
                 "*** (skg folded alias) a2",
-                "*** (skg folded alias (diff rel+)) a3",
-                "** (skg bodyFolded (oldText titleAndBody)) txt",
+                "*** (skg folded alias (diff rel+) (leaves 1)) a3",
+                "** (skg bodyFolded (oldText titleAndBody) (leaves 1)) txt",
                 "*** (skg folded bodyDiff)" ] {
     assert! ( saved . lines () . any ( |l| l == line ),
               "{:?} must stay:\n{}", line, saved ); }}
@@ -189,7 +189,7 @@ fn a_deleted_then_restored_node_keeps_the_folding_of_its_subtree (
       "*** (skg (node (id cy2)", "folded" );
     let deleted : String = save_cleanly (f, &all_changes_view (), &folded) ? . saved_view;
     assert! ( deleted . contains (
-      "** (skg bodyFolded (historical (id cy1) (repo main) (diff node- rel-))) cy1\n\
+      "** (skg bodyFolded (historical (id cy1) (repo main) (diff node- rel-) (leaves 2 node rel))) cy1\n\
        *** (skg folded (node (id cy2)" ),
       "cy1 is historical where it stood, its subtree folded as it was:\n{}", deleted );
     let restoring : String = edit_line (

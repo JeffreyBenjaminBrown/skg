@@ -321,7 +321,7 @@ fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
     assert! ( s1_and_folder [0] . contains ("writeProtected")
               && s1_and_folder [1] == "** (skg (subscriberFolder changed))"
               && s1_and_folder [2] . starts_with ("*** (skg (node (id sub) ")
-              && s1_and_folder [2] . ends_with ("(diff rel-))) sub")
+              && s1_and_folder [2] . ends_with ("(diff rel-) (leaves 1 rel))) sub")
               && ! s1_and_folder [2] . contains ("affectsParent"),
               "s1 must be write-protected, showing sub as a removed member:\n{}",
               text );
@@ -329,7 +329,7 @@ fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
     let response : SaveResponse = save (f, &text) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     assert_eq! ( skg_files (f) ?, files_before );
-    assert! ( response . saved_view . contains ("(diff rel-))) sub"),
+    assert! ( response . saved_view . contains ("(diff rel-) (leaves 1 rel))) sub"),
               "{}", response . saved_view );
     Ok (( )) }) }
 

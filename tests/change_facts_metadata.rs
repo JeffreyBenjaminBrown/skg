@@ -3,7 +3,7 @@
 // The diff view's metadata forms -- '(diff ...)', '(ready ...)',
 // '(readyRequest ...)' and '(unreadyRequest ...)' -- on every viewnode
 // that carries them: each renders, then parses back to the same
-// viewnode.
+// viewnode. '(leaves ...)' renders and parses back to nothing.
 
 use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
@@ -13,8 +13,8 @@ use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
-  AffectsParent, ChangeFacts, DiffPresence, Phantom, PhantomDeleted,
-  PhantomUnknown, Property, DiffObject, ReadinessRequest, Viewnode,
+  AffectsParent, ChangeFacts, DiffPresence, LeavesFact, Phantom,
+  PhantomDeleted, PhantomUnknown, Property, DiffObject, ReadinessRequest, Viewnode,
   ViewnodeKind, Vognode, mk_editable_viewnode, mk_writeProtected_viewnode};
 
 use std::collections::{BTreeSet, HashMap};
@@ -30,7 +30,8 @@ fn facts (
   ready : Option<&[DiffObject]>,
 ) -> ChangeFacts {
   ChangeFacts { presence : DiffPresence { node, rel },
-                ready    : ready . map (objects) } }
+                ready    : ready . map (objects),
+                leaves   : None } }
 
 fn request (
   ready : bool,
@@ -130,11 +131,35 @@ fn property_leaves_round_trip_their_change_facts () {
       readiness_request : None, } )),
     &format! ( "(flag {}) (diff rel+)", Flag::NoSearchMatching . wire_name () )); }
 
+/// '(leaves N OBJECT...)' is written beside '(ready ...)', and the
+/// parser accepts and ignores it: the view derives it again.
+#[test]
+fn the_leaves_fact_renders_and_parses_back_to_nothing () {
+  let config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::new ());
+  let mut change_facts : ChangeFacts =
+    facts ( None, Some (Sign::Plus), Some (&[DiffObject::Rel]) );
+  change_facts . leaves = Some ( LeavesFact {
+    count : 2, objects : objects (&[DiffObject::Node, DiffObject::Rel]) } );
+  let node : Viewnode = with_facts (
+    mk_editable_viewnode (
+      ID::from ("a"), SkgrepoName::from ("main"), "A" . into (), None ),
+    change_facts, None );
+  let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
+  assert_eq! ( rendered,
+               "(node (id a) (repo main) (diff rel+) (ready rel) (leaves 2 node rel))" );
+  let metadata : ViewnodeMetadata =
+    parse_metadata_to_viewnodemd ( &format! ("(skg {})", rendered) ) . unwrap ();
+  assert_eq! ( metadata . change_facts,
+               facts ( None, Some (Sign::Plus), Some (&[DiffObject::Rel]) ));
+  let marker : &str = "(skg (changesetMarker content) (leaves 3 all) (readyRequest all))";
+  assert! ( parse_metadata_to_viewnodemd (marker) . is_ok (), "{}", marker ); }
+
 #[test]
 fn malformed_change_facts_are_refused () {
   for metadata in [
     "(skg (diff rel+))",                              // top level, not a property
     "(skg aliasFolder (diff rel+))",                  // a folder's only fact is '(ready)'
+    "(skg aliasFolder (leaves 1))",
     "(skg (aliasFolder sideways))",                   // a folder's form is '(KIND changed)'
     "(skg (node (id a) (ready all)))",                // 'all' only in a request
     "(skg (node (id a) (diff node+ node-)))",         // an object twice

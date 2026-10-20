@@ -144,7 +144,8 @@ pub fn adopt_fresh_facts (
       e . birth         = f . birth; // a buffer does not carry it back
       e . change_facts  = ChangeFacts {
         presence : f . change_facts . presence,
-        ready    : None };
+        ready    : None,
+        leaves   : None };
       if f . is_writeProtected () {
         e . write_protect (); }},
     (kind, fresh_kind) => *kind = fresh_kind . clone (), }}
