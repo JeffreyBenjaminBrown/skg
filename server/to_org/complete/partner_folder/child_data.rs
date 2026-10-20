@@ -20,6 +20,7 @@
 ///   needed to create any missing goal child without querying while
 ///   the tree is being mutated.
 
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
@@ -86,16 +87,24 @@ impl FolderGoalItem {
       . collect () }
 }
 
-/// The ID of a folder child that a goal item can match: a member, an
-/// unknown phantom, a historical phantom, or a removed member.
-fn goal_matchable_skgid (
+/// Which ID a child of a partner folder stands for, over the union of
+/// a graph straddle: a member or a removed member, its skgid as
+/// 'graph' (the live graph) resolves it ('relationship_member_key':
+/// an extra ID becomes its node's pid, an ID the graph lacks stays as
+/// it is); an unknown phantom, its raw ID; a historical phantom, its
+/// ID in the before-graph, which the live graph does not resolve.
+/// None for any other child. The folder reconciler matches children
+/// to goal items by it, and the save's write-protected-occurrence
+/// check reads a folder's members by it, so the two agree.
+pub fn skgid_a_folder_child_stands_for (
   viewnode : &Viewnode,
+  graph    : &InRustGraph,
 ) -> Option<ID> {
   match &viewnode . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (t))
       if t . affectsParent == AffectsParent::True
          || is_unrestricted_removed_member (viewnode) =>
-      Some ( t . skgid . clone () ),
+      Some ( graph . relationship_member_key (&t . skgid) . into_id () ),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
       Some ( u . skgid . clone () ),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
@@ -190,19 +199,23 @@ pub fn reconcile_partnerFolder_children_against_goal_list (
   kind          : PartnerFolder,
   goal_list     : &[FolderGoalItem],
   child_data    : &HashMap<ID, ChildData>,
+  graph         : &InRustGraph,
 ) -> Result<RepairSummary<ID>, Box<dyn Error>> {
   reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
-    tree, folder_node, kind, goal_list, child_data, &HashMap::new () )
+    tree, folder_node, kind, goal_list, child_data, graph, &HashMap::new () )
 }
 
 /// As above, with the raw aliases captured for nodes deleted by the current
 /// save.  Only the immediate post-save rerender has this information.
+/// Children match goal items by 'skgid_a_folder_child_stands_for'
+/// over 'graph', the live graph.
 pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
   tree          : &mut Tree<Viewnode>,
   folder_node      : NodeId,
   kind          : PartnerFolder,
   goal_list     : &[FolderGoalItem],
   child_data    : &HashMap<ID, ChildData>,
+  graph         : &InRustGraph,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
 ) -> Result<RepairSummary<ID>, Box<dyn Error>> {
   let label : &'static str = kind . caller_label ();
@@ -220,8 +233,8 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
     // every restricted member, and a retained placeholder already in the
     // folder survives as an unmanaged child (preserved as-is, not
     // goal-matched), so it needs no id.
-    |vn : &Viewnode| goal_matchable_skgid (vn) . is_some (),
-    |vn : &Viewnode| goal_matchable_skgid (vn) . ok_or_else ( || format! (
+    |vn : &Viewnode| skgid_a_folder_child_stands_for (vn, graph) . is_some (),
+    |vn : &Viewnode| skgid_a_folder_child_stands_for (vn, graph) . ok_or_else ( || format! (
       "{}: managed child not a normal graphnode", label )),
     &goal_skgids,
     |skgid : &ID| {
@@ -230,7 +243,7 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
       drawing_of_goal_item (item, child_data, label) },
   ) ?;
   apply_goal_shapes (
-    tree, folder_node, &items_by_skgid, child_data, label ) ?;
+    tree, folder_node, &items_by_skgid, child_data, graph, label ) ?;
   mark_goal_children_as_folder_members (
     tree, folder_node, goal_list) ?;
   Ok (summary) }
@@ -274,13 +287,14 @@ fn apply_goal_shapes (
   folder_node    : NodeId,
   items_by_skgid : &HashMap<&ID, &FolderGoalItem>,
   child_data     : &HashMap<ID, ChildData>,
+  graph          : &InRustGraph,
   label          : &str,
 ) -> Result<(), Box<dyn Error>> {
   let children : Vec<(NodeId, ID)> =
     tree . get (folder_node)
     . ok_or ("apply_goal_shapes: folder not found") ?
     . children ()
-    . filter_map ( |child| goal_matchable_skgid ( child . value () )
+    . filter_map ( |child| skgid_a_folder_child_stands_for ( child . value (), graph )
                    . map ( |skgid| (child . id (), skgid) ))
     . collect ();
   for (child, skgid) in children {
@@ -370,6 +384,40 @@ mod tests {
   fn skgid (text : &str) -> ID { ID::from (text) }
   fn skgrepo (text : &str) -> SkgrepoName { SkgrepoName::from (text) }
 
+  /// A member drawn by an extra ID of x stands for x, so the
+  /// reconciler keeps it for the goal item x, as the save's
+  /// write-protected-occurrence check counts it as x.
+  #[test]
+  fn a_member_drawn_by_an_extra_id_is_kept_for_its_node () {
+    let graph : InRustGraph = InRustGraph::from_graphnodes (&[
+      crate::types::nodes::complete::Graphnode {
+        pid          : skgid ("x"),
+        extra_ids    : vec! [skgid ("x2")],
+        title        : "x" . to_string (),
+        home_skgrepo : skgrepo ("main"),
+        .. crate::types::nodes::complete::empty_graphnode () } ]);
+    let mut tree : Tree<Viewnode> = Tree::new (
+      Viewnode { focused: false, org_folded: false, org_body_folded: false,
+                 kind: ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) });
+    let folder : NodeId = tree . root () . id ();
+    let member : Viewnode = mk_writeProtected_viewnode (
+      skgid ("x2"), skgrepo ("main"), "x" . to_string (), AffectsParent::True );
+    assert_eq! ( skgid_a_folder_child_stands_for (&member, &graph),
+                 Some (skgid ("x")) );
+    let member_treeid : NodeId = tree . root_mut () . append (member) . id ();
+    let mut child_data : HashMap<ID, ChildData> = HashMap::new ();
+    child_data . insert ( skgid ("x"), ChildData {
+      home_skgrepo : skgrepo ("main"), title : "x" . to_string (),
+      unknown : false, relRepo : None } );
+    reconcile_partnerFolder_children_against_goal_list (
+      &mut tree, folder, PartnerFolder::Subscribee,
+      &FolderGoalItem::live_members (&[skgid ("x")]),
+      &child_data, &graph ) . unwrap ();
+    assert_eq! (
+      tree . root () . children () . map ( |child| child . id () )
+        . collect::<Vec<NodeId>> (),
+      vec! [member_treeid] ); }
+
   #[test]
   fn deleted_primary_with_surviving_extra_member_becomes_unknown () {
     let primary : ID = skgid ("deleted-primary");
@@ -394,7 +442,8 @@ mod tests {
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       &mut tree, folder, PartnerFolder::Subscribee,
       &FolderGoalItem::live_members (&[raw_extra . clone ()]),
-      &child_data, &deleted_extra_ids ) . unwrap ();
+      &child_data, &InRustGraph::from_graphnodes (&[]),
+      &deleted_extra_ids ) . unwrap ();
 
     let rendered = tree . get (child_treeid) . unwrap () . value ();
     assert! (rendered . focused,

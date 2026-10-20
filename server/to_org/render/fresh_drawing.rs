@@ -5,15 +5,17 @@
 //! viewnode it also produces is kept, with its fold state, and its
 //! kind and facts are updated in place; each it does not is
 //! detached; what only it has is copied in. A viewnode that stands
-//! for a graphnode is matched by its skgid, any other by its kind
-//! (and a folder entry by the entry): within one parent each key
-//! appears at most once.
+//! for a graphnode is matched by the ID it stands for, any other by
+//! its kind (and a folder entry by the entry): within one parent each
+//! key appears at most once.
 
+use crate::dbs::in_rust_graph::InRustGraph;
+use crate::to_org::complete::partner_folder::child_data::skgid_a_folder_child_stands_for;
 use crate::types::git::Sign;
 use crate::types::misc::ID;
 use crate::types::tree::moves::arrange_last_children;
 use crate::types::viewnode::{
-  AffectsParent, Birth, ChangeFacts, Phantom, Property, PropertyFolder,
+  AffectsParent, Birth, ChangeFacts, Property, PropertyFolder,
   Viewnode, ViewnodeKind, Vognode};
 use crate::update_buffer::util::detach_viewnode_transferring_focus;
 
@@ -23,7 +25,8 @@ use std::error::Error;
 /// What identifies a viewnode among its siblings.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum MatchKey {
-  /// A viewnode that stands for a graphnode: its skgid.
+  /// A viewnode that stands for a graphnode: the ID it stands for, as
+  /// 'skgid_a_folder_child_stands_for' reads it, else its skgid.
   Graphnode (ID),
   /// One that stands for no graphnode: its kind, and for a folder
   /// entry the entry.
@@ -31,19 +34,17 @@ pub enum MatchKey {
 }
 
 /// None for a viewnode that carries no identity (a restricted
-/// vognode, a dead viewnode, the buffer root).
+/// vognode, a dead viewnode, the buffer root). 'graph' is the live
+/// graph, which resolves a member's extra ID.
 pub fn match_key (
   viewnode : &Viewnode,
+  graph    : &InRustGraph,
 ) -> Option<MatchKey> {
   match &viewnode . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-      Some ( MatchKey::Graphnode ( t . skgid . clone () )),
-    ViewnodeKind::Vognode (Vognode::Phantom (phantom)) =>
-      Some ( MatchKey::Graphnode ( match phantom {
-        Phantom::Deleted (d)    => d . skgid . clone (),
-        Phantom::Unknown (u)    => u . skgid . clone (),
-        Phantom::Historical (h) => h . skgid . clone (), } )),
-    ViewnodeKind::Vognode (Vognode::Restricted (_)) => None,
+    ViewnodeKind::Vognode (vognode) =>
+      skgid_a_folder_child_stands_for (viewnode, graph)
+      . or_else ( || vognode . skgid () . cloned () )
+      . map (MatchKey::Graphnode),
     ViewnodeKind::Property (property) =>
       Some ( MatchKey::Kind ( property_kind (property) )),
     ViewnodeKind::PropertyFolder (folder) =>
@@ -79,12 +80,13 @@ fn property_kind (
 /// same way, every keyed child managed, and ordered as the fresh
 /// drawing orders them. Returns the kept and created children, in
 /// the fresh drawing's order; where they stand among the others is
-/// the caller's to decide.
+/// the caller's to decide. 'graph' is the live graph ('match_key').
 pub fn reconcile_children_with_fresh_drawing (
   tree         : &mut Tree<Viewnode>,
   parent       : NodeId,
   fresh        : &Tree<Viewnode>,
   fresh_parent : NodeId,
+  graph        : &InRustGraph,
   managed      : &dyn Fn (&Viewnode) -> bool,
   descend      : &dyn Fn (&Viewnode) -> bool,
 ) -> Result<Vec<NodeId>, Box<dyn Error>> {
@@ -93,7 +95,7 @@ pub fn reconcile_children_with_fresh_drawing (
     . ok_or ("reconcile_children_with_fresh_drawing: parent not found") ?
     . children ()
     . filter ( |child| managed ( child . value () ))
-    . filter_map ( |child| match_key ( child . value () )
+    . filter_map ( |child| match_key ( child . value (), graph )
                    . map ( |key| (child . id (), key) ))
     . collect ();
   let fresh_children : Vec<NodeId> =
@@ -104,7 +106,7 @@ pub fn reconcile_children_with_fresh_drawing (
   for fresh_child in fresh_children {
     let fresh_viewnode : &Viewnode =
       fresh . get (fresh_child) . unwrap () . value ();
-    let key : MatchKey = match_key (fresh_viewnode)
+    let key : MatchKey = match_key (fresh_viewnode, graph)
       . ok_or ("reconcile_children_with_fresh_drawing: a fresh viewnode has no match key") ?;
     let matched : Option<usize> =
       unmatched . iter () . position ( |(_, existing)| *existing == key );
@@ -115,8 +117,8 @@ pub fn reconcile_children_with_fresh_drawing (
           tree . get_mut (existing) . unwrap () . value (), fresh_viewnode );
         if descend (fresh_viewnode) {
           let kept : Vec<NodeId> = reconcile_children_with_fresh_drawing (
-            tree, existing, fresh, fresh_child,
-            &|viewnode| match_key (viewnode) . is_some (), descend ) ?;
+            tree, existing, fresh, fresh_child, graph,
+            &|viewnode| match_key (viewnode, graph) . is_some (), descend ) ?;
           arrange_last_children (tree, existing, &kept) ?; }
         result . push (existing); },
       None => result . push (

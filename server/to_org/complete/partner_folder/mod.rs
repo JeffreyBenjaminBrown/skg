@@ -173,7 +173,7 @@ pub fn maybe_add_subscribeeFolder_branch (
     reconcile_partnerFolder_children_against_goal_list (
       tree, subscribee_folder_treeid,
       PartnerFolder::Subscribee,
-      &FolderGoalItem::live_members (&goal), &data ) ?; }
+      &FolderGoalItem::live_members (&goal), &data, graph ) ?; }
   if ! hidden_outside_content . is_empty () {
     // HiddenOutsideOfSubscribeeFolder presents last, if it exists.
     let hidden_outside_folder_treeid : NodeId =
@@ -196,7 +196,7 @@ pub fn maybe_add_subscribeeFolder_branch (
     reconcile_partnerFolder_children_against_goal_list (
       tree, hidden_outside_folder_treeid,
       PartnerFolder::HiddenOutsideOfSubscribee,
-      &FolderGoalItem::live_members (&goal), &data ) ?; }
+      &FolderGoalItem::live_members (&goal), &data, graph ) ?; }
   Ok (( )) }
 
 /// Add the PartnerFolders that an editable node shows without an explicit
@@ -283,7 +283,7 @@ pub fn maybe_add_one_partnerFolder (
     build_initial_render_child_data (
       &member_skgids, graph, config ) ?;
   reconcile_partnerFolder_children_against_goal_list (
-    tree, folder_treeid, kind, &FolderGoalItem::live_members (&goal), &data ) ?;
+    tree, folder_treeid, kind, &FolderGoalItem::live_members (&goal), &data, graph ) ?;
   Ok (( )) }
 
 /// If this node is a Subscribee,
@@ -356,5 +356,5 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
   reconcile_partnerFolder_children_against_goal_list (
     tree, hidden_folder_treeid,
     PartnerFolder::HiddenInSubscribee,
-    &FolderGoalItem::live_members (&goal), &data ) ?;
+    &FolderGoalItem::live_members (&goal), &data, graph ) ?;
   Ok (( )) }

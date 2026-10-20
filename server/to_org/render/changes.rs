@@ -94,7 +94,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
   if ! editable {
     // What an earlier visit drew here while it was editable goes, and
     // the members it still holds are tagged as they stand now.
-    detach_change_viewnodes (tree, treeid) ?;
+    detach_change_viewnodes (tree, treeid, straddle) ?;
     tag_content_members (tree, treeid, straddle, &content, None) ?;
     return Ok (( )); }
   let sets : &PcsvfSets = drawing . sets ();
@@ -110,7 +110,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
     drawing . diffView_buffer_kind == DiffViewBufferKind::OrderOnlyChanges
       && straddle . order_only_pids () . contains (&pid) );
   let fronts : Vec<NodeId> = reconcile_children_with_fresh_drawing (
-    tree, treeid, &fresh, fresh . root () . id (),
+    tree, treeid, &fresh, fresh . root () . id (), &straddle . after,
     &is_front_change_viewnode,
     &|viewnode| ! matches! ( viewnode . kind, ViewnodeKind::Vognode (_) )) ?;
   let partner_folders : Vec<NodeId> =
@@ -230,8 +230,9 @@ pub(crate) fn process_historical_phantom_visit (
         node_mut . value () . kind = deleted; }
       let empty : Tree<Viewnode> = Tree::new (fresh_root ());
       reconcile_children_with_fresh_drawing (
-        tree, treeid, &empty, empty . root () . id (),
-        &|viewnode| match_key (viewnode) . is_some (), &|_| false ) ?;
+        tree, treeid, &empty, empty . root () . id (), &straddle . after,
+        &|viewnode| match_key (viewnode, &straddle . after) . is_some (),
+        &|_| false ) ?;
       return Ok (HistoricalPhantomVisit::Done); };
   if at_root {
     adopt_fresh_facts (
@@ -252,8 +253,8 @@ pub(crate) fn process_historical_phantom_visit (
     let root : NodeId = fresh . root () . id ();
     append_historical_phantom_content (&mut fresh, root, straddle, &skgid); }
   let kept : Vec<NodeId> = reconcile_children_with_fresh_drawing (
-    tree, treeid, &fresh, fresh . root () . id (),
-    &|viewnode| match_key (viewnode) . is_some (),
+    tree, treeid, &fresh, fresh . root () . id (), &straddle . after,
+    &|viewnode| match_key (viewnode, &straddle . after) . is_some (),
     &|viewnode| ! matches! ( viewnode . kind, ViewnodeKind::Vognode (_) )) ?;
   arrange_last_children (tree, treeid, &kept) ?;
   Ok (HistoricalPhantomVisit::Done) }
@@ -309,12 +310,13 @@ fn is_front_change_viewnode (
 
 /// Detach what this step draws under an editable node.
 fn detach_change_viewnodes (
-  tree   : &mut Tree<Viewnode>,
-  treeid : NodeId,
+  tree     : &mut Tree<Viewnode>,
+  treeid   : NodeId,
+  straddle : &GraphStraddle,
 ) -> Result<(), Box<dyn Error>> {
   let empty : Tree<Viewnode> = Tree::new (fresh_root ());
   reconcile_children_with_fresh_drawing (
-    tree, treeid, &empty, empty . root () . id (),
+    tree, treeid, &empty, empty . root () . id (), &straddle . after,
     &|viewnode| is_front_change_viewnode (viewnode)
       || is_unrestricted_removed_member (viewnode)
       || matches! ( &viewnode . kind,
@@ -424,7 +426,7 @@ fn tag_content_members (
     if let Some (moved) = moved {
       fresh . root_mut () . append (moved); }
     let kept : Vec<NodeId> = reconcile_children_with_fresh_drawing (
-      tree, member, &fresh, fresh . root () . id (),
+      tree, member, &fresh, fresh . root () . id (), &straddle . after,
       &|viewnode| matches! ( &viewnode . kind,
         ViewnodeKind::Property (Property::RelRepoMove { .. }) ),
       &|_| false ) ?;
@@ -473,7 +475,7 @@ fn reconcile_removed_content_members (
       fresh . root_mut () . append (drawn);
       anchors . push (anchor); }}
   let kept : Vec<NodeId> = reconcile_children_with_fresh_drawing (
-    tree, treeid, &fresh, fresh . root () . id (),
+    tree, treeid, &fresh, fresh . root () . id (), &straddle . after,
     &|viewnode| match &viewnode . kind {
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => true,
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>

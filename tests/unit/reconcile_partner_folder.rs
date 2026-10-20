@@ -1,5 +1,5 @@
 use super::*;
-use crate::types::viewnode::{mk_writeProtected_viewnode, viewforest_root_viewnode};
+use crate::types::viewnode::{AffectsParent, mk_writeProtected_viewnode, viewforest_root_viewnode};
 
 fn unrestricted_affected (id_str : &str) -> Viewnode {
   mk_writeProtected_viewnode (
@@ -35,7 +35,8 @@ fn view_order_wins_and_missing_members_append () {
   let graph_members : Vec<ID> =
     vec! [ ID::from ("a"), ID::from ("b"), ID::from ("c") ];
   let goal : Vec<ID> =
-    view_order_preserving_goal_list (&t, folder, &graph_members, &live_member_skgid) . unwrap ();
+    view_order_preserving_goal_list (
+      &t, folder, &graph_members, &InRustGraph::from_graphnodes (&[]) ) . unwrap ();
   assert_eq! ( goal,
                vec! [ ID::from ("c"), ID::from ("a"), ID::from ("b") ] ); }
 
@@ -53,6 +54,7 @@ fn duplicate_member_first_occurrence_wins () {
   let graph_members : Vec<ID> =
     vec! [ ID::from ("a"), ID::from ("c") ];
   let goal : Vec<ID> =
-    view_order_preserving_goal_list (&t, folder, &graph_members, &live_member_skgid) . unwrap ();
+    view_order_preserving_goal_list (
+      &t, folder, &graph_members, &InRustGraph::from_graphnodes (&[]) ) . unwrap ();
   assert_eq! ( goal,
                vec! [ ID::from ("c"), ID::from ("a") ] ); }

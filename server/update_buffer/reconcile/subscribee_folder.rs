@@ -81,7 +81,8 @@ pub fn reconcile_subscribeeFolder_children (
         tree, node, &goal_items, &context . relRepos, runtime ) ?;
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       tree, node, kind,
-      &goal_items, &child_data, deleted_by_this_save_extra_ids ) ?; }
+      &goal_items, &child_data, &runtime . graph,
+      deleted_by_this_save_extra_ids ) ?; }
 
   ensure_hiddenOutsideOfSubscribeeFolder_is_last (tree, node) ?;
   Ok(( )) }

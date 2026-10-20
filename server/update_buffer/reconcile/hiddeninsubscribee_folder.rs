@@ -75,7 +75,8 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
       // non-member only if it has a user subtree to preserve. The reconciler
       // applies this uniformly.
       tree, node, kind,
-      &goal_items, &child_data, deleted_by_this_save_extra_ids ) ?;
+      &goal_items, &child_data, &runtime . graph,
+      deleted_by_this_save_extra_ids ) ?;
   if let Some (sink) = warning_sink {
     push_repair_warnings (
       sink, kind, &context . subscribee_pid, summary ); }

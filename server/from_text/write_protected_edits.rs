@@ -11,6 +11,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{AffectsParent, PartnerFolder, Phantom, Property, PropertyFolder, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
+use crate::to_org::complete::partner_folder::child_data::skgid_a_folder_child_stands_for;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::nodes::complete::flag_is_true;
 use crate::update_buffer::reconcile::partner_folder::partnerFolder_members_in_graph;
@@ -111,25 +112,25 @@ fn partnerFolder_differences_from_graph (
     . collect () }
 
 /// The members of a partner folder, each with its relRepo request: its
-/// unrestricted vognode children that affect it, by pid (an
-/// unresolved ID as it is), less those whose relationship the
-/// diff view shows as removed, plus its Unknown phantom children, by
-/// raw ID, as the folder reconciler matches them.
+/// unrestricted vognode children that affect it, less those whose
+/// relationship the diff view shows as removed, and its Unknown
+/// phantom children, each by the ID the folder reconciler matches it
+/// by ('skgid_a_folder_child_stands_for').
 fn partnerFolder_members_in_view (
   folder : NodeRef<Viewnode>,
   graph  : &InRustGraph,
 ) -> Vec<(ID, Option<SkgrepoName>)> {
-  folder . children () . filter_map ( |child| match &child . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (member))
-      if member . affectsParent == AffectsParent::True
-         && member . change_facts . presence . rel != Some (Sign::Minus) =>
-      Some (( graph . pid_of (&member . skgid)
-                . unwrap_or_else ( || member . skgid . clone () ),
-              member . relRepo_request . clone () )),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
-      Some (( unknown . skgid . clone (),
-              unknown . relRepo_request . clone () )),
-    _ => None, } )
+  folder . children () . filter_map ( |child| {
+    let relRepo_request : Option<SkgrepoName> = match &child . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Unrestricted (member))
+        if member . affectsParent == AffectsParent::True
+           && member . change_facts . presence . rel != Some (Sign::Minus) =>
+        member . relRepo_request . clone (),
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
+        unknown . relRepo_request . clone (),
+      _ => return None, };
+    Some (( skgid_a_folder_child_stands_for (child . value (), graph) ?,
+            relRepo_request )) } )
     . collect () }
 
 /// How an error names a change to a partner folder of this kind.
@@ -551,6 +552,67 @@ mod tests {
       assert_eq! (refused_changes (&errors_in (&text)),
                   vec! ["changed containers" . to_string ()], "{}", text); }
   }
+
+  /// recorder subscribes to x by its extra ID x2, and to ghost, which
+  /// no node has. A member drawn by the extra ID, or by x's pid, passes,
+  /// because the check reads each member as the folder reconciler
+  /// matches it ('skgid_a_folder_child_stands_for'): by the pid the
+  /// graph resolves its ID to.
+  #[test]
+  fn a_member_drawn_by_an_extra_id_passes_when_the_graph_lists_the_extra_id () {
+    let graph : InRustGraph = graph_listing_an_extra_id_and_a_dangling_id ();
+    for drawn in ["x2", "x"] {
+      let text : String = format! (
+        "* (skg (node (id recorder) (repo main) writeProtected)) recorder
+** (skg subscribeeFolder)
+*** (skg (node (id {}) (repo main) writeProtected)) x
+*** (skg (unknown (id ghost)))
+", drawn );
+      assert_eq! (
+        errors_for_writeProtected_occurrences (
+          &forest (&text), &graph, &config (), None ),
+        vec! [], "{}", text ); }
+  }
+
+  /// An unknown phantom member is compared by its raw ID: drawn with
+  /// the ID the recorder lists it passes, drawn with another it is
+  /// refused.
+  #[test]
+  fn an_unknown_member_is_compared_by_raw_id () {
+    let graph : InRustGraph = graph_listing_an_extra_id_and_a_dangling_id ();
+    let text_with = |unknown : &str| -> String { format! (
+      "* (skg (node (id recorder) (repo main) writeProtected)) recorder
+** (skg subscribeeFolder)
+*** (skg (node (id x) (repo main) writeProtected)) x
+*** (skg (unknown (id {})))
+", unknown ) };
+    assert_eq! (
+      errors_for_writeProtected_occurrences (
+        &forest (&text_with ("ghost")), &graph, &config (), None ),
+      vec! [] );
+    assert_eq! (
+      refused_changes ( &errors_for_writeProtected_occurrences (
+        &forest (&text_with ("other_ghost")), &graph, &config (), None )),
+      vec! ["changed subscriptions" . to_string ()] );
+  }
+
+  /// recorder subscribes to x2, an extra ID of x, and to ghost, which
+  /// no node has.
+  fn graph_listing_an_extra_id_and_a_dangling_id () -> InRustGraph {
+    let main : SkgrepoName = SkgrepoName::from ("main");
+    let node = |pid : &str| -> Graphnode { Graphnode {
+      pid          : ID::from (pid),
+      title        : pid . to_string (),
+      home_skgrepo : main . clone (),
+      .. empty_graphnode () }};
+    InRustGraph::from_graphnodes (&[
+      Graphnode {
+        subscribesTo : MSV::Specified (rel_partners_at_relRepo (
+          &main, vec! [ID::from ("x2"), ID::from ("ghost")])),
+        .. node ("recorder") },
+      Graphnode {
+        extra_ids : vec! [ID::from ("x2")],
+        .. node ("x") } ]) }
 
   /// A member whose relationship the diff view shows as removed
   /// is not counted, nor is a non-member.

@@ -78,7 +78,8 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
       // (the common case) and demoted to non-member only if it has a user
       // subtree. Handled uniformly by the reconciler.
       tree, node, kind,
-      &goal_items, &child_data, deleted_by_this_save_extra_ids ) ?;
+      &goal_items, &child_data, &runtime . graph,
+      deleted_by_this_save_extra_ids ) ?;
   if let Some (sink) = warning_sink {
     push_repair_warnings (
       sink, kind, &context . subscriber_pid, summary ); }
