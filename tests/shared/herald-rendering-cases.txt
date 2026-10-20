@@ -267,7 +267,7 @@
 ---- text: body diff
 ---- styles: message*9
 ==== diff view: a home move, ready
-(skg (homeMove (old pub) (new priv)) (ready))
+(skg (homeSkgrepoMove (old pub) (new priv)) (ready))
 ---- text: ⌂ -pub +priv✓
 ---- styles: message*1 -*1 normal*4 -*1 normal*5 go*1
 ==== diff view: a relRepo move
@@ -311,10 +311,10 @@
 ---- text: its subscribees changed (this file)
 ---- styles: message*35
 ==== diff view: a node in the skgrepo-changes buffer whose home moved
-(skg (node (id x) (viewStats (homeMove (old pub) (new priv)))))
+(skg (node (id x) (viewStats (homeSkgrepoMove (old pub) (new priv)))))
 ---- text: -pub +priv
 ---- styles: normal*4 -*1 normal*5
 ==== diff view: a node that moved like its grandparent
-(skg (node (id x) (viewStats (homeMove (old pub) (new priv)) (movedLikeAncestor b))))
+(skg (node (id x) (viewStats (homeSkgrepoMove (old pub) (new priv)) (movedLikeAncestor b))))
 ---- text: -pub +priv Δ⌂=b
 ---- styles: normal*4 -*1 normal*5 -*1 nonstandard*4

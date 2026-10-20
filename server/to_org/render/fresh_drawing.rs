@@ -68,7 +68,7 @@ fn property_kind (
     Property::Flag { flag, .. }    => format! ("flag {:?}", flag),
     Property::OldText { .. }       => "oldText" . to_string (),
     Property::BodyDiff { .. }      => "bodyDiff" . to_string (),
-    Property::HomeSkgrepoMove { .. } => "homeMove" . to_string (),
+    Property::HomeSkgrepoMove { .. } => "homeSkgrepoMove" . to_string (),
     Property::RelRepoMove { .. }   => "relRepoMove" . to_string (),
     Property::ChangesetMarker { kind, .. } =>
       format! ("changesetMarker {:?}", kind), }}

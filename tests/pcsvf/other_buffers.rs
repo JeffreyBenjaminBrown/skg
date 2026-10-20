@@ -119,15 +119,15 @@ fn the_skgrepo_changes_buffer_heralds_each_move_and_moves_like_an_ancestor (
   let text : String = buffer (DiffViewBufferKind::SkgrepoChanges) ?;
   assert_eq! ( roots (&text) . len (), 1, "{}", text );
   for (id, facts) in [
-    ( "mvp", "(homeMove (old public) (new private)))" ),
-    ( "mvc", "(homeMove (old public) (new private)) (movedLikeAncestor a))" ),
-    ( "mvg", "(homeMove (old public) (new private)) (movedLikeAncestor a))" ),
-    ( "mvr", "(homeMove (old private) (new public)))" ),
-    ( "mvt", "(homeMove (old public) (new private)) (movedLikeAncestor b))" ),
+    ( "mvp", "(homeSkgrepoMove (old public) (new private)))" ),
+    ( "mvc", "(homeSkgrepoMove (old public) (new private)) (movedLikeAncestor a))" ),
+    ( "mvg", "(homeSkgrepoMove (old public) (new private)) (movedLikeAncestor a))" ),
+    ( "mvr", "(homeSkgrepoMove (old private) (new public)))" ),
+    ( "mvt", "(homeSkgrepoMove (old public) (new private)) (movedLikeAncestor b))" ),
   ] {
     assert! ( headline_of (&text, id) . contains (facts),
               "{} should carry {}:\n{}", id, facts, text ); }
-  assert! ( ! headline_of (&text, "mvs") . contains ("homeMove"),
+  assert! ( ! headline_of (&text, "mvs") . contains ("homeSkgrepoMove"),
             "mvs did not move:\n{}", text );
   for unrelated in [ "txt", "acq", "ord" ] {
     assert! ( ! text . contains (&format! ( "(id {})", unrelated )),
@@ -138,7 +138,7 @@ fn the_skgrepo_changes_buffer_heralds_each_move_and_moves_like_an_ancestor (
 fn the_home_move_heralds_are_only_in_the_skgrepo_changes_buffer (
 ) -> Result<(), Box<dyn Error>> {
   let text : String = buffer (DiffViewBufferKind::AllChanges) ?;
-  assert! ( ! headline_of (&text, "mvc") . contains ("homeMove"), "{}", text );
+  assert! ( ! headline_of (&text, "mvc") . contains ("homeSkgrepoMove"), "{}", text );
   Ok (( )) }
 
 #[test]

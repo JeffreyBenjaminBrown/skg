@@ -27,7 +27,7 @@
 ///     (historical (id ID) (repo REPO) ...)   a historical phantom
 ///     (oldText titleAndBody | title | body)  the text at HEAD
 ///     bodyDiff
-///     (homeMove (old REPO) (new REPO))
+///     (homeSkgrepoMove (old REPO) (new REPO))
 ///     (relRepoMove (old REPO) (new REPO))
 ///     (changesetMarker content | relRepo | orderOnly)
 ///     acquiredByFolder, acquiredFolder
@@ -419,11 +419,11 @@ pub fn parse_metadata_to_viewnodemd (
                 body  : body_changed  . then (String::new),
                 change_facts : ChangeFacts::default (),
                 readiness_request : None } )); },
-          "homeMove" | "relRepoMove" => {
+          "homeSkgrepoMove" | "relRepoMove" => {
             let (old, new) : (SkgrepoName, SkgrepoName) =
               parse_old_and_new_skgrepos (&first, &items[1..]) ?;
             result . non_vognode = Some ( MpViewnodeKind::Property (
-              if first == "homeMove" {
+              if first == "homeSkgrepoMove" {
                 Property::HomeSkgrepoMove {
                   old, new, change_facts : ChangeFacts::default (),
                   readiness_request : None }
@@ -817,7 +817,7 @@ fn parse_deleted_sexp (
 
 /// Parse the (viewStats ...) s-expression contents: the bare-atom
 /// 'cycle' stat and the keyed 'overridesHere' / 'homeRepoHerald' /
-/// 'homeMove' / 'movedLikeAncestor' sub-forms. Relationship stats are semantic display-only '(rels ...)'
+/// 'homeSkgrepoMove' / 'movedLikeAncestor' sub-forms. Relationship stats are semantic display-only '(rels ...)'
 /// facts, parsed and discarded at node level instead.
 fn parse_viewstats_sexp (
   items : &[Sexp],
@@ -835,7 +835,7 @@ fn parse_viewstats_sexp (
                                     bare_value )); }} },
       Sexp::List (form) if form . first () . is_some_and (
         |head| matches! ( atom_to_string (head) . as_deref (),
-                          Ok ("homeMove") | Ok ("movedLikeAncestor") )) => {
+                          Ok ("homeSkgrepoMove") | Ok ("movedLikeAncestor") )) => {
         // Output-only facts of the diff view's skgrepo-changes
         // buffer, recomputed after completion: silently discard.
       },

@@ -205,13 +205,13 @@ fn diffView_property_rules (
       rule ("title",        vec! [ s ("old title") ]),
       rule ("body",         vec! [ s ("old body") ]) ]),
     leaf ("bodyDiff", "body diff"),
-    crule ("homeMove", vec! [
+    crule ("homeSkgrepoMove", vec! [
       any (vec! [ s ("⌂") ]),
       // The sign is a prefix: an ANY rule would join it to the name
       // with a colon.
-      crule_styled_as ("homeMove_skgrepo", "old", vec! [
+      crule_styled_as ("homeSkgrepoMove_skgrepo", "old", vec! [
         s ("-"), any (vec! [ RuleChild::It ]) ]),
-      crule_styled_as ("homeMove_skgrepo", "new", vec! [
+      crule_styled_as ("homeSkgrepoMove_skgrepo", "new", vec! [
         s ("+"), any (vec! [ RuleChild::It ]) ]) ]),
     crule ("relRepoMove", vec! [
       any (vec! [ s ("relationship moved from") ]),
@@ -505,10 +505,10 @@ pub fn herald_rule_table () -> HeraldRule {
           // The skgrepo-changes buffer of the diff view: the
           // node's home move, "-OLD +NEW", then "Δ⌂=a" when its
           // nearest moved vognode ancestor (here a) moved the same way.
-          rule ("homeMove", vec! [
-            crule_styled_as ("homeMove_skgrepo", "old", vec! [
+          rule ("homeSkgrepoMove", vec! [
+            crule_styled_as ("homeSkgrepoMove_skgrepo", "old", vec! [
               s ("-"), any (vec! [ RuleChild::It ]) ]),
-            crule_styled_as ("homeMove_skgrepo", "new", vec! [
+            crule_styled_as ("homeSkgrepoMove_skgrepo", "new", vec! [
               s ("+"), any (vec! [ RuleChild::It ]) ]) ]),
           crule ("movedLikeAncestor", vec! [
             any (vec! [ s ("Δ⌂="), RuleChild::It ]) ]) ]),
@@ -755,12 +755,12 @@ fn viewstats_atoms () -> Vec<&'static str> {
       overridesHere : _,    // keyed form (a viewStats sub-form)
       omitted_body : _,      // -> the node-level omittedBody atom
       relRepo : _,       // -> the relRepo display-fact atom and herald
-      home_skgrepo_move : _,   // -> the homeMove atom
+      home_skgrepo_move : _,   // -> the homeSkgrepoMove atom
       moved_like_ancestor : _, // -> the movedLikeAncestor atom
     } = v; }
   let _ = guard;
   vec! [ "cycle", "homeRepoHerald", "overridesHere", "relRepo",
-         "homeMove", "movedLikeAncestor" ] }
+         "homeSkgrepoMove", "movedLikeAncestor" ] }
 
 /// AffectsParent values the serializer can emit (True stays implicit).
 fn affectsParent_emitted_atoms () -> Vec<&'static str> {
@@ -813,7 +813,7 @@ fn property_and_folder_atoms () -> Vec<&'static str> {
           => () }}
     let _ = property_guard;
     [ "alias", "id", "flag", "removedAlias", "removedID", "oldText", "bodyDiff",
-      "homeMove", "relRepoMove", "changesetMarker" ] };
+      "homeSkgrepoMove", "relRepoMove", "changesetMarker" ] };
   // The arguments the diff view's properties take in match
   // position (org_to_text.rs's 'property_metadata_to_string').
   let property_argument_atoms : Vec<&'static str> =

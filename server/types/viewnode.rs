@@ -742,7 +742,7 @@ impl Property {
       Property::RemovedID { .. }       => "removedID",
       Property::OldText { .. }         => "oldText",
       Property::BodyDiff { .. }        => "bodyDiff",
-      Property::HomeSkgrepoMove { .. } => "homeMove",
+      Property::HomeSkgrepoMove { .. } => "homeSkgrepoMove",
       Property::RelRepoMove { .. }     => "relRepoMove",
       Property::ChangesetMarker { .. } => "changesetMarker",
     } }

@@ -203,7 +203,7 @@ fn a_confirmed_resend_commits_and_redraws_the_open_buffers (
       . map ( |line| root_id (line) ) . collect ();
     assert_eq! ( roots_after, roots, "the roots remain:\n{}", content );
     for fact in [ "(diff ", "changed)", "changesetMarker", "oldText",
-                  "historical", "homeMove", "(ready" ] {
+                  "historical", "homeSkgrepoMove", "(ready" ] {
       assert! ( ! content . contains (fact),
                 "no change fact {:?} remains:\n{}", fact, content ); }
     assert! ( f . views_state . open_views . views

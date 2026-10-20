@@ -481,7 +481,7 @@ fn validate_skgrepo_move (
   let is_home_move : bool =
     tree . get (treeid) . is_some_and ( |n| matches! ( &n . value () . kind,
       MpViewnodeKind::Property (Property::HomeSkgrepoMove { .. }) ));
-  let label : &str = if is_home_move { "homeMove" } else { "relRepoMove" };
+  let label : &str = if is_home_move { "homeSkgrepoMove" } else { "relRepoMove" };
   if !generation_exists_and_includes(
     tree, treeid, -1, false,
     |node| matches!(&node . kind, MpViewnodeKind::Vognode (_)))

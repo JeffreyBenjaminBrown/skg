@@ -416,7 +416,7 @@ fn unrestrictedVognode_metadata_to_string (
       if let Some ((old, new)) =
         &unrestrictedVognode . viewStats . home_skgrepo_move {
         parts . push ( format! (
-          "(homeMove (old {}) (new {}))",
+          "(homeSkgrepoMove (old {}) (new {}))",
           metadata_value_atom (old), metadata_value_atom (new) )); }
       if let Some (letter) =
         &unrestrictedVognode . viewStats . moved_like_ancestor {

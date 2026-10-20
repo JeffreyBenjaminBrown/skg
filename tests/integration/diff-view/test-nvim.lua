@@ -75,7 +75,7 @@ do
   local text = T.buffer_text(all_changes)
   for _, expected in ipairs({
       '(oldText title)',                    -- t's text edit
-      '(homeMove (old alpha) (new beta))',  -- m's move
+      '(homeSkgrepoMove (old alpha) (new beta))',  -- m's move
       '(historical (id d)',                 -- d's deletion
       'acquiredFolder' }) do                -- x's nodeMerge
     T.check(text:find(expected, 1, true) ~= nil,
@@ -139,7 +139,7 @@ T.check(T.wait_for(function ()
     local text = T.buffer_text(buf)
     if not text:find('^%* ') then return nil end
     for _, change in ipairs({ '(diff ', 'changed)', 'changesetMarker',
-                              'oldText', 'homeMove', 'acquiredFolder' }) do
+                              'oldText', 'homeSkgrepoMove', 'acquiredFolder' }) do
       if text:find(change, 1, true) then return nil end
     end
   end

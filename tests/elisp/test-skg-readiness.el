@@ -100,28 +100,28 @@ without a title ends in a space, as 'skg-format-headline' writes it."
 
 (ert-deftest test-skg-mark-gnode-skgrepo-changes-commitReady ()
   (let ((lines '("* (skg (node (id a) (repo b))) a"
-                 "** (skg (homeMove (old x) (new b)))"
+                 "** (skg (homeSkgrepoMove (old x) (new b)))"
                  "** (skg (node (id c) (repo b) writeProtected)) c"
-                 "*** (skg (homeMove (old x) (new b)))"
+                 "*** (skg (homeSkgrepoMove (old x) (new b)))"
                  "** (skg (node (id e) (repo b))) e"
-                 "*** (skg (homeMove (old y) (new b)))")))
+                 "*** (skg (homeSkgrepoMove (old y) (new b)))")))
     (should (equal (test-skg-readiness--run
                     lines 1 #'skg-mark-gnode-skgrepo-changes-commitReady)
                    '("* (skg (node (id a) (repo b))) a"
-                     "** (skg (homeMove (old x) (new b)) (readyRequest)) "
+                     "** (skg (homeSkgrepoMove (old x) (new b)) (readyRequest)) "
                      "** (skg (node (id c) (repo b) writeProtected)) c"
-                     "*** (skg (homeMove (old x) (new b)))"
+                     "*** (skg (homeSkgrepoMove (old x) (new b)))"
                      "** (skg (node (id e) (repo b))) e"
-                     "*** (skg (homeMove (old y) (new b)))")))
+                     "*** (skg (homeSkgrepoMove (old y) (new b)))")))
     ;; Recursively: only the moves between the same two skgrepos.
     (should (equal (test-skg-readiness--run
                     lines 1 #'skg-mark-gnode-skgrepo-changes-commitReady '(4))
                    '("* (skg (node (id a) (repo b))) a"
-                     "** (skg (homeMove (old x) (new b)) (readyRequest)) "
+                     "** (skg (homeSkgrepoMove (old x) (new b)) (readyRequest)) "
                      "** (skg (node (id c) (repo b) writeProtected)) c"
-                     "*** (skg (homeMove (old x) (new b)) (readyRequest)) "
+                     "*** (skg (homeSkgrepoMove (old x) (new b)) (readyRequest)) "
                      "** (skg (node (id e) (repo b))) e"
-                     "*** (skg (homeMove (old y) (new b)))")))))
+                     "*** (skg (homeSkgrepoMove (old y) (new b)))")))))
 
 (ert-deftest test-skg-readiness-a-single-leaf-unmark-asks-nothing ()
   ;; The folder's one leaf is its only unmark: nothing is asked.
@@ -155,26 +155,26 @@ without a title ends in a space, as 'skg-format-headline' writes it."
 
 (ert-deftest test-skg-mark-gnode-skgrepo-changes-commitReady-unmarks ()
   (let ((lines '("* (skg (node (id a) (repo b))) a"
-                 "** (skg (homeMove (old x) (new b)) (ready))"
+                 "** (skg (homeSkgrepoMove (old x) (new b)) (ready))"
                  "** (skg (node (id c) (repo b) writeProtected)) c"
-                 "*** (skg (homeMove (old x) (new b)) (ready))")))
+                 "*** (skg (homeSkgrepoMove (old x) (new b)) (ready))")))
     ;; One move, from the node or the move: nothing is asked.
     (dolist (line-number '(1 2))
       (should (equal (test-skg-readiness--run
                       lines line-number
                       #'skg-mark-gnode-skgrepo-changes-commitReady)
                      '("* (skg (node (id a) (repo b))) a"
-                       "** (skg (homeMove (old x) (new b)) (ready) (unreadyRequest)) "
+                       "** (skg (homeSkgrepoMove (old x) (new b)) (ready) (unreadyRequest)) "
                        "** (skg (node (id c) (repo b) writeProtected)) c"
-                       "*** (skg (homeMove (old x) (new b)) (ready))"))))
+                       "*** (skg (homeSkgrepoMove (old x) (new b)) (ready))"))))
     ;; Recursively, two moves: asked first.
     (should (equal (test-skg-readiness--run
                     lines 1 #'skg-mark-gnode-skgrepo-changes-commitReady
                     '(4) nil 'yes)
                    '("* (skg (node (id a) (repo b))) a"
-                     "** (skg (homeMove (old x) (new b)) (ready) (unreadyRequest)) "
+                     "** (skg (homeSkgrepoMove (old x) (new b)) (ready) (unreadyRequest)) "
                      "** (skg (node (id c) (repo b) writeProtected)) c"
-                     "*** (skg (homeMove (old x) (new b)) (ready) (unreadyRequest)) ")))))
+                     "*** (skg (homeSkgrepoMove (old x) (new b)) (ready) (unreadyRequest)) ")))))
 
 (ert-deftest test-skg-readiness-summary-is-shown-after-a-save ()
   (let ((shown '()))

@@ -82,7 +82,7 @@ fn skgrepo_moves_round_trip () {
     property ( Property::HomeSkgrepoMove {
       old : SkgrepoName::from ("pub"), new : SkgrepoName::from ("priv"),
       change_facts : ready (&[]), readiness_request : None } ),
-    "(homeMove (old pub) (new priv)) (ready)" );
+    "(homeSkgrepoMove (old pub) (new priv)) (ready)" );
   assert_round_trip (
     property ( Property::RelRepoMove {
       old : SkgrepoName::from ("pub"), new : SkgrepoName::from ("a repo"),
@@ -145,8 +145,8 @@ fn malformed_diff_view_metadata_is_refused () {
     "(skg (oldText))",                               // no aspect
     "(skg (oldText title body))",                    // two aspects
     "(skg (oldText sideways))",
-    "(skg (homeMove (old a)))",                      // no new
-    "(skg (homeMove (old a) (old b) (new c)))",      // old twice
+    "(skg (homeSkgrepoMove (old a)))",                      // no new
+    "(skg (homeSkgrepoMove (old a) (old b) (new c)))",      // old twice
     "(skg (relRepoMove a b))",                       // bare names
     "(skg (changesetMarker sideways))",
     "(skg bodyDiff (ready))", ] {                    // a body diff is no leaf

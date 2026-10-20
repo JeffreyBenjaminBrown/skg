@@ -172,7 +172,7 @@ fn home_and_relRepo_moves_are_drawn (
   let buffer : String = kinds_buffer () ?;
   assert_lines_in_order ( &buffer, &[
     "* (skg (node (id mv) (repo private)",
-    "** (skg (homeMove (old public) (new private)))" ] );
+    "** (skg (homeSkgrepoMove (old public) (new private)))" ] );
   assert_lines_in_order ( &buffer, &[
     "* (skg (node (id rr)",
     "** (skg (changesetMarker relRepo))",

@@ -25,7 +25,7 @@
 (defconst skg--readiness-vognode-kinds '(node deleted unknown historical)
   "The metadata forms that hold a vognode's or phantom's change facts.")
 
-(defconst skg--readiness-property-heads '(oldText homeMove relRepoMove)
+(defconst skg--readiness-property-heads '(oldText homeSkgrepoMove relRepoMove)
   "The heads of the properties that name one leaf without a diff fact.")
 
 (defconst skg--readiness-wide-unmark-question
@@ -155,7 +155,7 @@ node, whose readiness is not drawn."
 
 (defun skg--readiness-home-move (metadata-sexp)
   "The (OLD NEW) skgrepos of METADATA-SEXP when it is a home move."
-  (let ((move (assq 'homeMove (cdr metadata-sexp))))
+  (let ((move (assq 'homeSkgrepoMove (cdr metadata-sexp))))
     (when move
       (list (cadr (assq 'old (cdr move)))
             (cadr (assq 'new (cdr move)))))))

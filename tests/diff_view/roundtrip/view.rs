@@ -200,7 +200,7 @@ fn a_buffer_of_the_new_viewnodes_saves_back_unchanged (
       "(diff rel-))) kept", // a surviving member under gone
       "(unknown (id ghost) (diff rel-))",
       "(oldText titleAndBody)", "bodyDiff",
-      "(homeMove (old main) (new elsewhere))",
+      "(homeSkgrepoMove (old main) (new elsewhere))",
       "(relRepoMove (old main) (new elsewhere))",
       "(changesetMarker content)", "(changesetMarker relRepo)",
       "(changesetMarker orderOnly)",

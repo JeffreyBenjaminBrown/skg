@@ -76,7 +76,7 @@
                  (cl-some (lambda (n) (string-match-p "skgrepo changes" n)) names))
       (test-fail "Expected the merges and skgrepo-changes buffers, got %S" names))
     (dolist (expected '("(oldText title)"        ; t's text edit
-                        "(homeMove (old alpha) (new beta))" ; m's move
+                        "(homeSkgrepoMove (old alpha) (new beta))" ; m's move
                         "(historical (id d)"     ; d's deletion
                         "acquiredFolder"))       ; x's nodeMerge
       (unless (string-match-p (regexp-quote expected) all-changes)
@@ -148,7 +148,7 @@
                          (let ((text (with-current-buffer b (buffer-string))))
                            (and (string-match-p "^\\* " text)
                                 (not (string-match-p
-                                      "(diff \\|changed)\\|changesetMarker\\|oldText\\|homeMove\\|acquiredFolder"
+                                      "(diff \\|changed)\\|changesetMarker\\|oldText\\|homeSkgrepoMove\\|acquiredFolder"
                                       text)))))
                        (diff-view-buffers)))
            10)

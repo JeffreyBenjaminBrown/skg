@@ -16,7 +16,7 @@ local M = {}
 
 local VOGNODE_KINDS = { node = true, deleted = true, unknown = true,
                         historical = true }
-local PROPERTY_HEADS = { oldText = true, homeMove = true,
+local PROPERTY_HEADS = { oldText = true, homeSkgrepoMove = true,
                          relRepoMove = true }
 
 -- ── reading a headline's change facts ──────────────────────────────
@@ -148,7 +148,7 @@ end
 function M.home_move (metadata_sexp)
   for i = 2, #metadata_sexp do
     local move = metadata_sexp[i]
-    if head_name(move) == 'homeMove' then
+    if head_name(move) == 'homeSkgrepoMove' then
       local pair = {}
       for j = 2, #move do
         pair[head_name(move[j])] = arguments(move[j])[1] end

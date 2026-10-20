@@ -110,26 +110,26 @@ describe('skg.readiness', function ()
   it('marks home moves, recursively only those like the first', function ()
     local lines = {
       '* (skg (node (id a) (repo b))) a',
-      '** (skg (homeMove (old x) (new b)))',
+      '** (skg (homeSkgrepoMove (old x) (new b)))',
       '** (skg (node (id c) (repo b) writeProtected)) c',
-      '*** (skg (homeMove (old x) (new b)))',
+      '*** (skg (homeSkgrepoMove (old x) (new b)))',
       '** (skg (node (id e) (repo b))) e',
-      '*** (skg (homeMove (old y) (new b)))' }
+      '*** (skg (homeSkgrepoMove (old y) (new b)))' }
     assert.are.same({
       '* (skg (node (id a) (repo b))) a',
-      '** (skg (homeMove (old x) (new b)) (readyRequest)) ',
+      '** (skg (homeSkgrepoMove (old x) (new b)) (readyRequest)) ',
       '** (skg (node (id c) (repo b) writeProtected)) c',
-      '*** (skg (homeMove (old x) (new b)))',
+      '*** (skg (homeSkgrepoMove (old x) (new b)))',
       '** (skg (node (id e) (repo b))) e',
-      '*** (skg (homeMove (old y) (new b)))' },
+      '*** (skg (homeSkgrepoMove (old y) (new b)))' },
       run(lines, 1, readiness.mark_gnode_skgrepo_changes_commitReady))
     assert.are.same({
       '* (skg (node (id a) (repo b))) a',
-      '** (skg (homeMove (old x) (new b)) (readyRequest)) ',
+      '** (skg (homeSkgrepoMove (old x) (new b)) (readyRequest)) ',
       '** (skg (node (id c) (repo b) writeProtected)) c',
-      '*** (skg (homeMove (old x) (new b)) (readyRequest)) ',
+      '*** (skg (homeSkgrepoMove (old x) (new b)) (readyRequest)) ',
       '** (skg (node (id e) (repo b))) e',
-      '*** (skg (homeMove (old y) (new b)))' },
+      '*** (skg (homeSkgrepoMove (old y) (new b)))' },
       run(lines, 1,
           readiness.mark_gnode_skgrepo_changes_commitReady_recursive))
   end)
@@ -165,23 +165,23 @@ describe('skg.readiness', function ()
   it('unmarks a ready home move, asking only for several', function ()
     local lines = {
       '* (skg (node (id a) (repo b))) a',
-      '** (skg (homeMove (old x) (new b)) (ready))',
+      '** (skg (homeSkgrepoMove (old x) (new b)) (ready))',
       '** (skg (node (id c) (repo b) writeProtected)) c',
-      '*** (skg (homeMove (old x) (new b)) (ready))' }
+      '*** (skg (homeSkgrepoMove (old x) (new b)) (ready))' }
     for _, line_number in ipairs({ 1, 2 }) do
       assert.are.same({
         '* (skg (node (id a) (repo b))) a',
-        '** (skg (homeMove (old x) (new b)) (ready) (unreadyRequest)) ',
+        '** (skg (homeSkgrepoMove (old x) (new b)) (ready) (unreadyRequest)) ',
         '** (skg (node (id c) (repo b) writeProtected)) c',
-        '*** (skg (homeMove (old x) (new b)) (ready))' },
+        '*** (skg (homeSkgrepoMove (old x) (new b)) (ready))' },
         run(lines, line_number,
             readiness.mark_gnode_skgrepo_changes_commitReady))
     end
     assert.are.same({
       '* (skg (node (id a) (repo b))) a',
-      '** (skg (homeMove (old x) (new b)) (ready) (unreadyRequest)) ',
+      '** (skg (homeSkgrepoMove (old x) (new b)) (ready) (unreadyRequest)) ',
       '** (skg (node (id c) (repo b) writeProtected)) c',
-      '*** (skg (homeMove (old x) (new b)) (ready) (unreadyRequest)) ' },
+      '*** (skg (homeSkgrepoMove (old x) (new b)) (ready) (unreadyRequest)) ' },
       run(lines, 1,
           readiness.mark_gnode_skgrepo_changes_commitReady_recursive,
           nil, 'yes'))
