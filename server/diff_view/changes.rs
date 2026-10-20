@@ -29,7 +29,9 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   NodeRelation, RelationRole};
-use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner, Presence};
+use crate::graph_straddle::types::{GraphStraddle, Partner, Presence};
+use crate::diff_view::change_leaves::{
+  ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};
 use crate::diff_view::pcsvf::{PcsvfSets, DiffViewSource};
 use crate::diff_view::change_viewnodes::{
   append_acquired_folder, append_historical_phantom_content, append_old_text,
@@ -71,6 +73,61 @@ const OUT_FOLDERS : [PartnerFolder; 3] = [
   PartnerFolder::Subscribee, PartnerFolder::Overridden,
   PartnerFolder::Hidden ];
 
+/// What the change leaves that mention a node say changed about it,
+/// grouped by aspect: what the per-visit step draws ahead of its
+/// content and as its changed partner folders. A new aspect of a leaf
+/// is added here once, and C, the drawing and readiness follow.
+#[derive(Debug, Default)]
+struct ChangedAspects {
+  text         : bool,
+  home_skgrepo : bool,
+  aliases      : bool,
+  extra_ids    : bool,
+  flags        : bool,
+  /// The relations of the relationships the node records that were
+  /// added or removed (existence) or moved (relRepo).
+  recorded     : HashSet<(NodeRelation, RelationshipAspect)>,
+  /// The relations by which a recorder gained or lost the node.
+  recorders    : HashSet<NodeRelation>,
+  /// Mentions are no leaves; see 'ChangeLeaves::mentioner_sets_changed'.
+  mentioners   : bool,
+}
+
+impl ChangedAspects {
+  fn of_node (
+    leaves : &ChangeLeaves,
+    pid    : &ID,
+  ) -> ChangedAspects {
+    let mut aspects : ChangedAspects = ChangedAspects {
+      mentioners : leaves . mentioner_sets_changed () . contains (pid),
+      .. ChangedAspects::default () };
+    for leaf in leaves . leaves_under (pid) {
+      match &leaf . key {
+        LeafKey::Node { aspect, .. } => match aspect {
+          NodeAspect::Existence    => {},
+          NodeAspect::Text         => aspects . text         = true,
+          NodeAspect::HomeSkgrepo  => aspects . home_skgrepo = true,
+          NodeAspect::Alias (_)    => aspects . aliases      = true,
+          NodeAspect::ExtraId (_)  => aspects . extra_ids    = true,
+          NodeAspect::Flag (_)     => aspects . flags        = true, },
+        LeafKey::Relationship { relationship, aspect } => {
+          aspects . recorded . insert (( relationship . relation, *aspect )); }, }}
+    for leaf in leaves . leaves_naming_member (pid) {
+      if let LeafKey::Relationship {
+        relationship, aspect : RelationshipAspect::Existence } = &leaf . key {
+        aspects . recorders . insert ( relationship . relation ); }}
+    aspects }
+
+  /// Whether a recorded relationship of this relation changed in this
+  /// aspect.
+  fn recorded_changed (
+    &self,
+    relation : NodeRelation,
+    aspect   : RelationshipAspect,
+  ) -> bool {
+    self . recorded . contains (&( relation, aspect )) }
+}
+
 /// See the module comment. 'created_in_this_completion' is whether
 /// view completion created the viewnode at 'treeid': only then does
 /// its body's fold state come from C. 'editable_before_completion'
@@ -106,8 +163,11 @@ pub(crate) fn process_unrestrictedVognode_changes (
     tree, treeid, straddle, &content,
     Some (( &sets . u, editable_before_completion )) ) ?;
   reconcile_removed_content_members (tree, treeid, straddle, &pid) ?;
+  let aspects : ChangedAspects = // read only for a node in C
+    if in_c { ChangedAspects::of_node (straddle . change_leaves (), &pid) }
+    else { ChangedAspects::default () };
   let fresh : Tree<Viewnode> = fresh_front_change_viewnodes (
-    straddle, &pid, &content, in_c,
+    straddle, &pid, &aspects, in_c,
     drawing . diffView_buffer_kind == DiffViewBufferKind::OrderOnlyChanges
       && straddle . order_only_pids () . contains (&pid) );
   let fronts : Vec<NodeId> = reconcile_children_with_fresh_drawing (
@@ -115,7 +175,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
     &is_front_change_viewnode,
     &|viewnode| ! matches! ( viewnode . kind, ViewnodeKind::Vognode (_) )) ?;
   let partner_folders : Vec<NodeId> =
-    if in_c { changed_partner_folders (tree, treeid, straddle, &pid) }
+    if in_c { changed_partner_folders (tree, treeid, &aspects) }
     else { Vec::new () };
   let is_marker = |treeid : &NodeId| -> bool {
     matches! ( tree . get (*treeid) . unwrap () . value () . kind,
@@ -342,27 +402,32 @@ fn detach_change_viewnodes (
 /// The fresh drawing of what an editable node holds ahead of its
 /// content, in order, partner folders aside: for a node in C, its old
 /// text, its home move, its "it acquired" folder, its alias, ID and
-/// flags folders that changed, and its content and relRepo markers;
-/// then, in the order-only buffer, its order-only marker.
+/// flags folders that changed, and its content and relRepo markers,
+/// each as 'aspects' says; then, in the order-only buffer, its
+/// order-only marker.
 fn fresh_front_change_viewnodes (
   straddle   : &GraphStraddle,
   pid        : &ID,
-  content    : &[Partner],
+  aspects    : &ChangedAspects,
   in_c       : bool,
   order_only : bool,
 ) -> Tree<Viewnode> {
   let mut fresh : Tree<Viewnode> = Tree::new (fresh_root ());
   let root : NodeId = fresh . root () . id ();
   if in_c {
-    append_old_text (&mut fresh, root, straddle, pid);
-    if let Some (home_move) = mk_home_move_viewnode (straddle, pid) {
-      append (&mut fresh, root, home_move); }
+    if aspects . text {
+      append_old_text (&mut fresh, root, straddle, pid); }
+    if aspects . home_skgrepo {
+      if let Some (home_move) = mk_home_move_viewnode (straddle, pid) {
+        append (&mut fresh, root, home_move); }}
     append_acquired_folder (&mut fresh, root, straddle, pid);
-    append_changed_property_folders (&mut fresh, root, straddle, pid);
-    if content . iter () . any ( |partner| partner . presence != Presence::Both ) {
+    append_changed_property_folders (&mut fresh, root, straddle, pid, aspects);
+    if aspects . recorded_changed (
+      NodeRelation::Contains, RelationshipAspect::Existence ) {
       append ( &mut fresh, root,
         mk_changeset_marker_viewnode (ChangesetMarkerKind::Content) ); }
-    if content . iter () . any ( |partner| partner . relRepo_moved () ) {
+    if aspects . recorded_changed (
+      NodeRelation::Contains, RelationshipAspect::RelRepo ) {
       append ( &mut fresh, root,
         mk_changeset_marker_viewnode (ChangesetMarkerKind::RelRepo) ); }}
   if order_only {
@@ -376,19 +441,21 @@ fn fresh_front_change_viewnodes (
 /// (changed when one was added, removed or moved to another skgrepo).
 /// The view completion's visit of each fills it from the straddle.
 fn changed_partner_folders (
-  tree     : &mut Tree<Viewnode>,
-  treeid   : NodeId,
-  straddle : &GraphStraddle,
-  pid      : &ID,
+  tree    : &mut Tree<Viewnode>,
+  treeid  : NodeId,
+  aspects : &ChangedAspects,
 ) -> Vec<NodeId> {
   let mut folders : Vec<NodeId> = Vec::new ();
   for kind in IN_FOLDERS . into_iter () . chain (OUT_FOLDERS) {
-    let role : RelationRole = kind . relation_member_role ()
-      . expect ("a relation folder has a member role");
-    let outbound : bool = OUT_FOLDERS . contains (&kind);
-    if straddle . partners (pid, role) . iter () . any ( |partner|
-      if outbound { partner . changed () }
-      else { partner . presence != Presence::Both } ) {
+    let relation : NodeRelation = kind . relation_member_role ()
+      . expect ("a relation folder has a member role") . relation;
+    let changed : bool =
+      if OUT_FOLDERS . contains (&kind) {
+        aspects . recorded_changed (relation, RelationshipAspect::Existence)
+        || aspects . recorded_changed (relation, RelationshipAspect::RelRepo) }
+      else if relation == NodeRelation::LinksTo { aspects . mentioners }
+      else { aspects . recorders . contains (&relation) };
+    if changed {
       folders . push ( child_folder_or_new (tree, treeid, kind) ); }}
   folders }
 
@@ -579,20 +646,21 @@ fn interleaved_diff_without_reorders<T : Clone + Eq + Hash + Ord> (
     . collect () }
 
 /// Under 'treeid', the node's alias, ID and flags folders, those whose
-/// list changed, each holding the union of the list: the old order where the LCS
-/// puts a removed entry, + on a gained entry, - on a lost one. A lost
-/// alias or ID is a 'Property::RemovedAlias' or 'Property::RemovedID'.
+/// list changed ('aspects'), each holding the union of the list: the
+/// old order where the LCS puts a removed entry, + on a gained entry,
+/// - on a lost one. A lost alias or ID is a 'Property::RemovedAlias'
+/// or 'Property::RemovedID'.
 fn append_changed_property_folders (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
   straddle : &GraphStraddle,
   pid      : &ID,
+  aspects  : &ChangedAspects,
 ) {
-  let changes : NodeChanges = straddle . node_changes (pid);
   let (Some (before), Some (after)) =
     ( straddle . before . get (pid), straddle . after . get (pid) ) else {
       return; };
-  if ! changes . aliases_gained . is_empty () || ! changes . aliases_lost . is_empty () {
+  if aspects . aliases {
     append_property_folder (
       tree, treeid, PropertyFolder::Alias,
       signed_union ( &before . alias_texts (), &after . alias_texts () )
@@ -604,7 +672,7 @@ fn append_changed_property_folders (
           text, relRepo : None, relRepo_request : None,
           change_facts : facts_of_entry (sign), readiness_request : None }, } )
       . collect () ); }
-  if ! changes . extra_ids_gained . is_empty () || ! changes . extra_ids_lost . is_empty () {
+  if aspects . extra_ids {
     let ids = |node : &GraphnodeInRust| -> Vec<ID> {
       std::iter::once ( pid . clone () )
         . chain ( node . extra_ids . iter () . cloned () ) . collect () };
@@ -617,16 +685,18 @@ fn append_changed_property_folders (
         _ => Property::ID {
           skgid, change_facts : facts_of_entry (sign), readiness_request : None }, } )
       . collect () ); }
-  if ! changes . flags_gained . is_empty () || ! changes . flags_lost . is_empty () {
+  if aspects . flags {
     append_property_folder (
       tree, treeid, PropertyFolder::flags (),
       Flag::ALL . into_iter ()
       . filter_map ( |flag| {
         let sign : Option<Sign> =
-          if changes . flags_gained . contains (&flag) { Some (Sign::Plus) }
-          else if changes . flags_lost . contains (&flag) { Some (Sign::Minus) }
-          else if after . flags . contains (&flag) { None }
-          else { return None; };
+          match ( before . flags . contains (&flag),
+                  after  . flags . contains (&flag) ) {
+            (false, true)  => Some (Sign::Plus),
+            (true,  false) => Some (Sign::Minus),
+            (true,  true)  => None,
+            (false, false) => return None, };
         Some ( Property::Flag {
           flag, title : String::new (), body : None,
           change_facts : facts_of_entry (sign), readiness_request : None } ) } )

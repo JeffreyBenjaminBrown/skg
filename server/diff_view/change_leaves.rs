@@ -137,6 +137,8 @@ pub struct ChangeLeaves {
   leaves_by_recorder    : BTreeMap<ID, Vec<ChangeLeaf>>,
   /// Where each leaf is in 'leaves_by_recorder': (recorder, position).
   index                 : HashMap<LeafKey, (ID, usize)>,
+  /// Where the relationship leaves naming each member are.
+  index_by_member       : HashMap<ID, Vec<(ID, usize)>>,
   order_only_pids       : BTreeSet<ID>,
   order_only_files      : BTreeSet<ChangedFile>,
   foreign_changed_files : usize,
@@ -174,6 +176,15 @@ impl ChangeLeaves {
           move |(position, leaf)|
           ( leaf . key . clone (), (recorder . clone (), position) )) )
       . collect ();
+    let index_by_member : HashMap<ID, Vec<(ID, usize)>> = {
+      let mut index_by_member : HashMap<ID, Vec<(ID, usize)>> =
+        HashMap::new ();
+      for (recorder, leaves) in &leaves_by_recorder {
+        for (position, leaf) in leaves . iter () . enumerate () {
+          if let LeafKey::Relationship { relationship, .. } = &leaf . key {
+            index_by_member . entry ( relationship . member . clone () )
+              . or_default () . push (( recorder . clone (), position )); }} }
+      index_by_member };
     let order_only_pids : BTreeSet<ID> =
       differing . into_iter ()
       . filter ( |pid|
@@ -193,7 +204,7 @@ impl ChangeLeaves {
       . filter ( |partner| partner . presence != Presence::Both )
       . map ( |partner| partner . id )
       . collect ();
-    ChangeLeaves { leaves_by_recorder, index, order_only_pids,
+    ChangeLeaves { leaves_by_recorder, index, index_by_member, order_only_pids,
                    order_only_files,
                    foreign_changed_files : straddle . foreign_changed_files,
                    mentioner_sets_changed } }
@@ -228,6 +239,15 @@ impl ChangeLeaves {
     self . leaves_by_recorder . get (pid)
       . map ( |leaves| leaves . as_slice () )
       . unwrap_or (&[]) }
+
+  /// The relationship leaves whose member is 'pid'.
+  pub fn leaves_naming_member (
+    &self,
+    pid : &ID,
+  ) -> impl Iterator<Item = &ChangeLeaf> {
+    self . index_by_member . get (pid) . into_iter () . flatten ()
+      . filter_map ( |(recorder, position)|
+        self . leaves_by_recorder . get (recorder) ? . get (*position) ) }
 
   /// The members of the relationship leaves whose relationship
   /// exists in one graph only.

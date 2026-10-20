@@ -2037,3 +2037,55 @@ isolated server: the four buffers carry the facts, "all changes"
 saved unchanged reopens identical, and a save with
 '(readyRequest)' added after an old text's '(leaves 1)' marks it
 ('(ready) (leaves 1)', summary "(ready 1) (changed 12)").
+** Slice 13: deviations
+*** mentions stay in C's in-half
+The plan derives the in-half from relationship leaves only, but its
+definition of C (and the code before this slice) counts a node whose
+set of mentioners changed, and the per-visit step draws a mentioner
+folder for it. A mention is no leaf. So the builder also keeps
+'ChangeLeaves::mentioner_sets_changed', the nodes its recorders
+mention in one graph only (computed from the recorders, as the old
+in-half was), and both C and the mentioner folder read it. Without
+it, adding a link to T would no longer put T in C nor draw its
+mentioner folder. The test 'a_newly_mentioned_node_is_in_changed'
+('tests/graph_straddle.rs') holds it; the plan's test on the
+'tests/pcsvf/' fixtures asserts the set is empty there (no fixture
+changes a mention) and then checks the plan's equality exactly.
+*** what the per-visit step reads from the leaves
+'ChangedAspects' ('server/diff_view/changes.rs') gathers, from the
+leaves a node records and the relationship leaves naming it as
+member ('ChangeLeaves::leaves_naming_member', a new index), which of
+its aspects changed. It decides the old text, the home skgrepo move,
+the alias, ID and flags folders, the content and relRepo markers and
+the partner folders. 'append_old_text' and 'mk_home_move_viewnode'
+compare the two nodes directly instead of building 'NodeChanges'. The
+"it acquired" folder still reads 'acquirees_of': an acquirer created
+since HEAD has only an existence leaf, so no leaf names its
+acquirees. The member tagging ('tag_content_members') and the removed
+members still read the content partners, which they draw.
+*** the nodeMerge caveat
+'recorders_of_reresolved_members' ('server/diff_view/change_leaves.rs')
+finds the IDs among the symmetric extra-ID differences of the unequal
+nodes whose relationship-member key differs between the graphs, and
+their recorders through each graph's recorderward relmaps for the
+four listed relations. The test
+'a_nodeMerge_since_head_puts_the_acquirers_container_in_c' fails
+with that function's result discarded.
+*** the performance harness
+'tests/results/perf/tdv_perf.rs' was brought up to date (the retired
+names, 'pcsvf_sets_of_buffer', 'load_config''s pair) before the
+"before" run. Outputs: 'tests/results/hk-slice13/perf-{before,after}-{release,dev}.txt'.
+On the real data (55198 nodes), per simulated straddle, every row
+with the same C, leaves and sets before and after:
+| profile | before: changed_pids + change_leaves | after: changed_pids (leaves included) |
+|---------+--------------------------------------+---------------------------------------|
+| release | 166-179 + 35-46 ms                   | 56-74 ms                              |
+| dev     | 724-863 + 59-104 ms                  | 97-136 ms                             |
+What remains is the scan comparing each node of both graphs for
+equality; it grows only slightly with the number of changes (n=1000
+edits: 60-72 ms release).
+*** verification
+Counts: nextest 833 (three new tests), Emacs 374, Neovim 348, at each
+of the three commits. 'tests/results/hk-slice13/verify.sh' (slice
+12's) gives the same responses as slice 12's run, apart from the
+order of the lock-views lists, which varies from run to run.

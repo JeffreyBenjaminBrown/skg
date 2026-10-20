@@ -96,15 +96,19 @@ buffer's sets -- is computed once per straddle, on first use.
 These sets define the PCSVF ("pruned change-spanning viewforest") a
 buffer draws ('PcsvfSets').
 ** C
-C is the set of changed graphnodes. It has two halves:
-- out-changed: the nodes whose own files record a change -- a new or
-  deleted node, a changed title or body, alias, extra ID, flag or home
-  skgrepo, an added or removed member of its contains, subscribesTo,
-  overrides or hidesFromSubs list, or a moved relRepo of one;
+C is the set of changed graphnodes, read off the change-forest leaves
+(see "Change-forest leaves"). It has two halves:
+- out-changed: the recorders of leaves, the nodes whose own files
+  record a change -- a new or deleted node, a changed title or body,
+  alias, extra ID, flag or home skgrepo, an added or removed member of
+  its contains, subscribesTo, overrides or hidesFromSubs list, or a
+  moved relRepo of one;
 - in-changed: the nodes whose set of containers, mentioners,
-  subscribers, overriders or hiders changed, found from the first
-  half: every partner of an out-changed node whose relationship
-  exists in one graph only.
+  subscribers, overriders or hiders changed: every member of a
+  relationship leaf whose relationship exists in one graph only, and
+  every node a recorder mentions in one graph only (a mention is no
+  leaf: it changes with its mentioner's text, the mentioner's leaf),
+  when that node exists in either graph.
 A relRepo move puts only the recorder in C. A change of order alone
 puts nothing in C.
 ** R and U
@@ -168,6 +172,14 @@ viewnodes:
   folders whose list changed, the partner folders whose membership
   changed, and its changeset markers;
 - in the order-only buffer, its order-only marker.
+What it draws for a node in C, it reads from the leaves that mention
+the node (those it records and the relationship leaves naming it as
+member), grouped by aspect ('ChangedAspects' in
+'server/diff_view/changes.rs'); the graphs supply only what each
+viewnode shows, such as the old title. A new aspect of a leaf is
+added in one place, and C, the drawing and readiness follow. The
+mentioner folder alone reads the nodes whose set of mentioners
+changed, since a mention is no leaf.
 A node in U but not in C is context: when completion creates it, its
 body starts folded. A write-protected occurrence gets none of this;
 what an earlier visit drew under it while it was editable goes, and
@@ -345,6 +357,14 @@ relRepo). The recorder of a leaf is the node whose file records it; a
 relationship's leaf lives under its recorder, and seen from either
 end it is the same leaf. A node's existence leaf covers its own
 content when it is new or deleted.
+
+The builder compares only the nodes that one graph lacks or holds
+unequal, and the nodes that list a member whose ID the two graphs
+resolve to different nodes: after a nodeMerge since HEAD, a container
+that still lists the acquiree's ID is equal in both graphs, yet the
+after-graph resolves that ID to the acquirer. Such IDs are among the
+extra-ID differences of the unequal nodes. No other node can record a
+change, so neither the leaves nor C cost a comparison of every node.
 ** Marks, fingerprints and the store
 A mark says that one leaf is commit-ready. The readiness store
 ('server/diff_view/readiness_store.rs') keeps each mark with the fingerprint of

@@ -1067,7 +1067,7 @@ than one and not on a single-leaf headline; the existing gesture tests
 pass. The COMMANDS description of the wide-unmark warning says that
 the count is the server's.
 
-** TODO Slice 13: the change leaves are the one source of "changed"
+** DONE Slice 13: the change leaves are the one source of "changed"
 Make the changes under "The change leaves are the one source of
 "changed"" above. Order: first the leaf builder's prefilter with its
 nodeMerge caveat (keep the full comparison for nodes whose recorded

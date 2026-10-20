@@ -7,7 +7,7 @@
 //! read from the store where they are placed.
 
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner, Presence};
+use crate::graph_straddle::types::{GraphStraddle, Partner, Presence};
 use crate::types::git::Sign;
 use crate::types::misc::{ID, SkgrepoChange};
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -29,20 +29,21 @@ pub fn append_old_text (
   straddle : &GraphStraddle,
   pid      : &ID,
 ) -> Option<NodeId> {
-  let changes : NodeChanges = straddle . node_changes (pid);
-  if ! changes . text_changed () { return None; }
   let (before, after) : (&GraphnodeInRust, &GraphnodeInRust) =
     ( straddle . before . get (pid) ?, straddle . after . get (pid) ? );
+  let title_changed : bool = before . title != after . title;
+  let body_changed  : bool = before . body  != after . body;
+  if ! title_changed && ! body_changed { return None; }
   let old_text : Viewnode = viewnode_of ( ViewnodeKind::Property (
     Property::OldText {
-      title : changes . title_changed . then ( || before . title . clone () ),
-      body  : changes . body_changed
+      title : title_changed . then ( || before . title . clone () ),
+      body  : body_changed
               . then ( || before . body . clone () . unwrap_or_default () ),
       change_facts      : ChangeFacts::default (),
       readiness_request : None } ));
   let old_text_treeid : NodeId =
     tree . get_mut (parent) ? . append (old_text) . id ();
-  if changes . body_changed {
+  if body_changed {
     tree . get_mut (old_text_treeid) ? . append (
       mk_body_diff_viewnode (
         before . body . as_deref (), after . body . as_deref () )); }
@@ -71,11 +72,14 @@ pub fn mk_home_move_viewnode (
   straddle : &GraphStraddle,
   pid      : &ID,
 ) -> Option<Viewnode> {
-  let skgrepo_change : SkgrepoChange =
-    straddle . node_changes (pid) . home ?;
+  let (before, after) : (&GraphnodeInRust, &GraphnodeInRust) =
+    ( straddle . before . get (pid) ?, straddle . after . get (pid) ? );
+  if before . home_skgrepo == after . home_skgrepo { return None; }
   Some ( viewnode_of ( ViewnodeKind::Property (
     Property::HomeSkgrepoMove {
-      skgrepo_change,
+      skgrepo_change : SkgrepoChange {
+        old : before . home_skgrepo . clone (),
+        new : after  . home_skgrepo . clone () },
       change_facts      : ChangeFacts::default (),
       readiness_request : None } )) ) }
 
