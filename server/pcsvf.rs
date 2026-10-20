@@ -378,7 +378,7 @@ pub fn root_skgids_of_buffer (
 /// drawn editable viewnode has it. Completion then draws its content
 /// list. A node of U with no occurrence is reached through the node
 /// above it on its walk, once that one is editable.
-pub fn make_freshU_editable_at_first_occurrences (
+pub fn ensure_editableOccurrences_exist (
   drawing    : TdvDrawing,
   viewforest : &mut ViewForest,
   graph      : &InRustGraph,

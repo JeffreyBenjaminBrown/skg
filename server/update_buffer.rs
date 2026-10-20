@@ -19,7 +19,7 @@ use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::pcsvf::{
   TdvDrawing, append_contentOrigins_to_buffer, contentOrigins_missing_from_buffer,
-  make_freshU_editable_at_first_occurrences, nodes_drawn_in_viewforest,
+  ensure_editableOccurrences_exist, nodes_drawn_in_viewforest,
   root_skgids_of_buffer, set_tdv_facts_in_viewforest};
 use crate::readiness_store::ReadinessStore;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
@@ -534,7 +534,7 @@ pub fn rerender_view (
   if let Some (drawing) = drawing_to_show_unshown_changes {
     // Before any visit, so that a node of U is editable before its
     // parent's visit can see it.
-    make_freshU_editable_at_first_occurrences (
+    ensure_editableOccurrences_exist (
       drawing, viewforest,
       &context . runtime . graph, &context . runtime . config ) ?; }
   { tracing::debug!("rerender_view: starting complete_viewforest");

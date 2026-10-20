@@ -160,8 +160,7 @@ pub enum Phantom {
 /// DISTINCT INFO: unlike PhantomUnknown it knows its `repo`, and unlike either
 /// other phantom it keeps the `title`/`body` it last displayed -- because it was
 /// a fully materialized node right up until the save deleted it, so that text is
-/// still worth showing. (The title is empty for one promoted from a Restricted
-/// node, which carried none.)
+/// still worth showing.
 #[derive( Debug, Clone, PartialEq )]
 pub struct PhantomDeleted {
   pub skgid        : ID,
