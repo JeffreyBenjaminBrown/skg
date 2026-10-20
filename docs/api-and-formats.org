@@ -1300,11 +1300,19 @@ at top level on alias, id and flag leaves, whose single diff object
 is written =rel+= or =rel-=. A lost alias or ID is a =removedAlias= or
 =removedID= leaf (below), whose =rel-= is display only.
 
-*** Readiness: =(ready OBJECTS)=, =(readyRequest OBJECTS)=, =(unreadyRequest OBJECTS)=
+*** Readiness: =(ready OBJECTS)=, =(leaves N OBJECTS)=, =(readyRequest OBJECTS)=, =(unreadyRequest OBJECTS)=
 =(ready OBJECTS)= lists the diff objects (=node=, =rel=) whose
 change-forest leaves are all marked commit-ready; a bare =(ready)=
 marks a single-object leaf, or an aggregate (a folder or changeset
 marker) that is ready. It is absent when nothing is ready.
+=(leaves N OBJECTS)= follows it on every viewnode that names leaves:
+the OBJECTS a request there may name (=node= and/or =rel= on a vognode
+or historical phantom, each worth one leaf; =all= on a changed node
+without a =(diff ...)= fact or on a changeset marker; none where a bare
+request names them), and N, how many leaves a request naming all of
+them touches. The clients read it to build their requests and to
+count the leaves an unmark touches; the server's parser accepts and
+ignores it.
 =(readyRequest OBJECTS)= and =(unreadyRequest OBJECTS)= ask the save
 to set or clear the marks of those leaves; the object =all= names
 every leaf of an aggregate, one level down. These sit where =(diff ...)= sits, and also at top level on the
@@ -1347,13 +1355,13 @@ in a vognode's =(viewStats ...)= in the skgrepo-changes buffer; see
 
 Examples:
 #+begin_example
-(skg (node (id 7) (repo main) (diff node+ rel+) (ready node)))
-(skg (node (id 9) (repo main) (affectsParent false) writeProtected (diff rel-)))
-(skg alias (diff rel+) (readyRequest))
-(skg removedAlias (diff rel-) (ready))
-(skg (historical (id 4) (repo main) (diff node- rel-)))
-(skg (oldText title) (ready))
-(skg (changesetMarker content) (readyRequest all))
+(skg (node (id 7) (repo main) (diff node+ rel+) (ready node) (leaves 2 node rel)))
+(skg (node (id 9) (repo main) (affectsParent false) writeProtected (diff rel-) (leaves 1 rel)))
+(skg alias (diff rel+) (leaves 1) (readyRequest))
+(skg removedAlias (diff rel-) (ready) (leaves 1))
+(skg (historical (id 4) (repo main) (diff node- rel-) (leaves 2 node rel)))
+(skg (oldText title) (ready) (leaves 1))
+(skg (changesetMarker content) (leaves 3 all) (readyRequest all))
 (skg (subscriberFolder changed) (ready))
 #+end_example
 

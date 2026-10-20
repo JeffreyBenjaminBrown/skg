@@ -1982,3 +1982,58 @@ server, saves "all changes" unchanged, reopens them, sends "rerender
 all views", and "integrate unshown changes" for "all changes" and for
 "merges". Its output is byte-identical to that of the binary built
 from the commit before this slice.
+** Slice 12: deviations
+*** which objects each kind lists
+'leaves_fact_at' (beside 'set_ready_facts_in_viewforest') lists
+'node' and 'rel' only on an unrestricted vognode and a historical
+phantom, the two kinds whose '(ready ...)' already names objects. A
+deleted or an unknown phantom gets a bare '(leaves N)', since the
+server reads a bare request on it, and draws its '(ready)', the same
+way. 'all' goes on a vognode that names no leaf on either object but
+whose node records some, and on a changeset marker (content or
+relRepo) whatever its N, decided by 'leaves_named_at' naming an
+aggregate rather than by a count. A folder carries no fact; the
+order-only marker names no leaf and carries none.
+*** below the headline a gesture acts on, no 'all'
+The clients send each headline's listed objects, except that below
+the headline at point (the children of a changed folder, the
+descendants in a recursive gesture, the children read by
+'children-ready-p') a headline that lists 'all' is skipped: its
+leaves are named again by the headlines under it, or are not drawn
+in that subtree (a write-protected occurrence of a changed node).
+This keeps the old reach of the gestures, which never named a
+descendant aggregate node. One visible change: a changeset marker
+below the headline at point used to get a bare request in a
+recursive gesture and now gets none, since its leaves are its
+siblings'. On the marker itself, a gesture writes
+'(readyRequest all)'.
+*** the existing gesture tests carry the fact
+The client gesture tests now give every headline the
+'(leaves ...)' fact the server would draw. Two expectations changed
+with it: the recursive test's changeset marker (above), and the
+"unmarking a changed node asks first" case, whose node now records
+two leaves, because a node with one leaf no longer asks; that
+one-leaf case is now asserted not to ask. Without the fact a
+headline names nothing ("Nothing here can be marked commit-ready").
+A home-move headline without the fact counts one leaf, the only
+fallback.
+*** where the fact sits, and the expected lines
+It is written after '(ready ...)' and before the request. The PCSVF
+tests' expected lines (33 tests in 'tests/pcsvf/') gained it,
+mechanically. The herald table matches it with an empty rule
+('vac'), so it shows nothing, and 'tests/shared/herald-rules.sexp' is
+regenerated.
+*** tests
+The server test is 'a_headline_carries_the_leaves_it_names'
+('tests/pcsvf/readiness.rs'): the kinds fixture has no content
+changeset marker over three relationships, so the test removes ctx
+from ct in the buffer and saves, giving '(leaves 3 all)'. A parser
+test ('the_leaves_fact_renders_and_parses_back_to_nothing') checks
+the rendering and that the fact parses back to nothing.
+*** verification
+Counts: nextest 830, Emacs 374, Neovim 348 successes.
+'tests/results/hk-slice12/verify.sh' (slice 11's, extended) on an
+isolated server: the four buffers carry the facts, "all changes"
+saved unchanged reopens identical, and a save with
+'(readyRequest)' added after an old text's '(leaves 1)' marks it
+('(ready) (leaves 1)', summary "(ready 1) (changed 12)").

@@ -1053,7 +1053,7 @@ steps go. Tests pass unchanged; add one unit test that
 'RerenderOptions' for the post-save case and for the repo-switch case
 carry the values the old calls passed.
 
-** TODO Slice 12: the server says which leaves a headline names
+** DONE Slice 12: the server says which leaves a headline names
 Make the changes under "The server says which leaves a headline names"
 above: the fact written by 'set_ready_facts_in_viewforest' from
 'leaves_named_at'; the parser's acceptance; the API doc's metadata

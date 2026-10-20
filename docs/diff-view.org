@@ -372,7 +372,7 @@ completion ('set_ready_facts_in_viewforest'): the diff objects
 headline that names one leaf, or on a ready aggregate. Nothing reads
 it at save.
 
-(from slice 12 of 13_plan) Beside it, a headline that names leaves
+Beside it, a headline that names leaves
 carries '(leaves N OBJECT...)': N is the number of leaves a request
 naming every listed object would touch, and the OBJECTs are those a
 request on this headline may name ('node' and/or 'rel' on a vognode or
@@ -394,12 +394,16 @@ Every gesture toggles: it unmarks what is ready and marks what is
 not. C-c r r ('skg-cycle-commit-ready') acts on the headline at point:
 one leaf; on a content member with both objects, the one the user
 picks; on an aggregate, its leaves one level down; with a prefix
-argument, every leaf of the subtree. C-c r h
+argument, every leaf of the subtree. A gesture requests the objects
+that '(leaves ...)' lists, except that below the headline it acts on
+it names no 'all': an aggregate's leaves there are named by the
+headlines under it, or are not shown there. C-c r h
 ('skg-toggle-homeSkgrepo-move-commitReady') acts on the home skgrepo
 move of the node at point, and with a prefix argument on every
 descendant whose home moved between the same two skgrepos. Both work
 on write-protected occurrences. A gesture that would unmark more than
-one leaf first asks for a typed "yes".
+one leaf, counting each request's leaves as '(leaves N ...)' does,
+first asks for a typed "yes".
 ** The readiness summary
 After every save of a buffer of the diff view, after C-c r u, and
 before a stage-and-commit that would leave changes behind, the client

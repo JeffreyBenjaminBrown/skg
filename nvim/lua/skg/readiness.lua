@@ -4,9 +4,10 @@
 -- OBJECTS)', into headline metadata, then saves. The save consumes
 -- them, setting or clearing the marks, and answers with the buffer
 -- redrawn and the readiness summary.
--- The Lua port of elisp/skg-readiness.el, which describes which
--- headlines name leaves and which are aggregates. Neovim has no
--- prefix argument, so each recursive form is its own command.
+-- The Lua port of elisp/skg-readiness.el, which describes how the
+-- server's '(leaves N OBJECT...)' fact says which leaves a headline
+-- names. Neovim has no prefix argument, so each recursive form is its
+-- own command.
 -- It also formats the readiness summary, which the save,
 -- stage-and-commit and integrate-unshown-changes show.
 
@@ -17,11 +18,6 @@ local picker = require('skg.picker')
 local sexpr = require('skg.sexpr.parse')
 
 local M = {}
-
-local VOGNODE_KINDS = { node = true, deleted = true, unknown = true,
-                        historical = true }
-local PROPERTY_HEADS = { oldText = true, homeSkgrepoMove = true,
-                         relRepoMove = true }
 
 -- ── reading a headline's change facts ──────────────────────────────
 
@@ -35,20 +31,26 @@ local function head_name (value)
   return nil
 end
 
----The list in METADATA_SEXP that holds its change facts: the kind
----form of a vognode or phantom, else the whole sexp.
+---The list in METADATA_SEXP that holds its change facts: the form
+---among its elements that holds its '(leaves ...)' fact, if one does,
+---else the whole sexp.
 ---@param metadata_sexp any
 ---@return any
 function M.host (metadata_sexp)
   for i = 2, #metadata_sexp do
-    if VOGNODE_KINDS[head_name(metadata_sexp[i]) or ''] then
-      return metadata_sexp[i] end
+    local element = metadata_sexp[i]
+    if sexpr.is_list(element) then
+      for j = 2, #element do
+        if head_name(element[j]) == 'leaves' then return element end
+      end
+    end
   end
   return metadata_sexp
 end
 
 ---@param metadata_sexp any
----@return boolean is it a vognode's or a phantom's?
+---@return boolean does it hold its change facts in a nested form, as
+---a vognode or a phantom does?
 function M.vognode_p (metadata_sexp)
   return M.host(metadata_sexp) ~= metadata_sexp
 end
@@ -79,45 +81,48 @@ local function arguments (form)
   return result
 end
 
----The objects on which the headline with METADATA_SEXP names a leaf: a
----sublist of {'node', 'rel'} for a vognode or phantom, {'single'}
----for a property that names one, {} when it names none.
+---The '(leaves N OBJECT...)' fact of the headline with METADATA_SEXP,
+---as { count = N, objects = OBJECTS }, or nil when it names no leaf.
 ---@param metadata_sexp any
----@return string[]
-function M.leaf_objects (metadata_sexp)
-  local diff = M.form(metadata_sexp, 'diff')
-  if M.vognode_p(metadata_sexp) then
-    local objects = {}
-    for _, object in ipairs({ 'node', 'rel' }) do
-      for _, atom in ipairs(arguments(diff)) do
-        if vim.startswith(atom, object) then
-          table.insert(objects, object) break end
-      end
-    end
-    return objects end
-  if diff then return { 'single' } end
-  for i = 2, #metadata_sexp do
-    local head = head_name(metadata_sexp[i])
-    if PROPERTY_HEADS[head or ''] then return { 'single' } end
-    if head == 'changesetMarker' then
-      local kind = arguments(metadata_sexp[i])[1]
-      if kind == 'content' or kind == 'relRepo' then
-        return { 'single' } end
-    end
-  end
-  return {}
+---@return table|nil
+function M.leaves (metadata_sexp)
+  local form = M.form(metadata_sexp, 'leaves')
+  if not form then return nil end
+  local atoms = arguments(form)
+  return { count = tonumber(atoms[1]) or 0,
+           objects = vim.list_slice(atoms, 2) }
+end
+
+---The same, for a headline below the one a gesture acts on: nil when
+---its objects include 'all'.
+---@param metadata_sexp any
+---@return table|nil
+function M.leaves_below (metadata_sexp)
+  local leaves = M.leaves(metadata_sexp)
+  if leaves and vim.tbl_contains(leaves.objects, 'all') then return nil end
+  return leaves
+end
+
+---@param metadata_sexp any
+---@return boolean is it a changed node's whose request may name only
+---'all'? Its readiness is not drawn.
+function M.aggregate_node_p (metadata_sexp)
+  local leaves = M.leaves(metadata_sexp)
+  return M.vognode_p(metadata_sexp) and leaves ~= nil
+         and #leaves.objects == 1 and leaves.objects[1] == 'all'
 end
 
 ---@param metadata_sexp any
 ---@param objects string[]
----@return boolean is every one of OBJECTS ready?
+---@return boolean is every one of OBJECTS ready? 'all' and no object
+---at all are ready when '(ready ...)' is there.
 function M.objects_ready_p (metadata_sexp, objects)
   local ready = M.form(metadata_sexp, 'ready')
   if not ready then return false end
   local ready_objects = {}
   for _, object in ipairs(arguments(ready)) do ready_objects[object] = true end
   for _, object in ipairs(objects) do
-    if object ~= 'single' and not ready_objects[object] then return false end
+    if object ~= 'all' and not ready_objects[object] then return false end
   end
   return true
 end
@@ -134,14 +139,15 @@ function M.changed_folder_p (metadata_sexp)
   return false
 end
 
----Whether the headline is ready: a leaf on all its objects, or a folder
----that carries (ready). False for an aggregate node, whose readiness
----is not drawn.
+---Whether the headline is ready: a headline that names leaves, on all
+---the objects it lists, or a folder that carries (ready). False for an
+---aggregate node, whose readiness is not drawn.
 ---@param metadata_sexp any
 ---@return boolean
 function M.ready_p (metadata_sexp)
-  local objects = M.leaf_objects(metadata_sexp)
-  if #objects > 0 then return M.objects_ready_p(metadata_sexp, objects) end
+  if M.aggregate_node_p(metadata_sexp) then return false end
+  local leaves = M.leaves(metadata_sexp)
+  if leaves then return M.objects_ready_p(metadata_sexp, leaves.objects) end
   return M.changed_folder_p(metadata_sexp)
          and M.form(metadata_sexp, 'ready') ~= nil
 end
@@ -199,8 +205,7 @@ function M.write_request (line_number, ready, objects)
   local request = { sexpr.symbol(ready and 'readyRequest'
                                  or 'unreadyRequest') }
   for _, object in ipairs(objects) do
-    if object ~= 'single' then
-      table.insert(request, sexpr.symbol(object)) end
+    table.insert(request, sexpr.symbol(object))
   end
   local edits = { { sexpr.symbol('DELETE'),
                     { sexpr.symbol('readyRequest') },
@@ -223,8 +228,7 @@ function M.children_ready_p (line_number)
   local some = false
   for _, line in ipairs(M.child_lines(line_number)) do
     local child = metadata.metadata_sexp_at_line_or_nil(line)
-    if child and (#M.leaf_objects(child) > 0
-                  or M.changed_folder_p(child)) then
+    if child and (M.leaves_below(child) or M.changed_folder_p(child)) then
       some = true
       if not M.ready_p(child) then return false end
     end
@@ -232,8 +236,26 @@ function M.children_ready_p (line_number)
   return some
 end
 
--- A gesture first gathers its requests, each { line, ready, objects },
--- then writes them all or none.
+---A request on the headline at LINE_NUMBER, with how many leaves it
+---touches as the server counts them: N of the headline's '(leaves N
+---OBJECT...)' when OBJECTS are the ones it lists, else one for each of
+---'node' and 'rel'. A headline without the fact, which only the
+---home-move gesture can reach, counts one.
+---@param line_number integer
+---@param ready boolean
+---@param objects string[]
+---@return table
+function M.request_at_line (line_number, ready, objects)
+  local leaves = M.leaves(metadata.metadata_sexp_at_line_or_nil(line_number))
+  local count = #objects
+  if vim.deep_equal(objects, leaves and leaves.objects or {}) then
+    count = leaves and leaves.count or 1 end
+  return { line = line_number, ready = ready, objects = objects,
+           count = count }
+end
+
+-- A gesture first gathers its requests, each { line, ready, objects,
+-- count }, then writes them all or none.
 
 ---The requests of the one-level gesture on the headline at
 ---LINE_NUMBER. Empty when the object prompt is dismissed.
@@ -242,76 +264,71 @@ end
 function M.requests_at_line (line_number)
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
   if not metadata_sexp then return {} end
-  local objects = M.leaf_objects(metadata_sexp)
-  if #objects > 0 then
-    local chosen = objects
-    if #objects > 1 then
+  if M.aggregate_node_p(metadata_sexp) then
+    return { M.request_at_line(line_number,
+                               not M.children_ready_p(line_number),
+                               { 'all' }) } end
+  local leaves = M.leaves(metadata_sexp)
+  if leaves then
+    local chosen = leaves.objects
+    if #chosen > 1 then
       local object = picker.completing_read_with_cycle(
         'Which change (node = ∃ its existence, rel = ~ its relationship here)? ',
         { 'node', 'rel' }, { require_match = true })
       if object ~= 'node' and object ~= 'rel' then return {} end
       chosen = { object } end
-    return { { line = line_number,
-               ready = not M.objects_ready_p(metadata_sexp, chosen),
-               objects = chosen } } end
+    return { M.request_at_line(line_number,
+                               not M.objects_ready_p(metadata_sexp, chosen),
+                               chosen) } end
   if M.changed_folder_p(metadata_sexp) then
     local ready = not M.ready_p(metadata_sexp)
     local requests = {}
     for _, line in ipairs(M.child_lines(line_number)) do
       local child = metadata.metadata_sexp_at_line_or_nil(line)
-      local child_objects = child and M.leaf_objects(child) or {}
-      if #child_objects > 0 then
+      local child_leaves = child and M.leaves_below(child)
+      if child_leaves then
         table.insert(requests,
-                     { line = line, ready = ready, objects = child_objects }) end
+                     M.request_at_line(line, ready, child_leaves.objects)) end
     end
     return requests end
-  if M.vognode_p(metadata_sexp) then
-    return { { line = line_number,
-               ready = not M.children_ready_p(line_number),
-               objects = { 'all' } } } end
   return {}
 end
 
 ---The requests of the recursive gesture on the headline at
----LINE_NUMBER: one on every leaf named in the subtree, readying them
----unless the headline is ready. On a changed node, also one naming
----every leaf it owns.
+---LINE_NUMBER: one on every headline in the subtree that names leaves,
+---readying them unless the headline is ready.
 ---@param line_number integer
 ---@return table[]
 function M.requests_for_subtree_at_line (line_number)
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
   if not metadata_sexp then return {} end
-  local aggregate_node = M.vognode_p(metadata_sexp)
-                         and #M.leaf_objects(metadata_sexp) == 0
   local headline_ready
-  if aggregate_node then
+  if M.aggregate_node_p(metadata_sexp) then
     headline_ready = M.children_ready_p(line_number)
   else
     headline_ready = M.ready_p(metadata_sexp) end
   local ready = not headline_ready
   local requests = {}
-  if aggregate_node then
-    table.insert(requests,
-                 { line = line_number, ready = ready, objects = { 'all' } }) end
   for _, line in ipairs(M.subtree_lines(line_number)) do
     local headline = metadata.metadata_sexp_at_line_or_nil(line)
-    local objects = headline and M.leaf_objects(headline) or {}
-    if #objects > 0 then
-      table.insert(requests, { line = line, ready = ready, objects = objects }) end
+    local leaves = nil
+    if headline and line == line_number then
+      leaves = M.leaves(headline)
+    elseif headline then
+      leaves = M.leaves_below(headline) end
+    if leaves then
+      table.insert(requests, M.request_at_line(line, ready, leaves.objects)) end
   end
   return requests
 end
 
----Whether the unmark requests among REQUESTS name more than one
----leaf. A request naming 'all' names every leaf its node owns.
+---Whether the unmark requests among REQUESTS touch more than one leaf.
 ---@param requests table[]
 ---@return boolean
 function M.unmarks_several_leaves_p (requests)
   local leaves = 0
   for _, request in ipairs(requests) do
-    if not request.ready then
-      if vim.tbl_contains(request.objects, 'all') then return true end
-      leaves = leaves + #request.objects end
+    if not request.ready then leaves = leaves + request.count end
   end
   return leaves > 1
 end
@@ -394,7 +411,7 @@ function M.toggle_homeSkgrepo_move_commitReady (recursive)
     metadata.metadata_sexp_at_line_or_nil(move_line))
   local requests = {}
   if not recursive then
-    requests = { { line = move_line, ready = ready, objects = { 'single' } } }
+    requests = { M.request_at_line(move_line, ready, {}) }
   else
     local node_line =
       metadata.parent_headline_line(move_line,
@@ -403,8 +420,7 @@ function M.toggle_homeSkgrepo_move_commitReady (recursive)
       local headline = metadata.metadata_sexp_at_line_or_nil(line)
       local other = headline and M.home_move(headline)
       if other and other[1] == pair[1] and other[2] == pair[2] then
-        table.insert(requests,
-                     { line = line, ready = ready, objects = { 'single' } }) end
+        table.insert(requests, M.request_at_line(line, ready, {})) end
     end
   end
   if not M.write_requests_if_confirmed(requests) then return end

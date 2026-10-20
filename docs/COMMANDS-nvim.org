@@ -504,7 +504,9 @@ on a folder of changes, or one on a changed node, which unmarks every
 change the node records) first asks "Unmarking this node commit-ready
 will unmark every contributing decision. You might discard a lot of
 hard-won information. Continue (yes/no)?", and does nothing unless
-you type "yes". Unmarking a single change asks nothing.
+you type "yes". Unmarking a single change asks nothing. The
+server counts the changes: each headline that names changes says how
+many, in its metadata's '(leaves N ...)'.
 *** <localleader>rr : :SkgCycleCommitReady
 Toggles the commit-readiness of the change at point, then saves.
 On a headline that is one change (an old text, an alias, a move, a
