@@ -94,8 +94,8 @@ fn a_relRepo_move_is_one_leaf_recorded_in_both_files () {
   let key : LeafKey = contains_key ("r", "m", RelationshipAspect::RelRepo);
   assert_eq! ( keys_under (forest, "r"), vec! [ key . clone () ] );
   assert_eq! ( forest . leaf (&key) . unwrap () . files, vec! [
-    ( SkgrepoName::from ("main"),    ID::from ("r") ),
-    ( SkgrepoName::from ("private"), ID::from ("r") ) ] ); }
+    ChangedFile { skgrepo : SkgrepoName::from ("main"),    pid : ID::from ("r") },
+    ChangedFile { skgrepo : SkgrepoName::from ("private"), pid : ID::from ("r") } ] ); }
 
 #[test]
 fn a_reorder_has_no_leaf_but_its_file_changed () {
@@ -143,11 +143,12 @@ fn readiness_aggregates_over_the_leaves_that_exist () {
   assert! ( forest . readiness_of_leaves (&store, [&text, &unchanged]),
             "a key that is no leaf is never asked" );
   assert! ( ! forest . readiness_of_leaves (&store, [&text, &member]) );
-  let main : SkgrepoName = SkgrepoName::from ("main");
-  assert! ( ! forest . readiness_of_file (&store, &main, &ID::from ("r")) );
+  let file : ChangedFile = ChangedFile { skgrepo : SkgrepoName::from ("main"),
+                                         pid     : ID::from ("r") };
+  assert! ( ! forest . readiness_of_file (&store, &file) );
   assert_eq! ( forest . readiness_summary (&store) . ready_files, 0 );
   store . mark ( member . clone (), forest . leaf_fingerprint (&member) . unwrap () );
-  assert! ( forest . readiness_of_file (&store, &main, &ID::from ("r")) );
+  assert! ( forest . readiness_of_file (&store, &file) );
   assert_eq! ( forest . readiness_summary (&store), ReadinessSummary {
     ready_files : 1, changed_files : 1,
     foreign_changed_files : 0, order_only_files : 0 } ); }

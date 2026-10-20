@@ -105,8 +105,8 @@ async fn test_move_node_to_another_owned_skgrepo (
     assert_eq!(save_plan . skgrepo_moves . len(), 1,
                "Expected exactly 1 repo move");
     assert_eq!(save_plan . skgrepo_moves[0] . pid . 0, "b");
-    assert_eq!(save_plan . skgrepo_moves[0] . old_skgrepo . as_str(), "public");
-    assert_eq!(save_plan . skgrepo_moves[0] . new_skgrepo . as_str(), "private");
+    assert_eq!(save_plan . skgrepo_moves[0] . skgrepo_change . old . as_str(), "public");
+    assert_eq!(save_plan . skgrepo_moves[0] . skgrepo_change . new . as_str(), "private");
 
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;

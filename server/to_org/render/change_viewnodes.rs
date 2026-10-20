@@ -9,7 +9,7 @@
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner, Presence};
 use crate::types::git::Sign;
-use crate::types::misc::{ID, SkgrepoName};
+use crate::types::misc::{ID, SkgrepoChange};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
   AffectsParent, ChangeFacts, ChangesetMarkerKind, DiffPresence,
@@ -71,11 +71,11 @@ pub fn mk_home_move_viewnode (
   straddle : &GraphStraddle,
   pid      : &ID,
 ) -> Option<Viewnode> {
-  let (old, new) : (SkgrepoName, SkgrepoName) =
+  let skgrepo_change : SkgrepoChange =
     straddle . node_changes (pid) . home ?;
   Some ( viewnode_of ( ViewnodeKind::Property (
     Property::HomeSkgrepoMove {
-      old, new,
+      skgrepo_change,
       change_facts      : ChangeFacts::default (),
       readiness_request : None } )) ) }
 
@@ -87,8 +87,9 @@ pub fn mk_relRepo_move_viewnode (
   if ! partner . relRepo_moved () { return None; }
   Some ( viewnode_of ( ViewnodeKind::Property (
     Property::RelRepoMove {
-      old : partner . relRepo_before . clone () ?,
-      new : partner . relRepo_after  . clone () ?,
+      skgrepo_change : SkgrepoChange {
+        old : partner . relRepo_before . clone () ?,
+        new : partner . relRepo_after  . clone () ? },
       change_facts      : ChangeFacts::default (),
       readiness_request : None } )) ) }
 

@@ -33,7 +33,7 @@
 ///     acquiredByFolder, acquiredFolder
 
 use crate::types::sexp::atom_to_string;
-use crate::types::misc::{ID, SkgrepoName};
+use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use crate::types::errors::BufferValidationError;
 use crate::types::nodes::complete::Flag;
 use crate::types::git::Sign;
@@ -271,14 +271,14 @@ pub fn viewnode_from_metadata (
           MpViewnodeKind::Property (Property::BodyDiff { .. }) =>
             MpViewnodeKind::Property (Property::BodyDiff {
               diff : body . clone () . unwrap_or_default () }),
-          MpViewnodeKind::Property (Property::HomeSkgrepoMove { old, new, .. }) =>
+          MpViewnodeKind::Property (Property::HomeSkgrepoMove { skgrepo_change, .. }) =>
             MpViewnodeKind::Property (Property::HomeSkgrepoMove {
-              old : old . clone (), new : new . clone (),
+              skgrepo_change    : skgrepo_change . clone (),
               change_facts      : metadata . change_facts . clone (),
               readiness_request : metadata . readiness_request . clone () }),
-          MpViewnodeKind::Property (Property::RelRepoMove { old, new, .. }) =>
+          MpViewnodeKind::Property (Property::RelRepoMove { skgrepo_change, .. }) =>
             MpViewnodeKind::Property (Property::RelRepoMove {
-              old : old . clone (), new : new . clone (),
+              skgrepo_change    : skgrepo_change . clone (),
               change_facts      : metadata . change_facts . clone (),
               readiness_request : metadata . readiness_request . clone () }),
           MpViewnodeKind::Property (Property::ChangesetMarker { kind, .. }) =>
@@ -420,16 +420,16 @@ pub fn parse_metadata_to_viewnodemd (
                 change_facts : ChangeFacts::default (),
                 readiness_request : None } )); },
           "homeSkgrepoMove" | "relRepoMove" => {
-            let (old, new) : (SkgrepoName, SkgrepoName) =
+            let skgrepo_change : SkgrepoChange =
               parse_old_and_new_skgrepos (&first, &items[1..]) ?;
             result . non_vognode = Some ( MpViewnodeKind::Property (
               if first == "homeSkgrepoMove" {
                 Property::HomeSkgrepoMove {
-                  old, new, change_facts : ChangeFacts::default (),
+                  skgrepo_change, change_facts : ChangeFacts::default (),
                   readiness_request : None }
               } else {
                 Property::RelRepoMove {
-                  old, new, change_facts : ChangeFacts::default (),
+                  skgrepo_change, change_facts : ChangeFacts::default (),
                   readiness_request : None } } )); },
           "changesetMarker" => {
             let name : String = single_argument (&first, &items[1..]) ?;
@@ -761,7 +761,7 @@ fn single_argument (
 fn parse_old_and_new_skgrepos (
   head : &str,
   args : &[Sexp],
-) -> Result<(SkgrepoName, SkgrepoName), String> {
+) -> Result<SkgrepoChange, String> {
   let mut old : Option<SkgrepoName> = None;
   let mut new : Option<SkgrepoName> = None;
   for arg in args {
@@ -779,7 +779,7 @@ fn parse_old_and_new_skgrepos (
     *slot = Some ( SkgrepoName::from (
       single_argument (&key, &pair [1..]) ? )); }
   match (old, new) {
-    (Some (old), Some (new)) => Ok ((old, new)),
+    (Some (old), Some (new)) => Ok ( SkgrepoChange { old, new } ),
     _ => Err ( format! ( "{} requires both (old REPO) and (new REPO)", head )), } }
 
 /// Parse the (deleted (id X) (repo S)) s-expression contents.

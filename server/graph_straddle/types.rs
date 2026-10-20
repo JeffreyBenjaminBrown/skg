@@ -10,7 +10,7 @@ use crate::pcsvf::{
   PcsvfSets, pcsvf_sets, pcsvf_sets_for_home_moves, pcsvf_sets_for_merges};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::git::Sign;
-use crate::types::misc::{ID, SkgrepoName};
+use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::views_state::DiffViewBufferKind;
 
@@ -64,7 +64,7 @@ pub struct NodeChanges {
   pub extra_ids_lost   : Vec<ID>,
   pub flags_gained     : Vec<Flag>,
   pub flags_lost       : Vec<Flag>,
-  pub home             : Option<(SkgrepoName, SkgrepoName)>, // (old, new)
+  pub home             : Option<SkgrepoChange>,
 }
 
 /// One partner of a node in some role, over the union of the two

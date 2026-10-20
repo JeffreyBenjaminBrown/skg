@@ -1,4 +1,4 @@
-use super::misc::{ID, SkgrepoName};
+use super::misc::{ID, SkgrepoChange, SkgrepoName};
 use super::nodes::complete::Graphnode;
 use super::errors::{SaveError, BufferValidationError};
 
@@ -12,9 +12,8 @@ use super::errors::{SaveError, BufferValidationError};
 /// (in addition to the usual NodeInstruction).
 #[derive(Debug)]
 pub struct SkgrepoMove {
-  pub pid         : ID,
-  pub old_skgrepo : SkgrepoName,
-  pub new_skgrepo : SkgrepoName,
+  pub pid            : ID,
+  pub skgrepo_change : SkgrepoChange,
 }
 
 /// Defines what to do with a single node: save it or delete it.

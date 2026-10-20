@@ -340,11 +340,12 @@ fn property_metadata_to_string (
       parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
     Property::BodyDiff { .. } =>
       parts . push ( "bodyDiff" . to_string () ),
-    Property::HomeSkgrepoMove { old, new, change_facts, readiness_request }
-      | Property::RelRepoMove { old, new, change_facts, readiness_request } => {
+    Property::HomeSkgrepoMove { skgrepo_change, change_facts, readiness_request }
+      | Property::RelRepoMove { skgrepo_change, change_facts, readiness_request } => {
       parts . push ( format! ( "({} (old {}) (new {}))",
         property . repr_in_client (),
-        metadata_value_atom (old), metadata_value_atom (new) ));
+        metadata_value_atom (&skgrepo_change . old),
+        metadata_value_atom (&skgrepo_change . new) ));
       parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
     Property::ChangesetMarker { kind, change_facts, readiness_request } => {
       parts . push ( format! ( "(changesetMarker {})", kind . wire_name () ));
@@ -413,11 +414,12 @@ fn unrestrictedVognode_metadata_to_string (
             "(homeRepoHerald {})",
             metadata_value_atom (
               & format! ("⌂:{}", src_config . herald_label ()) ) ) ); }}
-      if let Some ((old, new)) =
+      if let Some (home_skgrepo_move) =
         &unrestrictedVognode . viewStats . home_skgrepo_move {
         parts . push ( format! (
           "(homeSkgrepoMove (old {}) (new {}))",
-          metadata_value_atom (old), metadata_value_atom (new) )); }
+          metadata_value_atom (&home_skgrepo_move . old),
+          metadata_value_atom (&home_skgrepo_move . new) )); }
       if let Some (letter) =
         &unrestrictedVognode . viewStats . moved_like_ancestor {
         parts . push ( format! (

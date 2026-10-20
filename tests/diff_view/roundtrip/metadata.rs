@@ -6,7 +6,7 @@ use skg::serve::parse_metadata_sexp::{
   ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
 use skg::types::git::Sign;
 use skg::types::maybe_placed_viewnode::MpViewnode;
-use skg::types::misc::{ID, SkgConfig, SkgrepoName};
+use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use skg::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffPresence, PartnerFolder, Phantom,
   PhantomHistorical, Property, DiffObject, ReadinessRequest, Viewnode,
@@ -80,12 +80,14 @@ fn body_diff_round_trips () {
 fn skgrepo_moves_round_trip () {
   assert_round_trip (
     property ( Property::HomeSkgrepoMove {
-      old : SkgrepoName::from ("pub"), new : SkgrepoName::from ("priv"),
+      skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("pub"),
+                                       new : SkgrepoName::from ("priv") },
       change_facts : ready (&[]), readiness_request : None } ),
     "(homeSkgrepoMove (old pub) (new priv)) (ready)" );
   assert_round_trip (
     property ( Property::RelRepoMove {
-      old : SkgrepoName::from ("pub"), new : SkgrepoName::from ("a repo"),
+      skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("pub"),
+                                       new : SkgrepoName::from ("a repo") },
       change_facts : ChangeFacts::default (), readiness_request : request_all () } ),
     "(relRepoMove (old pub) (new \"a repo\")) (readyRequest all)" ); }
 

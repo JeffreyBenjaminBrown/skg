@@ -372,8 +372,8 @@ pub fn suppress_writes_to_restricted_nodes (
     skgrepo_moves . into_iter ()
     . filter ( |mv| {
         let keep : bool =
-          restriction . contains_skgrepo (&mv . old_skgrepo)
-          && restriction . contains_skgrepo (&mv . new_skgrepo);
+          restriction . contains_skgrepo (&mv . skgrepo_change . old)
+          && restriction . contains_skgrepo (&mv . skgrepo_change . new);
         if ! keep { suppressed = true; }
         keep } )
     . collect ();

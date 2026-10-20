@@ -269,8 +269,8 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       assert_eq!(save_plan . skgrepo_moves . len(), 1,
                  "Expected exactly 1 repo move");
       assert_eq!(save_plan . skgrepo_moves[0] . pid . 0, "priv-1");
-      assert_eq!(save_plan . skgrepo_moves[0] . old_skgrepo . as_str(), "private");
-      assert_eq!(save_plan . skgrepo_moves[0] . new_skgrepo . as_str(), "public");
+      assert_eq!(save_plan . skgrepo_moves[0] . skgrepo_change . old . as_str(), "private");
+      assert_eq!(save_plan . skgrepo_moves[0] . skgrepo_change . new . as_str(), "public");
     }
 
     // Test 2: A write-protected occurrence's skgrepo is not an instruction.
@@ -296,7 +296,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       let ( _viewforest, save_plan, _warnings ) = result?;
       assert_eq!(save_plan . skgrepo_moves . len(), 1,
                  "Only the editable occurrence should move pub-1");
-      assert_eq!(save_plan . skgrepo_moves[0] . new_skgrepo . as_str(), "private");
+      assert_eq!(save_plan . skgrepo_moves[0] . skgrepo_change . new . as_str(), "private");
       let buffer_with_stale_write_protected_skgrepo: &str = indoc! {"
         * (skg (node (id pub-1) (repo public))) pub-1
         * (skg (node (id pub-1) (repo private) writeProtected)) pub-1

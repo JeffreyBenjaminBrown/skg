@@ -57,12 +57,20 @@ pub enum RelationshipAspect {
 }
 
 /// A change-forest leaf: its key, the fingerprint of the change it
-/// stands for, and the files ((skgrepo, pid) pairs) that record it.
+/// stands for, and the files that record it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ChangeLeaf {
   pub key         : LeafKey,
   pub fingerprint : u64,
-  pub files       : Vec<(SkgrepoName, ID)>,
+  pub files       : Vec<ChangedFile>,
+}
+
+/// The '.skg' file of node 'pid' in skgrepo 'skgrepo', as a file that
+/// records a change.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ChangedFile {
+  pub skgrepo : SkgrepoName,
+  pub pid     : ID,
 }
 
 /// What the client shows after a save of a diff-view buffer.
@@ -129,7 +137,7 @@ pub struct ChangeLeaves {
   /// Where each leaf is in 'leaves_by_recorder': (recorder, position).
   index                 : HashMap<LeafKey, (ID, usize)>,
   order_only_pids       : BTreeSet<ID>,
-  order_only_files      : BTreeSet<(SkgrepoName, ID)>,
+  order_only_files      : BTreeSet<ChangedFile>,
   foreign_changed_files : usize,
 }
 
@@ -158,10 +166,11 @@ impl ChangeLeaves {
              . is_some_and ( |before| before != *after ))
       . map ( |(pid, _)| pid . clone () )
       . collect ();
-    let order_only_files : BTreeSet<(SkgrepoName, ID)> =
+    let order_only_files : BTreeSet<ChangedFile> =
       order_only_pids . iter ()
       . filter_map ( |pid| straddle . after . nodes . get (pid) )
-      . map ( |node| ( node . home_skgrepo . clone (), node . pid . clone () ))
+      . map ( |node| ChangedFile { skgrepo : node . home_skgrepo . clone (),
+                                   pid     : node . pid . clone () } )
       . collect ();
     ChangeLeaves { leaves_by_recorder, index, order_only_pids,
                    order_only_files,
@@ -198,30 +207,25 @@ impl ChangeLeaves {
       . map ( |leaves| leaves . as_slice () )
       . unwrap_or (&[]) }
 
-  /// The leaves that the file of 'pid' in 'skgrepo' records.
+  /// The leaves that 'file' records.
   pub fn leaves_in_file (
     &self,
-    skgrepo : &SkgrepoName,
-    pid     : &ID,
+    file : &ChangedFile,
   ) -> Vec<&ChangeLeaf> {
-    let file : (SkgrepoName, ID) = ( skgrepo . clone (), pid . clone () );
     self . leaves_by_recorder . values () . flatten ()
-      . filter ( |leaf| leaf . files . contains (&file) )
+      . filter ( |leaf| leaf . files . contains (file) )
       . collect () }
 
   /// Every changed file of the owned skgrepos, order-only ones
-  /// included, as the pids changed in each skgrepo.
+  /// included.
   pub fn files_changed (
     &self,
-  ) -> BTreeMap<SkgrepoName, BTreeSet<ID>> {
-    let mut files : BTreeMap<SkgrepoName, BTreeSet<ID>> = BTreeMap::new ();
-    for (skgrepo, pid) in
-      self . leaves_by_recorder . values () . flatten ()
+  ) -> BTreeSet<ChangedFile> {
+    self . leaves_by_recorder . values () . flatten ()
       . flat_map ( |leaf| leaf . files . iter () )
       . chain ( self . order_only_files . iter () )
-    { files . entry (skgrepo . clone ()) . or_default ()
-        . insert (pid . clone ()); }
-    files }
+      . cloned ()
+      . collect () }
 
   pub fn order_only_pids (
     &self,
@@ -244,28 +248,22 @@ impl ChangeLeaves {
   /// change is order has no leaf, and so is ready.
   pub fn readiness_of_file (
     &self,
-    store   : &ReadinessStore,
-    skgrepo : &SkgrepoName,
-    pid     : &ID,
+    store : &ReadinessStore,
+    file  : &ChangedFile,
   ) -> bool {
     self . readiness_of_leaves (
       store,
-      self . leaves_in_file (skgrepo, pid) . into_iter ()
+      self . leaves_in_file (file) . into_iter ()
         . map ( |leaf| &leaf . key )) }
 
   pub fn readiness_summary (
     &self,
     store         : &ReadinessStore,
   ) -> ReadinessSummary {
-    let files : Vec<(SkgrepoName, ID)> =
-      self . files_changed () . into_iter ()
-      . flat_map ( |(skgrepo, pids)|
-        pids . into_iter () . map ( move |pid| ( skgrepo . clone (), pid )) )
-      . collect ();
+    let files : BTreeSet<ChangedFile> = self . files_changed ();
     ReadinessSummary {
       ready_files : files . iter ()
-        . filter ( |(skgrepo, pid)|
-          self . readiness_of_file (store, skgrepo, pid) )
+        . filter ( |file| self . readiness_of_file (store, file) )
         . count (),
       changed_files         : files . len (),
       foreign_changed_files : self . foreign_changed_files,
@@ -304,10 +302,12 @@ fn leaves_recorded_by (
 ) -> Vec<ChangeLeaf> {
   let before : Option<&GraphnodeInRust> = straddle . before . get (pid);
   let after  : Option<&GraphnodeInRust> = straddle . after  . get (pid);
-  let home_file = |node : &GraphnodeInRust| -> Vec<(SkgrepoName, ID)> {
-    vec! [ ( node . home_skgrepo . clone (), pid . clone () ) ] };
+  let file_in = |skgrepo : &SkgrepoName| -> ChangedFile {
+    ChangedFile { skgrepo : skgrepo . clone (), pid : pid . clone () } };
+  let home_file = |node : &GraphnodeInRust| -> Vec<ChangedFile> {
+    vec! [ file_in (&node . home_skgrepo) ] };
   let node_leaf = |aspect : NodeAspect, fingerprint : u64,
-                   files : Vec<(SkgrepoName, ID)>| -> ChangeLeaf {
+                   files : Vec<ChangedFile>| -> ChangeLeaf {
     ChangeLeaf { key : LeafKey::Node { pid : pid . clone (), aspect },
                  fingerprint, files } };
   let mut leaves : Vec<ChangeLeaf> = Vec::new ();
@@ -320,12 +320,11 @@ fn leaves_recorded_by (
           fingerprint_of (&( &before . title, &before . body,
                              &after  . title, &after  . body )),
           home_file (after) )); }
-      if let Some ((old, new)) = &changes . home {
+      if let Some (home) = &changes . home {
         leaves . push ( node_leaf (
           NodeAspect::HomeSkgrepo,
-          fingerprint_of (&(old, new)),
-          vec! [ ( old . clone (), pid . clone () ),
-                 ( new . clone (), pid . clone () ) ] )); }
+          fingerprint_of (&( &home . old, &home . new )),
+          vec! [ file_in (&home . old), file_in (&home . new) ] )); }
       for (gained, alias) in
         changes . aliases_gained . iter () . map ( |a| (true, a) )
         . chain ( changes . aliases_lost . iter () . map ( |a| (false, a) ))
@@ -376,8 +375,8 @@ fn relationship_leaves (
       recorder : recorder . clone (),
       member   : partner . id . clone (),
       aspect } };
-  let file_in = |skgrepo : &SkgrepoName| -> (SkgrepoName, ID) {
-    ( skgrepo . clone (), recorder . clone () ) };
+  let file_in = |skgrepo : &SkgrepoName| -> ChangedFile {
+    ChangedFile { skgrepo : skgrepo . clone (), pid : recorder . clone () } };
   if partner . presence != Presence::Both {
     let relRepo : &SkgrepoName =
       partner . relRepo_after . as_ref ()

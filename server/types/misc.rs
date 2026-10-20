@@ -253,6 +253,14 @@ impl SkgrepoName {
   pub fn not_found () -> Self {
     SkgrepoName ( Self::NOT_FOUND_STR . to_string () ) } }
 
+/// A change of skgrepo, from 'old' to 'new': of a node's home, or of
+/// a relationship's relRepo.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct SkgrepoChange {
+  pub old : SkgrepoName,
+  pub new : SkgrepoName,
+}
+
 #[derive (Clone)]
 pub struct TantivyIndex {
   // Associates titles and aliases to paths.

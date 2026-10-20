@@ -34,7 +34,7 @@ use skg::to_org::render::change_viewnodes::{
   mk_changeset_marker_viewnode, mk_historical_viewnode, mk_relRepo_move_viewnode};
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::git::Sign;
-use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
+use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName, TantivyIndex};
 use skg::types::tree::moves::{move_before, move_to_first_child};
 use skg::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, Phantom, Property, Viewnode, ViewnodeKind,
@@ -169,7 +169,8 @@ fn buffer_with_every_new_viewnode (
     b_mut . append ( Viewnode {
       focused : false, org_folded : false, org_body_folded : false,
       kind : ViewnodeKind::Property ( Property::HomeSkgrepoMove {
-        old : SkgrepoName::from ("main"), new : SkgrepoName::from ("elsewhere"),
+        skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("main"),
+                                         new : SkgrepoName::from ("elsewhere") },
         change_facts : ChangeFacts::default (), readiness_request : None } ) } );
     b_mut . append ( mk_relRepo_move_viewnode ( &Partner {
       id : ID::from ("b"), presence : Presence::Both,

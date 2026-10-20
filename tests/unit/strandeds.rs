@@ -3,7 +3,7 @@
 // order is public, private, trusted.
 
 use super::*;
-use crate::types::misc::Skgrepo;
+use crate::types::misc::{Skgrepo, SkgrepoChange};
 use crate::types::nodes::complete::empty_graphnode;
 
 use std::path::PathBuf;
@@ -45,9 +45,9 @@ fn moved (
   old : &str,
   new : &str,
 ) -> SkgrepoMove {
-  SkgrepoMove { pid : ID::from (pid),
-                old_skgrepo : SkgrepoName::from (old),
-                new_skgrepo : SkgrepoName::from (new) } }
+  SkgrepoMove { pid            : ID::from (pid),
+                skgrepo_change : SkgrepoChange { old : SkgrepoName::from (old),
+                                                 new : SkgrepoName::from (new) } } }
 
 /// (recorder, member, raised automatically) of each stranded
 /// containment.

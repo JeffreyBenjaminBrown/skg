@@ -7,7 +7,7 @@
 /// aliases, IDs, and partner folders.
 
 use super::git::Sign;
-use super::misc::{ID, SkgrepoName};
+use super::misc::{ID, SkgrepoChange, SkgrepoName};
 use super::nodes::complete::Flag;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use std::collections::{BTreeSet, HashSet};
@@ -380,12 +380,12 @@ pub struct ViewnodeStats {
   /// Herald: red "~NAME" immediately before the ⌂ homeRepoHerald
   /// (server/heralds.rs).
   pub relRepo            : Option<SkgrepoName>,
-  /// Some((OLD, NEW)) in the skgrepo-changes buffer of the diff
+  /// Some(OLD to NEW) in the skgrepo-changes buffer of the diff
   /// view, for a node whose home skgrepo moved from OLD to NEW since
   /// HEAD. Display-only; the buffer's pass sets it after completion
   /// ('set_home_move_facts_in_viewforest'), and the parser discards
   /// it. Herald "-OLD +NEW".
-  pub home_skgrepo_move  : Option<(SkgrepoName, SkgrepoName)>,
+  pub home_skgrepo_move  : Option<SkgrepoChange>,
   /// Some(LETTER) beside 'home_skgrepo_move' when the nearest vognode
   /// ancestor whose home moved moved the same way. LETTER names that
   /// ancestor as the relationship heralds name ancestors: a for the
@@ -452,8 +452,7 @@ pub enum Property {
   /// The node's home skgrepo changed. Its change-forest leaf is the
   /// node's home skgrepo.
   HomeSkgrepoMove {
-    old               : SkgrepoName,
-    new               : SkgrepoName,
+    skgrepo_change    : SkgrepoChange,
     change_facts      : ChangeFacts,
     readiness_request : Option<ReadinessRequest>,
   },
@@ -461,8 +460,7 @@ pub enum Property {
   /// one skgrepo to another. Its change-forest leaf is that
   /// relationship's relRepo.
   RelRepoMove {
-    old               : SkgrepoName,
-    new               : SkgrepoName,
+    skgrepo_change    : SkgrepoChange,
     change_facts      : ChangeFacts,
     readiness_request : Option<ReadinessRequest>,
   },

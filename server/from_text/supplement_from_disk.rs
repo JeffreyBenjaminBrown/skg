@@ -15,7 +15,7 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::opt_graphnode_by_skgid;
-use crate::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoName, members_of, rel_partners_at_relRepo};
+use crate::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoChange, SkgrepoName, members_of, rel_partners_at_relRepo};
 use crate::types::phantom::home_from_disk;
 use crate::types::nodes::complete::{
   Graphnode, empty_graphnode, set_flag};
@@ -583,9 +583,9 @@ pub fn detect_skgrepo_move (
   if config . skgrepo_is_owned (disk_skgrepo)
   && config . skgrepo_is_owned (buffer_skgrepo) {
     Ok (Some (SkgrepoMove {
-      pid         : pid . clone(),
-      old_skgrepo : disk_skgrepo . clone(),
-      new_skgrepo : buffer_skgrepo . clone() }))
+      pid            : pid . clone(),
+      skgrepo_change : SkgrepoChange { old : disk_skgrepo . clone(),
+                                       new : buffer_skgrepo . clone() } }))
   } else {
     Err(Box::new(
       BufferValidationError::CannotMoveToOrFromForeignSkgrepo(

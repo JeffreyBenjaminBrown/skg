@@ -184,10 +184,12 @@ fn the_change_facts_and_readiness_request_accessors_cover_every_kind () {
       title : Some ("old" . into ()), body : None,
       change_facts : facts . clone (), readiness_request : Some (request . clone ()) }),
     ViewnodeKind::Property (Property::HomeSkgrepoMove {
-      old : SkgrepoName::from ("public"), new : SkgrepoName::from ("private"),
+      skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("public"),
+                                       new : SkgrepoName::from ("private") },
       change_facts : facts . clone (), readiness_request : Some (request . clone ()) }),
     ViewnodeKind::Property (Property::RelRepoMove {
-      old : SkgrepoName::from ("public"), new : SkgrepoName::from ("private"),
+      skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("public"),
+                                       new : SkgrepoName::from ("private") },
       change_facts : facts . clone (), readiness_request : Some (request . clone ()) }),
     ViewnodeKind::Property (Property::ChangesetMarker {
       kind : ChangesetMarkerKind::Content,

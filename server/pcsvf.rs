@@ -27,7 +27,7 @@ use crate::to_org::util::{
   EditableMap, append_plain_stub_root, graphnode_and_viewnode_from_skgid};
 use crate::types::env::RuntimeGeneration;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::misc::{ID, SkgConfig, SkgrepoChange};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::tree::forest::{ViewForest, editable_occurrences};
 use crate::types::viewnode::{
@@ -201,12 +201,12 @@ pub fn set_home_move_facts_in_viewforest (
   viewforest : &mut ViewForest,
   straddle   : &GraphStraddle,
 ) {
-  let facts : Vec<(NodeId, Option<(SkgrepoName, SkgrepoName)>, Option<String>)> =
+  let facts : Vec<(NodeId, Option<SkgrepoChange>, Option<String>)> =
     viewforest . nodes ()
     . filter_map ( |node| {
       let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
         &node . value () . kind else { return None; };
-      let home_skgrepo_move : Option<(SkgrepoName, SkgrepoName)> =
+      let home_skgrepo_move : Option<SkgrepoChange> =
         straddle . node_changes (&t . skgid) . home;
       let moved_like_ancestor : Option<String> =
         home_skgrepo_move . as_ref () . and_then ( |home_skgrepo_move|
@@ -228,7 +228,7 @@ pub fn set_home_move_facts_in_viewforest (
 fn nearest_moved_vognode_ancestor (
   node     : NodeRef<Viewnode>,
   straddle : &GraphStraddle,
-) -> Option<(usize, (SkgrepoName, SkgrepoName))> {
+) -> Option<(usize, SkgrepoChange)> {
   node . ancestors () . enumerate ()
     . find_map ( |(index, ancestor)| match &ancestor . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>

@@ -13,7 +13,7 @@ use crate::dbs::in_rust_graph::relation_accessors::{
   NodeRelation, RelationRole};
 use crate::graph_straddle::types::{
   ChangedPids, GraphStraddle, NodeChanges, Partner, Presence};
-use crate::types::misc::{ID, RelPartner, SkgrepoName};
+use crate::types::misc::{ID, RelPartner, SkgrepoChange, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::util::setlike_vector_subtraction;
@@ -196,8 +196,8 @@ fn node_changes_between (
     extra_ids_gained, extra_ids_lost,
     flags_gained, flags_lost,
     home : ( before . home_skgrepo != after . home_skgrepo )
-      . then ( || ( before . home_skgrepo . clone (),
-                    after  . home_skgrepo . clone () )), } }
+      . then ( || SkgrepoChange { old : before . home_skgrepo . clone (),
+                                  new : after  . home_skgrepo . clone () } ), } }
 
 /// The partners playing 'role' toward 'pid' in one graph, each with
 /// its relationship's relRepo, without duplicates.
