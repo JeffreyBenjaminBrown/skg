@@ -1,5 +1,3 @@
-local client = require('skg.client')
-local lock = require('skg.lock')
 local metadata = require('skg.metadata')
 local payload = require('skg.payload')
 local rerender = require('skg.rerender')
@@ -26,10 +24,12 @@ local function any_dirty_view ()
 end
 
 local function send (skgid, approved_preview)
-  lock.begin_stream('delete absent references')
-  lock.lock_all_skg_buffers()
-  rerender.register_rerender_stream_handlers()
-  state.register_response_handler('delete-references-confirmation',
+  local request = { sexpr.pair(sexpr.symbol('request'), 'delete references to absent node'),
+                    sexpr.pair(sexpr.symbol('id'), skgid) }
+  if approved_preview then
+    table.insert(request, sexpr.pair(sexpr.symbol('approved-preview'), approved_preview)) end
+  rerender.send_streaming_request('delete absent references',
+    'delete-references-confirmation', request,
     function (_text, response)
       remove_unfired({ 'delete-references-result', 'error' })
       local content = payload.field_text(response, 'content') or ''
@@ -42,29 +42,21 @@ local function send (skgid, approved_preview)
       vim.api.nvim_set_current_buf(buf)
       if vim.fn.confirm('Remove the structured references?', '&Yes\n&No', 2) == 1 then
         rerender.after_empty_stream = function () send(skgid, approval) end end
-    end, true)
-  state.register_response_handler('delete-references-result',
-    function (_text, response)
-      remove_unfired({ 'error' })
-      vim.notify(payload.field_text(response, 'content') or
-                 'Absent-reference cleanup complete')
-    end, true)
-  state.register_response_handler('error',
-    function (_text, response)
-      -- The dispatcher removes `error' itself.  Remove only terminal
-      -- alternatives that can no longer arrive.
-      remove_unfired({ 'delete-references-confirmation',
-                       'delete-references-result' })
-      vim.notify('skg absent-reference cleanup: ' ..
-                 (payload.field_text(response, 'content') or 'server error'),
-                 vim.log.levels.ERROR)
-    end, true)
-  state.lp_reset()
-  local request = { sexpr.pair(sexpr.symbol('request'), 'delete references to absent node'),
-                    sexpr.pair(sexpr.symbol('id'), skgid) }
-  if approved_preview then
-    table.insert(request, sexpr.pair(sexpr.symbol('approved-preview'), approved_preview)) end
-  client.send_string(sexpr.to_string(request) .. '\n')
+    end,
+    { ['delete-references-result'] = function (_text, response)
+        remove_unfired({ 'error' })
+        vim.notify(payload.field_text(response, 'content') or
+                   'Absent-reference cleanup complete')
+      end,
+      ['error'] = function (_text, response)
+        -- The dispatcher removes `error' itself.  Remove only terminal
+        -- alternatives that can no longer arrive.
+        remove_unfired({ 'delete-references-confirmation',
+                         'delete-references-result' })
+        vim.notify('skg absent-reference cleanup: ' ..
+                   (payload.field_text(response, 'content') or 'server error'),
+                   vim.log.levels.ERROR)
+      end })
 end
 
 function M.request ()

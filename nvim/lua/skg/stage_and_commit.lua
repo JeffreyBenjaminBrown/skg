@@ -8,13 +8,10 @@
 -- diff view. The Lua port of elisp/skg-request-stage-and-commit.el.
 
 local buffer = require('skg.buffer')
-local client = require('skg.client')
-local lock = require('skg.lock')
 local payload = require('skg.payload')
 local readiness = require('skg.readiness')
 local rerender = require('skg.rerender')
 local sexpr = require('skg.sexpr.parse')
-local state = require('skg.state')
 
 local M = {}
 
@@ -31,20 +28,15 @@ end
 ---@param message string
 ---@param confirmed boolean
 function M.send (message, confirmed)
-  lock.begin_stream('stage and commit')
-  lock.lock_all_skg_buffers()
-  rerender.register_rerender_stream_handlers()
-  state.register_response_handler('stage-and-commit',
-    function (_payload_text, response) M.handler(message, response) end,
-    true)
-  state.lp_reset()
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'stage and commit'),
     sexpr.pair(sexpr.symbol('message'), message) }
   if confirmed then
     table.insert(request, sexpr.pair(sexpr.symbol('confirmed'),
                                      sexpr.symbol('t'))) end
-  client.send_string(sexpr.to_string(request) .. '\n')
+  rerender.send_streaming_request('stage and commit', 'stage-and-commit',
+    request,
+    function (_payload_text, response) M.handler(message, response) end)
 end
 
 ---On a request for confirmation, ask for it, and on "yes" resend
@@ -81,14 +73,14 @@ function M.result_message (response)
           sexpr.atom_text(commit[2]):sub(1, 7))) end
     end
   end
-  local errors = payload.string_list(payload.field(response, 'errors'))
+  local errors_line = rerender.response_errors_line(response)
   local parts = {}
   if #committed > 0 then
     table.insert(parts, 'Committed in ' .. table.concat(committed, ', '))
   else
     table.insert(parts, 'Nothing was committed') end
-  if #errors > 0 then
-    table.insert(parts, '. Errors: ' .. table.concat(errors, '; '))
+  if errors_line then
+    table.insert(parts, '. Errors: ' .. errors_line)
   else
     table.insert(parts, '.') end
   return table.concat(parts)

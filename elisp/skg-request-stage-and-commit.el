@@ -12,8 +12,6 @@
 ;;; DATA USED/ASSUMED: See docs/api-and-formats.org.
 
 (require 'skg-buffer)
-(require 'skg-length-prefix)
-(require 'skg-lock-buffers)
 (require 'skg-readiness) ; for skg--readiness-summary-message
 (require 'skg-request-rerender-all-views)
 
@@ -33,24 +31,15 @@ user types \"yes\"."
 (defun skg--stage-and-commit-send (commit-message confirmed)
   "Send the request with COMMIT-MESSAGE, and '(confirmed . t)' when
 CONFIRMED."
-  (let ((tcp-proc (skg-tcp-connect-to-rust)))
-    (skg--begin-stream "stage and commit")
-    (skg--lock-all-skg-buffers)
-    (skg--register-rerender-stream-handlers)
-    (skg--wrap-rerender-done-with-after-empty-stream)
-    (skg-register-response-handler
-     'stage-and-commit
-     (lambda (_tcp payload)
-       (skg--stage-and-commit-handler commit-message payload))
-     t)
-    (skg-lp-reset)
-    (process-send-string
-     tcp-proc
-     (concat (prin1-to-string
-              (append `((request . "stage and commit")
-                        (message . ,commit-message))
-                      (when confirmed '((confirmed . t)))))
-             "\n"))))
+  (skg--send-streaming-request
+   "stage and commit"
+   'stage-and-commit
+   (append `((request . "stage and commit")
+             (message . ,commit-message))
+           (when confirmed '((confirmed . t))))
+   (lambda (_tcp payload)
+     (skg--stage-and-commit-handler commit-message payload))
+   nil t))
 
 (defun skg--stage-and-commit-handler (commit-message payload)
   "Handle the stage-and-commit response PAYLOAD. On a request for
@@ -78,7 +67,7 @@ confirmed once the empty rerender stream that follows is done."
   "The line shown for RESPONSE, '((commits ((SKGREPO COMMIT-ID) ...))
 \(errors (...)) (warnings (...)))'."
   (let ((commits (cadr (assq 'commits response)))
-        (errors (cadr (assq 'errors response))))
+        (errors-line (skg--response-errors-line response)))
     (concat
      (if commits
          (format "Committed in %s"
@@ -89,9 +78,8 @@ confirmed once the empty rerender stream that follows is done."
                               (substring commit-id 0 (min 7 (length commit-id))))))
                   commits ", "))
        "Nothing was committed")
-     (if errors
-         (format ". Errors: %s"
-                 (mapconcat (lambda (e) (format "%s" e)) errors "; "))
+     (if errors-line
+         (format ". Errors: %s" errors-line)
        "."))))
 
 (provide 'skg-request-stage-and-commit)

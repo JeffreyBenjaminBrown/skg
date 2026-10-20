@@ -9,10 +9,13 @@ local helpers = dofile(
   debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
 
 local buffer = require('skg.buffer')
+local client = require('skg.client')
 local investigate_unknown_node = require('skg.investigate_unknown_node')
 local lock = require('skg.lock')
 local rerender = require('skg.rerender')
 local repo_sets = require('skg.repo_sets')
+local sexpr = require('skg.sexpr.parse')
+local state = require('skg.state')
 
 local function wipe_named (name)
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
@@ -38,6 +41,55 @@ describe('skg stream consumers', function ()
     lock.end_stream()
     wipe_named('skg://messages/rerender')
     wipe_named('skg://unknown-node')
+  end)
+
+  it('sends a streaming request after the prologue', function ()
+    -- Mirrors test-skg-send-streaming-request-sends-after-the-prologue.
+    local calls = {}
+    local stubs = {
+      { lock, 'begin_stream', function (label)
+          table.insert(calls, 'begin_stream ' .. label) end },
+      { lock, 'lock_all_skg_buffers', function ()
+          table.insert(calls, 'lock') end },
+      { rerender, 'register_rerender_stream_handlers', function ()
+          table.insert(calls, 'rerender handlers') end },
+      { state, 'register_response_handler',
+        function (response_type, _handler, one_shot)
+          table.insert(calls, 'handler ' .. response_type
+                              .. (one_shot and ' one-shot' or '')) end },
+      { state, 'lp_reset', function () table.insert(calls, 'reset') end },
+      { client, 'send_string', function (text)
+          table.insert(calls, 'send ' .. text) end } }
+    local originals = {}
+    for i, stub in ipairs(stubs) do
+      originals[i] = stub[1][stub[2]]
+      stub[1][stub[2]] = stub[3] end
+    local ok, err = pcall(rerender.send_streaming_request,
+      'the label', 'the-answer',
+      { sexpr.pair(sexpr.symbol('request'), 'a request') },
+      function () end,
+      { ['other-answer'] = function () end })
+    for i, stub in ipairs(stubs) do stub[1][stub[2]] = originals[i] end
+    assert(ok, err)
+    assert.are.same({ 'begin_stream the label',
+                      'lock',
+                      'rerender handlers',
+                      'handler the-answer one-shot',
+                      'handler other-answer one-shot',
+                      'reset',
+                      'send ((request . "a request"))\n' },
+                    calls)
+  end)
+
+  it("joins a response's errors into one line", function ()
+    assert.are.equal('first; second', rerender.response_errors_line(
+      sexpr.read('((errors ("first" "second")) (warnings ("w")))')))
+    assert.are.equal('only', rerender.response_errors_line(
+      sexpr.read('((errors ("only")))')))
+    assert.is_nil(rerender.response_errors_line(
+      sexpr.read('((errors ()) (warnings ("w")))')))
+    assert.is_nil(rerender.response_errors_line(
+      sexpr.read('((content "x"))')))
   end)
 
   it('drives the rerender stream: lock, per-view update, done with'

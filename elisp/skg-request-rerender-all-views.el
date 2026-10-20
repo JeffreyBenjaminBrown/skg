@@ -1,7 +1,9 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; Handler for the "rerender all views" request/response,
-;;; and the rerender stream that follows several other requests.
+;;; and the rerender stream that follows several other requests,
+;;; with the prologue those requests share
+;;; ('skg--send-streaming-request').
 ;;;
 ;;; Protocol: rerender-lock → rerender-view* → rerender-done.
 ;;; Each view is unlocked and updated as its rerender-view arrives.
@@ -36,6 +38,39 @@ streaming protocol: rerender-lock, rerender-view*, rerender-done."
                (when approved-pids
                  `((approved-overPrivateText-pids ,@approved-pids)))))
              "\n"))))
+
+(defun skg--send-streaming-request
+    (label response-type request handler
+           &optional other-handlers retry-after-empty-stream)
+  "Send REQUEST, an alist, for a command whose answer a rerender
+stream follows. First begin the stream (LABEL names it in the error
+when another is in flight), lock every skg buffer, register the
+rerender stream's handlers and, one-shot, HANDLER for RESPONSE-TYPE,
+then reset the receiver.
+OTHER-HANDLERS, an alist of (TYPE . HANDLER), are the command's other
+possible answers, also one-shot. With RETRY-AFTER-EMPTY-STREAM, a
+handler may set `skg--rerender-after-empty-stream' to resend once
+the empty stream that follows a confirmation is done.
+Each handler is called as (HANDLER TCP-PROC PAYLOAD)."
+  (let ((tcp-proc (skg-tcp-connect-to-rust)))
+    (skg--begin-stream label)
+    (skg--lock-all-skg-buffers)
+    (skg--register-rerender-stream-handlers)
+    (when retry-after-empty-stream
+      (skg--wrap-rerender-done-with-after-empty-stream))
+    (skg-register-response-handler response-type handler t)
+    (dolist (other other-handlers)
+      (skg-register-response-handler (car other) (cdr other) t))
+    (skg-lp-reset)
+    (process-send-string tcp-proc
+                         (concat (prin1-to-string request) "\n"))))
+
+(defun skg--response-errors-line (response)
+  "The errors of RESPONSE, an alist with an (errors (...)) entry,
+joined into one line, or nil when it has none."
+  (let ((errors (cadr (assq 'errors response))))
+    (when (skg--message-list-nonempty-p errors)
+      (mapconcat (lambda (e) (format "%s" e)) errors "; "))))
 
 (defun skg--register-rerender-overPrivateText-confirmation
     (retry &optional unfired-response-type)

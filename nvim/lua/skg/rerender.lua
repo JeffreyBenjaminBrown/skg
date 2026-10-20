@@ -1,7 +1,8 @@
 -- PURPOSE: The rerender stream (rerender-lock -> rerender-view* ->
 -- rerender-done), shared by the skgrepo-set switch, the explicit
--- rerender-all request, and the requests a rerender stream follows. The Lua port of
--- elisp/skg-request-rerender-all-views.el.
+-- rerender-all request, and the requests a rerender stream follows,
+-- with the prologue those requests share (send_streaming_request).
+-- The Lua port of elisp/skg-request-rerender-all-views.el.
 
 local client = require('skg.client')
 local lock = require('skg.lock')
@@ -73,6 +74,41 @@ function M.request_rerender_all_views_with_approval (approved_pids,
     lock.unlock_all_save_locked()
     error(err)
   end
+end
+
+---Send REQUEST, a list of sexpr pairs, for a command whose answer a
+---rerender stream follows. First begin the stream (LABEL names it in
+---the error when another is in flight), lock every skg buffer,
+---register the rerender stream's handlers and, one-shot, HANDLER for
+---RESPONSE_TYPE, then reset the receiver. OTHER_HANDLERS, a table from
+---response type to handler, are the command's other possible answers,
+---also one-shot. Each handler is called as HANDLER(payload_text,
+---response).
+---@param label string
+---@param response_type string
+---@param request table
+---@param handler function
+---@param other_handlers table<string, function>|nil
+function M.send_streaming_request (label, response_type, request,
+                                   handler, other_handlers)
+  lock.begin_stream(label)
+  lock.lock_all_skg_buffers()
+  M.register_rerender_stream_handlers()
+  state.register_response_handler(response_type, handler, true)
+  for other_type, other_handler in pairs(other_handlers or {}) do
+    state.register_response_handler(other_type, other_handler, true) end
+  state.lp_reset()
+  client.send_string(sexpr.to_string(request) .. '\n')
+end
+
+---The errors of RESPONSE joined into one line, or nil when it has
+---none.
+---@param response any
+---@return string|nil
+function M.response_errors_line (response)
+  local errors = payload.string_list(payload.field(response, 'errors'))
+  if #errors == 0 then return nil end
+  return table.concat(errors, '; ')
 end
 
 ---Register the alternative privacy challenge for a rerendering request.

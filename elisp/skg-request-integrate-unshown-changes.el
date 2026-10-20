@@ -11,8 +11,6 @@
 ;;; DATA USED/ASSUMED: See docs/api-and-formats.org.
 
 (require 'skg-buffer)
-(require 'skg-length-prefix)
-(require 'skg-lock-buffers)
 (require 'skg-readiness) ; for skg--readiness-summary-message
 (require 'skg-request-rerender-all-views)
 
@@ -26,32 +24,22 @@ Refuses while the buffer has unsaved changes."
     (user-error "Not in a skg view"))
   (when (buffer-modified-p)
     (user-error "Save the buffer first."))
-  (let ((tcp-proc (skg-tcp-connect-to-rust)))
-    (skg--begin-stream "integrate unshown changes")
-    (skg--lock-all-skg-buffers)
-    (skg--register-rerender-stream-handlers)
-    (skg-register-response-handler
-     'integrate-unshown-changes
-     (lambda (_tcp payload)
-       (skg--integrate-unshown-changes-handler payload))
-     t)
-    (skg-lp-reset)
-    (process-send-string
-     tcp-proc
-     (concat (prin1-to-string
-              `((request . "integrate unshown changes")
-                (view-id . ,skg-view-id)))
-             "\n"))))
+  (skg--send-streaming-request
+   "integrate unshown changes"
+   'integrate-unshown-changes
+   `((request . "integrate unshown changes")
+     (view-id . ,skg-view-id))
+   (lambda (_tcp payload)
+     (skg--integrate-unshown-changes-handler payload))))
 
 (defun skg--integrate-unshown-changes-handler (payload)
   "Show the readiness summary in PAYLOAD, or its errors."
   (condition-case err
       (let* ((response (read payload))
-             (errors-list (cadr (assq 'errors response)))
+             (errors-line (skg--response-errors-line response))
              (summary (assq 'readiness-summary response)))
-        (cond ((skg--message-list-nonempty-p errors-list)
-               (message "%s" (mapconcat (lambda (e) (format "%s" e))
-                                        errors-list "; ")))
+        (cond (errors-line
+               (message "%s" errors-line))
               (summary
                (message "%s" (skg--readiness-summary-message summary)))))
     (error (message "skg: integrate-unshown-changes handler error: %S" err))))
