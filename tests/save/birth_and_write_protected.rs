@@ -3,7 +3,7 @@
 use skg::dbs::filesystem::one_node::graphnode_from_skgid;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::save::update_fs_from_nodeInstructions;
-use skg::test_utils::run_with_test_stores;
+use skg::test_utils::{copy_dir_all, run_with_test_stores};
 use skg::types::misc::{ID, members_of};
 use skg::types::nodes::complete::Graphnode;
 
@@ -83,22 +83,3 @@ fn test_birth_and_write_protected(
 
   result }
 
-/// Recursively copy a directory
-fn copy_dir_all(
-  src: &PathBuf,
-  dst: &PathBuf,
-) -> std::io::Result<()> {
-  fs::create_dir_all (dst)?;
-  for entry in fs::read_dir (src)? {
-    let entry = entry?;
-    let ty = entry . file_type()?;
-    if ty . is_dir() {
-      copy_dir_all(
-        &entry . path(),
-        &dst . join(entry . file_name()),
-      )?;
-    } else {
-      fs::copy( entry . path(),
-                dst . join(entry . file_name()))?; }}
-  Ok (( ))
-}

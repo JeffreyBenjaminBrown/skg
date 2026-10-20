@@ -1,43 +1,20 @@
-/// Shared utilities for tests over git fixtures: the graph straddle and the diff view.
+// Git and stream helpers for the tests over git fixtures (the graph
+// straddle and the diff view). Declared once, in 'tests/grouped_repos.rs'.
 
-pub use git2::Repository;
-pub use std::collections::HashMap;
-pub use std::error::Error;
-pub use std::fs;
-pub use std::net::TcpStream;
-pub use std::path::{Path, PathBuf};
-pub use tempfile::TempDir;
+use git2::Repository;
+use std::error::Error;
+use std::fs;
+use std::net::TcpStream;
+use std::path::Path;
 
-pub use futures::executor::block_on;
-
-pub use skg::dbs::init::create_empty_tantivy_index;
-pub use skg::to_org::render::content_view::multi_root_view;
-pub use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
-pub use skg::test_utils::graph_handle_from_config;
-pub use skg::types::misc::{ID, SkgConfig, Skgrepo, TantivyIndex, SkgrepoName};
-pub use skg::dbs::in_rust_graph::InRustGraphHandle;
-pub use skg::types::nodes::fs::GraphnodeOnDisk;
-pub use skg::types::nodes::complete::Graphnode;
-pub use skg::serve::ViewsState;
-pub use skg::types::views_state::OpenViews;
+use skg::test_utils::copy_dir_all;
+use skg::types::misc::SkgrepoName;
+use skg::types::nodes::complete::Graphnode;
+use skg::types::nodes::fs::GraphnodeOnDisk;
 
 //
 // Git helpers
 //
-
-pub fn copy_dir_all ( src: &Path,
-                      dst: &Path
-                    ) -> Result<(), Box<dyn Error>> {
-  if !dst . exists() { fs::create_dir_all (dst)?; }
-  for entry in fs::read_dir (src)? {
-    let entry = entry?;
-    let src_path = entry . path();
-    let dst_path = dst . join(entry . file_name());
-    if entry . file_type()?. is_dir() {
-      copy_dir_all(&src_path, &dst_path)?;
-    } else {
-      fs::copy(&src_path, &dst_path)?; }}
-  Ok (( )) }
 
 pub fn configure_git_user(gitrepo: &Repository) {
   let mut config = gitrepo . config() . unwrap();
@@ -62,42 +39,6 @@ pub fn commit_all(gitrepo: &Repository, message: &str) {
       gitrepo . commit(Some ("HEAD"), &sig, &sig, message, &tree, &[]) . unwrap();
     }
   }
-}
-
-//
-// Database helpers
-//
-
-pub async fn setup_test_stores(
-  _test_name: &str,
-  skgrepo_path: &str,
-  tantivy_folder: &str,
-) -> Result<(SkgConfig, TantivyIndex), Box<dyn Error>> {
-  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> = HashMap::new();
-  skgrepos . insert (SkgrepoName::from ("main"), Skgrepo {
-    name: SkgrepoName::from ("main"),
-    abbreviation: None,
-    path: PathBuf::from (skgrepo_path),
-    owned: true, });
-  let config = SkgConfig::fromSkgreposAndTantivyFolder (
-    skgrepos, tantivy_folder );
-  let tantivy_index =
-    create_empty_tantivy_index (&config . tantivy_folder) ?;
-  Ok ((config, tantivy_index)) }
-
-pub async fn cleanup_test_stores(
-  _test_name: &str,
-
-  tantivy_folder: Option<&Path>,
-) -> Result<(), Box<dyn Error>> {
-  if let Some (path) = tantivy_folder {
-    // A save's Tantivy update is tantivy-committed on a background worker
-    // (coding-advice/common-gotchas.md); removing the folder while a
-    // tantivy-commit is in flight flakes with DirectoryNotEmpty.
-    skg::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
-    if path . exists() { fs::remove_dir_all (path)?; }
-  }
-  Ok(())
 }
 
 //

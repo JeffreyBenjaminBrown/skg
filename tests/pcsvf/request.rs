@@ -4,22 +4,22 @@
 // last such view closes. A rerender-all writes back the straddle it
 // brought up to date.
 
-use crate::pcsvf::common::git_fixture_helpers::mk_test_tcp_stream_pair;
-use crate::pcsvf::common::{Fixture, open_all_changes_buffer, with_fixture};
+use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
+use crate::git_fixture::{Fixture, everything_written};
+use crate::pcsvf::common::{open_all_changes_buffer, with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
 use skg::serve::handlers::close_view::handle_close_view_request;
 use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use skg::serve::handlers::diff_view::handle_diffView_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::{graph_handle_from_config, read_all_lp_messages, skg_env_from_parts};
+use skg::test_utils::{graph_handle_from_config, skg_env_from_parts};
 use skg::types::env::SkgEnv;
 use skg::types::views_state::{DiffViewBufferKind, ViewId};
 
 use git2::{Commit, Oid, Repository, Signature};
 use std::error::Error;
 use std::fs;
-use std::io::BufReader;
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -30,16 +30,6 @@ fn request (
 ) -> String {
   format! ( "((request . \"diff view\") (buffer . \"{}\") (view-id . \"{}\"))\n",
             buffer, view_id ) }
-
-/// Everything a handler wrote to 'writer', read from its peer
-/// 'read_end': 'writer' is dropped first, so the read ends after the
-/// last message. The messages are joined by newlines.
-fn everything_written (
-  writer   : TcpStream,
-  read_end : TcpStream,
-) -> String {
-  drop (writer);
-  read_all_lp_messages ( &mut BufReader::new (read_end) ) . join ("\n") }
 
 #[test]
 fn a_request_registers_its_buffer_and_the_last_close_drops_the_straddle (

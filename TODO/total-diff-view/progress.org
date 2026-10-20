@@ -1703,3 +1703,76 @@ the prologue too, but each registers the overPrivateText confirmation
 between the rerender handlers and the reset, and has no one-shot
 answer of its own (or, for the skgrepo restriction, one that the
 confirmation must cancel). The plan names three commands; those stay.
+** Slice 7: deviations
+*** the partner-folder check already had its tests
+Slice 5 added them as unit tests of the check
+('a_member_drawn_by_an_extra_id_passes_when_the_graph_lists_the_extra_id',
+'an_unknown_member_is_compared_by_raw_id'). The slice's tests of that
+behavior run the save end to end instead, over a new fixture,
+'partner_ids', in a new file, 'tests/pcsvf/partner_folder_check.rs'.
+*** where the other new tests sit
+Fold state gets two tests in 'folding.rs', one per occasion
+('folds_survive_a_commit', 'folds_survive_a_collateral_rerender'); the
+second uses 'retitle_in_a_content_view', moved from
+'recomputed_sets.rs' to the shared helpers. The home skgrepo, the ID
+and flags folders and the adoption are in 'write_protecting.rs' (over
+'kinds' and 'shared'); the request's refusals and the merge commit are
+in 'request.rs', over 'sets' with its gitrepo removed, re-initialized
+without a commit, or given a merge commit at HEAD; the foreign count
+is in 'readiness.rs', over a new fixture, 'foreign', whose foreign
+skgrepo is a gitrepo with two changed files.
+*** the split bundles
+Each sub-test is a test of its own, named as its async function less
+the 'test_' prefix, in stores of its own ('run_with_test_stores'),
+except that 'test_find_buffer_errors_for_saving' runs as
+'finds_buffer_errors_for_saving', since the bare name is the
+validator's, which the file imports.
+*** the shared fixture
+'git_fixture (case folder, owned, foreign)' takes the case's folder,
+so each test file keeps its own fixtures folder; 'OwnedSkgrepos::Named'
+is the PCSVF layout and 'OwnedSkgrepos::OnlyMain' the single-skgrepo
+one ('<case>/head', '<case>/worktree'). A foreign skgrepo with a 'head'
+folder is made a gitrepo like an owned one; without, it is copied as a
+plain folder (the graph straddle's case). Beside 'save_cleanly',
+'edit_line' and the reader ('everything_written'), the shared file
+holds 'with_git_fixture', 'graph_straddle', 'save_view' and
+'skg_files', which the four files also each had.
+**** the view a save goes to
+The four files save under different views (the diff view's buffers,
+two content views), so 'save_view' and 'save_cleanly' take the view
+id; the PCSVF files pass 'all_changes_view ()'. 'folding.rs''s copy of
+'save_cleanly' returned the saved text; its callers now read
+'saved_view'.
+**** the PCSVF wrappers
+'with_fixture' and 'with_fixture_and_foreign' in 'tests/pcsvf/common.rs'
+are one-line wrappers that name the case under 'tests/pcsvf/fixtures/'.
+**** the graph straddle's tests
+'tests/graph_straddle.rs' uses the fixture everywhere but its rebuild
+test, which lays out its skgrepos under its own 'skgconfig.toml'.
+**** 'git_fixture_helpers.rs'
+It is declared once as well, beside 'git_fixture.rs', in
+'tests/grouped_repos.rs'. Besides the two uncalled tantivy helpers
+('setup_test_stores', 'cleanup_test_stores') it lost its re-exports,
+which nothing used, and its 'copy_dir_all'.
+*** 'copy_dir_all'
+The shared one is 'skg::test_utils::copy_dir_all', made public. The
+copies in 'git_fixture_helpers.rs', 'tests/strandeds.rs',
+'tests/collateral_repo_move.rs' and
+'tests/save/birth_and_write_protected.rs' went.
+*** the reader beyond 'request.rs''s refusals
+The rerender-all test in 'request.rs' reads with 'everything_written'
+too. The send helpers in 'common.rs' still drop the writer and read
+the raw stream to its end, which does not truncate, because
+'first_streamed_view_content' splits that stream at "Content-Length".
+*** counts
+'cargo nextest run': 785 before, 824 after: eleven new tests, and the
+two bundles became thirty tests. The only names lost are the two
+'all_tests'. The Emacs suite has 369 tests and the Neovim suite 344, as
+before. The name lists are 'tests/results/slice7/names-before.txt' and
+'names-after.txt' (not committed).
+*** seen, left
+'tests/titles_by_ids.rs' has its own 'commit_all' and
+'configure_git_user'; 'tests/collateral_repo_move.rs' its own
+'mk_test_tcp_stream_pair'; 'tests/editable_view_cascade_and_budget.rs'
+a one-ended 'mk_test_tcp_stream'. They are outside the four modules
+the plan names.

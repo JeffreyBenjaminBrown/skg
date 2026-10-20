@@ -8,8 +8,9 @@
 //   (unmoved), whose content mvt moved like mvp.
 // - ord's content changed only in order: o1, o2 became o2, o1.
 
+use crate::git_fixture::{Fixture, graph_straddle};
 use crate::pcsvf::common::{
-  Fixture, graph_straddle, ids, open_buffer, saves_back_unchanged, with_fixture};
+  ids, open_buffer, saves_back_unchanged, with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
 use skg::pcsvf::{PcsvfSets, pcsvf_sets_for_home_moves, pcsvf_sets_for_merges};

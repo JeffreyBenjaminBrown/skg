@@ -347,7 +347,7 @@ async fn guarded_test_then_cleanup(
 }
 
 /// Recursively copy a directory and its contents.
-fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), Box<dyn Error>> {
+pub fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), Box<dyn Error>> {
   fs::create_dir_all (dst)?;
   for entry in fs::read_dir (src)? {
     let entry : fs::DirEntry = entry?;

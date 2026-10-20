@@ -3,10 +3,10 @@
 // 'kinds' fixture is described in 'buffer.rs'. The 'overrides'
 // fixture: r overrides n, and p, which contains n, is retitled.
 
+use crate::git_fixture::{Fixture, skg_files};
 use crate::pcsvf::common::{
-  Fixture, open_all_changes_buffer, save, skg_files, view_id_of,
-  with_fixture};
-use crate::pcsvf::common::git_fixture_helpers::{
+  open_all_changes_buffer, save, view_id_of, with_fixture};
+use crate::git_fixture_helpers::{
   mk_test_tcp_stream_pair, read_graphnode, without_lines_containing};
 
 use skg::serve::handlers::save_buffer::SaveResponse;

@@ -4,9 +4,10 @@
 // carries the readiness summary
 // ('TODO/total-diff-view/02_plan.org', "Saving a diff-view buffer").
 
+use crate::git_fixture::{Fixture, edit_line, save_cleanly};
 use crate::pcsvf::common::{
-  Fixture, open_all_changes_buffer, open_buffer, save, save_buffer,
-  integrate_unshown_changes, with_fixture, with_fixture_and_foreign};
+  all_changes_view, integrate_unshown_changes, open_all_changes_buffer,
+  open_buffer, save_buffer, with_fixture, with_fixture_and_foreign};
 
 use skg::change_leaves::{BufferReadinessSummary, ReadinessSummary};
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -14,33 +15,6 @@ use skg::serve::util::sexp_to_client_string;
 use skg::types::views_state::DiffViewBufferKind;
 
 use std::error::Error;
-
-/// 'buffer' with the headline line starting 'prefix' (the only one)
-/// replaced by 'replace (line)'.
-fn edit_line (
-  buffer  : &str,
-  prefix  : &str,
-  replace : impl Fn (&str) -> String,
-) -> String {
-  let matching : Vec<&str> = buffer . lines ()
-    . filter ( |line| line . starts_with (prefix) ) . collect ();
-  assert_eq! ( matching . len (), 1,
-               "exactly one line should start {:?}:\n{}", prefix, buffer );
-  buffer . lines ()
-    . map ( |line| if line . starts_with (prefix) { replace (line) }
-                   else { line . to_string () } )
-    . collect::<Vec<String>> () . join ("\n") + "\n" }
-
-/// Save 'buffer'; it must save without errors.
-fn save_cleanly (
-  f      : &mut Fixture,
-  buffer : &str,
-) -> Result<SaveResponse, Box<dyn Error>> {
-  let response : SaveResponse = save (f, buffer) ?;
-  assert! ( response . errors . is_empty (),
-            "the buffer must save without errors, got {:?}\n\nbuffer:\n{}",
-            response . errors, buffer );
-  Ok (response) }
 
 /// The relationship by which sub no longer subscribes to s1 is one
 /// leaf. Marked on its image under sub, it shows ready on its image
@@ -54,7 +28,7 @@ fn a_mark_shows_on_both_images_of_a_relationship (
       &buffer, "*** (skg (node (id s1)",
       |line| line . replace ( "(diff rel-))) s1",
                               "(diff rel-) (readyRequest rel))) s1" ));
-    let saved : String = save_cleanly (f, &marked) ? . saved_view;
+    let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
     assert! ( saved . contains (
       "*** (skg (node (id s1) (repo public) (affectsParent false) writeProtected (diff rel-) (ready rel))) s1" ),
       "the image under sub is ready:\n{}", saved );
@@ -78,7 +52,7 @@ fn marking_a_removed_entry_marks_its_leaf (
       . into_iter () . fold ( buffer, |marked, line|
         edit_line ( &marked, line, |line| line . replacen (
           "(diff rel-))", "(diff rel-) (readyRequest))", 1 )) );
-    let saved : String = save_cleanly (f, &marked) ? . saved_view;
+    let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
     for line in [ "*** (skg removedAlias (diff rel-) (ready)) a1",
                   "*** (skg removedID (diff rel-) (ready)) ali-old" ] {
       assert! ( saved . lines () . any ( |l| l == line ),
@@ -97,13 +71,13 @@ fn editing_a_node_lapses_its_mark (
     let marked : String = edit_line (
       &buffer, "** (skg (oldText titleAndBody)) txt",
       |_| "** (skg (oldText titleAndBody) (readyRequest)) txt" . to_string () );
-    let saved : String = save_cleanly (f, &marked) ? . saved_view;
+    let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
     assert! ( saved . contains ("** (skg (oldText titleAndBody) (ready)) txt"),
               "the old text is ready:\n{}", saved );
     let edited : String = edit_line (
       &saved, "* (skg (node (id txt)",
       |line| line . replace ( "txt, retitled", "txt, retitled again" ));
-    let saved : String = save_cleanly (f, &edited) ? . saved_view;
+    let saved : String = save_cleanly (f, &all_changes_view (), &edited) ? . saved_view;
     assert! ( saved . contains ("** (skg (oldText titleAndBody)) txt"),
               "the edit lapsed the mark:\n{}", saved );
     Ok (( )) }) }
@@ -122,11 +96,11 @@ fn the_save_reports_the_readiness_summary (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("sets", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert_eq! ( summary_of ( &save_cleanly (f, &buffer) ? ), summary (0, 6, 0) );
+    assert_eq! ( summary_of ( &save_cleanly (f, &all_changes_view (), &buffer) ? ), summary (0, 6, 0) );
     let marked : String = edit_line (
       &buffer, "** (skg (oldText title)) mc",
       |_| "** (skg (oldText title) (readyRequest)) mc" . to_string () );
-    let response : SaveResponse = save_cleanly (f, &marked) ?;
+    let response : SaveResponse = save_cleanly (f, &all_changes_view (), &marked) ?;
     assert_eq! ( summary_of (&response), summary (1, 6, 0),
                  "mc's file records only its text change" );
     let only_r : String = { // drop the roots cy2, ln and mc, which precede r
@@ -135,7 +109,7 @@ fn the_save_reports_the_readiness_summary (
         . position ( |line| line . starts_with ("* (skg (node (id r)") )
         . expect ("r is a root");
       lines [start ..] . join ("\n") + "\n" };
-    let response : SaveResponse = save_cleanly (f, &only_r) ?;
+    let response : SaveResponse = save_cleanly (f, &all_changes_view (), &only_r) ?;
     assert_eq! ( response . saved_view . lines ()
                    . filter ( |line| line . starts_with ("* ") ) . count (), 1,
                  "the dropped roots stay dropped:\n{}", response . saved_view );
@@ -181,7 +155,7 @@ fn the_summary_counts_the_changed_files_of_the_foreign_skgrepos (
   with_fixture_and_foreign ("foreign", &["main"], &["foreign"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let summary : BufferReadinessSummary =
-      summary_of ( &save_cleanly (f, &buffer) ? );
+      summary_of ( &save_cleanly (f, &all_changes_view (), &buffer) ? );
     assert_eq! ( summary . summary, ReadinessSummary {
       ready_files : 0, changed_files : 1,
       foreign_changed_files : 2, order_only_files : 0 } );
@@ -221,8 +195,8 @@ fn save_deleting (
     buffer, prefix,
     |line| line . replacen (
       &node, &format! ("{} (editRequest delete)", node), 1 ));
-  let saved : String = save_cleanly (f, &deleting) ? . saved_view;
-  assert_eq! ( save_cleanly (f, &saved) ? . saved_view, saved,
+  let saved : String = save_cleanly (f, &all_changes_view (), &deleting) ? . saved_view;
+  assert_eq! ( save_cleanly (f, &all_changes_view (), &saved) ? . saved_view, saved,
                "the reconciled buffer is a fixed point" );
   Ok (saved) }
 

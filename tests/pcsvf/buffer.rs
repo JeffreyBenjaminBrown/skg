@@ -8,9 +8,10 @@
 // private; acq acquired acqd by a nodeMerge; gone, which subscribed
 // to orph, is deleted.
 
+use crate::git_fixture::Fixture;
 use crate::pcsvf::common::{
-  Fixture, all_changes_buffer, all_changes_buffer_with_marks,
-  saves_back_unchanged, with_fixture};
+  all_changes_buffer, all_changes_buffer_with_marks, saves_back_unchanged,
+  with_fixture};
 
 use skg::change_leaves::{LeafKey, NodeAspect};
 use skg::types::misc::ID;

@@ -6,10 +6,11 @@
 // contains a, whose body changed, and b, unchanged. So n, a node of
 // U, is drawn editable under x and write-protected under y.
 
+use crate::git_fixture::{Fixture, skg_files};
 use crate::pcsvf::common::{
-  Fixture, node_lines, open_all_changes_buffer, requesting_editable_at, save,
-  skg_files, view_id_of, with_fixture};
-use crate::pcsvf::common::git_fixture_helpers::mk_test_tcp_stream_pair;
+  node_lines, open_all_changes_buffer, requesting_editable_at, save,
+  view_id_of, with_fixture};
+use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::update_from_and_rerender_buffer_test;

@@ -990,7 +990,7 @@ headlines one level below point) and, in the Neovim suite, a test that
 still approves in the fork-confirmation buffer. 'docs/COMMANDS-nvim.org'
 moves the seven folder commands to their new keys.
 
-** TODO Slice 7: tests
+** DONE Slice 7: tests
 Make every change under "Tests" above. Write the six missing tests
 first, each named for the behavior it asserts, in the 'tests/pcsvf/'
 file whose fixture fits (or a new file with its fixture's shape stated

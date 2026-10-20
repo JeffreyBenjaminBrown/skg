@@ -3,10 +3,10 @@
 // owned skgrepos public and private both have changes, deletions
 // among them.
 
+use crate::git_fixture::{Fixture, graph_straddle};
 use crate::pcsvf::common::{
-  Fixture, all_changes_buffer, graph_straddle, open_all_changes_buffer,
-  rerendered_view_content, send_stage_and_commit_request, view_id_of,
-  with_fixture};
+  all_changes_buffer, open_all_changes_buffer, rerendered_view_content,
+  send_stage_and_commit_request, view_id_of, with_fixture};
 
 use skg::change_leaves::{ChangeLeaves, LeafKey};
 use skg::graph_straddle::types::GraphStraddle;

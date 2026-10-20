@@ -5,12 +5,11 @@
 // are described in 'buffer.rs' ('sets', 'kinds') and in
 // 'other_buffers.rs' ('buffers').
 
+use crate::git_fixture::{edit_line, save_cleanly};
 use crate::pcsvf::common::{
-  Fixture, open_all_changes_buffer, rerendered_view_content,
-  retitle_in_a_content_view, save, send_stage_and_commit_request,
-  with_fixture};
+  all_changes_view, open_all_changes_buffer, rerendered_view_content,
+  retitle_in_a_content_view, send_stage_and_commit_request, with_fixture};
 
-use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::skg_env_from_parts;
 use skg::types::env::SkgEnv;
 
@@ -26,21 +25,6 @@ fn with_atom (
   edit_line ( buffer, prefix,
     |line| line . replacen ("(skg ", &format! ("(skg {} ", atom), 1 )) }
 
-/// 'buffer' with its one line starting 'prefix' replaced.
-fn edit_line (
-  buffer  : &str,
-  prefix  : &str,
-  replace : impl Fn (&str) -> String,
-) -> String {
-  let matching : usize = buffer . lines ()
-    . filter ( |line| line . starts_with (prefix) ) . count ();
-  assert_eq! ( matching, 1,
-               "exactly one line should start {:?}:\n{}", prefix, buffer );
-  buffer . lines ()
-    . map ( |line| if line . starts_with (prefix) { replace (line) }
-                   else { line . to_string () } )
-    . collect::<Vec<String>> () . join ("\n") + "\n" }
-
 /// 'buffer' with 'lines' inserted after its one line starting
 /// 'prefix'.
 fn insert_after (
@@ -51,17 +35,6 @@ fn insert_after (
   edit_line ( buffer, prefix,
     |line| std::iter::once (line) . chain ( lines . iter () . copied () )
            . collect::<Vec<&str>> () . join ("\n") ) }
-
-/// Save 'buffer'; it must save without errors.
-fn save_cleanly (
-  f      : &mut Fixture,
-  buffer : &str,
-) -> Result<String, Box<dyn Error>> {
-  let response : SaveResponse = save (f, buffer) ?;
-  assert! ( response . errors . is_empty (),
-            "the buffer must save without errors, got {:?}\n\nbuffer:\n{}",
-            response . errors, buffer );
-  Ok (response . saved_view) }
 
 /// The one line of 'buffer' starting 'prefix'.
 fn line_starting<'a> (
@@ -84,9 +57,9 @@ fn a_context_body_unfolded_by_the_client_stays_open (
     let unfolded : String = edit_line (
       &buffer, "** (skg bodyFolded (node (id cy1)",
       |line| line . replacen ("bodyFolded ", "", 1) );
-    let saved : String = save_cleanly (f, &unfolded) ?;
+    let saved : String = save_cleanly (f, &all_changes_view (), &unfolded) ? . saved_view;
     assert_eq! ( saved, unfolded, "cy1's body stays open" );
-    assert_eq! ( save_cleanly (f, &saved) ?, saved, "and again" );
+    assert_eq! ( save_cleanly (f, &all_changes_view (), &saved) ? . saved_view, saved, "and again" );
     Ok (( )) }) }
 
 /// The folds of the 'kinds' buffer the tests put there: the alias
@@ -123,15 +96,15 @@ fn folded_change_folders_and_old_text_stay_folded (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let folded : String = fold_kinds_buffer ( &open_all_changes_buffer (f) ? );
-    let saved : String = save_cleanly (f, &folded) ?;
+    let saved : String = save_cleanly (f, &all_changes_view (), &folded) ? . saved_view;
     assert_eq! ( saved, folded, "saved unchanged, the buffer comes back as it was" );
-    assert_eq! ( save_cleanly (f, &saved) ?, saved, "and again" );
+    assert_eq! ( save_cleanly (f, &all_changes_view (), &saved) ? . saved_view, saved, "and again" );
     let contained : String = insert_after (
       &saved, "* (skg (node (id ct)", &[
         "** a new container",
         "*** (skg (node (id txt) (repo public) writeProtected)) txt, retitled",
         "*** (skg (node (id ali) (repo public) writeProtected)) ali" ] );
-    let saved : String = save_cleanly (f, &contained) ?;
+    let saved : String = save_cleanly (f, &all_changes_view (), &contained) ? . saved_view;
     assert! ( saved . contains ("a new container"), "{}", saved );
     assert_kinds_folds_stay (&saved);
     Ok (( )) }) }
@@ -147,13 +120,13 @@ fn a_folded_historical_phantom_stays_folded (
     let folded : String = with_atom (
       &with_atom ( &buffer, "*** (skg (historical (id delc)", "folded" ),
       "** (skg (historical (id del)", "bodyFolded" );
-    let saved : String = save_cleanly (f, &folded) ?;
+    let saved : String = save_cleanly (f, &all_changes_view (), &folded) ? . saved_view;
     assert_eq! ( saved, folded, "saved unchanged, the buffer comes back as it was" );
     let contained : String = insert_after (
       &saved, "* (skg (node (id ln)", &[
         "** a new container",
         "*** (skg (node (id r) (repo main) writeProtected)) r" ] );
-    let saved : String = save_cleanly (f, &contained) ?;
+    let saved : String = save_cleanly (f, &all_changes_view (), &contained) ? . saved_view;
     assert! ( saved . contains ("a new container"), "{}", saved );
     assert! ( line_starting (&saved, "** (skg bodyFolded (historical (id del)")
               . ends_with (" del"), "{}", saved );
@@ -171,13 +144,13 @@ fn a_folded_headline_in_a_member_role_tree_stays_folded (
     let buffer : String = open_all_changes_buffer (f) ?;
     let memberRoleTree_headline : &str = "****** (skg (node (id top)";
     let folded : String = with_atom (&buffer, memberRoleTree_headline, "folded");
-    let saved : String = save_cleanly (f, &folded) ?;
+    let saved : String = save_cleanly (f, &all_changes_view (), &folded) ? . saved_view;
     assert_eq! ( saved, folded, "saved unchanged, the buffer comes back as it was" );
     let contained : String = insert_after (
       &saved, "* (skg (node (id txt)", &[
         "** a new container",
         "*** (skg (node (id top) (repo public) writeProtected)) top" ] );
-    let saved : String = save_cleanly (f, &contained) ?;
+    let saved : String = save_cleanly (f, &all_changes_view (), &contained) ? . saved_view;
     assert! ( saved . contains ("a new container"), "{}", saved );
     line_starting (&saved, "****** (skg folded (node (id top)");
     Ok (( )) }) }
@@ -192,7 +165,7 @@ fn a_removed_member_keeps_its_fold_state_and_its_place (
     let folded : String = with_atom (&buffer, "** (skg (node (id k1)", "folded");
     let mut saved : String = folded . clone ();
     for _ in 0 .. 2 {
-      saved = save_cleanly (f, &saved) ?;
+      saved = save_cleanly (f, &all_changes_view (), &saved) ? . saved_view;
       let lines : Vec<&str> = saved . lines () . collect ();
       let k1 : usize = lines . iter ()
         . position ( |line| line . starts_with ("** (skg folded (node (id k1)") )
@@ -214,7 +187,7 @@ fn a_deleted_then_restored_node_keeps_the_folding_of_its_subtree (
       &edit_line ( &buffer, "** (skg bodyFolded (node (id cy1)",
         |line| line . replacen ("(node (id cy1)", "(node (id cy1) (editRequest delete)", 1) ),
       "*** (skg (node (id cy2)", "folded" );
-    let deleted : String = save_cleanly (f, &folded) ?;
+    let deleted : String = save_cleanly (f, &all_changes_view (), &folded) ? . saved_view;
     assert! ( deleted . contains (
       "** (skg bodyFolded (historical (id cy1) (repo main) (diff node- rel-))) cy1\n\
        *** (skg folded (node (id cy2)" ),
@@ -226,7 +199,7 @@ fn a_deleted_then_restored_node_keeps_the_folding_of_its_subtree (
       &restoring, "*** (skg folded (node (id cy2)",
       |_| "*** (skg folded (node (id cy2) (repo main) writeProtected)) cy2, retitled"
           . to_string () );
-    let restored : String = save_cleanly (f, &restoring) ?;
+    let restored : String = save_cleanly (f, &all_changes_view (), &restoring) ? . saved_view;
     assert! ( restored . contains ("** (skg bodyFolded (node (id cy1)")
               && restored . contains ("*** (skg folded (node (id cy2)")
               && ! restored . contains ("historical (id cy1)"),
@@ -268,7 +241,7 @@ fn folds_survive_a_commit (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &["public", "private"], |f| {
     let folded : String = fold_buffers_buffer ( &open_all_changes_buffer (f) ? );
-    assert_buffers_folds_stay ( &save_cleanly (f, &folded) ? );
+    assert_buffers_folds_stay ( &save_cleanly (f, &all_changes_view (), &folded) ? . saved_view );
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let response : String = send_stage_and_commit_request ( f, &env,
       "((request . \"stage and commit\") (message . \"commit\") (confirmed . t))\n" ) ?;
@@ -287,7 +260,7 @@ fn folds_survive_a_collateral_rerender (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &["public", "private"], |f| {
     let folded : String = fold_buffers_buffer ( &open_all_changes_buffer (f) ? );
-    let saved : String = save_cleanly (f, &folded) ?;
+    let saved : String = save_cleanly (f, &all_changes_view (), &folded) ? . saved_view;
     let rerendered : String =
       retitle_in_a_content_view (f, "txt", "txt, retitled again", &saved) ?;
     assert! ( line_starting (&rerendered, "* (skg (node (id txt)")

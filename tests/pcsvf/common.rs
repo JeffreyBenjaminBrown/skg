@@ -1,20 +1,16 @@
-// Fixtures for the PCSVF tests: one gitrepo per owned skgrepo of a
-// case, at HEAD '<case>/<skgrepo>/head' with
-// '<case>/<skgrepo>/worktree' in the worktree.
+// Helpers for the PCSVF tests, over the git fixtures
+// ('tests/shared/git_fixture.rs') of the cases in 'tests/pcsvf/fixtures/',
+// each of whose owned skgrepos is a folder of the case.
 
-#[path = "../shared/git_fixture_helpers.rs"]
-#[allow(unused_imports, dead_code)] // shared by several test targets, each using part of it
-pub mod git_fixture_helpers;
-
-use git_fixture_helpers::{mk_test_tcp_stream_pair, setup_gitrepo_with_fixtures};
+use crate::git_fixture::{
+  Fixture, OwnedSkgrepos, graph_straddle, save_view, skg_files,
+  with_git_fixture};
+use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 
 use skg::change_leaves::LeafKey;
-use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::dbs::init::create_empty_tantivy_index;
 use skg::graph_straddle::build::current_graph_straddle_in_slot;
 use skg::graph_straddle::types::GraphStraddle;
 use skg::readiness_store::ReadinessStore;
-use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::serve::handlers::integrate_unshown_changes::handle_integrate_unshown_changes_request;
 use skg::serve::handlers::stage_and_commit::handle_stage_and_commit_request;
@@ -22,73 +18,28 @@ use skg::pcsvf::DrawnDiffViewBuffer;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::test_utils::{
-  cleanup_test_tantivy, extract_string_field_from_sexp, graph_handle_from_config,
-  skg_env_from_parts, update_from_and_rerender_buffer_test};
+  extract_string_field_from_sexp, skg_env_from_parts,
+  update_from_and_rerender_buffer_test};
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::env::{RuntimeGeneration, SkgEnv};
-use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
-use skg::types::views_state::{OpenViews, DiffViewBufferKind, ViewId};
+use skg::types::misc::ID;
+use skg::types::views_state::{DiffViewBufferKind, ViewId};
 use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
 
 use futures::executor::block_on;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
-use std::fs;
 use std::io::Read;
 use std::net::TcpStream;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, MutexGuard};
-use tempfile::TempDir;
 
 const FIXTURES : &str = "tests/pcsvf/fixtures";
 
-pub struct Fixture {
-  pub root        : TempDir,
-  pub skgrepos    : Vec<String>,
-  pub config      : SkgConfig,
-  pub tantivy     : TantivyIndex,
-  pub graph       : InRustGraphHandle,
-  pub views_state : ViewsState,
-}
-
-/// The case's gitrepos, one owned skgrepo each, in privacy order,
-/// then one for each foreign skgrepo of 'foreign', built the same way.
-pub fn fixture_with_foreign (
-  case     : &str,
-  skgrepos : &[&str],
-  foreign  : &[&str],
-) -> Result<Fixture, Box<dyn Error>> {
-  let root : TempDir = TempDir::new () ?;
-  let mut skgrepo_map : HashMap<SkgrepoName, Skgrepo> = HashMap::new ();
-  for (name, owned) in skgrepos . iter () . map ( |name| (name, true) )
-    . chain ( foreign . iter () . map ( |name| (name, false) )) {
-    let fixtures : PathBuf = Path::new (FIXTURES) . join (case) . join (name);
-    setup_gitrepo_with_fixtures (
-      &root . path () . join (name),
-      fixtures . join ("head") . to_str () . unwrap (),
-      fixtures . join ("worktree") . to_str () . unwrap () ) ?;
-    skgrepo_map . insert ( SkgrepoName::from (*name), Skgrepo {
-      name : SkgrepoName::from (*name), abbreviation : None,
-      path : root . path () . join (name), owned } ); }
-  let mut config : SkgConfig = SkgConfig::fromSkgreposAndTantivyFolder (
-    skgrepo_map, root . path () . join ("tantivy") . to_str () . unwrap () );
-  config . skgrepo_order =
-    skgrepos . iter () . chain (foreign)
-    . map ( |name| SkgrepoName::from (*name) ) . collect ();
-  config . data_root = root . path () . to_path_buf ();
-  let tantivy : TantivyIndex = create_empty_tantivy_index (&config . tantivy_folder) ?;
-  let graph : InRustGraphHandle = graph_handle_from_config (&config) ?;
-  Ok ( Fixture {
-    root,
-    skgrepos : skgrepos . iter () . map ( |name| name . to_string () ) . collect (),
-    config, tantivy, graph,
-    views_state : ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None, } } ) }
-
-/// Run 'body' on the fixture, then remove its search index.
+/// Run 'body' on the case's fixture, its owned skgrepos 'skgrepos' in
+/// privacy order; see 'with_git_fixture'.
 pub fn with_fixture (
   case     : &str,
   skgrepos : &[&str],
@@ -96,22 +47,15 @@ pub fn with_fixture (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture_and_foreign (case, skgrepos, &[], body) }
 
-/// The same, with the foreign skgrepos of 'fixture_with_foreign'.
+/// The same, with the foreign skgrepos 'foreign' after them.
 pub fn with_fixture_and_foreign (
   case     : &str,
   skgrepos : &[&str],
   foreign  : &[&str],
   body     : impl FnOnce (&mut Fixture) -> Result<(), Box<dyn Error>>,
 ) -> Result<(), Box<dyn Error>> {
-  let mut f : Fixture = fixture_with_foreign (case, skgrepos, foreign) ?;
-  let result : Result<(), Box<dyn Error>> = body (&mut f);
-  cleanup_test_tantivy ( Some (&f . config . tantivy_folder) ) ?;
-  result }
-
-pub fn graph_straddle (
-  f : &Fixture,
-) -> Result<GraphStraddle, Box<dyn Error>> {
-  Ok ( GraphStraddle::from_head_and_live (&f . config, f . graph . load_full ()) ? ) }
+  with_git_fixture ( &Path::new (FIXTURES) . join (case),
+                     OwnedSkgrepos::Named (skgrepos), foreign, body ) }
 
 /// The text of the "all changes" buffer, with no marks; None when it
 /// would be empty.
@@ -189,11 +133,12 @@ pub fn save_buffer (
   diffView_buffer_kind : DiffViewBufferKind,
   text                 : &str,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  Ok ( block_on ( update_from_and_rerender_buffer_test (
-    &mut stream, text, &f . config, &f . tantivy, &f . graph,
-    &Ok ( view_id_of (diffView_buffer_kind) ), &mut f . views_state )) ? ) }
+  save_view (f, &view_id_of (diffView_buffer_kind), text) }
+
+/// The view id of the "all changes" buffer.
+pub fn all_changes_view (
+) -> ViewId {
+  view_id_of (DiffViewBufferKind::AllChanges) }
 
 /// The round-trip invariant for a buffer of the diff view:
 /// saved unchanged, it changes no file, reports no error, and is
@@ -217,22 +162,6 @@ pub fn saves_back_unchanged (
     assert_eq! ( response . saved_view, text,
                  "the reconciled buffer must be the buffer saved" );
     Ok (( )) }) }
-
-/// Every '.skg' file of the fixture's skgrepos, by path, with its
-/// contents.
-pub fn skg_files (
-  f : &Fixture,
-) -> Result<BTreeMap<String, String>, Box<dyn Error>> {
-  let mut files : BTreeMap<String, String> = BTreeMap::new ();
-  for skgrepo in &f . skgrepos {
-    for entry in fs::read_dir ( f . root . path () . join (skgrepo) ) ? {
-      let path : PathBuf = entry ? . path ();
-      if path . extension () . is_some_and ( |ext| ext == "skg" ) {
-        files . insert (
-          format! ( "{}/{}", skgrepo,
-                    path . file_name () . unwrap () . to_string_lossy () ),
-          fs::read_to_string (&path) ? ); }}}
-  Ok (files) }
 
 pub fn ids (
   list : &[&str],

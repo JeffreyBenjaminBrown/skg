@@ -17,8 +17,8 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::{
   SaveResponse, update_from_and_rerender_buffer_with_approvals};
 use skg::test_utils::{
-  cleanup_test_tantivy, extract_string_field_from_sexp, read_all_lp_messages,
-  skg_env_from_parts};
+  cleanup_test_tantivy, copy_dir_all, extract_string_field_from_sexp,
+  read_all_lp_messages, skg_env_from_parts};
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
@@ -30,10 +30,9 @@ use ego_tree::Tree;
 use futures::executor::block_on;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::fs;
 use std::io::BufReader;
 use std::net::{TcpListener, TcpStream};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tempfile::TempDir;
 
 struct Fixture {
@@ -216,16 +215,3 @@ fn a_reviewed_save_that_chooses_nothing_leaves_the_relationship_where_it_was (
     Ok (( )) }) ();
   cleanup_test_tantivy ( Some (&f . config . tantivy_folder) ) ?;
   result }
-
-fn copy_dir_all (
-  src : &Path,
-  dst : &Path,
-) -> Result<(), Box<dyn Error>> {
-  fs::create_dir_all (dst) ?;
-  for entry in fs::read_dir (src) ? {
-    let entry : fs::DirEntry = entry ?;
-    let dst_path : PathBuf = dst . join (entry . file_name ());
-    if entry . file_type () ? . is_dir () {
-      copy_dir_all (&entry . path (), &dst_path) ?;
-    } else { fs::copy (entry . path (), &dst_path) ?; }}
-  Ok (( )) }

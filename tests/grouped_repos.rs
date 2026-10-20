@@ -2,6 +2,12 @@
 // and skgrepo/storage-layer tests. See tests/grouped_unit.rs for why test
 // files are grouped into a few [[test]] targets.
 
+#[path = "shared/git_fixture_helpers.rs"]
+mod git_fixture_helpers;
+
+#[path = "shared/git_fixture.rs"]
+mod git_fixture;
+
 #[path = "graph_straddle.rs"]
 mod graph_straddle;
 

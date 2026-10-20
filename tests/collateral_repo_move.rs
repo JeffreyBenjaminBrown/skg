@@ -12,6 +12,7 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
   cleanup_test_tantivy,
+  copy_dir_all,
   extract_string_field_from_sexp,
   read_all_lp_messages,
   update_from_and_rerender_buffer_test as update_from_and_rerender_buffer};
@@ -23,7 +24,6 @@ use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
 use std::error::Error;
-use std::fs;
 use std::io::BufReader;
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
@@ -200,24 +200,6 @@ async fn setup_test_stores (
   let tantivy_index : TantivyIndex =
     create_empty_tantivy_index (&config . tantivy_folder)?;
   Ok ((config, tantivy_index, nodes)) }
-
-fn copy_dir_all (
-  src : &Path,
-  dst : &Path,
-) -> Result<(), Box<dyn Error>> {
-  fs::create_dir_all (dst)?;
-  for entry in fs::read_dir (src)? {
-    let entry : fs::DirEntry = entry?;
-    let src_path : PathBuf =
-      entry . path();
-    let dst_path : PathBuf =
-      dst . join (entry . file_name());
-    if entry . file_type()? . is_dir() {
-      copy_dir_all (&src_path, &dst_path)?;
-    } else {
-      fs::copy (&src_path, &dst_path)?;
-    }}
-  Ok (( )) }
 
 fn mk_test_tcp_stream_pair (
 ) -> (TcpStream, TcpStream) {

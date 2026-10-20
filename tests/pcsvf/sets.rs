@@ -4,7 +4,8 @@
 // contains del, which is deleted with its content delc), and a
 // in-changed-only change (ln now contains lo, which lp contains too).
 
-use crate::pcsvf::common::{graph_straddle, ids, with_fixture};
+use crate::git_fixture::graph_straddle;
+use crate::pcsvf::common::{ids, with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
 use skg::pcsvf::PcsvfSets;
