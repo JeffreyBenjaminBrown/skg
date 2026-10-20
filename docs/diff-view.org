@@ -1,0 +1,458 @@
+#+title: The diff view
+* What it is
+The diff view shows every change in the owned skgrepos since their
+last commits -- how each worktree differs from HEAD -- with the
+context needed to understand each change, in buffers that are
+ordinary editable views. It lets the user review the changes, mark
+each one commit-ready, and commit everything at once. C-c v d
+('skg-diffView-open'; Neovim '<localleader>vd') opens it.
+
+The vocabulary (graph straddle, presence, C, R, U, D, change-forest
+leaf, mark, changeset marker, ...) is the glossary's "Terms of the
+diff view" ('docs/glossary.org'). The wire forms are the API doc's
+"Diff view", "Stage and commit", "Integrate unshown changes" and
+"Metadata of the diff view" ('docs/api-and-formats.org'). The
+heralds are 'docs/heralds.org', "Diff heralds". The commands are
+both COMMANDS files, under C-c v d and C-c r.
+
+A paragraph marked "(from slice N of 13_plan)" describes behavior a
+later slice of 'TODO/total-diff-view/13_plan.org' lands; that slice
+removes the mark.
+
+* The four buffers
+One command opens up to four buffers, in this order, and skips any
+that would be empty. The client sends one "diff view" request per
+buffer; the server answers each with a buffer, or with '(empty . t)',
+which the client does not open. Each buffer is registered like any
+view, under a client-generated view ID, with its buffer kind
+('DiffViewBufferKind'), so saves and collateral rerenders reach it.
+** "diff-view: all changes"
+The PCSVF over all of C.
+** "diff-view: merges"
+A PCSVF over the nodeMerges since HEAD: its C is each acquiree (a
+node only the before-graph has, which an after-graph node lists as an
+extra ID) and its acquirer. The acquiree's text preserver is not in
+C; it shows as a new member of the acquirer's content.
+** "diff-view: skgrepo changes"
+A PCSVF over the nodes whose home skgrepo moved. In this buffer each
+moved vognode's own heralds also read "-OLD +NEW", and "Δ⌂=a" when
+the nearest moved vognode ancestor (a, the viewparent; b, the
+grandparent; ...) moved the same way ('set_home_move_facts_in_viewforest').
+
+(from slice 16 of 13_plan) Its C is the recorders of the change-forest
+leaves whose aspect is the home skgrepo or the relRepo: the nodes
+whose home skgrepo moved, and the recorders of the relationships whose
+relRepo moved. A node of that C is drawn as in any buffer, with all
+of its changes. The readiness summary is unaffected (it counts every
+leaf whatever buffer is open); only this buffer's count of changes
+not editable in it shrinks.
+** "diff-view: order-only changes"
+A flat list, in ID order, of the nodes whose file changed but which
+record no change-forest leaf: only the order of some list changed.
+Each is drawn with its content in the new order, as write-protected
+members drawn without their content, and with an order-only changeset
+marker, which is always ready. Its sets are empty: it draws no PCSVF.
+** Refusals
+Every buffer is refused, and the client stops, unless the skgrepo
+restriction is 'all', and when the graph straddle cannot be built: an
+owned skgrepo that is not in a gitrepo or has no HEAD commit, or a
+HEAD that fails the whole-graph validation. A merge commit at HEAD is
+no reason to refuse.
+** Foreign skgrepos
+Foreign skgrepos are read at their worktrees in both halves of the
+straddle, so they never produce a change: they are outside C, the
+change-forest and readiness. The readiness summary only counts their
+changed '.skg' files.
+** No stages
+The diff view compares HEAD with the worktree. The git index never
+enters it: no fact carries a stage, and stage-and-commit stages every
+change itself.
+
+* The graph straddle
+The graph straddle ('GraphStraddle', 'server/graph_straddle/') holds
+the before-graph (each owned skgrepo read at HEAD, each foreign one at
+its worktree) and the after-graph (the live graph), and answers
+questions about their union (the "union walk"): each node and each
+relationship it reports carries a presence, 'Both', 'OnlyBefore' or
+'OnlyAfter'. A partner of a node in some role is an entry of the
+union of the two graphs' lists, with its presence and its relRepo in
+each graph; it changed when the relationship is in one graph only, or
+its relRepo differs.
+
+Each connection keeps one straddle. A diff-view request, a save, a
+rerender and stage-and-commit bring it up to date: it is rebuilt when
+an owned skgrepo's HEAD moved (as a git-commit does), re-paired with
+the live graph when that changed, and otherwise reused. The before-graph
+is read through a cache keyed by the owned skgrepos' HEAD commits.
+Closing the last buffer of the diff view drops the straddle, and so
+does a rebuild of the session-lifetime stores, so the next request
+reads both halves from the disk the rebuilt live graph was read from.
+What the straddle computes from itself -- C, the change-forest, each
+buffer's sets -- is computed once per straddle, on first use.
+
+* C, R, U and D
+These sets define the PCSVF ("pruned change-spanning viewforest") a
+buffer draws ('PcsvfSets').
+** C
+C is the set of changed graphnodes. It has two halves:
+- out-changed: the nodes whose own files record a change -- a new or
+  deleted node, a changed title or body, alias, extra ID, flag or home
+  skgrepo, an added or removed member of its contains, subscribesTo,
+  overrides or hidesFromSubs list, or a moved relRepo of one;
+- in-changed: the nodes whose set of containers, mentioners,
+  subscribers, overriders or hiders changed, found from the first
+  half: every partner of an out-changed node whose relationship
+  exists in one graph only.
+A relRepo move puts only the recorder in C. A change of order alone
+puts nothing in C.
+** R and U
+From each node of C the containerward walk climbs through the union
+of the two graphs, following single containers, until it reaches a
+content origin: a node with no container or with several, or the
+members of a rootlike cycle. R is the content origins reached. U, the
+nodes to viewforest-unfold, is C, R and every node on those walks.
+** D
+D, the buffer's first roots, is R deduplicated: R is processed in ID
+order, and a content origin is discarded when its containerward walk
+within U reaches another content origin still kept. Of two origins on
+a shared cycle, exactly one is kept. When D is recomputed for a buffer
+that already stands (see "Integrating unshown changes"), the buffer's
+standing roots are pinned as kept first, so a change to a cycle's
+membership never adds a second root for it.
+
+* Drawing a buffer
+** Stub roots
+The buffer starts as one stub per root, in D's order: an editable
+vognode, or, when the after-graph lacks the node, its historical
+phantom. In a PCSVF, a root with several containers gets a folded
+container folder, which completion fills with its containers in
+either graph and their containerward forest.
+** Completion over the straddle
+The stub is completed by the one view completion every view uses
+(the level-order BFS of 'complete_viewforest'), with 'diffView_source'
+set to the straddle and the buffer kind. That switch changes
+completion so:
+- at an editable node's visit, before the content reconciler runs,
+  its children are aligned with the straddle, so that the reconciler
+  keeps each viewnode instead of drawing another;
+- content is drawn without override substitution: the view shows raw
+  graph facts;
+- no default partner folders and no hidden-in-subscribee folder are
+  drawn; folders appear only where something changed;
+- the property folders (alias, ID, flags) are reconciled by the
+  per-visit step from the straddle, not from the live graph;
+- a partner folder draws the union of the straddle;
+- a deleted phantom whose node the before-graph has becomes its
+  historical phantom, and a historical phantom in content position
+  draws its old content;
+- the node budget is charged only as "Editability in the diff view"
+  says;
+- each editable node's visit ends in the per-visit step;
+- after completion, the readiness facts are set from the store.
+The skgrepo restriction plays no part, since the diff view requires
+'all'.
+** The per-visit step
+At each editable occurrence's visit, after the content reconciler,
+'process_unrestrictedVognode_changes' draws the node's change
+viewnodes:
+- it tags each content member with the presence of its node and of
+  its relationship ('(diff node+ ...)', '(diff rel- ...)'), and draws a
+  new member outside U as a write-protected member drawn without its
+  content (one that was editable when the rerender began stays
+  editable);
+- it draws the removed content members (below);
+- for a node in C, ahead of its content: its old text, its home
+  skgrepo move, its "it acquired" folder, the alias, ID and flags
+  folders whose list changed, the partner folders whose membership
+  changed, and its changeset markers;
+- in the order-only buffer, its order-only marker.
+A node in U but not in C is context: when completion creates it, its
+body starts folded. A write-protected occurrence gets none of this;
+what an earlier visit drew under it while it was editable goes, and
+its viewparent tags it.
+** What each kind of change looks like
+Every label is a herald rule on a metadata atom; 'docs/heralds.org'
+lists them, and the API doc's "Metadata of the diff view" the atoms.
+*** text
+A changed title or body adds an old-text property under the node,
+"old title and body", "old title" or "old body" (its headline the old
+title, its body the old body), with a "body diff" property under it
+holding the line diff when the body changed. The text change is one
+leaf, marked on the old-text headline.
+*** content
+Content has no folder. The members are the node's children, each
+tagged ∃+ / ∃- for its node's presence and ~+ / ~- for its
+relationship's; a removed member stands where it stood (below). The
+content changeset marker, "its content changed", aggregates the
+relationship leaves of the content list.
+*** the in-folders and out-folders
+A changed set of containers, mentioners, subscribers, overriders or
+hiders adds a write-protected folder labelled "its containers changed
+(other files)" and so on; a changed set of subscribees, overridden or
+hidden nodes adds the existing folder labelled "its subscribees
+changed (this file)" and so on. A folder holds the partners in either
+graph, tagged by presence. Under each member of a changed folder
+hangs its member role tree, so that the user sees where the member
+sits: under a container, its full containerward tree; under a
+mentioner, subscriber, overrider or hider, the role tree of that role
+with a containerward tree under each graft.
+*** aliases, IDs and flags
+The alias, ID and flags folders, drawn only when their list changed,
+hold the union of the two lists in the order of their interleaved
+diff, each entry signed + or -. A lost alias or ID is its own kind,
+'Property::RemovedAlias' or 'Property::RemovedID', which the save never
+reads. Each entry is one leaf.
+*** home skgrepo and relRepo moves
+A home skgrepo move is one property under the node, "⌂ -OLD +NEW",
+one leaf. A relRepo move is a property under the member whose
+relationship moved, "relationship moved from X to Y", one leaf keyed
+by the relationship, so the same move seen from either end is the
+same mark. The relRepo changeset marker, "some content relationships
+changed skgrepo", sits under the recorder when a content relationship
+moved. Mentions have no relRepo.
+*** deleted and new nodes
+A deleted node is drawn as its historical phantom: write-protected,
+with HEAD's title and body, under each former container. Its old
+content stands beneath it, recursing into deleted members. Its
+existence is one leaf. An acquiree's phantom holds a derived,
+save-inert folder "it was acquired by" with its acquirer, and the
+acquirer holds "it acquired" with the phantoms of its acquirees. A new
+node is an ordinary editable node with ∃+; its existence is one leaf.
+** The fresh drawing, and what it keeps
+Nothing that exists is drawn again. Each step builds a fresh drawing
+of what a viewnode should hold, in a scratch tree, and
+'reconcile_children_with_fresh_drawing' matches what the viewnode holds
+to it. A child that stands for a graphnode is matched by its ID; any
+other by its kind (a folder entry by its entry); within one parent
+each key appears at most once. A matched child is kept, with its fold
+state, and its kind and facts are updated in place: a member that
+loses its relationship becomes a removed member and back, a deleted
+phantom becomes a historical phantom and back. A child the fresh
+drawing lacks is detached; what only the fresh drawing has is created.
+"Produced by the fresh drawing" is defined over the union of the two
+graphs, so a viewnode is detached only when what it stands for is in
+neither graph. The member role trees under a changed folder's members
+are reconciled the same way.
+
+So folding survives saves, rerenders and commits: the server sets a
+fold state only on a viewnode it creates (a context node's body and a
+container folder start folded, the rest open).
+
+A root stays until the buffer is closed, whatever becomes of the
+changes under it. A commit is an ordinary rerender: the roots stand
+as plain context with their change viewnodes gone, and a root whose
+node the commit deleted is drawn as a deleted phantom.
+** Removed members and the LCS placement
+A removed member is a member of the before-graph's list that the
+after-graph's lacks. Membership is decided by set difference, so a
+reorder shows nothing; the longest common subsequence of the two
+lists only places a removed entry: immediately before the next
+surviving member of the old order, or last
+('phantom_insertion_plan', 'compute_interleaved_diff'). Content and
+the alias, ID and flags folders are placed this way, each removed
+member moved, not redrawn, to its slot at every visit, after the
+content reconciler has reordered the children.
+
+(from slice 14 of 13_plan) The partner folders drawn over the straddle
+place their removed members the same way, instead of appending them,
+so every drawing of the union of the two graphs places a removed entry
+by the LCS.
+** One encoding of a removed relationship
+In content, a removed member whose node survives is an unrestricted
+vognode drawn as a non-member, write-protected, with the fact
+'(diff rel-)': its relationship to its viewparent exists in the
+before-graph only. A removed dangling ID is not drawn (an unknown
+phantom there would read back as a member); its leaf is under the
+content changeset marker. A former member is any viewnode standing for
+a before-only relationship, historical phantoms included.
+
+(from slice 14 of 13_plan) A removed relationship has this one
+encoding everywhere: the write-protected-set folders and a historical
+phantom's old content draw their removed members as non-members with
+'(diff rel-)' too, and 'is_unrestricted_removed_member' is their one
+reader. Since a removed member is never a member, the save's check of
+a write-protected occurrence's folders needs no clause discounting
+members marked removed.
+
+* Editability in the diff view
+The diff view follows the rule that decides which occurrence is
+editable in any view -- the editable map, the draw rule, the cascade
+and the node budget, described in the module comment of
+'server/to_org/expand/editable.rs' -- with these deviations.
+** A node of U is editable, with its whole content list
+When a buffer is first drawn, a node of U is editable at its first
+occurrence and its whole content list is drawn; a member outside U is
+a write-protected member drawn without its content. No size cap
+applies: the node budget is not charged for any of this.
+** The budget bounds only requests outside U
+An editable-view request (C-c s d) behaves as in any view: it makes
+its occurrence the editable one, write-protecting the other with its
+content subtree, and cascades to its content children. Only the
+expansion of a node outside U that a request asked for is charged to
+'initial_node_limit'; a node of U is never charged, whether the rule
+above or a request made it editable. A request adds no default
+folders, since the diff view draws none.
+** A save makes nothing editable and appends no root
+After a save, a buffer's sets are recomputed, and completion draws by
+the recomputed U wherever it draws something new. Nothing the buffer
+holds editable is write-protected again by the server. But the server
+makes no occurrence editable and appends no root on its own: a change
+recorded by a node the buffer holds no editable occurrence of is not
+editable in this view, and the readiness summary counts it.
+** Integrating unshown changes
+C-c r u ('skg-diffView-integrate-unshown-changes'; Neovim
+'<localleader>ru'), on a buffer with no unsaved changes, sends
+"integrate unshown changes". The server brings the straddle up to
+date and recomputes the buffer's sets. Every node of U without an
+editable occurrence becomes editable (its body read from the live
+graph) at its first content occurrence in level order, else at its
+first partner-folder occurrence ('ensure_editableOccurrences_exist').
+The buffer is then rerendered as after a save, which draws the
+content list of each node made editable, and last, each content
+origin of D that the buffer draws nowhere is appended as a root, in ID
+order, with the standing roots pinned, and completed. The answer is
+the readiness summary, and the rerender stream carries the buffer. It
+does not matter who write-protected an occurrence: the user asked for
+every change.
+** What counts as editable here
+A buffer makes a node's changes editable when it holds an editable
+occurrence of the node, wherever that sits, or the node's historical
+phantom in content position (under the buffer root, an unrestricted
+vognode, or a historical phantom that is itself in content position),
+since a deleted node's old content is editable nowhere and shown
+there ('nodes_editable_in_diffView'). The change-forest leaves those
+nodes record are the changes editable in the buffer.
+
+* Readiness
+** Change-forest leaves
+The change-forest ('ChangeLeaves', built from the straddle,
+independent of any view) holds every change a user can mark: its
+leaves. A leaf's key is a node and an aspect of it (existence, text,
+home skgrepo, an alias, an extra ID, a flag), or a relationship (a
+relation, its recorder, its member) and an aspect of it (existence,
+relRepo). The recorder of a leaf is the node whose file records it; a
+relationship's leaf lives under its recorder, and seen from either
+end it is the same leaf. A node's existence leaf covers its own
+content when it is new or deleted.
+** Marks, fingerprints and the store
+A mark says that one leaf is commit-ready. The readiness store
+('server/readiness_store.rs') keeps each mark with the fingerprint of
+the change it approved, a hash of the leaf's before and after values.
+A mark whose fingerprint no longer matches the change counts as
+absent: editing a marked change unmarks it, and nothing signals that
+an earlier version was approved. The store lives on the server, is
+written to '<data_root>/readiness-marks.json' after every change, and
+is read at startup; a missing or unreadable file is an empty store.
+The file serializes the leaf keys, aspect names included, so their
+spelling is kept stable. After a git-commit, the store keeps exactly
+the marks whose leaves still exist in the rebuilt straddle.
+** Aggregates
+A folder, a changeset marker, a node, a file or the whole changeset
+is ready when every leaf under it that can be ready is ready (its
+derived commit-readiness aggregate). An unchanged member has no leaf
+and is never asked. The content changeset marker aggregates the
+content relationship leaves of its node; a member's existence leaf
+belongs to the member's own file. A file whose only change is order
+has no leaf and is ready.
+** Facts on the wire
+'(ready OBJECTS)' is a display fact the server writes after
+completion ('set_ready_facts_in_viewforest'): the diff objects
+('node', 'rel') whose leaves are all marked; a bare '(ready)' on a
+headline that names one leaf, or on a ready aggregate. Nothing reads
+it at save.
+
+(from slice 12 of 13_plan) Beside it, a headline that names leaves
+carries '(leaves N OBJECT...)': N is the number of leaves a request
+naming every listed object would touch, and the OBJECTs are those a
+request on this headline may name ('node' and/or 'rel' on a vognode or
+phantom, each worth one leaf; 'all' on an aggregate, worth N; none on
+a headline that names exactly one leaf, which a bare request marks).
+The server's 'leaves_named_at' is the one rule; the fact is
+display-only, and the clients read it instead of keeping tables of
+headline kinds.
+** Readiness requests and gestures
+A gesture writes readiness requests, '(readyRequest OBJECTS)' or
+'(unreadyRequest OBJECTS)', into headline metadata and saves; the save
+consumes them after its graph edits succeed (not when it stops for a
+confirmation), in any buffer, marking or unmarking the leaves each
+headline names at their current fingerprints. A request naming no
+current change is dropped with a warning. 'all' names every leaf of an
+aggregate one level down.
+
+Every gesture toggles: it unmarks what is ready and marks what is
+not. C-c r r ('skg-cycle-commit-ready') acts on the headline at point:
+one leaf; on a content member with both objects, the one the user
+picks; on an aggregate, its leaves one level down; with a prefix
+argument, every leaf of the subtree. C-c r h
+('skg-toggle-homeSkgrepo-move-commitReady') acts on the home skgrepo
+move of the node at point, and with a prefix argument on every
+descendant whose home moved between the same two skgrepos. Both work
+on write-protected occurrences. A gesture that would unmark more than
+one leaf first asks for a typed "yes".
+** The readiness summary
+After every save of a buffer of the diff view, after C-c r u, and
+before a stage-and-commit that would leave changes behind, the client
+shows the readiness summary: "12 of 14 changed files are ready", or
+"COMMIT READY. All 14 of 14 changed files are ready.". A changed file
+is ready when every change it records is marked; order-only files
+count as changed and ready. It is computed over every leaf of the
+change-forest, whatever buffer is open. It adds the changed files of
+the foreign skgrepos, and the changes not editable in this view:
+the leaves whose recorder the buffer does not make editable (see
+"What counts as editable here"), with the command that integrates
+them.
+
+* Stage and commit
+C-c r c ('skg-stage-and-commit') prompts once for a message and sends
+"stage and commit". The server stages the changed '.skg' files of
+every owned skgrepo, deletions included, and git-commits each gitrepo
+that has changes with that message, by the gitrepo's configured user.
+It refuses unless the skgrepo restriction is 'all', for a blank
+message, and when the straddle cannot be built. It commits whole
+skgrepos, never less: a partial commit can leave HEAD inconsistent
+(referencing nodes it lacks, recording a relationship from one end
+only, holding a moved node twice), and the next diff view against it
+would report changes that are only that inconsistency.
+** Its confirmations
+When the readiness summary is incomplete and the request lacks
+'(confirmed . t)', the answer is the summary alone with
+'(needs-confirmation . t)', and nothing changes; the client asks for
+the typed word "yes" and resends confirmed.
+
+(from slice 9 of 13_plan) Before staging anything, the server also
+reads the index of every owned gitrepo. If any has entries staged
+already, the answer is the same confirmation with a second reason,
+'(pre-staged ((GITREPO PATH...) ...))', and nothing is staged or
+committed; the client lists those paths and asks the typed "yes".
+One confirmed resend covers both reasons, and the commit of such a
+gitrepo then includes what was staged before, as a git commit
+records the whole index.
+** After the commit
+The straddle is rebuilt over the new HEAD, the store keeps only the
+marks whose leaves still exist, and each open buffer of the diff view
+is rerendered as any rerender is: its roots and what it drew editable
+stay, and what was committed loses its change viewnodes.
+
+* Strandeds
+A relationship touching a node whose home skgrepo moves is stranded
+when it sat at its default relRepo before the move and the sticky rule
+would leave it off its new default. The save finds every stranded
+relationship of every relation, in both directions, shown in some view
+or not ('server/from_text/strandeds.rs'). An inbound stranded
+relationship of a privatizing move would leak its member's ID, so the
+save raises it to the new home by itself and says so in its warnings.
+The strandeds of a publicizing move are listed in a
+strandeds-confirmation; the client asks which to reset to their new
+defaults and re-saves with '(strandeds-reviewed . "true")' and the
+chosen '(reset-strandeds ...)', after which the server resets them,
+rewrites the telescopes of the nodes that record them, and rerenders
+the views that show them. Mentions carry no relRepo, so they are
+never stranded. The client writes only the new home; the analysis is
+the server's.
+
+* Investigating an unknown node
+An unknown phantom stands for an ID nothing in the graph answers to.
+C-c t r ('skg-investigate-unknown-node') asks the server what git
+history knows of it: when it was last present, the commit it vanished
+at, its title and relations then, and what referred to it (the API
+doc's "Investigate unknown node").

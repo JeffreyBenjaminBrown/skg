@@ -1,5 +1,5 @@
 //! The "diff view" request: one buffer of the diff view
-//! ('TODO/total-diff-view/02_plan.org', "One command, four buffers").
+//! ('docs/diff-view.org', "The four buffers").
 //! The client sends one request per buffer, in order, and opens each
 //! one the server does not answer with '(empty . t)'.
 

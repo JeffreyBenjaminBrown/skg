@@ -1382,3 +1382,52 @@ editable in the view, in the glossary's wording ("a buffer shows a
 node's changes where ..."). Both COMMANDS files reword the sentence
 about changes a save draws nowhere editable, since "is not editable
 in this view" would repeat "draws nowhere editable".
+** Slice 2: deviations
+*** where a citation outside the diff view now points
+Most citations of 'TODO/' named older plans (local-view-update,
+source-set safety, fork fixes, privacy telescopes, ...), not the diff
+view. Each now cites the glossary term or API section that covers it
+(the API doc's "Restricted-skgrepo nodes", "Text search", "Strip body
+whitespace", "Export to org"; the glossary's "subscribee as such",
+"unknown node, dangling ID", "local fieldIntent collection",
+"write-protected set"), or 'docs/telescopes.org', 'docs/heralds.org'
+or 'docs/forks.org'. Where no doc covers the idea, the citation names
+the code that is its one statement: the module comment of
+'to_org/expand/editable.rs' (the draw rule, the cascade, the budget),
+the required-ancestry table of 'update_buffer/ancestry.rs', the
+stale-member rule of 'complete_managed_children', the prune sweep
+'prune_self_deletable_when_empty'. A citation that only pointed at a
+feature request or a problem entry ('TODO/more.org',
+'TODO/problems.org', the faster-tests and dup-IDs notes) is dropped,
+since the comment says what it needs to. "Phase 8" goes with its
+plan.
+*** beyond comments
+The grep the plan ends with covers every file under 'server/',
+'elisp/' and 'nvim/', so 'nvim/README.org' (the Lua module map now
+says how a module is named) and the two retired-config error messages
+in 'dbs/filesystem/not_nodes.rs' (now "See docs/telescopes.org, "The
+privacy order".") were repointed too. In 'git_snapshot.rs' the
+"diff-report endpoints" error string, the "diff snapshot" log
+message and the doc comment of
+'fold_telescope_tolerating_homelessness' were reworded; slice 4
+deletes the arms that error belongs to.
+*** 'ordered_repos' elsewhere
+The stale method name 'ordered_repos' (it is 'ordered_skgrepos') was
+also in comments of 'types/misc.rs', 'types/phantom.rs',
+'telescope/compose.rs', 'dbs/filesystem/one_node.rs' and
+'dbs/filesystem/multiple_nodes.rs'; all say 'ordered_skgrepos' now.
+*** "total diff view" across a line break
+Slice 1's grep missed "total diff view" split over two lines, in
+seven server files, 'nvim/lua/skg/stage_and_commit.lua' and two
+files under 'tests/pcsvf/'. They say "diff view" now.
+*** docs beyond the plan's list
+The glossary's "Terms of the diff view" said the view "is specified
+in 'TODO/total-diff-view/02_plan.org'"; it points at
+'docs/diff-view.org' instead. 'docs/diff-view.org' names functions
+more than files, so that slice 10's moves leave it true, and ends
+with a short section on investigating an unknown node, which the
+view's unknown phantoms lead to.
+*** the 'diffView_source' doc
+The readiness facts are not set by completion but by its callers
+('set_diffView_facts_in_viewforest'), so the doc lists them as what
+the caller does after.

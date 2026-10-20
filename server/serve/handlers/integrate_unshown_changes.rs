@@ -1,6 +1,5 @@
 //! The "integrate unshown changes" request
-//! ('TODO/total-diff-view/08_plan_yet-more.org', "The view follows U
-//! only on command"): redraw one buffer of the diff view so
+//! ('docs/diff-view.org', "Integrating unshown changes"): redraw one buffer of the diff view so
 //! that every node of its recomputed U has an editable occurrence,
 //! and every content origin of its recomputed D that it draws nowhere
 //! is a root. A

@@ -1,6 +1,5 @@
 //! Moving a node between skgrepos: the save decides what the move
-//! strands ('TODO/total-diff-view/02_plan.org', "Moving a node between
-//! skgrepos").
+//! strands ('docs/diff-view.org', "Strandeds").
 //!
 //! A relationship touching a moved node, in either direction and
 //! whether or not any view shows it, is STRANDED when it sat at its

@@ -709,8 +709,7 @@ Headline is a term from org-mode. It refers to a line that begins with some aste
 
 ** Terms of the diff view
 
-The diff view is specified in
-'TODO/total-diff-view/02_plan.org'; these are its terms.
+'docs/diff-view.org' describes the diff view; these are its terms.
 
 *** diff view
 

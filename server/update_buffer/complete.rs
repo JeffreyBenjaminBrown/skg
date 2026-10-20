@@ -46,13 +46,14 @@ pub(super) struct CompletionContext<'a> {
   pub(super) deleted_by_this_save_pids      : &'a HashSet<ID>,
   pub(super) deleted_by_this_save_extra_ids : &'a HashMap<ID, HashSet<ID>>,
   pub(super) skgrepo_restriction            : Option<&'a SkgrepoRestriction>,
-  /// TODO/DONE/local-view-update/plan_v2.org §5.5 per-buffer node limit: the remaining budget of *new* Viewnodes
-  /// the ordinary update pass may create. Initialized once per rerender to
-  /// `config.initial_node_limit` and decremented as content children are
-  /// created; when it reaches 0 no further new content is drawn (and the
-  /// cascade stops).
+  /// The node budget (see the module comment of 'to_org/expand/editable.rs'): how
+  /// many more vognodes may expand their content. Initialized once per
+  /// completion to `config.initial_node_limit` and decremented by one at
+  /// each expansion of an editable vognode (a folder fills for free, and
+  /// a content list is drawn whole); when it reaches 0 no later
+  /// vognode other than a root expands (and the cascade stops).
   pub(super) node_budget                    : usize,
-  /// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): true only for a DE-NOVO (initial) render driven through
+  /// True only for a DE-NOVO (initial) render driven through
   /// view completion. When set, each fresh editable node gets its default
   /// PartnerFolders created at its visit, the way
   /// build_node_branch_minus_content does at node birth.
@@ -70,19 +71,35 @@ pub(super) struct CompletionContext<'a> {
   /// de-novo renders, collateral rerenders and rerender-all, whose
   /// repairs do not correspond to edits the user just made.
   pub(super) warning_sink : Option<&'a mut Vec<CompletionWarning>>,
-  /// Some only when completing a diff view ('server/pcsvf.rs').
-  /// Each unrestricted vognode's visit then ends with
-  /// 'process_unrestrictedVognode_changes', each historical phantom's
-  /// draws its old content ('process_historical_phantom_visit'),
-  /// the partner folders draw the union of the straddle, the node
-  /// budget bounds only the expansions an editable-view request makes
-  /// outside U, and no default folders are created.
+  /// Some only when completing a buffer of the diff view
+  /// ('docs/diff-view.org', "Completion over the straddle"). The
+  /// switch then changes completion so:
+  /// - at an editable node's visit, its children are aligned with the
+  ///   straddle before the content reconciler runs
+  ///   ('align_content_members_with_straddle');
+  /// - content is drawn without override substitution;
+  /// - the property folders are skipped at their own visits: the
+  ///   per-visit step reconciles the alias, ID and flags folders from
+  ///   the straddle;
+  /// - a deleted phantom whose node the before-graph has becomes its
+  ///   historical phantom, and each historical phantom's visit draws
+  ///   its old content ('process_historical_phantom_visit');
+  /// - no default partner folders and no hidden-in-subscribee folder
+  ///   are created;
+  /// - the node budget bounds only the expansions an editable-view
+  ///   request makes outside U (see 'budgeted' in 'visit_normal_node');
+  /// - each unrestricted vognode's visit ends with the per-visit step
+  ///   ('process_unrestrictedVognode_changes');
+  /// - the partner folders draw the union of the straddle (the
+  ///   Subscribee folder too, through the generic folder reconciler).
+  /// The caller then sets the readiness facts
+  /// ('set_diffView_facts_in_viewforest').
   pub(super) diffView_source : Option<DiffViewSource<'a>>,
   /// The viewnodes the viewforest held before this completion began.
   /// In a diff view, a fold state is set only on a viewnode
   /// not among them.
   pub(super) nodes_before_completion : &'a HashSet<NodeId>,
-  /// The editable unrestricted vognodes among them. In a total diff
+  /// The editable unrestricted vognodes among them. In a diff
   /// view, a content member outside U is write-protected only when it
   /// is not among these: nothing writable is write-protected again.
   pub(super) editable_before_completion : &'a HashSet<NodeId>,
@@ -93,9 +110,9 @@ pub(super) fn complete_viewforest (
   context    : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
   let root_treeid : NodeId = viewforest . root () . id ();
-  // The single TODO/DONE/local-view-update/plan_v2.org §3 level-order BFS: each node's visit
+  // The single level-order BFS: each node's visit
   // (dispatch_node_update) does ALL of its own update -- content
-  // reconcile, the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule + TODO/DONE/local-view-update/plan_v2.org §5.3 cascade for editable-view
+  // reconcile, the draw rule and the cascade for editable-view
   // requests, the other view requests, ensuring an editable
   // subscribee's HiddenInSubscribeeFolder, and per-folder reconciliation. Folders and
   // content children created during a node's visit are reached later in the
@@ -120,10 +137,10 @@ pub(super) fn complete_appended_roots (
 /// Visit every node in *level order* (BFS), completing each at its own visit.
 ///
 /// This is the core of view completion: a single top-down level-order traversal
-/// (TODO/DONE/local-view-update/plan_v2.org §3) in which each node, when visited, may create viewdescendants
+/// in which each node, when visited, may create viewdescendants
 /// (content children, subscribee/relation members) that are then visited later
 /// in the same traversal. A FIFO queue (not depth-first recursion) is what makes
-/// the TODO/DONE/local-view-update/plan_v2.org §5.5 node-limit and TODO/DONE/local-view-update/plan_v2.org §5.2 draw-rule semantics order-correct: the first
+/// the node budget and the draw rule (see 'to_org/expand/editable.rs') order-correct: the first
 /// occurrence of a duplicate id reached in BFS order -- not in depth-first order
 /// -- is the one that wins, and the Finalizable draw rule makes that safe. A
 /// node's expansion depends only on its ancestors and the graph, never on
@@ -147,7 +164,7 @@ fn complete_nodes_in_level_order (
   Ok(( )) }
 
 /// One BFS visit: dispatch on (kind, parent-kind) to the node's update rule
-/// (TODO/DONE/local-view-update/plan_v2.org §3/§4). Folders are reconciled at their own visit (the BFS reaches a
+/// Folders are reconciled at their own visit (the BFS reaches a
 /// folder after its Unrestricted parent created it).
 fn dispatch_node_update (
   tree    : &mut Tree<Viewnode>,
@@ -156,7 +173,7 @@ fn dispatch_node_update (
 ) -> Result<(), Box<dyn Error>> {
   let kind : ViewnodeKind =
     tree . get (treeid) . unwrap () . value () . kind . clone ();
-  // Death-leafward (TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5): before reconciling any
+  // Death-leafward ('update_buffer/ancestry.rs'): before reconciling any
   // folder, self-check its required ancestry. If it is a generalized orphan (some
   // required ancestor is the wrong viewnode kind -- full chain, not just the
   // parent), deaden it and dispose its children instead of reconciling, so the
@@ -172,7 +189,7 @@ fn dispatch_node_update (
       visit_normal_node (tree, treeid, context) ?,
     ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)
       if context . diffView_source . is_none () =>
-      // A folder fills its members WHOLE and is budget-neutral (TODO/DONE/local-view-update/plan_v2.org §5.5): the owning
+      // A folder fills its members WHOLE and is budget-neutral (the node budget): the owning
       // vognode already spent its 1 budget unit when it expanded, so drawing all
       // the members here costs nothing more and never truncates a group.
       reconcile_subscribeeFolder_children (
@@ -242,7 +259,7 @@ fn dispatch_node_update (
     } }
   Ok(( )) }
 
-/// The Unrestricted-node visit (TODO/DONE/local-view-update/plan_v2.org §6.1/§6.2): settle the Finalizable state
+/// The Unrestricted-node visit: settle the Finalizable state
 /// for a editable-view request *before* drawing content (so a Final node
 /// can cascade), reconcile content, run the remaining (non-Editable) view
 /// requests, ensure an editable subscribee's HiddenInSubscribeeFolder, and
@@ -284,12 +301,19 @@ fn visit_normal_node (
   let in_u : bool = // of the diff view being drawn
     context . diffView_source . is_some_and (
       |drawing| drawing . sets () . u . contains (&pid) );
-  let budgeted : bool = // In a diff view the budget bounds only the expansions requests make outside U.
+  // Whether this expansion is charged to the node budget (see the
+  // module comment of 'to_org/expand/editable.rs'). In an ordinary
+  // view, every expansion is. The diff view deviates
+  // ('docs/diff-view.org', "Editability in the diff view"): a node of U
+  // is never charged, whether the PCSVF's rule or a request made it
+  // editable, so the budget bounds only the expansions that an
+  // editable-view request makes outside U.
+  let budgeted : bool =
     context . diffView_source . is_none ()
     || ( had_editableViewRequest && ! in_u );
-  let mut settled : bool = false; // TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule already ran
+  let mut settled : bool = false; // the draw rule already ran
   let mut cascade : bool = false; // node is Final -> hand EVRs to children
-  // TODO/DONE/local-view-update/plan_v2.org §5.5: the budget counts vognode *expansions* (each costs 1, charged in
+  // The node budget counts vognode *expansions* (each costs 1, charged in
   // expand_true_content_at_unrestrictedVognode); once it hits 0 every later vognode is left
   // write-protected -- a visible, collapsed headline. We never truncate a group
   // mid-way (whole groups already drawn keep all their members); we only stop
@@ -372,11 +396,11 @@ fn visit_normal_node (
       context . editable_before_completion ) ?; }
   Ok(( )) }
 
-/// Whether a node of this kind is *self-deletable when empty* (TODO/DONE/local-view-update/plan_v2.org §3.4): the
+/// Whether a node of this kind is *self-deletable when empty*: the
 /// single postorder prune sweep removes it once it is childless. This is the
 /// one place self-deletion lives -- per-kind reconcilers no longer detach
 /// themselves when empty.
-/// - DeadViewnode and a childless Vognode::Deleted (TODO/DONE/local-view-update/plan_v2.org §6.6).
+/// - DeadViewnode and a childless Vognode::Deleted.
 /// - the write-protected PartnerFolders Subscriber/Overrider/Hider/Hidden/
 ///   Container/Mentioner/AcquiredBy/Acquired (a graph
 ///   relationship the user cannot edit from this side, so an emptied one is
@@ -386,7 +410,7 @@ fn visit_normal_node (
 /// - PropertyFolder::ID (largely moot -- an IDFolder always holds at least the PID).
 /// PRESERVED when empty (so NOT here): PartnerFolder(Subscribee), PartnerFolder
 /// (Overridden), PropertyFolder(Alias) -- each an *editable interface onto the origin*
-/// that the user must be able to refill, removed only by hand (TODO/DONE/local-view-update/plan_v2.org §3.4 exception).
+/// that the user must be able to refill, removed only by hand.
 fn is_self_deletable_when_empty (
   kind : &ViewnodeKind,
 ) -> bool {
@@ -405,9 +429,9 @@ fn is_self_deletable_when_empty (
     | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee)
     | ViewnodeKind::PropertyFolder (PropertyFolder::ID) ) }
 
-/// The TODO/DONE/local-view-update/plan_v2.org §3.4 postorder prune sweep -- the *one* place self-deletion happens.
+/// The postorder prune sweep -- the *one* place self-deletion happens.
 /// Removes, bottom-up, every childless `is_self_deletable_when_empty` node:
-/// deadened folders whose members all died, a TODO/DONE/local-view-update/plan_v2.org §6.6 childless Deleted, and empty
+/// deadened folders whose members all died, a childless Deleted, and empty
 /// write-protected relation / Hidden* / ID folders. Postorder so a chain (e.g.
 /// Dead -> Deleted, or a folder emptied by the removal of its last member)
 /// collapses completely in one pass. Focus is transferred to the surviving

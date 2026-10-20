@@ -1,6 +1,6 @@
 //! The commit-readiness store: which change-forest leaves the user
-//! has marked commit-ready ('TODO/total-diff-view/02_plan.org',
-//! "Readiness"). Each mark keeps the fingerprint of the change it
+//! has marked commit-ready ('docs/diff-view.org',
+//! "Marks, fingerprints and the store"). Each mark keeps the fingerprint of the change it
 //! approved; a mark whose fingerprint no longer matches the current
 //! change counts as absent. The store lives server-side, in
 //! '<data_root>/readiness-marks.json', rewritten after every change.

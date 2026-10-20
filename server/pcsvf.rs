@@ -1,6 +1,6 @@
 //! The PCSVF ("pruned change-spanning viewforest"): the viewforest
 //! the "all changes" buffer of the diff view draws
-//! ('TODO/total-diff-view/02_plan.org', "The PCSVF").
+//! ('docs/diff-view.org', "C, R, U and D").
 //!
 //! C is the set of changed graphnodes. R is the set of content
 //! origins reached from C by walking containerward through the union

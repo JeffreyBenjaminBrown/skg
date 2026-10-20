@@ -895,7 +895,7 @@ the strand keys follow. Grep for 'tdv', 'TDV', 'total diff view',
 what remains is only what this plan keeps (the verb "strand"; "diff
 view" itself).
 
-** TODO Slice 2: the diff view's doc, the plan citations and the stale comments
+** DONE Slice 2: the diff view's doc, the plan citations and the stale comments
 Write 'docs/diff-view.org' as "The diff view's own doc" above says,
 describing behavior as it will be after this plan where a later slice
 changes it (the LCS placement, the one encoding, the '(leaves ...)'

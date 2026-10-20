@@ -1,3 +1,13 @@
+//! Rerendering every open view, or a selection of them, outside a
+//! save: the "rerender all views" request, the skgrepo-set switch,
+//! the cleanup after deleting references to an absent node, and the
+//! diff view's buffers after a git-commit. Each rerender is prepared in
+//! memory first ('prepare_rerender_views_where'), so that a
+//! text-release decision can precede any visible change, and then
+//! streamed: "rerender-lock", one "rerender-view" per view,
+//! "rerender-done" ('stream_prepared_rerenders'). The graph straddle
+//! the rerenders brought up to date is written back to the connection.
+
 use crate::graph_straddle::types::GraphStraddle;
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::{
@@ -115,7 +125,7 @@ fn stream_rerender_views_excluding (
 /// Shared by 'handle_rerender_all_views_request' and the skgrepo-set switch
 /// ('restrict_repo_set'), which passes a per-view prepass (the
 /// convert-and-prune step) and asks for PartnerFolder re-creation
-/// (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org).
+/// (the API doc's "Restricted-skgrepo nodes").
 pub fn stream_rerender_views (
   stream     : &mut TcpStream,
   env        : &SkgEnv,
@@ -154,10 +164,10 @@ pub fn stream_rerender_views_after_absent_reference_cleanup (
   stream_prepared_rerenders (stream, views_state, prepared);
 }
 
-/// After a git-commit: rerender each open buffer of the total diff
+/// After a git-commit: rerender each open buffer of the diff
 /// view as any rerender does, over the graph straddle the commit
-/// rebuilt. Its roots stay ('TODO/total-diff-view/04_plan-fixes.org',
-/// "Roots linger"), and what the commit made unchanged loses its
+/// rebuilt. Its roots stay ('docs/diff-view.org',
+/// "The fresh drawing, and what it keeps"), and what the commit made unchanged loses its
 /// decorations. The commit requires the skgrepo-set all, so no text
 /// is withheld and no release is asked for.
 pub fn stream_rerender_diffView_views (

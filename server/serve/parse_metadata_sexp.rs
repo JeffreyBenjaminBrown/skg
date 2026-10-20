@@ -21,7 +21,7 @@
 ///   where PRESENCE is node+, node-, rel+ or rel-, and OBJECT is node,
 ///   rel or (in a request only) all. The last three forms may also
 ///   appear in (deleted ...), (unknown ...) and (historical ...), and
-///   at top level on an alias, id or flag property and on the total
+///   at top level on an alias, id or flag property and on the
 ///   diff view's properties other than bodyDiff.
 ///   The diff view's own viewnodes:
 ///     (historical (id ID) (repo REPO) ...)   a historical phantom

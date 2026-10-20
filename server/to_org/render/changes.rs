@@ -1,6 +1,6 @@
 //! The diff view's step at each unrestricted vognode's visit
-//! in view completion ('TODO/total-diff-view/02_plan.org', "The
-//! PCSVF" and "What each kind of change looks like"), and at each
+//! in view completion ('docs/diff-view.org', "The
+//! per-visit step" and "What each kind of change looks like"), and at each
 //! historical phantom's.
 //!
 //! On an editable occurrence: the content members (which the content
@@ -18,8 +18,8 @@
 //! buffer being drawn ('DiffViewSource::sets'); in the order-only buffer
 //! both are empty, and each node there gets an order-only marker.
 //!
-//! Nothing that exists is drawn again ('TODO/total-diff-view/04_plan-fixes.org',
-//! "Folding survives, because nothing that exists is recreated"):
+//! Nothing that exists is drawn again ('docs/diff-view.org',
+//! "The fresh drawing, and what it keeps"):
 //! each step builds a fresh drawing and reconciles what the node
 //! holds with it ('server/to_org/render/fresh_drawing.rs'), so every
 //! viewnode that stays keeps its fold state, and is moved, not
@@ -298,8 +298,9 @@ fn fresh_root (
   viewnode_of (ViewnodeKind::BufferRoot) }
 
 /// The change viewnodes an editable node holds ahead of its content.
-/// Partner folders are not among them: one the user requested may
-/// be among a node's folders, so a folder is never detached.
+/// Partner folders other than the derived "it acquired" folder are not
+/// among them: one the user requested may be among a node's folders,
+/// so such a folder is never detached.
 fn is_front_change_viewnode (
   viewnode : &Viewnode,
 ) -> bool {

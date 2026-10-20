@@ -1,9 +1,19 @@
-//! A save consumes the readiness requests of the buffer it saves
-//! ('TODO/total-diff-view/02_plan.org', "metadata"): after the graph
-//! edits succeed, each '(readyRequest ...)' or '(unreadyRequest ...)'
-//! sets or clears the marks of the change-forest leaves it names, at
-//! their fingerprints in the fresh graph straddle. A save that stops for
-//! a confirmation consumes nothing.
+//! Readiness requests and readiness facts ('docs/diff-view.org',
+//! "Readiness"), the two places where the readiness store meets a
+//! viewforest. Both rest on one rule, 'leaves_named_at': which
+//! change-forest leaves a headline names.
+//!
+//! A save consumes the readiness requests of the buffer it saves, in
+//! any buffer ('consume_readiness_requests'): after the graph edits
+//! succeed, each '(readyRequest ...)' or '(unreadyRequest ...)' sets or
+//! clears the marks of the leaves it names, at their fingerprints in
+//! the graph straddle brought up to date with the save. A request that
+//! names no current change is dropped with a warning. A save that stops
+//! for a confirmation consumes nothing.
+//!
+//! After view completion of a buffer of the diff view, the
+//! '(ready ...)' display facts are set from the store
+//! ('set_ready_facts_in_viewforest').
 
 use crate::change_leaves::{
   ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};

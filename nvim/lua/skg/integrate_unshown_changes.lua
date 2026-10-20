@@ -1,6 +1,6 @@
 -- PURPOSE: Integrate the changes not editable in a buffer of the
--- diff view ('TODO/total-diff-view/08_plan_yet-more.org', "The view
--- follows U only on command"). A save never makes an occurrence
+-- diff view ('docs/diff-view.org', "Integrating unshown
+-- changes"). A save never makes an occurrence
 -- editable or appends a root on its own; this command asks the server
 -- to, for the current buffer. The answer carries the readiness
 -- summary, as a save's does, and a rerender stream follows it,

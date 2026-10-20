@@ -1,5 +1,5 @@
 //! The diff view's own viewnodes, drawn from the graph straddle
-//! ('TODO/total-diff-view/02_plan.org', "What each kind of change
+//! ('docs/diff-view.org', "What each kind of change
 //! looks like"): the old text and its body diff, the home and relRepo
 //! moves, the changeset markers, the historical phantom of a node
 //! the after-graph lacks, and the two derived acquisition folders.

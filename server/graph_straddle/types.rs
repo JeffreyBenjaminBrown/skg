@@ -1,3 +1,10 @@
+//! The types of the graph straddle ('server/graph_straddle/mod.rs'):
+//! the straddle itself, with the sets it computes once per straddle
+//! (C, the change-forest leaves, each buffer's PCSVF sets); the
+//! presence of a node or relationship in its two graphs; a node's own
+//! changes ('NodeChanges'); a partner over the union of the two graphs
+//! ('Partner'); and the two halves of C ('ChangedPids').
+
 use crate::change_leaves::ChangeLeaves;
 use crate::pcsvf::{
   PcsvfSets, pcsvf_sets, pcsvf_sets_for_home_moves, pcsvf_sets_for_merges};

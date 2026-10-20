@@ -1,5 +1,5 @@
-//! The "stage and commit" request ('TODO/total-diff-view/02_plan.org',
-//! "the summary and the commit"): stage everything and git-commit it,
+//! The "stage and commit" request ('docs/diff-view.org',
+//! "Stage and commit"): stage everything and git-commit it,
 //! in every owned skgrepo that has changes, with one message. When the
 //! readiness summary is incomplete and the request lacks
 //! '(confirmed . t)', the answer is the summary alone and nothing
@@ -78,8 +78,8 @@ pub fn handle_stage_and_commit_request (
 /// See the module comment. Refused unless the skgrepo restriction is
 /// 'all', as the diff view is. After the git-commits, the
 /// connection's graph straddle is rebuilt (each committed HEAD moved), and
-/// the marks of the changes committed are dropped from the store: a
-/// commit lapses every mark.
+/// the store keeps exactly the marks whose change-forest leaves still
+/// exist in it, so the marks of the changes committed are dropped.
 pub fn stage_and_commit (
   env                 : &SkgEnv,
   views_state         : &mut ViewsState,

@@ -112,7 +112,7 @@ fn partnerFolder_differences_from_graph (
 
 /// The members of a partner folder, each with its relRepo request: its
 /// unrestricted vognode children that affect it, by pid (an
-/// unresolved ID as it is), less those whose relationship the total
+/// unresolved ID as it is), less those whose relationship the
 /// diff view shows as removed, plus its Unknown phantom children, by
 /// raw ID, as the folder reconciler matches them.
 fn partnerFolder_members_in_view (

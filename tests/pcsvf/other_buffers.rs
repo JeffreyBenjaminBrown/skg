@@ -1,4 +1,4 @@
-// The merges, skgrepo-changes and order-only buffers of the total
+// The merges, skgrepo-changes and order-only buffers of the
 // diff view. In the 'buffers' fixture (owned skgrepos public and
 // private):
 // - top contains acq, which acquired acqd by a nodeMerge; pres, new

@@ -403,7 +403,7 @@ So far there are these endpoints:
       from the readiness store.
     - =((errors ("REFUSAL")) (warnings ()))= when the skgrepo
       restriction is not =all=, the message is blank, or the graph
-      pair cannot be built. The rerender stream is empty.
+      straddle cannot be built. The rerender stream is empty.
   - Logic: =server/serve/handlers/stage_and_commit.rs=,
     =server/git_ops/stage_and_commit.rs=.
 

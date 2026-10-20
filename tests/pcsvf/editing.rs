@@ -169,7 +169,7 @@ fn a_new_child_is_created_and_drawn_as_new (
       "the new child must be drawn as new:\n{}", response . saved_view );
     Ok (( )) }) }
 
-/// When another view's save changes what a buffer of the total diff
+/// When another view's save changes what a buffer of the diff
 /// view shows, the buffer is rerendered as a collateral view over the
 /// fresh graph straddle: it shows the new change and keeps the old ones.
 #[test]

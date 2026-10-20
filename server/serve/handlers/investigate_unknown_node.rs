@@ -1,3 +1,8 @@
+//! The "investigate unknown node" request: what an ID that the graph
+//! does not resolve used to be, according to git history (the API
+//! doc's "Investigate unknown node"; the glossary's "unknown node,
+//! dangling ID").
+
 use crate::git_ops::vanished::{
   investigate_vanished_skgids, vanished_node_report_as_org};
 use crate::serve::protocol::TcpToClient;

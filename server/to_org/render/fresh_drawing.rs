@@ -1,6 +1,6 @@
 //! Reconciling what the diff view drew under a viewnode with a
-//! fresh drawing of it ('TODO/total-diff-view/04_plan-fixes.org',
-//! "Folding survives, because nothing that exists is recreated").
+//! fresh drawing of it ('docs/diff-view.org',
+//! "The fresh drawing, and what it keeps").
 //! The fresh drawing is built in a scratch tree. Each existing
 //! viewnode it also produces is kept, with its fold state, and its
 //! kind and facts are updated in place; each it does not is

@@ -1,5 +1,5 @@
 -- PURPOSE: The commit-readiness gestures of the diff view
--- ('TODO/total-diff-view/02_plan.org', "gestures"). Each writes
+-- ('docs/diff-view.org', "Readiness requests and gestures"). Each writes
 -- readiness requests, '(readyRequest OBJECTS)' or '(unreadyRequest
 -- OBJECTS)', into headline metadata, then saves. The save consumes
 -- them, setting or clearing the marks, and answers with the buffer
