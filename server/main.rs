@@ -57,12 +57,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     // 'load_config' the server runs at startup (TOML parse +
     // skgrepo-set/path validation) and exit 0/1, reporting a bad config
     // exactly the way the real startup does (via 'die_bad_config'). No
-    // tracing and no file walk.
+    // tracing and no file walk. Its warnings (unknown keys) are
+    // printed, one per line, and do not change the exit status.
     let config_path: String =
       if args . len() > 2 { args[2] . clone() }
       else { "data/skgconfig.toml" . to_string() };
     return match load_config (&config_path) {
-      Ok (_)  => Ok (( )),
+      Ok (( _config, warnings )) => {
+        for warning in &warnings {
+          println! ("Warning: {}", warning); }
+        Ok (( )) },
       Err (e) => die_bad_config (&config_path, e) }; }
 
   // The real server start. load_config runs on EVERY launch -- via
@@ -74,11 +78,14 @@ fn main() -> Result<(), Box<dyn Error>> {
   let config_path: String =
     if args . len() > 1 { args[1] . clone() } // config from command line, if given
     else { "data/skgconfig.toml" . to_string() }; // default config
-  let config: SkgConfig = match load_config (&config_path) {
-    Ok (c)  => c,
-    Err (e) => die_bad_config (&config_path, e) };
+  let (config, config_warnings) : (SkgConfig, Vec<String>) =
+    match load_config (&config_path) {
+      Ok (loaded) => loaded,
+      Err (e)     => die_bad_config (&config_path, e) };
 
   init_tracing (&config);
+  for warning in &config_warnings {
+    tracing::warn! ("{}", warning); }
 
   { // shared/herald-styles.json is embedded at compile time, so an
     // inconsistency in it is a build defect, not a runtime condition.
@@ -143,6 +150,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "initialize_dbs") . entered ();
       initialize_dbs (&config) };
   drop (nodes); // 'initialize_dbs' checked and used them; nothing here needs them.
+  env . runtime . record_startup_warnings (config_warnings);
 
   let runtime = env . runtime_snapshot ();
   compute_context_rankings (
@@ -339,7 +347,7 @@ fn run_export_org (
     if ! positional . is_empty () { positional[0] . clone () }
     else { "data/skgconfig.toml" . to_string() };
   let config : SkgConfig =
-    load_config (&config_path) ?;
+    load_config (&config_path) ? . 0;
   let set_name : SkgrepoSetName =
     if positional . len () > 1 {
       SkgrepoSetName::from (positional[1] . as_str()) }

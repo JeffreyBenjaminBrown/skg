@@ -22,7 +22,7 @@ fn test_multi_skgrepo_errors() -> Result<(), Box<dyn Error>> {
     // Load the multi-repo fixture config.
     let mut config: SkgConfig =
       load_config(
-        "tests/multi_repo_errors/fixtures/skgconfig.toml")?;
+        "tests/multi_repo_errors/fixtures/skgconfig.toml")? . 0;
     config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-repo-errors-1");
 
 
@@ -89,7 +89,7 @@ fn test_foreign_node_modification_errors(
   block_on(async {
     let mut config: SkgConfig =
       load_config(
-        "tests/multi_repo_errors/fixtures/skgconfig.toml")?;
+        "tests/multi_repo_errors/fixtures/skgconfig.toml")? . 0;
     config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-repo-errors-2");
 
     // Test 1: Foreign node modifications
@@ -241,7 +241,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
   block_on(async {
     // Load the multi-repo fixture config.
     let mut config: SkgConfig = load_config(
-      "tests/multi_repo_errors/fixtures/skgconfig.toml")?;
+      "tests/multi_repo_errors/fixtures/skgconfig.toml")? . 0;
     config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-repo-errors-3");
 
 

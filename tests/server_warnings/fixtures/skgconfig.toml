@@ -1,0 +1,6 @@
+# Sets 'max_role_tree_depth', the old spelling of 'max_roleTree_depth',
+# and 'no_such_key', which skg never knew. Neither may stop it loading.
+repos = []
+tantivy_folder = "tantivy"
+max_role_tree_depth = 5
+no_such_key = true

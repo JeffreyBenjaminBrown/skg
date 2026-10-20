@@ -22,7 +22,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
     if args . len () > 2 {
       args[2] . parse () . unwrap_or (20) }
     else { 20 };
-  let config : SkgConfig = load_config (config_path) ?;
+  let config : SkgConfig = load_config (config_path) ? . 0;
   let nodes : Vec<Graphnode> =
     read_all_skg_files_from_skgrepos (&config) ?;
   error_unless_each_skgid_names_one_node (

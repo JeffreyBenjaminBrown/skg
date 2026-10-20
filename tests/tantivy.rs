@@ -25,7 +25,7 @@ fn test_many_tantivy_things (
   let index_path: &Path =
     Path::new (index_dir);
 
-  let config = load_config ("tests/tantivy/fixtures/skgconfig.toml")?;
+  let config = load_config ("tests/tantivy/fixtures/skgconfig.toml")? . 0;
   let nodes: Vec<Graphnode> =
     read_all_skg_files_from_skgrepos (&config)?;
 

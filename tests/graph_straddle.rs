@@ -192,7 +192,7 @@ fn a_rebuild_drops_the_straddle_and_the_next_reads_foreign_files_afresh (
     "[[repos]]\nname = \"main\"\npath = \"owned/main\"\n",
     "[[repos]]\nname = \"foreign\"\npath = \"foreign\"\n" )) ?;
   let config : SkgConfig = load_config (
-    root . path () . join ("skgconfig.toml") . to_str () . unwrap () ) ?;
+    root . path () . join ("skgconfig.toml") . to_str () . unwrap () ) ? . 0;
   let tantivy : TantivyIndex =
     create_empty_tantivy_index (&config . tantivy_folder) ?;
   let mut env : SkgEnv = skg_env_from_parts (

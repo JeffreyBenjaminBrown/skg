@@ -58,10 +58,10 @@ pub fn rebuild_session_lifetime_stores_in_place (
   let result : Result<(), String> = (|| {
     let config_path : String =
       runtime . config . config_path . display () . to_string ();
-    let fresh_config : SkgConfig =
+    let fresh_config : SkgConfig = // The server keeps its startup warnings; a reload's are not reported.
       load_config (&config_path)
       . map_err ( |e| format! (
-        "Reloading config from {}: {}", config_path, e) ) ?;
+        "Reloading config from {}: {}", config_path, e) ) ? . 0;
     let (nodes, load_violations)
       : (Vec<Graphnode>, Vec<(ID, TelescopeViolation)>) =
       read_all_skg_files_from_skgrepos_collecting_violations (&fresh_config)

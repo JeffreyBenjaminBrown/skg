@@ -9,7 +9,7 @@ use crate::readiness_store::ReadinessStore;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use crate::types::phantom::home_from_disk;
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::sync::Mutex as SyncMutex;
 use std::sync::MutexGuard as SyncMutexGuard;
 use arc_swap::ArcSwap;
@@ -42,6 +42,10 @@ pub struct SharedRuntime {
   /// The commit-readiness marks, read from '<data_root>' at startup
   /// and written back after every change.
   pub readiness_store : SyncMutex<ReadinessStore>,
+  /// What the server warned about as it started (unknown config
+  /// keys), recorded once by 'main' and served by the "server
+  /// warnings" request.
+  startup_warnings : OnceLock<Vec<String>>,
 }
 
 impl SharedRuntime {
@@ -69,8 +73,25 @@ impl SharedRuntime {
       mutation_gate : new_mutation_gate (),
       legacy_graph,
       readiness_store : SyncMutex::new (readiness_store),
+      startup_warnings : OnceLock::new (),
     }
   }
+
+  /// Record the startup warnings. Only the first call has an effect.
+  pub fn record_startup_warnings (
+    &self,
+    warnings : Vec<String>,
+  ) {
+    let _already_recorded : Result<(), Vec<String>> =
+      self . startup_warnings . set (warnings); }
+
+  /// The startup warnings; none if none were recorded.
+  pub fn startup_warnings (
+    &self,
+  ) -> &[String] {
+    self . startup_warnings . get ()
+      . map ( |warnings| warnings . as_slice () )
+      . unwrap_or (&[] ) }
 
   pub fn graph_snapshot (&self) -> Arc<RuntimeGeneration> {
     self . current . load_full ()

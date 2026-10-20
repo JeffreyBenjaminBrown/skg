@@ -1,5 +1,6 @@
 use crate::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
 
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use std::io;
@@ -140,9 +141,54 @@ fn derive_ownership_and_labels (
       if ! trimmed . is_empty () { // path == owned folder: keep full
         skgrepo . abbreviation = Some (trimmed); }}}}
 
+/// Top-level keys that skg once read under another spelling, each
+/// beside its current spelling, so that the warning about the old one
+/// can name the new one.
+const RENAMED_SKGCONFIG_KEYS : [(&str, &str); 1] = [
+  ("max_role_tree_depth", "max_roleTree_depth"), ];
+
+/// Deserialized only to find the top-level keys of a skgconfig.toml
+/// that 'SkgConfig' does not know: serde hands the flattened config
+/// every key it knows, and the catch-all table keeps the rest.
+#[derive(Deserialize)]
+struct SkgConfigBesideUnknownKeys {
+  #[serde (flatten)]
+  _config      : SkgConfig,
+  #[serde (flatten)]
+  unknown_keys : toml::Table, }
+
+/// One warning per top-level key of the config text that 'SkgConfig'
+/// does not know, which serde would otherwise ignore silently.
+/// A key that was renamed gets its current spelling named.
+/// Runs after 'SkgConfig' parsed the same text, so this parse cannot
+/// fail for a reason the first did not report; if it does anyway,
+/// there are no warnings.
+pub fn unknown_top_level_config_key_warnings (
+  contents : &str,
+) -> Vec<String> {
+  let unknown_keys : Vec<String> =
+    toml::from_str::<SkgConfigBesideUnknownKeys> (contents)
+    . map ( |parsed| parsed . unknown_keys . keys () . cloned ()
+            . collect () )
+    . unwrap_or_default ();
+  unknown_keys . iter ()
+    . map ( |key| {
+      let unknown : String = format! (
+        "skgconfig.toml sets '{}', a key skg does not know, so it has no effect.",
+        key );
+      match RENAMED_SKGCONFIG_KEYS . iter ()
+        . find ( |(old, _new)| old == key )
+      { Some ((_old, new)) => format! (
+          "{} Its current spelling is '{}'.", unknown, new ),
+        None => unknown }} )
+    . collect () }
+
+/// The config at 'path', beside one warning per top-level key it sets
+/// that skg does not know (see 'unknown_top_level_config_key_warnings').
+/// An unknown key is warned about, never refused.
 pub fn load_config (
   path: &str )
-  -> Result <SkgConfig,
+  -> Result <(SkgConfig, Vec<String>),
              Box<dyn std::error::Error>>
 { if !Path::new (path) . exists() {
     return Err(format!("Config file not found: {}",
@@ -179,7 +225,8 @@ pub fn load_config (
   validate_skgrepo_sets (&config)?;
   validate_skgrepo_paths_creating_owned_ones_if_needed(
     &config . skgrepos)?;
-  Ok (config) }
+  Ok (( config,
+        unknown_top_level_config_key_warnings (&contents) )) }
 
 /// Load config from TOML file with optional overrides for testing.
 ///

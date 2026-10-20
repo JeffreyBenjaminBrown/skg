@@ -55,6 +55,9 @@ mod skgrepo_inheritance_for_non_content;
 #[path = "repo_path_validation.rs"]
 mod skgrepo_path_validation;
 
+#[path = "server_warnings.rs"]
+mod server_warnings;
+
 #[path = "subscribee_folder.rs"]
 mod subscribee_folder;
 

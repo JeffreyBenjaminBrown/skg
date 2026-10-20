@@ -103,7 +103,7 @@ mod tests {
   #[test]
   fn statuses_use_the_current_graph_and_hide_restricted_skgrepos () {
     let mut config : SkgConfig = load_config (
-      "tests/repo_sets/fixtures/skgconfig.toml") . unwrap ();
+      "tests/repo_sets/fixtures/skgconfig.toml") . unwrap () . 0;
     config . skgrepos . get_mut (&SkgrepoName::from ("public"))
       .unwrap () . abbreviation = Some ("pub" . to_string ());
     let restriction : SkgrepoRestriction = SkgrepoRestriction::named (
@@ -141,7 +141,7 @@ mod tests {
   #[test]
   fn a_newly_swapped_in_graph_answers_before_any_title_index_update () {
     let config : SkgConfig = load_config (
-      "tests/repo_sets/fixtures/skgconfig.toml") . unwrap ();
+      "tests/repo_sets/fixtures/skgconfig.toml") . unwrap () . 0;
     let restriction : SkgrepoRestriction = SkgrepoRestriction::named (
       &config, SkgrepoSetName::from ("public")) . unwrap ();
     let handle : InRustGraphHandle = Arc::new (ArcSwap::from_pointee (

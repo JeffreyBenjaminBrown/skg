@@ -31,6 +31,7 @@ pub enum RequestType {
   StageAndCommit,
   IntegrateUnshownChanges,
   InvestigateUnknownNode,
+  ServerWarnings,
 }
 
 impl RequestType {
@@ -64,6 +65,7 @@ impl RequestType {
       "stage and commit"         => Ok (RequestType::StageAndCommit),
       "integrate unshown changes"     => Ok (RequestType::IntegrateUnshownChanges),
       "investigate unknown node" => Ok (RequestType::InvestigateUnknownNode),
+      "server warnings"          => Ok (RequestType::ServerWarnings),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See docs/api-and-formats.org
@@ -112,6 +114,7 @@ pub enum TcpToClient {
   StageAndCommit, // The per-skgrepo git-commits, or the readiness summary with '(needs-confirmation . t)'. A rerender stream follows.
   IntegrateUnshownChanges, // The readiness summary of the buffer of the diff view redrawn with every change editable, or a refusal. A rerender stream follows.
   InvestigateUnknownNode, // What git history says an unknown node used to be, or the node an ID resolves to, as Org text.
+  ServerWarnings, // What the server warned about as it started, '(warnings ("..." ...))'. Each client asks once per connection.
   Error,
 }
 
@@ -161,4 +164,5 @@ impl TcpToClient {
       TcpToClient::StageAndCommit   => "stage-and-commit",
       TcpToClient::IntegrateUnshownChanges => "integrate-unshown-changes",
       TcpToClient::InvestigateUnknownNode => "investigate-unknown-node",
+      TcpToClient::ServerWarnings   => "server-warnings",
       TcpToClient::Error            => "error", }} }

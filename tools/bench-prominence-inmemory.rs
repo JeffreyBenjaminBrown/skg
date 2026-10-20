@@ -36,7 +36,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
   println! ("=== In-Memory Context Pipeline Benchmark ===");
   println! ("Config: {}", config_path);
 
-  let config : SkgConfig = load_config (config_path) ?;
+  let config : SkgConfig = load_config (config_path) ? . 0;
 
   // Step 1: Read all .skg files
   let t0 : Instant = Instant::now ();

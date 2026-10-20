@@ -289,7 +289,7 @@ fn config_loads_default_skgrepo_set_and_prefix_skgrepo_sets (
   // skgrepo selects it and everything more public. The fixture lists
   // public before private, so "public" selects only itself.
   let config =
-    load_config ("tests/repo_sets/fixtures/skgconfig.toml")?;
+    load_config ("tests/repo_sets/fixtures/skgconfig.toml")? . 0;
   assert_eq! (
     config . default_skgrepo_set_name (),
     &SkgrepoSetName::from ("public"));
@@ -582,7 +582,7 @@ async fn restricted_skgrepo_search_and_save_work_together_end_to_end (
 fn backward_path_truncates_before_first_restricted_node (
 ) -> Result<(), Box<dyn Error>> {
   let config =
-    load_config ("tests/repo_sets/fixtures/skgconfig.toml")?;
+    load_config ("tests/repo_sets/fixtures/skgconfig.toml")? . 0;
   let restriction : SkgrepoRestriction =
     SkgrepoRestriction::named (
       &config,
@@ -604,7 +604,7 @@ fn backward_path_truncates_before_first_restricted_node (
 fn backward_path_filters_forks_per_branch_and_omits_empty_forks (
 ) -> Result<(), Box<dyn Error>> {
   let config =
-    load_config ("tests/repo_sets/fixtures/skgconfig.toml")?;
+    load_config ("tests/repo_sets/fixtures/skgconfig.toml")? . 0;
   let restriction : SkgrepoRestriction =
     SkgrepoRestriction::named (
       &config,
@@ -732,7 +732,7 @@ async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks 
 fn search_enrichment_truncates_role_tree_before_restricted_container (
 ) -> Result<(), Box<dyn Error>> {
   let config =
-    load_config ("tests/repo_sets/fixtures/skgconfig.toml")?;
+    load_config ("tests/repo_sets/fixtures/skgconfig.toml")? . 0;
   let restriction : SkgrepoRestriction =
     SkgrepoRestriction::named (
       &config,
@@ -817,7 +817,7 @@ fn search_enrichment_truncates_role_tree_before_restricted_container (
 fn titles_by_skgids_omits_restricted_skgrepo_titles (
 ) -> Result<(), Box<dyn Error>> {
   let config =
-    load_config ("tests/repo_sets/fixtures/skgconfig.toml")?;
+    load_config ("tests/repo_sets/fixtures/skgconfig.toml")? . 0;
   let restriction : SkgrepoRestriction =
     SkgrepoRestriction::named (
       &config,

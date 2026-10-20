@@ -27,6 +27,7 @@ use crate::serve::handlers::investigate_unknown_node::handle_investigate_unknown
 use crate::serve::handlers::rebuild_session_lifetime_stores::handle_rebuild_session_lifetime_stores_request;
 use crate::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
+use crate::serve::handlers::server_warnings::handle_server_warnings_request;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
   decide as decide_text_release,
@@ -265,6 +266,9 @@ fn handle_emacs (
               &skgrepo_restriction ),
           Ok (RequestType::HeraldRules) =>
             handle_herald_rules_request ( &mut stream ),
+          Ok (RequestType::ServerWarnings) =>
+            handle_server_warnings_request (
+              &mut stream, env . runtime . startup_warnings () ),
           Ok (RequestType::ExportToOrg) =>
             handle_export_to_org_request ( &mut stream,
                                            &runtime . config,

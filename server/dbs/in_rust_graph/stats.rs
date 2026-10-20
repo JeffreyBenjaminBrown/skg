@@ -279,7 +279,7 @@ mod tests {
   #[test]
   fn restricted_content_and_targets_do_not_make_a_mentioner_substantive () {
     let config = load_config (
-      "tests/repo_sets/fixtures/skgconfig.toml") . unwrap ();
+      "tests/repo_sets/fixtures/skgconfig.toml") . unwrap () . 0;
     let restriction : SkgrepoRestriction = SkgrepoRestriction::named (
       &config, SkgrepoSetName::from ("public")) . unwrap ();
     let mut mentioner : Graphnode = node (
