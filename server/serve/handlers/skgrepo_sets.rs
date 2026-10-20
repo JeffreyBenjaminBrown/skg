@@ -17,6 +17,7 @@ use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgrepoSetName;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
+use crate::update_buffer::RerenderOptions;
 use crate::update_buffer::skgrepo_switch::convert_and_prune_for_skgrepo_switch;
 
 use std::net::TcpStream;
@@ -92,7 +93,8 @@ fn set_skgrepo_restriction (
         viewforest . as_internal_tree_mut (), &target ) };
     prepare_rerender_views_with_runtime (
       env, runtime, views_state,
-      Some (&target), Some (&prepass), true ) };
+      Some (&target), Some (&prepass),
+      RerenderOptions::for_skgrepo_switch ) };
   if ! authorize_prepared_rerenders (
     stream, &mut prepared, Some (&restriction),
     "repo-set-switch-rerender",

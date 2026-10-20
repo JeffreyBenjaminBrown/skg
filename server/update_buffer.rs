@@ -229,10 +229,7 @@ pub fn update_views_after_save (
         &mut saved_view_mut,
         &mut context,
         Some (&mut repair_warnings),
-        false,
-        true,
-        saved_diffView_buffer_kind,
-        false ) } ?;
+        RerenderOptions::for_saved_view (saved_diffView_buffer_kind) ) } ?;
   let readiness_summary : Option<BufferReadinessSummary> =
     saved_diffView_buffer_kind . and ( context . graph_straddle . as_ref () )
     . map ( |straddle| {
@@ -376,10 +373,8 @@ fn rerender_collateral_view (
         &mut viewforest,
         context,
         None, // Collateral views repair silently.
-        false,
-        false,
-        views_state . open_views . diffView_buffer_kind_of_view (&view_id),
-        false
+        RerenderOptions::ordinary (
+          views_state . open_views . diffView_buffer_kind_of_view (&view_id) )
       ) . map_err (
         |e| format!( "Collateral view {}: {}",
                       view_id . repr_in_client (), e)) ? };
@@ -441,11 +436,76 @@ pub fn render_initial_view (
   drop (sink);
   Ok (( viewforest, Vec::new () )) }
 
+/// How 'rerender_view' treats a view, beyond what its context says.
+/// Each case of rerender has its own constructor, which names every
+/// field.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RerenderOptions {
+  /// Create default PartnerFolders for nodes that lack them. Ordinarily
+  /// false: folders round-trip from the buffer. True for the
+  /// skgrepo-set switch, where pruning removed them and the new set
+  /// decides which return.
+  pub create_partnerFolders                 : bool,
+  /// True only for the view whose edit created the override.
+  pub substitute_existing_content_overrides : bool,
+  /// Some for a buffer of the diff view.
+  pub diffView_buffer                       : Option<DiffViewBufferKind>,
+  /// True only for the "integrate unshown changes" request; matters
+  /// only in a buffer of the diff view.
+  pub integrate_unshown_changes             : bool,
+}
+
+impl RerenderOptions {
+  /// The view a save came from.
+  pub fn for_saved_view (
+    diffView_buffer : Option<DiffViewBufferKind>,
+  ) -> RerenderOptions {
+    RerenderOptions {
+      create_partnerFolders                 : false,
+      substitute_existing_content_overrides : true,
+      diffView_buffer,
+      integrate_unshown_changes             : false, } }
+
+  /// Every other rerender of an open view: the collateral views of a
+  /// save, "rerender all views", the cleanup after deleting references
+  /// to an absent node, and the diff view's buffers after a git-commit.
+  pub fn ordinary (
+    diffView_buffer : Option<DiffViewBufferKind>,
+  ) -> RerenderOptions {
+    RerenderOptions {
+      create_partnerFolders                 : false,
+      substitute_existing_content_overrides : false,
+      diffView_buffer,
+      integrate_unshown_changes             : false, } }
+
+  /// A view after its convert-and-prune step at a skgrepo-set switch.
+  pub fn for_skgrepo_switch (
+    diffView_buffer : Option<DiffViewBufferKind>,
+  ) -> RerenderOptions {
+    RerenderOptions {
+      create_partnerFolders                 : true,
+      substitute_existing_content_overrides : false,
+      diffView_buffer,
+      integrate_unshown_changes             : false, } }
+
+  /// The buffer of the diff view named by an "integrate unshown
+  /// changes" request.
+  pub fn for_integrating_unshown_changes (
+    diffView_buffer : Option<DiffViewBufferKind>,
+  ) -> RerenderOptions {
+    RerenderOptions {
+      create_partnerFolders                 : false,
+      substitute_existing_content_overrides : false,
+      diffView_buffer,
+      integrate_unshown_changes             : true, } }
+}
+
 /// Strip the stale ID folders, re-complete the viewforest,
 /// set graph/view stats, and render to string.
 /// .
-/// A buffer of the diff view ('diffView_buffer_kind' Some) is reconciled
-/// over the graph straddle, brought up to date in 'context': view
+/// A buffer of the diff view ('options . diffView_buffer' Some) is
+/// reconciled over the graph straddle, brought up to date in
+/// 'context': view
 /// completion reconciles each editable node's change facts, change
 /// folders, markers and former members, its ID folder among them,
 /// with a fresh drawing from the straddle
@@ -453,8 +513,8 @@ pub fn render_initial_view (
 /// that stays and its fold state, and its readiness facts are then
 /// read from the store. Completion draws what it draws anew by the
 /// buffer's sets recomputed after the save, and nothing editable is
-/// write-protected again. Only when 'integrate_unshown_changes' is true
-/// (the "integrate unshown changes" request) does it make occurrences
+/// write-protected again. Only when 'options . integrate_unshown_changes'
+/// is true (the "integrate unshown changes" request) does it make occurrences
 /// editable or append roots: before completion each node of the
 /// recomputed U is made editable at its first occurrence if it has no
 /// editable one, and after completion the content origins of the
@@ -466,20 +526,18 @@ pub fn rerender_view (
   viewforest    : &mut ViewForest,
   context       : &mut RerenderAfterSaveContext<'_>,
   warning_sink  : Option<&mut Vec<CompletionWarning>>, // Some only for the view the user just saved.
-  create_partnerFolders : bool, // false post-save (folders round-trip from the buffer); true for the repo-switch rerender, where pruning removed them and the new set decides which return.
-  substitute_existing_content_overrides : bool, // true only for the view whose edit created the override.
-  diffView_buffer_kind : Option<DiffViewBufferKind>, // Some for a buffer of the diff view
-  integrate_unshown_changes : bool, // true only for the "integrate unshown changes" request; matters only in a diff view
+  options       : RerenderOptions,
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
-  if diffView_buffer_kind . is_none () {
+  if options . diffView_buffer . is_none () {
     // A diff view's step reconciles its ID folders instead.
     tracing::debug!("rerender_view: starting");
     remove_id_folders (viewforest) ?; }
   let diffView_rerender : Option<DiffViewRerender> =
     prepare_diffView_rerender (
       &mut context . graph_straddle, &context . runtime,
-      diffView_buffer_kind, integrate_unshown_changes, viewforest ) ?;
+      options . diffView_buffer, options . integrate_unshown_changes,
+      viewforest ) ?;
   let diffView_source : Option<DiffViewSource> =
     diffView_rerender . as_ref () . map ( |rerender| rerender . source () );
   { tracing::debug!("rerender_view: starting complete_viewforest");
@@ -501,8 +559,8 @@ pub fn rerender_view (
       // Post-save (and rerender-all) reuse the saved buffer's PartnerFolders
       // and pass false. The repo-switch rerender passes true: its prune
       // removed the folders, and the new set decides which defaults return.
-      create_partnerFolders,
-      substitute_existing_content_overrides,
+      options . create_partnerFolders,
+      options . substitute_existing_content_overrides,
       warning_sink,
       diffView_source,
       &nodes_before_completion,
@@ -690,3 +748,8 @@ fn fulfill_root_containerward_requests (
         &mut node_mut . value () . kind
       { t . view_requests . remove (& ViewRequest::RoleTree (RelationRole::CONTAINER)); }} }
   Ok (( )) }
+
+#[cfg(test)]
+#[allow(non_snake_case)]
+#[path = "../tests/unit/rerender_options.rs"]
+mod tests;

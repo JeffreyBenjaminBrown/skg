@@ -20,10 +20,10 @@ use crate::serve::util::{ format_errors_warnings_sexp, format_lock_views_sexp, f
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::tree::forest::ViewForest;
-use crate::types::views_state::{ViewId, ViewState};
+use crate::types::views_state::{DiffViewBufferKind, ViewId, ViewState};
 use crate::types::views_state::pids_from_viewforest;
 use crate::update_buffer::{
-  rerender_view, RerenderAfterSaveContext};
+  rerender_view, RerenderAfterSaveContext, RerenderOptions};
 
 use futures::executor::block_on;
 use std::net::TcpStream;
@@ -110,37 +110,13 @@ fn stream_rerender_views_excluding (
   excluded : &HashSet<ViewId>,
 ) {
   let mut prepared : PreparedRerenders = prepare_rerender_views (
-    env, views_state, Some (skgrepo_restriction), None, false);
+    env, views_state, Some (skgrepo_restriction), None,
+    RerenderOptions::ordinary );
   prepared . view_ids . retain (|view_id| ! excluded . contains (view_id));
   prepared . views . retain (|view| ! excluded . contains (&view . view_id));
   if ! authorize_prepared_rerenders (
     stream, &mut prepared, Some (skgrepo_restriction),
     "rerender-all-views", approved_pids) {
-    return; }
-  stream_prepared_rerenders (stream, views_state, prepared);
-}
-
-/// Stream re-rendered views to Emacs.
-/// Sends: rerender-lock → rerender-view* → rerender-done.
-/// Shared by 'handle_rerender_all_views_request' and the skgrepo-set switch
-/// ('restrict_repo_set'), which passes a per-view prepass (the
-/// convert-and-prune step) and asks for PartnerFolder re-creation
-/// (the API doc's "Restricted-skgrepo nodes").
-pub fn stream_rerender_views (
-  stream     : &mut TcpStream,
-  env        : &SkgEnv,
-  views_state : &mut ViewsState,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
-  prepass    : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
-  create_partnerFolders : bool,
-  operation          : &str,
-  approved_pids      : &HashSet<crate::types::misc::ID>,
-) {
-  let mut prepared : PreparedRerenders = prepare_rerender_views (
-    env, views_state, skgrepo_restriction, prepass, create_partnerFolders );
-  if ! authorize_prepared_rerenders (
-    stream, &mut prepared, skgrepo_restriction,
-    operation, approved_pids ) {
     return; }
   stream_prepared_rerenders (stream, views_state, prepared);
 }
@@ -156,9 +132,9 @@ pub fn stream_rerender_views_after_absent_reference_cleanup (
   raw_skgid     : &crate::types::misc::ID,
   affected_recorder_pids : &HashSet<crate::types::misc::ID>,
 ) {
-  let prepared = prepare_rerender_views_where (
+  let prepared : PreparedRerenders = prepare_rerender_views_where (
     env, env . runtime_snapshot (), views_state,
-    Some (skgrepo_restriction), None, false, false,
+    Some (skgrepo_restriction), None, RerenderOptions::ordinary,
     |_, state| view_can_display_absent_reference_change (
       &state . viewforest, raw_skgid, affected_recorder_pids ));
   stream_prepared_rerenders (stream, views_state, prepared);
@@ -178,7 +154,7 @@ pub fn stream_rerender_diffView_views (
 ) {
   let prepared : PreparedRerenders = prepare_rerender_views_where (
     env, env . runtime_snapshot (), views_state,
-    Some (skgrepo_restriction), None, false, false,
+    Some (skgrepo_restriction), None, RerenderOptions::ordinary,
     |_, state| state . diffView_buffer_kind . is_some () );
   stream_prepared_rerenders (stream, views_state, prepared);
 }
@@ -191,12 +167,12 @@ pub(crate) fn prepare_rerender_views (
   views_state         : &ViewsState,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
-  create_partnerFolders  : bool,
+  rerender_options    : fn (Option<DiffViewBufferKind>) -> RerenderOptions,
 ) -> PreparedRerenders {
   let runtime = env . runtime_snapshot ();
   prepare_rerender_views_with_runtime (
     env, runtime, views_state, skgrepo_restriction, prepass,
-    create_partnerFolders)
+    rerender_options)
 }
 
 pub(crate) fn prepare_rerender_views_with_runtime (
@@ -205,25 +181,25 @@ pub(crate) fn prepare_rerender_views_with_runtime (
   views_state         : &ViewsState,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
-  create_partnerFolders  : bool,
+  rerender_options    : fn (Option<DiffViewBufferKind>) -> RerenderOptions,
 ) -> PreparedRerenders {
   prepare_rerender_views_where (
     env, runtime, views_state, skgrepo_restriction, prepass,
-    create_partnerFolders, false, |_, _| true )
+    rerender_options, |_, _| true )
 }
 
 /// Prepare only open views selected from their already-held state.
 /// The selector is deliberately evaluated before cloning or rerendering, so a
 /// command can leave unrelated clean *and dirty* buffers entirely untouched.
-/// 'integrate_unshown_changes' is passed to 'rerender_view'.
+/// 'rerender_options' gives the options of each view's 'rerender_view'
+/// from the view's buffer kind in the diff view, if any.
 pub(crate) fn prepare_rerender_views_where (
   env                 : &SkgEnv,
   runtime             : std::sync::Arc<RuntimeGeneration>,
   views_state         : &ViewsState,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
-  create_partnerFolders  : bool,
-  integrate_unshown_changes : bool,
+  rerender_options    : fn (Option<DiffViewBufferKind>) -> RerenderOptions,
   include             : impl Fn (&ViewId, &ViewState) -> bool,
 ) -> PreparedRerenders {
   let view_ids : Vec<ViewId> = views_state . open_views . views . iter ()
@@ -261,11 +237,8 @@ pub(crate) fn prepare_rerender_views_where (
         &mut viewforest,
         &mut context,
         None, // streamed rerenders repair silently.
-        create_partnerFolders,
-        false,
-        views_state . open_views . diffView_buffer_kind_of_view (view_id),
-        integrate_unshown_changes
-      ) } )
+        rerender_options (
+          views_state . open_views . diffView_buffer_kind_of_view (view_id) )) } )
     { Ok (text) => {
         rendered_views . push ( PreparedView {
           view_id : view_id . clone (), text, viewforest } ); },
