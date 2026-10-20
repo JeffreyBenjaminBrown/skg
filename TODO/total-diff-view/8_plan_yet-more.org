@@ -440,7 +440,7 @@ on a buffer with nothing unshown changes nothing. Client tests: the
 command refuses on a modified buffer and sends the request on a
 clean one.
 
-** Slice 3: housekeeping
+** DONE Slice 3: housekeeping
 Rename 'make_freshU_editable_at_first_occurrences' to
 'ensure_editableOccurrences_exist'. Delete the stale parenthetical in
 the 'PhantomDeleted' doc comment. Extend 'nvim/lua/skg/messages.lua'

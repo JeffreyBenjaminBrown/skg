@@ -1,3 +1,13 @@
+* Neovim shows Emacs chords in most server messages (2026-10-19; fixed 2026-10-20)
+  Server messages name Emacs chords: C-c s s (fork errors), C-c g RET
+  (edit requests on write-protected nodes, the overridesHere
+  mismatch), C-c s r (leak-shaped members). The Neovim client
+  translates only C-c s d ('neovim_bindings_of_emacs_chords',
+  'nvim/lua/skg/messages.lua'); adding the others that have a Neovim
+  binding there would fix it.
+  Fixed 2026-10-20 in slice 3 of [[file:../total-diff-view/8_plan_yet-more.org][the TDV yet-more-fixes plan]]: the
+  table gains C-c s s and C-c g RET; C-c s r stays, as Neovim has no
+  relRepo command.
 * Write-protecting a drawn TDV occurrence duplicates its children (2026-10-19; fixed 2026-10-19)
   In the total diff view's 'shared' fixture (x and y each contain n),
   a save that write-protects n under x and requests n under y

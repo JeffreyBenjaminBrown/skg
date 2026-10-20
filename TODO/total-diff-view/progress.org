@@ -1211,3 +1211,17 @@ not a buffer of the total diff view, or when the rerender fails.
   command.
 *** the headline had no keyword
 The slice's headline carried no TODO; it now carries DONE.
+** Slice 3: deviations
+*** C-c s r has no Neovim binding
+Neovim has no relRepo command, so 'neovim_bindings_of_emacs_chords'
+gains C-c s s ('<localleader>ss') and C-c g RET ('<localleader>gg'),
+and a message naming C-c s r keeps the Emacs chord. The test is in
+'tests/nvim/save_spec.lua', beside the C-c s d one.
+*** one entry moved, not two
+The duplicated-children entry had already moved to
+'TODO/DONE/problems.org' in slice 0, with its line naming that slice.
+The other 2026-10-19 entry left in 'TODO/problems.org',
+"'ViewForest::nodes' yields every root twice", is still open and
+stays. Only the Emacs-chords entry moved.
+*** the headline had no keyword
+The slice's headline carried no TODO; it now carries DONE.

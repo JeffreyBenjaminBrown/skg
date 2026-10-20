@@ -421,7 +421,7 @@ So far there are these endpoints:
     deduplicated with the buffer's roots pinned, so that a changed
     cycle that already has a root gains no second one.
     =server/serve/handlers/show_unshown_changes.rs=, =server/pcsvf.rs=
-    ('make_freshU_editable_at_first_occurrences',
+    ('ensure_editableOccurrences_exist',
     'contentOrigins_missing_from_buffer'), and 'rerender_view' in
     =server/update_buffer.rs=.
 
