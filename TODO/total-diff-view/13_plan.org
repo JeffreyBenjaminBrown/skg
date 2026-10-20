@@ -1018,7 +1018,7 @@ opens the buffer and an empty one does not. Docs: the request in
 'docs/api-and-formats.org'; the warning and 'SKG_RELEASE=1' in
 'docs/setup.org'; the key note in the API doc's config section.
 
-** TODO Slice 9: stage-and-commit stops for pre-staged entries
+** DONE Slice 9: stage-and-commit stops for pre-staged entries
 Make the changes under "Stage-and-commit stops for pre-staged entries"
 above. The check reads each owned gitrepo's index before any staging
 and collects '(GITREPO PATH...)' for every gitrepo with staged

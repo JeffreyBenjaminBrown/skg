@@ -78,6 +78,21 @@ first, via a function), the handlers and the prompts."
      (should-not skg--rerender-after-empty-stream)
      (should (= 1 (length (funcall sent)))))))
 
+(ert-deftest test-stage-and-commit-prompt-names-pre-staged-entries ()
+  "Entries staged already are listed in the prompt, by gitrepo, even
+when every changed file is ready; \"yes\" resends confirmed."
+  (test--stage-and-commit-run
+   '("the message" "yes")
+   (lambda (sent handlers prompts)
+     (skg-stage-and-commit)
+     (funcall (gethash 'stage-and-commit handlers) 'fake-proc
+              "((needs-confirmation . t) (pre-staged ((/data/public notes.txt \"a b.skg\") (/data/private c.skg))) (readiness-summary (ready 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0)) (errors ()) (warnings ()))")
+     (should (equal (car (funcall prompts))
+                    "COMMIT READY. All 3 of 3 changed files are ready. Staged already, so committed too: /data/public (notes.txt, a b.skg); /data/private (c.skg). Type yes to commit anyway: "))
+     (funcall skg--rerender-after-empty-stream)
+     (should (string-match-p (regexp-quote "(confirmed . t)")
+                             (car (funcall sent)))))))
+
 (ert-deftest test-stage-and-commit-result-message ()
   (should (equal (skg--stage-and-commit-result-message
                   (read "((commits ((public 5f135fea1585a3253a5e) (private bff3a57e0670))) (errors ()) (warnings ()))"))

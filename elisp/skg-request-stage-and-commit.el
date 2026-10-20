@@ -3,9 +3,10 @@
 ;;; PURPOSE: Stage every change and git-commit it, in every owned
 ;;; skgrepo that has changes, with one message
 ;;; ('docs/diff-view.org', "Stage and commit").
-;;; When the readiness summary is incomplete, the server answers with
-;;; it instead and changes nothing; only the typed word "yes" resends
-;;; the request confirmed. Every answer is followed by a rerender
+;;; When the readiness summary is incomplete, or some owned gitrepo
+;;; has entries staged already, the server asks for confirmation
+;;; instead and changes nothing; only the typed word "yes" resends the
+;;; request confirmed. Every answer is followed by a rerender
 ;;; stream, which after a commit redraws the open buffers of the
 ;;; diff view.
 ;;;
@@ -18,8 +19,9 @@
 (defun skg-stage-and-commit ()
   "Stage every change and git-commit it, in every owned skgrepo
 that has changes, with one message. If not every changed file is
-commit-ready, show the readiness summary and proceed only if the
-user types \"yes\"."
+commit-ready, or some owned gitrepo has entries staged already,
+show the readiness summary and those entries, and proceed only if
+the user types \"yes\"."
   (interactive)
   (when (skg--unsaved-view-buffers)
     (user-error "Save or revert every skg view before staging and committing"))
@@ -48,20 +50,38 @@ confirmed once the empty rerender stream that follows is done."
   (condition-case err
       (let ((response (read payload)))
         (if (assq 'needs-confirmation response)
-            (when (skg--stage-and-commit-confirmed-p
-                   (assq 'readiness-summary response))
+            (when (skg--stage-and-commit-confirmed-p response)
               (setq skg--rerender-after-empty-stream
                     (lambda ()
                       (skg--stage-and-commit-send commit-message t))))
           (message "%s" (skg--stage-and-commit-result-message response))))
     (error (message "skg: stage-and-commit handler error: %S" err))))
 
-(defun skg--stage-and-commit-confirmed-p (summary)
-  "Show the readiness SUMMARY; non-nil iff the user types exactly \"yes\"."
+(defun skg--stage-and-commit-confirmed-p (response)
+  "Show the readiness summary of RESPONSE, a request for confirmation,
+and the entries it lists as staged already; non-nil iff the user
+types exactly \"yes\"."
   (string= "yes"
            (read-string
-            (format "%s. Type yes to commit anyway: "
-                    (skg--readiness-summary-message summary)))))
+            (format "%s%s. Type yes to commit anyway: "
+                    (string-remove-suffix
+                     "." (skg--readiness-summary-message
+                          (assq 'readiness-summary response)))
+                    (skg--stage-and-commit-pre-staged-message
+                     (cadr (assq 'pre-staged response)))))))
+
+(defun skg--stage-and-commit-pre-staged-message (pre-staged)
+  "The prompt's clause for PRE-STAGED, '((GITREPO PATH...) ...)', or
+the empty string when there is none."
+  (if (null pre-staged) ""
+    (format ". Staged already, so committed too: %s"
+            (mapconcat
+             (lambda (gitrepo-and-paths)
+               (format "%s (%s)"
+                       (car gitrepo-and-paths)
+                       (mapconcat (lambda (path) (format "%s" path))
+                                  (cdr gitrepo-and-paths) ", ")))
+             pre-staged "; "))))
 
 (defun skg--stage-and-commit-result-message (response)
   "The line shown for RESPONSE, '((commits ((SKGREPO COMMIT-ID) ...))

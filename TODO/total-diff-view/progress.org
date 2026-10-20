@@ -1829,3 +1829,36 @@ are the config's. Escaping a string for a sexp is written out four
 times ('skgrepo_sets.rs''s 'escape_string',
 'delete_references_to_absent_node.rs''s 'escape', 'heralds.rs',
 'dependencies_manifest.rs'); the new handler builds a 'Sexp' instead.
+** Slice 9: deviations
+*** what counts as a pre-staged entry
+Any path whose git index entry differs from HEAD ('git diff --cached
+--name-only'), '.skg' or not; without a HEAD, every entry. Each
+gitrepo is listed once even when several owned skgrepos share it,
+in config order, by its worktree path; the paths are relative to it.
+A skgrepo outside any gitrepo, or whose index cannot be read, adds
+nothing to the list, since staging it reports the failure anyway.
+'pre_staged_entries_of_owned_gitrepos' is in
+'server/git_ops/stage_and_commit.rs'.
+*** the answer and the variant
+'(pre-staged ...)' follows '(needs-confirmation . t)' and is there only
+when the list is non-empty, so a summary-only confirmation keeps its
+old form. 'StageAndCommitAnswer::NeedsConfirmation' became a struct
+variant with 'summary' and 'pre_staged'. The paths are string atoms,
+printed as the 'commits' list prints skgrepo names: quoted only when
+they hold whitespace or a quote.
+*** the prompt
+Both clients put the list into the existing prompt: "SUMMARY. Staged
+already, so committed too: GITREPO (PATH, PATH); GITREPO (PATH). Type
+yes to commit anyway: ". The summary's own final period (a complete
+summary ends with one) is dropped first, which the summary-only prompt
+never needed because a complete summary never asked.
+*** docs
+'docs/diff-view.org' already described the behavior; its "(from slice
+9 of 13_plan)" mark is gone.
+*** tests
+Server: 'an_entry_staged_beforehand_needs_confirmation_and_is_then_committed'
+in 'tests/pcsvf/stage_and_commit.rs'. Emacs:
+'test-stage-and-commit-prompt-names-pre-staged-entries'. Neovim: one
+spec in 'stage_and_commit_spec.lua'. Counts: nextest 827 (826 before),
+Emacs 373 (372), Neovim 347 (346). 'bash/integration-tests.sh': 34 of
+35, the baseline 'import-md-and-org' failing.

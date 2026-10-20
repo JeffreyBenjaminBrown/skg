@@ -428,7 +428,7 @@ When the readiness summary is incomplete and the request lacks
 '(needs-confirmation . t)', and nothing changes; the client asks for
 the typed word "yes" and resends confirmed.
 
-(from slice 9 of 13_plan) Before staging anything, the server also
+Before staging anything, the server also
 reads the index of every owned gitrepo. If any has entries staged
 already, the answer is the same confirmation with a second reason,
 '(pre-staged ((GITREPO PATH...) ...))', and nothing is staged or

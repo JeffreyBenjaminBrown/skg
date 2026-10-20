@@ -535,8 +535,13 @@ changes. (Emacs: C-c r u.)
 *** <localleader>rc : :SkgStageAndCommit
 Prompts once for a commit message, then stages every change and
 git-commits it, in every owned skgrepo that has changes, with that
-message. If not every changed file is ready, it first shows the
-readiness summary and proceeds only if you type the word "yes". Every
+message. It stages only '.skg' files (deletions included). If not
+every changed file is ready, it first shows the readiness summary and
+proceeds only if you type the word "yes". Likewise, if some owned
+gitrepo already has entries staged before the command, it first lists
+each such gitrepo and its staged paths, and proceeds only on "yes";
+the commit then includes those entries, since a git-commit records
+everything staged. Every
 open view must be saved or reverted first. Afterward the open buffers
 of the diff view are rerendered: each keeps its roots, its
 folding and what it drew editable, and what was committed no longer

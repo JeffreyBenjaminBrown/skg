@@ -94,6 +94,34 @@ describe('skg stage and commit', function ()
     assert.are.equal(1, #requests, vim.inspect(requests))
   end)
 
+  it('names the gitrepos with entries staged already in the prompt', function ()
+    local requests, prompts = {}, {}
+    local typed = { 'one message', 'no' }
+    vim.fn.input = function (prompt)
+      table.insert(prompts, prompt)
+      return table.remove(typed, 1) end
+    server = helpers.connect_to_fake_server(function (line, respond)
+      table.insert(requests, line)
+      respond(helpers.framed(
+        '((response-type stage-and-commit) (needs-confirmation . t)'
+        .. ' (pre-staged ((/data/public notes.txt "a b.skg")))'
+        .. ' (readiness-summary (ready 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0))'
+        .. ' (errors ()) (warnings ()))'))
+      respond(helpers.framed('((response-type rerender-lock) (lock-views ()))'))
+      respond(helpers.framed(
+        '((response-type rerender-done) (errors ()) (warnings ()))'))
+    end)
+    stage_and_commit.stage_and_commit()
+    vim.wait(3000, function ()
+      return #prompts == 2 and lock.stream_in_progress == nil end, 10)
+    assert.are.equal(
+      'COMMIT READY. All 3 of 3 changed files are ready.'
+      .. ' Staged already, so committed too: /data/public (notes.txt, a b.skg).'
+      .. ' Type yes to commit anyway: ',
+      prompts[2])
+    assert.are.equal(1, #requests, vim.inspect(requests))
+  end)
+
   it('refuses a dirty view and an empty message', function ()
     local view = buffer.open_org_buffer_from_text(
       '* (skg (node (id a))) a', 'skg://a', 'a-view_id')

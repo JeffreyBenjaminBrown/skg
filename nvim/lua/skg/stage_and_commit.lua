@@ -1,9 +1,10 @@
 -- PURPOSE: Stage every change and git-commit it, in every owned
 -- skgrepo that has changes, with one message
 -- ('docs/diff-view.org', "Stage and commit").
--- When the readiness summary is incomplete, the server answers with
--- it instead and changes nothing; only the typed word "yes" resends
--- the request confirmed. Every answer is followed by a rerender
+-- When the readiness summary is incomplete, or some owned gitrepo
+-- has entries staged already, the server asks for confirmation
+-- instead and changes nothing; only the typed word "yes" resends the
+-- request confirmed. Every answer is followed by a rerender
 -- stream, which after a commit redraws the open buffers of the
 -- diff view. The Lua port of elisp/skg-request-stage-and-commit.el.
 
@@ -48,7 +49,8 @@ function M.handler (message, response)
   if payload.field(response, 'needs-confirmation') ~= nil then
     local summary = readiness.readiness_summary_from_response(response)
     local typed = vim.fn.input(
-      readiness.readiness_summary_message(summary)
+      readiness.readiness_summary_message(summary):gsub('%.$', '')
+      .. M.pre_staged_message(payload.field(response, 'pre-staged'))
       .. '. Type yes to commit anyway: ')
     if typed == 'yes' then
       rerender.after_empty_stream = function () M.send(message, true) end
@@ -56,6 +58,25 @@ function M.handler (message, response)
   else
     vim.notify(M.result_message(response))
   end
+end
+
+---The prompt's clause for PRE_STAGED, '((GITREPO PATH...) ...)', or
+---the empty string when there is none.
+---@param pre_staged any
+---@return string
+function M.pre_staged_message (pre_staged)
+  if pre_staged == nil or not sexpr.is_list(pre_staged)
+     or #pre_staged == 0 then return '' end
+  local gitrepos = {}
+  for _, gitrepo_and_paths in ipairs(pre_staged) do
+    local paths = {}
+    for i = 2, #gitrepo_and_paths do
+      table.insert(paths, sexpr.atom_text(gitrepo_and_paths[i])) end
+    table.insert(gitrepos, string.format('%s (%s)',
+      sexpr.atom_text(gitrepo_and_paths[1]), table.concat(paths, ', ')))
+  end
+  return '. Staged already, so committed too: '
+    .. table.concat(gitrepos, '; ')
 end
 
 ---The line shown for '((commits ((SKGREPO COMMIT-ID) ...)) (errors

@@ -414,14 +414,21 @@ So far there are these endpoints:
   - Response: LP response-type "stage-and-commit", then a rerender
     stream (rerender-lock, rerender-view*, rerender-done). The
     response is one of:
-    - =((needs-confirmation . t) (readiness-summary ...) (errors ()) (warnings ()))=
-      when the readiness summary (the save response's form, with
-      =(notEditable 0)=) is incomplete and the request is not confirmed.
-      Nothing changes, and the rerender stream is empty.
+    - =((needs-confirmation . t) (pre-staged (("GITREPO" "PATH" ...) ...)) (readiness-summary ...) (errors ()) (warnings ()))=
+      when the request is not confirmed and either the readiness
+      summary (the save response's form, with =(notEditable 0)=) is
+      incomplete or some owned gitrepo has entries staged already.
+      =pre-staged= is present only in the second case: each such
+      gitrepo's worktree path, then its staged paths relative to it,
+      read from the git index before anything is staged. Nothing
+      changes, and the rerender stream is empty. A resend with
+      =(confirmed . t)= covers both reasons.
     - =((commits (("SKGREPO" "COMMIT-ID") ...)) (errors (...)) (warnings ()))=
       otherwise: every owned skgrepo with changes had its =.skg= files
-      staged (deletions included) and git-committed with MESSAGE, by
-      the gitrepo's configured user. A skgrepo without changes is in
+      staged (deletions included; the command stages nothing else) and
+      git-committed with MESSAGE, by the gitrepo's configured user. A
+      git-commit records the whole git index, so the commit of a
+      gitrepo with entries staged beforehand includes them. A skgrepo without changes is in
       neither list; one that failed is an error. When something was
       committed, the rerender stream rerenders each open buffer of
       the diff view over the rebuilt graph straddle, as any
