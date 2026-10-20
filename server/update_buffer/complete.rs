@@ -36,7 +36,7 @@ use super::reconcile::content::{
 use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::error::Error;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 pub(super) struct CompletionContext<'a> {
   pub(super) editable_map                         : &'a mut EditableMap,
@@ -103,6 +103,110 @@ pub(super) struct CompletionContext<'a> {
   /// view, a content member outside U is write-protected only when it
   /// is not among these: nothing writable is write-protected again.
   pub(super) editable_before_completion : &'a HashSet<NodeId>,
+}
+
+/// What a completion that follows no save, or draws nothing that was
+/// there before, is given for the sets it reads.
+static NOTHING_DELETED_PIDS      : LazyLock<HashSet<ID>> = LazyLock::new (HashSet::new);
+static NOTHING_DELETED_EXTRA_IDS : LazyLock<HashMap<ID, HashSet<ID>>> = LazyLock::new (HashMap::new);
+static NO_NODES                  : LazyLock<HashSet<NodeId>> = LazyLock::new (HashSet::new);
+
+impl<'a> CompletionContext<'a> {
+  /// A de-novo content view ('render_initial_view'): each fresh
+  /// editable node gets its default partner folders, nothing was
+  /// deleted, and nothing was there before. Repairs go to
+  /// 'warning_sink', which the caller drops.
+  pub(super) fn for_content_view (
+    runtime             : &'a RuntimeGeneration,
+    graph_snap          : &'a Arc<InRustGraph>,
+    editable_map        : &'a mut EditableMap,
+    errors              : &'a mut Vec<String>,
+    skgrepo_restriction : Option<&'a SkgrepoRestriction>,
+    warning_sink        : &'a mut Vec<CompletionWarning>,
+  ) -> CompletionContext<'a> {
+    CompletionContext {
+      editable_map, runtime, graph_snap, errors,
+      deleted_by_this_save_pids      : &NOTHING_DELETED_PIDS,
+      deleted_by_this_save_extra_ids : &NOTHING_DELETED_EXTRA_IDS,
+      skgrepo_restriction,
+      node_budget                    : runtime . config . initial_node_limit,
+      create_partnerFolders_for_fresh_nodes : true,
+      substitute_existing_content_overrides : false,
+      warning_sink                   : Some (warning_sink),
+      diffView_source                : None,
+      nodes_before_completion        : &NO_NODES,
+      editable_before_completion     : &NO_NODES, } }
+
+  /// The first drawing of a buffer of the diff view
+  /// ('complete_viewforest_with_graph_straddle'), over 'drawing'. It
+  /// is never restricted by skgrepo (the diff view requires the set
+  /// 'all'), creates no default partner folders, substitutes no
+  /// overrider, and reports no repair. Every viewnode of a first
+  /// drawing is created by it.
+  pub(super) fn for_diffView (
+    runtime      : &'a RuntimeGeneration,
+    graph_snap   : &'a Arc<InRustGraph>,
+    editable_map : &'a mut EditableMap,
+    errors       : &'a mut Vec<String>,
+    drawing      : DiffViewSource<'a>,
+  ) -> CompletionContext<'a> {
+    CompletionContext {
+      editable_map, runtime, graph_snap, errors,
+      deleted_by_this_save_pids      : &NOTHING_DELETED_PIDS,
+      deleted_by_this_save_extra_ids : &NOTHING_DELETED_EXTRA_IDS,
+      skgrepo_restriction            : None,
+      node_budget                    : runtime . config . initial_node_limit,
+      create_partnerFolders_for_fresh_nodes : false,
+      substitute_existing_content_overrides : false,
+      warning_sink                   : None,
+      diffView_source                : Some (drawing),
+      nodes_before_completion        : &NO_NODES,
+      editable_before_completion     : &NO_NODES, } }
+
+  /// A rerender of an open view ('rerender_view'): after a save, for
+  /// rerender-all, or after a skgrepo-set switch. It carries what the
+  /// save deleted, the repairs' sink, and what the view held before.
+  /// With 'diffView_source' it completes a buffer of the diff view,
+  /// with the settings of 'for_diffView' whatever
+  /// 'skgrepo_restriction', 'create_partnerFolders_for_fresh_nodes'
+  /// and 'substitute_existing_content_overrides' say.
+  pub(super) fn for_rerender (
+    runtime                        : &'a RuntimeGeneration,
+    graph_snap                     : &'a Arc<InRustGraph>,
+    editable_map                   : &'a mut EditableMap,
+    errors                         : &'a mut Vec<String>,
+    deleted_by_this_save_pids      : &'a HashSet<ID>,
+    deleted_by_this_save_extra_ids : &'a HashMap<ID, HashSet<ID>>,
+    skgrepo_restriction            : Option<&'a SkgrepoRestriction>,
+    create_partnerFolders_for_fresh_nodes : bool,
+    substitute_existing_content_overrides : bool,
+    warning_sink                   : Option<&'a mut Vec<CompletionWarning>>,
+    diffView_source                : Option<DiffViewSource<'a>>,
+    nodes_before_completion        : &'a HashSet<NodeId>,
+    editable_before_completion     : &'a HashSet<NodeId>,
+  ) -> CompletionContext<'a> {
+    let settings : CompletionContext<'a> = match diffView_source {
+      Some (drawing) => CompletionContext::for_diffView (
+        runtime, graph_snap, editable_map, errors, drawing ),
+      None => CompletionContext {
+        editable_map, runtime, graph_snap, errors,
+        deleted_by_this_save_pids      : &NOTHING_DELETED_PIDS,
+        deleted_by_this_save_extra_ids : &NOTHING_DELETED_EXTRA_IDS,
+        skgrepo_restriction,
+        node_budget                    : runtime . config . initial_node_limit,
+        create_partnerFolders_for_fresh_nodes,
+        substitute_existing_content_overrides,
+        warning_sink                   : None,
+        diffView_source                : None,
+        nodes_before_completion        : &NO_NODES,
+        editable_before_completion     : &NO_NODES, }, };
+    CompletionContext {
+      deleted_by_this_save_pids,
+      deleted_by_this_save_extra_ids,
+      warning_sink,
+      nodes_before_completion,
+      editable_before_completion,
+      .. settings } }
 }
 
 pub(super) fn complete_viewforest (
@@ -476,3 +580,8 @@ where Predicate : Fn (&Viewnode) -> bool {
       Ok (( )) } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (result) }
+
+#[cfg(test)]
+#[allow(non_snake_case)]
+#[path = "../../tests/unit/completion_context.rs"]
+mod tests;

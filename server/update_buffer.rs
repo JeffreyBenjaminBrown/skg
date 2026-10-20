@@ -439,23 +439,10 @@ pub fn render_initial_view (
   let graph_snap : Arc<InRustGraph> = runtime . graph . clone ();
   let mut editable_map : EditableMap = EditableMap::new ();
   let mut errors : Vec<String> = Vec::new ();
-  let empty_deleted_pids : HashSet<ID> = HashSet::new ();
   let mut sink : Vec<CompletionWarning> = Vec::new ();
-  let mut context : CompletionContext = CompletionContext {
-    editable_map                 : &mut editable_map,
-    runtime,
-    graph_snap                     : &graph_snap,
-    errors                         : &mut errors,
-    deleted_by_this_save_pids      : &empty_deleted_pids,
-    deleted_by_this_save_extra_ids : &HashMap::new (),
-    skgrepo_restriction            : restriction,
-    node_budget                    : runtime . config . initial_node_limit,
-    create_partnerFolders_for_fresh_nodes : true,
-    substitute_existing_content_overrides : false,
-    warning_sink : Some (&mut sink),
-    diffView_source            : None,
-    nodes_before_completion    : &HashSet::new (),
-    editable_before_completion : &HashSet::new (), };
+  let mut context : CompletionContext = CompletionContext::for_content_view (
+    runtime, &graph_snap, &mut editable_map, &mut errors, restriction,
+    &mut sink );
   complete_viewforest ( &mut viewforest, &mut context ) ?;
   // De-novo rendering REPAIRS silently: the sink's ColRepairs do not
   // correspond to edits the user just made, so a fresh view carries no
@@ -479,22 +466,8 @@ pub fn complete_viewforest_with_graph_straddle (
   let graph_snap : Arc<InRustGraph> = runtime . graph . clone ();
   let mut editable_map : EditableMap = EditableMap::new ();
   let mut errors : Vec<String> = Vec::new ();
-  let mut context : CompletionContext = CompletionContext {
-    editable_map                   : &mut editable_map,
-    runtime,
-    graph_snap                     : &graph_snap,
-    errors                         : &mut errors,
-    deleted_by_this_save_pids      : &HashSet::new (),
-    deleted_by_this_save_extra_ids : &HashMap::new (),
-    skgrepo_restriction            : None,
-    node_budget                    : runtime . config . initial_node_limit,
-    create_partnerFolders_for_fresh_nodes : false,
-    substitute_existing_content_overrides : false,
-    warning_sink                   : None,
-    diffView_source                : Some (drawing),
-    // Every viewnode of a first drawing is created by it.
-    nodes_before_completion        : &HashSet::new (),
-    editable_before_completion     : &HashSet::new (), };
+  let mut context : CompletionContext = CompletionContext::for_diffView (
+    runtime, &graph_snap, &mut editable_map, &mut errors, drawing );
   complete_viewforest ( viewforest, &mut context ) ?;
   if ! errors . is_empty () {
     return Err ( errors . join ("\n") . into () ); }
@@ -561,31 +534,23 @@ pub fn rerender_view (
       . filter ( |node| node . value () . editable_skgid () . is_some () )
       . map ( |node| node . id () ) . collect ();
     let mut editable_map       : EditableMap = EditableMap::new ();
-    let mut completion_context : CompletionContext = CompletionContext {
-      editable_map                         : &mut editable_map,
-      runtime                        : &context . runtime,
-      graph_snap                     : &context . graph_snap,
-      errors                         : &mut context . errors,
-      deleted_by_this_save_pids      : &context . deleted_by_this_save_pids,
-      deleted_by_this_save_extra_ids : &context . deleted_by_this_save_extra_ids,
-      // A diff view, like its first drawing
-      // ('complete_viewforest_with_graph_straddle'), is not restricted by
-      // skgrepo while it is completed.
-      skgrepo_restriction            : if graph_straddle . is_some () { None }
-                                       else { context . skgrepo_restriction },
-      node_budget                    : context . runtime . config . initial_node_limit,
+    let mut completion_context : CompletionContext = CompletionContext::for_rerender (
+      &context . runtime,
+      &context . graph_snap,
+      &mut editable_map,
+      &mut context . errors,
+      &context . deleted_by_this_save_pids,
+      &context . deleted_by_this_save_extra_ids,
+      context . skgrepo_restriction,
       // Post-save (and rerender-all) reuse the saved buffer's PartnerFolders
       // and pass false. The repo-switch rerender passes true: its prune
       // removed the folders, and the new set decides which defaults return.
-      // A diff view draws no default folders.
-      create_partnerFolders_for_fresh_nodes :
-        create_partnerFolders && graph_straddle . is_none (),
-      substitute_existing_content_overrides : // off in a diff view
-        substitute_existing_content_overrides && graph_straddle . is_none (),
+      create_partnerFolders,
+      substitute_existing_content_overrides,
       warning_sink,
       diffView_source,
-      nodes_before_completion    : &nodes_before_completion,
-      editable_before_completion : &editable_before_completion, };
+      &nodes_before_completion,
+      &editable_before_completion );
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "complete_viewforest" ). entered();
       complete_viewforest (
