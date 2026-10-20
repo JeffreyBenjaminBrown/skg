@@ -187,7 +187,7 @@ So far there are these endpoints:
        of the M changed files of the owned skgrepos (O of them changed only
        in order, and so ready), N are commit-ready; F files changed in
        foreign skgrepos; and K changes are not editable in the view: they
-       are owned by nodes whose changes the buffer does not show. A
+       are recorded by nodes whose changes the buffer does not show. A
        buffer shows a node's changes where it has an editable
        occurrence of it, in content or in a partner folder, or a
        historical phantom of it in content position: under the buffer
@@ -204,6 +204,16 @@ So far there are these endpoints:
        cascades as in any view, and only the expansion of a node
        outside U spends =initial_node_limit=; nothing else in the
        buffer spends that budget.
+  - Readiness requests (=(readyRequest OBJECTS)= and
+    =(unreadyRequest OBJECTS)=; see "Metadata of the diff view") are
+    consumed by a save of any buffer, not only one of the diff view's,
+    after its graph edits succeed: each sets or clears the marks of the
+    change-forest leaves its headline names, at their current
+    fingerprints. A save that stops for a confirmation (strandeds,
+    Hoist, forks) or fails consumes none, and leaves them in the
+    buffer. A request that names no current change is dropped, with
+    the warning =The readiness request on "HEADLINE" names no current
+    change; it was dropped.=
   - A write-protected occurrence saves nothing of its own, so a save is
     refused, before anything is written, if one differs from the graph:
     in its title or home skgrepo, in its alias folder or a partner
@@ -811,10 +821,13 @@ node's heralds.
 
 - =(folder RELNAME)= — build BOTH folders of the relation, populated from the
   graph. RELNAME is =aliases=, =overrides=,
-  =hidesFromSubs=, or =subscribesTo=.
+  =hidesFromSubs=, =subscribesTo=, =containers= or =mentioners=.
   The editable folder (=overriddenFolder= / =subscribeeFolder= / =aliasFolder=)
   appears even when empty (its editable "add here" surface); an empty
-  write-protected folder is pruned.
+  write-protected folder is pruned. =containers= and =mentioners= each
+  build one write-protected folder (=containerFolder=,
+  =mentionerFolder=), pruned when empty: the other side of each is the
+  node's content, or its links, drawn without a folder.
   Emitted by the =C-c l= commands.
 - =(roleTree ROLENAME)= — build the role tree for one partner role, grafting
   the partners as inverted write-protected children, the role grafts. ROLENAME
@@ -1231,8 +1244,9 @@ PartnerFolders are represented in Rust as
 =ViewnodeKind::PartnerFolder (PartnerFolder)=, but their external metadata
 remains the established bare non-vognode atom:
 =subscribeeFolder=, =subscriberFolder=, =overriddenFolder=, =overriderFolder=,
-=hiderFolder=, =hiddenFolder=, =hiddenInSubscribeeFolder=, or
-=hiddenOutsideOfSubscribeeFolder=.
+=hiderFolder=, =hiddenFolder=, =hiddenInSubscribeeFolder=,
+=hiddenOutsideOfSubscribeeFolder=, =containerFolder=, =mentionerFolder=,
+or, in the diff view only, =acquiredByFolder= or =acquiredFolder=.
 
 ** Metadata of the diff view
 

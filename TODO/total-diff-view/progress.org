@@ -1431,3 +1431,61 @@ view's unknown phantoms lead to.
 The readiness facts are not set by completion but by its callers
 ('set_diffView_facts_in_viewforest'), so the doc lists them as what
 the caller does after.
+** Slice 3: deviations
+*** the config key note waits for slice 8
+The API doc's note on the spelling 'max_roleTree_depth' and the
+warning about an unknown key is the "key note in the API doc's config
+section" that slice 8 lists among its docs. Nothing warns about an
+unknown key yet, so the note lands with slice 8.
+*** not every gesture saves
+The plan defines a gesture as a command that writes requests "and
+saves". The relRepo and flag gestures do not save (both COMMANDS
+files say so); the fork and readiness gestures do. The glossary entry
+says which.
+*** where the new entries sit
+"home skgrepo move, relRepo move" follows "privacy order and relRepo"
+and "text preserver" follows the nodeMerge entry, in the general
+section, since a save moves homes and a nodeMerge makes a preserver
+outside the diff view too; "home skgrepo move" therefore means a
+change of home skgrepo by a save, which the diff view shows since
+HEAD. "stranded relationship, strandeds" is a subheadline of the
+sticky rule. "gesture" follows "view request vs edit request". The
+rest are in "Terms of the diff view". "changes not editable in the
+view" became an entry of its own, beside the readiness summary.
+*** the folder entry, against the code
+The glossary had 'hiddenOutsideOfSubscribeeFolder' under the
+write-protected filter policy; 'PartnerFolder::policy' gives it
+'EditableFilter', and the herald table gives it no ☮. The entry lists
+the four policies as the code has them, and the relation table at its
+top now names 'containerFolder' and 'mentionerFolder' (its footnote
+said neither existed).
+*** the Neovim set-repo commands warn about nothing
+The Emacs sentence under C-c s S names "the write-protected warning";
+Neovim's ':SkgSetRepo' and ':SkgSetRepoRecursive' neither skip nor warn
+about a write-protected occurrence. Under <localleader>sS the Neovim
+doc gains the sentence about the save's handling of relationships and
+says that the save refuses a write-protected occurrence whose skgrepo
+changed. The Emacs C-c s s paragraph said the save would "silently
+ignore" such an edit; it says "refuse" now.
+*** the way out of a write-protected refusal
+An editable-view request does not license an edit on the same
+occurrence in the same save (the test
+'a_member_child_under_a_requested_writeProtected_occurrence_is_refused'),
+so the new COMMANDS paragraph says to undo the edit, make the
+occurrence editable, save, and edit it then; or to mark a child as
+not affecting its parent, as the server's refusal says.
+*** smaller edits beyond the list
+The C-c r paragraphs say "every change the node records" for
+"owns", and the API doc's readiness summary "recorded by nodes" for
+"owned by nodes". The Neovim <localleader>vd paragraph also gains the
+Emacs wording of why the diff view commits whole skgrepos.
+'docs/nvim-client-deviations.org' said "source" for skgrepo in seven
+places, among them ':SkgViewSourceList' for ':SkgViewRepoList'; it
+says skgrepo now. "the graph pair cannot be built" was already gone
+(slice 2).
+*** seen, left for code slices
+The comment above the folder leaves in 'server/heralds.rs' still says
+"The six WRITE-PROTECTED folders", and the docstring of
+'skg-set-repo' ('elisp/skg-metadata.el') still says the save would
+"silently ignore" a write-protected occurrence's skgrepo edit. This
+slice changes no code.

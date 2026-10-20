@@ -154,7 +154,7 @@ node rather than an automatic substitute:
 - content-view roots;
 - search-result roots and enrichment role grafts;
 - PartnerFolder members and role grafts;
-- role-tree viewnodes and diff phantoms.
+- role-tree viewnodes and historical phantoms.
 
 When a node with an owned overrider is deliberately drawn raw, its
 immediate content children are also drawn raw.  Substitution resumes at

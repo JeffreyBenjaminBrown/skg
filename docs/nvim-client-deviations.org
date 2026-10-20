@@ -28,15 +28,15 @@
   command-line-mode mappings '<C-x>i', '<C-x>l', '<C-x>I', '<C-x>L'.
   The Emacs shell-mode linkstack bindings have no terminal-mode
   equivalent here; paste the id from a buffer instead.
-- The source prompts cycle with S-Left/S-Right and complete with TAB,
-  as in Emacs; the 'C-?' show-all-sources helper key inside the prompt
-  is dropped (terminals rarely deliver C-?); ':SkgViewSourceList'
+- The skgrepo prompts cycle with S-Left/S-Right and complete with TAB,
+  as in Emacs; the 'C-?' show-all-skgrepos helper key inside the prompt
+  is dropped (terminals rarely deliver C-?); ':SkgViewRepoList'
   shows the same list.
-- There is no automatic source prompt when a brand-new level-1
+- There is no automatic skgrepo prompt when a brand-new level-1
   headline is created: Emacs hooked its insert-heading command, and
   vim users simply type headlines, so there is no seam to hook. The
   quick path is '<localleader>ss' on the new headline (populates
-  minimal metadata, prompting for the source), or '<localleader>vm'
+  minimal metadata, prompting for the skgrepo), or '<localleader>vm'
   for the full metadata view.
 
 * Buffer locking (necessary: nvim has no overlay modification hooks)
@@ -53,7 +53,7 @@
   drops the title group whatever it holds). Emacs rejected the edits
   at type time.
 - The fork-confirmation buffer similarly relies on commit-time
-  validation (the placeholder-source refusal) rather than type-time
+  validation (the placeholder-skgrepo refusal) rather than type-time
   protection.
 
 * Folding (necessary: vim folds are line ranges on windows)
@@ -75,7 +75,7 @@
 
 * The git jumps (necessary: no magit exists for vim)
 - 'skg-goto-in-magit' -> ':SkgGotoInGit': opens neogit (the closest
-  magit analog, baked into the docker image) on the source's repo and
+  magit analog, baked into the docker image) on the skgrepo's gitrepo and
   lands on the file's entry by text search, warning when the file
   appears in several sections. Magit's section-object navigation has
   no neogit API equivalent.
@@ -95,7 +95,8 @@
   server round-trip, different mechanism.
 - View buffers are named 'skg://TITLE' (search: 'skg://?TERMS');
   Emacs used '*TITLE*'. Message/report buffers live under
-  'skg://messages/...', 'skg://diff-analysis', etc.
+  'skg://messages/...', 'skg://unknown-node', 'skg://diff-view: ...',
+  etc.
 
 * Small semantic notes
 - 'point-column' in the save round-trip is a byte offset here and a

@@ -291,8 +291,10 @@ the git history (first parents, from HEAD) of every skgrepo, and
 reports the most recent commit that held the ID's file, the commit it
 vanished at, its title then, its own relation lists then, and every
 node that referred to it then, links included; or that the ID was
-never in any skgrepo's history. It refuses unless the skgrepo
-restriction is 'all'.
+never in any skgrepo's history. If HEAD still holds the ID's file,
+it says so: "still present at HEAD (only the worktree lacks it)". It
+refuses unless the skgrepo restriction is 'all'; a refusal opens the
+same buffer, as "* investigation failed" with the reason under it.
 ** <localleader>c : show a folder (both folders of a relation)
 These commands don't edit the graph. Each inserts a request into the
 metadata of the node at point that, on save, causes the server to
@@ -364,9 +366,23 @@ A view of a node can be editable or write-protected.
 Typically the first place in the buffer that depicts a node
 is the editable view of it. So that other views of that node
 cannot contradict it, they are 'write-protected': Edits to them
-cannot affect the node they depict. They are also truncated --
-that is, shown without content --
-in order to prevent the view from becoming redundant and huge.
+cannot affect the node they depict. One also has no content --
+the server draws none under it,
+in order to prevent the view from becoming redundant and huge --
+but it may keep children that do not affect it.
+
+A write-protected occurrence saves nothing of its own,
+so an edit to it refuses the whole save, and nothing is written:
+a changed title or home skgrepo;
+an alias folder, partner folder or flags folder
+that differs from the graph;
+or a child that affects it (a member).
+The refusal names the occurrence and what differs.
+The way out is to make the edit at the node's editable occurrence
+instead, or to undo it, make this occurrence editable
+(<localleader>sd on it), save, and edit it then.
+A child that should stay there can instead be marked
+as not affecting its parent.
 *** PITFALL: Don't make something 'editable' by directly editing its metadata.
 Instead, use 'SetEditable' (<localleader>sd), below.
 That's because Skg has to make other occurrences of it
@@ -392,11 +408,13 @@ Called on a node that is already editable,
 it unfolds the node's content editable,
 up to 'initial_node_limit' expansions.
 A buffer may carry only one such request per node.
+It does not save; the request takes effect at the next save.
 *** <localleader>sw : :SkgRequestWriteProtected
 Requests that this occurrence become write-protected,
 as described above. It does not save.
 At the next save, edits the occurrence carries are saved first;
-then the server makes it write-protected
+then the server makes it write-protected,
+resyncing its title from the graph,
 and makes each of its children stop affecting it,
 so that edits to its title, body or children no longer affect it
   (although edits to its children still affect those children:
@@ -440,6 +458,10 @@ Like 'SetRepo', but it also
 changes the skgrepo of every content descendent of the node at point
 whose skgrepo matches the original skgrepo of the node at point.
 Only descendents for which AffectsParent=True are traversed.
+The save's handling of relationships described under
+<localleader>ss applies here too, across the whole subtree.
+Unlike Emacs, neither command skips or warns about a write-protected
+occurrence; the save refuses one whose skgrepo changed.
 *** <localleader>sx : :SkgSetFlagSearchMatching
 Prompts between =search matching= and =no search matching= and stages the
 desired state without saving. Foreign/write-protected/unsaved roots and an
@@ -470,13 +492,16 @@ a changeset marker) shows ✓ when all of its changes are.
 
 After every save of one of the diff view's buffers, a
 notification shows the readiness summary: "12 of 14 changed files are
-ready", or "COMMIT READY. All 14 of 14 changed files are ready.". It
+ready", or "COMMIT READY. All 14 of 14 changed files are ready.". A
+changed file counts as ready when every change it records is marked;
+a file whose only change is the order of a list counts as ready
+without marks. The summary
 adds how many changes are not editable in this view (<localleader>ru
 integrates them) and how many files changed in foreign skgrepos.
 
 A gesture that would unmark more than one change (a recursive one, one
 on a folder of changes, or one on a changed node, which unmarks every
-change the node owns) first asks "Unmarking this node commit-ready
+change the node records) first asks "Unmarking this node commit-ready
 will unmark every contributing decision. You might discard a lot of
 hard-won information. Continue (yes/no)?", and does nothing unless
 you type "yes". Unmarking a single change asks nothing.
@@ -487,7 +512,7 @@ changeset marker), it toggles that one. On a content member that
 carries two changes (∃, its existence, and ~, its relationship to
 the headline above it), it asks which. On a folder of changes, it
 toggles each change one level down; on a changed node, every change
-the node owns. Works on write-protected headlines too.
+the node records. Works on write-protected headlines too.
 *** <localleader>rR : :SkgCycleCommitReadyRecursive
 Marks every change in the subtree at point, or unmarks them if the
 headline at point is ready, then saves. (Emacs: C-u C-c r r.)
@@ -585,11 +610,14 @@ since their last commits (how each worktree differs from HEAD), with
 the context needed to understand it. It opens up to four buffers,
 "skg://diff-view: all changes", "...: merges", "...: skgrepo changes"
 and "...: order-only changes", skipping any that would be empty. It
-refuses unless the skgrepo restriction is 'all'. A buffer keeps its
-roots until you close it. A save (of it or of another view) draws
-what it draws anew by what changed: a new member that changed, or
-leads to a change, is editable with its content, and any other new
-member is a write-protected member drawn without its content. But a
+refuses unless the skgrepo restriction is 'all', and when an owned
+skgrepo is not in a git repository or has no HEAD commit (the refusal
+names the skgrepo). A buffer keeps its roots until you close it, and
+saving it (or committing) keeps what you folded. A save (of it or of
+another view) draws what it draws anew by what changed: a new member
+that changed, or leads to a change, is editable with its content, and
+any other new member is a write-protected member drawn without its
+content. But a
 save makes nothing editable that the buffer already draws, and
 appends no root: the readiness summary counts a change since the
 buffer opened that it draws nowhere editable as not editable in this
@@ -601,9 +629,9 @@ expansion of a node outside U (the nodes the buffer unfolds anyway:
 those that changed and those leading to them) is charged to
 'initial_node_limit'; nothing else in the buffer is bounded by that
 limit.
-Why the diff view commits all skgrepos, and offers nothing
-more granular: a single-skgrepo commit is dangerous. The graph is one
-structure spread over many files in many repos. Committing some changed files
+Why the diff view commits whole skgrepos, and offers nothing
+smaller: in skg a partial commit is dangerous. The graph is one
+structure spread over many files, so committing some changed files
 and not others leaves HEAD inconsistent: it can reference nodes it
 does not contain, record a relationship from one end only, or hold a
 moved node in two skgrepos at once. Such a HEAD cannot be reasoned

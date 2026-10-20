@@ -119,6 +119,18 @@ that is =RelPartner { relRepo, member }=; a collection of them is
 a *list of relation partners*. "More private" = later in the
 privacy order.
 
+*** home skgrepo move, relRepo move
+
+A *home skgrepo move* is a change of a node's home skgrepo (=C-c s s=,
+then a save); a *relRepo move* is a change of a relationship's relRepo
+(=C-c s r=, or a save that resets or raises it). The diff view shows
+each move since HEAD as one change-forest leaf: a home skgrepo move as
+the property "⌂ -OLD +NEW" under the node, a relRepo move as the
+property "relationship moved from OLD to NEW" under the member, keyed
+by the relationship, so the same move seen from either end is the
+same leaf. A relRepo move puts only the recorder in C. Say "home
+skgrepo move", not "home move".
+
 *** MSV = maybe specified vector
 
 =MSV<T>= distinguishes "no opinion" from "empty". =Unspecified= says a
@@ -135,15 +147,16 @@ sections unrestricted under the current skgrepo restriction, and is what a
 restricted view renders. *Decomposition* is the save-side inverse:
 splitting the effective node back into sections, byte-stably.
 
-*** placement, anchor
+*** placement, more public anchor
 
 How a more private section orders its members into a more public
 list without the public file recording anything: in the section's
-stored sequence, a =- anchor: ID= entry names a more public member,
-and the members after it insert immediately after that ID; members
-before the first anchor prepend. Placements exist only on disk —
-anchors are derived at save from the in-memory order, so they can
-never go stale in memory.
+stored sequence, a =- anchor: ID= entry names a *more public anchor*,
+a member of the more public list, and the members after it insert
+immediately after that ID; members before the first anchor prepend.
+Placements exist only on disk — more public anchors are derived at
+save from the in-memory order, so they can never go stale in memory.
+Say "more public anchor", never a bare "anchor".
 
 *** sticky rule (sticky-else-default)
 
@@ -162,6 +175,20 @@ default; a more-public choice is a save error. A legacy or
 hand-authored relationship whose disk relRepo already sits more public than
 its default may be held or made more private, never made still more
 public. See =server/from_text/supplement_from_disk.rs=.
+
+**** stranded relationship, strandeds
+
+A home skgrepo move can strand a relationship touching the moved
+node: a *stranded relationship* is one that sat at its default relRepo
+before the move and that the sticky rule would leave off its new
+default. *Strandeds* is the noun for stranded relationships; "strand"
+is only a verb. A save finds every one, of every relation, in both
+directions, shown in some view or not ('server/from_text/strandeds.rs').
+It raises the inbound strandeds of a privatizing move to the new home
+by itself, since they would leak the member's ID, and asks the user
+whether to reset the strandeds of a publicizing move to their new
+defaults (the strandeds-confirmation). Mentions carry no relRepo, so
+they are never stranded.
 
 *** view, buffer, viewforest
 
@@ -240,8 +267,8 @@ recorders that record its parent:
 
 | relation      | members its parent records | recorders of its parent |
 |---------------+----------------------------+-------------------------|
-| containment   | not implemented[1]         | not implemented[3]      |
-| link          | not implemented[2]         | not implemented[3]      |
+| containment   | not implemented[1]         | containerFolder         |
+| link          | not implemented[2]         | mentionerFolder         |
 | subscription  | subscribeeFolder           | subscriberFolder        |
 | hiding        | hiddenFolder               | hiderFolder             |
 | overriding    | overriddenFolder           | overriderFolder         |
@@ -250,15 +277,18 @@ recorders that record its parent:
    ordinary viewchildren.
 2. A mentionedFolder would be silly: the links are already visible in
    the node's own text.
-3. A containerFolder or mentionerFolder might be a good idea, but
-   neither is implemented; containerward and mentionerward role trees
-   do the same job.
 
 Two more PartnerFolders filter the hiding relation by subscription:
 - a *hiddenInSubscribeeFolder*, under a subscribee as such, lists that
   subscribee's contents which the subscriber hides;
 - a *hiddenOutsideOfSubscribeeFolder*, under a subscribeeFolder, lists
   the nodes its parent hides that no subscribee contains.
+
+The diff view adds two more, for nodeMerges since HEAD:
+- an *acquiredByFolder* ("it was acquired by"), under an acquiree's
+  historical phantom, holds its acquirer;
+- an *acquiredFolder* ("it acquired"), under an acquirer, holds the
+  historical phantoms of the nodes it acquired.
 
 **** Some extremely technical details
 
@@ -267,39 +297,42 @@ type of the same name.  “Folder” here describes an org non-vognode that grou
 viewnodes; it does not mean a filesystem directory.  “Role col”, “relation
 col”, and bare “sharing col” are retired names for the general concept.
 
-There are eight PartnerFolders, named by their external non-vognode atom:
+There are twelve PartnerFolders, named by their external non-vognode
+atom. Each kind's behavior is decided by one method,
+=PartnerFolder::policy= (=server/types/viewnode.rs=), returning a
+*FolderPolicy*.  This single arbiter is consulted by reconciliation
+dispatch, save extraction's write-protected treatment, and
+herald/warning gating, so a new relation cannot acquire inconsistent
+policies in different layers:
 
-- writable: =subscribeeFolder=, =overriddenFolder=;
-- write-protected inbound: =subscriberFolder=, =overriderFolder=, =hiderFolder=,
-  =hiddenFolder=;
-- write-protected filter: =hiddenInSubscribeeFolder=,
-  =hiddenOutsideOfSubscribeeFolder=.
-
-Each kind's behavior is decided by one method, =PartnerFolder::policy=
-(=server/types/viewnode.rs=), returning a *FolderPolicy*.  This single
-arbiter is consulted by reconciliation dispatch, save extraction's
-write-protected treatment, and herald/warning gating, so a new relation
-cannot acquire inconsistent policies in different layers:
-
-- *WritableSet* (=subscribeeFolder=, =overriddenFolder=): membership edits
+- *EditableSet* (=subscribeeFolder=, =overriddenFolder=): membership edits
   are graph edits.  An absent folder means "no opinion" (its field lowers
   to =MSV::Unspecified=, filled from disk); a present-but-empty folder
   means an explicit empty set (=MSV::Specified(vec![])=).
-- *WriteProtectedSet* (=subscriberFolder=, =overriderFolder=, =hiderFolder=,
-  =hiddenFolder=): membership is generated from graph facts; the user's
-  order is respected view-locally; repairs warn.  See [[*write-protected set][write-protected set]].
-- *WriteProtectedFilter* (=hiddenInSubscribeeFolder=,
-  =hiddenOutsideOfSubscribeeFolder=): membership is derived from hide
-  state rather than from a single relation role.
+- *EditableFilter* (=hiddenOutsideOfSubscribeeFolder=): membership is
+  derived from hide state, and a visible member set is an explicit
+  edit of that subset; the hides' relRepos stay derived.
+- *WriteProtectedSet*: membership is generated from graph facts; the
+  user's order is respected view-locally; repairs warn.  See
+  [[*write-protected set][write-protected set]].  These are the inbound folders
+  =subscriberFolder=, =overriderFolder=, =hiderFolder= and
+  =containerFolder= and =mentionerFolder= (the folders of =C-c l c= and
+  =C-c l m=; the other side of each is the node's content, or its
+  links, drawn without a folder), the outbound =hiddenFolder=, and the
+  diff view's =acquiredByFolder= and =acquiredFolder=, which are
+  derived from the graph straddle and save-inert.
+- *WriteProtectedFilter* (=hiddenInSubscribeeFolder=): membership is
+  derived from hide state rather than from a single relation role.
 
-The SIX write-protected folders (the =WriteProtectedSet= four plus the =WriteProtectedFilter=
-two) carry the ☮ herald on their folder headline, meaning "this folder
-cannot be changed from here" — the same sense ☮ (=writeProtected=) carries on a
-node.  The two =WritableSet= folders and =aliasFolder= do not.  This is a
-herald-table fact only (=server/heralds.rs=), with no wire atom of its
-own: which folders are write-protected is already known from the folder atom.
+The write-protected folders (those of the two write-protected
+policies) carry the ☮ herald on their folder headline, meaning "this
+folder cannot be changed from here" — the same sense ☮
+(=writeProtected=) carries on a node.  The editable folders and
+=aliasFolder= do not.  This is a herald-table fact only
+(=server/heralds.rs=), with no wire atom of its own: which folders are
+write-protected is already known from the folder atom.
 
-The stale-member rule is uniform across all eight kinds (decided
+The stale-member rule is uniform across all policies (decided
 2026-06-10, demote-not-discard): a stale ~affectsParent=true~ member
 that is a leaf is deleted; one with children is demoted to
 ~affectsParent=false~ so the user keeps any subtree they built under
@@ -472,12 +505,26 @@ display fact is =(overridesHere N)=; see "override substitution".
 
 Both are requests the client writes into metadata and the server
 consumes. A *view request* (=(viewRequests ...)=: =folder=, =roleTree=,
-=flags=, =editableView=) asks for more of the view (viewbranches); the server
-fulfills it while completing the view and then drops it. (=fork= is
-also written as a view request, but the save consumes it.) An *edit
+=flags=, =editableView=, =writeProtectedView=,
+=writeProtectedSubtreeView=) asks for more of the view (viewbranches),
+or changes which occurrence of a node is editable; the server fulfills
+it while completing the view and then drops it. (=fork= is also
+written as a view request, but the save consumes it.) An *edit
 request* (=(editRequest ...)=: =merge=, =toDelete=, =flag=, =relRepo=) asks
 the save to change the graph; a successful save consumes it, and a
-failed save leaves it in the buffer.
+failed save leaves it in the buffer. A *readiness request* (see
+"readiness request, readiness gesture") is a third kind: the save
+consumes it after its graph edits succeed, to mark or unmark changes
+commit-ready, and changes neither the view nor the graph.
+
+*** gesture
+
+A *gesture* is a client command that writes requests into headline
+metadata for the server to apply at a save. The relRepo gesture
+(=skg-set-relRepo=), the flag gesture (=skg-set-flag-search-matching=),
+the fork gesture (=skg-fork-node=) and the readiness gestures are
+kinds. The fork and readiness gestures save at once; the others leave
+the save to the user.
 
 *** collateral view
 
@@ -497,6 +544,14 @@ A /nodeMerge/ is the acquirer/acquiree operation on graphnodes (the
 map during local fieldIntent collection. In prose, say "merge nodes"
 or "merge instructions"; bare "merge" appears only in client-facing
 wire strings, where only nodes can merge.
+
+*** text preserver
+
+A nodeMerge keeps the acquiree's text in a new node, its *text
+preserver*: titled "MERGED: " and the acquiree's title, with the
+acquiree's body, and placed first in the acquirer's content. The
+acquiree's other content joins the acquirer's, and the acquiree's ID
+becomes an extra ID of the acquirer. See =docs/merging.org=.
 
 *** "snapshot" is always qualified: graph, git or buffer snapshot
 
@@ -667,7 +722,10 @@ affects its parent.
 The server leaves no such child under one it draws. A buffer may hold at most one editable occurrence of a node,
 so that two occurrences cannot contradict each other. Make one
 editable with =skg-set-editable= (=C-c s d=), which writes a
-=editableView= view request.
+=editableView= view request; make one write-protected with
+=skg-request-write-protected= (=C-c s w=; =C-c s W= for its whole
+content subtree), which writes a =writeProtectedView= or
+=writeProtectedSubtreeView= view request.
 
 *** birth
 
@@ -691,7 +749,7 @@ resolves to nothing; see "unknown node"). Phantoms are save-inert.
 An *unknown node* is an ID that some node's contains, subscribesTo,
 hidesFromSubs or overrides list names but that no node of the graph
 answers to, as primary or extra ID; such an ID is *dangling*. A view
-draws it as an unknown phantom ("Parent references unknown node").
+draws it as an unknown phantom ("Reference to unknown node.").
 The "investigate unknown node" request says what git history knows of
 it, and the delete-references-to-absent-node command removes the
 references.
@@ -743,26 +801,49 @@ relationship it reports carries a *presence*: 'Both', 'OnlyBefore' or
 'node-' on the node itself, 'rel+' and 'rel-' on its relationship to
 its viewparent.
 
+*** diff object, diff aspect
+
+A *diff object* is what a '(diff ...)' fact or a readiness request
+names on a headline: the node itself ('node'), or the node's
+relationship to its viewparent ('rel'). There are exactly these two.
+A change-forest leaf about a relationship has the relationship as its
+object, never the member. A readiness request may also say 'all',
+which names every leaf of an aggregate one level down; 'all' is
+request-only shorthand, not a third object. A *diff aspect* is what a
+change-forest leaf is about: existence, text, home skgrepo, an alias,
+an extra ID, a flag, or relRepo.
+
 *** C, R, U, D, content origin
 
 The sets the PCSVF is drawn from. *C* is the set of changed
-graphnodes: out-changed ones (the node's own file changed) and
-in-changed ones (only its recorders' files did). *R* is the set of
-content origins reached from C by walking containerward. A *content
-origin* is a node with no container, a multiply-contained node, or a
-member of a rootlike cycle (the stop rule of 'server/prominence.rs').
-*U*, the nodes to unfold, is R, C and every node on a containerward
-path from a node of C to an origin. *D*, the roots of the "all
-changes" buffer, is R minus the origins that another kept origin
-reaches containerward inside U.
+graphnodes, in two halves: a node is changed *out* when its own file
+records a change (it is new or deleted, or its text, aliases, extra
+IDs, flags, home skgrepo or own relationships changed), and *in* when
+its recorders' files do (its set of containers, mentioners,
+subscribers, overriders or hiders changed). A node can be both. A
+relRepo move puts only the recorder in C, and a change of order alone
+puts nothing in it. *R* is the set of content origins reached from C
+by walking containerward. A *content origin* is a node with no
+container, a multiply-contained node, or a member of a rootlike cycle
+(the stop rule of 'server/prominence.rs'). *U*, the nodes to
+viewforest-unfold, is R, C and every node on a containerward path
+from a node of C to an origin. *D*, the roots of the "all changes"
+buffer, is R minus the origins that another kept origin reaches
+containerward inside U.
 
-*** change-forest, change-forest leaf
+*** change-forest, change-forest leaf, recorder of a leaf
 
-The *change-forest* ('ChangeLeaves', 'server/change_leaves.rs') is
-the tree of everything commit-readiness can be asked about, built
-from the graph straddle, independent of any view. Its roots are the
-changed graphnodes; under each come its changed aspects; its leaves,
-the *change-forest leaves*, are the individual changes a user marks.
+The *change-forest* is the picture of everything commit-readiness can
+be asked about, built from the graph straddle, independent of any
+view: its roots are the changed graphnodes; under each come its
+changed aspects; its leaves, the *change-forest leaves*, are the
+individual changes a user marks. The type 'ChangeLeaves'
+('server/change_leaves.rs') holds every leaf, keyed by its recorder,
+its aspect and, for a relationship, the relationship ('LeafKey'). The
+*recorder* of a leaf is the node whose file records the change, and
+that node *records* the leaf; a relationship's leaf is recorded by
+the relationship's recorder, so seen from either end it is the same
+leaf.
 
 *** mark, fingerprint, readiness
 
@@ -789,6 +870,66 @@ marker ("its content changed"), the relRepo changeset marker ("some
 content relationships changed skgrepo") and the order-only marker
 ("order-only change", which is always ready).
 
+*** content position
+
+A viewnode is in *content position* when its viewparent is the buffer
+root, an unrestricted vognode, or a historical phantom that is itself
+in content position. A historical phantom in content position draws
+its old content under it.
+
+*** removed member, former member
+
+A *removed member* is an unrestricted vognode drawn as a non-member,
+write-protected, with the fact '(diff rel-)': its node survives, but
+its relationship to its viewparent exists in the before-graph only. A
+*former member* is any viewnode standing for such a before-only
+relationship, historical phantoms included.
+
+*** change viewnode
+
+A viewnode the diff view draws, at an editable node's visit, to show
+a change of that node: its old text, its home skgrepo move, its
+changeset markers, its "it acquired" folder, its changed folders, its
+removed members, and, under a member, the relRepo move of the
+member's relationship. A rerender keeps a change viewnode the fresh
+drawing still produces and detaches the rest.
+
+*** old text
+
+The change viewnode ('(oldText ASPECT)') under a node whose title or
+body changed since HEAD: labelled "old title and body", "old title" or
+"old body", its headline is the old title and its body the old body.
+When the body changed, a "body diff" property under it holds the line
+diff. The text change is one change-forest leaf, marked on the old
+text.
+
+*** changed folder
+
+A partner, alias, ID or flags folder the diff view draws because its
+membership changed since HEAD. It is written '(FOLDER changed)' in
+place of the bare folder atom, holds the members of either graph
+tagged by presence, and reads "its X changed (this file)" or "(other
+files)" (see "in, out"). It shows '(ready)' when every changed member
+is ready.
+
+*** member role tree
+
+The role tree drawn under each member of a changed partner folder, so
+that the user sees where the member sits: under a container, its
+containerward role tree; under a mentioner, subscriber, overrider or
+hider, the role tree of that role, with a containerward role tree
+under each role graft.
+
+*** moved-like-ancestor fact
+
+In the skgrepo-changes buffer, a vognode whose home skgrepo moved
+carries '(homeSkgrepoMove (old OLD) (new NEW))' in its viewStats, its
+herald "-OLD +NEW". When the nearest vognode ancestor whose home moved
+moved the same way, it also carries the *moved-like-ancestor fact*
+'(movedLikeAncestor LETTER)', its herald "Δ⌂=a", where the letter
+names that ancestor as an ancestor generation does (a, the
+viewparent; b, the grandparent; ...).
+
 *** removed alias, removed ID
 
 An alias or extra ID of a node that HEAD has and the worktree lacks.
@@ -804,18 +945,28 @@ The line a client shows after every save of a diff-view buffer, after the
 "integrate unshown changes" command (C-c r u), and before a
 stage-and-commit that would leave changes behind: "12 of 14 changed
 files are ready", or "COMMIT READY. All 14 of 14 changed files are
-ready." It also counts the changed files of foreign skgrepos and the
-*changes not editable in the view*: those recorded by a node of which
-the buffer has no editable occurrence (nor a historical phantom in
-content position). A save never makes them editable; C-c r u
-integrates them.
+ready." A changed file is ready when every change it records is
+marked; a file whose only change is order is ready without marks. The
+summary also counts the changed files of foreign skgrepos and the
+changes not editable in the view.
 
-*** readiness request, gesture
+*** changes not editable in the view
+
+A buffer *shows a node's changes* when it holds an editable
+occurrence of the node, wherever that sits, or the node's historical
+phantom in content position. The change-forest leaves those nodes
+record are the changes editable in the buffer; the rest are the
+*changes not editable in the view*, which the readiness summary
+counts. A save never makes them editable; C-c r u integrates them.
+
+*** readiness request, readiness gesture
 
 A *readiness request* is a metadata form, '(readyRequest OBJECTS)' or
-'(unreadyRequest OBJECTS)', that the save consumes to set or clear the
-marks of a headline's leaves. A *gesture* is a client command that
-writes readiness requests on one or many headlines, then saves.
+'(unreadyRequest OBJECTS)', that the save consumes, after its graph
+edits succeed, to set or clear the marks of a headline's leaves. A
+*readiness gesture* is a gesture (C-c r r, C-c r h and their
+recursive forms) that writes readiness requests on one or many
+headlines, then saves.
 
 *** in, out, "(this file)", "(other files)"
 

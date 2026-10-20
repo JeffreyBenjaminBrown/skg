@@ -936,7 +936,7 @@ files that lack one and that this slice touches ('update_buffer.rs',
 '//!' for its module comment. 'coding-advice/ORIENTATION.org' links
 'docs/diff-view.org' where it lists the docs.
 
-** TODO Slice 3: glossary and user docs
+** DONE Slice 3: glossary and user docs
 Make every change under "Glossary and user docs" above. Where a term
 is defined in this plan's vocabulary, the glossary entry says the same
 thing in the glossary's voice. Check each edited COMMANDS paragraph
