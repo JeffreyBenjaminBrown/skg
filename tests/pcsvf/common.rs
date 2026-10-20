@@ -24,9 +24,13 @@ use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::test_utils::{
   cleanup_test_tantivy, extract_string_field_from_sexp, graph_handle_from_config,
   skg_env_from_parts, update_from_and_rerender_buffer_test};
+use skg::to_org::render::content_view::multi_root_view;
 use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
 use skg::types::views_state::{OpenViews, DiffViewBufferKind, ViewId};
+use skg::types::viewnode::Viewnode;
+
+use ego_tree::Tree;
 
 use futures::executor::block_on;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -49,14 +53,17 @@ pub struct Fixture {
   pub views_state : ViewsState,
 }
 
-/// The case's gitrepos, one owned skgrepo each, in privacy order.
-pub fn fixture (
+/// The case's gitrepos, one owned skgrepo each, in privacy order,
+/// then one for each foreign skgrepo of 'foreign', built the same way.
+pub fn fixture_with_foreign (
   case     : &str,
   skgrepos : &[&str],
+  foreign  : &[&str],
 ) -> Result<Fixture, Box<dyn Error>> {
   let root : TempDir = TempDir::new () ?;
   let mut skgrepo_map : HashMap<SkgrepoName, Skgrepo> = HashMap::new ();
-  for name in skgrepos {
+  for (name, owned) in skgrepos . iter () . map ( |name| (name, true) )
+    . chain ( foreign . iter () . map ( |name| (name, false) )) {
     let fixtures : PathBuf = Path::new (FIXTURES) . join (case) . join (name);
     setup_gitrepo_with_fixtures (
       &root . path () . join (name),
@@ -64,11 +71,12 @@ pub fn fixture (
       fixtures . join ("worktree") . to_str () . unwrap () ) ?;
     skgrepo_map . insert ( SkgrepoName::from (*name), Skgrepo {
       name : SkgrepoName::from (*name), abbreviation : None,
-      path : root . path () . join (name), owned : true } ); }
+      path : root . path () . join (name), owned } ); }
   let mut config : SkgConfig = SkgConfig::fromSkgreposAndTantivyFolder (
     skgrepo_map, root . path () . join ("tantivy") . to_str () . unwrap () );
   config . skgrepo_order =
-    skgrepos . iter () . map ( |name| SkgrepoName::from (*name) ) . collect ();
+    skgrepos . iter () . chain (foreign)
+    . map ( |name| SkgrepoName::from (*name) ) . collect ();
   config . data_root = root . path () . to_path_buf ();
   let tantivy : TantivyIndex = create_empty_tantivy_index (&config . tantivy_folder) ?;
   let graph : InRustGraphHandle = graph_handle_from_config (&config) ?;
@@ -86,7 +94,16 @@ pub fn with_fixture (
   skgrepos : &[&str],
   body     : impl FnOnce (&mut Fixture) -> Result<(), Box<dyn Error>>,
 ) -> Result<(), Box<dyn Error>> {
-  let mut f : Fixture = fixture (case, skgrepos) ?;
+  with_fixture_and_foreign (case, skgrepos, &[], body) }
+
+/// The same, with the foreign skgrepos of 'fixture_with_foreign'.
+pub fn with_fixture_and_foreign (
+  case     : &str,
+  skgrepos : &[&str],
+  foreign  : &[&str],
+  body     : impl FnOnce (&mut Fixture) -> Result<(), Box<dyn Error>>,
+) -> Result<(), Box<dyn Error>> {
+  let mut f : Fixture = fixture_with_foreign (case, skgrepos, foreign) ?;
   let result : Result<(), Box<dyn Error>> = body (&mut f);
   cleanup_test_tantivy ( Some (&f . config . tantivy_folder) ) ?;
   result }
@@ -275,6 +292,41 @@ pub fn integrate_unshown_changes (
     . unwrap_or_else ( || panic! ( "no notEditable count in:\n{}", response ));
   Ok (( rerendered_view_content (&response), not_editable )) }
 
+/// Retitle 'node' to 'title' by saving a content view of it, as
+/// another buffer would. Returns the "all changes" buffer as its
+/// client then holds it: 'buffer', or its collateral rerendering if
+/// the save sent one.
+pub fn retitle_in_a_content_view (
+  f      : &mut Fixture,
+  node   : &str,
+  title  : &str,
+  buffer : &str,
+) -> Result<String, Box<dyn Error>> {
+  let view_id : ViewId =
+    ViewId::ContentView ( format! ("content-view-of-{}", node) );
+  let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
+    multi_root_view ( &f . config, Some (&f . tantivy), &[ ID::from (node) ] ) ?;
+  f . views_state . open_views . register_view (
+    &f . graph . load_full (), view_id . clone (), tree, &pids );
+  let root_line : &str = text . lines () . next () . unwrap ();
+  let edited : String = text . replacen (
+    root_line,
+    &format! ( "{} {}", &root_line [ .. root_line . rfind (' ') . unwrap () ],
+               title ),
+    1 );
+  let (mut stream, mut read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  let response : SaveResponse = block_on (
+    update_from_and_rerender_buffer_test (
+      &mut stream, &edited, &f . config, &f . tantivy, &f . graph,
+      &Ok (view_id), &mut f . views_state )) ?;
+  assert! ( response . errors . is_empty (),
+            "the content view must save, got {:?}", response . errors );
+  drop (stream);
+  let mut streamed : String = String::new ();
+  read_end . read_to_string (&mut streamed) ?;
+  Ok ( collateral_view_content (&streamed)
+       . unwrap_or_else ( || buffer . to_string () )) }
 /// The content of the first rerendered view in 'response'.
 pub fn rerendered_view_content (
   response : &str,

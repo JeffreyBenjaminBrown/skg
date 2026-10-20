@@ -1,0 +1,6 @@
+pid: c1
+title: c1
+body: |-
+  new body
+contains:
+- recorder

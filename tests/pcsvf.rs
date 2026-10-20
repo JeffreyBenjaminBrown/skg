@@ -26,3 +26,5 @@ mod folding;
 mod recomputed_sets;
 #[path = "pcsvf/write_protecting.rs"]
 mod write_protecting;
+#[path = "pcsvf/partner_folder_check.rs"]
+mod partner_folder_check;

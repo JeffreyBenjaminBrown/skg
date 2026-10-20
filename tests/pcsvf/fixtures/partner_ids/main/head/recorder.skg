@@ -1,0 +1,5 @@
+pid: recorder
+title: recorder
+subscribesTo:
+- x2
+- ghost

@@ -6,7 +6,7 @@
 
 use crate::pcsvf::common::{
   Fixture, open_all_changes_buffer, open_buffer, save, save_buffer,
-  integrate_unshown_changes, with_fixture};
+  integrate_unshown_changes, with_fixture, with_fixture_and_foreign};
 
 use skg::change_leaves::{BufferReadinessSummary, ReadinessSummary};
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -169,6 +169,25 @@ fn the_summary_counts_the_changes_the_saved_buffer_does_not_show (
                  format! ( "(readiness-summary (ready {}) (changed {}) (foreign 0) (order-only 1) (notEditable 11))",
                            summary . summary . ready_files,
                            summary . summary . changed_files ));
+    Ok (( )) }) }
+
+/// The 'foreign' fixture has the owned skgrepo main, which retitles
+/// m, and the foreign skgrepo foreign, a gitrepo too, which retitles
+/// f and deletes g. The summary counts m's file as changed and the
+/// foreign skgrepo's two files apart, as foreign.
+#[test]
+fn the_summary_counts_the_changed_files_of_the_foreign_skgrepos (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture_and_foreign ("foreign", &["main"], &["foreign"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let summary : BufferReadinessSummary =
+      summary_of ( &save_cleanly (f, &buffer) ? );
+    assert_eq! ( summary . summary, ReadinessSummary {
+      ready_files : 0, changed_files : 1,
+      foreign_changed_files : 2, order_only_files : 0 } );
+    assert! ( sexp_to_client_string (&summary . to_sexp ())
+                . contains ("(foreign 2)"),
+              "{:?}", summary );
     Ok (( )) }) }
 
 fn summary_of (

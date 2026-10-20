@@ -331,3 +331,103 @@ fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
     assert! ( response . saved_view . contains ("(diff rel-))) sub"),
               "{}", response . saved_view );
     Ok (( )) }) }
+
+/// The kinds buffer's line drawing ctx, unchanged and write-protected
+/// in ct's content, with 'replace' applied to it.
+fn editing_ctx (
+  buffer  : &str,
+  replace : impl Fn (&str) -> String,
+) -> String {
+  let ctx : &str = buffer . lines ()
+    . find ( |line| line . starts_with (
+      "** (skg (node (id ctx) (repo public) writeProtected ") )
+    . expect ("ctx is drawn write-protected in ct's content");
+  buffer . replacen ( ctx, &replace (ctx), 1 ) }
+
+/// In the 'kinds' fixture ctx, unchanged, is drawn write-protected in
+/// ct's content. Drawn there with another home skgrepo, it is
+/// refused, naming the home skgrepo.
+#[test]
+fn a_writeProtected_occurrence_with_another_home_skgrepo_is_refused (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("kinds", &["public", "private"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let errors : Vec<BufferValidationError> = refusal_errors ( f, &editing_ctx (
+      &buffer, |line| line . replacen ("(repo public)", "(repo private)", 1) ));
+    assert! ( matches! (
+      &errors [..],
+      [ BufferValidationError::EditedWriteProtectedOccurrence {
+          skgid, changes, .. } ]
+      if *skgid == ID::from ("ctx")
+         && *changes == vec! [
+           "home skgrepo private differs from the graph's public" . to_string () ] ),
+      "{:?}", errors );
+    Ok (( )) }) }
+
+/// An ID folder and a flags folder under the write-protected ctx
+/// (see the previous test) are checked as under any recorder: saying
+/// what the graph says, they save; saying more, they are refused.
+#[test]
+fn id_and_flags_folders_under_a_writeProtected_occurrence_are_checked (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("kinds", &["public", "private"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let with_folder = |folder : &str| -> String {
+      editing_ctx ( &buffer, |line| format! ("{}\n{}", line, folder) ) };
+    for agreeing in [ "*** (skg idFolder)\n**** (skg id) ctx",
+                      "*** (skg flagsFolder)" ] {
+      let response : SaveResponse = save ( f, &with_folder (agreeing) ) ?;
+      assert! ( response . errors . is_empty (),
+                "{:?} must save, got {:?}", agreeing, response . errors ); }
+    let errors : Vec<BufferValidationError> = refusal_errors (
+      f, &with_folder ("*** (skg idFolder)\n**** (skg id) ctx\n**** (skg id) ctx-too") );
+    assert! ( matches! (
+      &errors [..],
+      [ BufferValidationError::IDFolder_Edited (recorder, _, _) ]
+      if *recorder == ID::from ("ctx") ),
+      "{:?}", errors );
+    let errors : Vec<BufferValidationError> = refusal_errors (
+      f, &with_folder ("*** (skg flagsFolder)\n**** (skg (flag noSearchMatching))") );
+    assert! ( matches! (
+      &errors [..],
+      [ BufferValidationError::FlagsSurfaceEdited { recorder_skgid, .. } ]
+      if *recorder_skgid == ID::from ("ctx") ),
+      "{:?}", errors );
+    Ok (( )) }) }
+
+/// Typed under n under y as non-members, b (folded) then a are n's
+/// content in the wrong order. An editable-view request there makes
+/// that occurrence editable; it adopts them as its members, keeping
+/// their viewnodes (b stays folded), and moves them into content
+/// order: a, then b.
+#[test]
+fn an_adopted_child_moves_into_content_order (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("shared", &["main"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let n_under_y_line : &str = buffer . lines ()
+      . find ( |line| line . starts_with (N_UNDER_Y) )
+      . expect ("n is drawn write-protected under y");
+    let typed : String = buffer . replacen ( n_under_y_line, &format! (
+      "{}\n{}\n{}", n_under_y_line,
+      "*** (skg folded (node (id b) (repo main) (affectsParent false) writeProtected)) b",
+      "*** (skg (node (id a) (repo main) (affectsParent false) writeProtected)) a" ), 1 );
+    let response : SaveResponse =
+      save ( f, &requesting_editable_at (&typed, N_UNDER_Y) ) ?;
+    assert! ( response . errors . is_empty (), "{:?}", response . errors );
+    let saved : String = response . saved_view;
+    let under_y : Vec<&str> = saved . lines ()
+      . skip_while ( |line| ! line . starts_with ("* (skg (node (id y) ") )
+      . filter ( |line| line . starts_with ("** (skg ")
+                        || line . starts_with ("*** (skg ") )
+      . filter ( |line| line . contains ("(node (id ") )
+      . collect ();
+    assert! ( under_y . len () == 3
+              && under_y [0] . contains ("(node (id n) ")
+              && ! under_y [0] . contains ("writeProtected")
+              && under_y [1] . starts_with ("*** (skg (node (id a) ")
+              && under_y [2] . starts_with ("*** (skg folded (node (id b) ")
+              && ! under_y [1 ..] . iter () . any ( |line| line . contains ("affectsParent") ),
+              "n under y must be editable, its members a then b, b folded:\n{}",
+              saved );
+    Ok (( )) }) }

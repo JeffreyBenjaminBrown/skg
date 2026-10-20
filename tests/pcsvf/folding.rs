@@ -5,9 +5,14 @@
 // are described in 'buffer.rs' ('sets', 'kinds') and in
 // 'other_buffers.rs' ('buffers').
 
-use crate::pcsvf::common::{Fixture, open_all_changes_buffer, save, with_fixture};
+use crate::pcsvf::common::{
+  Fixture, open_all_changes_buffer, rerendered_view_content,
+  retitle_in_a_content_view, save, send_stage_and_commit_request,
+  with_fixture};
 
 use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::test_utils::skg_env_from_parts;
+use skg::types::env::SkgEnv;
 
 use std::error::Error;
 
@@ -227,4 +232,66 @@ fn a_deleted_then_restored_node_keeps_the_folding_of_its_subtree (
               && ! restored . contains ("historical (id cy1)"),
               "cy1 is a live member again, its subtree folded as it was:\n{}",
               restored );
+    Ok (( )) }) }
+
+/// The folds the 'buffers' buffer gets: mvp (a root), mvc (its
+/// member) and acq (top's member) folded, and mvs's body, which the
+/// server draws folded, unfolded.
+fn fold_buffers_buffer (
+  buffer : &str,
+) -> String {
+  let mut folded : String = buffer . to_string ();
+  for headline in [ "* (skg (node (id mvp)",
+                    "** (skg (node (id mvc)",
+                    "** (skg (node (id acq)" ] {
+    folded = with_atom (&folded, headline, "folded"); }
+  edit_line ( &folded, "** (skg bodyFolded (node (id mvs)",
+              |line| line . replacen ("bodyFolded ", "", 1) ) }
+
+fn assert_buffers_folds_stay (
+  buffer : &str,
+) {
+  for (folded, unfolded) in [
+    ( "* (skg folded (node (id mvp)",   "* (skg (node (id mvp)" ),
+    ( "** (skg folded (node (id mvc)",  "** (skg (node (id mvc)" ),
+    ( "** (skg folded (node (id acq)",  "** (skg (node (id acq)" ),
+    ( "** (skg (node (id mvs)",         "** (skg bodyFolded (node (id mvs)" ) ] {
+    assert! ( buffer . lines () . any ( |line| line . starts_with (folded) )
+              && ! buffer . lines () . any ( |line| line . starts_with (unfolded) ),
+              "{:?} must stay:\n{}", folded, buffer ); }}
+
+/// Folds survive a git-commit: the 'buffers' buffer, saved with its
+/// folds ('fold_buffers_buffer'), is rerendered by a confirmed
+/// stage-and-commit, and the headlines folded before are folded after.
+#[test]
+fn folds_survive_a_commit (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("buffers", &["public", "private"], |f| {
+    let folded : String = fold_buffers_buffer ( &open_all_changes_buffer (f) ? );
+    assert_buffers_folds_stay ( &save_cleanly (f, &folded) ? );
+    let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
+    let response : String = send_stage_and_commit_request ( f, &env,
+      "((request . \"stage and commit\") (message . \"commit\") (confirmed . t))\n" ) ?;
+    assert! ( response . contains ("(commits ((public "), "{}", response );
+    let committed : String = rerendered_view_content (&response);
+    assert! ( ! committed . contains ("homeSkgrepoMove"),
+              "the buffer shows no change after the commit:\n{}", committed );
+    assert_buffers_folds_stay (&committed);
+    Ok (( )) }) }
+
+/// Folds survive a collateral rerender: the 'buffers' buffer, saved
+/// with its folds, is rerendered when a content view retitles txt,
+/// and shows the new title with the same folds.
+#[test]
+fn folds_survive_a_collateral_rerender (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("buffers", &["public", "private"], |f| {
+    let folded : String = fold_buffers_buffer ( &open_all_changes_buffer (f) ? );
+    let saved : String = save_cleanly (f, &folded) ?;
+    let rerendered : String =
+      retitle_in_a_content_view (f, "txt", "txt, retitled again", &saved) ?;
+    assert! ( line_starting (&rerendered, "* (skg (node (id txt)")
+                . ends_with (" txt, retitled again"),
+              "the buffer was rerendered collaterally:\n{}", rerendered );
+    assert_buffers_folds_stay (&rerendered);
     Ok (( )) }) }

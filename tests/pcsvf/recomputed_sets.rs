@@ -10,30 +10,24 @@
 // member.
 
 use crate::pcsvf::common::{
-  Fixture, collateral_view_content, graph_straddle, node_lines,
+  Fixture, graph_straddle, node_lines,
   open_all_changes_buffer, requesting_editable_at, rerendered_view_content,
-  save, send_stage_and_commit_request, integrate_unshown_changes,
+  retitle_in_a_content_view, save, send_stage_and_commit_request, integrate_unshown_changes,
   with_fixture};
-use crate::pcsvf::common::git_fixture_helpers::mk_test_tcp_stream_pair;
 
 use skg::graph_straddle::types::GraphStraddle;
 use skg::pcsvf::{DiffViewSource, ensure_editableOccurrences_exist};
 use skg::readiness_store::ReadinessStore;
 use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::test_utils::{skg_env_from_parts, update_from_and_rerender_buffer_test};
-use skg::to_org::render::content_view::multi_root_view;
+use skg::test_utils::skg_env_from_parts;
 use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::misc::ID;
 use skg::types::tree::forest::ViewForest;
-use skg::types::views_state::{DiffViewBufferKind, ViewId};
-use skg::types::viewnode::{Phantom, Viewnode, ViewnodeKind, Vognode};
+use skg::types::views_state::DiffViewBufferKind;
+use skg::types::viewnode::{Phantom, ViewnodeKind, Vognode};
 
-use ego_tree::Tree;
-use futures::executor::block_on;
 use std::error::Error;
-use std::io::Read;
-use std::net::TcpStream;
 use std::sync::Arc;
 
 /// Save 'buffer' as the "all changes" buffer; it must save without
@@ -47,42 +41,6 @@ fn save_cleanly (
             "the buffer must save without errors, got {:?}\n\nbuffer:\n{}",
             response . errors, buffer );
   Ok (response) }
-
-/// Retitle 'node' to 'title' by saving a content view of it, as
-/// another buffer would. Returns the "all changes" buffer as its
-/// client then holds it: 'buffer', or its collateral rerendering if
-/// the save sent one.
-fn retitle_in_a_content_view (
-  f      : &mut Fixture,
-  node   : &str,
-  title  : &str,
-  buffer : &str,
-) -> Result<String, Box<dyn Error>> {
-  let view_id : ViewId =
-    ViewId::ContentView ( format! ("content-view-of-{}", node) );
-  let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
-    multi_root_view ( &f . config, Some (&f . tantivy), &[ ID::from (node) ] ) ?;
-  f . views_state . open_views . register_view (
-    &f . graph . load_full (), view_id . clone (), tree, &pids );
-  let root_line : &str = text . lines () . next () . unwrap ();
-  let edited : String = text . replacen (
-    root_line,
-    &format! ( "{} {}", &root_line [ .. root_line . rfind (' ') . unwrap () ],
-               title ),
-    1 );
-  let (mut stream, mut read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response : SaveResponse = block_on (
-    update_from_and_rerender_buffer_test (
-      &mut stream, &edited, &f . config, &f . tantivy, &f . graph,
-      &Ok (view_id), &mut f . views_state )) ?;
-  assert! ( response . errors . is_empty (),
-            "the content view must save, got {:?}", response . errors );
-  drop (stream);
-  let mut streamed : String = String::new ();
-  read_end . read_to_string (&mut streamed) ?;
-  Ok ( collateral_view_content (&streamed)
-       . unwrap_or_else ( || buffer . to_string () )) }
 
 /// Whether some line of 'buffer' draws 'node' editable.
 fn drawn_editable (
