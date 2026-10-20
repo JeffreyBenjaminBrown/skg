@@ -1,3 +1,49 @@
+//! Which occurrence of a node is editable, and the view requests.
+//!
+//! A buffer holds at most one editable occurrence of a graphnode; every
+//! other occurrence of it is write-protected (see the glossary's
+//! "editable, write-protected"). View completion decides which, as its
+//! level-order BFS ('complete_nodes_in_level_order' in
+//! 'server/update_buffer/complete.rs') visits the occurrences, by four
+//! rules:
+//!
+//! - The editable map ('EditableMap' in 'server/to_org/util.rs'),
+//!   built afresh at every completion, records which node has claimed
+//!   an editable occurrence, and where. An occurrence an editable-view
+//!   request made editable claims its node as 'Finalizable::Final'; any
+//!   other editable occurrence claims it as 'Finalizable::Tentative'.
+//!   Only an editable occurrence claims, so editability can move from
+//!   one rerender to the next.
+//! - The draw rule: an occurrence without a request is editable when
+//!   its node is unclaimed, and write-protected when the BFS reached
+//!   another occurrence first
+//!   ('make_writeProtected_if_repeat_then_extend_editable_map'). An
+//!   occurrence carrying an editable-view request ('ViewRequest::Editable',
+//!   C-c s d) defers to a Final occurrence elsewhere, becoming
+//!   write-protected and losing the request; otherwise it becomes
+//!   editable and Final, and a Tentative occurrence elsewhere is
+//!   write-protected with its whole content subtree
+//!   ('apply_editable_draw_rule'). Write-protecting an occurrence makes
+//!   its member children non-members, since it writes no content.
+//! - The cascade: a Final occurrence hands an editable-view request to
+//!   each of its member content children
+//!   ('pass_editableViewRequest_to_content_children' in
+//!   'server/update_buffer/reconcile/content.rs'), each of which applies
+//!   the draw rule at its own visit and cascades in turn. So a request
+//!   on an editable occurrence means "unfold this subtree editable".
+//! - The node budget ('CompletionContext::node_budget') starts at
+//!   'initial_node_limit' at each completion. Each expansion of an
+//!   editable vognode's content costs one; a folder fills its members
+//!   for free, and a content list is drawn whole or not at all. Once the
+//!   budget is spent, every later occurrence other than a root is drawn
+//!   write-protected and loses its request, which is what bounds the
+//!   cascade. The diff view charges only some expansions; see
+//!   'docs/diff-view.org', "Editability in the diff view".
+//!
+//! This file also dispatches the view requests that remain after the
+//! node's visit ('execute_view_requests'), and applies the write-protect
+//! requests ('apply_writeProtect_request', C-c s w and C-c s W).
+
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::role_tree::build_and_integrate_role_tree_then_drop_request;
@@ -45,8 +91,8 @@ pub fn execute_view_requests (
           viewforest, treeid, graph, config, errors ) ?; },
       ViewRequest::Editable =>
         // View completion (dispatch_node_update) settles every Editable
-        // request at the node's own visit (apply_editable_draw_rule, the TODO/DONE/local-view-update/plan_v2.org §5.2
-        // draw rule + TODO/DONE/local-view-update/plan_v2.org §5.3 cascade), before this post-content view-request pass
+        // request at the node's own visit (apply_editable_draw_rule, the
+        // draw rule and the cascade), before this post-content view-request pass
         // runs, so none should reach here. Fail loudly if one does, rather than
         // silently dropping it.
         return Err ( "execute_view_requests: a ViewRequest::Editable survived \
@@ -67,25 +113,26 @@ pub fn execute_view_requests (
           save path and stripped before rendering" . into () ), }}
   Ok (( )) }
 
-/// The result of applying the TODO/DONE/local-view-update/plan_v2.org §5.2 Tentative/Final draw rule to a node that
-/// carries a 'ViewRequest::Editable' (a user EVR, or a TODO/DONE/local-view-update/plan_v2.org §5.3 cascade EVR).
+/// The result of applying the Tentative/Final draw rule (see the module
+/// comment) to a node that carries a 'ViewRequest::Editable' (a user
+/// EVR, or one the cascade passed down).
 pub enum DrawOutcome {
   /// An existing Final occurrence of this id won: the EVR was dropped and
   /// the node left write-protected. No content expansion should follow.
   Deferred,
   /// The node was made Final (and any prior Tentative occurrence of its id
-  /// write-protectd). The caller draws its content next via the TODO/DONE/local-view-update/plan_v2.org §5.3 cascade.
+  /// write-protectd). The caller draws its content next, and cascades.
   MadeFinal,
 }
 
-/// Apply the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule for a node carrying
+/// Apply the draw rule (see the module comment) for a node carrying
 /// 'ViewRequest::Editable', WITHOUT expanding its content:
 /// - defer to an existing Final occurrence (drop the EVR, stay
 ///   write-protected) -> 'DrawOutcome::Deferred';
 /// - otherwise write-protect any prior Tentative occurrence of the id, mark
 ///   this node Final (resyncing title/body from disk), register it in the map,
 ///   and clear the request -> 'DrawOutcome::MadeFinal'.
-/// Content drawing is the caller's job (the TODO/DONE/local-view-update/plan_v2.org §5.3 cascade), so the rule settles
+/// Content drawing is the caller's job (and so is the cascade), so the rule settles
 /// Final-ness before view completion (complete_nodes_in_level_order) draws
 /// (and cascades) content.
 pub fn apply_editable_draw_rule (
@@ -99,8 +146,8 @@ pub fn apply_editable_draw_rule (
     viewforest, treeid ) ?;
   if let Some (&prior) = visited . get (& node_pid) {
     if prior . is_final () && prior . treeid () != treeid {
-      // TODO/DONE/local-view-update/plan_v2.org §5.2: an existing Final occurrence wins; discard this EVR and make
-      // the node write-protected. (Setting write-protected matters for a TODO/DONE/local-view-update/plan_v2.org §5.3
+      // An existing Final occurrence wins; discard this EVR and make
+      // the node write-protected. (Setting write-protected matters for a
       // cascade EVR landing on a freshly-created editable child whose id
       // is already Final elsewhere; for a user EVR on an already-write-protected
       // node it is a no-op. The expand step then clobbers/refreshes it.)
@@ -124,7 +171,7 @@ pub fn apply_editable_draw_rule (
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     from_disk_replace_title_body_and_graphnode (
       viewforest, treeid, graph, config ) ?;
-    // A EVR target is Final (TODO/DONE/local-view-update/plan_v2.org §5.2): later EVRs for this ID defer to it.
+    // A EVR target is Final: later EVRs for this ID defer to it.
     visited . insert ( node_pid . clone(), Finalizable::Final (treeid) ); }
   Ok ( DrawOutcome::MadeFinal ) }
 

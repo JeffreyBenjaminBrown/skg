@@ -24,11 +24,12 @@ use std::time;
 /// Whether an ID's editable occurrence is Final (claimed by a
 /// editable view request, EVR) or merely Tentative (an ordinary
 /// saved/completed editable). A EVR clobbers a Tentative occurrence
-/// but defers to a Final one (TODO/DONE/local-view-update/plan_v2.org §5.2). The EVR cascade (TODO/DONE/local-view-update/plan_v2.org §5.3) is
-/// not yet implemented, so today no second EVR ever reaches an
-/// already-Final ID (validation forbids two user EVRs per ID); the
-/// defer-to-Final branch is therefore correct-but-dormant until cascade
-/// lands. NodeId is the occurrence's position in the viewforest.
+/// but defers to a Final one: the draw rule, described with the editable
+/// map, the cascade and the node budget in the module comment of
+/// 'server/to_org/expand/editable.rs'. A user writes at most one EVR
+/// per ID (validation forbids two), so a second EVR reaching a Final
+/// ID is one the cascade passed down. NodeId is the occurrence's
+/// position in the viewforest.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Finalizable {
   Tentative (NodeId),
@@ -42,7 +43,8 @@ impl Finalizable {
     matches! (self, Finalizable::Final (_)) }
 }
 
-/// Tracks which IDs have been rendered as editable and where.
+/// The editable map: tracks which IDs have been rendered as editable
+/// and where (see the module comment of 'server/to_org/expand/editable.rs').
 /// - Key: the ID that was visited
 /// - Value: Finalizable (its NodeId in the viewforest, tagged Tentative/Final)
 ///
@@ -177,7 +179,7 @@ pub fn make_writeProtected_if_repeat_then_extend_editable_map (
              t . is_writeProtected () } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   if !is_writeProtected {
-    // Ordinary completed/saved editable -> Tentative (TODO/DONE/local-view-update/plan_v2.org §5.2).
+    // Ordinary completed/saved editable -> Tentative (the draw rule).
     editableMap . insert ( pid, Finalizable::Tentative (treeid) ); }
   else { make_member_children_nonMembers ( tree, treeid ) ?; }
   Ok (( )) }
@@ -359,7 +361,7 @@ pub fn validate_affectsParent_relationships (
       = node_mut . value () . kind
     { t . birth = Birth::Unremarkable; } } }
 
-/// Jeff's invariant (TODO/DONE/local-view-update/progress.org §11 thread): a *non-dead generalized orphan*
+/// An invariant: a *non-dead generalized orphan*
 /// must have AffectsParent=False. An Unrestricted node whose PARENT is a
 /// non-container -- a historical phantom, a Deleted, or a DeadViewnode -- is exactly
 /// that: it survives (is not itself dead) but its container is gone, so its
