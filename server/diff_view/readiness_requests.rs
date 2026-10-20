@@ -1,7 +1,8 @@
-//! Readiness requests and readiness facts ('docs/diff-view.org',
-//! "Readiness"), the two places where the readiness store meets a
-//! viewforest. Both rest on one rule, 'leaves_named_at': which
-//! change-forest leaves a headline names.
+//! Readiness requests, readiness facts and a buffer's readiness
+//! summary ('docs/diff-view.org', "Readiness"), the places where the
+//! readiness store meets a viewforest. The first two rest on one
+//! rule, 'leaves_named_at': which change-forest leaves a headline
+//! names.
 //!
 //! A save consumes the readiness requests of the buffer it saves, in
 //! any buffer ('consume_readiness_requests'): after the graph edits
@@ -14,9 +15,14 @@
 //! After view completion of a buffer of the diff view, the
 //! '(ready ...)' display facts are set from the store
 //! ('set_ready_facts_in_viewforest').
+//!
+//! A save of a buffer of the diff view, and the "integrate unshown
+//! changes" request, answer with the readiness summary of the buffer
+//! they rerendered ('buffer_readiness_summary_for').
 
 use crate::diff_view::change_leaves::{
-  ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};
+  BufferReadinessSummary, ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};
+use crate::diff_view::pcsvf::nodes_editable_in_diffView;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   NodeRelation, RelationRole, RelationshipKey};
@@ -329,3 +335,17 @@ fn grandparent_pid (
   match &node . parent () ? . parent () ? . value () . kind {
     ViewnodeKind::Vognode (vognode) => vognode . skgid () . cloned (),
     _ => None, } }
+
+/// The readiness summary of a buffer of the diff view, from
+/// 'straddle' and the marks in the store: the changeset's counts, and
+/// how many leaves are recorded by a node that 'viewforest' does not
+/// make editable ('nodes_editable_in_diffView').
+pub fn buffer_readiness_summary_for (
+  env        : &SkgEnv,
+  straddle   : &GraphStraddle,
+  viewforest : &ViewForest,
+) -> BufferReadinessSummary {
+  let store : MutexGuard<ReadinessStore> =
+    env . runtime . lock_readiness_store ();
+  straddle . change_leaves () . buffer_readiness_summary (
+    &store, &nodes_editable_in_diffView (viewforest) ) }

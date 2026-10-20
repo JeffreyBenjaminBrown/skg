@@ -10,9 +10,8 @@
 //! view, or nothing when the request was refused.
 
 use crate::diff_view::change_leaves::{BufferReadinessSummary, readiness_response_sexp};
+use crate::diff_view::readiness_requests::buffer_readiness_summary_for;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::diff_view::pcsvf::nodes_editable_in_diffView;
-use crate::diff_view::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
 use crate::serve::rerender_stream::{
   PreparedRerenders, PreparedView, prepare_rerender_views_where,
@@ -27,7 +26,7 @@ use crate::types::views_state::ViewId;
 use crate::update_buffer::RerenderOptions;
 
 use std::net::TcpStream;
-use std::sync::{Arc, MutexGuard};
+use std::sync::Arc;
 
 pub fn handle_integrate_unshown_changes_request (
   stream              : &mut TcpStream,
@@ -81,9 +80,6 @@ fn integrate_unshown_changes (
     (Option<&PreparedView>, Option<&Arc<GraphStraddle>>) =
     (prepared . views . first (), prepared . graph_straddle . as_ref ())
     else { return Err ( prepared . errors . join ("\n") ); };
-  let summary : BufferReadinessSummary = {
-    let store : MutexGuard<ReadinessStore> =
-      env . runtime . lock_readiness_store ();
-    straddle . change_leaves () . buffer_readiness_summary (
-      &store, &nodes_editable_in_diffView (&view . viewforest) ) };
+  let summary : BufferReadinessSummary =
+    buffer_readiness_summary_for (env, straddle, &view . viewforest);
   Ok (( prepared, summary )) }

@@ -411,7 +411,8 @@ change-forest, whatever buffer is open. It adds the changed files of
 the foreign skgrepos, and the changes not editable in this view:
 the leaves whose recorder the buffer does not make editable (see
 "What counts as editable here"), with the command that integrates
-them.
+them. A save and C-c r u compute it alike
+('buffer_readiness_summary_for', 'server/diff_view/readiness_requests.rs').
 
 * Stage and commit
 C-c r c ('skg-stage-and-commit') prompts once for a message and sends

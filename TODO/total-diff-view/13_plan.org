@@ -1045,7 +1045,7 @@ module's 'mod.rs' comment points at 'docs/diff-view.org' and lists the
 files. Remove the "(from slice N)" marks in 'docs/diff-view.org' that
 this slice makes true, if any.
 
-** TODO Slice 11: the rerender pipeline
+** DONE Slice 11: the rerender pipeline
 Make the changes under "The rerender pipeline" above. Every call of
 'rerender_view' and 'prepare_rerender_views_where' names its options;
 no positional bool remains among them. The save path's two copied

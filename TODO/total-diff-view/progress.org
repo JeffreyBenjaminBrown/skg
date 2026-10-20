@@ -1936,3 +1936,49 @@ the order of the save-lock's view list, which varies from run to run
 at baseline too. Counts: nextest 827, Emacs 373, Neovim 347, as before.
 One nextest run failed while cargo-watch was rebuilding for Jeff's
 server; the reruns passed.
+** Slice 11: deviations
+*** each case of rerender has a constructor of 'RerenderOptions'
+The calls name their options through a constructor rather than a
+struct literal: 'RerenderOptions::for_saved_view', 'ordinary' (the
+collateral views of a save, "rerender all views", the cleanup after
+deleting references to an absent node, the diff view after a
+git-commit), 'for_skgrepo_switch' and
+'for_integrating_unshown_changes'. Each constructor names every field,
+and each takes the buffer kind. The unit test the slice asks for
+('tests/unit/rerender_options.rs') needs the post-save and
+skgrepo-switch values to come from somewhere callable, and a literal
+at each call site would have nothing to test.
+**** 'prepare_rerender_views_where' takes a constructor
+'diffView_buffer' differs per view in a streamed rerender, so
+'prepare_rerender_views_where' (and its two wrappers) take
+'fn (Option<DiffViewBufferKind>) -> RerenderOptions' and apply it to
+each view's buffer kind. A caller passes the constructor by name, e.g.
+'RerenderOptions::for_skgrepo_switch'.
+*** what left 'rerender_all_views.rs' besides the pipeline
+'rerender_all_views.rs' now holds only the "rerender all views"
+request. The two operation-specific wrappers moved to their only
+callers: 'stream_rerender_views_after_absent_reference_cleanup' (with
+'view_can_display_absent_reference_change' and its test) to
+'delete_references_to_absent_node.rs', and
+'stream_rerender_diffView_views' to 'stage_and_commit.rs'.
+'stream_rerender_views' had no caller (its comment named the
+skgrepo-set switch, which calls 'prepare_rerender_views_with_runtime'
+directly) and is gone.
+*** the two steps
+'write_graph_straddle_back' is in 'serve/rerender_stream.rs'; both
+'stream_prepared_rerenders' and 'update_views_after_save' call it.
+'buffer_readiness_summary_for' is in
+'diff_view/readiness_requests.rs', whose module comment now names it;
+the save and "integrate unshown changes" call it.
+*** docs
+'docs/api-and-formats.org' ("Rerender all views") names
+'server/serve/rerender_stream.rs'; 'docs/diff-view.org' ("The readiness
+summary") names 'buffer_readiness_summary_for'.
+*** verification
+Counts: nextest 828 (the new unit test), Emacs 373, Neovim 347.
+'tests/results/hk-slice11/verify.sh' (slice 10's script, extended)
+opens the four buffers of the 'kinds' fixture over TCP on an isolated
+server, saves "all changes" unchanged, reopens them, sends "rerender
+all views", and "integrate unshown changes" for "all changes" and for
+"merges". Its output is byte-identical to that of the binary built
+from the commit before this slice.

@@ -5,7 +5,8 @@
 //! precede any visible change, and then streamed: "rerender-lock",
 //! one "rerender-view" per view, "rerender-done"
 //! ('stream_prepared_rerenders'). The graph straddle the rerenders
-//! brought up to date is written back to the connection.
+//! brought up to date is written back to the connection
+//! ('write_graph_straddle_back'), as a save does with its own.
 
 use crate::graph_straddle::types::GraphStraddle;
 use crate::serve::ViewsState;
@@ -179,8 +180,7 @@ pub(crate) fn stream_prepared_rerenders (
     & tag_sexp_response (
       TcpToClient::RerenderLock,
       & format_lock_views_sexp (&prepared . view_ids) ));
-  if prepared . graph_straddle . is_some () {
-    views_state . graph_straddle = prepared . graph_straddle; }
+  write_graph_straddle_back (views_state, prepared . graph_straddle);
   for view in prepared . views {
     views_state . open_views . update_view (
       &prepared . runtime . graph,
@@ -198,6 +198,16 @@ pub(crate) fn stream_prepared_rerenders (
       & format_errors_warnings_sexp (
         &prepared . errors,
         &prepared . warnings) )); }
+
+/// Keep the graph straddle a rerender brought up to date as the
+/// connection's. A rerender that drew no buffer of the diff view
+/// built none, and leaves the connection's as it was.
+pub(crate) fn write_graph_straddle_back (
+  views_state    : &mut ViewsState,
+  graph_straddle : Option<Arc<GraphStraddle>>,
+) {
+  if graph_straddle . is_some () {
+    views_state . graph_straddle = graph_straddle; }}
 
 /// Send an EMPTY rerender stream: a "rerender-lock" naming no views,
 /// then "rerender-done" with no errors or warnings.  Used after a

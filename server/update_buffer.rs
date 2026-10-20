@@ -33,9 +33,9 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::diff_view::change_leaves::BufferReadinessSummary;
 use crate::diff_view::completion::{
   DiffViewRerender, finish_diffView_rerender, prepare_diffView_rerender};
+use crate::diff_view::readiness_requests::buffer_readiness_summary_for;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::diff_view::pcsvf::{DiffViewSource, nodes_editable_in_diffView};
-use crate::diff_view::readiness_store::ReadinessStore;
+use crate::diff_view::pcsvf::DiffViewSource;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
@@ -44,6 +44,7 @@ use crate::serve::handlers::text_release::{
   TextReleaseDecision, challenge_response, decide,
 };
 use crate::serve::protocol::TcpToClient;
+use crate::serve::rerender_stream::write_graph_straddle_back;
 use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::skgrepo_sets::{SkgrepoRestriction, apply_skgrepo_set_to_viewforest};
 use crate::to_org::expand::role_tree::{
@@ -63,7 +64,7 @@ use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::sync::{Arc, MutexGuard};
+use std::sync::Arc;
 use std::time::Instant;
 
 pub struct RerenderAfterSaveContext<'a> {
@@ -232,11 +233,8 @@ pub fn update_views_after_save (
         RerenderOptions::for_saved_view (saved_diffView_buffer_kind) ) } ?;
   let readiness_summary : Option<BufferReadinessSummary> =
     saved_diffView_buffer_kind . and ( context . graph_straddle . as_ref () )
-    . map ( |straddle| {
-      let store : MutexGuard<ReadinessStore> =
-        env . runtime . lock_readiness_store ();
-      straddle . change_leaves () . buffer_readiness_summary (
-        &store, &nodes_editable_in_diffView (&saved_view_mut) ) } );
+    . map ( |straddle| buffer_readiness_summary_for (
+      env, straddle, &saved_view_mut ) );
   context . warnings . extend (
     // Repairs the completion pass made to write-protected PartnerFolders in
     // the saved view, batched per (folder, recorder).
@@ -274,8 +272,7 @@ pub fn update_views_after_save (
       TextReleaseDecision::AllowWithWarning { warning } =>
         context . warnings . push (warning),
       TextReleaseDecision::Allow => {}, }}
-  if context . graph_straddle . is_some () {
-    views_state . graph_straddle = context . graph_straddle . clone (); }
+  write_graph_straddle_back (views_state, context . graph_straddle . take ());
   if let Ok (view_id) = viewid_from_request_result {
     views_state . open_views . update_view (
       &context . graph_snap, view_id, saved_view_mut);

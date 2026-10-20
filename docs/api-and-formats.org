@@ -692,6 +692,9 @@ one automatically.
     text is sent and no open-view registry entry changes. A retry adds
     =approved-overPrivateText-pids=; =all= instead adds the shared warning to
     =rerender-done=.
+  - =server/serve/rerender_stream.rs= prepares, authorizes and streams
+    the rerenders; every request answered by a rerender stream shares
+    it.
 
 ** skgrepo-sets
   - Skgrepo-sets are the prefixes of the config's privacy order (see
