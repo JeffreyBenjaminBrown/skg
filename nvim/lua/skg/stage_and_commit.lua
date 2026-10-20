@@ -11,8 +11,8 @@ local buffer = require('skg.buffer')
 local client = require('skg.client')
 local lock = require('skg.lock')
 local payload = require('skg.payload')
+local readiness = require('skg.readiness')
 local rerender = require('skg.rerender')
-local save = require('skg.save')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -54,9 +54,9 @@ end
 ---@param response any
 function M.handler (message, response)
   if payload.field(response, 'needs-confirmation') ~= nil then
-    local summary = save.readiness_summary_from_response(response)
+    local summary = readiness.readiness_summary_from_response(response)
     local typed = vim.fn.input(
-      save.readiness_summary_message(summary)
+      readiness.readiness_summary_message(summary)
       .. '. Type yes to commit anyway: ')
     if typed == 'yes' then
       rerender.after_empty_stream = function () M.send(message, true) end

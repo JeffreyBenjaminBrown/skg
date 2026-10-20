@@ -14,8 +14,8 @@
 (require 'skg-buffer)
 (require 'skg-length-prefix)
 (require 'skg-lock-buffers)
+(require 'skg-readiness) ; for skg--readiness-summary-message
 (require 'skg-request-rerender-all-views)
-(require 'skg-request-save) ; for skg--readiness-summary-message
 
 (defun skg-stage-and-commit ()
   "Stage every change and git-commit it, in every owned skgrepo

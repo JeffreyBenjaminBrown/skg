@@ -8,6 +8,7 @@
 (require 'skg-metadata)
 (require 'skg-buffer)
 (require 'skg-lock-buffers)
+(require 'skg-readiness) ; for skg--readiness-summary-message
 
 (defun skg-request-save-buffer (&optional approved-forks fork-skgrepos
                                           approved-hoist-pids
@@ -993,32 +994,6 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
             (message "%s" (skg--readiness-summary-message summary)))))
     (error (skg-log 'error 'save "parsing save response: %S" err)
            (skg-log 'error 'save "sexp string was: %S" sexp-string))))
-
-(defun skg--readiness-summary-message (summary)
-  "The line shown after a save of a buffer of the diff view,
-from SUMMARY, the save response's
-'(readiness-summary (ready N) (changed M) (foreign F) (order-only O)
-\(notEditable K))'."
-  (let* ((count (lambda (key)
-                  (or (cadr (assq key (cdr summary))) 0)))
-         (ready (funcall count 'ready))
-         (changed (funcall count 'changed))
-         (foreign (funcall count 'foreign))
-         (not-editable (funcall count 'notEditable))
-         (complete (= ready changed)))
-    (concat
-     (if complete
-         (format "COMMIT READY. All %d of %d changed files are ready"
-                 ready changed)
-       (format "%d of %d changed files are ready" ready changed))
-     (if (> not-editable 0)
-         (format ", %d changes are not editable in this view; C-c r u integrates them"
-                 not-editable)
-       "")
-     (if (> foreign 0)
-         (format ", %d files changed in foreign skgrepos" foreign)
-       "")
-     (if complete "." ""))))
 
 (defun skg--save-point-position-from-response (response)
   "Extract optional save point position from RESPONSE."

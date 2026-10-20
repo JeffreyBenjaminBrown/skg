@@ -13,8 +13,8 @@
 (require 'skg-buffer)
 (require 'skg-length-prefix)
 (require 'skg-lock-buffers)
+(require 'skg-readiness) ; for skg--readiness-summary-message
 (require 'skg-request-rerender-all-views)
-(require 'skg-request-save) ; for skg--readiness-summary-message
 
 (defun skg-diffView-integrate-unshown-changes ()
   "In a buffer of the diff view, make every changed node that

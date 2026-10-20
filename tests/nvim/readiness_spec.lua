@@ -186,6 +186,24 @@ describe('skg.readiness', function ()
           readiness.toggle_homeSkgrepo_move_commitReady_recursive,
           nil, 'yes'))
   end)
+
+  it('walks exactly the headlines one level below the line', function ()
+    -- Mirrors test-skg-readiness-do-children-visits-exactly-one-level-below-point.
+    local buf = vim.api.nvim_create_buf(true, false)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+      '* (skg (node (id before))) before',
+      '* (skg (node (id parent))) parent',
+      'body of parent',
+      '** (skg (node (id child1))) child1',
+      '*** (skg (node (id grandchild))) grandchild',
+      '** (skg (node (id child2))) child2',
+      '* (skg (node (id after))) after',
+      '** (skg (node (id nephew))) nephew' })
+    vim.api.nvim_set_current_buf(buf)
+    local lines = readiness.child_lines(2)
+    vim.api.nvim_buf_delete(buf, { force = true })
+    assert.are.same({ 4, 6 }, lines)
+  end)
 end)
 
 describe('skg.save readiness summary', function ()

@@ -10,8 +10,8 @@
 local client = require('skg.client')
 local lock = require('skg.lock')
 local payload = require('skg.payload')
+local readiness = require('skg.readiness')
 local rerender = require('skg.rerender')
-local save = require('skg.save')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -40,9 +40,9 @@ function M.handler (response)
   if #errors > 0 then
     vim.notify(table.concat(errors, '; '))
     return end
-  local summary = save.readiness_summary_from_response(response)
+  local summary = readiness.readiness_summary_from_response(response)
   if summary then
-    vim.notify(save.readiness_summary_message(summary)) end
+    vim.notify(readiness.readiness_summary_message(summary)) end
 end
 
 return M

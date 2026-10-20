@@ -15,12 +15,19 @@
 ;;; names no object. A folder drawn because of a change, and a changed
 ;;; node without a '(diff ...)' fact, are aggregates.
 ;;;
+;;; It also formats the readiness summary, which the save, stage-and-
+;;; commit and integrate-unshown-changes show.
+;;;
 ;;; DATA USED/ASSUMED: See docs/api-and-formats.org.
 
 (require 'org)
 (require 'seq)
 (require 'skg-metadata)
-(require 'skg-request-save)
+(require 'skg-modify-graph) ; for skg--immediate-viewchildren
+
+;; The save module shows the readiness summary formatted here, so it
+;; requires this module; the gestures load it only when they save.
+(autoload 'skg-request-save-buffer "skg-request-save" nil t)
 
 (defconst skg--readiness-vognode-kinds '(node deleted unknown historical)
   "The metadata forms that hold a vognode's or phantom's change facts.")
@@ -181,18 +188,14 @@ point, or the child of the node at point that is its home move."
 (defun skg--readiness-do-children (fn)
   "Call FN, with point on each, on the metadata of the headlines one
 level below the headline at point. Returns the non-nil results, in
-buffer order."
-  (let ((level (org-outline-level))
-        (results '()))
-    (outline-next-heading)
-    (while (and (not (eobp)) (> (org-outline-level) level))
-      (let* ((metadata-sexp (skg--metadata-sexp-at-point-or-nil))
-             (result (and metadata-sexp (= (org-outline-level) (1+ level))
-                          (save-excursion (funcall fn metadata-sexp)))))
-        (when result
-          (push result results)))
-      (outline-next-heading))
-    (nreverse results)))
+buffer order. Leaves point on the last of those headlines."
+  (delq nil
+        (mapcar (lambda (position)
+                  (goto-char position)
+                  (let ((metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
+                    (and metadata-sexp
+                         (save-excursion (funcall fn metadata-sexp)))))
+                (skg--immediate-viewchildren))))
 
 (defun skg--readiness-walk-subtree (fn)
   "Call FN, with point on each, on the metadata of the headline at
@@ -320,5 +323,33 @@ that marks (READY non-nil) or unmarks the leaves on OBJECTS."
      (if (eq host metadata-sexp)
          `(skg ,@edits)
        `(skg (,(car host) ,@edits))))))
+
+;;; The readiness summary
+
+(defun skg--readiness-summary-message (summary)
+  "The line shown after a save of a buffer of the diff view,
+from SUMMARY, the save response's
+'(readiness-summary (ready N) (changed M) (foreign F) (order-only O)
+\(notEditable K))'."
+  (let* ((count (lambda (key)
+                  (or (cadr (assq key (cdr summary))) 0)))
+         (ready (funcall count 'ready))
+         (changed (funcall count 'changed))
+         (foreign (funcall count 'foreign))
+         (not-editable (funcall count 'notEditable))
+         (complete (= ready changed)))
+    (concat
+     (if complete
+         (format "COMMIT READY. All %d of %d changed files are ready"
+                 ready changed)
+       (format "%d of %d changed files are ready" ready changed))
+     (if (> not-editable 0)
+         (format ", %d changes are not editable in this view; C-c r u integrates them"
+                 not-editable)
+       "")
+     (if (> foreign 0)
+         (format ", %d files changed in foreign skgrepos" foreign)
+       "")
+     (if complete "." ""))))
 
 (provide 'skg-readiness)

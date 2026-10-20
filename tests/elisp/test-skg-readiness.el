@@ -6,6 +6,7 @@
 (require 'ert)
 (require 'org)
 (require 'skg-readiness)
+(require 'skg-request-save) ; for skg-handle-save-sexp
 
 (defun test-skg-readiness--run (lines line-number command
                                        &optional prefix object answer)
@@ -175,6 +176,30 @@ without a title ends in a space, as 'skg-format-headline' writes it."
                      "** (skg (homeSkgrepoMove (old x) (new b)) (ready) (unreadyRequest)) "
                      "** (skg (node (id c) (repo b) writeProtected)) c"
                      "*** (skg (homeSkgrepoMove (old x) (new b)) (ready) (unreadyRequest)) ")))))
+
+(ert-deftest test-skg-readiness-do-children-visits-exactly-one-level-below-point ()
+  "The children of the headline at point, not its grandchildren, its
+siblings, or a child without metadata."
+  (with-temp-buffer
+    (org-mode)
+    (insert "* (skg (node (id before))) before\n"
+            "* (skg (node (id parent))) parent\n"
+            "body of parent\n"
+            "** (skg (node (id child1))) child1\n"
+            "*** (skg (node (id grandchild))) grandchild\n"
+            "** no metadata\n"
+            "** (skg (node (id child2))) child2\n"
+            "* (skg (node (id after))) after\n"
+            "** (skg (node (id nephew))) nephew\n")
+    (goto-char (point-min))
+    (forward-line 1)
+    (let ((visited nil))
+      (should (equal (skg--readiness-do-children
+                      (lambda (metadata-sexp)
+                        (push (skg--node-id metadata-sexp) visited)
+                        (skg--node-id metadata-sexp)))
+                     '("child1" "child2")))
+      (should (equal (nreverse visited) '("child1" "child2"))))))
 
 (ert-deftest test-skg-readiness-summary-is-shown-after-a-save ()
   (let ((shown '()))
