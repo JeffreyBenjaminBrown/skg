@@ -8,6 +8,7 @@
 //! The readiness of an aggregate (a set of leaves, a file, the whole
 //! changeset) is derived here from a 'ReadinessStore'.
 
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   RelationRole, RelationshipKey};
 use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner, Presence};
@@ -142,12 +143,22 @@ pub struct ChangeLeaves {
 }
 
 impl ChangeLeaves {
+  /// Only the nodes that differ between the two graphs, and those
+  /// that record a member the two graphs resolve differently, are
+  /// compared ('recorders_of_reresolved_members'): no other node can
+  /// record a change.
   pub fn from_graph_straddle (
     straddle : &GraphStraddle,
   ) -> ChangeLeaves {
+    let differing : BTreeSet<ID> =
+      nodes_differing_between_the_two_graphs (straddle);
+    let compared : BTreeSet<ID> =
+      differing . iter () . cloned ()
+      . chain ( recorders_of_reresolved_members (straddle, &differing) )
+      . collect ();
     let mut leaves_by_recorder : BTreeMap<ID, Vec<ChangeLeaf>> =
       BTreeMap::new ();
-    for pid in & straddle . changed_pids () . out_changed {
+    for pid in &compared {
       let leaves : Vec<ChangeLeaf> = leaves_recorded_by (straddle, pid);
       if ! leaves . is_empty () {
         leaves_by_recorder . insert (pid . clone (), leaves); }}
@@ -159,12 +170,10 @@ impl ChangeLeaves {
           ( leaf . key . clone (), (recorder . clone (), position) )) )
       . collect ();
     let order_only_pids : BTreeSet<ID> =
-      straddle . after . nodes . iter ()
-      . filter ( |(pid, after)|
-        ! leaves_by_recorder . contains_key (*pid)
-        && straddle . before . nodes . get (*pid)
-             . is_some_and ( |before| before != *after ))
-      . map ( |(pid, _)| pid . clone () )
+      differing . into_iter ()
+      . filter ( |pid|
+        ! leaves_by_recorder . contains_key (pid)
+        && straddle . node_presence (pid) == Some (Presence::Both) )
       . collect ();
     let order_only_files : BTreeSet<ChangedFile> =
       order_only_pids . iter ()
@@ -292,6 +301,60 @@ impl ReadinessSummary {
   ) -> bool {
     self . ready_files == self . changed_files }
 }
+
+/// The nodes of either graph that the other lacks or holds unequal.
+fn nodes_differing_between_the_two_graphs (
+  straddle : &GraphStraddle,
+) -> BTreeSet<ID> {
+  let in_before : Vec<&ID> = // unequal or only before
+    straddle . before . nodes . iter ()
+    . filter ( |(pid, before)|
+      straddle . after . nodes . get (*pid) != Some (*before) )
+    . map ( |(pid, _)| pid )
+    . collect ();
+  let only_after : Vec<&ID> =
+    straddle . after . nodes . keys ()
+    . filter ( |pid| ! straddle . before . nodes . contains_key (*pid) )
+    . collect ();
+  in_before . into_iter () . chain (only_after) . cloned () . collect () }
+
+/// The nodes that list a member whose ID the two graphs resolve to
+/// different pids. After a nodeMerge since HEAD, a container of the
+/// acquiree that still lists the acquiree's ID is equal in both graphs,
+/// but the after-graph resolves that ID to the acquirer, so the
+/// container records a changed relationship. An ID resolves
+/// differently only when it is an extra ID of some node in one graph
+/// and not of the same node in the other, so such IDs are found among
+/// the extra-ID differences of the nodes in 'differing' (those that
+/// differ between the graphs), and their recorders through each
+/// graph's recorderward relmaps.
+fn recorders_of_reresolved_members (
+  straddle  : &GraphStraddle,
+  differing : &BTreeSet<ID>,
+) -> BTreeSet<ID> {
+  let extra_ids_in = |graph : &InRustGraph, pid : &ID| -> BTreeSet<ID> {
+    graph . get (pid)
+      . map ( |node| node . extra_ids . iter () . cloned () . collect () )
+      . unwrap_or_default () };
+  let member_key_in = |graph : &InRustGraph, skgid : &ID| -> ID {
+    graph . relationship_member_key (skgid) . into_id () };
+  let reresolved : BTreeSet<ID> =
+    differing . iter ()
+    . flat_map ( |pid|
+      extra_ids_in (&straddle . before, pid)
+      . symmetric_difference ( &extra_ids_in (&straddle . after, pid) )
+      . cloned () . collect::<Vec<ID>> () )
+    . filter ( |skgid| member_key_in (&straddle . before, skgid)
+                       != member_key_in (&straddle . after, skgid) )
+    . collect ();
+  let mut recorders : BTreeSet<ID> = BTreeSet::new ();
+  for skgid in &reresolved {
+    for graph in [ &straddle . before, &straddle . after ] {
+      let member : ID = member_key_in (graph, skgid);
+      for role in ROLES_OF_LISTED_MEMBERS {
+        recorders . extend (
+          graph . inbound_pids_for_relation (&member, role . relation) ); }} }
+  recorders }
 
 /// The leaves recorded by 'pid': its existence when it is new or
 /// deleted, else its changed aspects; then the relationships it

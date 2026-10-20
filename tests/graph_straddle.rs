@@ -215,3 +215,20 @@ fn a_rebuild_drops_the_straddle_and_the_next_reads_foreign_files_afresh (
   assert_eq! ( rebuilt . changed_pids () . all (), ids (&[]),
                "a foreign file edited before the rebuild is in neither half" );
   Ok (( )) }
+
+#[test]
+fn a_nodeMerge_since_head_puts_the_acquirers_container_in_c () {
+  // a acquired b since HEAD. P, untouched on disk, still lists b,
+  // which the after-graph resolves to a: P is equal in both graphs
+  // and still records a changed relationship.
+  let (_f, straddle) : (Fixture, GraphStraddle) =
+    one_skgrepo_straddle ("nodeMerge_container");
+  assert_eq! ( straddle . before . get (&id ("P")),
+               straddle . after  . get (&id ("P")) );
+  assert_eq! (
+    straddle . partners (&id ("P"), CONTENT),
+    vec! [ partner ("a", Presence::OnlyAfter,  None, Some ("main")),
+           partner ("b", Presence::OnlyBefore, Some ("main"), None) ] );
+  assert_eq! ( straddle . change_leaves () . leaves_under (&id ("P")) . len (), 2 );
+  assert_eq! ( straddle . changed_pids () . out_changed, ids (&["P", "a", "b"]) );
+  assert_eq! ( straddle . changed_pids () . in_changed,  ids (&["a", "b"]) ); }
