@@ -17,7 +17,7 @@
 //! recorder's text), so they cannot be stranded.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
+use crate::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::from_text::supplement_from_disk::hide_skgrepo;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName};
@@ -33,15 +33,6 @@ const RELATIONS_WITH_RELREPOS : [NodeRelation; 4] = [
   NodeRelation::SubscribesTo,
   NodeRelation::HidesFromSubs,
   NodeRelation::Overrides, ];
-
-/// One relationship: 'recorder' lists 'member' (a primary ID, or the
-/// stored ID when it resolves to no node) under 'relation'.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct RelationshipKey {
-  pub relation : NodeRelation,
-  pub recorder : ID,
-  pub member   : ID,
-}
 
 /// See the module comment.
 #[derive(Clone, Debug, Eq, PartialEq)]

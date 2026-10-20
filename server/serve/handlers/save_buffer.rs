@@ -1,12 +1,12 @@
 use crate::change_leaves::BufferReadinessSummary;
 use crate::dbs::in_rust_graph::{
   in_rust_graph_coherent_with_nodeInstructions_in, new_handle };
-use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
+use crate::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::from_text
   ::buffer_to_validated_saveplan_with_fork_skgrepos_in_graph;
 use crate::from_text::strandeds::{
-  RelationshipKey, StrandedsReview, StrandedRelationship,
+  StrandedsReview, StrandedRelationship,
   raised_relationship_warning, reset_to_default_relationships,
   stranded_relationships};
 use crate::git_ops::diff::compute_diff_for_skgrepo;

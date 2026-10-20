@@ -23,6 +23,17 @@ pub enum NodeRelation {
   Overrides,
 }
 
+/// One relationship: 'recorder' lists 'member' (a primary ID, or the
+/// stored ID when it resolves to no node) under 'relation'. The save's
+/// strand analysis and the change leaves both name relationships so.
+/// Serialized in readiness marks files.
+#[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct RelationshipKey {
+  pub relation : NodeRelation,
+  pub recorder : ID,
+  pub member   : ID,
+}
+
 impl NodeRelation {
   pub const ALL : [NodeRelation; 5] = [
     NodeRelation::Contains, NodeRelation::LinksTo,

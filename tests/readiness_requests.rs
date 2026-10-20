@@ -13,7 +13,7 @@ use git_fixture_helpers::{mk_test_tcp_stream_pair, setup_gitrepo_with_fixtures};
 
 use skg::change_leaves::{LeafKey, NodeAspect, RelationshipAspect};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::dbs::in_rust_graph::relation_accessors::NodeRelation;
+use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
 use skg::readiness_store::ReadinessStore;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -84,10 +84,11 @@ fn r_text () -> LeafKey {
 
 fn r_contains_a () -> LeafKey {
   LeafKey::Relationship {
-    relation : NodeRelation::Contains,
-    recorder : ID::from ("r"),
-    member   : ID::from ("a"),
-    aspect   : RelationshipAspect::Existence } }
+    relationship : RelationshipKey {
+      relation : NodeRelation::Contains,
+      recorder : ID::from ("r"),
+      member   : ID::from ("a") },
+    aspect       : RelationshipAspect::Existence } }
 
 fn a_alias () -> LeafKey {
   LeafKey::Node { pid : ID::from ("a"),

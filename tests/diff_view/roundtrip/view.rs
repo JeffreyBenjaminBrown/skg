@@ -20,7 +20,7 @@ use git_fixture_helpers::{mk_test_tcp_stream_pair, setup_gitrepo_with_fixtures};
 
 use skg::change_leaves::{LeafKey, NodeAspect, RelationshipAspect};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::dbs::in_rust_graph::relation_accessors::NodeRelation;
+use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
 use skg::graph_straddle::types::{GraphStraddle, Partner, Presence};
 use skg::org_to_text::viewforest_tree_to_string;
 use skg::readiness_store::ReadinessStore;
@@ -246,9 +246,10 @@ fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     assert! ( response . warnings . is_empty (), "{:?}", response . warnings );
     let p_contains_gone : LeafKey = LeafKey::Relationship {
-      relation : NodeRelation::Contains,
-      recorder : ID::from ("p"), member : ID::from ("gone"),
-      aspect   : RelationshipAspect::Existence };
+      relationship : RelationshipKey {
+        relation : NodeRelation::Contains,
+        recorder : ID::from ("p"), member : ID::from ("gone") },
+      aspect       : RelationshipAspect::Existence };
     assert_eq! (
       ReadinessStore::load (&f . config . data_root) . marks
         . into_keys () . collect::<HashSet<LeafKey>> (),

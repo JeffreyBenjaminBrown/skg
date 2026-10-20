@@ -9,7 +9,7 @@
 //! changeset) is derived here from a 'ReadinessStore'.
 
 use crate::dbs::in_rust_graph::relation_accessors::{
-  NodeRelation, RelationRole};
+  RelationRole, RelationshipKey};
 use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner, Presence};
 use crate::graph_straddle::union_walk::ROLES_OF_LISTED_MEMBERS;
 use crate::readiness_store::ReadinessStore;
@@ -30,13 +30,13 @@ pub enum LeafKey {
   Node {
     pid    : ID,
     aspect : NodeAspect, },
-  /// The relationship by which 'recorder' lists 'member' under
-  /// 'relation'. Seen from either end, it is the same leaf.
+  /// A relationship. Seen from either end, it is the same leaf.
+  /// Flattened, so that a marks file spells it as one object of
+  /// 'relation', 'recorder', 'member' and 'aspect'.
   Relationship {
-    relation : NodeRelation,
-    recorder : ID,
-    member   : ID,
-    aspect   : RelationshipAspect, },
+    #[serde(flatten)]
+    relationship : RelationshipKey,
+    aspect       : RelationshipAspect, },
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
@@ -371,9 +371,10 @@ fn relationship_leaves (
 ) -> Vec<ChangeLeaf> {
   let key = |aspect : RelationshipAspect| -> LeafKey {
     LeafKey::Relationship {
-      relation : role . relation,
-      recorder : recorder . clone (),
-      member   : partner . id . clone (),
+      relationship : RelationshipKey {
+        relation : role . relation,
+        recorder : recorder . clone (),
+        member   : partner . id . clone () },
       aspect } };
   let file_in = |skgrepo : &SkgrepoName| -> ChangedFile {
     ChangedFile { skgrepo : skgrepo . clone (), pid : recorder . clone () } };

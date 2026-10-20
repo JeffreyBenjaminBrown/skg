@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::types::misc::{MSV, RelPartner};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 
@@ -43,9 +44,10 @@ fn contains_key (
   aspect   : RelationshipAspect,
 ) -> LeafKey {
   LeafKey::Relationship {
-    relation : NodeRelation::Contains,
-    recorder : ID::from (recorder),
-    member   : ID::from (member),
+    relationship : RelationshipKey {
+      relation : NodeRelation::Contains,
+      recorder : ID::from (recorder),
+      member   : ID::from (member) },
     aspect } }
 
 fn keys_under (

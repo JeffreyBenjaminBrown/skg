@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::change_leaves::{NodeAspect, RelationshipAspect};
-use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
+use crate::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
 use crate::types::misc::ID;
 use crate::types::nodes::complete::Flag;
 
@@ -17,10 +17,11 @@ fn some_keys () -> Vec<LeafKey> {
     LeafKey::Node { pid : ID::from ("b"),
                     aspect : NodeAspect::Flag (Flag::NoSearchMatching) },
     LeafKey::Relationship {
-      relation : NodeRelation::Contains,
-      recorder : ID::from ("a"),
-      member   : ID::from ("b"),
-      aspect   : RelationshipAspect::RelRepo }, ] }
+      relationship : RelationshipKey {
+        relation : NodeRelation::Contains,
+        recorder : ID::from ("a"),
+        member   : ID::from ("b") },
+      aspect       : RelationshipAspect::RelRepo }, ] }
 
 #[test]
 fn a_mark_is_ready_only_with_its_fingerprint () {
@@ -69,3 +70,20 @@ fn a_marks_file_spelling_the_aspect_Home_still_loads () {
   let saved : String =
     fs::read_to_string ( readiness_marks_path (dir . path ()) ) . unwrap ();
   assert! ( saved . contains ("\"aspect\": \"Home\""), "{}", saved ); }
+
+/// A relationship leaf is one flat object of 'relation', 'recorder',
+/// 'member' and 'aspect' in a marks file ('LeafKey' flattens its
+/// 'RelationshipKey'); it loads, and saving writes that form back.
+#[test]
+fn a_relationship_mark_is_one_flat_object_in_the_file () {
+  let dir : TempDir = TempDir::new () . unwrap ();
+  let fixture : &str =
+    include_str! ("readiness_store/marks_with_a_relationship.json");
+  fs::write ( readiness_marks_path (dir . path ()), fixture ) . unwrap ();
+  let store : ReadinessStore = ReadinessStore::load (dir . path ());
+  let key : LeafKey = some_keys () . remove (3);
+  assert! ( store . is_ready (&key, 42) );
+  store . save (dir . path ()) . unwrap ();
+  let saved : String =
+    fs::read_to_string ( readiness_marks_path (dir . path ()) ) . unwrap ();
+  assert_eq! ( saved . trim_end (), fixture . trim_end () ); }

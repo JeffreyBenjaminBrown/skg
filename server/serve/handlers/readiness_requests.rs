@@ -19,7 +19,7 @@ use crate::change_leaves::{
   ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
-  NodeRelation, RelationRole};
+  NodeRelation, RelationRole, RelationshipKey};
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::readiness_store::ReadinessStore;
@@ -67,13 +67,7 @@ pub fn consume_readiness_requests (
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RequestedReadiness {
   pub ready    : bool,
-  /// The leaves named outright.
-  pub leaves   : Vec<LeafKey>,
-  /// The nodes whose leaves an 'all' request names.
-  pub all_of   : Vec<ID>,
-  /// The recorders whose content relationships' leaves of an aspect
-  /// a changeset marker's request names.
-  pub content_relationships_of : Vec<(ID, RelationshipAspect)>,
+  pub named    : NamedLeaves,
   /// The headline, for warnings.
   pub headline : String,
 }
@@ -94,17 +88,20 @@ pub fn readiness_requests_in_viewforest (
       let named : NamedLeaves = leaves_named_at (node, &request . objects, &pid_of) ?;
       Some ( RequestedReadiness {
         ready    : request . ready,
-        leaves   : named . leaves,
-        all_of   : named . all_of,
-        content_relationships_of : named . content_relationships_of,
+        named,
         headline : node . value () . title () . to_string (), } ) } )
     . collect () }
 
-/// What a request on a viewnode names (see 'RequestedReadiness').
-struct NamedLeaves {
-  leaves                   : Vec<LeafKey>,
-  all_of                   : Vec<ID>,
-  content_relationships_of : Vec<(ID, RelationshipAspect)>,
+/// What a request on a viewnode names.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NamedLeaves {
+  /// The leaves named outright.
+  pub leaves                   : Vec<LeafKey>,
+  /// The nodes whose leaves an 'all' request names.
+  pub all_of                   : Vec<ID>,
+  /// The recorders whose content relationships' leaves of an aspect
+  /// a changeset marker's request names.
+  pub content_relationships_of : Vec<(ID, RelationshipAspect)>,
 }
 
 /// The leaves that a request naming the diff objects 'objects' at
@@ -201,8 +198,9 @@ fn keys_in_forest (
           . map ( |leaf| leaf . key . clone () )
           . filter ( move |key| matches! ( key,
             LeafKey::Relationship {
-              relation : NodeRelation::Contains, recorder,
-              aspect : leaf_aspect, .. }
+              relationship : RelationshipKey {
+                relation : NodeRelation::Contains, recorder, .. },
+              aspect : leaf_aspect }
             if recorder == pid && leaf_aspect == aspect )) ))
     . filter ( |key| forest . leaf (key) . is_some () )
     . collect () }
@@ -279,12 +277,7 @@ pub fn apply_readiness_requests (
 ) -> Vec<String> {
   let mut warnings : Vec<String> = Vec::new ();
   for request in requests {
-    let keys : Vec<LeafKey> = keys_in_forest (
-      &NamedLeaves {
-        leaves                   : request . leaves . clone (),
-        all_of                   : request . all_of . clone (),
-        content_relationships_of : request . content_relationships_of . clone (), },
-      forest );
+    let keys : Vec<LeafKey> = keys_in_forest (&request . named, forest);
     if keys . is_empty () {
       warnings . push ( format! (
         "The readiness request on \"{}\" names no current change; it was dropped.",
@@ -310,7 +303,9 @@ fn relationship_to_viewparent (
 ) -> Option<LeafKey> {
   let parent : NodeRef<Viewnode> = node . parent () ?;
   let key = |relation : NodeRelation, recorder : ID, member : ID| -> LeafKey {
-    LeafKey::Relationship { relation, recorder, member, aspect } };
+    LeafKey::Relationship {
+      relationship : RelationshipKey { relation, recorder, member },
+      aspect } };
   match &parent . value () . kind {
     ViewnodeKind::Vognode (_) =>
       Some ( key ( NodeRelation::Contains,
