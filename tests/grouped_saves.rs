@@ -35,5 +35,5 @@ mod save_request_envelope;
 #[path = "save_dirty_conflicts.rs"]
 mod save_dirty_conflicts;
 
-#[path = "strands.rs"]
-mod strands;
+#[path = "strandeds.rs"]
+mod strandeds;

@@ -1,7 +1,7 @@
-// cargo nextest run --test grouped_saves -E 'test(strands::)'
+// cargo nextest run --test grouped_saves -E 'test(strandeds::)'
 //
 // What a home move strands, decided by the save
-// (server/from_text/strands.rs). In the fixture, the public node p
+// (server/from_text/strandeds.rs). In the fixture, the public node p
 // contains the public node m, and the public node q contains the
 // private node n, recorded at private (q's private section). Each
 // test views only the moved node, so the recorder is outside the view.
@@ -11,7 +11,7 @@ use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 use skg::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use skg::dbs::init::create_empty_tantivy_index;
-use skg::from_text::strands::{RelationshipKey, StrandReview};
+use skg::from_text::strandeds::{RelationshipKey, StrandedsReview};
 use skg::readiness_store::readiness_marks_path;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::{
@@ -48,7 +48,7 @@ fn fixture (
   test_name : &str,
 ) -> Result<Fixture, Box<dyn Error>> {
   let dir : TempDir = TempDir::new () ?;
-  copy_dir_all ( Path::new ("tests/strands/fixtures"), dir . path () ) ?;
+  copy_dir_all ( Path::new ("tests/strandeds/fixtures"), dir . path () ) ?;
   let root : &Path = dir . path ();
   let config : SkgConfig = load_config_with_overrides (
     root . join ("skgconfig.toml") . to_str () . unwrap (),
@@ -89,7 +89,7 @@ fn save (
   f       : &mut Fixture,
   buffer  : &str,
   view_id : &ViewId,
-  review  : &StrandReview,
+  review  : &StrandedsReview,
 ) -> Result<(SaveResponse, HashMap<String, String>), Box<dyn Error>> {
   let listener : TcpListener = TcpListener::bind ("127.0.0.1:0") ?;
   let mut stream : TcpStream = TcpStream::connect (listener . local_addr () ?) ?;
@@ -136,7 +136,7 @@ fn q_contains_n () -> RelationshipKey {
 #[test]
 fn a_privatizing_move_raises_an_inbound_relationship (
 ) -> Result<(), Box<dyn Error>> {
-  let mut f : Fixture = fixture ("skg-test-strands-privatizing") ?;
+  let mut f : Fixture = fixture ("skg-test-strandeds-privatizing") ?;
   let result : Result<(), Box<dyn Error>> = (|| {
     let view_m : ViewId = ViewId::ContentView ("m" . to_string ());
     let view_p : ViewId = ViewId::ContentView ("p" . to_string ());
@@ -145,8 +145,8 @@ fn a_privatizing_move_raises_an_inbound_relationship (
     let (response, collateral) : (SaveResponse, HashMap<String, String>) =
       save ( &mut f,
              &buffer . replace ("(id m) (repo public)", "(id m) (repo private)"),
-             &view_m, &StrandReview::NotReviewed ) ?;
-    assert_eq! ( response . strand_confirmation, None,
+             &view_m, &StrandedsReview::NotReviewed ) ?;
+    assert_eq! ( response . strandeds_confirmation, None,
                  "a raise asks nothing" );
     assert_eq! ( home_of (&f, "m"), Some (SkgrepoName::from ("private")) );
     assert_eq! ( relRepo_of (&f, "p", "m"), Some (SkgrepoName::from ("private")),
@@ -164,7 +164,7 @@ fn a_privatizing_move_raises_an_inbound_relationship (
 #[test]
 fn a_publicizing_move_asks_about_a_relationship_recorded_outside_the_view (
 ) -> Result<(), Box<dyn Error>> {
-  let mut f : Fixture = fixture ("skg-test-strands-publicizing") ?;
+  let mut f : Fixture = fixture ("skg-test-strandeds-publicizing") ?;
   let result : Result<(), Box<dyn Error>> = (|| {
     let view_n : ViewId = ViewId::ContentView ("n" . to_string ());
     let buffer : String = open_view (&mut f, &["n"], &view_n) ?;
@@ -174,8 +174,8 @@ fn a_publicizing_move_asks_about_a_relationship_recorded_outside_the_view (
       let (response, _) : (SaveResponse, HashMap<String, String>) =
         save ( &mut f,
                &moved . replace ("(repo public)", "(repo public) (readyRequest all)"),
-               &view_n, &StrandReview::NotReviewed ) ?;
-      let stranded = response . strand_confirmation
+               &view_n, &StrandedsReview::NotReviewed ) ?;
+      let stranded = response . strandeds_confirmation
         . expect ("the move strands q's relationship to n");
       assert_eq! ( stranded . len (), 1 );
       assert_eq! ( stranded [0] . relationship, q_contains_n () );
@@ -187,8 +187,8 @@ fn a_publicizing_move_asks_about_a_relationship_recorded_outside_the_view (
     { // The approving re-save re-levels the chosen relationship.
       let (response, _) : (SaveResponse, HashMap<String, String>) =
         save ( &mut f, &moved, &view_n,
-               &StrandReview::Reviewed ( [q_contains_n ()] . into () )) ?;
-      assert_eq! ( response . strand_confirmation, None );
+               &StrandedsReview::Reviewed ( [q_contains_n ()] . into () )) ?;
+      assert_eq! ( response . strandeds_confirmation, None );
       assert! ( response . errors . is_empty (), "{:?}", response . errors );
       assert_eq! ( home_of (&f, "n"), Some (SkgrepoName::from ("public")) );
       assert_eq! ( relRepo_of (&f, "q", "n"), Some (SkgrepoName::from ("public")) );
@@ -202,15 +202,15 @@ fn a_publicizing_move_asks_about_a_relationship_recorded_outside_the_view (
 #[test]
 fn a_reviewed_save_that_chooses_nothing_leaves_the_relationship_where_it_was (
 ) -> Result<(), Box<dyn Error>> {
-  let mut f : Fixture = fixture ("skg-test-strands-declined") ?;
+  let mut f : Fixture = fixture ("skg-test-strandeds-declined") ?;
   let result : Result<(), Box<dyn Error>> = (|| {
     let view_n : ViewId = ViewId::ContentView ("n" . to_string ());
     let buffer : String = open_view (&mut f, &["n"], &view_n) ?;
     let (response, _) : (SaveResponse, HashMap<String, String>) =
       save ( &mut f,
              &buffer . replace ("(id n) (repo private)", "(id n) (repo public)"),
-             &view_n, &StrandReview::Reviewed (HashSet::new ()) ) ?;
-    assert_eq! ( response . strand_confirmation, None );
+             &view_n, &StrandedsReview::Reviewed (HashSet::new ()) ) ?;
+    assert_eq! ( response . strandeds_confirmation, None );
     assert_eq! ( home_of (&f, "n"), Some (SkgrepoName::from ("public")) );
     assert_eq! ( relRepo_of (&f, "q", "n"), Some (SkgrepoName::from ("private")) );
     Ok (( )) }) ();

@@ -1,4 +1,4 @@
-tantivy_folder = "/tmp/tantivy-test-strands"
+tantivy_folder = "/tmp/tantivy-test-strandeds"
 port = 1730
 beep_when_server_becomes_available = false
 

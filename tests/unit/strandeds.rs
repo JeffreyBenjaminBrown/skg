@@ -1,4 +1,4 @@
-// Unit tests for the strand analysis, over in-memory graphs. They port
+// Unit tests for the analysis of strandeds, over in-memory graphs. They port
 // the scenarios of the client-side analysis this replaced. The privacy
 // order is public, private, trusted.
 
@@ -51,7 +51,7 @@ fn moved (
 
 /// (recorder, member, raised automatically) of each stranded
 /// containment.
-fn strands_of (
+fn strandeds_of (
   graph        : Vec<Graphnode>,
   instructions : Vec<NodeInstruction>,
   moves        : Vec<SkgrepoMove>,
@@ -59,13 +59,13 @@ fn strands_of (
   stranded_relationships (
     &moves, &instructions, &InRustGraph::from_graphnodes (&graph), &config () )
     . into_iter ()
-    . map ( |strand| (
-      strand . relationship . recorder . 0,
-      strand . relationship . member . 0,
-      strand . raised_automatically ))
+    . map ( |stranded| (
+      stranded . relationship . recorder . 0,
+      stranded . relationship . member . 0,
+      stranded . raised_automatically ))
     . collect () }
 
-fn strand (
+fn stranded (
   recorder : &str,
   member   : &str,
   raised   : bool,
@@ -75,7 +75,7 @@ fn strand (
 #[test]
 fn a_recursive_publicizing_move_strands_every_moved_containment () {
   assert_eq! (
-    strands_of (
+    strandeds_of (
       vec! [ node ("r", "private", &[("a", "private")]),
              node ("a", "private", &[("b", "private")]),
              node ("b", "private", &[]) ],
@@ -85,13 +85,13 @@ fn a_recursive_publicizing_move_strands_every_moved_containment () {
       vec! [ moved ("r", "private", "public"),
              moved ("a", "private", "public"),
              moved ("b", "private", "public") ] ),
-    vec! [ strand ("a", "b", false), strand ("r", "a", false) ] ); }
+    vec! [ stranded ("a", "b", false), stranded ("r", "a", false) ] ); }
 
 #[test]
 fn a_privatizing_move_strands_no_outbound_relationship () {
   // The sticky rule already raised r's relationship to its new home.
   assert_eq! (
-    strands_of (
+    strandeds_of (
       vec! [ node ("r", "public", &[("a", "public")]),
              node ("a", "public", &[]) ],
       vec! [ save ( node ("r", "trusted", &[("a", "trusted")]) ),
@@ -105,41 +105,41 @@ fn a_single_publicizing_move_strands_only_the_defaults_that_rise () {
   // r's relationship to the public a was private, and now defaults to
   // public; to the trusted c it stays trusted.
   assert_eq! (
-    strands_of (
+    strandeds_of (
       vec! [ node ("r", "private", &[("a", "private"), ("c", "trusted")]),
              node ("a", "public", &[]),
              node ("c", "trusted", &[]) ],
       vec! [ save ( node ("r", "public",
                           &[("a", "private"), ("c", "trusted")]) ) ],
       vec! [ moved ("r", "private", "public") ] ),
-    vec! [ strand ("r", "a", false) ] ); }
+    vec! [ stranded ("r", "a", false) ] ); }
 
 #[test]
 fn publicizing_a_child_strands_its_parents_relationship () {
   assert_eq! (
-    strands_of (
+    strandeds_of (
       vec! [ node ("parent", "public", &[("child", "private")]),
              node ("child", "private", &[]) ],
       vec! [ save ( node ("child", "public", &[]) ) ],
       vec! [ moved ("child", "private", "public") ] ),
-    vec! [ strand ("parent", "child", false) ] ); }
+    vec! [ stranded ("parent", "child", false) ] ); }
 
 #[test]
 fn privatizing_a_child_raises_its_parents_relationship () {
   assert_eq! (
-    strands_of (
+    strandeds_of (
       vec! [ node ("parent", "public", &[("child", "public")]),
              node ("child", "public", &[]) ],
       vec! [ save ( node ("child", "private", &[]) ) ],
       vec! [ moved ("child", "public", "private") ] ),
-    vec! [ strand ("parent", "child", true) ] ); }
+    vec! [ stranded ("parent", "child", true) ] ); }
 
 #[test]
 fn a_deliberately_private_relationship_is_not_stranded () {
   // r's relationship to a sat at trusted, more private than its
   // default: a choice the move leaves alone.
   assert_eq! (
-    strands_of (
+    strandeds_of (
       vec! [ node ("r", "private", &[("a", "trusted")]),
              node ("a", "public", &[]) ],
       vec! [ save ( node ("r", "public", &[("a", "trusted")]) ) ],
@@ -147,16 +147,16 @@ fn a_deliberately_private_relationship_is_not_stranded () {
     vec! [] ); }
 
 #[test]
-fn releveling_rewrites_a_recorder_outside_the_save () {
+fn resetting_to_default_rewrites_a_recorder_outside_the_save () {
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
     node ("parent", "public", &[("child", "private")]),
     node ("child", "private", &[]) ]);
   let mut instructions : Vec<NodeInstruction> =
     vec! [ save ( node ("child", "public", &[]) ) ];
-  let stranded : Vec<StrandedRelationship> = stranded_relationships (
+  let strandeds : Vec<StrandedRelationship> = stranded_relationships (
     &[ moved ("child", "private", "public") ], &instructions, &graph, &config () );
-  relevel_relationships (
-    &mut instructions, &stranded . iter () . collect::<Vec<_>> (), &graph );
+  reset_to_default_relationships (
+    &mut instructions, &strandeds . iter () . collect::<Vec<_>> (), &graph );
   let NodeInstruction::Save (SaveNode (parent)) = &instructions [1]
     else { panic! ("expected a save of parent"); };
   assert_eq! ( parent . pid, ID::from ("parent") );

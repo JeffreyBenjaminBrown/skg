@@ -203,7 +203,7 @@ pub fn update_views_after_save (
         save_point_position : None,
         fork_confirmation   : None,
         hoist_confirmation  : None,
-        strand_confirmation : None,
+        strandeds_confirmation : None,
         text_release_confirmation : challenge_response (&release),
         readiness_summary   : None,
       } ); }}
@@ -257,7 +257,7 @@ pub fn update_views_after_save (
           save_point_position : None,
           fork_confirmation   : None,
           hoist_confirmation  : None,
-          strand_confirmation : None,
+          strandeds_confirmation : None,
           text_release_confirmation : challenge_response (&decision),
           readiness_summary   : None,
         } ); }
@@ -286,7 +286,7 @@ pub fn update_views_after_save (
     save_point_position : None,
     fork_confirmation   : None,
     hoist_confirmation  : None,
-    strand_confirmation : None,
+    strandeds_confirmation : None,
     text_release_confirmation : None,
     readiness_summary, } ) }
 

@@ -12,7 +12,7 @@
 //! the save raises it to the new default (the new home) automatically.
 //! The others -- those of a publicizing move, left more private than
 //! they need be -- are listed for the user, who chooses which to
-//! re-level.
+//! reset to their new defaults.
 //!
 //! Mentions are not relationships with a relRepo (links live in their
 //! recorder's text), so they cannot be stranded.
@@ -50,16 +50,16 @@ pub struct StrandedRelationship {
   pub relationship : RelationshipKey,
   /// Where the save would leave it.
   pub relRepo      : SkgrepoName,
-  /// Where re-leveling puts it.
+  /// Where resetting it to its default puts it.
   pub new_default  : SkgrepoName,
   /// It would leak its member's ID, so the save raises it without asking.
   pub raised_automatically : bool,
 }
 
-/// Whether the user has reviewed this save's stranded relationships,
-/// and if so, which ones they chose to re-level.
+/// Whether the user has reviewed this save's strandeds, and if so,
+/// which ones they chose to reset to their defaults.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub enum StrandReview {
+pub enum StrandedsReview {
   #[default]
   NotReviewed,
   Reviewed (HashSet<RelationshipKey>),
@@ -105,7 +105,7 @@ pub fn stranded_relationships (
     saves . get (pid) . map ( |node| (*node) . clone () )
       . or_else ( || graphnode_from_graph (graph, pid) ) };
   let mut seen : HashSet<RelationshipKey> = HashSet::new ();
-  let mut stranded : Vec<StrandedRelationship> = Vec::new ();
+  let mut strandeds : Vec<StrandedRelationship> = Vec::new ();
   for skgrepo_move in skgrepo_moves {
     let moved : &ID = &skgrepo_move . pid;
     let mut recorders : Vec<(ID, NodeRelation)> =
@@ -140,29 +140,29 @@ pub fn stranded_relationships (
           &subscribes_after, &resolve, &home_after );
         if partner . relRepo != default_before
           || partner . relRepo == default_after { continue; }
-        stranded . push ( StrandedRelationship {
+        strandeds . push ( StrandedRelationship {
           raised_automatically :
             home_after (&member) . is_some_and ( |member_home|
               config . is_strictly_more_public (&partner . relRepo, &member_home) ),
           relationship,
           relRepo     : partner . relRepo . clone (),
           new_default : default_after, } ); }} }
-  stranded . sort_by ( |a, b| key_order (&a . relationship)
-                       . cmp ( &key_order (&b . relationship) ));
-  stranded }
+  strandeds . sort_by ( |a, b| key_order (&a . relationship)
+                        . cmp ( &key_order (&b . relationship) ));
+  strandeds }
 
-/// Re-level each of 'stranded' to its new default, in its recorder's
+/// Reset each of 'strandeds' to its new default, in its recorder's
 /// saved form, adding a save of the recorder when the save did not
 /// already write it.
-pub fn relevel_relationships (
+pub fn reset_to_default_relationships (
   instructions : &mut Vec<NodeInstruction>,
-  stranded     : &[&StrandedRelationship],
+  strandeds    : &[&StrandedRelationship],
   graph        : &InRustGraph,
 ) {
   let resolve = |skgid : &ID| -> ID {
     graph . pid_of (skgid) . unwrap_or_else ( || skgid . clone () ) };
-  for strand in stranded {
-    let recorder_pid : &ID = &strand . relationship . recorder;
+  for stranded in strandeds {
+    let recorder_pid : &ID = &stranded . relationship . recorder;
     let position : Option<usize> =
       instructions . iter () . position ( |instruction| matches! (
         instruction,
@@ -179,20 +179,20 @@ pub fn relevel_relationships (
         instructions . len () - 1 }, };
     let NodeInstruction::Save (SaveNode (recorder)) = &mut instructions [position]
       else { continue; };
-    for partner in relation_list_mut (recorder, strand . relationship . relation) {
-      if resolve (&partner . member) == strand . relationship . member {
-        partner . relRepo = strand . new_default . clone (); }} }}
+    for partner in relation_list_mut (recorder, stranded . relationship . relation) {
+      if resolve (&partner . member) == stranded . relationship . member {
+        partner . relRepo = stranded . new_default . clone (); }} }}
 
 /// The warning for a relationship the save raised without asking.
 pub fn raised_relationship_warning (
-  strand : &StrandedRelationship,
+  stranded : &StrandedRelationship,
 ) -> String {
   format! (
     "Raised the relationship by which {} {} {} from '{}' to '{}': at '{}' it would publish the ID of a node that moved to a more private skgrepo.",
-    strand . relationship . recorder,
-    strand . relationship . relation . relation_name (),
-    strand . relationship . member,
-    strand . relRepo, strand . new_default, strand . relRepo ) }
+    stranded . relationship . recorder,
+    stranded . relationship . relation . relation_name (),
+    stranded . relationship . member,
+    stranded . relRepo, stranded . new_default, stranded . relRepo ) }
 
 /// The relationships in a node's list for 'relation'.
 fn relation_list (
@@ -252,5 +252,5 @@ fn key_order (
 
 #[cfg(test)]
 #[allow(non_snake_case)]
-#[path = "../../tests/unit/strands.rs"]
+#[path = "../../tests/unit/strandeds.rs"]
 mod tests;
