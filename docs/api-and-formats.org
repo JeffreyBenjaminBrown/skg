@@ -202,6 +202,15 @@ So far there are these endpoints:
        cascades as in any view, and only the expansion of a node
        outside U spends =initial_node_limit=; nothing else in the
        buffer spends that budget.
+  - A write-protected occurrence saves nothing of its own, so a save is
+    refused, before anything is written, if one differs from the graph:
+    in its title or home skgrepo, in its alias folder or a partner
+    folder when present, or by holding a child that affects it. A
+    partner folder's members are compared with the node's partners in
+    its relation as a set of node IDs, under the save's skgrepo
+    restriction, not counting a member the total diff view shows as
+    removed; a member carrying a relRepo request differs. A present
+    flags folder, under any node, must likewise equal the node's flags.
   - Before mutation, the server computes the update-relevant neighborhood of
     every prepared write/delete identity independently in the before and
     candidate graphs. Other registered views containing an affected unrestricted ID

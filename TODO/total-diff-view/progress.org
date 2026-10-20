@@ -1226,3 +1226,38 @@ The other 2026-10-19 entry left in 'TODO/problems.org',
 stays. Only the Emacs-chords entry moved.
 *** the headline had no keyword
 The slice's headline carried no TODO; it now carries DONE.
+* Still more fixes
+** Slice 0: deviations
+*** the shared function takes the config, not the runtime
+'partnerFolder_members_in_graph (graph, config, recorder_pid, kind,
+skgrepo_restriction) -> Option<Vec<ID>>'. The reconciler used the
+runtime generation only for its config (to find a member's home on
+disk), and the save has a graph and a config but no runtime. It
+returns None for a kind with no relation member role, which is how
+the validator skips the hidden-in, hidden-outside and acquisition
+folders. The reconciler still reads the raw outbound members for
+their relRepos, through the same private helper,
+'raw_outbound_members'. 'errors_for_writeProtected_occurrences'
+gains the config with the restriction.
+*** the members compared
+A member in the view is compared by its pid ('pid_of', an
+unresolved ID as it is), as the function resolves the graph's. The
+content view's subscribee folder has its own reconciler
+('reconcile_subscribeeFolder_children'), which draws the stored IDs
+unresolved; resolving both sides makes them agree there too.
+*** the API doc had no such sentence
+'docs/api-and-formats.org' listed nothing a save refuses under a
+write-protected occurrence (only the glossary did), so a paragraph
+saying so, partner folders included, joins its "Save buffer"
+section.
+*** the TDV test
+In the 'kinds' fixture no write-protected occurrence holds a partner
+folder, so 'a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged'
+('tests/pcsvf/write_protecting.rs') write-protects the root s1,
+whose subscriber folder shows sub as a member marked '(diff rel-)',
+and saves. Counting that member makes both it and the unit test
+'a_member_shown_as_removed_is_not_counted' fail. The other cases,
+the TDV-buffer refusal among them, are unit tests beside the
+function.
+*** the headline had no keyword
+The slice's headline carried no TODO; it now carries DONE.

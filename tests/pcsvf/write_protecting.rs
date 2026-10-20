@@ -8,7 +8,7 @@
 
 use crate::pcsvf::common::{
   Fixture, node_lines, open_all_changes_buffer, requesting_editable_at, save,
-  view_id_of, with_fixture};
+  skg_files, view_id_of, with_fixture};
 use crate::pcsvf::common::git_fixture_helpers::mk_test_tcp_stream_pair;
 
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -21,6 +21,7 @@ use skg::types::views_state::{TdvBuffer, ViewId};
 use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
+use std::collections::BTreeMap;
 use futures::executor::block_on;
 use std::error::Error;
 use std::net::TcpStream;
@@ -296,4 +297,37 @@ fn a_writeProtect_request_and_an_editable_request_move_editability_and_back (
       assert! ( lines . len () == 2
                 && ! lines [0] . contains ("affectsParent"),
                 "{} must be n's member under x again:\n{}", child, moved_back ); }
+    Ok (( )) }) }
+
+/// In the 'kinds' fixture the worktree removed sub's subscription to
+/// s1, so the buffer draws s1's subscriber folder holding sub, marked
+/// '(diff rel-)'. Write-protected, s1 saves unchanged: the check of a
+/// write-protected occurrence's partner folders does not count a
+/// member shown as removed.
+#[test]
+fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("kinds", &["public", "private"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let s1_root : &str = buffer . lines ()
+      . find ( |line| line . starts_with ("* (skg (node (id s1) (repo public) ") )
+      . expect ("s1 is a root");
+    let text : String = buffer . replacen ( s1_root, &s1_root . replacen (
+      "(repo public) ", "(repo public) writeProtected ", 1 ), 1 );
+    let s1_and_folder : Vec<&str> = text . lines ()
+      . skip_while ( |line| ! line . starts_with ("* (skg (node (id s1) ") )
+      . take (3) . collect ();
+    assert! ( s1_and_folder [0] . contains ("writeProtected")
+              && s1_and_folder [1] == "** (skg (subscriberFolder changed))"
+              && s1_and_folder [2] . starts_with ("*** (skg (node (id sub) ")
+              && s1_and_folder [2] . ends_with ("(diff rel-))) sub")
+              && ! s1_and_folder [2] . contains ("affectsParent"),
+              "s1 must be write-protected, showing sub as a removed member:\n{}",
+              text );
+    let files_before : BTreeMap<String, String> = skg_files (f) ?;
+    let response : SaveResponse = save (f, &text) ?;
+    assert! ( response . errors . is_empty (), "{:?}", response . errors );
+    assert_eq! ( skg_files (f) ?, files_before );
+    assert! ( response . saved_view . contains ("(diff rel-))) sub"),
+              "{}", response . saved_view );
     Ok (( )) }) }

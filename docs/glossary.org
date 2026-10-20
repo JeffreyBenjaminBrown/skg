@@ -662,7 +662,8 @@ Each occurrence of an unrestricted vognode is either *editable* or
 an editable occurrence's title, body and children are saved; a
 write-protected occurrence shows no body and saves nothing of its own,
 so a save is refused if one differs from the graph (in its title,
-skgrepo, aliases or flags) or has a child that affects its parent.
+skgrepo, aliases, flags or partner folders) or has a child that
+affects its parent.
 The server leaves no such child under one it draws. A buffer may hold at most one editable occurrence of a node,
 so that two occurrences cannot contradict each other. Make one
 editable with =skg-set-editable= (=C-c s d=), which writes a

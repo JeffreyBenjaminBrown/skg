@@ -135,7 +135,7 @@ Each slice ends with the three suites passing ('cargo nextest run',
 'bash/emacs-tests.sh', 'bash/nvim-tests.sh'), its docs updated, and
 its last commit made as the Commits section says.
 
-** Slice 0: partner folders join the write-protected-occurrence check
+** DONE Slice 0: partner folders join the write-protected-occurrence check
 First, in 'reconcile_partnerFolder_children', lift the live-graph goal
 computation (from 'raw_outbound_members' through 'graph_members',
 including 'omit_restricted_members') into a function in the same
