@@ -184,7 +184,7 @@ fn a_publicizing_move_asks_about_a_relationship_recorded_outside_the_view (
       assert_eq! ( home_of (&f, "n"), Some (SkgrepoName::from ("private")) );
       assert! ( ! readiness_marks_path (&f . config . data_root) . exists (),
                 "a save that stops for confirmation consumes nothing" ); }
-    { // The approving re-save re-levels the chosen relationship.
+    { // The approving re-save resets the chosen relationship to default.
       let (response, _) : (SaveResponse, HashMap<String, String>) =
         save ( &mut f, &moved, &view_n,
                &StrandedsReview::Reviewed ( [q_contains_n ()] . into () )) ?;

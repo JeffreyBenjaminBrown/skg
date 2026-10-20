@@ -86,7 +86,7 @@ pub struct SaveResponse {
   pub text_release_confirmation : Option<String>,
   /// Some when a home move would strand relationships and the request
   /// carried no review of them: nothing was skgsave-committed, and the
-  /// handler sends a 'strand-confirmation' listing these. Checked
+  /// handler sends a 'strandeds-confirmation' listing these. Checked
   /// before every other confirmation.
   pub strandeds_confirmation : Option<Vec<StrandedRelationship>>,
   /// Some when the saved buffer is one of the diff view's: the
@@ -528,15 +528,15 @@ fn nat_from_request (
   value_from_request_sexp (key, request) . ok () ? . parse () . ok () }
 
 /// The request's review of the relationships a home move strands:
-/// '(strands-reviewed . "true")' marks a re-save after a
-/// strand-confirmation, and '(relevel-strands (RELATION RECORDER
-/// MEMBER) ...)' names the ones the user chose to re-level. Without
+/// '(strandeds-reviewed . "true")' marks a re-save after a
+/// strandeds-confirmation, and '(reset-strandeds (RELATION RECORDER
+/// MEMBER) ...)' names the ones the user chose to reset to default. Without
 /// the first, not reviewed.
 fn strandeds_review_from_request (
   request : &str,
 ) -> StrandedsReview {
   let reviewed : bool =
-    value_from_request_sexp ("strands-reviewed", request)
+    value_from_request_sexp ("strandeds-reviewed", request)
     . map ( |v| v == "true" )
     . unwrap_or (false);
   if ! reviewed { return StrandedsReview::NotReviewed; }
@@ -547,7 +547,7 @@ fn strandeds_review_from_request (
     let Sexp::List (field) = item else { continue; };
     let Some ( Sexp::Atom ( Atom::S (key) )) = field . first ()
       else { continue; };
-    if key != "relevel-strands" { continue; }
+    if key != "reset-strandeds" { continue; }
     for entry in &field [1..] {
       if let Sexp::List (triple) = entry {
         if let [ Sexp::Atom ( Atom::S (relation) ),
@@ -560,7 +560,7 @@ fn strandeds_review_from_request (
               member   : ID::from (member . as_str ()), } ); }} }} }
   StrandedsReview::Reviewed (chosen) }
 
-/// The strand-confirmation payload: each stranded relationship (its
+/// The strandeds-confirmation payload: each stranded relationship (its
 /// relation, recorder and member IDs, where the save would leave it
 /// and its new default), and a prompt. IDs only, no titles: the
 /// response precedes any text-release decision.
@@ -580,12 +580,12 @@ fn strandeds_confirmation_response (
     . collect ();
   let count : usize = strandeds . len ();
   let prompt : String = format! (
-    "This move would leave {} relationship{} in {} old, more private skgrepo{}. Nothing was saved. Re-level them to their new defaults?",
+    "This move would leave {} relationship{} in {} old, more private skgrepo{}. Nothing was saved. Reset them to their new defaults?",
     count, if count == 1 { "" } else { "s" },
     if count == 1 { "its" } else { "their" },
     if count == 1 { "" } else { "s" } );
   Sexp::List ( vec! [
-    Sexp::List ( vec! [ atom ("strands"), Sexp::List (entries) ] ),
+    Sexp::List ( vec! [ atom ("strandeds"), Sexp::List (entries) ] ),
     pair ("prompt", &prompt), ] ) . to_string () }
 
 /// Whether this save request carries '(approved-forks . "true")', set by

@@ -135,7 +135,7 @@ via `skg--populate-minimal-node-metadata' (RECURSIVE is then moot).
 
 What the move strands, the save decides: relationships it would leave
 at their old, more private repos come back for review before anything
-is written (see `skg--strand-confirmation-handler'), and those it would
+is written (see `skg--strandeds-confirmation-handler'), and those it would
 leave more public than a node's new home are raised automatically.
 
 Write-protected occurrences are NOT changed -- the save would silently

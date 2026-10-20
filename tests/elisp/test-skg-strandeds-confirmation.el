@@ -1,4 +1,4 @@
-;;; test-skg-strand-confirmation.el --- Tests for the strand-confirmation client -*- lexical-binding: t; -*-
+;;; test-skg-strandeds-confirmation.el --- Tests for the strandeds-confirmation client -*- lexical-binding: t; -*-
 
 (load-file (expand-file-name "../../elisp/skg-test-utils.el"
                              (file-name-directory load-file-name)))
@@ -6,57 +6,57 @@
 (require 'cl-lib)
 (require 'skg-request-save)
 
-(defconst test--strand-point-position
+(defconst test--strandeds-point-position
   '(:point-lines-below-focused-headline 0
     :point-column 0
     :point-screen-lines-below-window-start 0))
 
-(defconst test--strand-payload
-  (concat "((response-type strand-confirmation)"
-          " (strands (((relation \"contains\") (recorder \"q\") (member \"n\")"
+(defconst test--strandeds-payload
+  (concat "((response-type strandeds-confirmation)"
+          " (strandeds (((relation \"contains\") (recorder \"q\") (member \"n\")"
           "            (relRepo \"private\") (default \"public\"))"
           "           ((relation \"contains\") (recorder \"r\") (member \"n\")"
           "            (relRepo \"private\") (default \"public\"))))"
-          " (prompt \"Re-level them? \"))"))
+          " (prompt \"Reset them to default? \"))"))
 
-(ert-deftest test-save-request-sexp-omits-the-strand-review-by-default ()
-  (let ((sexp (skg--save-request-sexp "v" test--strand-point-position)))
-    (should-not (assoc 'strands-reviewed sexp))
-    (should-not (assoc 'relevel-strands sexp))))
+(ert-deftest test-save-request-sexp-omits-the-strandeds-review-by-default ()
+  (let ((sexp (skg--save-request-sexp "v" test--strandeds-point-position)))
+    (should-not (assoc 'strandeds-reviewed sexp))
+    (should-not (assoc 'reset-strandeds sexp))))
 
-(ert-deftest test-save-request-sexp-carries-a-strand-review ()
+(ert-deftest test-save-request-sexp-carries-a-strandeds-review ()
   (let ((sexp (skg--save-request-sexp
-               "v" test--strand-point-position nil nil nil nil
+               "v" test--strandeds-point-position nil nil nil nil
                '(reviewed ("contains" "q" "n")))))
-    (should (equal (cdr (assoc 'strands-reviewed sexp)) "true"))
-    (should (equal (cdr (assoc 'relevel-strands sexp))
+    (should (equal (cdr (assoc 'strandeds-reviewed sexp)) "true"))
+    (should (equal (cdr (assoc 'reset-strandeds sexp))
                    '(("contains" "q" "n")))))
   (let ((sexp (skg--save-request-sexp
-               "v" test--strand-point-position nil nil nil nil
+               "v" test--strandeds-point-position nil nil nil nil
                '(reviewed))))
-    (should (equal (cdr (assoc 'strands-reviewed sexp)) "true"))
-    (should-not (assoc 'relevel-strands sexp))))
+    (should (equal (cdr (assoc 'strandeds-reviewed sexp)) "true"))
+    (should-not (assoc 'reset-strandeds sexp))))
 
-(ert-deftest test-strands-from-response ()
-  (let ((strands (skg--strands-from-response (read test--strand-payload))))
-    (should (= (length strands) 2))
-    (should (equal (car strands)
+(ert-deftest test-strandeds-from-response ()
+  (let ((strandeds (skg--strandeds-from-response (read test--strandeds-payload))))
+    (should (= (length strandeds) 2))
+    (should (equal (car strandeds)
                    '(:relation "contains" :recorder "q" :member "n"
                      :relRepo "private" :default "public")))))
 
-(ert-deftest test-strand-review-from-choice ()
-  (let ((strands (skg--strands-from-response (read test--strand-payload))))
-    (should (equal (skg--strand-review-from-choice strands ?a #'ignore)
+(ert-deftest test-strandeds-review-from-choice ()
+  (let ((strandeds (skg--strandeds-from-response (read test--strandeds-payload))))
+    (should (equal (skg--strandeds-review-from-choice strandeds ?a #'ignore)
                    '(reviewed ("contains" "q" "n") ("contains" "r" "n"))))
-    (should (equal (skg--strand-review-from-choice strands ?n #'ignore)
+    (should (equal (skg--strandeds-review-from-choice strandeds ?n #'ignore)
                    '(reviewed)))
-    (should (equal (skg--strand-review-from-choice
-                    strands ?c
-                    (lambda (prompt) (string-match-p "^Re-level r " prompt)))
+    (should (equal (skg--strandeds-review-from-choice
+                    strandeds ?c
+                    (lambda (prompt) (string-match-p "^Reset r " prompt)))
                    '(reviewed ("contains" "r" "n"))))
-    (should-not (skg--strand-review-from-choice strands ?q #'ignore))))
+    (should-not (skg--strandeds-review-from-choice strandeds ?q #'ignore))))
 
-(ert-deftest test-strand-confirmation-resaves-with-the-review-and-approvals ()
+(ert-deftest test-strandeds-confirmation-resaves-with-the-review-and-approvals ()
   "The handler is terminal for the save attempt, and re-issues the save
 with the review, carrying the attempt's other approvals."
   (let ((skg-response-handler-map
@@ -66,17 +66,17 @@ with the review, carrying the attempt's other approvals."
         (skg-lp--pending-count 1)
         (noninteractive nil)
         (resave-args :none)
-        (save-buffer (generate-new-buffer "strand-test")))
+        (save-buffer (generate-new-buffer "strandeds-test")))
     (unwind-protect
         (cl-letf (((symbol-function 'skg--end-stream) #'ignore)
                   ((symbol-function 'skg--unlock-all-save-locked) #'ignore)
-                  ((symbol-function 'skg--show-strands) #'ignore)
+                  ((symbol-function 'skg--show-strandeds) #'ignore)
                   ((symbol-function 'read-multiple-choice)
                    (lambda (&rest _) '(?a "all")))
                   ((symbol-function 'skg-request-save-buffer)
                    (lambda (&rest args) (setq resave-args args))))
-          (skg--strand-confirmation-handler
-           save-buffer test--strand-payload
+          (skg--strandeds-confirmation-handler
+           save-buffer test--strandeds-payload
            t '(("n" . "public")) '("h") '("t"))
           (should-not (assoc 'save-result skg-response-handler-map))
           (should-not (assoc 'telescope-hoist-confirmation
@@ -88,4 +88,4 @@ with the review, carrying the attempt's other approvals."
                                        ("contains" "r" "n"))))))
       (kill-buffer save-buffer))))
 
-(provide 'test-skg-strand-confirmation)
+(provide 'test-skg-strandeds-confirmation)

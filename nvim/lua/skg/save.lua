@@ -36,13 +36,13 @@ M.fork_repo_placeholder = 'PICK-A-REPO'
 ---@param fork_repos table[]|nil {{id, repo}, ...}
 ---@param approved_hoist_pids string[]|nil
 ---@param text_approved_pids string[]|nil
----@param strand_review table|nil the relationships, each
----  {relation, recorder, member}, the user chose to re-level after a
----  strand-confirmation (possibly none); nil when not reviewed
+---@param strandeds_review table|nil the relationships, each
+---  {relation, recorder, member}, the user chose to reset to default after a
+---  strandeds-confirmation (possibly none); nil when not reviewed
 function M.request_save_buffer (approved_forks, fork_skgrepos,
                                 approved_hoist_pids,
                                 text_approved_pids,
-                                strand_review)
+                                strandeds_review)
   local save_buf = vim.api.nvim_get_current_buf()
   local saved_view_id = vim.b[save_buf].skg_view_id
   if not saved_view_id then
@@ -55,7 +55,7 @@ function M.request_save_buffer (approved_forks, fork_skgrepos,
   lock.lock_all_skg_buffers()
   local ok, err = pcall(
     M.send_save_buffer, save_buf, saved_view_id, approved_forks, fork_skgrepos,
-    approved_hoist_pids, text_approved_pids, strand_review)
+    approved_hoist_pids, text_approved_pids, strandeds_review)
   if not ok then
     M.cancel_locally_failed_save()
     error(err) end
@@ -64,7 +64,7 @@ end
 ---Serialize and send a save after the stream guard and locks are held.
 function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgrepos,
                              approved_hoist_pids, text_approved_pids,
-                             strand_review)
+                             strandeds_review)
   local focused_line = focus.owning_headline_line()
   local focused_had_metadata = focused_line ~= nil
     and metadata.line_text(focused_line):match('^%*+ %(skg') ~= nil
@@ -81,7 +81,7 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
                           approved_forks, fork_skgrepos,
                           approved_hoist_pids,
                           text_approved_pids,
-                          strand_review)
+                          strandeds_review)
   state.register_response_handler('save-lock',
     function (_payload_text, response)
       M.broad_save_lock_handler(response)
@@ -110,13 +110,13 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
   -- save-result one-shot), so the pending count balances either way.
   state.register_response_handler('fork-confirmation',
     function (_payload_text, response)
-      M.fork_confirmation_handler(save_buf, response, strand_review)
+      M.fork_confirmation_handler(save_buf, response, strandeds_review)
     end, false)
   -- Another alternative terminal: a home move would strand
   -- relationships. Retry this same save with the user's review.
-  state.register_response_handler('strand-confirmation',
+  state.register_response_handler('strandeds-confirmation',
     function (_payload_text, response)
-      M.strand_confirmation_handler(
+      M.strandeds_confirmation_handler(
         save_buf, response, approved_forks, fork_skgrepos,
         approved_hoist_pids, text_approved_pids)
     end, false)
@@ -124,13 +124,13 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
     function (_payload_text, response)
       M.telescope_hoist_confirmation_handler(
         save_buf, response, approved_forks, fork_skgrepos,
-        text_approved_pids, strand_review)
+        text_approved_pids, strandeds_review)
     end, false)
   state.register_response_handler('overPrivateText-telescope-confirmation',
     function (_payload_text, response)
       M.save_text_release_confirmation_handler(
         save_buf, response, approved_forks, fork_skgrepos,
-        approved_hoist_pids, strand_review)
+        approved_hoist_pids, strandeds_review)
     end, false)
   state.lp_reset()
   client.send_string(request_line)
@@ -204,7 +204,7 @@ function M.cancel_locally_failed_save ()
   end
   for _, response_type in ipairs({
       'save-lock', 'save-relax-lock', 'collateral-view', 'save-result',
-      'fork-confirmation', 'strand-confirmation',
+      'fork-confirmation', 'strandeds-confirmation',
       'telescope-hoist-confirmation',
       'overPrivateText-telescope-confirmation' }) do
     state.response_handler_map[response_type] = nil
@@ -220,11 +220,11 @@ end
 ---@param fork_repos table[]|nil
 ---@param approved_hoist_pids string[]|nil
 ---@param text_approved_pids string[]|nil
----@param strand_review table|nil
+---@param strandeds_review table|nil
 ---@return string
 function M.save_request_string (view_id, position, approved_forks,
                                 fork_skgrepos, approved_hoist_pids,
-                                text_approved_pids, strand_review)
+                                text_approved_pids, strandeds_review)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'save buffer'),
     sexpr.pair(sexpr.symbol('view-id'), view_id),
@@ -253,12 +253,12 @@ function M.save_request_string (view_id, position, approved_forks,
     for _, pid in ipairs(text_approved_pids) do
       table.insert(field, pid) end
     table.insert(request, field) end
-  if strand_review then
+  if strandeds_review then
     table.insert(request,
-      sexpr.pair(sexpr.symbol('strands-reviewed'), 'true'))
-    if #strand_review > 0 then
-      local field = { sexpr.symbol('relevel-strands') }
-      for _, triple in ipairs(strand_review) do
+      sexpr.pair(sexpr.symbol('strandeds-reviewed'), 'true'))
+    if #strandeds_review > 0 then
+      local field = { sexpr.symbol('reset-strandeds') }
+      for _, triple in ipairs(strandeds_review) do
         table.insert(field, { triple[1], triple[2], triple[3] }) end
       table.insert(request, field) end end
   return sexpr.to_string(request) .. '\n'
@@ -361,7 +361,7 @@ function M.save_result_handler (save_buf, response)
   state.response_handler_map['collateral-view'] = nil
   state.response_handler_map['save-relax-lock'] = nil
   state.response_handler_map['fork-confirmation'] = nil
-  state.response_handler_map['strand-confirmation'] = nil
+  state.response_handler_map['strandeds-confirmation'] = nil
   state.response_handler_map['telescope-hoist-confirmation'] = nil
   state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
   lock.end_stream()
@@ -585,13 +585,13 @@ end
 ---count), ends the stream, unlocks.
 ---@param save_buf integer
 ---@param response any
----@param strand_review table|nil the review the save carried, which the
+---@param strandeds_review table|nil the review the save carried, which the
 ---  approving re-save carries again
-function M.fork_confirmation_handler (save_buf, response, strand_review)
+function M.fork_confirmation_handler (save_buf, response, strandeds_review)
   state.response_handler_map['collateral-view'] = nil
   state.response_handler_map['save-relax-lock'] = nil
   state.response_handler_map['fork-confirmation'] = nil
-  state.response_handler_map['strand-confirmation'] = nil
+  state.response_handler_map['strandeds-confirmation'] = nil
   state.response_handler_map['telescope-hoist-confirmation'] = nil
   state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
   if state.response_handler_map['save-result'] then
@@ -610,7 +610,7 @@ function M.fork_confirmation_handler (save_buf, response, strand_review)
     local content = payload.field_text(response, 'content')
     local to_minibuffer = payload.field_text(response, 'to-minibuffer')
     confirm_buf = M.show_fork_confirmation(content or '', save_buf)
-    vim.b[confirm_buf].skg_fork_strand_review = strand_review
+    vim.b[confirm_buf].skg_fork_strandeds_review = strandeds_review
     if to_minibuffer then vim.notify(to_minibuffer) end
   end)
   if not ok then
@@ -642,11 +642,11 @@ end
 ---@param fork_repos table[]|nil
 function M.telescope_hoist_confirmation_handler (
     save_buf, response, approved_forks, fork_skgrepos,
-    text_approved_pids, strand_review)
+    text_approved_pids, strandeds_review)
   state.response_handler_map['collateral-view'] = nil
   state.response_handler_map['save-relax-lock'] = nil
   state.response_handler_map['fork-confirmation'] = nil
-  state.response_handler_map['strand-confirmation'] = nil
+  state.response_handler_map['strandeds-confirmation'] = nil
   state.response_handler_map['telescope-hoist-confirmation'] = nil
   state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
   if state.response_handler_map['save-result'] then
@@ -675,7 +675,7 @@ function M.telescope_hoist_confirmation_handler (
       vim.api.nvim_set_current_buf(save_buf)
       M.request_save_buffer(
         approved_forks, fork_skgrepos, approved_pids,
-        text_approved_pids, strand_review)
+        text_approved_pids, strandeds_review)
     else
       vim.notify('Hoist aborted; nothing was saved. Repair the .skg'
                  .. ' sections manually.')
@@ -688,18 +688,18 @@ function M.telescope_hoist_confirmation_handler (
   end
 end
 
----Handle a strand-confirmation: the save's home moves would strand
+---Handle a strandeds-confirmation: the save's home moves would strand
 ---the relationships it lists, and nothing was skgsave-committed. Show
----them, ask which to re-level, and re-issue the same save with that
+---them, ask which to reset to default, and re-issue the same save with that
 ---review, carrying the other approvals along. Headless, only report.
 ---@param save_buf integer
 ---@param response any
-function M.strand_confirmation_handler (
+function M.strandeds_confirmation_handler (
     save_buf, response, approved_forks, fork_skgrepos,
     approved_hoist_pids, text_approved_pids)
   for _, response_type in ipairs({
       'collateral-view', 'save-relax-lock', 'fork-confirmation',
-      'strand-confirmation',
+      'strandeds-confirmation',
       'telescope-hoist-confirmation', 'overPrivateText-telescope-confirmation' }) do
     state.response_handler_map[response_type] = nil
   end
@@ -710,21 +710,21 @@ function M.strand_confirmation_handler (
   lock.end_stream()
   lock.unlock_all_save_locked()
   local ok, err = pcall(function ()
-    local strands = M.strands_from_response(response)
+    local strandeds = M.strandeds_from_response(response)
     local prompt = payload.field_text(response, 'prompt')
-      or 'Re-level the stranded relationships?'
+      or 'Reset the stranded relationships to default?'
     if #vim.api.nvim_list_uis() == 0 then
       vim.notify(string.format(
-        '%d relationship(s) would be stranded; nothing was saved', #strands))
+        '%d relationship(s) would be stranded; nothing was saved', #strandeds))
       return
     end
     local lines = { prompt }
-    for _, strand in ipairs(strands) do
-      table.insert(lines, '  ' .. M.strand_description(strand)) end
+    for _, stranded in ipairs(strandeds) do
+      table.insert(lines, '  ' .. M.stranded_description(stranded)) end
     local choice = ({ 'all', 'none', 'choose' })[
       vim.fn.confirm(table.concat(lines, '\n'),
                      '&All\n&None\n&Choose each\n&Quit', 4)]
-    local review = M.strand_review_from_choice(strands, choice,
+    local review = M.strandeds_review_from_choice(strandeds, choice,
       function (question)
         return vim.fn.confirm(question, '&Yes\n&No', 2) == 1 end)
     if not review then
@@ -737,58 +737,58 @@ function M.strand_confirmation_handler (
       text_approved_pids, review)
   end)
   if not ok then
-    log.log('error', 'save', 'strand-confirmation handler error: %s',
+    log.log('error', 'save', 'strandeds-confirmation handler error: %s',
             tostring(err))
   end
 end
 
----The stranded relationships in a strand-confirmation RESPONSE, each
+---The stranded relationships in a strandeds-confirmation RESPONSE, each
 ---{relation, recorder, member, relRepo, default}.
 ---@param response any
 ---@return table[]
-function M.strands_from_response (response)
-  local strands = {}
-  local entries = payload.field(response, 'strands') or {}
-  if not sexpr.is_list(entries) then return strands end
+function M.strandeds_from_response (response)
+  local strandeds = {}
+  local entries = payload.field(response, 'strandeds') or {}
+  if not sexpr.is_list(entries) then return strandeds end
   for _, entry in ipairs(entries) do
-    table.insert(strands, {
+    table.insert(strandeds, {
       relation = payload.field_text(entry, 'relation'),
       recorder = payload.field_text(entry, 'recorder'),
       member   = payload.field_text(entry, 'member'),
       relRepo  = payload.field_text(entry, 'relRepo'),
       default  = payload.field_text(entry, 'default') })
   end
-  return strands
+  return strandeds
 end
 
----One line describing STRAND.
----@param strand table
+---One line describing STRANDED.
+---@param stranded table
 ---@return string
-function M.strand_description (strand)
+function M.stranded_description (stranded)
   return string.format('%s %s %s: stays at %s; its default is now %s',
-                       strand.recorder, strand.relation, strand.member,
-                       strand.relRepo, strand.default)
+                       stranded.recorder, stranded.relation, stranded.member,
+                       stranded.relRepo, stranded.default)
 end
 
----The strand review CHOICE ('all', 'none', 'choose', or nil to save
----nothing) makes of STRANDS: the {relation, recorder, member} triples
----to re-level, or nil. For 'choose', ASK is called with a question
----per relationship and re-levels those it accepts.
----@param strands table[]
+---The strandeds review CHOICE ('all', 'none', 'choose', or nil to save
+---nothing) makes of STRANDEDS: the {relation, recorder, member} triples
+---to reset to default, or nil. For 'choose', ASK is called with a question
+---per relationship and resets to default those it accepts.
+---@param strandeds table[]
 ---@param choice string|nil
 ---@param ask fun(question: string): boolean
 ---@return table|nil
-function M.strand_review_from_choice (strands, choice, ask)
-  local function triple (strand)
-    return { strand.relation, strand.recorder, strand.member } end
+function M.strandeds_review_from_choice (strandeds, choice, ask)
+  local function triple (stranded)
+    return { stranded.relation, stranded.recorder, stranded.member } end
   local review = {}
   if choice == 'all' then
-    for _, strand in ipairs(strands) do
-      table.insert(review, triple(strand)) end
+    for _, stranded in ipairs(strandeds) do
+      table.insert(review, triple(stranded)) end
   elseif choice == 'choose' then
-    for _, strand in ipairs(strands) do
-      if ask('Re-level ' .. M.strand_description(strand) .. '?') then
-        table.insert(review, triple(strand)) end
+    for _, stranded in ipairs(strandeds) do
+      if ask('Reset ' .. M.stranded_description(stranded) .. ' to default?') then
+        table.insert(review, triple(stranded)) end
     end
   elseif choice ~= 'none' then
     return nil end
@@ -805,10 +805,10 @@ end
 ---@param approved_hoist_pids string[]|nil
 function M.save_text_release_confirmation_handler (
     save_buf, response, approved_forks, fork_skgrepos,
-    approved_hoist_pids, strand_review)
+    approved_hoist_pids, strandeds_review)
   for _, response_type in ipairs({
       'collateral-view', 'save-relax-lock', 'fork-confirmation',
-      'strand-confirmation',
+      'strandeds-confirmation',
       'telescope-hoist-confirmation', 'overPrivateText-telescope-confirmation' }) do
     state.response_handler_map[response_type] = nil
   end
@@ -831,7 +831,7 @@ function M.save_text_release_confirmation_handler (
     vim.api.nvim_set_current_buf(save_buf)
     M.request_save_buffer(
       approved_forks, fork_skgrepos, approved_hoist_pids,
-      approved_pids, strand_review)
+      approved_pids, strandeds_review)
   else
     vim.notify('Save succeeded; protected rerender text remains withheld'
                .. ' and buffers are unchanged.')
@@ -980,7 +980,7 @@ end
 function M.approve_fork ()
   local buf = vim.api.nvim_get_current_buf()
   local source = vim.b[buf].skg_fork_source
-  local strand_review = vim.b[buf].skg_fork_strand_review
+  local strandeds_review = vim.b[buf].skg_fork_strandeds_review
   local fork_skgrepos = M.fork_repos_from_confirmation_buffer(buf)
   if not source or not vim.api.nvim_buf_is_valid(source) then
     error('The buffer that requested these forks is no longer open')
@@ -996,7 +996,7 @@ function M.approve_fork ()
   vim.b[buf].skg_fork_suppress_strip = true
   vim.api.nvim_buf_delete(buf, { force = true })
   vim.api.nvim_set_current_buf(source)
-  M.request_save_buffer(true, fork_skgrepos, nil, nil, strand_review)
+  M.request_save_buffer(true, fork_skgrepos, nil, nil, strandeds_review)
 end
 
 ---Decline the forks; nothing was written. Strips any lingering

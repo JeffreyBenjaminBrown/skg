@@ -678,7 +678,7 @@ window plumbing are stubbed as in the other handler tests."
 ;; --- set-repo and write-protected occurrences ---
 ;; (Here rather than in test-skg-metadata.el because these need the
 ;; config harness. What a move strands, the save decides; see
-;; tests/strands.rs and tests/unit/strands.rs.)
+;; tests/strandeds.rs and tests/unit/strandeds.rs.)
 
 (defun test--messages-during (fn)
   "Run FN with `message' captured; return (RESULT . MESSAGES)."

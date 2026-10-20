@@ -12,7 +12,7 @@
 (defun skg-request-save-buffer (&optional approved-forks fork-skgrepos
                                           approved-hoist-pids
                                           text-approved-pids
-                                          strand-review)
+                                          strandeds-review)
   "Send the current buffer contents to Rust for processing.
 Before sending, adds 'folded' atoms to folded headlines and 'focused' atom to current headline.
 The server sends three LP messages around the save:
@@ -30,10 +30,10 @@ nothing. `skg--fork-confirmation-handler' then shows the confirmation
 buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
 `skg-decline-fork'.
 
-STRAND-REVIEW, when non-nil, is (reviewed . TRIPLES): the user has
+STRANDEDS-REVIEW, when non-nil, is (reviewed . TRIPLES): the user has
 reviewed the relationships a home move strands (see
-`skg--strand-confirmation-handler'), and TRIPLES, each
-(RELATION RECORDER MEMBER), are the ones to re-level."
+`skg--strandeds-confirmation-handler'), and TRIPLES, each
+(RELATION RECORDER MEMBER), are the ones to reset to default."
   (interactive)
   (unless skg-view-id
     (error "Cannot save: skg-view-id is nil in buffer '%s' (content-view-mode=%s). Re-open the view."
@@ -44,7 +44,7 @@ reviewed the relationships a home move strands (see
   (condition-case err
       (skg--send-save-buffer
        approved-forks fork-skgrepos approved-hoist-pids text-approved-pids
-       strand-review)
+       strandeds-review)
     (error
      (skg--cancel-locally-failed-save)
      (signal (car err) (cdr err)))))
@@ -52,7 +52,7 @@ reviewed the relationships a home move strands (see
 (defun skg--send-save-buffer (approved-forks fork-skgrepos
                                             approved-hoist-pids
                                             text-approved-pids
-                                            strand-review)
+                                            strandeds-review)
   "Serialize and send a save after the stream guard and locks are held."
   (when (org-before-first-heading-p)
     ;; Rather than complain, save as if point were at the first headline.
@@ -82,7 +82,7 @@ reviewed the relationships a home move strands (see
                                     fork-skgrepos
                                     approved-hoist-pids
                                     text-approved-pids
-                                    strand-review))
+                                    strandeds-review))
                                   "\n"))
            (content-bytes (encode-coding-string wire-content 'utf-8))
            (content-length (length content-bytes))
@@ -126,14 +126,14 @@ reviewed the relationships a home move strands (see
       (skg-register-response-handler
        'fork-confirmation
        (lambda (_tcp-proc payload)
-         (skg--fork-confirmation-handler save-buffer payload strand-review))
+         (skg--fork-confirmation-handler save-buffer payload strandeds-review))
        nil)
       ;; Another alternative terminal: a home move would strand
       ;; relationships. Retry this same save with the user's review.
       (skg-register-response-handler
-       'strand-confirmation
+       'strandeds-confirmation
        (lambda (_tcp-proc payload)
-         (skg--strand-confirmation-handler
+         (skg--strandeds-confirmation-handler
           save-buffer payload approved-forks fork-skgrepos
           approved-hoist-pids text-approved-pids))
        nil)
@@ -144,14 +144,14 @@ reviewed the relationships a home move strands (see
        (lambda (_tcp-proc payload)
          (skg--telescope-hoist-confirmation-handler
           save-buffer payload approved-forks fork-skgrepos
-          text-approved-pids strand-review))
+          text-approved-pids strandeds-review))
        nil)
       (skg-register-response-handler
        'overPrivateText-telescope-confirmation
        (lambda (_tcp-proc payload)
          (skg--save-text-release-confirmation-handler
           save-buffer payload approved-forks fork-skgrepos
-          approved-hoist-pids strand-review))
+          approved-hoist-pids strandeds-review))
        nil)
 
       (skg-lp-reset)
@@ -234,7 +234,7 @@ internal edit; it is restored before any request is sent."
       (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count)))))
   (dolist (response-type
            '(save-lock save-relax-lock collateral-view save-result
-             fork-confirmation strand-confirmation
+             fork-confirmation strandeds-confirmation
              telescope-hoist-confirmation
              overPrivateText-telescope-confirmation))
     (setq skg-response-handler-map
@@ -246,15 +246,15 @@ internal edit; it is restored before any request is sent."
                                         &optional approved-forks fork-skgrepos
                                         approved-hoist-pids
                                         text-approved-pids
-                                        strand-review)
+                                        strandeds-review)
   "Build the save-buffer request sexp. When FORK-APPROVED is non-nil,
 include (approved-forks . \"true\") so the server skgsave-commits any forks it
 finds instead of returning a fork-confirmation. FORK-REPOS, when
 non-nil, is an alist ((N . REPO) ...) pairing each forked node's id
 with the owned repo the user chose for its clone; it rides out as the
-field (fork-repos ((N . REPO) ...)). STRAND-REVIEW, when non-nil,
-rides out as (strands-reviewed . \"true\") and, unless it chose
-none, (relevel-strands (RELATION RECORDER MEMBER) ...)."
+field (fork-repos ((N . REPO) ...)). STRANDEDS-REVIEW, when non-nil,
+rides out as (strandeds-reviewed . \"true\") and, unless it chose
+none, (reset-strandeds (RELATION RECORDER MEMBER) ...)."
   (append
    `((request . "save buffer")
      (view-id . ,view-id)
@@ -278,10 +278,10 @@ none, (relevel-strands (RELATION RECORDER MEMBER) ...)."
      `((approved-hoist-pids ,@approved-hoist-pids)))
    (when text-approved-pids
      `((approved-overPrivateText-pids ,@text-approved-pids)))
-   (when strand-review
-     '((strands-reviewed . "true")))
-   (when (cdr strand-review)
-     `((relevel-strands ,@(cdr strand-review))))))
+   (when strandeds-review
+     '((strandeds-reviewed . "true")))
+   (when (cdr strandeds-review)
+     `((reset-strandeds ,@(cdr strandeds-review))))))
 
 (defun skg--current-save-point-position ()
   "WHAT IT DOES: Return point position data that should survive the save redraw:
@@ -383,7 +383,7 @@ which would trigger overlay modification-hooks if still present."
   (setq skg-response-handler-map
         (assoc-delete-all 'fork-confirmation skg-response-handler-map))
   (setq skg-response-handler-map
-        (assoc-delete-all 'strand-confirmation skg-response-handler-map))
+        (assoc-delete-all 'strandeds-confirmation skg-response-handler-map))
   (setq skg-response-handler-map
         (assoc-delete-all 'telescope-hoist-confirmation
                           skg-response-handler-map))
@@ -417,8 +417,8 @@ leaves things untouched.")
 source's fork atom. `skg-approve-fork' sets it before killing this
 buffer, because its re-save still needs the atom to skgsave-commit the fork.")
 
-(defvar-local skg--fork-strand-review nil
-  "In a fork-confirmation buffer, the strand review the forking save
+(defvar-local skg--fork-strandeds-review nil
+  "In a fork-confirmation buffer, the strandeds review the forking save
 carried, for `skg-approve-fork' to carry again.")
 
 (defvar-local skg--pending-fork-result nil
@@ -511,7 +511,7 @@ Record that buffer and FORK-COUNT on ORIGIN, then kill CONFIRMATION."
                         noun)
                 (format "%S" err))))))))))
 
-(defun skg--fork-confirmation-handler (save-buffer payload &optional strand-review)
+(defun skg--fork-confirmation-handler (save-buffer payload &optional strandeds-review)
   "Handle a `fork-confirmation' LP message: the save edited foreign
 node(s) and was not pre-approved, so NOTHING was skgsave-committed. Show the
 confirmation buffer (which lists the nodes that would be forked) and,
@@ -520,7 +520,7 @@ whether to approve.
 
 Terminal, like `skg--save-result-handler': remove the streaming handlers
 AND the unfired save-result one-shot (decrementing the pending count for
-it), end the stream, and unlock. STRAND-REVIEW is the review the save
+it), end the stream, and unlock. STRANDEDS-REVIEW is the review the save
 carried, which the approving re-save carries again."
   (setq skg-response-handler-map
         (assoc-delete-all 'collateral-view skg-response-handler-map))
@@ -529,7 +529,7 @@ carried, which the approving re-save carries again."
   (setq skg-response-handler-map
         (assoc-delete-all 'fork-confirmation skg-response-handler-map))
   (setq skg-response-handler-map
-        (assoc-delete-all 'strand-confirmation skg-response-handler-map))
+        (assoc-delete-all 'strandeds-confirmation skg-response-handler-map))
   (setq skg-response-handler-map
         (assoc-delete-all 'telescope-hoist-confirmation
                           skg-response-handler-map))
@@ -557,7 +557,7 @@ carried, which the approving re-save carries again."
                     (to-minibuffer (cadr (assoc 'to-minibuffer response)))
                     (buf (skg--show-fork-confirmation content save-buffer)))
                (with-current-buffer buf
-                 (setq skg--fork-strand-review strand-review))
+                 (setq skg--fork-strandeds-review strandeds-review))
                (when to-minibuffer (message "%s" to-minibuffer))
                buf)
            (error
@@ -575,20 +575,20 @@ carried, which the approving re-save carries again."
             (skg-approve-fork)
           (skg-decline-fork))))))
 
-;;; Strand confirmation: a home move would leave relationships at their
+;;; Strandeds confirmation: a home move would leave relationships at their
 ;;; old, more private skgrepos. The server decides which
-;;; (server/from_text/strands.rs); the user chooses which to re-level.
+;;; (server/from_text/strandeds.rs); the user chooses which to reset to default.
 
-(defun skg--strand-confirmation-handler
+(defun skg--strandeds-confirmation-handler
     (save-buffer payload approved-forks fork-skgrepos
                  approved-hoist-pids text-approved-pids)
-  "Handle a `strand-confirmation' message for SAVE-BUFFER: the save's home
+  "Handle a `strandeds-confirmation' message for SAVE-BUFFER: the save's home
 moves would strand the relationships it lists, and nothing was
-skgsave-committed. Show them, ask which to re-level, and re-issue the
+skgsave-committed. Show them, ask which to reset to default, and re-issue the
 same save with that review, carrying the other approvals along."
   (dolist (response-type
            '(collateral-view save-relax-lock fork-confirmation
-             strand-confirmation telescope-hoist-confirmation
+             strandeds-confirmation telescope-hoist-confirmation
              overPrivateText-telescope-confirmation))
     (setq skg-response-handler-map
           (assoc-delete-all response-type skg-response-handler-map)))
@@ -600,18 +600,18 @@ same save with that review, carrying the other approvals along."
   (skg--unlock-all-save-locked)
   (condition-case err
       (let* ((response (read payload))
-             (strands (skg--strands-from-response response))
+             (strandeds (skg--strandeds-from-response response))
              (prompt (or (cadr (assoc 'prompt response))
-                         "Re-level the stranded relationships? ")))
+                         "Reset the stranded relationships to default? ")))
         (if noninteractive
             (message "%d relationship(s) would be stranded; nothing was saved"
-                     (length strands))
-          (skg--show-strands strands)
-          (let ((review (skg--strand-review-from-choice
-                         strands
+                     (length strandeds))
+          (skg--show-strandeds strandeds)
+          (let ((review (skg--strandeds-review-from-choice
+                         strandeds
                          (car (read-multiple-choice
                                prompt
-                               '((?a "all" "re-level every listed relationship")
+                               '((?a "all" "reset every listed relationship to default")
                                  (?n "none" "save, leaving them where they are")
                                  (?c "choose" "ask about each")
                                  (?q "quit" "save nothing"))))
@@ -623,10 +623,10 @@ same save with that review, carrying the other approvals along."
                  approved-forks fork-skgrepos approved-hoist-pids
                  text-approved-pids review))))))
     (error
-     (skg-log 'error 'save "strand-confirmation handler error: %S" err))))
+     (skg-log 'error 'save "strandeds-confirmation handler error: %S" err))))
 
-(defun skg--strands-from-response (response)
-  "The stranded relationships in a strand-confirmation RESPONSE, each a
+(defun skg--strandeds-from-response (response)
+  "The stranded relationships in a strandeds-confirmation RESPONSE, each a
 plist (:relation :recorder :member :relRepo :default) of strings."
   (mapcar (lambda (entry)
             (let ((field (lambda (key)
@@ -636,63 +636,63 @@ plist (:relation :recorder :member :relRepo :default) of strings."
                     :member   (funcall field 'member)
                     :relRepo  (funcall field 'relRepo)
                     :default  (funcall field 'default))))
-          (cadr (assoc 'strands response))))
+          (cadr (assoc 'strandeds response))))
 
-(defun skg--strand-description (strand)
-  "One line describing STRAND, a plist from `skg--strands-from-response'."
+(defun skg--stranded-description (stranded)
+  "One line describing STRANDED, a plist from `skg--strandeds-from-response'."
   (format "%s %s %s: stays at %s; its default is now %s"
-          (plist-get strand :recorder) (plist-get strand :relation)
-          (plist-get strand :member) (plist-get strand :relRepo)
-          (plist-get strand :default)))
+          (plist-get stranded :recorder) (plist-get stranded :relation)
+          (plist-get stranded :member) (plist-get stranded :relRepo)
+          (plist-get stranded :default)))
 
-(defun skg--show-strands (strands)
-  "List STRANDS in the *SKG Stranded Relationships* buffer."
+(defun skg--show-strandeds (strandeds)
+  "List STRANDEDS in the *SKG Stranded Relationships* buffer."
   (with-current-buffer (get-buffer-create "*SKG Stranded Relationships*")
     (let ((inhibit-read-only t))
       (erase-buffer)
       (insert "These relationships would stay in their old, more private skgrepos:\n")
-      (dolist (strand strands)
-        (insert "- " (skg--strand-description strand) "\n"))
+      (dolist (stranded strandeds)
+        (insert "- " (skg--stranded-description stranded) "\n"))
       (goto-char (point-min))
       (special-mode))
     (display-buffer (current-buffer))))
 
-(defun skg--strand-review-from-choice (strands choice ask)
-  "The strand review CHOICE (a key from the strand prompt) makes of
-STRANDS: (reviewed . TRIPLES), each TRIPLE (RELATION RECORDER MEMBER)
-a relationship to re-level; or nil, to save nothing. For ?c, ASK is
-called with a prompt per relationship, and re-levels those it accepts."
-  (let ((triple (lambda (strand)
-                  (list (plist-get strand :relation)
-                        (plist-get strand :recorder)
-                        (plist-get strand :member)))))
+(defun skg--strandeds-review-from-choice (strandeds choice ask)
+  "The strandeds review CHOICE (a key from the strandeds prompt) makes of
+STRANDEDS: (reviewed . TRIPLES), each TRIPLE (RELATION RECORDER MEMBER)
+a relationship to reset to default; or nil, to save nothing. For ?c, ASK is
+called with a prompt per relationship, and resets to default those it accepts."
+  (let ((triple (lambda (stranded)
+                  (list (plist-get stranded :relation)
+                        (plist-get stranded :recorder)
+                        (plist-get stranded :member)))))
     (pcase choice
-      (?a (cons 'reviewed (mapcar triple strands)))
+      (?a (cons 'reviewed (mapcar triple strandeds)))
       (?n (list 'reviewed))
       (?c (cons 'reviewed
                 (delq nil
-                      (mapcar (lambda (strand)
+                      (mapcar (lambda (stranded)
                                 (when (funcall ask
-                                               (format "Re-level %s? "
-                                                       (skg--strand-description
-                                                        strand)))
-                                  (funcall triple strand)))
-                              strands))))
+                                               (format "Reset %s to default? "
+                                                       (skg--stranded-description
+                                                        stranded)))
+                                  (funcall triple stranded)))
+                              strandeds))))
       (_ nil))))
 
 (defun skg--telescope-hoist-confirmation-handler
     (save-buffer payload approved-forks fork-skgrepos
-                 &optional text-approved-pids strand-review)
+                 &optional text-approved-pids strandeds-review)
   "Handle the text-free terminal Hoist challenge for SAVE-BUFFER.
 The server has skgsave-committed nothing.  On approval, reissue the same save with
 the exact candidate PIDs; on Abort, leave the buffer and every .skg file
 untouched.  FORK-APPROVED and FORK-REPOS survive if this challenge arose
-on a retry that had already received fork authority, and STRAND-REVIEW
+on a retry that had already received fork authority, and STRANDEDS-REVIEW
 if it had already been reviewed."
   (setq skg-response-handler-map
         (assoc-delete-all 'collateral-view skg-response-handler-map))
   (setq skg-response-handler-map
-        (assoc-delete-all 'strand-confirmation skg-response-handler-map))
+        (assoc-delete-all 'strandeds-confirmation skg-response-handler-map))
   (setq skg-response-handler-map
         (assoc-delete-all 'save-relax-lock skg-response-handler-map))
   (setq skg-response-handler-map
@@ -725,7 +725,7 @@ if it had already been reviewed."
               (with-current-buffer save-buffer
                 (skg-request-save-buffer
                  approved-forks fork-skgrepos approved-pids
-                 text-approved-pids strand-review))
+                 text-approved-pids strandeds-review))
             (message
              "Hoist aborted; nothing was saved. Repair the .skg sections manually."))))
     (error
@@ -734,7 +734,7 @@ if it had already been reviewed."
 
 (defun skg--save-text-release-confirmation-handler
     (save-buffer payload approved-forks fork-skgrepos approved-hoist-pids
-                 &optional strand-review)
+                 &optional strandeds-review)
   "Handle a save-rerender text release challenge.
 The filesystem save has succeeded, but the server has not released the
 staged saved/collateral text or changed its open-view registry.  Approval
@@ -742,7 +742,7 @@ reissues the save with the exact PIDs; declining leaves the current buffers
 unchanged."
   (dolist (response-type
            '(collateral-view save-relax-lock fork-confirmation
-             strand-confirmation
+             strandeds-confirmation
              telescope-hoist-confirmation overPrivateText-telescope-confirmation))
     (setq skg-response-handler-map
           (assoc-delete-all response-type skg-response-handler-map)))
@@ -766,7 +766,7 @@ unchanged."
               (with-current-buffer save-buffer
                 (skg-request-save-buffer
                  approved-forks fork-skgrepos approved-hoist-pids
-                 approved-pids strand-review))
+                 approved-pids strandeds-review))
             (message
              "Save succeeded; protected rerender text remains withheld and buffers are unchanged."))))
     (error
@@ -908,7 +908,7 @@ hand (C-c s s)."
   (unless noninteractive
     (skg--fork-choose-placeholder-repos))
   (let ((source skg--fork-source-buffer)
-        (strand-review skg--fork-strand-review)
+        (strandeds-review skg--fork-strandeds-review)
         (fork-skgrepos (skg--fork-repos-from-confirmation-buffer)))
     (unless (buffer-live-p source)
       (error "The buffer that requested these forks is no longer open"))
@@ -923,7 +923,7 @@ hand (C-c s s)."
     (skg--replace-fork-confirmation-with-result
      (current-buffer) source (length fork-skgrepos))
     (with-current-buffer source
-      (skg-request-save-buffer t fork-skgrepos nil nil strand-review))))
+      (skg-request-save-buffer t fork-skgrepos nil nil strandeds-review))))
 
 (defun skg-decline-fork ()
   "Decline the forks; nothing was written. Strip any lingering explicit
