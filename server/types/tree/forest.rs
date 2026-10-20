@@ -79,8 +79,8 @@ impl<T> Forest<T> {
   pub fn nodes<'a> (
     &'a self,
   ) -> impl Iterator<Item = NodeRef<'a, T>> + 'a {
-    self . roots () . flat_map ( |root| {
-      std::iter::once (root) . chain (root . descendants ()) } ) }
+    self . roots () . flat_map ( |root|
+      root . descendants () ) } // 'descendants' begins with 'root' itself.
 
   pub fn first_root<'a> (
     &'a self,
@@ -139,3 +139,7 @@ pub fn tree_forest_root_skgids<T> (
   tree . root () . children ()
     . map ( |root| root . id () )
     . collect () }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/tree_forest.rs"]
+mod tests;
