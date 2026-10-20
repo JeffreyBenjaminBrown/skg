@@ -194,9 +194,10 @@ So far there are these endpoints:
        phantom. The buffer is reconciled over the graph straddle, not
        rebuilt: its roots, and every headline it drew editable, stay as
        saved, and its change facts, change folders, markers and removed
-       members are redrawn. What it draws anew it draws by its fresh
-       PCSVF sets: a new member in U is editable, with its content
-       list, and any other new member is a write-protected leaf. It
+       members are redrawn. What it draws anew it draws by its PCSVF
+       sets recomputed after the save: a new member in U is editable,
+       with its content list, and any other new member is a
+       write-protected member drawn without its content. It
        makes no occurrence editable and appends no root; the "show
        unshown changes" request below does. An editable-view request
        cascades as in any view, and only the expansion of a node
@@ -225,7 +226,7 @@ So far there are these endpoints:
     finds every relationship touching the moved node, in either
     direction and whether or not a view shows it, that sat at its
     default relRepo and that the sticky-else-default rule would leave
-    off its new default ('server/from_text/strands.rs'). One left more
+    off its new default ('server/from_text/strandeds.rs'). One left more
     public than its member's new home (an inbound relationship of a
     privatizing move) is raised to the new default, and the save's
     warnings say so. If any other remains and the request lacks
@@ -947,7 +948,7 @@ under different parents):
   skgrepo already sits more public than the default may be held or
   made more private, never made still more public). Absent means the
   relationship sits at its default relRepo. The relationship belongs to the
-  view-parent (or a writable folder's anchor), so a write-protected headline
+  view-parent (or a writable folder's viewparent), so a write-protected headline
   may carry this request too; the save refuses it only when nothing editable
   writes that relationship, e.g. under a write-protected parent.
   Alias and Unknown headlines likewise
@@ -1141,7 +1142,7 @@ of the total diff view ('server/readiness_store.rs'). The server reads
 it at startup and rewrites it after every change; a missing or
 unreadable file means no marks. It is a JSON object whose =marks= is a
 list of ={"leaf": KEY, "fingerprint": N}= entries. KEY names one
-change-forest leaf ('LeafKey' in 'server/change_forest.rs'): a node
+change-forest leaf ('LeafKey' in 'server/change_leaves.rs'): a node
 aspect ={"Node": {"pid": ..., "aspect": ...}}=, where the aspect is
 ="Existence"=, ="Text"=, ="Home"=, ={"Alias": TEXT}=, ={"ExtraId": ID}=
 or ={"Flag": FLAG}=; or a relationship aspect ={"Relationship":
@@ -1245,18 +1246,18 @@ ATOMS are drawn from =node+ node- rel+ rel-=: the node HEAD lacks (=node+=)
 or the worktree lacks (=node-=); the relationship to the viewparent
 that HEAD lacks (=rel+=) or the worktree lacks (=rel-=). It sits inside
 =(node ...)=, =(deleted ...)=, =(unknown ...)= and =(historical ...)=, and
-at top level on alias, id and flag leaves, whose single axis is
-written =rel+= or =rel-=. A lost alias or ID is a =removedAlias= or
+at top level on alias, id and flag leaves, whose single diff object
+is written =rel+= or =rel-=. A lost alias or ID is a =removedAlias= or
 =removedID= leaf (below), whose =rel-= is display only.
 
-*** Readiness: =(ready AXES)=, =(readyRequest AXES)=, =(unreadyRequest AXES)=
-=(ready AXES)= lists the axes (=node=, =rel=) whose change-forest leaves
-are all marked commit-ready; a bare =(ready)= marks a single-axis leaf,
-or an aggregate (a folder or changeset marker) that is ready. It is
-absent when nothing is ready. =(readyRequest AXES)= and
-=(unreadyRequest AXES)= ask the save to set or clear the marks of those
-leaves; the axis =all= names every leaf of an aggregate, one level
-down. These sit where =(diff ...)= sits, and also at top level on the
+*** Readiness: =(ready OBJECTS)=, =(readyRequest OBJECTS)=, =(unreadyRequest OBJECTS)=
+=(ready OBJECTS)= lists the diff objects (=node=, =rel=) whose
+change-forest leaves are all marked commit-ready; a bare =(ready)=
+marks a single-object leaf, or an aggregate (a folder or changeset
+marker) that is ready. It is absent when nothing is ready.
+=(readyRequest OBJECTS)= and =(unreadyRequest OBJECTS)= ask the save
+to set or clear the marks of those leaves; the object =all= names
+every leaf of an aggregate, one level down. These sit where =(diff ...)= sits, and also at top level on the
 properties below other than =bodyDiff=.
 
 *** The total diff view's viewnodes

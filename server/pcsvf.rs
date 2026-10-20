@@ -328,11 +328,11 @@ fn append_stub_root (
         kind : ViewnodeKind::PartnerFolder (PartnerFolder::Container) } ); }
   Ok (root_treeid) }
 
-/// The content origins of the buffer's fresh D that no viewnode in it draws,
-/// in ID order. The fresh R is deduplicated with the buffer's
-/// 'standing_roots' pinned as kept, so that a change to a rootlike
-/// cycle's membership never adds a second root for a cycle that
-/// already stands.
+/// The content origins in D, of the buffer's sets recomputed after
+/// the save, that no viewnode in it draws, in ID order. The recomputed
+/// R is deduplicated with the buffer's 'standing_roots' pinned as
+/// kept, so that a change to a rootlike cycle's membership never adds
+/// a second root for a cycle that already stands.
 pub fn contentOrigins_missing_from_buffer (
   drawing        : DiffViewSource,
   viewforest     : &ViewForest,
@@ -374,7 +374,7 @@ pub fn root_skgids_of_buffer (
     . collect () }
 
 /// Before the view completion of a rerender that shows the unshown
-/// changes ('rerender_view'): each node of the buffer's fresh U that
+/// changes ('rerender_view'): each node of the buffer's recomputed U that
 /// has no editable occurrence becomes editable where it
 /// stands, at its BFS-first content occurrence (a root, or a member
 /// of a vognode's content), or if it has none at its BFS-first

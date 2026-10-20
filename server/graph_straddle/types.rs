@@ -110,8 +110,8 @@ impl GraphStraddle {
 
   /// The sets of the PCSVF that a buffer of the total diff view
   /// draws. The order-only buffer draws no PCSVF: its sets are empty,
-  /// so each of its roots is drawn with its content as
-  /// write-protected leaves. Computed once per straddle.
+  /// so each of its roots is drawn with its content as unexpanded
+  /// write-protected members. Computed once per straddle.
   pub fn pcsvf_sets_of_buffer (
     &self,
     tdv_buffer : DiffViewBufferKind,

@@ -680,7 +680,7 @@ async fn test_editable_view_request_on_an_editable_node (
 // Test: a request on a write-protected occurrence moves editability
 // ===================================================
 // A view of 1 and 12 draws root 12 editable, with its content, and
-// the 12 under 1 as a write-protected leaf. A request on that leaf
+// the 12 under 1 as an unexpanded write-protected member. A request on it
 // moves editability to it; root 12 is write-protected and keeps its
 // drawn content, no longer as members. A request on root 12, whose
 // drawn children are unchanged, moves editability back: root 12 is
@@ -914,7 +914,8 @@ async fn test_writeProtect_subtree_request (
 // ===================================================
 // Test: a write-protect request on a write-protected occurrence is a no-op
 // ===================================================
-// A view of 1 and 12 draws the 12 under 1 as a write-protected leaf.
+// A view of 1 and 12 draws the 12 under 1 as an unexpanded
+// write-protected member.
 async fn test_writeProtect_request_on_a_writeProtected_occurrence (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,

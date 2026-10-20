@@ -452,7 +452,7 @@ pub fn render_initial_view (
 /// Complete a stub viewforest of the total diff view
 /// ('server/pcsvf.rs') as 'drawing' says: view completion with
 /// 'diffView_source' set, which draws the union of the straddle's content, the change
-/// folders and markers, and the removed members. It creates no
+/// folders and markers, and the former members. It creates no
 /// default partner folders, spends no node budget (only an
 /// editable-view request spends it, and a first drawing carries
 /// none), and never restricts by skgrepo (the total diff view
@@ -492,19 +492,19 @@ pub fn complete_viewforest_with_graph_straddle (
 /// A buffer of the total diff view ('tdv_buffer' Some) is reconciled
 /// over the graph straddle, brought up to date in 'context': view
 /// completion reconciles each editable node's change facts, change
-/// folders, markers and removed members, its ID folder among them,
+/// folders, markers and former members, its ID folder among them,
 /// with a fresh drawing from the straddle
 /// ('process_unrestrictedVognode_changes'), keeping every viewnode
 /// that stays and its fold state, and its readiness facts are then
 /// read from the store. Completion draws what it draws anew by the
-/// buffer's fresh sets, and nothing editable is write-protected
-/// again. Only when 'show_unshown_changes' is true (the "show unshown
-/// changes" request) does it make occurrences editable or append
-/// roots: before completion each node of the fresh U is made
-/// editable at its first occurrence if it has no editable one, and
-/// after completion the origins of the fresh D that the buffer does
-/// not draw are appended as roots and completed. Its standing roots
-/// stay.
+/// buffer's sets recomputed after the save, and nothing editable is
+/// write-protected again. Only when 'show_unshown_changes' is true
+/// (the "show unshown changes" request) does it make occurrences
+/// editable or append roots: before completion each node of the
+/// recomputed U is made editable at its first occurrence if it has no
+/// editable one, and after completion the content origins of the
+/// recomputed D that the buffer does not draw are appended as roots
+/// and completed. Its standing roots stay.
 pub fn rerender_view (
   viewforest    : &mut ViewForest,
   context       : &mut RerenderAfterSaveContext<'_>,

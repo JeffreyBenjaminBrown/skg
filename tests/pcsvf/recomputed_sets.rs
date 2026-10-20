@@ -1,12 +1,13 @@
-// A buffer of the total diff view draws by its fresh sets wherever a
-// save draws something new, but only the "show unshown changes"
-// request makes occurrences editable or appends roots
+// A buffer of the total diff view draws by its sets recomputed after
+// the save wherever a save draws something new, but only the "show
+// unshown changes" request makes occurrences editable or appends roots
 // ('TODO/total-diff-view/08_plan_yet-more.org', "The view follows U
 // only on command"). The 'fresh' fixture (one skgrepo, main): r
 // contains a, whose body changed, and w, unchanged; w contains w1
 // and w2; w1 contains w1a and subscribes to w2. s, unchanged,
 // contains s1. p and q are new, and contain each other. So the
-// buffer's roots are q and r, and w is a write-protected leaf.
+// buffer's roots are q and r, and w is an unexpanded write-protected
+// member.
 
 use crate::pcsvf::common::{
   Fixture, collateral_view_content, node_lines, open_all_changes_buffer,
@@ -113,8 +114,8 @@ fn subtree_starting<'a> (
     . collect () }
 
 /// w changes after the buffer opened, while the buffer draws it only
-/// as a write-protected leaf. After the next save it is still one,
-/// and its change is counted unshown. The command makes it editable,
+/// as an unexpanded write-protected member. After the next save it is
+/// still one, and its change is counted unshown. The command makes it editable,
 /// with its change drawn, and its members, outside U, write-protected.
 /// Its origin r is drawn already, so no root is added, and no change
 /// is unshown.
@@ -129,7 +130,7 @@ fn a_write_protected_leaf_that_changes_becomes_editable_by_the_command (
     let saved : &str = &response . saved_view;
     assert! ( ! node_lines (saved, "w") . is_empty ()
               && ! drawn_editable (saved, "w"),
-              "w must stay a write-protected leaf:\n{}", saved );
+              "w must stay an unexpanded write-protected member:\n{}", saved );
     assert! ( node_lines (saved, "w1") . is_empty (), "{}", saved );
     assert_eq! ( response . readiness_summary . unwrap () . changes_not_editable_here, 1 );
     let (shown, unshown) : (String, usize) = show_unshown_changes (f) ?;
@@ -139,13 +140,13 @@ fn a_write_protected_leaf_that_changes_becomes_editable_by_the_command (
     for member in [ "w1", "w2" ] {
       assert! ( ! node_lines (&shown, member) . is_empty ()
                 && ! drawn_editable (&shown, member),
-                "{} must be a write-protected leaf:\n{}", member, shown ); }
+                "{} must be an unexpanded write-protected member:\n{}", member, shown ); }
     assert_eq! ( root_ids (&shown), vec! [ "q", "r" ] );
     assert_eq! ( unshown, 0 );
     Ok (( )) }) }
 
-/// w1a, two levels under the write-protected leaf w, changes. The
-/// next save draws nothing of it and counts it unshown. The command
+/// w1a, two levels under the unexpanded write-protected member w,
+/// changes. The next save draws nothing of it and counts it unshown. The command
 /// makes w, w1 and w1a editable and draws w1a's change under them;
 /// w2 stays write-protected.
 #[test]

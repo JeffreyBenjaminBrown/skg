@@ -722,9 +722,10 @@ buffer keeps its roots until you close it, and saving it (or
 committing) keeps what you folded. A save (of it or of another view)
 draws what it draws anew by what changed: a new member that changed,
 or leads to a change, is editable with its content, and any other new
-member is a write-protected leaf. But a save makes nothing editable
-that the buffer already draws, and appends no root: a change since
-the buffer opened that it draws nowhere editable is unshown, and the
+member is a write-protected member drawn without its content. But a
+save makes nothing editable that the buffer already draws, and
+appends no root: a change since the buffer opened that it draws
+nowhere editable is unshown, and the
 readiness summary counts it. C-c r u shows such changes. Nothing the
 buffer draws editable is write-protected again by the server. An
 editable-view request (C-c s d) works as in any view, except that

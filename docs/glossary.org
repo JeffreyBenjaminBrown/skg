@@ -315,8 +315,8 @@ subscriber sees the subscribee.
 
 *Non-member children jump above the members.*  A non-member
 child parked inside any folder is reordered above the
-generated members on save (=complete_relevant_children= moves
-irrelevant children to the front).  This is deliberate, not a bug: the
+generated members on save (=complete_managed_children= moves
+unmanaged children to the front).  This is deliberate, not a bug: the
 membership is generated and ordered, so a note you park inside a folder is
 kept but visibly separated from the live membership.
 
@@ -733,7 +733,7 @@ The *graph straddle* ('GraphStraddle { before, after }',
 with one foot in the committed graph and one in the live graph. The
 *before-graph* is an in-Rust graph built from each owned skgrepo at
 HEAD (each foreign skgrepo at its worktree); the *after-graph* is the
-live graph. Its old name is the *graph pair*.
+live graph.
 
 *** union walk, presence
 
@@ -741,24 +741,25 @@ The *union walk* is the API over the graph straddle that answers
 questions about the union of its two graphs. Each node and each
 relationship it reports carries a *presence*: 'Both', 'OnlyBefore' or
 'OnlyAfter'. A view shows a presence as '(diff ...)' atoms: 'node+' and
-'node-' on the node axis, 'rel+' and 'rel-' on the relationship axis.
+'node-' on the node itself, 'rel+' and 'rel-' on its relationship to
+its viewparent.
 
 *** C, R, U, D, content origin
 
 The sets the PCSVF is drawn from. *C* is the set of changed
-graphnodes: rightward changes (the node's own file changed) and
-leftward ones (only its recorders' files did). *R* is the set of
+graphnodes: out-changed ones (the node's own file changed) and
+in-changed ones (only its recorders' files did). *R* is the set of
 content origins reached from C by walking containerward. A *content
 origin* is a node with no container, a multiply-contained node, or a
-member of a rootlike cycle (the stop rule of 'server/prominence.rs';
-"origin" in code). *U*, the nodes to unfold, is R, C and every node on
-a containerward path from a node of C to an origin. *D*, the roots of
-the "all changes" buffer, is R minus the origins that another kept
-origin reaches containerward inside U.
+member of a rootlike cycle (the stop rule of 'server/prominence.rs').
+*U*, the nodes to unfold, is R, C and every node on a containerward
+path from a node of C to an origin. *D*, the roots of the "all
+changes" buffer, is R minus the origins that another kept origin
+reaches containerward inside U.
 
 *** change-forest, change-forest leaf
 
-The *change-forest* ('ChangeForest', 'server/change_forest.rs') is
+The *change-forest* ('ChangeLeaves', 'server/change_leaves.rs') is
 the tree of everything commit-readiness can be asked about, built
 from the graph straddle, independent of any view. Its roots are the
 changed graphnodes; under each come its changed aspects; its leaves,
@@ -811,8 +812,8 @@ A save never shows them; C-c r u does.
 
 *** readiness request, gesture
 
-A *readiness request* is a metadata form, '(readyRequest AXES)' or
-'(unreadyRequest AXES)', that the save consumes to set or clear the
+A *readiness request* is a metadata form, '(readyRequest OBJECTS)' or
+'(unreadyRequest OBJECTS)', that the save consumes to set or clear the
 marks of a headline's leaves. A *gesture* is a client command that
 writes readiness requests on one or many headlines, then saves.
 

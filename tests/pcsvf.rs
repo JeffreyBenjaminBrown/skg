@@ -22,7 +22,7 @@ mod stage_and_commit;
 mod editing;
 #[path = "pcsvf/folding.rs"]
 mod folding;
-#[path = "pcsvf/fresh_sets.rs"]
-mod fresh_sets;
+#[path = "pcsvf/recomputed_sets.rs"]
+mod recomputed_sets;
 #[path = "pcsvf/write_protecting.rs"]
 mod write_protecting;

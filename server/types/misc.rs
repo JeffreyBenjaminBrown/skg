@@ -245,7 +245,7 @@ pub struct SkgrepoName ( pub String );
 
 impl SkgrepoName {
   /// Reserved sentinel skgrepo for a *non-Unrestricted* viewnode (e.g. a
-  /// Diff phantom) whose skgrepo could not be determined. It renders like
+  /// historical phantom) whose skgrepo could not be determined. It renders like
   /// any other skgrepo -- the all-caps name alone flags it to the user --
   /// so that one unresolvable reference does not abort an entire render
   /// (TODO/DONE/local-view-update/plan_v2.org §7.6). Unrestricted-vognode skgrepo failures are caught by

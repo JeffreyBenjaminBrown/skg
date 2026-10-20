@@ -5,7 +5,7 @@
 /// in the same sweep) every:
 /// - RestrictedVognode leaf;
 /// - Property leaf whose owning vognode (grandparent) is restricted;
-/// - write-protected leaf partner (child of a PartnerFolder), unrestricted or
+/// - write-protected partner without children (child of a PartnerFolder), unrestricted or
 ///   restricted: a write-protected partner defines nothing, and
 ///   completion regenerates current membership afterward;
 /// - empty PropertyFolder or PartnerFolder;

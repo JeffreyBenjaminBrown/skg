@@ -1282,3 +1282,53 @@ it now calls 'nodes'.
 generic) fails on the old code.
 *** the headline had no keyword
 The slice's headline carried no TODO; it now carries DONE.
+* Housekeeping and structure
+** Slice 0: deviations
+*** renamed beyond the list, for one word per thing
+Besides the listed names: the accessor 'GraphStraddle::change_forest'
+is 'change_leaves'; 'leaves_owned_by' is 'leaves_recorded_by', and the
+change leaves' comments say "records" for "owns";
+'buffer_readiness_summary''s parameter 'shown' is 'editable_here';
+'kept_origins' is 'kept_content_origins'; 'MpViewnode''s fold fields,
+and the serializer's parameters that carry them, are 'org_folded' and
+'org_body_folded' too; 'change_fact_rules_for_two_axes' and
+'_one_axis' say 'objects' and 'object', as do
+'readiness_objects_from_atoms' and 'object_is_ready'. The locals that
+hold 'viewStats.home_skgrepo_move' are named so.
+*** test files and fixtures follow the renames
+'tests/unit/change_forest.rs' is 'change_leaves.rs';
+'tests/unit/strands.rs', 'tests/strands.rs' and 'tests/strands/' are
+'strandeds'; 'tests/pcsvf/fresh_sets.rs' is 'recomputed_sets.rs'; the
+graph-straddle fixture 'rightward_and_leftward' is
+'out_changed_and_in_changed', and the tests named for the two halves
+of C say "out-changed" and "in-changed". The code map's slice 7 entry
+still names 'fresh_sets.rs' and 'strands.rs'.
+*** 'relevel' became 'reset_to_default' literally
+'relevel_relationships' is 'reset_to_default_relationships'. The
+comments say "reset to default"; the confirmation prompt the server
+sends still says "Re-level", as the clients and the wire key
+'relevel-strands' do until slice 1.
+*** who prefixes the HEAD error
+'owned_head_identity' says "Cannot read HEAD of skgrepo 'X': it is
+not in a git repository." or "...: it has no HEAD commit: E". Opening a
+diff-view buffer prefixes "Cannot open the diff view: ", stage-and-
+commit "Cannot stage and commit: ", a rerender "Cannot redraw the diff
+view buffer: "; the readiness requests and the post-commit rebuild
+already prefixed their own.
+*** what was left for later slices
+The wire keys and strings ('strand-confirmation', 'strands-reviewed',
+'relevel-strands', '(strands ...)', 'unshown'), the 'tdv_buffer' locals,
+the "tdv:" and "axis" names in 'tests/shared/herald-rendering-cases.txt',
+and the clients' axis and strand names are slice 1's; "diff phantoms"
+in 'docs/override.org' is slice 3's. The local 'anchor' of the
+removal plan in 'to_org/render/changes.rs' (the next surviving
+sibling, not a folder's viewparent) keeps its name.
+*** docs touched
+The docs that named a renamed identifier or used a retired word now
+use the new one: the glossary (the C entry's halves, the change-forest
+entry's type and file, 'complete_managed_children', the dropped "graph
+pair" sentence, the readiness request's OBJECTS), the API doc (the
+readiness forms' OBJECTS, the file paths, "a writable folder's
+viewparent", the sets recomputed after a save), 'docs/heralds.org'
+("diff object") and both COMMANDS files ("write-protected member drawn
+without its content").

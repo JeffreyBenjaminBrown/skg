@@ -868,7 +868,7 @@ its last commit made as the Commits section says. A rename slice must
 leave every suite passing with only the renamed identifiers changed in
 the tests.
 
-** TODO Slice 0: server-internal renames
+** DONE Slice 0: server-internal renames
 Apply every rename under "Server identifiers" above, including the
 file renames 'change_forest.rs' to 'change_leaves.rs' and
 'strands.rs' to 'strandeds.rs' ('git mv'), the comment rewordings, and

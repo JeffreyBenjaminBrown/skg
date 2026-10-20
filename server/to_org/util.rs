@@ -361,14 +361,14 @@ pub fn validate_affectsParent_relationships (
 
 /// Jeff's invariant (TODO/DONE/local-view-update/progress.org §11 thread): a *non-dead generalized orphan*
 /// must have AffectsParent=False. An Unrestricted node whose PARENT is a
-/// non-container -- a Diff phantom, a Deleted, or a DeadViewnode -- is exactly
+/// non-container -- a historical phantom, a Deleted, or a DeadViewnode -- is exactly
 /// that: it survives (is not itself dead) but its container is gone, so its
 /// member claim (that it is part of that parent's membership) cannot hold.
 /// Demote it to non-member so it renders as its own graph-contains root rather
 /// than claiming to affect a parent that no longer contains anything.
 ///
 /// Scope, deliberately narrow:
-/// - PARENT is Diff phantom / Deleted / DeadViewnode -> demote a member child.
+/// - PARENT is historical phantom / Deleted / DeadViewnode -> demote a member child.
 /// - PARENT is a Folder (PropertyFolder / PartnerFolder): the child is a legitimate folder
 ///   MEMBER; membership is correct -> leave. (A folder whose own ancestry broke is
 ///   deadened to DeadViewnode first, and then THIS pass catches its members.)
@@ -378,9 +378,8 @@ pub fn validate_affectsParent_relationships (
 /// Belt-and-suspenders: most cases are already demoted during the BFS
 /// (mark_erroneous_content_children_as_indep for content children;
 /// dispose_orphaned_folder_child for a deadened folder's members). This final pass
-/// GUARANTEES the invariant for any survivor those miss (e.g. a removedHere
-/// phantom's content children), in both the post-save and de-novo paths. Purely
-/// structural -- no graph read.
+/// GUARANTEES the invariant for any survivor those miss, in both the
+/// post-save and de-novo paths. Purely structural -- no graph read.
 pub fn mark_orphans_under_dead_parents_false (
   viewforest : &mut Tree<Viewnode>,
 ) {

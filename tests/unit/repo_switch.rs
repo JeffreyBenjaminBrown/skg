@@ -57,7 +57,7 @@ fn conversion_and_retention () {
     t . get (kept) . unwrap () . children () . count () == 1,
     "the unrestricted child survives under the retained node" ); }
 
-// All write-protected leaf partners are pruned, unrestricted and restricted
+// All write-protected partners without children are pruned, unrestricted and restricted
 // alike, and the emptied folder goes with them; an editable partner
 // survives.
 #[test]

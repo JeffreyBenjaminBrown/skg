@@ -82,7 +82,8 @@ pub enum DiffObject {
 
 /// '(readyRequest OBJECTS)' or '(unreadyRequest OBJECTS)': save intent that
 /// sets or clears the commit-readiness marks of the viewnode's
-/// leaves on those objects. No objects means the viewnode's only leaf.
+/// leaves on those objects. No objects means the viewnode's only
+/// change-forest leaf.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReadinessRequest {
   pub ready   : bool, // true for readyRequest, false for unreadyRequest
@@ -211,7 +212,7 @@ pub struct PhantomUnknown {
 ///
 /// ARISES: only in a total diff view, built from the graph straddle
 /// ('server/to_org/render/change_viewnodes.rs'): under each former
-/// container as a removed member, or as a view root. Its own old
+/// container as a former member, or as a view root. Its own old
 /// content hangs beneath it, recursing into deleted members.
 ///
 /// USED: write-protected and save-inert, like every phantom: it emits
@@ -220,8 +221,8 @@ pub struct PhantomUnknown {
 /// reconciler owns it.
 ///
 /// DISTINCT INFO: the before-graph's title, body and home skgrepo,
-/// and the change facts of its existence leaf (node-) and of its
-/// relationship to its viewparent (rel-).
+/// and the change facts of its existence (node-) and of its
+/// relationship to its viewparent (rel-), each a change-forest leaf.
 #[derive( Debug, Clone, PartialEq )]
 pub struct PhantomHistorical {
   pub skgid             : ID,
@@ -423,14 +424,14 @@ pub enum Property {
   // reconciler owns them. Each but BodyDiff is a change-forest leaf or
   // aggregate, so it carries '(ready ...)' and a readiness request.
   /// In an alias folder: an alias the worktree lost since HEAD. The
-  /// alias reader never reads it. Its leaf is that alias.
+  /// alias reader never reads it. Its change-forest leaf is that alias.
   RemovedAlias {
     text              : String,
     change_facts      : ChangeFacts,
     readiness_request : Option<ReadinessRequest>,
   },
   /// In an ID folder: an extra ID the worktree lost since HEAD. The
-  /// ID check never counts it. Its leaf is that ID.
+  /// ID check never counts it. Its change-forest leaf is that ID.
   RemovedID {
     skgid             : ID,
     change_facts      : ChangeFacts,
@@ -438,8 +439,8 @@ pub enum Property {
   },
   /// The node's text at HEAD, under a node whose text changed.
   /// 'title' is Some iff the title changed, 'body' Some iff the body
-  /// changed (the empty string for a body HEAD lacked). Its leaf is
-  /// the node's text change.
+  /// changed (the empty string for a body HEAD lacked). Its
+  /// change-forest leaf is the node's text change.
   OldText {
     title             : Option<String>,
     body              : Option<String>,
@@ -448,7 +449,8 @@ pub enum Property {
   },
   /// The line diff of the node's body, under its OldText.
   BodyDiff { diff : String },
-  /// The node's home skgrepo changed. Its leaf is the node's home.
+  /// The node's home skgrepo changed. Its change-forest leaf is the
+  /// node's home skgrepo.
   HomeSkgrepoMove {
     old               : SkgrepoName,
     new               : SkgrepoName,
@@ -456,7 +458,8 @@ pub enum Property {
     readiness_request : Option<ReadinessRequest>,
   },
   /// Under a member: the relationship to its viewparent moved from
-  /// one skgrepo to another. Its leaf is that relationship's relRepo.
+  /// one skgrepo to another. Its change-forest leaf is that
+  /// relationship's relRepo.
   RelRepoMove {
     old               : SkgrepoName,
     new               : SkgrepoName,
@@ -475,7 +478,7 @@ pub enum Property {
 /// Which changes a 'Property::ChangesetMarker' stands for.
 #[derive( Debug, Clone, Copy, PartialEq, Eq, Hash )]
 pub enum ChangesetMarkerKind {
-  Content,   // "its content changed": the ~ leaves of its content
+  Content,   // "its content changed": the ~ change-forest leaves of its content
   RelRepo,   // "some content relationships changed skgrepo"
   OrderOnly, // "order-only change", always ready
 }
