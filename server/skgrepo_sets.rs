@@ -102,6 +102,17 @@ pub fn filter_branches_to_unrestricted_skgrepos_for_test (
         result . insert (skgid); }}}
   Ok (result) }
 
+/// Refuses unless the restriction is 'all'. 'what' is the refused
+/// command, as the subject of the refusal ("The diff view").
+pub fn require_skgrepo_set_all (
+  what        : &str,
+  restriction : &SkgrepoRestriction,
+) -> Result<(), String> {
+  if restriction . is_all () { return Ok (( )); }
+  Err ( format! (
+    "{} requires no skgrepo restriction (the skgrepo-set all); current skgrepo restriction is {}. Switch the repo-set to all first.",
+    what, restriction . name )) }
+
 pub fn apply_skgrepo_set_to_viewforest (
   viewforest : &mut Tree<Viewnode>,
   restriction : &SkgrepoRestriction,

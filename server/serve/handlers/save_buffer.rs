@@ -1,4 +1,4 @@
-use crate::change_leaves::{BufferReadinessSummary, ReadinessSummary};
+use crate::change_leaves::BufferReadinessSummary;
 use crate::dbs::in_rust_graph::{
   in_rust_graph_coherent_with_nodeInstructions_in, new_handle };
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
@@ -34,7 +34,7 @@ use crate::serve::handlers::save_dependencies::{
 };
 use crate::serve::util::{
   view_id_from_request,
-  format_buffer_response_sexp,
+  buffer_response_entries,
   format_fork_confirmation_response_sexp,
   format_lock_views_sexp,
   read_length_prefixed_content,
@@ -115,40 +115,17 @@ pub struct SavePointPosition {
 }
 
 impl SaveResponse {
-  /// Format: ((content "...") (errors (...)) (warnings (...)))
+  /// Format: ((content "...") (errors (...)) (warnings (...)) POINT...
+  /// (readiness-summary ...)), where the point entries and the
+  /// readiness summary are there when the save has them.
   fn to_sexp_string (&self) -> String {
-    let mut response : Sexp =
-      sexp::parse (
-        &format_buffer_response_sexp (
-          & self . saved_view,
-          & self . errors,
-          & self . warnings ))
-      . expect (
-        "format_buffer_response_sexp should produce valid sexp" );
-    if let ( Sexp::List (items),
-             Some (point_position) ) =
-      ( &mut response, &self . save_point_position )
-    { push_save_point_position_to_sexp_items (
-        items, point_position ); }
-    if let ( Sexp::List (items),
-             Some (readiness_summary) ) =
-      ( &mut response, &self . readiness_summary )
-    { items . push ( sexp::parse (
-        &readiness_summary_sexp (readiness_summary) )
-        . expect ( "readiness_summary_sexp should produce valid sexp" )); }
-    sexp_to_client_string (&response) }}
-
-/// '(readiness-summary (ready N) (changed M) (foreign F)
-/// (order-only O) (notEditable K))'.
-pub fn readiness_summary_sexp (
-  readiness_summary : &BufferReadinessSummary,
-) -> String {
-  let summary : &ReadinessSummary = &readiness_summary . summary;
-  format! (
-    "(readiness-summary (ready {}) (changed {}) (foreign {}) (order-only {}) (notEditable {}))",
-    summary . ready_files, summary . changed_files,
-    summary . foreign_changed_files, summary . order_only_files,
-    readiness_summary . changes_not_editable_here ) }
+    let mut items : Vec<Sexp> = buffer_response_entries (
+      & self . saved_view, & self . errors, & self . warnings );
+    if let Some (point_position) = &self . save_point_position {
+      push_save_point_position_to_sexp_items (&mut items, point_position); }
+    if let Some (readiness_summary) = &self . readiness_summary {
+      items . push (readiness_summary . to_sexp ()); }
+    sexp_to_client_string (&Sexp::List (items)) }}
 
 /// Handles save buffer requests from Emacs.
 /// - Reads the buffer content (with length prefix).

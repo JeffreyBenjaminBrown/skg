@@ -11,6 +11,7 @@ use crate::types::phantom::home_from_disk;
 
 use std::sync::Arc;
 use std::sync::Mutex as SyncMutex;
+use std::sync::MutexGuard as SyncMutexGuard;
 use arc_swap::ArcSwap;
 use tokio::sync::Mutex;
 
@@ -74,6 +75,15 @@ impl SharedRuntime {
   pub fn graph_snapshot (&self) -> Arc<RuntimeGeneration> {
     self . current . load_full ()
   }
+
+  /// The readiness store, locked. A panic while another holder had it
+  /// leaves the marks as they were, so a poisoned lock is taken
+  /// anyway.
+  pub fn lock_readiness_store (
+    &self,
+  ) -> SyncMutexGuard<'_, ReadinessStore> {
+    self . readiness_store . lock ()
+      . unwrap_or_else ( |poisoned| poisoned . into_inner () ) }
 
   pub fn swap_in (
     &self,

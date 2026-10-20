@@ -5,7 +5,7 @@
 //! change counts as absent. The store lives server-side, in
 //! '<data_root>/readiness-marks.json', rewritten after every change.
 
-use crate::change_leaves::LeafKey;
+use crate::change_leaves::{ChangeLeaves, LeafKey};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -42,6 +42,14 @@ impl ReadinessStore {
     key : &LeafKey,
   ) {
     self . marks . remove (key); }
+
+  /// Drop every mark whose leaf is not among 'leaves', as when the
+  /// changes it approved were git-committed.
+  pub fn drop_marks_of_vanished_leaves (
+    &mut self,
+    leaves : &ChangeLeaves,
+  ) {
+    self . marks . retain ( |key, _| leaves . leaf (key) . is_some () ); }
 
   /// The store saved under 'data_root'. A missing or unreadable file
   /// means an empty store.

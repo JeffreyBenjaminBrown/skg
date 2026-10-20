@@ -12,7 +12,8 @@
 //! ('stream_rerender_diffView_views'). Its roots stay, so a buffer whose
 //! changes were all committed comes back as plain context.
 
-use crate::change_leaves::{BufferReadinessSummary, ReadinessSummary};
+use crate::change_leaves::{
+  BufferReadinessSummary, ReadinessSummary, readiness_response_sexp};
 use crate::git_ops::stage_and_commit::{
   SkgrepoCommitOutcome, stage_and_commit_owned_skgrepos};
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
@@ -21,12 +22,11 @@ use crate::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
 use crate::serve::handlers::rerender_all_views::{
   stream_empty_rerender, stream_rerender_diffView_views};
-use crate::serve::handlers::save_buffer::readiness_summary_sexp;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
-  format_errors_warnings_sexp, send_response_with_length_prefix,
-  sexp_to_client_string, tag_sexp_response, value_from_request_sexp};
-use crate::skgrepo_sets::SkgrepoRestriction;
+  send_response_with_length_prefix, sexp_to_client_string,
+  tag_sexp_response, true_entry_sexp, value_from_request_sexp};
+use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgrepoName;
 
@@ -87,10 +87,9 @@ pub fn stage_and_commit (
   message             : &str,
   confirmed           : bool,
 ) -> StageAndCommitAnswer {
-  if ! skgrepo_restriction . is_all () {
-    return StageAndCommitAnswer::Refused ( format! (
-      "Stage and commit requires no skgrepo restriction (the skgrepo-set all); current skgrepo restriction is {}. Switch the repo-set to all first.",
-      skgrepo_restriction . name )); }
+  if let Err (refusal) =
+    require_skgrepo_set_all ("Stage and commit", skgrepo_restriction) {
+    return StageAndCommitAnswer::Refused (refusal); }
   if message . trim () . is_empty () {
     return StageAndCommitAnswer::Refused (
       "A commit message is required." . to_string () ); }
@@ -101,7 +100,8 @@ pub fn stage_and_commit (
     Ok (straddle) => straddle,
     Err (e) => return StageAndCommitAnswer::Refused ( format! (
       "Cannot stage and commit: {}", e )), };
-  { let store : MutexGuard<ReadinessStore> = lock_store (env);
+  { let store : MutexGuard<ReadinessStore> =
+      env . runtime . lock_readiness_store ();
     let summary : ReadinessSummary =
       straddle . change_leaves () . readiness_summary (&store);
     if ! summary . is_complete () && ! confirmed {
@@ -115,19 +115,13 @@ pub fn stage_and_commit (
     Err (e) => errors . push ( format! (
       "The graph straddle could not be rebuilt after the commits: {}", e )),
     Ok (rebuilt) => {
-      let mut store : MutexGuard<ReadinessStore> = lock_store (env);
-      store . marks . retain ( |key, _|
-        rebuilt . change_leaves () . leaf (key) . is_some () );
+      let mut store : MutexGuard<ReadinessStore> =
+        env . runtime . lock_readiness_store ();
+      store . drop_marks_of_vanished_leaves (rebuilt . change_leaves ());
       if let Err (e) = store . save (&runtime . config . data_root) {
         errors . push ( format! (
           "The readiness marks were not written to disk: {}", e )); }}, }
   StageAndCommitAnswer::Committed { outcomes, errors } }
-
-fn lock_store (
-  env : &SkgEnv,
-) -> MutexGuard<'_, ReadinessStore> {
-  env . runtime . readiness_store . lock ()
-    . unwrap_or_else ( |poisoned| poisoned . into_inner () ) }
 
 /// Format, for each answer:
 ///   ((errors ("REFUSAL")) (warnings ()))
@@ -140,21 +134,16 @@ fn lock_store (
 pub fn stage_and_commit_response_sexp (
   answer : &StageAndCommitAnswer,
 ) -> String {
-  let errors_and_warnings = |errors : &[String]| -> Vec<Sexp> {
-    match sexp::parse (&format_errors_warnings_sexp (errors, &[]))
-      . expect ("format_errors_warnings_sexp should produce valid sexp") {
-      Sexp::List (items) => items,
-      atom => vec! [ atom ], } };
-  let items : Vec<Sexp> = match answer {
+  let response : Sexp = match answer {
     StageAndCommitAnswer::Refused (error) =>
-      errors_and_warnings ( &[ error . clone () ] ),
+      readiness_response_sexp (
+        Vec::new (), None, &[ error . clone () ], &[] ),
     StageAndCommitAnswer::NeedsConfirmation (summary) =>
-      [ sexp::parse ("(needs-confirmation . t)")
-          . expect ("a literal sexp parses"),
-        sexp::parse ( &readiness_summary_sexp ( &BufferReadinessSummary {
-          summary : summary . clone (), changes_not_editable_here : 0 } ))
-          . expect ("readiness_summary_sexp should produce valid sexp") ]
-      . into_iter () . chain ( errors_and_warnings (&[]) ) . collect (),
+      readiness_response_sexp (
+        vec! [ true_entry_sexp ("needs-confirmation") ],
+        Some ( &BufferReadinessSummary {
+          summary : summary . clone (), changes_not_editable_here : 0 } ),
+        &[], &[] ),
     StageAndCommitAnswer::Committed { outcomes, errors } => {
       let commits : Vec<Sexp> = outcomes . iter ()
         . filter_map ( |(skgrepo, outcome)| match outcome {
@@ -169,8 +158,9 @@ pub fn stage_and_commit_response_sexp (
           Ok (_) => None, } )
         . chain ( errors . iter () . cloned () )
         . collect ();
-      std::iter::once ( Sexp::List ( vec! [
-        Sexp::Atom ( Atom::S ( "commits" . to_string () )),
-        Sexp::List (commits) ] ))
-        . chain ( errors_and_warnings (&all_errors) ) . collect () }, };
-  sexp_to_client_string ( &Sexp::List (items) ) }
+      readiness_response_sexp (
+        vec! [ Sexp::List ( vec! [
+          Sexp::Atom ( Atom::S ( "commits" . to_string () )),
+          Sexp::List (commits) ] ) ],
+        None, &all_errors, &[] ) }, };
+  sexp_to_client_string (&response) }

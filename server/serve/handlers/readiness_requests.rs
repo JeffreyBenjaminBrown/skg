@@ -55,8 +55,7 @@ pub fn consume_readiness_requests (
       Err (e) => return vec! [ format! (
         "Readiness requests were not applied: {}", e ) ], };
   let mut store : MutexGuard<ReadinessStore> =
-    env . runtime . readiness_store . lock ()
-    . unwrap_or_else ( |poisoned| poisoned . into_inner () );
+    env . runtime . lock_readiness_store ();
   let mut warnings : Vec<String> =
     apply_readiness_requests (&requests, straddle . change_leaves (), &mut store);
   if let Err (e) = store . save (&runtime . config . data_root) {

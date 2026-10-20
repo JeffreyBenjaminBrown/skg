@@ -122,12 +122,22 @@ pub(crate) fn format_buffer_response_sexp (
   errors         : &[String],
   warnings       : &[String],
 ) -> String {
-  sexp_to_client_string ( &Sexp::List ( vec! [
+  sexp_to_client_string ( &Sexp::List ( buffer_response_entries (
+    buffer_content, errors, warnings )) ) }
+
+/// The entries of 'format_buffer_response_sexp', for a caller that
+/// adds more.
+pub(crate) fn buffer_response_entries (
+  buffer_content : &str,
+  errors         : &[String],
+  warnings       : &[String],
+) -> Vec<Sexp> {
+  vec! [
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "content" . to_string () )),
       Sexp::Atom ( Atom::S ( buffer_content . to_string () )) ] ),
     format_string_list_sexp ("errors", errors),
-    format_string_list_sexp ("warnings", warnings) ] )) }
+    format_string_list_sexp ("warnings", warnings) ] }
 
 /// Format the fork-confirmation response: a write-protected buffer listing
 /// the foreign nodes about to be forked, plus the one-line minibuffer
@@ -188,7 +198,16 @@ pub(super) fn format_errors_warnings_sexp (
     format_string_list_sexp ("errors", errors),
     format_string_list_sexp ("warnings", warnings) ] )) }
 
-fn format_string_list_sexp (
+/// Format: (KEY . t)
+pub(crate) fn true_entry_sexp (
+  key : &str,
+) -> Sexp {
+  Sexp::List ( vec! [ Sexp::Atom ( Atom::S ( key . to_string () )),
+                      Sexp::Atom ( Atom::S ( "." . to_string () )),
+                      Sexp::Atom ( Atom::S ( "t" . to_string () )) ] ) }
+
+/// Format: (KEY ("v1" ...))
+pub(crate) fn format_string_list_sexp (
   key    : &str,
   values : &[String],
 ) -> Sexp {

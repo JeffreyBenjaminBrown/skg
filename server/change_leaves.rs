@@ -13,11 +13,13 @@ use crate::dbs::in_rust_graph::relation_accessors::{
 use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner, Presence};
 use crate::graph_straddle::union_walk::ROLES_OF_LISTED_MEMBERS;
 use crate::readiness_store::ReadinessStore;
+use crate::serve::util::format_string_list_sexp;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::rust::GraphnodeInRust;
 
 use serde::{Deserialize, Serialize};
+use sexp::{Atom, Sexp};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -83,6 +85,41 @@ pub struct BufferReadinessSummary {
   pub summary                   : ReadinessSummary,
   pub changes_not_editable_here : usize,
 }
+
+impl BufferReadinessSummary {
+  /// '(readiness-summary (ready N) (changed M) (foreign F)
+  /// (order-only O) (notEditable K))'.
+  pub fn to_sexp (
+    &self,
+  ) -> Sexp {
+    let entry = |key : &str, count : usize| -> Sexp {
+      Sexp::List ( vec! [ Sexp::Atom ( Atom::S ( key . to_string () )),
+                          Sexp::Atom ( Atom::I ( count as i64 )) ] ) };
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "readiness-summary" . to_string () )),
+      entry ( "ready",       self . summary . ready_files ),
+      entry ( "changed",     self . summary . changed_files ),
+      entry ( "foreign",     self . summary . foreign_changed_files ),
+      entry ( "order-only",  self . summary . order_only_files ),
+      entry ( "notEditable", self . changes_not_editable_here ), ] ) }
+}
+
+/// The response of a request that can report a readiness summary:
+///   (LEADING... (readiness-summary ...) (errors (...)) (warnings (...)))
+/// 'leading' are the request's own entries; the summary is there when
+/// one is given.
+pub fn readiness_response_sexp (
+  leading  : Vec<Sexp>,
+  summary  : Option<&BufferReadinessSummary>,
+  errors   : &[String],
+  warnings : &[String],
+) -> Sexp {
+  Sexp::List (
+    leading . into_iter ()
+      . chain ( summary . map ( |summary| summary . to_sexp () ))
+      . chain ( [ format_string_list_sexp ("errors", errors),
+                  format_string_list_sexp ("warnings", warnings) ] )
+      . collect () ) }
 
 /// See the module comment.
 #[derive(Clone, Debug, Default)]

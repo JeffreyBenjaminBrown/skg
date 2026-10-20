@@ -238,8 +238,7 @@ pub fn update_views_after_save (
     saved_diffView_buffer_kind . and ( context . graph_straddle . as_ref () )
     . map ( |straddle| {
       let store : MutexGuard<ReadinessStore> =
-        env . runtime . readiness_store . lock ()
-        . unwrap_or_else ( |poisoned| poisoned . into_inner () );
+        env . runtime . lock_readiness_store ();
       straddle . change_leaves () . buffer_readiness_summary (
         &store, &nodes_editable_in_diffView (&saved_view_mut) ) } );
   context . warnings . extend (
@@ -602,8 +601,7 @@ pub fn rerender_view (
         viewforest, &appended, &mut completion_context ) ?; }}
   if let Some (drawing) = diffView_source {
     let store : MutexGuard<ReadinessStore> =
-      context . env . runtime . readiness_store . lock ()
-      . unwrap_or_else ( |poisoned| poisoned . into_inner () );
+      context . env . runtime . lock_readiness_store ();
     set_diffView_facts_in_viewforest (
       viewforest, drawing, &store, &context . runtime . graph ); }
   let result : String =

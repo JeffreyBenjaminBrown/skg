@@ -9,7 +9,8 @@ use crate::pcsvf::common::{
   integrate_unshown_changes, with_fixture};
 
 use skg::change_leaves::{BufferReadinessSummary, ReadinessSummary};
-use skg::serve::handlers::save_buffer::{SaveResponse, readiness_summary_sexp};
+use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::serve::util::sexp_to_client_string;
 use skg::types::views_state::DiffViewBufferKind;
 
 use std::error::Error;
@@ -164,7 +165,7 @@ fn the_summary_counts_the_changes_the_saved_buffer_does_not_show (
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     let summary : BufferReadinessSummary = summary_of (&response);
     assert_eq! ( summary . changes_not_editable_here, 11, "{:?}", summary );
-    assert_eq! ( readiness_summary_sexp (&summary),
+    assert_eq! ( sexp_to_client_string (&summary . to_sexp ()),
                  format! ( "(readiness-summary (ready {}) (changed {}) (foreign 0) (order-only 1) (notEditable 11))",
                            summary . summary . ready_files,
                            summary . summary . changed_files ));

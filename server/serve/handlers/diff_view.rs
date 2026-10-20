@@ -3,6 +3,7 @@
 //! The client sends one request per buffer, in order, and opens each
 //! one the server does not answer with '(empty . t)'.
 
+use crate::change_leaves::readiness_response_sexp;
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::pcsvf::{DiffViewSource, diffView_buffer_viewforest};
@@ -11,8 +12,9 @@ use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   format_buffer_response_sexp, send_response_with_length_prefix,
-  tag_sexp_response, value_from_request_sexp, view_id_from_request};
-use crate::skgrepo_sets::SkgrepoRestriction;
+  sexp_to_client_string, tag_sexp_response, true_entry_sexp,
+  value_from_request_sexp, view_id_from_request};
+use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
@@ -42,10 +44,7 @@ pub fn handle_diffView_request (
   let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
   let response : Result<(DiffViewBuffer, DiffViewBufferKind, ViewId), String> =
     ( || {
-      if ! skgrepo_restriction . is_all () {
-        return Err ( format! (
-          "The diff view requires no skgrepo restriction (the skgrepo-set all); current skgrepo restriction is {}. Switch the repo-set to all first.",
-          skgrepo_restriction . name )); }
+      require_skgrepo_set_all ("The diff view", skgrepo_restriction) ?;
       let view_id : ViewId = view_id_from_request (request) ?;
       let buffer_name : String = value_from_request_sexp ("buffer", request) ?;
       let diffView_buffer_kind : DiffViewBufferKind = DiffViewBufferKind::from_wire_name (&buffer_name)
@@ -56,8 +55,7 @@ pub fn handle_diffView_request (
         runtime . graph . clone () )
         . map_err ( |e| format! ( "Cannot open the diff view: {}", e )) ?;
       let store : MutexGuard<ReadinessStore> =
-        env . runtime . readiness_store . lock ()
-        . unwrap_or_else ( |poisoned| poisoned . into_inner () );
+        env . runtime . lock_readiness_store ();
       let buffer : DiffViewBuffer =
         diffView_buffer (&runtime, &straddle, &store, diffView_buffer_kind)
         . map_err ( |e| format! ( "Error generating the diff view: {}", e )) ?;
@@ -66,7 +64,8 @@ pub fn handle_diffView_request (
     Err (error) =>
       format_buffer_response_sexp ( "", &[ error ], &[] ),
     Ok (( DiffViewBuffer::Empty, _, _ )) =>
-      "((empty . t) (errors ()) (warnings ()))" . to_string (),
+      sexp_to_client_string ( &readiness_response_sexp (
+        vec! [ true_entry_sexp ("empty") ], None, &[], &[] )),
     Ok (( DiffViewBuffer::Content { text, pids, viewforest },
           diffView_buffer_kind, view_id )) => {
       views_state . open_views . register_diffView_view (

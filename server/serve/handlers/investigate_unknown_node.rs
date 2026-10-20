@@ -11,7 +11,7 @@ use crate::serve::util::{
   send_response_with_length_prefix,
   tag_sexp_response,
   value_from_request_sexp};
-use crate::skgrepo_sets::SkgrepoRestriction;
+use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
 use crate::types::env::RuntimeGeneration;
 use crate::types::misc::ID;
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -48,10 +48,7 @@ fn investigation_as_org (
   runtime     : &RuntimeGeneration,
   restriction : &SkgrepoRestriction,
 ) -> Result<String, String> {
-  if ! restriction . is_all () {
-    return Err ( format! (
-      "Investigating an unknown node requires no skgrepo restriction (the skgrepo-set all); current skgrepo restriction is {}",
-      restriction . name )); }
+  require_skgrepo_set_all ("Investigating an unknown node", restriction) ?;
   let skgid : ID = ID::from ( value_from_request_sexp ("id", request) ? );
   if let Some (pid) = runtime . graph . pid_of (&skgid) {
     let node : &GraphnodeInRust = runtime . graph . get (&pid)
