@@ -167,7 +167,7 @@ fn buffer_with_every_new_viewnode (
       . expect ("a's text changed"); }
   { let mut b_mut = tree . get_mut (b) . unwrap ();
     b_mut . append ( Viewnode {
-      focused : false, folded : false, body_folded : false,
+      focused : false, org_folded : false, org_body_folded : false,
       kind : ViewnodeKind::Property ( Property::HomeSkgrepoMove {
         old : SkgrepoName::from ("main"), new : SkgrepoName::from ("elsewhere"),
         change_facts : ChangeFacts::default (), readiness_request : None } ) } );

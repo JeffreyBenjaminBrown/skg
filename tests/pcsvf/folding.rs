@@ -191,7 +191,7 @@ fn a_removed_member_keeps_its_fold_state_and_its_place (
       let lines : Vec<&str> = saved . lines () . collect ();
       let k1 : usize = lines . iter ()
         . position ( |line| line . starts_with ("** (skg folded (node (id k1)") )
-        . unwrap_or_else ( || panic! ("k1 stays folded:\n{}", saved) );
+        . unwrap_or_else ( || panic! ("k1 stays org_folded:\n{}", saved) );
       assert! ( lines [k1 + 1] . starts_with ("** (skg (node (id ctx)"),
                 "k1 stays before ctx:\n{}", saved ); }
     assert_eq! ( saved, folded );

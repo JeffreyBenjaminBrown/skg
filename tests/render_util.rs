@@ -12,10 +12,10 @@ use std::path::PathBuf;
 #[test]
 fn test_viewnode_to_text_no_metadata () {
   let node : Viewnode = Viewnode {
-    focused     : false,
-    folded      : false,
-    body_folded : false,
-    kind    : ViewnodeKind::Vognode (Vognode::Unrestricted (
+    focused         : false,
+    org_folded      : false,
+    org_body_folded : false,
+    kind            : ViewnodeKind::Vognode (Vognode::Unrestricted (
       default_unrestrictedVognode ( ID::from ("test"),
                          SkgrepoName::from ("main"),
                          "Test Title" . to_string() ))) };
@@ -34,10 +34,10 @@ fn test_viewnode_to_text_with_body () {
                           SkgrepoName::from ("main"),
                           "Test Title" . to_string() ) };
   let node : Viewnode = Viewnode {
-    focused     : false,
-    folded      : false,
-    body_folded : false,
-    kind    : ViewnodeKind::Vognode (Vognode::Unrestricted (t)), };
+    focused         : false,
+    org_folded      : false,
+    org_body_folded : false,
+    kind            : ViewnodeKind::Vognode (Vognode::Unrestricted (t)), };
   let result : String =
     viewnode_to_text ( 2, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
     . expect ("UnrestrictedVognode rendering never fails");
@@ -46,12 +46,12 @@ fn test_viewnode_to_text_with_body () {
 #[test]
 fn test_viewnode_to_text_with_metadata () {
   let mut node = Viewnode {
-    focused     : false,
-    folded      : false,
-    body_folded : false,
-    kind        : ViewnodeKind::PropertyFolder (
+    focused         : false,
+    org_folded      : false,
+    org_body_folded : false,
+    kind            : ViewnodeKind::PropertyFolder (
       PropertyFolder::Alias) };
-  node . folded = true;
+  node . org_folded = true;
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
     . expect ("AliasFolder rendering never fails");
@@ -65,10 +65,10 @@ fn test_viewnode_to_text_with_skgid_metadata () {
                           SkgrepoName::from ("main"),
                           "Test Title" . to_string() ) };
   let node : Viewnode = Viewnode {
-    focused     : false,
-    folded      : false,
-    body_folded : false,
-    kind    : ViewnodeKind::Vognode (Vognode::Unrestricted (t)), };
+    focused         : false,
+    org_folded      : false,
+    org_body_folded : false,
+    kind            : ViewnodeKind::Vognode (Vognode::Unrestricted (t)), };
   let result : String =
     viewnode_to_text ( 3, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
     . expect ("UnrestrictedVognode rendering never fails");
@@ -83,10 +83,10 @@ fn skgrepo_name_with_whitespace_is_one_round_trippable_atom () {
       "Cooking" . to_string () );
   unrestricted_node . viewStats . homeSkgrepoAtBoundary = true;
   let node : Viewnode = Viewnode {
-    focused     : false,
-    folded      : false,
-    body_folded : false,
-    kind : ViewnodeKind::Vognode (Vognode::Unrestricted (unrestricted_node)) };
+    focused         : false,
+    org_folded      : false,
+    org_body_folded : false,
+    kind            : ViewnodeKind::Vognode (Vognode::Unrestricted (unrestricted_node)) };
   let config = SkgConfig::dummyFromSkgrepos (HashMap::from ([
     ( skgrepo . clone (), Skgrepo {
         name         : skgrepo,
@@ -120,10 +120,10 @@ fn test_metadata_ordering () {
                           SkgrepoName::from ("main"),
                           "Test" . to_string() ) };
   let node : Viewnode = Viewnode {
-    focused     : false,
-    folded      : false,
-    body_folded : false,
-    kind    : ViewnodeKind::Vognode (Vognode::Unrestricted (t)), };
+    focused         : false,
+    org_folded      : false,
+    org_body_folded : false,
+    kind            : ViewnodeKind::Vognode (Vognode::Unrestricted (t)), };
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
     . expect ("UnrestrictedVognode rendering never fails");
@@ -142,7 +142,7 @@ fn test_rel_heralds_emitted () {
                             SkgrepoName::from ("main"),
                             "N" . to_string () ) };
     let node = Viewnode {
-      focused : false, folded : false, body_folded : false,
+      focused : false, org_folded : false, org_body_folded : false,
       kind : ViewnodeKind::Vognode (Vognode::Unrestricted (t)) };
     viewnode_to_text (
       1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )

@@ -44,7 +44,7 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   assert! (restriction . view_requests . contains (&ViewRequest::Editable));
 
   let mut unknown : Viewnode = Viewnode {
-    focused : false, folded : false, body_folded : false,
+    focused : false, org_folded : false, org_body_folded : false,
     kind : ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (PhantomUnknown {
       skgid : ID::from ("unknown"),
       relRepo : None,
@@ -59,7 +59,7 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   assert_eq! (unknown . readiness_request, None);
 
   let mut alias : Viewnode = Viewnode {
-    focused : false, folded : false, body_folded : false,
+    focused : false, org_folded : false, org_body_folded : false,
     kind : ViewnodeKind::Property (Property::Alias {
       text : "alias" . into (),
       relRepo : None,

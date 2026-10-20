@@ -28,7 +28,7 @@ fn request_all () -> Option<ReadinessRequest> {
 fn viewnode (
   kind : ViewnodeKind,
 ) -> Viewnode {
-  Viewnode { focused : false, folded : false, body_folded : false, kind } }
+  Viewnode { focused : false, org_folded : false, org_body_folded : false, kind } }
 
 /// Render 'node', check its metadata against 'expected', parse it
 /// back with its headline and body, and check that the result is

@@ -35,10 +35,10 @@ pub fn reconcile_flags_folder_children (
       _ => Err ("relevant child is not a Flag" . to_string ()), },
     &goals,
     |flag| Ok (Viewnode {
-      focused     : false,
-      folded      : false,
-      body_folded : false,
-      kind        : ViewnodeKind::Property (Property::Flag {
+      focused         : false,
+      org_folded      : false,
+      org_body_folded : false,
+      kind            : ViewnodeKind::Property (Property::Flag {
         flag : *flag,
         title    : String::new (),
         body     : None,

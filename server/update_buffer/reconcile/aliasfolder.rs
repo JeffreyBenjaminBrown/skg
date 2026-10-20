@@ -68,10 +68,10 @@ pub fn reconcile_aliasFolder_children (
                  . to_string() ), }; // relevance means Property::Alias
   let create_alias = |text: &String| -> Result<Viewnode, String> {
     Ok ( Viewnode {
-      focused     : false,
-      folded      : false,
-      body_folded : false,
-      kind : ViewnodeKind::Property (Property::Alias { text : text . clone(),
+      focused         : false,
+      org_folded      : false,
+      org_body_folded : false,
+      kind            : ViewnodeKind::Property (Property::Alias { text : text . clone(),
                                                relRepo : alias_relRepos
                                                  . get (text)
                                                  . and_then ( |relRepo|

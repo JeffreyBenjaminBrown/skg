@@ -96,10 +96,10 @@ pub struct ReadinessRequest {
 /// Corresponds to an Emacs headline-body pair.
 #[derive( Debug, Clone, PartialEq )]
 pub struct Viewnode {
-  pub focused     : bool,
-  pub folded      : bool, // Is this     hidden in its parent?
-  pub body_folded : bool, // Is the body hidden in this?
-  pub kind        : ViewnodeKind,
+  pub focused         : bool,
+  pub org_folded      : bool, // Is this     hidden in its parent?
+  pub org_body_folded : bool, // Is the body hidden in this?
+  pub kind            : ViewnodeKind,
 }
 
 #[derive( Debug, Clone, PartialEq )]
@@ -1133,10 +1133,10 @@ pub fn mk_unknown_viewnode (
   skgid : ID,
 ) -> Viewnode {
   Viewnode {
-    focused     : false,
-    folded      : false,
-    body_folded : false,
-    kind        : ViewnodeKind::Vognode (Vognode::Phantom (
+    focused         : false,
+    org_folded      : false,
+    org_body_folded : false,
+    kind            : ViewnodeKind::Vognode (Vognode::Phantom (
       Phantom::Unknown ( PhantomUnknown {
         skgid,
         relRepo         : None,
@@ -1149,10 +1149,10 @@ pub fn mk_unknown_viewnode (
 pub fn mk_restricted_viewnode (
 ) -> Viewnode {
   Viewnode {
-    focused     : false,
-    folded      : false,
-    body_folded : false,
-    kind        : ViewnodeKind::Vognode (
+    focused         : false,
+    org_folded      : false,
+    org_body_folded : false,
+    kind            : ViewnodeKind::Vognode (
       Vognode::Restricted ( RestrictedVognode ) ),
   }}
 
@@ -1216,10 +1216,10 @@ pub fn mk_viewnode (
   editability  : Editability,
   view_requests : HashSet < ViewRequest >,
 ) -> Viewnode {
-  Viewnode { focused     : false,
-             folded      : false,
-             body_folded : false,
-             kind        : ViewnodeKind::Vognode (
+  Viewnode { focused         : false,
+             org_folded      : false,
+             org_body_folded : false,
+             kind            : ViewnodeKind::Vognode (
                Vognode::Unrestricted (
                  UnrestrictedVognode { affectsParent,
                             birth,
@@ -1231,10 +1231,10 @@ pub fn mk_viewnode (
 /// Helper to create a BufferRoot Viewnode.
 pub fn viewforest_root_viewnode () -> Viewnode {
   Viewnode {
-    focused     : false,
-    folded      : false,
-    body_folded : false,
-    kind        : ViewnodeKind::BufferRoot,
+    focused         : false,
+    org_folded      : false,
+    org_body_folded : false,
+    kind            : ViewnodeKind::BufferRoot,
   }}
 
 #[cfg(test)]

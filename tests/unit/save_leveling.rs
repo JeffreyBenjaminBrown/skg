@@ -691,10 +691,10 @@ fn relrepo_fact_and_request_round_trip_separately (
   t . viewStats . relRepo = Some ( SkgrepoName::from ("private") );
   t . relRepo_request = Some ( SkgrepoName::from ("secret") );
   let viewnode : Viewnode = Viewnode {
-    focused     : false,
-    folded      : false,
-    body_folded : false,
-    kind        : ViewnodeKind::Vognode ( Vognode::Unrestricted (t) ), };
+    focused         : false,
+    org_folded      : false,
+    org_body_folded : false,
+    kind            : ViewnodeKind::Vognode ( Vognode::Unrestricted (t) ), };
   let config : SkgConfig =
     config_with_order ( & ["public", "private"] );
   let rendered : String =
@@ -762,10 +762,10 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
         value, }); }
     else { unreachable! (); }
     let mut node : Viewnode = Viewnode {
-      focused     : false,
-      folded      : false,
-      body_folded : false,
-      kind        : ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)), };
+      focused         : false,
+      org_folded      : false,
+      org_body_folded : false,
+      kind            : ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)), };
     let config : SkgConfig = config_with_order (&["public"]);
     let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
     assert! ( rendered . contains (&format! (

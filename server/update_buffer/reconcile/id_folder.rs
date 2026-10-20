@@ -54,10 +54,10 @@ pub fn reconcile_idFolder_children (
                  . to_string() ), };
   let create_skgid = |skgid: &ID| -> Result<Viewnode, String> {
     Ok ( Viewnode {
-      focused     : false,
-      folded      : false,
-      body_folded : false,
-      kind        : ViewnodeKind::Property (
+      focused         : false,
+      org_folded      : false,
+      org_body_folded : false,
+      kind            : ViewnodeKind::Property (
         Property::ID {
           skgid: skgid . clone(),
           change_facts: ChangeFacts::default (),

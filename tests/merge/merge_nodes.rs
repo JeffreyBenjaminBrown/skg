@@ -34,10 +34,10 @@ fn mk_test_viewnode (
     .. default_unrestrictedVognode ( ID::from (skgid),
                           SkgrepoName::from ("main"),
                           title . to_string() ) };
-  Viewnode { focused     : false,
-            folded      : false,
-            body_folded : false,
-            kind        : ViewnodeKind::Vognode (Vognode::Unrestricted (t)) }}
+  Viewnode { focused         : false,
+            org_folded      : false,
+            org_body_folded : false,
+            kind            : ViewnodeKind::Vognode (Vognode::Unrestricted (t)) }}
 
 #[test]
 fn all_tests

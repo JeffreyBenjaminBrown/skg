@@ -10,22 +10,22 @@ fn normal (title : &str, pi : AffectsParent) -> Viewnode {
   mk_writeProtected_viewnode (sid (title), src (), title . to_string (), pi) }
 
 fn deleted (title : &str) -> Viewnode {
-  Viewnode { focused : false, folded : false, body_folded : false,
+  Viewnode { focused : false, org_folded : false, org_body_folded : false,
     kind : ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (PhantomDeleted {
       skgid    : sid (title), home_skgrepo : src (),
       title : title . to_string (), body : None,
       change_facts : ChangeFacts::default (), readiness_request : None }))) } }
 
 fn role_folder (rc : PartnerFolder) -> Viewnode {
-  Viewnode { focused : false, folded : false, body_folded : false,
+  Viewnode { focused : false, org_folded : false, org_body_folded : false,
     kind : ViewnodeKind::PartnerFolder (rc) } }
 
 fn property_folder (qc : PropertyFolder) -> Viewnode {
-  Viewnode { focused : false, folded : false, body_folded : false,
+  Viewnode { focused : false, org_folded : false, org_body_folded : false,
     kind : ViewnodeKind::PropertyFolder (qc) } }
 
 fn alias_property (text : &str) -> Viewnode {
-  Viewnode { focused : false, folded : false, body_folded : false,
+  Viewnode { focused : false, org_folded : false, org_body_folded : false,
     kind : ViewnodeKind::Property (Property::Alias {
       text : text . to_string (),
       relRepo : None,
@@ -72,7 +72,7 @@ fn relation_folder_under_deadviewnode_is_orphan () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let dead : NodeId = child (&mut t, root,
-    Viewnode { focused : false, folded : false, body_folded : false,
+    Viewnode { focused : false, org_folded : false, org_body_folded : false,
       kind : ViewnodeKind::DeadViewnode });
   let rc : NodeId = child (&mut t, dead, role_folder (PartnerFolder::Subscriber));
   assert! ( folder_is_generalized_orphan (&t, rc) . unwrap () ); }

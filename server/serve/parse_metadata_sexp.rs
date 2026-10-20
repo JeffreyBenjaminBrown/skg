@@ -61,8 +61,8 @@ use std::collections::{BTreeSet, HashSet};
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewnodeMetadata {
   pub focused: bool,
-  pub folded: bool,
-  pub body_folded: bool,
+  pub org_folded: bool,
+  pub org_body_folded: bool,
   // None means vognode, Some means non-vognode.
   pub non_vognode: Option<MpViewnodeKind>,
   // UnrestrictedVognode fields (ignored if non-vognode is Some)
@@ -102,8 +102,8 @@ pub struct ViewnodeMetadata {
 pub fn default_metadata() -> ViewnodeMetadata {
   ViewnodeMetadata {
     focused: false,
-    folded: false,
-    body_folded: false,
+    org_folded: false,
+    org_body_folded: false,
     non_vognode: None,
     skgid: None,
     home_skgrepo: None,
@@ -332,9 +332,9 @@ pub fn viewnode_from_metadata (
         ( node_kind,
           error, None ) }
     };
-  ( MpViewnode { focused     : metadata . focused,
-                       folded      : metadata . folded,
-                       body_folded : metadata . body_folded,
+  ( MpViewnode { focused         : metadata . focused,
+                       org_folded      : metadata . org_folded,
+                       org_body_folded : metadata . org_body_folded,
                        kind },
     error, warning ) }
 
@@ -354,10 +354,10 @@ fn maybeplaced_kind_error_label (
       "deadViewnode" . to_string (),
     MpViewnodeKind::Vognode (_) =>
       MpViewnode {
-        focused     : false,
-        folded      : false,
-        body_folded : false,
-        kind        : kind . clone (),
+        focused         : false,
+        org_folded      : false,
+        org_body_folded : false,
+        kind            : kind . clone (),
       } . error_label (), } }
 
 
@@ -512,8 +512,8 @@ pub fn parse_metadata_to_viewnodemd (
           atom_to_string (element) ?;
         match bare_value . as_str () {
           "focused"  => result . focused = true,
-          "folded"   => result . folded = true,
-          "bodyFolded" => result . body_folded = true,
+          "folded"   => result . org_folded = true,
+          "bodyFolded" => result . org_body_folded = true,
           // A restricted vognode is a dataless bare atom
           // (see RestrictedVognode). The legacy field-bearing list form
           // '(restrictedNode ...)' is still tolerated by the List arm

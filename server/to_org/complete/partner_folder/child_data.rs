@@ -376,7 +376,7 @@ mod tests {
     let primary : ID = skgid ("deleted-primary");
     let raw_extra : ID = skgid ("surviving-extra");
     let mut tree : Tree<Viewnode> = Tree::new (
-      Viewnode { focused: false, folded: false, body_folded: false,
+      Viewnode { focused: false, org_folded: false, org_body_folded: false,
                  kind: ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) });
     let folder : NodeId = tree . root () . id ();
     let mut child : Viewnode = mk_writeProtected_viewnode (

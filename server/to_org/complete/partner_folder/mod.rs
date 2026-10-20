@@ -186,7 +186,7 @@ pub fn maybe_add_subscribeeFolder_branch (
         // TODO/DONE/fork-fixes.org: a new hidden folder begins folded. The
         // stamp moves to the members at the folder's own BFS visit
         // ('fold_members_of_newborn_folder').
-        n . value () . folded = true; } )
+        n . value () . org_folded = true; } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
     let hidden_outside_skgids : Vec<ID> =
       hidden_outside_content . into_iter () . collect ();
@@ -348,7 +348,7 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
       // TODO/DONE/fork-fixes.org: a new hidden folder begins folded. The
       // stamp moves to the members at the folder's own BFS visit
       // ('fold_members_of_newborn_folder').
-      n . value () . folded = true; } )
+      n . value () . org_folded = true; } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
     build_initial_render_child_data (

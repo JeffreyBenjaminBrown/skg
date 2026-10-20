@@ -37,7 +37,7 @@ fn restriction (skgid : &str, skgrepo : &str) -> Viewnode {
     ID::from (skgid), SkgrepoName::from (skgrepo), skgid . to_string (), None ) }
 
 fn subscribee_folder () -> Viewnode {
-  Viewnode { focused : false, folded : false, body_folded : false,
+  Viewnode { focused : false, org_folded : false, org_body_folded : false,
              kind : ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) } }
 
 /// Build a forest exercising the three shapes:

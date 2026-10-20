@@ -102,7 +102,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
   let sets : &PcsvfSets = drawing . sets ();
   let in_c : bool = sets . c . contains (&pid);
   if created_in_this_completion {
-    tree . get_mut (treeid) . unwrap () . value () . body_folded = ! in_c; }
+    tree . get_mut (treeid) . unwrap () . value () . org_body_folded = ! in_c; }
   tag_content_members (
     tree, treeid, straddle, &content,
     Some (( &sets . u, editable_before_completion )) ) ?;
@@ -678,7 +678,7 @@ fn append (
 fn viewnode_of (
   kind : ViewnodeKind,
 ) -> Viewnode {
-  Viewnode { focused : false, folded : false, body_folded : false, kind } }
+  Viewnode { focused : false, org_folded : false, org_body_folded : false, kind } }
 
 #[cfg(test)]
 #[path = "../../../tests/unit/render_changes.rs"]

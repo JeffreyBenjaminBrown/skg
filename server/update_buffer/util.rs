@@ -49,15 +49,15 @@ pub fn fold_members_of_newborn_folder (
   let newborn : bool =
     tree . get (folder)
     . ok_or ("fold_members_of_newborn_folder: node not found") ?
-    . value () . folded;
+    . value () . org_folded;
   if ! newborn { return Ok (( )); }
   with_node_mut ( tree, folder,
-                  |mut n| { n . value () . folded = false; } )
+                  |mut n| { n . value () . org_folded = false; } )
     . map_err ( |e| -> String { e . into () } ) ?;
   treat_certain_children (
     tree, folder,
     |_vn : &Viewnode| true,
-    |vn : &mut Viewnode| { vn . folded = true; } ) }
+    |vn : &mut Viewnode| { vn . org_folded = true; } ) }
 
 /// Classify children of a node based on a classifier function.
 /// Returns a HashMap from classification key to Vec<NodeId>.

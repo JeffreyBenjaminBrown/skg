@@ -199,4 +199,4 @@ fn mk_member_viewnode (
 fn viewnode_of (
   kind : ViewnodeKind,
 ) -> Viewnode {
-  Viewnode { focused : false, folded : false, body_folded : false, kind } }
+  Viewnode { focused : false, org_folded : false, org_body_folded : false, kind } }

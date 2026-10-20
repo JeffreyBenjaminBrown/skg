@@ -683,20 +683,20 @@ pub fn build_search_viewforest (
           let mut result_mut : NodeMut<Viewnode> =
             viewforest . get_mut (result_treeid) . unwrap ();
           result_mut . append ( Viewnode {
-            focused     : false,
-            folded      : true,
-            body_folded : false,
-            kind        : ViewnodeKind::PropertyFolder (
+            focused         : false,
+            org_folded      : true,
+            org_body_folded : false,
+            kind            : ViewnodeKind::PropertyFolder (
               PropertyFolder::Alias ) } )
           . id () };
         for (_score, title) in sorted_matches . iter () . skip (1) {
           let mut aliasfolder_mut : NodeMut<Viewnode> =
             viewforest . get_mut (aliasfolder_skgid) . unwrap ();
           aliasfolder_mut . append ( Viewnode {
-            focused     : false,
-            folded      : false,
-            body_folded : false,
-            kind        : ViewnodeKind::Property (Property::Alias {
+            focused         : false,
+            org_folded      : false,
+            org_body_folded : false,
+            kind            : ViewnodeKind::Property (Property::Alias {
                 text       : title . clone (),
                 relRepo : None,
                 relRepo_request : None,

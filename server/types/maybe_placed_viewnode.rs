@@ -22,10 +22,10 @@ use std::collections::{HashMap, HashSet};
 /// That's the only difference.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MpViewnode {
-  pub focused     : bool,
-  pub folded      : bool,
-  pub body_folded : bool,
-  pub kind        : MpViewnodeKind,
+  pub focused         : bool,
+  pub org_folded      : bool,
+  pub org_body_folded : bool,
+  pub kind            : MpViewnodeKind,
 }
 
 // MpUnrestrictedVognode is defined in viewnode.rs.
@@ -116,10 +116,10 @@ impl TryFrom<MpViewnode> for Viewnode {
 
   fn try_from(u: MpViewnode) -> Result<Self, Self::Error> {
     Ok(Viewnode {
-      focused     : u . focused,
-      folded      : u . folded,
-      body_folded : u . body_folded,
-      kind        : ViewnodeKind::try_from(u . kind)?,
+      focused         : u . focused,
+      org_folded      : u . org_folded,
+      org_body_folded : u . org_body_folded,
+      kind            : ViewnodeKind::try_from(u . kind)?,
     })
   }
 }
@@ -174,10 +174,10 @@ impl From<ViewnodeKind> for MpViewnodeKind {
 impl From<Viewnode> for MpViewnode {
   fn from(o: Viewnode) -> Self {
     MpViewnode {
-      focused     : o . focused,
-      folded      : o . folded,
-      body_folded : o . body_folded,
-      kind        : MpViewnodeKind::from(o . kind),
+      focused         : o . focused,
+      org_folded      : o . org_folded,
+      org_body_folded : o . org_body_folded,
+      kind            : MpViewnodeKind::from(o . kind),
     }
   }
 }
@@ -263,10 +263,10 @@ impl Default for MpUnrestrictedVognode {
 impl Default for MpViewnode {
   fn default() -> Self {
     MpViewnode {
-      focused     : false,
-      folded      : false,
-      body_folded : false,
-      kind        : MpViewnodeKind::Vognode (
+      focused         : false,
+      org_folded      : false,
+      org_body_folded : false,
+      kind            : MpViewnodeKind::Vognode (
         MpVognode::Unrestricted (MpUnrestrictedVognode::default())),
     }
   }
@@ -378,7 +378,7 @@ impl MpViewnode {
 
 pub fn maybePlaced_viewforest_root_viewnode() -> MpViewnode {
   MpViewnode {
-    focused     : false,
-    folded      : false,
-    body_folded : false,
-    kind        : MpViewnodeKind::BufferRoot, }}
+    focused         : false,
+    org_folded      : false,
+    org_body_folded : false,
+    kind            : MpViewnodeKind::BufferRoot, }}

@@ -24,10 +24,10 @@ fn writeProtected (skgid : &str, skgrepo : &str) -> Viewnode {
 
 fn folder (kind : PartnerFolder) -> Viewnode {
   Viewnode {
-    focused     : false,
-    folded      : false,
-    body_folded : false,
-    kind        : ViewnodeKind::PartnerFolder (kind) } }
+    focused         : false,
+    org_folded      : false,
+    org_body_folded : false,
+    kind            : ViewnodeKind::PartnerFolder (kind) } }
 
 // A now-restricted childless branch disappears; a now-restricted node
 // with an unrestricted child is retained as a RestrictedVognode (converted,

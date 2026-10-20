@@ -16,10 +16,10 @@ fn test_get_skgid_from_viewnode_at_with_skgid() {
                        SkgrepoName::from ("main"),
                        "Test" . to_string() );
   let viewnode : Viewnode =
-    Viewnode { focused     : false,
-              folded      : false,
-              body_folded : false,
-              kind        : ViewnodeKind::Vognode (Vognode::Unrestricted (t)) };
+    Viewnode { focused         : false,
+              org_folded      : false,
+              org_body_folded : false,
+              kind            : ViewnodeKind::Vognode (Vognode::Unrestricted (t)) };
   let tree : Tree<Viewnode> = Tree::new (viewnode);
   let root_skgid : NodeId = tree . root() . id();
   let result : Result<ID, Box<dyn std::error::Error>> =
@@ -34,10 +34,10 @@ fn test_get_skgid_from_viewnode_at_non_vognode() {
   let viewnode :
     Viewnode =
     Viewnode {
-      focused     : false,
-      folded       : false,
-      body_folded : false,
-      kind        : ViewnodeKind::PropertyFolder (
+      focused         : false,
+      org_folded      : false,
+      org_body_folded : false,
+      kind            : ViewnodeKind::PropertyFolder (
         PropertyFolder::Alias) };
   let tree : Tree<Viewnode> = Tree::new (viewnode);
   let root_skgid : NodeId = tree . root() . id();

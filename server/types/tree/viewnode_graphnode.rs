@@ -131,10 +131,10 @@ pub fn insert_non_vognode_as_child (
 ) -> Result < NodeId, Box<dyn Error> > {
   let viewnode : Viewnode =
     Viewnode {
-      focused     : false,
-      folded      : false,
-      body_folded : false,
-      kind        : non_vognode_kind };
+      focused         : false,
+      org_folded      : false,
+      org_body_folded : false,
+      kind            : non_vognode_kind };
   let folder_skgid : NodeId = with_node_mut (
     tree, parent_skgid,
     |mut parent_mut| {

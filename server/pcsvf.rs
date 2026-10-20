@@ -322,7 +322,7 @@ fn append_stub_root (
     viewforest . as_internal_tree_mut () . get_mut (root_treeid)
       . ok_or ("diffView_buffer_viewforest: a stub root vanished") ?
       . append ( Viewnode {
-        focused : false, folded : true, body_folded : false,
+        focused : false, org_folded : true, org_body_folded : false,
         kind : ViewnodeKind::PartnerFolder (PartnerFolder::Container) } ); }
   Ok (root_treeid) }
 

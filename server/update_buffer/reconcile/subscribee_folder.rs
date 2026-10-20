@@ -160,6 +160,6 @@ fn ensure_hiddenOutsideOfSubscribeeFolder_is_last (
           // TODO/DONE/fork-fixes.org: a new hidden folder begins folded. The
           // stamp moves to the members at the folder's own BFS visit
           // ('fold_members_of_newborn_folder'), which reconciles them in.
-          n . value () . folded = true; } )
+          n . value () . org_folded = true; } )
         . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }}
   Ok (( )) }

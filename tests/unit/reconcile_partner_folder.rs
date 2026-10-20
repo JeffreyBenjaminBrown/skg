@@ -13,10 +13,10 @@ fn unrestricted_independent (id_str : &str) -> Viewnode {
 
 fn mk_folder (kind : PartnerFolder) -> Viewnode {
   Viewnode {
-    focused     : false,
-    folded      : false,
-    body_folded : false,
-    kind        : ViewnodeKind::PartnerFolder (kind) } }
+    focused         : false,
+    org_folded      : false,
+    org_body_folded : false,
+    kind            : ViewnodeKind::PartnerFolder (kind) } }
 
 // The user's view order of present members survives; missing graph
 // members are appended in graph order; non-member children

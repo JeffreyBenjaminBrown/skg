@@ -51,7 +51,7 @@ fn same_session_surviving_content_membership_becomes_unknown () {
     ghost . clone (), skgrepo_name ("main"), "last seen" . to_string (),
     Some ("last seen body" . to_string ()) );
   restriction . focused = true;
-  restriction . folded = true;
+  restriction . org_folded = true;
   let child : NodeId = tree . root_mut () . append (restriction) . id ();
   let mut relRepos : HashMap<ID, SkgrepoName> = HashMap::new ();
   relRepos . insert (ghost . clone (), skgrepo_name ("private"));
@@ -63,7 +63,7 @@ fn same_session_surviving_content_membership_becomes_unknown () {
     &skgrepo_name ("main"), &graph_snap, &HashMap::new () ) . unwrap ();
 
   let rendered = tree . get (child) . unwrap () . value ();
-  assert! (rendered . focused && rendered . folded,
+  assert! (rendered . focused && rendered . org_folded,
     "same-session normalization preserves view wrapper state");
   match &rendered . kind {
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
