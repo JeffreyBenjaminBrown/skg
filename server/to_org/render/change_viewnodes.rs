@@ -6,8 +6,7 @@
 //! Each is save-inert. The presence facts are set here; readiness is
 //! read from the store where they are placed.
 
-use crate::dbs::in_rust_graph::relation_accessors::{
-  BinaryRolePosition, NodeRelation, RelationRole};
+use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner, Presence};
 use crate::types::git::Sign;
 use crate::types::misc::{ID, SkgrepoName};
@@ -15,7 +14,8 @@ use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
   AffectsParent, ChangeFacts, ChangesetMarkerKind, DiffPresence,
   PartnerFolder, Phantom, PhantomHistorical, Property, Viewnode,
-  ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_viewnode};
+  ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_viewnode,
+  viewnode_of};
 
 use ego_tree::{NodeId, Tree};
 use similar::{ChangeTag, TextDiff};
@@ -141,7 +141,7 @@ pub fn append_historical_phantom_content (
         viewnode_of ( ViewnodeKind::PartnerFolder (
           PartnerFolder::AcquiredBy ))) . id ();
       tree . get_mut (folder) ? . append (acquirer_viewnode); }}
-  for partner in straddle . partners (pid, CONTENT) {
+  for partner in straddle . partners (pid, RelationRole::CONTENT) {
     let member : Option<Viewnode> =
       match straddle . node_presence (&partner . id) {
         Some (Presence::OnlyBefore) =>
@@ -170,10 +170,6 @@ pub fn append_acquired_folder (
       tree . get_mut (folder) ? . append (phantom); }}
   Some (folder) }
 
-const CONTENT : RelationRole =
-  RelationRole { relation : NodeRelation::Contains,
-                 position : BinaryRolePosition::Second };
-
 /// A write-protected image of a node of the after-graph, whose
 /// relationship to its viewparent has presence 'rel'; an unknown
 /// phantom if the after-graph lacks it.
@@ -195,8 +191,3 @@ fn mk_member_viewnode (
       u . change_facts . presence = presence,
     _ => return None, }
   Some (viewnode) }
-
-fn viewnode_of (
-  kind : ViewnodeKind,
-) -> Viewnode {
-  Viewnode { focused : false, org_folded : false, org_body_folded : false, kind } }

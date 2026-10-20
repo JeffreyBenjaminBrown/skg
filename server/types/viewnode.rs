@@ -616,6 +616,13 @@ impl < Id, Repo > UnrestrictedVognode_Generic < Id, Repo > {
     matches! ( self . editability,
                Editability::WriteProtected ) }
 
+  /// Make this occurrence write-protected: discard its body and edit
+  /// request, and drop its editable-view request, which would
+  /// otherwise make it editable again at its next visit.
+  pub fn write_protect (&mut self) {
+    self . view_requests . remove (&ViewRequest::Editable);
+    self . editability = Editability::WriteProtected; }
+
   pub fn body (&self) -> Option < &String > {
     match &self . editability {
       Editability::Editable { body, .. } =>
@@ -1185,7 +1192,7 @@ pub fn mk_writeProtected_viewnode_with_birth (
                             HashSet::new ( )) } // view_requests
 
 /// Convert an editable Viewnode to write-protected.
-/// Discards body and edit_request.
+/// Discards body, edit_request and the editable-view request.
 /// Errors if the input is not an UnrestrictedVognode.
 pub fn mk_writeProtected_from_viewnode (
   mut viewnode : Viewnode,
@@ -1195,12 +1202,12 @@ pub fn mk_writeProtected_from_viewnode (
   match &mut viewnode . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
       // Mutate in place, so that every field not named here
-      // (view_requests, change facts, graphStats, viewStats, and any
-      // field added later) is preserved rather than silently reset.
+      // (the other view_requests, change facts, graphStats,
+      // viewStats, and any field added later) is preserved rather
+      // than silently reset.
       t . affectsParent = affectsParent;
       t . birth = birth;
-      t . editability = // discards body and edit_request
-        Editability::WriteProtected;
+      t . write_protect ();
       Ok (viewnode) },
     _ => Err (
       "mk_writeProtected_from_viewnode: expected UnrestrictedVognode"
@@ -1239,6 +1246,12 @@ pub fn viewforest_root_viewnode () -> Viewnode {
     org_body_folded : false,
     kind            : ViewnodeKind::BufferRoot,
   }}
+
+/// A viewnode of the given kind, unfocused and not org-folded.
+pub fn viewnode_of (
+  kind : ViewnodeKind,
+) -> Viewnode {
+  Viewnode { focused : false, org_folded : false, org_body_folded : false, kind } }
 
 #[cfg(test)]
 #[allow(non_snake_case)]

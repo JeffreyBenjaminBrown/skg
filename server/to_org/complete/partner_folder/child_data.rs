@@ -25,7 +25,7 @@ use crate::types::misc::{ID, SkgrepoName};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::to_org::render::fresh_drawing::{
   adopt_fresh_facts, is_unrestricted_removed_member};
-use crate::types::viewnode::{ChangeFacts, DiffPresence, Editability, Phantom, ViewRequest, Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{ChangeFacts, DiffPresence, Phantom, Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{complete_managed_children_in_viewforest, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
 
@@ -297,8 +297,7 @@ fn apply_goal_shapes (
       FolderGoalShape::Removed if unrestricted => {
         if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut viewnode . kind {
           t . affectsParent = AffectsParent::False;
-          t . view_requests . remove (&ViewRequest::Editable);
-          t . editability = Editability::WriteProtected; }},
+          t . write_protect (); }},
       _ => adopt_fresh_facts (
         viewnode, &drawing_of_goal_item (item, child_data, label) ? ), }
     if let Some (presence) = item . presence {

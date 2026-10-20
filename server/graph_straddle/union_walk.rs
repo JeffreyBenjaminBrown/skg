@@ -10,24 +10,21 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
-  BinaryRolePosition, NodeRelation, RelationRole};
+  NodeRelation, RelationRole};
 use crate::graph_straddle::types::{
   ChangedPids, GraphStraddle, NodeChanges, Partner, Presence};
-use crate::types::misc::{ID, RelPartner, SkgrepoName, members_msv};
+use crate::types::misc::{ID, RelPartner, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::rust::GraphnodeInRust;
+use crate::util::setlike_vector_subtraction;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
-
-const CONTENT : RelationRole =
-  RelationRole { relation : NodeRelation::Contains,
-                 position : BinaryRolePosition::Second };
 
 /// The roles that the members of a node's own relationship lists
 /// play: a change among them is recorded in the node's files.
 /// (Mentions are not in a list; they change with the text.)
 pub(crate) const ROLES_OF_LISTED_MEMBERS : [RelationRole; 4] = [
-  CONTENT,
+  RelationRole::CONTENT,
   RelationRole::SUBSCRIBEE,
   RelationRole::HIDDEN,
   RelationRole::OVERRIDDEN, ];
@@ -35,7 +32,7 @@ pub(crate) const ROLES_OF_LISTED_MEMBERS : [RelationRole; 4] = [
 /// The roles a node's recorded partners play toward it, mentions
 /// included: every relationship the node records.
 const ROLES_OF_RECORDED_PARTNERS : [RelationRole; 5] = [
-  CONTENT,
+  RelationRole::CONTENT,
   RelationRole::MENTIONED,
   RelationRole::SUBSCRIBEE,
   RelationRole::HIDDEN,
@@ -176,14 +173,22 @@ fn node_changes_between (
   before : &GraphnodeInRust,
   after  : &GraphnodeInRust,
 ) -> NodeChanges {
-  let alias_texts = |node : &GraphnodeInRust| -> Vec<String> {
-    members_msv (&node . aliases) . or_default () . to_vec () };
-  let (aliases_gained, aliases_lost) : (Vec<String>, Vec<String>) =
-    gained_and_lost (&alias_texts (before), &alias_texts (after));
-  let (extra_ids_gained, extra_ids_lost) : (Vec<ID>, Vec<ID>) =
-    gained_and_lost (&before . extra_ids, &after . extra_ids);
-  let (flags_gained, flags_lost) : (Vec<Flag>, Vec<Flag>) =
-    gained_and_lost (&before . flags, &after . flags);
+  // Gained entries in the after-list's order, lost ones in the
+  // before-list's.
+  let (aliases_before, aliases_after) : (Vec<String>, Vec<String>) =
+    ( before . alias_texts (), after . alias_texts () );
+  let aliases_gained : Vec<String> =
+    setlike_vector_subtraction (aliases_after . clone (), &aliases_before);
+  let aliases_lost : Vec<String> =
+    setlike_vector_subtraction (aliases_before, &aliases_after);
+  let extra_ids_gained : Vec<ID> =
+    setlike_vector_subtraction (after . extra_ids . clone (), &before . extra_ids);
+  let extra_ids_lost : Vec<ID> =
+    setlike_vector_subtraction (before . extra_ids . clone (), &after . extra_ids);
+  let flags_gained : Vec<Flag> =
+    setlike_vector_subtraction (after . flags . clone (), &before . flags);
+  let flags_lost : Vec<Flag> =
+    setlike_vector_subtraction (before . flags . clone (), &after . flags);
   NodeChanges {
     title_changed : before . title != after . title,
     body_changed  : before . body  != after . body,
@@ -193,20 +198,6 @@ fn node_changes_between (
     home : ( before . home_skgrepo != after . home_skgrepo )
       . then ( || ( before . home_skgrepo . clone (),
                     after  . home_skgrepo . clone () )), } }
-
-/// (in 'after' but not 'before', in 'before' but not 'after'),
-/// each in its own list's order.
-fn gained_and_lost<T : Clone + PartialEq> (
-  before : &[T],
-  after  : &[T],
-) -> (Vec<T>, Vec<T>) {
-  let missing_from = |list : &[T], other : &[T]| -> Vec<T> {
-    list . iter ()
-      . filter ( |item| ! other . contains (item) )
-      . cloned ()
-      . collect () };
-  ( missing_from (after, before),
-    missing_from (before, after) ) }
 
 /// The partners playing 'role' toward 'pid' in one graph, each with
 /// its relationship's relRepo, without duplicates.

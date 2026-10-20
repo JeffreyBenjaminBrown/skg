@@ -13,7 +13,7 @@ use crate::dbs::in_rust_graph::relation_accessors::{
 use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner, Presence};
 use crate::graph_straddle::union_walk::ROLES_OF_LISTED_MEMBERS;
 use crate::readiness_store::ReadinessStore;
-use crate::types::misc::{ID, SkgrepoName, members_msv};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::rust::GraphnodeInRust;
 
@@ -368,7 +368,7 @@ fn own_content_of (
        &Vec<Flag>, &SkgrepoName ) {
   ( &node . title,
     &node . body,
-    members_msv (&node . aliases) . or_default () . to_vec (),
+    node . alias_texts (),
     &node . extra_ids,
     &node . flags,
     &node . home_skgrepo ) }

@@ -28,7 +28,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
-  BinaryRolePosition, NodeRelation, RelationRole};
+  NodeRelation, RelationRole};
 use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner, Presence};
 use crate::pcsvf::{PcsvfSets, DiffViewSource};
 use crate::to_org::render::change_viewnodes::{
@@ -40,7 +40,7 @@ use crate::to_org::render::fresh_drawing::{
   reconcile_children_with_fresh_drawing};
 use crate::types::git::Sign;
 use crate::types::list::{Diff_Item, compute_interleaved_diff};
-use crate::types::misc::{ID, members_msv};
+use crate::types::misc::ID;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::nodes::complete::Flag;
 use crate::types::tree::moves::{
@@ -51,16 +51,13 @@ use crate::types::viewnode::{
   AffectsParent, Birth, ChangeFacts, ChangesetMarkerKind, DiffPresence,
   Editability, PartnerFolder, Phantom, PhantomDeleted, Property,
   PropertyFolder, Viewnode, ViewnodeKind, Vognode,
-  mk_editable_viewnode, mk_writeProtected_viewnode};
+  mk_editable_viewnode, mk_writeProtected_viewnode, viewforest_root_viewnode,
+  viewnode_of};
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::hash::Hash;
-
-const CONTENT : RelationRole =
-  RelationRole { relation : NodeRelation::Contains,
-                 position : BinaryRolePosition::Second };
 
 /// The folders of a node's recorders (its in-set changed when one
 /// was added or removed), then those of the relationships it records
@@ -92,7 +89,8 @@ pub(crate) fn process_unrestrictedVognode_changes (
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         ( t . skgid . clone (), ! t . is_writeProtected () ),
       _ => return Ok (( )), };
-  let content : Vec<Partner> = straddle . partners (&pid, CONTENT);
+  let content : Vec<Partner> =
+    straddle . partners (&pid, RelationRole::CONTENT);
   if ! editable {
     // What an earlier visit drew here while it was editable goes, and
     // the members it still holds are tagged as they stand now.
@@ -284,7 +282,7 @@ pub(crate) fn deleted_phantom_becomes_historical (
     return Ok (false); }
   let rel : Option<Sign> = // its relationship to a viewparent that contained it
     parent_pid . and_then ( |parent_pid|
-      straddle . partners (&parent_pid, CONTENT) . into_iter ()
+      straddle . partners (&parent_pid, RelationRole::CONTENT) . into_iter ()
       . find ( |partner| partner . id == skgid )
       . and_then ( |partner| partner . presence . diff_sign () ));
   let Some (historical) : Option<Viewnode> =
@@ -295,7 +293,7 @@ pub(crate) fn deleted_phantom_becomes_historical (
 /// The root of a scratch tree that holds a fresh drawing.
 fn fresh_root (
 ) -> Viewnode {
-  viewnode_of (ViewnodeKind::BufferRoot) }
+  viewforest_root_viewnode () }
 
 /// The change viewnodes an editable node holds ahead of its content.
 /// Partner folders other than the derived "it acquired" folder are not
@@ -416,6 +414,7 @@ fn tag_content_members (
           if t . affectsParent == AffectsParent::True
              && u_and_editable . is_some_and ( |(u, writable)|
             ! u . contains (&t . skgid) && ! writable . contains (&member) ) {
+            // Not 'write_protect': the member keeps its view requests.
             t . editability = Editability::WriteProtected; }
           moved = partner . and_then ( |p| mk_relRepo_move_viewnode (p) ); },
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
@@ -580,11 +579,10 @@ fn append_changed_property_folders (
     ( straddle . before . get (pid), straddle . after . get (pid) ) else {
       return; };
   if ! changes . aliases_gained . is_empty () || ! changes . aliases_lost . is_empty () {
-    let aliases = |node : &GraphnodeInRust| -> Vec<String> {
-      members_msv (&node . aliases) . or_default () . to_vec () };
     append_property_folder (
       tree, treeid, PropertyFolder::Alias,
-      signed_union ( &aliases (before), &aliases (after) ) . into_iter ()
+      signed_union ( &before . alias_texts (), &after . alias_texts () )
+      . into_iter ()
       . map ( |(text, sign)| match sign {
         Some (Sign::Minus) => Property::RemovedAlias {
           text, change_facts : facts_of_entry (sign), readiness_request : None },
@@ -675,11 +673,6 @@ fn append (
   viewnode : Viewnode,
 ) -> NodeId {
   tree . get_mut (treeid) . unwrap () . append (viewnode) . id () }
-
-fn viewnode_of (
-  kind : ViewnodeKind,
-) -> Viewnode {
-  Viewnode { focused : false, org_folded : false, org_body_folded : false, kind } }
 
 #[cfg(test)]
 #[path = "../../../tests/unit/render_changes.rs"]

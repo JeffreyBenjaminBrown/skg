@@ -239,15 +239,28 @@ pub fn stub_viewforest_from_root_skgids (
 ) -> Result < ViewForest, Box<dyn Error> > {
   let mut viewforest : ViewForest =
     ViewForest::new ();
+  for root_skgid in root_skgids {
+    append_plain_stub_root (
+      &mut viewforest, root_skgid, graph, config, visited,
+      skgrepo_restriction ) ?; }
+  Ok (viewforest) }
+
+/// Append one view root to the viewforest, completed via
+/// build_node_branch_minus_content. Returns its treeid.
+pub fn append_plain_stub_root (
+  viewforest : &mut ViewForest,
+  root_skgid : &ID,
+  graph      : &crate::dbs::in_rust_graph::InRustGraph,
+  config     : &SkgConfig,
+  visited    : &mut EditableMap,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
+) -> Result < NodeId, Box<dyn Error> > {
   let viewforest_root_treeid : NodeId =
     viewforest . internal_root_skgid ();
-  for root_skgid in root_skgids {
-    build_node_branch_minus_content (
-      Some ( (viewforest . as_internal_tree_mut (),
-              viewforest_root_treeid) ),
-      root_skgid, graph, config, visited, skgrepo_restriction
-    ) ?; }
-  Ok (viewforest) }
+  build_node_branch_minus_content (
+    Some ( (viewforest . as_internal_tree_mut (),
+            viewforest_root_treeid) ),
+    root_skgid, graph, config, visited, skgrepo_restriction ) }
 
 /// Mark forest-root UnrestrictedVognodes as having no parent in the view.
 pub fn mark_view_roots_parent_na (

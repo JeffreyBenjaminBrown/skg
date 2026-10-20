@@ -13,8 +13,8 @@ use crate::types::git::Sign;
 use crate::types::misc::ID;
 use crate::types::tree::moves::arrange_last_children;
 use crate::types::viewnode::{
-  AffectsParent, Birth, ChangeFacts, Editability, Phantom, Property, PropertyFolder,
-  ViewRequest, Viewnode, ViewnodeKind, Vognode};
+  AffectsParent, Birth, ChangeFacts, Phantom, Property, PropertyFolder,
+  Viewnode, ViewnodeKind, Vognode};
 use crate::update_buffer::util::detach_viewnode_transferring_focus;
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -144,8 +144,7 @@ pub fn adopt_fresh_facts (
         presence : f . change_facts . presence,
         ready    : None };
       if f . is_writeProtected () {
-        e . view_requests . remove (&ViewRequest::Editable);
-        e . editability = Editability::WriteProtected; }},
+        e . write_protect (); }},
     (kind, fresh_kind) => *kind = fresh_kind . clone (), }}
 
 /// Append under 'parent' a copy of the subtree of 'fresh' at

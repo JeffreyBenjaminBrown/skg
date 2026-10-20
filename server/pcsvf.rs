@@ -24,7 +24,7 @@ use crate::readiness_store::ReadinessStore;
 use crate::serve::handlers::readiness_requests::set_ready_facts_in_viewforest;
 use crate::to_org::render::change_viewnodes::mk_historical_viewnode;
 use crate::to_org::util::{
-  EditableMap, build_node_branch_minus_content, graphnode_and_viewnode_from_skgid};
+  EditableMap, append_plain_stub_root, graphnode_and_viewnode_from_skgid};
 use crate::types::env::RuntimeGeneration;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
@@ -315,10 +315,9 @@ fn append_stub_root (
     return Ok ( viewforest . as_internal_tree_mut () . get_mut (buffer_root)
                 . ok_or ("diffView_buffer_viewforest: no buffer root") ?
                 . append (phantom) . id () ); }
-  let root_treeid : NodeId = build_node_branch_minus_content (
-    Some (( viewforest . as_internal_tree_mut (), buffer_root )),
-    root, &runtime . graph, &runtime . config, stub_editable_map,
-    None ) ?;
+  let root_treeid : NodeId = append_plain_stub_root (
+    viewforest, root, &runtime . graph, &runtime . config,
+    stub_editable_map, None ) ?;
   if drawing . diffView_buffer_kind != DiffViewBufferKind::OrderOnlyChanges
     && union_containers (straddle, root) . len () > 1 {
     viewforest . as_internal_tree_mut () . get_mut (root_treeid)

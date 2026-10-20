@@ -23,7 +23,7 @@ use crate::graph_straddle::types::GraphStraddle;
 use crate::pcsvf::DiffViewSource;
 use crate::types::tree::viewnode_graphnode::{
   pid_and_skgrepo_from_viewnode_at, write_at_unrestrictedVognode_in_tree};
-use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder, ViewRequest, Editability};
+use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder, ViewRequest};
 use crate::types::viewnode::{Vognode, Phantom, PropertyFolder};
 use super::reconcile::hiddeninsubscribee_folder::reconcile_hiddenInSubscribeeFolder_children;
 use super::reconcile::hiddenoutsideof_subscribeefolder::reconcile_hiddenoutsideSubscribeeFolder_children;
@@ -330,8 +330,7 @@ fn visit_normal_node (
     // engine (settled) then clobbers+returns.
     write_at_unrestrictedVognode_in_tree (
       tree, treeid,
-      |t| { t . view_requests . remove (& ViewRequest::Editable);
-            t . editability = Editability::WriteProtected; } )
+      |t| { t . write_protect (); } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
     settled = true;
   } else if had_editableViewRequest {

@@ -103,11 +103,15 @@ impl RelationRole {
 impl RelationRole {
   // The nine partner roles a role tree can graft, named for the
   // role the grafted partner plays toward the origin (= toward its
-  // viewparent). 'Contains, Second' ("content") is intentionally
-  // absent -- the recursive content view already serves it.
+  // viewparent), and CONTENT. CONTENT is no partner role -- the
+  // recursive content view already serves it, so PARTNER_ROLE_VOCAB
+  // lacks it -- but the diff view compares content lists by it.
   pub const CONTAINER : RelationRole =
     RelationRole { relation : NodeRelation::Contains,
                    position : BinaryRolePosition::First };
+  pub const CONTENT : RelationRole =
+    RelationRole { relation : NodeRelation::Contains,
+                   position : BinaryRolePosition::Second };
   pub const MENTIONER : RelationRole =
     RelationRole { relation : NodeRelation::LinksTo,
                    position : BinaryRolePosition::First };

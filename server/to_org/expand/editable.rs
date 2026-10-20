@@ -153,8 +153,7 @@ pub fn apply_editable_draw_rule (
       // node it is a no-op. The expand step then clobbers/refreshes it.)
       write_at_unrestrictedVognode_in_tree (
         viewforest, treeid,
-        |t| { t . view_requests . remove (& ViewRequest::Editable);
-              t . editability = Editability::WriteProtected; } )
+        |t| { t . write_protect (); } )
         . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
       return Ok ( DrawOutcome::Deferred ); }
     if prior . treeid () != treeid {

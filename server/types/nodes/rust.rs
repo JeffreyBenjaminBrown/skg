@@ -4,7 +4,7 @@
 //! derived fields), plus linksTo — derived from body parsing at
 //! GraphnodeInRust construction time.
 
-use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName};
+use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName, members_msv};
 use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::links::links_from_node;
 
@@ -52,4 +52,13 @@ impl From<&Graphnode> for GraphnodeInRust {
       linksTo,
     }
   }
+}
+
+impl GraphnodeInRust {
+  /// The texts of the node's aliases, without their relRepos; empty
+  /// when the aliases are unspecified.
+  pub fn alias_texts (
+    &self,
+  ) -> Vec<String> {
+    members_msv (&self . aliases) . or_default () . to_vec () }
 }
