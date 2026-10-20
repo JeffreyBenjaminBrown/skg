@@ -11,6 +11,20 @@ See ../bash/docker.sh
 ** within the Docker container
 *** start the Skg server
 See ../bash/start-servers.sh
+It validates the config first, and refuses to start on an invalid one.
+A config key the server does not know (a misspelling, or an old
+spelling such as =max_role_tree_depth= for =max_roleTree_depth=) does
+not stop it: the script prints a warning naming the key, and once the
+client connects, it shows the same warnings in a buffer
+(=*SKG Server Warnings*= in Emacs, =skg://messages/server-warnings=
+in Neovim).
+
+The script builds and runs the debug profile. To build and run the
+release profile instead (faster, but slower to rebuild on each code
+change):
+#+begin_example
+   SKG_RELEASE=1 ../bash/start-servers.sh
+#+end_example
 *** optional : import data from org-roam
 See [[file:COMMANDS.org::#import-org-roam][importing from Org-roam]] for arguments,
 supported input, and setup steps. Use a fresh staging directory:

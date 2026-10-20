@@ -1776,3 +1776,56 @@ before. The name lists are 'tests/results/slice7/names-before.txt' and
 'mk_test_tcp_stream_pair'; 'tests/editable_view_cascade_and_budget.rs'
 a one-ended 'mk_test_tcp_stream'. They are outside the four modules
 the plan names.
+** Slice 8: deviations
+*** the Neovim buffer is 'skg://messages/server-warnings'
+The plan names it 'skg://server-warnings' and asks that it be "named
+like the save warnings". The save warnings are
+'skg://messages/save-warnings', and a bare 'skg://NAME' is where a
+content view goes ('skg://' and its title), so 'skg://server-warnings'
+would collide with a view titled "server-warnings". The Emacs buffer is
+'*SKG Server Warnings*', as planned.
+*** finding the unknown keys
+'load_config' parses the text once more into a wrapper that flattens
+'SkgConfig' beside a 'toml::Table' catch-all
+('SkgConfigBesideUnknownKeys'), after the direct parse, so a bad
+config is still reported with toml's line numbers.
+'RENAMED_SKGCONFIG_KEYS' maps 'max_role_tree_depth' to
+'max_roleTree_depth' for the warning. 'load_config' returns
+'(SkgConfig, Vec<String>)'; the callers that do not want the warnings
+take '. 0'. 'load_config_with_overrides', which only tests call, does
+not warn.
+*** where the server keeps them
+'SharedRuntime' has a 'OnceLock' of them, which 'main' fills after
+'initialize_dbs' ('record_startup_warnings'); the server also logs
+them at startup. A reload of the config ("rebuild session-lifetime
+stores") does not change them. The handler takes the warnings, not the
+env, so its test needs only a socket pair.
+*** 'check-config' and the start script
+'check-config' prints each warning as "Warning: ..." on stdout. The
+start script showed that command's output only on failure; it now
+prints it, in yellow, when the config is valid but warned about.
+'bash/stop-servers.sh' is generated and signals the script's process
+group, whose 'cleanup' trap runs 'kill_stale_skg'; so the patterns
+there, which now match both profiles, are the ones both kill by.
+*** where the clients send the request
+Emacs sends it from 'skg-tcp-connect-to-rust' and Neovim from
+'client.connect', right after a new connection is made, without an LP
+reset (the caller's request follows at once). The Neovim specs' fake
+server answers that request itself (with no warnings, or the list a
+spec passes), so the specs that count request lines are unchanged;
+the busy-initializing spec passes 'false' so its server answers it as
+busy, as a real one would.
+*** tests
+'tests/server_warnings.rs' (in 'grouped_unit.rs', over
+'tests/server_warnings/fixtures/skgconfig.toml'): the old spelling
+and the request's answer. Emacs: 'tests/elisp/test-skg-server-warnings.el'
+(that a new connection asks once, and the two answers). Neovim: two
+specs in 'client_spec.lua', over the fake server. Counts: nextest 826
+(824 before), Emacs 372 (369), Neovim 346 (344).
+*** seen, left
+'foreign_manifest_order_warnings' are startup warnings too, which
+'initialize_dbs' logs; they are not served, since the plan's warnings
+are the config's. Escaping a string for a sexp is written out four
+times ('skgrepo_sets.rs''s 'escape_string',
+'delete_references_to_absent_node.rs''s 'escape', 'heralds.rs',
+'dependencies_manifest.rs'); the new handler builds a 'Sexp' instead.

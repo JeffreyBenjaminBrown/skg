@@ -6,6 +6,8 @@
 #     by running this:
 #       SKG_CONFIG=another_skg_config ./bash/start-servers.sh
 #     or by editing SKG_CONFIG in ./bash/start-servers.sh
+#   To build and run the release profile instead of the debug one:
+#       SKG_RELEASE=1 ./bash/start-servers.sh
 # - TO SHUTDOWN
 #   - If foregrounded at command line, use
 #     Ctrl-C
@@ -18,6 +20,11 @@
 
 SKG_CONFIG="${SKG_CONFIG:-data/skgconfig.toml}"
 DATA_ROOT="$(dirname "$SKG_CONFIG")"
+if [ "${SKG_RELEASE:-}" = "1" ]; then
+  CARGO_PROFILE_FLAG="--release"
+else
+  CARGO_PROFILE_FLAG=""
+fi
 
 preflight_check_config() {
   # Validate the config before starting the watcher, using skg's own loader
@@ -29,13 +36,13 @@ preflight_check_config() {
   # it here, in red, turns that into an obvious fix.
   echo ""
   echo "Validating config: $SKG_CONFIG"
-  if ! cargo build -q --bin skg; then
+  if ! cargo build -q $CARGO_PROFILE_FLAG --bin skg; then
     printf '\033[1;31m%s\033[0m\n' \
       "ERROR: skg failed to compile (see errors above). Servers NOT started."
     exit 1
   fi
   local config_err
-  if ! config_err="$( cargo run -q --bin skg -- check-config "$SKG_CONFIG" 2>&1 )"; then
+  if ! config_err="$( cargo run -q $CARGO_PROFILE_FLAG --bin skg -- check-config "$SKG_CONFIG" 2>&1 )"; then
     printf '\033[1;31m'   # bold red
     echo "=================================================================="
     echo "ERROR: invalid skg config '$SKG_CONFIG' -- servers NOT started:"
@@ -46,6 +53,11 @@ preflight_check_config() {
     echo "=================================================================="
     printf '\033[0m'      # reset color
     exit 1
+  fi
+  if [ -n "$config_err" ]; then
+    # Warnings (unknown keys) do not stop the start; the server also
+    # sends them to each client, which shows them in a buffer.
+    printf '\033[1;33m%s\033[0m\n' "$config_err"   # bold yellow
   fi
   echo "Config OK."
 }
@@ -74,10 +86,13 @@ kill_stale_skg() {
   # pattern caught -- cargo-watch does not always take its child down
   # with it. Kill cargo-watch first so it cannot respawn skg.
   # Every pattern is scoped to THIS config, so skg instances serving
-  # other configs (other ports, other data) are left alone.
-  pkill -f "cargo[- ]watch .*--bin skg -- $SKG_CONFIG" 2>/dev/null || true
-  pkill -f "cargo run --bin skg -- $SKG_CONFIG"        2>/dev/null || true
-  pkill -f "target/debug/skg $SKG_CONFIG"              2>/dev/null || true
+  # other configs (other ports, other data) are left alone. Each matches
+  # the debug and the release (SKG_RELEASE=1) form of its command.
+  # bash/stop-servers.sh signals this script's process group, whose
+  # 'cleanup' trap runs this function, so it kills by these patterns too.
+  pkill -f "cargo[- ]watch .*--bin skg -- $SKG_CONFIG"         2>/dev/null || true
+  pkill -f "cargo run (--release )?--bin skg -- $SKG_CONFIG"   2>/dev/null || true
+  pkill -f "target/(debug|release)/skg $SKG_CONFIG"            2>/dev/null || true
 }
 
 wait_for_free_api_port() {
@@ -110,7 +125,7 @@ start_skg_with_restart() {
   echo "cargo-watch starting..."
   echo "Server logs go to $DATA_ROOT/logs/server-to-user.log and $DATA_ROOT/logs/server.jsonl"
   echo "cargo-watch/stdout-stderr go to $DATA_ROOT/logs/cargo-watch.log"
-  cargo watch -w server/ -x "run --bin skg -- $SKG_CONFIG" \
+  cargo watch -w server/ -x "run ${CARGO_PROFILE_FLAG:+$CARGO_PROFILE_FLAG }--bin skg -- $SKG_CONFIG" \
     >> "$DATA_ROOT/logs/cargo-watch.log" 2>&1 # "-w server/" says "only watch server/"
 }
 

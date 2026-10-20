@@ -338,6 +338,21 @@ So far there are these endpoints:
     pins the table to the metadata vocabulary the server can emit, in
     both directions. It pins atom coverage only, not presentation.
 
+** Server warnings
+  - Request: ((request . "server warnings"))
+  - Response: LP =((response-type server-warnings) (warnings ("WARNING" ...)))=,
+    or =(warnings ())= when there are none. The warnings are the ones
+    the server raised as it started; today, one per top-level key of
+    skgconfig.toml it does not know (see "skgconfig.toml", below).
+    A reload of the config ("Rebuild session-lifetime stores") does
+    not change them.
+  - Each client sends this once per connection, as soon as the
+    connection is up and before it requests any view
+    ('skg-tcp-connect-to-rust', 'client.connect'). A non-empty answer
+    opens a buffer listing the warnings, one headline each:
+    =*SKG Server Warnings*= in Emacs, =skg://messages/server-warnings=
+    in Neovim. An empty answer opens nothing.
+
 ** Link statuses
   - Request: =((request . "link statuses") (request-id . "TOKEN") (ids "ID" ...))=.
     A client batches and deduplicates literal link target IDs in a view.
@@ -1061,6 +1076,13 @@ Pass its path as a command-line argument (default: =data/skgconfig.toml=) when s
 
 The retired keys =db_name=, =delete_on_quit=, and =auto_audit_daily= are
 rejected with a migration error; remove them from older configurations.
+
+Any other top-level key the server does not know is not refused: it
+has no effect, and the server warns about it, naming the current
+spelling of a renamed key (=max_role_tree_depth= is now
+=max_roleTree_depth=). =skg check-config= prints these warnings and
+still exits 0; the server logs them and serves them to each client
+(see "Server warnings", above).
 
 ** Skgrepos
 

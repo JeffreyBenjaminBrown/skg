@@ -1002,7 +1002,7 @@ fixture as described; the suite count rises by the new tests and by
 the split, and no test is lost (compare the list of test names before
 and after, and record the counts in 'progress.org').
 
-** TODO Slice 8: startup warnings and the release profile
+** DONE Slice 8: startup warnings and the release profile
 Make the changes under "Startup warnings and the release profile"
 above. 'load_config' parses the file once more as a generic TOML table
 to find the top-level keys the struct lacks (or uses serde's
