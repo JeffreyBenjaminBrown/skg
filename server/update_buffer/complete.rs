@@ -38,7 +38,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::error::Error;
 use std::sync::{Arc, LazyLock};
 
-pub(super) struct CompletionContext<'a> {
+pub(crate) struct CompletionContext<'a> {
   pub(super) editable_map                         : &'a mut EditableMap,
   pub(super) runtime                        : &'a RuntimeGeneration,
   pub(super) graph_snap                     : &'a Arc<InRustGraph>,
@@ -143,7 +143,7 @@ impl<'a> CompletionContext<'a> {
   /// 'all'), creates no default partner folders, substitutes no
   /// overrider, and reports no repair. Every viewnode of a first
   /// drawing is created by it.
-  pub(super) fn for_diffView (
+  pub(crate) fn for_diffView (
     runtime      : &'a RuntimeGeneration,
     graph_snap   : &'a Arc<InRustGraph>,
     editable_map : &'a mut EditableMap,
@@ -209,7 +209,7 @@ impl<'a> CompletionContext<'a> {
       .. settings } }
 }
 
-pub(super) fn complete_viewforest (
+pub(crate) fn complete_viewforest (
   viewforest : &mut Tree<Viewnode>,
   context    : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
@@ -229,7 +229,7 @@ pub(super) fn complete_viewforest (
 /// Complete the subtrees at 'roots', appended to a viewforest that
 /// 'context' has already completed, in level order among themselves,
 /// continuing that completion's editable map and node budget.
-pub(super) fn complete_appended_roots (
+pub(crate) fn complete_appended_roots (
   viewforest : &mut Tree<Viewnode>,
   roots      : &[NodeId],
   context    : &mut CompletionContext<'_>,

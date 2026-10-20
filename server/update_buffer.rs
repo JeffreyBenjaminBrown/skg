@@ -5,8 +5,9 @@
 //! stats, the skgrepo set, the text):
 //! - 'render_initial_view' draws a new content view from a stub of its
 //!   roots;
-//! - 'complete_viewforest_with_graph_straddle' draws a buffer of the
-//!   diff view the same way, over the graph straddle;
+//! - 'complete_viewforest_with_graph_straddle'
+//!   ('server/diff_view/completion.rs') draws a buffer of the diff
+//!   view the same way, over the graph straddle;
 //! - 'rerender_view' re-completes a view that already exists (after a
 //!   save, collaterally, after a commit, or at a skgrepo-set switch),
 //!   reconciling what it holds instead of redrawing it;
@@ -27,15 +28,13 @@ pub use graphnodestats::{
   set_graphnodestats_in_viewforest_with_skgrepo_set};
 pub use viewnodestats::set_viewnodestats_in_viewforest;
 
-use complete::{complete_appended_roots, complete_viewforest, CompletionContext};
+use complete::{complete_viewforest, CompletionContext};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::diff_view::change_leaves::BufferReadinessSummary;
-use crate::graph_straddle::build::current_graph_straddle_in_slot;
+use crate::diff_view::completion::{
+  DiffViewRerender, finish_diffView_rerender, prepare_diffView_rerender};
 use crate::graph_straddle::types::GraphStraddle;
-use crate::diff_view::pcsvf::{
-  DiffViewSource, append_contentOrigins_to_buffer, contentOrigins_missing_from_buffer,
-  ensure_editableOccurrences_exist, nodes_editable_in_diffView,
-  root_skgids_of_buffer, set_diffView_facts_in_viewforest};
+use crate::diff_view::pcsvf::{DiffViewSource, nodes_editable_in_diffView};
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
@@ -62,7 +61,7 @@ use crate::types::viewnode::{Vognode, PropertyFolder, ViewRequest};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 
 use ego_tree::{Tree, NodeId, NodeMut};
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::sync::{Arc, MutexGuard};
 use std::time::Instant;
@@ -184,7 +183,7 @@ pub fn update_views_after_save (
   context . graph_straddle = views_state . graph_straddle . clone ();
   let saved_diffView_buffer_kind : Option<DiffViewBufferKind> =
     viewid_from_request_result . as_ref () . ok ()
-    . and_then ( |view_id| diffView_buffer_kind_of_view (views_state, view_id) );
+    . and_then ( |view_id| views_state . open_views . diffView_buffer_kind_of_view (view_id) );
   let mut saved_view_mut : ViewForest = saved_view;
   replace_saved_view_fork_roots (&mut saved_view_mut, fork_specs) ?;
   // The skgsave-commit has happened, so every `(editRequest ...)` in the
@@ -304,14 +303,6 @@ pub fn update_views_after_save (
     text_release_confirmation : None,
     readiness_summary, } ) }
 
-/// The buffer of the diff view that 'view_id' is, if it is one.
-pub fn diffView_buffer_kind_of_view (
-  views_state : &ViewsState,
-  view_id     : &ViewId,
-) -> Option<DiffViewBufferKind> {
-  views_state . open_views . views . get (view_id)
-    . and_then ( |state| state . diffView_buffer_kind ) }
-
 fn unrestricted_skgids_in_viewforest (
   viewforest : &ViewForest,
 ) -> Vec<ID> {
@@ -387,7 +378,7 @@ fn rerender_collateral_view (
         None, // Collateral views repair silently.
         false,
         false,
-        diffView_buffer_kind_of_view (views_state, &view_id),
+        views_state . open_views . diffView_buffer_kind_of_view (&view_id),
         false
       ) . map_err (
         |e| format!( "Collateral view {}: {}",
@@ -450,29 +441,6 @@ pub fn render_initial_view (
   drop (sink);
   Ok (( viewforest, Vec::new () )) }
 
-/// Complete a stub viewforest of the diff view
-/// ('server/pcsvf.rs') as 'drawing' says: view completion with
-/// 'diffView_source' set, which draws the union of the straddle's content, the change
-/// folders and markers, and the former members. It creates no
-/// default partner folders, spends no node budget (only an
-/// editable-view request spends it, and a first drawing carries
-/// none), and never restricts by skgrepo (the diff view
-/// requires the set 'all').
-pub fn complete_viewforest_with_graph_straddle (
-  runtime    : &RuntimeGeneration,
-  drawing    : DiffViewSource,
-  viewforest : &mut ViewForest,
-) -> Result<(), Box<dyn Error>> {
-  let graph_snap : Arc<InRustGraph> = runtime . graph . clone ();
-  let mut editable_map : EditableMap = EditableMap::new ();
-  let mut errors : Vec<String> = Vec::new ();
-  let mut context : CompletionContext = CompletionContext::for_diffView (
-    runtime, &graph_snap, &mut editable_map, &mut errors, drawing );
-  complete_viewforest ( viewforest, &mut context ) ?;
-  if ! errors . is_empty () {
-    return Err ( errors . join ("\n") . into () ); }
-  Ok (( )) }
-
 /// Strip the stale ID folders, re-complete the viewforest,
 /// set graph/view stats, and render to string.
 /// .
@@ -491,7 +459,9 @@ pub fn complete_viewforest_with_graph_straddle (
 /// recomputed U is made editable at its first occurrence if it has no
 /// editable one, and after completion the content origins of the
 /// recomputed D that the buffer does not draw are appended as roots
-/// and completed. Its standing roots stay.
+/// and completed. Its standing roots stay. The diff view does its
+/// part before completion in 'prepare_diffView_rerender' and after it
+/// in 'finish_diffView_rerender'.
 pub fn rerender_view (
   viewforest    : &mut ViewForest,
   context       : &mut RerenderAfterSaveContext<'_>,
@@ -506,26 +476,12 @@ pub fn rerender_view (
     // A diff view's step reconciles its ID folders instead.
     tracing::debug!("rerender_view: starting");
     remove_id_folders (viewforest) ?; }
-  let graph_straddle : Option<Arc<GraphStraddle>> =
-    match diffView_buffer_kind {
-      Some (_) => Some ( current_graph_straddle_in_slot (
-        &mut context . graph_straddle, &context . runtime . config,
-        context . runtime . graph . clone () )
-        . map_err ( |e| format! (
-          "Cannot redraw the diff view buffer: {}", e )) ? ),
-      None => None, };
+  let diffView_rerender : Option<DiffViewRerender> =
+    prepare_diffView_rerender (
+      &mut context . graph_straddle, &context . runtime,
+      diffView_buffer_kind, integrate_unshown_changes, viewforest ) ?;
   let diffView_source : Option<DiffViewSource> =
-    graph_straddle . as_deref () . zip (diffView_buffer_kind)
-    . map ( |(straddle, diffView_buffer_kind)| DiffViewSource { straddle, diffView_buffer_kind } );
-  let drawing_to_integrate_unshown_changes : Option<DiffViewSource> =
-    diffView_source . filter ( |_| integrate_unshown_changes );
-  let standing_roots : BTreeSet<ID> = root_skgids_of_buffer (viewforest);
-  if let Some (drawing) = drawing_to_integrate_unshown_changes {
-    // Before any visit, so that a node of U is editable before its
-    // parent's visit can see it.
-    ensure_editableOccurrences_exist (
-      drawing, viewforest,
-      &context . runtime . graph, &context . runtime . config ) ?; }
+    diffView_rerender . as_ref () . map ( |rerender| rerender . source () );
   { tracing::debug!("rerender_view: starting complete_viewforest");
     let nodes_before_completion : HashSet<NodeId> =
       viewforest . nodes () . map ( |node| node . id () ) . collect ();
@@ -555,18 +511,9 @@ pub fn rerender_view (
         "complete_viewforest" ). entered();
       complete_viewforest (
         viewforest, &mut completion_context ) ? };
-    if let Some (drawing) = drawing_to_integrate_unshown_changes {
-      let new_roots : Vec<ID> =
-        contentOrigins_missing_from_buffer (drawing, viewforest, &standing_roots);
-      let appended : Vec<NodeId> = append_contentOrigins_to_buffer (
-        &context . runtime, drawing, viewforest, &new_roots ) ?;
-      complete_appended_roots (
-        viewforest, &appended, &mut completion_context ) ?; }}
-  if let Some (drawing) = diffView_source {
-    let store : MutexGuard<ReadinessStore> =
-      context . env . runtime . lock_readiness_store ();
-    set_diffView_facts_in_viewforest (
-      viewforest, drawing, &store, &context . runtime . graph ); }
+    finish_diffView_rerender (
+      diffView_rerender . as_ref (), viewforest, &mut completion_context,
+      &context . runtime, context . env ) ?; }
   let result : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "finish_viewforest" ). entered();

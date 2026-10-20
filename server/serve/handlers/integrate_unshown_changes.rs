@@ -24,7 +24,6 @@ use crate::serve::util::{
 use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
 use crate::types::env::SkgEnv;
 use crate::types::views_state::ViewId;
-use crate::update_buffer::diffView_buffer_kind_of_view;
 
 use std::net::TcpStream;
 use std::sync::{Arc, MutexGuard};
@@ -68,7 +67,7 @@ fn integrate_unshown_changes (
   require_skgrepo_set_all (
     "Integrating unshown changes", skgrepo_restriction ) ?;
   let view_id : ViewId = view_id_from_request (request) ?;
-  if diffView_buffer_kind_of_view (views_state, &view_id) . is_none () {
+  if views_state . open_views . diffView_buffer_kind_of_view (&view_id) . is_none () {
     return Err ( format! (
       "View {} is not a buffer of the diff view.",
       view_id . repr_in_client () )); }

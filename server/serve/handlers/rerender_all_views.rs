@@ -23,7 +23,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::{ViewId, ViewState};
 use crate::types::views_state::pids_from_viewforest;
 use crate::update_buffer::{
-  rerender_view, diffView_buffer_kind_of_view, RerenderAfterSaveContext};
+  rerender_view, RerenderAfterSaveContext};
 
 use futures::executor::block_on;
 use std::net::TcpStream;
@@ -263,7 +263,7 @@ pub(crate) fn prepare_rerender_views_where (
         None, // streamed rerenders repair silently.
         create_partnerFolders,
         false,
-        diffView_buffer_kind_of_view (views_state, view_id),
+        views_state . open_views . diffView_buffer_kind_of_view (view_id),
         integrate_unshown_changes
       ) } )
     { Ok (text) => {

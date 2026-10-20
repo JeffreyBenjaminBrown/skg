@@ -2,6 +2,7 @@
 //! graph straddle ('server/graph_straddle/'). 'docs/diff-view.org'
 //! describes it; this module implements it:
 //! - 'pcsvf.rs': C, R, U and D, each buffer's sets, and its stub roots;
+//! - 'completion.rs': drawing and rerendering a whole buffer;
 //! - 'changes.rs': the per-visit step that view completion runs at
 //!   each unrestricted vognode and historical phantom;
 //! - 'change_viewnodes.rs': the diff view's own viewnodes;
@@ -15,6 +16,7 @@
 pub mod change_leaves;
 pub mod change_viewnodes;
 pub mod changes;
+pub mod completion;
 pub mod fresh_drawing;
 pub mod partner_folders;
 pub mod pcsvf;

@@ -34,7 +34,8 @@ use crate::types::viewnode::{
   AffectsParent, Editability, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
   Vognode};
 use crate::types::views_state::{DiffViewBufferKind, pids_from_viewforest};
-use crate::update_buffer::{complete_viewforest_with_graph_straddle, finish_viewforest};
+use crate::diff_view::completion::complete_viewforest_with_graph_straddle;
+use crate::update_buffer::finish_viewforest;
 
 use ego_tree::{NodeId, NodeRef};
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};

@@ -167,6 +167,14 @@ impl OpenViews {
   ) -> bool {
     self . views . values () . any ( |state| state . diffView_buffer_kind . is_some () ) }
 
+  /// The buffer of the diff view that 'view_id' is, if it is one.
+  pub fn diffView_buffer_kind_of_view (
+    &self,
+    view_id : &ViewId,
+  ) -> Option<DiffViewBufferKind> {
+    self . views . get (view_id)
+      . and_then ( |state| state . diffView_buffer_kind ) }
+
   pub fn update_view (
     &mut self,
     graph      : &InRustGraph,
