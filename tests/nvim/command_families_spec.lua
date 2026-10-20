@@ -214,6 +214,19 @@ describe('skg.view_requests', function ()
     assert.are.equal(0, saved_count)
   end)
 
+  it('the write-protect requests stamp without saving', function ()
+    buffer_with('* (skg (node (id n5))) title')
+    view_requests.request_write_protected()
+    assert.is_truthy(buffer_text():find(
+      '(viewRequests writeProtectedView)', 1, true))
+    assert.is_falsy(buffer_text():find('writeProtected)', 1, true))
+    buffer_with('* (skg (node (id n6))) title')
+    view_requests.request_write_protected_recursive()
+    assert.is_truthy(buffer_text():find(
+      '(viewRequests writeProtectedSubtreeView)', 1, true))
+    assert.are.equal(0, saved_count)
+  end)
+
   it('fork refuses a modified buffer', function ()
     local buf = buffer_with('* (skg (node (id n4))) title')
     vim.bo[buf].modified = true

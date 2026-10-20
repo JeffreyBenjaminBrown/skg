@@ -46,13 +46,6 @@ call `skg-request-save-buffer' afterward."
         (outline-next-heading))))
   (message "This change will only be applied when you save the buffer."))
 
-(defun skg-set-write-protected ()
-  "Mark the headline at point as write-protected.
-Edits the metadata to include `writeProtected` in the `node` section.
-Does NOT save; call `skg-request-save-buffer' afterward."
-  (interactive)
-  (skg-edit-metadata-at-point '(skg (node writeProtected))))
-
 (defun skg-view-without-metadata ()
   "Copy the active region to a new org buffer, stripping skg metadata.
 If there is no active region, do nothing."

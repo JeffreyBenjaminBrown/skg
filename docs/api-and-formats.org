@@ -786,6 +786,19 @@ node's heralds.
   becomes a non-member); on an editable node, unfold its content
   editable, within =initial_node_limit= expansions. A buffer carries at
   most one per node.
+- =writeProtectedView= — make the occurrence write-protected (its title
+  resynced from the graph) and each of its direct child vognodes a
+  non-member; the children keep their own editability and subtrees. The
+  edits the occurrence carries in the same save are saved first. On a
+  write-protected occurrence it does nothing. Emitted by =C-c s w=.
+- =writeProtectedSubtreeView= — the same for the occurrence and its whole
+  content subtree: every node in it becomes write-protected, and every
+  child under them a non-member. Emitted by =C-c s W=.
+  Either write-protect request together with =editableView= on one
+  occurrence is refused; on two occurrences of a node they move
+  editability. An editable occurrence adopts a non-member child that
+  stands for an entry of its content list, where no member does, as
+  that entry's member, so moving editability back restores the content.
 - =flags= — add one write-protected =flagsFolder=, retained even when empty.
   Its true-only viewnodes use =(flag hadId)=, =(flag wasOverloaded)=, and
   =(flag noSearchMatching)= metadata in that order. Viewnodes have no Org title;

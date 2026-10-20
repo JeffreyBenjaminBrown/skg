@@ -378,7 +378,7 @@ write-protected occurrence is refused, an alias folder that differs
 is refused and an absent one passes, and reordered children under a
 write-protected occurrence pass.
 
-** Slice 1: write-protection is a request; an editable node adopts its non-member content
+** DONE Slice 1: write-protection is a request; an editable node adopts its non-member content
 Add 'ViewRequest::WriteProtected' and 'ViewRequest::WriteProtectedSubtree',
 the atoms 'writeProtectedView' and 'writeProtectedSubtreeView' in
 the parser and the serializer, and the refusal of both requests

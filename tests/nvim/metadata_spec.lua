@@ -81,19 +81,6 @@ describe('skg.metadata commands', function ()
           vim.api.nvim_get_current_buf(), { force = true })
   end)
 
-  it('set_write_protected adds writeProtected to the node section', function ()
-    -- Mirrors test-skg-set-write-protected's three cases.
-    buffer_with('* (skg (node (id 1))) title')
-    metadata.set_write_protected()
-    local result = first_metadata_sexp()
-    assert.is_true(subtree_p(result, '(skg (node writeProtected))'))
-    assert.is_true(subtree_p(result, '(skg (node (id 1)))'))
-    buffer_with('* plain title')
-    metadata.set_write_protected()
-    assert.is_true(subtree_p(first_metadata_sexp(),
-                             '(skg (node writeProtected))'))
-  end)
-
   it('delete marks the node for deletion', function ()
     buffer_with('* (skg (node (id 1))) title')
     metadata.delete()
@@ -237,6 +224,8 @@ describe('skg.metadata keybinding surface', function ()
     for _, binding in ipairs(keymaps.content_view_bindings) do
       by_lhs[binding[1]] = binding[2]
     end
+    assert.are.equal('RequestWriteProtected', by_lhs['sw'])
+    assert.are.equal('RequestWriteProtectedRecursive', by_lhs['sW'])
     assert.are.equal('ShowFolderOfAliases', by_lhs['ca'])
     assert.are.equal('ShowFolderOfOverrides', by_lhs['co'])
     assert.are.equal('ShowFolderOfSubscribesTo', by_lhs['cs'])

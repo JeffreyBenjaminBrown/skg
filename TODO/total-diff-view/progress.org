@@ -1113,3 +1113,59 @@ slice 1.
 *** seen along the way
 'ViewForest::nodes' yields every root twice; recorded in
 'TODO/problems.org'.
+** Slice 1: deviations
+*** what slice 0 had already done
+The drawing half of this slice came forward to slice 0 (see its
+"slice 1's server-side half came forward"): the non-members under
+'writeProtect_content_subtree', the tagging of non-member content in
+'tag_content_members', and the adoption in the content reconciler.
+This slice adds the requests and tests them, the adoption included.
+*** where the request is applied
+'apply_writeProtect_request' ('server/to_org/expand/editable.rs')
+runs in 'visit_normal_node' right after the deletion preflight,
+before the budget and the draw rule read the occurrence's
+editability. The plain form is 'writeProtect_occurrence' plus
+'make_member_children_nonMembers'; the subtree form is
+'writeProtect_content_subtree', now built on 'writeProtect_occurrence'.
+*** the editable map keeps an entry that names another occurrence
+'writeProtect_content_subtree' removed a node's editable-map entry
+whatever occurrence it named. 'writeProtect_occurrence' removes it
+only when it names the occurrence being write-protected: an entry
+naming another occurrence is that node's editable copy, and removing
+it would let a third occurrence become editable beside it.
+*** a write-protect request beats a cascaded editable-view request
+The validator refuses both requests on one occurrence when the user
+writes them. The cascade can still hand an editable-view request to
+a child that carries a write-protect request; the write-protect
+request then wins, and the editable-view request is dropped with it.
+*** the error
+'WriteProtectAndEditableViewRequestsOnOneOccurrence (ID)', reported
+by 'validate_editable_view_requests'.
+*** the commands do not auto-save
+Like C-c s d, so that C-c s w and C-c s d can go into one save,
+which is how editability moves.
+*** heralds, cycling, chords
+The two atoms have heralds 'req:write-protected' and
+'req:write-protected-subtree' ('tests/shared/herald-rules.sexp'
+regenerated; 'docs/heralds.org' lists them), and join 'editableView'
+in both clients' cycle lists for the viewRequests field. The new
+error names C-c s w, so 'nvim/lua/skg/messages.lua' translates that
+chord now; slice 3 adds the others.
+*** tests
+- Content views, in 'tests/editable_view_cascade_and_budget.rs'. A
+  view of a node draws its containerward branch, which the tests
+  skip when they count content.
+- The parking test needs a collateral rerender: saving the view that
+  parks a node removes it from its parent's content, so another view's
+  save puts it back, and the parking view, rerendered, adopts it.
+- The TDV test, in 'tests/pcsvf/write_protecting.rs', first types a
+  child c under n, since the 'shared' fixture changes no membership
+  and so gives a, b no presence facts. c, being new, then draws its
+  containers, n among them, so the test matches lines by depth.
+- 'tests/new/buffer_to_viewnodes/validate_tree.rs' tests the refusal;
+  'tests/unit/viewnode.rs' the atoms' round trip.
+*** docs beyond the plan's list
+The 'C-c s d' entries also say that moving editability back makes the
+children content again, and the "View requests" section describes
+the adoption. The integration run fails only 'import-md-and-org', as
+at baseline.

@@ -91,8 +91,11 @@ M.commands = {
                                   desc = 'Graft the subscribees (auto-saves)' },
   SetEditable = { module = 'skg.view_requests', fn = 'set_editable',
                     desc = 'Make this the editable view of its node' },
-  SetWriteProtected = { module = 'skg.metadata', fn = 'set_write_protected',
-                      desc = 'Make this view of its node write-protected' },
+  RequestWriteProtected = { module = 'skg.view_requests', fn = 'request_write_protected',
+                            desc = 'Request this view of its node write-protected' },
+  RequestWriteProtectedRecursive = { module = 'skg.view_requests',
+                                     fn = 'request_write_protected_recursive',
+                                     desc = 'Request this view and its content write-protected' },
   SetMergeRequest = { module = 'skg.metadata', fn = 'set_merge_request',
                       desc = 'Request merging another node into this one' },
   SetRepo = { module = 'skg.metadata', fn = 'set_repo',
@@ -253,7 +256,8 @@ M.content_view_bindings = {
   { 'pS', 'ShowSubscriberwardTree' }, -- C-c p S
   { 'ps', 'ShowSubscribeewardTree' }, -- C-c p s
   { 'sd', 'SetEditable' },             -- C-c s d
-  { 'sw', 'SetWriteProtected' },          -- C-c s w
+  { 'sw', 'RequestWriteProtected' },     -- C-c s w
+  { 'sW', 'RequestWriteProtectedRecursive' }, -- C-c s W
   { 'sm', 'SetMergeRequest' },           -- C-c s m
   { 'ss', 'SetRepo' },                 -- C-c s s
   { 'sS', 'SetRepoRecursive' },        -- C-c s S

@@ -139,7 +139,8 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c p s") #'skg-show-subscribeeward-tree))
   (progn;; properties
     (define-key map (kbd "C-c s d") #'skg-set-editable)
-    (define-key map (kbd "C-c s w") #'skg-set-write-protected)
+    (define-key map (kbd "C-c s w") #'skg-request-write-protected)
+    (define-key map (kbd "C-c s W") #'skg-request-write-protected-recursive)
     (define-key map (kbd "C-c s m") #'skg-set-merge-request)
     (define-key map (kbd "C-c s r") #'skg-set-relRepo)
     (define-key map (kbd "C-c s R") #'skg-set-relRepo-recursive)

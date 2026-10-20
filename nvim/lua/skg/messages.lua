@@ -28,6 +28,7 @@ end
 ---binding that plays it (skg.keymaps).
 M.neovim_bindings_of_emacs_chords = {
   ['C-c s d'] = '<localleader>sd',
+  ['C-c s w'] = '<localleader>sw',
 }
 
 ---MESSAGE with each Emacs chord it names replaced by its Neovim

@@ -382,10 +382,10 @@ write-protected. That's because a buffer can only be saved
 if it has at most one editable occurrence of a node.
 Otherwise, two editable nodes could contradict each other.
 
-This same caveat does not apply to making a node write-protected.
-While there does exist a command for that (skg-set-write-protected)
-you can also 'do it yourself'
-by visiting a metadata buffer for the node (skg-view-metadata).
+Making a node write-protected is likewise a request
+(skg-request-write-protected, below), which the server performs:
+it also makes the children of the write-protected occurrence
+stop affecting it, since a write-protected occurrence has no content.
 *** C-c s d : skg-set-editable
 If you want to see the editable view of that node
 from a place where it is currently shown in a write-protected form,
@@ -393,18 +393,30 @@ call this function. It will make the current editable view
 (if it exists) write-protected, keeping what it draws
 (though no longer as its content: each child that affected its parent
 stops affecting it), and then draw an editable view here.
+Moving editability back to that occurrence later
+makes those children its content again.
 Called on a node that is already editable,
 it unfolds the node's content editable,
 up to 'initial_node_limit' expansions.
 A buffer may carry only one such request per node.
-*** C-c s w : skg-set-write-protected
-This marks a node as 'write-protected',
-as described above.
-In brief, it means edits to its title, body or
-  (more importantly) children
-will not affect it
-  (although edits to its children will affect those children,
-  unless they are also write-protected).
+*** C-c s w : skg-request-write-protected
+Requests that this occurrence become write-protected,
+as described above. It does not save.
+At the next save, edits the occurrence carries are saved first;
+then the server makes it write-protected
+and makes each of its children stop affecting it,
+so that edits to its title, body or children no longer affect it
+  (although edits to its children still affect those children:
+  they keep their own editability, and their own content).
+On an occurrence that is already write-protected, it does nothing.
+In one save with C-c s d on another occurrence of the same node,
+it moves editability there.
+The two requests on the same occurrence contradict each other,
+and the save is refused.
+*** C-c s W : skg-request-write-protected-recursive
+The same, for the occurrence and its whole content subtree:
+every node in it becomes write-protected,
+and every child under them stops affecting its parent.
 *** C-c s s : skg-set-repo
 Changes the skgrepo of the node at point.
 The prompt starts with the current skgrepo as editable minibuffer text.

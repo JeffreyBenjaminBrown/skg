@@ -177,8 +177,8 @@ node; relRepo belongs to a relationship.
 Folder labels, =alias=, =ID= and the flag rows describe their view
 positions. The flags folder spells out =had ID before import=, =was
 overloaded during org-roam import=, and =no search matching= when true.
-=req:folder:...=, =req:roleTree:...=, =req:flags= and =req:editable=
-request a view. =delete=, =merge:...=, and =request:no search matching=
+=req:folder:...=, =req:roleTree:...=, =req:flags=, =req:editable=,
+=req:write-protected= and =req:write-protected-subtree= request a view. =delete=, =merge:...=, and =request:no search matching=
 or =request:search matching= are save requests.
 
 An unknown node is labeled =Reference to unknown node.=; a restricted

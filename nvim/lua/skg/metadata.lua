@@ -1,6 +1,6 @@
 -- PURPOSE: Utilities to parse and edit skg headline metadata, plus
 -- the user commands that reduce to metadata edits (delete,
--- set-write-protected, set-repo, merge requests, ...).
+-- set-repo, merge requests, ...).
 -- The Lua port of elisp/skg-metadata.el.
 --
 -- The elisp file's biggest hazard -- org-fold's fragility check
@@ -375,11 +375,6 @@ function M.delete_recursive ()
   end
   vim.notify(
     'This change will only be applied when you save the buffer.')
-end
-
----Mark the headline at point as write-protected. Does NOT save.
-function M.set_write_protected ()
-  M.edit_metadata_at_point(sexpr.read('(skg (node writeProtected))'))
 end
 
 ---Copy the visually-selected region to a new org buffer, stripping

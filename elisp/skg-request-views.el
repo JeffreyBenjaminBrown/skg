@@ -7,7 +7,8 @@
 ;;;     BOTH folders of the relation (one for containers and mentioners);
 ;;;   - ROLE TREES, `skg-show-*ward-tree' : (roleTree ROLENAME), the
 ;;;     role tree for that one partner role.
-;;; (`skg-request-editable-view', a different concept, is also here.)
+;;; (`skg-request-editable-view' and the write-protect requests, a
+;;; different concept, are also here.)
 
 (require 'skg-metadata)
 (require 'skg-request-save)
@@ -89,6 +90,33 @@ one such request per node. Does NOT auto-save."
     (org-back-to-heading t)
     (skg-edit-metadata-at-point
      `(skg (node (viewRequests editableView))))))
+
+(defun skg-request-write-protected ()
+  "Edit metadata to request write-protection for the headline at point.
+At the next save, the occurrence's own edits are saved first; then the
+server makes it write-protected, resyncing its title from the graph,
+and makes each of its direct children not affect it, keeping their own
+editability and subtrees. A no-op on a write-protected headline.
+Requesting an editable view (\\[skg-request-editable-view]) of another
+occurrence of the node in the same save moves editability there.
+Does NOT auto-save."
+  (interactive)
+  (save-excursion
+    (org-back-to-heading t)
+    (skg-edit-metadata-at-point
+     `(skg (node (viewRequests writeProtectedView))))))
+
+(defun skg-request-write-protected-recursive ()
+  "Edit metadata to request write-protection for the headline at point
+and its whole content subtree. At the next save, after the subtree's
+own edits are saved, the server makes the occurrence and every node of
+its content subtree write-protected, each child under them not
+affecting its parent. Does NOT auto-save."
+  (interactive)
+  (save-excursion
+    (org-back-to-heading t)
+    (skg-edit-metadata-at-point
+     `(skg (node (viewRequests writeProtectedSubtreeView))))))
 
 (defun skg-fork-node ()
   "Fork the (owned) node at point: create a private clone that overrides it.

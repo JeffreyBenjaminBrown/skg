@@ -8,6 +8,7 @@
 (require 'org)
 (require 'skg-keymaps-and-aliases)
 (require 'skg-metadata)
+(require 'skg-request-views)
 (require 'skg-id-search)
 (require 'skg-modify-graph)
 (require 'skg-compare-sexpr)
@@ -93,41 +94,32 @@ Returns the parsed s-expression or nil if not found."
             (list (intern skgid))))
    (test-skg--all-metadata-sexps)))
 
-(ert-deftest test-skg-set-write-protected ()
-  "Test skg-set-write-protected adds writeProtected to node section."
-  ;; Test adding write-protected to headline with id
-  (with-temp-buffer
-    (org-mode)
-    (insert "* (skg (node (id 1))) title")
-    (goto-char (point-min))
-    (skg-set-write-protected)
-    (let ((result (test-skg--extract-metadata-sexp)))
-      ;; Verify write-protected is in node section
-      (should (skg-sexp-subtree-p result '(skg (node writeProtected))))
-      ;; Verify id is preserved
-      (should (skg-sexp-subtree-p result '(skg (node (id 1)))))))
+(ert-deftest test-skg-request-write-protected ()
+  "The write-protect commands add their view request without saving,
+and leave the headline's own metadata alone."
+  (dolist (pair '((skg-request-write-protected . writeProtectedView)
+                  (skg-request-write-protected-recursive
+                   . writeProtectedSubtreeView)))
+    (cl-letf (((symbol-function 'skg-request-save-buffer)
+               (lambda () (error "The command must not save"))))
+      (with-temp-buffer
+        (org-mode)
+        (insert "* (skg (node (id 1))) title")
+        (goto-char (point-min))
+        (funcall (car pair))
+        (let ((result (test-skg--extract-metadata-sexp)))
+          (should (skg-sexp-subtree-p
+                   result `(skg (node (viewRequests ,(cdr pair))))))
+          (should (skg-sexp-subtree-p result '(skg (node (id 1)))))
+          (should-not (skg-sexp-subtree-p
+                       result '(skg (node writeProtected)))))))))
 
-  ;; Test adding write-protected to headline with existing node section
-  (with-temp-buffer
-    (org-mode)
-    (insert "* (skg (node (id 2))) title")
-    (goto-char (point-min))
-    (skg-set-write-protected)
-    (let ((result (test-skg--extract-metadata-sexp)))
-      ;; Verify write-protected is in node section
-      (should (skg-sexp-subtree-p result '(skg (node writeProtected))))
-      ;; Verify id is preserved
-      (should (skg-sexp-subtree-p result '(skg (node (id 2)))))))
-
-  ;; Test adding write-protected to headline with no metadata
-  (with-temp-buffer
-    (org-mode)
-    (insert "* plain title")
-    (goto-char (point-min))
-    (skg-set-write-protected)
-    (let ((result (test-skg--extract-metadata-sexp)))
-      ;; Verify write-protected is in node section
-      (should (skg-sexp-subtree-p result '(skg (node writeProtected)))))))
+(ert-deftest test-skg-write-protect-keybindings ()
+  "C-c s w and C-c s W request write-protection."
+  (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c s w"))
+              'skg-request-write-protected))
+  (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c s W"))
+              'skg-request-write-protected-recursive)))
 
 (ert-deftest test-skg-strip-metadata-from-org-text ()
   "Test stripping skg metadata from every headline in org text."

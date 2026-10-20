@@ -3,8 +3,8 @@
 -- letting the server fulfill the request during completion. Two
 -- families, both auto-saving: FOLDERS (folder RELNAME), building
 -- both folders of the relation, and ROLE TREES (roleTree ROLENAME), the role tree
--- for one partner role. Also the editable-view request (no
--- auto-save) and the explicit fork. The Lua port of
+-- for one partner role. Also the editable-view and write-protect
+-- requests (no auto-save) and the explicit fork. The Lua port of
 -- elisp/skg-request-views.el.
 
 local focus = require('skg.focus')
@@ -59,6 +59,33 @@ function M.set_editable ()
   if not line then error('Not on a headline') end
   metadata.edit_metadata_at_line(line,
     sexpr.read('(skg (node (viewRequests editableView)))'))
+end
+
+---Request write-protection for the headline at point. At the next
+---save, the occurrence's own edits are saved first; then the server
+---makes it write-protected, resyncing its title from the graph, and
+---makes each of its direct children not affect it, keeping their own
+---editability and subtrees. A no-op on a write-protected headline.
+---Requesting an editable view (set_editable) of another occurrence of
+---the node in the same save moves editability there. Does NOT
+---auto-save.
+function M.request_write_protected ()
+  local line = focus.owning_headline_line()
+  if not line then error('Not on a headline') end
+  metadata.edit_metadata_at_line(line,
+    sexpr.read('(skg (node (viewRequests writeProtectedView)))'))
+end
+
+---Request write-protection for the headline at point and its whole
+---content subtree. At the next save, after the subtree's own edits
+---are saved, the server makes the occurrence and every node of its
+---content subtree write-protected, each child under them not
+---affecting its parent. Does NOT auto-save.
+function M.request_write_protected_recursive ()
+  local line = focus.owning_headline_line()
+  if not line then error('Not on a headline') end
+  metadata.edit_metadata_at_line(line,
+    sexpr.read('(skg (node (viewRequests writeProtectedSubtreeView)))'))
 end
 
 ---Fork the (owned) node at point: create a private clone that

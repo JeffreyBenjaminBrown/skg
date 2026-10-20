@@ -50,11 +50,13 @@ Returns nil if the field is not cycleable."
    ((string= field-name "repo") ;; from the config
     (skg-sexp-edit--repo-cycle-values field-value))
    ((string= field-name "viewRequests")
-    ;; Only the bare-atom request 'editableView' is field-cycleable.
+    ;; Only the bare-atom requests are field-cycleable.
     ;; The '(folder RELNAME)' / '(roleTree ROLENAME)' requests are structured
     ;; forms, inserted via their dedicated commands, not by cycling.
     '("none (default)"
-      "editableView"))))
+      "editableView"
+      "writeProtectedView"
+      "writeProtectedSubtreeView"))))
 
 (defun skg-sexp-edit--repo-cycle-values (field-value)
   "Return repo names from config as a cycle list.
