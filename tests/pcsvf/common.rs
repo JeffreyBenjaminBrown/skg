@@ -18,9 +18,9 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::serve::handlers::integrate_unshown_changes::handle_integrate_unshown_changes_request;
 use skg::serve::handlers::stage_and_commit::handle_stage_and_commit_request;
+use skg::pcsvf::DrawnDiffViewBuffer;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::serve::handlers::diff_view::{
-  DiffViewBuffer, diffView_buffer};
+use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::test_utils::{
   cleanup_test_tantivy, extract_string_field_from_sexp, graph_handle_from_config,
   skg_env_from_parts, update_from_and_rerender_buffer_test};
@@ -117,10 +117,9 @@ pub fn all_changes_buffer_with_marks (
     store . mark ( key . clone (),
                    straddle . change_leaves () . leaf_fingerprint (key)
                    . expect ("a marked key is a leaf") ); }
-  Ok ( match diffView_buffer (
-    &runtime, &straddle, &store, DiffViewBufferKind::AllChanges ) ? {
-    DiffViewBuffer::Empty => None,
-    DiffViewBuffer::Content { text, .. } => Some (text), } ) }
+  Ok ( diffView_buffer (
+    &runtime, &straddle, &store, DiffViewBufferKind::AllChanges ) ?
+    . map ( |drawn| drawn . text ) ) }
 
 /// The view id under which 'open_buffer' registers a buffer: its
 /// client's name for it.
@@ -148,13 +147,13 @@ pub fn open_buffer (
   let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
   let straddle : Arc<GraphStraddle> = current_graph_straddle_in_slot (
     &mut f . views_state . graph_straddle, &f . config, runtime . graph . clone () ) ?;
-  let buffer : DiffViewBuffer = {
+  let buffer : Option<DrawnDiffViewBuffer> = {
     let store : MutexGuard<ReadinessStore> =
       env . runtime . readiness_store . lock () . unwrap ();
     diffView_buffer (&runtime, &straddle, &store, diffView_buffer_kind) ? };
   Ok ( match buffer {
-    DiffViewBuffer::Empty => None,
-    DiffViewBuffer::Content { text, pids, viewforest } => {
+    None => None,
+    Some (DrawnDiffViewBuffer { text, pids, viewforest }) => {
       f . views_state . open_views . register_diffView_view (
         &runtime . graph, view_id_of (diffView_buffer_kind),
         viewforest, &pids, diffView_buffer_kind );

@@ -157,15 +157,22 @@ fn kept_content_origins (
       kept . remove (content_origin); }}
   kept . intersection (r) . cloned () . collect () }
 
+/// A buffer of the diff view, drawn: its text, the pids to register
+/// it under, and its viewforest.
+pub struct DrawnDiffViewBuffer {
+  pub text       : String,
+  pub pids       : Vec<ID>,
+  pub viewforest : ViewForest,
+}
+
 /// The buffer 'drawing' names, with roots 'roots' (for a PCSVF, its
-/// D in order), drawn with readiness from 'store': the buffer text,
-/// the pids to register, and the viewforest.
+/// D in order), drawn with readiness from 'store'.
 pub fn diffView_buffer_viewforest (
   runtime : &RuntimeGeneration,
   drawing : DiffViewSource,
   store   : &ReadinessStore,
   roots   : &[ID],
-) -> Result<(String, Vec<ID>, ViewForest), Box<dyn Error>> {
+) -> Result<DrawnDiffViewBuffer, Box<dyn Error>> {
   let mut viewforest : ViewForest =
     stub_viewforest_of_roots (runtime, drawing, roots) ?;
   complete_viewforest_with_graph_straddle (runtime, drawing, &mut viewforest) ?;
@@ -175,7 +182,7 @@ pub fn diffView_buffer_viewforest (
     &mut viewforest, &runtime . graph, &runtime . config, None ) ?;
   let pids : Vec<ID> =
     pids_from_viewforest (&viewforest) . into_iter () . collect ();
-  Ok (( text, pids, viewforest )) }
+  Ok ( DrawnDiffViewBuffer { text, pids, viewforest } ) }
 
 /// What a buffer of the diff view gets after view completion:
 /// its '(ready ...)' facts, and in the skgrepo-changes buffer each
