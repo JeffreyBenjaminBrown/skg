@@ -164,9 +164,10 @@ M.commands = {
     module = 'skg.readiness',
     fn = 'mark_gnode_skgrepo_changes_commitReady_recursive',
     desc = 'Toggle the commit-readiness of every home move in the subtree like this one, and save' },
-  TdvShowUnshownChanges = { module = 'skg.show_unshown_changes',
-                            fn = 'show_unshown_changes',
-                            desc = 'Make every change of this diff-view buffer shown, appending roots as needed' },
+  DiffViewIntegrateUnshownChanges = {
+    module = 'skg.integrate_unshown_changes',
+    fn = 'diffView_integrate_unshown_changes',
+    desc = 'Make every change of this diff-view buffer editable, appending roots as needed' },
   StageAndCommit = { module = 'skg.stage_and_commit', fn = 'stage_and_commit',
                      desc = 'Stage and git-commit every owned skgrepo with changes, with one message' },
   InvestigateUnknownNode = { module = 'skg.investigate_unknown_node',
@@ -268,7 +269,7 @@ M.content_view_bindings = {
   { 'rR', 'CycleCommitReadyRecursive' }, -- C-u C-c r r
   { 'rh', 'MarkGnodeSkgrepoChangesCommitReady' }, -- C-c r h
   { 'rH', 'MarkGnodeSkgrepoChangesCommitReadyRecursive' }, -- C-u C-c r h
-  { 'ru', 'TdvShowUnshownChanges' },     -- C-c r u
+  { 'ru', 'DiffViewIntegrateUnshownChanges' }, -- C-c r u
   { 'rc', 'StageAndCommit' },            -- C-c r c
   { 'sx', 'SetFlagSearchMatching' },
   { 'sX', 'SetFlagSearchMatchingRecursive' },

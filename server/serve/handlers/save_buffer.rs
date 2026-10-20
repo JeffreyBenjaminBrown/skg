@@ -139,13 +139,13 @@ impl SaveResponse {
     sexp_to_client_string (&response) }}
 
 /// '(readiness-summary (ready N) (changed M) (foreign F)
-/// (order-only O) (unshown K))'.
+/// (order-only O) (notEditable K))'.
 pub fn readiness_summary_sexp (
   readiness_summary : &BufferReadinessSummary,
 ) -> String {
   let summary : &ReadinessSummary = &readiness_summary . summary;
   format! (
-    "(readiness-summary (ready {}) (changed {}) (foreign {}) (order-only {}) (unshown {}))",
+    "(readiness-summary (ready {}) (changed {}) (foreign {}) (order-only {}) (notEditable {}))",
     summary . ready_files, summary . changed_files,
     summary . foreign_changed_files, summary . order_only_files,
     readiness_summary . changes_not_editable_here ) }

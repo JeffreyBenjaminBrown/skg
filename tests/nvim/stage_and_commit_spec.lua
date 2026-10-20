@@ -9,7 +9,7 @@ local stage_and_commit = require('skg.stage_and_commit')
 
 local NEEDS_CONFIRMATION =
   '((response-type stage-and-commit) (needs-confirmation . t)'
-  .. ' (readiness-summary (ready 1) (changed 3) (foreign 0) (order-only 0) (unshown 0))'
+  .. ' (readiness-summary (ready 1) (changed 3) (foreign 0) (order-only 0) (notEditable 0))'
   .. ' (errors ()) (warnings ()))'
 
 describe('skg stage and commit', function ()

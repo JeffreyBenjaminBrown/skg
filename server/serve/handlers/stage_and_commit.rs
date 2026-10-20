@@ -134,7 +134,7 @@ fn lock_store (
 ///   ((needs-confirmation . t) (readiness-summary ...) (errors ()) (warnings ()))
 ///   ((commits (("SKGREPO" "COMMIT-ID") ...)) (errors (...)) (warnings ()))
 /// The readiness summary has the save response's form, with an
-/// unshown count of 0. 'commits' lists the skgrepos git-committed; a
+/// not-editable count of 0. 'commits' lists the skgrepos git-committed; a
 /// skgrepo without changes is in neither list, a failed one is an
 /// error.
 pub fn stage_and_commit_response_sexp (

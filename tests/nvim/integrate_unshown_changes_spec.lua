@@ -1,13 +1,13 @@
--- Client coverage for the show-unshown-changes command.
+-- Client coverage for the integrate-unshown-changes command.
 
 local helpers = dofile(
   debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
 
 local buffer = require('skg.buffer')
 local lock = require('skg.lock')
-local show_unshown_changes = require('skg.show_unshown_changes')
+local integrate_unshown_changes = require('skg.integrate_unshown_changes')
 
-describe('skg show unshown changes', function ()
+describe('skg integrate unshown changes', function ()
   local server
   local original_notify
 
@@ -36,7 +36,7 @@ describe('skg show unshown changes', function ()
       'diff-view: all changes')
     vim.api.nvim_set_current_buf(view)
     vim.bo[view].modified = true
-    local ok, err = pcall(show_unshown_changes.show_unshown_changes)
+    local ok, err = pcall(integrate_unshown_changes.diffView_integrate_unshown_changes)
     assert.is_false(ok)
     assert.is_truthy(tostring(err):find('Save the buffer first.', 1, true))
     vim.wait(100, function () return #requests > 0 end, 10)
@@ -49,8 +49,8 @@ describe('skg show unshown changes', function ()
     server = helpers.connect_to_fake_server(function (line, respond)
       table.insert(requests, line)
       respond(helpers.framed(
-        '((response-type show-unshown-changes)'
-        .. ' (readiness-summary (ready 1) (changed 3) (foreign 0) (order-only 0) (unshown 0))'
+        '((response-type integrate-unshown-changes)'
+        .. ' (readiness-summary (ready 1) (changed 3) (foreign 0) (order-only 0) (notEditable 0))'
         .. ' (errors ()) (warnings ()))'))
       respond(helpers.framed(
         '((response-type rerender-lock) (lock-views ("diff-view: all changes")))'))
@@ -64,12 +64,12 @@ describe('skg show unshown changes', function ()
       '* (skg (node (id a))) a', 'skg://diff-view: all changes',
       'diff-view: all changes')
     vim.api.nvim_set_current_buf(view)
-    show_unshown_changes.show_unshown_changes()
+    integrate_unshown_changes.diffView_integrate_unshown_changes()
     vim.wait(3000, function ()
       return #notices > 0 and lock.stream_in_progress == nil end, 10)
     assert.are.equal(1, #requests, vim.inspect(requests))
     assert.is_truthy(requests[1]:find(
-      '(request . "show unshown changes")', 1, true))
+      '(request . "integrate unshown changes")', 1, true))
     assert.is_truthy(requests[1]:find(
       '(view-id . "diff-view: all changes")', 1, true))
     assert.is_truthy(vim.tbl_contains(

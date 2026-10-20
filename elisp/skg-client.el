@@ -27,7 +27,7 @@
 (require 'skg-recovery)
 (require 'skg-request-save)
 (require 'skg-request-repo-sets)
-(require 'skg-request-show-unshown-changes)
+(require 'skg-request-integrate-unshown-changes)
 (require 'skg-request-stage-and-commit)
 (require 'skg-request-strip-body-whitespace)
 (require 'skg-search-make-link)

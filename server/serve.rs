@@ -33,7 +33,7 @@ use crate::serve::handlers::text_release::{
   exclude_overPrivateText_nodes_from_viewforest};
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
-use crate::serve::handlers::show_unshown_changes::handle_show_unshown_changes_request;
+use crate::serve::handlers::integrate_unshown_changes::handle_integrate_unshown_changes_request;
 use crate::serve::handlers::stage_and_commit::handle_stage_and_commit_request;
 use crate::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
 use crate::serve::handlers::text_search::render_enriched_search_buffer::{insert_full_containerward_role_trees_into_search_view, insert_overrideward_view_subtrees};
@@ -259,8 +259,8 @@ fn handle_emacs (
             handle_stage_and_commit_request (
               &mut stream, &request_header, &env, &mut views_state,
               &skgrepo_restriction ),
-          Ok (RequestType::ShowUnshownChanges) =>
-            handle_show_unshown_changes_request (
+          Ok (RequestType::IntegrateUnshownChanges) =>
+            handle_integrate_unshown_changes_request (
               &mut stream, &request_header, &env, &mut views_state,
               &skgrepo_restriction ),
           Ok (RequestType::HeraldRules) =>

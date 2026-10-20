@@ -95,7 +95,7 @@ fn refusal_errors (
 /// c, typed under a and so created, is a node of U whose creation is
 /// marked ready. Write-protecting its only editable occurrence saves,
 /// c keeps its readiness facts, and the summary counts its change
-/// unshown.
+/// as not editable.
 #[test]
 fn write_protecting_the_only_editable_occurrence_of_a_node_of_u_saves (
 ) -> Result<(), Box<dyn Error>> {

@@ -6,7 +6,7 @@
 ;;; When the readiness summary is incomplete, the server answers with
 ;;; it instead and changes nothing; only the typed word "yes" resends
 ;;; the request confirmed. Every answer is followed by a rerender
-;;; stream, which after a commit redraws the open buffers of the total
+;;; stream, which after a commit redraws the open buffers of the
 ;;; diff view.
 ;;;
 ;;; DATA USED/ASSUMED: See docs/api-and-formats.org.

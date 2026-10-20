@@ -29,7 +29,7 @@ pub enum RequestType {
   DeleteReferencesToAbsentNode,
   DiffView,
   StageAndCommit,
-  ShowUnshownChanges,
+  IntegrateUnshownChanges,
   InvestigateUnknownNode,
 }
 
@@ -62,7 +62,7 @@ impl RequestType {
       "delete references to absent node" => Ok (RequestType::DeleteReferencesToAbsentNode),
       "diff view"                => Ok (RequestType::DiffView),
       "stage and commit"         => Ok (RequestType::StageAndCommit),
-      "show unshown changes"     => Ok (RequestType::ShowUnshownChanges),
+      "integrate unshown changes"     => Ok (RequestType::IntegrateUnshownChanges),
       "investigate unknown node" => Ok (RequestType::InvestigateUnknownNode),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
@@ -110,7 +110,7 @@ pub enum TcpToClient {
   DeleteReferencesResult,
   DiffView, // One buffer of the diff view, or '(empty . t)' when that buffer would show nothing.
   StageAndCommit, // The per-skgrepo git-commits, or the readiness summary with '(needs-confirmation . t)'. A rerender stream follows.
-  ShowUnshownChanges, // The readiness summary of the buffer of the diff view redrawn with every change shown, or a refusal. A rerender stream follows.
+  IntegrateUnshownChanges, // The readiness summary of the buffer of the diff view redrawn with every change editable, or a refusal. A rerender stream follows.
   InvestigateUnknownNode, // What git history says an unknown node used to be, or the node an ID resolves to, as Org text.
   Error,
 }
@@ -159,6 +159,6 @@ impl TcpToClient {
       TcpToClient::DeleteReferencesResult => "delete-references-result",
       TcpToClient::DiffView         => "diff-view",
       TcpToClient::StageAndCommit   => "stage-and-commit",
-      TcpToClient::ShowUnshownChanges => "show-unshown-changes",
+      TcpToClient::IntegrateUnshownChanges => "integrate-unshown-changes",
       TcpToClient::InvestigateUnknownNode => "investigate-unknown-node",
       TcpToClient::Error            => "error", }} }

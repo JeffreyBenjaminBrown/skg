@@ -6,7 +6,7 @@
 
 use crate::pcsvf::common::{
   Fixture, open_all_changes_buffer, open_buffer, save, save_buffer,
-  show_unshown_changes, with_fixture};
+  integrate_unshown_changes, with_fixture};
 
 use skg::change_leaves::{BufferReadinessSummary, ReadinessSummary};
 use skg::serve::handlers::save_buffer::{SaveResponse, readiness_summary_sexp};
@@ -114,8 +114,8 @@ fn editing_a_node_lapses_its_mark (
 /// del); their seven leaves are the two text changes, the two
 /// deletions, and the relationships ln-lo, r-del and del-delc. Roots
 /// the user drops from the buffer are origins it no longer draws: the
-/// save leaves them out and counts their changes unshown, and the
-/// "show unshown changes" request appends them again.
+/// save leaves them out and counts their changes as not editable, and the
+/// "integrate unshown changes" request appends them again.
 #[test]
 fn the_save_reports_the_readiness_summary (
 ) -> Result<(), Box<dyn Error>> {
@@ -139,18 +139,18 @@ fn the_save_reports_the_readiness_summary (
                    . filter ( |line| line . starts_with ("* ") ) . count (), 1,
                  "the dropped roots stay dropped:\n{}", response . saved_view );
     assert_eq! ( summary_of (&response), summary (1, 6, 3) );
-    let (shown, unshown) : (String, usize) = show_unshown_changes (f) ?;
+    let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
     let roots : Vec<&str> = shown . lines ()
       . filter ( |line| line . starts_with ("* ") ) . collect ();
     assert! ( roots . len () == 4 && roots [0] . starts_with ("* (skg (node (id r)")
               && roots [1] . contains ("(id cy2)") && roots [2] . contains ("(id ln)")
               && roots [3] . contains ("(id mc)"),
               "the dropped roots return, after r:\n{}", shown );
-    assert_eq! ( unshown, 0 );
+    assert_eq! ( not_editable, 0 );
     Ok (( )) }) }
 
 /// A save of the merges buffer of the 'buffers' fixture (described in
-/// 'other_buffers.rs') leaves unshown the eleven leaves of the nodes
+/// 'other_buffers.rs') counts as not editable the eleven leaves of the nodes
 /// it does not draw editable: txt's text, the home and relRepo moves
 /// of mvc, mvg, mvp, mvr and mvt, and the creation of pres, which it
 /// draws as a write-protected member of acq's content.
@@ -165,7 +165,7 @@ fn the_summary_counts_the_changes_the_saved_buffer_does_not_show (
     let summary : BufferReadinessSummary = summary_of (&response);
     assert_eq! ( summary . changes_not_editable_here, 11, "{:?}", summary );
     assert_eq! ( readiness_summary_sexp (&summary),
-                 format! ( "(readiness-summary (ready {}) (changed {}) (foreign 0) (order-only 1) (unshown 11))",
+                 format! ( "(readiness-summary (ready {}) (changed {}) (foreign 0) (order-only 1) (notEditable 11))",
                            summary . summary . ready_files,
                            summary . summary . changed_files ));
     Ok (( )) }) }

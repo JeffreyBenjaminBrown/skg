@@ -399,7 +399,7 @@ function M.handle_save_response (save_buf, response)
 end
 
 ---The save response's '(readiness-summary (ready N) (changed M)
----(foreign F) (order-only O) (unshown K))' as a table of counts, or
+---(foreign F) (order-only O) (notEditable K))' as a table of counts, or
 ---nil when it has none.
 ---@param response any
 ---@return table|nil
@@ -416,7 +416,7 @@ function M.readiness_summary_from_response (response)
       return { ready = count('ready'), changed = count('changed'),
                foreign = count('foreign'),
                order_only = count('order-only'),
-               unshown = count('unshown') } end
+               not_editable = count('notEditable') } end
   end
   return nil
 end
@@ -435,10 +435,10 @@ function M.readiness_summary_message (summary)
     table.insert(parts, string.format(
       '%d of %d changed files are ready',
       summary.ready, summary.changed)) end
-  if summary.unshown > 0 then
+  if summary.not_editable > 0 then
     table.insert(parts, string.format(
-      ', %d changes are not shown in this view; <localleader>ru shows them',
-      summary.unshown)) end
+      ', %d changes are not editable in this view; <localleader>ru integrates them',
+      summary.not_editable)) end
   if summary.foreign > 0 then
     table.insert(parts, string.format(
       ', %d files changed in foreign skgrepos', summary.foreign)) end

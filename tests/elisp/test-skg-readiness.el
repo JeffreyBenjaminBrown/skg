@@ -185,14 +185,14 @@ without a title ends in a space, as 'skg-format-headline' writes it."
         (skg-handle-save-sexp
          (concat "((content \"* (skg (node (id a))) a\n\") (errors ()) (warnings ())"
                  " (readiness-summary (ready 12) (changed 14) (foreign 2)"
-                 " (order-only 1) (unshown 3)))")))
+                 " (order-only 1) (notEditable 3)))")))
       (should (equal (car shown)
-                     "12 of 14 changed files are ready, 3 changes are not shown in this view; C-c r u shows them, 2 files changed in foreign skgrepos"))
+                     "12 of 14 changed files are ready, 3 changes are not editable in this view; C-c r u integrates them, 2 files changed in foreign skgrepos"))
       (with-temp-buffer
         (skg-handle-save-sexp
          (concat "((content \"* (skg (node (id a))) a\n\") (errors ()) (warnings ())"
                  " (readiness-summary (ready 14) (changed 14) (foreign 0)"
-                 " (order-only 0) (unshown 0)))")))
+                 " (order-only 0) (notEditable 0)))")))
       (should (equal (car shown)
                      "COMMIT READY. All 14 of 14 changed files are ready."))
       (setq shown '())

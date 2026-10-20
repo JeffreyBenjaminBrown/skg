@@ -9,7 +9,7 @@
 (require 'skg-request-stage-and-commit)
 
 (defconst test--stage-and-commit-needs-confirmation
-  "((needs-confirmation . t) (readiness-summary (ready 1) (changed 3) (foreign 0) (order-only 0) (unshown 0)) (errors ()) (warnings ()))")
+  "((needs-confirmation . t) (readiness-summary (ready 1) (changed 3) (foreign 0) (order-only 0) (notEditable 0)) (errors ()) (warnings ()))")
 
 (defun test--stage-and-commit-run (typed body)
   "Run BODY with the network faked and every `read-string' answered

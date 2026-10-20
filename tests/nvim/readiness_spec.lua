@@ -198,11 +198,11 @@ describe('skg.save readiness summary', function ()
       save.handle_save_response(buf, sexpr.read(
         '((content "* (skg (node (id a))) a\n") (errors ()) (warnings ())'
         .. ' (readiness-summary (ready 12) (changed 14) (foreign 2)'
-        .. ' (order-only 1) (unshown 3)))'))
+        .. ' (order-only 1) (notEditable 3)))'))
       save.handle_save_response(buf, sexpr.read(
         '((content "* (skg (node (id a))) a\n") (errors ()) (warnings ())'
         .. ' (readiness-summary (ready 14) (changed 14) (foreign 0)'
-        .. ' (order-only 0) (unshown 0)))'))
+        .. ' (order-only 0) (notEditable 0)))'))
       save.handle_save_response(buf, sexpr.read(
         '((content "* (skg (node (id a))) a\n") (errors ()) (warnings ()))'))
     end)
@@ -210,7 +210,7 @@ describe('skg.save readiness summary', function ()
     vim.api.nvim_buf_delete(buf, { force = true })
     assert(ok, err)
     assert.are.same({
-      '12 of 14 changed files are ready, 3 changes are not shown in this view; <localleader>ru shows them, 2 files changed in foreign skgrepos',
+      '12 of 14 changed files are ready, 3 changes are not editable in this view; <localleader>ru integrates them, 2 files changed in foreign skgrepos',
       'COMMIT READY. All 14 of 14 changed files are ready.' },
       vim.tbl_filter(function (message)
         return message:find('changed files', 1, true) ~= nil

@@ -11,7 +11,7 @@ pub mod readiness_requests;
 pub mod rebuild_session_lifetime_stores;
 pub mod rerender_all_views;
 pub mod save_buffer;
-pub mod show_unshown_changes;
+pub mod integrate_unshown_changes;
 pub(crate) mod save_dependencies;
 pub mod text_release;
 pub mod single_root_view;

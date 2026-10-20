@@ -498,8 +498,8 @@ pub fn complete_viewforest_with_graph_straddle (
 /// that stays and its fold state, and its readiness facts are then
 /// read from the store. Completion draws what it draws anew by the
 /// buffer's sets recomputed after the save, and nothing editable is
-/// write-protected again. Only when 'show_unshown_changes' is true
-/// (the "show unshown changes" request) does it make occurrences
+/// write-protected again. Only when 'integrate_unshown_changes' is true
+/// (the "integrate unshown changes" request) does it make occurrences
 /// editable or append roots: before completion each node of the
 /// recomputed U is made editable at its first occurrence if it has no
 /// editable one, and after completion the content origins of the
@@ -512,7 +512,7 @@ pub fn rerender_view (
   create_partnerFolders : bool, // false post-save (folders round-trip from the buffer); true for the repo-switch rerender, where pruning removed them and the new set decides which return.
   substitute_existing_content_overrides : bool, // true only for the view whose edit created the override.
   diffView_buffer_kind : Option<DiffViewBufferKind>, // Some for a buffer of the diff view
-  show_unshown_changes : bool, // true only for the "show unshown changes" request; matters only in a diff view
+  integrate_unshown_changes : bool, // true only for the "integrate unshown changes" request; matters only in a diff view
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
   if diffView_buffer_kind . is_none () {
@@ -530,10 +530,10 @@ pub fn rerender_view (
   let diffView_source : Option<DiffViewSource> =
     graph_straddle . as_deref () . zip (diffView_buffer_kind)
     . map ( |(straddle, diffView_buffer_kind)| DiffViewSource { straddle, diffView_buffer_kind } );
-  let drawing_to_show_unshown_changes : Option<DiffViewSource> =
-    diffView_source . filter ( |_| show_unshown_changes );
+  let drawing_to_integrate_unshown_changes : Option<DiffViewSource> =
+    diffView_source . filter ( |_| integrate_unshown_changes );
   let standing_roots : BTreeSet<ID> = root_skgids_of_buffer (viewforest);
-  if let Some (drawing) = drawing_to_show_unshown_changes {
+  if let Some (drawing) = drawing_to_integrate_unshown_changes {
     // Before any visit, so that a node of U is editable before its
     // parent's visit can see it.
     ensure_editableOccurrences_exist (
@@ -578,7 +578,7 @@ pub fn rerender_view (
         "complete_viewforest" ). entered();
       complete_viewforest (
         viewforest, &mut completion_context ) ? };
-    if let Some (drawing) = drawing_to_show_unshown_changes {
+    if let Some (drawing) = drawing_to_integrate_unshown_changes {
       let new_roots : Vec<ID> =
         contentOrigins_missing_from_buffer (drawing, viewforest, &standing_roots);
       let appended : Vec<NodeId> = append_contentOrigins_to_buffer (

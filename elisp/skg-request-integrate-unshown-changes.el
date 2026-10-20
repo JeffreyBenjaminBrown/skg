@@ -1,7 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Show the changes a buffer of the diff view does
-;;; not show ('TODO/total-diff-view/08_plan_yet-more.org', "The view
+;;; PURPOSE: Integrate the changes not editable in a buffer of the
+;;; diff view ('TODO/total-diff-view/08_plan_yet-more.org', "The view
 ;;; follows U only on command"). A save never makes an occurrence
 ;;; editable or appends a root on its own; this command asks the
 ;;; server to, for the current buffer. The answer carries the
@@ -16,7 +16,7 @@
 (require 'skg-request-rerender-all-views)
 (require 'skg-request-save) ; for skg--readiness-summary-message
 
-(defun skg-tdv-show-unshown-changes ()
+(defun skg-diffView-integrate-unshown-changes ()
   "In a buffer of the diff view, make every changed node that
 has no editable occurrence editable at its first occurrence, and
 append as roots the origins of changes the buffer draws nowhere.
@@ -27,23 +27,23 @@ Refuses while the buffer has unsaved changes."
   (when (buffer-modified-p)
     (user-error "Save the buffer first."))
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
-    (skg--begin-stream "show unshown changes")
+    (skg--begin-stream "integrate unshown changes")
     (skg--lock-all-skg-buffers)
     (skg--register-rerender-stream-handlers)
     (skg-register-response-handler
-     'show-unshown-changes
+     'integrate-unshown-changes
      (lambda (_tcp payload)
-       (skg--show-unshown-changes-handler payload))
+       (skg--integrate-unshown-changes-handler payload))
      t)
     (skg-lp-reset)
     (process-send-string
      tcp-proc
      (concat (prin1-to-string
-              `((request . "show unshown changes")
+              `((request . "integrate unshown changes")
                 (view-id . ,skg-view-id)))
              "\n"))))
 
-(defun skg--show-unshown-changes-handler (payload)
+(defun skg--integrate-unshown-changes-handler (payload)
   "Show the readiness summary in PAYLOAD, or its errors."
   (condition-case err
       (let* ((response (read payload))
@@ -54,6 +54,6 @@ Refuses while the buffer has unsaved changes."
                                         errors-list "; ")))
               (summary
                (message "%s" (skg--readiness-summary-message summary)))))
-    (error (message "skg: show-unshown-changes handler error: %S" err))))
+    (error (message "skg: integrate-unshown-changes handler error: %S" err))))
 
-(provide 'skg-request-show-unshown-changes)
+(provide 'skg-request-integrate-unshown-changes)

@@ -205,7 +205,7 @@ pub(crate) fn prepare_rerender_views_with_runtime (
 /// Prepare only open views selected from their already-held state.
 /// The selector is deliberately evaluated before cloning or rerendering, so a
 /// command can leave unrelated clean *and dirty* buffers entirely untouched.
-/// 'show_unshown_changes' is passed to 'rerender_view'.
+/// 'integrate_unshown_changes' is passed to 'rerender_view'.
 pub(crate) fn prepare_rerender_views_where (
   env                 : &SkgEnv,
   runtime             : std::sync::Arc<RuntimeGeneration>,
@@ -213,7 +213,7 @@ pub(crate) fn prepare_rerender_views_where (
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
   create_partnerFolders  : bool,
-  show_unshown_changes   : bool,
+  integrate_unshown_changes : bool,
   include             : impl Fn (&ViewId, &ViewState) -> bool,
 ) -> PreparedRerenders {
   let view_ids : Vec<ViewId> = views_state . open_views . views . iter ()
@@ -254,7 +254,7 @@ pub(crate) fn prepare_rerender_views_where (
         create_partnerFolders,
         false,
         diffView_buffer_kind_of_view (views_state, view_id),
-        show_unshown_changes
+        integrate_unshown_changes
       ) } )
     { Ok (text) => {
         rendered_views . push ( PreparedView {

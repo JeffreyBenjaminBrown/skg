@@ -1,4 +1,4 @@
-//! The "show unshown changes" request
+//! The "integrate unshown changes" request
 //! ('TODO/total-diff-view/08_plan_yet-more.org', "The view follows U
 //! only on command"): redraw one buffer of the diff view so
 //! that every node of its recomputed U has an editable occurrence,
@@ -31,36 +31,36 @@ use crate::update_buffer::diffView_buffer_kind_of_view;
 use std::net::TcpStream;
 use std::sync::{Arc, MutexGuard};
 
-pub fn handle_show_unshown_changes_request (
+pub fn handle_integrate_unshown_changes_request (
   stream              : &mut TcpStream,
   request             : &str,
   env                 : &SkgEnv,
   views_state         : &mut ViewsState,
   skgrepo_restriction : &SkgrepoRestriction,
 ) {
-  match show_unshown_changes (
+  match integrate_unshown_changes (
     env, views_state, skgrepo_restriction, request ) {
     Err (error) => {
       send_response_with_length_prefix (
         stream, &tag_sexp_response (
-          TcpToClient::ShowUnshownChanges,
+          TcpToClient::IntegrateUnshownChanges,
           &format_errors_warnings_sexp ( &[ error ], &[] ) ));
       stream_empty_rerender (stream); },
     Ok (( prepared, summary )) => {
       send_response_with_length_prefix (
         stream, &tag_sexp_response (
-          TcpToClient::ShowUnshownChanges,
+          TcpToClient::IntegrateUnshownChanges,
           &format! ( "({} (errors ()) (warnings ()))",
                      readiness_summary_sexp (&summary) )));
       stream_prepared_rerenders (stream, views_state, prepared); }, }}
 
 /// The named buffer's registered viewforest, rerendered over the
 /// connection's graph straddle, brought up to date, with
-/// 'show_unshown_changes' set ('rerender_view'), and the readiness
+/// 'integrate_unshown_changes' set ('rerender_view'), and the readiness
 /// summary of the result. Nothing is registered or sent. Refused
 /// unless the skgrepo restriction is 'all', as the diff view
 /// is, and unless the view is a buffer of the diff view.
-fn show_unshown_changes (
+fn integrate_unshown_changes (
   env                 : &SkgEnv,
   views_state         : &ViewsState,
   skgrepo_restriction : &SkgrepoRestriction,
@@ -68,7 +68,7 @@ fn show_unshown_changes (
 ) -> Result<(PreparedRerenders, BufferReadinessSummary), String> {
   if ! skgrepo_restriction . is_all () {
     return Err ( format! (
-      "Showing unshown changes requires no skgrepo restriction (the skgrepo-set all); current skgrepo restriction is {}. Switch the repo-set to all first.",
+      "Integrating unshown changes requires no skgrepo restriction (the skgrepo-set all); current skgrepo restriction is {}. Switch the repo-set to all first.",
       skgrepo_restriction . name )); }
   let view_id : ViewId = view_id_from_request (request) ?;
   if diffView_buffer_kind_of_view (views_state, &view_id) . is_none () {
