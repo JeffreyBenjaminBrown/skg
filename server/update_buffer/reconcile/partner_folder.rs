@@ -17,7 +17,7 @@ use crate::to_org::complete::partner_folder::child_data::{
   reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds,
 };
 use crate::types::env::RuntimeGeneration;
-use crate::types::misc::{ID, RelPartner, SkgrepoName};
+use crate::types::misc::{ID, RelPartner, SkgConfig, SkgrepoName};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::phantom::home_from_disk;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
@@ -74,36 +74,11 @@ pub fn reconcile_partnerFolder_children (
     return reconcile_partnerFolder_children_from_graph_straddle (
       node, tree, kind, straddle, &recorder_pid, member_role, runtime,
       deleted_by_this_save_extra_ids, warning_sink ); }
-  let recorder_role =
-    member_role . opposite_role ();
-  let skgrepo_resolver = |skgid : &ID| -> Option<SkgrepoName> {
-    graph_snap . pid_and_skgrepo (skgid)
-      . map ( |(_pid, src)| src )
-      . or_else ( || home_from_disk (skgid, &runtime . config) ) };
-  let outbound : bool = // the folder shows a list in the RECORDER's file
-    recorder_role . is_first_role ();
-  let raw_outbound_members : Vec<RelPartner<ID>> = if outbound {
-    // Preserve an unresolved ID through this outbound surface.  The old
-    // canonical-PID accessor is still right for inverse/write-protected folders, but
-    // would erase an Unknown from the writable OverriddenFolder.
-    graph_snap . outbound_rel_partners_for_relation_gated (
-      &recorder_pid, member_role . relation, skgrepo_restriction )
-  } else { Vec::new () };
   let goal_list : Vec<ID> = {
     let graph_members : Vec<ID> =
-      // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: these folders omit
-      // restricted members, with no retention (a stale RestrictedVognode
-      // child gets the reconciler's delete-leaf / deaden-branch rule).
-      omit_restricted_members (
-        if outbound {
-          raw_outbound_members . iter ()
-            . map ( |member| graph_snap . pid_of (&member . member)
-                   . unwrap_or_else ( || member . member . clone () ) )
-            . collect ()
-        } else { graph_snap . other_member_pids_gated (
-          &recorder_pid, recorder_role, skgrepo_restriction ) },
-        skgrepo_restriction,
-        skgrepo_resolver );
+      partnerFolder_members_in_graph (
+        graph_snap, &runtime . config, &recorder_pid, kind, skgrepo_restriction )
+      . ok_or ( "partnerFolder_members_in_graph: no relation member role" ) ?;
     match kind . policy () {
       FolderPolicy::EditableSet =>
         // Graph (disk) order is meaningful here: the user's own
@@ -128,7 +103,8 @@ pub fn reconcile_partnerFolder_children (
   // relation members here costs nothing and never truncates the group. (The
   // budget bounds how many vognodes EXPAND, not how big one group is.)
   let relRepos : HashMap<ID, SkgrepoName> =
-    raw_outbound_members . iter ()
+    raw_outbound_members (graph_snap, &recorder_pid, member_role, skgrepo_restriction)
+      . iter ()
       . filter (|member| graph_snap . pid_of (&member . member) . is_none ())
       . filter (|member| member . relRepo != recorder_skgrepo)
       . map (|member| (member . member . clone (), member . relRepo . clone ()))
@@ -152,6 +128,59 @@ pub fn reconcile_partnerFolder_children (
     if let Some (sink) = warning_sink {
       push_repair_warnings (sink, kind, &recorder_pid, summary); }}
   Ok (( )) }
+
+/// The members a folder of this kind under the recorder should hold,
+/// from 'graph': its partners in the folder's relation, each extra ID
+/// resolved to its node's pid (an unresolved ID kept as it is), less
+/// the members the skgrepo restriction hides. In graph order. None if
+/// the kind has no relation member role. The folder reconciler draws
+/// these, and the save's write-protected-occurrence check compares a
+/// present folder with them.
+pub fn partnerFolder_members_in_graph (
+  graph               : &InRustGraph,
+  config              : &SkgConfig,
+  recorder_pid        : &ID,
+  kind                : PartnerFolder,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
+) -> Option<Vec<ID>> {
+  let member_role : RelationRole = kind . relation_member_role () ?;
+  let recorder_role : RelationRole =
+    member_role . opposite_role ();
+  let skgrepo_resolver = |skgid : &ID| -> Option<SkgrepoName> {
+    graph . pid_and_skgrepo (skgid)
+      . map ( |(_pid, src)| src )
+      . or_else ( || home_from_disk (skgid, config) ) };
+  let members : Vec<ID> =
+    if recorder_role . is_first_role () { // the folder shows a list in the RECORDER's file
+      raw_outbound_members (graph, recorder_pid, member_role, skgrepo_restriction)
+        . iter ()
+        . map ( |member| graph . pid_of (&member . member)
+               . unwrap_or_else ( || member . member . clone () ) )
+        . collect ()
+    } else { graph . other_member_pids_gated (
+      recorder_pid, recorder_role, skgrepo_restriction ) };
+  Some ( // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: these folders omit
+         // restricted members, with no retention (a stale RestrictedVognode
+         // child gets the reconciler's delete-leaf / deaden-branch rule).
+    omit_restricted_members (
+      members, skgrepo_restriction, skgrepo_resolver )) }
+
+/// The recorder's partners in the member role's relation, as its file
+/// lists them, if the folder shows a list in the RECORDER's file; else
+/// none.
+fn raw_outbound_members (
+  graph               : &InRustGraph,
+  recorder_pid        : &ID,
+  member_role         : RelationRole,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
+) -> Vec<RelPartner<ID>> {
+  if member_role . opposite_role () . is_first_role () {
+    // Preserve an unresolved ID through this outbound surface.  The old
+    // canonical-PID accessor is still right for inverse/write-protected folders, but
+    // would erase an Unknown from the writable OverriddenFolder.
+    graph . outbound_rel_partners_for_relation_gated (
+      recorder_pid, member_role . relation, skgrepo_restriction )
+  } else { Vec::new () }}
 
 /// 'reconcile_partnerFolder_children' with its goal list from the union
 /// of a graph straddle: the partners in either graph, each item tagged
