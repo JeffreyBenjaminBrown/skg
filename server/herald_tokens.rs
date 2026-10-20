@@ -26,7 +26,7 @@
 //! here, the side of this node it is on, and the ancestor generation
 //! it accounts for -- omitted when no ancestor does, as for a
 //! node drawn in place of a node it overrides.
-//! See TODO/DONE/semantic-heralds-wire/plan.org.
+//! See 'docs/heralds.org'.
 
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 

@@ -47,8 +47,8 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
     PartnerFolder::HiddenOutsideOfSubscribee;
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
-  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: the parent-is-SubscribeeFolder check is subsumed by reading the
-  // subscriber through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 1 validates the
+  // The parent-is-SubscribeeFolder check is subsumed by reading the
+  // subscriber through the required-ancestry table of 'update_buffer/ancestry.rs' (index 1 validates the
   // [SubscribeeFolder, Unrestricted] prefix), so a separate validation is unneeded.
   let context : HiddenOutsideContext =
     read_hiddenoutside_context (
@@ -59,12 +59,12 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
       &context . subscriber_hides, &context . subscribees,
       &runtime . config );
   let goal_list : Vec<ID> =
-    // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: omit restricted
+    // Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): omit restricted
     // members; no retention for this filter folder.
     omit_restricted_members (
       goal_list, skgrepo_restriction,
       |skgid : &ID| SkgEnv::find_skgrepo_in_generation (runtime, skgid) );
-  // TODO/DONE/local-view-update/plan_v2.org §5.5: a folder fills its members WHOLE and is budget-neutral -- the owning
+  // The node budget: a folder fills its members WHOLE and is budget-neutral -- the owning
   // subscriber already spent its budget unit when it expanded, so drawing all
   // these hidden members here costs nothing and never truncates the group.
   let goal_items : Vec<FolderGoalItem> =
@@ -74,7 +74,7 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
       tree, node, &goal_items, &context . relRepos, runtime ) ?;
   let summary =
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
-      // TODO/DONE/local-view-update/plan_v2.org §6.0: a stale member of this write-protected folder is removed when a view-leaf
+      // The stale-member rule of 'complete_managed_children': a stale member of this write-protected folder is removed when a view-leaf
       // (the common case) and demoted to non-member only if it has a user
       // subtree. Handled uniformly by the reconciler.
       tree, node, kind,
@@ -84,7 +84,7 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
       sink, kind, &context . subscriber_pid, summary ); }
   fold_members_of_newborn_folder (tree, node)
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
-  // TODO/DONE/local-view-update/plan_v2.org §3.4: an emptied HiddenOutsideOfSubscribeeFolder is removed by the single
+  // An emptied HiddenOutsideOfSubscribeeFolder is removed by the single
   // postorder prune sweep (prune_self_deletable_when_empty), not here.
   Ok(( )) }
 
@@ -95,7 +95,7 @@ fn read_hiddenoutside_context (
   runtime            : &RuntimeGeneration,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result<HiddenOutsideContext, Box<dyn Error>> {
-  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: subscriber = ancestry-table index 1 (the [SubscribeeFolder, Unrestricted] chain).
+  // The subscriber = required-ancestry-table index 1 (the [SubscribeeFolder, Unrestricted] chain).
   let (subscriber_pid, subscriber_skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_required_ancestor(
       tree, node, 1, kind . caller_label () ) ?;

@@ -99,7 +99,7 @@ enum OverrideDir {
 /// inverted write-protected viewdescendants, so an overridden
 /// node and the node(s) overriding it are navigable straight from the
 /// search results
-/// (TODO/DONE/override-ancestry-in-search-results.org). Each direction is
+/// (the API doc's "Text search"). Each direction is
 /// its own one-directional chain hanging under the result, recursive
 /// and cycle-guarded. Reads the in-Rust graph (override relationships are
 /// direct graph-index lookups); a relative whose override RELATIONSHIP is

@@ -28,7 +28,7 @@ where F: FnOnce (&mut UnrestrictedVognode) -> R {
   write_at_node_in_tree (
     tree, treeid,
     |viewnode| { match &mut viewnode . kind {
-      // TODO/DONE/local-view-update/plan_v2.org §11: a phantom is not an UnrestrictedVognode (it carries a slim PhantomDiff), so
+      // A phantom is not an UnrestrictedVognode (it carries a slim PhantomDiff), so
       // this Unrestricted-only mutator cannot apply to one (a phantom has no
       // view_requests/editability/etc).
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
@@ -257,7 +257,7 @@ fn collect_generation (
           next_gen . extend(
             n . children()
               . filter(|c| !skip_non_content ||
-                          // TODO/DONE/local-view-update/plan_v2.org §11: a phantom has no affectsParent and is implicitly
+                          // A phantom has no affectsParent and is implicitly
                           // a member (content), so it is never filtered here.
                           !matches!(&c . value() . kind,
                                     MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))

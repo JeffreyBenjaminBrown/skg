@@ -44,7 +44,7 @@ pub fn reconcile_subscribeeFolder_children (
     read_subscribeeFolder_context (
       tree, node, runtime, skgrepo_restriction) ?;
   let goal_list : Vec<ID> =
-    // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: omit every restricted
+    // Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): omit every restricted
     // subscribee from the goal (the weave preserves them at save). A
     // retained restricted vognode already in the tree survives anyway
     // -- the folder reconciler treats it as unmanaged, not goal-matched.
@@ -52,7 +52,7 @@ pub fn reconcile_subscribeeFolder_children (
       context . worktree_subscribees . clone (), skgrepo_restriction,
       |skgid : &ID| SkgEnv::find_skgrepo_in_generation (runtime, skgid) );
 
-  // TODO/DONE/local-view-update/plan_v2.org §3.4/§6.7 exception: an *empty* SubscribeeFolder is PRESERVED, not
+  // An exception to the prune sweep ('prune_self_deletable_when_empty'): an *empty* SubscribeeFolder is PRESERVED, not
   // self-deleted. It is the editable interface onto the origin's outgoing
   // subscriptions; if it vanished when emptied, the user would lose the place
   // to add one back. (A SubscribeeFolder is only *created* when subscribesTo is
@@ -71,7 +71,7 @@ pub fn reconcile_subscribeeFolder_children (
   // subscribeeFolder during a collateral rerender -- the latent staleness
   // subscribeeFolder-maybe-todo.org flagged (forks plan.org: "Collateral-rerender
   // staleness fix").
-  { // TODO/DONE/local-view-update/plan_v2.org §5.5: a folder fills its members WHOLE and is budget-neutral -- the owning
+  { // The node budget: a folder fills its members WHOLE and is budget-neutral -- the owning
     // subscriber already spent its budget unit when it expanded, so drawing all
     // its subscribees here costs nothing and never truncates the group.
     let goal_items : Vec<FolderGoalItem> =
@@ -92,7 +92,7 @@ fn read_subscribeeFolder_context (
   runtime            : &RuntimeGeneration,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result<SubscribeeFolderContext, Box<dyn Error>> {
-  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the subscriber Unrestricted vognode through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
+  // Read the subscriber Unrestricted vognode through the required-ancestry table of 'update_buffer/ancestry.rs'
   // (index 0 = the parent), rather than at a hard-coded generation.
   let subscriber : NodeId =
     required_ancestor (tree, node, 0) ?
@@ -157,7 +157,7 @@ fn ensure_hiddenOutsideOfSubscribeeFolder_is_last (
           false ) ?;
       with_node_mut ( tree, new_folder,
         |mut n| {
-          // TODO/DONE/fork-fixes.org: a new hidden folder begins folded. The
+          // A new hidden folder begins folded. The
           // stamp moves to the members at the folder's own BFS visit
           // ('fold_members_of_newborn_folder'), which reconciles them in.
           n . value () . org_folded = true; } )

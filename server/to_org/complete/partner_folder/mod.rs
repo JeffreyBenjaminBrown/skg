@@ -132,7 +132,7 @@ pub fn maybe_add_subscribeeFolder_branch (
   let subscribee_skgids : Vec<ID> = graph . outbound_skgids_for_relation_gated (
     &subscriber_pid, NodeRelation::SubscribesTo, skgrepo_restriction );
   let subscribee_skgids : Vec<ID> =
-    // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: restricted
+    // Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): restricted
     // subscribees are omitted at de novo creation (no retained
     // members exist yet); a folder left empty by this is not created.
     omit_restricted_members (
@@ -183,7 +183,7 @@ pub fn maybe_add_subscribeeFolder_branch (
         false ) ?;
     with_node_mut ( tree, hidden_outside_folder_treeid,
       |mut n| {
-        // TODO/DONE/fork-fixes.org: a new hidden folder begins folded. The
+        // A new hidden folder begins folded. The
         // stamp moves to the members at the folder's own BFS visit
         // ('fold_members_of_newborn_folder').
         n . value () . org_folded = true; } )
@@ -263,7 +263,7 @@ pub fn maybe_add_one_partnerFolder (
   let recorder_role =
     member_role . opposite_role ();
   let member_skgids : Vec<ID> =
-    // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: restricted members
+    // Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): restricted members
     // are omitted, so a folder whose members are all restricted is not
     // created at all (de novo creation has no retained members).
     omit_restricted_members (
@@ -345,7 +345,7 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
       true ) ?;
   with_node_mut ( tree, hidden_folder_treeid,
     |mut n| {
-      // TODO/DONE/fork-fixes.org: a new hidden folder begins folded. The
+      // A new hidden folder begins folded. The
       // stamp moves to the members at the folder's own BFS visit
       // ('fold_members_of_newborn_folder').
       n . value () . org_folded = true; } )

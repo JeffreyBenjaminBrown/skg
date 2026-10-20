@@ -115,8 +115,7 @@ impl From<SkgrepoToml> for Skgrepo {
 /// 'skg-set-relRepo' may move its privacy anywhere at least as
 /// private as that default;
 /// renormalization never lowers its privacy (the sticky rule). See
-/// TODO/DONE/privacy-telescope/5_plan.org and
-/// BUG-and-fix_make-edge-more-public.org.
+/// 'docs/telescopes.org', "Where new relationships land".
 ///
 /// Every value records the relRepo whose section contains it.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -199,7 +198,7 @@ pub struct SkgConfig {
   // alphabetical. LOAD-BEARING: declaration order is the privacy order
   // (most public first); the composition, the relRepo defaults, the
   // validators, and prefix skgrepo-sets all read it, through the
-  // comparison chokepoint methods below ('ordered_repos',
+  // comparison chokepoint methods below ('ordered_skgrepos',
   // 'repo_position', 'is_strictly_more_public', 'more_private_of',
   // 'prefix_through'). No other code may compare skgrepo positions.
   #[serde (skip)]
@@ -248,7 +247,7 @@ impl SkgrepoName {
   /// historical phantom) whose skgrepo could not be determined. It renders like
   /// any other skgrepo -- the all-caps name alone flags it to the user --
   /// so that one unresolvable reference does not abort an entire render
-  /// (TODO/DONE/local-view-update/plan_v2.org §7.6). Unrestricted-vognode skgrepo failures are caught by
+  /// (see the glossary's "unknown node, dangling ID"). Unrestricted-vognode skgrepo failures are caught by
   /// validation (pre-save) or are catastrophic (post-save), never this.
   pub const NOT_FOUND_STR : &'static str = "NOT_FOUND";
   pub fn not_found () -> Self {
@@ -497,7 +496,7 @@ impl SkgConfig {
       . unwrap_or (false)
   }
 
-  /// The owned skgrepo names in privacy order (see 'ordered_repos').
+  /// The owned skgrepo names in privacy order (see 'ordered_skgrepos').
   pub fn owned_skgrepos_in_config_order (
     &self,
   ) -> Vec<SkgrepoName> {

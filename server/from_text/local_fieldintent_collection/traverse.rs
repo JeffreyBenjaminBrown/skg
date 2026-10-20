@@ -1,5 +1,5 @@
 /// This file defines the pure traversal at the heart of local
-/// instruction collection (TODO/DONE/local-fieldintent-collection/3_plan.org).
+/// instruction collection (the glossary's "local fieldIntent collection").
 /// .
 /// The traversal is one recursive DFS preorder over the placed
 /// viewforest. Recursion is UNCONDITIONAL: every node's children are
@@ -395,7 +395,7 @@ fn dedup_members_by_skgid (
 /// 'FieldIntent').  (Restricted
 /// children are NOT members here: the overriddenFolder omits restricted
 /// members from display, and the set-difference merge preserves
-/// them at save.  TODO/DONE/full-schema/DONE/9-2_source-set-safety.org.)
+/// them at save; see the API doc's "Restricted-skgrepo nodes".)
 fn partnerFolder_members (
   node_ref : NodeRef<Viewnode>,
 ) -> Vec<(ID, Option<SkgrepoName>)> {
@@ -453,8 +453,7 @@ fn subscribeeFolder_members (
 /// Including a buffer-present restricted child would let a stale or
 /// concurrently-edited buffer resurrect a member that was
 /// authoritatively removed, and would persist reorderings of a
-/// write-protected placeholder. (See TODO/problems.org, "Retained restricted
-/// nodes emit positional save intentions for their container".)
+/// write-protected placeholder.
 fn content_members (
   node_ref : NodeRef<Viewnode>,
 ) -> Vec<(ID, Option<SkgrepoName>)> {

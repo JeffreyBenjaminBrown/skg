@@ -216,7 +216,7 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
     complete_managed_children_in_viewforest (
     tree, folder_node,
     // A RestrictedVognode child is UNMANAGED
-    // (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org): the goal omits
+    // (the API doc's "Restricted-skgrepo nodes"): the goal omits
     // every restricted member, and a retained placeholder already in the
     // folder survives as an unmanaged child (preserved as-is, not
     // goal-matched), so it needs no id.

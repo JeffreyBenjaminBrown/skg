@@ -51,7 +51,6 @@ pub struct DeleteNode {
 /// might not be.) The rerender step consumes the ViewForest -- returned
 /// alongside this as the other half of 'buffer_to_validated_saveplan's pair,
 /// not stored here -- plus this plan's PIDs, for collateral selection.
-/// (TODO/DONE/local-view-update/plan_v2.org §11.)
 #[derive(Debug)]
 pub struct SavePlan {
   pub node_instructions      : Vec<NodeInstruction>,

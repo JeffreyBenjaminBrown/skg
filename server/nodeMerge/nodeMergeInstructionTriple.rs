@@ -66,9 +66,8 @@ fn nodeMerge_from_acquirer_and_acquiree (
     create_acquiree_text_preserver (&acquiree_from_disk);
   let shown_pre_merge : HashSet<ID> = {
     // Whatever EITHER member showed as unintegrated subscribed
-    // content before the merge, the merged node must keep showing
-    // (TODO/more.org, "Take something like the intersection of hides
-    // when merging"), so these ids are dropped from the combined
+    // content before the merge, the merged node must keep showing,
+    // so these ids are dropped from the combined
     // hides below.
     let mut shown : HashSet<ID> =
       skgids_shown_through_subscriptions (

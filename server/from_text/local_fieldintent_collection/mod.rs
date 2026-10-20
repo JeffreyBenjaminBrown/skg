@@ -3,7 +3,7 @@
 /// refers to its central property: extraction is one pure traversal
 /// in which each buffer position reads only itself and its direct
 /// children, plus a context that flows down from its ancestors. The
-/// spec is TODO/DONE/local-fieldintent-collection/3_plan.org.
+/// glossary's "local fieldIntent collection" defines it.
 /// .
 /// Beyond listing the submodules, this mod file defines the composed
 /// pipeline, 'extract_nonmergeSavePlan_locally'. That function runs
@@ -97,7 +97,7 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
         Some (restriction) => {
           // A nodeMerge writes both nodes' files; under a restricted
           // set it is suppressed unless both sides are provably
-          // unrestricted (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org).
+          // unrestricted (the API doc's "Restricted-skgrepo nodes").
           let before : usize = nodeMerge_acquisitions . len ();
           let kept : Vec<(ID, ID)> =
             nodeMerge_acquisitions . into_iter ()

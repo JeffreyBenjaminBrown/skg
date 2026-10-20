@@ -147,7 +147,7 @@ pub fn graphnode_from_telescope_on_disk (
     & SkgrepoName::from ("(any)") ) }
 
 /// Compose each telescope (already grouped by pid; sections arrive in
-/// privacy order because the caller iterated 'ordered_repos').
+/// privacy order because the caller iterated 'ordered_skgrepos').
 /// Anchors resolve through the extra-id map built from every
 /// section, so a nodeMerge cannot dangle an anchor. A telescope
 /// with no title in any section is a hard load error; every other

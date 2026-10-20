@@ -54,12 +54,12 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
       &runtime . graph,
       &context . subscribee_contains, &context . subscriber_hides );
   let goal_list : Vec<ID> =
-    // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: omit restricted
+    // Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): omit restricted
     // members; no retention for this filter folder.
     omit_restricted_members (
       goal_list, skgrepo_restriction,
       |skgid : &ID| SkgEnv::find_skgrepo_in_generation (runtime, skgid) );
-  // TODO/DONE/local-view-update/plan_v2.org §5.5: a folder fills its members WHOLE and is budget-neutral -- the owning
+  // The node budget: a folder fills its members WHOLE and is budget-neutral -- the owning
   // subscribee already spent its budget unit when it expanded, so drawing all
   // the hidden members here costs nothing and never truncates the group.
   let goal_items : Vec<FolderGoalItem> =
@@ -69,7 +69,7 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
       tree, node, &goal_items, &context . relRepos, runtime ) ?;
   let summary =
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
-      // TODO/DONE/local-view-update/plan_v2.org §6.0: a HiddenInSubscribeeFolder child that becomes stale (e.g. the user
+      // The stale-member rule of 'complete_managed_children': a HiddenInSubscribeeFolder child that becomes stale (e.g. the user
       // moved it into the subscribee-as-such, 'unhiding' it) is removed when it
       // is a view-leaf -- the common case for hidden members -- and demoted to
       // non-member only if it has a user subtree to preserve. The reconciler
@@ -81,7 +81,7 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
       sink, kind, &context . subscribee_pid, summary ); }
   fold_members_of_newborn_folder (tree, node)
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
-  // TODO/DONE/local-view-update/plan_v2.org §3.4: an emptied HiddenInSubscribeeFolder is removed by the single postorder
+  // An emptied HiddenInSubscribeeFolder is removed by the single postorder
   // prune sweep (prune_self_deletable_when_empty), not self-deleted here.
   Ok(( )) }
 
@@ -92,7 +92,7 @@ fn read_hiddenin_context (
   runtime            : &RuntimeGeneration,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result<HiddenInContext, Box<dyn Error>> {
-  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: ancestry table indices -- subscribee = index 0 (parent), subscriber =
+  // Required-ancestry table ('update_buffer/ancestry.rs') indices -- subscribee = index 0 (parent), subscriber =
   // index 2 (the full [Unrestricted, SubscribeeFolder, Unrestricted] chain), read through the
   // helper so this multi-level read shares the death-check's spec.
   let (subscribee_pid, subscribee_skgrepo) : (ID, SkgrepoName) =

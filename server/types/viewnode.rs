@@ -206,7 +206,7 @@ pub struct PhantomUnknown {
   pub readiness_request : Option<ReadinessRequest>,
 }
 
-/// A phantom for a node that the before-graph of the total diff
+/// A phantom for a node that the before-graph of the diff
 /// view's graph straddle has and the after-graph lacks: a node deleted
 /// (or acquired by a nodeMerge) since HEAD.
 ///
@@ -341,7 +341,7 @@ pub struct ViewnodeStats {
   /// member counts and which tracked ancestors are members on each side,
   /// plus the birth. None when there is nothing to say. The
   /// client parses this and decides all presentation (letters, colors,
-  /// order). See TODO/DONE/semantic-heralds-wire/plan.org.
+  /// order). See 'docs/heralds.org'.
   pub rel_heralds           : Option<String>,
   /// Some(N) means this viewnode was drawn here in place of N,
   /// which it (transitively) overrides. Herald pink "ĥ" after "O".
@@ -356,7 +356,7 @@ pub struct ViewnodeStats {
   pub overridesHere         : Option<ID>,
   /// True iff the node is drawn write-protected here while its graph
   /// node has a body -- a body the rendering hides. Herald "B",
-  /// hugging the ☮ (TODO/more.org). Display-only, like the assembled
+  /// hugging the ☮. Display-only, like the assembled
   /// herald strings; the parser accepts and discards it.
   pub omitted_body           : bool,
   /// Some(NAME) when the relationship instance this position's
@@ -366,8 +366,8 @@ pub struct ViewnodeStats {
   /// is recorded in a skgrepo that DIFFERS from that relationship's DEFAULT
   /// (see the relationship-default policy in 'SkgConfig'). None when
   /// equal to the default:
-  /// the suppression is deliberate (render-and-gating,
-  /// TODO/DONE/privacy-telescope/5_plan.org) -- the herald marks
+  /// the suppression is deliberate (see 'docs/telescopes.org',
+  /// "What leaks, and what repair fixes") -- the herald marks
   /// exactly the deliberately privatized relationships. Also None: without a
   /// graph handle; for a node that is not genuinely a member here
   /// (affectsParent != True, or a role graft); and for the two
@@ -380,7 +380,7 @@ pub struct ViewnodeStats {
   /// Herald: red "~NAME" immediately before the ⌂ homeRepoHerald
   /// (server/heralds.rs).
   pub relRepo            : Option<SkgrepoName>,
-  /// Some((OLD, NEW)) in the skgrepo-changes buffer of the total diff
+  /// Some((OLD, NEW)) in the skgrepo-changes buffer of the diff
   /// view, for a node whose home skgrepo moved from OLD to NEW since
   /// HEAD. Display-only; the buffer's pass sets it after completion
   /// ('set_home_move_facts_in_viewforest'), and the parser discards
@@ -511,7 +511,7 @@ pub enum PartnerFolder {
 ///
 /// STALE-MEMBER RULE (uniform; decided 2026-06-10, superseding the
 /// discard policy once planned for the filter folders in
-/// TODO/DONE/full-schema/7_saving-readonly-cols.org): during
+/// the glossary's "write-protected set"): during
 /// reconciliation, a stale member that is a leaf is deleted, and one
 /// with children is demoted to affectsParent=false, whatever the
 /// policy. The policies differ in:

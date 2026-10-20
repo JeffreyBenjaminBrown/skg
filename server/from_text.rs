@@ -55,7 +55,7 @@ use crate::types::save::ForkSpec;
 /// Returns the saved view, the plan derived from it, and nonfatal
 /// parse warnings (e.g. discarded folder headline text, destined for
 /// 'SaveResponse.warnings'). View and plan are
-/// kept apart (TODO/DONE/local-view-update/plan_v2.org §11): the graph-mutation
+/// kept apart: the graph-mutation
 /// step consumes only the SavePlan; the rerender step consumes the ViewForest
 /// (plus the plan's PIDs, for collateral selection). One parse produces both.
 pub fn buffer_to_validated_saveplan_in_graph (
@@ -302,8 +302,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos (
 
 /// One nonfatal warning per DANGLING link this save writes: a
 /// '[[id:X][label]]' in a saved title or body where X is neither in
-/// the graph nor created by this same save (TODO/more.org, "Warn the
-/// user when they make dangling links"). Only nodes the save actually
+/// the graph nor created by this same save. Only nodes the save actually
 /// writes are scanned -- the noop filter has already dropped
 /// unchanged ones -- so an old dangling link warns again only when its
 /// carrier is edited. The explicit save-planning graph makes this check use

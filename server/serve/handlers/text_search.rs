@@ -598,7 +598,7 @@ pub fn group_matches_by_skgid (
 /// The result ids to drop from the top level because an OWNED
 /// result recursively overrides them: they will reappear as
 /// overriddenward role-graft descendants of that owned result
-/// (TODO/DONE/override-ancestry-in-search-results.org, "Suppression"). A
+/// (the API doc's "Text search"). A
 /// FOREIGN overrider never suppresses -- so a pure-foreign mutual
 /// override shows both, and a "boring" foreign overrider does not hide
 /// the node it overrides. Reachability follows relRepo-visible

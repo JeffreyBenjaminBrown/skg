@@ -10,7 +10,7 @@ use super::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
 /// the most public skgrepo holding a section. Returns None if no
 /// skgrepo holds one.
 ///
-/// Walks 'ordered_repos' (the privacy order, most public first),
+/// Walks 'ordered_skgrepos' (the privacy order, most public first),
 /// never 'config.repos' -- that is a HashMap, whose iteration
 /// order Rust randomizes per process, so returning its first hit
 /// answered arbitrarily for any node with more than one section.

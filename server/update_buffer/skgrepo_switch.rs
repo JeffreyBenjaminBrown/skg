@@ -1,5 +1,5 @@
 /// Applying a repo-set switch to an already-drawn view
-/// (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org).  Two passes:
+/// (the API doc's "Restricted-skgrepo nodes").  Two passes:
 /// convert every Unrestricted viewnode from a now-restricted skgrepo into an
 /// RestrictedVognode, then prune (DFS postorder, so emptied parents prune
 /// in the same sweep) every:

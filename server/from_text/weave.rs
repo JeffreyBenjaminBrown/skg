@@ -1,6 +1,6 @@
 /// Pure merge functions letting a save under a restricted
 /// skgrepo-set preserve relationship-list members the user could not
-/// see (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org).
+/// see (the API doc's "Restricted-skgrepo nodes").
 ///
 /// VOCABULARY (shared by both functions):
 /// - A disk member is VISIBLE iff its relRepo is unrestricted

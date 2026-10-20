@@ -170,8 +170,8 @@ pub fn fork_spec_from_buffer_node (
     buffer_node, disk_title, disk_contains, clone_skgrepo,
     skgrepo_confirmed ) ) }
 
-/// The clone-repo specification Case 2 of TODO/DONE/fork-fixes.org asks
-/// for: when the fork-forcing edit is the addition of NEW children
+/// What 'docs/forks.org', "Adding new content under a foreign node",
+/// describes: when the fork-forcing edit is the addition of NEW children
 /// whose metadata EXPLICITLY names an owned skgrepo, the user has
 /// already said where this material belongs, so the clone of the
 /// foreign parent goes there too and the confirmation flow does not
@@ -223,7 +223,7 @@ pub const FORK_SKGREPO_PLACEHOLDER : &str = "PICK-A-REPO";
 
 /// Build the fork-confirmation buffer. Its head is an org headline
 /// whose BODY holds the explanation (foldable; a long '#' comment
-/// block annoyed in practice -- TODO/DONE/fork-fixes.org Case 2). Then two
+/// block annoyed in practice). Then two
 /// levels per fork, because one headline cannot honestly stand for
 /// both the original N and the (possibly re-titled) clone C:
 ///

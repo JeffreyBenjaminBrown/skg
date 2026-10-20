@@ -107,8 +107,8 @@ pub fn find_buffer_errors_for_saving (
     viewforest, &graph, config ) }
 
 /// Edits to an idFolder's membership abort the save (decision from
-/// vision.org, via metaplan_2.org and
-/// TODO/DONE/full-schema/DONE/8_readonly-set-ergonomics.org): for each present
+/// vision.org, via metaplan_2.org; see the glossary's "write-protected
+/// set"): for each present
 /// idFolder whose parent is an UnrestrictedVognode with an ID, the multiset of ID
 /// non-vognodes beneath it must equal the recorder's real ID list (pid
 /// plus extra_ids). Reordering passes (the rerender re-sorts
@@ -263,7 +263,7 @@ fn validate_view_roots (
     if ! matches! (
       &root . value () . kind,
         MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))
-        | MpViewnodeKind::Vognode (MpVognode::Restricted (_)) // a retained restricted root (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org)
+        | MpViewnodeKind::Vognode (MpVognode::Restricted (_)) // a retained restricted root (the API doc's "Restricted-skgrepo nodes")
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_)))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))))
@@ -291,7 +291,7 @@ fn validate_editable_view_requests (
   { if let Edge::Open (node_ref) = edge
     { let viewnode : &MpViewnode =
         node_ref . value();
-      // TODO/DONE/local-view-update/plan_v2.org §11: only an Unrestricted node carries view_requests; a phantom never can,
+      // Only an Unrestricted node carries view_requests; a phantom never can,
       // so the Editable-request validations below apply to Unrestricted only.
       if let MpViewnodeKind::Vognode (
         MpVognode::Unrestricted (t))

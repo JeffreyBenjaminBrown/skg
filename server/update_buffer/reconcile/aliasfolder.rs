@@ -41,7 +41,7 @@ pub fn reconcile_aliasFolder_children (
       . map_err( |e| -> Box<dyn Error> { e . into() } )?;
     if !is_aliasFolder { return Err(
       "reconcile_aliasFolder_children: Node is not an AliasFolder" . into() ); }}
-  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: parent Unrestricted vognode read through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 0).
+  // The parent Unrestricted vognode, read through the required-ancestry table of 'update_buffer/ancestry.rs' (index 0).
   let (parent_pid, parent_skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_required_ancestor(
       tree, aliasfolder_treeid, 0,

@@ -52,7 +52,7 @@ pub fn handle_skgrepo_set_request (
     Err (e) =>
       refuse_unwinding (stream, skgrepo_restriction, &e), }}
 
-/// TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: a repo-set switch
+/// Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): a repo-set switch
 /// RE-RENDERS open views in place rather than closing them.  Each
 /// view gets the convert-and-prune prepass (now-restricted unrestricted vognodes
 /// become RestrictedVognodes; childless restricted branches, properties of

@@ -339,8 +339,7 @@ pub(super) fn validate_no_simultaneous_move_and_nodeMerge (
   if errors . is_empty() { Ok (())
   } else { Err (errors) }}
 
-/// TODO/DONE/full-schema/DONE/9-2_source-set-safety.org, restricted-node rewrite
-/// suppression: under a restricted skgrepo-set, any nodeInstruction that
+/// Restricted-node rewrite suppression (the API doc's "Restricted-skgrepo nodes"): under a restricted skgrepo-set, any nodeInstruction that
 /// would modify a restricted node is DROPPED rather than executed or
 /// fatal.  A stale buffer (rendered before a skgrepo-set switch) can
 /// legitimately hold whole now-restricted subtrees; aborting would

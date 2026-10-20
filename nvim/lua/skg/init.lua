@@ -1,7 +1,6 @@
 -- PURPOSE: The entry point of the skg Neovim client; require('skg').
 -- The analog of elisp/skg-init.el + the 'skg-client-init' entry in
--- elisp/skg-client.el. Modules land here as they are ported; the
--- module map lives in TODO/DONE/vim-client/plan.org.
+-- elisp/skg-client.el. Modules land here as they are ported.
 
 local M = {}
 

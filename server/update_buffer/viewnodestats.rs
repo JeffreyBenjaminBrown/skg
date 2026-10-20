@@ -344,7 +344,7 @@ fn birth_facts_for_folder (
 
 /// Sets omitted_body on the unrestricted vognode at treeid: true iff the node
 /// is drawn WRITE_PROTECTED here while its graphnode has a body -- one
-/// the rendering hides. Herald "B" on the ☮ (TODO/more.org). False
+/// the rendering hides. Herald "B" on the ☮. False
 /// without a graph handle (some tests): better no B than a wrong one.
 fn set_omitted_body (
   tree     : &mut Tree<Viewnode>,

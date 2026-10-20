@@ -42,7 +42,7 @@ pub enum PartnerFolderGoalSource<'a> {
   GraphStraddle (&'a GraphStraddle),
 }
 
-/// Reconciles one PartnerFolder (TODO/DONE/local-view-update/plan_v2.org §19 terminology: a folder = a collecting non-vognode)
+/// Reconciles one PartnerFolder (a folder is a collecting non-vognode)
 /// from a node in the viewforest with the current in-Rust graph snapshot's data
 /// about that node, or with a graph straddle's ('goal_source').
 /// Makes the folder's UnrestrictedVognode children marked affectsParent=true match a goal list,
@@ -60,7 +60,7 @@ pub fn reconcile_partnerFolder_children (
   warning_sink : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
   kind . error_unless_node_is_this_kind (tree, node) ?;
-  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the recorder Unrestricted vognode *through* the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
+  // Read the recorder Unrestricted vognode *through* the required-ancestry table of 'update_buffer/ancestry.rs'
   // (index 0 = the parent), so this can never read an ancestor the table
   // does not list, and the death-check and this read share one spec.
   let (recorder_pid, recorder_skgrepo) : (ID, SkgrepoName) =
@@ -98,7 +98,7 @@ pub fn reconcile_partnerFolder_children (
         // Likewise unreachable here: HiddenOutside has its own
         // hide-derived reconciler, rather than a relation role.
         graph_members, }};
-  // TODO/DONE/local-view-update/plan_v2.org §5.5: a folder fills its members WHOLE and is budget-neutral -- the owning
+  // The node budget: a folder fills its members WHOLE and is budget-neutral -- the owning
   // vognode already spent its budget unit when it expanded, so drawing all the
   // relation members here costs nothing and never truncates the group. (The
   // budget bounds how many vognodes EXPAND, not how big one group is.)
@@ -114,7 +114,7 @@ pub fn reconcile_partnerFolder_children (
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
       tree, node, &goal_items, &relRepos, runtime ) ?;
-  // TODO/DONE/local-view-update/plan_v2.org §6.0/§16: the reconciler deletes a stale member that is a view-leaf and
+  // The stale-member rule of 'complete_managed_children': the reconciler deletes a stale member that is a view-leaf and
   // demotes one that is a branch, so a write-protected PartnerFolder
   // drops a stale leaf member instead of preserving it.
   let summary : RepairSummary<ID> =
@@ -159,7 +159,7 @@ pub fn partnerFolder_members_in_graph (
         . collect ()
     } else { graph . other_member_pids_gated (
       recorder_pid, recorder_role, skgrepo_restriction ) };
-  Some ( // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: these folders omit
+  Some ( // Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): these folders omit
          // restricted members, with no retention (a stale RestrictedVognode
          // child gets the reconciler's delete-leaf / deaden-branch rule).
     omit_restricted_members (

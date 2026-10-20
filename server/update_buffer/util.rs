@@ -31,7 +31,7 @@ where
     } ) . map_err( |e| -> String { e . into() } )?; }
   Ok( () ) }
 
-/// TODO/DONE/fork-fixes.org: a NEW hiddenInSubscribee or
+/// A NEW hiddenInSubscribee or
 /// hiddenOutsideOfSubscribee folder begins folded. Creation sites stamp
 /// 'folded' on the newborn folder; this runs at the folder's own BFS visit
 /// (its members now reconciled in) and transfers the stamp: every
@@ -159,12 +159,12 @@ where Managed  : Fn (&Viewnode) -> bool,
       subtree_satisfies( tree, stale_treeid, &|n: &Viewnode| n . focused ) };
   let problem_discard_response =
     |n: &mut Viewnode| { n . focused = true; };
-  // TODO/DONE/local-view-update/plan_v2.org §6.0 stale-member rule: a stale member (managed child not in the goal)
+  // The stale-member rule: a stale member (managed child not in the goal)
   // that is an Unrestricted, affectsParent=true *branch* (has children) is demoted to
   // non-member so the user's subtree survives; a stale RestrictedVognode
   // *branch* is deadened to a DeadViewnode instead (it has no
   // affectsParent to demote; the orphan handling then preserves its
-  // subtree as independent -- TODO/DONE/full-schema/DONE/9-2_source-set-safety.org);
+  // subtree as independent -- see the API doc's "Restricted-skgrepo nodes");
   // everything else stale -- a leaf, a historical phantom, a property -- is
   // deleted by the reconciler. Returns true iff it kept the node.
   let demote_invalid =
@@ -220,7 +220,7 @@ where Managed  : Fn (&Viewnode) -> bool,
 ///   whose orderkey is not in goal_list).
 ///   - Duplicates are always detached.
 ///   - A stale member is offered to 'demote_invalid'; if that keeps it (returns
-///     true, e.g. TODO/DONE/local-view-update/plan_v2.org §6.0 demote-a-branch-to-non-member) it survives, otherwise it
+///     true, e.g. by making a branch a non-member) it survives, otherwise it
 ///     is detached.
 ///   Runs problem_discard on each node that is actually detached; if any returns
 ///   true, runs problem_discard_response on the parent afterward.
@@ -293,7 +293,7 @@ where
                    |mut n| { n . detach(); } )
       . map_err( |e| -> Box<dyn Error> { e . into() } )?;
     summary . deleted_duplicates . push( orderkey . clone() ); }
-  // Stale members: demote_invalid may keep one (TODO/DONE/local-view-update/plan_v2.org §6.0 demote-a-branch); only a
+  // Stale members: demote_invalid may keep one (a branch made a non-member); only a
   // node it does NOT keep is detached, and only that detach can lose focus.
   for ( treeid, orderkey ) in &invalid_skgids {
     if demote_invalid( tree, *treeid )? {

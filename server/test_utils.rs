@@ -79,8 +79,8 @@ where
     // Serializes against other store tests in this process (see
     // TEST_STORE_GROUPS_MUTEX): under plain 'cargo test' a binary's
     // tests share one process, and tests can race on shared temporary paths
-    // and the Tantivy background writer -- the historical flake family in
-    // TODO/problems.org. Uncontended under nextest.
+    // and the Tantivy background writer -- the historical flake family.
+    // Uncontended under nextest.
     TEST_STORE_GROUPS_MUTEX . lock ()
     . unwrap_or_else ( |poisoned| poisoned . into_inner () );
   let temp_fixtures : PathBuf =
@@ -147,8 +147,7 @@ static TEST_STORE_GROUPS_MUTEX : std::sync::Mutex<()> =
 /// One fixture workspace, shared by a whole group of
 /// sequential sub-tests. 'reset' restores a pristine state between
 /// sub-tests by wiping the DATA in place (~10ms) instead of
-/// deleting and recreating the fixture stores (~250ms) -- see
-/// TODO/DONE/faster-tests.org for the measurements.
+/// deleting and recreating the fixture stores (~250ms).
 pub struct SharedStoreSession {
   pub test_name    : String,
   temp_fixtures  : PathBuf, // where reset() copies each sub-test's fixtures, so saves don't corrupt originals

@@ -34,7 +34,7 @@ use std::sync::Arc;
 enum ContentReality {
   Real, // Real content: Exists in worktree, and parent contains it at this position.
   Restricted,
-  Unknown, // TODO/DONE/local-view-update/plan_v2.org §7.6: a content id that resolves to nothing (a dangling reference) -> an Unknown phantom, rather than aborting the whole view.
+  Unknown, // A content id that resolves to nothing (a dangling reference) -> an Unknown phantom, rather than aborting the whole view.
 }
 
 struct ChildData {
@@ -55,19 +55,19 @@ struct ChildData {
 }
 
 /// UnrestrictedVognode content reconcile + content-child creation, for one node, in the
-/// TODO/DONE/local-view-update/plan_v2.org §3 level-order BFS visit. View completion (dispatch_node_update)
+/// level-order BFS visit. View completion (dispatch_node_update)
 /// settles the node's
 /// Finalizable state *before* calling this (via 'apply_editable_draw_rule')
 /// and passes:
-/// - `settled`: the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule already ran for this node (it carried a
+/// - `settled`: the draw rule (see 'to_org/expand/editable.rs') already ran for this node (it carried a
 ///   ViewRequest::Editable), so its map entry and write-protected/def are already
 ///   correct -- skip 'make_write-protected_if_repeat_then_extend_defmap', which would
 ///   otherwise write-protect a just-made-Final node against its own entry.
-/// - `cascade`: this node is Final (EVR-made); per TODO/DONE/local-view-update/plan_v2.org §5.3 it hands a
+/// - `cascade`: this node is Final (EVR-made); by the cascade it hands a
 ///   ViewRequest::Editable to each of its affected content children so the
 ///   BFS draws each Final (clobbering competing Tentative occurrences).
-/// - `node_budget`: the TODO/DONE/local-view-update/plan_v2.org §5.5 remaining budget of new Viewnodes; content-child
-///   creation is capped against it. None when this expansion is not
+/// - `node_budget`: the remaining node budget (see 'to_org/expand/editable.rs'); this
+///   expansion costs one unit of it. None when this expansion is not
 ///   charged (in a diff view, all but a request's).
 pub fn expand_true_content_at_unrestrictedVognode (
   node               : NodeId,
@@ -108,7 +108,7 @@ pub fn expand_true_content_at_unrestrictedVognode (
     if is_writeProtected {
       clobberWriteProtectedViewnode( tree, node, graph_snap, config ) ?;
       return Ok (( )); }}
-  // TODO/DONE/local-view-update/plan_v2.org §5.5: this vognode is editable and about to expand -- draw its whole
+  // The node budget: this vognode is editable and about to expand -- draw its whole
   // content group, and (via the BFS) its folders. Each expansion costs ONE budget
   // unit; a write-protected node (returned above) costs nothing, and a folder fills
   // for free. visit_normal_node already forced this node write-protected if the
@@ -118,7 +118,7 @@ pub fn expand_true_content_at_unrestrictedVognode (
   let graphnode : Graphnode =
     graphnode_graphFirst_by_pid_and_skgrepo (
       graph_snap, config, &pid, &initial_skgrepo ) ?;
-  // TODO/DONE/local-view-update/plan_v2.org §8.3: EVERY editable node re-syncs title/body/repo from the snapshot,
+  // EVERY editable node re-syncs title/body/repo from the snapshot,
   // saved and collateral alike. (After extraction the snapshot already reflects
   // the saved buffer's text, so re-syncing the saved node yields the same
   // content it just defined -- a no-op.)
@@ -135,7 +135,7 @@ pub fn expand_true_content_at_unrestrictedVognode (
     tree, node ) ?;
   Ok(( )) }
 
-/// TODO/DONE/local-view-update/plan_v2.org §5.3 cascade: hand a ViewRequest::Editable to each affected,
+/// The cascade (see 'to_org/expand/editable.rs'): hand a ViewRequest::Editable to each affected,
 /// non-phantom Unrestricted content child of a Final node -- new and existing
 /// alike -- so the main BFS draws each Final (and it in turn cascades to its
 /// own content). The cascade does *not* flow through non-vognodes, so only
@@ -160,7 +160,7 @@ fn pass_editableViewRequest_to_content_children (
   Ok (( )) }
 
 /// Overwrite the viewnode's title, skgrepo, and body with the fresh values from
-/// the snapshot. TODO/DONE/local-view-update/plan_v2.org §8.3: every editable node re-syncs, saved and collateral
+/// the snapshot. Every editable node re-syncs, saved and collateral
 /// alike -- after extraction the snapshot already holds the saved buffer's text,
 /// so the saved node re-syncs to the same content it just defined.
 fn sync_unrestrictedVognode_from_disk (
@@ -223,16 +223,16 @@ fn reconcile_content_children (
                   m . relRepo . clone () ))
     . collect ();
   let is_sub : bool = is_subscribee (tree, node) ?;
-  // TODO/DONE/local-view-update/plan_v2.org §6.1: an editable subscribee-as-such regenerates its content as
+  // An editable subscribee-as-such (the glossary's "subscribee as such") regenerates its content as
   // contains-minus-hides, saved and collateral views alike. (View-update is
   // strictly post-extraction, so the hide edits are already in the graph and
-  // regenerating contains-minus-hides is correct. The TODO/DONE/local-view-update/plan_v2.org §5.3 cascade draws
+  // regenerating contains-minus-hides is correct. The cascade draws
   // subscribee content through this same path.)
   let apparent_content_skgids : Vec<ID> =
     content_goal_list( tree, node, &content_skgids, is_sub, config,
                        graph_snap, skgrepo_restriction ) ?;
   let apparent_content_skgids : Vec<ID> =
-    // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: rendering omits every
+    // Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): rendering omits every
     // restricted member from the goal (the weave preserves them at save).
     // A retained restricted vognode already in the tree survives
     // anyway -- it is unmanaged by this reconciler, not goal-matched.
@@ -241,7 +241,7 @@ fn reconcile_content_children (
       |skgid : &ID| graph_snap . pid_and_skgrepo (skgid)
                  . map ( |(_pid, src)| src )
                  . or_else ( || home_from_disk (skgid, config) ));
-  // TODO/DONE/local-view-update/plan_v2.org §5.5: the content group is drawn WHOLE -- never truncated mid-group. The
+  // The content group is drawn WHOLE -- never truncated mid-group. The
   // budget is spent once per expanding vognode (in expand_true_content_at_unrestrictedVognode),
   // not per child, so a node either fully expands or is left write-protected; we
   // never create a silent partial sibling set.
@@ -249,7 +249,7 @@ fn reconcile_content_children (
   // becomes a PhantomDeleted whose folders generalized-orphan and deaden -- so no folder
   // reconciles against a missing Graphnode -- while any user subtree under it
   // is preserved (demoted), and a now-childless PhantomDeleted is removed by the
-  // TODO/DONE/local-view-update/plan_v2.org §6.6 prune sweep.
+  // prune sweep ('prune_self_deletable_when_empty').
   let substitution_for_children : bool =
     // The raw-drawn-override rule (generalized 2026-06-12 from the
     // plan-11 overridden-as-such case): when this node is itself
@@ -373,9 +373,9 @@ fn replace_raw_content_children_with_visible_overriders (
   Ok (())
 }
 
-/// TODO/DONE/local-view-update/plan_v2.org §6.5: an Unknown content placeholder (a dangling reference the parent kept
+/// An Unknown content placeholder (a dangling reference the parent kept
 /// rather than failing the whole view) that is *no longer a member* of the
-/// parent's contains converts to a DeadViewnode; the TODO/DONE/local-view-update/plan_v2.org §3.4 postorder prune sweep
+/// parent's contains converts to a DeadViewnode; the postorder prune sweep
 /// then removes it. An Unknown still in contains is retained (a present-but-
 /// unresolvable reference). Self-deletion is the sweep's job -- this only
 /// decides member-vs-convert, so a Dead -> Unknown -> Dead chain collapses in
@@ -493,7 +493,7 @@ fn is_subscribee (
   Ok( is_member_of_parent && affects_parent_subscribeeFolder ) }
 
 /// The worktree content goal list for a node: the (extra-id-resolved) contains,
-/// in order. For a subscribee-as-such (TODO/DONE/local-view-update/plan_v2.org §6.1) it is contains MINUS what the
+/// in order. For a subscribee-as-such (the glossary's "subscribee as such") it is contains MINUS what the
 /// subscriber neither HIDES nor CONTAINS: the hidden remainder shows in the
 /// HiddenInSubscribeeFolder, and content the subscriber has integrated into its
 /// own graph (any node it contains) has dropped out of "unintegrated subscribed
@@ -805,7 +805,7 @@ fn build_child_creation_data (
           // Only a member Unrestricted child counts as "already present" -- the
           // same predicate complete_content_children's reconcile applies. An
           // non-member same-id child is a distinct occurrence (e.g. a
-          // containerward ancestor, or a TODO/DONE/local-view-update/plan_v2.org §6.0-demoted branch), so its goal id
+          // containerward ancestor, or a stale branch made a non-member), so its goal id
           // must still be pre-fetched here; otherwise the reconcile sends it to
           // the create closure and child_data.get(id).expect(..) panics.
           // Keys are COLLECTED ids, matching the reconcile's orderkey:
@@ -834,7 +834,7 @@ fn build_child_creation_data (
         graph_snap, skgid, None, config )
       { Some (s) => s,
         None => {
-          // TODO/DONE/local-view-update/plan_v2.org §7.6: the id resolves to nothing (a dangling reference). Render an
+          // The id resolves to nothing (a dangling reference). Render an
           // Unknown phantom rather than aborting the whole view. This is
           // what lets the one view completion serve de-novo (which must tolerate
           // dangling refs) and makes post-save robust to them too.

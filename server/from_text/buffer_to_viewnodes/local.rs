@@ -290,7 +290,7 @@ fn validate_subscribeefolder (
     tree, treeid, 1, true,
     |node| node . is_unrestricted ()
            || matches!(&node . kind,
-                    MpViewnodeKind::Vognode (MpVognode::Restricted (_)) // a retained restricted subscribee may sit here as an save-inert display placeholder; it emits no subscribesTo membership (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org)
+                    MpViewnodeKind::Vognode (MpVognode::Restricted (_)) // a retained restricted subscribee may sit here as an save-inert display placeholder; it emits no subscribesTo membership (the API doc's "Restricted-skgrepo nodes")
                       | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
                       | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))) // a former member, in the diff view; save-inert
                       | MpViewnodeKind::PartnerFolder (
@@ -339,7 +339,7 @@ fn validate_relation_folder (
                 && matches! ( &node . kind,
                               MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) ))
            || matches!(&node . kind,
-                       MpViewnodeKind::Vognode (MpVognode::Restricted (_))) // tolerated from stale buffers; the rerender removes it (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org)
+                       MpViewnodeKind::Vognode (MpVognode::Restricted (_))) // tolerated from stale buffers; the rerender removes it (the API doc's "Restricted-skgrepo nodes")
            || matches!(&node . kind, // a former member, in the diff view; save-inert
                        MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_)))))
     { errors . push(format!("{}'s children must include only UnrestrictedVognodes, restricted vognodes, historical phantoms, or (for OverriddenFolder) Unknown phantoms.", label)); }
@@ -560,7 +560,7 @@ fn validate_restricted_node (
   tree    : &Tree<MpViewnode>,
   treeid  : NodeId,
 ) -> Vec<String> {
-  // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: a RestrictedVognode may
+  // Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): a RestrictedVognode may
   // sit under a folder (a stale buffer from before a skgrepo-set
   // switch) or under another vognode, and it may have children (the
   // retained case: a restricted node kept on screen because of its
@@ -581,8 +581,8 @@ fn validate_restricted_node (
                     . to_string()); }
   errors }
 
-/// The identity + child-structure checks shared by an UnrestrictedVognode and a phantom
-/// (TODO/DONE/local-view-update/plan_v2.org §20.4 dedup): id present, no
+/// The identity + child-structure checks shared by an UnrestrictedVognode and a phantom:
+/// id present, no
 /// wrong-structure child, and distinct content-child ids. `label` ("UnrestrictedVognode"
 /// / "Phantom") is woven into the messages so each kind reports itself.
 /// Repo validity is NOT checked here: skgrepo is load-bearing only for a

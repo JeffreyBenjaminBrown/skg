@@ -843,8 +843,8 @@ end
 ---suggested skgrepo (the comment directly above the clone) is the
 ---default; aborting the prompt accepts it. A no-op when every clone's
 ---repo is already specified -- notably when the saved metadata
----itself specified it (the server then omits the placeholder), per
----TODO/fork-fixes.org: no redundant ask.
+---itself specified it (the server then omits the placeholder): no
+---redundant ask.
 ---@param buf integer
 function M.choose_placeholder_repos (buf)
   local picker = require('skg.picker')

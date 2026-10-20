@@ -15,7 +15,7 @@ pub mod view_requests;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgrepoName};
 
-/// TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: rendering omits EVERY
+/// Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): rendering omits EVERY
 /// restricted member from goal lists (no placeholders are created).  A
 /// member whose skgrepo cannot be resolved is omitted too: it might be
 /// private, and rendering must not leak; saving preserves it

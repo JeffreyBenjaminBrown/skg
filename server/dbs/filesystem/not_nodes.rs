@@ -45,8 +45,8 @@ fn skgrepo_order_from_toml (
     . unwrap_or_default () }
 
 /// Named skgrepo-sets are retired: skgrepo-sets are now the prefixes of
-/// the config's privacy order (see TODO/DONE/privacy-telescope/
-/// 5_plan.org, work item privacy-order). A config still defining
+/// the config's privacy order (see 'docs/telescopes.org', "The privacy
+/// order"). A config still defining
 /// '[[repo_sets]]' would silently mean something else than its
 /// author intended, so its presence is a hard error. Likewise
 /// 'user_owns_it': ownership is now derived from the skgrepo's path
@@ -79,8 +79,8 @@ fn reject_retired_config_keys (
       "Repo-sets are now the PREFIXES of the [[repos]] order: ",
       "list your repos most-public-first, and select a set by ",
       "naming the most private repo to make available (or 'all'). ",
-      "See TODO/DONE/privacy-telescope/5_plan.org, work item ",
-      "privacy-order. Delete the [[repo_sets]] entries and, if a ",
+      "See docs/telescopes.org, \"The privacy order\". ",
+      "Delete the [[repo_sets]] entries and, if a ",
       "deleted set was your default_repo_set, replace that with a ",
       "repo name or 'all'." ) . into () ); }
   let has_user_owns_it : bool =
@@ -100,8 +100,7 @@ fn reject_retired_config_keys (
       "folder, update its 'path', and delete the 'user_owns_it' ",
       "lines. bash/migrate-to-author-folders.sh does this for a ",
       "whole config at once. See ",
-      "TODO/DONE/privacy-telescope/5_plan.org, work item ",
-      "privacy-order." ) . into () ); }
+      "docs/telescopes.org, \"The privacy order\"." ) . into () ); }
   Ok (( )) }
 
 /// Fills the DERIVED parts of each skgrepo. Must run AFTER

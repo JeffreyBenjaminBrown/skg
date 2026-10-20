@@ -1,3 +1,18 @@
+//! Bringing views up to date with the graph. Every rendering of a
+//! view runs view completion ('complete_viewforest' in
+//! 'update_buffer/complete.rs') and then the shared tail
+//! ('finish_viewforest': root role trees, affectsParent marking,
+//! stats, the skgrepo set, the text):
+//! - 'render_initial_view' draws a new content view from a stub of its
+//!   roots;
+//! - 'complete_viewforest_with_graph_straddle' draws a buffer of the
+//!   diff view the same way, over the graph straddle;
+//! - 'rerender_view' re-completes a view that already exists (after a
+//!   save, collaterally, after a commit, or at a skgrepo-set switch),
+//!   reconciling what it holds instead of redrawing it;
+//! - 'update_views_after_save' rerenders the saved view and then the
+//!   collateral ones, streaming each to the client.
+
 pub mod ancestry;
 pub mod skgrepo_switch;
 pub mod warnings;
@@ -384,18 +399,18 @@ fn rerender_collateral_view (
     viewforest,
   }) }
 
-/// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): build a DE-NOVO (initial) content view by running the ONE
+/// Build a DE-NOVO (initial) content view by running the ONE
 /// post-save view completion (complete_viewforest) over a stub forest of the
 /// requested roots. View completion
 /// creates each fresh node's default PartnerFolders
 /// (create_partnerFolders_for_fresh_nodes = true), expands content, reconciles
-/// folders, and applies the TODO/DONE/local-view-update/plan_v2.org §5.5 node budget.
+/// folders, and applies the node budget (see 'to_org/expand/editable.rs').
 /// The caller (multi_root_view_via_env) then adds containerward role tree and
 /// stats.
-/// Returns the completed viewforest plus any warning strings the
-/// render itself produced -- today only compound-override-chain
-/// notices. (Folder-repair warnings stay silent for de novo renders;
-/// see the warning-sink filtering at the bottom.)
+/// Returns the completed viewforest plus the warning strings the
+/// render itself produced, of which there are none: folder-repair
+/// warnings stay silent for de novo renders (see the warning-sink
+/// filtering at the bottom).
 pub fn render_initial_view (
   runtime     : &RuntimeGeneration,
   root_skgids : &[ID],
@@ -416,7 +431,7 @@ pub fn render_initial_view (
   // generated once, here, and round-trips in the saved buffer as ordinary content
   // -- a later save never re-generates it. (Roots are already editable by
   // construction -- first occurrence in the editable_map -- so they need no
-  // ViewRequest::Editable; adding one would over-trigger the TODO/DONE/local-view-update/plan_v2.org §5.3 cascade.)
+  // ViewRequest::Editable; adding one would over-trigger the cascade.)
   for root_treeid in viewforest . root_skgids () {
     if let Some (mut node_mut) = viewforest . get_mut (root_treeid) {
       if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
@@ -603,7 +618,7 @@ pub fn rerender_view (
             t_rerender . elapsed () . as_secs_f64 ());
   Ok (result) }
 
-/// The shared post-completion tail for BOTH render paths (TODO/DONE/local-view-update/plan_v2.org §20.3): the de-novo
+/// The shared post-completion tail for BOTH render paths: the de-novo
 /// view (multi_root_view_via_env, server/to_org/render/content_view.rs) and the
 /// post-save re-render (rerender_view, above). Given a viewforest whose UnrestrictedVognode
 /// content has already been completed, it:
@@ -710,7 +725,7 @@ fn rewriteInPlace_viewnodes_whose_skgid_is_newly_extra (
         { *body = new_body; }} }}
   Ok (( )) }
 
-/// Remove every ID folder. A view draws one only in the total diff
+/// Remove every ID folder. A view draws one only in the diff
 /// view, whose step at its node's visit
 /// ('process_unrestrictedVognode_changes') reconciles it instead.
 fn remove_id_folders (
@@ -741,7 +756,7 @@ fn remove_id_folders (
 /// subtree and handles a cyclic root, whereas the dispatch's
 /// build_and_integrate_containerward would merge it into existing content and
 /// panic on a cyclic root (one whose containerward path cycles back to the root,
-/// e.g. a contains b contains a). See TODO/DONE/local-view-update/progress.org §17.
+/// e.g. a contains b contains a).
 fn fulfill_root_containerward_requests (
   viewforest : &mut ViewForest,
   graph      : &InRustGraph,

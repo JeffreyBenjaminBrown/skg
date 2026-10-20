@@ -1,6 +1,6 @@
 //! Export .skg content to plain .org files.
 //!
-//! See TODO/export-to-org/ (plan.org, discussion.org). In brief:
+//! See the API doc's "Export to org". In brief:
 //! every "export root" -- a node with a child whose title links to
 //! the instruction node EXPORT_MARKER_ID and whose body yields a
 //! `target_filepath` -- is written to

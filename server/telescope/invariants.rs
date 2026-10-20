@@ -1,8 +1,8 @@
 //! The telescope invariant validator: ONE shared primitive
 //! ('telescope_violations_of') consulted at both gates -- init /
 //! rebuild (whole graph, aggregated report) and save (affected recorders)
-//! -- per the override-invariants lesson in TODO/problems.org (two
-//! divergent validators nearly let bad data through).
+//! -- because two divergent validators once nearly let bad data
+//! through.
 //!
 //! ENFORCEMENT STRENGTH (decided, 4_discussion "Migration and the
 //! fate of today's validations"): cross-file violations are

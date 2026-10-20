@@ -104,7 +104,7 @@ SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER."
 (defun skg-sexp-edit--decorate-with-heralds ()
   "Append, per headline, the herald its metadata path produces:
 colored per herald rules, inside (uncolored) parentheses, after the
-rest of the title (TODO/more.org). Implemented as overlays, so the
+rest of the title. Implemented as overlays, so the
 hints never become buffer text -- applying reads titles, and a
 herald baked into a title would corrupt the sexp. A no-op without a
 rule table (e.g. no server connection). Hints reflect the values at

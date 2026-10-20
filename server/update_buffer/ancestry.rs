@@ -1,6 +1,6 @@
 //! Death-leafward: a folder self-checks its required ancestry at its BFS visit.
 //!
-//! See TODO/DONE/local-view-update/propagate-death-leafward/plan.org. In the
+//! In the
 //! single-visit BFS (complete.rs), each folder (a non-vognode viewnode: PropertyFolder,
 //! PartnerFolder) is reconciled at its own visit, and that reconcile reads its
 //! ancestor vognode(s). If a required ancestor died this save, the read would
@@ -21,7 +21,7 @@
 //! descendant folder is visited; so by the time a folder checks, a dead ancestor
 //! already shows the wrong kind in the tree.
 //!
-//! The TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 required-ancestry table is the single source of truth. Reconciles
+//! The required-ancestry table below ('required_ancestry') is the single source of truth. Reconciles
 //! read their ancestors *through* `required_ancestor`, so a reconcile can
 //! never read an ancestor the table does not list, and the death-check and the
 //! reads share one spec (the per-folder *field* each reconcile then pulls --
@@ -36,20 +36,20 @@ use crate::update_buffer::util::detach_viewnode_transferring_focus;
 use ego_tree::{ NodeId, NodeRef, Tree };
 use std::error::Error;
 
-/// One position in a folder's required ancestry (TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 table). A position is matched
+/// One position in a folder's required ancestry (the table below). A position is matched
 /// against the *actual ancestor at that tree depth*.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ExpectedAncestor {
   /// Must be a `Vognode::Unrestricted` (anything else at this depth means death).
   NormalVognode,
-  /// Must be exactly this folder kind (TODO/DONE/local-view-update/plan_v2.org §19: a folder = a collecting non-vognode). The
+  /// Must be exactly this folder kind (a folder is a collecting non-vognode; see 'is_folder_kind'). The
   /// only intermediate-chain folder the table uses is the SubscribeeFolder.
   Folder (PartnerFolder),
   /// Must be a `Phantom::Historical` (the parent of an AcquiredBy folder).
   HistoricalPhantom,
 }
 
-// The TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 required-ancestry table, nearest -> farthest. required_ancestry[i] is
+// The required-ancestry table, nearest -> farthest. required_ancestry[i] is
 // matched against the actual ancestor at tree depth i+1 (0 = the folder itself).
 const ANC_NORMAL : &[ExpectedAncestor] =
   &[ ExpectedAncestor::NormalVognode ];
@@ -64,7 +64,7 @@ const ANC_HISTORICAL : &[ExpectedAncestor] =
   &[ ExpectedAncestor::HistoricalPhantom ];
 const ANC_NONE : &[ExpectedAncestor] = &[];
 
-/// The TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 required ancestry for a folder kind, nearest -> farthest. Non-folder kinds
+/// The required ancestry for a folder kind, nearest -> farthest. Non-folder kinds
 /// have none (they are never orphan-checked).
 fn required_ancestry (
   kind : &ViewnodeKind,
@@ -107,7 +107,7 @@ fn matches_expected (
                  ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) ),
   } }
 
-/// Whether `kind` is a FOLDER -- in Jeff's terminology (TODO/DONE/local-view-update/plan_v2.org §19) a folder is a
+/// Whether `kind` is a FOLDER -- a folder is a
 /// *collecting* non-vognode, i.e. a PropertyFolder (ID/Alias) or a PartnerFolder. (A NON-VOGNODE
 /// is any non-Vognode viewnode; the non-folders -- Property leaves, BufferRoot,
 /// DeadViewnode -- are excluded here.) Folders are the kinds that carry a required
@@ -152,7 +152,7 @@ pub fn folder_is_generalized_orphan (
     if ! matches { return Ok (true); } }
   Ok (false) }
 
-/// The NodeId of the folder's i-th required ancestor (per the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 table for its
+/// The NodeId of the folder's i-th required ancestor (per the required-ancestry table for its
 /// kind); `None` if i is past the end of the table for this kind.
 ///
 /// RELIES ON THE ORPHAN PRE-CHECK: it does NOT re-validate that each ancestor is
@@ -175,7 +175,7 @@ pub fn required_ancestor (
   Ok ( ancestor_treeid (tree, folder, i + 1) ) }
 
 /// The (pid, skgrepo) of the folder's i-th required ancestor, read *through* the
-/// TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 table. Errors if that ancestor is absent (the folder is a generalized
+/// required-ancestry table. Errors if that ancestor is absent (the folder is a generalized
 /// orphan up to i) -- unreachable in practice, since the BFS dispatch runs the
 /// orphan pre-check and deadens an orphan before its reconcile is ever called,
 /// but the contract is what keeps a reconcile from reading an unlisted ancestor.
@@ -201,7 +201,7 @@ pub fn pid_and_skgrepo_from_required_ancestor (
     . ok_or_else ( || format! (
       "{}: required ancestor {} has no pid/repo", caller, i ) . into () ) }
 
-/// Deaden a generalized-orphan folder at its BFS visit (TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5): dispose each
+/// Deaden a generalized-orphan folder at its BFS visit: dispose each
 /// direct child, then convert the folder itself to a DeadViewnode and skip its
 /// reconcile. The BFS still visits the (disposed) children; a demoted-
 /// non-member survivor is visited normally, a DeadViewnode child is a no-op.
@@ -220,20 +220,17 @@ pub fn deaden_generalized_orphan_folder (
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (( )) }
 
-/// Dispose one direct child of a deadened orphan folder (TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5.1.a):
+/// Dispose one direct child of a deadened orphan folder:
 /// - a member (affectsParent=true Unrestricted) view-leaf -> delete;
 /// - a member branch (has children) -> demote to affectsParent=false, so
 ///   the user's subtree survives;
 /// - a nested folder (PropertyFolder / PartnerFolder) -> LEAVE it untouched: it is itself a
 ///   generalized orphan under this now-dead folder, so it deadens itself -- and
-///   disposes ITS OWN children -- at its own BFS visit. (This DEVIATES from
-///   TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5.1.a, which converted nested folders to DeadViewnode here; doing
-///   so would freeze a nested folder before it could dispose its own leaf members,
-///   leaving them stranded under a dead chain. Leaving it to self-deaden is
-///   what the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5 note actually intends -- "a nested folder ... deadens
-///   itself at its own visit too" -- and is what makes leaf members at every
-///   depth die. A Property leaf does NOT self-dispatch, so it is still converted
-///   below.)
+///   disposes ITS OWN children -- at its own BFS visit. (Converting a nested
+///   folder to DeadViewnode here would freeze it before it could dispose its
+///   own leaf members, leaving them stranded under a dead chain. Leaving it to
+///   self-deaden is what makes leaf members at every depth die. A Property
+///   leaf does NOT self-dispatch, so it is still converted below.)
 /// - any other non-vognode, non-phantom child (a Property, a DeadViewnode) -> convert
 ///   to DeadViewnode;
 /// - any other child (a non-member vognode -- a non-member Unrestricted or an

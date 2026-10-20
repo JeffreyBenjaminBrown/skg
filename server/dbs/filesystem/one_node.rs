@@ -56,7 +56,7 @@ pub fn graphnode_from_pid_and_skgrepo (
 /// PID's telescope as it sits on disk, in privacy order: for each
 /// configured skgrepo (most public first), pid.skg if present. The
 /// order is what makes the first section the home, so it comes from
-/// 'ordered_repos' and nowhere else.
+/// 'ordered_skgrepos' and nowhere else.
 pub(crate) fn telescope_from_disk (
   config : &SkgConfig,
   pid    : &ID,

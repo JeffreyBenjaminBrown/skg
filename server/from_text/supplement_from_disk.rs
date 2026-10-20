@@ -187,7 +187,7 @@ fn supplement_nodeSaveIntent_from_disk (
 /// Under a restricted skgrepo-set, the buffer shows only some of a
 /// node's relationship-list members, so its lists describe only the
 /// visible subset.  This merges each list with its disk counterpart
-/// (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org): the anchored
+/// (the API doc's "Restricted-skgrepo nodes"): the anchored
 /// 'weave' for the order-meaningful 'contains' and 'subscribesTo',
 /// the 'set_difference_merge' for the order-meaningless
 /// 'overrides'.  A field is replaced only when the merge

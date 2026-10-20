@@ -2,11 +2,11 @@
 /// Build a string intended as buffer-text,
 /// to represent an 'inital view' (content relationships only).
 ///
-/// METHOD (phase 8 TODO/DONE/local-view-update/plan_v2.org §13): the de-novo render runs the ONE post-save view
+/// METHOD: the de-novo render runs the ONE post-save view
 /// completion path (multi_root_view_via_env -> render_initial_view)
 /// over a stub forest. View completion (complete_viewforest) completes each node
 /// at its BFS visit. After view completion, the shared finish_viewforest
-/// tail (server/update_buffer.rs, TODO/DONE/local-view-update/plan_v2.org §20.3)
+/// tail (server/update_buffer.rs)
 /// attaches the roots' containerward role trees,
 /// marks/validates affectsParent, sets graph/view stats, applies the skgrepo set,
 /// and renders to string.
@@ -50,7 +50,7 @@ pub fn multi_root_view (
     config, tantivy_index, root_skgids, None )
 }
 
-/// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): the parts-based de-novo entry -- a thin shim that assembles a
+/// The parts-based de-novo entry -- a thin shim that assembles a
 /// SkgEnv and routes through the ONE view completion path (multi_root_view_via_env). Used only
 /// by tests (production calls multi_root_view_via_env directly).
 /// The shim builds a fixture-local graph from disk and, when Tantivy is not
@@ -82,7 +82,7 @@ fn multi_root_view_inner (
     // caller (the single-root handler) surfaces them.
     &mut Vec::new () ) }
 
-/// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): the de-novo view, built through the ONE view completion path
+/// The de-novo view, built through the ONE view completion path
 /// (render_initial_view). Takes a SkgEnv (carries
 /// config/driver/tantivy/graph), runs view completion over a stub forest of the
 /// requested roots, then attaches containerward role tree and stats and renders.
@@ -114,7 +114,7 @@ pub(crate) fn multi_root_view_via_runtime (
           runtime, root_skgids, skgrepo_restriction ) ?;
       warnings_out . extend (render_warnings);
       viewforest };
-  // TODO/DONE/local-view-update/plan_v2.org §20.3: the de-novo and post-save render tails are one shared helper now.
+  // The de-novo and post-save render tails are one shared helper.
   // Root containerward is requested per-root in render_initial_view
   // (de-novo only) and fulfilled + dropped inside finish_viewforest, so the tail
   // itself is caller-agnostic -- no mode flag.
@@ -122,7 +122,7 @@ pub(crate) fn multi_root_view_via_runtime (
     finish_viewforest (
       &mut viewforest, &runtime . graph, &runtime . config,
       skgrepo_restriction ) ?;
-  // TODO/DONE/local-view-update/plan_v2.org §20.5: the pids the caller registers for this view -- the {Unrestricted, Restricted}
+  // The pids the caller registers for this view -- the {Unrestricted, Restricted}
   // set, via the one shared skgrepo of which-kinds-count
   // (views_state::pids_from_viewforest), the same helper update_view uses post-save.
   let pids : Vec<ID> =

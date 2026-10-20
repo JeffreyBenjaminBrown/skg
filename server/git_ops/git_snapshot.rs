@@ -93,7 +93,7 @@ pub fn foreign_changed_skg_file_count (
         . map ( |paths| paths . len () ) } )
     . sum () }
 
-/// Sections arrive in privacy order (ordered_repos) so each
+/// Sections arrive in privacy order ('ordered_skgrepos') so each
 /// telescope composes with its most public section first.
 fn read_graph_snapshot_per_skgrepo (
   config            : &SkgConfig,
@@ -196,7 +196,7 @@ fn changed_paths_for_skgrepo (
         if path_is_skgrepo_skg (&entry . path, prefix) {
           paths . insert (entry . path); }}}
     _ => return Err ( format! (
-      "Unsupported diff-report endpoints: {:?} to {:?}",
+      "Unsupported endpoints for comparing changed paths: {:?} to {:?}",
       before_kind, after_kind )), }
   Ok (paths)
 }
@@ -266,7 +266,7 @@ fn git_snapshot_from_sections (
       tracing::warn! (
         pid = %pid,
         ignored_skgrepos = ?collision . ignored_skgrepos,
-        "diff snapshot ignored non-owned files colliding with an owned telescope" ); }}
+        "git snapshot ignored non-owned files colliding with an owned telescope" ); }}
   let mut id_claims
     : HashMap<ID, BTreeMap<ID, BTreeSet<SkgrepoName>>> =
     HashMap::new ();
@@ -295,11 +295,11 @@ fn git_snapshot_from_sections (
 }
 
 /// Compose one telescope, but where init would hard-error on a
-/// titleless telescope (no home), a snapshot must not: diff
-/// endpoints legitimately pass through ill-formed states (e.g. a
-/// home-section deletion staged before its recreation). Retry with
-/// a placeholder title on the most public section, so the report
-/// can still describe the telescope.
+/// titleless telescope (no home), a git snapshot must not: a commit
+/// can legitimately hold an ill-formed state (e.g. a home section
+/// deleted in one commit and recreated in the next). Retry with a
+/// placeholder title on the most public section, so the before-graph
+/// of the graph straddle can still hold the telescope.
 fn fold_telescope_tolerating_homelessness (
   config   : &SkgConfig,
   pid      : &ID,

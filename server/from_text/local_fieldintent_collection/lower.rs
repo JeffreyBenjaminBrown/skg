@@ -70,8 +70,8 @@ pub struct NodeSaveIntent {
 /// unconditionally resolved by 'apply_sticky_relRepos' -- this is the
 /// side-channel that tells that pass which members carry a real,
 /// user-requested skgrepo to validate against the default
-/// floor, rather than deriving normally (render-and-gating,
-/// TODO/DONE/privacy-telescope/5_plan.org).
+/// floor, rather than deriving normally (see 'docs/telescopes.org',
+/// "What leaks, and what repair fixes").
 #[derive(Clone, Debug, Default)]
 pub struct RequestedRelRepos {
   pub contains          : HashMap<ID, SkgrepoName>,

@@ -35,8 +35,8 @@ Emacs client's 'C-c' chords runs everything else; every command is
 also an ':Skg*' Ex command.
 
 * Where things live
-- lua/skg/ -- the modules; the map from elisp file to Lua module is
-  the table in ../TODO/vim-client/plan.org.
+- lua/skg/ -- the modules; a module is usually named for the elisp
+  file it ports, without the 'skg-' or 'skg-request-' prefix.
 - plugin/skg.lua -- the Ex-command surface and autocmds.
 - ../tests/nvim/ -- unit tests (plenary.busted; run
   ../bash/nvim-tests.sh).

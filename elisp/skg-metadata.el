@@ -733,8 +733,7 @@ Does NOT save; call `skg-request-save-buffer' afterward."
 Returns (CHANGED-COUNT . WRITE-PROTECTED-IDS).  The root node is inclusive;
 only descendents for which affectsParent=true are traversed.
 A write-protected occurrence is NOT edited -- the save would silently
-ignore its repo edit (see TODO/problems.org, \"skg-set-repo
-silently no-ops on write-protected occurrences\") -- and its ID is
+ignore its repo edit -- and its ID is
 collected into WRITE-PROTECTED-IDS instead, for the caller to warn about,
 unless the walk also changed that ID's editable occurrence: that one
 carries the move, and the rerender after the save shows it everywhere.

@@ -1,5 +1,5 @@
 /// This file defines the types of local fieldIntent collection
-/// (TODO/DONE/local-fieldintent-collection/3_plan.org), plus the
+/// (the glossary's "local fieldIntent collection"), plus the
 /// instructionMerge insert function that accumulates emissions.
 /// .
 /// TERMINOLOGY: 'merge' is always qualified. 'nodeMerge' is the
@@ -163,7 +163,7 @@ impl CollectedFieldIntents {
     CollectedFieldIntents::default() }
 
   /// This instructionMerges one emitted fieldIntent into the map.
-  /// The rules (from TODO/DONE/local-fieldintent-collection/3_plan.org) are:
+  /// The rules are:
   /// - a combineable fieldIntent always pushes;
   /// - an exclusive fieldIntent into an empty slot fills it;
   /// - an exclusive fieldIntent into an occupied slot with an EQUAL

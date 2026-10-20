@@ -12,8 +12,7 @@
 //! anchor-free base; a more private section's items before the first
 //! anchor are its prepend, and each anchor starts a run inserted
 //! after that member of the strictly-more-public compose. See
-//! TODO/DONE/privacy-telescope/5_plan.org, work item
-//! section-format-and-fold.
+//! 'docs/telescopes.org', "What lives where".
 
 use serde::{Serialize, Deserialize};
 
@@ -34,8 +33,7 @@ use std::fmt;
 /// one-file question about a many-file node could do so without
 /// anything forcing it to say which section it meant --- which is
 /// how 'repo_from_disk' went on answering the pre-telescope
-/// question long after telescopes arrived (see
-/// TODO/dup-ids-maybe-bad/1_discussion.org). New code meets a
+/// question long after telescopes arrived. New code meets a
 /// 'Telescope' and has to choose.
 ///
 /// Construction is checked against the config, so a value is always

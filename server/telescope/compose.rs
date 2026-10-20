@@ -124,7 +124,7 @@ pub fn graphnode_from_composition (
     flags, } ) }
 
 /// Compose SECTIONS (already sorted most public first -- the caller
-/// orders them via 'SkgConfig::ordered_repos') into effective
+/// orders them via 'SkgConfig::ordered_skgrepos') into effective
 /// lists. 'resolve' maps any ID to its primary ID ('pid_of');
 /// anchors and members are compared through it.
 pub fn compose_sections (
