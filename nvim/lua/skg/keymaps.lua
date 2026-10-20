@@ -243,13 +243,13 @@ M.content_view_bindings = {
   { 'Gm', 'GotoInGitAndCloseThis' },     -- C-c G m
   { 'gM', 'GotoInGitParent' },           -- C-c g M
   { 'GM', 'GotoInGitParentAndCloseThis' }, -- C-c G M
-  { 'ca', 'ShowFolderOfAliases' },
-  { 'co', 'ShowFolderOfOverrides' },
-  { 'ch', 'ShowFolderOfHidesFromSubs' },
-  { 'cs', 'ShowFolderOfSubscribesTo' },
-  { 'cp', 'ShowFolderOfFlags' },
-  { 'cc', 'ShowFolderOfContainers' },
-  { 'cm', 'ShowFolderOfMentioners' },
+  { 'la', 'ShowFolderOfAliases' },       -- C-c l a
+  { 'lo', 'ShowFolderOfOverrides' },     -- C-c l o
+  { 'lh', 'ShowFolderOfHidesFromSubs' }, -- C-c l h
+  { 'ls', 'ShowFolderOfSubscribesTo' },  -- C-c l s
+  { 'lp', 'ShowFolderOfFlags' },         -- C-c l p
+  { 'lc', 'ShowFolderOfContainers' },    -- C-c l c
+  { 'lm', 'ShowFolderOfMentioners' },    -- C-c l m
   { 'pC', 'ShowContainerwardTree' }, -- C-c p C
   { 'pL', 'ShowMentionerwardTree' }, -- C-c p L
   { 'pl', 'ShowMentionedwardTree' }, -- C-c p l

@@ -980,7 +980,7 @@ the old literals produced (compare field by field against the
 settings written in 'complete_viewforest_with_graph_straddle' and
 'render_initial_view' before you delete them).
 
-** TODO Slice 6: client helpers and the Neovim folder keys
+** DONE Slice 6: client helpers and the Neovim folder keys
 Make every change under "The clients" above, in both clients, keeping
 each client's tests green and adding one test per new helper
 ('skg--send-streaming-request' sends the request after the prologue;

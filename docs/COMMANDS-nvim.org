@@ -295,7 +295,7 @@ never in any skgrepo's history. If HEAD still holds the ID's file,
 it says so: "still present at HEAD (only the worktree lacks it)". It
 refuses unless the skgrepo restriction is 'all'; a refusal opens the
 same buffer, as "* investigation failed" with the reason under it.
-** <localleader>c : show a folder (both folders of a relation)
+** <localleader>l : show a folder (both folders of a relation)
 These commands don't edit the graph. Each inserts a request into the
 metadata of the node at point that, on save, causes the server to
 render the relation's folder viewnodes into the view, POPULATED from
@@ -305,34 +305,34 @@ marks a folder you cannot change from here. Every command auto-saves.
 Without such a request, an editable node shows only its nonempty
 subscribeeFolder (plus the nonempty hiddenInSubscribeeFolder on an editable
 subscribee-as-such); the heralds advertise other nonempty relations.
-*** <localleader>ca : :SkgShowFolderOfAliases
+*** <localleader>la : :SkgShowFolderOfAliases
 The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:
 type an alias in and save.
-*** <localleader>co : :SkgShowFolderOfOverrides
+*** <localleader>lo : :SkgShowFolderOfOverrides
 The overriddenFolder (the nodes this node overrides -- EDITABLE, shown
 even when empty as an "add an override here" surface) and the
 overriderFolder (the nodes that override this one -- write-protected, ☮).
-*** <localleader>ch : :SkgShowFolderOfHidesFromSubs
+*** <localleader>lh : :SkgShowFolderOfHidesFromSubs
 The hiderFolder and hiddenFolder -- BOTH write-protected (☮). Hiding is edited from
 a subscribee-as-such, never from these folders. On a node that neither
 hides nor is hidden, nothing appears.
-*** <localleader>cs : :SkgShowFolderOfSubscribesTo
+*** <localleader>ls : :SkgShowFolderOfSubscribesTo
 The subscribeeFolder (the nodes this node subscribes to -- EDITABLE, shown
 even when empty) and the subscriberFolder (the nodes that subscribe to
 this one -- write-protected, ☮).
-*** <localleader>cp : :SkgShowFolderOfFlags
+*** <localleader>lp : :SkgShowFolderOfFlags
 Shows the write-protected, true-only flags folder as titleless viewnodes whose
 heralds carry their labels, in canonical order.
 The empty folder is retained. Import provenance viewnodes have no setter; use the
 search-matching command below for =No search matching=. Delete the whole
 folder branch to dismiss this optional view without changing any flag.
-*** <localleader>cc : :SkgShowFolderOfContainers
+*** <localleader>lc : :SkgShowFolderOfContainers
 The containerFolder -- the nodes that contain this one. Write-protected (☮):
 containment is edited from the container. Its other side, the node's
 content, is drawn without a folder. On a node nothing contains, nothing
 appears.
-*** <localleader>cm : :SkgShowFolderOfMentioners
+*** <localleader>lm : :SkgShowFolderOfMentioners
 The mentionerFolder -- the nodes that link to this one. Write-protected
 (☮): a link lives in the linking node's text. On a node nothing links to,
 nothing appears.

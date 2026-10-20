@@ -1651,3 +1651,55 @@ says how the write-protected check counts a member drawn by an extra
 ID and an unknown phantom, and that the marks file's relationship is
 the flattened 'RelationshipKey'; the glossary's "content position"
 names 'in_content_position'.
+** Slice 6: deviations
+*** the streaming helper's optional arguments
+'skg--send-streaming-request' takes, after the plan's four, an alist
+of other one-shot handlers and a flag for
+'skg--wrap-rerender-done-with-after-empty-stream'. Delete-references
+has three possible answers (confirmation, result, error), each
+one-shot and each registered before the send; stage-and-commit and
+delete-references wrap rerender-done so that a confirmation can
+resend after the empty stream, while integrate-unshown-changes does
+not, as before. The Lua twin, 'rerender.send_streaming_request',
+takes only the other handlers, since the Lua rerender-done always
+runs 'after_empty_stream'. Both live beside the rerender handlers
+they register ('skg-request-rerender-all-views.el', 'rerender.lua'),
+and so do 'skg--response-errors-line' and
+'rerender.response_errors_line'. Delete-references' three Emacs
+handlers became named functions, so its send reads as one call.
+*** the save module and the readiness module require each other
+The save shows the summary that 'skg-readiness.el' now formats, and
+the gestures save. 'skg-request-save.el' requires 'skg-readiness';
+'skg-readiness.el' no longer requires the save module and declares
+'skg-request-save-buffer' with 'autoload', as 'readiness.lua' already
+required 'skg.save' lazily. 'test-skg-readiness.el', which calls
+'skg-handle-save-sexp', requires the save module itself. Stage-and-
+commit and integrate-unshown-changes require 'skg-readiness' instead
+of the save module, in both clients.
+*** the unknown-node-ID helper
+Emacs's is 'skg--unknown-node-id-at-point' in 'skg-metadata.el';
+Neovim's keeps its name, 'unknown_id_at_point', in 'metadata.lua'.
+Delete-references calls it, so its two refusals ("Point must be on an
+Unknown headline", "Unknown headline lacks its raw ID") are one, the
+first.
+*** the walkers
+'skg--readiness-do-children' leaves point on the last child rather
+than after the subtree; every caller wraps it in 'save-excursion'.
+'readiness.child_lines' returns 'headlines_with_level_between' over
+the subtree directly.
+*** tests
+'test-skg-send-streaming-request-sends-after-the-prologue' and
+'test-skg-response-errors-line-joins-the-errors' (a new file,
+'tests/elisp/test-skg-streaming-request.el'),
+'test-skg-readiness-do-children-visits-exactly-one-level-below-point';
+in Neovim the twins of those three, and the two key tests (in
+'metadata_spec.lua' and 'save_spec.lua'), which press the keys with
+'nvim_feedkeys'. The Emacs suite has 369 tests, the Neovim suite 344
+(the plan's 17 is one spec file's count; the 31 files had 339).
+*** seen, left
+'skg-request-repo-sets.el', the import's clean-view rerender and
+'skg-request-rerender-all-views' (and their Lua twins) repeat most of
+the prologue too, but each registers the overPrivateText confirmation
+between the rerender handlers and the reset, and has no one-shot
+answer of its own (or, for the skgrepo restriction, one that the
+confirmation must cancel). The plan names three commands; those stay.

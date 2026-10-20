@@ -570,6 +570,19 @@ describe('skg.save fork confirmation', function ()
     assert.are.equal(source, vim.api.nvim_get_current_buf())
   end)
 
+  it("approves with '<localleader>cc', which the folder keys left free",
+     function ()
+    local _, requests = save_and_get_confirmation()
+    metadata.change_repo_at_line(1, 'my-repo')
+    vim.api.nvim_feedkeys((vim.g.maplocalleader or '\\') .. 'cc', 'x', false)
+    vim.wait(3000, function () return #requests >= 2 end, 10)
+    assert.are.equal(2, #requests)
+    assert.is_truthy(requests[2]:find(
+      '(approved-forks . "true")', 1, true))
+    vim.wait(3000, function ()
+      return lock.stream_in_progress == nil end, 10)
+  end)
+
   it('declining strips the fork atom from the source buffer', function ()
     local source = save_and_get_confirmation()
     save.decline_fork()

@@ -226,10 +226,10 @@ describe('skg.metadata keybinding surface', function ()
     end
     assert.are.equal('RequestWriteProtected', by_lhs['sw'])
     assert.are.equal('RequestWriteProtectedRecursive', by_lhs['sW'])
-    assert.are.equal('ShowFolderOfAliases', by_lhs['ca'])
-    assert.are.equal('ShowFolderOfOverrides', by_lhs['co'])
-    assert.are.equal('ShowFolderOfSubscribesTo', by_lhs['cs'])
-    assert.are.equal('ShowFolderOfFlags', by_lhs['cp'])
+    assert.are.equal('ShowFolderOfAliases', by_lhs['la'])
+    assert.are.equal('ShowFolderOfOverrides', by_lhs['lo'])
+    assert.are.equal('ShowFolderOfSubscribesTo', by_lhs['ls'])
+    assert.are.equal('ShowFolderOfFlags', by_lhs['lp'])
     assert.is_nil(by_lhs['cb'])
     assert.are.equal('ShowContainerwardTree', by_lhs['pC'])
     assert.are.equal('ShowMentionerwardTree', by_lhs['pL'])
@@ -238,6 +238,29 @@ describe('skg.metadata keybinding surface', function ()
     assert.are.equal('ShowOverriddenwardTree', by_lhs['po'])
     assert.are.equal('ShowSubscribeewardTree', by_lhs['ps'])
     assert.are.equal('SetMergeRequest', by_lhs['sm'])
+  end)
+
+  it("opens the container folder with '<localleader>lc'", function ()
+    -- The folder commands sit under 'l', mirroring Emacs's C-c l.
+    local helpers = dofile(
+      debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
+    local save = require('skg.save')
+    helpers.install_fixture_herald_rules()
+    local saves = 0
+    local original_save = save.request_save_buffer
+    save.request_save_buffer = function () saves = saves + 1 end
+    local ok, err = pcall(function ()
+      require('skg.buffer').open_org_buffer_from_text(
+        '* (skg (node (id a))) a', 'skg://keymap-lc', 'keymap-lc-view_id')
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+      vim.api.nvim_feedkeys((vim.g.maplocalleader or '\\') .. 'lc', 'x', false)
+      assert.are.equal(1, saves)
+      assert.is_truthy(vim.api.nvim_get_current_line():find(
+        '(viewRequests (folder containers))', 1, true))
+    end)
+    save.request_save_buffer = original_save
+    helpers.wipe_skg_buffers()
+    if not ok then error(err, 0) end
   end)
 end)
 
