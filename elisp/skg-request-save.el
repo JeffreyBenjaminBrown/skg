@@ -1012,7 +1012,7 @@ from SUMMARY, the save response's
                  ready changed)
        (format "%d of %d changed files are ready" ready changed))
      (if (> unshown 0)
-         (format ", %d changes are not shown in this view; reopen it"
+         (format ", %d changes are not shown in this view; C-c r u shows them"
                  unshown)
        "")
      (if (> foreign 0)

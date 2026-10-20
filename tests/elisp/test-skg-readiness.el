@@ -187,7 +187,7 @@ without a title ends in a space, as 'skg-format-headline' writes it."
                  " (readiness-summary (ready 12) (changed 14) (foreign 2)"
                  " (order-only 1) (unshown 3)))")))
       (should (equal (car shown)
-                     "12 of 14 changed files are ready, 3 changes are not shown in this view; reopen it, 2 files changed in foreign skgrepos"))
+                     "12 of 14 changed files are ready, 3 changes are not shown in this view; C-c r u shows them, 2 files changed in foreign skgrepos"))
       (with-temp-buffer
         (skg-handle-save-sexp
          (concat "((content \"* (skg (node (id a))) a\n\") (errors ()) (warnings ())"

@@ -1169,3 +1169,45 @@ The 'C-c s d' entries also say that moving editability back makes the
 children content again, and the "View requests" section describes
 the adoption. The integration run fails only 'import-md-and-org', as
 at baseline.
+** Slice 2: deviations
+*** the command works on U, as the step it reuses does
+The behavior section says the command makes editable every node of
+C without an editable occurrence. It reuses
+'make_freshU_editable_at_first_occurrences', which works on the fresh
+U, as the plan's housekeeping intends ("serves the command"). U
+covers C, and the step's way of reaching a node of C that has no
+occurrence is through the nodes of U above it on its walk, once those
+are editable. So an occurrence of a node of R (in U, unchanged) that
+the user write-protected is made editable again too.
+*** every missing origin is appended
+The command appends what 'contentOrigins_missing_from_buffer'
+returns: every kept origin of the fresh R that the buffer draws
+nowhere, deduplicated with the standing roots pinned, not only the
+origins of the nodes of C that had no occurrence. That is what the
+save used to append.
+*** how the command is built
+'rerender_view' takes a flag, 'show_unshown_changes'; only the
+command sets it, and only then do the step, the appending and
+'complete_appended_roots' run. The handler
+('server/serve/handlers/show_unshown_changes.rs') rerenders through
+'prepare_rerender_views_where' (now 'pub(crate)', its selector given
+the view ID too) and streams through 'stream_prepared_rerenders'.
+*** the response
+Like stage-and-commit's: the answer, response-type
+'show-unshown-changes', carries '(readiness-summary ...)' or the
+refusal, and a rerender stream follows (the one view, or empty). It
+is refused unless the skgrepo restriction is 'all', when the view is
+not a buffer of the total diff view, or when the rerender fails.
+*** the summary line
+"N changes are not shown in this view; C-c r u shows them" in Emacs,
+"...; <localleader>ru shows them" in Neovim.
+*** tests adapted
+- Slice 0's write-protecting test now asserts the unshown count, as
+  its deviation note asked.
+- 'the_save_reports_the_readiness_summary' ('tests/pcsvf/readiness.rs'):
+  dropped roots now stay dropped after a save, counted unshown (3),
+  and the command appends them.
+- The two 'folder_member' tests reach c1's editability through the
+  command.
+*** the headline had no keyword
+The slice's headline carried no TODO; it now carries DONE.

@@ -584,8 +584,8 @@ a changeset marker) shows ✓ when all of its changes are.
 After every save of one of the total diff view's buffers, the
 minibuffer shows the readiness summary: "12 of 14 changed files are
 ready", or "COMMIT READY. All 14 of 14 changed files are ready.". It
-adds how many changes the buffer does not show (reopen the view to see
-them) and how many files changed in foreign skgrepos.
+adds how many changes the buffer does not show (C-c r u shows them)
+and how many files changed in foreign skgrepos.
 
 A gesture that would unmark more than one change (a recursive one, one
 on a folder of changes, or one on a changed node, which unmarks every
@@ -611,6 +611,14 @@ point (or of the move at point), then saves: it unmarks the move if
 it is ready, else marks it. With a prefix argument (C-u C-c r h), it
 does the same to every descendant whose home moved between the same
 two skgrepos. Works on write-protected headlines too.
+*** C-c r u : skg-tdv-show-unshown-changes
+Shows every change the buffer of the total diff view does not show.
+Each changed node with no editable occurrence becomes editable where
+the buffer first draws it, in content or else in a partner folder,
+with its change and its content drawn under it; when a change is
+under a root the buffer lacks, that root is appended at the end. The
+minibuffer then shows the readiness summary, as after a save. Refuses
+with "Save the buffer first." while the buffer has unsaved changes.
 *** C-c r c : skg-stage-and-commit
 Prompts once for a commit message, then stages every change and
 git-commits it, in every owned skgrepo that has changes, with that
@@ -711,12 +719,14 @@ the context needed to understand it. It opens up to four buffers,
 changes" and "diff-view: order-only changes", skipping any that would
 be empty. It refuses unless the skgrepo restriction is 'all'. A
 buffer keeps its roots until you close it, and saving it (or
-committing) keeps what you folded. Each save (of it or of another
-view) also draws what changed since it opened: a node that changed is
-made editable where the buffer first draws it, in content or else
-in a partner folder (a container folder, say), and when a change is
-under a root the buffer lacks, that root is appended at the end.
-Nothing the buffer draws editable is write-protected again. An
+committing) keeps what you folded. A save (of it or of another view)
+draws what it draws anew by what changed: a new member that changed,
+or leads to a change, is editable with its content, and any other new
+member is a write-protected leaf. But a save makes nothing editable
+that the buffer already draws, and appends no root: a change since
+the buffer opened that it draws nowhere editable is unshown, and the
+readiness summary counts it. C-c r u shows such changes. Nothing the
+buffer draws editable is write-protected again by the server. An
 editable-view request (C-c s d) works as in any view, except that
 only the expansion of a node outside U (the nodes the buffer unfolds
 anyway: those that changed and those leading to them) is charged to

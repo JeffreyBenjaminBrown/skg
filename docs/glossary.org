@@ -799,11 +799,14 @@ node's IDs. Marking it marks the leaf of the lost alias or ID.
 
 *** readiness summary
 
-The line a client shows after every save of a TDV buffer, and before
-a stage-and-commit that would leave changes behind: "12 of 14 changed
+The line a client shows after every save of a TDV buffer, after the
+"show unshown changes" command (C-c r u), and before a
+stage-and-commit that would leave changes behind: "12 of 14 changed
 files are ready", or "COMMIT READY. All 14 of 14 changed files are
 ready." It also counts the changed files of foreign skgrepos and the
-changes the buffer does not show.
+*unshown* changes: those owned by a node of which the buffer has no
+editable occurrence (nor a historical phantom in content position).
+A save never shows them; C-c r u does.
 
 *** readiness request, gesture
 

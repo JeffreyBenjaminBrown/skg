@@ -471,7 +471,7 @@ a changeset marker) shows ✓ when all of its changes are.
 After every save of one of the total diff view's buffers, a
 notification shows the readiness summary: "12 of 14 changed files are
 ready", or "COMMIT READY. All 14 of 14 changed files are ready.". It
-adds how many changes the buffer does not show (reopen the view to see
+adds how many changes the buffer does not show (<localleader>ru shows
 them) and how many files changed in foreign skgrepos.
 
 A gesture that would unmark more than one change (a recursive one, one
@@ -498,6 +498,15 @@ it is ready, else marks it. Works on write-protected headlines too.
 *** <localleader>rH : :SkgMarkGnodeSkgrepoChangesCommitReadyRecursive
 Also toggles, in the same direction, every descendant whose home
 moved between the same two skgrepos. (Emacs: C-u C-c r h.)
+*** <localleader>ru : :SkgTdvShowUnshownChanges
+Shows every change the buffer of the total diff view does not show.
+Each changed node with no editable occurrence becomes editable where
+the buffer first draws it, in content or else in a partner folder,
+with its change and its content drawn under it; when a change is
+under a root the buffer lacks, that root is appended at the end. A
+notification then shows the readiness summary, as after a save.
+Refuses with "Save the buffer first." while the buffer has unsaved
+changes. (Emacs: C-c r u.)
 *** <localleader>rc : :SkgStageAndCommit
 Prompts once for a commit message, then stages every change and
 git-commits it, in every owned skgrepo that has changes, with that
@@ -577,12 +586,15 @@ the context needed to understand it. It opens up to four buffers,
 "skg://diff-view: all changes", "...: merges", "...: skgrepo changes"
 and "...: order-only changes", skipping any that would be empty. It
 refuses unless the skgrepo restriction is 'all'. A buffer keeps its
-roots until you close it. Each save (of it or of another view) also
-draws what changed since it opened: a node that changed is made
-editable where the buffer first draws it, in content or else in a
-partner folder (a container folder, say), and when a change is under
-a root the buffer lacks, that root is appended at the end. Nothing
-the buffer draws editable is write-protected again. An editable-view
+roots until you close it. A save (of it or of another view) draws
+what it draws anew by what changed: a new member that changed, or
+leads to a change, is editable with its content, and any other new
+member is a write-protected leaf. But a save makes nothing editable
+that the buffer already draws, and appends no root: a change since
+the buffer opened that it draws nowhere editable is unshown, and the
+readiness summary counts it. <localleader>ru shows such changes.
+Nothing the buffer draws editable is write-protected again by the
+server. An editable-view
 request (<localleader>sd) works as in any view, except that only the
 expansion of a node outside U (the nodes the buffer unfolds anyway:
 those that changed and those leading to them) is charged to

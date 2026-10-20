@@ -210,7 +210,7 @@ describe('skg.save readiness summary', function ()
     vim.api.nvim_buf_delete(buf, { force = true })
     assert(ok, err)
     assert.are.same({
-      '12 of 14 changed files are ready, 3 changes are not shown in this view; reopen it, 2 files changed in foreign skgrepos',
+      '12 of 14 changed files are ready, 3 changes are not shown in this view; <localleader>ru shows them, 2 files changed in foreign skgrepos',
       'COMMIT READY. All 14 of 14 changed files are ready.' },
       vim.tbl_filter(function (message)
         return message:find('changed files', 1, true) ~= nil

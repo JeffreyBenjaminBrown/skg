@@ -194,15 +194,14 @@ So far there are these endpoints:
        phantom. The buffer is reconciled over the graph straddle, not
        rebuilt: its roots, and every headline it drew editable, stay as
        saved, and its change facts, change folders, markers and removed
-       members are redrawn. It follows its fresh PCSVF sets: each node
-       of U without an editable occurrence becomes editable at its
-       first content occurrence in level order, or if it has none at
-       its first partner folder occurrence, and each origin of D with
-       no occurrence in the buffer is appended as a root, at the end,
-       in ID order. An editable-view request cascades as in any
-       view, and only the expansion of a node outside U spends
-       =initial_node_limit=; nothing else in the buffer spends that
-       budget.
+       members are redrawn. What it draws anew it draws by its fresh
+       PCSVF sets: a new member in U is editable, with its content
+       list, and any other new member is a write-protected leaf. It
+       makes no occurrence editable and appends no root; the "show
+       unshown changes" request below does. An editable-view request
+       cascades as in any view, and only the expansion of a node
+       outside U spends =initial_node_limit=; nothing else in the
+       buffer spends that budget.
   - Before mutation, the server computes the update-relevant neighborhood of
     every prepared write/delete identity independently in the before and
     candidate graphs. Other registered views containing an affected unrestricted ID
@@ -396,6 +395,35 @@ So far there are these endpoints:
       pair cannot be built. The rerender stream is empty.
   - Logic: =server/serve/handlers/stage_and_commit.rs=,
     =server/git_ops/stage_and_commit.rs=.
+
+** Show unshown changes
+  - Request: =((request . "show unshown changes") (view-id . "VIEW_ID"))=,
+    where VIEW_ID names a buffer of the total diff view. The client
+    sends it only for a buffer with no unsaved changes, since the
+    server works on the viewforest it registered at the last rerender.
+  - Response: LP response-type "show-unshown-changes", then a rerender
+    stream (rerender-lock, rerender-view*, rerender-done). The
+    response is one of:
+    - =((readiness-summary ...) (errors ()) (warnings ()))=, the save
+      response's form, for the buffer as rerendered; the rerender
+      stream carries that buffer.
+    - =((errors ("REFUSAL")) (warnings ()))= when the skgrepo
+      restriction is not =all=, VIEW_ID is not a buffer of the total
+      diff view, or the rerender fails. The rerender stream is empty.
+  - Logic: the graph straddle is brought up to date, and the buffer's
+    fresh PCSVF sets computed. Each node of U without an editable
+    occurrence becomes editable (its body from the live graph) at its
+    first content occurrence in level order, or if it has none at its
+    first partner folder occurrence. The buffer is then rerendered as
+    after a save, which draws the content list of each node made
+    editable. Last, each origin of D that the buffer draws nowhere is
+    appended as a root, at the end, in ID order, and completed; R is
+    deduplicated with the buffer's roots pinned, so that a changed
+    cycle that already has a root gains no second one.
+    =server/serve/handlers/show_unshown_changes.rs=, =server/pcsvf.rs=
+    ('make_freshU_editable_at_first_occurrences',
+    'contentOrigins_missing_from_buffer'), and 'rerender_view' in
+    =server/update_buffer.rs=.
 
 ** Investigate unknown node
   - Request: =((request . "investigate unknown node") (id . "ID"))=.

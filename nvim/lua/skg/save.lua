@@ -437,7 +437,7 @@ function M.readiness_summary_message (summary)
       summary.ready, summary.changed)) end
   if summary.unshown > 0 then
     table.insert(parts, string.format(
-      ', %d changes are not shown in this view; reopen it',
+      ', %d changes are not shown in this view; <localleader>ru shows them',
       summary.unshown)) end
   if summary.foreign > 0 then
     table.insert(parts, string.format(

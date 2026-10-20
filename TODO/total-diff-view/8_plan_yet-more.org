@@ -412,7 +412,7 @@ back adopts them as V's members with their fold state kept; in
 still on the children under V; parking a content node under an
 editable parent no longer draws it twice (an ordinary-view test).
 
-** Slice 2: the view follows U only on command
+** DONE Slice 2: the view follows U only on command
 Remove from the TDV branch of 'rerender_view' the call of the
 editable-occurrences step and the appending and completion of roots;
 remove 'complete_appended_roots' from the save path (keep the
