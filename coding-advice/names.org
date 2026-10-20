@@ -29,6 +29,20 @@ The glossary ('docs/glossary.org') defines each kind.
   generation (the clients' per-buffer request counter), or ancestor
   generation (how far up the view an ancestor is: 1 = viewparent). A
   bare "generation" of a tree, counting down from its root, is fine.
+* Do not ask the reader to learn a distinction that does not exist outside skg
+Two ordinary words that are near-synonyms outside skg must not be
+given different technical meanings inside it. Outside skg, "unfold"
+and "expand" are roughly equivalent, and nothing makes one of them
+more pertinent to org folding than the other; so skg must not say
+"unfold" for the org fold state and "expand" for drawing more of the
+viewforest and expect a reader to keep them apart. When two things
+need distinct names, make the names different in a way the reader
+can see: a qualifier that says which thing is meant ("org-fold",
+"viewforest-unfold"; in a longer symbol, 'orgFold' and
+'viewforestUnfold'), not a pair of plain synonyms with a private
+convention attached. The same applies to "fresh" versus "current",
+"drawn" versus "shown", and any other pair whose difference a
+newcomer could not guess.
 * Please report any synonyms you encounter.
 There's no need to go specifically looking for them,
 but if you encounter them in the course of whatever you're doing,

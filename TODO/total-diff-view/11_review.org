@@ -1,0 +1,138 @@
+#+title: Review of the "still more fixes" run (2026-10-20)
+#+TODO: TODO ONGOING | DONE
+
+* Verdict
+The run finished [[file:10_plan_still-more.org][10_plan_still-more.org]]: two slices, four commits,
+fourteen minutes (00:41 to 00:55), both DONE. It did what the plan
+says and nothing it does not, and its audit of the iterator's callers
+found and removed two workarounds the old double yield had bred.
+Nothing here needs a decision; the two items under "Know" are facts
+you will meet, and "Housekeeping" has one suggestion about future
+plans.
+
+* What I checked myself
+- The suites after the run and a build check of every commit since the
+  last review: see "Results".
+- One goal function, two callers: 'partnerFolder_members_in_graph'
+  is defined in the folder reconciler's module, called there in place
+  of the lifted inline code, and called by the validator; the
+  validator's signature gained the config and the save's skgrepo
+  restriction.
+- 'ViewForest::nodes' iterates each root's descendants alone, with
+  the comment saying why; the problems entry is at the top of the
+  archive with its fix date.
+- The TDV case the plan asked for is tested: a write-protected root
+  whose subscriber folder shows a removed partner, marked '(diff
+  rel-)', saves unchanged, and the unit test that a removed member is
+  not counted fails if it is.
+** Results
+Rust 772 of 772 (up from 763), Emacs 366 of 366, Neovim 17 of 17. All
+seven commits since the last review compile ('cargo check
+--all-targets' at each, in a throwaway worktree), your three among
+them. The log is 'tests/results/review11/checks.txt'.
+
+* Know: what you will meet while dogfooding
+** A save now refuses an edited partner folder under a write-protected occurrence, in every view
+Subscribee, overridden, hidden, subscriber, overrider, hider,
+container, mentioner, acquired and acquired-by folders, compared as
+sets of node IDs against the graph under the save's skgrepo
+restriction, members marked removed excluded. The hidden-in and
+hidden-outside subscribee folders have no relation of their own and
+are not checked. The message names the folder ("changed
+subscriptions", "changed containers", and so on). A paragraph in
+'docs/api-and-formats.org' now lists what a save refuses under a
+write-protected occurrence, which no API sentence did before.
+** Members are compared by their resolved IDs
+The validator resolves a member's extra ID to its node's pid, as the
+shared function resolves the graph's, so the content view's
+subscribee folder, whose own reconciler draws stored IDs unresolved,
+agrees with the graph too.
+
+* Sound: placements and repairs, no action needed
+** The shared function takes the config, not the runtime
+The reconciler used the runtime only for its config, and the save has
+a graph and a config but no runtime. It returns None for a folder
+kind with no relation member role, which is how the validator skips
+the folders it does not check; the reconciler still reads the raw
+outbound members for their relRepos through the same private helper.
+** The audit found two workarounds and removed them
+The fork-spec builder kept a seen-set so that a forked root would not
+yield two specs, blaming detached arena copies; the second fork
+request for one node is already refused elsewhere, so the seen-set is
+gone. The write-protected-occurrence validator walked the roots'
+descendants itself to avoid reporting a root twice; it calls 'nodes'
+now. Every other caller gathers into a set or map, tests a predicate,
+or sets the same fact twice, so none changed behavior. The unit test
+is on a plain forest of integers, since the iterator is generic, and
+fails on the old code.
+
+* How to run a plan unattended
+This replaces 'jeff-resume-here.org', which is deleted. The runner is
+'bash/run-plan-slices.sh'; its header comment says what it takes.
+** Before starting
+Commit the plan and anything else you want tracked. Every slice's
+last commit edits the plan (its DONE keyword rides in that commit,
+never in a commit of its own). Tracked files with uncommitted changes
+do not stop the script: it takes them for the work a stopped slice
+left behind and hands them to that slice's agent to finish and
+commit, so commit or stash edits of your own first. The script's
+'PLAN' and 'PROGRESS_HEADLINE' variables and its default last slice
+name the plan it runs; change them for a new plan. Then, from a plain
+shell in the container (claude refuses to nest):
+#+begin_example
+nohup bash/run-plan-slices.sh > TODO/total-diff-view/run-logs/run.out 2>&1 &
+#+end_example
+** What runs
+One fresh Claude Code session per slice (Opus 5.5, effort high,
+permissions bypassed), in order. After each slice the script checks
+that the agent marked the slice's headline DONE in the plan, and it
+stops at the first slice that did not end that way. It writes under
+'run-logs/' in this directory: 'run.out' (its own output; the last
+line says how the run ended), 'sessions.log' (one line per slice
+start, with the session UUID, and one per finish), and per slice
+'slice-N.json' (the raw result), 'slice-N.txt' (the agent's final
+message) and 'slice-N.err' (its stderr).
+** When every slice is DONE
+Review the commits (each message names its plan and slice), run the
+three suites yourself, dogfood what the plan built, and read
+'progress.org' under the plan's headline, which holds the deviations
+the agents chose to record.
+** When a slice ended without DONE
+The agent stopped for a question; its report is in 'progress.org'
+under the plan's headline, and its last message in 'slice-N.txt'.
+Answer it in the session that asked, with its context intact:
+#+begin_example
+claude --resume UUID --dangerously-skip-permissions
+#+end_example
+with the UUID from 'sessions.log'; let it finish the slice and mark
+it DONE inside its last commit. Or rewrite the slice in the plan and
+rerun the script, which hands the modified files to a fresh agent as
+leftover work. Either way, rerunning the script skips every slice
+already DONE; give it a range ('bash/run-plan-slices.sh 2 3') to be
+explicit.
+** When claude exited nonzero
+Read 'slice-N.err'. Usual causes are a network or authentication
+failure, or a crash. Resume the same session as above; if it has no
+useful context, rerun the script, which starts that slice afresh.
+** What is meant to be committed
+The plan (its DONE keywords) and the agents' commits. 'progress.org'
+is committed by the agents with each slice. 'run-logs/' is
+bookkeeping and stays untracked.
+
+* Housekeeping
+** DONE The commit rule was followed
+Each slice's last commit carries the plan's DONE keyword, the
+'progress.org' entry and the docs it changed; every message names the
+plan document.
+** Slice headlines should start with TODO
+Both agents noted "the headline had no keyword" before marking it
+DONE, as the agents of the previous plan did. My plans write slice
+headlines bare; the runner only looks for DONE, so nothing broke, but
+the note is noise. Future plans will write '** TODO Slice N: ...'.
+** The run's own files
+'run-logs/' is untracked; 'tests/results/review11/' holds this
+review's suite outputs and per-commit log. Your commit titled
+"nothing" reflowed 'progress.org' and changed nothing else.
+** The branch
+'total-diff-view' now carries five finished plans. Nothing from the
+reviews is open. Dogfooding and a merge to 'main' are what remain.

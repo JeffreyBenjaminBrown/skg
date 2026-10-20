@@ -1,0 +1,1134 @@
+#+title: Diff view, housekeeping and structure after the post-mortem — execution plan
+#+TODO: TODO ONGOING | DONE
+
+* Assignment and authority
+Implement this plan. It is a complete, settled specification, and
+nothing here is open for discussion. Writing it has implemented
+nothing. It stands on its own: every term it uses is defined below or
+in 'docs/glossary.org', and the post-mortem that produced it
+([[file:12_total-review.org][12_total-review.org]], with the reports under
+[[file:12_1_postmortem-reports/][12_1_postmortem-reports/]]) is background that nobody needs to read;
+where the two differ, this document wins.
+
+Read [[file:../../coding-advice/ORIENTATION.org][the orientation]] and its code-change, architecture, testing and
+execution advice before starting. Preserve unrelated edits. Do not
+change branches or git configuration. Finish the agreed work and its
+verification without stopping for routine choices; stopping to ask is
+for the rare conditions that [[file:../../coding-advice/when-to-stop.org][when-to-stop.org]] describes, and this plan
+expects none. Record meaningful deviations, and any such question, in
+[[file:progress.org][progress.org]] beside this plan, under a top-level headline "Housekeeping
+and structure" with one subheadline per slice. This plan's text stays
+as it is, except the keyword of a slice's headline. Write any log or
+scratch file of your own under 'tests/results/', never under 'TODO/'.
+
+** Commits
+Commit granularly, one or a few commits per slice, each message naming
+the slice and this document ("Slice 4 of
+TODO/total-diff-view/13_plan.org: ..."). A slice's last code-modifying
+commit also carries the slice's documentation changes and the change
+of its headline here from TODO to DONE; neither stands as a commit of
+its own. So update the docs and the keyword before making that last
+commit, and if something is left over after it, amend that commit
+('git commit --amend'; the branch is not pushed) rather than adding
+one.
+
+** Scope
+Seventeen slices in two parts. Slices 0 to 9 are housekeeping: the
+renames the post-mortem settled, the diff view's own documentation,
+the glossary and user-doc corrections, the removal of copies, a few
+small reifications, the client helpers, the missing tests, startup
+warnings, and the stage-and-commit check for pre-staged files. Slices
+10 to 16 change structure and behavior: the diff view gets a module of
+its own, the rerender pipeline gets named options, the server tells
+the clients which leaves a headline names, the change leaves become
+the one source of "changed" (which also removes a full scan on every
+save), the three union drawings and the two encodings of a removed
+relationship become one each, the two child reconcilers obey one rule
+about the user's structure, and the skgrepo-changes buffer shows
+relRepo moves. The parts may be run as one run or as two
+('bash/run-plan-slices.sh 0 9', then '10 16'); the order of the slices
+is the order they must land in.
+
+* Words this plan uses
+The glossary ('docs/glossary.org') defines most of these; the rest are
+defined here, and slice 3 adds them to the glossary.
+- The diff view (until this plan, "the total diff view", "TDV") is the
+  view opened by C-c v d: up to four buffers, "all changes", "merges",
+  "skgrepo changes" and "order-only changes", each drawn over the
+  graph straddle. A buffer kind is which of the four a buffer is
+  ('TdvBuffer' today, 'DiffViewBufferKind' after slice 0).
+- The graph straddle ('GraphStraddle', 'server/graph_straddle/') holds
+  the before-graph (the owned skgrepos as committed at HEAD) and the
+  after-graph (the live graph) and compares them. A node's presence is
+  Both, OnlyBefore or OnlyAfter. A partner of a node in some role is
+  one entry of the union of the two graphs' lists, with its presence
+  and its relRepo in each graph ('Partner'); 'Partner::changed' is
+  true when the relationship exists in one graph only or its relRepo
+  differs.
+- C is the set of changed nodes; R, U and D are the sets of the pruned
+  change-spanning viewforest (PCSVF) built over C ('PcsvfSets' in
+  'server/pcsvf.rs'; the glossary entry "C, R, U, D"). C has two
+  halves ('ChangedPids'): nodes whose own files record a change, and
+  nodes whose set of containers, mentioners, subscribers, overriders
+  or hiders changed. The second half is found from the first: for each
+  recorder in the first half, every partner whose presence is not
+  Both. A relRepo move puts only the recorder in C.
+- A change-forest leaf ('ChangeLeaf' in 'server/change_forest.rs') is
+  one change a user can mark commit-ready. Its key ('LeafKey') is
+  either a node and an aspect of it ('NodeAspect': existence, text,
+  home skgrepo, an alias, an extra ID, a flag) or a relationship (a
+  relation, its recorder, its member) and an aspect of it
+  ('RelationshipAspect': existence, relRepo). The recorder of a leaf
+  is the node whose file records it. The type that holds every leaf,
+  grouped by recorder, is 'ChangeForest' today and 'ChangeLeaves'
+  after slice 0; "change-forest" stays the glossary's name for the
+  mental picture (changed nodes, their changed aspects, the leaves).
+- A mark is a user's declaration that a leaf is commit-ready, stored
+  with the leaf's fingerprint in the readiness store
+  ('server/readiness_store.rs', persisted to 'readiness-marks.json').
+  A readiness request ('(readyRequest OBJECT...)' or
+  '(unreadyRequest OBJECT...)' in a headline's metadata) is what a
+  readiness gesture (C-c r r, C-c r h and their recursive forms)
+  writes before saving; the save consumes it and marks or unmarks the
+  leaves the headline names. The readiness summary is the save's
+  count of ready and changed files.
+- A diff object (until this plan, "axis") is what a '(diff ...)' fact
+  or a readiness request names: the node itself, or the node's
+  relationship to its viewparent; the wire atoms are 'node' and
+  'rel', and a request may also say 'all', meaning every leaf of an
+  aggregate one level down. A diff aspect is what a leaf is about
+  (existence, text, home skgrepo, an alias, an extra ID, a flag,
+  relRepo). The two diff objects are exactly the node and its
+  relationship to its viewparent; a leaf about a relationship has the
+  relationship as its object, never the member.
+- An occurrence of a graphnode is a viewnode that stands for it (an
+  unrestricted vognode). A buffer has at most one editable occurrence
+  of a node; the others are write-protected, and the server draws no
+  content under a write-protected one. A member is a child viewnode
+  whose 'affectsParent' is true; a non-member has it false. Under a
+  write-protected occurrence every child is a non-member, and the
+  save refuses a member child there.
+- The editable map, the draw rule, the cascade and the node budget are
+  the rule that decides which occurrence of a node is editable
+  ('server/to_org/expand/editable.rs', 'server/to_org/util.rs',
+  'server/update_buffer/complete.rs'): the map records, as the BFS
+  visits occurrences, which node has claimed an editable occurrence;
+  the draw rule makes the first unclaimed occurrence editable and
+  write-protects later ones; an editable-view request cascades to the
+  node's content children within 'initial_node_limit'. In the diff
+  view a node of U is never charged against the budget.
+- A reconciler brings a parent's children in the viewforest into
+  agreement with what they should be. The older one,
+  'complete_relevant_children' ('server/update_buffer/util.rs',
+  'complete_managed_children' after slice 0), takes a predicate for
+  the children it is responsible for (its managed children: the
+  members of a content list or partner folder, the entries of an
+  alias, flags or ID folder), a goal list of keys and a constructor,
+  and keeps, creates, reorders or detaches those children. The diff
+  view's reconciler, 'reconcile_children_with_fresh_drawing'
+  ('server/to_org/render/fresh_drawing.rs'), takes a fresh drawing (a
+  scratch tree of what the parent's change viewnodes should be),
+  matches managed children to it by match key, copies the fresh facts
+  onto a kept child, descends where asked, and detaches the rest.
+- The per-visit step ('process_unrestrictedVognode_changes',
+  'server/to_org/render/changes.rs') runs at every editable node's
+  visit in a diff-view buffer, after the content reconciler, and draws
+  the node's change viewnodes: its old text, its home skgrepo move,
+  its "it acquired" folder, the alias, ID and flags folders that
+  changed, the partner folders whose membership changed, its
+  changeset markers, and its removed content members.
+- A historical phantom is a viewnode standing for a node that only the
+  before-graph has, drawn with HEAD's title and body. A removed member
+  is an unrestricted vognode drawn as a non-member with the fact
+  '(diff rel-)', because its relationship to its viewparent exists in
+  the before-graph only. A former member is any viewnode standing for
+  such a before-only relationship, phantoms included.
+- A viewnode is in content position when its parent is the buffer
+  root, an unrestricted vognode, or a historical phantom that is
+  itself in content position.
+- A member role tree (until this plan, a "continuation") is the role
+  tree drawn under a member of a changed partner folder in the diff
+  view, so that the user sees where the member sits. Its nodes are
+  role grafts: viewnodes the role-tree engine created with
+  'Birth::RoleGraft (role)'. A viewnode's birth is not written into
+  the buffer today, so after a save every viewnode is born
+  'Unremarkable'.
+- A home skgrepo move (until this plan, a "home move") is a change of
+  a node's home skgrepo since HEAD. A relRepo move is a change of a
+  relationship's relRepo since HEAD. The skgrepo-changes buffer shows
+  the nodes whose home skgrepo moved and, after slice 16, the
+  recorders of relationships whose relRepo moved.
+- A stranded relationship is one whose relRepo was at its default
+  before a home skgrepo move and is off its new default after it. The
+  save's strand analysis ('server/from_text/strands.rs') raises the
+  inbound strandeds of a privatizing move by itself and asks the user
+  about the strandeds of a publicizing move. "Strandeds" is the noun
+  for stranded relationships; "strand" stays a verb only.
+- The LCS placement puts a removed entry where it stood by the longest
+  common subsequence of the before-list and the after-list
+  ('compute_interleaved_diff' in 'server/types/list.rs').
+- A gitrepo is a git repository; a skgrepo is a directory of '.skg'
+  files inside one. Stage-and-commit (C-c r c) stages the changed
+  '.skg' files of every owned skgrepo and commits each gitrepo with
+  one message; it asks for a typed "yes" when not every change is
+  marked ready.
+- An org fold state is whether an org headline or its body is folded
+  in the client; the viewnode fields are 'folded' and 'body_folded'
+  today ('org_folded' and 'org_body_folded' after slice 0) and the
+  wire atoms '(folded)' and 'bodyFolded' stay as they are. To
+  viewforest-unfold a node is to draw its content (the sense of U).
+- The three suites are 'cargo nextest run', 'bash/emacs-tests.sh' and
+  'bash/nvim-tests.sh'. At the start of this plan they pass with 772,
+  366 and 17 tests.
+
+* Agreed behavior
+** Names
+The renames below are settled; each slice that applies them lists its
+part. The rule behind them: one word for one thing, and the word the
+glossary already uses. "Diff view" replaces "total diff view" and
+"TDV" everywhere, with 'diffView' camel-cased inside longer
+snake-cased symbols ('skg-diffView-open'), because "diff view" alone
+could read as a verb and a noun.
+*** Server identifiers (slice 0)
+- 'TdvBuffer' becomes 'DiffViewBufferKind'; 'TdvDrawing' becomes
+  'DiffViewSource'; the completion field 'tdv_drawing' becomes
+  'diffView_source'.
+- 'tdv_buffer_of_view' becomes 'diffView_buffer_kind_of_view';
+  'has_tdv_views' becomes 'has_diffView_views';
+  'set_tdv_facts_in_viewforest' becomes 'set_diffView_facts_in_viewforest';
+  'pcsvf_viewforest' becomes 'diffView_buffer_viewforest'.
+- 'nodes_drawn_in_viewforest' becomes 'nodes_editable_in_diffView'
+  (its doc says that a historical phantom in content position counts,
+  since its old content is editable nowhere and shown there);
+  'BufferReadinessSummary::unshown_changes' becomes
+  'changes_not_editable_here'.
+- 'ChangedPids { rightward, leftward }' becomes '{ out_changed,
+  in_changed }'; 'changed_rightward' becomes 'changed_out'.
+- 'leaves_by_owner' becomes 'leaves_by_recorder'; 'owners' becomes
+  'recorders'; 'ChangeForest' becomes 'ChangeLeaves' and
+  'server/change_forest.rs' becomes 'server/change_leaves.rs'.
+- 'writable_before_completion' becomes 'editable_before_completion';
+  'u_and_writable' becomes 'u_and_editable'.
+- The viewnode fields 'folded' and 'body_folded' become 'org_folded'
+  and 'org_body_folded', in 'Viewnode' and in the parser's
+  'ViewnodeMetadata'; the wire atoms do not change.
+- 'NodeAspect::Home' becomes 'NodeAspect::HomeSkgrepo';
+  'viewStats.home_move' becomes 'home_skgrepo_move'.
+- 'attach_continuations_under_straddle_folder_members' becomes
+  'attach_memberRoleTrees_under_straddle_folder_members'.
+- The local 'anchor' meaning the folder's viewparent
+  ('readiness_requests.rs', 'child_data.rs', 'partner_folder.rs')
+  becomes 'folder_viewparent'; the parameter 'anchor' of 'move_before'
+  and 'move_after' ('server/types/tree/moves.rs') becomes 'neighbor'
+  ("make 'node' the sibling immediately before 'neighbor'").
+- Bare 'origin' locals and comments in 'pcsvf.rs' become
+  'content_origin'; 'climb_containerward_to_cycle_via' becomes
+  'climb_containerward_to_content_origins_via' with its result named
+  '(path, content_origins)' and its doc stating the two shapes of the
+  result (one node with no container or several; or the members of a
+  rootlike cycle); its wrapper 'climb_containerward_to_cycle' in
+  'server/prominence.rs' becomes 'climb_containerward_to_content_origins'.
+- 'complete_relevant_children' and
+  'complete_relevant_children_in_viewforest' become
+  'complete_managed_children' and 'complete_managed_children_in_viewforest';
+  their parameter 'relevant' becomes 'managed', and "relevant" in
+  their doc comments and their callers' comments becomes "managed".
+- 'ReadinessAxis' becomes 'DiffObject'; 'axes' becomes 'objects' in
+  'ReadinessRequest', 'ChangeFacts', 'NamedLeaves' and every function
+  that passes them; "AXIS" and "AXES" in comments become "OBJECT" and
+  "OBJECTS". The wire atoms 'node', 'rel' and 'all' stay.
+- 'removed_by_set_difference' becomes 'interleaved_diff_without_reorders';
+  'editableViewRequest_applies' is deleted and its uses say
+  'had_editableViewRequest'.
+- 'owned_head_identity' stops saying "Cannot open the diff view"; its
+  error says "Cannot read HEAD of skgrepo X: ..." and each caller
+  prefixes what it was doing.
+- The strand names: 'server/from_text/strands.rs' becomes
+  'strandeds.rs'; 'StrandReview' and 'strand_review' become
+  'StrandedsReview' and 'strandeds_review'; 'StrandConfirmation'
+  becomes 'StrandedsConfirmation'; 'strand_confirmation' becomes
+  'strandeds_confirmation'; every other identifier or comment using
+  "strand" or "strands" as a noun says "stranded" or "strandeds";
+  'StrandedRelationship' and 'stranded_relationships' already fit;
+  the verb stays. The 'relevel' identifiers become 'reset_to_default'.
+- Stale words: "diff phantom" ('server/to_org/util.rs',
+  'server/types/misc.rs') becomes "historical phantom"; "graph pair"
+  ('server/graph_straddle/mod.rs') becomes "graph straddle";
+  "removedHere" ('to_org/util.rs') goes; "fresh sets", "fresh U",
+  "fresh D" in comments become "the sets recomputed after the save"
+  and in identifiers 'recomputed' ('recomputed_sets'); "fresh drawing"
+  and the 'fresh_*' names of 'fresh_drawing.rs' stay; a bare "leaf"
+  meaning a change-forest leaf says "change-forest leaf" where the
+  context does not already say so; "write-protected leaf" becomes
+  "write-protected member drawn without its content" (in a comment,
+  "unexpanded write-protected member"); "gnode" in comments becomes
+  "graphnode"; "continuation" becomes "member role tree"; a comment
+  that says "removed member" for a phantom says "former member".
+*** Wire, requests, commands, files and client identifiers (slice 1)
+- Requests: "total diff view" becomes "diff view"; "show unshown
+  changes" becomes "integrate unshown changes".
+- Wire atoms and fields: 'homeMove' becomes 'homeSkgrepoMove'; the
+  readiness summary's '(unshown K)' becomes '(notEditable K)'; the
+  terminal message 'strand-confirmation' becomes
+  'strandeds-confirmation'; the save keys '(strands-reviewed . "true")'
+  and '(relevel-strands ...)' become '(strandeds-reviewed . "true")'
+  and '(reset-strandeds ...)'.
+- Server files: 'server/serve/handlers/total_diff_view.rs' becomes
+  'diff_view.rs'; 'show_unshown_changes.rs' becomes
+  'integrate_unshown_changes.rs'; the 'rerender_view' flag
+  'show_unshown_changes' becomes 'integrate_unshown_changes'.
+- Emacs: 'elisp/skg-request-total-diff-view.el' becomes
+  'skg-request-diff-view.el'; 'skg-request-show-unshown-changes.el'
+  becomes 'skg-request-integrate-unshown-changes.el'; 'skg-diff-view'
+  becomes 'skg-diffView-open'; 'skg-tdv-show-unshown-changes' becomes
+  'skg-diffView-integrate-unshown-changes';
+  'skg-mark-gnode-skgrepo-changes-commitReady' and its recursive form
+  become 'skg-toggle-homeSkgrepo-move-commitReady' and
+  'skg-toggle-homeSkgrepo-move-commitReady-recursive'; every 'skg-tdv-'
+  or 'skg--tdv-' prefix becomes 'skg-diffView-' or 'skg--diffView-';
+  'skg--strands-from-response', 'skg--show-strands',
+  'skg--strand-description', 'skg--fork-strand-review' and
+  'skg--strand-confirmation-handler' say "strandeds"; 'axes' becomes
+  'objects' in identifiers ('skg--readiness-leaf-objects',
+  'skg--readiness-ask-object', ...). Keys do not change.
+- Neovim: 'nvim/lua/skg/total_diff_view.lua' becomes 'diff_view.lua';
+  'show_unshown_changes.lua' becomes 'integrate_unshown_changes.lua';
+  ':SkgDiffView' becomes ':SkgDiffViewOpen'; ':SkgTdvShowUnshownChanges'
+  becomes ':SkgDiffViewIntegrateUnshownChanges';
+  ':SkgMarkGnodeSkgrepoChangesCommitReady' and its 'Recursive' form
+  become ':SkgToggleHomeSkgrepoMoveCommitReady' and
+  ':SkgToggleHomeSkgrepoMoveCommitReadyRecursive'; the Lua strand and
+  axis identifiers follow the Emacs ones. Keys do not change.
+- The buffer names "diff-view: ..." and the messages buffer "*SKG Diff
+  View Messages*" stay.
+- The summary line becomes "N changes are not editable in this view;
+  C-c r u integrates them" in Emacs, with Neovim naming its binding
+  ('<localleader>ru'); the summary keeps counting files for ready and
+  changed and says "changes" for the third count.
+- Prose: "total diff view" and "TDV" become "diff view" in every
+  comment, docstring and doc; the glossary section "Terms of the total
+  diff view" becomes "Terms of the diff view".
+** Documentation
+*** The diff view's own doc, and no citations of plans (slice 2)
+A new 'docs/diff-view.org' describes the diff view as it behaves
+after this plan: the four buffers and what each shows; the straddle;
+C, R, U and D and the PCSVF; the drawing of a buffer (stub roots,
+completion over the straddle, the per-visit step, the fresh drawing
+and what it keeps, the LCS placement of removed members, the one
+encoding of a removed relationship); the editability deviations (a
+node of U is never charged; nothing is made editable or appended at a
+save; C-c r u integrates); the readiness machinery (leaves, marks,
+fingerprints, the store, the '(ready ...)' and '(leaves ...)' facts,
+the gestures, the summary); stage-and-commit and its two confirmations;
+and the strandeds. It is lifted from the agreed-behavior sections of
+plans 02, 04, 06, 08 and 10 as amended, and from this plan, written
+as a description, not as a history. Every comment under 'server/',
+'elisp/' and 'nvim/' that cites a path under 'TODO/' is changed to
+cite the glossary term, the API section or 'docs/diff-view.org' that
+covers it. The rule that decides which occurrence is editable gets a
+module comment at the top of 'server/to_org/expand/editable.rs' (the
+map, the draw rule, the cascade, the budget, in that order), cited
+from 'to_org/util.rs' and 'complete.rs'; the diff view's deviations
+from it are described in 'docs/diff-view.org' and cited from
+'complete.rs' (and, after slice 10, from the diff view module).
+*** Glossary and user docs (slice 3)
+The glossary gains or corrects: "gesture" (general: a client command
+that writes requests into headline metadata and saves, so that the
+server applies them; the relRepo, fork, flag and readiness gestures
+are kinds), "readiness gesture" (the renamed entry); "diff object" and
+"diff aspect" (as defined above, with the sentence that the object of
+a relationship leaf is the relationship, never the member, and that
+'all' is request-only shorthand); "more public anchor" (the renamed
+"placement, anchor"); "former member" and "removed member"; "content
+position"; "change viewnode"; "text preserver"; "home skgrepo move";
+"relRepo move"; "old text"; "stranded relationship" and "strandeds"
+(under the sticky rule); "changed folder"; "member role tree"; the
+moved-like-ancestor fact (Δ⌂=a); "changes not editable in the view"
+(replacing "unshown changes"); "a buffer shows a node's changes when
+it holds an editable occurrence of the node, or its historical phantom
+in content position"; the C entry says "out (the node's own file) or
+in (its recorders' files)" and the "rightward, leftward" lines go;
+"recorder" for the node whose file records a leaf, and "records" for
+"owns"; the change-forest entry says that the picture is the forest
+and the type 'ChangeLeaves' is every leaf keyed by recorder, aspect
+and relationship; 'WritableSet' becomes 'EditableSet'; "U, the nodes
+to viewforest-unfold"; the folder entry lists all twelve partner
+folder kinds with their policies, the two diff-view folders marked
+derived and save-inert, and says that the container and mentioner
+folders are the write-protected inbound folders of C-c l c and
+C-c l m ("eight PartnerFolders" and "SIX write-protected folders" go);
+the view-request entry lists 'writeProtectedView' and
+'writeProtectedSubtreeView' and names readiness requests as a third
+kind that the save consumes after its graph edits; the quoted herald
+label becomes "Reference to unknown node."; the glossary's "editable,
+write-protected" entry names C-c s w beside C-c s d and the partner
+folders among what a save refuses.
+
+The API doc ('docs/api-and-formats.org'): '(folder RELNAME)' lists
+'containers' and 'mentioners' and says each builds one write-protected
+folder pruned when empty; the metadata list gains 'containerFolder',
+'mentionerFolder', 'acquiredByFolder' and 'acquiredFolder'; the save
+section says when readiness requests are consumed (after the graph
+edits succeed, not when the save stops for a confirmation, in any
+buffer) and that a request naming no current change is dropped with
+its warning; "the graph pair cannot be built" says "graph straddle".
+
+The command docs ('docs/COMMANDS.org', 'docs/COMMANDS-nvim.org'): a
+paragraph under the editable/write-protected vocabulary saying that a
+write-protected occurrence saves nothing of its own, that an edit to
+it refuses the whole save (a changed title or home skgrepo; a
+differing alias, partner or flags folder; a member child) and that the
+way out is C-c s d on it or an edit at an editable occurrence; the
+sentence saying write-protected occurrences are "truncated" says
+instead that one has no content but may keep children that do not
+affect it; the C-c r intro says that a changed file counts as ready
+when every change it records is marked and that order-only files count
+as ready without marks; C-c v d names the other refusals (an owned
+skgrepo outside git or without a HEAD commit); C-c t r names the
+outcome "still present at HEAD" and the content form of a refusal; the
+Neovim doc gains the Emacs sentences it lacks under <localleader>vd
+and :SkgSetRepoRecursive; C-c s d says it does not save and C-c s w
+says the title is resynced from the graph.
+
+Elsewhere: 'docs/sharing-model.org' says the folder repair happens
+under an editable occurrence and that under a write-protected one the
+save is refused; 'docs/override.org' says "historical phantoms";
+'docs/nvim-client-deviations.org' replaces 'skg://diff-analysis' with
+'skg://unknown-node' and 'skg://diff-view: ...'; 'docs/heralds.org'
+says "alias, ID or flag entry" and adds that a deleted phantom's one
+object reads '∃+'/'∃-' and an unknown phantom's '~+'/'~-'; the API doc
+notes the config key spelling 'max_roleTree_depth' and that an
+unknown key is warned about (slice 8).
+** The copies and the small reifications (slices 4 and 5)
+- 'RelationRole::CONTENT' exists once, beside 'CONTAINER'; the three
+  local constants go.
+- One 'viewnode_of'; 'fresh_root' calls the older
+  'viewforest_root_viewnode'.
+- 'gained_and_lost' goes; its callers use the older
+  'setlike_vector_subtraction' ('server/util.rs') twice, keeping the
+  order the callers rely on (gained in the after-list's order, lost in
+  the before-list's).
+- One alias-text function replaces the closure written in
+  'union_walk.rs', 'changes.rs' and 'change_leaves.rs'.
+- 'Viewnode::write_protect' sets 'Editability::WriteProtected' and
+  removes the editable-view request; 'tag_content_members',
+  'adopt_fresh_facts', 'apply_goal_shapes' and
+  'mk_writeProtected_from_viewnode' call it.
+  'ensure_editableOccurrences_exist' keeps its direct write.
+- 'append_plain_stub_root' is the one-root body of
+  'stub_viewforest_from_root_skgids'; that loop and the diff view's
+  'append_stub_root' call it, the latter adding its historical phantom
+  root and its container folder.
+- The dead git paths go: 'GitSnapshotKind::Index',
+  'read_skgrepo_from_index', the Head-Index and Index-Worktree arms of
+  'changed_paths_for_skgrepo' and its "diff-report endpoints" wording;
+  'git_snapshot.rs' gets a module comment ("The before-graph of the
+  straddle: owned skgrepos read at HEAD, cached by HEAD identity") and
+  its two "diff report" comments go.
+- Handler boilerplate: 'SharedRuntime::lock_readiness_store' (the
+  poison-tolerant lock, written once); 'require_skgrepo_set_all (what,
+  restriction)' with one wording; one formatter for a response of
+  "readiness summary plus errors and warnings" beside
+  'BufferReadinessSummary', building a 'Sexp' once, used by the save,
+  the diff view, integrate-unshown-changes and stage-and-commit (no
+  response is built as a string and re-parsed); the store is cleared
+  through one 'ReadinessStore' method, not a direct 'marks.retain'.
+- 'Viewnode::editable_skgid () -> Option<&ID>' and
+  'editable_occurrences (&ViewForest) -> HashSet<ID>' replace the
+  three copies of that match.
+- 'ViewnodeKind::change_facts', 'change_facts_mut',
+  'readiness_request' and 'readiness_request_mut', defined once in
+  'server/types/viewnode.rs' over every kind that carries the pair
+  (the unrestricted vognode, the three phantoms, the properties that
+  carry it); the six hand-written accessors and the private
+  'vognode_skgid' go. A kind that lacks the pair returns None.
+- 'ChangedFile { skgrepo, pid }' replaces the bare '(SkgrepoName, ID)'
+  tuple in the change leaves and the readiness summary.
+- 'SkgrepoChange { old, new }' replaces every (old, new) skgrepo pair:
+  'NodeChanges.home', 'viewStats.home_skgrepo_move', the fields of
+  'HomeSkgrepoMove' and 'RelRepoMove', the parser's pairs; the save's
+  'SkgrepoMove' reuses it.
+- 'LeafKey::Relationship { relationship : RelationshipKey, aspect }',
+  so that 'strandeds.rs' and the change leaves share
+  'RelationshipKey'; 'RequestedReadiness { ready, named : NamedLeaves,
+  headline }', so that 'apply_readiness_requests' passes the inner
+  value.
+- 'MemberId { Resolved (ID), Unresolved (ID) }', returned by one graph
+  accessor for an outbound relation's members: the pid when the graph
+  resolves the listed ID, else the raw ID tagged unresolved. The four
+  sites that re-derive "pid, or the raw ID" (the content reconciler,
+  'partnerFolder_members_in_graph', 'partners_in_graph',
+  'content_list') call it; the drawing code reads the tag (an
+  unresolved member is drawn as an unknown phantom), the others take
+  the ID from either variant.
+- One function, 'skgid_a_folder_child_stands_for', answers "which ID
+  does this folder child stand for, over the union" for a live
+  member, a removed member, a historical phantom and an unknown
+  phantom, resolving an extra ID to its node's pid through the tagged
+  accessor; 'goal_matchable_skgid', 'live_member_skgid',
+  'straddle_member_skgid' and the reading inside
+  'partnerFolder_members_in_view' become calls to it, and 'match_key'
+  calls it for vognode children. The save check and the folder
+  reconciler then agree by construction.
+- 'CompletionContext::for_content_view', '::for_rerender' and
+  '::for_diffView' are the three constructors; the four literal
+  constructions and the guards that repeat the diff view's settings
+  go.
+- 'DrawnDiffViewBuffer { text, pids, viewforest }' is what the drawing
+  function returns and the handler holds as an 'Option' (None when the
+  buffer is empty); the enum 'TotalDiffViewBuffer' goes.
+- One 'in_content_position (NodeRef<Viewnode>) -> bool' with the
+  definition above, in 'server/types/tree/'; the walker in
+  'content_occurrences_in_level_order' uses it and then asks
+  separately whether the viewnode is a member, so it now passes
+  through a historical phantom; the check in
+  'process_historical_phantom_visit' uses it.
+** The clients (slice 6)
+- The readiness-summary formatter moves from 'skg-request-save.el' and
+  'save.lua' into 'skg-readiness.el' and 'readiness.lua'; the save,
+  stage-and-commit, integrate-unshown-changes and the gestures call it
+  there, and the three commands stop requiring the save module for it.
+- 'skg--send-streaming-request (label response-type request handler)'
+  and its Lua twin hold the prologue each streaming command repeats
+  (begin the stream, lock the buffers, register the rerender handlers
+  and the one-shot handler, reset, send); stage-and-commit,
+  integrate-unshown-changes and delete-references-to-absent-node use
+  it.
+- 'skg--response-errors-line' and its twin join a response's errors
+  once.
+- One unknown-node-ID-at-point helper per client, in its metadata
+  module; the Emacs copy in 'skg-request-investigate-unknown-node.el'
+  goes.
+- 'skg--readiness-do-children' is a loop over the older
+  'skg--immediate-viewchildren'; the Neovim walker is a loop over
+  'headlines_with_level_between'; the subtree walker stays.
+- The Neovim folder commands move from the 'c' group to an 'l' group
+  mirroring Emacs's C-c l: 'la' aliases, 'lo' overrides, 'lh'
+  hides-from-subs, 'ls' subscribes-to, 'lp' flags, 'lc' containers,
+  'lm' mentioners. No '<localleader>l' binding exists today, so nothing
+  else moves. 'docs/COMMANDS-nvim.org' follows.
+** Tests (slice 7)
+Six decided behaviors gain tests: fold state surviving a commit and a
+collateral rerender; the home skgrepo under a write-protected
+occurrence (a differing one is refused; the ID and flags folders under
+a write-protected occurrence are checked under a write-protected
+recorder); the partner-folder check with a member that is an unknown
+phantom (compared by raw ID) and with a member drawn by an extra ID;
+an adopted child that has to move into content order; the diff-view
+request's refusals for a skgrepo with no gitrepo and with no HEAD, and
+its acceptance of a merge commit at HEAD; a nonzero foreign count in
+the summary. The two bundles that run many tests inside one nextest
+test ('all_tests' in 'tests/editable_view_cascade_and_budget.rs' and
+in 'tests/new/buffer_to_viewnodes/validate_tree.rs') are split so that
+nextest names each behavior. The reader 'response_from' in
+'tests/pcsvf/request.rs', which does one read into a capped buffer, is
+replaced by a reader that drops the writer and calls
+'read_all_lp_messages'. The 'Fixture' of 'tests/pcsvf/common.rs'
+becomes the shared git fixture, extended for foreign skgrepos and the
+single-skgrepo layout, moved with 'save_cleanly' (returning the
+response), 'edit_line' and the reader into 'tests/shared/git_fixture.rs',
+declared once in 'tests/grouped_repos.rs' and imported by the modules
+that today include 'git_fixture_helpers.rs' four times; the three
+test-side copies of 'copy_dir_all' go in favor of the shared one, and
+the uncalled tantivy helpers in 'git_fixture_helpers.rs' go.
+** Startup warnings and the release profile (slice 8)
+'load_config' reports every top-level key of 'skgconfig.toml' that the
+config struct does not know, as a warning naming the key and, for
+'max_role_tree_depth', the new spelling. 'skg check-config' prints the
+warnings and still exits 0 for them ('bash/start-servers.sh' already
+runs it and shows its output). The server keeps its startup warnings
+and answers a new request, "server warnings", with them. Each client,
+once per connection, after the connection is up and before it requests
+any view, sends that request and, when the answer is non-empty, opens
+a buffer named like the save warnings ('*SKG Server Warnings*' in
+Emacs, 'skg://server-warnings' in Neovim) with the warnings; an empty
+answer opens nothing. 'bash/start-servers.sh' accepts 'SKG_RELEASE=1'
+in its environment and then builds and runs the release profile
+('cargo build --release', 'cargo watch -w server/ -x "run --release
+--bin skg -- ..."'), and the process patterns it and
+'bash/stop-servers.sh' kill match both forms of the command.
+** Stage-and-commit stops for pre-staged entries (slice 9)
+Before staging anything, the server checks the index of every owned
+gitrepo. If any gitrepo has entries staged already, the answer is a
+confirmation of a second kind, listing each such gitrepo and its
+staged paths, and nothing is staged or committed. The client shows the
+list and asks the high-friction question (the typed word "yes", as the
+not-all-ready confirmation already does); only a confirmed resend
+proceeds, and then the commit of that gitrepo includes what was staged
+before, as a git commit always records the whole index. The existing
+confirmation flow carries this with a second reason: the answer is
+'((needs-confirmation . t) (pre-staged ((GITREPO PATH...) ...)) ...)',
+and a resend with '(confirmed . t)' covers both reasons. Both COMMANDS
+files and the API section say so, and say that only '.skg' files are
+staged by the command itself.
+** The diff view's module (slice 10)
+'server/diff_view/' holds the diff view: 'pcsvf.rs',
+'change_leaves.rs', 'readiness_store.rs', 'readiness_requests.rs'
+(moved from 'serve/handlers/', with a module comment covering both of
+its halves: consuming requests at a save and setting the '(ready ...)'
+facts), 'changes.rs', 'change_viewnodes.rs' and 'fresh_drawing.rs'
+(moved from 'to_org/render/'), and 'partner_folders.rs' (the straddle
+half of 'update_buffer/reconcile/partner_folder.rs':
+'reconcile_partnerFolder_children_from_graph_straddle',
+'straddle_goal_item', 'attach_memberRoleTrees_under_straddle_folder_members'
+and their helpers). 'complete_viewforest_with_graph_straddle' and the
+two diff-view blocks of 'rerender_view' move there as
+'prepare_diffView_rerender' and 'finish_diffView_rerender', so that
+'rerender_view' makes two calls. 'diffView_buffer_kind_of_view' moves
+onto 'OpenViews' beside 'has_diffView_views'. The straddle's three
+per-buffer caches become one opaque field 'pcsvf_cache : PcsvfCache',
+a type defined in 'diff_view/pcsvf.rs' and keyed there by buffer kind;
+'GraphStraddle' neither names the buffers nor computes the sets, and
+the sets still persist with the straddle across requests. The ten
+places where 'visit_normal_node' and 'dispatch_node_update' test the
+diff-view switch are gathered behind two functions of the module, one
+called before a node expands and one after, so that 'complete.rs'
+reads the switch in two places; where a branch is a parameter of a
+generic call (substitution off, no default partner folders), the
+functions supply the value. The module comment points at
+'docs/diff-view.org'. 'server/graph_straddle/' stays where it is, with
+a module comment saying it is the graph layer's comparison of two
+graphs; 'server/git_ops/git_snapshot.rs' stays.
+** The rerender pipeline (slice 11)
+The shared "prepare, answer, stream" pipeline moves out of
+'serve/handlers/rerender_all_views.rs' into 'serve/rerender_stream.rs'.
+'rerender_view' and 'prepare_rerender_views_where' take a
+'RerenderOptions { create_partnerFolders, substitute_existing_content_overrides,
+diffView_buffer, integrate_unshown_changes }' whose fields are named at
+every call. The save path stops keeping its own copy of two steps: it
+writes the straddle back and computes the buffer readiness summary
+through the pipeline's functions, the summary through
+'buffer_readiness_summary_for (env, straddle, viewforest)' in the diff
+view module.
+** The server says which leaves a headline names (slice 12)
+When the server draws a headline that names change-forest leaves, it
+writes the fact '(leaves N OBJECT...)' beside '(ready ...)': N is the
+number of leaves a request naming every listed object would touch, and
+the OBJECTs are those a request on this headline may name ('node'
+and/or 'rel' for a vognode or phantom, each worth one leaf; 'all' for
+an aggregate, worth N; none for a headline that names exactly one
+leaf, which a bare request marks). The server's 'leaves_named_at' is
+the one rule; the fact is display-only, and the parser accepts and
+ignores it. Each client reads the fact: the objects it may request,
+whether each is ready (from '(ready ...)'), and N for the wide-unmark
+warning, which now fires when an unmark would touch more than one
+leaf, as the server counts. The clients' tables of headline kinds and
+their 'single' atom go, and so does the second implementation.
+** The change leaves are the one source of "changed" (slice 13)
+C is derived from the change leaves: the out-half is the recorders of
+leaves; the in-half is every member named by a relationship leaf whose
+relationship exists in one graph only and whose node exists in some
+graph. The per-visit step draws a node's markers and change folders
+from the leaves that mention it, grouped by aspect, instead of reading
+'NodeChanges' and partner presence a third time. A new aspect is then
+added in one place, the leaf keys, and C, the drawing and readiness
+follow. The leaf builder's scan over the union of the two graphs'
+nodes skips a node that is equal in both graphs, except a node that
+records a member whose ID resolves to a different pid in the two
+graphs (a nodeMerge since HEAD), which must still be compared; those
+nodes are found from the extra-ID differences. The full scan in
+'changed_pids' goes with it, so a save made while a diff-view buffer
+is open no longer pays for a comparison of every node.
+** One ordering and one encoding (slice 14)
+Every drawing of the before/after union places a removed entry by the
+LCS: the partner folders drawn over the straddle interleave their
+removed members where they stood, as content and the alias, ID and
+flags folders already do, instead of appending them. A removed
+relationship has one encoding everywhere: an unrestricted vognode
+drawn as a non-member with '(diff rel-)'. The write-protected-set
+folders and a historical phantom's old content draw their removed
+members that way too, and the validator's clause that discounts
+members marked removed goes, since a removed member is never a member.
+'is_unrestricted_removed_member' is the one reader.
+** The two reconcilers obey one rule about the user's structure (slice 15)
+A reconciler detaches only what it drew; what the user added survives.
+The older reconciler already obeys it (a stale member branch survives
+as a non-member; a stale restricted branch is deadened so that the
+orphan pass keeps what is under it; only a childless stale child is
+detached). The diff view's reconciler now obeys it too:
+- Within a descended subtree, an unrestricted vognode born
+  'Unremarkable' that is not a managed kind and carries no
+  '(diff ...)' fact is the user's and is left where it stands; a role
+  graft ('Birth::RoleGraft') is the server's. For that distinction to
+  survive a save, the server writes a role graft's birth into its
+  metadata as '(birth roleGraft ROLENAME)' (the form the parser's
+  grammar comment already names, inside the '(node ...)' sexp) and
+  the parser reads it back into 'Birth::RoleGraft'; the clients
+  rewrite metadata structurally and strip only what they know, so the
+  atom passes through a save unchanged.
+- The stale treatment of the older reconciler (survive as a plain
+  non-member occurrence with the diff facts cleared; deaden a property
+  or folder so the orphan pass keeps its children; detach what has
+  nothing of the user's under it) is lifted into one function that
+  both reconcilers call.
+- A comment at the per-visit step says which reconciler runs when and
+  that they share the rule.
+Concretely, after this slice: a note the user adds under a member of a
+changed folder, under a historical phantom, in the "it acquired"
+folder, or under a removed member survives every rerender, and
+survives the removed member going stale.
+** The skgrepo-changes buffer widens (slice 16)
+The skgrepo-changes buffer's C is the recorders of leaves whose aspect
+is the home skgrepo or relRepo: the nodes whose home skgrepo moved,
+plus the recorders of a relationship whose relRepo moved. A node in
+that C is drawn as in any buffer, with all of its changes. The buffer
+keeps its name and 'DiffViewBufferKind::SkgrepoChanges';
+'pcsvf_sets_for_home_moves' becomes 'pcsvf_sets_for_skgrepo_changes'.
+The readiness summary does not change: it is computed over every
+leaf of the change leaves whatever buffer is open, and a relRepo move
+is one leaf in its recorder's file, already counted today. Only the
+buffer's own count of changes not editable in it shrinks.
+
+* Pitfalls the slices must respect
+- The readiness marks file ('readiness-marks.json') serializes
+  'LeafKey' with serde, aspect names included. Renaming
+  'NodeAspect::Home' must keep the on-disk spelling
+  ('#[serde (rename = "Home")]' or an equivalent), since a marks file
+  is user data. 'ChangeForest' to 'ChangeLeaves' and 'ReadinessAxis'
+  to 'DiffObject' touch nothing serialized.
+- The wire atoms stay as they are unless a slice names them: '(folded)'
+  and 'bodyFolded', 'node', 'rel', 'all', '(diff ...)', '(ready ...)'.
+  Both clients write metadata back before every save by editing the
+  parsed sexp ('skg-edit-metadata-at-point' and the Lua twin), so an
+  atom they do not know survives a save; the only atoms they strip are
+  the fork request and a bare 'skg'. The server's parser ignores
+  'rels' and must gain an arm for 'birth' (slice 15); it has none
+  today although its grammar comment lists the atom.
+- The older reconciler reorders a parent's children: unmanaged first,
+  then managed in goal order. It runs at the content list before the
+  per-visit step, which places its own viewnodes afterwards
+  ('arrange_first_children', 'arrange_last_children', 'move_before').
+- The editable map is rebuilt at every rerender; only an editable
+  occurrence claims its ID, so editability can move. A request on a
+  node of U is not charged; a request on a node outside U is checked
+  against and charged to the budget.
+- 'GraphStraddle::partners' returns the after-graph's list in its
+  order with the before-only members appended; slice 14 changes the
+  folder goal's order, not this function's contract, unless it finds
+  that cleaner, in which case every caller is checked.
+- 'is_unrestricted_removed_member' requires 'Birth::Unremarkable';
+  slice 15's birth round trip does not change that, because a removed
+  member is never a role graft.
+- The straddle's per-buffer sets are cached in 'OnceLock's so that
+  they persist across requests; slice 10 keeps that persistence inside
+  'PcsvfCache'.
+- 'ViewForest::nodes' yields each viewnode once (fixed in plan 10);
+  'set_ready_facts_in_viewforest' still walks 'root().descendants()',
+  which is equivalent.
+- The leftward half of C counts presence changes only; a relRepo move
+  puts only the recorder in C (slice 13 preserves this; slice 16 reads
+  it).
+- 'changed_rightward' compares every node of both graphs; the change
+  leaves' builder relies on 'GraphnodeInRust' equality for order-only
+  detection. 'partners_in_graph' resolves members through each graph's
+  'pid_of', so two equal nodes can still differ in a partner after a
+  nodeMerge since HEAD (slice 13's caveat).
+- 'bash/start-servers.sh' and 'bash/stop-servers.sh' kill the server
+  by matching the exact cargo command line ("cargo run --bin skg --
+  CONFIG"); a release command line ("cargo run --release --bin skg
+  ...") must match too (slice 8).
+- The clients' tests use a fake network harness; the Neovim specs
+  share 'tests/nvim/helpers.lua'. 'bash/integration-tests.sh' has one
+  baseline failure ('import-md-and-org', recorded in
+  'TODO/problems.org').
+- Test files under 'tests/' are gathered into a few nextest targets
+  ('tests/grouped_repos.rs', 'grouped_views.rs', ...); a shared helper
+  file is '#[path]'-included, so declaring it twice in one target
+  duplicates its symbols (slice 7).
+- The Neovim fork-confirmation buffer ('save.lua') and the
+  search-and-link buffer ('search_make_link.lua') bind '<localleader>cc'
+  for themselves; slice 6 leaves those bindings alone and moves the
+  folder commands away from 'c'.
+- Stage-and-commit's confirmation today is '((needs-confirmation . t)
+  (readiness-summary ...) ...)', and the clients resend with
+  '(confirmed . t)'; slice 9 adds a reason, it does not add a second
+  flow.
+- The diff view's 'DiffViewSource' is handed to completion and read at
+  every visit; the per-visit step and the folder reconciler read the
+  straddle through it. Slices 10 and 13 keep one straddle per
+  rerender, never a second comparison.
+
+* Code map
+- Names and files (slices 0, 1): 'server/types/views_state.rs'
+  ('TdvBuffer', 'has_tdv_views'), 'server/pcsvf.rs' ('TdvDrawing',
+  'pcsvf_viewforest', 'nodes_drawn_in_viewforest',
+  'set_tdv_facts_in_viewforest', 'pcsvf_sets_for_home_moves',
+  'append_stub_root', 'ensure_editableOccurrences_exist'),
+  'server/change_forest.rs', 'server/graph_straddle/' ('types.rs':
+  'ChangedPids', 'NodeChanges', 'Partner'; 'union_walk.rs':
+  'changed_rightward', 'gained_and_lost', 'partners_in_graph'),
+  'server/update_buffer.rs' ('rerender_view', 'tdv_buffer_of_view',
+  'complete_viewforest_with_graph_straddle', 'writable_before_completion'),
+  'server/update_buffer/complete.rs' ('CompletionContext',
+  'visit_normal_node', 'dispatch_node_update', 'editableViewRequest_applies'),
+  'server/update_buffer/util.rs' ('complete_relevant_children'),
+  'server/update_buffer/reconcile/partner_folder.rs',
+  'server/to_org/render/{changes,change_viewnodes,fresh_drawing}.rs',
+  'server/to_org/complete/partner_folder/child_data.rs',
+  'server/serve/handlers/{total_diff_view,show_unshown_changes,readiness_requests,stage_and_commit,save_buffer,investigate_unknown_node,rerender_all_views}.rs',
+  'server/serve/protocol.rs' (request names, 'StrandConfirmation'),
+  'server/serve/parse_metadata_sexp.rs', 'server/org_to_text.rs',
+  'server/from_text/strands.rs', 'server/from_text/write_protected_edits.rs',
+  'server/git_ops/git_snapshot.rs' ('owned_head_identity'),
+  'server/prominence.rs' ('climb_containerward_to_cycle_via'),
+  'server/types/viewnode.rs' ('Editability', 'ReadinessAxis',
+  'ReadinessRequest', 'ChangeFacts', 'DiffPresence', 'Birth',
+  'Property', 'PartnerFolder', 'folded', 'body_folded'),
+  'server/types/tree/moves.rs'; 'elisp/skg-request-total-diff-view.el',
+  'elisp/skg-request-show-unshown-changes.el', 'elisp/skg-readiness.el',
+  'elisp/skg-request-save.el' (the summary line, the strand handler),
+  'elisp/skg-request-stage-and-commit.el', 'elisp/skg-keymaps-and-aliases.el',
+  'elisp/skg-metadata.el'; 'nvim/lua/skg/{total_diff_view,show_unshown_changes,readiness,save,stage_and_commit,keymaps,metadata}.lua';
+  'docs/glossary.org', 'docs/api-and-formats.org', 'docs/COMMANDS.org',
+  'docs/COMMANDS-nvim.org', 'docs/heralds.org'; the tests under
+  'tests/pcsvf/', 'tests/elisp/', 'tests/nvim/'.
+- Documentation (slices 2, 3): 'docs/diff-view.org' (new),
+  'docs/glossary.org', 'docs/api-and-formats.org', both COMMANDS files,
+  'docs/sharing-model.org', 'docs/override.org',
+  'docs/nvim-client-deviations.org', 'docs/heralds.org',
+  'server/to_org/expand/editable.rs', every file whose comments cite
+  'TODO/' (grep "TODO/" under 'server/', 'elisp/', 'nvim/'), the
+  thirteen stale comments listed in slice 2.
+- Copies and reifications (slices 4, 5): 'server/dbs/in_rust_graph/relation_accessors.rs'
+  ('RelationRole', 'outbound_pids_for_relation_gated', 'pid_of'),
+  'server/util.rs' ('setlike_vector_subtraction'), 'server/types/viewnode.rs'
+  ('mk_writeProtected_from_viewnode', 'viewforest_root_viewnode',
+  'Property::readiness_request'), 'server/to_org/util.rs'
+  ('stub_viewforest_from_root_skgids'), 'server/git_ops/git_snapshot{,_types}.rs',
+  'server/serve/handlers/readiness_requests.rs' ('change_facts_of_property',
+  'change_facts_mut', 'readiness_request_of', 'RequestedReadiness',
+  'NamedLeaves', 'leaves_named_at', 'set_ready_facts_in_viewforest'),
+  'server/types/env.rs' ('SharedRuntime', 'SkgEnv'),
+  'server/readiness_store.rs', 'server/change_forest.rs' ('LeafKey',
+  the '(SkgrepoName, ID)' sites, 'ReadinessSummary'),
+  'server/from_text/strands.rs' ('RelationshipKey'),
+  'server/update_buffer/reconcile/content.rs' (the content
+  reconciler's resolution), 'server/to_org/complete/partner_folder/child_data.rs'
+  ('goal_matchable_skgid', 'apply_goal_shapes', 'drawing_of_goal_item'),
+  'server/update_buffer/reconcile/partner_folder.rs'
+  ('partnerFolder_members_in_graph', 'live_member_skgid',
+  'straddle_member_skgid'), 'server/from_text/write_protected_edits.rs'
+  ('partnerFolder_members_in_view'), 'server/to_org/render/fresh_drawing.rs'
+  ('match_key'), 'server/to_org/render/changes.rs' ('content_list',
+  'process_historical_phantom_visit', 'tag_content_members'),
+  'server/pcsvf.rs' ('historical_phantom_in_content_position',
+  'content_occurrences_in_level_order'), 'server/serve/handlers/total_diff_view.rs'
+  ('TotalDiffViewBuffer').
+- Clients (slice 6): 'elisp/skg-readiness.el', 'elisp/skg-request-save.el',
+  'elisp/skg-request-stage-and-commit.el',
+  'elisp/skg-request-show-unshown-changes.el' (renamed by then),
+  'elisp/skg-request-delete-references-to-absent-node.el',
+  'elisp/skg-request-investigate-unknown-node.el', 'elisp/skg-metadata.el',
+  'elisp/skg-modify-graph.el' ('skg--immediate-viewchildren');
+  'nvim/lua/skg/{readiness,save,stage_and_commit,integrate_unshown_changes,delete_absent_references,investigate_unknown_node,metadata,modify_graph,keymaps}.lua';
+  'docs/COMMANDS-nvim.org'.
+- Tests (slice 7): 'tests/pcsvf/{common,request,folding,readiness,fresh_sets,write_protecting,other_buffers,buffer}.rs',
+  'tests/shared/git_fixture_helpers.rs', 'tests/grouped_repos.rs',
+  'tests/editable_view_cascade_and_budget.rs',
+  'tests/new/buffer_to_viewnodes/validate_tree.rs', 'tests/strands.rs',
+  'tests/graph_straddle.rs', 'tests/readiness_requests.rs',
+  'tests/tdv/roundtrip/view.rs', 'tests/investigate_unknown_node.rs'.
+- Startup (slice 8): 'server/dbs/filesystem/not_nodes.rs'
+  ('load_config'), 'server/types/misc.rs' ('SkgConfig'), 'server/main.rs'
+  ('check-config'), 'server/serve/protocol.rs' and 'server/serve.rs'
+  (the request dispatch), a new handler file, 'elisp/skg-client.el'
+  ('skg-tcp-connect-to-rust'), 'nvim/lua/skg/client.lua' ('connect'),
+  'bash/start-servers.sh', 'bash/stop-servers.sh', 'docs/setup.org',
+  'docs/api-and-formats.org'.
+- Stage-and-commit (slice 9): 'server/git_ops/stage_and_commit.rs'
+  ('stage_and_commit_owned_skgrepos', 'stage_skg_files'),
+  'server/serve/handlers/stage_and_commit.rs' ('StageAndCommitAnswer',
+  the confirmation answer), 'elisp/skg-request-stage-and-commit.el',
+  'nvim/lua/skg/stage_and_commit.lua', both COMMANDS files,
+  'docs/api-and-formats.org'.
+- Structure (slices 10, 11): everything the diff view owns (listed
+  under slice 10), 'server/graph_straddle/types.rs' (the caches,
+  'pcsvf_sets_of_buffer'), 'server/update_buffer.rs',
+  'server/update_buffer/complete.rs', 'server/serve/handlers/rerender_all_views.rs',
+  'server/serve/handlers/save_buffer.rs' ('readiness_summary_sexp',
+  'update_views_after_save').
+- Behavior (slices 12 to 16): 'readiness_requests.rs' ('leaves_named_at',
+  'set_ready_facts_in_viewforest'), 'parse_metadata_sexp.rs',
+  'org_to_text.rs', both clients' readiness modules;
+  'change_leaves.rs' (the builder), 'graph_straddle/union_walk.rs'
+  ('compute_changed_pids'), 'changes.rs' ('changed_partner_folders',
+  'fresh_front_change_viewnodes'); 'partner_folders.rs' (the straddle
+  goal), 'change_viewnodes.rs' ('mk_member_viewnode',
+  'append_historical_phantom_content'), 'child_data.rs'
+  ('straddle_goal_item' shapes, 'drawing_of_goal_item'),
+  'write_protected_edits.rs'; 'fresh_drawing.rs', 'update_buffer/util.rs'
+  (the stale treatment), 'to_org/expand/role_tree.rs', 'to_org/util.rs'
+  ('mark_orphans_under_dead_parents_false'); 'pcsvf.rs'
+  ('pcsvf_sets_for_home_moves'). The performance harness is
+  'tests/results/perf/run.sh' (one-time, not a workspace member).
+
+* Implementation sequence
+Each slice ends with the three suites passing, its docs updated, and
+its last commit made as the Commits section says. A rename slice must
+leave every suite passing with only the renamed identifiers changed in
+the tests.
+
+** TODO Slice 0: server-internal renames
+Apply every rename under "Server identifiers" above, including the
+file renames 'change_forest.rs' to 'change_leaves.rs' and
+'strands.rs' to 'strandeds.rs' ('git mv'), the comment rewordings, and
+the serde spelling for 'NodeAspect::HomeSkgrepo' (pitfalls). Update
+the doc comment of 'climb_containerward_to_content_origins_via' to
+state the two shapes of its result. Give 'nodes_editable_in_diffView'
+the doc sentence about historical phantoms. Add a unit test that a
+marks file written before the rename (a JSON fixture with the aspect
+spelled 'Home') still loads. Grep for every old name, under 'server/',
+'tests/' and 'docs/', before finishing; the only references left to an
+old name are in 'TODO/'.
+
+** TODO Slice 1: wire, requests, commands, files and client renames
+Apply every rename under "Wire, requests, commands, files and client
+identifiers" above, with 'git mv' for the files, in the server, both
+clients, their tests and the docs. Update the summary line in both
+clients and the glossary's "unshown changes" entry into "changes not
+editable in the view". Replace "total diff view" and "TDV" by "diff
+view" in every comment, docstring and doc, and retitle the glossary
+section. The API doc's request names, the metadata atoms it lists and
+the strand keys follow. Grep for 'tdv', 'TDV', 'total diff view',
+'homeMove', 'unshown', 'strand-', 'relevel' and 'gnode' under
+'server/', 'elisp/', 'nvim/', 'docs/' and 'tests/' before finishing;
+what remains is only what this plan keeps (the verb "strand"; "diff
+view" itself).
+
+** TODO Slice 2: the diff view's doc, the plan citations and the stale comments
+Write 'docs/diff-view.org' as "The diff view's own doc" above says,
+describing behavior as it will be after this plan where a later slice
+changes it (the LCS placement, the one encoding, the '(leaves ...)'
+fact, the pre-staged confirmation, the widened skgrepo-changes
+buffer), each such paragraph marked "(from slice N of 13_plan)" so
+that the slice that lands it removes the mark. Repoint every citation
+of 'TODO/' in comments under 'server/', 'elisp/' and 'nvim/' to the
+glossary term, the API section or the section of 'docs/diff-view.org'
+that covers it. Write the module comment of
+'server/to_org/expand/editable.rs' (the editable map, the draw rule,
+the cascade, the budget; and that the file also dispatches view
+requests) and cite it from 'to_org/util.rs' and 'complete.rs';
+describe the diff view's deviations in 'docs/diff-view.org' and cite
+that from 'complete.rs'. Make the doc comment of 'diffView_source'
+list every effect of the switch (the alignment before content
+reconciliation, substitution off, property folders skipped, deleted
+phantoms becoming historical, no hidden-in-subscribee folder, the
+budget rule, the per-visit step, the folder drawn from the straddle,
+the readiness facts, the ID folders reconciled by the step) and move
+the budget rule into a block comment above its test. Correct the
+thirteen stale comments: 'handlers/stage_and_commit.rs' ("a commit
+lapses every mark" goes; the code keeps every mark whose leaf still
+exists); 'changes.rs' 'is_front_change_viewnode' ("partner folders
+other than the derived 'it acquired' folder"); the 'diffView_source'
+doc (above); 'readiness_requests.rs' module comment (both halves);
+the citations of 02_plan's budget sentence (above); "graph pair" in
+'graph_straddle/mod.rs' and in 'docs/api-and-formats.org'; the three
+"diff report" comments in 'git_snapshot.rs'; 'ordered_repos' there
+becomes 'ordered_skgrepos'; the "Cannot open the diff view" wording
+(done in slice 0); 'editableViewRequest_applies' (done in slice 0);
+the 'Finalizable' doc in 'to_org/util.rs' (the cascade is
+implemented); 'render_initial_view' in 'update_buffer.rs' (no
+compound-override-chain warnings are produced); the budget doc in
+'complete.rs' (it counts vognode expansions). Module comments for
+files that lack one and that this slice touches ('update_buffer.rs',
+'graph_straddle/types.rs', 'rerender_all_views.rs',
+'investigate_unknown_node.rs'); 'git_ops/stage_and_commit.rs' uses
+'//!' for its module comment. 'coding-advice/ORIENTATION.org' links
+'docs/diff-view.org' where it lists the docs.
+
+** TODO Slice 3: glossary and user docs
+Make every change under "Glossary and user docs" above. Where a term
+is defined in this plan's vocabulary, the glossary entry says the same
+thing in the glossary's voice. Check each edited COMMANDS paragraph
+against the code it describes (the refusal messages, the summary
+words, the bindings) before writing it. No code changes in this slice
+except the quoted herald label if the glossary's wording is generated
+from code (it is not expected to be).
+
+** TODO Slice 4: the copies and the handler boilerplate
+Make the changes under "The copies and the small reifications" from
+'RelationRole::CONTENT' through 'ViewnodeKind::change_facts' and its
+siblings: the one constant, the one 'viewnode_of', 'gained_and_lost'
+replaced, the one alias-text function, 'Viewnode::write_protect', the
+one stub-root body, the dead git paths deleted with the module comment
+added, 'SharedRuntime::lock_readiness_store', 'require_skgrepo_set_all',
+the one response formatter beside 'BufferReadinessSummary', the one
+store-clearing method, 'Viewnode::editable_skgid' with
+'editable_occurrences', and the four accessors on 'ViewnodeKind' with
+the six hand-written ones deleted. Each replacement keeps behavior;
+the suites pass unchanged. Add unit tests for 'write_protect' (it
+removes the request and sets the editability, and leaves
+'affectsParent' and 'birth' alone), for 'editable_occurrences' over a
+small forest, and for the four accessors over every kind (a kind
+without the pair returns None).
+
+** TODO Slice 5: the small reifications
+Make the rest of that section: 'ChangedFile', 'SkgrepoChange',
+'LeafKey::Relationship' over 'RelationshipKey', 'RequestedReadiness'
+over 'NamedLeaves', the 'MemberId' accessor used by its four sites,
+'skgid_a_folder_child_stands_for' used by its four readers and by
+'match_key', the three 'CompletionContext' constructors,
+'DrawnDiffViewBuffer', and 'in_content_position'. Tests: a member
+drawn by an extra ID passes the write-protected-occurrence check when
+the graph lists the extra ID (the save check resolves as the
+reconciler does); a member that is an unknown phantom is compared by
+raw ID; the walker 'content_occurrences_in_level_order' now visits a
+member under a historical phantom in content position (a diff-view
+fixture whose historical phantom holds old content that is itself
+changed); a unit test that the three constructors produce the settings
+the old literals produced (compare field by field against the
+settings written in 'complete_viewforest_with_graph_straddle' and
+'render_initial_view' before you delete them).
+
+** TODO Slice 6: client helpers and the Neovim folder keys
+Make every change under "The clients" above, in both clients, keeping
+each client's tests green and adding one test per new helper
+('skg--send-streaming-request' sends the request after the prologue;
+'skg--response-errors-line' joins; the walker visits exactly the
+headlines one level below point) and, in the Neovim suite, a test that
+'<localleader>lc' opens the container folder and that '<localleader>cc'
+still approves in the fork-confirmation buffer. 'docs/COMMANDS-nvim.org'
+moves the seven folder commands to their new keys.
+
+** TODO Slice 7: tests
+Make every change under "Tests" above. Write the six missing tests
+first, each named for the behavior it asserts, in the 'tests/pcsvf/'
+file whose fixture fits (or a new file with its fixture's shape stated
+in its first comment, as 'fresh_sets.rs' does); the fold-across-commit
+test commits through the stage-and-commit handler and rerenders, then
+checks the fold atoms of the headlines that were folded. Then split
+the two bundles, replace the truncating reader, and consolidate the
+fixture as described; the suite count rises by the new tests and by
+the split, and no test is lost (compare the list of test names before
+and after, and record the counts in 'progress.org').
+
+** TODO Slice 8: startup warnings and the release profile
+Make the changes under "Startup warnings and the release profile"
+above. 'load_config' parses the file once more as a generic TOML table
+to find the top-level keys the struct lacks (or uses serde's
+'#[serde (flatten)]' catch-all; either way, no key is refused), and
+returns the warnings beside the config; 'check-config' prints them;
+the server stores them in its runtime and answers "server warnings"
+with '(warnings ("..." ...))'. Each client sends the request from its
+connect path, once, and opens the buffer only on a non-empty answer.
+Tests: a unit test that a config with 'max_role_tree_depth' yields a
+warning naming 'max_roleTree_depth' and still loads; a handler test
+for the request; one client test per client that a non-empty answer
+opens the buffer and an empty one does not. Docs: the request in
+'docs/api-and-formats.org'; the warning and 'SKG_RELEASE=1' in
+'docs/setup.org'; the key note in the API doc's config section.
+
+** TODO Slice 9: stage-and-commit stops for pre-staged entries
+Make the changes under "Stage-and-commit stops for pre-staged entries"
+above. The check reads each owned gitrepo's index before any staging
+and collects '(GITREPO PATH...)' for every gitrepo with staged
+entries; a non-empty list and no '(confirmed . t)' yields the
+confirmation answer with both the summary and the list; the clients
+show the list in their confirmation prompt and ask the typed "yes" as
+they do for the not-all-ready case; on "yes" they resend with
+'(confirmed . t)'. Tests: a server test with a pre-staged file in one
+gitrepo (confirmation; then, confirmed, a commit that includes the
+file); a client test per client that the prompt names the gitrepo.
+Docs: both COMMANDS files under C-c r c and the API's stage-and-commit
+section say that only '.skg' files are staged by the command, that a
+gitrepo with entries staged beforehand stops the command for a typed
+"yes", and that a confirmed commit includes them.
+
+** TODO Slice 10: the diff view's module
+Make the changes under "The diff view's module" above, with 'git mv'
+for the moved files, updating every 'use'. Move, do not rewrite: the
+suites pass unchanged after the moves, and the only new code is the
+two visit functions, 'prepare_diffView_rerender',
+'finish_diffView_rerender', 'PcsvfCache' and the module comments. Each
+moved file keeps its module comment, updated for its new home; the
+module's 'mod.rs' comment points at 'docs/diff-view.org' and lists the
+files. Remove the "(from slice N)" marks in 'docs/diff-view.org' that
+this slice makes true, if any.
+
+** TODO Slice 11: the rerender pipeline
+Make the changes under "The rerender pipeline" above. Every call of
+'rerender_view' and 'prepare_rerender_views_where' names its options;
+no positional bool remains among them. The save path's two copied
+steps go. Tests pass unchanged; add one unit test that
+'RerenderOptions' for the post-save case and for the repo-switch case
+carry the values the old calls passed.
+
+** TODO Slice 12: the server says which leaves a headline names
+Make the changes under "The server says which leaves a headline names"
+above: the fact written by 'set_ready_facts_in_viewforest' from
+'leaves_named_at'; the parser's acceptance; the API doc's metadata
+list gains '(leaves N OBJECT...)'; both clients read it and drop their
+kind tables and 'single'; the wide-unmark warning uses N. Tests: a
+server test that a content changeset marker over three content
+relationships carries '(leaves 3 all)', a vognode with both objects
+'(leaves 2 node rel)', an old-text headline '(leaves 1)'; a client
+test per client that the warning fires on a marker whose N is greater
+than one and not on a single-leaf headline; the existing gesture tests
+pass. The COMMANDS description of the wide-unmark warning says that
+the count is the server's.
+
+** TODO Slice 13: the change leaves are the one source of "changed"
+Make the changes under "The change leaves are the one source of
+"changed"" above. Order: first the leaf builder's prefilter with its
+nodeMerge caveat (keep the full comparison for nodes whose recorded
+members resolve differently, found from the extra-ID differences);
+then C derived from the leaves, with 'compute_changed_pids' becoming a
+projection and the full scan gone; then the per-visit step reading the
+leaves. The suites pass unchanged at each of the three steps (commit
+each). Tests: a unit test that C equals the set of recorders and the
+set of members of presence-changed relationship leaves, on the
+'tests/pcsvf/' fixtures; a test that a nodeMerge since HEAD still puts
+the acquirer's container in C. Run 'tests/results/perf/run.sh' before
+and after on the real data and record the 'changed_pids' numbers in
+'progress.org'.
+
+** TODO Slice 14: one ordering and one encoding
+Make the changes under "One ordering and one encoding" above. The
+folder goal over the straddle computes the interleaved order with
+'compute_interleaved_diff' as the alias, ID and flags folders do; a
+removed member goes where it stood. The write-protected-set folders'
+'Member' shape for a removed member and 'mk_member_viewnode' for a
+historical phantom's old content produce non-members with
+'(diff rel-)', and the validator's "minus those marked removed" clause
+goes. Tests: a container folder with a removed member between two kept
+ones draws it between them; a historical phantom's old content draws
+its members as non-members and a diff-view buffer showing them saves
+unchanged; the existing write-protected-occurrence tests pass with the
+clause gone. 'docs/diff-view.org' loses its "(from slice 14)" marks.
+
+** TODO Slice 15: the two reconcilers obey one rule about the user's structure
+Make the changes under "The two reconcilers obey one rule about the
+user's structure" above, in this order: the birth round trip (writer,
+parser arm, a unit test that a role graft's metadata parses back to
+'Birth::RoleGraft (role)'); the stale treatment lifted into one
+function in 'update_buffer/util.rs' and called by both reconcilers;
+the descent rule in 'reconcile_children_with_fresh_drawing' (the
+'managed' predicate of a descent excludes an Unremarkable-born
+unrestricted vognode with no diff fact that is not a managed kind);
+the comment at the per-visit step. Tests, each a diff-view fixture
+saved with the user's headline added and then rerendered: a note under
+a member of a changed container folder survives a rerender and the
+member's role tree is still redrawn around it; a note under a
+historical phantom survives; a note parked in the "it acquired" folder
+survives; a note under a removed member survives the member going
+stale (commit the removal through stage-and-commit, rerender, and
+find the note under a plain non-member occurrence). 'docs/diff-view.org'
+describes the rule and the birth atom.
+
+** TODO Slice 16: the skgrepo-changes buffer widens
+Make the changes under "The skgrepo-changes buffer widens" above,
+with the rename. Tests: a fixture with one relRepo-only move draws the
+recorder in the skgrepo-changes buffer with the relRepo-move viewnode
+under the member; a node whose only change is text is not there. The
+glossary's buffer description, both COMMANDS files and
+'docs/diff-view.org' say what the buffer shows and lose the "(from
+slice 16)" mark.
+
+* Verification and completion
+'cargo nextest run', 'bash/emacs-tests.sh' and 'bash/nvim-tests.sh'
+after every slice; 'bash/integration-tests.sh' after slices 9 and 16
+(the 'import-md-and-org' test fails at baseline, as 'TODO/problems.org'
+records). After slice 16, grep once more for every retired name and
+for citations of 'TODO/' under 'server/', 'elisp/' and 'nvim/', and
+for "(from slice" in 'docs/diff-view.org'; all three come back empty.
+Done when all seventeen slices are committed and every suite passes.

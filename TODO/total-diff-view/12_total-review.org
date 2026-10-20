@@ -1,0 +1,1617 @@
+#+title: Post-mortem of the total diff view effort (2026-10-20)
+#+TODO: TODO ONGOING | DONE
+
+* How this was made
+Five Opus 5.5 subagents each read the 104 commits between the merge
+base with 'main' (68ceef04) and HEAD, one question group each, and
+wrote a report with file:line evidence. The reports are in
+[[file:12_1_postmortem-reports/][12_1_postmortem-reports/]]: 'duplication.md', 'vocabulary.md' (vocabulary
+and reification), 'readability.md', 'userdocs.md' and 'churn.md' (the
+planning ledger). This document is my synthesis and judgment; where I
+cite a number or a line, it comes from a report, and the report has
+the rest. I read all five in full; you need not.
+
+* The verdict in short
+The core survived and is sound: the straddle, the change-forest, the
+readiness store, the strand analysis, stage-and-commit, fold
+preservation and the write-protect requests were each built once and
+kept. Of the 22,613 lines the effort added, about 1,610 (7%) were
+later rewritten for substance and 560 for renames; 21 of the 104
+commits were reversals. Most of the substantive reversals trace to
+three causes: a design the executing agent chose and you rejected
+(about 530 lines), a requirement you changed with new information
+(about 380), and a requirement the plan got wrong (about 280). Three
+wrong beliefs of mine about the existing code cost one stopped run
+and three rounds of the editability discussion.
+
+What the effort left behind that needs work is not behavior but
+shape: the TDV has no module of its own and sends readers to
+superseded plans; a handful of terms mean two things ("drawn",
+"leaf", "fresh", "origin") and one thing has five names (a home
+move); the same removed relationship is encoded two ways; and the
+glossary and API doc are stale in the places the effort added to
+without rewriting. All of that is a housekeeping plan, not a redesign.
+
+* DONE [jeff] Where I have merely marked my agreement,
+please change my headline from TODO to DONE,
+without otherwise replying to it (unless something novel comes up).
+That will signify to me that you received the message and will
+incorporate that into the plan.
+
+* 1. Does it implement the same thing in more than one way?
+Yes, in sixteen places the duplication report ranks; six matter.
+** DONE The ones that can disagree about what the user sees or saves
+*** A removed relationship is encoded two ways.
+Under content and
+editable-set folders it is a non-member marked 'rel-'; under
+write-protected-set folders and a historical phantom's old content
+it is a member marked 'rel-'. Three constructors draw these and
+the two readers each assume one encoding
+('is_unrestricted_removed_member', 'partnerFolder_members_in_view').
+A third reader written against either will misjudge the other. The
+report calls unifying costly; I would pick one encoding (the
+non-member, which the save already relies on) and make the
+write-protected-set case match, with the validator's "members
+marked removed are not counted" clause then deletable.
+**** jeff : agreed
+*** The before/after union is drawn three ways, with different
+orderings: content keeps a removed member at its old position, a
+removed folder member goes to the end, and the alias, ID and flags
+folders use their own signed union. Costly to unify; worth a
+glossary sentence that says the orderings differ and why.
+**** jeff : please elaborate on each.
+And amid that, please explain what a removed folder is.
+***** [Claude] the three drawings, and what a removed folder member is
+First the term: there is no "removed folder". A removed folder member
+is a member of a partner folder (a subscribee, a container, ...) whose
+relationship exists only in the before-graph: a subscription you
+dropped since HEAD, say. The diff view draws it in the folder so that
+you can see the removal, with the fact '(diff rel-)'.
+
+The three drawings of the before/after union:
+1. Content under an editable node. The content list of the after-graph
+   is reconciled first, as in any view. Then, for each member that
+   only the before-graph lists, the per-visit step computes where it
+   stood by the longest common subsequence of the two lists and
+   inserts it there as a non-member marked 'rel-'
+   ('reconcile_removed_content_members', 'phantom_insertion_plan'). A
+   removed member therefore keeps its old place.
+2. Partner folders. The folder's goal list over the straddle is the
+   after-graph's members in their order, with the before-only members
+   appended at the end ('GraphStraddle::partners'), each marked 'rel-';
+   under a write-protected-set folder they are drawn as members, under
+   an editable-set folder as non-members (the encoding split of the
+   item above). A removed member therefore goes last.
+3. The alias, ID and flags folders. Their entries are not nodes, so
+   the per-visit step computes a signed union over the LCS of the two
+   lists and draws a removed entry as its own kind ('RemovedAlias',
+   'RemovedID') at the LCS position.
+So content keeps the old position, folders push removals to the end,
+and property folders interleave by LCS. The old diff view interleaved
+folders by LCS too; the diff view dropped that. Either make folders
+interleave again (the LCS code exists in 'changes.rs') or state the
+difference in the glossary; I would do the former, since a removal
+shown in place is what the content drawing already taught the user.
+****** [jeff] : agreed
+But I only see two behaviors:
+(1) and (3) are both LCS, according to what you wrote.
+Anyway yes, make them all LCS.
+******* [Claude] two orderings, three constructions; all three become LCS
+You read it right: (1) and (3) both place a removal by the LCS, and
+only (2) appends; what differs between (1) and (3) is how the removed
+thing is drawn (a non-member vognode against a removed-entry kind).
+The plan item is: folders interleave by LCS too.
+*** Which headline names which readiness leaves is decided by the
+server and again by each client, and the clients' count for the
+wide-unmark warning undercounts: unmarking one content changeset
+marker clears every content-relationship mark of the node with no
+warning. The cheap fix is for the server to stamp each headline's
+leaf count (or axes) into the metadata and for the clients to read
+it; that also deletes two client re-derivations.
+**** jeff : I don't understand.
+Does the warning undercount, or does it happen "with no warning"?
+***** [Claude] the same fact twice: it undercounts, so the warning does not fire
+The warning fires when the client's count of leaves an unmark would
+touch exceeds one. The client counts one leaf per axis of the request
+it writes, so a request on a content changeset marker counts as one.
+The server, applying that request, clears the mark of every content
+relationship of the node, which may be many leaves. So the client
+counts one, the warning stays silent, and the save clears many: the
+undercount is why there is no warning.
+**** DONE jeff : agreed, the cheap fix please
+*** "Changed" is defined three times
+(membership of C, leaf ownership, the markers drawn),
+sharing one source today; a fourth aspect added
+to one and not the others would put a node in C with no leaf.
+**** [jeff] : Do you see a way to unify them?
+***** [Claude] yes: make the change-forest the one source, at moderate cost
+Today C is computed from the straddle ('changed_rightward' and the
+leftward set in 'union_walk.rs'), the leaves from the straddle again
+('ChangeForest::from_graph_straddle'), and the markers and change
+folders at a node's visit from the straddle a third time
+('changed_partner_folders', 'fresh_front_change_viewnodes'). The
+change-forest already contains everything the other two need: each
+leaf names its recorder, its aspect and, for a relationship, its
+member. So C can be "every node some leaf mentions, as recorder or
+member" (which covers the leftward nodes, whose leaves their
+recorders record), and the per-visit step can draw a node's markers
+and folders from the leaves that mention it, grouped by aspect. Then a
+new aspect is added in one place, the leaf keys, and C, the drawing
+and readiness follow. The cost is a rewrite of the two consumers to
+read leaves instead of 'NodeChanges' and partner presence, a day's
+agent work with the fixtures already there. I would do it, but after
+the housekeeping, as its own slice, since it is the one item in this
+review that changes a core computation rather than its names.
+****** DONE jeff : agreed
+** The ones that are maintenance burden
+*** Two child reconcilers run at the same TDV visit, the older
+'complete_relevant_children' and the new
+'reconcile_children_with_fresh_drawing'. The report rightly calls
+merging them unwise: their rules for stale children differ on
+purpose (keep the user's subtree as non-members versus drop the
+server's drawing). A comment at the visit saying so would do.
+**** jeff : please describe what each does in detail
+and in what context.
+***** ONGOING [Claude] the two reconcilers
+'complete_relevant_children' ('server/update_buffer/util.rs') is the
+older, generic one. It takes a parent, a predicate that says which of
+its children are "relevant" (for a content list, the members; for a
+folder, its members), a way to read each relevant child's key, a goal
+list of keys computed from the graph, and a constructor for a missing
+key. It partitions the children into relevant and irrelevant, detaches
+duplicates among the relevant, offers each stale relevant child (one
+whose key is not in the goal list) to a callback that may keep it as
+a non-member ("demote a branch rather than discard the user's
+subtree") or let it be detached, creates children for the keys that
+no child matches, and reorders: irrelevant children first, then the
+relevant ones in goal-list order. It returns a summary of what it
+created, kept as non-member, and detached, which the folder code
+turns into repair warnings. Context: it runs at every editable node's
+visit for the content list, and at every folder's visit, in every
+kind of view.
+
+'reconcile_children_with_fresh_drawing' ('server/to_org/render/fresh_drawing.rs')
+is the diff view's. It takes a parent, a scratch tree (the fresh
+drawing of what the parent's change viewnodes should be), a predicate
+for the children it manages (the change viewnodes: old text, markers,
+change folders, removed members, historical phantoms), and a
+predicate for which matched children to descend into. For each child
+of the fresh parent it finds the managed child with the same match
+key (kind, or kind plus node, or kind plus entry), copies the fresh
+facts onto it keeping its fold state, recurses where asked, and
+otherwise copies the fresh subtree in; every managed child that
+nothing matched is detached, never kept. It returns the kept and
+created children in the fresh drawing's order and leaves their
+placement among the other children to the caller. Context: it runs
+at every editable node's visit in a diff-view buffer, after the
+generic one has reconciled the content list, and at a historical
+phantom's visit.
+
+The two differ where it matters: the older one keeps a stale child
+as the user's own (a subtree the user built under a member that is
+no longer content), the newer one drops a stale child because every
+child it manages was drawn by the server and the fresh drawing is
+the truth. Merging them would force one rule on both. A comment at
+the visit, saying which runs when and why they differ, is the right
+fix.
+****** DONE jeff : It sounds like we should rename 'relevant child'
+to 'member', right?
+Isn't that the term used everywhere else for the same idea?
+******* [Claude] no: three of its five callers reconcile entries, not members
+'complete_relevant_children' serves the content list and the partner
+folders, whose relevant children are members, and also the alias,
+flags and ID folders ('aliasfolder.rs', 'flags_folder.rs',
+'id_folder.rs'), whose relevant children are alias, flag and ID
+entries. "Member" would misname those three. What the predicate
+selects, in every caller, is the children this reconciler is
+responsible for, which the diff view's reconciler already calls
+"managed". So the rename is 'complete_relevant_children' and
+'complete_relevant_children_in_viewforest' to
+'complete_managed_children' and
+'complete_managed_children_in_viewforest', the parameter 'relevant'
+to 'managed', and "relevant" to "managed" in their doc comments and
+in the callers' comments. Then both reconcilers use one word for one
+idea.
+******** DONE jeff : agreed
+****** DONE jeff : I'm not convinced the second should remain.
+The user can edit the TDV, so we can't say
+"every child it manages was drawn by the server", can we?
+If the user adds some structure to the TDV, it should stay.
+
+Is that the only meaningful difference?
+******* [Claude] you are right about what sits under them; three differences, and two rules to change
+The managed viewnodes themselves are the server's: old text, the
+markers, a home move, a change folder, a phantom and a removed
+member are kinds the user cannot type, and the save parses their
+metadata back, so a rerender finds them as the server drew them.
+What the user nests under them is the user's, and I left it out.
+The validator allows four such additions, and the diff view's
+reconciler loses each one today:
+- A non-member child the user adds under a member of a changed
+  folder (a write-protected member accepts non-member children,
+  which 'write_protected_edits.rs' calls the user's own). Dropped at
+  the next rerender, stale or not: the member's subtree is redrawn
+  as its member role tree at every visit, with every keyed viewnode
+  in it managed ('partner_folder.rs', near line 326).
+- A vognode the user adds under a historical phantom (allowed, as
+  the phantom's old content is). Dropped at the next rerender, for
+  the same reason ('changes.rs', near line 258).
+- A vognode the user parks in the "it acquired" folder. Dropped at
+  the next rerender: the descent from the front change viewnodes
+  manages every keyed child of a folder ('changes.rs', near line
+  114).
+- A non-member child under a removed member. Kept while the member
+  stays removed; dropped with the member when it goes stale, which
+  happens when a commit makes the removal part of HEAD or the
+  relationship returns ('changes.rs', near line 477).
+The validator refuses children under old text, markers and ID
+entries, and the alias and flags folders accept only entries, so
+nothing of the user's can sit there.
+
+The older reconciler loses none of these: it never looks below a
+parent's direct children, and a stale member branch survives as a
+non-member. So staleness is not the only difference. There are
+three:
+1. Staleness. The older keeps a stale member branch as a non-member
+   and deadens a stale restricted branch, so that the orphan pass
+   ('mark_orphans_under_dead_parents_false') keeps what is under
+   it. The newer detaches a stale managed viewnode with its subtree.
+2. Descent. The older touches a parent's direct children only. The
+   newer, where it descends, treats every keyed viewnode of the
+   subtree as its own.
+3. Facts. The newer copies the fresh facts (title, home, presence,
+   write-protection) onto a kept viewnode. The older leaves a kept
+   child's facts to that child's own visit.
+The third is right and stays. The first two should obey the rule the
+older one obeys: a reconciler detaches only what it drew, and what
+the user added survives. Concretely:
+- Descent: within a descended subtree, a vognode that is not a
+  managed kind and carries no '(diff ...)' fact is the user's and is
+  left where it stands. That settles the phantom's content and the
+  acquired folder.
+- Staleness: a stale managed viewnode with a child of the user's
+  under it gets the older reconciler's treatment, lifted into one
+  function both call: a vognode survives as a plain non-member
+  occurrence of its node, with its diff facts cleared; a property or
+  a folder is deadened, so that the orphan pass keeps its children;
+  a stale viewnode with nothing of the user's under it is detached,
+  as today.
+- The member role tree is the one place these rules cannot reach:
+  its unchanged nodes carry no diff fact, and the role a graft was
+  born with ('Birth::RoleGraft') is not written into the buffer, so
+  after a save the server cannot tell a graft from the user's note.
+  The proper fix writes the role into the metadata and parses it
+  back, which costs the serializer and the parser a field and asks
+  both clients to carry the atom through a save; the cheap one
+  redraws a member's role tree only when the member has none yet,
+  which leaves a role tree stale after later edits. I recommend the
+  proper one. Say which.
+So the second reconciler remains as a function, because its work
+differs (it matches a tree of drawings and copies their facts, where
+the older matches a list of keys and creates what is missing), but
+its two rules become the older one's, with a comment at the visit
+saying which runs when. Three tests: a note under a folder member,
+one under a historical phantom, and one under a removed member that
+then goes stale, each surviving a rerender. This is a behavior
+change and goes in the second run.
+******** DONE jeff : agreed
+*** DONE Five functions decide which folder children are members and under
+what ID; only the goal side was unified in plan 10. The save check
+and the reconciler are the pair that must agree, and that pair is
+cheap to unify.
+**** jeff : what do you mean
+by 'goal side', 'save check' and 'the reconciler'?
+And what are the five functions?
+***** [Claude] the words, and the five functions
+A partner folder is reconciled by comparing two lists: what the folder
+should hold (the goal side, computed from the graph: plan 10 made that
+one function, 'partnerFolder_members_in_graph') and what the folder
+does hold in the buffer (the view side: which of its children count as
+members, and under which ID each one counts). "The reconciler" is
+'reconcile_partnerFolder_children', which draws a folder at its visit;
+"the save check" is 'errors_for_writeProtected_occurrences', which
+refuses a save when a folder under a write-protected occurrence
+differs from the graph. Both read the view side, and each has its own
+way of doing so. The five functions that read it:
+- 'goal_matchable_skgid' ('child_data.rs'): the ID a folder child can
+  be matched by: a member, an unknown phantom, a historical phantom or
+  a removed member.
+- 'live_member_skgid' ('partner_folder.rs'): the ID a member of a
+  live-graph folder stands for (members only).
+- 'straddle_member_skgid' ('partner_folder.rs'): the same for a folder
+  drawn over the straddle (a live member, a removed one, or a
+  historical phantom).
+- 'partnerFolder_members_in_view' ('write_protected_edits.rs'): the
+  save check's reading: members by pid (an unresolved ID as it is),
+  minus those marked removed, plus unknown phantoms by raw ID.
+- 'match_key' ('fresh_drawing.rs'): the diff view's identity of any
+  change viewnode, including folder members.
+Only the save check resolves an extra ID to its node's pid; the
+reconciler matches the raw ID. That is the pair that must agree, and
+one function for "the ID a folder child stands for" would serve all
+five.
+****** jeff : agreed
+And it should be robust to extra-id indirection.
+******* [Claude] it will be: the one function resolves through the tagged accessor
+The one function for "the ID a folder child stands for" reads the
+child's ID through the tagged accessor of the next item, so an extra
+ID resolves to its node's pid when the graph knows it and stays raw,
+tagged unresolved, when it does not; the save check and the
+reconciler then agree by construction. Section 10 already lists the
+missing test, a member drawn by an extra ID; it goes in with the
+function.
+*** DONE Four places resolve "pid, or the raw ID if unresolved" because the
+existing accessor drops unresolved IDs. One accessor would serve
+all four.
+**** jeff : yes please. Also
+would it be helpful if that accessor returned a tagged union,
+indicating whether it was found?
+***** [Claude] yes, a tagged result is better
+'enum MemberId { Resolved (ID), Unresolved (ID) }' (or 'Result<ID,
+ID>'), returned by one accessor on the graph. The drawing code needs
+the tag, since an unresolved member is drawn as an unknown phantom;
+the content reconciler and the folder goal need only the ID and take
+it from either variant. Today each of the four sites re-derives "pid,
+or the raw ID" and the tag is lost.
+*** DONE The TDV's completion settings are written in three places, plus a
+  fourth older one; one constructor per mode would do.
+**** jeff : what's a mode? completion settings?
+***** [Claude] the words
+View completion runs with a bundle of settings, 'CompletionContext':
+the skgrepo restriction, the node budget, whether to create the
+default partner folders for a node first shown editable, whether to
+substitute overrides, where warnings go, and whether a diff view is
+being drawn. By "mode" I meant the three occasions completion runs:
+drawing a fresh content view, rerendering a saved or collateral view,
+and drawing or rerendering a diff-view buffer. Each occasion wants
+its own values (a diff view: no restriction, no default folders, no
+substitution), and those values are written out in three places for
+the diff view ('complete_viewforest_with_graph_straddle', the guards
+in 'rerender_view', the guards in 'complete.rs') and once more for
+the fresh content view ('render_initial_view'). The fix is one
+constructor per occasion ('CompletionContext::for_content_view',
+'::for_rerender', '::for_diffView'), so that each combination of
+settings is written once and named.
+****** DONE jeff : agreed
+*** DONE Handler boilerplate: the readiness-store lock six times, the
+"requires the skgrepo-set all" refusal four times with drifting
+wording, responses built both as strings and as sexps re-parsed
+from strings.
+**** jeff : yes, please unify each kind
+** DONE The copies
+The 'CONTENT' role constant three times, 'viewnode_of' twice, a
+quadratic 'gained_and_lost' beside the older 'setlike_vector_subtraction',
+the alias-text closure three times, and in the tests four near-copies
+of the fixture builder, three of 'save_cleanly', a fifth 'copy_dir_all'
+and four readers of the response stream, one of which can truncate.
+All cheap.
+*** jeff : yes please, dedup
+* DONE 2. Does it reimplement what already existed?
+In four places, two of them worth fixing.
+** Git state for a node missing from the live graph is read two ways:
+  the older "titles by ids" fallback reads per stage through
+  'diff.rs', the TDV reads the HEAD snapshot. The old reader uses a
+  default skgrepo, skips the stem check and swallows parse errors, so
+  a deleted node's title can differ between a TDV buffer and a titles
+  reply. 'git_snapshot.rs' also carries an index reader that nothing
+  reaches. Delete the dead path now; unify the fallback when it next
+  misbehaves.
+*** [Jeff] yes please
+** Occurrences are made editable and write-protected by direct writes in four places,
+bypassing the older draw rule and 'mk_writeProtected_from_viewnode'.
+The first ('ensure_editableOccurrences_exist')
+is deliberate, since the request path spends budget and cascades;
+the other three should go through the existing constructor.
+*** DONE [Jeff] please elaborate each case
+**** [Claude] the four sites, and the one small helper that would serve three of them
+The older constructor these bypass, 'mk_writeProtected_from_viewnode',
+builds a write-protected viewnode and also sets its 'affectsParent'
+and 'birth', which is right at creation and wrong at sites 2 to 4,
+where the member must keep its membership. So the remedy is not to
+call the constructor but to give 'Viewnode' one method,
+'write_protect', that sets the editability and removes the
+editable-view request, used by sites 2 to 4 and by the constructor
+itself. Two lines, three copies today; no present danger.
+***** 'ensure_editableOccurrences_exist' ('server/pcsvf.rs') sets
+  'Editability::Editable { body }' directly on the occurrence it
+  chooses. Deliberate: the older path is an editable-view request
+  that the draw rule consumes, which charges the node budget and
+  cascades to the children, neither of which the diff view wants
+  here. It stays as it is.
+****** DONE jeff : where is Editability defined?
+Please provide a relative link that will work from here in emacs.
+******* TODO [Claude] here
+[[file:../../server/types/viewnode.rs::293][server/types/viewnode.rs, line 293]]: 'pub enum Editability',
+with the variants 'Editable { body, edit_request }' and
+'WriteProtected'.
+***** 'tag_content_members' ('server/to_org/render/changes.rs', near
+  line 418) sets 'Editability::WriteProtected' on a content member
+  outside U that was not editable when completion began.
+***** 'adopt_fresh_facts' ('server/to_org/render/fresh_drawing.rs', near
+  line 148) copies write-protection from the freshly drawn viewnode
+  to the existing one it matched, and removes the editable-view
+  request.
+***** 'apply_goal_shapes' ('server/to_org/complete/partner_folder/child_data.rs',
+near line 301) write-protects a removed folder member and makes it
+a non-member.
+*** DONE [jeff] agreed
+** 'stub_viewforest_of_roots' parallels the older
+'stub_viewforest_from_root_skgids', adding phantom roots and
+container folders; and the clients' new headline walkers parallel
+older ones in the modify-graph modules.
+*** [Jeff] Is it straightforward how to dedup this?
+**** [Claude] yes, both
+The stub builders: 'stub_viewforest_from_root_skgids' (the older one,
+'server/to_org/util.rs') loops over the roots calling
+'build_node_branch_minus_content'. The diff view's 'append_stub_root'
+('server/pcsvf.rs') makes the same call and adds two things: a
+historical phantom root when the after-graph lacks the node, and a
+folded container folder when the root has several containers. Lift
+the one-root body of the older function into 'append_plain_stub_root',
+have the older loop call it, and have 'append_stub_root' call it and
+then add its two things.
+
+The client walkers: 'skg--readiness-do-children' (new) steps through
+the headlines one level below point and calls a function on each
+one's metadata; 'skg--immediate-viewchildren' (older,
+'skg-modify-graph.el') returns the positions of exactly those
+headlines. Rewrite the former as a loop over the latter's positions.
+The Neovim pair is the same shape ('readiness.lua' walkers against
+'modify_graph.lua''s 'headlines_with_level_between'). The subtree
+walker 'skg--readiness-walk-subtree' has no older twin and stays.
+***** jeff : yes please
+** The retired code was retired, not left beside its replacement: the
+  old diff view, the diff report, stage moves and the client git code
+  are gone, and the role-tree engines were parametrized over the
+  straddle instead of copied. That is the part that went right.
+* 3. Vocabulary: more, less, and confusible
+The effort introduced about forty terms. Most are sound and
+consistent: straddle, before-graph and after-graph, C, R and D,
+changeset marker, mark and fingerprint, historical phantom, the
+removed alias and ID, the readiness summary. The problems are of
+three kinds.
+** DONE [Jeff]
+Herein I have made a lot of requests but haven't entirely spelled them out.
+Please fill in the details I've left out:
+exactly what would get renamed to what.
+** Terms that mean two things
+*** DONE "drawn", "shown", "unshown": 'nodes_drawn_in_viewforest' returns
+  the nodes with an editable occurrence, so a changed node visibly on
+  screen but write-protected counts as "unshown". The identifier
+  should say what it means ('nodes_showing_changes'), the glossary
+  should define "shows a change", and the summary should count in one
+  unit (it counts files for ready and changed, leaves for unshown).
+**** DONE [Jeff] Let's say "editable in (a/the) the diff view"
+Am I correct that now the TDV is the only DV, so we can just say diff view?
+If so, let's retire TDV for "diff view" (or diffView in code,
+camel-cased within longer snake-cased symbols,
+because "diff view" could read like "(diff : verb) (view : noun)").
+***** TODO [Claude] yes: the diff view is the only diff view now, and the renames are in the table above
+The old git diff view was retired in plan 02 and nothing else is
+called a diff view, so "diff view" is unambiguous. The table above
+lists every "TDV" and "total diff view" that changes, with 'diffView'
+camel-cased inside longer symbols as you asked, and the "editable in
+the diff view" phrasing for the count and the function.
+**** DONE [Claude] the renames that retire "total diff view"
+***** Prose and docs: "total diff view (TDV)" becomes "diff view"; the
+  glossary section "Terms of the total diff view" becomes "Terms of
+  the diff view".
+***** 'tdv_buffer_of_view' becomes 'diffView_buffer_kind_of_view';
+  'has_tdv_views' becomes 'has_diffView_views';
+  'set_tdv_facts_in_viewforest' becomes 'set_diffView_facts_in_viewforest';
+  'pcsvf_viewforest' becomes 'diffView_buffer_viewforest' (it draws
+  the order-only buffer too, which draws no PCSVF).
+***** Files: 'server/serve/handlers/total_diff_view.rs' becomes
+  'diff_view.rs'; the module the readability item asks for is
+  'server/diff_view/'; 'elisp/skg-request-total-diff-view.el' becomes
+  'skg-request-diff-view.el'; 'nvim/lua/skg/total_diff_view.lua'
+  becomes 'diff_view.lua'.
+***** Wire: the request "total diff view" becomes "diff view" (both
+  clients, 'server/serve/protocol.rs').
+**** DONE [Claude] the renames for "editable in the diff view"
+***** 'nodes_drawn_in_viewforest' becomes 'nodes_editable_in_diffView'
+  (its doc says that a historical phantom in content position counts,
+  since its old content is editable nowhere and shown there).
+***** 'BufferReadinessSummary::unshown_changes' becomes
+  'changes_not_editable_here'; the wire field '(unshown K)' becomes
+  '(notEditable K)'; the summary line becomes "N changes are not
+  editable in this view; C-c r u integrates them" (Neovim names its
+  binding); the glossary's "unshown changes" entry is rewritten under
+  "changes not editable in the view". The summary keeps counting
+  files for ready and changed, since files are what a commit takes,
+  and says "changes" for the third count.
+*** DONE "leaf": a change-forest leaf, a "write-protected leaf" (a member
+  drawn without its content), and a property leaf in the heralds doc.
+  Reserve it for the change-forest.
+**** DONE [Jeff] Better to spell it out.
+Just say change-forest leaf, etc.
+**** DONE [Claude] the renames
+***** Prose and comments: a bare "leaf" for a change-forest leaf becomes
+  "change-forest leaf"; "write-protected leaf" becomes
+  "write-protected member drawn without its content" (in a comment,
+  "unexpanded write-protected member"); in 'docs/heralds.org', "alias,
+  ID or flag leaf" becomes "alias, ID or flag entry". The type
+  'ChangeLeaf' stays.
+*** DONE "fresh": a fresh drawing (a scratch tree), the fresh sets (over the
+  current straddle), and the older "fresh nodes". Keep it for the
+  drawing; say "current sets".
+**** DONE [Jeff] Nothing should hinge on the fresh/current distinction.
+Just use a whole phrase that can't be misunderstood:
+fresh view, new changes, etc.
+**** DONE [Claude] the renames
+***** "Fresh sets", "fresh U", "fresh D" in prose, comments and docs
+  become "the sets recomputed after the save", "U as recomputed after
+  the save"; in identifiers, 'recomputed' ('recomputedSets').
+***** "Fresh drawing" stays, as a complete phrase (a drawing made anew
+  from the graph); so do 'fresh_drawing.rs', 'fresh_root',
+  'fresh_child', 'fresh_viewnode', 'adopt_fresh_facts'. The older
+  'create_partnerFolders_for_fresh_nodes' is outside this effort.
+*** "origin": a content origin, a role tree's origin, and the bare
+  'origin' in code. Say "content origin" in code too.
+**** [Claude] the renames
+***** Bare 'origin' locals and comments in 'pcsvf.rs' become
+  'content_origin'; 'climb_containerward_to_cycle_via' documents its
+  second result as the content origins, not "the cycle".
+****** DONE jeff : maybe 'the cycle' should become 'the content origin cycle'?
+In case it's important that a reader understand it is a cycle.
+******* TODO [Claude] it is not always a cycle, so the name should say "content origins"
+The climb follows single containers and stops at the first content
+origin it reaches, which has two shapes: one node with no container
+or with several, returned alone; or the members of a rootlike cycle,
+each singly contained by the next. The second result is that set.
+"The content origin cycle" would be wrong for the first shape, which
+is the common one; "content origins" is right for both, and the doc
+comment states the two shapes, so a reader learns that a cycle is
+one of them. So 'climb_containerward_to_cycle_via' becomes
+'climb_containerward_to_content_origins_via', its result
+'(path, content_origins)', and its two-line wrapper
+'climb_containerward_to_cycle' in 'prominence.rs', which has the
+same misnomer, is renamed with it.
+******** DONE jeff : agreed
+*** DONE "drawing": 'TdvDrawing' (a source: which buffer, over which
+  straddle) beside a "fresh drawing" (a tree). 'TdvBuffer' beside
+  'TotalDiffViewBuffer', two concepts whose names expand to the same
+  words.
+**** DONE [Jeff] Huh?
+Please define each of these in full sentences,
+and make a clear distinction between what is currently written and what should be.
+***** [Claude] the four things, defined
+****** What is written today, in full sentences:
+******** 'TdvDrawing' is a struct holding a reference to the straddle and
+  the kind of buffer being drawn. It is handed to completion so that
+  the per-visit step knows which of the four buffers it is drawing and
+  over which two graphs. It is a source of drawing parameters, not a
+  drawing.
+******** A "fresh drawing" is a scratch tree that the per-visit step builds
+  from the graph for one node: the change viewnodes the node would
+  have if drawn anew. The step then matches the node's existing
+  children against that tree, keeping what matches (with its fold
+  state) and creating only what is missing. It is a drawing.
+******** 'TdvBuffer' is the enum of the four buffer kinds: all changes,
+  merges, skgrepo changes, order-only changes.
+******** 'TotalDiffViewBuffer' is the result of drawing one buffer: either
+  'Empty' or 'Content' with the text, the pids and the viewforest. It
+  has one producer and one consumer, and the drawing function returns
+  the same three things as a tuple.
+****** What should be:
+'TdvDrawing' becomes 'DiffViewSource'; "fresh
+drawing" keeps its name, which is a complete phrase; 'TdvBuffer'
+becomes 'DiffViewBufferKind'; 'TotalDiffViewBuffer' goes, replaced by
+'DrawnDiffViewBuffer { text, pids, viewforest }', which the drawing
+function returns and the handler wraps in an 'Option'. Then no two of
+them share a word.
+**** [Claude] the renames
+***** 'TdvBuffer' (the enum of the four buffer kinds) becomes
+  'DiffViewBufferKind'; its variant 'SkgrepoChanges' is discussed under
+  the home-move item.
+***** 'TdvDrawing' (which buffer kind, over which straddle) becomes
+  'DiffViewSource'; the completion field 'tdv_drawing' becomes
+  'diffView_source'.
+***** 'TotalDiffViewBuffer' (the drawn result: empty, or text plus pids plus
+  viewforest) goes; the drawing function returns 'DrawnDiffViewBuffer
+  { text, pids, viewforest }' and the handler holds an 'Option' of it.
+**** DONE jeff : agreed
+*** DONE "anchor"
+(the glossary's placement anchor, now also a folder's
+viewparent and a sibling in the move helpers)
+**** DONE [Jeff]
+So that's three meanings? Even 'placement anchor' doesn't seem good to me --
+any use of the term 'anchor' suggests placement of some kind is relevant,
+and placement doesn't say what kind. That first should become
+'more public anchor' -- it is the more public content sibling
+of some private content.
+
+For the other two, what do you suggest?
+'the folder's viewparent' seems clean.
+I don't know what you mean by a sibling in the move helpers.
+***** [Claude] three meanings; your name for the first, and names for the other two
+Yes, three. The glossary's "placement anchor" becomes "more public
+anchor", as you say. The second is the folder's viewparent: in
+'readiness_requests.rs' a readiness request on a folder member names
+a relationship between the member and the node the folder hangs
+under, and the code calls that node the anchor; "the folder's
+viewparent" says it, so the local becomes 'folder_viewparent'. The
+third is in 'server/types/tree/moves.rs': 'move_before (tree, anchor,
+node)' makes 'node' the sibling immediately before 'anchor', so
+"anchor" there is the sibling that the moved node is placed beside;
+the parameter becomes 'neighbor'. The table above has all three.
+**** [Claude] the renames
+***** The glossary's "placement, anchor" becomes "more public anchor".
+***** The folder's viewparent: the word "anchor" in
+  'readiness_requests.rs' (near 345 and 363), 'child_data.rs' (55) and
+  'partner_folder.rs' (284) becomes "the folder's viewparent", and the
+  local 'anchor' becomes 'folder_viewparent'.
+***** The move helpers' parameter 'anchor' ('move_before', 'move_after' in
+  'server/types/tree/moves.rs') becomes 'neighbor': "make 'node' the
+  sibling immediately before 'neighbor'".
+**** DONE jeff : agreed
+*** DONE "gesture"
+(now defined narrowly though older commands used it broadly)
+**** [jeff]
+Do you mean the new code talks about "the gesture" without
+specifying what kind it is? The code uses "gesture" broadly because,
+indeed, skg has a few gestures.
+What gesture -- to achieve what, by doing what -- is the new code
+talking about?
+***** [Claude] the glossary entry is the narrow one; the code's gestures are the readiness gestures
+The code is fine; the glossary is the problem. Its entry "readiness
+request, gesture" defines a gesture as "a client command that writes
+readiness requests on one or many headlines, then saves", as if that
+were what a gesture is. The gestures the new code talks about are the
+readiness gestures: C-c r r (toggle the readiness of the change at
+point: it writes '(readyRequest AXES)' or '(unreadyRequest AXES)' into
+the headline's metadata and saves; the save consumes the request and
+marks or unmarks the leaves the headline names), its recursive form,
+and C-c r h for home moves. The fix: a general glossary entry for
+"gesture" (a client command that writes requests into headline
+metadata and saves, so that the server applies them), of which the
+relRepo, fork, flag and readiness gestures are kinds; and the
+readiness entry renamed "readiness gesture".
+**** [Claude] the rename
+***** The glossary gets a general entry "gesture: a client command that
+  writes requests into headline metadata and saves, so that the
+  server applies them", and the readiness entry becomes "readiness
+  gesture"; in code and docs, "gesture" in a readiness context becomes
+  "readiness gesture" where the context does not already say so.
+**** DONE jeff : agreed
+*** DONE "continuation" (also the elisp word for a callback)
+What's the new use of continuation in this new code?
+**** [Claude] what the new code means by it, and a better name
+In the diff view, when a changed folder lists a member (a container
+of the node, say), the containerward role tree of that member is
+drawn under it, so that the user sees where the container sits. The
+plans called that drawn tree the member's "continuation", and the
+code kept the word ('attach_continuations_under_straddle_folder_members').
+It is a role tree drawn under a folder member, so "member role tree"
+says it, and the function becomes
+'attach_memberRoleTrees_under_straddle_folder_members'.
+**** [Claude] the rename
+***** "Continuation" (the role tree drawn under a member of a changed
+  folder) becomes "member role tree":
+  'attach_continuations_under_straddle_folder_members' becomes
+  'attach_memberRoleTrees_under_straddle_folder_members', and the
+  glossary entry moves with it.
+**** DONE jeff : agreed
+** DONE One thing with several names
+*** DONE A home move has five names in the TDV ('homeMove', 'HomeSkgrepoMove',
+  'NodeAspect::Home', the "skgrepo changes" buffer, the command
+  'skg-mark-gnode-skgrepo-changes-commitReady', which also coins
+  "gnode") and a sixth older one ('SkgrepoMove'). Say "home move"
+  everywhere.
+**** DONE [Jeff] Skgrepo changes are broader than home repo moves.
+A relationship's skgrepo can change; that's not a home move.
+The skgrepo changes buffer shows both kinds.
+
+For clarity I think we should say 'home repo', not just 'home'.
+***** [Claude] what the buffer shows today, and two choices for you
+As built, the buffer's root set is narrower than its name: its C is
+the nodes whose home skgrepo changed ('pcsvf_sets_for_home_moves'
+keeps a node only when 'node_changes (pid) . home' is set). A node
+whose only change is a relationship's relRepo is not in that C, so it
+has no root in that buffer; it is in the all-changes buffer. RelRepo
+moves appear in the skgrepo-changes buffer only on nodes that are
+there for their home move. So today the name overstates, and either
+the name or the set should change.
+
+Choice one: rename the buffer "home skgrepo moves"
+('DiffViewBufferKind::HomeSkgrepoMoves'), matching what it shows.
+Choice two: widen its C to every node with a home or relRepo change,
+which is a behavior change and makes the buffer what you thought it
+was. I lean to the first, since the all-changes buffer already shows
+every relRepo move.
+
+On "home repo": the codebase never says bare "repo" for a skgrepo,
+because a gitrepo is a different thing in the same code, and the
+glossary keeps the two apart. So I wrote "home skgrepo move" in the
+table ('homeSkgrepoMove', 'NodeAspect::HomeSkgrepo'). If you prefer
+"home repo", every name in that group follows suit.
+****** DONE jeff
+******* "home skgrepo" is good
+******* let's change the set
+to include the relationship skgrepo changes
+******* [Claude] folded in: the names say "home skgrepo", and the buffer widens
+The group below says so now. The widening: the buffer's C becomes
+the nodes whose home skgrepo moved, plus the recorders of a
+relationship whose relRepo moved ('Partner::relRepo_moved', over the
+roles a node records). The member of such a relationship is not
+added: C counts a member only when a relationship appeared or
+disappeared, as in the all-changes buffer, and the relRepo move is
+drawn on the member's occurrence under its recorder anyway (the
+relRepo-move viewnode). A node in that C is drawn as in any buffer,
+with all of its changes, as a home-moved node is today. So
+'pcsvf_sets_for_home_moves' becomes 'pcsvf_sets_for_skgrepo_changes'
+(not the name the group had), 'home_moves_pcsvf_sets' becomes
+'skgrepo_changes_pcsvf_sets', the glossary and 'docs/' say what the
+buffer shows, and a test puts a relRepo-only move in the buffer.
+'DiffViewBufferKind::SkgrepoChanges' and the buffer's name stay.
+******** DONE jeff : will this screw up the count?
+The user wants to know when they have marked all changes as commit-ready.
+Are the rel changes (or their recorders) counted in that?
+********* TODO [Claude] no: the summary counts every leaf, whatever buffer is open
+The summary that tells you every change is marked ("all N of N
+changed files are ready") is computed over the whole change forest
+('readiness_summary' over every leaf and the store), not over the
+buffer you are looking at. A relRepo move is one leaf, recorded in
+its recorder's file, so that file is already among the changed files
+today, and it counts as ready only when every leaf it records is
+marked, the relRepo leaf included. The member is not a recorder of
+that leaf and adds nothing to the count. So the widening changes no
+count of the summary. It changes where the leaf can be marked: today
+a relRepo-only move is drawn, and markable, only in the all-changes
+buffer; after it, in the skgrepo-changes buffer too. The one
+per-buffer number, "changes not editable in this view", is what
+shrinks there, by exactly those leaves. The plan says so under its
+skgrepo-changes item, so that no agent "fixes" the count.
+**** DONE [jeff] I guess gnode and vnode should go
+in favor of graphnode and viewnode.
+***** [Claude] there is little to go
+"gnode" occurs in two identifiers, the toggle command for home moves
+and its recursive form, in both clients, and in three comment words
+in the server; "vnode" occurs nowhere. The table renames the commands
+'skg-toggle-homeSkgrepo-move-commitReady' and the comments
+"graphnode".
+**** DONE [Claude] the renames
+***** The wire atom 'homeMove' becomes 'homeSkgrepoMove';
+  'viewStats.home_move' becomes 'home_skgrepo_move'; 'NodeAspect::Home'
+  becomes 'NodeAspect::HomeSkgrepo'; 'pcsvf_sets_for_home_moves'
+  becomes 'pcsvf_sets_for_skgrepo_changes' and 'home_moves_pcsvf_sets'
+  becomes 'skgrepo_changes_pcsvf_sets', since the buffer now shows
+  relRepo moves too (your decision above); 'Property::HomeSkgrepoMove'
+  already fits. "Home move" in prose becomes "home skgrepo move".
+***** The skgrepo-changes buffer widens: its C becomes the nodes whose
+  home skgrepo moved plus the recorders of a relationship whose
+  relRepo moved; the glossary and 'docs/' say so, and a test puts a
+  relRepo-only move in the buffer. 'DiffViewBufferKind::SkgrepoChanges'
+  and the buffer's name stay.
+***** The command 'skg-mark-gnode-skgrepo-changes-commitReady' and its
+  recursive form become 'skg-toggle-homeSkgrepo-move-commitReady' and
+  '-recursive'; Neovim ':SkgToggleHomeSkgrepoMoveCommitReady' and
+  'Recursive' (keys unchanged). The three comment words "gnode" become
+  "graphnode"; "vnode" occurs nowhere.
+*** DONE One split has three vocabularies: rightward/leftward, in/out, and
+  "(this file)"/"(other files)", all for "recorded in the node's own
+  file versus in its recorders' files". Keep in/out, which the
+  glossary already defines; rightward and leftward also clash with the
+  glossary's "-ward" adjectives.
+**** DONE [jeff] agreed
+**** DONE [Claude] the renames
+***** 'ChangedPids { rightward, leftward }' becomes '{ out_changed,
+  in_changed }'; 'changed_rightward' becomes 'changed_out'; the
+  glossary's "rightward, leftward" lines go, and the C entry says
+  "out (the node's own file) or in (its recorders' files)".
+*** DONE The command surface says "diff view" ('skg-diff-view', "diff-view:"
+  buffers) beside 'skg-tdv-show-unshown-changes'.
+**** DONE [jeff]
+Let's rename that command skg-diffView-integrate-unshown-changes.
+**** DONE [Claude] the renames
+***** Commands: 'skg-tdv-show-unshown-changes' becomes
+  'skg-diffView-integrate-unshown-changes' (yours), Neovim
+  ':SkgDiffViewIntegrateUnshownChanges'; the request "show unshown
+  changes" becomes "integrate unshown changes", the handler file
+  'integrate_unshown_changes.rs', the 'rerender_view' flag
+  'integrate_unshown_changes'. The opener 'skg-diff-view' becomes
+  'skg-diffView-open' and ':SkgDiffView' becomes ':SkgDiffViewOpen'
+  (mine, for the same camel-cased prefix; say if you want the opener
+  left alone). The buffer names "diff-view: ..." stay.
+****** DONE jeff : agreed
+** DONE Words we had rules against
+*** DONE "owner" for the node whose file records a leaf: the glossary
+  forbids it (the user owns skgrepos). The glossary word is
+  "recorder".
+**** DONE jeff : agreed
+**** DONE [Claude] the renames
+***** 'leaves_by_owner' becomes 'leaves_by_recorder', 'owners' becomes
+  'recorders', and "owns" in the docs becomes "records".
+*** DONE "writable" where the codebase says "editable"
+  ('writable_before_completion').
+**** DONE jeff : agreed
+**** DONE [Claude] the renames
+***** 'writable_before_completion' becomes 'editable_before_completion',
+  'u_and_writable' becomes 'u_and_editable'; the glossary's
+  'WritableSet' becomes 'EditableSet'.
+*** DONE "unfold" for U, in a view that takes care to preserve org folding.
+"Expand" is the word the rest of the docs use.
+**** That's another distinction I don't want to rely on.
+In general, asking the reader to learn a distinction
+that doesn't apply outside of skg is to be avoided.
+Outside of skg, unfold and expand are roughly equivalent --
+not exactly the same, but certainly nothing makes one of them
+more pertinent to org-folding.
+This principle should go into coding-advice/names.org
+
+Rather than fold, we should have org-fold
+(or, within a bigger symbol, 'orgFold').
+For unfolding more viewforest, viewforest-unfold.
+***** [Claude] the principle is in names.org; the renames are in the table, with one cost to confirm
+'coding-advice/names.org' has a new section, "Do not ask the reader to
+learn a distinction that does not exist outside skg", with your
+unfold/expand example and the org-fold and viewforest-unfold names.
+The table above renames the viewnode fields and the wire atoms for
+the org fold state ('org_folded', '(orgFolded)', 'orgBodyFolded') and
+U's "unfold" to "viewforest-unfold". The wire atoms are written by
+both clients before every save and parsed by the server, so that
+rename touches the clients' metadata writers, the parser, the
+serializer and their tests; it is the one item in the table that is
+more than a search and replace. Say whether the atoms change too or
+only the prose and the fields.
+****** jeff
+The metadata atoms don't need to mention org, because there's nothing
+else they could be talking about. The others should change.
+******* [Claude] folded in: the atoms stay, the fields and the prose change
+The group below says so now. The parser and the serializer keep
+their atoms; the rename touches the two fields and their readers.
+**** [Claude] the renames
+***** Org fold state: the viewnode fields 'folded' and 'body_folded'
+  become 'org_folded' and 'org_body_folded'; the wire atoms '(folded)'
+  and 'bodyFolded' stay, since there is nothing else they could mean
+  (your decision above). U's "unfold contentward" becomes
+  "viewforest-unfold contentward" in the glossary and the docs.
+****** jeff : omit the wire atoms (see above)
+*** DONE "re-level" for the strand reset, where "level" is a privacy order.
+**** [jeff] What's the strand reset?
+***** [Claude] what the strands machinery calls re-levelling
+When a save moves a node to another skgrepo, each relationship
+touching the node has a default relRepo that follows from the two
+nodes' homes. A relationship that sat at its old default and would
+now be off its new default is stranded. A stranded inbound
+relationship of a privatizing move would leak the member's ID, so
+the save raises it to the new default by itself. The strands of a
+publicizing move are merely more private than they need be, so the
+save lists them and asks the user which to set back to their new
+default; the wire key for that answer is '(relevel-strands ...)',
+and the docs say the server "re-levels" them. That is the strand
+reset: setting a stranded relationship's relRepo to its new default.
+Since "level" means a position in the privacy order, the table
+renames it "reset to the default relRepo", with the wire key
+'(reset-strands ...)'.
+**** [Claude] the renames
+***** "Re-level" becomes "reset to the default relRepo": the wire key
+  '(relevel-strands ...)' becomes '(reset-strandeds ...)', and the
+  'relevel' identifiers in 'strandeds.rs' (today 'strands.rs') and
+  the clients become 'reset_to_default'.
+**** jeff : agreed, except
+'strands' should not be used as a noun, since it's a known verb;
+let's say 'strandeds' instead.
+***** [Claude] applied: "stranded(s)" wherever "strand(s)" is a noun
+The verb stays: a move strands a relationship. The noun goes
+everywhere, in the wire keys and the compounds too, since a reader
+of 'strand-review' can take "strand" for the verb. The file
+'server/from_text/strands.rs' becomes 'strandeds.rs'; 'StrandReview'
+and 'strand_review' become 'StrandedsReview' and 'strandeds_review';
+'StrandConfirmation' and the wire message 'strand-confirmation'
+become 'StrandedsConfirmation' and 'strandeds-confirmation'; the wire
+keys '(strands-reviewed ...)' and '(relevel-strands ...)' become
+'(strandeds-reviewed ...)' and '(reset-strandeds ...)'; the clients'
+'skg--strands-from-response', 'skg--show-strands',
+'skg--strand-description' and 'skg--fork-strand-review' follow, as do
+'strands_from_response' and 'skg_fork_strand_review' in Neovim; and
+prose says "the strandeds" or, where a full phrase fits, "the
+stranded relationships". 'StrandedRelationship' and
+'stranded_relationships' already fit. It is a search and replace
+across twelve files, three of its targets wire keys that both
+clients and 'docs/api-and-formats.org' carry. The group above is
+updated.
+** DONE Terms used without a definition
+"content position" (three predicates implement it differently),
+"removed member" (which sometimes means the non-member vognode and
+sometimes any former member, phantoms included), "change viewnode",
+"text preserver", "home move", "relRepo move", "old text", "strand",
+"changed folder", and "axis" versus "aspect" (the server's
+'ReadinessAxis::All' is request-only; the client has a 'single' the
+server lacks). Each wants a glossary line.
+*** DONE [jeff]
+Any of these terms that means more than one thing needs to be split
+into multiple terms, unless maybe some of those would-be terms
+deserves to be replaced by another.
+*** DONE [Claude] the terms split or defined
+**** "Removed member" keeps its narrow sense (an unrestricted vognode
+  drawn as a non-member with '(diff rel-)'); where comments mean any
+  viewnode standing for a before-only relationship, phantoms
+  included, they say "former member". Glossary entries for both.
+**** "Diff object" (what a '(diff ...)' fact or a readiness request
+  names: the node, or its relationship to its viewparent) and "diff
+  aspect" (what a change-forest leaf is about: existence, text, home
+  skgrepo, relRepo) each get an entry; 'ReadinessAxis' becomes
+  'DiffObject'; the glossary says 'DiffObject::All' is request-only;
+  the clients' 'single' is renamed after the server's bare form.
+***** jeff
+I would say 'diff object and 'diff aspect'.
+If it's already in a context that makes clear we're talking about diffs,
+we would not need to repeat the word diff.
+But push back if you see some danger here.
+****** [Claude] "diff aspect" yes; "diff object" yes, with one glossary line against a misreading
+"Aspect" already matches the types ('NodeAspect',
+'RelationshipAspect'), so "diff aspect" costs nothing. "Object" is
+used nowhere in skg, so it clashes with nothing; the one danger is
+grammatical. A relationship has a recorder and a member, and a reader
+who knows that pair can take "the object of a relationship leaf" for
+the member, as the object of "the recorder lists the member". One
+glossary line prevents it: the diff objects are exactly two, the node
+and its relationship to its viewparent; a leaf about a relationship
+has the relationship as its object, never the member. With that, the
+renames are 'ReadinessAxis' to 'DiffObject', 'axes' to 'objects' in
+the request types and the clients, and "AXES" to "OBJECTS" in
+'docs/api-and-formats.org'; the wire atoms 'node', 'rel' and 'all'
+stay, and the glossary says that 'all' is request-only shorthand for
+every leaf one level down, not an object. In a sentence already about
+a diff, "object" and "aspect" go bare, as you say. The item above is
+updated.
+**** Glossary entries for "content position" (one definition, see the
+  reification item), "change viewnode", "text preserver", "home
+  skgrepo move", "relRepo move", "old text", "stranded relationship",
+  "changed folder", "member role tree".
+** DONE The answer to "more or less?"
+Less in the code, more in the glossary. The code should drop the
+duplicate names (five for a home move, three for one split, two for
+"drawn") and the words we have rules against; the glossary should
+gain the dozen terms the docs and comments already use without
+defining them. The term survey you asked for ('07_1') shows the
+pattern: a word is coined in a plan, used in the code, and the
+glossary is updated only when a review notices.
+* DONE 4. Reification
+** Things that should have been reified
+*** The (change facts, readiness request) pair sits on thirteen
+  viewnode kinds, reached through six hand-written accessors that
+  must each be extended for every new kind. One method on
+  'ViewnodeKind', or one field, would end that.
+**** [jeff] agreed
+*** "Content position" exists as three different predicates and no
+  type or function of its own.
+**** jeff : how do they differ? should they all persist?
+***** [Claude] three predicates, one definition
+'historical_phantom_in_content_position' ('pcsvf.rs'): the node is in
+content position when its parent is the buffer root or an
+unrestricted vognode, or a historical phantom that is itself in
+content position (it recurses); it does not look at 'affectsParent'.
+The walker in 'content_occurrences_in_level_order' ('pcsvf.rs'): under
+the buffer root, yes; under an unrestricted vognode, only if the node
+is a member; under a historical phantom, never. The check in
+'process_historical_phantom_visit' ('changes.rs'): under the buffer
+root, an unrestricted vognode or a historical phantom, yes, without
+recursing into the phantom's own position. They should not all
+persist. One function, 'in_content_position', with the first
+definition; the walker then adds "and is a member", which is a
+separate question (membership, not position); the third drops its
+non-recursing copy. The walker's refusal to pass through a historical
+phantom has no reason I can find, and the unification removes it.
+****** DONE jeff : yes please
+*** The set of a buffer's editable occurrences is recomputed three
+  times by the same match.
+**** [jeff] obvious how to dedup, yes?
+***** [Claude] yes
+A method 'Viewnode::editable_skgid () -> Option<&ID>' (the node's ID
+when the viewnode is an editable unrestricted vognode) and a function
+'editable_occurrences (&ViewForest) -> HashSet<ID>' over it; the
+three sites call the function.
+****** DONE jeff : yes please
+*** A changed file is a bare '(SkgrepoName, ID)' tuple seven times; an
+  old/new skgrepo pair is a bare tuple in four shapes.
+**** [jeff] yes, please reify both
+*** 'RelationshipKey' is 'LeafKey::Relationship' minus the aspect;
+  'RequestedReadiness' repeats 'NamedLeaves' field for field.
+**** [jeff] the fix is obvious?
+***** [Claude] yes
+'LeafKey::Relationship { relationship : RelationshipKey, aspect }',
+so that 'strands.rs' and the change-forest share the key; and
+'RequestedReadiness { ready, named : NamedLeaves, headline }', so that
+'apply_readiness_requests' passes the inner value instead of cloning
+three fields into a new one.
+****** DONE jeff : yes please
+*** The clients re-derive which headlines carry leaves by matching
+  names; the server should say.
+**** [jeff] that sounds dangerous. please elaborate.
+What's the problem, and what's the solution?
+***** [Claude] the problem is a second implementation; the solution removes it
+The problem. When you press C-c r r on a headline, the client has to
+decide what to ask for: which readiness axes the headline carries
+(node, rel, or both) and, for the wide-unmark warning, how many
+leaves an unmark would touch. Today each client decides that by
+looking at the headline's metadata shape: an old-text property means
+the text axis, a folder with a 'changed' fact means relationship axes,
+and so on, from a table of kinds written into 'skg-readiness.el' and
+'readiness.lua'. The server has its own rule for the same question,
+'leaves_named_at', which is the one that counts. The two already
+disagree: the server expands a request on a content changeset marker
+to every content relationship of the node, while the client counts
+one leaf, so the warning does not fire where it should. Every new
+kind of change viewnode has to be added to three tables.
+
+The solution. The server knows, when it draws a headline, which leaves
+it names; it writes that into the headline's metadata, as a fact such
+as '(leaves N AXES)' beside the existing '(ready ...)' fact. The
+client reads the fact: the axes to request, and N for the warning.
+The clients' tables go. That is less dangerous than today, not more:
+one implementation, on the side that applies the request.
+****** DONE jeff : yes please
+** Things reified that need not have been, or sit in the wrong place
+*** 'TotalDiffViewBuffer' has one producer and one consumer, and its
+  'Content' is the triple 'pcsvf_viewforest' already returns.
+**** jeff : please spell out the problem and the solution to me
+***** [Claude] problem and solution
+Problem: the handler for the diff view defines an enum,
+'TotalDiffViewBuffer', with two variants, 'Empty' and 'Content {
+text, pids, viewforest }', fills it in one function and reads it in
+one other, and the function that draws a buffer returns the same
+three things as a plain tuple. A reader meets two shapes for one
+thing and a type whose name reads like 'TdvBuffer'. Solution: one
+struct, 'DrawnDiffViewBuffer { text, pids, viewforest }', returned by
+the drawing function and held by the handler as an 'Option' (None
+when the buffer is empty). The enum goes.
+****** DONE jeff : yes please
+*** The straddle caches per-buffer PCSVF sets in its own fields, so a
+  graph-level type knows the TDV's four buffers.
+**** jeff : please spell out the problem and the solution to me
+***** [Claude] problem and solution
+Problem: 'GraphStraddle' is the comparison of two graphs, a thing the
+graph layer owns. But it holds three lazily computed fields, one per
+diff-view buffer kind ('pcsvf_sets', 'merges_pcsvf_sets',
+'home_moves_pcsvf_sets'), and a method 'pcsvf_sets_of_buffer' that
+takes a 'TdvBuffer'. So the graph layer imports a view concept and
+knows that there are four buffers, and adding a fifth buffer means
+editing the straddle. Solution: keep the caching, since the sets must
+persist across requests with the straddle, but make it one opaque
+field, 'pcsvf_cache : PcsvfCache', whose type is defined in
+'pcsvf.rs' and keyed there by buffer kind; the straddle neither names
+the buffers nor computes the sets.
+****** DONE jeff : yes please
+*** 'ChangeForest' is a flat map from recorder to leaves; the layered
+  structure the glossary describes exists only inside 'LeafKey'.
+**** jeff : please spell out the problem and the solution to me
+***** [Claude] problem and solution
+Problem: the glossary and the module comment describe the
+change-forest as a tree: changed nodes at the roots, their changed
+aspects beneath, the leaves (the individual changes) under those.
+The type is a map from each recorder to a flat list of its leaves,
+plus an index; the aspect layer exists only as a field inside each
+leaf's key. A reader who goes looking for the tree finds a map, and
+wonders what they missed. Solution, either way: rename the type
+'ChangeLeaves' and describe it as what it is (every leaf, grouped by
+recorder, keyed by recorder, aspect and relationship), or keep the
+name and make the glossary say the forest is the mental picture and
+the type a two-level map. I would rename; a name that promises a
+structure the code lacks is the kind you dislike most.
+****** DONE jeff : agreed, rename and describe
+*** 'serve/handlers/readiness_requests.rs' holds no handler; core
+  rendering imports from it.
+**** jeff : please spell out the problem and the solution to me
+***** [Claude] problem and solution
+Problem: the directory 'server/serve/handlers/' is where each request
+has its handler, a function that reads a request from the stream and
+answers it. 'readiness_requests.rs' sits there but handles no
+request: it holds the save-path logic that consumes readiness
+requests and the view-fact logic that writes '(ready ...)' facts.
+Core code imports from it ('pcsvf.rs' calls
+'set_ready_facts_in_viewforest'), so rendering depends on the
+handlers directory, the wrong way round, and its module comment
+describes only the first half. Solution: move the file to the diff
+view's module (or beside 'readiness_store.rs' as
+'server/readiness_requests.rs'), give it a comment covering both
+halves, and move its two accessors for change facts onto
+'ViewnodeKind' beside 'Property::readiness_request'.
+****** DONE jeff : agreed
+** What is fine
+'Phantom::Historical' (its own data, its own visit; it replaced
+'Phantom::Diff' and reduced the type count), the removed alias and
+ID kinds (save-inert by kind, which the glossary requires),
+'PcsvfSets', 'ChangedPids', the folder goal items, the request-kind
+enum, and the reuse of the older words occurrence, acquirer and
+acquiree with their old meanings.
+
+* DONE 5. Could better planning have saved pain?
+Yes, about half of it. The ledger's numbers first, then what I would
+do differently.
+** The numbers
+*** 104 commits; 22,613 lines added; about 2,950 later deleted or
+  rewritten within the effort, of which 2,172 by a later plan, 716
+  within the same run, 43 by your own commits; 559 of the 2,172 are
+  renames. Substantive cross-plan churn: about 1,610 lines, 7%.
+*** Survival at HEAD by plan: 02 kept 87% of its lines, 04 89%, 06
+  74%, 08 98%, 10 100%.
+*** Plan 02 caused the most churn in the next plan (04 deleted 1,450 of
+  its lines; 8 of 04's 11 slices rewrote 02's work). Plan 06 lost the
+  largest share of its own work (24%), to the retracted refusal and
+  the automatic following.
+*** One stopped run in five (plan 06, slice 2), on a wrong belief of
+  mine about the save rules.
+** The causes, honestly
+*** The executing agents chose designs you rejected (about 530 lines):
+  detach-and-recreate drawing, the restore/redraw pair, the save
+  reading a display fact, the client-side '(content )' workaround.
+  Each was a local fix to a problem the plan had not foreseen. The
+  plans' "Pitfalls" sections, which plan 04 introduced, were the
+  cure: from plan 04 on, no agent chose a design you later rejected.
+*** You changed requirements with new information (about 380 lines):
+  roots that linger, the retracted refusal, the automatic following
+  turned into a command, the history-based validator replaced, the
+  write-protect command turned into a request. Each of these came
+  out of a review thread in which you reasoned from first principles
+  ("let's not think about how things got there, just what they
+  are"). I do not count these as planning failures; they are the
+  design converging. But three of them concern one model, editability
+  and write-protection, which was redesigned three times across
+  plans 04, 06 and 08. Designing that model once, up front, in the
+  discussion document, would have saved two rounds.
+*** The plans got requirements wrong (about 280 lines): the partial
+  staging commands survived a decision already on record; the home
+  move gesture broke the plan's own toggle rule; "drawn" was worded
+  so that folder members counted; the partner folders were dropped
+  from the graph check by my oversight. These are mine.
+*** Wrong beliefs about the existing code (three, all mine): that the
+  graph pair identifies a text preserver; that the editable map
+  write-protects a later occurrence (so editability could not move);
+  that a request on an editable node reaches the cascade (two older
+  save rules refused it). The first cost a heuristic that was later
+  deleted; the second cost the dropped requests and a round of
+  discussion; the third cost the stopped run and a 250-line
+  explanation. Each was a claim I wrote into a plan or review without
+  reading the code path that decides it.
+*** [jeff]
+So what are the concrete habits that could have helped?
+I think I see two: the pitfalls habit introduced in plan four,
+and something about "reading the code path".
+Please write those into coding-advice/ with enough context to stand alone.
+If any of them are directed at me, add a new document there,
+'jeff-should-do.org'.
+ANy of these (maybe it's all of them) that are specific to planning
+should go in a new doc there, 'plans.org'
+**** [Claude] written, in three files
+'coding-advice/plans.org': the planner's habits, each with the case
+that taught it: read the code path before writing a rule and cite the
+function; design the shared model once, stateless, before the first
+plan that touches it; check "what stays" against the decisions on
+record; prefer deleting a mechanism to adding a rule; keep the
+Pitfalls section; land a rule with the mechanism it depends on; the
+form of a plan (TODO on slice headlines, one-time tools named,
+deviations in 'progress.org'); the two-question check after each
+plan. 'coding-advice/jeff-should-do.org': the habits directed at you:
+settle the shared model in the discussion before saying "write the
+plan"; process a review in one sitting or mark what is left; keep one
+list of decisions and reverse a decision where it stands; ask for
+the vocabulary check after each plan and the full post-mortem at
+milestones; the marking rules we use. 'coding-advice/code-reviews.org'
+holds the post-mortem method (the next section). 'ORIENTATION.org'
+links all three under "Reviews and plans".
+** What I would do differently as planner
+*** Before writing a rule about existing behavior into a plan, read
+  the code path that decides it, and cite the function. Each of the
+  three wrong beliefs would have died at that step.
+*** Design the one model that every later slice touches (here:
+  editability, write-protection, members, requests) in the
+  discussion document, as a stateless description of states and
+  transitions, before any plan. The 07 thread produced that
+  description in the end; it should have come first.
+*** Keep a list of decisions already taken ("partial commits are
+  dangerous") and check each plan's "what stays" section against
+  it.
+*** Prefer deleting a mechanism to adding a rule. The refusal, the
+  automatic following and the counterpart matching were all rules
+  added to tame a mechanism; each time, removing the mechanism was
+  simpler and you chose it once you saw it.
+*** Keep the "Pitfalls" section; it is what stopped the agents from
+  improvising designs after plan 02.
+*** Write slice headlines with TODO, name one-time tools as one-time,
+  and order slices so that a rule and the mechanism it depends on
+  land together (my error in plan 08).
+*** Review vocabulary after every plan, not at the end: the terms
+  that confused you ("promote", "pre-pass") and the ones this
+  post-mortem found ("drawn", "fresh", "leaf") each entered through
+  one plan and spread through the next.
+
+* DONE 6. Is it readable to coders?
+The algorithms are documented, with one exception, but the code is
+hard to navigate. The readability report ranks fourteen problems;
+these are the ones that cost a reader most.
+** DONE problems
+*** DONE Twenty-three source files cite the plans under 'TODO/' as the
+  description of what they implement, and the plans were amended
+  four times and now contradict the code (02_plan says the node
+  budget is off in a TDV; 'complete.rs' spends it on request-driven
+  expansions outside U). The durable descriptions exist in the
+  glossary and the API doc. Every such citation should point there,
+  and the rules neither covers (the per-visit step, the fresh-drawing
+  matching, the readiness gestures) belong in a 'docs/total-diff-view.org'
+  lifted from the plans' agreed-behavior sections as amended.
+**** jeff : agreed
+*** DONE The TDV has no home. Its code is spread over 'pcsvf.rs',
+  'change_forest.rs', 'readiness_store.rs', 'graph_straddle/', three
+  files under 'to_org/render/' that render no text, a file under
+  'serve/handlers/' that holds no handler, half of the partner-folder
+  reconciler, and branches of 'update_buffer.rs' and 'complete.rs'.
+  A 'server/tdv/' module, with the two TDV blocks of 'rerender_view'
+  pulled out as named functions, would let a reader find it.
+**** jeff : agreed
+*** DONE The shared rerender pipeline (prepare, answer, stream) lives in one
+  request's handler file, and the save path keeps its own copy of two
+  steps. Its calls read 'None, false, true, saved_tdv_buffer, false';
+  a named options struct would make every call readable.
+**** jeff : agreed
+*** DONE The generic node visit tests the TDV switch ten times, and the
+switch's doc comment lists five of the effects. 'editableViewRequest_applies'
+is now an alias whose name promises a condition that no longer
+exists.
+**** [jeff] So what do we do?
+***** [Claude] four things
+Now: make the doc comment of the 'tdv_drawing' field (to be
+'diffView_source') list all ten effects of the switch; delete
+'editableViewRequest_applies' and use 'had_editableViewRequest';
+move the budget rule from a trailing line comment into a block
+comment above the test. When the diff view gets its own module:
+gather the ten branches behind two functions in that module, one
+called before the node expands and one after, so that
+'visit_normal_node' tests the switch twice and the diff view's
+behavior is read in one file.
+****** DONE jeff : agreed
+*** DONE Names that mislead: 'nodes_drawn_in_viewforest' (see vocabulary),
+  'removed_by_set_difference' (returns the whole diff),
+  'pcsvf_viewforest' (also draws the order-only buffer, which draws no
+  PCSVF), 'owned_head_identity' refusing with "Cannot open the diff
+  view" for every caller, and the toggling command still called
+  "mark".
+**** [Claude] the renames
+***** 'removed_by_set_difference' becomes 'interleaved_diff_without_reorders'.
+***** 'owned_head_identity' stops saying "Cannot open the diff view"; it
+  says "Cannot read HEAD of skgrepo X: ..." and the caller prefixes
+  what it was doing.
+***** 'editableViewRequest_applies' is deleted in favor of
+  'had_editableViewRequest'.
+***** Stale words: "diff phantom" ('to_org/util.rs', 'types/misc.rs',
+  'docs/override.org') becomes "historical phantom"; "graph pair"
+  ('graph_straddle/mod.rs', 'docs/api-and-formats.org') becomes "graph
+  straddle"; "removedHere" goes.
+*** DONE Thirteen stale or wrong comments among about fifty checked, three
+  of them older than the effort but in the audited algorithms. The
+  worst: 'stage_and_commit.rs' says a commit lapses every mark, while
+  the code keeps every mark whose change still exists; the
+  'Finalizable' doc says the cascade "is not yet implemented".
+**** jeff : yes, please correct
+*** DONE The one undocumented algorithm is the editability rule itself (the
+  editable map, the draw rule, the cascade, the budget): it is spread
+  over four files, its cited authority is an archived plan, and the
+  TDV's change to it is a trailing line comment.
+**** jeff : yes, document somewhere in code
+and other code should refer to that rather than plans
+***** [Claude] where
+A module comment at the top of 'server/to_org/expand/editable.rs',
+which holds the draw rule, describing the editable map, the draw
+rule, the cascade and the node budget in that order; 'to_org/util.rs'
+(the map) and 'complete.rs' (the visit) cite it. The diff view's
+deviations (a node of U is never charged; the editable-occurrences
+step) are described once in the diff view's own module and cited
+from 'complete.rs'.
+*** DONE The clients mirror each other function for function, which is
+good; but the readiness-summary formatter lives in the save module
+while three other commands use it, the streaming-request prologue
+is repeated in each command, and the prefixes are mixed
+('skg-tdv-…' beside 'skg-diff-view').
+**** [jeff] So what's the fix?
+***** [Claude] three moves
+Move the readiness-summary formatter from 'skg-request-save.el' and
+'save.lua' into 'skg-readiness.el' and 'readiness.lua', since the
+save, stage-and-commit, integrate-unshown-changes and the gestures all
+show it, and have the three commands stop requiring the whole save
+module for it. Add one function per client,
+'skg--send-streaming-request (label response-type request handler)'
+and its Lua twin, holding the prologue each command repeats (begin the
+stream, lock the buffers, register the rerender handlers and the
+one-shot handler, reset, send), and one helper that joins a
+response's errors. Rename the commands to one prefix, as the table
+says ('skg-diffView-open', 'skg-diffView-integrate-unshown-changes').
+****** DONE jeff : agreed
+** DONE What is good
+'moves.rs', 'fresh_drawing.rs', 'change_forest.rs' and
+'strands.rs' are clear and say what they are for in their first
+lines; every new request has an API section with its refusals and a
+line naming its files; the camelCase-noun convention is applied
+consistently; callers mostly precede callees.
+
+* DONE 7. Is everything documented for users?
+The commands, yes: every command the effort added has a section
+under its actual binding in both clients, every removed command is
+gone from the docs, and the late changes (write-protection as a
+request, the unfolding request, C-c r u, the summary line, the
+wide-unmark warning) are described as the code behaves today. The
+heralds doc matches the code glyph for glyph. The gaps are in the
+glossary and in the parts of the API doc the effort added to without
+rewriting; the report lists twenty-one, these matter most.
+** DONE The glossary says the container and mentioner folders are "not
+implemented" and that there are eight partner folders; both exist
+(C-c l c, C-c l m) and the code has twelve kinds.
+*** jeff : fix is clear, yes?
+**** [Claude] yes
+Yes: rewrite the folder entry to list all twelve kinds with their policies, the two diff-view folders marked derived and save-inert, and say that the container and mentioner folders are the write-protected inbound folders of C-c l c and C-c l m.
+** DONE The API doc lists four values for '(folder RELNAME)' and says each
+  request builds two folders; 'containers' and 'mentioners' are
+  missing and build one each. Four folder atoms are missing from the
+  metadata list.
+*** jeff : fix is clear, yes?
+**** [Claude] yes
+Yes: add 'containers' and 'mentioners' to the list, say that each builds one write-protected folder pruned when empty, and add the four folder atoms to the metadata list.
+** DONE The command docs never say what a save refuses under a
+  write-protected occurrence; only the API doc and the glossary do.
+  'docs/sharing-model.org' still says such an edit merely respawns.
+*** jeff : fix is clear, yes?
+**** [Claude] yes
+Yes: one paragraph under the vocabulary entry for editable and write-protected in both COMMANDS files, listing what is refused (a changed title or home skgrepo, a differing alias, partner or flags folder, a member child) and the way out (C-c s d, or an edit at an editable occurrence); and the sentence in 'docs/sharing-model.org' gains "under an editable occurrence; under a write-protected one the save is refused".
+** DONE Stage-and-commit stages only '.skg' files but commits the whole git
+  index, so anything the user had staged in that gitrepo goes into
+  the commit; no doc says so.
+*** Jeff : It should only commit what is staged.
+**** [Claude] that is what it does; the question is whose staging
+A git commit always records the whole index, that is, everything
+staged. The command stages the changed '.skg' files of each owned
+skgrepo and commits, so the commit contains those files plus anything
+you had staged there earlier by hand, '.skg' or not. If "what is
+staged" means that, nothing changes and the docs just say it. If you
+meant "only the '.skg' files it staged itself", the command would have
+to build the commit from a temporary index so that your own staged
+files stay staged and uncommitted; that is more code and a second
+meaning of "staged" for the user. I would keep the git meaning and
+document it. Say which.
+***** [jeff]
+If anything was staged before the user runs skg's stage-and-commit
+command, it should stop and warn them, listing the dirty repos,
+and offer to continue anyway, the high-friction way (yes/no rather
+than y/n). And yes, the docs should explain that.
+****** [Claude] noted as the behavior; one detail to fix in the plan
+Before staging anything, the server checks each owned gitrepo's index;
+if any has entries staged already, it answers with a confirmation that
+lists those gitrepos and their staged paths, the client asks the
+high-friction question (the typed word "yes", as the not-all-ready
+confirmation already does), and only a confirmed resend stages and
+commits. The existing confirmation flow of the stage-and-commit
+request carries this with a second reason. The docs say so under C-c
+r c in both COMMANDS files and in the API section.
+** DONE The Neovim binding for the container folder, '<localleader>cc', is
+  taken over in the fork-confirmation and search-and-link buffers.
+*** jeff : I don't understand. Please elaborate.
+**** [Claude] one key, three bindings
+In Neovim, '<localleader>' followed by a key plays the role of C-c.
+The folder commands sit under 'c' ('ca' aliases, 'co' overrides, 'ch'
+hides-from-subs, 'cs' subscribes-to, 'cp' flags), and this effort added
+'cc' for the container folder and 'cm' for the mentioner folder. But
+two special buffers already bind '<localleader>cc' for themselves: the
+fork-confirmation buffer uses it to approve the fork, and the
+search-and-link buffer uses it to pick a result; both also attach the
+content-view keymap. In those two buffers, pressing 'cc' approves or
+picks, and the container folder cannot be opened. The fix is to move
+the folder commands to an 'l' group, mirroring Emacs's C-c l ('la',
+'lo', 'lh', 'ls', 'lp', 'lc', 'lm'); no '<localleader>l' binding exists
+today. Say if you would rather move only 'cc'.
+***** DONE jeff : agreed
+** DONE Missing glossary entries for home move, relRepo move, old text,
+text preserver, stranded relationship, changed folder and the
+moved-like-ancestor fact; the view-request entry lacks the two
+write-protect requests; a quoted herald label is stale; "diff
+phantom" survives in 'docs/override.org'.
+*** jeff : fix is clear, yes?
+**** [Claude] yes
+Yes: one short entry each under the diff view's terms, the two write-protect atoms added to the view-request entry, the quoted label corrected to "Reference to unknown node.", and "diff phantom" in 'docs/override.org' replaced by "historical phantom".
+** DONE A config key was renamed ('max_role_tree_depth' to
+  'max_roleTree_depth') and an old config silently falls back to the
+  default.
+*** jeff : yes, please update that old config
+**** [Claude] your config has no such key; the fix is a warning
+'data/skgconfig.toml' names neither 'max_role_tree_depth' nor
+'max_roleTree_depth', so the default applies and there is nothing to
+update. The gap is for a config that still says the old key: today
+the server ignores it silently. The cheap fix is a startup warning
+that names any unknown key in 'skgconfig.toml' (serde's
+'deny_unknown_fields' would refuse to start instead, which is harsher
+than a stale key deserves). I would add the warning.
+***** jeff : agreed, but where would the warning show up?
+We need to make sure the user actually sees it.
+There might be a few things that flash onto the minibuffer during startup;
+if so, later ones could clobber earlier ones before the user has looked.
+Maybe safer would be to open a Warnings buffer once everything is ready.
+****** [Claude] in the terminal at startup, and in a buffer when the client connects
+Two places, both needed. 'bash/start-servers.sh' already runs 'skg
+check-config' before starting the server and refuses to start on a
+bad config; an unknown key is reported there, in the terminal you
+started the servers from, which is where a stale key is most likely
+to be noticed by whoever edited the config. That is not enough for
+the reason you give. So the server also keeps its startup warnings,
+and the client, when it connects, asks for them with one small request
+and shows the answer in a buffer named like the save warnings
+('*SKG Server Warnings*', 'skg://server-warnings'), once, after the
+connection is up and before any view is requested, so that nothing
+flashes past in the minibuffer. An empty answer opens nothing.
+* DONE 8. Your post-mortem technique
+** What worked
+The questions were the right ones and they were separable, which is
+what let five agents work in parallel without overlap. Asking for
+"more or less" vocabulary rather than "is the vocabulary good" forced
+a list. Asking about reification in both directions found the
+over-reified things, which a one-direction question would have
+missed. Doing it with agents cost you nothing to read but this
+document.
+** What I would add
+*** jeff : let's add all these ideas
+to coding-advice/, in a new file, code-reviews.org.
+**** [Claude] written
+'coding-advice/code-reviews.org': the method (scope by commits;
+separable questions, one agent each, with the nine questions
+including the three added here; the churn ledger's cause classes;
+synthesis and the org protocol; when to do the short check and when
+the full method).
+*** A test-quality question: do the tests assert the decided behaviors
+  by name, are the fixtures shared or copied (the duplication report
+  found four copies of the fixture builder and three of
+  'save_cleanly'), and is anything decided in a review untested? I
+  did not ask the agents this, and it is the cheapest place to lose
+  the decisions.
+**** jeff : let's do this
+***** [Claude] running
+An Opus agent is on it now, writing its report into
+'12_1_postmortem-reports/'; its findings will be appended to this
+document as a new section when it lands.
+*** A performance question: the straddle is rebuilt by a full
+comparison of two graphs after every save, and each TDV request
+recomputes sets; nothing measured it. One number on your real data
+would say whether it matters.
+**** jeff : let's do this
+***** [Claude] running
+An Opus agent is on it now, writing its report into
+'12_1_postmortem-reports/'; its findings will be appended to this
+document as a new section when it lands.
+*** A "what did the user lose" question: which gestures or views that
+existed before the effort are gone or changed (the old diff view's
+interleaved folder ordering was dropped; the partial staging
+commands were deleted by decision; a hand-edited 'writeProtected'
+with members is now refused).
+*** A cost question: hours of your time per round, which the ledger's
+timestamps could estimate but I did not ask for.
+** Incremental or at the end
+Both, in different sizes. The end-of-effort post-mortem is the right
+place for structure (where the TDV lives, what to reify) because
+structure is only visible once the behavior has settled, and the
+behavior here settled in plan 08. But two of its findings were cheap
+to catch per plan and expensive to catch late: vocabulary drift and
+plan citations in code. A short review after each plan, by one agent
+with two questions (what terms did this plan coin or reuse, and what
+does its code cite), would have caught "drawn" in plan 04, "fresh" in
+plan 06 and the plan citations in plan 02, before each spread. So:
+a two-question check after every plan, a full post-mortem at
+milestones like this one.
+*** jeff : let's add this to the aforementioned code-reviews.org
+**** [Claude] it is there
+'coding-advice/code-reviews.org' has it, near line 92: the
+two-question check after every plan, the full method at milestones.
+* DONE 9. [obsolete]
+** TODO [Claude] the plan
+[[file:13_plan.org][13_plan.org]]: seventeen slices in two parts, housekeeping (0 to 9)
+and structure and behavior (10 to 16), written from every decision
+above; 'bash/run-plan-slices.sh' points at it.
+* DONE [Claude] 10. Tests (the question you asked to add; report: 12_1_postmortem-reports/testing.md)
+The agent read every Rust test the effort added and the client tests
+the plans name, and matched each decided behavior (the latest plan
+wins) to the test that asserts it. Most are asserted, largely in
+'tests/pcsvf/fresh_sets.rs', 'tests/pcsvf/write_protecting.rs', the
+editable-view cascade tests and the validator's unit tests: editability
+moving and back, a request unfolding within the budget, C-c r u, the
+one-request-per-node rule, the summary counts, stage-and-commit's
+confirmation, the straddle dropped on a rebuild, quoted empty strings,
+the tree-move helpers, the strand logic on the server.
+** Decided and untested, ranked
+*** Fold state across commits and collateral rerenders: every fold
+  test folds and then saves; the two commit tests and the collateral
+  test check no fold. This is the decision the whole of plan 04 was
+  about, tested for saves only.
+*** The home skgrepo under a write-protected occurrence: no test
+  changes it. The ID and flags folders under a write-protected
+  occurrence are tested only under an editable recorder.
+*** Two cases of the partner-folder check: a member that is an Unknown
+  phantom (compared by raw ID), and a member drawn by an extra ID.
+*** An adopted child that has to move into content order: every
+  adoption test starts with the children already in order.
+*** The diff-view request's refusals for a skgrepo with no gitrepo or
+  no HEAD, and its acceptance of a merge commit at HEAD.
+*** A nonzero foreign count in the summary; the strand display in
+  either client (both stub it out); the exact wording of the
+  wide-unmark warning; the last line of the delete-references
+  preview.
+** Fixtures and helpers
+The earlier duplication report was wrong about one thing: the git
+fixture builder exists once, in 'tests/shared/git_fixture_helpers.rs',
+and all four files call it; what is copied is the wrapper around it,
+with a fifth inline in 'tests/graph_straddle.rs', and the shared file
+is compiled four times because each test file includes it. Confirmed:
+three copies of 'save_cleanly', a fifth 'copy_dir_all', four readers
+of the response stream, one of which ('response_from' in
+'tests/pcsvf/request.rs') does a single read into a buffer and would
+truncate a long reply. Proposed: the 'Fixture' of 'tests/pcsvf/common.rs',
+extended for foreign skgrepos and the single-skgrepo layout, moved
+with 'save_cleanly' and a proper reader into 'tests/shared/git_fixture.rs',
+declared once in the test binary.
+** Readability
+Tests are named for what they assert and the 'tests/pcsvf/' files
+state their fixtures' shapes; 'folding.rs' and the cascade tests' main
+fixture are the exceptions. Two structural problems: the cascade tests
+and the validator tests each run inside one nextest test called
+'all_tests', so a failure never names the behavior; and per-node
+checks re-parse the org text by hand with five separate subtree
+extractors, where a query over the parsed tree would be shorter and
+exact.
+** [Claude] what I would do
+Add the six missing tests (the fold-across-commit one first), split
+the two 'all_tests' bundles so nextest names each behavior, replace
+the truncating reader, and consolidate the fixture wrapper. All of
+it fits the housekeeping plan; say if any of it should wait.
+*** DONE jeff : agreed
+* [Claude] 11. Performance (the question you asked to add; report: 12_1_postmortem-reports/performance.md)
+Measured on your real data, read-only, with a standalone harness the
+agent left under 'tests/results/perf/' (its 'run.sh' reruns it in
+about 80 seconds). Your owned worktrees were clean, so the changes
+were simulated in memory over the real graph: title edits and dropped
+children on 1, 10, 100 and 1000 random nodes, compared against the
+real HEAD graph. Hardware: an i5-13500H, 16 threads, 15 GiB; the
+server runs single-threaded. The numbers that apply are the dev
+build's, since 'bash/start-servers.sh' runs the server through
+'cargo watch -x run' with no optimization.
+** Sizes
+Seven skgrepos are configured and six are owned; 55,246 configured
+files fold into 55,198 nodes (the other 6,400 files under
+'owned/RETIRED/' are named by no config entry and never read). There
+is no readiness-marks file today; a mark costs about 304 bytes.
+** The numbers (dev build; release in parentheses)
+*** Reading the before-graph from HEAD, once per commit: 2.0 s (0.67 s),
+  of which the six skgrepos' HEAD reads are 1.4 s. Validating it, again
+  on every connection whose slot is empty even when the snapshot is
+  cached: 1.6 s (0.5 s).
+*** Re-pairing the straddle after a save ('with_after'): nothing. The
+  first 'changed_pids' after it: 0.65 s (0.16 s) whether 1 or 1000
+  nodes changed, since it scans every node. The change-forest: 60 to
+  94 ms.
+*** The PCSVF sets at 1, 10, 100, 1000 changes: 0.1, 0.7, 4 to 7, 38 to
+  59 ms. Drawing the all-changes buffer at the same counts: 1, 16, 145,
+  800 to 985 ms.
+*** Saving and loading 1000 readiness marks: 80 ms and 3.5 ms.
+** What this means
+While a diff-view buffer is open, every save pays about 0.74 s in dev
+before anything is drawn, however small the change: the full scan in
+'changed_pids', plus the change-forest, plus 16 ms for the HEAD
+identity. Everything else is proportional to the change count and
+small. Nothing else needs work now.
+** [Claude] two things worth doing
+*** Make 'changed_pids' skip nodes that are equal in both graphs,
+which the change-forest already relies on; the one caveat is a node
+whose member IDs resolve differently after a merge since HEAD, which
+must still count. This removes most of the 0.74 s.
+**** DONE jeff : yes please
+*** Run the server in release when you dogfood: every number above is
+three to four times smaller with no code change. If 'cargo watch'
+is what you want for the rebuild-on-save loop, '--release' can be
+given to it.
+**** DONE jeff : what does 'in release' mean?
+
+***** TODO [Claude] cargo's two builds
+Cargo builds a Rust program in one of two profiles. The dev profile,
+which 'cargo run' and 'cargo build' use by default, compiles fast, with
+no optimization and with debug checks on; it is for development. The
+release profile ('cargo run --release', 'cargo build --release')
+optimizes the code, which takes minutes to compile and runs three to
+four times faster here. 'bash/start-servers.sh' starts the server with
+'cargo watch -x "run ..."', so you have been running the dev build.
+Passing '--release' inside that quoted command ('cargo watch -x "run
+--release ..."') runs the optimized build and keeps the
+rebuild-on-save loop; the first build is slower and every later one
+only recompiles what changed. A flag on the script to choose would do.
