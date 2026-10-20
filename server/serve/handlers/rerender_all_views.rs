@@ -20,19 +20,19 @@ use std::net::TcpStream;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-struct PreparedView {
-  view_id    : ViewId,
-  text       : String,
-  viewforest : ViewForest,
+pub(crate) struct PreparedView {
+  view_id                : ViewId,
+  text                   : String,
+  pub(crate) viewforest  : ViewForest,
 }
 
 pub(crate) struct PreparedRerenders {
   runtime  : std::sync::Arc<RuntimeGeneration>,
   view_ids : Vec<ViewId>,
-  views    : Vec<PreparedView>,
-  errors   : Vec<String>,
+  pub(crate) views    : Vec<PreparedView>,
+  pub(crate) errors   : Vec<String>,
   warnings : Vec<String>,
-  graph_straddle : Option<Arc<GraphStraddle>>, // the connection's, as the rerenders brought it up to date
+  pub(crate) graph_straddle : Option<Arc<GraphStraddle>>, // the connection's, as the rerenders brought it up to date
 }
 
 pub fn handle_rerender_all_views_request (
@@ -148,8 +148,8 @@ pub fn stream_rerender_views_after_absent_reference_cleanup (
 ) {
   let prepared = prepare_rerender_views_where (
     env, env . runtime_snapshot (), views_state,
-    Some (skgrepo_restriction), None, false,
-    |state| view_can_display_absent_reference_change (
+    Some (skgrepo_restriction), None, false, false,
+    |_, state| view_can_display_absent_reference_change (
       &state . viewforest, raw_skgid, affected_recorder_pids ));
   stream_prepared_rerenders (stream, views_state, prepared);
 }
@@ -168,8 +168,8 @@ pub fn stream_rerender_tdv_views (
 ) {
   let prepared : PreparedRerenders = prepare_rerender_views_where (
     env, env . runtime_snapshot (), views_state,
-    Some (skgrepo_restriction), None, false,
-    |state| state . tdv_buffer . is_some () );
+    Some (skgrepo_restriction), None, false, false,
+    |_, state| state . tdv_buffer . is_some () );
   stream_prepared_rerenders (stream, views_state, prepared);
 }
 
@@ -199,23 +199,25 @@ pub(crate) fn prepare_rerender_views_with_runtime (
 ) -> PreparedRerenders {
   prepare_rerender_views_where (
     env, runtime, views_state, skgrepo_restriction, prepass,
-    create_partnerFolders, |_| true )
+    create_partnerFolders, false, |_, _| true )
 }
 
 /// Prepare only open views selected from their already-held state.
 /// The selector is deliberately evaluated before cloning or rerendering, so a
 /// command can leave unrelated clean *and dirty* buffers entirely untouched.
-fn prepare_rerender_views_where (
+/// 'show_unshown_changes' is passed to 'rerender_view'.
+pub(crate) fn prepare_rerender_views_where (
   env                 : &SkgEnv,
   runtime             : std::sync::Arc<RuntimeGeneration>,
   views_state         : &ViewsState,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
   create_partnerFolders  : bool,
-  include             : impl Fn (&ViewState) -> bool,
+  show_unshown_changes   : bool,
+  include             : impl Fn (&ViewId, &ViewState) -> bool,
 ) -> PreparedRerenders {
   let view_ids : Vec<ViewId> = views_state . open_views . views . iter ()
-    .filter (|(_, state)| include (state))
+    .filter (|(view_id, state)| include (view_id, state))
     .map (|(view_id, _)| view_id . clone ()) . collect ();
   let mut context : RerenderAfterSaveContext =
     RerenderAfterSaveContext::without_save_with_runtime (
@@ -251,7 +253,8 @@ fn prepare_rerender_views_where (
         None, // streamed rerenders repair silently.
         create_partnerFolders,
         false,
-        tdv_buffer_of_view (views_state, view_id)
+        tdv_buffer_of_view (views_state, view_id),
+        show_unshown_changes
       ) } )
     { Ok (text) => {
         rendered_views . push ( PreparedView {

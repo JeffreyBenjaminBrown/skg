@@ -217,7 +217,8 @@ pub fn update_views_after_save (
         Some (&mut repair_warnings),
         false,
         true,
-        saved_tdv_buffer ) } ?;
+        saved_tdv_buffer,
+        false ) } ?;
   let readiness_summary : Option<BufferReadinessSummary> =
     saved_tdv_buffer . and ( context . graph_straddle . as_ref () )
     . map ( |straddle| {
@@ -372,7 +373,8 @@ fn rerender_collateral_view (
         None, // Collateral views repair silently.
         false,
         false,
-        tdv_buffer_of_view (views_state, &view_id)
+        tdv_buffer_of_view (views_state, &view_id),
+        false
       ) . map_err (
         |e| format!( "Collateral view {}: {}",
                       view_id . repr_in_client (), e)) ? };
@@ -494,13 +496,15 @@ pub fn complete_viewforest_with_graph_straddle (
 /// with a fresh drawing from the straddle
 /// ('process_unrestrictedVognode_changes'), keeping every viewnode
 /// that stays and its fold state, and its readiness facts are then
-/// read from the store. It follows the buffer's fresh sets
-/// ('TODO/total-diff-view/4_plan-fixes.org', "The view follows its
-/// fresh sets after a save"): before completion each node of the
-/// fresh U is made editable at its first occurrence if it has no
-/// editable one, nothing editable is write-protected again, and after
-/// completion the origins of the fresh D that the buffer does not
-/// draw are appended as roots and completed. Its standing roots stay.
+/// read from the store. Completion draws what it draws anew by the
+/// buffer's fresh sets, and nothing editable is write-protected
+/// again. Only when 'show_unshown_changes' is true (the "show unshown
+/// changes" request) does it make occurrences editable or append
+/// roots: before completion each node of the fresh U is made
+/// editable at its first occurrence if it has no editable one, and
+/// after completion the origins of the fresh D that the buffer does
+/// not draw are appended as roots and completed. Its standing roots
+/// stay.
 pub fn rerender_view (
   viewforest    : &mut ViewForest,
   context       : &mut RerenderAfterSaveContext<'_>,
@@ -508,6 +512,7 @@ pub fn rerender_view (
   create_partnerFolders : bool, // false post-save (folders round-trip from the buffer); true for the repo-switch rerender, where pruning removed them and the new set decides which return.
   substitute_existing_content_overrides : bool, // true only for the view whose edit created the override.
   tdv_buffer    : Option<TdvBuffer>, // Some for a buffer of the total diff view
+  show_unshown_changes : bool, // true only for the "show unshown changes" request; matters only in a total diff view
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
   if tdv_buffer . is_none () {
@@ -523,8 +528,10 @@ pub fn rerender_view (
   let tdv_drawing : Option<TdvDrawing> =
     graph_straddle . as_deref () . zip (tdv_buffer)
     . map ( |(straddle, tdv_buffer)| TdvDrawing { straddle, tdv_buffer } );
+  let drawing_to_show_unshown_changes : Option<TdvDrawing> =
+    tdv_drawing . filter ( |_| show_unshown_changes );
   let standing_roots : BTreeSet<ID> = root_skgids_of_buffer (viewforest);
-  if let Some (drawing) = tdv_drawing {
+  if let Some (drawing) = drawing_to_show_unshown_changes {
     // Before any visit, so that a node of U is editable before its
     // parent's visit can see it.
     make_freshU_editable_at_first_occurrences (
@@ -569,7 +576,7 @@ pub fn rerender_view (
         "complete_viewforest" ). entered();
       complete_viewforest (
         viewforest, &mut completion_context ) ? };
-    if let Some (drawing) = tdv_drawing {
+    if let Some (drawing) = drawing_to_show_unshown_changes {
       let new_roots : Vec<ID> =
         contentOrigins_missing_from_buffer (drawing, viewforest, &standing_roots);
       let appended : Vec<NodeId> = append_contentOrigins_to_buffer (

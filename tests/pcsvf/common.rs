@@ -16,6 +16,7 @@ use skg::graph_straddle::types::GraphStraddle;
 use skg::readiness_store::ReadinessStore;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::serve::handlers::show_unshown_changes::handle_show_unshown_changes_request;
 use skg::serve::handlers::stage_and_commit::handle_stage_and_commit_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::serve::handlers::total_diff_view::{
@@ -239,6 +240,41 @@ pub fn send_stage_and_commit_request (
   let mut response : String = String::new ();
   read_end . read_to_string (&mut response) ?;
   Ok (response) }
+
+/// Send a "show unshown changes" request for the buffer 'tdv_buffer'
+/// to its handler, under the skgrepo set 'all'; return everything it
+/// wrote.
+pub fn send_show_unshown_changes_request (
+  f          : &mut Fixture,
+  tdv_buffer : TdvBuffer,
+) -> Result<String, Box<dyn Error>> {
+  let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
+  let all_skgrepos : SkgrepoRestriction =
+    SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+  let (mut stream, mut read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  handle_show_unshown_changes_request (
+    &mut stream,
+    &format! ( "((request . \"show unshown changes\") (view-id . \"{}\"))\n",
+               view_id_of (tdv_buffer) . repr_in_client () ),
+    &env, &mut f . views_state, &all_skgrepos );
+  drop (stream);
+  let mut response : String = String::new ();
+  read_end . read_to_string (&mut response) ?;
+  Ok (response) }
+
+/// The "all changes" buffer as the "show unshown changes" request
+/// redraws it, and the unshown count of its readiness summary.
+pub fn show_unshown_changes (
+  f : &mut Fixture,
+) -> Result<(String, usize), Box<dyn Error>> {
+  let response : String =
+    send_show_unshown_changes_request (f, TdvBuffer::AllChanges) ?;
+  let unshown : usize = response . split ("(unshown ") . nth (1)
+    . and_then ( |rest| rest . split (')') . next () )
+    . and_then ( |count| count . parse () . ok () )
+    . unwrap_or_else ( || panic! ( "no unshown count in:\n{}", response ));
+  Ok (( rerendered_view_content (&response), unshown )) }
 
 /// The content of the first rerendered view in 'response'.
 pub fn rerendered_view_content (

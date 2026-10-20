@@ -369,8 +369,9 @@ pub fn root_skgids_of_buffer (
       _ => None, } )
     . collect () }
 
-/// Before a rerender's view completion: each node of the buffer's
-/// fresh U that has no editable occurrence becomes editable where it
+/// Before the view completion of a rerender that shows the unshown
+/// changes ('rerender_view'): each node of the buffer's fresh U that
+/// has no editable occurrence becomes editable where it
 /// stands, at its BFS-first content occurrence (a root, or a member
 /// of a vognode's content), or if it has none at its BFS-first
 /// folder occurrence, with its body from the live graph, as a freshly

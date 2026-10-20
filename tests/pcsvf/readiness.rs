@@ -5,7 +5,8 @@
 // ('TODO/total-diff-view/2_plan.org', "Saving a TDV buffer").
 
 use crate::pcsvf::common::{
-  Fixture, open_all_changes_buffer, open_buffer, save, save_buffer, with_fixture};
+  Fixture, open_all_changes_buffer, open_buffer, save, save_buffer,
+  show_unshown_changes, with_fixture};
 
 use skg::change_forest::{BufferReadinessSummary, ReadinessSummary};
 use skg::serve::handlers::save_buffer::{SaveResponse, readiness_summary_sexp};
@@ -112,8 +113,9 @@ fn editing_a_node_lapses_its_mark (
 /// (retitled), del and delc (deleted), ln (gains lo) and r (loses
 /// del); their seven leaves are the two text changes, the two
 /// deletions, and the relationships ln-lo, r-del and del-delc. Roots
-/// the user drops from the buffer are origins it no longer draws, so
-/// the save appends them again, and every change stays shown.
+/// the user drops from the buffer are origins it no longer draws: the
+/// save leaves them out and counts their changes unshown, and the
+/// "show unshown changes" request appends them again.
 #[test]
 fn the_save_reports_the_readiness_summary (
 ) -> Result<(), Box<dyn Error>> {
@@ -133,13 +135,18 @@ fn the_save_reports_the_readiness_summary (
         . expect ("r is a root");
       lines [start ..] . join ("\n") + "\n" };
     let response : SaveResponse = save_cleanly (f, &only_r) ?;
-    let roots : Vec<&str> = response . saved_view . lines ()
+    assert_eq! ( response . saved_view . lines ()
+                   . filter ( |line| line . starts_with ("* ") ) . count (), 1,
+                 "the dropped roots stay dropped:\n{}", response . saved_view );
+    assert_eq! ( summary_of (&response), summary (1, 6, 3) );
+    let (shown, unshown) : (String, usize) = show_unshown_changes (f) ?;
+    let roots : Vec<&str> = shown . lines ()
       . filter ( |line| line . starts_with ("* ") ) . collect ();
     assert! ( roots . len () == 4 && roots [0] . starts_with ("* (skg (node (id r)")
               && roots [1] . contains ("(id cy2)") && roots [2] . contains ("(id ln)")
               && roots [3] . contains ("(id mc)"),
-              "the dropped roots return, after r:\n{}", response . saved_view );
-    assert_eq! ( summary_of (&response), summary (1, 6, 0) );
+              "the dropped roots return, after r:\n{}", shown );
+    assert_eq! ( unshown, 0 );
     Ok (( )) }) }
 
 /// A save of the merges buffer of the 'buffers' fixture (described in
