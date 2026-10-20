@@ -1,5 +1,5 @@
 //! A save consumes the readiness requests of the buffer it saves
-//! ('TODO/total-diff-view/2_plan.org', "metadata"): after the graph
+//! ('TODO/total-diff-view/02_plan.org', "metadata"): after the graph
 //! edits succeed, each '(readyRequest ...)' or '(unreadyRequest ...)'
 //! sets or clears the marks of the change-forest leaves it names, at
 //! their fingerprints in the fresh graph straddle. A save that stops for

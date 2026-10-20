@@ -1,7 +1,7 @@
 #+title: Uses of "promote" and "demote"
 
 * Summary
-A case-insensitive search for the stems "promot" and "demot" in 'server/', 'elisp/', 'nvim/', 'tests/' (without 'tests/results/'), 'docs/', 'coding-advice/' and 'TODO/' (with 'TODO/DONE/'), skipping backup files ending in "~", finds 228 uses on 218 lines: 40 of "promote" and its forms, and 188 of "demote" and its forms; 'elisp/' and 'nvim/' contain none. They carry 17 distinct meanings, 6 for "demote" and 11 for "promote", plus 8 uses in 'TODO/total-diff-view/7_review.org' that mention the words themselves. One meaning dominates: "demote" as "set a child's 'affectsParent' to false" accounts for 164 uses, and it is the only sense of "demote" in live code and docs (59 uses in code, 3 in docs). Live code and docs also use "promote" in four other senses: lifting the sole top heading of an imported org file to its root ('parse.rs'), turning a viewnode into a deleted-node phantom ('viewnode.rs'), raising a search term to MUST ('docs/COMMANDS-nvim.org'), and two plain-English senses, raising something's prominence ('docs/this-is-awesome.org') and adopting something as a standard ('coding-advice/'). The pair "demote = make write-protected" and "promote = make editable" never occurs in code or docs; it occurs in the historical 'TODO/DONE/local-view-update/' plans under the old names "indefinitive" and "definitive", in one line of 'TODO/DONE/rename-indef-to-writeprotected.org', and in the recent TDV documents ('4_plan-fixes.org', '5_review.org', '7_review.org'). The open TODO files outside 'TODO/DONE/' and 'TODO/total-diff-view/' add the 'affectsParent' sense ('TODO/problems.org'), "focus-promotion" ('TODO/lying-names.org') and an async-to-sync sense ('TODO/from-dot-claude/obsolete-skgnodemap.org'). Every other meaning (deadening a viewnode, resetting a 'birth' claim, demoting org headings, lowering an error's severity, injecting a node into search results, turning a merged node's ID into an extra ID, and refactoring code to a broader home) occurs only in historical 'TODO/DONE/' documents.
+A case-insensitive search for the stems "promot" and "demot" in 'server/', 'elisp/', 'nvim/', 'tests/' (without 'tests/results/'), 'docs/', 'coding-advice/' and 'TODO/' (with 'TODO/DONE/'), skipping backup files ending in "~", finds 228 uses on 218 lines: 40 of "promote" and its forms, and 188 of "demote" and its forms; 'elisp/' and 'nvim/' contain none. They carry 17 distinct meanings, 6 for "demote" and 11 for "promote", plus 8 uses in 'TODO/total-diff-view/07_review.org' that mention the words themselves. One meaning dominates: "demote" as "set a child's 'affectsParent' to false" accounts for 164 uses, and it is the only sense of "demote" in live code and docs (59 uses in code, 3 in docs). Live code and docs also use "promote" in four other senses: lifting the sole top heading of an imported org file to its root ('parse.rs'), turning a viewnode into a deleted-node phantom ('viewnode.rs'), raising a search term to MUST ('docs/COMMANDS-nvim.org'), and two plain-English senses, raising something's prominence ('docs/this-is-awesome.org') and adopting something as a standard ('coding-advice/'). The pair "demote = make write-protected" and "promote = make editable" never occurs in code or docs; it occurs in the historical 'TODO/DONE/local-view-update/' plans under the old names "indefinitive" and "definitive", in one line of 'TODO/DONE/rename-indef-to-writeprotected.org', and in the recent TDV documents ('04_plan-fixes.org', '05_review.org', '07_review.org'). The open TODO files outside 'TODO/DONE/' and 'TODO/total-diff-view/' add the 'affectsParent' sense ('TODO/problems.org'), "focus-promotion" ('TODO/lying-names.org') and an async-to-sync sense ('TODO/from-dot-claude/obsolete-skgnodemap.org'). Every other meaning (deadening a viewnode, resetting a 'birth' claim, demoting org headings, lowering an error's severity, injecting a node into search results, turning a merged node's ID into an extra ID, and refactoring code to a broader home) occurs only in historical 'TODO/DONE/' documents.
 
 Terms used below. A /viewnode/ is one node of the tree the server draws into a buffer (an org headline in Emacs); it is a drawing of a stored node, not the stored node itself. An /occurrence/ is one viewnode that shows a given stored node; a node can occur several times in one view. 'affectsParent' is a flag on a viewnode: true means the child is a /member/ of its parent (it belongs to the parent's content list or to the folder's set, and a save reads it as such); false means the child sits under the parent only in the view, and a save does not add it to the parent. Older documents call these two values 'parentIs=Affected' and 'parentIs=Independent', and say "independent" or "non-member" for the second. A /stale/ member is a child marked as a member whose node the graph no longer lists in its parent's list or set. A /write-protected/ occurrence shows no body, accepts no edits, and has no content children drawn under it; older documents call it "indefinitive". An /editable/ occurrence is the opposite; older documents call it "definitive", and a "DVR" (definitive view request) is the user's request to make an occurrence editable. A /phantom/ is a viewnode standing for a node that is absent from the current graph (deleted, historical, or unknown). "TDV" is the total diff view.
 
@@ -167,12 +167,12 @@ This is the reconciler's "demote-not-discard" rule, decided 2026-06-10: a stale 
 - 'TODO/problems.org:10' (live TODO): "editable draws a and b twice under x: once demoted to non-members"
 - 'TODO/problems.org:15' (live TODO): "so it treats n as a new one and demotes its drawn children"
 - 'TODO/problems.org:18' (live TODO): "gesture only demotes them. Seen over TCP while verifying slice 3"
-- 'TODO/total-diff-view/7_review.org:207' (recent TDV documents): "it finds no counterpart, treats the occurrence as new, and demotes"
+- 'TODO/total-diff-view/07_review.org:207' (recent TDV documents): "it finds no counterpart, treats the occurrence as new, and demotes"
 ** Trigger: the TDV draws a member removed since the base as a non-member of its editable folder
 (4 uses.)
-- 'TODO/total-diff-view/3_review.org:254' (recent TDV documents): "reconciler cannot match a demoted member or a historical phantom. Every"
-- 'TODO/total-diff-view/4_plan-fixes.org:272' (recent TDV documents): "to skgids and treats a demoted member or a historical phantom as"
-- 'TODO/total-diff-view/4_plan-fixes.org:449' (recent TDV documents): "phantom: a goal item matches an existing historical phantom or demoted"
+- 'TODO/total-diff-view/03_review.org:254' (recent TDV documents): "reconciler cannot match a demoted member or a historical phantom. Every"
+- 'TODO/total-diff-view/04_plan-fixes.org:272' (recent TDV documents): "to skgids and treats a demoted member or a historical phantom as"
+- 'TODO/total-diff-view/04_plan-fixes.org:449' (recent TDV documents): "phantom: a goal item matches an existing historical phantom or demoted"
 - 'TODO/total-diff-view/progress.org:363' (recent TDV documents): "The redraw demotes a removed member of an editable set (Subscribee,"
 
 * "demote": reset a viewnode's 'birth' claim to its default value, 'Unremarkable'
@@ -181,7 +181,7 @@ The 'birth' field records why a child appears under its parent (for example, tha
 
 * "demote": make an occurrence write-protected (formerly "indefinitive")
 This meaning takes an occurrence that was editable (formerly "definitive") and makes it write-protected, so that it shows no body, accepts no edits and has no content children drawn under it; in the historical plans this happens when a deeper DVR for the same node claims the single editable occurrence. (13 uses.)
-- 'TODO/total-diff-view/4_plan-fixes.org:275' (recent TDV documents): "** 'tag_content_members' demotes at every visit and never promotes"
+- 'TODO/total-diff-view/04_plan-fixes.org:275' (recent TDV documents): "** 'tag_content_members' demotes at every visit and never promotes"
 - 'TODO/DONE/local-view-update/plan-critique.org:165' (historical TODO): "buffer's own *root could be demoted to indefinitive* -- its body and"
 - 'TODO/DONE/local-view-update/plan.org:281' (historical TODO): "Jeff's call: the invisible BufferRoot (§6.14) carries no data, so demotion"
 - 'TODO/DONE/local-view-update/plan.org:284' (historical TODO): "**** DONE residual: a visible origin can still be demoted"
@@ -197,10 +197,10 @@ This meaning takes an occurrence that was editable (formerly "definitive") and m
 
 * "promote": make a write-protected occurrence editable (formerly "definitive")
 This meaning is the inverse of the previous one: an occurrence that was write-protected becomes the editable occurrence of its node, so the server draws its body and content children. In the TDV documents it names what the step now called "ensuring editable occurrences exist" does: after a save, for every changed node that has no editable occurrence, it makes one of that node's occurrences editable. (5 uses.)
-- 'TODO/total-diff-view/4_plan-fixes.org:275' (recent TDV documents): "** 'tag_content_members' demotes at every visit and never promotes"
-- 'TODO/total-diff-view/5_review.org:76' (recent TDV documents): "pre-pass re-promote, and send a completion warning that says so."
-- 'TODO/total-diff-view/5_review.org:157' (recent TDV documents): "promotes only those (a member of a write-protected folder would be"
-- 'TODO/total-diff-view/7_review.org:130' (recent TDV documents): "promotes a write-protected viewnode by itself. It never touches a node"
+- 'TODO/total-diff-view/04_plan-fixes.org:275' (recent TDV documents): "** 'tag_content_members' demotes at every visit and never promotes"
+- 'TODO/total-diff-view/05_review.org:76' (recent TDV documents): "pre-pass re-promote, and send a completion warning that says so."
+- 'TODO/total-diff-view/05_review.org:157' (recent TDV documents): "promotes only those (a member of a write-protected folder would be"
+- 'TODO/total-diff-view/07_review.org:130' (recent TDV documents): "promotes a write-protected viewnode by itself. It never touches a node"
 - 'TODO/DONE/rename-indef-to-writeprotected.org:662' (historical TODO): "=definitiveView= request still promotes a write-protected childless node."
 
 * "demote": change a viewnode's kind to 'DeadScaffold', a dead placeholder that only holds its children
@@ -280,17 +280,17 @@ In "focus-promotion", the cursor's focus passes from a viewnode that removes its
 
 * Uses that mention the words themselves
 These lines in the current discussion talk about the words rather than use them; line 148's phrase "heading promotion in the importer" refers to the 'parse.rs' meaning above. (8 uses.)
-- 'TODO/total-diff-view/7_review.org:139' (recent TDV documents): "******* ONGOING Is 'promote' widely used in the codebase?"
-- 'TODO/total-diff-view/7_review.org:146' (recent TDV documents): "A quick count before the survey: 'promote' appears five times in the"
-- 'TODO/total-diff-view/7_review.org:148' (recent TDV documents): "heading promotion in the importer, one a restricted viewnode shown as"
-- 'TODO/total-diff-view/7_review.org:149' (recent TDV documents): "unrestricted, the rest prose); 'demote' appears about forty times,"
-- 'TODO/total-diff-view/7_review.org:153' (recent TDV documents): "survey is going to [[file:7_1_uses-of-promote-and-demote.org][7_1_uses-of-promote-and-demote.org]]: every use of"
+- 'TODO/total-diff-view/07_review.org:139' (recent TDV documents): "******* ONGOING Is 'promote' widely used in the codebase?"
+- 'TODO/total-diff-view/07_review.org:146' (recent TDV documents): "A quick count before the survey: 'promote' appears five times in the"
+- 'TODO/total-diff-view/07_review.org:148' (recent TDV documents): "heading promotion in the importer, one a restricted viewnode shown as"
+- 'TODO/total-diff-view/07_review.org:149' (recent TDV documents): "unrestricted, the rest prose); 'demote' appears about forty times,"
+- 'TODO/total-diff-view/07_review.org:153' (recent TDV documents): "survey is going to [[file:07_1_uses-of-promote-and-demote.org][07_1_uses-of-promote-and-demote.org]]: every use of"
 
 * Collisions
 ** Same file, same word, different meanings
-- 'TODO/total-diff-view/4_plan-fixes.org': lines 272 and 449 say "demoted member" for a member made a non-member ('affectsParent' false), and line 275, three lines after the first, says "'tag_content_members' demotes at every visit and never promotes" for making an occurrence write-protected (and, with "promotes", editable).
-- 'TODO/total-diff-view/7_review.org': line 130 uses "promotes" for making a write-protected viewnode editable, and line 207 uses "demotes children the server drew" for setting their 'affectsParent' to false; the second is not the inverse of the first.
-- 'TODO/total-diff-view/progress.org' (lines 209 and 363, 'affectsParent' false) and '5_review.org' (lines 76 and 157, make editable): the TDV documents taken together use "demote" for one axis and "promote" for another, so a reader expects an inverse that is not there.
+- 'TODO/total-diff-view/04_plan-fixes.org': lines 272 and 449 say "demoted member" for a member made a non-member ('affectsParent' false), and line 275, three lines after the first, says "'tag_content_members' demotes at every visit and never promotes" for making an occurrence write-protected (and, with "promotes", editable).
+- 'TODO/total-diff-view/07_review.org': line 130 uses "promotes" for making a write-protected viewnode editable, and line 207 uses "demotes children the server drew" for setting their 'affectsParent' to false; the second is not the inverse of the first.
+- 'TODO/total-diff-view/progress.org' (lines 209 and 363, 'affectsParent' false) and '05_review.org' (lines 76 and 157, make editable): the TDV documents taken together use "demote" for one axis and "promote" for another, so a reader expects an inverse that is not there.
 - 'TODO/DONE/local-view-update/plan_v2.org': lines 229, 232, 234, 261, 994 and 996 use "demote" for making an origin indefinitive (write-protected), while lines 331 through 1029 use it for setting a stale branch's 'parentIs' to 'Independent'.
 - 'TODO/DONE/local-view-update/plan.org': lines 281, 284, 298 and 326 (make indefinitive) collide in the same way with lines 414 through 1089 ('parentIs' to 'Independent').
 - 'TODO/DONE/local-view-update/plan-critique.org': line 165 ("root could be demoted to indefinitive") and line 210 ("demote-not-delete", the stale-member rule) are 45 lines apart.

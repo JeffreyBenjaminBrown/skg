@@ -100,7 +100,7 @@ TDV in COMMANDS.org.)
 **** [Claude] agreed; the danger is now documented, and one more candidate
 Both COMMANDS files now say, in the total diff view's section, why
 partial commits are dangerous in skg. The deletion itself is slice 3
-of 4_plan-fixes.org.
+of 04_plan-fixes.org.
 ***** DONE Decision: delete 'skg-stage-moves' too?
 It is the other partial-staging tool: it writes a script that
 'git rm's a moved node's file in one skgrepo and 'git add's it in
@@ -832,7 +832,7 @@ a risk to retire on purpose rather than by surprise. Candidate
 replacements exist (maintained forks such as 'serde_yaml_ng'); I have
 not evaluated them.
 **** Decision: a dependency-upgrade pass as its own small plan, after these fixes
-Not inside 4_plan-fixes.org: upgrading ego-tree, git2 and tantivy
+Not inside 04_plan-fixes.org: upgrading ego-tree, git2 and tantivy
 touches APIs across the server, and the yaml replacement deserves its
 own look at the '.skg' round trip. I would do it next, with the three
 suites as the net. Say yes and I will write that plan; 'cargo update'

@@ -170,8 +170,8 @@ the duplication, and still cannot see out-of-view relationships.
 ANSWER:
 I'll default to: B, after your answers to the next two questions.
 *** Claude says: B, confirmed
-Jeff confirmed B on 2026-10-17 in TODO/total-diff-view/1_discussion.org
-("went with all your suggestions"). The TDV plan, TODO/total-diff-view/2_plan.org,
+Jeff confirmed B on 2026-10-17 in TODO/total-diff-view/01_discussion.org
+("went with all your suggestions"). The TDV plan, TODO/total-diff-view/02_plan.org,
 implements it in slice 3.
 ** DONE When a node moves more private, should relationships into it rise automatically?
 Today they keep their old, more public repo, leaving the moved node's ID

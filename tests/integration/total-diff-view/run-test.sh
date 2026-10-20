@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Integration test: the total diff view, end to end
-# ('TODO/total-diff-view/2_plan.org', "Verification and completion").
+# ('TODO/total-diff-view/02_plan.org', "Verification and completion").
 #
 # Two owned skgrepos, alpha and beta, and one foreign skgrepo, gamma,
 # each its own gitrepo. At HEAD, alpha's r contains t, m, d and x; y

@@ -6,7 +6,7 @@ Implement this plan. It is a complete, settled specification, and
 nothing here is open for discussion. Writing it has implemented
 nothing. It stands on its own: every term it uses is defined below or
 in 'docs/glossary.org', and the review that produced it
-([[file:7_review.org][7_review.org]]) is background that nobody needs to read; where the two
+([[file:07_review.org][07_review.org]]) is background that nobody needs to read; where the two
 differ, this document wins.
 
 Read [[file:../../coding-advice/ORIENTATION.org][the orientation]] and its code-change, architecture, testing and
@@ -24,7 +24,7 @@ file of your own under 'tests/results/', never under 'TODO/'.
 ** Commits
 Commit granularly, one or a few commits per slice, each message naming
 the slice and this document ("Slice 2 of
-TODO/total-diff-view/8_plan_yet-more.org: ..."). A slice's last
+TODO/total-diff-view/08_plan_yet-more.org: ..."). A slice's last
 code-modifying commit also carries the slice's documentation changes
 and the change of its headline here from TODO to DONE; neither stands
 as a commit of its own. So update the docs and the keyword before

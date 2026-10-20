@@ -1,5 +1,5 @@
 // The "investigate unknown node" request
-// ('TODO/total-diff-view/2_plan.org', "Investigating an unknown
+// ('TODO/total-diff-view/02_plan.org', "Investigating an unknown
 // node"). One gitrepo: p contains v, ghost and w; v, which contains w
 // and links to it, is deleted in a second commit; ghost never existed.
 

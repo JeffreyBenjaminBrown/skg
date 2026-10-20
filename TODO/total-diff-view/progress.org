@@ -613,7 +613,7 @@ and 'RerenderAfterSaveContext::graph_pair' became 'graph_straddle',
 matching 'graph_straddle_slot' beside them.
 *** a citation keeps the old name
 'server/graph_straddle/mod.rs' cites the heading "graph pair" of
-'TODO/total-diff-view/2_plan.org', which still has that name.
+'TODO/total-diff-view/02_plan.org', which still has that name.
 *** 'docs/heralds.org' needed nothing
 It no longer mentioned the graph pair.
 ** Slice 1: deviations

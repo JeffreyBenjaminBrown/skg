@@ -1,7 +1,7 @@
 // A buffer of the total diff view draws by its fresh sets wherever a
 // save draws something new, but only the "show unshown changes"
 // request makes occurrences editable or appends roots
-// ('TODO/total-diff-view/8_plan_yet-more.org', "The view follows U
+// ('TODO/total-diff-view/08_plan_yet-more.org', "The view follows U
 // only on command"). The 'fresh' fixture (one skgrepo, main): r
 // contains a, whose body changed, and w, unchanged; w contains w1
 // and w2; w1 contains w1a and subscribes to w2. s, unchanged,

@@ -2,7 +2,7 @@
 #+TODO: TODO ONGOING | DONE
 
 * What happened, in short
-The run of [[file:6_plan-more.org][6_plan-more.org]] finished slices 0 and 1 and stopped in slice 2,
+The run of [[file:06_plan-more.org][06_plan-more.org]] finished slices 0 and 1 and stopped in slice 2,
 on purpose and correctly. Slice 2 asked for two things. The first,
 moving editability between two instances of a changed node, is built,
 tested and green, but uncommitted. The second, "unfold this subtree
@@ -230,7 +230,7 @@ The alternative, with the stopped session's context intact, is
 #+begin_example
 claude --resume bdba0930-0565-4480-bd08-a2167cf820af --dangerously-skip-permissions
 #+end_example
-and telling it that slice 2 of 6_plan-more.org is rewritten and to
+and telling it that slice 2 of 06_plan-more.org is rewritten and to
 finish the slice as it now says; then the runner for slice 3.
 
 * What I checked

@@ -1,4 +1,4 @@
-//! The "stage and commit" request ('TODO/total-diff-view/2_plan.org',
+//! The "stage and commit" request ('TODO/total-diff-view/02_plan.org',
 //! "the summary and the commit"): stage everything and git-commit it,
 //! in every owned skgrepo that has changes, with one message. When the
 //! readiness summary is incomplete and the request lacks

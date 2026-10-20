@@ -1,5 +1,5 @@
 //! The "show unshown changes" request
-//! ('TODO/total-diff-view/8_plan_yet-more.org', "The view follows U
+//! ('TODO/total-diff-view/08_plan_yet-more.org', "The view follows U
 //! only on command"): redraw one buffer of the total diff view so
 //! that every node of its fresh U has an editable occurrence, and
 //! every origin of its fresh D that it draws nowhere is a root. A

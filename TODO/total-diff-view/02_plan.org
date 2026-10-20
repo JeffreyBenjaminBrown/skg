@@ -4,7 +4,7 @@
 * Assignment and authority
 Implement this plan. It is a complete, settled specification: every
 decision needed to execute it is in this document, and nothing here is
-open for discussion. [[file:1_discussion.org][The discussion]] that produced it is background only;
+open for discussion. [[file:01_discussion.org][The discussion]] that produced it is background only;
 where the two differ, this document wins. Writing this plan has
 implemented nothing.
 

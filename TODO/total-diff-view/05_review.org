@@ -3,7 +3,7 @@
 
 * Verdict
 The run did not go off the rails. It implemented all ten slices of
-[[file:4_plan-fixes.org][4_plan-fixes.org]] and the six slices of the dependency plan in two hours
+[[file:04_plan-fixes.org][04_plan-fixes.org]] and the six slices of the dependency plan in two hours
 (00:27 to 02:24), in 29 commits, and every slice is marked DONE in
 both plans. The one stop the plan allowed for did not happen: three of
 the four 'serde_yaml' replacements re-serialize all 62,339 '.skg'
@@ -308,7 +308,7 @@ there, so this is older state of yours to look at or discard.
 
 * Housekeeping
 ** DONE The commit rule was followed
-Each slice's last commit carries '4_plan-fixes.org' (the keyword),
+Each slice's last commit carries '04_plan-fixes.org' (the keyword),
 'progress.org' and the docs it changed; the dependency sub-slices each
 carry 'TODO/dependency-upgrade/plan.org'. Slice 0's lockfile commit is
 alone, as the plan asked.
@@ -328,7 +328,7 @@ directory are removed).
 After dogfooding, a merge to 'main' is the natural next step.
 ** A citation keeps the old name
 'server/graph_straddle/mod.rs' cites the "graph pair" heading of
-'2_plan.org', which still has that name. Fine as history.
+'02_plan.org', which still has that name. Fine as history.
 
 * The follow-up work, as decided here
 Six items, small enough for one plan:

@@ -1,7 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; PURPOSE: The commit-readiness gestures of the total diff view
-;;; ('TODO/total-diff-view/2_plan.org', "gestures"). Each writes
+;;; ('TODO/total-diff-view/02_plan.org', "gestures"). Each writes
 ;;; readiness requests, '(readyRequest AXES)' or '(unreadyRequest
 ;;; AXES)', into headline metadata, then saves. The save consumes
 ;;; them, setting or clearing the marks, and answers with the buffer

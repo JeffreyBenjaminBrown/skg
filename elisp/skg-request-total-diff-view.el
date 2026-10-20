@@ -1,7 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; PURPOSE: The total diff view
-;;; ('TODO/total-diff-view/2_plan.org', "One command, four buffers").
+;;; ('TODO/total-diff-view/02_plan.org', "One command, four buffers").
 ;;; One command sends one "total diff view" request per buffer, in
 ;;; order, and opens each buffer the server does not answer with
 ;;; '(empty . t)', named "diff-view: " followed by the buffer's name.

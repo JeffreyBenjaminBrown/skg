@@ -1,5 +1,5 @@
 // The PCSVF and the "all changes" buffer of the total diff view
-// ('TODO/total-diff-view/2_plan.org', "The PCSVF"), over git fixtures
+// ('TODO/total-diff-view/02_plan.org', "The PCSVF"), over git fixtures
 // in 'tests/pcsvf/fixtures/'.
 //
 // cargo nextest run --test grouped_repos -E 'test(pcsvf::)'

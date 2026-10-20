@@ -4,7 +4,7 @@
 * Assignment and authority
 Implement this plan. It is a complete, settled specification, and
 nothing here is open for discussion. Writing it has implemented nothing.
-It is slice 10 of [[file:../total-diff-view/4_plan-fixes.org][the fixes plan]], whose assignment section applies
+It is slice 10 of [[file:../total-diff-view/04_plan-fixes.org][the fixes plan]], whose assignment section applies
 here too.
 
 Read [[file:../../coding-advice/ORIENTATION.org][the orientation]] and its code-change, testing and execution advice

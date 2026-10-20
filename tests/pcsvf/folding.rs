@@ -1,4 +1,4 @@
-// Folding survives saves ('TODO/total-diff-view/4_plan-fixes.org',
+// Folding survives saves ('TODO/total-diff-view/04_plan-fixes.org',
 // "Folding survives, because nothing that exists is recreated"): the
 // server never changes the fold state of a viewnode that exists, and
 // a viewnode whose kind changes keeps its fold state. The fixtures

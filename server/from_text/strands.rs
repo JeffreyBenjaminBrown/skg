@@ -1,5 +1,5 @@
 //! Moving a node between skgrepos: the save decides what the move
-//! strands ('TODO/total-diff-view/2_plan.org', "Moving a node between
+//! strands ('TODO/total-diff-view/02_plan.org', "Moving a node between
 //! skgrepos").
 //!
 //! A relationship touching a moved node, in either direction and

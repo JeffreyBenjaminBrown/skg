@@ -6,7 +6,7 @@ Implement this plan. It is a complete, settled specification, and
 nothing here is open for discussion. Writing it has implemented
 nothing. It stands on its own: every term it uses is defined below or
 in 'docs/glossary.org', and the review that produced it
-([[file:5_review.org][5_review.org]]) is background that nobody needs to read; where the two
+([[file:05_review.org][05_review.org]]) is background that nobody needs to read; where the two
 differ, this document wins.
 
 Read [[file:../../coding-advice/ORIENTATION.org][the orientation]] and its code-change, architecture, testing and

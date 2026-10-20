@@ -1,5 +1,5 @@
 //! The total diff view's step at each unrestricted vognode's visit
-//! in view completion ('TODO/total-diff-view/2_plan.org', "The
+//! in view completion ('TODO/total-diff-view/02_plan.org', "The
 //! PCSVF" and "What each kind of change looks like"), and at each
 //! historical phantom's.
 //!
@@ -18,7 +18,7 @@
 //! buffer being drawn ('TdvDrawing::sets'); in the order-only buffer
 //! both are empty, and each node there gets an order-only marker.
 //!
-//! Nothing that exists is drawn again ('TODO/total-diff-view/4_plan-fixes.org',
+//! Nothing that exists is drawn again ('TODO/total-diff-view/04_plan-fixes.org',
 //! "Folding survives, because nothing that exists is recreated"):
 //! each step builds a fresh drawing and reconciles what the node
 //! holds with it ('server/to_org/render/fresh_drawing.rs'), so every

@@ -1,6 +1,6 @@
 -- PURPOSE: Stage every change and git-commit it, in every owned
 -- skgrepo that has changes, with one message
--- ('TODO/total-diff-view/2_plan.org', "the summary and the commit").
+-- ('TODO/total-diff-view/02_plan.org', "the summary and the commit").
 -- When the readiness summary is incomplete, the server answers with
 -- it instead and changes nothing; only the typed word "yes" resends
 -- the request confirmed. Every answer is followed by a rerender

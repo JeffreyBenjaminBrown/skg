@@ -1,6 +1,6 @@
 /// Stages every '.skg' change of each owned skgrepo, deletions
 /// included, and git-commits it with one message
-/// ('TODO/total-diff-view/2_plan.org', "the summary and the commit").
+/// ('TODO/total-diff-view/02_plan.org', "the summary and the commit").
 /// A skgrepo whose staged tree equals its HEAD's has no changes and
 /// gets no commit. The author and committer are the gitrepo's
 /// configured user.

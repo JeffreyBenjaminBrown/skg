@@ -2077,7 +2077,7 @@ Slice 1 renames the style in the shared file and in every file that
 names it (both clients' link annotations and their tests, the two
 COMMANDS docs, the API doc and the heralds doc).
 ** DONE Strand computation: proceed with option B and its three defaults?
-(Raised while writing 2_plan.org, and moved here from it.)
+(Raised while writing 02_plan.org, and moved here from it.)
 [[file:../repo-move-graph-logic/1_discussion.org][TODO/repo-move-graph-logic]] still carried three TODOs for you: which
 option (my default was B, the save decides with a confirmation round
 trip), whether inbound relationships of a privatizing move rise
@@ -2091,7 +2091,7 @@ between skgrepos" and in slice 3, without pointing at either
 discussion. The last TODO in TODO/repo-move-graph-logic is marked DONE
 with a pointer here.
 ** DONE Does this plan retire the diff report too?
-(Raised while writing 2_plan.org, and moved here from it.)
+(Raised while writing 02_plan.org, and moved here from it.)
 Slice 9 retired the diff-mode toggle and the per-stage machinery, and
 it kept the diff report, because its duplicate-ID and vanished-node
 investigations are not diff-view features.

@@ -1,7 +1,7 @@
 #+title: Jeff, resume here: the unattended run of the current plan
 
 * Before starting it
-Commit the plan ('8_plan_yet-more.org') and anything else you want
+Commit the plan ('10_plan_still-more.org') and anything else you want
 tracked: every slice's last commit edits the plan (its DONE keyword
 rides in that commit, never in a commit of its own). Tracked files with
 uncommitted changes do not stop the script; it takes them for the work
@@ -13,8 +13,8 @@ nohup bash/run-plan-slices.sh > TODO/total-diff-view/run-logs/run.out 2>&1 &
 #+end_example
 
 * What runs
-'bash/run-plan-slices.sh' runs the slices of [[file:8_plan_yet-more.org][8_plan_yet-more.org]] in
-order, slices 0 to 3, each in a fresh Claude Code session (Opus 5.5, effort
+'bash/run-plan-slices.sh' runs the slices of [[file:10_plan_still-more.org][10_plan_still-more.org]] in
+order, slices 0 to 1, each in a fresh Claude Code session (Opus 5.5, effort
 high, permissions bypassed). After each slice the
 script checks whether the agent marked that slice's headline DONE in
 the plan, and it stops at the first slice that did not end that way.
@@ -32,24 +32,22 @@ One line per slice start ("slice N  session UUID") and one per slice
 finish ("slice N DONE"). The UUID is what you need to resume a session.
 ** the plan's headlines
 #+begin_example
-grep '^\*\* ' TODO/total-diff-view/8_plan_yet-more.org
+grep '^\*\* ' TODO/total-diff-view/10_plan_still-more.org
 #+end_example
 Every slice that finished reads "** DONE Slice N: ...".
 
 * If every slice is DONE
 Review the commits ('git log --oneline' since your planning commit;
 each message names its slice) and run the suites once yourself:
-'cargo nextest run', 'bash/emacs-tests.sh', 'bash/nvim-tests.sh'. Open
-a TDV, edit a node it shows only as a write-protected leaf from
-another buffer, see the summary count it unshown, and run C-c r u to
-pull it in; write-protect an occurrence with C-c s w and see its
-children become non-members. Then read 'progress.org' under its "Yet
-more fixes" headline: it holds any deviation from the plan
+'cargo nextest run', 'bash/emacs-tests.sh', 'bash/nvim-tests.sh'. Edit a
+subscribee folder under a write-protected headline and save: the
+save is refused. Then read 'progress.org' under its "Still more
+fixes" headline: it holds any deviation from the plan
 the agents chose to record.
 
 * If a slice ended without DONE
 The agent stopped for a question. Its report is in [[file:progress.org][progress.org]] under
-"Yet more fixes"; its last message is in 'run-logs/slice-N.txt'. The plan
+"Still more fixes"; its last message is in 'run-logs/slice-N.txt'. The plan
 expects no stop.
 ** Answer it in the session that asked, with its context intact
 #+begin_example
@@ -64,7 +62,7 @@ ask it to mark the slice DONE in the plan inside its last commit.
 nohup bash/run-plan-slices.sh > TODO/total-diff-view/run-logs/run.out 2>&1 &
 #+end_example
 It skips every slice already marked DONE. Give it a range
-('bash/run-plan-slices.sh 2 3') to be explicit.
+('bash/run-plan-slices.sh 1 1') to be explicit.
 
 * If claude exited nonzero
 Read 'run-logs/slice-N.err'. Usual causes are a network or
@@ -78,5 +76,5 @@ which starts that slice afresh.
 - The plan is the specification; 'progress.org' is the agents'
   deviation and stop log; 'run-logs/' is the run's bookkeeping. Of the
   three, only the plan's DONE keywords are meant to be committed.
-- The review that produced the plan is [[file:7_review.org][7_review.org]]; the agents were
+- The review that produced the plan is [[file:09_review.org][09_review.org]]; the agents were
   told it is background they need not read.

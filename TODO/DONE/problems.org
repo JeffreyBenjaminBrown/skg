@@ -5,7 +5,7 @@
   translates only C-c s d ('neovim_bindings_of_emacs_chords',
   'nvim/lua/skg/messages.lua'); adding the others that have a Neovim
   binding there would fix it.
-  Fixed 2026-10-20 in slice 3 of [[file:../total-diff-view/8_plan_yet-more.org][the TDV yet-more-fixes plan]]: the
+  Fixed 2026-10-20 in slice 3 of [[file:../total-diff-view/08_plan_yet-more.org][the TDV yet-more-fixes plan]]: the
   table gains C-c s s and C-c g RET; C-c s r stays, as Neovim has no
   relRepo command.
 * Write-protecting a drawn TDV occurrence duplicates its children (2026-10-19; fixed 2026-10-19)
@@ -20,9 +20,9 @@
   ('make_direct_unrestricted_children_independent'), though the server
   drew them as n's members. In an ordinary content view the same
   gesture only demotes them. Seen over TCP while verifying slice 3
-  of 'TODO/total-diff-view/6_plan-more.org'; the gesture was allowed
+  of 'TODO/total-diff-view/06_plan-more.org'; the gesture was allowed
   before that slice too.
-  Fixed 2026-10-19 in slice 0 of [[file:../total-diff-view/8_plan_yet-more.org][the TDV yet-more-fixes plan]]: the save
+  Fixed 2026-10-19 in slice 0 of [[file:../total-diff-view/08_plan_yet-more.org][the TDV yet-more-fixes plan]]: the save
   no longer compares with the last rendering, nor demotes anything; a
   write-protected occurrence with a member is refused; and the server
   makes the members of what it write-protects non-members, which an
@@ -38,7 +38,7 @@
   callers are safe today only because of where they move nodes; a
   shared helper that detaches first, used everywhere, would remove
   the trap.
-  Fixed 2026-10-19 in slice 9 of [[file:../total-diff-view/4_plan-fixes.org][the TDV fixes plan]]: every move of
+  Fixed 2026-10-19 in slice 9 of [[file:../total-diff-view/04_plan-fixes.org][the TDV fixes plan]]: every move of
   a node already in a tree goes through 'server/types/tree/moves.rs',
   whose helpers detach first and do nothing when the node is already
   in place.
@@ -52,7 +52,7 @@
   empty. Any other empty string the server sends (an empty title, an
   empty error) is read the same way. Building string atoms through
   one helper that always quotes would remove the trap.
-  Fixed 2026-10-19 in slice 8 of [[file:../total-diff-view/4_plan-fixes.org][the TDV fixes plan]]: every response
+  Fixed 2026-10-19 in slice 8 of [[file:../total-diff-view/04_plan-fixes.org][the TDV fixes plan]]: every response
   is printed by 'sexp_to_client_string' ('server/serve/util.rs'),
   which prints an empty string atom as '""', and the clients'
   reading of a bare '(content)' as empty is gone.
@@ -68,9 +68,9 @@
   worktree, never with a parent. So after a 'git pull' that merges,
   both features are blocked until the next ordinary commit. Removing
   both checks is proposed in the TDV discussion
-  ([[file:total-diff-view/1_discussion.org][TODO/total-diff-view]], open question on the
+  ([[file:total-diff-view/01_discussion.org][TODO/total-diff-view]], open question on the
   merge-commit refusal). Decided 2026-10-17: Jeff agreed. Fixed
-  2026-10-17 in slice 0 of [[file:total-diff-view/2_plan.org][the TDV plan]]: both refusals are gone,
+  2026-10-17 in slice 0 of [[file:total-diff-view/02_plan.org][the TDV plan]]: both refusals are gone,
   along with 'head_is_merge_commit', which nothing else used.
   Resolved 2026-10-17: slice 9 retired both tools; the total diff
   view, which replaces them, does not refuse a merge commit at HEAD.
@@ -82,7 +82,7 @@
   a content relationship) shows no diff fact in diff mode and no line
   in the report, although the section files changed. Comparing
   'RelPartner' (relRepo, member) pairs would fix both; the TDV
-  discussion ([[file:total-diff-view/1_discussion.org][TODO/total-diff-view]], "relationship diffs that
+  discussion ([[file:total-diff-view/01_discussion.org][TODO/total-diff-view]], "relationship diffs that
   see relRepo") depends on the same fix.
   Resolved 2026-10-17: the graph pair of the total diff view (slice 2)
   compares relationships with their relRepos, and draws a relRepo move

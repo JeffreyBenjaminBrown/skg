@@ -43,7 +43,7 @@ pub struct ViewState {
 }
 
 /// The four buffers of the total diff view
-/// ('TODO/total-diff-view/2_plan.org', "One command, four buffers").
+/// ('TODO/total-diff-view/02_plan.org', "One command, four buffers").
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TdvBuffer {
   AllChanges,

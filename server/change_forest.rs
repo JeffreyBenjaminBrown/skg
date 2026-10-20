@@ -1,6 +1,6 @@
 //! The change-forest: the tree of everything commit-readiness can be
 //! asked about, built from the graph straddle, independent of any view
-//! ('TODO/total-diff-view/2_plan.org', "change-forest"). Its roots
+//! ('TODO/total-diff-view/02_plan.org', "change-forest"). Its roots
 //! are the changed graphnodes that own a change; under each come its
 //! changed aspects; its leaves are the individual changes a user
 //! marks. A relationship's leaves live under its recorder.

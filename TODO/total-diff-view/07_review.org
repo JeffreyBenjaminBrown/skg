@@ -2,7 +2,7 @@
 #+TODO: TODO ONGOING | DONE
 
 * Verdict
-The run finished the plan: slices 2 and 3 of [[file:6_plan-more.org][6_plan-more.org]] are DONE
+The run finished the plan: slices 2 and 3 of [[file:06_plan-more.org][06_plan-more.org]] are DONE
 and committed, in four commits over seventeen minutes (05:32 to
 05:49). Slice 2 was finished by a fresh agent on top of the work the
 stopped one left, as the rewritten plan asked; slice 3 built the
@@ -152,7 +152,7 @@ deleted phantom, the rest prose); 'demote' appears about forty times
 in code, nearly always meaning "set a child's 'affectsParent' to
 false". The sense you had to decode, "make a write-protected
 occurrence editable", is mine alone, from the recent TDV documents.
-The survey is [[file:7_1_uses-of-promote-and-demote.org][7_1_uses-of-promote-and-demote.org]]: every use of both
+The survey is [[file:07_1_uses-of-promote-and-demote.org][07_1_uses-of-promote-and-demote.org]]: every use of both
 words, grouped by meaning, with the collisions listed.
 ******** [Claude] what the survey found
 228 uses in all (40 of "promote", 188 of "demote"), none in the Emacs
@@ -161,7 +161,7 @@ for 164 of them: "demote" as setting a child's 'affectsParent' to
 false while keeping it and its subtree, which is the only sense of
 "demote" in live code and docs. The pair "promote = make editable,
 demote = make write-protected" occurs nowhere in code or docs; it
-lives in the recent TDV documents ('4_plan-fixes.org', '5_review.org',
+lives in the recent TDV documents ('04_plan-fixes.org', '05_review.org',
 this file) and, under the old words "definitive" and "indefinitive",
 in the historical local-view-update plans. The other fifteen meanings
 are scattered and mostly historical (org heading levels, an error's
@@ -776,7 +776,7 @@ content view saves).
 The slice-2 entry in 'progress.org' is now the finishing agent's,
 with one sentence saying the first run stopped and why. The stop
 report itself is gone from the file; its substance lives in
-[[file:6_1_unblocking-slice-2.org][6_1_unblocking-slice-2.org]].
+[[file:06_1_unblocking-slice-2.org][06_1_unblocking-slice-2.org]].
 
 * Housekeeping
 ** DONE The commit rule was followed

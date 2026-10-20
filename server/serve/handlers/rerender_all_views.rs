@@ -156,7 +156,7 @@ pub fn stream_rerender_views_after_absent_reference_cleanup (
 
 /// After a git-commit: rerender each open buffer of the total diff
 /// view as any rerender does, over the graph straddle the commit
-/// rebuilt. Its roots stay ('TODO/total-diff-view/4_plan-fixes.org',
+/// rebuilt. Its roots stay ('TODO/total-diff-view/04_plan-fixes.org',
 /// "Roots linger"), and what the commit made unchanged loses its
 /// decorations. The commit requires the skgrepo-set all, so no text
 /// is withheld and no release is asked for.
