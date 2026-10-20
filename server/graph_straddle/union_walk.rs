@@ -13,7 +13,7 @@ use crate::dbs::in_rust_graph::relation_accessors::{
   NodeRelation, RelationRole};
 use crate::graph_straddle::types::{
   ChangedPids, GraphStraddle, NodeChanges, Partner, Presence};
-use crate::types::misc::{ID, RelPartner, SkgrepoChange, SkgrepoName};
+use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::util::setlike_vector_subtraction;
@@ -218,33 +218,13 @@ fn partners_in_graph (
           Some ((recorder, relRepo)) } )
         . collect ()
     } else { // the node records the relationship
-      recorded_rel_partners (graph, pid, role . relation)
+      graph . outbound_member_keys_for_relation_gated (pid, role . relation, None)
         . into_iter ()
-        . map ( |rel_partner| (
-          graph . pid_of (&rel_partner . member)
-            . unwrap_or (rel_partner . member),
-          rel_partner . relRepo ))
+        . map ( |rel_partner| ( rel_partner . member . into_id (),
+                                rel_partner . relRepo ))
         . collect () };
   partners . into_iter ()
     . filter ( |(id, _)| seen . insert (id . clone ()) )
-    . collect () }
-
-/// Every relationship of 'relation' that 'recorder' records, with its
-/// stored member ID. A mention's relRepo is the recorder's home,
-/// because links live in the text.
-fn recorded_rel_partners (
-  graph    : &InRustGraph,
-  recorder : &ID,
-  relation : NodeRelation,
-) -> Vec<RelPartner<ID>> {
-  if relation != NodeRelation::LinksTo {
-    return graph . outbound_rel_partners_for_relation_gated (
-      recorder, relation, None ); }
-  let Some (node) = graph . get (recorder) else {
-    return Vec::new (); };
-  node . linksTo . iter ()
-    . map ( |member| RelPartner::at_relRepo (
-      node . home_skgrepo . clone (), member . clone () ))
     . collect () }
 
 /// The relRepo of the relationship by which 'recorder' names 'member'
@@ -255,9 +235,7 @@ fn relRepo_of_recorded_relationship (
   relation : NodeRelation,
   member   : &ID,
 ) -> Option<SkgrepoName> {
-  recorded_rel_partners (graph, recorder, relation)
+  graph . outbound_member_keys_for_relation_gated (recorder, relation, None)
     . into_iter ()
-    . find ( |rel_partner|
-      graph . pid_of (&rel_partner . member) . as_ref ()
-        . unwrap_or (&rel_partner . member) == member )
+    . find ( |rel_partner| rel_partner . member . id () == member )
     . map ( |rel_partner| rel_partner . relRepo ) }

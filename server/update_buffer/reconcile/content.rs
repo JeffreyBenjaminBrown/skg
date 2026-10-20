@@ -2,8 +2,9 @@ use crate::to_org::complete::contents::clobberWriteProtectedViewnode;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::viewnode::{ChangeFacts, mk_restricted_viewnode, mk_unknown_viewnode};
 use crate::to_org::util::{EditableMap, make_writeProtected_if_repeat_then_extend_editable_map};
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoName};
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::in_rust_graph::override_resolution::{
     OverrideResolution, resolve_override};
 use crate::types::env::find_skgrepo_with_optional_tantivy;
@@ -202,25 +203,23 @@ fn reconcile_content_children (
   // subtree, even though the parent's containment logically points
   // at the acquirer. (Fresh views already got this for free from
   // 'pid_and_repo_from_id'; this makes the rerender consistent.)
-  let content_members = graphnode . contains . iter ()
-    . filter ( |m| match skgrepo_restriction {
-      // relRepo gating (render-and-gating, 5_plan.org): a
-      // membership whose REPO is restricted is invisible here even
-      // when the member node itself is unrestricted -- the private
-      // reading-list case. Node-repo omission still happens
-      // below, in omit_restricted_members.
-      None => true,
-      Some (a) => a . is_all ()
-        || a . contains_skgrepo ( &m . relRepo ) } )
-    . collect::<Vec<_>> ();
+  let content_members : Vec<RelPartner<RelationshipMemberKey>> =
+    // relRepo gating (render-and-gating, 5_plan.org): a
+    // membership whose REPO is restricted is invisible here even
+    // when the member node itself is unrestricted -- the private
+    // reading-list case. Node-repo omission still happens
+    // below, in omit_restricted_members.
+    graph_snap . outbound_member_keys_for_relation_gated (
+      &graphnode . pid, NodeRelation::Contains, skgrepo_restriction );
   let content_skgids : Vec<ID> = content_members . iter ()
-    . map ( |m| graph_snap . pid_of ( &m . member )
-                 . unwrap_or_else ( || m . member . clone () ))
+    . map ( |m| m . member . id () . clone () )
     . collect ();
-  let relRepos : HashMap<ID, SkgrepoName> = content_members . iter ()
-    .map ( |m| ( graph_snap . pid_of ( &m . member )
-                  . unwrap_or_else ( || m . member . clone () ),
-                  m . relRepo . clone () ))
+  let unresolved_relRepos : HashMap<ID, SkgrepoName> =
+    // The members the graph does not resolve are drawn as unknown
+    // phantoms, with their relationships' relRepos.
+    content_members . iter ()
+    . filter ( |m| m . member . is_unresolved () )
+    . map ( |m| ( m . member . id () . clone (), m . relRepo . clone () ))
     . collect ();
   let is_sub : bool = is_subscribee (tree, node) ?;
   // An editable subscribee-as-such (the glossary's "subscribee as such") regenerates its content as
@@ -268,7 +267,7 @@ fn reconcile_content_children (
   adopt_nonMember_children_that_are_content (
     tree, node, &apparent_content_skgids ) ?;
   complete_content_children(
-    tree, node, &apparent_content_skgids, &relRepos,
+    tree, node, &apparent_content_skgids, &unresolved_relRepos,
     &graphnode . home_skgrepo, config, graph_snap,
     deleted_by_this_save_extra_ids,
     skgrepo_restriction,
@@ -578,7 +577,7 @@ fn complete_content_children (
   tree               : &mut Tree<Viewnode>,
   node               : NodeId,
   goal_list          : &[ID],
-  relRepos : &HashMap<ID, SkgrepoName>,
+  unresolved_relRepos : &HashMap<ID, SkgrepoName>, // of the members the graph does not resolve
   recorder_home      : &SkgrepoName,
   config             : &SkgConfig,
   graph_snap         : &Arc<InRustGraph>,
@@ -588,11 +587,11 @@ fn complete_content_children (
 ) -> Result<(), Box<dyn Error>> {
   let child_data : HashMap<ID, ChildData> =
     build_child_creation_data(
-      tree, node, goal_list, relRepos, config, graph_snap,
+      tree, node, goal_list, unresolved_relRepos, config, graph_snap,
       skgrepo_restriction,
       substitution_enabled ) ?;
   normalize_relationship_backed_content_unknowns (
-    tree, node, goal_list, relRepos, recorder_home, graph_snap,
+    tree, node, goal_list, unresolved_relRepos, recorder_home, graph_snap,
     deleted_by_this_save_extra_ids ) ?;
   // The RepairSummary is dropped: content is not a generated
   // folder, so its reconciliation is not a "repair" to warn about.
@@ -672,7 +671,7 @@ fn normalize_relationship_backed_content_unknowns (
   tree                 : &mut Tree<Viewnode>,
   node                 : NodeId,
   goal_list            : &[ID],
-  relRepos             : &HashMap<ID, SkgrepoName>,
+  unresolved_relRepos  : &HashMap<ID, SkgrepoName>,
   recorder_home        : &SkgrepoName,
   graph_snap           : &Arc<InRustGraph>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
@@ -701,7 +700,7 @@ fn normalize_relationship_backed_content_unknowns (
         . expect ("normalization predicate found a raw member") . clone ();
       vn . kind = ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (
         crate::types::viewnode::PhantomUnknown {
-          relRepo: relRepos . get (&skgid) . cloned ()
+          relRepo: unresolved_relRepos . get (&skgid) . cloned ()
             . filter (|skgrepo| skgrepo != recorder_home),
           relRepo_request: None,
           change_facts: ChangeFacts::default (),
@@ -789,7 +788,7 @@ fn build_child_creation_data (
   tree               : &Tree<Viewnode>,
   node               : NodeId,
   goal_list          : &[ID],
-  relRepos : &HashMap<ID, SkgrepoName>,
+  unresolved_relRepos : &HashMap<ID, SkgrepoName>, // of the members the graph does not resolve
   config             : &SkgConfig,
   graph_snap         : &Arc<InRustGraph>,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
@@ -829,9 +828,12 @@ fn build_child_creation_data (
     // every goal_list ID would fail (ENOENT) for children that
     // this save just deleted, since their .skg file is gone.
     if child_skgrepos . contains_key (skgid) { continue; }
+    let found_skgrepo : Option<SkgrepoName> =
+      if unresolved_relRepos . contains_key (skgid) { None }
+      else { find_skgrepo_with_optional_tantivy (
+               graph_snap, skgid, None, config ) };
     let child_skgrepo : SkgrepoName =
-      match find_skgrepo_with_optional_tantivy (
-        graph_snap, skgid, None, config )
+      match found_skgrepo
       { Some (s) => s,
         None => {
           // The id resolves to nothing (a dangling reference). Render an
@@ -844,7 +846,7 @@ fn build_child_creation_data (
                         body         : None,
                         kind         : ContentReality::Unknown,
                         relRepo:
-                          relRepos . get (skgid) . cloned (),
+                          unresolved_relRepos . get (skgid) . cloned (),
                         drawn_skgid : None } );
           continue; } };
     if skgrepo_restriction

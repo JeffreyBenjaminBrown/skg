@@ -17,7 +17,7 @@ use crate::to_org::complete::partner_folder::child_data::{
   reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds,
 };
 use crate::types::env::RuntimeGeneration;
-use crate::types::misc::{ID, RelPartner, SkgConfig, SkgrepoName};
+use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoName};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::phantom::home_from_disk;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
@@ -102,12 +102,12 @@ pub fn reconcile_partnerFolder_children (
   // vognode already spent its budget unit when it expanded, so drawing all the
   // relation members here costs nothing and never truncates the group. (The
   // budget bounds how many vognodes EXPAND, not how big one group is.)
-  let relRepos : HashMap<ID, SkgrepoName> =
+  let relRepos : HashMap<ID, SkgrepoName> = // of unknown members, for their heralds
     raw_outbound_members (graph_snap, &recorder_pid, member_role, skgrepo_restriction)
-      . iter ()
-      . filter (|member| graph_snap . pid_of (&member . member) . is_none ())
+      . into_iter ()
+      . filter (|member| member . member . is_unresolved ())
       . filter (|member| member . relRepo != recorder_skgrepo)
-      . map (|member| (member . member . clone (), member . relRepo . clone ()))
+      . map (|member| (member . member . into_id (), member . relRepo))
       . collect ();
   let goal_items : Vec<FolderGoalItem> =
     FolderGoalItem::live_members (&goal_list);
@@ -153,9 +153,8 @@ pub fn partnerFolder_members_in_graph (
   let members : Vec<ID> =
     if recorder_role . is_first_role () { // the folder shows a list in the RECORDER's file
       raw_outbound_members (graph, recorder_pid, member_role, skgrepo_restriction)
-        . iter ()
-        . map ( |member| graph . pid_of (&member . member)
-               . unwrap_or_else ( || member . member . clone () ) )
+        . into_iter ()
+        . map ( |member| member . member . into_id () )
         . collect ()
     } else { graph . other_member_pids_gated (
       recorder_pid, recorder_role, skgrepo_restriction ) };
@@ -166,19 +165,19 @@ pub fn partnerFolder_members_in_graph (
       members, skgrepo_restriction, skgrepo_resolver )) }
 
 /// The recorder's partners in the member role's relation, as its file
-/// lists them, if the folder shows a list in the RECORDER's file; else
-/// none.
+/// lists them, each tagged by whether the graph resolves it, if the
+/// folder shows a list in the RECORDER's file; else none.
 fn raw_outbound_members (
   graph               : &InRustGraph,
   recorder_pid        : &ID,
   member_role         : RelationRole,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-) -> Vec<RelPartner<ID>> {
+) -> Vec<RelPartner<RelationshipMemberKey>> {
   if member_role . opposite_role () . is_first_role () {
     // Preserve an unresolved ID through this outbound surface.  The old
     // canonical-PID accessor is still right for inverse/write-protected folders, but
     // would erase an Unknown from the writable OverriddenFolder.
-    graph . outbound_rel_partners_for_relation_gated (
+    graph . outbound_member_keys_for_relation_gated (
       recorder_pid, member_role . relation, skgrepo_restriction )
   } else { Vec::new () }}
 

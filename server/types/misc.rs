@@ -67,6 +67,28 @@ pub enum RelationshipMemberKey {
   UnresolvedRawId (ID),
 }
 
+impl RelationshipMemberKey {
+  /// The ID either variant carries.
+  pub fn id (
+    &self,
+  ) -> &ID {
+    match self {
+      RelationshipMemberKey::ResolvedPid (id)
+        | RelationshipMemberKey::UnresolvedRawId (id) => id, } }
+
+  pub fn into_id (
+    self,
+  ) -> ID {
+    match self {
+      RelationshipMemberKey::ResolvedPid (id)
+        | RelationshipMemberKey::UnresolvedRawId (id) => id, } }
+
+  pub fn is_unresolved (
+    &self,
+  ) -> bool {
+    matches! ( self, RelationshipMemberKey::UnresolvedRawId (_) ) }
+}
+
 #[derive(Serialize, Clone, PartialEq, Eq, Hash)]
 pub struct Skgrepo {
   pub name         : SkgrepoName,

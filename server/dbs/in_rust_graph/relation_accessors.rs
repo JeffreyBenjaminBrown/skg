@@ -305,6 +305,39 @@ impl InRustGraph {
           || set . contains_skgrepo (&member . relRepo), } )
       . collect () }
 
+  /// The members 'pid' records under 'relation', each with its relRepo
+  /// and its comparison identity ('relationship_member_key'): the pid
+  /// when this graph resolves the listed ID, else the raw ID tagged
+  /// unresolved. A mention's relRepo is the recorder's home, because
+  /// links live in the text. Members whose relRepo is outside the
+  /// skgrepo restriction are left out; pass None for every member.
+  /// Drawing code reads the tag (an unresolved member is drawn as an
+  /// unknown phantom); comparisons take the ID from either variant.
+  pub fn outbound_member_keys_for_relation_gated (
+    &self,
+    pid         : &ID,
+    relation    : NodeRelation,
+    restriction : Option<&crate::skgrepo_sets::SkgrepoRestriction>,
+  ) -> Vec<RelPartner<RelationshipMemberKey>> {
+    let rel_partners : Vec<RelPartner<ID>> =
+      if relation == NodeRelation::LinksTo {
+        self . nodes . get (pid) . map ( |node|
+          node . linksTo . iter ()
+          . map ( |member| RelPartner::at_relRepo (
+            node . home_skgrepo . clone (), member . clone () ))
+          . filter ( |member| match restriction {
+            None => true,
+            Some (set) => set . is_all ()
+              || set . contains_skgrepo (&member . relRepo), } )
+          . collect () )
+        . unwrap_or_default ()
+      } else { self . outbound_rel_partners_for_relation_gated (
+                 pid, relation, restriction ) };
+    rel_partners . into_iter ()
+      . map ( |member| RelPartner::at_relRepo (
+        member . relRepo, self . relationship_member_key (&member . member) ))
+      . collect () }
+
   /// Raw outbound member IDs whose relRepo is in the skgrepo restriction. Unlike the
   /// PID-oriented accessor, this retains unresolved stored IDs so rendering
   /// can preserve them as Unknown phantoms.

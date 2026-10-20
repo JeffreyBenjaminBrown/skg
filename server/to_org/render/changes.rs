@@ -543,11 +543,10 @@ fn content_list (
   graph : &InRustGraph,
   pid   : &ID,
 ) -> Vec<ID> {
-  graph . outbound_rel_partners_for_relation_gated (
+  graph . outbound_member_keys_for_relation_gated (
     pid, NodeRelation::Contains, None )
     . into_iter ()
-    . map ( |member| graph . pid_of (&member . member)
-            . unwrap_or (member . member) )
+    . map ( |member| member . member . into_id () )
     . collect () }
 
 /// The interleaved diff of two lists, minus the 'Removed' items that

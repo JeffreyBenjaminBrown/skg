@@ -144,7 +144,18 @@ fn stored_outbound_accessor_retains_unresolved_raw_members () {
   assert_eq! (
     graph . outbound_pids_for_relation_gated (
       &ID::from ("recorder"), NodeRelation::Contains, None ),
-    vec![ID::from ("known")] ); }
+    vec![ID::from ("known")] );
+  assert_eq! (
+    graph . outbound_member_keys_for_relation_gated (
+      &ID::from ("recorder"), NodeRelation::Contains, None ),
+    vec! [
+      RelPartner {
+        member : RelationshipMemberKey::ResolvedPid (ID::from ("known")),
+        relRepo : SkgrepoName::from ("main"), },
+      RelPartner {
+        member : RelationshipMemberKey::UnresolvedRawId (ID::from ("absent-raw")),
+        relRepo : SkgrepoName::from ("main"), },
+    ] ); }
 
 #[test]
 fn relationship_member_key_canonicalizes_only_resolved_skgids () {
