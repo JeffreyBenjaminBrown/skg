@@ -1,4 +1,4 @@
-//! Reconciling what the total diff view drew under a viewnode with a
+//! Reconciling what the diff view drew under a viewnode with a
 //! fresh drawing of it ('TODO/total-diff-view/04_plan-fixes.org',
 //! "Folding survives, because nothing that exists is recreated").
 //! The fresh drawing is built in a scratch tree. Each existing
@@ -167,7 +167,7 @@ pub fn append_copy_of_subtree (
     append_copy_of_subtree (tree, copy, fresh, fresh_child) ?; }
   Ok (copy) }
 
-/// A member the total diff view drew, outside the content list,
+/// A member the diff view drew, outside the content list,
 /// because its relationship to its viewparent is only in the
 /// before-graph (or, while a visit reconciles, is about to be).
 pub fn is_unrestricted_removed_member (

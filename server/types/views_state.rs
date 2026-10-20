@@ -39,10 +39,10 @@ pub struct ViewState {
   pub pids       : HashSet<ID>, // the Unrestricted vognodes in the buffer (the
                             // kind this view renders meaningfully; see
                             // pids_from_viewforest)
-  pub tdv_buffer : Option<DiffViewBufferKind>, // Some for a buffer of the total diff view
+  pub diffView_buffer_kind : Option<DiffViewBufferKind>, // Some for a buffer of the diff view
 }
 
-/// The four buffers of the total diff view
+/// The four buffers of the diff view
 /// ('TODO/total-diff-view/02_plan.org', "One command, four buffers").
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum DiffViewBufferKind {
@@ -57,7 +57,7 @@ impl DiffViewBufferKind {
     DiffViewBufferKind::AllChanges, DiffViewBufferKind::Merges,
     DiffViewBufferKind::SkgrepoChanges, DiffViewBufferKind::OrderOnlyChanges ];
 
-  /// The '(buffer . "...")' of a "total diff view" request; the
+  /// The '(buffer . "...")' of a "diff view" request; the
   /// client names the buffer "diff-view: " followed by it.
   pub fn wire_name (
     self,
@@ -146,26 +146,26 @@ impl OpenViews {
       let pids : HashSet<ID> =
         pids . iter () . cloned () . collect ();
       let state : ViewState =
-        ViewState { viewforest, pids, tdv_buffer : None };
+        ViewState { viewforest, pids, diffView_buffer_kind : None };
       self . views . insert ( view_id, state ); }
 
-  /// 'register_view' for a buffer of the total diff view.
-  pub fn register_tdv_view (
+  /// 'register_view' for a buffer of the diff view.
+  pub fn register_diffView_view (
     &mut self,
-    graph      : &InRustGraph,
-    view_id    : ViewId,
-    viewforest : impl Into<ViewForest>,
-    pids       : &[ID],
-    tdv_buffer : DiffViewBufferKind,
+    graph                : &InRustGraph,
+    view_id              : ViewId,
+    viewforest           : impl Into<ViewForest>,
+    pids                 : &[ID],
+    diffView_buffer_kind : DiffViewBufferKind,
   ) { self . register_view ( graph, view_id . clone (), viewforest, pids );
       if let Some (state) = self . views . get_mut (&view_id) {
-        state . tdv_buffer = Some (tdv_buffer); }}
+        state . diffView_buffer_kind = Some (diffView_buffer_kind); }}
 
-  /// Whether any open view is a buffer of the total diff view.
+  /// Whether any open view is a buffer of the diff view.
   pub fn has_diffView_views (
     &self,
   ) -> bool {
-    self . views . values () . any ( |state| state . tdv_buffer . is_some () ) }
+    self . views . values () . any ( |state| state . diffView_buffer_kind . is_some () ) }
 
   pub fn update_view (
     &mut self,
@@ -189,7 +189,7 @@ impl OpenViews {
       else { self . views . insert (
                view_id . clone (),
                ViewState { viewforest : new_viewforest,
-                           pids, tdv_buffer : None } ); }}
+                           pids, diffView_buffer_kind : None } ); }}
 
   pub fn unregister_view (
     &mut self,

@@ -19,8 +19,8 @@ use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::serve::handlers::show_unshown_changes::handle_show_unshown_changes_request;
 use skg::serve::handlers::stage_and_commit::handle_stage_and_commit_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::serve::handlers::total_diff_view::{
-  TotalDiffViewBuffer, total_diff_view_buffer};
+use skg::serve::handlers::diff_view::{
+  DiffViewBuffer, diffView_buffer};
 use skg::test_utils::{
   cleanup_test_tantivy, extract_string_field_from_sexp, graph_handle_from_config,
   skg_env_from_parts, update_from_and_rerender_buffer_test};
@@ -117,17 +117,17 @@ pub fn all_changes_buffer_with_marks (
     store . mark ( key . clone (),
                    straddle . change_leaves () . leaf_fingerprint (key)
                    . expect ("a marked key is a leaf") ); }
-  Ok ( match total_diff_view_buffer (
+  Ok ( match diffView_buffer (
     &runtime, &straddle, &store, DiffViewBufferKind::AllChanges ) ? {
-    TotalDiffViewBuffer::Empty => None,
-    TotalDiffViewBuffer::Content { text, .. } => Some (text), } ) }
+    DiffViewBuffer::Empty => None,
+    DiffViewBuffer::Content { text, .. } => Some (text), } ) }
 
 /// The view id under which 'open_buffer' registers a buffer: its
 /// client's name for it.
 pub fn view_id_of (
-  tdv_buffer : DiffViewBufferKind,
+  diffView_buffer_kind : DiffViewBufferKind,
 ) -> ViewId {
-  ViewId::ContentView ( format! ( "diff-view: {}", tdv_buffer . wire_name () )) }
+  ViewId::ContentView ( format! ( "diff-view: {}", diffView_buffer_kind . wire_name () )) }
 
 /// Open the "all changes" buffer; see 'open_buffer'.
 pub fn open_all_changes_buffer (
@@ -136,28 +136,28 @@ pub fn open_all_changes_buffer (
   open_buffer (f, DiffViewBufferKind::AllChanges) ?
     . ok_or_else ( || "the all-changes buffer is empty" . into () ) }
 
-/// Open a buffer of the total diff view as the "total diff view"
+/// Open a buffer of the diff view as the "diff view"
 /// request does: drawn from the connection's graph straddle with the
-/// marks on disk, and registered as a view of the total diff view.
+/// marks on disk, and registered as a view of the diff view.
 /// None when it would be empty.
 pub fn open_buffer (
-  f          : &mut Fixture,
-  tdv_buffer : DiffViewBufferKind,
+  f                    : &mut Fixture,
+  diffView_buffer_kind : DiffViewBufferKind,
 ) -> Result<Option<String>, Box<dyn Error>> {
   let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
   let straddle : Arc<GraphStraddle> = current_graph_straddle_in_slot (
     &mut f . views_state . graph_straddle, &f . config, runtime . graph . clone () ) ?;
-  let buffer : TotalDiffViewBuffer = {
+  let buffer : DiffViewBuffer = {
     let store : MutexGuard<ReadinessStore> =
       env . runtime . readiness_store . lock () . unwrap ();
-    total_diff_view_buffer (&runtime, &straddle, &store, tdv_buffer) ? };
+    diffView_buffer (&runtime, &straddle, &store, diffView_buffer_kind) ? };
   Ok ( match buffer {
-    TotalDiffViewBuffer::Empty => None,
-    TotalDiffViewBuffer::Content { text, pids, viewforest } => {
-      f . views_state . open_views . register_tdv_view (
-        &runtime . graph, view_id_of (tdv_buffer),
-        viewforest, &pids, tdv_buffer );
+    DiffViewBuffer::Empty => None,
+    DiffViewBuffer::Content { text, pids, viewforest } => {
+      f . views_state . open_views . register_diffView_view (
+        &runtime . graph, view_id_of (diffView_buffer_kind),
+        viewforest, &pids, diffView_buffer_kind );
       Some (text) }, } ) }
 
 /// Save the "all changes" buffer; see 'save_buffer'.
@@ -169,29 +169,29 @@ pub fn save (
 
 /// Save 'text' as the buffer 'open_buffer' registered.
 pub fn save_buffer (
-  f          : &mut Fixture,
-  tdv_buffer : DiffViewBufferKind,
-  text       : &str,
+  f                    : &mut Fixture,
+  diffView_buffer_kind : DiffViewBufferKind,
+  text                 : &str,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   Ok ( block_on ( update_from_and_rerender_buffer_test (
     &mut stream, text, &f . config, &f . tantivy, &f . graph,
-    &Ok ( view_id_of (tdv_buffer) ), &mut f . views_state )) ? ) }
+    &Ok ( view_id_of (diffView_buffer_kind) ), &mut f . views_state )) ? ) }
 
-/// The round-trip invariant for a buffer of the total diff view:
+/// The round-trip invariant for a buffer of the diff view:
 /// saved unchanged, it changes no file, reports no error, and is
 /// reconciled to itself.
 pub fn saves_back_unchanged (
-  case       : &str,
-  skgrepos   : &[&str],
-  tdv_buffer : DiffViewBufferKind,
+  case                 : &str,
+  skgrepos             : &[&str],
+  diffView_buffer_kind : DiffViewBufferKind,
 ) -> Result<(), Box<dyn Error>> {
   with_fixture (case, skgrepos, |f| {
-    let text : String = open_buffer (f, tdv_buffer) ?
+    let text : String = open_buffer (f, diffView_buffer_kind) ?
       . ok_or ("the fixture's buffer is empty") ?;
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
-    let response : SaveResponse = save_buffer (f, tdv_buffer, &text) ?;
+    let response : SaveResponse = save_buffer (f, diffView_buffer_kind, &text) ?;
     assert! ( response . errors . is_empty (),
               "the buffer must save without errors, got {:?}\n\nbuffer:\n{}",
               response . errors, text );
@@ -241,12 +241,12 @@ pub fn send_stage_and_commit_request (
   read_end . read_to_string (&mut response) ?;
   Ok (response) }
 
-/// Send a "show unshown changes" request for the buffer 'tdv_buffer'
+/// Send a "show unshown changes" request for the buffer 'diffView_buffer_kind'
 /// to its handler, under the skgrepo set 'all'; return everything it
 /// wrote.
 pub fn send_show_unshown_changes_request (
-  f          : &mut Fixture,
-  tdv_buffer : DiffViewBufferKind,
+  f                    : &mut Fixture,
+  diffView_buffer_kind : DiffViewBufferKind,
 ) -> Result<String, Box<dyn Error>> {
   let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let all_skgrepos : SkgrepoRestriction =
@@ -256,7 +256,7 @@ pub fn send_show_unshown_changes_request (
   handle_show_unshown_changes_request (
     &mut stream,
     &format! ( "((request . \"show unshown changes\") (view-id . \"{}\"))\n",
-               view_id_of (tdv_buffer) . repr_in_client () ),
+               view_id_of (diffView_buffer_kind) . repr_in_client () ),
     &env, &mut f . views_state, &all_skgrepos );
   drop (stream);
   let mut response : String = String::new ();

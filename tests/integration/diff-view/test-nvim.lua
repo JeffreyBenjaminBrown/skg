@@ -1,8 +1,8 @@
--- Integration test: the total diff view, end to end, nvim client. The
+-- Integration test: the diff view, end to end, nvim client. The
 -- Lua mirror of test-emacs.el in this directory; see run-test.sh for
 -- the data.
 --
--- Phase 1: Open the total diff view; its buffers open.
+-- Phase 1: Open the diff view; its buffers open.
 -- Phase 2: Mark every change commit-ready, through the recursive
 --          gesture on each root of the "all changes" buffer, and see
 --          "COMMIT READY".
@@ -30,8 +30,8 @@ local function newest_notification (pattern)
   return nil
 end
 
----@return integer[] the buffers of the total diff view
-local function total_diff_view_buffers ()
+---@return integer[] the buffers of the diff view
+local function diffView_buffers ()
   local found = {}
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf)
@@ -43,7 +43,7 @@ end
 
 ---@return integer|nil the "all changes" buffer
 local function all_changes_buffer ()
-  for _, buf in ipairs(total_diff_view_buffers()) do
+  for _, buf in ipairs(diffView_buffers()) do
     if vim.api.nvim_buf_get_name(buf):find('diff-view: all changes', 1, true) then
       return buf end
   end
@@ -59,17 +59,17 @@ end
 
 print('=== SKG Total Diff View Integration Test ===')
 
--- PHASE 1: open the total diff view.
-print('=== PHASE 1: Open the total diff view ===')
-require('skg.total_diff_view').diff_view()
+-- PHASE 1: open the diff view.
+print('=== PHASE 1: Open the diff view ===')
+require('skg.diff_view').diffView_open()
 local all_changes = T.wait_for(function ()
   local buf = all_changes_buffer()
   if buf and T.buffer_text(buf):find('(id r)', 1, true) then return buf end
   return nil
 end)
 if not all_changes then T.fail('Timeout waiting for the "all changes" buffer') end
-T.wait_for(function () return #total_diff_view_buffers() >= 3 end, 10)
-T.check(#total_diff_view_buffers() >= 3,
+T.wait_for(function () return #diffView_buffers() >= 3 end, 10)
+T.check(#diffView_buffers() >= 3,
         'the all-changes, merges and skgrepo-changes buffers opened')
 do
   local text = T.buffer_text(all_changes)
@@ -135,7 +135,7 @@ T.check(git_head_summary('owned/beta') == 'integration commit', 'beta was commit
 T.check(git_head_summary('foreign/gamma') == 'Initial commit',
         'the foreign skgrepo was not committed')
 T.check(T.wait_for(function ()
-  for _, buf in ipairs(total_diff_view_buffers()) do
+  for _, buf in ipairs(diffView_buffers()) do
     local text = T.buffer_text(buf)
     if not text:find('^%* ') then return nil end
     for _, change in ipairs({ '(diff ', 'changed)', 'changesetMarker',
@@ -144,7 +144,7 @@ T.check(T.wait_for(function ()
     end
   end
   return true
-end, 10), 'the buffers of the total diff view keep their roots, unchanged')
+end, 10), 'the buffers of the diff view keep their roots, unchanged')
 
 -- PHASE 4: reference d again, by hand; have the server reread the
 -- files; open a view of r; investigate d there.
@@ -187,5 +187,5 @@ do
 end
 
 print('')
-print('All total-diff-view tests passed!')
+print('All diff-view tests passed!')
 T.pass()

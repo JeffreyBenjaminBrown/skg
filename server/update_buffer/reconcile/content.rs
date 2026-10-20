@@ -68,7 +68,7 @@ struct ChildData {
 ///   BFS draws each Final (clobbering competing Tentative occurrences).
 /// - `node_budget`: the TODO/DONE/local-view-update/plan_v2.org §5.5 remaining budget of new Viewnodes; content-child
 ///   creation is capped against it. None when this expansion is not
-///   charged (in a total diff view, all but a request's).
+///   charged (in a diff view, all but a request's).
 pub fn expand_true_content_at_unrestrictedVognode (
   node               : NodeId,
   tree               : &mut Tree<Viewnode>,
@@ -80,7 +80,7 @@ pub fn expand_true_content_at_unrestrictedVognode (
   settled                        : bool,
   cascade                        : bool,
   node_budget                    : Option<&mut usize>,
-  substitution_enabled           : bool, // false in the total diff view: it shows raw graph facts.
+  substitution_enabled           : bool, // false in the diff view: it shows raw graph facts.
   substitute_existing_content_overrides : bool,
 ) -> Result<(), Box<dyn Error>> {
   // Phantoms are diff placeholders; this pass mutates and expands

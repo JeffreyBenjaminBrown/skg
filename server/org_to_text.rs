@@ -117,7 +117,7 @@ pub fn viewnode_to_text (
 ) -> Result < String, Box<dyn Error> > {
   viewnode_to_text_with_folder_facts (level, viewnode, None, config) }
 
-/// The total diff view's facts about a folder, derived from its
+/// The diff view's facts about a folder, derived from its
 /// members when the buffer is rendered: it is drawn because of a
 /// change when some member carries one, and ready when every such
 /// member's change is ready. Rendered '(KIND changed)' in place of
@@ -352,8 +352,8 @@ fn property_metadata_to_string (
   }
   Ok ( parts . join (" ")) }
 
-/// The total diff view's forms for one viewnode: '(diff ...)',
-/// '(ready ...)', and its readiness request. Empty outside a TDV.
+/// The diff view's forms for one viewnode: '(diff ...)',
+/// '(ready ...)', and its readiness request. Empty outside the diff view.
 fn change_fact_forms (
   facts   : &ChangeFacts,
   request : &Option<ReadinessRequest>,

@@ -989,13 +989,13 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
           (skg-show-save-errors-and-warnings
            errors-list warnings-list content-value))
         (let ((summary (assq 'readiness-summary response)))
-          (when summary ;; the saved buffer is one of the total diff view's
+          (when summary ;; the saved buffer is one of the diff view's
             (message "%s" (skg--readiness-summary-message summary)))))
     (error (skg-log 'error 'save "parsing save response: %S" err)
            (skg-log 'error 'save "sexp string was: %S" sexp-string))))
 
 (defun skg--readiness-summary-message (summary)
-  "The line shown after a save of a buffer of the total diff view,
+  "The line shown after a save of a buffer of the diff view,
 from SUMMARY, the save response's
 '(readiness-summary (ready N) (changed M) (foreign F) (order-only O)
 \(unshown K))'."

@@ -1,4 +1,4 @@
-//! The total diff view's step at each unrestricted vognode's visit
+//! The diff view's step at each unrestricted vognode's visit
 //! in view completion ('TODO/total-diff-view/02_plan.org', "The
 //! PCSVF" and "What each kind of change looks like"), and at each
 //! historical phantom's.
@@ -109,7 +109,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
   reconcile_removed_content_members (tree, treeid, straddle, &pid) ?;
   let fresh : Tree<Viewnode> = fresh_front_change_viewnodes (
     straddle, &pid, &content, in_c,
-    drawing . tdv_buffer == DiffViewBufferKind::OrderOnlyChanges
+    drawing . diffView_buffer_kind == DiffViewBufferKind::OrderOnlyChanges
       && straddle . order_only_pids () . contains (&pid) );
   let fronts : Vec<NodeId> = reconcile_children_with_fresh_drawing (
     tree, treeid, &fresh, fresh . root () . id (),
@@ -188,7 +188,7 @@ pub(crate) enum HistoricalPhantomVisit {
   RootIsLive,
 }
 
-/// The visit of a historical phantom in a total diff view. Where
+/// The visit of a historical phantom in a diff view. Where
 /// content stands (under a vognode, or as a root), it holds what
 /// 'append_historical_phantom_content' draws, reconciled with what it
 /// holds already; a node drawn above itself holds nothing. In a

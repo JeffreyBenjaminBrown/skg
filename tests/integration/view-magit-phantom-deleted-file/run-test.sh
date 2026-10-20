@@ -6,7 +6,7 @@
 # HEAD:        a contains [b]; a.skg and b.skg both committed.
 # Worktree:    a no longer contains b; b.skg deleted from disk.
 #
-# The test opens the total diff view, verifies that b shows up as a
+# The test opens the diff view, verifies that b shows up as a
 # historical phantom, and calls skg-goto-in-magit on it. It
 # then checks that the magit buffer is rooted at the skg-data skgrepo
 # (NOT the outer skg project skgrepo, which is the failure mode when

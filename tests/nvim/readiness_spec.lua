@@ -1,5 +1,5 @@
 -- Coverage for skg.readiness (the commit-readiness gestures) and the
--- readiness summary a save of a total-diff-view buffer shows.
+-- readiness summary a save of a diff-view buffer shows.
 -- Mirrors tests/elisp/test-skg-readiness.el.
 
 local picker = require('skg.picker')
@@ -189,7 +189,7 @@ describe('skg.readiness', function ()
 end)
 
 describe('skg.save readiness summary', function ()
-  it('is shown after a save of a total-diff-view buffer', function ()
+  it('is shown after a save of a diff-view buffer', function ()
     local shown = {}
     local original_notify = vim.notify
     vim.notify = function (message) table.insert(shown, message) end

@@ -1,6 +1,6 @@
 // A save judges a write-protected occurrence by the graph alone
 // ('errors_for_writeProtected_occurrences'), so in a buffer of the
-// total diff view a save may write-protect the only editable
+// diff view a save may write-protect the only editable
 // occurrence of a node of U. The 'shared' fixture (one skgrepo,
 // main): x and y, whose bodies changed, each contain n, which
 // contains a, whose body changed, and b, unchanged. So n, a node of

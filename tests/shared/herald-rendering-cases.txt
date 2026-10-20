@@ -230,91 +230,91 @@
 (skg (node (id x) (editRequest (merge y))))
 ---- text: merge:y
 ---- styles: nonstandard*7
-==== tdv: a new member whose node axis is ready
+==== diff view: a new member whose node axis is ready
 (skg (node (id x) (diff node+ rel+) (ready node)))
 ---- text: ∃+✓ ~+
 ---- styles: nonstandard*2 go*1 -*1 nonstandard*2
-==== tdv: each ✓ follows its own axis, whatever the raw order
+==== diff view: each ✓ follows its own axis, whatever the raw order
 (skg (node (id x) (ready rel node) (diff rel- node+)))
 ---- text: ∃+✓ ~-✓
 ---- styles: nonstandard*2 go*1 -*1 nonstandard*2 go*1
-==== tdv: an added alias, ready
+==== diff view: an added alias, ready
 (skg alias (diff rel+) (ready))
 ---- text: alias +✓
 ---- styles: message*5 -*1 nonstandard*1 go*1
-==== tdv: a deleted node with a request to unmark it
+==== diff view: a deleted node with a request to unmark it
 (skg (deleted (id x) (diff node-) (unreadyRequest)))
 ---- text: DELETED ∃- request:unready
 ---- styles: message*7 -*1 nonstandard*2 -*1 nonstandard*15
-==== tdv: a request to mark both axes of a member
+==== diff view: a request to mark both axes of a member
 (skg (node (id x) (readyRequest node rel)))
 ---- text: request:ready:node request:ready:rel
 ---- styles: nonstandard*18 -*1 nonstandard*17
-==== tdv: old title and body, ready
+==== diff view: old title and body, ready
 (skg (oldText titleAndBody) (ready))
 ---- text: old title and body✓
 ---- styles: message*18 go*1
-==== tdv: old title
+==== diff view: old title
 (skg (oldText title))
 ---- text: old title
 ---- styles: message*9
-==== tdv: old body
+==== diff view: old body
 (skg (oldText body))
 ---- text: old body
 ---- styles: message*8
-==== tdv: body diff
+==== diff view: body diff
 (skg bodyDiff)
 ---- text: body diff
 ---- styles: message*9
-==== tdv: a home move, ready
+==== diff view: a home move, ready
 (skg (homeMove (old pub) (new priv)) (ready))
 ---- text: ⌂ -pub +priv✓
 ---- styles: message*1 -*1 normal*4 -*1 normal*5 go*1
-==== tdv: a relRepo move
+==== diff view: a relRepo move
 (skg (relRepoMove (old pub) (new priv)))
 ---- text: relationship moved from pub to priv
 ---- styles: message*23 -*1 normal*3 -*1 message*2 -*1 normal*4
-==== tdv: the content changeset marker, ready
+==== diff view: the content changeset marker, ready
 (skg (changesetMarker content) (ready))
 ---- text: its content changed✓
 ---- styles: message*19 go*1
-==== tdv: the relRepo changeset marker
+==== diff view: the relRepo changeset marker
 (skg (changesetMarker relRepo))
 ---- text: some content relationships changed skgrepo
 ---- styles: message*42
-==== tdv: the order-only changeset marker
+==== diff view: the order-only changeset marker
 (skg (changesetMarker orderOnly) (ready))
 ---- text: order-only change✓
 ---- styles: message*17 go*1
-==== tdv: a historical phantom, its existence ready
+==== diff view: a historical phantom, its existence ready
 (skg (historical (id x) (repo main) (diff node- rel-) (ready node)))
 ---- text: ☮ ∃-✓ ~-
 ---- styles: crucial*1 -*1 nonstandard*2 go*1 -*1 nonstandard*2
-==== tdv: the acquired-by folder
+==== diff view: the acquired-by folder
 (skg acquiredByFolder)
 ---- text: ☮ it was acquired by
 ---- styles: crucial*1 -*1 message*18
-==== tdv: the acquired folder
+==== diff view: the acquired folder
 (skg acquiredFolder)
 ---- text: ☮ it acquired
 ---- styles: crucial*1 -*1 message*11
-==== tdv: a folder of recorders drawn because of a change, ready
+==== diff view: a folder of recorders drawn because of a change, ready
 (skg (containerFolder changed) (ready))
 ---- text: ☮ its containers changed (other files)✓
 ---- styles: crucial*1 -*1 message*36 go*1
-==== tdv: a folder of the node's own list drawn because of a change
+==== diff view: a folder of the node's own list drawn because of a change
 (skg (aliasFolder changed))
 ---- text: its aliases changed (this file)
 ---- styles: message*31
-==== tdv: the node's subscribees changed
+==== diff view: the node's subscribees changed
 (skg (subscribeeFolder changed))
 ---- text: its subscribees changed (this file)
 ---- styles: message*35
-==== tdv: a node in the skgrepo-changes buffer whose home moved
+==== diff view: a node in the skgrepo-changes buffer whose home moved
 (skg (node (id x) (viewStats (homeMove (old pub) (new priv)))))
 ---- text: -pub +priv
 ---- styles: normal*4 -*1 normal*5
-==== tdv: a node that moved like its grandparent
+==== diff view: a node that moved like its grandparent
 (skg (node (id x) (viewStats (homeMove (old pub) (new priv)) (movedLikeAncestor b))))
 ---- text: -pub +priv Δ⌂=b
 ---- styles: normal*4 -*1 normal*5 -*1 nonstandard*4

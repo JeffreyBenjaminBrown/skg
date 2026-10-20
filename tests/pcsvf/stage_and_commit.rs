@@ -74,7 +74,7 @@ fn mark_every_leaf (
   Ok (( )) }
 
 /// Each owned skgrepo now has the one message at HEAD and no changed
-/// '.skg' file, and the total diff view has nothing to show.
+/// '.skg' file, and the diff view has nothing to show.
 fn assert_everything_committed (
   f       : &Fixture,
   message : &str,
@@ -209,7 +209,7 @@ fn a_confirmed_resend_commits_and_redraws_the_open_buffers (
     assert! ( f . views_state . open_views . views
               . get (&view_id_of (DiffViewBufferKind::AllChanges))
               . is_some_and ( |state| ! state . pids . is_empty ()
-                              && state . tdv_buffer == Some (DiffViewBufferKind::AllChanges) ));
+                              && state . diffView_buffer_kind == Some (DiffViewBufferKind::AllChanges) ));
     Ok (( )) }) }
 
 /// The ID of a root line, whatever kind of vognode it is.

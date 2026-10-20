@@ -1,6 +1,6 @@
 // cargo nextest run --test grouped_unit -E 'test(change_facts_metadata::)'
 //
-// The total diff view's metadata forms -- '(diff ...)', '(ready ...)',
+// The diff view's metadata forms -- '(diff ...)', '(ready ...)',
 // '(readyRequest ...)' and '(unreadyRequest ...)' -- on every viewnode
 // that carries them: each renders, then parses back to the same
 // viewnode.

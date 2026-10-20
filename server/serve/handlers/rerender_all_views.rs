@@ -160,7 +160,7 @@ pub fn stream_rerender_views_after_absent_reference_cleanup (
 /// "Roots linger"), and what the commit made unchanged loses its
 /// decorations. The commit requires the skgrepo-set all, so no text
 /// is withheld and no release is asked for.
-pub fn stream_rerender_tdv_views (
+pub fn stream_rerender_diffView_views (
   stream              : &mut TcpStream,
   env                 : &SkgEnv,
   views_state         : &mut ViewsState,
@@ -169,7 +169,7 @@ pub fn stream_rerender_tdv_views (
   let prepared : PreparedRerenders = prepare_rerender_views_where (
     env, env . runtime_snapshot (), views_state,
     Some (skgrepo_restriction), None, false, false,
-    |_, state| state . tdv_buffer . is_some () );
+    |_, state| state . diffView_buffer_kind . is_some () );
   stream_prepared_rerenders (stream, views_state, prepared);
 }
 
@@ -222,7 +222,7 @@ pub(crate) fn prepare_rerender_views_where (
   let mut context : RerenderAfterSaveContext =
     RerenderAfterSaveContext::without_save_with_runtime (
       env, runtime, skgrepo_restriction );
-  // A buffer of the total diff view is reconciled over a graph straddle
+  // A buffer of the diff view is reconciled over a graph straddle
   // brought up to date from the connection's. Streaming the rerenders
   // writes it back, as a save does.
   context . graph_straddle = views_state . graph_straddle . clone ();

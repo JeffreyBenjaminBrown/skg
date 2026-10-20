@@ -1,4 +1,4 @@
--- PURPOSE: Show the changes a buffer of the total diff view does not
+-- PURPOSE: Show the changes a buffer of the diff view does not
 -- show ('TODO/total-diff-view/08_plan_yet-more.org', "The view
 -- follows U only on command"). A save never makes an occurrence
 -- editable or appends a root on its own; this command asks the server

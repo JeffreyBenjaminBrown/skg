@@ -47,7 +47,7 @@ pub enum Birth {
   RoleGraft (RelationRole),
 }
 
-/// The total diff view's facts about one viewnode: which graphs of
+/// The diff view's facts about one viewnode: which graphs of
 /// the graph straddle hold its node and its relationship to its
 /// viewparent ('(diff ...)'), and which of its change-forest leaves
 /// are marked commit-ready ('(ready ...)'). Display facts: the view
@@ -132,7 +132,7 @@ pub enum Phantom {
   Deleted (PhantomDeleted), // Epistemically: No longer exists in the graph. Procedurally: Skg just watched the user delete this node (maybe from a different view), but for some reason (e.g. its view-descendents are interesting, or it is a root) had to retain an image of it here.
   // PITFALL: There is an exception. If Skg watches a user delete a node, while that user has a view of a foreign node that refers to the deleted node, that "foreigner's view" will show it as Unknown rather than Deleted. This is to maintain consistency with how that relationship to a nonexistent node will appear when viewed in later sessions.
   Unknown (PhantomUnknown), // Skg can't find it (and, unlike Deleted, does not know why). Can result from bad data, or from a reference to another user's node that has since been deleted.
-  Historical (PhantomHistorical), // The total diff view's image of a node that HEAD has and the worktree lacks.
+  Historical (PhantomHistorical), // The diff view's image of a node that HEAD has and the worktree lacks.
 }
 
 /// A phantom for a node whose .skg file a save just
@@ -210,14 +210,14 @@ pub struct PhantomUnknown {
 /// view's graph straddle has and the after-graph lacks: a node deleted
 /// (or acquired by a nodeMerge) since HEAD.
 ///
-/// ARISES: only in a total diff view, built from the graph straddle
+/// ARISES: only in a diff view, built from the graph straddle
 /// ('server/to_org/render/change_viewnodes.rs'): under each former
 /// container as a former member, or as a view root. Its own old
 /// content hangs beneath it, recursing into deleted members.
 ///
 /// USED: write-protected and save-inert, like every phantom: it emits
 /// no fieldIntents, is excluded from its parent's contains, and the
-/// vognodes under it are not its members. The total diff view's
+/// vognodes under it are not its members. The diff view's
 /// reconciler owns it.
 ///
 /// DISTINCT INFO: the before-graph's title, body and home skgrepo,
@@ -419,8 +419,8 @@ pub enum Property {
     change_facts      : ChangeFacts,
     readiness_request : Option<ReadinessRequest>,
   },
-  // The total diff view's properties, below, are display-only and
-  // save-inert: the validator ignores them, and the total diff view's
+  // The diff view's properties, below, are display-only and
+  // save-inert: the validator ignores them, and the diff view's
   // reconciler owns them. Each but BodyDiff is a change-forest leaf or
   // aggregate, so it carries '(ready ...)' and a readiness request.
   /// In an alias folder: an alias the worktree lost since HEAD. The
@@ -498,7 +498,7 @@ pub enum PartnerFolder {
   HiddenOutsideOfSubscribee, // Child of a SubscribeeFolder. Collects things hidden by the SubscribeeFolder's parent but absent from every subscribee's content. This derived filter is editable as an exclusive visible-outside subset; its hide skgrepos remain derived. Shown after all Subscribees, under the same SubscribeeFolder.
   Container, // Collects nodes that contain its parent. Write-protected (editable from the other side of the relationship).
   Mentioner, // Collects nodes that link to its parent. Write-protected (a link lives in the linking node's text).
-  // The total diff view's two derived folders. Their membership comes from the extra IDs of the graph straddle's after-graph; both are save-inert.
+  // The diff view's two derived folders. Their membership comes from the extra IDs of the graph straddle's after-graph; both are save-inert.
   AcquiredBy, // Child of a historical phantom: the node that acquired it by a nodeMerge.
   Acquired, // Child of an acquirer: the historical phantoms of the nodes it acquired.
 }

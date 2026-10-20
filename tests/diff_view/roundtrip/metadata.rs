@@ -1,4 +1,4 @@
-// Each of the total diff view's viewnodes renders its metadata, then
+// Each of the diff view's viewnodes renders its metadata, then
 // parses back to the same viewnode.
 
 use skg::org_to_text::viewnode_to_string;
@@ -140,7 +140,7 @@ fn the_acquisition_folders_round_trip () {
     "acquiredFolder" ); }
 
 #[test]
-fn malformed_total_diff_view_metadata_is_refused () {
+fn malformed_diff_view_metadata_is_refused () {
   for metadata in [
     "(skg (oldText))",                               // no aspect
     "(skg (oldText title body))",                    // two aspects

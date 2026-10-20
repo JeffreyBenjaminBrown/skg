@@ -4,7 +4,7 @@
 ;;; HEAD:       a contains [b]; a.skg and b.skg both committed.
 ;;; Worktree:   a no longer contains b; b.skg deleted from disk.
 ;;;
-;;; Phase 1: Open the total diff view.
+;;; Phase 1: Open the diff view.
 ;;; Phase 2: In its "all changes" buffer, b appears as a historical
 ;;;          phantom.
 ;;; Phase 3: Call skg-goto-in-magit on the phantom b.
@@ -28,12 +28,12 @@
   (apply #'message (concat "✓ PASS: " message) args))
 
 (defun find-content-view-buffer ()
-  "The total diff view's \"all changes\" buffer."
+  "The diff view's \"all changes\" buffer."
   (cl-find-if
    (lambda (b) (string-match-p "diff-view: all changes" (buffer-name b)))
    (buffer-list)))
 
-(defun phase-1-open-the-total-diff-view ()
+(defun phase-1-open-the-diff-view ()
   (setq integration-test-phase "phase-1")
   (let ((test-port (getenv "SKG_TEST_PORT")))
     (when test-port
@@ -44,7 +44,7 @@
   ;; $TEST_DIR/data/.
   (setq skg-config-dir
         (expand-file-name "data/" (file-name-directory load-file-name)))
-  (skg-diff-view)
+  (skg-diffView-open)
   (unless (skg-test-wait-for
            (lambda ()
              (let ((buf (find-content-view-buffer)))
@@ -125,7 +125,7 @@
 
 (defun run-all-tests ()
   (message "=== SKG View-Magit-Phantom-Deleted-File Integration Test ===")
-  (phase-1-open-the-total-diff-view)
+  (phase-1-open-the-diff-view)
   (phase-2-verify-phantom-b)
   (phase-3-call-view-magit-on-phantom-b)
   (phase-4-verify-magit-root-folder-and-point-position)

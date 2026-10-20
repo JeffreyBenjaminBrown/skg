@@ -1,11 +1,11 @@
-// A buffer holding every one of the total diff view's viewnodes,
+// A buffer holding every one of the diff view's viewnodes,
 // drawn from the graph straddle of a git fixture, saves back unchanged:
 // no graph change, no validation error, and every one of them kept.
 // The buffer the save returns is a fixed point: saved again, it comes
 // back the same. (The first save's view completion adds the display
 // facts the builders leave out, and moves a historical phantom ahead
 // of the live content it stood among; positioning removed members is
-// the total diff view's reconciler's job.)
+// the diff view's reconciler's job.)
 // The fixture's HEAD and worktree differ so: a is retitled and its
 // body edited; gone, which held gc, kept and the dangling ghost, is
 // deleted with gc, and p no longer contains it; acq acquired
@@ -50,7 +50,7 @@ use std::net::TcpStream;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
-const FIXTURES : &str = "tests/tdv/roundtrip/fixtures";
+const FIXTURES : &str = "tests/diff_view/roundtrip/fixtures";
 
 struct Fixture {
   _root       : TempDir,
@@ -92,7 +92,7 @@ fn save (
   let response : SaveResponse = block_on (
     update_from_and_rerender_buffer_test (
       &mut stream, buffer, &f . config, &f . tantivy, &f . graph,
-      &Ok ( ViewId::ContentView ("tdv-roundtrip" . to_string ()) ),
+      &Ok ( ViewId::ContentView ("diffView-roundtrip" . to_string ()) ),
       &mut f . views_state )) ?;
   Ok (response) }
 
@@ -143,8 +143,8 @@ fn append_historical_phantom (
     append_historical_phantom_content (tree, member, straddle, &skgid) ?; }
   Some (phantom) }
 
-/// The view of p, with every one of the total diff view's viewnodes
-/// added where the total diff view draws it.
+/// The view of p, with every one of the diff view's viewnodes
+/// added where the diff view draws it.
 fn buffer_with_every_new_viewnode (
   f : &Fixture,
 ) -> Result<String, Box<dyn Error>> {
@@ -191,7 +191,7 @@ fn buffer_with_every_new_viewnode (
 #[test]
 fn a_buffer_of_the_new_viewnodes_saves_back_unchanged (
 ) -> Result<(), Box<dyn Error>> {
-  let mut f : Fixture = fixture ("skg-test-tdv-roundtrip") ?;
+  let mut f : Fixture = fixture ("skg-test-diffView-roundtrip") ?;
   let result : Result<(), Box<dyn Error>> = (|| {
     let buffer : String = buffer_with_every_new_viewnode (&f) ?;
     let atoms : [&str; 14] = [
@@ -234,7 +234,7 @@ fn a_buffer_of_the_new_viewnodes_saves_back_unchanged (
 #[test]
 fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
 ) -> Result<(), Box<dyn Error>> {
-  let mut f : Fixture = fixture ("skg-test-tdv-roundtrip-readiness") ?;
+  let mut f : Fixture = fixture ("skg-test-diffView-roundtrip-readiness") ?;
   let result : Result<(), Box<dyn Error>> = (|| {
     let buffer : String = buffer_with_every_new_viewnode (&f) ?
       . replace ( "(skg (oldText titleAndBody))",
@@ -268,11 +268,11 @@ fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
   result }
 
 /// The new viewnodes are save-inert, but the validator keeps each
-/// where the total diff view draws it.
+/// where the diff view draws it.
 #[test]
 fn the_new_viewnodes_are_refused_out_of_place (
 ) -> Result<(), Box<dyn Error>> {
-  let mut f : Fixture = fixture ("skg-test-tdv-roundtrip-out-of-place") ?;
+  let mut f : Fixture = fixture ("skg-test-diffView-roundtrip-out-of-place") ?;
   let result : Result<(), Box<dyn Error>> = (|| {
     for (misplaced, error) in [
       ( "** (skg bodyDiff)\n",          "bodyDiff must have an oldText parent" ),

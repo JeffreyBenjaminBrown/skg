@@ -117,49 +117,49 @@ ACTUAL:
           ;; Don't kill emacs yet — we want all scenarios to report.
           (format "Scenario %s: BEFORE/AFTER differ" name))))))
 
-(defun bfp-tdv-all-changes-buffer ()
-  "The \"all changes\" buffer of the total diff view, once it draws tdvr."
+(defun bfp-diffView-all-changes-buffer ()
+  "The \"all changes\" buffer of the diff view, once it draws dvroot."
   (cl-find-if
    (lambda (b)
      (and (string-match-p "diff-view: all changes" (buffer-name b))
           (with-current-buffer b
-            (string-match-p "(id tdvr)" (buffer-string)))))
+            (string-match-p "(id dvroot)" (buffer-string)))))
    (buffer-list)))
 
-(defun bfp-run-tdv-scenario ()
-  "The total diff view variant, over the data run-test.sh makes: in the
-\"all changes\" buffer, two `org-cycle's on tdvr leave its children's
-headlines visible and their bodies (tdvc's, and tdvr's old text's)
+(defun bfp-run-diffView-scenario ()
+  "The diff view variant, over the data run-test.sh makes: in the
+\"all changes\" buffer, two `org-cycle's on dvroot leave its children's
+headlines visible and their bodies (dvchild's, and dvroot's old text's)
 hidden. After save the snapshot should be unchanged.
 Returns a short diagnostic string on failure, nil on success."
   (message "")
-  (message "=== Scenario TDV : 2 org-cycles on tdvr ===")
-  (skg-diff-view)
-  (let ((buf (skg-test-wait-for #'bfp-tdv-all-changes-buffer 20)))
-    (unless buf (fail "Scenario TDV: timeout waiting for the \"all changes\" buffer"))
+  (message "=== Scenario diff view : 2 org-cycles on dvroot ===")
+  (skg-diffView-open)
+  (let ((buf (skg-test-wait-for #'bfp-diffView-all-changes-buffer 20)))
+    (unless buf (fail "Scenario diff view: timeout waiting for the \"all changes\" buffer"))
     (skg-test-wait-for-response 20)
     (switch-to-buffer buf)
     (goto-char (point-min))
-    (re-search-forward "(id tdvr)")
+    (re-search-forward "(id dvroot)")
     (beginning-of-line)
     (dotimes (_ 2) (org-cycle))
     (let ((before (bfp-snapshot)))
       (message "--- snapshot BEFORE save ---\n%s" before)
       (dolist (expected '("[H] root body line two\n" ; the old text's body
-                          "[V] ** the tdv child, edited\n[H] child body line one\n"))
+                          "[V] ** the diff view child, edited\n[H] child body line one\n"))
         (unless (string-match-p (regexp-quote expected) before)
-          (fail "Scenario TDV: BEFORE snapshot lacks %S:\n%s" expected before)))
-      (setq integration-test-phase "TDV-saving")
+          (fail "Scenario diff view: BEFORE snapshot lacks %S:\n%s" expected before)))
+      (setq integration-test-phase "diffView-saving")
       (condition-case err
           (skg-request-save-buffer)
-        (error (fail "Scenario TDV: save raised: %S" err)))
+        (error (fail "Scenario diff view: save raised: %S" err)))
       (skg-test-wait-for-response 20)
       (let ((after (bfp-snapshot)))
         (message "--- snapshot AFTER save ---\n%s" after)
         (if (equal before after)
-            (progn (pass "Scenario TDV: fold state preserved") nil)
-          (message "DIFF in scenario TDV.\nBEFORE:\n%s\nAFTER:\n%s" before after)
-          "Scenario TDV: BEFORE/AFTER differ")))))
+            (progn (pass "Scenario diff view: fold state preserved") nil)
+          (message "DIFF in scenario diff view.\nBEFORE:\n%s\nAFTER:\n%s" before after)
+          "Scenario diff view: BEFORE/AFTER differ")))))
 
 (defun run-all-tests ()
   (message "=== SKG Body-Fold-Preservation Integration Test ===")
@@ -185,8 +185,8 @@ Returns a short diagnostic string on failure, nil on success."
                    "[V] ** child\n"
                    "[H] child body line\n")
                   2))
-         (diff-tdv (bfp-run-tdv-scenario))
-         (diffs  (delq nil (list diff-a diff-b diff-tdv))))
+         (diff-diffView (bfp-run-diffView-scenario))
+         (diffs  (delq nil (list diff-a diff-b diff-diffView))))
     (if diffs
         (fail "Scenarios with broken fold-preservation: %s"
               (mapconcat #'identity diffs "; "))

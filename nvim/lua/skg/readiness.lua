@@ -1,4 +1,4 @@
--- PURPOSE: The commit-readiness gestures of the total diff view
+-- PURPOSE: The commit-readiness gestures of the diff view
 -- ('TODO/total-diff-view/02_plan.org', "gestures"). Each writes
 -- readiness requests, '(readyRequest AXES)' or '(unreadyRequest
 -- AXES)', into headline metadata, then saves. The save consumes

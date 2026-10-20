@@ -70,7 +70,7 @@ pub(super) struct CompletionContext<'a> {
   /// de-novo renders, collateral rerenders and rerender-all, whose
   /// repairs do not correspond to edits the user just made.
   pub(super) warning_sink : Option<&'a mut Vec<CompletionWarning>>,
-  /// Some only when completing a total diff view ('server/pcsvf.rs').
+  /// Some only when completing a diff view ('server/pcsvf.rs').
   /// Each unrestricted vognode's visit then ends with
   /// 'process_unrestrictedVognode_changes', each historical phantom's
   /// draws its old content ('process_historical_phantom_visit'),
@@ -79,7 +79,7 @@ pub(super) struct CompletionContext<'a> {
   /// outside U, and no default folders are created.
   pub(super) diffView_source : Option<DiffViewSource<'a>>,
   /// The viewnodes the viewforest held before this completion began.
-  /// In a total diff view, a fold state is set only on a viewnode
+  /// In a diff view, a fold state is set only on a viewnode
   /// not among them.
   pub(super) nodes_before_completion : &'a HashSet<NodeId>,
   /// The editable unrestricted vognodes among them. In a total diff
@@ -197,7 +197,7 @@ fn dispatch_node_update (
       // FolderPolicy::WriteProtectedSet folder. The reconciler branches on
       // 'PartnerFolder::policy' where their treatment differs.
       if role . relation_member_role () . is_some () =>
-      // In a total diff view (diffView_source set) the folder draws the
+      // In a diff view (diffView_source set) the folder draws the
       // union of the straddle; the Subscribee folder comes here too.
       reconcile_partnerFolder_children (
         treeid, tree, *role,
@@ -208,7 +208,7 @@ fn dispatch_node_update (
         context . deleted_by_this_save_extra_ids,
         context . skgrepo_restriction,
         context . warning_sink . as_deref_mut () ) ?,
-    // In a total diff view, the node's visit fills its alias, ID and
+    // In a diff view, the node's visit fills its alias, ID and
     // flags folders from the graph straddle
     // ('process_unrestrictedVognode_changes').
     ViewnodeKind::PropertyFolder (_) if context . diffView_source . is_some () => {},
@@ -224,7 +224,7 @@ fn dispatch_node_update (
       super::reconcile::flags_folder::reconcile_flags_folder_children (
         tree, treeid, &context . runtime . graph,
         &context . runtime . config ) ?,
-    // In a total diff view, a historical phantom where content stands
+    // In a diff view, a historical phantom where content stands
     // draws its old content.
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_)))
       if context . diffView_source . is_some () => {
@@ -246,7 +246,7 @@ fn dispatch_node_update (
 /// for a editable-view request *before* drawing content (so a Final node
 /// can cascade), reconcile content, run the remaining (non-Editable) view
 /// requests, ensure an editable subscribee's HiddenInSubscribeeFolder, and
-/// finally (in a total diff view) draw this node's changes. The BFS reaches
+/// finally (in a diff view) draw this node's changes. The BFS reaches
 /// every folder/child this creates and reconciles it in turn.
 fn visit_normal_node (
   tree    : &mut Tree<Viewnode>,
@@ -265,7 +265,7 @@ fn visit_normal_node (
     mutate_unrestrictedVognode_to_deletednode (
       tree, treeid, &pid, &skgrepo ) ?;
     if let Some (drawing) = context . diffView_source {
-      // In a total diff view, a node HEAD has is drawn as history.
+      // In a diff view, a node HEAD has is drawn as history.
       if deleted_phantom_becomes_historical (tree, treeid, drawing . straddle) ? {
         process_historical_phantom_visit (tree, treeid, drawing . straddle) ?; }}
     return Ok (( )); }
@@ -281,10 +281,10 @@ fn visit_normal_node (
         ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
           t . view_requests . contains (& ViewRequest::Editable),
         _ => false } ) ?;
-  let in_u : bool = // of the total diff view being drawn
+  let in_u : bool = // of the diff view being drawn
     context . diffView_source . is_some_and (
       |drawing| drawing . sets () . u . contains (&pid) );
-  let budgeted : bool = // In a total diff view the budget bounds only the expansions requests make outside U.
+  let budgeted : bool = // In a diff view the budget bounds only the expansions requests make outside U.
     context . diffView_source . is_none ()
     || ( had_editableViewRequest && ! in_u );
   let mut settled : bool = false; // TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule already ran
@@ -329,7 +329,7 @@ fn visit_normal_node (
     context . skgrepo_restriction,
     settled, cascade,
     if budgeted { Some (&mut context . node_budget) } else { None },
-    context . diffView_source . is_none (), // substitution is off in the total diff view: it shows raw graph facts
+    context . diffView_source . is_none (), // substitution is off in the diff view: it shows raw graph facts
     context . substitute_existing_content_overrides ) ?;
   // The steps below apply only while the node is still an Unrestricted vognode.
   let still_normal : bool =
@@ -342,7 +342,7 @@ fn visit_normal_node (
   // just expanded an existing occurrence.  Folder members are included;
   // hid*/overrid*-as-such nodes get the same defaults as ordinary nodes, and
   // the subscribee-specific HiddenIn folder is added by the pass below.
-  // A total diff view draws no default folders.
+  // A diff view draws no default folders.
   if ( context . create_partnerFolders_for_fresh_nodes || had_editableViewRequest )
     && context . diffView_source . is_none () {
     maybe_add_default_partnerFolder_branches (
@@ -357,7 +357,7 @@ fn visit_normal_node (
     context . errors, context . skgrepo_restriction ) ?;
   // Ensure an editable subscribee's HiddenInSubscribeeFolder exists; the BFS
   // reconciles it on reaching it. (A default folder, so not in a
-  // total diff view.)
+  // diff view.)
   if context . diffView_source . is_none () {
     super::reconcile::view_requests::ensure_hiddenInFolder_under_editable_subscribee (
       tree, treeid, &context . runtime . graph,

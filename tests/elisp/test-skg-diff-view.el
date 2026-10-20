@@ -1,15 +1,15 @@
-;;; test-skg-total-diff-view.el --- Tests for the total diff view command.  -*- lexical-binding: t; -*-
+;;; test-skg-diff-view.el --- Tests for the diff view command.  -*- lexical-binding: t; -*-
 
-(defconst test-skg-total-diff-view--this-dir
+(defconst test-skg-diff-view--this-dir
   (file-name-directory load-file-name))
 
 (load-file (expand-file-name "../../elisp/skg-test-utils.el"
-                             test-skg-total-diff-view--this-dir))
+                             test-skg-diff-view--this-dir))
 (require 'ert)
-(require 'skg-request-total-diff-view)
+(require 'skg-request-diff-view)
 
-(defun test-skg-total-diff-view--run (answers)
-  "Run `skg-diff-view' against a fake server that answers each
+(defun test-skg-diff-view--run (answers)
+  "Run `skg-diffView-open' against a fake server that answers each
 buffer's request from ANSWERS, an alist from buffer name to payload.
 Returns (REQUESTED-BUFFERS OPENED-BUFFER-NAMES)."
   (let ((handler nil)
@@ -35,41 +35,41 @@ Returns (REQUESTED-BUFFERS OPENED-BUFFER-NAMES)."
                         (buffer (cdr (assoc 'buffer request))))
                    (push buffer requested)
                    (should (equal (cdr (assoc 'request request))
-                                  "total diff view"))
+                                  "diff view"))
                    (should (cdr (assoc 'view-id request)))
                    (funcall handler :fake-proc
                             (cdr (assoc buffer answers)))))))
-      (skg-diff-view))
+      (skg-diffView-open))
     (list (nreverse requested) (nreverse opened))))
 
-(defconst test-skg-total-diff-view--empty
+(defconst test-skg-diff-view--empty
   "((empty . t) (errors ()) (warnings ()))")
 
-(defun test-skg-total-diff-view--content (text)
+(defun test-skg-diff-view--content (text)
   (prin1-to-string `((content ,text) (errors ()) (warnings ()))))
 
-(ert-deftest test-skg-total-diff-view-opens-only-nonempty-buffers ()
+(ert-deftest test-skg-diff-view-opens-only-nonempty-buffers ()
   (pcase-let ((`(,requested ,opened)
-               (test-skg-total-diff-view--run
+               (test-skg-diff-view--run
                 `(("all changes"
-                   . ,(test-skg-total-diff-view--content "* (skg (node (id a))) a\n"))
-                  ("merges" . ,test-skg-total-diff-view--empty)
+                   . ,(test-skg-diff-view--content "* (skg (node (id a))) a\n"))
+                  ("merges" . ,test-skg-diff-view--empty)
                   ("skgrepo changes"
-                   . ,(test-skg-total-diff-view--content "* (skg (node (id b))) b\n"))
-                  ("order-only changes" . ,test-skg-total-diff-view--empty)))))
-    (should (equal requested skg-total-diff-view-buffers))
+                   . ,(test-skg-diff-view--content "* (skg (node (id b))) b\n"))
+                  ("order-only changes" . ,test-skg-diff-view--empty)))))
+    (should (equal requested skg-diffView-buffers))
     (should (equal opened '("diff-view: all changes"
                             "diff-view: skgrepo changes")))))
 
-(ert-deftest test-skg-total-diff-view-a-refusal-ends-the-sequence ()
+(ert-deftest test-skg-diff-view-a-refusal-ends-the-sequence ()
   (pcase-let ((`(,requested ,opened)
-               (test-skg-total-diff-view--run
+               (test-skg-diff-view--run
                 `(("all changes"
                    . ,(prin1-to-string
                        '((content "")
-                         (errors ("The total diff view requires no skgrepo restriction"))
+                         (errors ("The diff view requires no skgrepo restriction"))
                          (warnings ()))))))))
     (should (equal requested '("all changes")))
     (should (null opened))))
 
-(provide 'test-skg-total-diff-view)
+(provide 'test-skg-diff-view)

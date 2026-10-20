@@ -3,7 +3,7 @@
 ;;; Graph at HEAD: a contains [b].
 ;;; Worktree:      a contains [].
 ;;;
-;;; Phase 1: Open the total diff view.
+;;; Phase 1: Open the diff view.
 ;;; Phase 2: In its "all changes" buffer, b appears under a as a
 ;;;          removed member: write-protected, tagged (diff rel-).
 ;;; Phase 3: Call skg-goto-in-magit-parent on b.
@@ -28,7 +28,7 @@
   "Report test success."
   (apply #'message (concat "✓ PASS: " message) args))
 
-;;; The line of the total diff view's "all changes" buffer that draws
+;;; The line of the diff view's "all changes" buffer that draws
 ;;; b as a removed member of a.
 (defconst test-removed-member-line-regexp
   "(id b).*(diff rel-)")
@@ -38,14 +38,14 @@
    (lambda (b) (string-match-p "diff-view: all changes" (buffer-name b)))
    (buffer-list)))
 
-(defun phase-1-open-the-total-diff-view ()
+(defun phase-1-open-the-diff-view ()
   (setq integration-test-phase "phase-1")
   (let ((test-port (getenv "SKG_TEST_PORT")))
     (when test-port
       (setq skg-port (string-to-number test-port))))
   (setq skg-config-dir
         (expand-file-name "data/" (file-name-directory load-file-name)))
-  (skg-diff-view)
+  (skg-diffView-open)
   (unless (skg-test-wait-for
            (lambda ()
              (let ((buf (find-all-changes-buffer)))
@@ -116,7 +116,7 @@
 
 (defun run-all-tests ()
   (message "=== SKG View-Magit-Removed-Member Integration Test ===")
-  (phase-1-open-the-total-diff-view)
+  (phase-1-open-the-diff-view)
   (phase-2-verify-removed-member-b)
   (phase-3-call-view-magit-on-removed-member-b)
   (phase-4-verify-magit-points-to-deletion-of-b-in-a)

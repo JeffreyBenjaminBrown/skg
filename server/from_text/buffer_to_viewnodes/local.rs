@@ -292,7 +292,7 @@ fn validate_subscribeefolder (
            || matches!(&node . kind,
                     MpViewnodeKind::Vognode (MpVognode::Restricted (_)) // a retained restricted subscribee may sit here as an save-inert display placeholder; it emits no subscribesTo membership (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org)
                       | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
-                      | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))) // a former member, in the total diff view; save-inert
+                      | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))) // a former member, in the diff view; save-inert
                       | MpViewnodeKind::PartnerFolder (
                           PartnerFolder::HiddenOutsideOfSubscribee) ))
     { errors . push( "SubscribeeFolder's children must include only UnrestrictedVognodes, Unknown, historical or restricted vognodes, or HiddenOutsideOfSubscribeeFolder." . to_string()); }
@@ -340,7 +340,7 @@ fn validate_relation_folder (
                               MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) ))
            || matches!(&node . kind,
                        MpViewnodeKind::Vognode (MpVognode::Restricted (_))) // tolerated from stale buffers; the rerender removes it (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org)
-           || matches!(&node . kind, // a former member, in the total diff view; save-inert
+           || matches!(&node . kind, // a former member, in the diff view; save-inert
                        MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_)))))
     { errors . push(format!("{}'s children must include only UnrestrictedVognodes, restricted vognodes, historical phantoms, or (for OverriddenFolder) Unknown phantoms.", label)); }
   if !generation_includes_only(
@@ -372,8 +372,8 @@ fn validate_relation_folder (
       "{} must not have duplicate UnrestrictedVognode children.", label)); }
   errors }
 
-// The total diff view's viewnodes are save-inert: these checks only
-// keep each where the total diff view draws it.
+// The diff view's viewnodes are save-inert: these checks only
+// keep each where the diff view draws it.
 
 fn validate_historical_phantom (
   tree    : &Tree<MpViewnode>,

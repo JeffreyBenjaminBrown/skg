@@ -1,4 +1,4 @@
-// Editing a buffer of the total diff view like any view: what the
+// Editing a buffer of the diff view like any view: what the
 // user may change, what the save refuses, and what is redrawn. The
 // 'kinds' fixture is described in 'buffer.rs'. The 'overrides'
 // fixture: r overrides n, and p, which contains n, is retitled.
@@ -222,7 +222,7 @@ fn register_content_view_of (
     &f . graph . load_full (), view_id . clone (), tree, &pids );
   Ok (text) }
 
-/// The total diff view shows the graph as stored: a member that an
+/// The diff view shows the graph as stored: a member that an
 /// overrider would replace in an ordinary view is drawn as itself.
 #[test]
 fn override_substitution_is_off (

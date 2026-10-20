@@ -1,6 +1,6 @@
 //! The "show unshown changes" request
 //! ('TODO/total-diff-view/08_plan_yet-more.org', "The view follows U
-//! only on command"): redraw one buffer of the total diff view so
+//! only on command"): redraw one buffer of the diff view so
 //! that every node of its recomputed U has an editable occurrence,
 //! and every content origin of its recomputed D that it draws nowhere
 //! is a root. A
@@ -58,8 +58,8 @@ pub fn handle_show_unshown_changes_request (
 /// connection's graph straddle, brought up to date, with
 /// 'show_unshown_changes' set ('rerender_view'), and the readiness
 /// summary of the result. Nothing is registered or sent. Refused
-/// unless the skgrepo restriction is 'all', as the total diff view
-/// is, and unless the view is a buffer of the total diff view.
+/// unless the skgrepo restriction is 'all', as the diff view
+/// is, and unless the view is a buffer of the diff view.
 fn show_unshown_changes (
   env                 : &SkgEnv,
   views_state         : &ViewsState,
@@ -73,7 +73,7 @@ fn show_unshown_changes (
   let view_id : ViewId = view_id_from_request (request) ?;
   if diffView_buffer_kind_of_view (views_state, &view_id) . is_none () {
     return Err ( format! (
-      "View {} is not a buffer of the total diff view.",
+      "View {} is not a buffer of the diff view.",
       view_id . repr_in_client () )); }
   let prepared : PreparedRerenders = prepare_rerender_views_where (
     env, env . runtime_snapshot (), views_state,

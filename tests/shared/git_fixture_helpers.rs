@@ -1,4 +1,4 @@
-/// Shared utilities for tests over git fixtures: the graph straddle and the total diff view.
+/// Shared utilities for tests over git fixtures: the graph straddle and the diff view.
 
 pub use git2::Repository;
 pub use std::collections::HashMap;

@@ -1,7 +1,7 @@
-;;; Integration test: the total diff view, end to end. See run-test.sh
+;;; Integration test: the diff view, end to end. See run-test.sh
 ;;; for the data.
 ;;;
-;;; Phase 1: Open the total diff view; its buffers open.
+;;; Phase 1: Open the diff view; its buffers open.
 ;;; Phase 2: Mark every change commit-ready, through the recursive
 ;;;          gesture on each root of the "all changes" buffer, and see
 ;;;          "COMMIT READY".
@@ -40,7 +40,7 @@
    (lambda (b) (string-match-p "diff-view: all changes" (buffer-name b)))
    (buffer-list)))
 
-(defun total-diff-view-buffers ()
+(defun diff-view-buffers ()
   (cl-remove-if-not
    (lambda (b) (string-match-p "diff-view: " (buffer-name b)))
    (buffer-list)))
@@ -50,13 +50,13 @@
   (let ((default-directory (expand-file-name skgrepo test-data-dir)))
     (string-trim (shell-command-to-string "git log -1 --format=%s"))))
 
-(defun phase-1-open-the-total-diff-view ()
+(defun phase-1-open-the-diff-view ()
   (setq integration-test-phase "phase-1")
   (let ((test-port (getenv "SKG_TEST_PORT")))
     (when test-port
       (setq skg-port (string-to-number test-port))))
   (setq skg-config-dir test-data-dir)
-  (skg-diff-view)
+  (skg-diffView-open)
   (unless (skg-test-wait-for
            (lambda ()
              (let ((buf (all-changes-buffer)))
@@ -67,8 +67,8 @@
     (test-fail "Timeout waiting for the \"all changes\" buffer"))
   ;; The sequence opens each nonempty buffer in turn.
   (skg-test-wait-for
-   (lambda () (>= (length (total-diff-view-buffers)) 3)) 10)
-  (let ((names (sort (mapcar #'buffer-name (total-diff-view-buffers))
+   (lambda () (>= (length (diff-view-buffers)) 3)) 10)
+  (let ((names (sort (mapcar #'buffer-name (diff-view-buffers))
                      #'string<))
         (all-changes (with-current-buffer (all-changes-buffer)
                        (buffer-string))))
@@ -82,7 +82,7 @@
       (unless (string-match-p (regexp-quote expected) all-changes)
         (test-fail "The \"all changes\" buffer lacks %s:\n%s"
                    expected all-changes)))
-    (test-pass "The total diff view opened: %S" names)))
+    (test-pass "The diff view opened: %S" names)))
 
 (defun root-headline-positions ()
   "The positions of the current buffer's root headlines."
@@ -150,12 +150,12 @@
                                 (not (string-match-p
                                       "(diff \\|changed)\\|changesetMarker\\|oldText\\|homeMove\\|acquiredFolder"
                                       text)))))
-                       (total-diff-view-buffers)))
+                       (diff-view-buffers)))
            10)
-    (test-fail "The buffers of the total diff view did not keep their roots without their changes: %S"
+    (test-fail "The buffers of the diff view did not keep their roots without their changes: %S"
                (mapcar (lambda (b) (cons (buffer-name b)
                                          (with-current-buffer b (buffer-string))))
-                       (total-diff-view-buffers))))
+                       (diff-view-buffers))))
   (test-pass "Committed alpha and beta, and the buffers keep their roots, unchanged"))
 
 (defun phase-4-investigate-the-deleted-node ()
@@ -204,12 +204,12 @@
 
 (defun run-all-tests ()
   (message "=== SKG Total Diff View Integration Test ===")
-  (phase-1-open-the-total-diff-view)
+  (phase-1-open-the-diff-view)
   (phase-2-mark-everything)
   (phase-3-stage-and-commit)
   (phase-4-investigate-the-deleted-node)
   (message "")
-  (test-pass "All total-diff-view tests passed!")
+  (test-pass "All diff-view tests passed!")
   (kill-emacs 0))
 
 (progn

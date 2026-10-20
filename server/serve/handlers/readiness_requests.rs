@@ -134,7 +134,7 @@ fn leaves_named_at (
             all_of . push (pid . clone ()), }} },
     ViewnodeKind::Property (property) => {
       // The change-forest leaf of an entry in a folder belongs to the
-      // folder's viewparent; the total diff view's properties hang
+      // folder's viewparent; the diff view's properties hang
       // under their node.
       let owner_of_folder = || -> Option<ID> {
         Some ( pid_of ( &grandparent_pid (node) ? )) };

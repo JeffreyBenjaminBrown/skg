@@ -21,11 +21,11 @@ const SKGREPOS : [&str; 2] = [ "public", "private" ];
 
 /// The text of a buffer of the 'buffers' fixture.
 fn buffer (
-  tdv_buffer : DiffViewBufferKind,
+  diffView_buffer_kind : DiffViewBufferKind,
 ) -> Result<String, Box<dyn Error>> {
   let mut text : String = String::new ();
   with_fixture ("buffers", &SKGREPOS, |f : &mut Fixture| {
-    text = open_buffer (f, tdv_buffer) ?
+    text = open_buffer (f, diffView_buffer_kind) ?
       . ok_or ("the fixture's buffer is empty") ?;
     Ok (( )) }) ?;
   Ok (text) }

@@ -1,6 +1,6 @@
 //! The graph straddle: the before-graph, read from each owned skgrepo's
 //! HEAD, and the after-graph, the live graph. The union walk answers
-//! questions about the union of the two. The total diff view is built
+//! questions about the union of the two. The diff view is built
 //! on it ('TODO/total-diff-view/02_plan.org', "graph straddle").
 
 pub mod build;

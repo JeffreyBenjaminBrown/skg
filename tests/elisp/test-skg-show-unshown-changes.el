@@ -63,5 +63,5 @@ the sent requests (newest first) and the handlers."
        "((readiness-summary (ready 1) (changed 3) (foreign 0) (order-only 0) (unshown 0)) (errors ()) (warnings ()))")
       (should (equal shown "1 of 3 changed files are ready"))
       (skg--show-unshown-changes-handler
-       "((errors (\"View x is not a buffer of the total diff view.\")) (warnings ()))")
-      (should (equal shown "View x is not a buffer of the total diff view.")))))
+       "((errors (\"View x is not a buffer of the diff view.\")) (warnings ()))")
+      (should (equal shown "View x is not a buffer of the diff view.")))))

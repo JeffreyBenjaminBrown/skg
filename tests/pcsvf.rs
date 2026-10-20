@@ -1,4 +1,4 @@
-// The PCSVF and the "all changes" buffer of the total diff view
+// The PCSVF and the "all changes" buffer of the diff view
 // ('TODO/total-diff-view/02_plan.org', "The PCSVF"), over git fixtures
 // in 'tests/pcsvf/fixtures/'.
 //

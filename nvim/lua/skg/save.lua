@@ -394,7 +394,7 @@ function M.handle_save_response (save_buf, response)
                                     content_text ~= nil)
   end
   local summary = M.readiness_summary_from_response(response)
-  if summary then -- the saved buffer is one of the total diff view's
+  if summary then -- the saved buffer is one of the diff view's
     vim.notify(M.readiness_summary_message(summary)) end
 end
 
@@ -421,7 +421,7 @@ function M.readiness_summary_from_response (response)
   return nil
 end
 
----The line shown after a save of a buffer of the total diff view.
+---The line shown after a save of a buffer of the diff view.
 ---@param summary table as readiness_summary_from_response gives it
 ---@return string
 function M.readiness_summary_message (summary)

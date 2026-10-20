@@ -1,6 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: The commit-readiness gestures of the total diff view
+;;; PURPOSE: The commit-readiness gestures of the diff view
 ;;; ('TODO/total-diff-view/02_plan.org', "gestures"). Each writes
 ;;; readiness requests, '(readyRequest AXES)' or '(unreadyRequest
 ;;; AXES)', into headline metadata, then saves. The save consumes
@@ -8,7 +8,7 @@
 ;;; redrawn and the readiness summary.
 ;;;
 ;;; A headline names leaves (single changes) when it carries a
-;;; '(diff ...)' fact or is one of the total diff view's properties.
+;;; '(diff ...)' fact or is one of the diff view's properties.
 ;;; A vognode or phantom names a leaf on each axis its '(diff ...)'
 ;;; signs: 'node' (∃, its existence) and 'rel' (~, its relationship
 ;;; to its viewparent). A property names one leaf, and its request

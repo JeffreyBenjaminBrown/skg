@@ -65,7 +65,7 @@ pub struct RerenderAfterSaveContext<'a> {
   /// these IDs after the pid itself has disappeared.
   pub deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
   pub skgrepo_restriction            : Option<&'a SkgrepoRestriction>,
-  /// The graph straddle a buffer of the total diff view is completed
+  /// The graph straddle a buffer of the diff view is completed
   /// over, brought up to date by 'current_graph_straddle_in_slot' when
   /// the first such buffer is rerendered. A caller that holds the
   /// connection's straddle sets it, and keeps what it becomes.
@@ -167,7 +167,7 @@ pub fn update_views_after_save (
         env, runtime, &node_instructions,
         deleted_by_this_save_extra_ids, skgrepo_restriction ) };
   context . graph_straddle = views_state . graph_straddle . clone ();
-  let saved_tdv_buffer : Option<DiffViewBufferKind> =
+  let saved_diffView_buffer_kind : Option<DiffViewBufferKind> =
     viewid_from_request_result . as_ref () . ok ()
     . and_then ( |view_id| diffView_buffer_kind_of_view (views_state, view_id) );
   let mut saved_view_mut : ViewForest = saved_view;
@@ -217,10 +217,10 @@ pub fn update_views_after_save (
         Some (&mut repair_warnings),
         false,
         true,
-        saved_tdv_buffer,
+        saved_diffView_buffer_kind,
         false ) } ?;
   let readiness_summary : Option<BufferReadinessSummary> =
-    saved_tdv_buffer . and ( context . graph_straddle . as_ref () )
+    saved_diffView_buffer_kind . and ( context . graph_straddle . as_ref () )
     . map ( |straddle| {
       let store : MutexGuard<ReadinessStore> =
         env . runtime . readiness_store . lock ()
@@ -290,13 +290,13 @@ pub fn update_views_after_save (
     text_release_confirmation : None,
     readiness_summary, } ) }
 
-/// The buffer of the total diff view that 'view_id' is, if it is one.
+/// The buffer of the diff view that 'view_id' is, if it is one.
 pub fn diffView_buffer_kind_of_view (
   views_state : &ViewsState,
   view_id     : &ViewId,
 ) -> Option<DiffViewBufferKind> {
   views_state . open_views . views . get (view_id)
-    . and_then ( |state| state . tdv_buffer ) }
+    . and_then ( |state| state . diffView_buffer_kind ) }
 
 fn unrestricted_skgids_in_viewforest (
   viewforest : &ViewForest,
@@ -449,13 +449,13 @@ pub fn render_initial_view (
   drop (sink);
   Ok (( viewforest, Vec::new () )) }
 
-/// Complete a stub viewforest of the total diff view
+/// Complete a stub viewforest of the diff view
 /// ('server/pcsvf.rs') as 'drawing' says: view completion with
 /// 'diffView_source' set, which draws the union of the straddle's content, the change
 /// folders and markers, and the former members. It creates no
 /// default partner folders, spends no node budget (only an
 /// editable-view request spends it, and a first drawing carries
-/// none), and never restricts by skgrepo (the total diff view
+/// none), and never restricts by skgrepo (the diff view
 /// requires the set 'all').
 pub fn complete_viewforest_with_graph_straddle (
   runtime    : &RuntimeGeneration,
@@ -489,7 +489,7 @@ pub fn complete_viewforest_with_graph_straddle (
 /// Strip the stale ID folders, re-complete the viewforest,
 /// set graph/view stats, and render to string.
 /// .
-/// A buffer of the total diff view ('tdv_buffer' Some) is reconciled
+/// A buffer of the diff view ('diffView_buffer_kind' Some) is reconciled
 /// over the graph straddle, brought up to date in 'context': view
 /// completion reconciles each editable node's change facts, change
 /// folders, markers and former members, its ID folder among them,
@@ -511,16 +511,16 @@ pub fn rerender_view (
   warning_sink  : Option<&mut Vec<CompletionWarning>>, // Some only for the view the user just saved.
   create_partnerFolders : bool, // false post-save (folders round-trip from the buffer); true for the repo-switch rerender, where pruning removed them and the new set decides which return.
   substitute_existing_content_overrides : bool, // true only for the view whose edit created the override.
-  tdv_buffer    : Option<DiffViewBufferKind>, // Some for a buffer of the total diff view
-  show_unshown_changes : bool, // true only for the "show unshown changes" request; matters only in a total diff view
+  diffView_buffer_kind : Option<DiffViewBufferKind>, // Some for a buffer of the diff view
+  show_unshown_changes : bool, // true only for the "show unshown changes" request; matters only in a diff view
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
-  if tdv_buffer . is_none () {
-    // A total diff view's step reconciles its ID folders instead.
+  if diffView_buffer_kind . is_none () {
+    // A diff view's step reconciles its ID folders instead.
     tracing::debug!("rerender_view: starting");
     remove_id_folders (viewforest) ?; }
   let graph_straddle : Option<Arc<GraphStraddle>> =
-    match tdv_buffer {
+    match diffView_buffer_kind {
       Some (_) => Some ( current_graph_straddle_in_slot (
         &mut context . graph_straddle, &context . runtime . config,
         context . runtime . graph . clone () )
@@ -528,8 +528,8 @@ pub fn rerender_view (
           "Cannot redraw the diff view buffer: {}", e )) ? ),
       None => None, };
   let diffView_source : Option<DiffViewSource> =
-    graph_straddle . as_deref () . zip (tdv_buffer)
-    . map ( |(straddle, tdv_buffer)| DiffViewSource { straddle, tdv_buffer } );
+    graph_straddle . as_deref () . zip (diffView_buffer_kind)
+    . map ( |(straddle, diffView_buffer_kind)| DiffViewSource { straddle, diffView_buffer_kind } );
   let drawing_to_show_unshown_changes : Option<DiffViewSource> =
     diffView_source . filter ( |_| show_unshown_changes );
   let standing_roots : BTreeSet<ID> = root_skgids_of_buffer (viewforest);
@@ -556,7 +556,7 @@ pub fn rerender_view (
       errors                         : &mut context . errors,
       deleted_by_this_save_pids      : &context . deleted_by_this_save_pids,
       deleted_by_this_save_extra_ids : &context . deleted_by_this_save_extra_ids,
-      // A total diff view, like its first drawing
+      // A diff view, like its first drawing
       // ('complete_viewforest_with_graph_straddle'), is not restricted by
       // skgrepo while it is completed.
       skgrepo_restriction            : if graph_straddle . is_some () { None }
@@ -565,10 +565,10 @@ pub fn rerender_view (
       // Post-save (and rerender-all) reuse the saved buffer's PartnerFolders
       // and pass false. The repo-switch rerender passes true: its prune
       // removed the folders, and the new set decides which defaults return.
-      // A total diff view draws no default folders.
+      // A diff view draws no default folders.
       create_partnerFolders_for_fresh_nodes :
         create_partnerFolders && graph_straddle . is_none (),
-      substitute_existing_content_overrides : // off in a total diff view
+      substitute_existing_content_overrides : // off in a diff view
         substitute_existing_content_overrides && graph_straddle . is_none (),
       warning_sink,
       diffView_source,

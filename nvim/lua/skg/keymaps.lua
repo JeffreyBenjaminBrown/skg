@@ -113,8 +113,8 @@ M.commands = {
            desc = 'Fork the owned node at point into a private clone' },
   ReplaceContentWithLink = { module = 'skg.modify_graph', fn = 'replace_content_with_link',
                              desc = 'Turn the branch at point into a link (saves)' },
-  DiffView = { module = 'skg.total_diff_view', fn = 'diff_view',
-               desc = 'Open the total diff view: every change since the last commits' },
+  DiffViewOpen = { module = 'skg.diff_view', fn = 'diffView_open',
+                   desc = 'Open the diff view: every change since the last commits' },
   ViewNewEmpty = { module = 'skg.view_new_empty', fn = 'view_new_empty',
                    desc = 'Open a fresh root node in a chosen repo' },
   HeraldsToggle = { module = 'skg.heralds', fn = 'toggle',
@@ -166,7 +166,7 @@ M.commands = {
     desc = 'Toggle the commit-readiness of every home move in the subtree like this one, and save' },
   TdvShowUnshownChanges = { module = 'skg.show_unshown_changes',
                             fn = 'show_unshown_changes',
-                            desc = 'Make every change of this total-diff-view buffer shown, appending roots as needed' },
+                            desc = 'Make every change of this diff-view buffer shown, appending roots as needed' },
   StageAndCommit = { module = 'skg.stage_and_commit', fn = 'stage_and_commit',
                      desc = 'Stage and git-commit every owned skgrepo with changes, with one message' },
   InvestigateUnknownNode = { module = 'skg.investigate_unknown_node',
@@ -275,7 +275,7 @@ M.content_view_bindings = {
   { 'mc', 'ReplaceLinkWithContent' },    -- C-c m c
   { 'mf', 'Fork' },                      -- C-c m f
   { 'ml', 'ReplaceContentWithLink' },    -- C-c m l
-  { 'vd', 'DiffView' },                  -- C-c v d
+  { 'vd', 'DiffViewOpen' },              -- C-c v d
   { 've', 'ViewNewEmpty' },              -- C-c v e
   { 'vh', 'HeraldsToggle' },             -- C-c v h
   { 'vl', 'RestrictRepoSet' },            -- C-c v l

@@ -1,8 +1,8 @@
-// Saving a buffer of the total diff view: the save consumes its
+// Saving a buffer of the diff view: the save consumes its
 // readiness requests, the buffer is reconciled over the fresh graph
 // straddle with its readiness read from the store, and the response
 // carries the readiness summary
-// ('TODO/total-diff-view/02_plan.org', "Saving a TDV buffer").
+// ('TODO/total-diff-view/02_plan.org', "Saving a diff-view buffer").
 
 use crate::pcsvf::common::{
   Fixture, open_all_changes_buffer, open_buffer, save, save_buffer,
@@ -174,7 +174,7 @@ fn summary_of (
   response : &SaveResponse,
 ) -> BufferReadinessSummary {
   response . readiness_summary . clone ()
-    . expect ("a save of a TDV buffer reports the readiness summary") }
+    . expect ("a save of a diff-view buffer reports the readiness summary") }
 
 fn summary (
   ready_files     : usize,

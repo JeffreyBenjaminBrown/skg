@@ -5,7 +5,7 @@
 -- Graph at HEAD: a contains [b].
 -- Worktree:      a contains [].
 --
--- Phase 1: Open the total diff view.
+-- Phase 1: Open the diff view.
 -- Phase 2: In its "all changes" buffer, b appears under a as a
 --          removed member: write-protected, tagged (diff rel-).
 -- Phase 3: Call goto_git.goto_in_git_parent on b.
@@ -61,9 +61,9 @@ end
 
 print('=== SKG View-Magit-Removed-Member Integration Test ===')
 
--- PHASE 1: open the total diff view.
-print('=== PHASE 1: Open the total diff view ===')
-require('skg.total_diff_view').diff_view()
+-- PHASE 1: open the diff view.
+print('=== PHASE 1: Open the diff view ===')
+require('skg.diff_view').diffView_open()
 local all_changes = find_all_changes_buffer()
 if not all_changes then
   T.fail('Timeout waiting for the "all changes" buffer') end

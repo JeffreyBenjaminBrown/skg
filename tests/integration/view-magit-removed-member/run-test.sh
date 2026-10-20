@@ -6,7 +6,7 @@
 # Worktree:      a contains [].  (b removed from a's content)
 # Both a.skg and b.skg still exist on disk.
 #
-# The test opens the total diff view, verifies that its "all changes"
+# The test opens the diff view, verifies that its "all changes"
 # buffer draws b under a as a removed member, calls
 # skg-goto-in-magit-parent on b, and checks that magit navigates to
 # a.skg (the parent) at the deletion line.

@@ -27,7 +27,7 @@ pub enum RequestType {
   ExportToOrg,
   ImportMdAndOrg,
   DeleteReferencesToAbsentNode,
-  TotalDiffView,
+  DiffView,
   StageAndCommit,
   ShowUnshownChanges,
   InvestigateUnknownNode,
@@ -60,7 +60,7 @@ impl RequestType {
       "export to org"            => Ok (RequestType::ExportToOrg),
       "import md and org"         => Ok (RequestType::ImportMdAndOrg),
       "delete references to absent node" => Ok (RequestType::DeleteReferencesToAbsentNode),
-      "total diff view"          => Ok (RequestType::TotalDiffView),
+      "diff view"                => Ok (RequestType::DiffView),
       "stage and commit"         => Ok (RequestType::StageAndCommit),
       "show unshown changes"     => Ok (RequestType::ShowUnshownChanges),
       "investigate unknown node" => Ok (RequestType::InvestigateUnknownNode),
@@ -108,9 +108,9 @@ pub enum TcpToClient {
   ImportMdAndOrgResult,
   DeleteReferencesConfirmation,
   DeleteReferencesResult,
-  TotalDiffView, // One buffer of the total diff view, or '(empty . t)' when that buffer would show nothing.
+  DiffView, // One buffer of the diff view, or '(empty . t)' when that buffer would show nothing.
   StageAndCommit, // The per-skgrepo git-commits, or the readiness summary with '(needs-confirmation . t)'. A rerender stream follows.
-  ShowUnshownChanges, // The readiness summary of the buffer of the total diff view redrawn with every change shown, or a refusal. A rerender stream follows.
+  ShowUnshownChanges, // The readiness summary of the buffer of the diff view redrawn with every change shown, or a refusal. A rerender stream follows.
   InvestigateUnknownNode, // What git history says an unknown node used to be, or the node an ID resolves to, as Org text.
   Error,
 }
@@ -157,7 +157,7 @@ impl TcpToClient {
       TcpToClient::ImportMdAndOrgResult => "import-md-and-org-result",
       TcpToClient::DeleteReferencesConfirmation => "delete-references-confirmation",
       TcpToClient::DeleteReferencesResult => "delete-references-result",
-      TcpToClient::TotalDiffView    => "total-diff-view",
+      TcpToClient::DiffView         => "diff-view",
       TcpToClient::StageAndCommit   => "stage-and-commit",
       TcpToClient::ShowUnshownChanges => "show-unshown-changes",
       TcpToClient::InvestigateUnknownNode => "investigate-unknown-node",

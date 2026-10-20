@@ -135,12 +135,12 @@ local function bfp_run_scenario (name, expected_snapshot_before,
   return string.format('Scenario %s: BEFORE/AFTER differ', name)
 end
 
----@return integer|nil the "all changes" buffer, once it draws tdvr
-local function tdv_all_changes_buffer ()
+---@return integer|nil the "all changes" buffer, once it draws dvroot
+local function diffView_all_changes_buffer ()
   for _, b in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(b)
        and vim.api.nvim_buf_get_name(b):find('diff-view: all changes', 1, true)
-       and T.buffer_text(b):find('(id tdvr)', 1, true) then
+       and T.buffer_text(b):find('(id dvroot)', 1, true) then
       return b end
   end
   return nil
@@ -182,48 +182,48 @@ local diff_b = bfp_run_scenario(
   .. '[H] child body line two\n',
   function () folds.hide_entry(4) end)
 
--- The total diff view variant, over the data run-test.sh makes: in
--- the "all changes" buffer, tdvc's body and the body of tdvr's old
+-- The diff view variant, over the data run-test.sh makes: in
+-- the "all changes" buffer, dvchild's body and the body of dvroot's old
 -- text hidden. After save the snapshot should be unchanged.
-local function bfp_run_tdv_scenario ()
+local function bfp_run_diffView_scenario ()
   print('')
-  print('=== Scenario TDV ===')
-  require('skg.total_diff_view').diff_view()
-  local tdv = T.wait_for(tdv_all_changes_buffer, 20)
-  if not tdv then T.fail('Scenario TDV: timeout waiting for the "all changes" buffer') end
+  print('=== Scenario diff view ===')
+  require('skg.diff_view').diffView_open()
+  local diffView = T.wait_for(diffView_all_changes_buffer, 20)
+  if not diffView then T.fail('Scenario diff view: timeout waiting for the "all changes" buffer') end
   T.wait_for_response(20)
-  vim.api.nvim_set_current_buf(tdv)
-  folds.hide_entry(line_containing(tdv, '(oldText body)'))
-  folds.hide_entry(line_containing(tdv, '(id tdvc)'))
-  local before = bfp_snapshot(tdv)
+  vim.api.nvim_set_current_buf(diffView)
+  folds.hide_entry(line_containing(diffView, '(oldText body)'))
+  folds.hide_entry(line_containing(diffView, '(id dvchild)'))
+  local before = bfp_snapshot(diffView)
   print(string.format('--- snapshot BEFORE save ---\n%s', before))
   for _, expected in ipairs({
       -- the fold placeholder shows a body's first line (see B-children)
       '[V] root body line one\n[H] root body line two\n',
       '[V] child body line one\n[H] child body line two\n' }) do
     if not before:find(expected, 1, true) then
-      T.fail('Scenario TDV: BEFORE snapshot lacks ' .. expected .. ':\n' .. before)
+      T.fail('Scenario diff view: BEFORE snapshot lacks ' .. expected .. ':\n' .. before)
     end
   end
   local ok, err = pcall(save.request_save_buffer)
-  if not ok then T.fail('Scenario TDV: save raised: ' .. tostring(err)) end
+  if not ok then T.fail('Scenario diff view: save raised: ' .. tostring(err)) end
   T.wait_for_response(20)
-  local after = bfp_snapshot(tdv)
+  local after = bfp_snapshot(diffView)
   print(string.format('--- snapshot AFTER save ---\n%s', after))
   if before == after then
-    print('ok: Scenario TDV: fold state preserved')
+    print('ok: Scenario diff view: fold state preserved')
     return nil
   end
-  print(string.format('DIFF in scenario TDV.\nBEFORE:\n%s\nAFTER:\n%s', before, after))
-  return 'Scenario TDV: BEFORE/AFTER differ'
+  print(string.format('DIFF in scenario diff view.\nBEFORE:\n%s\nAFTER:\n%s', before, after))
+  return 'Scenario diff view: BEFORE/AFTER differ'
 end
 
-local diff_tdv = bfp_run_tdv_scenario()
+local diff_diffView = bfp_run_diffView_scenario()
 
 local diffs = {}
 if diff_a then table.insert(diffs, diff_a) end
 if diff_b then table.insert(diffs, diff_b) end
-if diff_tdv then table.insert(diffs, diff_tdv) end
+if diff_diffView then table.insert(diffs, diff_diffView) end
 
 if #diffs > 0 then
   T.fail('Scenarios with broken fold-preservation: '

@@ -21,5 +21,5 @@ pub mod strip_body_whitespace;
 pub mod telescope_hoist;
 pub mod text_search;
 pub mod titles_by_skgids;
-pub mod total_diff_view;
+pub mod diff_view;
 pub mod link_statuses;

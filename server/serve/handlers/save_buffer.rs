@@ -89,7 +89,7 @@ pub struct SaveResponse {
   /// handler sends a 'strand-confirmation' listing these. Checked
   /// before every other confirmation.
   pub strandeds_confirmation : Option<Vec<StrandedRelationship>>,
-  /// Some when the saved buffer is one of the total diff view's: the
+  /// Some when the saved buffer is one of the diff view's: the
   /// readiness summary the client shows after the save.
   pub readiness_summary   : Option<BufferReadinessSummary>,
 }

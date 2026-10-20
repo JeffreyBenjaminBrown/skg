@@ -143,56 +143,56 @@
             (kill-emacs 1))))
 
       (message "✓ PASS: Integration test successful!")))
-  (test-tdv-fold-preservation)
+  (test-diffView-fold-preservation)
   (setq integration-test-completed t)
   (kill-emacs 0))
 
-(defun tdv-all-changes-buffer ()
-  "The \"all changes\" buffer of the total diff view, once it draws tdvr."
+(defun diffView-all-changes-buffer ()
+  "The \"all changes\" buffer of the diff view, once it draws dvroot."
   (cl-find-if
    (lambda (b)
      (and (string-match-p "diff-view: all changes" (buffer-name b))
           (with-current-buffer b
-            (string-match-p "(id tdvr)" (buffer-string)))))
+            (string-match-p "(id dvroot)" (buffer-string)))))
    (buffer-list)))
 
-(defun tdv-goto-headline (regexp)
+(defun diffView-goto-headline (regexp)
   "Move to the beginning of the first headline matching REGEXP."
   (goto-char (point-min))
   (re-search-forward regexp)
   (beginning-of-line))
 
-(defun tdv-fail (format-string &rest args)
+(defun diffView-fail (format-string &rest args)
   (message "✗ FAIL: %s" (apply #'format format-string args))
   (kill-emacs 1))
 
-(defun test-tdv-fold-preservation ()
-  "The total diff view variant: tdvr's old-text line, folded, stays
+(defun test-diffView-fold-preservation ()
+  "The diff view variant: dvroot's old-text line, folded, stays
 folded (its body and its body diff hidden) after the \"all changes\"
 buffer is saved. See run-test.sh for the data."
-  (message "=== PHASE 5: The total diff view ===")
-  (setq integration-test-phase "tdv")
-  (skg-diff-view)
-  (let ((buf (skg-test-wait-for #'tdv-all-changes-buffer 20)))
-    (unless buf (tdv-fail "Timeout waiting for the \"all changes\" buffer"))
+  (message "=== PHASE 5: The diff view ===")
+  (setq integration-test-phase "diffView")
+  (skg-diffView-open)
+  (let ((buf (skg-test-wait-for #'diffView-all-changes-buffer 20)))
+    (unless buf (diffView-fail "Timeout waiting for the \"all changes\" buffer"))
     (skg-test-wait-for-response 20)
     (switch-to-buffer buf)
-    (tdv-goto-headline "(oldText body)")
+    (diffView-goto-headline "(oldText body)")
     (org-cycle)
     (let ((hidden-p
            (lambda ()
-             (tdv-goto-headline "(oldText body)")
+             (diffView-goto-headline "(oldText body)")
              (and (not (invisible-p (point)))
                   (save-excursion (forward-line 1) (invisible-p (point)))
                   (progn (re-search-forward "bodyDiff")
                          (invisible-p (line-beginning-position)))))))
       (unless (funcall hidden-p)
-        (tdv-fail "The old text did not fold:\n%s" (buffer-string)))
+        (diffView-fail "The old text did not fold:\n%s" (buffer-string)))
       (skg-request-save-buffer)
       (skg-test-wait-for-response 20)
       (if (funcall hidden-p)
           (message "✓ PASS: The folded old text stays folded after the save")
-        (tdv-fail "The old text unfolded after the save:\n%s"
+        (diffView-fail "The old text unfolded after the save:\n%s"
                   (buffer-string))))))
 
 (progn ;; Run the test with a timeout in case things hang.

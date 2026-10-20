@@ -12,12 +12,12 @@ local buffer = require('skg.buffer')
 local folds = require('skg.folds')
 local save = require('skg.save')
 
----@return integer|nil the "all changes" buffer, once it draws tdvr
-local function tdv_all_changes_buffer ()
+---@return integer|nil the "all changes" buffer, once it draws dvroot
+local function diffView_all_changes_buffer ()
   for _, b in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(b)
        and vim.api.nvim_buf_get_name(b):find('diff-view: all changes', 1, true)
-       and T.buffer_text(b):find('(id tdvr)', 1, true) then
+       and T.buffer_text(b):find('(id dvroot)', 1, true) then
       return b end
   end
   return nil
@@ -101,21 +101,21 @@ local line_7_text = vim.api.nvim_get_current_line()
 T.check(line_7_text:match('%*%* .* e') ~= nil,
         "now on line with '** e' (got: " .. line_7_text .. ')')
 
--- PHASE 5: the total diff view variant (see run-test.sh for the
--- data): tdvr's old-text line, folded, stays folded -- its body and
+-- PHASE 5: the diff view variant (see run-test.sh for the
+-- data): dvroot's old-text line, folded, stays folded -- its body and
 -- its body diff hidden -- after the "all changes" buffer is saved.
-print('=== PHASE 5: The total diff view ===')
-require('skg.total_diff_view').diff_view()
-local tdv = T.wait_for(tdv_all_changes_buffer, 20)
-if not tdv then T.fail('Timeout waiting for the "all changes" buffer') end
+print('=== PHASE 5: The diff view ===')
+require('skg.diff_view').diffView_open()
+local diffView = T.wait_for(diffView_all_changes_buffer, 20)
+if not diffView then T.fail('Timeout waiting for the "all changes" buffer') end
 T.wait_for_response(20)
-vim.api.nvim_set_current_buf(tdv)
-folds.close_fold_at(line_containing(tdv, '(oldText body)'))
+vim.api.nvim_set_current_buf(diffView)
+folds.close_fold_at(line_containing(diffView, '(oldText body)'))
 local function old_text_folded ()
-  local old_text = line_containing(tdv, '(oldText body)')
+  local old_text = line_containing(diffView, '(oldText body)')
   return not folds.line_invisible_p(old_text)
      and folds.line_invisible_p(old_text + 1)
-     and folds.line_invisible_p(line_containing(tdv, 'bodyDiff'))
+     and folds.line_invisible_p(line_containing(diffView, 'bodyDiff'))
 end
 T.check(old_text_folded(), 'the old text folded')
 save.request_save_buffer()

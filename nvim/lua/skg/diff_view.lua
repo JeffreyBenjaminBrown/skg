@@ -1,9 +1,9 @@
--- PURPOSE: The total diff view
+-- PURPOSE: The diff view
 -- ('TODO/total-diff-view/02_plan.org', "One command, four buffers").
--- One command sends one "total diff view" request per buffer, in
+-- One command sends one "diff view" request per buffer, in
 -- order, and opens each buffer the server does not answer with
 -- '(empty . t)', named "skg://diff-view: " followed by the buffer's name.
--- The Lua port of elisp/skg-request-total-diff-view.el.
+-- The Lua port of elisp/skg-request-diff-view.el.
 
 local buffer = require('skg.buffer')
 local client = require('skg.client')
@@ -15,25 +15,25 @@ local state = require('skg.state')
 
 local M = {}
 
----The buffers of the total diff view, in the order they open.
+---The buffers of the diff view, in the order they open.
 M.buffers = { 'all changes', 'merges', 'skgrepo changes',
               'order-only changes' }
 
----The request sexp string for the total diff view's BUFFER_NAME.
+---The request sexp string for the diff view's BUFFER_NAME.
 ---@param buffer_name string
 ---@param view_id string
 ---@return string
 function M.request_string (buffer_name, view_id)
   return sexpr.to_string({
-    sexpr.pair(sexpr.symbol('request'), 'total diff view'),
+    sexpr.pair(sexpr.symbol('request'), 'diff view'),
     sexpr.pair(sexpr.symbol('buffer'), buffer_name),
     sexpr.pair(sexpr.symbol('view-id'), view_id) }) .. '\n'
 end
 
----Open the total diff view: every change in the owned skgrepos
+---Open the diff view: every change in the owned skgrepos
 ---since their last commits, in up to four buffers. Buffers that
 ---would be empty are not opened.
-function M.diff_view ()
+function M.diffView_open ()
   M.request_buffers(1, 0)
 end
 
@@ -46,11 +46,11 @@ function M.request_buffers (index, opened)
   local buffer_name = M.buffers[index]
   if not buffer_name then
     if opened == 0 then
-      vim.notify('The total diff view is empty: nothing changed since the last commits.')
+      vim.notify('The diff view is empty: nothing changed since the last commits.')
     end
     return end
   local view_id = buffer.generate_uuid()
-  state.register_response_handler('total-diff-view',
+  state.register_response_handler('diff-view',
     function (_payload_text, response)
       local outcome = M.handle_response(response, buffer_name, view_id)
       -- A refusal applies to every buffer, so it ends the sequence.
@@ -66,7 +66,7 @@ function M.request_buffers (index, opened)
   client.send_string(M.request_string(buffer_name, view_id))
 end
 
----Open the total diff view's BUFFER_NAME from RESPONSE under
+---Open the diff view's BUFFER_NAME from RESPONSE under
 ---VIEW_ID, unless the server answered '(empty . t)'. Shows any
 ---errors and warnings.
 ---@return string 'opened', 'empty' or 'failed' (no buffer, and errors)
@@ -84,7 +84,7 @@ function M.handle_response (response, buffer_name, view_id)
     if #errors > 0 or #warnings > 0 then
       messages.big_nonfatal_message(
         'skg://messages/diff-view',
-        'The total diff view\'s "' .. buffer_name
+        'The diff view\'s "' .. buffer_name
           .. '" buffer reported problems',
         messages.errors_and_warnings_to_org_string(errors, warnings)) end
     if opened then return 'opened'
@@ -92,7 +92,7 @@ function M.handle_response (response, buffer_name, view_id)
     else return 'failed' end
   end)
   if not ok then
-    log.log('error', 'view', 'parsing total diff view response: %s',
+    log.log('error', 'view', 'parsing diff view response: %s',
             tostring(outcome))
     return 'failed' end
   return outcome

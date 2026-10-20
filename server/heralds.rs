@@ -193,11 +193,11 @@ fn any_styled_as (
     node_heralds_key : Some (node_heralds_key), interc : None,
     label : Some ("ANY"), abut : false, children } ) }
 
-/// The total diff view's properties, each a label. A ready one's ✓
+/// The diff view's properties, each a label. A ready one's ✓
 /// comes from the property-leaf rules after them in the table.
 /// "⌂ -OLD +NEW" and "relationship moved from OLD to NEW" show the
 /// skgrepo names in their own style.
-fn total_diff_view_property_rules (
+fn diffView_property_rules (
 ) -> Vec<RuleChild> {
   vec! [
     crule ("oldText", vec! [
@@ -228,7 +228,7 @@ fn total_diff_view_property_rules (
           ChangesetMarkerKind::OrderOnly => "order-only change", } ) ] ))
       . collect () ) ] }
 
-/// The label of a folder the total diff view drew because of a
+/// The label of a folder the diff view drew because of a
 /// change, '(KIND changed)', which takes the place of the folder's
 /// ordinary label: "its X changed (this file)" for a folder of the
 /// node's own lists, "(other files)" for one of its recorders. A
@@ -267,7 +267,7 @@ fn changed_folder_rules (
     changed (PartnerFolder::Hidden . repr_in_client (), true,
              "the nodes it hides changed (this file)") ] }
 
-/// The total diff view's facts on a vognode: '(diff ...)' as ∃+ ∃-
+/// The diff view's facts on a vognode: '(diff ...)' as ∃+ ∃-
 /// (the node itself) and ~+ ~- (its relationship to its viewparent),
 /// each followed by a ✓ when '(ready ...)' names that diff object,
 /// then the readiness request. The same form is matched once per object, so each ✓ lands
@@ -431,9 +431,9 @@ pub fn herald_rule_table () -> HeraldRule {
         . map (|flag| rule (
           flag . wire_name (), vec! [s (flag . herald_text ())]))
         . collect ()) ],
-      total_diff_view_property_rules (),
+      diffView_property_rules (),
       changed_folder_rules (),
-      // The total diff view's facts on a property leaf: + and - for
+      // The diff view's facts on a property leaf: + and - for
       // its presence, ✓ when ready.
       change_fact_rules_for_one_object ("+", "-"),
       vec! [
@@ -502,7 +502,7 @@ pub fn herald_rule_table () -> HeraldRule {
           // that regardless of the atoms' order in the raw sexp).
           crule ("relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
           crule ("homeRepoHerald", vec! [ any (vec! [RuleChild::It]) ]),
-          // The skgrepo-changes buffer of the total diff view: the
+          // The skgrepo-changes buffer of the diff view: the
           // node's home move, "-OLD +NEW", then "Δ⌂=a" when its
           // nearest moved vognode ancestor (here a) moved the same way.
           rule ("homeMove", vec! [
@@ -707,7 +707,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   atoms . extend ( change_fact_atoms () );
   atoms . into_iter () . collect () }
 
-/// The total diff view's forms, from org_to_text.rs's
+/// The diff view's forms, from org_to_text.rs's
 /// 'change_fact_forms': their heads, the presence atoms and the
 /// diff objects.
 fn change_fact_atoms () -> Vec<&'static str> {
@@ -814,7 +814,7 @@ fn property_and_folder_atoms () -> Vec<&'static str> {
     let _ = property_guard;
     [ "alias", "id", "flag", "removedAlias", "removedID", "oldText", "bodyDiff",
       "homeMove", "relRepoMove", "changesetMarker" ] };
-  // The arguments the total diff view's properties take in match
+  // The arguments the diff view's properties take in match
   // position (org_to_text.rs's 'property_metadata_to_string').
   let property_argument_atoms : Vec<&'static str> =
     [ vec! [ "titleAndBody", "title", "body", "old", "new" ],

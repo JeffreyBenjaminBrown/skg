@@ -102,7 +102,7 @@ pub fn rebuild_session_lifetime_stores_in_place (
   })();
   if result . is_ok () {
     views_state . open_views . clear ();
-    // The next request of the total diff view rebuilds both halves
+    // The next request of the diff view rebuilds both halves
     // of its straddle from the disk state the rebuilt live graph was
     // read from.
     views_state . graph_straddle = None; }

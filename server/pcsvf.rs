@@ -1,5 +1,5 @@
 //! The PCSVF ("pruned change-spanning viewforest"): the viewforest
-//! the "all changes" buffer of the total diff view draws
+//! the "all changes" buffer of the diff view draws
 //! ('TODO/total-diff-view/02_plan.org', "The PCSVF").
 //!
 //! C is the set of changed graphnodes. R is the set of content
@@ -49,19 +49,19 @@ pub struct PcsvfSets {
   pub d : BTreeSet<ID>,
 }
 
-/// What view completion draws a buffer of the total diff view from:
+/// What view completion draws a buffer of the diff view from:
 /// the graph straddle, and the buffer, whose PCSVF sets it draws.
 #[derive(Clone, Copy)]
 pub struct DiffViewSource<'a> {
   pub straddle   : &'a GraphStraddle,
-  pub tdv_buffer : DiffViewBufferKind,
+  pub diffView_buffer_kind : DiffViewBufferKind,
 }
 
 impl<'a> DiffViewSource<'a> {
   pub fn sets (
     &self,
   ) -> &'a PcsvfSets {
-    self . straddle . pcsvf_sets_of_buffer (self . tdv_buffer) }
+    self . straddle . pcsvf_sets_of_buffer (self . diffView_buffer_kind) }
 }
 
 /// The sets of the PCSVF over all of C.
@@ -177,7 +177,7 @@ pub fn diffView_buffer_viewforest (
     pids_from_viewforest (&viewforest) . into_iter () . collect ();
   Ok (( text, pids, viewforest )) }
 
-/// What a buffer of the total diff view gets after view completion:
+/// What a buffer of the diff view gets after view completion:
 /// its '(ready ...)' facts, and in the skgrepo-changes buffer each
 /// moved vognode's home move ('set_home_move_facts_in_viewforest').
 pub fn set_diffView_facts_in_viewforest (
@@ -188,7 +188,7 @@ pub fn set_diffView_facts_in_viewforest (
 ) {
   set_ready_facts_in_viewforest (
     viewforest, drawing . straddle . change_leaves (), store, graph );
-  if drawing . tdv_buffer == DiffViewBufferKind::SkgrepoChanges {
+  if drawing . diffView_buffer_kind == DiffViewBufferKind::SkgrepoChanges {
     set_home_move_facts_in_viewforest (viewforest, drawing . straddle ); }}
 
 /// On each unrestricted vognode whose home skgrepo moved: the move,
@@ -245,7 +245,7 @@ fn ancestor_letter (
     char::from ( b'a' + (generation - 1) as u8 ) . to_string ()
   } else { format! ( "{{{}}}", generation ) }}
 
-/// The nodes a buffer of the total diff view makes editable: those it
+/// The nodes a buffer of the diff view makes editable: those it
 /// has an editable occurrence of, wherever it sits, and the deleted
 /// nodes it draws as historical phantoms in content position. A
 /// historical phantom in content position counts, since its old
@@ -319,7 +319,7 @@ fn append_stub_root (
     Some (( viewforest . as_internal_tree_mut (), buffer_root )),
     root, &runtime . graph, &runtime . config, stub_editable_map,
     None ) ?;
-  if drawing . tdv_buffer != DiffViewBufferKind::OrderOnlyChanges
+  if drawing . diffView_buffer_kind != DiffViewBufferKind::OrderOnlyChanges
     && union_containers (straddle, root) . len () > 1 {
     viewforest . as_internal_tree_mut () . get_mut (root_treeid)
       . ok_or ("diffView_buffer_viewforest: a stub root vanished") ?

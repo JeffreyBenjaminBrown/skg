@@ -5,7 +5,7 @@
 -- HEAD:       a contains [b]; a.skg and b.skg both committed.
 -- Worktree:   a no longer contains b; b.skg deleted from disk.
 --
--- Phase 1: Open the total diff view.
+-- Phase 1: Open the diff view.
 -- Phase 2: Its "all changes" buffer draws b as a historical phantom.
 -- Phase 3: Resolve b's on-disk path and open its plain diff.
 -- Phase 4: Verify the resolved path is exactly skg-data/b.skg (NOT
@@ -72,9 +72,9 @@ end
 
 print('=== SKG View-Magit-Phantom-Deleted-File Integration Test ===')
 
--- PHASE 1: open the total diff view.
-print('=== PHASE 1: Open the total diff view ===')
-require('skg.total_diff_view').diff_view()
+-- PHASE 1: open the diff view.
+print('=== PHASE 1: Open the diff view ===')
+require('skg.diff_view').diffView_open()
 local all_changes = find_all_changes_buffer()
 if not all_changes then
   T.fail('Timeout waiting for the "all changes" buffer') end

@@ -20,7 +20,7 @@
 (require 'skg-request-flag-state)
 (require 'skg-request-export-org)
 (require 'skg-request-import-md-and-org)
-(require 'skg-request-total-diff-view)
+(require 'skg-request-diff-view)
 (require 'skg-readiness)
 (require 'skg-request-rebuild-session-lifetime-stores)
 (require 'skg-request-rerender-all-views)

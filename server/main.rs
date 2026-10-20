@@ -314,7 +314,7 @@ fn run_import (
     tracing::warn! ("  {}", err); }
   println! ( // reminder printed in yellow
     "\x1b[1;33mRemember to commit the imported .skg files in {:?} to git, \
-     so that the total diff view can detect changes.\x1b[0m",
+     so that the diff view can detect changes.\x1b[0m",
     output_dir );
   Ok (( )) }
 

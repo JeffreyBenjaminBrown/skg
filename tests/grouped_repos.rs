@@ -26,5 +26,5 @@ mod skgrepo_sets;
 #[path = "pcsvf.rs"]
 mod pcsvf;
 
-#[path = "tdv.rs"]
-mod tdv;
+#[path = "diff_view.rs"]
+mod diff_view;

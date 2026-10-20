@@ -1,5 +1,5 @@
-// The "total diff view" request at the handler: it registers each
-// nonempty buffer as a view of the total diff view, answers an empty
+// The "diff view" request at the handler: it registers each
+// nonempty buffer as a view of the diff view, answers an empty
 // buffer with '(empty . t)', and the graph straddle is dropped when the
 // last such view closes. A rerender-all writes back the straddle it
 // brought up to date.
@@ -10,7 +10,7 @@ use crate::pcsvf::common::{open_all_changes_buffer, with_fixture};
 use skg::graph_straddle::types::GraphStraddle;
 use skg::serve::handlers::close_view::handle_close_view_request;
 use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
-use skg::serve::handlers::total_diff_view::handle_total_diff_view_request;
+use skg::serve::handlers::diff_view::handle_diffView_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{graph_handle_from_config, skg_env_from_parts};
 use skg::types::env::SkgEnv;
@@ -25,7 +25,7 @@ fn request (
   buffer  : &str,
   view_id : &str,
 ) -> String {
-  format! ( "((request . \"total diff view\") (buffer . \"{}\") (view-id . \"{}\"))\n",
+  format! ( "((request . \"diff view\") (buffer . \"{}\") (view-id . \"{}\"))\n",
             buffer, view_id ) }
 
 /// The response the handler wrote to 'stream''s peer.
@@ -46,31 +46,31 @@ fn a_request_registers_its_buffer_and_the_last_close_drops_the_straddle (
       SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
     { let (mut stream, mut read_end) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
-      handle_total_diff_view_request (
-        &mut stream, &request ("all changes", "tdv-1"), &env,
+      handle_diffView_request (
+        &mut stream, &request ("all changes", "diff-view-1"), &env,
         &mut f . views_state, &all );
       let response : String = response_from (&mut read_end);
-      assert! ( response . contains ("total-diff-view")
+      assert! ( response . contains ("diff-view")
                 && response . contains ("(content"), "{}", response ); }
     { let (mut stream, mut read_end) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
-      handle_total_diff_view_request (
-        &mut stream, &request ("merges", "tdv-2"), &env,
+      handle_diffView_request (
+        &mut stream, &request ("merges", "diff-view-2"), &env,
         &mut f . views_state, &all );
       let response : String = response_from (&mut read_end);
       assert! ( response . contains ("(empty . t)"), "{}", response ); }
-    let view_id : ViewId = ViewId::ContentView ("tdv-1" . to_string ());
+    let view_id : ViewId = ViewId::ContentView ("diff-view-1" . to_string ());
     assert_eq! ( f . views_state . open_views . views . get (&view_id)
-                 . and_then ( |state| state . tdv_buffer ),
+                 . and_then ( |state| state . diffView_buffer_kind ),
                  Some (DiffViewBufferKind::AllChanges) );
     assert! ( ! f . views_state . open_views . views
-              . contains_key (&ViewId::ContentView ("tdv-2" . to_string ())),
+              . contains_key (&ViewId::ContentView ("diff-view-2" . to_string ())),
               "an empty buffer is not registered" );
     assert! ( f . views_state . graph_straddle . is_some () );
     let (mut stream, _read_end) : (TcpStream, TcpStream) =
       mk_test_tcp_stream_pair ();
     handle_close_view_request (
-      &mut stream, "((request . \"close view\") (view-id . \"tdv-1\"))\n",
+      &mut stream, "((request . \"close view\") (view-id . \"diff-view-1\"))\n",
       &mut f . views_state );
     assert! ( f . views_state . graph_straddle . is_none () );
     Ok (( )) }) }
@@ -85,8 +85,8 @@ fn a_request_is_refused_under_a_skgrepo_restriction (
     restriction . name = "some" . into ();
     let (mut stream, mut read_end) : (TcpStream, TcpStream) =
       mk_test_tcp_stream_pair ();
-    handle_total_diff_view_request (
-      &mut stream, &request ("all changes", "tdv-1"), &env,
+    handle_diffView_request (
+      &mut stream, &request ("all changes", "diff-view-1"), &env,
       &mut f . views_state, &restriction );
     let response : String = response_from (&mut read_end);
     assert! ( response . contains ("requires no skgrepo restriction"), "{}", response );
@@ -135,21 +135,21 @@ fn request_the_four_buffers (
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let all : SkgrepoRestriction =
       SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
-    for tdv_buffer in DiffViewBufferKind::ALL {
-      let view_id : String = format! ( "diff-view: {}", tdv_buffer . wire_name () );
+    for diffView_buffer_kind in DiffViewBufferKind::ALL {
+      let view_id : String = format! ( "diff-view: {}", diffView_buffer_kind . wire_name () );
       let (mut stream, mut read_end) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
-      handle_total_diff_view_request (
-        &mut stream, &request (tdv_buffer . wire_name (), &view_id), &env,
+      handle_diffView_request (
+        &mut stream, &request (diffView_buffer_kind . wire_name (), &view_id), &env,
         &mut f . views_state, &all );
       let response : String = response_from (&mut read_end);
       let registered : Option<DiffViewBufferKind> =
         f . views_state . open_views . views
         . get (&ViewId::ContentView (view_id))
-        . and_then ( |state| state . tdv_buffer );
-      if expected_nonempty . contains (&tdv_buffer) {
+        . and_then ( |state| state . diffView_buffer_kind );
+      if expected_nonempty . contains (&diffView_buffer_kind) {
         assert! ( response . contains ("(content"), "{}", response );
-        assert_eq! ( registered, Some (tdv_buffer) );
+        assert_eq! ( registered, Some (diffView_buffer_kind) );
       } else {
         assert! ( response . contains ("(empty . t)"), "{}", response );
         assert_eq! ( registered, None ); }}

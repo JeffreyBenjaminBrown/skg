@@ -1,6 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Show the changes a buffer of the total diff view does
+;;; PURPOSE: Show the changes a buffer of the diff view does
 ;;; not show ('TODO/total-diff-view/08_plan_yet-more.org', "The view
 ;;; follows U only on command"). A save never makes an occurrence
 ;;; editable or appends a root on its own; this command asks the
@@ -17,7 +17,7 @@
 (require 'skg-request-save) ; for skg--readiness-summary-message
 
 (defun skg-tdv-show-unshown-changes ()
-  "In a buffer of the total diff view, make every changed node that
+  "In a buffer of the diff view, make every changed node that
 has no editable occurrence editable at its first occurrence, and
 append as roots the origins of changes the buffer draws nowhere.
 Refuses while the buffer has unsaved changes."

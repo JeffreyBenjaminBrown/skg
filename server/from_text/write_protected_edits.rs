@@ -501,10 +501,10 @@ mod tests {
              "{}", errors [0]);
   }
 
-  /// As a buffer of the total diff view draws the folder: each member
+  /// As a buffer of the diff view draws the folder: each member
   /// with its presence facts.
   #[test]
-  fn a_subscribee_folder_with_an_extra_member_is_refused_in_a_tdv_buffer () {
+  fn a_subscribee_folder_with_an_extra_member_is_refused_in_a_diffView_buffer () {
     let errors : Vec<BufferValidationError> = errors_in (indoc! {"
       * (skg (node (id recorder) (repo main) writeProtected)) recorder
       ** (skg subscribeeFolder)
@@ -552,7 +552,7 @@ mod tests {
                   vec! ["changed containers" . to_string ()], "{}", text); }
   }
 
-  /// A member whose relationship the total diff view shows as removed
+  /// A member whose relationship the diff view shows as removed
   /// is not counted, nor is a non-member.
   #[test]
   fn a_member_shown_as_removed_is_not_counted () {

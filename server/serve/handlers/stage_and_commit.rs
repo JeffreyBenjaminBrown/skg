@@ -7,9 +7,9 @@
 //!
 //! Every answer is followed by a rerender stream, as the
 //! delete-references command's is: empty unless something was
-//! committed, else one view per open buffer of the total diff view,
+//! committed, else one view per open buffer of the diff view,
 //! rerendered as any rerender is, over the rebuilt graph straddle
-//! ('stream_rerender_tdv_views'). Its roots stay, so a buffer whose
+//! ('stream_rerender_diffView_views'). Its roots stay, so a buffer whose
 //! changes were all committed comes back as plain context.
 
 use crate::change_leaves::{BufferReadinessSummary, ReadinessSummary};
@@ -20,7 +20,7 @@ use crate::graph_straddle::types::GraphStraddle;
 use crate::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
 use crate::serve::handlers::rerender_all_views::{
-  stream_empty_rerender, stream_rerender_tdv_views};
+  stream_empty_rerender, stream_rerender_diffView_views};
 use crate::serve::handlers::save_buffer::readiness_summary_sexp;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
@@ -71,12 +71,12 @@ pub fn handle_stage_and_commit_request (
     StageAndCommitAnswer::Committed { outcomes, .. }
       if outcomes . iter () . any (
         |(_, outcome)| matches! (outcome, Ok (Some (_))) ) =>
-      stream_rerender_tdv_views (
+      stream_rerender_diffView_views (
         stream, env, views_state, skgrepo_restriction ),
     _ => stream_empty_rerender (stream), }}
 
 /// See the module comment. Refused unless the skgrepo restriction is
-/// 'all', as the total diff view is. After the git-commits, the
+/// 'all', as the diff view is. After the git-commits, the
 /// connection's graph straddle is rebuilt (each committed HEAD moved), and
 /// the marks of the changes committed are dropped from the store: a
 /// commit lapses every mark.

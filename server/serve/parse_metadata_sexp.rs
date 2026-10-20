@@ -23,7 +23,7 @@
 ///   appear in (deleted ...), (unknown ...) and (historical ...), and
 ///   at top level on an alias, id or flag property and on the total
 ///   diff view's properties other than bodyDiff.
-///   The total diff view's own viewnodes:
+///   The diff view's own viewnodes:
 ///     (historical (id ID) (repo REPO) ...)   a historical phantom
 ///     (oldText titleAndBody | title | body)  the text at HEAD
 ///     bodyDiff
@@ -76,7 +76,7 @@ pub struct ViewnodeMetadata {
   pub edit_request: Option<NodeEditRequest>,
   pub relRepo_request: Option<SkgrepoName>,
   pub view_requests: HashSet<ViewRequest>,
-  // The total diff view's '(diff ...)' and '(ready ...)' facts and
+  // The diff view's '(diff ...)' and '(ready ...)' facts and
   // readiness requests, on whichever vognode, phantom or property
   // leaf carries them.
   pub change_facts: ChangeFacts,
@@ -200,7 +200,7 @@ pub fn viewnode_from_metadata (
           MpViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }));
         let is_flag = matches! (non_vognode,
           MpViewnodeKind::Property (Property::Flag { .. }));
-        let carries_text : bool = // the total diff view's text properties
+        let carries_text : bool = // the diff view's text properties
           matches! (non_vognode,
             MpViewnodeKind::Property (
               Property::OldText { .. } | Property::BodyDiff { .. } ));
@@ -498,7 +498,7 @@ pub fn parse_metadata_to_viewnodemd (
                and (skg [focused] [folded] nonVognodeKind) for Non-vognodes.",
               first )); },
           folder_atom if folder_kind_of_atom (folder_atom) . is_some () => {
-            // '(KIND changed)': a folder the total diff view drew
+            // '(KIND changed)': a folder the diff view drew
             // because of a change. A display fact, like its '(ready)'.
             if items . len () != 2
               || atom_to_string (&items[1]) ? != "changed" {
@@ -544,7 +544,7 @@ pub fn parse_metadata_to_viewnodemd (
           "bodyDiff" =>
             result . non_vognode = Some (MpViewnodeKind::Property (
               Property::BodyDiff { diff : String::new () } )),
-          // The total diff view's removed entries; their text, like an
+          // The diff view's removed entries; their text, like an
           // alias's or an ID's, comes from the headline.
           "removedAlias" =>
             result . non_vognode = Some (MpViewnodeKind::Property (
@@ -595,7 +595,7 @@ pub fn parse_metadata_to_viewnodemd (
                        | Property::HomeSkgrepoMove { .. }
                        | Property::RelRepoMove { .. }
                        | Property::ChangesetMarker { .. } )) )
-  { return Err ( "Top-level diff, ready and readiness requests are valid only on alias, id and flag properties and the total diff view's properties other than bodyDiff (and ready on folders)"
+  { return Err ( "Top-level diff, ready and readiness requests are valid only on alias, id and flag properties and the diff view's properties other than bodyDiff (and ready on folders)"
                  . to_string () ); }
   Ok (result) }
 
@@ -836,7 +836,7 @@ fn parse_viewstats_sexp (
       Sexp::List (form) if form . first () . is_some_and (
         |head| matches! ( atom_to_string (head) . as_deref (),
                           Ok ("homeMove") | Ok ("movedLikeAncestor") )) => {
-        // Output-only facts of the total diff view's skgrepo-changes
+        // Output-only facts of the diff view's skgrepo-changes
         // buffer, recomputed after completion: silently discard.
       },
       Sexp::List (kv_pair) if kv_pair . len () == 2 => {
@@ -963,7 +963,7 @@ fn parse_viewrequests_sexp (
   Ok (( )) }
 
 
-/// Parse one of the total diff view's forms -- '(diff PRESENCE...)',
+/// Parse one of the diff view's forms -- '(diff PRESENCE...)',
 /// '(ready OBJECT...)', '(readyRequest OBJECT...)' or
 /// '(unreadyRequest OBJECT...)' -- whose head is 'key' and whose
 /// arguments are 'args', into 'metadata'. Each may appear once; a

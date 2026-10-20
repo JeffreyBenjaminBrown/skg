@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Integration test: the total diff view, end to end
+# Integration test: the diff view, end to end
 # ('TODO/total-diff-view/02_plan.org', "Verification and completion").
 #
 # Two owned skgrepos, alpha and beta, and one foreign skgrepo, gamma,
@@ -14,7 +14,7 @@
 #   - gamma's g is retitled (a foreign change, which the total diff
 #     view only counts).
 #
-# The client opens the total diff view, marks everything commit-ready
+# The client opens the diff view, marks everything commit-ready
 # through the gestures, sees "COMMIT READY", stages and commits, and
 # sees the buffers keep their roots, which show no change any more. Then r's file is made to contain d again,
 # by hand; the client opens a view of r, where d is an unknown node,

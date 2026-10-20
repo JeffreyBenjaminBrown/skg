@@ -108,18 +108,18 @@ impl GraphStraddle {
   ) -> &PcsvfSets {
     self . pcsvf_sets . get_or_init ( || pcsvf_sets (self) ) }
 
-  /// The sets of the PCSVF that a buffer of the total diff view
+  /// The sets of the PCSVF that a buffer of the diff view
   /// draws. The order-only buffer draws no PCSVF: its sets are empty,
   /// so each of its roots is drawn with its content as unexpanded
   /// write-protected members. Computed once per straddle.
   pub fn pcsvf_sets_of_buffer (
     &self,
-    tdv_buffer : DiffViewBufferKind,
+    diffView_buffer_kind : DiffViewBufferKind,
   ) -> &PcsvfSets {
     static NO_SETS : PcsvfSets = PcsvfSets {
       c : BTreeSet::new (), r : BTreeSet::new (),
       u : BTreeSet::new (), d : BTreeSet::new () };
-    match tdv_buffer {
+    match diffView_buffer_kind {
       DiffViewBufferKind::AllChanges => self . pcsvf_sets (),
       DiffViewBufferKind::Merges => self . merges_pcsvf_sets . get_or_init (
         || pcsvf_sets_for_merges (self) ),

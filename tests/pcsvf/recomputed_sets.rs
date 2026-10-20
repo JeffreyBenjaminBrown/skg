@@ -1,4 +1,4 @@
-// A buffer of the total diff view draws by its sets recomputed after
+// A buffer of the diff view draws by its sets recomputed after
 // the save wherever a save draws something new, but only the "show
 // unshown changes" request makes occurrences editable or appends roots
 // ('TODO/total-diff-view/08_plan_yet-more.org', "The view follows U

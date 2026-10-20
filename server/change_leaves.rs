@@ -63,7 +63,7 @@ pub struct ChangeLeaf {
   pub files       : Vec<(SkgrepoName, ID)>,
 }
 
-/// What the client shows after a save of a TDV buffer.
+/// What the client shows after a save of a diff-view buffer.
 /// Order-only files count as changed and ready. Foreign files are
 /// counted apart, and never ready.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -74,7 +74,7 @@ pub struct ReadinessSummary {
   pub order_only_files      : usize,
 }
 
-/// The readiness summary a save of a TDV buffer reports: that of the
+/// The readiness summary a save of a diff-view buffer reports: that of the
 /// whole changeset, and how many of its leaves are not editable in
 /// the buffer (their recorder is not among the nodes
 /// 'nodes_editable_in_diffView' returns for it).
