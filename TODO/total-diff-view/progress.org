@@ -1,29 +1,30 @@
 #+title: Total diff view (TDV) — progress notes
-* Slice 1: deviations
-** a rule holds its 'node_heralds' key, not its style name
+* First plan
+** Slice 1: deviations
+*** a rule holds its 'node_heralds' key, not its style name
 'HeraldRule' carries 'node_heralds_key'; 'HeraldRule::style' looks the
 name up. Holding the key lets the consistency check report a styled
 rule with no entry, instead of the table panicking while it is built.
 The served sexp still carries the uppercased style name.
-** qualified 'node_heralds' keys
+*** qualified 'node_heralds' keys
 An atom styled differently in different places gets a qualified key:
 'affectsParent_false', and 'editRequest_relRepo' and 'editRequest_flag'
 for the requested forms. The ☮ on a write-protected label or flag row
 takes 'writeProtected''s style. Later slices that add atoms (the diff
 atoms, the labels) add entries the same way.
-** 'ready' is listed before its atom exists
+*** 'ready' is listed before its atom exists
 The plan names 'ready' go, so 'node_heralds' has it now. The check only
 requires that every styled rule has an entry, not the converse. The
 retiring 'staged' and 'unstaged' keep go and stop until slice 9.
-* Slice 2: deviations
-** foreign skgrepos: read at the worktree in both halves
+** Slice 2: deviations
+*** foreign skgrepos: read at the worktree in both halves
 The plan excludes foreign skgrepos from both halves. Excluding them
 literally would leave every owned-to-foreign relationship dangling in
 both graphs, and a foreign-home node with owned sections titleless. So
 the before-graph reads each foreign skgrepo from its worktree, as the
 live graph does. Foreign sections are then the same in both halves and
 never produce a change; foreign skgrepos need not be gitrepos.
-*** consequence: a sibling of the HEAD reader
+**** consequence: a sibling of the HEAD reader
 'read_graph_snapshot_maybe_cached (config, Head)' reads every skgrepo
 at HEAD. The pair instead uses 'read_owned_head_graph_snapshot_maybe_cached',
 which shares that reader's per-skgrepo loop and its cache, keyed by
@@ -32,43 +33,43 @@ ignores foreign files. A foreign file changed on disk after the server
 started but before the first pair is built would differ from the live
 graph, and its node would enter C. Nothing in the session writes
 foreign files.
-*** quasi-duplication
+**** quasi-duplication
 'owned_head_identity' resembles 'validate_skgrepos_for_selection' plus
 'head_cache_identity', with the refusal text the plan wants. Those two
 retire with the diff report in slice 9.
-** 'from_head_and_live (config, live_graph)'
+*** 'from_head_and_live (config, live_graph)'
 It takes the live graph rather than the runtime generation, so tests
 need no Tantivy index.
-** partner identity and role naming
+*** partner identity and role naming
 'partners (pid, role)': 'role' is the role the PARTNER plays, as in
 role trees ('CONTAINER' gives the containers, '(Contains, Second)' the
 content). Each graph identifies a member by its own resolution of the
 stored ID, as its recorderward relmaps do, so the outbound and inbound
 answers agree. The queried ID is a primary ID, unresolved.
-*** consequence for nodeMerges
+**** consequence for nodeMerges
 A node that lists an acquiree B by B's old ID resolves that ID to B at
 HEAD and to the acquirer A in the live graph. Its content then shows
 B as OnlyBefore and A as OnlyAfter, and the node is rightward in C,
 although its file did not change.
-** what 'node_changes' and 'changed_pids' report
+*** what 'node_changes' and 'changed_pids' report
 'NodeChanges' has 'title_changed' and 'body_changed' ('text_changed'
 is their disjunction), so slice 6 can choose "old title", "old body"
 or both. Aliases are compared by text. A node not in both graphs has
 empty 'NodeChanges'; its change is its existence. Leftward excludes
 IDs that neither graph has as a node (dangling references).
-** deferred to later slices
+*** deferred to later slices
 'order_only_pids' needs the change-forest, so slice 3 adds it. The
 pair lives in 'ViewsState::graph_pair', and 'current_graph_pair_in_slot'
 reuses it, re-pairs it with a newer live graph, or rebuilds it when an
 owned HEAD moved (which covers stage-and-commit). Building it on a TDV
 request and dropping it when the last TDV buffer closes come with the
 TDV buffers (slice 5).
-** the test helpers were moved, not copied
+*** the test helpers were moved, not copied
 'tests/git_diff_view/common.rs' is now 'tests/shared/git_fixture_helpers.rs',
 used by both the git diff view tests and 'tests/graph_pair.rs', so it
 is not duplicated. The fixtures are in 'tests/graph_pair/fixtures/'.
-* Slice 3: deviations
-** the new property atoms wait for their kinds
+** Slice 3: deviations
+*** the new property atoms wait for their kinds
 '(oldText)', '(bodyDiff)', '(homeMove ...)', '(relRepoMove ...)',
 '(changesetMarker ...)' and '(historical)' mark viewnode kinds that
 slice 4 creates, so slice 4 parses and serializes them with the kinds.
@@ -76,18 +77,18 @@ slice 4 creates, so slice 4 parses and serializes them with the kinds.
 folder ('PartnerFolder' is a fieldless enum) cannot yet carry
 '(changed)' or an aggregate '(ready ...)'; those come when slice 5
 draws folders because of a change.
-** where the facts sit on the wire
+*** where the facts sit on the wire
 '(diff ...)', '(ready ...)' and the readiness requests sit inside
 '(node ...)', '(deleted ...)' and '(unknown ...)', and at top level on
 the alias, id and flag leaves (the form the existing '(staged ...)'
 takes there). The parser refuses them at top level on anything else.
 The folder atoms are bare, like the existing folder atoms:
 'containerFolder', 'mentionerFolder'.
-*** which viewnodes carry them
+**** which viewnodes carry them
 'ChangeFacts' (presence and ready) and 'readiness_request' are on the
 unrestricted vognode, the deleted and unknown phantoms, and the alias,
 id and flag leaves. Not on 'PhantomDiff', which retires in slice 9.
-*** what a request names
+**** what a request names
 On a vognode, 'node' is its existence leaf, 'rel' the relationship to
 its viewparent (content, or the relation of the partner folder it is
 in), 'all' every leaf the node owns ('leaves_under'), and no axis both
@@ -95,30 +96,30 @@ in), 'all' every leaf the node owns ('leaves_under'), and no axis both
 unknown) no axis names its one leaf. A request that names no current
 change is dropped with a warning. Until slice 4 draws the old-text
 property, a text leaf can be marked only through 'all' on its node.
-** change-forest details
-*** roots
+*** change-forest details
+**** roots
 The roots are the rightward nodes that own a leaf. A leftward-only
 node owns none: its change is its recorders' relationship leaves.
-*** fingerprints
+**** fingerprints
 A new or deleted node's existence leaf hashes the node's own content
 (title, body, aliases, extra IDs, flags, home), so editing a new node
 lapses its mark. A relationship's existence leaf hashes which graphs
 hold it; its relRepo leaf, the two relRepos. 'leaf_fingerprint'
 returns 'Option<u64>': None when the change does not exist.
-*** files
+**** files
 A node aspect is recorded in the node's home file, a home move in both
 homes' files, a relationship in its relRepo's file (both, for a
 relRepo move). A file is order-only when its node is in both graphs,
 owns no leaf, and differs between them.
-*** foreign changed files
+**** foreign changed files
 'GraphPair::foreign_changed_files' is counted when the pair is built:
 the '.skg' files that differ between HEAD and the worktree in each
 foreign skgrepo that is in a gitrepo with a HEAD commit.
-** the marks file
+*** the marks file
 JSON object keys must be strings, so '<data_root>/readiness-marks.json'
 holds a list of '{ "leaf": KEY, "fingerprint": N }' entries
 (documented in 'docs/api-and-formats.org').
-** the role-tree engine takes a partners source, not a bare function
+*** the role-tree engine takes a partners source, not a bare function
 'build_and_integrate_role_tree_with_skgrepo_set' takes
 'RoleTreePartners' ('LiveGraph' or 'GraphPair'). Over the live graph
 the engine keeps its two gatings: the role tree's steps see only what
@@ -128,19 +129,19 @@ not carry both. The generic engines are 'paths_to_first_nonlinearities_via'
 and 'full_containerward_role_tree' (over a 'PartnersOf');
 'full_containerward_role_tree_from_inRustGraph' keeps its name as the
 live-graph wrapper.
-** a partner folder over a graph pair
+*** a partner folder over a graph pair
 'reconcile_partnerFolder_children' takes a 'PartnerFolderGoalSource'.
 Over a pair, a member whose node exists only in the before-graph is
 drawn as an unknown phantom, tagged node- rel-, until slice 4's
 historical phantom replaces it. Nothing uses the pair source yet;
 slice 5 does.
-** strands
-*** where the client analysis was
+*** strands
+**** where the client analysis was
 It lived in 'elisp/skg-metadata.el' ('skg-set-repo'), not in
 'skg-request-relRepo-info.el'. Neovim's 'set_repo' never had one, so
 Neovim only gained the confirmation handling. The ERT tests of the old
 analysis are gone; their scenarios are in 'tests/unit/strands.rs'.
-*** what counts as stranded
+**** what counts as stranded
 A relationship touching a moved node is stranded when its relRepo was
 its default before the save and the sticky-else-default rule leaves it
 off its new default. One that would be left more public than its
@@ -148,40 +149,40 @@ member's new home is raised without asking: that is exactly an
 inbound relationship of a privatizing move. A hide's default is the
 hide rule's ('hide_skgrepo'). Mentions have no relRepo and are
 skipped.
-*** the round trip
+**** the round trip
 The analysis runs before the Hoist gate, so recorders that
 re-leveling adds are gated too, and its confirmation precedes every
 other one. The confirmation carries IDs, no titles. The re-save
 carries '(strands-reviewed . "true")' and '(relevel-strands ("REL"
 "REC" "MEM") ...)'; the clients offer all, none, each in turn, or
 quit. Documented in 'docs/api-and-formats.org' and 'docs/COMMANDS*.org'.
-** smaller things
+*** smaller things
 'NodeRelation' derives serde and gains 'from_relation_name', which
 replaced a private copy in 'paths.rs'. The folder commands are 'C-c l
 c' and 'C-c l m' in Emacs, '<localleader>cc' and 'cm' in Neovim.
-* Slice 4: deviations
-** wire forms
-*** '(oldText ASPECT)'
+** Slice 4: deviations
+*** wire forms
+**** '(oldText ASPECT)'
 The label ("old title and body", "old title", "old body") needs to
 know which aspects changed, and an empty headline or body cannot say,
 so the form names it: '(oldText titleAndBody)', '(oldText title)' or
 '(oldText body)'. A body HEAD lacked is the empty string.
-*** '(homeMove (old A) (new B))' and '(relRepoMove (old A) (new B))'
+**** '(homeMove (old A) (new B))' and '(relRepoMove (old A) (new B))'
 not '(homeMove OLD NEW)'. The herald engine's ANY/IT gives every
 value of a form the same prefix, so two positional names cannot
 render as "⌂ -A +B" or "relationship moved from A to B". The names
 are styled 'normal' through the 'node_heralds' keys
 'homeMove_skgrepo' and 'relRepoMove_skgrepo'.
-*** the phantom
+**** the phantom
 '(historical (id X) (repo R) ...)', the grammar of '(deleted ...)'.
 Its heralds are a ☮, then ∃- and ~- with a ✓ after each ready axis.
-** what the kinds carry
+*** what the kinds carry
 'Phantom::Historical' carries 'change_facts' (presence and ready) and
 'readiness_request', like the deleted and unknown phantoms, in place
 of the plan's 'presence'. Every new property but 'BodyDiff' does too;
 'BodyDiff' is '{ diff }', its body. 'ChangesetMarkerKind' is 'Content',
 'RelRepo' or 'OrderOnly'.
-** the save consumes their readiness requests
+*** the save consumes their readiness requests
 'server/serve/handlers/readiness_requests.rs' names, for an
 old text, its node's text leaf; for a home move, its node's home
 leaf; for a relRepo move, the relRepo leaf of the relationship
@@ -191,7 +192,7 @@ the content relationships its node records ('content_relationships_of');
 for the order-only marker, nothing. A historical phantom's leaves are
 keyed by its ID as written, a node of the before-graph: the
 after-graph would resolve an acquiree to its acquirer.
-** the builders
+*** the builders
 'server/to_org/render/change_viewnodes.rs' draws each kind from the
 graph pair, for slice 5 to place: 'append_old_text' (with the body
 diff, a ' '/'-'/'+' line diff), 'mk_home_move_viewnode',
@@ -200,7 +201,7 @@ diff, a ' '/'-'/'+' line diff), 'mk_home_move_viewnode',
 'append_acquired_folder'. 'GraphPair::acquirer_of' and 'acquirees_of'
 derive the acquisition folders' members from the after-graph's extra
 IDs.
-*** a historical phantom's old content
+**** a historical phantom's old content
 A deleted member is a historical phantom with its own old content; a
 surviving member is a write-protected vognode tagged rel-; a dangling
 one is an unknown phantom tagged rel-. A node already drawn above
@@ -208,20 +209,20 @@ itself in the recursion is drawn without content. The vognodes under
 a historical phantom keep affectsParent true (under a deleted phantom
 they are demoted): they are drawn as its old content, and the save
 reads nothing under a phantom.
-*** the acquisition folders
+**** the acquisition folders
 "it was acquired by" (under the historical phantom) holds the
 acquirer, write-protected. "it acquired" (under the acquirer) holds
 bare historical phantoms, without their content, which is drawn where
 the acquiree itself is drawn. The labels are lower-case, as the plan
 writes them, unlike the other folders' sentences.
-** where the validator allows them
+*** where the validator allows them
 A historical phantom may be a view root or a vognode's child, and may
 hold vognodes and an "it was acquired by" folder. An old text, a move
 or a changeset marker needs a vognode parent and is unique among its
 siblings (a marker per kind); a body diff needs an old-text parent.
 The acquisition folders need a historical phantom or an ordinary
 vognode for a parent, as above.
-** the rerender until slice 5
+*** the rerender until slice 5
 View completion leaves the new viewnodes alone (the acquisition
 folders have no 'relation_member_role', so no reconciler runs on
 them), except that the content reconciler moves a historical phantom
@@ -230,12 +231,12 @@ is slice 5's 'process_unrestrictedVognode_changes'. So the round-trip
 test ('tests/tdv/roundtrip/view.rs') checks that the first save
 changes no file and drops none of the new viewnodes, and that its
 result is a fixed point of a second save.
-** clients
+*** clients
 Both clients read the ID and skgrepo of a historical phantom at point,
 as they do a deleted one's. Emacs refuses a relRepo request on a
 member of either acquisition folder.
-* Slice 5: deviations
-** names and shapes
+** Slice 5: deviations
+*** names and shapes
 'server/pcsvf.rs' has 'PcsvfSets { c, r, u, d }', 'pcsvf_sets (pair)'
 (cached in the pair as 'GraphPair::pcsvf_sets', like 'changed_pids'),
 'pcsvf_sets_over (pair, c)' for slice 7's subsets, and
@@ -248,14 +249,14 @@ containerward climb of 'server/prominence.rs' is lifted to a
 containers function ('climb_containerward_to_cycle_via'); one climb
 from a changed node gives both its walk and its origins, because the
 walk stops at the first multiply-contained node.
-** readiness is set after completion, not at each visit
+*** readiness is set after completion, not at each visit
 'set_ready_facts_in_viewforest' ('readiness_requests.rs') sets every
 '(ready ...)' in one pass over the completed viewforest, from the
 same leaf naming the save's readiness requests use (refactored into
 'leaves_named_at' and 'keys_in_forest'). An axis is ready when it
 names at least one leaf and all of them are marked. Slice 6's save
 reconcile can call the same pass.
-** the folder's '(changed)' fact
+*** the folder's '(changed)' fact
 The plan writes '(changed)'; a folder drawn because of a change is
 written '(containerFolder changed)' in place of the bare atom, and
 '(ready)' follows when every changed member is ready. The lens engine
@@ -270,23 +271,23 @@ containers / mentioners / subscribers / overriders / hiders /
 subscribees changed", and "the nodes it overrides / hides changed",
 each with "(this file)" or "(other files)". The new 'node_heralds' key
 is 'changed' (message).
-** removed members and what the save reads
-*** a removed member that survives
+*** removed members and what the save reads
+**** a removed member that survives
 is drawn under its former container as a write-protected vognode with
 affectsParent false, tagged rel-. As affectsParent true the save would
 re-add it. Likewise in the editable subscribee and overridden folders.
-*** a removed dangling ID
+**** a removed dangling ID
 is not drawn in an editable node's content or an editable folder:
 the save reads an unknown phantom there as a member. Its leaf is
 still under the content changeset marker.
-*** lost aliases and IDs
+**** lost aliases and IDs
 The alias folder is read at save, and the ID folder is checked
 against the node's IDs. Both now skip an entry tagged '(diff rel-)'
 ('visit_aliasFolder', 'validate_tree.rs'), as the ID check already
 skipped the old view's removed entries. This is the one place the
 save reads a presence fact. Entries carry their + or - on the rel
 axis.
-** folders and continuations
+*** folders and continuations
 The partner folders of a node in C are drawn when a partner's
 relationship is only in one graph (and, for the node's own lists,
 also when its relRepo moved); the BFS fills them from the pair. In
@@ -299,10 +300,10 @@ Subscribee folder goes through the generic reconciler when the pair
 is set. Alias, ID and flags folders are filled at the node's visit;
 their own reconcilers do nothing when the pair is set. The default
 HiddenInSubscribee folder is not created in a TDV.
-** override substitution
+*** override substitution
 is off in a TDV, as in the old diff view: the content is the union of
 the stored lists.
-** the request
+*** the request
 The merges, skgrepo-changes and order-only buffers answer
 '(empty . t)' until slice 7 draws them. A refusal is a content
 response with the error and no content; the clients stop the
@@ -310,21 +311,21 @@ sequence at the first refusal. The empty answer is
 '((empty . t) (errors ()) (warnings ()))' after the response type.
 'ViewState' records 'tdv_buffer' ('TdvBuffer'), set by
 'register_tdv_view'; closing the last such view drops the pair.
-** clients
+*** clients
 Both clients chain the four requests (each one-shot handler sends the
 next after it returns, since the handler map holds one handler per
 response type). Neovim names the buffers "skg://diff-view: ...", as
 its content views are "skg://...". 'C-c v d' and '<localleader>vd'
 now run the new command; the old toggle is unbound until slice 9
 removes it, and 'docs/COMMANDS*.org' say so.
-** an ego_tree pitfall
+*** an ego_tree pitfall
 'prepend_id' and 'insert_id_before' (ego-tree 0.6.3) read the old
 first child or previous sibling before detaching the node they move,
 so moving a node already in that place links it to itself and a
 traversal never ends. 'changes.rs' detaches first. Noted in
 'TODO/problems.org'.
-* Slice 6: deviations
-** where a TDV buffer is detected
+** Slice 6: deviations
+*** where a TDV buffer is detected
 'rerender_view' sees a viewforest, not its 'ViewState', so it takes
 'tdv_buffer : Option<TdvBuffer>' and its callers look it up
 ('tdv_buffer_of_view'): the saved view, each collateral view, and
@@ -337,20 +338,20 @@ branch completes as 'complete_viewforest_with_graph_pair' does (no
 skgrepo diffs, no restriction during completion, no default folders,
 no override substitution) but keeps the save's deleted-ID maps, then
 sets the '(ready ...)' facts with 'set_ready_facts_in_viewforest'.
-** what counts as shown
+*** what counts as shown
 K counts the leaves whose owner is not among the buffer's pids or
 its historical phantoms ('nodes_drawn_in_viewforest'). Read
 literally, "not in the buffer's pids" would count every deleted
 node's existence leaf as unshown, since a deleted node is drawn as a
 phantom, so the summary would always ask to reopen the view.
-** the summary
+*** the summary
 It is sent only on a save-result, and only when the saved buffer is
 a TDV buffer ('SaveResponse::readiness_summary',
 'BufferReadinessSummary' in 'change_forest.rs'). The foreign count
 reads ", F files changed in foreign skgrepos". The complete form keeps
 its final period after the suffixes; the incomplete form has none,
 as the plan writes them.
-** a node deleted in a TDV buffer
+*** a node deleted in a TDV buffer
 Completion turns a node the save deleted into a deleted phantom.
 Over the pair it is drawn as the PCSVF draws it, as a historical
 phantom: 'redraw_deleted_phantoms_as_historical' ('changes.rs') drops
@@ -358,44 +359,44 @@ a deleted phantom that stands beside a historical one of the same
 node, and redraws any other (a root, say) as a historical phantom
 with its old content. A node created and deleted since HEAD stays a
 deleted phantom.
-** two slice-5 bugs the reconcile exposed
-*** removed members of a pair-drawn folder were drawn twice
+*** two slice-5 bugs the reconcile exposed
+**** removed members of a pair-drawn folder were drawn twice
 The redraw demotes a removed member of an editable set (Subscribee,
 Overridden) to a non-member, and turns a deleted one into a
 historical phantom. The reconciler matches neither, so the next pass
 drew each again. 'restore_removed_members_of_pair_folder' undoes the
 redraw before reconciling, so they are matched where they stand.
-*** a historical phantom in a partner folder failed validation
+**** a historical phantom in a partner folder failed validation
 The relation-folder and subscribee-folder checks now admit it
 (save-inert, like elsewhere). The kinds fixture gained 'gone', a
 deleted subscriber of 'orph', to cover both.
-** the gestures
-*** what an aggregate writes
+*** the gestures
+**** what an aggregate writes
 On a changed folder (folders carry no request), the one-level
 gesture writes a request on each leaf-naming child. On a changed
 node without a diff fact it writes '(readyRequest all)' on the node.
 It readies unless the aggregate is ready: a folder's '(ready)', or,
 for a node, all of its leaf-naming and changed-folder children.
-*** the recursive form
+**** the recursive form
 writes, in one direction, a request on every leaf-naming headline in
 the subtree, write-protected ones included, and '(readyRequest all)'
 on the headline at point when it is a changed node. It readies unless
 the headline at point is ready.
-*** the home-move gesture
+**** the home-move gesture
 marks; it does not toggle. Point may be on the node or its move.
-*** bindings
+**** bindings
 'C-c r r' and 'C-c r h' in Emacs (C-u for the recursive forms).
 Neovim has no prefix argument, so the recursive forms are their own
 commands: '<localleader>rr', 'rR', 'rh', 'rH'.
-** imperfect
-*** context bodies refold
+*** imperfect
+**** context bodies refold
 'process_unrestrictedVognode_changes' sets 'body_folded' at every
 visit, so a context body the user unfolded folds again at each save.
-*** a node that changed after the buffer opened
+**** a node that changed after the buffer opened
 If such a node is drawn only write-protected, its change is not drawn
 there, yet it counts as shown, because its pid is in the buffer.
-* Slice 7: deviations
-** what view completion draws from
+** Slice 7: deviations
+*** what view completion draws from
 The step at each visit needs the buffer's own U and C, not those of
 all changes, so the completion context's 'graph_pair' became
 'tdv_drawing : Option<TdvDrawing>' (the pair and the 'TdvBuffer';
@@ -403,7 +404,7 @@ all changes, so the completion context's 'graph_pair' became
 'pcsvf_viewforest' take one. 'GraphPair::pcsvf_sets_of_buffer' caches
 each buffer's sets beside 'pcsvf_sets'. A save reconciles a buffer
 over its own sets, since 'ViewState' records its 'TdvBuffer'.
-** the text preserver
+*** the text preserver
 The pair records no link from an acquiree to its text preserver, so
 'pcsvf_sets_for_merges' takes it to be a node new in the acquirer's
 content titled as a nodeMerge titles it ("MERGED: " and the
@@ -412,39 +413,39 @@ the nodeMerge code). A preserver retitled since the merge is still
 drawn, as a new member of the acquirer's content, but not as a node
 of C. The acquirees are the members of rightward C that
 'acquirer_of' answers.
-** the home move on the vognode
-*** where it sits
+*** the home move on the vognode
+**** where it sits
 In '(viewStats ...)', beside '(homeRepoHerald ...)':
 '(homeMove (old A) (new B))', the form of the property (slice 4), and
 '(movedLikeAncestor LETTER)'. Both are display facts, set after
 completion by 'set_home_move_facts_in_viewforest' (only in the
 skgrepo-changes buffer) and discarded by the parser. They are
 'ViewnodeStats::home_move' and 'moved_like_ancestor'.
-*** a letter, not GEN
+**** a letter, not GEN
 The plan writes '(movedLikeAncestor GEN)' and the herald 'Δ⌂=a'. The
 lens engine cannot turn a number into a letter, and matching numeric
 atoms by label is fragile in both clients, so the server sends the
 letter itself: a for generation 1, '{N}' past z, as the clients
 letter the relationship heralds. Generations count every viewnode
 between, a folder included, as the relationship heralds do.
-*** which vognodes
+**** which vognodes
 Every unrestricted vognode in the buffer whose home moved,
 write-protected occurrences included. Its nearest moved ancestor is
 the nearest unrestricted vognode ancestor whose home moved; Δ⌂ shows
 when that move has the same (old, new).
-** the order-only buffer
+*** the order-only buffer
 Its roots are editable stubs; completion over empty sets folds their
 bodies, draws their content as write-protected leaves in the new
 order, draws no change folders, and (in this buffer only) puts the
 order-only marker first. No container folder is drawn for a
 multiply-contained root, as it is a flat list, not a PCSVF.
-** a slice-5 bug the round trip exposed
+*** a slice-5 bug the round trip exposed
 A save reattached each pair-drawn folder member's continuation (and
 relRepo move) beside the old one, duplicating it. The kinds fixture
 never showed it: its folder members had no containers.
 'attach_continuations_under_pair_folder_members' detaches the old
 ones first.
-** tests
+*** tests
 The 'buffers' fixture ('tests/pcsvf/other_buffers.rs') covers the
 three buffers and the round trip of all four. "The one-command
 behavior end to end" is tested at the handler
@@ -453,12 +454,12 @@ buffer registered as itself and each empty one answered
 '(empty . t)'. The clients needed no change; their slice-5 tests
 cover skipping the empty answers. The new heralds are in the shared
 rendering cases, so both clients' herald tests cover them.
-** imperfect
+*** imperfect
 A folder member's continuation is redrawn at each save, so any
 folding the user gave its headlines is lost, as with the context
 bodies (slice 6).
-* Slice 8: deviations
-** a rerender stream follows every answer
+** Slice 8: deviations
+*** a rerender stream follows every answer
 The plan says to rebuild the graph pair "so open TDV buffers rerender
 empty or shrunken", without naming the messages. The request follows
 the delete-references command's shape: the clients lock every view
@@ -470,24 +471,24 @@ waits for that empty stream to finish, so Emacs's
 'skg-request-rerender-all-views.el' as
 'skg--wrap-rerender-done-with-after-empty-stream', shared by both
 commands (Neovim already had 'rerender.after_empty_stream').
-*** the buffers are redrawn, not reconciled
+**** the buffers are redrawn, not reconciled
 A rerender reconciles a TDV buffer over the pair but keeps its roots,
 so a buffer whose changes were all committed would never come back
 empty. After a commit, each open TDV buffer is instead drawn afresh,
 as the "total diff view" request draws it ('redraw_tdv_views'), and
 registered in place; one with nothing left is registered with an
 empty viewforest and sent empty. Folding the user gave it is lost.
-*** an empty view on the wire
+**** an empty view on the wire
 The 'sexp' crate writes an empty string as nothing, so the emptied
 view arrives as '(content )'. Both clients' streamed view update now
 reads that as empty. Noted in 'TODO/problems.org'.
-** what the request refuses
+*** what the request refuses
 Besides an incomplete, unconfirmed summary: a skgrepo restriction
 other than 'all' (as the TDV request refuses it), a blank message,
 and a graph pair that cannot be built. The clients also refuse while
 any view has unsaved edits, as the delete-references command does:
 the commit takes the files on disk.
-** what is staged, and "with changes"
+*** what is staged, and "with changes"
 In each owned skgrepo, the '.skg' files under its folder
 ('<prefix>/*.skg'), by 'add_all' and then 'update_all', since
 'add_all' does not stage deletions. A skgrepo has changes when the
@@ -495,31 +496,31 @@ staged tree differs from its HEAD's; one without gets no commit and is
 in neither list of the response. Each skgrepo is committed on its
 own, so two owned skgrepos in one gitrepo would give two commits with
 the same message.
-** the response
+*** the response
 '((commits (("SKGREPO" "COMMIT-ID") ...)) (errors (...)) (warnings
 ()))', a failed skgrepo being an error "skgrepo NAME: why". The
 needs-confirmation answer carries the save response's
 '(readiness-summary ...)', with '(unshown 0)', so the clients format
 it with their existing summary line. Documented in
 'docs/api-and-formats.org', "Stage and commit".
-** a commit lapses the marks
+*** a commit lapses the marks
 After the commits, the marks whose leaf is not in the rebuilt pair's
 change-forest are dropped from the store and the file rewritten. A
 skgrepo whose commit failed keeps its marks.
-** bindings
+*** bindings
 'C-c r c' in Emacs, '<localleader>rc' (':SkgStageAndCommit') in
 Neovim, beside the readiness gestures; 'docs/COMMANDS*.org' describe
 them.
-* Slice 9: deviations
-** what of the old diff machinery stays
-*** the git fallback of "titles by ids"
+** Slice 9: deviations
+*** what of the old diff machinery stays
+**** the git fallback of "titles by ids"
 'titles by ids' still looks up, in each skgrepo's staged and unstaged
 diffs, the titles of nodes the search index lacks (new or deleted
 files), for readable IDs in magit. So 'SkgrepoDiff', 'GraphnodeDiff',
 'GitDiffStatus', 'PathDiffStatus' and 'compute_diff_for_skgrepo'
 stay; 'GraphnodeDiff' lost its 'node_changes', which only the old
 view read. 'Sign' stays, for '(diff ...)'.
-*** the snapshot reader
+**** the snapshot reader
 What the graph pair uses stays: 'read_owned_head_graph_snapshot_maybe_cached',
 its per-skgrepo loop and cache, 'GraphSnapshot' and 'GitSnapshotKind'.
 What served only the report goes: 'read_graph_snapshot_maybe_cached'
@@ -529,7 +530,7 @@ by kind and its cache key, the pair readers ('read_git_snapshot_pair',
 'validate_skgrepos_for_selection' with 'head_cache_identity', as the
 slice-2 notes foresaw. The profiling switch is now
 'SKG_PROFILE_GIT_SNAPSHOT'.
-*** gone as dead once the old view went
+**** gone as dead once the old view went
 The view-completion threading of the per-stage diffs (and of the
 deleted-since-HEAD map, always empty without them), the diff-aware
 goal lists of the partner folders, 'inverse_scan.rs' and
@@ -540,7 +541,7 @@ them), 'title_for_phantom' and 'phantom_axes', 'graphnode_from_index_or_head'
 'remove_id_folders': the total diff view redraws an ID folder at its
 node's visit. 'phantom_insertion_plan' moved into 'changes.rs', the
 one user left, with its unit tests ('tests/unit/render_changes.rs').
-** a consumer of the old atoms the plan did not list
+*** a consumer of the old atoms the plan did not list
 The git-add commands ('skg-git-add-if-new-recursive' and its preview,
 in both clients) found new files by '(unstaged addedN)'. They now look
 for '(diff node+)', so they work in a buffer of the total diff view.
@@ -548,29 +549,29 @@ A node HEAD lacks may already be in the git index; the commands' own
 recheck ('git ls-files --error-unmatch') already skipped such a file.
 With nothing found, they say that only the total diff view marks new
 nodes.
-** renames whose old names would lie
+*** renames whose old names would lie
 'unrestricted_or_diff_phantom_skgid' is 'unrestricted_skgid', and
 'MpViewnode::is_unrestricted_or_diff_phantom' is 'is_unrestricted'.
 The Neovim git-add helpers lost "unstaged" from their names.
-** the investigation request
-*** refused under a skgrepo restriction
+*** the investigation request
+**** refused under a skgrepo restriction
 Not in the plan: git history can hold the text of any skgrepo, and a
 resolvable ID's answer names its node's title, so the request refuses,
 as the diff report did, unless the restriction is 'all'.
-*** its answer
+**** its answer
 For a resolvable ID, the plan's line, as plain text. Otherwise the
 report's section for one ID, with its headline levels raised to start
 at '* ID'. 'dangling_skgids_in_git_snapshot', which found the report's
 IDs, went with the report; the report's types for a vanished node
 moved into 'vanished.rs'.
-*** the preview line
+**** the preview line
 'preview_warning_org' lives in 'server/delete_references_to_absent_node.rs',
 not in the handler the plan names; the line was added there.
-*** Neovim
+**** Neovim
 The ID at point is read by 'delete_absent_references.unknown_id_at_point',
 now exported, rather than by a copy.
-** tests
-*** ported from the old view
+*** tests
+**** ported from the old view
 To the TDV fixtures, in 'tests/pcsvf/editing.rs': deleting the ID
 folder respawns it; editing an entry of it aborts the save; deleting
 the image of a removed member (a write-protected rel- member, a
@@ -582,7 +583,7 @@ diff-mode cases of 'tests/override_substitution.rs' and
 'tests/repo_sets.rs', and the predicate tests of the diff axes are
 gone. Tests that only flipped a node into a diff phantom now use a
 historical phantom.
-*** integration
+**** integration
 'view-magit-phantom' and 'view-magit-phantom-deleted-file' open the
 total diff view instead of toggling diff mode; the first is now
 'view-magit-removed-member', since a removed member there is a
@@ -593,12 +594,12 @@ gone. The plan's scenario ("Verification and completion") is
 slice because it ends with the investigation. Its gestures skip a
 root already ready: the recursive gesture toggles, and an acquiree is
 drawn both under its acquirer and as a root.
-** docs and problems
+*** docs and problems
 The config rows the plan names are the two slice 0 added; the TDV
 adds no config field. 'TODO/problems.org' says its own done entries
 move to 'TODO/DONE/problems.org'; the plan says the file records the
 two resolved entries, so they are marked RESOLVED in place.
-** imperfect
+*** imperfect
 The 'stop' herald style is now used by no herald ('✗' retired); the
 plan does not retire it, so it stays defined.
 * Fixes plan
