@@ -24,12 +24,28 @@ function M.framed (payload)
                        #payload, payload)
 end
 
+---The framed answer to a "server warnings" request listing WARNINGS.
+---@param warnings string[]
+---@return string
+function M.framed_server_warnings (warnings)
+  local quoted = {}
+  for _, warning in ipairs(warnings) do
+    table.insert(quoted, string.format('%q', warning)) end
+  return M.framed(string.format(
+    '((response-type server-warnings) (warnings (%s)))',
+    table.concat(quoted, ' ')))
+end
+
 ---A minimal TCP server on 127.0.0.1. ON_REQUEST(line, respond) runs
 ---for each newline-terminated request line; respond(text) writes raw
----bytes back. Returns {port, close}.
+---bytes back. The "server warnings" request every new connection
+---sends is answered here, with SERVER_WARNINGS (default none), and
+---not passed to ON_REQUEST -- unless SERVER_WARNINGS is false, which
+---passes it on like any other line. Returns {port, close}.
 ---@param on_request fun(line: string, respond: fun(text: string))
+---@param server_warnings string[]|false|nil
 ---@return table
-function M.fake_server (on_request)
+function M.fake_server (on_request, server_warnings)
   local server = vim.uv.new_tcp()
   server:bind('127.0.0.1', 0)
   local connections = {}
@@ -45,7 +61,11 @@ function M.fake_server (on_request)
         local line, rest = pending:match('^([^\n]*)\n(.*)$')
         if not line then break end
         pending = rest
-        on_request(line, function (text) connection:write(text) end)
+        if line == '((request . "server warnings"))'
+           and server_warnings ~= false then
+          connection:write(M.framed_server_warnings(server_warnings or {}))
+        else
+          on_request(line, function (text) connection:write(text) end) end
       end
     end)
   end)

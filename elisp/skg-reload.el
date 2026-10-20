@@ -93,6 +93,7 @@ rather than via `unload-feature'."
             skg-request-rebuild-session-lifetime-stores
             skg-request-rerender-all-views
             skg-request-save
+            skg-request-server-warnings
             skg-request-single-root-content-view
             skg-request-repo-sets
             skg-request-integrate-unshown-changes

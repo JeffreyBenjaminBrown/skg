@@ -26,6 +26,7 @@
 (require 'skg-request-rerender-all-views)
 (require 'skg-recovery)
 (require 'skg-request-save)
+(require 'skg-request-server-warnings)
 (require 'skg-request-repo-sets)
 (require 'skg-request-integrate-unshown-changes)
 (require 'skg-request-stage-and-commit)
@@ -117,6 +118,7 @@ other server, and saving one would write it into this server's graph."
      ;; What this sentinel does: If the server crashes or the connection drops mid-save, skg--tcp-sentinel fires and unlocks all save-locked buffers. Without it, a server crash would leave buffers permanently locked.
      skg-rust-tcp-proc
      #'skg--tcp-sentinel)
+    (skg-request-server-warnings skg-rust-tcp-proc) ; once per connection, before any view request
     (skg-link-annotations-invalidate-all) )
   skg-rust-tcp-proc)
 

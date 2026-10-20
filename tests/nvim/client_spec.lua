@@ -92,7 +92,7 @@ describe('skg.client', function ()
      function ()
     server = fake_server(function (_line, respond)
       respond('((busy-initializing . "still loading the graph"))\n')
-    end)
+    end, false) -- a busy server answers the warnings request so too
     client.port = server.port
     local reset_ran = false
     table.insert(state.connection_reset_hooks,
@@ -161,5 +161,54 @@ describe('skg.client', function ()
     assert.is_false(ok)
     assert.is_truthy(message:find('SkgCloseAllSkgBuffers', 1, true))
     assert.are.equal(tcp, state.tcp)
+  end)
+
+  describe('server warnings', function ()
+    local server_warnings = require('skg.server_warnings')
+
+    local function warnings_buffer ()
+      for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_get_name(buf) == server_warnings.buffer_name then
+          return buf end
+      end
+      return nil
+    end
+
+    local function wipe_warnings_buffer ()
+      local buf = warnings_buffer()
+      if buf then vim.api.nvim_buf_delete(buf, { force = true }) end
+    end
+
+    before_each(wipe_warnings_buffer)
+    after_each(wipe_warnings_buffer)
+
+    it('a new connection asks once, and a non-empty answer opens the'
+       .. ' buffer', function ()
+      server = fake_server(function () end,
+        { "skgconfig.toml sets 'max_role_tree_depth', a key skg does not"
+          .. " know, so it has no effect. Its current spelling is"
+          .. " 'max_roleTree_depth'." })
+      client.port = server.port
+      client.connect()
+      vim.wait(2000, function () return warnings_buffer() ~= nil end, 10)
+      local buf = warnings_buffer()
+      assert.is_truthy(buf)
+      local text = table.concat(
+        vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
+      assert.is_truthy(text:find(
+        "* skgconfig.toml sets 'max_role_tree_depth'", 1, true))
+      assert.is_truthy(text:find("'max_roleTree_depth'", 1, true))
+    end)
+
+    it('an empty answer opens nothing', function ()
+      server = fake_server(function () end)
+      client.port = server.port
+      client.connect()
+      assert.is_truthy(state.response_handler_map['server-warnings'])
+      vim.wait(2000, function ()
+        return state.response_handler_map['server-warnings'] == nil end, 10)
+      assert.is_nil(state.response_handler_map['server-warnings'])
+      assert.is_nil(warnings_buffer())
+    end)
   end)
 end)
