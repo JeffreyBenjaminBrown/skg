@@ -139,12 +139,10 @@ pub(crate) fn align_content_members_with_straddle (
   treeid   : NodeId,
   straddle : &GraphStraddle,
 ) -> Result<(), Box<dyn Error>> {
-  let pid : ID = match &tree . get (treeid)
+  let Some (pid) : Option<ID> = tree . get (treeid)
     . ok_or ("align_content_members_with_straddle: node not found") ?
-    . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-      if ! t . is_writeProtected () => t . skgid . clone (),
-    _ => return Ok (( )), };
+    . value () . editable_skgid () . cloned ()
+    else { return Ok (( )); };
   let after_list : Vec<ID> = content_list (&straddle . after, &pid);
   let after_set : HashSet<&ID> = after_list . iter () . collect ();
   let removed : HashSet<ID> = removed_content_members (straddle, &pid);

@@ -558,9 +558,7 @@ pub fn rerender_view (
       viewforest . nodes () . map ( |node| node . id () ) . collect ();
     let editable_before_completion : HashSet<NodeId> =
       viewforest . nodes ()
-      . filter ( |node| matches! ( &node . value () . kind,
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          if ! t . is_writeProtected () ))
+      . filter ( |node| node . value () . editable_skgid () . is_some () )
       . map ( |node| node . id () ) . collect ();
     let mut editable_map       : EditableMap = EditableMap::new ();
     let mut completion_context : CompletionContext = CompletionContext {

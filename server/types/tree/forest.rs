@@ -1,9 +1,11 @@
 use crate::types::maybe_placed_viewnode::{
   MpViewnode,
   maybePlaced_viewforest_root_viewnode};
+use crate::types::misc::ID;
 use crate::types::viewnode::{Viewnode, viewforest_root_viewnode};
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
+use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 
 /// ego_tree does not permit moving nodes from one tree to another.
@@ -31,6 +33,15 @@ impl Forest<Viewnode> {
   ) {
     for viewnode in self . values_mut () {
       viewnode . consume_edit_request_after_save (); }}}
+
+/// The IDs of the nodes that have an editable occurrence in the
+/// viewforest ('Viewnode::editable_skgid').
+pub fn editable_occurrences (
+  viewforest : &ViewForest,
+) -> HashSet<ID> {
+  viewforest . nodes ()
+    . filter_map ( |node| node . value () . editable_skgid () . cloned () )
+    . collect () }
 
 impl Forest<MpViewnode> {
   pub fn new () -> Self {

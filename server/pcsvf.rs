@@ -29,7 +29,7 @@ use crate::types::env::RuntimeGeneration;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
-use crate::types::tree::forest::ViewForest;
+use crate::types::tree::forest::{ViewForest, editable_occurrences};
 use crate::types::viewnode::{
   AffectsParent, Editability, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
   Vognode};
@@ -254,13 +254,15 @@ fn ancestor_letter (
 pub fn nodes_editable_in_diffView (
   viewforest : &ViewForest,
 ) -> HashSet<ID> {
-  viewforest . nodes () . filter_map ( |node| match &node . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-      if ! t . is_writeProtected () => Some ( t . skgid . clone () ),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))
-      if historical_phantom_in_content_position (node) =>
-      Some ( h . skgid . clone () ),
-    _ => None, } )
+  let historical_in_content_position : HashSet<ID> =
+    viewforest . nodes () . filter_map ( |node| match &node . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))
+        if historical_phantom_in_content_position (node) =>
+        Some ( h . skgid . clone () ),
+      _ => None, } )
+    . collect ();
+  editable_occurrences (viewforest) . into_iter ()
+    . chain (historical_in_content_position)
     . collect () }
 
 /// Whether a historical phantom stands where content does: under the
@@ -388,12 +390,7 @@ pub fn ensure_editableOccurrences_exist (
   config     : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let u : &BTreeSet<ID> = & drawing . sets () . u;
-  let mut editable : HashSet<ID> =
-    viewforest . nodes () . filter_map ( |node| match &node . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-        if ! t . is_writeProtected () => Some ( t . skgid . clone () ),
-      _ => None, } )
-    . collect ();
+  let mut editable : HashSet<ID> = editable_occurrences (viewforest);
   let occurrences : Vec<NodeId> =
     content_occurrences_in_level_order (viewforest) . into_iter ()
     . chain ( folder_occurrences_in_level_order (viewforest) )

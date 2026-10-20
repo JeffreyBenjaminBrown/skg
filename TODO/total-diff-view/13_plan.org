@@ -945,7 +945,7 @@ words, the bindings) before writing it. No code changes in this slice
 except the quoted herald label if the glossary's wording is generated
 from code (it is not expected to be).
 
-** TODO Slice 4: the copies and the handler boilerplate
+** DONE Slice 4: the copies and the handler boilerplate
 Make the changes under "The copies and the small reifications" from
 'RelationRole::CONTENT' through 'ViewnodeKind::change_facts' and its
 siblings: the one constant, the one 'viewnode_of', 'gained_and_lost'

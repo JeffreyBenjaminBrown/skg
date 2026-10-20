@@ -557,8 +557,8 @@ becomes an extra ID of the acquirer. See =docs/merging.org=.
 
 A /graph snapshot/ is one immutable state of the in-Rust graph
 ('GraphSnapshot'). A /git snapshot/ is one of HEAD, the git index or
-the worktree, as 'server/git_ops/git_snapshot.rs' reads them (the
-graph straddle's before-graph reads HEAD). A /buffer snapshot/ is a
+the worktree; 'server/git_ops/git_snapshot.rs' reads HEAD and the
+worktree (the graph straddle's before-graph reads HEAD). A /buffer snapshot/ is a
 buffer's text as a client sends it: for search enrichment, or for a
 dirty view in the save envelope. The wire atoms 'request-snapshot' and
 'snapshot response' predate the rule and mean buffer snapshots.

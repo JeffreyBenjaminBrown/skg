@@ -1489,3 +1489,73 @@ The comment above the folder leaves in 'server/heralds.rs' still says
 'skg-set-repo' ('elisp/skg-metadata.el') still says the save would
 "silently ignore" a write-protected occurrence's skgrepo edit. This
 slice changes no code.
+** Slice 4: deviations
+*** 'write_protect' is a method of the unrestricted vognode
+The plan names 'Viewnode::write_protect'. It is
+'UnrestrictedVognode::write_protect', beside 'is_writeProtected',
+because every caller holds the vognode, usually inside a match or a
+'write_at_unrestrictedVognode_in_tree' closure. Besides the plan's
+callers, the two other copies of "remove the editable-view request and
+write-protect" ('to_org/expand/editable.rs', 'update_buffer/complete.rs')
+call it.
+*** 'tag_content_members' keeps its direct write
+Calling 'write_protect' there drops a member's editable-view request,
+which that function's doc comment says stays ("drawn as the request
+says at its own visit"), and two tests fail:
+'an_editable_view_request_on_a_node_of_u_unfolds_its_members' and
+'an_editable_view_request_cascades_within_the_node_budget'
+('tests/pcsvf/recomputed_sets.rs'). So it sets the editability alone,
+with a comment saying why. 'mk_writeProtected_from_viewnode' now drops
+an editable-view request; its one caller passes a freshly drawn
+viewnode, which has none.
+*** the response formatter
+The diff view's answer carries no readiness summary, so the formatter
+('readiness_response_sexp' in 'change_leaves.rs') takes leading
+entries and an optional summary: '(LEADING... (readiness-summary ...)
+(errors ...) (warnings ...))'. The diff view's '(empty . t)' answer,
+integrate-unshown-changes' two answers and stage-and-commit's three
+use it. The save keeps its entry order, which the API doc gives
+(content, errors, warnings, point, summary): it appends
+'BufferReadinessSummary::to_sexp' to 'buffer_response_entries', the
+Sexp form of 'format_buffer_response_sexp'. 'true_entry_sexp' builds
+'(KEY . t)'. The wire text is unchanged. The test in
+'tests/pcsvf/readiness.rs' that called the deleted
+'readiness_summary_sexp' prints 'to_sexp' instead.
+*** one refusal wording
+The refusal of investigating an unknown node lacked "Switch the
+repo-set to all first."; with 'require_skgrepo_set_all' it has it.
+*** the "diff report" comments
+Slice 2 had already reworded the two in 'git_snapshot.rs'. The one left
+was on 'GraphSnapshot::id_claims' in 'git_snapshot_types.rs' ("the
+duplicate-ID VIOLATION the report warns about"); it no longer names
+the report. 'changed_paths_for_skgrepo' lost its two kind parameters
+with the arms, and with them the error about unsupported endpoints.
+*** where the new functions sit
+'editable_occurrences' is in 'types/tree/forest.rs';
+'nodes_editable_in_diffView' adds to it the historical phantoms in
+content position. 'rerender_view''s 'editable_before_completion' and
+'align_content_members_with_straddle' call 'Viewnode::editable_skgid'.
+'viewnode_of' is in 'types/viewnode.rs', beside
+'viewforest_root_viewnode'. The store-clearing method is
+'ReadinessStore::drop_marks_of_vanished_leaves'.
+*** the accessors
+The four public accessors on 'ViewnodeKind' read one private match
+each way (shared and mutable) that returns the pair.
+'consume_edit_request_after_save' clears the readiness request through
+'readiness_request_mut'. 'grandparent_pid' matches the vognode itself
+in place of 'vognode_skgid'. In 'set_ready_facts_in_viewforest' the
+property arm asked whether a request was present or the property
+carried change facts; the first implies the second, so it asks
+'change_facts ()' alone.
+*** docs
+The glossary said 'git_snapshot.rs' reads the git index; it reads HEAD
+and the worktree.
+*** seen, left
+'GraphSnapshot::id_claims' and 'skgrepos_claiming_skgid' are recorded
+but read by nothing since the diff report retired. Three more matches
+over the (change facts, readiness request) pair remain, outside the
+six the plan names: 'set_presence' ('child_data.rs'),
+'folder_change_facts' ('org_to_text.rs') and the one in
+'mk_member_viewnode' ('change_viewnodes.rs'). 'append_stub_root'
+builds its folded container folder as a 'Viewnode' literal, since
+'viewnode_of' draws it unfolded.

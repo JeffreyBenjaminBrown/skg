@@ -27,7 +27,7 @@ use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ChangeFacts, ChangesetMarkerKind, Phantom, Property, DiffObject,
+  ChangesetMarkerKind, Phantom, Property, DiffObject,
   ReadinessRequest, Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::{NodeId, NodeRef};
@@ -90,7 +90,7 @@ pub fn readiness_requests_in_viewforest (
     graph . pid_of (skgid) . unwrap_or_else ( || skgid . clone () ) };
   viewforest . root () . descendants ()
     . filter_map ( |node| {
-      let request : &ReadinessRequest = readiness_request_of (node . value ()) ?;
+      let request : &ReadinessRequest = node . value () . kind . readiness_request () ?;
       let named : NamedLeaves = leaves_named_at (node, &request . objects, &pid_of) ?;
       Some ( RequestedReadiness {
         ready    : request . ready,
@@ -244,52 +244,16 @@ pub fn set_ready_facts_in_viewforest (
           ViewnodeKind::Property ( Property::ChangesetMarker {
             kind : ChangesetMarkerKind::OrderOnly, .. } ) =>
             Some (BTreeSet::new ()),
-          ViewnodeKind::Property (property)
-            if property . readiness_request () . is_some ()
-               || change_facts_of_property (property) . is_some () =>
+          kind @ ViewnodeKind::Property (_)
+            if kind . change_facts () . is_some () =>
             object_is_ready (node, &[]) . then (BTreeSet::new),
           _ => return None, };
       Some (( node . id (), ready )) } )
     . collect ();
   for (treeid, ready) in ready_facts {
     if let Some (change_facts) =
-      change_facts_mut ( viewforest . get_mut (treeid) . unwrap () . value () ) {
+      viewforest . get_mut (treeid) . unwrap () . value () . kind . change_facts_mut () {
       change_facts . ready = ready; }}}
-
-fn change_facts_of_property (
-  property : &Property,
-) -> Option<&ChangeFacts> {
-  match property {
-    Property::Alias { change_facts, .. }
-    | Property::ID { change_facts, .. }
-    | Property::Flag { change_facts, .. }
-    | Property::RemovedAlias { change_facts, .. }
-    | Property::RemovedID { change_facts, .. }
-    | Property::OldText { change_facts, .. }
-    | Property::HomeSkgrepoMove { change_facts, .. }
-    | Property::RelRepoMove { change_facts, .. }
-    | Property::ChangesetMarker { change_facts, .. } => Some (change_facts),
-    Property::BodyDiff { .. } => None, } }
-
-fn change_facts_mut (
-  viewnode : &mut Viewnode,
-) -> Option<&mut ChangeFacts> {
-  match &mut viewnode . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some (&mut t . change_facts),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) => Some (&mut d . change_facts),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) => Some (&mut u . change_facts),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) => Some (&mut h . change_facts),
-    ViewnodeKind::Property (
-      Property::Alias { change_facts, .. }
-      | Property::ID { change_facts, .. }
-      | Property::Flag { change_facts, .. }
-      | Property::RemovedAlias { change_facts, .. }
-      | Property::RemovedID { change_facts, .. }
-      | Property::OldText { change_facts, .. }
-      | Property::HomeSkgrepoMove { change_facts, .. }
-      | Property::RelRepoMove { change_facts, .. }
-      | Property::ChangesetMarker { change_facts, .. } ) => Some (change_facts),
-    _ => None, } }
 
 /// The ID a vognode's leaves are keyed by: a historical phantom's as
 /// written (a node of the before-graph), any other's resolved by
@@ -334,22 +298,6 @@ pub fn apply_readiness_requests (
       } else { store . unmark (&key); }} }
   warnings }
 
-fn readiness_request_of (
-  viewnode : &Viewnode,
-) -> Option<&ReadinessRequest> {
-  match &viewnode . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-      t . readiness_request . as_ref (),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) =>
-      d . readiness_request . as_ref (),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
-      u . readiness_request . as_ref (),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
-      h . readiness_request . as_ref (),
-    ViewnodeKind::Property (property) =>
-      property . readiness_request (),
-    _ => None, } }
-
 /// The relationship by which a vognode is a member here: its
 /// viewparent's content, or the relation of the partner folder it is
 /// in, between it and the folder's viewparent. None at a root, or
@@ -383,13 +331,6 @@ fn relationship_to_viewparent (
 fn grandparent_pid (
   node : NodeRef<Viewnode>,
 ) -> Option<ID> {
-  node . parent () ? . parent () ? . value () . kind . vognode_skgid () }
-
-impl ViewnodeKind {
-  fn vognode_skgid (
-    &self,
-  ) -> Option<ID> {
-    match self {
-      ViewnodeKind::Vognode (vognode) => vognode . skgid () . cloned (),
-      _ => None, } }
-}
+  match &node . parent () ? . parent () ? . value () . kind {
+    ViewnodeKind::Vognode (vognode) => vognode . skgid () . cloned (),
+    _ => None, } }

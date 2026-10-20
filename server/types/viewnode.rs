@@ -775,40 +775,88 @@ impl Property {
       Property::OldText { body, .. } => body . as_ref (),
       Property::BodyDiff { diff } => Some (diff),
       _ => None, } }
+}
 
-  /// The readiness request a save consumes, on a property that can
-  /// carry one.
+/// The diff view's pair of a change-facts and a readiness request
+/// ('ChangeFacts', 'ReadinessRequest') is carried by the unrestricted
+/// vognode, the three phantoms and every property but 'BodyDiff'. A
+/// kind without the pair answers None.
+impl ViewnodeKind {
+  pub fn change_facts (
+    &self,
+  ) -> Option<&ChangeFacts> {
+    self . change_facts_and_readiness_request ()
+      . map ( |(change_facts, _)| change_facts ) }
+
+  pub fn change_facts_mut (
+    &mut self,
+  ) -> Option<&mut ChangeFacts> {
+    self . change_facts_and_readiness_request_mut ()
+      . map ( |(change_facts, _)| change_facts ) }
+
+  /// The readiness request a save consumes, if one is present.
   pub fn readiness_request (
     &self,
   ) -> Option<&ReadinessRequest> {
-    match self {
-      Property::Alias { readiness_request, .. }
-        | Property::ID { readiness_request, .. }
-        | Property::Flag { readiness_request, .. }
-        | Property::RemovedAlias { readiness_request, .. }
-        | Property::RemovedID { readiness_request, .. }
-        | Property::OldText { readiness_request, .. }
-        | Property::HomeSkgrepoMove { readiness_request, .. }
-        | Property::RelRepoMove { readiness_request, .. }
-        | Property::ChangesetMarker { readiness_request, .. } =>
-        readiness_request . as_ref (),
-      Property::BodyDiff { .. } => None, } }
+    self . change_facts_and_readiness_request ()
+      . and_then ( |(_, readiness_request)| readiness_request . as_ref () ) }
 
-  fn readiness_request_mut (
+  /// The slot of the readiness request, on a kind that has one.
+  pub fn readiness_request_mut (
     &mut self,
   ) -> Option<&mut Option<ReadinessRequest>> {
+    self . change_facts_and_readiness_request_mut ()
+      . map ( |(_, readiness_request)| readiness_request ) }
+
+  fn change_facts_and_readiness_request (
+    &self,
+  ) -> Option<( &ChangeFacts, &Option<ReadinessRequest> )> {
     match self {
-      Property::Alias { readiness_request, .. }
-        | Property::ID { readiness_request, .. }
-        | Property::Flag { readiness_request, .. }
-        | Property::RemovedAlias { readiness_request, .. }
-        | Property::RemovedID { readiness_request, .. }
-        | Property::OldText { readiness_request, .. }
-        | Property::HomeSkgrepoMove { readiness_request, .. }
-        | Property::RelRepoMove { readiness_request, .. }
-        | Property::ChangesetMarker { readiness_request, .. } =>
-        Some (readiness_request),
-      Property::BodyDiff { .. } => None, } }
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+        Some (( &t . change_facts, &t . readiness_request )),
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) =>
+        Some (( &d . change_facts, &d . readiness_request )),
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
+        Some (( &u . change_facts, &u . readiness_request )),
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
+        Some (( &h . change_facts, &h . readiness_request )),
+      ViewnodeKind::Property (
+        Property::Alias { change_facts, readiness_request, .. }
+        | Property::ID { change_facts, readiness_request, .. }
+        | Property::Flag { change_facts, readiness_request, .. }
+        | Property::RemovedAlias { change_facts, readiness_request, .. }
+        | Property::RemovedID { change_facts, readiness_request, .. }
+        | Property::OldText { change_facts, readiness_request, .. }
+        | Property::HomeSkgrepoMove { change_facts, readiness_request, .. }
+        | Property::RelRepoMove { change_facts, readiness_request, .. }
+        | Property::ChangesetMarker { change_facts, readiness_request, .. } ) =>
+        Some (( change_facts, readiness_request )),
+      _ => None, } }
+
+  fn change_facts_and_readiness_request_mut (
+    &mut self,
+  ) -> Option<( &mut ChangeFacts, &mut Option<ReadinessRequest> )> {
+    match self {
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+        Some (( &mut t . change_facts, &mut t . readiness_request )),
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) =>
+        Some (( &mut d . change_facts, &mut d . readiness_request )),
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
+        Some (( &mut u . change_facts, &mut u . readiness_request )),
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
+        Some (( &mut h . change_facts, &mut h . readiness_request )),
+      ViewnodeKind::Property (
+        Property::Alias { change_facts, readiness_request, .. }
+        | Property::ID { change_facts, readiness_request, .. }
+        | Property::Flag { change_facts, readiness_request, .. }
+        | Property::RemovedAlias { change_facts, readiness_request, .. }
+        | Property::RemovedID { change_facts, readiness_request, .. }
+        | Property::OldText { change_facts, readiness_request, .. }
+        | Property::HomeSkgrepoMove { change_facts, readiness_request, .. }
+        | Property::RelRepoMove { change_facts, readiness_request, .. }
+        | Property::ChangesetMarker { change_facts, readiness_request, .. } ) =>
+        Some (( change_facts, readiness_request )),
+      _ => None, } }
 }
 
 impl ChangesetMarkerKind {
@@ -938,6 +986,16 @@ impl AsMut<Viewnode> for Viewnode {
     self }}
 
 impl Viewnode {
+  /// The node's ID, when this viewnode is an editable occurrence of
+  /// it: an unrestricted vognode that is not write-protected.
+  pub fn editable_skgid (
+    &self,
+  ) -> Option<&ID> {
+    match &self . kind {
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+        if ! t . is_writeProtected () => Some (&t . skgid),
+      _ => None, }}
+
   /// Consume every save-only `(editRequest ...)`, and every readiness
   /// request, carried by this occurrence.
   /// Call only after the save's skgsave-commit: failed saves and confirmation
@@ -946,25 +1004,18 @@ impl Viewnode {
   pub fn consume_edit_request_after_save (
     &mut self,
   ) {
+    if let Some (readiness_request) = self . kind . readiness_request_mut () {
+      *readiness_request = None; }
     match &mut self . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) => {
         restriction . relRepo_request = None;
-        restriction . readiness_request = None;
         if let Editability::Editable { edit_request, .. } =
           &mut restriction . editability
         { *edit_request = None; }},
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
-        unknown . relRepo_request = None;
-        unknown . readiness_request = None; },
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (deleted))) =>
-        deleted . readiness_request = None,
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (historical))) =>
-        historical . readiness_request = None,
-      ViewnodeKind::Property (property) => {
-        if let Property::Alias { relRepo_request, .. } = property {
-          *relRepo_request = None; }
-        if let Some (readiness_request) = property . readiness_request_mut () {
-          *readiness_request = None; }},
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
+        unknown . relRepo_request = None,
+      ViewnodeKind::Property (Property::Alias { relRepo_request, .. }) =>
+        *relRepo_request = None,
       _ => {}, }}
 
   pub fn title (&self) -> &str {
