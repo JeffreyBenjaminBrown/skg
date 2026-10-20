@@ -13,7 +13,9 @@ diff view" ('docs/glossary.org'). The wire forms are the API doc's
 "Diff view", "Stage and commit", "Integrate unshown changes" and
 "Metadata of the diff view" ('docs/api-and-formats.org'). The
 heralds are 'docs/heralds.org', "Diff heralds". The commands are
-both COMMANDS files, under C-c v d and C-c r.
+both COMMANDS files, under C-c v d and C-c r. The server's code is
+'server/diff_view/' (its 'mod.rs' lists the files), over the graph
+straddle of 'server/graph_straddle/'.
 
 A paragraph marked "(from slice N of 13_plan)" describes behavior a
 later slice of 'TODO/total-diff-view/13_plan.org' lands; that slice
@@ -345,7 +347,7 @@ end it is the same leaf. A node's existence leaf covers its own
 content when it is new or deleted.
 ** Marks, fingerprints and the store
 A mark says that one leaf is commit-ready. The readiness store
-('server/readiness_store.rs') keeps each mark with the fingerprint of
+('server/diff_view/readiness_store.rs') keeps each mark with the fingerprint of
 the change it approved, a hash of the leaf's before and after values.
 A mark whose fingerprint no longer matches the change counts as
 absent: editing a marked change unmarks it, and nothing signals that

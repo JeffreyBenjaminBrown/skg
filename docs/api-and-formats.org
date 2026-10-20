@@ -405,8 +405,8 @@ So far there are these endpoints:
     a viewnode it creates: a context node's body starts folded. A
     root stays until the buffer is closed; a root whose node a commit
     deleted is drawn as a deleted phantom.
-  - Logic: =server/serve/handlers/diff_view.rs=, =server/pcsvf.rs=,
-    =server/to_org/render/changes.rs=.
+  - Logic: =server/serve/handlers/diff_view.rs=, =server/diff_view/=
+    (=pcsvf.rs=, =changes.rs=).
 
 ** Stage and commit
   - Request: =((request . "stage and commit") (message . "MESSAGE"))=,
@@ -465,7 +465,7 @@ So far there are these endpoints:
     appended as a root, at the end, in ID order, and completed; R is
     deduplicated with the buffer's roots pinned, so that a changed
     cycle that already has a root gains no second one.
-    =server/serve/handlers/integrate_unshown_changes.rs=, =server/pcsvf.rs=
+    =server/serve/handlers/integrate_unshown_changes.rs=, =server/diff_view/pcsvf.rs=
     ('ensure_editableOccurrences_exist',
     'contentOrigins_missing_from_buffer'), and 'rerender_view' in
     =server/update_buffer.rs=.
@@ -1183,11 +1183,11 @@ The server writes to =<data_root>/logs/=:
 ** Readiness marks file
 
 =<data_root>/readiness-marks.json= holds the commit-readiness marks
-of the diff view ('server/readiness_store.rs'). The server reads
+of the diff view ('server/diff_view/readiness_store.rs'). The server reads
 it at startup and rewrites it after every change; a missing or
 unreadable file means no marks. It is a JSON object whose =marks= is a
 list of ={"leaf": KEY, "fingerprint": N}= entries. KEY names one
-change-forest leaf ('LeafKey' in 'server/change_leaves.rs'): a node
+change-forest leaf ('LeafKey' in 'server/diff_view/change_leaves.rs'): a node
 aspect ={"Node": {"pid": ..., "aspect": ...}}=, where the aspect is
 ="Existence"=, ="Text"=, ="Home"=, ={"Alias": TEXT}=, ={"ExtraId": ID}=
 or ={"Flag": FLAG}=; or a relationship aspect ={"Relationship":

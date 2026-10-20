@@ -5,6 +5,7 @@
 
 use super::*;
 use crate::dbs::init::empty_in_ram_tantivy_index;
+use crate::graph_straddle::types::GraphStraddle;
 use crate::types::misc::{SkgConfig, SkgrepoSetName};
 use crate::types::views_state::DiffViewBufferKind;
 

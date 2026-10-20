@@ -1034,7 +1034,7 @@ section say that only '.skg' files are staged by the command, that a
 gitrepo with entries staged beforehand stops the command for a typed
 "yes", and that a confirmed commit includes them.
 
-** TODO Slice 10: the diff view's module
+** DONE Slice 10: the diff view's module
 Make the changes under "The diff view's module" above, with 'git mv'
 for the moved files, updating every 'use'. Move, do not rewrite: the
 suites pass unchanged after the moves, and the only new code is the

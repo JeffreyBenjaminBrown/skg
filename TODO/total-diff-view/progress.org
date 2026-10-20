@@ -1862,3 +1862,77 @@ in 'tests/pcsvf/stage_and_commit.rs'. Emacs:
 spec in 'stage_and_commit_spec.lua'. Counts: nextest 827 (826 before),
 Emacs 373 (372), Neovim 347 (346). 'bash/integration-tests.sh': 34 of
 35, the baseline 'import-md-and-org' failing.
+** Slice 10: deviations
+*** the two visit functions and what they return
+'diffView_visit_before_expansion' and 'diffView_visit_after_expansion'
+are in 'server/diff_view/visit.rs', whose module comment now holds
+the list of what the switch changes (it was the doc of
+'CompletionContext::diffView_source'). 'complete.rs' reads the switch
+only at their two calls.
+**** before
+Called at the top of 'dispatch_node_update' (after the orphan check),
+for every node. In the diff view it finishes a property folder's
+visit and a historical phantom's (or says to visit it as an
+unrestricted vognode, when its node is back); otherwise it returns
+'VisitSettings': the partner folders' goal source, whether the
+Subscribee folder has its own reconciler, substitution, whether
+default folders may be created, and two methods.
+**** the alignment and the budget are methods of the settings
+Two diff-view steps cannot run at the top of the visit:
+'align_content_members_with_straddle' reads the editability that the
+write-protect request and the draw rule settle, and the budget
+decision needs whether the node carried an editable-view request,
+read after the write-protect request. So 'VisitSettings' carries U
+and the straddle privately, and 'charges_node_budget' and
+'align_content_members_before_expansion' apply them where the visit
+did before.
+**** after
+'visit_normal_node' is now its old body, renamed 'update_normal_node'
+and returning a 'NormalNodeUpdate' (deleted by this save, no longer
+unrestricted, updated) instead of returning early, followed by
+'diffView_visit_after_expansion', which draws a deleted node HEAD has
+as history or runs the per-visit step.
+*** where the new code sits
+'mod.rs' only lists the files. 'complete_viewforest_with_graph_straddle',
+'prepare_diffView_rerender' and 'finish_diffView_rerender' are in
+'diff_view/completion.rs', with 'DiffViewRerender', which carries the
+straddle, the buffer kind, the flag and the standing roots from one
+call to the other. Both take an 'Option', so 'rerender_view' calls
+them unconditionally. 'CompletionContext', 'for_diffView',
+'complete_viewforest' and 'complete_appended_roots' became
+'pub(crate)'.
+*** the partner folders' shared helpers stay
+'push_repair_warnings' and 'view_order_preserving_goal_list' serve
+both halves, so they stay in 'update_buffer/reconcile/partner_folder.rs'
+('view_order_preserving_goal_list' is now 'pub(crate)').
+*** 'PcsvfCache'
+A map from each of the four buffer kinds to a 'OnceLock'. The
+order-only buffer's empty sets are cached like the others rather than
+returned from a static. 'pcsvf_sets_of_buffer (straddle, kind)' is a
+function of 'diff_view/pcsvf.rs'; 'GraphStraddle::pcsvf_sets' is gone,
+so 'tests/pcsvf/sets.rs' calls 'pcsvf_sets_of_buffer' for the "all
+changes" buffer.
+*** tests touched beyond paths
+Two unit tests included with '#[path]' imported a type through
+'use super::*' that their host file no longer imports:
+'tests/unit/reconcile_partner_folder.rs' ('ViewnodeKind') and
+'tests/unit/completion_context.rs' ('GraphStraddle') now import it
+themselves.
+*** the performance harness was already stale
+'tests/results/perf/tdv_perf.rs' still uses the names slice 0 retired
+('change_forest', 'TdvBuffer', 'total_diff_view'), and calls
+'GraphStraddle::pcsvf_sets'. Only its 'readiness_store' path was
+updated; slice 13 has to bring it up to date before running it.
+*** docs
+The path citations in 'docs/glossary.org', 'docs/api-and-formats.org'
+and 'docs/diff-view.org' follow the moves; 'docs/diff-view.org' now
+names 'server/diff_view/'. It had no "(from slice 10)" mark.
+*** verification
+Besides the suites, 'tests/results/hk-slice10/verify.sh' opens the four
+buffers of the 'kinds' fixture over TCP on an isolated server, saves
+"all changes" unchanged and opens them again. Its output is identical
+to that of the binary built from the commit before this slice, except
+the order of the save-lock's view list, which varies from run to run
+at baseline too. Counts: nextest 827, Emacs 373, Neovim 347, as before.
+One nextest run failed while cargo-watch was rebuilding for Jeff's
+server; the reruns passed.

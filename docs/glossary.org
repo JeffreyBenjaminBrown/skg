@@ -779,7 +779,7 @@ readiness summary only counts their changed files.
 
 *** PCSVF = pruned change-spanning viewforest
 
-The viewforest the "all changes" buffer draws ('server/pcsvf.rs',
+The viewforest the "all changes" buffer draws ('server/diff_view/pcsvf.rs',
 functions 'pcsvf_...'). The merges and skgrepo-changes buffers draw
 PCSVFs over subsets of the changes.
 
@@ -838,7 +838,7 @@ be asked about, built from the graph straddle, independent of any
 view: its roots are the changed graphnodes; under each come its
 changed aspects; its leaves, the *change-forest leaves*, are the
 individual changes a user marks. The type 'ChangeLeaves'
-('server/change_leaves.rs') holds every leaf, keyed by its recorder,
+('server/diff_view/change_leaves.rs') holds every leaf, keyed by its recorder,
 its aspect and, for a relationship, the relationship ('LeafKey'). The
 *recorder* of a leaf is the node whose file records the change, and
 that node *records* the leaf; a relationship's leaf is recorded by
