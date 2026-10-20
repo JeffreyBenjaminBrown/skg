@@ -1,27 +1,26 @@
 ;;; -*- lexical-binding: t; -*-
 ;; The explicit cleanup command for one Unknown's raw relationship ID.
 
+(require 'cl-lib)
 (require 'skg-buffer)
 (require 'skg-length-prefix)
 (require 'skg-lock-buffers)
-(require 'skg-metadata)
+(require 'skg-metadata) ; for skg--unknown-node-id-at-point
 (require 'skg-request-rerender-all-views)
 (require 'skg-request-save)
 
 (defun skg-delete-references-to-absent-node ()
   "Remove owned structured references to the Unknown headline at point."
   (interactive)
-  (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
-    (unless (skg--unknown-headline-p metadata)
+  (let ((skgid (skg--unknown-node-id-at-point)))
+    (unless skgid
       (user-error "Point must be on an Unknown headline"))
     (when (cl-some (lambda (buf)
                      (and (buffer-local-value 'skg-view-id buf)
                           (buffer-modified-p buf)))
                    (buffer-list))
       (user-error "Save or revert every skg view before global reference cleanup"))
-    (let ((skgid (skg--relationship-member-id metadata)))
-      (unless skgid (user-error "Unknown headline lacks its raw ID"))
-      (skg--delete-absent-send skgid nil))))
+    (skg--delete-absent-send skgid nil)))
 
 (defun skg--delete-absent-send (skgid approved-preview)
   "Send cleanup request for ID; APPROVED-PREVIEW is echoed verbatim on retry."

@@ -834,6 +834,13 @@ OLD-REPO. Restores point afterward."
         (when id-values
           (format "%s" (car id-values))))))
 
+(defun skg--unknown-node-id-at-point ()
+  "The ID of the unknown phantom whose headline is at point, or nil."
+  (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
+    (when (skg--unknown-headline-p metadata)
+      (let ((id-values (skg-sexp-cdr-at-path metadata '(skg unknown id))))
+        (when id-values (format "%s" (car id-values)))))))
+
 (defun skg--node-write-protected-p (metadata-sexp)
   "Return non-nil if METADATA-SEXP has the bare UnrestrictedVognode writeProtected atom."
   (skg-sexp-subtree-p metadata-sexp '(skg (node writeProtected))))

@@ -5,8 +5,8 @@
 -- elisp/skg-request-investigate-unknown-node.el.
 
 local client = require('skg.client')
-local delete_absent_references = require('skg.delete_absent_references')
 local messages = require('skg.messages')
+local metadata = require('skg.metadata')
 local payload = require('skg.payload')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
@@ -19,7 +19,7 @@ local BUFFER_NAME = 'skg://unknown-node'
 ---the ID.
 ---@param skgid string|nil for tests; taken from point or prompted when nil
 function M.investigate_unknown_node (skgid)
-  skgid = skgid or delete_absent_references.unknown_id_at_point()
+  skgid = skgid or metadata.unknown_id_at_point()
           or vim.fn.input('Investigate ID: ')
   if skgid == '' then
     vim.notify('No ID to investigate', vim.log.levels.WARN)

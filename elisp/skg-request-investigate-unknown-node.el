@@ -9,7 +9,7 @@
 ;;; "Investigate unknown node".
 
 (require 'skg-length-prefix)
-(require 'skg-metadata) ; for skg--metadata-sexp-at-point-or-nil
+(require 'skg-metadata) ; for skg--unknown-node-id-at-point
 (require 'skg-request-save) ; for skg-big-nonfatal-message, skg-report-mode
 
 (defun skg-investigate-unknown-node ()
@@ -30,13 +30,6 @@ read from the minibuffer."
     (process-send-string
      tcp-proc
      (skg--investigate-unknown-node-request-string skgid))))
-
-(defun skg--unknown-node-id-at-point ()
-  "The ID of the unknown phantom whose headline is at point, or nil."
-  (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
-    (when (skg--unknown-headline-p metadata)
-      (let ((id-values (skg-sexp-cdr-at-path metadata '(skg unknown id))))
-        (when id-values (format "%s" (car id-values)))))))
 
 (defun skg--investigate-unknown-node-request-string (skgid)
   "The request sexp string investigating SKGID."

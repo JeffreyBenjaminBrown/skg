@@ -284,6 +284,16 @@ function M.node_id (metadata_sexp)
   return nil
 end
 
+---@return string|nil the ID of the unknown phantom whose headline is
+---at point
+function M.unknown_id_at_point ()
+  local values = M.sexp_cdr_at_path(M.metadata_sexp_at_line_or_nil(nil),
+                                    { 'skg', 'unknown', 'id' })
+  if values and values[1] ~= nil then
+    return sexpr.atom_text(values[1]) end
+  return nil
+end
+
 ---@param metadata_sexp any
 ---@return boolean implicit or explicit affectsParent=true?
 function M.node_affectsParent_content_of_p (metadata_sexp)
