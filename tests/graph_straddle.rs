@@ -232,3 +232,12 @@ fn a_nodeMerge_since_head_puts_the_acquirers_container_in_c () {
   assert_eq! ( straddle . change_leaves () . leaves_under (&id ("P")) . len (), 2 );
   assert_eq! ( straddle . changed_pids () . out_changed, ids (&["P", "a", "b"]) );
   assert_eq! ( straddle . changed_pids () . in_changed,  ids (&["a", "b"]) ); }
+
+#[test]
+fn a_newly_mentioned_node_is_in_changed () {
+  // M's title gains a link to T. A mention is no leaf, but T's set of
+  // mentioners changed.
+  let (_f, straddle) : (Fixture, GraphStraddle) =
+    one_skgrepo_straddle ("mention");
+  assert_eq! ( straddle . changed_pids () . out_changed, ids (&["M"]) );
+  assert_eq! ( straddle . changed_pids () . in_changed,  ids (&["T"]) ); }

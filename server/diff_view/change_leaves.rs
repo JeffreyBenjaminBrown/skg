@@ -140,6 +140,11 @@ pub struct ChangeLeaves {
   order_only_pids       : BTreeSet<ID>,
   order_only_files      : BTreeSet<ChangedFile>,
   foreign_changed_files : usize,
+  /// The nodes whose set of mentioners changed: the mentioned nodes,
+  /// in one graph only, of the recorders. A mention is no leaf: it
+  /// changes with its mentioner's text, which is the mentioner's
+  /// leaf. C reads it ('GraphStraddle::changed_pids').
+  mentioner_sets_changed : BTreeSet<ID>,
 }
 
 impl ChangeLeaves {
@@ -181,9 +186,17 @@ impl ChangeLeaves {
       . map ( |node| ChangedFile { skgrepo : node . home_skgrepo . clone (),
                                    pid     : node . pid . clone () } )
       . collect ();
+    let mentioner_sets_changed : BTreeSet<ID> =
+      leaves_by_recorder . keys ()
+      . flat_map ( |recorder|
+        straddle . partners (recorder, RelationRole::MENTIONED) )
+      . filter ( |partner| partner . presence != Presence::Both )
+      . map ( |partner| partner . id )
+      . collect ();
     ChangeLeaves { leaves_by_recorder, index, order_only_pids,
                    order_only_files,
-                   foreign_changed_files : straddle . foreign_changed_files } }
+                   foreign_changed_files : straddle . foreign_changed_files,
+                   mentioner_sets_changed } }
 
   /// The nodes that record a leaf (the forest's roots).
   pub fn recorders (
@@ -215,6 +228,23 @@ impl ChangeLeaves {
     self . leaves_by_recorder . get (pid)
       . map ( |leaves| leaves . as_slice () )
       . unwrap_or (&[]) }
+
+  /// The members of the relationship leaves whose relationship
+  /// exists in one graph only.
+  pub fn members_of_relationships_in_one_graph (
+    &self,
+  ) -> impl Iterator<Item = &ID> {
+    self . leaves_by_recorder . values () . flatten ()
+      . filter_map ( |leaf| match &leaf . key {
+        LeafKey::Relationship {
+          relationship, aspect : RelationshipAspect::Existence } =>
+          Some (&relationship . member),
+        _ => None, } ) }
+
+  pub fn mentioner_sets_changed (
+    &self,
+  ) -> &BTreeSet<ID> {
+    &self . mentioner_sets_changed }
 
   /// The leaves that 'file' records.
   pub fn leaves_in_file (

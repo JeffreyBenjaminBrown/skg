@@ -11,6 +11,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   NodeRelation, RelationRole};
+use crate::diff_view::change_leaves::ChangeLeaves;
 use crate::graph_straddle::types::{
   ChangedPids, GraphStraddle, NodeChanges, Partner, Presence};
 use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
@@ -25,15 +26,6 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 /// (Mentions are not in a list; they change with the text.)
 pub(crate) const ROLES_OF_LISTED_MEMBERS : [RelationRole; 4] = [
   RelationRole::CONTENT,
-  RelationRole::SUBSCRIBEE,
-  RelationRole::HIDDEN,
-  RelationRole::OVERRIDDEN, ];
-
-/// The roles a node's recorded partners play toward it, mentions
-/// included: every relationship the node records.
-const ROLES_OF_RECORDED_PARTNERS : [RelationRole; 5] = [
-  RelationRole::CONTENT,
-  RelationRole::MENTIONED,
   RelationRole::SUBSCRIBEE,
   RelationRole::HIDDEN,
   RelationRole::OVERRIDDEN, ];
@@ -125,8 +117,11 @@ impl GraphStraddle {
               . collect () )
       . unwrap_or_default () }
 
-  /// C, split into its out-changed and in-changed halves. Computed once
-  /// per straddle.
+  /// C, split into its out-changed and in-changed halves, read off the
+  /// change leaves: the out-half is their recorders; the in-half is
+  /// the members of the relationship leaves whose relationship exists
+  /// in one graph only, and the nodes whose set of mentioners changed,
+  /// each when it is a node of either graph. Computed once per straddle.
   pub fn changed_pids (
     &self,
   ) -> &ChangedPids {
@@ -136,37 +131,16 @@ impl GraphStraddle {
   fn compute_changed_pids (
     &self,
   ) -> ChangedPids {
-    let all_pids : HashSet<&ID> =
-      self . before . nodes . keys ()
-      . chain ( self . after . nodes . keys () )
-      . collect ();
+    let leaves : &ChangeLeaves = self . change_leaves ();
     let out_changed : BTreeSet<ID> =
-      all_pids . into_iter ()
-      . filter ( |pid| self . changed_out (pid) )
+      leaves . recorders () . cloned () . collect ();
+    let in_changed : BTreeSet<ID> =
+      leaves . members_of_relationships_in_one_graph ()
+      . chain ( leaves . mentioner_sets_changed () )
+      . filter ( |member| self . node_presence (member) . is_some () )
       . cloned ()
       . collect ();
-    let in_changed : BTreeSet<ID> =
-      { // Every change to a set of recorders is a change to some
-        // recorder's relationships, so it is found from that recorder.
-        let mut in_changed : BTreeSet<ID> = BTreeSet::new ();
-        for recorder in &out_changed {
-          for role in ROLES_OF_RECORDED_PARTNERS {
-            for partner in self . partners (recorder, role) {
-              if partner . presence != Presence::Both
-                && self . node_presence (&partner . id) . is_some () {
-                in_changed . insert (partner . id); }} }}
-        in_changed };
     ChangedPids { out_changed, in_changed } }
-
-  fn changed_out (
-    &self,
-    pid : &ID,
-  ) -> bool {
-    self . node_presence (pid) != Some (Presence::Both)
-      || ! self . node_changes (pid) . is_empty ()
-      || ROLES_OF_LISTED_MEMBERS . iter () . any (
-        |role| self . partners (pid, *role) . iter ()
-          . any ( |partner| partner . changed () )) }
 }
 
 fn node_changes_between (

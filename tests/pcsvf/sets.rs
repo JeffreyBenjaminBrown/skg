@@ -5,12 +5,15 @@
 // in-changed-only change (ln now contains lo, which lp contains too).
 
 use crate::git_fixture::graph_straddle;
-use crate::pcsvf::common::{ids, with_fixture};
+use crate::pcsvf::common::{ids, with_fixture, with_fixture_and_foreign};
 
+use skg::diff_view::change_leaves::{ChangeLeaves, LeafKey, RelationshipAspect};
 use skg::graph_straddle::types::GraphStraddle;
+use skg::types::misc::ID;
 use skg::diff_view::pcsvf::{PcsvfSets, pcsvf_sets_of_buffer};
 use skg::types::views_state::DiffViewBufferKind;
 
+use std::collections::BTreeSet;
 use std::error::Error;
 
 fn sets_fixture_sets (
@@ -73,4 +76,47 @@ fn an_in_changed_only_change_is_drawn_under_its_new_container (
   assert! ( ! sets . d . contains (&"lo" . into ()) );
   assert! ( ! sets . u . contains (&"lp" . into ()) );
   assert_eq! ( sets . d, ids (&[ "cy2", "ln", "mc", "r" ]) );
+  Ok (( )) }
+
+/// On every fixture of 'tests/pcsvf/': C is the recorders of the change
+/// leaves, and the members of the relationship leaves whose
+/// relationship exists in one graph only (each a node of some graph).
+/// No fixture changes a mention, the in-half's other source.
+#[test]
+fn c_is_the_recorders_and_the_members_of_presence_changed_relationship_leaves (
+) -> Result<(), Box<dyn Error>> {
+  let fixtures : [(&str, &[&str], &[&str]); 10] = [
+    ("buffers",            &["public", "private"], &[]),
+    ("folder_member",      &["main"],              &[]),
+    ("foreign",            &["main"],              &["foreign"]),
+    ("fresh",              &["main"],              &[]),
+    ("historical_content", &["main"],              &[]),
+    ("kinds",              &["public", "private"], &[]),
+    ("overrides",          &["main"],              &[]),
+    ("partner_ids",        &["main"],              &[]),
+    ("sets",               &["main"],              &[]),
+    ("shared",             &["main"],              &[]), ];
+  for (case, skgrepos, foreign) in fixtures {
+    with_fixture_and_foreign (case, skgrepos, foreign, |f| {
+      let straddle : GraphStraddle = graph_straddle (f) ?;
+      let leaves : &ChangeLeaves = straddle . change_leaves ();
+      let recorders : BTreeSet<ID> =
+        leaves . recorders () . cloned () . collect ();
+      let members : BTreeSet<ID> =
+        leaves . recorders ()
+        . flat_map ( |recorder| leaves . leaves_under (recorder) )
+        . filter_map ( |leaf| match &leaf . key {
+          LeafKey::Relationship {
+            relationship, aspect : RelationshipAspect::Existence } =>
+            Some ( relationship . member . clone () ),
+          _ => None, } )
+        . filter ( |member| straddle . node_presence (member) . is_some () )
+        . collect ();
+      assert! ( leaves . mentioner_sets_changed () . is_empty (), "{}", case );
+      assert! ( ! recorders . is_empty (), "{}", case );
+      assert_eq! ( straddle . changed_pids () . out_changed, recorders,
+                   "{}", case );
+      assert_eq! ( straddle . changed_pids () . in_changed, members,
+                   "{}", case );
+      Ok (( )) }) ?; }
   Ok (( )) }
