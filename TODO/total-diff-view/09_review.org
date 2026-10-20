@@ -1,0 +1,258 @@
+#+title: Review of the "yet more fixes" run (2026-10-20)
+#+TODO: TODO ONGOING | DONE
+
+* Verdict
+The run finished the whole of [[file:08_plan_yet-more.org][08_plan_yet-more.org]]: four slices, eight
+commits, 42 minutes (23:35 to 00:17), every slice DONE. It did what
+the plan says, and one deviation was forced by a mistake of the
+plan's own ordering, which the slice-0 agent found and repaired
+correctly. Three small things deserve a decision, listed under
+"Decide"; none is a defect in what was asked for. The agents found
+one pre-existing bug along the way, in 'ViewForest::nodes', and logged
+it.
+
+* What I checked myself
+- The suites after the run and a build check of every commit: see
+  "Results" below.
+- The history-based validation is gone: no trace of the old
+  write-protected validator, the TDV refusal, its error variant, the
+  occurrence paths, the previous-view and U parameters, or the
+  normalization that made typed children non-members. The new
+  'errors_for_writeProtected_occurrences' compares title, home
+  skgrepo, a present alias folder and a present flags folder with the
+  graph, and refuses a member child; IDs are already checked for
+  every recorder elsewhere.
+- The requests exist end to end: 'ViewRequest::WriteProtected' and
+  'WriteProtectedSubtree', the atoms 'writeProtectedView' and
+  'writeProtectedSubtreeView', their heralds, the application in
+  'visit_normal_node' before the draw rule, the refusal of both
+  requests with an editable-view request on one occurrence, and the
+  commands on C-c s w and C-c s W with their Neovim twins on 'sw' and
+  'sW'. 'skg-set-write-protected' is gone from both clients.
+- A save no longer makes occurrences editable or appends roots: in
+  'rerender_view' both run only under a flag that the new request
+  sets. The command is 'skg-tdv-show-unshown-changes' on C-c r u,
+  ':SkgTdvShowUnshownChanges' on 'ru', and the summary line names it
+  ("N changes are not shown in this view; C-c r u shows them").
+- The rename to 'ensure_editableOccurrences_exist' is done, and the
+  words "promote", "demote" and "pre-pass" appear nowhere new.
+** Results
+Rust 763 of 763 (up from 755), Emacs 366 of 366 (up from 362), Neovim
+17 of 17. All nine commits since the planning commit compile ('cargo
+check --all-targets' at each, in a throwaway worktree). The log is
+'tests/results/review9/checks.txt'.
+
+* Decide: three small things
+** DONE The command makes editable every node of U, not only of C
+The plan's behavior section says the command gives an editable
+occurrence to every node of C that lacks one; the agent reused the
+step, which works on U, and said so. The difference: a context node
+(in U, unchanged) whose only editable occurrence the user
+write-protected is made editable again by C-c r u, along with the
+changed nodes. I would accept this. The command means "show me
+everything this buffer would show if drawn afresh", and a node of U
+that is not editable is one the walk cannot pass through; restricting
+the command to C would leave changes under a write-protected context
+node unreachable. If you want C only, it is a filter on one set.
+*** DONE [Jeff] Which command?
+**** DONE [Claude] the new one, C-c r u
+'skg-tdv-show-unshown-changes' (C-c r u; Neovim ':SkgTdvShowUnshownChanges',
+'ru'), the command this run added to pull unshown changes into a TDV
+buffer. The headline should have named it. The decision itself is
+still yours: as built, it makes an editable occurrence for every node
+of U that has none, context nodes included; restricting it to C is a
+one-line filter. The next plan leaves it as built unless you say C.
+***** DONE [Jeff] agreed, accept it as is
+****** TODO [Claude] noted; nothing to build
+The command stays as built, over U, and the plan says nothing about
+it.
+** DONE Partner folders under a write-protected occurrence are no longer checked
+The plan named the alias, ID and flags folders, so the new validator
+compares those; a subscribee, overridden or hidden folder edited
+under a write-protected occurrence is now neither saved nor refused,
+and the rerender puts the graph's members back. The old comparison
+refused it. Your rule in the review was "those other collections
+must equal the graph if the view shows them", which covers these
+folders too, and the plan dropped them by my oversight. I would add
+them: a present partner folder under a write-protected occurrence
+must equal the graph's set, as the alias folder must, or the save is
+refused. A few lines in 'errors_for_writeProtected_occurrences' and
+one test.
+*** DONE [Jeff] Yes please.
+This is already the behavior for content views outside the TDV, right?
+**** DONE [Claude] it was, everywhere, until this run; the fix restores it everywhere
+The check runs on every saved buffer, content views included; it is
+not TDV-specific. Before this run, the old comparison with the last
+rendering refused an edited partner folder under a write-protected
+occurrence in every view. Slice 0 of the last plan replaced that
+comparison with the graph-based one and, following the plan's list,
+compared only the alias, ID and flags folders, so the partner folders
+went unchecked in every view at once. Slice 0 of the next plan adds
+them, and the refusal is back in every view.
+***** DONE [Jeff]
+I hope the natural path is to reuse that machinery.
+Is there a danger of redundant code paths to the same effect?
+****** TODO [Claude] the danger is real, in two forms, and the plan now names the one path
+Yes. A validator that works out for itself what a folder should hold
+would be a second copy of what the folder reconciler already works
+out, and the two would drift. The reconciler's answer is not a
+one-liner: it reads the relation in the right direction (outbound
+through 'outbound_rel_partners_for_relation_gated', inbound through
+'other_member_pids_gated'), resolves an extra ID to its node's pid,
+and omits the members a skgrepo restriction hides
+('omit_restricted_members'). A validator that skipped the last step
+would refuse every untouched buffer drawn under a restriction. So
+slice 0 of the plan now says: lift that computation out of
+'reconcile_partnerFolder_children' into one function that returns a
+node's partners in a relation from the live graph under a given
+restriction, call it from the reconciler as before, and call the same
+function from the validator, with the save's restriction. One path,
+two callers.
+
+The second form is the TDV's. A folder drawn in a TDV buffer lists
+the union of both graphs, so under a write-protected occurrence it
+can hold a member whose relationship exists only in the before-graph,
+drawn with the presence fact '(diff rel-)'. A comparison with the
+live graph alone would call that an edit. The buffer says what it is,
+so the validator counts a member child only when it carries no
+removed-relationship fact; a node that exists only in the
+before-graph is a historical phantom there, not an unrestricted
+vognode, and never counted. That keeps the validator graph-only and
+stateless, as the thread decided, without re-threading the straddle
+into the save.
+** DONE 'ViewForest::nodes' yields every root twice
+Found by the slice-0 agent and logged in 'TODO/problems.org': the
+iterator chains each root with the root's descendants, and ego-tree's
+'descendants' already begins with the node itself. Most callers
+collect into sets or set the same fact twice, so nothing visible is
+known to be wrong, but the validator reported a root's error twice
+until it walked the tree itself, and the other callers were not
+audited. The fix is one line (iterate the descendants alone) plus a
+unit test, and an audit of the callers for any that counts. I would
+do it in the next housekeeping slice, wherever that is.
+*** DONE [Jeff] Yes please.
+**** TODO [Claude] slice 1 of the next plan
+The one-line fix, a unit test that each root is yielded once, and an
+audit of every caller of 'ViewForest::nodes' for one that counts or
+reports per node; the problems entry moves to the archive with it.
+** DONE [Jeff] Let's rename these planning docs
+so they have room for 2 digits -- e.g. 01_discussion.org, 02_plan.org ...
+*** TODO [Claude] done
+The eleven documents in this directory now carry two-digit prefixes
+('01_discussion.org' to '09_review.org', with '06_1_' and '07_1_' for
+the two side documents), renamed with 'git mv' except this file,
+which was untracked. Every reference to them was updated in the same
+pass: 51 files, the planning and review documents themselves, the
+runner, the resume document, 'progress.org', the glossary, the memory
+notes, and the citations in code comments and docstrings under
+'server/', 'tests/', 'elisp/' and 'nvim/' (comment text only; no
+code line changed, which I checked). Commit messages keep the old
+names, as history does. The next plan is '10_plan_still-more.org',
+which is what the digits were for. Nothing is committed.
+* Know: what you will meet while dogfooding
+** Write-protecting is a request now, and it does not save
+C-c s w writes the request and C-c s W its subtree form; like C-c s d
+they leave saving to you, so that C-c s w on one occurrence and C-c s
+d on another can go into one save, which is how editability moves.
+The requests show the heralds 'req:write-protected' and
+'req:write-protected-subtree' until the save, and both clients cycle
+them in the viewRequests field.
+** What write-protection does to children
+The occurrence's direct children become non-members ('⊥'), keep their
+own editability and subtrees; the subtree form does the same all the
+way down. The same now holds for everything the server
+write-protects: the draw rule's subtree, and an occurrence
+write-protected because it repeats an editable one, so a pasted copy
+of an editable subtree saves and comes back write-protected with
+non-member children.
+** When editability moves back, the children are adopted
+A request on a write-protected occurrence whose non-member children
+are its content makes them members again, keeping their fold state.
+The same adoption ends the old double drawing of a content node
+parked under an editable parent.
+** What a save refuses under a write-protected occurrence
+A member child (typed there), a changed title or home skgrepo, an
+alias or flags folder that differs from the graph, and the two
+requests together with an editable-view request on one occurrence
+('WriteProtectAndEditableViewRequestsOnOneOccurrence'). Hand-editing
+'writeProtected' into a headline with drawn members is refused by the
+member rule. Nothing is normalized any more.
+** A cascaded editable-view request loses to a write-protect request
+The validator refuses the two on one occurrence when you write them;
+when the cascade hands an editable-view request to a child that
+carries your write-protect request, the write-protect request wins.
+** The TDV follows U only when you ask
+After a save, a changed node the buffer shows only as a
+write-protected leaf stays so, and the summary counts it; C-c r u
+makes it editable, appends every missing origin as a root, and
+rerenders. The command refuses on a modified buffer ("Save the buffer
+first."), outside the 'all' restriction, and on a buffer that is not
+a TDV buffer. Dropped roots now stay dropped after a save and are
+counted unshown until you ask.
+** Neovim's chord table
+Server messages that name C-c s d, C-c s w, C-c s s and C-c g RET show
+the Neovim bindings; C-c s r stays verbatim, since Neovim has no
+relRepo command.
+
+* Sound: placements and repairs, no action needed
+** Slice 0 took slice 1's drawing half, rightly
+The member-child rule refuses any write-protected occurrence that
+holds a member, and the draw rule's subtree write-protection left
+members under what it write-protected, so after any move of
+editability the next save was refused; three suites showed it. The
+plan put the two in different slices, which was my error. Slice 0
+therefore also made 'writeProtect_content_subtree' and the
+repeat-occurrence path set non-members, taught 'tag_content_members'
+to tag non-member content, and added the reconciler's adoption; slice
+1 added the requests and tested all of it.
+** Where the request is applied
+'apply_writeProtect_request' runs in 'visit_normal_node' right after
+the deletion preflight, before the budget and the draw rule read the
+occurrence's editability. The plain form is 'writeProtect_occurrence'
+plus 'make_member_children_nonMembers'; the subtree form is
+'writeProtect_content_subtree', now built on the former. The editable
+map entry is removed only when it names the occurrence being
+write-protected, so a node's editable copy elsewhere stays.
+** The save path lost its special variant
+With no previous viewforest and no U to thread, the save variant that
+took them equalled the ordinary one and is gone; the straddle refresh
+the handler did for U is gone too, since 'rerender_view' refreshes it.
+** Fixtures that disagreed with the graph
+Several tests hand-wrote write-protected headlines whose titles,
+skgrepos or members differed from the graph; they now agree with it,
+or assert the refusal.
+** The command's shape
+'rerender_view' takes a flag that only the command sets; the handler
+rerenders through the shared preparation and streams through the
+shared streaming, with a response like stage-and-commit's: the
+summary or the refusal, then the rerender stream. It appends every
+kept origin the buffer draws nowhere, as the save used to.
+** Housekeeping as asked
+The rename, the stale comment, the chord table with a test, and the
+Emacs-chords problems entry moved to the archive; the
+duplicated-children entry had already moved in slice 0.
+
+* Housekeeping
+** DONE The commit rule was followed
+Each slice's last commit carries the plan's DONE keyword, the
+'progress.org' entry and the docs it changed; every message names the
+plan document.
+** The run's own files
+'run-logs/' is untracked; 'tests/results/review9/' holds this
+review's suite outputs and per-commit log.
+** The branch
+'total-diff-view' is far ahead of 'origin/main'. Four plans are now
+done on it; after the three decisions above and a dogfood, a merge is
+the next step.
+
+* Suggested dogfood
+1. In a TDV buffer, C-c s w on an editable node with content, save:
+   the node is write-protected, its children carry '⊥' and stay
+   editable. C-c s d on it, save: the children are members again,
+   folds intact.
+2. C-c s w on V and C-c s d on W, both occurrences of one node, one
+   save: editability moves, V's children are non-members, once.
+3. From another buffer, edit a node the TDV shows as a write-protected
+   leaf, save; the summary counts one unshown; C-c r u shows it.
+4. Type a child under a write-protected headline and save: refused,
+   with the message naming C-c s d.

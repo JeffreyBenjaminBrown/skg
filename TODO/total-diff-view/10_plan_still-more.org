@@ -1,0 +1,186 @@
+#+title: Total diff view, still more fixes — execution plan
+#+TODO: TODO ONGOING | DONE
+
+* Assignment and authority
+Implement this plan. It is a complete, settled specification, and
+nothing here is open for discussion. Writing it has implemented
+nothing. It stands on its own: every term it uses is defined below or
+in 'docs/glossary.org', and the review that produced it
+([[file:09_review.org][09_review.org]]) is background that nobody needs to read; where the two
+differ, this document wins.
+
+Read [[file:../../coding-advice/ORIENTATION.org][the orientation]] and its code-change, architecture, testing and
+execution advice before starting. Preserve unrelated edits. Do not
+change branches or git configuration. Finish the agreed work and its
+verification without stopping for routine choices; stopping to ask is
+for the rare conditions that [[file:../../coding-advice/when-to-stop.org][when-to-stop.org]] describes, and this plan
+expects none. Record meaningful deviations, and any such question, in
+[[file:progress.org][progress.org]] beside this plan, under a top-level headline "Still more
+fixes" with one subheadline per slice. This plan's text stays as it
+is, except the keyword of a slice's headline. Write any log or scratch
+file of your own under 'tests/results/', never under 'TODO/'.
+
+** Commits
+Commit granularly, one or a few commits per slice, each message naming
+the slice and this document ("Slice 1 of
+TODO/total-diff-view/10_plan_still-more.org: ..."). A slice's last
+code-modifying commit also carries the slice's documentation changes
+and the change of its headline here from TODO to DONE; neither stands
+as a commit of its own. So update the docs and the keyword before
+making that last commit, and if something is left over after it,
+amend that commit ('git commit --amend'; the branch is not pushed)
+rather than adding one.
+
+** Scope
+Two small changes. The save's check of a write-protected occurrence
+against the graph gains the partner folders it was missing, in every
+view. The viewforest's node iterator stops yielding each root twice,
+and its callers are audited.
+
+** Words this plan uses
+- An occurrence of a graphnode is a viewnode that stands for it (an
+  unrestricted vognode). A buffer has at most one editable occurrence
+  of a node; the others are write-protected, and the server draws
+  nothing under a write-protected one. A member is a child viewnode
+  whose 'affectsParent' is true; a non-member has it false.
+- A partner folder is a child of an occurrence that lists the node's
+  partners in one relation: the subscribee, overridden, hidden,
+  subscriber, overrider, hider, container, mentioner, acquired and
+  acquired-by folders ('PartnerFolder' in 'server/types/viewnode.rs').
+  The subscribee and overridden folders are editable sets
+  ('FolderPolicy::EditableSet': the user edits the relation by editing
+  the folder); the others are write-protected sets the server
+  generates. An absent folder expresses no opinion; a present one is
+  the folder's full set.
+- The write-protected-occurrence check is
+  'errors_for_writeProtected_occurrences'
+  ('server/from_text/write_protected_edits.rs'), run by the save on
+  every buffer. Today it refuses a save when a write-protected
+  occurrence's title or home skgrepo differs from the graph, when a
+  present alias folder or flags folder under it differs, or when it
+  holds a member child; it does not look at partner folders.
+- The folder reconciler ('reconcile_partnerFolder_children',
+  'server/update_buffer/reconcile/partner_folder.rs') computes, for a
+  folder under a node (the recorder), the members the folder should
+  hold from the live graph: outbound relations through
+  'outbound_rel_partners_for_relation_gated', inbound ones through
+  'other_member_pids_gated', each extra ID resolved to its node's pid
+  ('pid_of'), and the members a skgrepo restriction hides omitted
+  ('omit_restricted_members'). In a TDV buffer it draws instead from
+  the straddle, the union of both graphs, and a member whose
+  relationship exists only in the before-graph is drawn with the
+  presence fact '(diff rel-)'; a node that exists only in the
+  before-graph is drawn as a historical phantom, not an unrestricted
+  vognode.
+- 'ViewForest::nodes' ('server/types/tree/forest.rs') iterates every
+  viewnode of a buffer. It chains each root with the root's
+  descendants, and ego-tree's 'descendants' begins with the node
+  itself, so each root comes out twice.
+
+* Agreed behavior
+** A present partner folder under a write-protected occurrence must equal the graph
+For every write-protected occurrence of a saved buffer, every partner
+folder present under it lists exactly the node's partners in that
+relation as the graph has them, compared as a set of node IDs, or the
+save is refused as an edit to a write-protected occurrence, naming
+the node and the folder. An absent folder expresses no opinion. This
+holds in every view, as the rest of the check does; it restores what
+the comparison with the last rendering refused before the previous
+plan replaced it.
+
+The expected set is computed by one function, shared with the folder
+reconciler: what the reconciler now computes inline for the live
+graph is lifted into a function that takes the graph, the recorder,
+the folder kind and the skgrepo restriction, and both the reconciler
+and the validator call it, the validator with the save's restriction.
+The validator never re-derives a folder's members by itself.
+
+The members the validator compares are the folder's unrestricted
+vognode children with 'affectsParent' true that carry no
+removed-relationship presence fact ('(diff rel-)'), plus its Unknown
+phantom children by their raw ID, as the reconciler matches them.
+Non-member children, historical phantoms and members marked removed
+are not counted, so a TDV buffer that shows a removed partner under a
+write-protected occurrence is not refused for showing it.
+** Every viewnode is yielded once
+'ViewForest::nodes' yields each viewnode of the buffer exactly once,
+roots included. Callers that counted on nothing keep working; a
+caller that reported or counted a root twice stops doing so.
+
+* Code map
+- 'server/from_text/write_protected_edits.rs'
+  ('errors_for_writeProtected_occurrences', its helpers for the alias
+  and flags folders), 'server/from_text.rs' (the call, where the
+  save's 'skgrepo_restriction' is in scope),
+  'server/update_buffer/reconcile/partner_folder.rs'
+  ('reconcile_partnerFolder_children': the inline goal computation
+  between 'raw_outbound_members' and 'graph_members', 'live_member_skgid'),
+  'server/dbs/in_rust_graph/' ('outbound_rel_partners_for_relation_gated',
+  'other_member_pids_gated', 'pid_of'), 'omit_restricted_members',
+  'server/types/viewnode.rs' ('PartnerFolder', 'FolderPolicy',
+  'relation_member_role', 'DiffPresence'), 'server/types/errors.rs'
+  and 'server/types/save.rs' ('EditedWriteProtectedOccurrence'),
+  'tests/new/buffer_to_viewnodes/validate_tree.rs', 'tests/pcsvf/' (a
+  TDV fixture with a removed partner) and the unit tests in
+  'write_protected_edits.rs'.
+- 'server/types/tree/forest.rs' ('ViewForest::nodes'), every caller
+  (grep 'nodes ()' on a 'ViewForest' under 'server/' and 'tests/';
+  'TODO/problems.org' names 'server/pcsvf.rs', 'server/from_text/fork.rs'
+  and 'server/serve/handlers/save_dependencies/mod.rs' as unaudited),
+  the entry "'ViewForest::nodes' yields every root twice" in
+  'TODO/problems.org', and 'TODO/DONE/problems.org'.
+
+* Implementation sequence
+Each slice ends with the three suites passing ('cargo nextest run',
+'bash/emacs-tests.sh', 'bash/nvim-tests.sh'), its docs updated, and
+its last commit made as the Commits section says.
+
+** Slice 0: partner folders join the write-protected-occurrence check
+First, in 'reconcile_partnerFolder_children', lift the live-graph goal
+computation (from 'raw_outbound_members' through 'graph_members',
+including 'omit_restricted_members') into a function in the same
+module, 'partnerFolder_members_in_graph (graph_snap, runtime,
+recorder_pid, kind, skgrepo_restriction) -> Vec<ID>', and call it from
+the reconciler; the suites must pass unchanged after this step alone.
+Then, in 'errors_for_writeProtected_occurrences', which gains the
+save's 'skgrepo_restriction' from its caller in 'server/from_text.rs':
+for each write-protected occurrence, for each partner folder present
+among its children whose kind has a relation member role, read the
+folder's members as the behavior section defines them (members with
+no removed-relationship presence fact, plus Unknown phantoms by raw
+ID), call 'partnerFolder_members_in_graph' with the same restriction,
+compare as sets, and on a difference push 'EditedWriteProtectedOccurrence'
+with the change named ("changed subscriptions", "changed overrides",
+"changed containers", and so on, one phrase per folder kind). A
+folder member carrying a relRepo request counts as a difference, as
+an alias does. The hidden-in and hidden-outside subscribee folders
+have no relation member role and are not checked. Docs: the sentence
+in 'docs/api-and-formats.org' and the glossary's "editable,
+write-protected" entry that list what a save refuses under a
+write-protected occurrence name the partner folders too. Tests, in
+'tests/new/buffer_to_viewnodes/validate_tree.rs' or beside the
+function: a subscribee folder with an extra member under a
+write-protected occurrence is refused, in a content view and in a
+TDV buffer; one that matches passes; an absent folder passes; a
+container folder (a write-protected set) that differs is refused the
+same way; under a skgrepo restriction, a folder drawn without the
+hidden members passes; and in 'tests/pcsvf/', a TDV buffer whose
+write-protected occurrence shows a removed partner with '(diff
+rel-)' saves unchanged.
+
+** Slice 1: 'ViewForest::nodes' yields each root once
+Make 'nodes' iterate each root's descendants alone, since
+'descendants' includes the root. Add a unit test that a forest of two
+roots with children yields every viewnode exactly once. Audit every
+caller for behavior that the double yield hid or that the fix
+changes: one that counts, reports per node, or appends per node; fix
+what you find in the same slice and record it in 'progress.org'. Move
+the entry from 'TODO/problems.org' to the top of
+'TODO/DONE/problems.org' with one line naming this slice.
+
+* Verification and completion
+'cargo nextest run', 'bash/emacs-tests.sh' and 'bash/nvim-tests.sh'
+after every slice; 'bash/integration-tests.sh' after slice 1 (the
+'import-md-and-org' test fails at baseline, as 'TODO/problems.org'
+records). Done when both slices are committed, every suite passes,
+and the problems entry is archived.
