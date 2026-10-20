@@ -12,9 +12,9 @@
 /// - A goal child is a child Viewnode whose UnrestrictedVognode ID appears in
 ///   that `goal_list`, whether it already existed in the buffer or
 ///   was created during reconciliation.
-/// - A relevant child is one this reconciliation pass is allowed to
+/// - A managed child is one this reconciliation pass is allowed to
 ///   manage: for PartnerFolders, an UnrestrictedVognode marked affectsParent=true.
-///   Relevant children whose IDs are not in the goal list are removed
+///   Managed children whose IDs are not in the goal list are removed
 ///   or otherwise demoted by the caller-specific cleanup step.
 /// - `ChildData` is the pre-fetched title/repo metadata
 ///   needed to create any missing goal child without querying while
@@ -26,7 +26,7 @@ use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::to_org::render::fresh_drawing::{
   adopt_fresh_facts, is_unrestricted_removed_member};
 use crate::types::viewnode::{ChangeFacts, DiffPresence, Editability, Phantom, ViewRequest, Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
-use crate::update_buffer::util::{complete_relevant_children_in_viewforest, RepairSummary};
+use crate::update_buffer::util::{complete_managed_children_in_viewforest, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
@@ -52,7 +52,7 @@ pub struct ChildData {
 pub struct FolderGoalItem {
   pub skgid    : ID,
   /// The presence of its node and of its relationship to the
-  /// folder's anchor, when the folder draws the union of a graph
+  /// folder's viewparent, when the folder draws the union of a graph
   /// straddle; None from the live graph.
   pub presence : Option<DiffPresence>,
   pub shape    : FolderGoalShape,
@@ -103,7 +103,7 @@ fn goal_matchable_skgid (
     _ => None, }}
 
 /// Build a map from child ID to ChildData for the create-child
-/// closure of `complete_relevant_children_in_viewforest`, for every
+/// closure of `complete_managed_children_in_viewforest`, for every
 /// goal item but a historical phantom.
 /// The sharing completers build this before mutation so their flow
 /// stays explicit: read tree and graph facts, compute the goal list,
@@ -177,8 +177,8 @@ pub fn build_child_data (
 /// (SubscribeeFolder, HiddenInSubscribeeFolder,
 /// HiddenOutsideOfSubscribeeFolder) share the same call shape: build
 /// per-child data before mutation, then call
-/// `complete_relevant_children_in_viewforest` with identical
-/// relevance/key/create closures. A member with an unknown ChildData
+/// `complete_managed_children_in_viewforest` with identical
+/// managed/key/create closures. A member with an unknown ChildData
 /// entry produces an unknown phantom; any other, a write-protected
 /// viewnode marked AffectsParent::True. An item with another shape
 /// is drawn as its shape says, and matches an existing child of the
@@ -213,16 +213,16 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
   normalize_relationship_backed_partner_unknowns (
     tree, folder_node, child_data, deleted_by_this_save_extra_ids ) ?;
   let summary : RepairSummary<ID> =
-    complete_relevant_children_in_viewforest (
+    complete_managed_children_in_viewforest (
     tree, folder_node,
-    // A RestrictedVognode child is IRRELEVANT
+    // A RestrictedVognode child is UNMANAGED
     // (TODO/DONE/full-schema/DONE/9-2_source-set-safety.org): the goal omits
     // every restricted member, and a retained placeholder already in the
-    // folder survives as an irrelevant child (preserved as-is, not
+    // folder survives as an unmanaged child (preserved as-is, not
     // goal-matched), so it needs no id.
     |vn : &Viewnode| goal_matchable_skgid (vn) . is_some (),
     |vn : &Viewnode| goal_matchable_skgid (vn) . ok_or_else ( || format! (
-      "{}: relevant child not a normal graphnode", label )),
+      "{}: managed child not a normal graphnode", label )),
     &goal_skgids,
     |skgid : &ID| {
       let item : &FolderGoalItem = items_by_skgid . get (skgid) . ok_or_else (

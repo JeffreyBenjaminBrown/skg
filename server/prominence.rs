@@ -290,7 +290,7 @@ pub fn extend_regions_for_cycles (
     let start : ID = // picks a random node
       uncovered . iter () . next () . unwrap () . clone ();
     let ( _path, cycle_members ) : ( Vec<ID>, HashSet<ID> ) =
-      climb_containerward_to_cycle (&start, map_to_containers);
+      climb_containerward_to_content_origins (&start, map_to_containers);
     for cm in &cycle_members {
       if origins . get (cm) != Some (&ProminenceSource::Root) {
         // This should never execute: We already handled Roots and MultiContained, so each cycle member should be contained exactly once.
@@ -336,24 +336,27 @@ pub fn extend_region (
           next_frontier . push (child . clone ()); }} }
     frontier = next_frontier; } }
 
-/// Climb containerward from `start` until revisiting a node.
-/// Returns the full path walked and the set of cycle members
-/// (empty if a degenerate dead end is reached).
-fn climb_containerward_to_cycle (
+/// 'climb_containerward_to_content_origins_via', with each node's
+/// containers from 'map_to_containers'. Prominence calls it only once
+/// roots and multiply-contained nodes have their regions, so the
+/// content origins it returns are the members of a rootlike cycle.
+fn climb_containerward_to_content_origins (
   start             : &ID,
   map_to_containers : &MapToContainers,
 ) -> ( Vec<ID>, HashSet<ID> ) {
-  climb_containerward_to_cycle_via (
+  climb_containerward_to_content_origins_via (
     &|skgid : &ID| map_to_containers . get (skgid)
       . cloned () . unwrap_or_default (),
     start ) }
 
-/// 'climb_containerward_to_cycle', with each node's distinct
-/// containers from 'containers_of'. The climb follows single
-/// containers, so it stops at the first content origin: a node with
-/// no container or several (returned alone as the "cycle"), or the
-/// members of a rootlike cycle.
-pub fn climb_containerward_to_cycle_via (
+/// Climb containerward from 'start', with each node's distinct
+/// containers from 'containers_of', following single containers until
+/// the climb reaches content origins. Returns '(path, content_origins)':
+/// 'path' is every node walked, 'start' first, and 'content_origins'
+/// takes one of two shapes:
+/// - one node, which has no container or several;
+/// - the members of a rootlike cycle, when the climb revisits a node.
+pub fn climb_containerward_to_content_origins_via (
   containers_of : &dyn Fn (&ID) -> Vec<ID>,
   start         : &ID,
 ) -> ( Vec<ID>, HashSet<ID> ) {
@@ -373,10 +376,10 @@ pub fn climb_containerward_to_cycle_via (
         . position ( // returns the first match
           |skgid| skgid == container )
         . unwrap ();
-      let cycle_members : HashSet<ID> =
+      let content_origins : HashSet<ID> = // the rootlike cycle's members
         path [cycle_start_idx ..] . iter ()
         . cloned () . collect ();
-      return ( path, cycle_members );
+      return ( path, content_origins );
     } else {
       path . push (container . clone ());
       path_set . insert (container . clone ());

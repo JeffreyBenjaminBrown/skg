@@ -56,37 +56,37 @@ pub enum Birth {
 pub struct ChangeFacts {
   pub presence : DiffPresence,
   /// None when nothing is ready. 'Some' of an empty set is the bare
-  /// '(ready)' of a leaf with a single axis.
-  pub ready    : Option<BTreeSet<ReadinessAxis>>,
+  /// '(ready)' of a leaf with a single object.
+  pub ready    : Option<BTreeSet<DiffObject>>,
 }
 
 /// The '(diff ATOMS)' of a viewnode, from 'node+ node- rel+ rel-'.
-/// None on an axis means the node (or relationship) is in both
-/// graphs of the straddle, or that the axis does not apply.
+/// None on an object means the node (or relationship) is in both
+/// graphs of the straddle, or that the object does not apply.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DiffPresence {
   pub node : Option<Sign>,
   pub rel  : Option<Sign>,
 }
 
-/// The axes of a viewnode's change-forest leaves: 'node' (the node's
+/// The diff objects of a viewnode's change-forest leaves: 'node' (the node's
 /// own existence), 'rel' (its relationship to its viewparent), and,
 /// in a request only, 'all' (every leaf of an aggregate, one level
 /// down).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum ReadinessAxis {
+pub enum DiffObject {
   Node,
   Rel,
   All,
 }
 
-/// '(readyRequest AXES)' or '(unreadyRequest AXES)': save intent that
+/// '(readyRequest OBJECTS)' or '(unreadyRequest OBJECTS)': save intent that
 /// sets or clears the commit-readiness marks of the viewnode's
-/// leaves on those axes. No axes means the viewnode's only leaf.
+/// leaves on those objects. No objects means the viewnode's only leaf.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReadinessRequest {
-  pub ready : bool, // true for readyRequest, false for unreadyRequest
-  pub axes  : BTreeSet<ReadinessAxis>,
+  pub ready   : bool, // true for readyRequest, false for unreadyRequest
+  pub objects : BTreeSet<DiffObject>,
 }
 
 //
@@ -249,7 +249,7 @@ pub struct PhantomHistorical {
 ///
 /// Being dataless, it is save-inert everywhere: it emits no save intention
 /// (its membership is owned by disk supplementation), is not a collateral
-/// pid, is irrelevant to every reconciler (preserved as-is, never
+/// pid, is unmanaged by every reconciler (preserved as-is, never
 /// goal-matched), and renders as the bare atom 'restrictedNode'.
 #[derive( Debug, Clone, PartialEq )]
 pub struct RestrictedVognode;
@@ -866,7 +866,7 @@ impl Phantom {
 }
 
 impl DiffPresence {
-  /// The '(diff ...)' atoms, the node axis first.
+  /// The '(diff ...)' atoms, the node object first.
   pub fn atoms (
     &self,
   ) -> Vec<&'static str> {
@@ -881,23 +881,23 @@ impl DiffPresence {
     [ "node+", "node-", "rel+", "rel-" ];
 }
 
-impl ReadinessAxis {
-  pub const ALL : [ReadinessAxis; 3] =
-    [ ReadinessAxis::Node, ReadinessAxis::Rel, ReadinessAxis::All ];
+impl DiffObject {
+  pub const ALL : [DiffObject; 3] =
+    [ DiffObject::Node, DiffObject::Rel, DiffObject::All ];
 
   pub fn wire_name (
     self,
   ) -> &'static str {
     match self {
-      ReadinessAxis::Node => "node",
-      ReadinessAxis::Rel  => "rel",
-      ReadinessAxis::All  => "all", } }
+      DiffObject::Node => "node",
+      DiffObject::Rel  => "rel",
+      DiffObject::All  => "all", } }
 
   pub fn from_wire_name (
     s : &str,
-  ) -> Option<ReadinessAxis> {
-    ReadinessAxis::ALL . into_iter ()
-      . find ( |axis| axis . wire_name () == s ) }
+  ) -> Option<DiffObject> {
+    DiffObject::ALL . into_iter ()
+      . find ( |object| object . wire_name () == s ) }
 }
 
 impl ReadinessRequest {

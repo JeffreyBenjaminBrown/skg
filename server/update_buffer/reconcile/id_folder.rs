@@ -6,7 +6,7 @@ use crate::types::tree::generic::error_unless_node_satisfies;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
 use crate::types::viewnode::{ChangeFacts, PropertyFolder, Property};
-use crate::update_buffer::util::complete_relevant_children_in_viewforest;
+use crate::update_buffer::util::complete_managed_children_in_viewforest;
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
 
@@ -17,7 +17,7 @@ use std::error::Error;
 /// - Verify its parent is an UnrestrictedVognode
 /// - Fetch the corresponding Graphnode from the map
 /// - Read its IDs into a goal list
-/// - Reconcile children via complete_relevant_children_in_viewforest
+/// - Reconcile children via complete_managed_children_in_viewforest
 pub fn reconcile_idFolder_children (
   idfolder_treeid : NodeId,
   tree            : &mut Tree<Viewnode>,
@@ -50,7 +50,7 @@ pub fn reconcile_idFolder_children (
     |viewnode| match &viewnode . kind {
       ViewnodeKind::Property (Property::ID { skgid, .. } ) =>
         Ok ( skgid . clone() ),
-      _ => Err ( "reconcile_idFolder_children: relevant child is not an ID property"
+      _ => Err ( "reconcile_idFolder_children: managed child is not an ID property"
                  . to_string() ), };
   let create_skgid = |skgid: &ID| -> Result<Viewnode, String> {
     Ok ( Viewnode {
@@ -62,7 +62,7 @@ pub fn reconcile_idFolder_children (
           skgid: skgid . clone(),
           change_facts: ChangeFacts::default (),
           readiness_request: None } ) } ) };
-  complete_relevant_children_in_viewforest(
+  complete_managed_children_in_viewforest(
     tree,
     idfolder_treeid,
     is_skgid,

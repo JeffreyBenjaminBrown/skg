@@ -4,11 +4,12 @@
 //!
 //! C is the set of changed graphnodes. R is the set of content
 //! origins reached from C by walking containerward through the union
-//! of the graph straddle; U is R, C and every node on those walks; D is R
-//! minus the origins that another kept origin reaches containerward
-//! inside U. The view unfolds contentward from each d in D: a node in
-//! U is drawn editable with its whole content list, a member outside
-//! U is a write-protected leaf. View completion does the drawing, its
+//! of the graph straddle; U is R, C and every node on those walks; D
+//! is R minus the content origins that another kept content origin
+//! reaches containerward inside U. The view unfolds contentward from
+//! each d in D: a node in U is drawn editable with its whole content
+//! list, a member outside U is a write-protected member drawn without
+//! its content. View completion does the drawing, its
 //! 'diffView_source' set ('process_unrestrictedVognode_changes').
 //!
 //! The merges and skgrepo-changes buffers draw PCSVFs over subsets of
@@ -18,7 +19,7 @@
 
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::prominence::climb_containerward_to_cycle_via;
+use crate::prominence::climb_containerward_to_content_origins_via;
 use crate::readiness_store::ReadinessStore;
 use crate::serve::handlers::readiness_requests::set_ready_facts_in_viewforest;
 use crate::to_org::render::change_viewnodes::mk_historical_viewnode;
@@ -79,13 +80,13 @@ pub fn pcsvf_sets_over (
   let mut r : BTreeSet<ID> = BTreeSet::new ();
   let mut u : BTreeSet<ID> = c . clone ();
   for changed in &c {
-    let (walk, origins) : (Vec<ID>, HashSet<ID>) =
-      climb_containerward_to_cycle_via (&containers_of, changed);
+    let (walk, content_origins) : (Vec<ID>, HashSet<ID>) =
+      climb_containerward_to_content_origins_via (&containers_of, changed);
     u . extend (walk);
-    r . extend (origins); }
+    r . extend (content_origins); }
   u . extend ( r . iter () . cloned () );
   let d : BTreeSet<ID> =
-    kept_origins (&r, &u, &containers_of, &BTreeSet::new ());
+    kept_content_origins (&r, &u, &containers_of, &BTreeSet::new ());
   PcsvfSets { c, r, u, d } }
 
 /// The sets of the merges buffer's PCSVF, over the nodes involved in
@@ -125,22 +126,23 @@ pub fn union_containers (
     . map ( |partner| partner . id )
     . collect () }
 
-/// D: process R sorted by ID; discard each origin whose containerward
-/// walk within U reaches an origin still kept. Of two origins on a
-/// shared cycle, exactly one is kept. The 'pinned' nodes (a buffer's
-/// standing roots, at a rerender) are kept before the rest is
-/// processed, and never discarded; those not in R are not returned.
-fn kept_origins (
+/// D: process R sorted by ID; discard each content origin whose
+/// containerward walk within U reaches a content origin still kept. Of
+/// two content origins on a shared cycle, exactly one is kept. The
+/// 'pinned' nodes (a buffer's standing roots, at a rerender) are kept
+/// before the rest is processed, and never discarded; those not in R
+/// are not returned.
+fn kept_content_origins (
   r             : &BTreeSet<ID>,
   u             : &BTreeSet<ID>,
   containers_of : &dyn Fn (&ID) -> Vec<ID>,
   pinned        : &BTreeSet<ID>,
 ) -> BTreeSet<ID> {
   let mut kept : BTreeSet<ID> = r . union (pinned) . cloned () . collect ();
-  for origin in r . difference (pinned) {
-    let reaches_a_kept_origin : bool = {
-      let mut seen : HashSet<ID> = HashSet::from ([ origin . clone () ]);
-      let mut frontier : Vec<ID> = vec! [ origin . clone () ];
+  for content_origin in r . difference (pinned) {
+    let reaches_a_kept_content_origin : bool = {
+      let mut seen : HashSet<ID> = HashSet::from ([ content_origin . clone () ]);
+      let mut frontier : Vec<ID> = vec! [ content_origin . clone () ];
       let mut found : bool = false;
       while let Some (current) = frontier . pop () {
         for container in containers_of (&current) {
@@ -151,8 +153,8 @@ fn kept_origins (
           frontier . push (container); }
         if found { break; }}
       found };
-    if reaches_a_kept_origin {
-      kept . remove (origin); }}
+    if reaches_a_kept_content_origin {
+      kept . remove (content_origin); }}
   kept . intersection (r) . cloned () . collect () }
 
 /// The buffer 'drawing' names, with roots 'roots' (for a PCSVF, its
@@ -326,7 +328,7 @@ fn append_stub_root (
         kind : ViewnodeKind::PartnerFolder (PartnerFolder::Container) } ); }
   Ok (root_treeid) }
 
-/// The origins of the buffer's fresh D that no viewnode in it draws,
+/// The content origins of the buffer's fresh D that no viewnode in it draws,
 /// in ID order. The fresh R is deduplicated with the buffer's
 /// 'standing_roots' pinned as kept, so that a change to a rootlike
 /// cycle's membership never adds a second root for a cycle that
@@ -340,25 +342,25 @@ pub fn contentOrigins_missing_from_buffer (
   let containers_of = |skgid : &ID| -> Vec<ID> {
     union_containers (drawing . straddle, skgid) };
   let drawn : HashSet<ID> = nodes_editable_in_diffView (viewforest);
-  kept_origins (&sets . r, &sets . u, &containers_of, standing_roots)
+  kept_content_origins (&sets . r, &sets . u, &containers_of, standing_roots)
     . into_iter ()
-    . filter ( |origin| ! drawn . contains (origin)
-                        && ! standing_roots . contains (origin) )
+    . filter ( |content_origin| ! drawn . contains (content_origin)
+                                && ! standing_roots . contains (content_origin) )
     . collect () }
 
-/// Append 'origins' at the end of the buffer, each drawn as the first
+/// Append 'content_origins' at the end of the buffer, each drawn as the first
 /// drawing draws a root ('append_stub_root'), for view completion to
 /// complete. Returns their treeids.
 pub fn append_contentOrigins_to_buffer (
-  runtime    : &RuntimeGeneration,
-  drawing    : DiffViewSource,
-  viewforest : &mut ViewForest,
-  origins    : &[ID],
+  runtime         : &RuntimeGeneration,
+  drawing         : DiffViewSource,
+  viewforest      : &mut ViewForest,
+  content_origins : &[ID],
 ) -> Result<Vec<NodeId>, Box<dyn Error>> {
   let mut stub_editable_map : EditableMap = EditableMap::new ();
-  origins . iter ()
-    . map ( |origin| append_stub_root (
-      runtime, drawing, viewforest, origin, &mut stub_editable_map ) )
+  content_origins . iter ()
+    . map ( |content_origin| append_stub_root (
+      runtime, drawing, viewforest, content_origin, &mut stub_editable_map ) )
     . collect () }
 
 /// The IDs of the buffer's roots, whatever kind of vognode each is.

@@ -99,7 +99,8 @@ pub fn stage_and_commit (
     &mut views_state . graph_straddle, &runtime . config,
     runtime . graph . clone () ) {
     Ok (straddle) => straddle,
-    Err (e) => return StageAndCommitAnswer::Refused (e), };
+    Err (e) => return StageAndCommitAnswer::Refused ( format! (
+      "Cannot stage and commit: {}", e )), };
   { let store : MutexGuard<ReadinessStore> = lock_store (env);
     let summary : ReadinessSummary =
       straddle . change_leaves () . readiness_summary (&store);

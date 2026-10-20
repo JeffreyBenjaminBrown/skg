@@ -3,7 +3,7 @@
 ;;; Opens two buffers over a containment cycle (a contains b, b contains a),
 ;;; removes 'a' from b's children and saves. The collateral a-view should
 ;;; lose the now-stale write-protected 'a' underneath 'b', because
-;;; complete_relevant_children discards children not in the parent's goal_list.
+;;; complete_managed_children discards children not in the parent's goal_list.
 ;;;
 ;;; This test does NOT exercise DeletedNode — no nodes are deleted from disk,
 ;;; only a containment relationship is modified.

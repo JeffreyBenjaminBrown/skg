@@ -22,7 +22,7 @@ use crate::types::tree::viewnode_graphnode::{
     write_at_unrestrictedVognode_in_tree};
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::util::{
-    complete_relevant_children_in_viewforest,
+    complete_managed_children_in_viewforest,
     partition_children,
     treat_certain_children};
 
@@ -235,7 +235,7 @@ fn reconcile_content_children (
     // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: rendering omits every
     // restricted member from the goal (the weave preserves them at save).
     // A retained restricted vognode already in the tree survives
-    // anyway -- it is irrelevant to this reconciler, not goal-matched.
+    // anyway -- it is unmanaged by this reconciler, not goal-matched.
     omit_restricted_members (
       apparent_content_skgids, skgrepo_restriction,
       |skgid : &ID| graph_snap . pid_and_skgrepo (skgid)
@@ -596,7 +596,7 @@ fn complete_content_children (
     deleted_by_this_save_extra_ids ) ?;
   // The RepairSummary is dropped: content is not a generated
   // folder, so its reconciliation is not a "repair" to warn about.
-  complete_relevant_children_in_viewforest(
+  complete_managed_children_in_viewforest(
     tree, node,
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
@@ -606,7 +606,7 @@ fn complete_content_children (
         // its raw ID so a rerender retains one placeholder rather than
         // appending another one for the same dangling relationship.
         => true,
-      // A RestrictedVognode is IRRELEVANT: never matched against the goal
+      // A RestrictedVognode is UNMANAGED: never matched against the goal
       // list, so it is preserved as-is (a retained placeholder hosting
       // already-drawn unrestricted descendants) and needs no id. The goal
       // omits every restricted member (omit_restricted_members), so it is
@@ -623,7 +623,7 @@ fn complete_content_children (
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u)))
         => Ok ( u . skgid . clone() ),
       _ => Err(
-        "complete_content_children: relevant child had no content ID"
+        "complete_content_children: managed child had no content ID"
         . to_string() ) },
     goal_list,
     |skgid : &ID| {
@@ -784,7 +784,7 @@ fn order_children_as_non_vognodes_then_ignored_then_content (
 /// that is, by the closure that creates children,
 /// This way the closure captures only owned/pre-computed data
 /// and does not conflict with the &mut tree borrow
-/// in complete_relevant_children_in_viewforest.
+/// in complete_managed_children_in_viewforest.
 fn build_child_creation_data (
   tree               : &Tree<Viewnode>,
   node               : NodeId,
@@ -823,7 +823,7 @@ fn build_child_creation_data (
   for skgid in goal_list {
     if result . contains_key (skgid) { continue; }
     // Skip IDs already present as children in the viewnode tree.
-    // 'complete_relevant_children_in_viewforest' only needs
+    // 'complete_managed_children_in_viewforest' only needs
     // ChildData for children it creates from scratch; existing
     // children keep their in-tree state. Eagerly reading disk for
     // every goal_list ID would fail (ENOENT) for children that

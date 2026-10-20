@@ -6,7 +6,7 @@ use crate::types::viewnode::{Viewnode, ViewnodeKind, AffectsParent};
 use crate::types::viewnode::{ChangeFacts, Vognode, PropertyFolder, Property};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
-use crate::update_buffer::util::{complete_relevant_children_in_viewforest, treat_certain_children};
+use crate::update_buffer::util::{complete_managed_children_in_viewforest, treat_certain_children};
 use ego_tree::{NodeId, Tree};
 use std::collections::HashMap;
 use std::error::Error;
@@ -57,15 +57,15 @@ pub fn reconcile_aliasFolder_children (
   let goal_list : Vec<String> =
     members_of ( parent_graphnode . aliases . or_default() );
   let is_alias : fn (&Viewnode) -> bool =
-    // relevance to complete_relevant_children
+    // managedness for complete_managed_children
     |viewnode| matches!( &viewnode . kind,
                         ViewnodeKind::Property (Property::Alias { .. } ) );
   let view_alias_text : fn (&Viewnode) -> Result<String, String> =
     |viewnode| match &viewnode . kind {
       ViewnodeKind::Property (Property::Alias { text, .. } ) =>
         Ok ( text . clone() ),
-      _ => Err ( "reconcile_aliasFolder_children: relevant child is not an alias"
-                 . to_string() ), }; // relevance means Property::Alias
+      _ => Err ( "reconcile_aliasFolder_children: managed child is not an alias"
+                 . to_string() ), }; // managed means Property::Alias
   let create_alias = |text: &String| -> Result<Viewnode, String> {
     Ok ( Viewnode {
       focused         : false,
@@ -80,7 +80,7 @@ pub fn reconcile_aliasFolder_children (
                                                relRepo_request : None,
                                                change_facts : ChangeFacts::default (),
                                                readiness_request : None } ), })};
-  complete_relevant_children_in_viewforest(
+  complete_managed_children_in_viewforest(
     tree,
     aliasfolder_treeid,
     is_alias,

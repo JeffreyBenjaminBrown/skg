@@ -9,21 +9,21 @@ use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffPresence, PartnerFolder, Phantom,
-  PhantomHistorical, Property, ReadinessAxis, ReadinessRequest, Viewnode,
+  PhantomHistorical, Property, DiffObject, ReadinessRequest, Viewnode,
   ViewnodeKind, Vognode};
 
 use std::collections::{BTreeSet, HashMap};
 
 fn ready (
-  axes : &[ReadinessAxis],
+  objects : &[DiffObject],
 ) -> ChangeFacts {
   ChangeFacts { presence : DiffPresence::default (),
-                ready    : Some ( axes . iter () . copied () . collect () ) } }
+                ready    : Some ( objects . iter () . copied () . collect () ) } }
 
 fn request_all () -> Option<ReadinessRequest> {
   Some ( ReadinessRequest {
-    ready : true,
-    axes  : [ ReadinessAxis::All ] . into_iter () . collect::<BTreeSet<_>> () } ) }
+    ready   : true,
+    objects : [ DiffObject::All ] . into_iter () . collect::<BTreeSet<_>> () } ) }
 
 fn viewnode (
   kind : ViewnodeKind,
@@ -126,7 +126,7 @@ fn a_historical_phantom_round_trips () {
         change_facts : ChangeFacts {
           presence : DiffPresence { node : Some (Sign::Minus),
                                     rel  : Some (Sign::Minus) },
-          ready    : Some ( [ ReadinessAxis::Node ] . into_iter () . collect () ) },
+          ready    : Some ( [ DiffObject::Node ] . into_iter () . collect () ) },
         readiness_request : request_all () } )))),
     "(historical (id gone) (repo main) (diff node- rel-) (ready node) (readyRequest all))" ); }
 

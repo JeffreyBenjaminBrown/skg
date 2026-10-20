@@ -53,7 +53,8 @@ pub fn handle_total_diff_view_request (
           "Unknown total diff view buffer: {}", buffer_name )) ?;
       let straddle : Arc<GraphStraddle> = current_graph_straddle_in_slot (
         &mut views_state . graph_straddle, &runtime . config,
-        runtime . graph . clone () ) ?;
+        runtime . graph . clone () )
+        . map_err ( |e| format! ( "Cannot open the diff view: {}", e )) ?;
       let store : MutexGuard<ReadinessStore> =
         env . runtime . readiness_store . lock ()
         . unwrap_or_else ( |poisoned| poisoned . into_inner () );

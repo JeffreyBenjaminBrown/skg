@@ -17,7 +17,7 @@ use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ChangeFacts, ChangesetMarkerKind, Phantom, Property, ReadinessAxis,
+  ChangeFacts, ChangesetMarkerKind, Phantom, Property, DiffObject,
   ReadinessRequest, Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::{NodeId, NodeRef};
@@ -82,7 +82,7 @@ pub fn readiness_requests_in_viewforest (
   viewforest . root () . descendants ()
     . filter_map ( |node| {
       let request : &ReadinessRequest = readiness_request_of (node . value ()) ?;
-      let named : NamedLeaves = leaves_named_at (node, &request . axes, &pid_of) ?;
+      let named : NamedLeaves = leaves_named_at (node, &request . objects, &pid_of) ?;
       Some ( RequestedReadiness {
         ready    : request . ready,
         leaves   : named . leaves,
@@ -98,14 +98,14 @@ struct NamedLeaves {
   content_relationships_of : Vec<(ID, RelationshipAspect)>,
 }
 
-/// The leaves that a request on the axes 'axes' at 'node' names. No
-/// axes on a vognode means both of its axes (only 'rel' on an unknown
-/// phantom); a property leaf has one axis. None for a viewnode that
-/// names no leaf.
+/// The leaves that a request naming the diff objects 'objects' at
+/// 'node' names. No objects on a vognode means both of its objects
+/// (only 'rel' on an unknown phantom); a property leaf has one object.
+/// None for a viewnode that names no leaf.
 fn leaves_named_at (
-  node   : NodeRef<Viewnode>,
-  axes   : &BTreeSet<ReadinessAxis>,
-  pid_of : &dyn Fn (&ID) -> ID,
+  node    : NodeRef<Viewnode>,
+  objects : &BTreeSet<DiffObject>,
+  pid_of  : &dyn Fn (&ID) -> ID,
 ) -> Option<NamedLeaves> {
   let mut leaves : Vec<LeafKey> = Vec::new ();
   let mut all_of : Vec<ID> = Vec::new ();
@@ -116,21 +116,21 @@ fn leaves_named_at (
       let pid : ID = vognode_leaf_pid (node . value (), pid_of) ?;
       let is_unknown : bool =
         matches! (vognode, Vognode::Phantom (Phantom::Unknown (_)));
-      let axes : Vec<ReadinessAxis> =
-        if ! axes . is_empty () {
-          axes . iter () . copied () . collect ()
-        } else if is_unknown { vec! [ ReadinessAxis::Rel ] }
-        else { vec! [ ReadinessAxis::Node, ReadinessAxis::Rel ] };
-      for axis in axes {
-        match axis {
-          ReadinessAxis::Node if ! is_unknown =>
+      let objects : Vec<DiffObject> =
+        if ! objects . is_empty () {
+          objects . iter () . copied () . collect ()
+        } else if is_unknown { vec! [ DiffObject::Rel ] }
+        else { vec! [ DiffObject::Node, DiffObject::Rel ] };
+      for object in objects {
+        match object {
+          DiffObject::Node if ! is_unknown =>
             leaves . push ( LeafKey::Node {
               pid : pid . clone (), aspect : NodeAspect::Existence } ),
-          ReadinessAxis::Node => {},
-          ReadinessAxis::Rel =>
+          DiffObject::Node => {},
+          DiffObject::Rel =>
             leaves . extend ( relationship_to_viewparent (
               node, &pid, pid_of, RelationshipAspect::Existence )),
-          ReadinessAxis::All =>
+          DiffObject::All =>
             all_of . push (pid . clone ()), }} },
     ViewnodeKind::Property (property) => {
       // A folder's leaf belongs to the folder's viewparent; the
@@ -198,7 +198,7 @@ fn keys_in_forest (
     . collect () }
 
 /// Set the '(ready ...)' display fact of every viewnode that carries
-/// one, from 'store': an axis is ready when it names some leaf of
+/// one, from 'store': an object is ready when it names some leaf of
 /// 'forest' and every leaf it names is marked at its current
 /// fingerprint. The order-only marker is always ready.
 pub fn set_ready_facts_in_viewforest (
@@ -209,35 +209,35 @@ pub fn set_ready_facts_in_viewforest (
 ) {
   let pid_of = |skgid : &ID| -> ID {
     graph . pid_of (skgid) . unwrap_or_else ( || skgid . clone () ) };
-  let axis_is_ready = |node : NodeRef<Viewnode>, axes : &[ReadinessAxis]| -> bool {
+  let object_is_ready = |node : NodeRef<Viewnode>, objects : &[DiffObject]| -> bool {
     let Some (named) = leaves_named_at (
-      node, &axes . iter () . copied () . collect (), &pid_of ) else {
+      node, &objects . iter () . copied () . collect (), &pid_of ) else {
         return false; };
     let keys : Vec<LeafKey> = keys_in_forest (&named, forest);
     ! keys . is_empty () && forest . readiness_of_leaves (store, &keys) };
-  let ready_facts : Vec<(NodeId, Option<BTreeSet<ReadinessAxis>>)> =
+  let ready_facts : Vec<(NodeId, Option<BTreeSet<DiffObject>>)> =
     viewforest . root () . descendants ()
     . filter_map ( |node| {
-      let ready : Option<BTreeSet<ReadinessAxis>> =
+      let ready : Option<BTreeSet<DiffObject>> =
         match &node . value () . kind {
           ViewnodeKind::Vognode (
             Vognode::Unrestricted (_)
             | Vognode::Phantom (Phantom::Historical (_)) ) => {
-            let axes : BTreeSet<ReadinessAxis> =
-              [ ReadinessAxis::Node, ReadinessAxis::Rel ] . into_iter ()
-              . filter ( |axis| axis_is_ready (node, &[ *axis ]) )
+            let objects : BTreeSet<DiffObject> =
+              [ DiffObject::Node, DiffObject::Rel ] . into_iter ()
+              . filter ( |object| object_is_ready (node, &[ *object ]) )
               . collect ();
-            ( ! axes . is_empty () ) . then_some (axes) },
+            ( ! objects . is_empty () ) . then_some (objects) },
           ViewnodeKind::Vognode (
             Vognode::Phantom (Phantom::Deleted (_) | Phantom::Unknown (_)) ) =>
-            axis_is_ready (node, &[]) . then (BTreeSet::new),
+            object_is_ready (node, &[]) . then (BTreeSet::new),
           ViewnodeKind::Property ( Property::ChangesetMarker {
             kind : ChangesetMarkerKind::OrderOnly, .. } ) =>
             Some (BTreeSet::new ()),
           ViewnodeKind::Property (property)
             if property . readiness_request () . is_some ()
                || change_facts_of_property (property) . is_some () =>
-            axis_is_ready (node, &[]) . then (BTreeSet::new),
+            object_is_ready (node, &[]) . then (BTreeSet::new),
           _ => return None, };
       Some (( node . id (), ready )) } )
     . collect ();
@@ -342,7 +342,7 @@ fn readiness_request_of (
 
 /// The relationship by which a vognode is a member here: its
 /// viewparent's content, or the relation of the partner folder it is
-/// in, whose anchor is the folder's viewparent. None at a root, or
+/// in, between it and the folder's viewparent. None at a root, or
 /// under anything else.
 fn relationship_to_viewparent (
   node   : NodeRef<Viewnode>,
@@ -360,12 +360,12 @@ fn relationship_to_viewparent (
                    pid . clone () )),
     ViewnodeKind::PartnerFolder (folder) => {
       let role : RelationRole = folder . relation_member_role () ?;
-      let anchor : ID = vognode_leaf_pid (
+      let folder_viewparent : ID = vognode_leaf_pid (
         parent . parent () ? . value (), pid_of ) ?;
       Some ( if role . is_first_role () { // the member records it
-               key ( role . relation, pid . clone (), anchor )
+               key ( role . relation, pid . clone (), folder_viewparent )
              } else {
-               key ( role . relation, anchor, pid . clone () ) } ) },
+               key ( role . relation, folder_viewparent, pid . clone () ) } ) },
     _ => None, } }
 
 /// The ID of the vognode two levels up: the node that owns a

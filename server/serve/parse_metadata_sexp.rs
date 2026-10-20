@@ -16,9 +16,9 @@
 ///                         [(editRequest <delete | (merge ID)>)]
 ///                         [(viewRequests REQUEST...)]
 ///                         [(diff PRESENCE...)]
-///                         [(ready AXIS...)]
-///                         [(readyRequest AXIS...) | (unreadyRequest AXIS...)]))
-///   where PRESENCE is node+, node-, rel+ or rel-, and AXIS is node,
+///                         [(ready OBJECT...)]
+///                         [(readyRequest OBJECT...) | (unreadyRequest OBJECT...)]))
+///   where PRESENCE is node+, node-, rel+ or rel-, and OBJECT is node,
 ///   rel or (in a request only) all. The last three forms may also
 ///   appear in (deleted ...), (unknown ...) and (historical ...), and
 ///   at top level on an alias, id or flag property and on the total
@@ -38,7 +38,7 @@ use crate::types::errors::BufferValidationError;
 use crate::types::nodes::complete::Flag;
 use crate::types::git::Sign;
 use crate::types::viewnode::{
-  ChangeFacts, ReadinessAxis, ReadinessRequest,
+  ChangeFacts, DiffObject, ReadinessRequest,
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
   ChangesetMarkerKind, Property, PropertyFolder, PartnerFolder, PhantomDeleted,
   PhantomHistorical, RestrictedVognode, PhantomUnknown,
@@ -964,8 +964,8 @@ fn parse_viewrequests_sexp (
 
 
 /// Parse one of the total diff view's forms -- '(diff PRESENCE...)',
-/// '(ready AXIS...)', '(readyRequest AXIS...)' or
-/// '(unreadyRequest AXIS...)' -- whose head is 'key' and whose
+/// '(ready OBJECT...)', '(readyRequest OBJECT...)' or
+/// '(unreadyRequest OBJECT...)' -- whose head is 'key' and whose
 /// arguments are 'args', into 'metadata'. Each may appear once; a
 /// viewnode carries at most one readiness request.
 fn parse_change_fact_form (
@@ -986,31 +986,31 @@ fn parse_change_fact_form (
           other => return Err ( format! (
             "Unknown diff atom: {}", other )), };
         if slot . is_some () {
-          return Err ( format! ( "diff names an axis twice: {}", atom )); }
+          return Err ( format! ( "diff names an object twice: {}", atom )); }
         *slot = Some ( if atom . ends_with ('+') { Sign::Plus }
                        else { Sign::Minus } ); }},
     "ready" => {
       if metadata . change_facts . ready . is_some () {
         return Err ( "ready may appear only once" . to_string () ); }
-      let axes : BTreeSet<ReadinessAxis> =
-        readiness_axes_from_atoms (&atoms) ?;
-      if axes . contains (&ReadinessAxis::All) {
-        return Err ( "ready cannot name the axis all; only a request can"
+      let objects : BTreeSet<DiffObject> =
+        readiness_objects_from_atoms (&atoms) ?;
+      if objects . contains (&DiffObject::All) {
+        return Err ( "ready cannot name the object all; only a request can"
                      . to_string () ); }
-      metadata . change_facts . ready = Some (axes); },
+      metadata . change_facts . ready = Some (objects); },
     _ => { // readyRequest or unreadyRequest
       if metadata . readiness_request . is_some () {
         return Err ( "A viewnode may carry only one readiness request"
                      . to_string () ); }
       metadata . readiness_request = Some ( ReadinessRequest {
-        ready : key == "readyRequest",
-        axes  : readiness_axes_from_atoms (&atoms) ?, } ); }, }
+        ready   : key == "readyRequest",
+        objects : readiness_objects_from_atoms (&atoms) ?, } ); }, }
   Ok (( )) }
 
-fn readiness_axes_from_atoms (
+fn readiness_objects_from_atoms (
   atoms : &[String],
-) -> Result<BTreeSet<ReadinessAxis>, String> {
+) -> Result<BTreeSet<DiffObject>, String> {
   atoms . iter ()
-    . map ( |atom| ReadinessAxis::from_wire_name (atom)
-            . ok_or_else ( || format! ( "Unknown readiness axis: {}", atom )) )
+    . map ( |atom| DiffObject::from_wire_name (atom)
+            . ok_or_else ( || format! ( "Unknown diff object: {}", atom )) )
     . collect () }

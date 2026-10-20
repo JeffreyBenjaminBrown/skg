@@ -57,14 +57,14 @@ pub fn owned_head_identity (
         "Repo '{}' not found in config", skgrepo_name )) ?;
     let gitrepo : Repository =
       open_gitrepo (Path::new (&skgrepo . path)) . ok_or_else ( || format! (
-        "Cannot open the diff view: Skg repo '{}' is not in a git repository.",
+        "Cannot read HEAD of skgrepo '{}': it is not in a git repository.",
         skgrepo_name )) ?;
     let identity : String =
       gitrepo . head ()
         . and_then ( |head| head . peel_to_commit () )
         . map ( |commit| format! ("head:{}", commit . id ()) )
         . map_err ( |e| format! (
-          "Cannot open the diff view: Skg repo '{}' has no HEAD commit: {}",
+          "Cannot read HEAD of skgrepo '{}': it has no HEAD commit: {}",
           skgrepo_name, e )) ?;
     parts . push (format! (
       "{}:{}:{}", skgrepo_name, skgrepo . path . display (), identity )); }

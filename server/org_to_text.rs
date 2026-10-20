@@ -2,7 +2,7 @@ use crate::serve::util::sexp_to_client_string;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ChangeFacts, ReadinessAxis, ReadinessRequest,
+  ChangeFacts, DiffObject, ReadinessRequest,
   Viewnode, ViewnodeKind, Vognode, Phantom, Property, UnrestrictedVognode,
   PhantomDeleted, PhantomHistorical, PhantomUnknown, NodeEditRequest,
   AffectsParent,
@@ -167,14 +167,14 @@ pub fn folder_change_facts (
   Some ( FolderChangeFacts {
     ready : member_changes . iter () . all ( |ready| *ready ) } ) }
 
-/// Some (whether ready) when the relationship axis changed.
+/// Some (whether ready) when the relationship object changed.
 fn rel_change_ready (
   change_facts : &ChangeFacts,
 ) -> Option<bool> {
   change_facts . presence . rel . map ( |_| change_facts . ready . as_ref ()
-    . is_some_and ( |axes| axes . contains (&ReadinessAxis::Rel) )) }
+    . is_some_and ( |objects| objects . contains (&DiffObject::Rel) )) }
 
-/// Some (whether ready) when a single-axis leaf changed.
+/// Some (whether ready) when a single-object leaf changed.
 fn single_change_ready (
   change_facts : &ChangeFacts,
 ) -> Option<bool> {
@@ -365,12 +365,12 @@ fn change_fact_forms (
   let presence : Vec<&'static str> = facts . presence . atoms ();
   if ! presence . is_empty () {
     forms . push ( form ("diff", presence) ); }
-  if let Some (axes) = &facts . ready {
+  if let Some (objects) = &facts . ready {
     forms . push ( form ( "ready",
-      axes . iter () . map ( |axis| axis . wire_name () ) . collect () )); }
+      objects . iter () . map ( |object| object . wire_name () ) . collect () )); }
   if let Some (request) = request {
     forms . push ( form ( request . form_head (),
-      request . axes . iter () . map ( |axis| axis . wire_name () )
+      request . objects . iter () . map ( |object| object . wire_name () )
       . collect () )); }
   forms }
 

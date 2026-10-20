@@ -523,7 +523,9 @@ pub fn rerender_view (
     match tdv_buffer {
       Some (_) => Some ( current_graph_straddle_in_slot (
         &mut context . graph_straddle, &context . runtime . config,
-        context . runtime . graph . clone () ) ? ),
+        context . runtime . graph . clone () )
+        . map_err ( |e| format! (
+          "Cannot redraw the diff view buffer: {}", e )) ? ),
       None => None, };
   let diffView_source : Option<DiffViewSource> =
     graph_straddle . as_deref () . zip (tdv_buffer)

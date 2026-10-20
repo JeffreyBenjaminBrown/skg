@@ -224,7 +224,7 @@ fn reconcile_partnerFolder_children_from_graph_straddle (
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       tree, node, kind, &goal_items, &child_data,
       deleted_by_this_save_extra_ids ) ?;
-  attach_continuations_under_straddle_folder_members (
+  attach_memberRoleTrees_under_straddle_folder_members (
     tree, node, kind, member_role, straddle, &partners, runtime ) ?;
   if kind . policy () != FolderPolicy::EditableSet {
     if let Some (sink) = warning_sink {
@@ -277,18 +277,18 @@ fn straddle_member_skgid (
       if is_unrestricted_removed_member (viewnode) => Some ( t . skgid . clone () ),
     _ => live_member_skgid (viewnode), }}
 
-/// Under each member of a straddle-drawn folder, the role-tree engine's
-/// continuation over the union of the straddle: under a container, its
-/// full containerward tree; under any other member, the role tree of
-/// the folder's role, with a full containerward tree under each
-/// graft. In a folder of the anchor's own relationships, only under
-/// the members whose relationship changed. A member whose
-/// relationship moved to another skgrepo gets that move. Each
-/// member's continuation is drawn afresh in a scratch tree and
+/// Under each member of a straddle-drawn folder, its member role tree,
+/// drawn by the role-tree engine over the union of the straddle: under
+/// a container, its full containerward tree; under any other member,
+/// the role tree of the folder's role, with a full containerward tree
+/// under each graft. In a folder of the folder viewparent's own
+/// relationships, only under the members whose relationship changed.
+/// A member whose relationship moved to another skgrepo gets that
+/// move. Each member role tree is drawn afresh in a scratch tree and
 /// reconciled with what the member holds, by skgid (and the move by
-/// its kind) at each level, so that a continuation that stays keeps
-/// its viewnodes and their fold state, in the order of the walk.
-fn attach_continuations_under_straddle_folder_members (
+/// its kind) at each level, so that a member role tree that stays
+/// keeps its viewnodes and their fold state, in the order of the walk.
+fn attach_memberRoleTrees_under_straddle_folder_members (
   tree        : &mut Tree<Viewnode>,
   folder      : NodeId,
   kind        : PartnerFolder,
@@ -301,7 +301,7 @@ fn attach_continuations_under_straddle_folder_members (
     partners . iter () . map ( |partner| (&partner . id, partner) ) . collect ();
   let outbound : bool = ! member_role . is_first_role ();
   let members : Vec<(NodeId, &Partner)> =
-    tree . get (folder) . ok_or ("attach_continuations_under_straddle_folder_members: folder not found") ?
+    tree . get (folder) . ok_or ("attach_memberRoleTrees_under_straddle_folder_members: folder not found") ?
     . children ()
     . filter_map ( |child| match &child . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>

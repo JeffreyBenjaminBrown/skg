@@ -114,7 +114,7 @@ pub fn detach_viewnode_transferring_focus (
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (()) }
 
-/// What 'complete_relevant_children' changed while reconciling: the
+/// What 'complete_managed_children' changed while reconciling: the
 /// orderkeys it created, demoted to non-member (stale branches),
 /// detached as stale leaves, and detached as duplicates. Callers
 /// that warn about repairs to write-protected folders consume this
@@ -136,21 +136,21 @@ impl<Orderkey> RepairSummary<Orderkey> {
       deleted_duplicates : Vec::new (), }}
 }
 
-/// Viewnode-specialized version of complete_relevant_children.
+/// Viewnode-specialized version of complete_managed_children.
 /// See that one's description for more info.
 /// This one specializes it so that:
 /// - problem discards are those that would discard the focused node.
 /// - if any discard is problematic, transfer focus to 'treeid'
-pub fn complete_relevant_children_in_viewforest
-<Orderkey, Relevant, View> (
+pub fn complete_managed_children_in_viewforest
+<Orderkey, Managed, View> (
   tree                : &mut Tree<Viewnode>,
   treeid              : NodeId,
-  relevant            : Relevant,
+  managed             : Managed,
   view_child_orderkey : View,
   goal_list           : &[Orderkey],
   create_child        : impl Fn (&Orderkey) -> Result<Viewnode, String>,
 ) -> Result<RepairSummary<Orderkey>, Box<dyn Error>>
-where Relevant : Fn (&Viewnode) -> bool,
+where Managed  : Fn (&Viewnode) -> bool,
       View     : Fn (&Viewnode) -> Result<Orderkey, String>,
       Orderkey : Eq + Hash + Clone,
 {
@@ -159,13 +159,13 @@ where Relevant : Fn (&Viewnode) -> bool,
       subtree_satisfies( tree, stale_treeid, &|n: &Viewnode| n . focused ) };
   let problem_discard_response =
     |n: &mut Viewnode| { n . focused = true; };
-  // TODO/DONE/local-view-update/plan_v2.org §6.0 stale-member rule: a stale member (relevant child not in the goal)
+  // TODO/DONE/local-view-update/plan_v2.org §6.0 stale-member rule: a stale member (managed child not in the goal)
   // that is an Unrestricted, affectsParent=true *branch* (has children) is demoted to
   // non-member so the user's subtree survives; a stale RestrictedVognode
   // *branch* is deadened to a DeadViewnode instead (it has no
   // affectsParent to demote; the orphan handling then preserves its
   // subtree as independent -- TODO/DONE/full-schema/DONE/9-2_source-set-safety.org);
-  // everything else stale -- a leaf, a diff-phantom, a property -- is
+  // everything else stale -- a leaf, a historical phantom, a property -- is
   // deleted by the reconciler. Returns true iff it kept the node.
   let demote_invalid =
     |tree: &mut Tree<Viewnode>, stale_treeid: NodeId|
@@ -197,10 +197,10 @@ where Relevant : Fn (&Viewnode) -> bool,
             n . value () . kind = ViewnodeKind::DeadViewnode; } )
             . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
           Ok (true) }, }};
-  complete_relevant_children(
+  complete_managed_children(
     tree,
     treeid,
-    relevant,
+    managed,
     view_child_orderkey,
     goal_list,
     create_child,
@@ -209,14 +209,14 @@ where Relevant : Fn (&Viewnode) -> bool,
     demote_invalid ) }
 
 /// PURPOSE:
-/// Reconciles a parent's "relevant" children against a desired list of 'orderkeys'.
+/// Reconciles a parent's "managed" children against a desired list of 'orderkeys'.
 /// The payload of each tree node should be some possibly-improper supertype of 'orderkey' -- that is,
 /// there is a way to extract the orderkey from a node, but the node might have other information.
 /// .
 /// STEPS:
-/// - Partitions children into "relevant" (matching a predicate) and "irrelevant".
-///   It is not necessary that irrelevant children be able to provide an orderkey.
-/// - Among relevant children, identifies duplicates and "stale" members (those
+/// - Partitions children into "managed" (matching a predicate) and "unmanaged".
+///   It is not necessary that unmanaged children be able to provide an orderkey.
+/// - Among managed children, identifies duplicates and "stale" members (those
 ///   whose orderkey is not in goal_list).
 ///   - Duplicates are always detached.
 ///   - A stale member is offered to 'demote_invalid'; if that keeps it (returns
@@ -224,20 +224,20 @@ where Relevant : Fn (&Viewnode) -> bool,
 ///     is detached.
 ///   Runs problem_discard on each node that is actually detached; if any returns
 ///   true, runs problem_discard_response on the parent afterward.
-/// - Reorders remaining children: irrelevant first, then relevant in goal_list order.
+/// - Reorders remaining children: unmanaged first, then managed in goal_list order.
 ///   Creates new children for any orderkeys missing from the original children.
 ///   USER-FACING CONSEQUENCE for PartnerFolders: a non-member
-///   child a user parks inside a folder is "irrelevant" here, so it is moved
+///   child a user parks inside a folder is "unmanaged" here, so it is moved
 ///   ABOVE the generated members on save. This is deliberate -- the
 ///   membership is generated and ordered, so a parked note stays but is
 ///   visibly separated from the live membership. Documented in docs/glossary.org
 ///   ("PartnerFolder") and docs/sharing-model.org.
 /// - Returns a RepairSummary of what it created, demoted and detached.
-pub fn complete_relevant_children
-<Node, Orderkey, Relevant, View, ProblemDiscard, ProblemResponse, DemoteInvalid> (
+pub fn complete_managed_children
+<Node, Orderkey, Managed, View, ProblemDiscard, ProblemResponse, DemoteInvalid> (
   tree                     : &mut Tree<Node>,
   parent_skgid             : NodeId,
-  relevant                 : Relevant,
+  managed                  : Managed,
   view_child_orderkey      : View,
   goal_list                : &[Orderkey],
   create_child             : impl Fn (&Orderkey) -> Result<Node, String>,
@@ -246,8 +246,8 @@ pub fn complete_relevant_children
   demote_invalid           : DemoteInvalid,
 ) -> Result<RepairSummary<Orderkey>, Box<dyn Error>>
 where
-  Relevant        : Fn (&Node) -> bool,
-  // The orderkey and create-child closures are fallible so a relevant
+  Managed         : Fn (&Node) -> bool,
+  // The orderkey and create-child closures are fallible so a managed
   // child of an unexpected kind, or an unprefetched orderkey, surfaces
   // as an Err from this function rather than a panic in a closure.
   View            : Fn (&Node) -> Result<Orderkey, String>,
@@ -259,11 +259,11 @@ where
   let groups : HashMap<i32, Vec<NodeId>> =
     partition_children (
       tree, parent_skgid,
-      |n| if relevant (n) { 1 } else { 0 } )
+      |n| if managed (n) { 1 } else { 0 } )
         . map_err( |e| -> Box<dyn Error> { e . into() } )?;
-  let relevant_skgids   : Vec<NodeId> =
+  let managed_skgids    : Vec<NodeId> =
     groups . get( &1 ) . cloned() . unwrap_or_default();
-  let irrelevant_skgids : Vec<NodeId> =
+  let unmanaged_skgids : Vec<NodeId> =
     groups . get( &0 ) . cloned() . unwrap_or_default();
   let goal_list_as_set : HashSet<Orderkey> =
     goal_list . iter() . cloned() . collect();
@@ -272,10 +272,10 @@ where
     : HashMap<Orderkey, NodeId> = HashMap::new();
   let mut duplicate_skgids : Vec<( NodeId, Orderkey )> = Vec::new();
   let mut invalid_skgids : Vec<( NodeId, Orderkey )> = Vec::new();
-  for &treeid in &relevant_skgids { // populate the above three variables
+  for &treeid in &managed_skgids { // populate the above three variables
     let node_ref : NodeRef<Node> =
     tree . get (treeid)
-      . ok_or ("complete_relevant_children: node not found")?;
+      . ok_or ("complete_managed_children: node not found")?;
     let orderkey : Orderkey =
       view_child_orderkey( node_ref . value() ) ?;
     if !goal_list_as_set . contains (&orderkey) {
@@ -310,11 +310,11 @@ where
         tree, parent_skgid,
         |mut n| { problem_discard_response( n . value() ); }
       ) . map_err( |e| -> Box<dyn Error> { e . into() } )?; }
-  for &child_skgid in &irrelevant_skgids {
-    // Move irrelevant children to end. (They will precede the relevant ones.)
+  for &child_skgid in &unmanaged_skgids {
+    // Move unmanaged children to end. (They will precede the managed ones.)
     move_to_last_child( tree, parent_skgid, child_skgid )?; }
   for orderkey in goal_list {
-    // Move/create relevant children in desired order
+    // Move/create managed children in desired order
     match orderkey_to_treeid . get (orderkey) {
       Some (&child_skgid) => {
         move_to_last_child( tree, parent_skgid, child_skgid )?; },

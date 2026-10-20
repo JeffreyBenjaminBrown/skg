@@ -284,10 +284,9 @@ fn visit_normal_node (
   let in_u : bool = // of the total diff view being drawn
     context . diffView_source . is_some_and (
       |drawing| drawing . sets () . u . contains (&pid) );
-  let editableViewRequest_applies : bool = had_editableViewRequest;
   let budgeted : bool = // In a total diff view the budget bounds only the expansions requests make outside U.
     context . diffView_source . is_none ()
-    || ( editableViewRequest_applies && ! in_u );
+    || ( had_editableViewRequest && ! in_u );
   let mut settled : bool = false; // TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule already ran
   let mut cascade : bool = false; // node is Final -> hand EVRs to children
   // TODO/DONE/local-view-update/plan_v2.org §5.5: the budget counts vognode *expansions* (each costs 1, charged in
@@ -311,7 +310,7 @@ fn visit_normal_node (
             t . editability = Editability::WriteProtected; } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
     settled = true;
-  } else if editableViewRequest_applies {
+  } else if had_editableViewRequest {
     match apply_editable_draw_rule (
       tree, treeid, &context . runtime . graph,
       &context . runtime . config, context . editable_map ) ? {
@@ -344,7 +343,7 @@ fn visit_normal_node (
   // hid*/overrid*-as-such nodes get the same defaults as ordinary nodes, and
   // the subscribee-specific HiddenIn folder is added by the pass below.
   // A total diff view draws no default folders.
-  if ( context . create_partnerFolders_for_fresh_nodes || editableViewRequest_applies )
+  if ( context . create_partnerFolders_for_fresh_nodes || had_editableViewRequest )
     && context . diffView_source . is_none () {
     maybe_add_default_partnerFolder_branches (
       tree, treeid, &context . runtime . graph,

@@ -23,7 +23,7 @@
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
   ChangesetMarkerKind, DiffPresence, PartnerFolder, Property, PropertyFolder,
-  ReadinessAxis, ViewRequest};
+  DiffObject, ViewRequest};
 
 use serde_json::Value;
 use std::collections::HashSet;
@@ -268,11 +268,11 @@ fn changed_folder_rules (
              "the nodes it hides changed (this file)") ] }
 
 /// The total diff view's facts on a vognode: '(diff ...)' as ∃+ ∃-
-/// (the node axis) and ~+ ~- (the relationship axis), each followed
-/// by a ✓ when '(ready ...)' names its axis, then the readiness
-/// request. The same form is matched once per axis, so each ✓ lands
-/// after its own axis whatever the raw order.
-fn change_fact_rules_for_two_axes (
+/// (the node itself) and ~+ ~- (its relationship to its viewparent),
+/// each followed by a ✓ when '(ready ...)' names that diff object,
+/// then the readiness request. The same form is matched once per object, so each ✓ lands
+/// after its own object whatever the raw order.
+fn change_fact_rules_for_two_objects (
 ) -> Vec<RuleChild> {
   vec! [
     rule ("diff", vec! [
@@ -286,10 +286,10 @@ fn change_fact_rules_for_two_axes (
     readiness_request_rule ("readyRequest",   "request:ready"),
     readiness_request_rule ("unreadyRequest", "request:unready") ] }
 
-/// The same for a leaf with a single axis (a property leaf, a deleted
-/// or unknown phantom), whose '(ready)' names no axis. 'plus' and
-/// 'minus' render its presence atoms, whichever axis they name.
-fn change_fact_rules_for_one_axis (
+/// The same for a leaf with a single diff object (a property leaf, a deleted
+/// or unknown phantom), whose '(ready)' names no object. 'plus' and
+/// 'minus' render its presence atoms, whichever object they name.
+fn change_fact_rules_for_one_object (
   plus  : &'static str,
   minus : &'static str,
 ) -> Vec<RuleChild> {
@@ -303,19 +303,19 @@ fn change_fact_rules_for_one_axis (
     readiness_request_rule ("readyRequest",   "request:ready"),
     readiness_request_rule ("unreadyRequest", "request:unready") ] }
 
-/// "request:ready", then ":AXIS" for each axis the request names.
+/// "request:ready", then ":OBJECT" for each object the request names.
 fn readiness_request_rule (
   label  : &'static str,
   prefix : &'static str,
 ) -> RuleChild {
   crule ( label,
           [ vec! [ s (prefix) ],
-            ReadinessAxis::ALL . into_iter ()
-            . map ( |axis| rule ( axis . wire_name (), vec! [ s (
-              match axis {
-                ReadinessAxis::Node => ":node",
-                ReadinessAxis::Rel  => ":rel",
-                ReadinessAxis::All  => ":all", } ) ] ))
+            DiffObject::ALL . into_iter ()
+            . map ( |object| rule ( object . wire_name (), vec! [ s (
+              match object {
+                DiffObject::Node => ":node",
+                DiffObject::Rel  => ":rel",
+                DiffObject::All  => ":all", } ) ] ))
             . collect () ] . concat () ) }
 
 /// (ANY children...)
@@ -435,7 +435,7 @@ pub fn herald_rule_table () -> HeraldRule {
       changed_folder_rules (),
       // The total diff view's facts on a property leaf: + and - for
       // its presence, ✓ when ready.
-      change_fact_rules_for_one_axis ("+", "-"),
+      change_fact_rules_for_one_object ("+", "-"),
       vec! [
       crule ("deadViewnode", vec! [ s ("DELETED") ]),
       crule ("deleted", vec! [
@@ -444,7 +444,7 @@ pub fn herald_rule_table () -> HeraldRule {
         vac ("repo") ]),
       // A second rule over the same form, so its tokens do not take
       // the prefix "DELETED".
-      rule ("deleted", change_fact_rules_for_one_axis ("∃+", "∃-")),
+      rule ("deleted", change_fact_rules_for_one_object ("∃+", "∃-")),
       crule ("unknown", vec! [
         s ("Reference to unknown node."),
         vac ("id"),
@@ -454,14 +454,14 @@ pub fn herald_rule_table () -> HeraldRule {
         rule ("editRequest", vec! [
           crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
             any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ]),
-      rule ("unknown", change_fact_rules_for_one_axis ("~+", "~-")),
-      // A historical phantom is write-protected; its two axes are
+      rule ("unknown", change_fact_rules_for_one_object ("~+", "~-")),
+      // A historical phantom is write-protected; its two objects are
       // its existence (∃-) and its relationship to its viewparent.
       crule_styled_as ("writeProtected", "historical", vec! [
         s ("☮"),
         vac ("id"),
         vac ("repo") ]),
-      rule ("historical", change_fact_rules_for_two_axes ()),
+      rule ("historical", change_fact_rules_for_two_objects ()),
       // A restricted vognode is anonymous and dataless: the bare
       // atom 'restrictedNode' (see RestrictedVognode), like the other dataless
       // non-vognode atoms. Its id/repo would leak hidden content, so
@@ -535,7 +535,7 @@ pub fn herald_rule_table () -> HeraldRule {
           rule ("editableView", vec! [ s ("req:editable") ]),
           rule ("writeProtectedView", vec! [ s ("req:write-protected") ]),
           rule ("writeProtectedSubtreeView", vec! [ s ("req:write-protected-subtree") ]) ]) ],
-        change_fact_rules_for_two_axes () ] . concat ()) ] ] . concat (),
+        change_fact_rules_for_two_objects () ] . concat ()) ] ] . concat (),
   }}
 
 //
@@ -709,21 +709,21 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
 
 /// The total diff view's forms, from org_to_text.rs's
 /// 'change_fact_forms': their heads, the presence atoms and the
-/// readiness axes.
+/// diff objects.
 fn change_fact_atoms () -> Vec<&'static str> {
   use crate::types::viewnode::ChangeFacts;
-  fn guard ( facts : ChangeFacts, axis : ReadinessAxis ) {
+  fn guard ( facts : ChangeFacts, object : DiffObject ) {
     let ChangeFacts {
       presence : _, // -> diff, with DiffPresence::EMITTABLE_ATOMS
-      ready : _,    // -> ready, with the axes
+      ready : _,    // -> ready, with the objects
     } = facts;
-    match axis { // compile error here = update ReadinessAxis::ALL
-      ReadinessAxis::Node | ReadinessAxis::Rel | ReadinessAxis::All => () }}
+    match object { // compile error here = update DiffObject::ALL
+      DiffObject::Node | DiffObject::Rel | DiffObject::All => () }}
   let _ = guard;
   [ vec! [ "diff", "ready", "readyRequest", "unreadyRequest",
            "changed" ], // the head of a changed folder's form
     DiffPresence::EMITTABLE_ATOMS . to_vec (),
-    ReadinessAxis::ALL . into_iter () . map (ReadinessAxis::wire_name)
+    DiffObject::ALL . into_iter () . map (DiffObject::wire_name)
       . collect () ] . concat () }
 
 /// GraphnodeStats emits no match atoms: its counts feed semantic

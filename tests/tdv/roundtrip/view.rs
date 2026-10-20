@@ -228,7 +228,7 @@ fn a_buffer_of_the_new_viewnodes_saves_back_unchanged (
   result }
 
 /// A readiness request on the old text names the node's text leaf;
-/// on a historical phantom's node axis, its existence; on the content
+/// on a historical phantom's node object, its existence; on the content
 /// changeset marker ('all'), the relationship leaves of its node's
 /// content.
 #[test]

@@ -34,7 +34,7 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   if let ViewnodeKind::Vognode (Vognode::Unrestricted (node)) = &mut restriction . kind {
     node . relRepo_request = Some (SkgrepoName::from ("private"));
     node . readiness_request = Some (ReadinessRequest {
-      ready : true, axes : [ReadinessAxis::All] . into_iter () . collect () }); }
+      ready : true, objects : [DiffObject::All] . into_iter () . collect () }); }
   restriction . consume_edit_request_after_save ();
   let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) = &restriction . kind
   else { panic! ("expected unrestricted node"); };
@@ -51,7 +51,7 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
       relRepo_request : Some (SkgrepoName::from ("private")),
       change_facts : ChangeFacts::default (),
       readiness_request : Some (ReadinessRequest {
-        ready : true, axes : BTreeSet::new () }), }))) };
+        ready : true, objects : BTreeSet::new () }), }))) };
   unknown . consume_edit_request_after_save ();
   let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) = &unknown . kind
   else { panic! ("expected unknown node"); };
@@ -66,7 +66,7 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
       relRepo_request : Some (SkgrepoName::from ("private")),
       change_facts : ChangeFacts::default (),
       readiness_request : Some (ReadinessRequest {
-        ready : false, axes : BTreeSet::new () }), }) };
+        ready : false, objects : BTreeSet::new () }), }) };
   alias . consume_edit_request_after_save ();
   let ViewnodeKind::Property (Property::Alias { relRepo_request, .. }) =
     &alias . kind

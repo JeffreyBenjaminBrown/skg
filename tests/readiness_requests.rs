@@ -98,7 +98,7 @@ fn a_save_marks_and_unmarks_the_leaves_its_requests_name (
 ) -> Result<(), Box<dyn Error>> {
   let mut f : Fixture = fixture ("skg-test-readiness-requests") ?;
   let result : Result<(), Box<dyn Error>> = (|| {
-    { // The relationship axis of a member, and an alias leaf.
+    { // The relationship object of a member, and an alias leaf.
       let response : SaveResponse = save (&mut f, "\
 * (skg (node (id r) (repo main))) r, retitled
 ** (skg (node (id a) (repo main) (readyRequest rel))) a

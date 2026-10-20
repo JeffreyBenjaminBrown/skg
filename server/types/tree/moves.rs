@@ -38,35 +38,35 @@ pub fn move_to_last_child<T> (
     . append_id (node);
   Ok (( )) }
 
-/// Make 'node' the sibling immediately before 'anchor'.
+/// Make 'node' the sibling immediately before 'neighbor'.
 pub fn move_before<T> (
-  tree   : &mut Tree<T>,
-  anchor : NodeId,
-  node   : NodeId,
+  tree     : &mut Tree<T>,
+  neighbor : NodeId,
+  node     : NodeId,
 ) -> Result<(), String> {
-  if anchor == node { return Ok (( )); }
+  if neighbor == node { return Ok (( )); }
   let previous : Option<NodeId> =
-    node_ref (tree, anchor, "move_before") ?
+    node_ref (tree, neighbor, "move_before") ?
     . prev_sibling () . map ( |sibling| sibling . id () );
   if previous == Some (node) { return Ok (( )); }
   detach (tree, node, "move_before") ?;
-  tree . get_mut (anchor) . ok_or ("move_before: anchor not found") ?
+  tree . get_mut (neighbor) . ok_or ("move_before: neighbor not found") ?
     . insert_id_before (node);
   Ok (( )) }
 
-/// Make 'node' the sibling immediately after 'anchor'.
+/// Make 'node' the sibling immediately after 'neighbor'.
 pub fn move_after<T> (
-  tree   : &mut Tree<T>,
-  anchor : NodeId,
-  node   : NodeId,
+  tree     : &mut Tree<T>,
+  neighbor : NodeId,
+  node     : NodeId,
 ) -> Result<(), String> {
-  if anchor == node { return Ok (( )); }
+  if neighbor == node { return Ok (( )); }
   let next : Option<NodeId> =
-    node_ref (tree, anchor, "move_after") ?
+    node_ref (tree, neighbor, "move_after") ?
     . next_sibling () . map ( |sibling| sibling . id () );
   if next == Some (node) { return Ok (( )); }
   detach (tree, node, "move_after") ?;
-  tree . get_mut (anchor) . ok_or ("move_after: anchor not found") ?
+  tree . get_mut (neighbor) . ok_or ("move_after: neighbor not found") ?
     . insert_id_after (node);
   Ok (( )) }
 

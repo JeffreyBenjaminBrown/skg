@@ -14,29 +14,29 @@ use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
   AffectsParent, ChangeFacts, DiffPresence, Phantom, PhantomDeleted,
-  PhantomUnknown, Property, ReadinessAxis, ReadinessRequest, Viewnode,
+  PhantomUnknown, Property, DiffObject, ReadinessRequest, Viewnode,
   ViewnodeKind, Vognode, mk_editable_viewnode, mk_writeProtected_viewnode};
 
 use std::collections::{BTreeSet, HashMap};
 
-fn axes (
-  axes : &[ReadinessAxis],
-) -> BTreeSet<ReadinessAxis> {
-  axes . iter () . copied () . collect () }
+fn objects (
+  objects : &[DiffObject],
+) -> BTreeSet<DiffObject> {
+  objects . iter () . copied () . collect () }
 
 fn facts (
   node  : Option<Sign>,
   rel   : Option<Sign>,
-  ready : Option<&[ReadinessAxis]>,
+  ready : Option<&[DiffObject]>,
 ) -> ChangeFacts {
   ChangeFacts { presence : DiffPresence { node, rel },
-                ready    : ready . map (axes) } }
+                ready    : ready . map (objects) } }
 
 fn request (
   ready : bool,
-  on    : &[ReadinessAxis],
+  on    : &[DiffObject],
 ) -> Option<ReadinessRequest> {
-  Some ( ReadinessRequest { ready, axes : axes (on) } ) }
+  Some ( ReadinessRequest { ready, objects : objects (on) } ) }
 
 fn viewnode (
   kind : ViewnodeKind,
@@ -78,8 +78,8 @@ fn a_vognode_round_trips_its_presence_readiness_and_request () {
       mk_editable_viewnode (
         ID::from ("a"), SkgrepoName::from ("main"), "A" . into (), None ),
       facts ( Some (Sign::Plus), Some (Sign::Minus),
-              Some (&[ReadinessAxis::Node, ReadinessAxis::Rel]) ),
-      request (true, &[ReadinessAxis::All]) ),
+              Some (&[DiffObject::Node, DiffObject::Rel]) ),
+      request (true, &[DiffObject::All]) ),
     "(node (id a) (repo main) (diff node+ rel-) (ready node rel) (readyRequest all))" );
   // A readiness request is allowed on a write-protected occurrence.
   assert_round_trip (
@@ -88,7 +88,7 @@ fn a_vognode_round_trips_its_presence_readiness_and_request () {
         ID::from ("b"), SkgrepoName::from ("main"), "B" . into (),
         AffectsParent::True ),
       facts ( None, Some (Sign::Plus), Some (&[]) ),
-      request (false, &[ReadinessAxis::Rel]) ),
+      request (false, &[DiffObject::Rel]) ),
     "(node (id b) (repo main) writeProtected (diff rel+) (ready) (unreadyRequest rel))" ); }
 
 #[test]
@@ -137,7 +137,7 @@ fn malformed_change_facts_are_refused () {
     "(skg aliasFolder (diff rel+))",                  // a folder's only fact is '(ready)'
     "(skg (aliasFolder sideways))",                   // a folder's form is '(KIND changed)'
     "(skg (node (id a) (ready all)))",                // 'all' only in a request
-    "(skg (node (id a) (diff node+ node-)))",         // an axis twice
+    "(skg (node (id a) (diff node+ node-)))",         // an object twice
     "(skg (node (id a) (readyRequest) (unreadyRequest node)))", // two requests
     "(skg (node (id a) (readyRequest sideways)))", ] {
     assert! ( parse_metadata_to_viewnodemd (metadata) . is_err (),

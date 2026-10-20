@@ -156,16 +156,16 @@ fn a_folded_historical_phantom_stays_folded (
               . ends_with (" delc"), "{}", saved );
     Ok (( )) }) }
 
-/// A folded headline inside a continuation (top, under acq in pres's
+/// A folded headline inside a member role tree (top, under acq in pres's
 /// changed container folder) stays folded after a save that changes
 /// nothing and after one that adds a container above it.
 #[test]
-fn a_folded_headline_in_a_continuation_stays_folded (
+fn a_folded_headline_in_a_member_role_tree_stays_folded (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    let continuation : &str = "****** (skg (node (id top)";
-    let folded : String = with_atom (&buffer, continuation, "folded");
+    let memberRoleTree_headline : &str = "****** (skg (node (id top)";
+    let folded : String = with_atom (&buffer, memberRoleTree_headline, "folded");
     let saved : String = save_cleanly (f, &folded) ?;
     assert_eq! ( saved, folded, "saved unchanged, the buffer comes back as it was" );
     let contained : String = insert_after (

@@ -506,7 +506,7 @@ fn removal_plan (
   straddle : &GraphStraddle,
   pid      : &ID,
 ) -> Vec<(ID, Option<ID>)> {
-  phantom_insertion_plan ( &removed_by_set_difference (
+  phantom_insertion_plan ( &interleaved_diff_without_reorders (
     &content_list (&straddle . before, pid),
     &content_list (&straddle . after, pid) )) }
 
@@ -554,7 +554,7 @@ fn content_list (
 
 /// The interleaved diff of two lists, minus the 'Removed' items that
 /// the new list still holds (elsewhere: a reorder).
-fn removed_by_set_difference<T : Clone + Eq + Hash + Ord> (
+fn interleaved_diff_without_reorders<T : Clone + Eq + Hash + Ord> (
   old : &[T],
   new : &[T],
 ) -> Vec<Diff_Item<T>> {
@@ -628,7 +628,7 @@ fn signed_union<T : Clone + Eq + Hash + Ord> (
   new : &[T],
 ) -> Vec<(T, Option<Sign>)> {
   let old_set : HashSet<&T> = old . iter () . collect ();
-  removed_by_set_difference (old, new) . into_iter ()
+  interleaved_diff_without_reorders (old, new) . into_iter ()
     . map ( |item| match item {
       Diff_Item::Removed (x) => (x, Some (Sign::Minus)),
       Diff_Item::Unchanged (x) | Diff_Item::New (x) => {

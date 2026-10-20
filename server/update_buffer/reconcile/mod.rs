@@ -23,7 +23,7 @@ use crate::types::misc::{ID, SkgrepoName};
 /// invisible).  A retained restricted vognode (one already drawn,
 /// kept because it hosts unrestricted descendants after a skgrepo-set
 /// reduction) does NOT come back through the goal list: each
-/// reconciler treats it as an irrelevant child, preserved as-is.
+/// reconciler treats it as an unmanaged child, preserved as-is.
 pub fn omit_restricted_members (
   goal     : Vec<ID>,
   restriction : Option<&SkgrepoRestriction>,

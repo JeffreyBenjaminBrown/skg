@@ -6,7 +6,7 @@ use crate::types::nodes::complete::{
 use crate::types::viewnode::{ChangeFacts, Property, Viewnode, ViewnodeKind};
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::util::{
-  complete_relevant_children_in_viewforest, treat_certain_children};
+  complete_managed_children_in_viewforest, treat_certain_children};
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
@@ -26,13 +26,13 @@ pub fn reconcile_flags_folder_children (
   let goals : Vec<Flag> = Flag::ALL . into_iter ()
     . filter (|flag| flag_is_true (&node . flags, *flag))
     . collect ();
-  complete_relevant_children_in_viewforest (
+  complete_managed_children_in_viewforest (
     tree, folder_skgid,
     |viewnode| matches! (&viewnode . kind,
       ViewnodeKind::Property (Property::Flag { .. })),
     |viewnode| match &viewnode . kind {
       ViewnodeKind::Property (Property::Flag { flag, .. }) => Ok (*flag),
-      _ => Err ("relevant child is not a Flag" . to_string ()), },
+      _ => Err ("managed child is not a Flag" . to_string ()), },
     &goals,
     |flag| Ok (Viewnode {
       focused         : false,
