@@ -439,7 +439,7 @@ more public than a node's new home (an inbound relationship of a move
 to a more private skgrepo) is raised to that home, and the save's
 warnings say so. If it would leave others at their old, more private
 skgrepos, it saves nothing yet: it lists them in
-=*SKG Stranded Relationships*= and asks whether to re-level all of
+=*SKG Stranded Relationships*= and asks whether to reset all of
 them to their new defaults, none, or each in turn; then it saves with
 that answer, or not at all if you quit.
 *** C-c s S : skg-set-repo-recursive
@@ -573,18 +573,19 @@ moved to the new default (see
 
 The command only edits metadata in the current buffer.
 Save the view afterward to apply the changes.
-** C-c r : commit readiness, in the total diff view
-In a buffer of the total diff view (C-c v d), each change can be
+** C-c r : commit readiness, in the diff view
+In a buffer of the diff view (C-c v d), each change can be
 marked commit-ready. A mark approves the change as it is now: editing
 the changed thing again makes the mark lapse. Marks live on the
 server, in '<data_root>/readiness-marks.json'. A headline whose
 change is ready shows ✓ after it; an aggregate (a folder of changes,
 a changeset marker) shows ✓ when all of its changes are.
 
-After every save of one of the total diff view's buffers, the
+After every save of one of the diff view's buffers, the
 minibuffer shows the readiness summary: "12 of 14 changed files are
 ready", or "COMMIT READY. All 14 of 14 changed files are ready.". It
-adds how many changes the buffer does not show (C-c r u shows them)
+adds how many changes are not editable in this view (C-c r u
+integrates them)
 and how many files changed in foreign skgrepos.
 
 A gesture that would unmark more than one change (a recursive one, one
@@ -605,14 +606,14 @@ the node owns.
 With a prefix argument (C-u C-c r r), it marks every change in the
 subtree at point, or unmarks them if the headline at point is ready.
 Works on write-protected headlines too.
-*** C-c r h : skg-mark-gnode-skgrepo-changes-commitReady
+*** C-c r h : skg-toggle-homeSkgrepo-move-commitReady
 Toggles the commit-readiness of the home-skgrepo move of the node at
 point (or of the move at point), then saves: it unmarks the move if
 it is ready, else marks it. With a prefix argument (C-u C-c r h), it
 does the same to every descendant whose home moved between the same
 two skgrepos. Works on write-protected headlines too.
-*** C-c r u : skg-tdv-show-unshown-changes
-Shows every change the buffer of the total diff view does not show.
+*** C-c r u : skg-diffView-integrate-unshown-changes
+Integrates every change not editable in the buffer of the diff view.
 Each changed node with no editable occurrence becomes editable where
 the buffer first draws it, in content or else in a partner folder,
 with its change and its content drawn under it; when a change is
@@ -625,7 +626,7 @@ git-commits it, in every owned skgrepo that has changes, with that
 message. If not every changed file is ready, it first shows the
 readiness summary and proceeds only if you type the word "yes". Every
 open view must be saved or reverted first. Afterward the open buffers
-of the total diff view are rerendered: each keeps its roots, its
+of the diff view are rerendered: each keeps its roots, its
 folding and what it drew editable, and what was committed no longer
 shows as a change. The
 commit lapses the marks of everything it committed.
@@ -710,9 +711,9 @@ this brings you to a new view showing only that ancestry.
 This actually works in org-mode outside of skg.
 (skg uses org-mode, but org-mode can be used without skg.)
 ** C-c v : view changes, global
-*** C-c v d : skg-diff-view
+*** C-c v d : skg-diffView-open
 If you use git to manage your data,
-this opens the total diff view: every change in the owned skgrepos
+this opens the diff view: every change in the owned skgrepos
 since their last commits (how each worktree differs from HEAD), with
 the context needed to understand it. It opens up to four buffers,
 "diff-view: all changes", "diff-view: merges", "diff-view: skgrepo
@@ -724,16 +725,16 @@ draws what it draws anew by what changed: a new member that changed,
 or leads to a change, is editable with its content, and any other new
 member is a write-protected member drawn without its content. But a
 save makes nothing editable that the buffer already draws, and
-appends no root: a change since the buffer opened that it draws
-nowhere editable is unshown, and the
-readiness summary counts it. C-c r u shows such changes. Nothing the
+appends no root: the readiness summary counts a change since the
+buffer opened that it draws nowhere editable as not editable in this
+view. C-c r u integrates such changes. Nothing the
 buffer draws editable is write-protected again by the server. An
 editable-view request (C-c s d) works as in any view, except that
 only the expansion of a node outside U (the nodes the buffer unfolds
 anyway: those that changed and those leading to them) is charged to
 'initial_node_limit'; nothing else in the buffer is bounded by that
 limit.
-Why the total diff view commits whole skgrepos, and offers nothing
+Why the diff view commits whole skgrepos, and offers nothing
 smaller: in skg a partial commit is dangerous. The graph is one
 structure spread over many files, so committing some changed files
 and not others leaves HEAD inconsistent: it can reference nodes it

@@ -143,7 +143,7 @@ overrider is drawable, it draws =N=.  A monogamy violation makes the
 resolver refuse to choose a branch; a cycle makes it abandon
 substitution and return the originally requested node.
 
-Substitution is disabled in the total diff view.  Ordinary completion does not rewrite
+Substitution is disabled in the diff view.  Ordinary completion does not rewrite
 an existing raw viewnode merely because an overrider is now visible; closing
 and reopening a normal view produces the fresh normalized rendering.  The
 buffer whose save creates a fork has the post-save exceptions described below.

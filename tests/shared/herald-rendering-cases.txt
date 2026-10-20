@@ -230,11 +230,11 @@
 (skg (node (id x) (editRequest (merge y))))
 ---- text: merge:y
 ---- styles: nonstandard*7
-==== diff view: a new member whose node axis is ready
+==== diff view: a new member whose node object is ready
 (skg (node (id x) (diff node+ rel+) (ready node)))
 ---- text: ∃+✓ ~+
 ---- styles: nonstandard*2 go*1 -*1 nonstandard*2
-==== diff view: each ✓ follows its own axis, whatever the raw order
+==== diff view: each ✓ follows its own object, whatever the raw order
 (skg (node (id x) (ready rel node) (diff rel- node+)))
 ---- text: ∃+✓ ~-✓
 ---- styles: nonstandard*2 go*1 -*1 nonstandard*2 go*1
@@ -246,7 +246,7 @@
 (skg (deleted (id x) (diff node-) (unreadyRequest)))
 ---- text: DELETED ∃- request:unready
 ---- styles: message*7 -*1 nonstandard*2 -*1 nonstandard*15
-==== diff view: a request to mark both axes of a member
+==== diff view: a request to mark both objects of a member
 (skg (node (id x) (readyRequest node rel)))
 ---- text: request:ready:node request:ready:rel
 ---- styles: nonstandard*18 -*1 nonstandard*17

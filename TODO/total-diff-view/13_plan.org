@@ -881,7 +881,7 @@ spelled 'Home') still loads. Grep for every old name, under 'server/',
 'tests/' and 'docs/', before finishing; the only references left to an
 old name are in 'TODO/'.
 
-** TODO Slice 1: wire, requests, commands, files and client renames
+** DONE Slice 1: wire, requests, commands, files and client renames
 Apply every rename under "Wire, requests, commands, files and client
 identifiers" above, with 'git mv' for the files, in the server, both
 clients, their tests and the docs. Update the summary line in both

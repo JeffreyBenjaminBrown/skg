@@ -1,7 +1,7 @@
 -- PURPOSE: The commit-readiness gestures of the diff view
 -- ('TODO/total-diff-view/02_plan.org', "gestures"). Each writes
--- readiness requests, '(readyRequest AXES)' or '(unreadyRequest
--- AXES)', into headline metadata, then saves. The save consumes
+-- readiness requests, '(readyRequest OBJECTS)' or '(unreadyRequest
+-- OBJECTS)', into headline metadata, then saves. The save consumes
 -- them, setting or clearing the marks, and answers with the buffer
 -- redrawn and the readiness summary.
 -- The Lua port of elisp/skg-readiness.el, which describes which
@@ -75,22 +75,22 @@ local function arguments (form)
   return result
 end
 
----The axes on which the headline with METADATA_SEXP names a leaf: a
+---The objects on which the headline with METADATA_SEXP names a leaf: a
 ---sublist of {'node', 'rel'} for a vognode or phantom, {'single'}
 ---for a property that names one, {} when it names none.
 ---@param metadata_sexp any
 ---@return string[]
-function M.leaf_axes (metadata_sexp)
+function M.leaf_objects (metadata_sexp)
   local diff = M.form(metadata_sexp, 'diff')
   if M.vognode_p(metadata_sexp) then
-    local axes = {}
-    for _, axis in ipairs({ 'node', 'rel' }) do
+    local objects = {}
+    for _, object in ipairs({ 'node', 'rel' }) do
       for _, atom in ipairs(arguments(diff)) do
-        if vim.startswith(atom, axis) then
-          table.insert(axes, axis) break end
+        if vim.startswith(atom, object) then
+          table.insert(objects, object) break end
       end
     end
-    return axes end
+    return objects end
   if diff then return { 'single' } end
   for i = 2, #metadata_sexp do
     local head = head_name(metadata_sexp[i])
@@ -105,15 +105,15 @@ function M.leaf_axes (metadata_sexp)
 end
 
 ---@param metadata_sexp any
----@param axes string[]
----@return boolean is every one of AXES ready?
-function M.axes_ready_p (metadata_sexp, axes)
+---@param objects string[]
+---@return boolean is every one of OBJECTS ready?
+function M.objects_ready_p (metadata_sexp, objects)
   local ready = M.form(metadata_sexp, 'ready')
   if not ready then return false end
-  local ready_axes = {}
-  for _, axis in ipairs(arguments(ready)) do ready_axes[axis] = true end
-  for _, axis in ipairs(axes) do
-    if axis ~= 'single' and not ready_axes[axis] then return false end
+  local ready_objects = {}
+  for _, object in ipairs(arguments(ready)) do ready_objects[object] = true end
+  for _, object in ipairs(objects) do
+    if object ~= 'single' and not ready_objects[object] then return false end
   end
   return true
 end
@@ -130,14 +130,14 @@ function M.changed_folder_p (metadata_sexp)
   return false
 end
 
----Whether the headline is ready: a leaf on all its axes, or a folder
+---Whether the headline is ready: a leaf on all its objects, or a folder
 ---that carries (ready). False for an aggregate node, whose readiness
 ---is not drawn.
 ---@param metadata_sexp any
 ---@return boolean
 function M.ready_p (metadata_sexp)
-  local axes = M.leaf_axes(metadata_sexp)
-  if #axes > 0 then return M.axes_ready_p(metadata_sexp, axes) end
+  local objects = M.leaf_objects(metadata_sexp)
+  if #objects > 0 then return M.objects_ready_p(metadata_sexp, objects) end
   return M.changed_folder_p(metadata_sexp)
          and M.form(metadata_sexp, 'ready') ~= nil
 end
@@ -191,18 +191,18 @@ end
 -- ── the gestures ───────────────────────────────────────────────────
 
 ---Replace the readiness request of the headline at LINE_NUMBER with
----one that marks (READY true) or unmarks the leaves on AXES.
+---one that marks (READY true) or unmarks the leaves on OBJECTS.
 ---@param line_number integer
 ---@param ready boolean
----@param axes string[]
-function M.write_request (line_number, ready, axes)
+---@param objects string[]
+function M.write_request (line_number, ready, objects)
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
   local host = M.host(metadata_sexp)
   local request = { sexpr.symbol(ready and 'readyRequest'
                                  or 'unreadyRequest') }
-  for _, axis in ipairs(axes) do
-    if axis ~= 'single' then
-      table.insert(request, sexpr.symbol(axis)) end
+  for _, object in ipairs(objects) do
+    if object ~= 'single' then
+      table.insert(request, sexpr.symbol(object)) end
   end
   local edits = { { sexpr.symbol('DELETE'),
                     { sexpr.symbol('readyRequest') },
@@ -225,7 +225,7 @@ function M.children_ready_p (line_number)
   local some = false
   for _, line in ipairs(M.child_lines(line_number)) do
     local child = metadata.metadata_sexp_at_line_or_nil(line)
-    if child and (#M.leaf_axes(child) > 0
+    if child and (#M.leaf_objects(child) > 0
                   or M.changed_folder_p(child)) then
       some = true
       if not M.ready_p(child) then return false end
@@ -234,43 +234,43 @@ function M.children_ready_p (line_number)
   return some
 end
 
--- A gesture first gathers its requests, each { line, ready, axes },
+-- A gesture first gathers its requests, each { line, ready, objects },
 -- then writes them all or none.
 
 ---The requests of the one-level gesture on the headline at
----LINE_NUMBER. Empty when the axis prompt is dismissed.
+---LINE_NUMBER. Empty when the object prompt is dismissed.
 ---@param line_number integer
 ---@return table[]
 function M.requests_at_line (line_number)
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
   if not metadata_sexp then return {} end
-  local axes = M.leaf_axes(metadata_sexp)
-  if #axes > 0 then
-    local chosen = axes
-    if #axes > 1 then
-      local axis = picker.completing_read_with_cycle(
+  local objects = M.leaf_objects(metadata_sexp)
+  if #objects > 0 then
+    local chosen = objects
+    if #objects > 1 then
+      local object = picker.completing_read_with_cycle(
         'Which change (node = ∃ its existence, rel = ~ its relationship here)? ',
         { 'node', 'rel' }, { require_match = true })
-      if axis ~= 'node' and axis ~= 'rel' then return {} end
-      chosen = { axis } end
+      if object ~= 'node' and object ~= 'rel' then return {} end
+      chosen = { object } end
     return { { line = line_number,
-               ready = not M.axes_ready_p(metadata_sexp, chosen),
-               axes = chosen } } end
+               ready = not M.objects_ready_p(metadata_sexp, chosen),
+               objects = chosen } } end
   if M.changed_folder_p(metadata_sexp) then
     local ready = not M.ready_p(metadata_sexp)
     local requests = {}
     for _, line in ipairs(M.child_lines(line_number)) do
       local child = metadata.metadata_sexp_at_line_or_nil(line)
-      local child_axes = child and M.leaf_axes(child) or {}
-      if #child_axes > 0 then
+      local child_objects = child and M.leaf_objects(child) or {}
+      if #child_objects > 0 then
         table.insert(requests,
-                     { line = line, ready = ready, axes = child_axes }) end
+                     { line = line, ready = ready, objects = child_objects }) end
     end
     return requests end
   if M.vognode_p(metadata_sexp) then
     return { { line = line_number,
                ready = not M.children_ready_p(line_number),
-               axes = { 'all' } } } end
+               objects = { 'all' } } } end
   return {}
 end
 
@@ -284,7 +284,7 @@ function M.requests_for_subtree_at_line (line_number)
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
   if not metadata_sexp then return {} end
   local aggregate_node = M.vognode_p(metadata_sexp)
-                         and #M.leaf_axes(metadata_sexp) == 0
+                         and #M.leaf_objects(metadata_sexp) == 0
   local headline_ready
   if aggregate_node then
     headline_ready = M.children_ready_p(line_number)
@@ -294,12 +294,12 @@ function M.requests_for_subtree_at_line (line_number)
   local requests = {}
   if aggregate_node then
     table.insert(requests,
-                 { line = line_number, ready = ready, axes = { 'all' } }) end
+                 { line = line_number, ready = ready, objects = { 'all' } }) end
   for _, line in ipairs(M.subtree_lines(line_number)) do
     local headline = metadata.metadata_sexp_at_line_or_nil(line)
-    local axes = headline and M.leaf_axes(headline) or {}
-    if #axes > 0 then
-      table.insert(requests, { line = line, ready = ready, axes = axes }) end
+    local objects = headline and M.leaf_objects(headline) or {}
+    if #objects > 0 then
+      table.insert(requests, { line = line, ready = ready, objects = objects }) end
   end
   return requests
 end
@@ -312,8 +312,8 @@ function M.unmarks_several_leaves_p (requests)
   local leaves = 0
   for _, request in ipairs(requests) do
     if not request.ready then
-      if vim.tbl_contains(request.axes, 'all') then return true end
-      leaves = leaves + #request.axes end
+      if vim.tbl_contains(request.objects, 'all') then return true end
+      leaves = leaves + #request.objects end
   end
   return leaves > 1
 end
@@ -333,7 +333,7 @@ function M.write_requests_if_confirmed (requests)
      and vim.fn.input(M.WIDE_UNMARK_QUESTION) ~= 'yes' then
     return false end
   for _, request in ipairs(requests) do
-    M.write_request(request.line, request.ready, request.axes)
+    M.write_request(request.line, request.ready, request.objects)
   end
   return true
 end
@@ -387,7 +387,7 @@ end
 ---descendant that moved between the same two skgrepos. Before
 ---unmarking more than one move, ask. Then save.
 ---@param recursive boolean|nil
-function M.mark_gnode_skgrepo_changes_commitReady (recursive)
+function M.toggle_homeSkgrepo_move_commitReady (recursive)
   local move_line, pair =
     M.home_move_at_line(metadata.current_line_number())
   if not move_line then
@@ -396,7 +396,7 @@ function M.mark_gnode_skgrepo_changes_commitReady (recursive)
     metadata.metadata_sexp_at_line_or_nil(move_line))
   local requests = {}
   if not recursive then
-    requests = { { line = move_line, ready = ready, axes = { 'single' } } }
+    requests = { { line = move_line, ready = ready, objects = { 'single' } } }
   else
     local node_line =
       metadata.parent_headline_line(move_line,
@@ -406,7 +406,7 @@ function M.mark_gnode_skgrepo_changes_commitReady (recursive)
       local other = headline and M.home_move(headline)
       if other and other[1] == pair[1] and other[2] == pair[2] then
         table.insert(requests,
-                     { line = line, ready = ready, axes = { 'single' } }) end
+                     { line = line, ready = ready, objects = { 'single' } }) end
     end
   end
   if not M.write_requests_if_confirmed(requests) then return end
@@ -417,8 +417,8 @@ function M.mark_gnode_skgrepo_changes_commitReady (recursive)
   require('skg.save').request_save_buffer()
 end
 
-function M.mark_gnode_skgrepo_changes_commitReady_recursive ()
-  M.mark_gnode_skgrepo_changes_commitReady(true)
+function M.toggle_homeSkgrepo_move_commitReady_recursive ()
+  M.toggle_homeSkgrepo_move_commitReady(true)
 end
 
 return M

@@ -144,10 +144,10 @@ So far there are these endpoints:
       =(fork-repos ((N . REPO) ...))= pairs each forked node's id
       N with the owned skgrepo chosen for its clone. Both are absent on
       an ordinary save.
-    - =(strands-reviewed . "true")= and =(relevel-strands ("RELATION"
+    - =(strandeds-reviewed . "true")= and =(reset-strandeds ("RELATION"
       "RECORDER" "MEMBER") ...)= are present only on a retry after
-      =strand-confirmation=: the first says the user reviewed the
-      stranded relationships, the second names those to re-level
+      =strandeds-confirmation=: the first says the user reviewed the
+      stranded relationships, the second names those to reset to default
       (possibly none).
     - =(approved-hoist-pids "PID" ...)= is present only on a retry
       after =telescope-hoist-confirmation=. It is the exact list the
@@ -182,12 +182,13 @@ So far there are these endpoints:
     4. Final save response:
        =Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))=
        =content= is the re-rendered saved buffer (nil on failure). =errors= is a list of failure-explaining strings. =warnings= is a list of nonfatal messages. Both lists are present and empty if none.
-       When the saved buffer is one of the total diff view's, the response
-       ends with =(readiness-summary (ready N) (changed M) (foreign F) (order-only O) (unshown K))=:
+       When the saved buffer is one of the diff view's, the response
+       ends with =(readiness-summary (ready N) (changed M) (foreign F) (order-only O) (notEditable K))=:
        of the M changed files of the owned skgrepos (O of them changed only
        in order, and so ready), N are commit-ready; F files changed in
-       foreign skgrepos; and K changes are owned by nodes the buffer does
-       not show. A node is shown where the buffer has an editable
+       foreign skgrepos; and K changes are not editable in the view: they
+       are owned by nodes whose changes the buffer does not show. A
+       buffer shows a node's changes where it has an editable
        occurrence of it, in content or in a partner folder, or a
        historical phantom of it in content position: under the buffer
        root or an unrestricted vognode, or in the old content of such a
@@ -198,7 +199,7 @@ So far there are these endpoints:
        sets recomputed after the save: a new member in U is editable,
        with its content list, and any other new member is a
        write-protected member drawn without its content. It
-       makes no occurrence editable and appends no root; the "show
+       makes no occurrence editable and appends no root; the "integrate
        unshown changes" request below does. An editable-view request
        cascades as in any view, and only the expansion of a node
        outside U spends =initial_node_limit=; nothing else in the
@@ -209,7 +210,7 @@ So far there are these endpoints:
     folder when present, or by holding a child that affects it. A
     partner folder's members are compared with the node's partners in
     its relation as a set of node IDs, under the save's skgrepo
-    restriction, not counting a member the total diff view shows as
+    restriction, not counting a member the diff view shows as
     removed; a member carrying a relRepo request differs. A present
     flags folder, under any node, must likewise equal the node's flags.
   - Before mutation, the server computes the update-relevant neighborhood of
@@ -230,14 +231,14 @@ So far there are these endpoints:
     public than its member's new home (an inbound relationship of a
     privatizing move) is raised to the new default, and the save's
     warnings say so. If any other remains and the request lacks
-    =(strands-reviewed . "true")=, nothing is skgsave-committed and the
+    =(strandeds-reviewed . "true")=, nothing is skgsave-committed and the
     server replies, before any other decision and in place of
     save-result,
-    =((response-type strand-confirmation) (strands (((relation
+    =((response-type strandeds-confirmation) (strandeds (((relation
     "contains") (recorder "R") (member "M") (relRepo "REPO") (default
     "REPO")) ...)) (prompt "..."))=, with IDs but no titles. The
-    client re-issues the SAME save with =(strands-reviewed . "true")=
-    and the chosen =(relevel-strands ...)=; the server re-levels those
+    client re-issues the SAME save with =(strandeds-reviewed . "true")=
+    and the chosen =(reset-strandeds ...)=; the server resets those
     to their new defaults, saving each recorder (outside the view or
     not), so the views that show them rerender as collateral.
   - The first ALTERNATIVE terminal message: after validation, a save
@@ -284,7 +285,7 @@ So far there are these endpoints:
     approved retry, the ordinary save-result carries the shared overPrivateText-
     telescope warning. Declining leaves current client buffers and the
     server's open-view registry unchanged.
-  - Exactly one of =save-result=, =strand-confirmation=,
+  - Exactly one of =save-result=, =strandeds-confirmation=,
     =telescope-hoist-confirmation=, =fork-confirmation=, and the save-rerender
     =overPrivateText-telescope-confirmation= is sent as the terminal response to
     one save attempt.
@@ -339,14 +340,14 @@ So far there are these endpoints:
     of Tantivy title-index commits. =request-id= associates asynchronous
     responses with their requesting buffer and its buffer generation.
 
-** Total diff view
-  - Request: =((request . "total diff view") (buffer . "BUFFER") (view-id . "VIEW_ID"))=,
+** Diff view
+  - Request: =((request . "diff view") (buffer . "BUFFER") (view-id . "VIEW_ID"))=,
     where BUFFER is ="all changes"=, ="merges"=, ="skgrepo changes"= or
     ="order-only changes"=. The client sends one request per buffer, in
     that order, each after the previous answer.
-  - Response: LP response-type "total-diff-view", one of:
+  - Response: LP response-type "diff-view", one of:
     - =((content "ORG") (errors ()) (warnings ()))=: the buffer, now
-      registered under VIEW_ID as a buffer of the total diff view.
+      registered under VIEW_ID as a buffer of the diff view.
     - =((empty . t) (errors ()) (warnings ()))=: the buffer would show
       nothing, so the client does not open it.
     - =((content "") (errors ("REFUSAL")) (warnings ()))=: refused, when
@@ -358,11 +359,11 @@ So far there are these endpoints:
     skgrepo-changes buffers are PCSVFs over the nodeMerges and the home
     moves; the order-only buffer lists the nodes whose only change is
     the order of a list. Foreign skgrepos are excluded. See the
-    glossary's "Terms of the total diff view", and "Metadata of the
-    total diff view" below.
+    glossary's "Terms of the diff view", and "Metadata of the
+    diff view" below.
   - The server compares HEAD with the worktree through a graph straddle it
     keeps per connection, brought up to date at each request, at each
-    save of a buffer of the total diff view, and at each rerender of
+    save of a buffer of the diff view, and at each rerender of
     every view. Closing the last such buffer drops it, as does a
     rebuild of the session-lifetime stores, so the next request reads
     both halves from the disk the rebuilt live graph was read from. Saving such a buffer is ordinary (see "Save
@@ -377,7 +378,7 @@ So far there are these endpoints:
     a viewnode it creates: a context node's body starts folded. A
     root stays until the buffer is closed; a root whose node a commit
     deleted is drawn as a deleted phantom.
-  - Logic: =server/serve/handlers/total_diff_view.rs=, =server/pcsvf.rs=,
+  - Logic: =server/serve/handlers/diff_view.rs=, =server/pcsvf.rs=,
     =server/to_org/render/changes.rs=.
 
 ** Stage and commit
@@ -388,7 +389,7 @@ So far there are these endpoints:
     response is one of:
     - =((needs-confirmation . t) (readiness-summary ...) (errors ()) (warnings ()))=
       when the readiness summary (the save response's form, with
-      =(unshown 0)=) is incomplete and the request is not confirmed.
+      =(notEditable 0)=) is incomplete and the request is not confirmed.
       Nothing changes, and the rerender stream is empty.
     - =((commits (("SKGREPO" "COMMIT-ID") ...)) (errors (...)) (warnings ()))=
       otherwise: every owned skgrepo with changes had its =.skg= files
@@ -396,7 +397,7 @@ So far there are these endpoints:
       the gitrepo's configured user. A skgrepo without changes is in
       neither list; one that failed is an error. When something was
       committed, the rerender stream rerenders each open buffer of
-      the total diff view over the rebuilt graph straddle, as any
+      the diff view over the rebuilt graph straddle, as any
       rerender does: its roots and what it drew editable stay, and what
       was committed loses its change facts. The marks of the changes committed are dropped
       from the readiness store.
@@ -406,19 +407,19 @@ So far there are these endpoints:
   - Logic: =server/serve/handlers/stage_and_commit.rs=,
     =server/git_ops/stage_and_commit.rs=.
 
-** Show unshown changes
-  - Request: =((request . "show unshown changes") (view-id . "VIEW_ID"))=,
-    where VIEW_ID names a buffer of the total diff view. The client
+** Integrate unshown changes
+  - Request: =((request . "integrate unshown changes") (view-id . "VIEW_ID"))=,
+    where VIEW_ID names a buffer of the diff view. The client
     sends it only for a buffer with no unsaved changes, since the
     server works on the viewforest it registered at the last rerender.
-  - Response: LP response-type "show-unshown-changes", then a rerender
+  - Response: LP response-type "integrate-unshown-changes", then a rerender
     stream (rerender-lock, rerender-view*, rerender-done). The
     response is one of:
     - =((readiness-summary ...) (errors ()) (warnings ()))=, the save
       response's form, for the buffer as rerendered; the rerender
       stream carries that buffer.
     - =((errors ("REFUSAL")) (warnings ()))= when the skgrepo
-      restriction is not =all=, VIEW_ID is not a buffer of the total
+      restriction is not =all=, VIEW_ID is not a buffer of the
       diff view, or the rerender fails. The rerender stream is empty.
   - Logic: the graph straddle is brought up to date, and the buffer's
     fresh PCSVF sets computed. Each node of U without an editable
@@ -430,7 +431,7 @@ So far there are these endpoints:
     appended as a root, at the end, in ID order, and completed; R is
     deduplicated with the buffer's roots pinned, so that a changed
     cycle that already has a root gains no second one.
-    =server/serve/handlers/show_unshown_changes.rs=, =server/pcsvf.rs=
+    =server/serve/handlers/integrate_unshown_changes.rs=, =server/pcsvf.rs=
     ('ensure_editableOccurrences_exist',
     'contentOrigins_missing_from_buffer'), and 'rerender_view' in
     =server/update_buffer.rs=.
@@ -461,7 +462,7 @@ So far there are these endpoints:
     candidate graph, builds that graph and a fresh Tantivy index from the same
     node vector, then atomically swaps in the new runtime generation. It does
     not rewrite =.skg= files. Failure leaves the old generation live. Success
-    closes existing views, drops the graph straddle of the total diff
+    closes existing views, drops the graph straddle of the diff
     view, and recomputes context rankings for search.
 
 ** relRepo info
@@ -645,7 +646,7 @@ one automatically.
        =Content-Length: N\r\n\r\n((response-type rerender-done) (errors ("..." ...)) (warnings ("..." ...)))=
        Emacs removes the rerender-view handler and unlocks any remaining buffers.
   - Behavior: Re-renders every open view from server memory; a buffer
-    of the total diff view is reconciled over the graph straddle.
+    of the diff view is reconciled over the graph straddle.
     Does not save or modify the graph. Refreshes all views without
     requiring a save.
   - All view text is prepared in memory before the release decision.
@@ -925,10 +926,10 @@ under different parents):
 - =cycle= — this position repeats an ancestor's ID;
 - =(homeRepoHerald ⌂:LABEL)= — the node sits at a skgrepo boundary (a
   root, or a skgrepo differing from its nearest unrestricted-vognode ancestor);
-- =(homeMove (old OLD) (new NEW))= — in the skgrepo-changes buffer of
-  the total diff view, the node's home skgrepo moved from OLD to NEW
+- =(homeSkgrepoMove (old OLD) (new NEW))= — in the skgrepo-changes buffer of
+  the diff view, the node's home skgrepo moved from OLD to NEW
   since HEAD; herald "-OLD +NEW". A display fact, discarded at save;
-- =(movedLikeAncestor LETTER)= — beside =homeMove=, when the nearest
+- =(movedLikeAncestor LETTER)= — beside =homeSkgrepoMove=, when the nearest
   vognode ancestor whose home moved moved the same way; LETTER names
   that ancestor as the relationship tokens do (a = the viewparent).
   Herald "Δ⌂=LETTER". A display fact, discarded at save;
@@ -981,7 +982,7 @@ When view completion would CREATE a viewnode for node N as
 recursive content, and an owned overrider R of N is visible
 under the skgrepo restriction, it draws R instead -- transitively (a
 owned chain D overrides C overrides N is legal and resolves to
-the last visible link), cycle-guarded, and never in the total diff view.
+the last visible link), cycle-guarded, and never in the diff view.
 Ordinary completion does not rewrite an existing raw viewnode merely because
 an overrider is visible (closing and reopening normalizes). In a de-novo
 render, only content substitutes: PartnerFolder members, view roots, search
@@ -1138,7 +1139,7 @@ The server writes to =<data_root>/logs/=:
 ** Readiness marks file
 
 =<data_root>/readiness-marks.json= holds the commit-readiness marks
-of the total diff view ('server/readiness_store.rs'). The server reads
+of the diff view ('server/readiness_store.rs'). The server reads
 it at startup and rewrites it after every change; a missing or
 unreadable file means no marks. It is a JSON object whose =marks= is a
 list of ={"leaf": KEY, "fingerprint": N}= entries. KEY names one
@@ -1233,13 +1234,13 @@ remains the established bare non-vognode atom:
 =hiderFolder=, =hiddenFolder=, =hiddenInSubscribeeFolder=, or
 =hiddenOutsideOfSubscribeeFolder=.
 
-** Metadata of the total diff view
+** Metadata of the diff view
 
-The buffers of the total diff view (see "Total diff view") draw
+The buffers of the diff view (see "Diff view") draw
 changes with the forms below. All are display facts except the
 readiness requests, which the save consumes; saving a buffer reads
 none of the new viewnodes, which are save-inert. The glossary's "Terms
-of the total diff view" defines the vocabulary.
+of the diff view" defines the vocabulary.
 
 *** Presence: =(diff ATOMS)=
 ATOMS are drawn from =node+ node- rel+ rel-=: the node HEAD lacks (=node+=)
@@ -1260,7 +1261,7 @@ to set or clear the marks of those leaves; the object =all= names
 every leaf of an aggregate, one level down. These sit where =(diff ...)= sits, and also at top level on the
 properties below other than =bodyDiff=.
 
-*** The total diff view's viewnodes
+*** The diff view's viewnodes
 - =removedAlias=, =removedID= -- in an alias or ID folder: an alias or
   extra ID that HEAD has and the worktree lacks, its headline the alias
   or the ID, carrying =(diff rel-)=. Saving reads no alias from it and
@@ -1273,7 +1274,7 @@ properties below other than =bodyDiff=.
   the old title, its body the old body.
 - =bodyDiff= -- under an old text: the line diff of the body, each line
   prefixed by a space, =-= or =+=.
-- =(homeMove (old REPO) (new REPO))= -- the node's home skgrepo moved.
+- =(homeSkgrepoMove (old REPO) (new REPO))= -- the node's home skgrepo moved.
 - =(relRepoMove (old REPO) (new REPO))= -- under a member: the skgrepo
   recording its relationship to its viewparent moved.
 - =(changesetMarker content)=, =(changesetMarker relRepo)=,
@@ -1291,7 +1292,7 @@ changed member is ready. Its herald reads "its X changed (this file)"
 or "(other files)" (see the glossary's "in, out").
 
 *** In view stats
-=(homeMove (old OLD) (new NEW))= and =(movedLikeAncestor LETTER)= may sit
+=(homeSkgrepoMove (old OLD) (new NEW))= and =(movedLikeAncestor LETTER)= may sit
 in a vognode's =(viewStats ...)= in the skgrepo-changes buffer; see
 "Stats metadata" above.
 

@@ -8,11 +8,11 @@
 (require 'skg-readiness)
 
 (defun test-skg-readiness--run (lines line-number command
-                                       &optional prefix axis answer)
+                                       &optional prefix object answer)
   "Insert LINES, run COMMAND (with PREFIX) on line LINE-NUMBER, and
 return the buffer's lines. The save is stubbed; it must be called
-once, or never when ANSWER is 'no. AXIS answers the prompt for a
-member's axis, and ANSWER ('yes or 'no) the question before a wide
+once, or never when ANSWER is 'no. OBJECT answers the prompt for a
+member's object, and ANSWER ('yes or 'no) the question before a wide
 unmark; without them, those must not be asked. A rewritten headline
 without a title ends in a space, as 'skg-format-headline' writes it."
   (with-temp-buffer
@@ -25,8 +25,8 @@ without a title ends in a space, as 'skg-format-headline' writes it."
                  (lambda (&rest _) (setq saves (1+ saves))))
                 ((symbol-function 'completing-read)
                  (lambda (&rest _)
-                   (should axis)
-                   axis))
+                   (should object)
+                   object))
                 ((symbol-function 'yes-or-no-p)
                  (lambda (prompt)
                    (should answer)
@@ -47,12 +47,12 @@ without a title ends in a space, as 'skg-format-headline' writes it."
                   1 #'skg-cycle-commit-ready)
                  '("** (skg (oldText title) (ready) (unreadyRequest)) txt"))))
 
-(ert-deftest test-skg-cycle-commit-ready-asks-which-axis-of-a-member ()
+(ert-deftest test-skg-cycle-commit-ready-asks-which-object-of-a-member ()
   (should (equal (test-skg-readiness--run
                   '("* (skg (node (id k) (repo r) (diff node+ rel+) (ready rel))) k")
                   1 #'skg-cycle-commit-ready nil "rel")
                  '("* (skg (node (id k) (repo r) (diff node+ rel+) (ready rel) (unreadyRequest rel))) k")))
-  ;; With one axis, nothing is asked.
+  ;; With one object, nothing is asked.
   (should (equal (test-skg-readiness--run
                   '("* (skg (historical (id d) (repo r) (diff node-))) d")
                   1 #'skg-cycle-commit-ready)
@@ -98,7 +98,7 @@ without a title ends in a space, as 'skg-format-headline' writes it."
                    "* (skg (node (id other) (repo r))) other"
                    "** (skg (oldText title)) other"))))
 
-(ert-deftest test-skg-mark-gnode-skgrepo-changes-commitReady ()
+(ert-deftest test-skg-toggle-homeSkgrepo-move-commitReady ()
   (let ((lines '("* (skg (node (id a) (repo b))) a"
                  "** (skg (homeSkgrepoMove (old x) (new b)))"
                  "** (skg (node (id c) (repo b) writeProtected)) c"
@@ -106,7 +106,7 @@ without a title ends in a space, as 'skg-format-headline' writes it."
                  "** (skg (node (id e) (repo b))) e"
                  "*** (skg (homeSkgrepoMove (old y) (new b)))")))
     (should (equal (test-skg-readiness--run
-                    lines 1 #'skg-mark-gnode-skgrepo-changes-commitReady)
+                    lines 1 #'skg-toggle-homeSkgrepo-move-commitReady)
                    '("* (skg (node (id a) (repo b))) a"
                      "** (skg (homeSkgrepoMove (old x) (new b)) (readyRequest)) "
                      "** (skg (node (id c) (repo b) writeProtected)) c"
@@ -115,7 +115,7 @@ without a title ends in a space, as 'skg-format-headline' writes it."
                      "*** (skg (homeSkgrepoMove (old y) (new b)))")))
     ;; Recursively: only the moves between the same two skgrepos.
     (should (equal (test-skg-readiness--run
-                    lines 1 #'skg-mark-gnode-skgrepo-changes-commitReady '(4))
+                    lines 1 #'skg-toggle-homeSkgrepo-move-commitReady '(4))
                    '("* (skg (node (id a) (repo b))) a"
                      "** (skg (homeSkgrepoMove (old x) (new b)) (readyRequest)) "
                      "** (skg (node (id c) (repo b) writeProtected)) c"
@@ -153,7 +153,7 @@ without a title ends in a space, as 'skg-format-headline' writes it."
                  '("* (skg (node (id txt) (repo r))) txt"
                    "** (skg (oldText title) (ready)) txt"))))
 
-(ert-deftest test-skg-mark-gnode-skgrepo-changes-commitReady-unmarks ()
+(ert-deftest test-skg-toggle-homeSkgrepo-move-commitReady-unmarks ()
   (let ((lines '("* (skg (node (id a) (repo b))) a"
                  "** (skg (homeSkgrepoMove (old x) (new b)) (ready))"
                  "** (skg (node (id c) (repo b) writeProtected)) c"
@@ -162,14 +162,14 @@ without a title ends in a space, as 'skg-format-headline' writes it."
     (dolist (line-number '(1 2))
       (should (equal (test-skg-readiness--run
                       lines line-number
-                      #'skg-mark-gnode-skgrepo-changes-commitReady)
+                      #'skg-toggle-homeSkgrepo-move-commitReady)
                      '("* (skg (node (id a) (repo b))) a"
                        "** (skg (homeSkgrepoMove (old x) (new b)) (ready) (unreadyRequest)) "
                        "** (skg (node (id c) (repo b) writeProtected)) c"
                        "*** (skg (homeSkgrepoMove (old x) (new b)) (ready))"))))
     ;; Recursively, two moves: asked first.
     (should (equal (test-skg-readiness--run
-                    lines 1 #'skg-mark-gnode-skgrepo-changes-commitReady
+                    lines 1 #'skg-toggle-homeSkgrepo-move-commitReady
                     '(4) nil 'yes)
                    '("* (skg (node (id a) (repo b))) a"
                      "** (skg (homeSkgrepoMove (old x) (new b)) (ready) (unreadyRequest)) "

@@ -157,12 +157,12 @@ M.commands = {
   CycleCommitReadyRecursive = { module = 'skg.readiness',
                                 fn = 'cycle_commit_ready_recursive',
                                 desc = 'Mark (or unmark) every change in the subtree commit-ready, and save' },
-  MarkGnodeSkgrepoChangesCommitReady = { module = 'skg.readiness',
-                                         fn = 'mark_gnode_skgrepo_changes_commitReady',
-                                         desc = "Toggle the commit-readiness of the node's home-skgrepo move, and save" },
-  MarkGnodeSkgrepoChangesCommitReadyRecursive = {
+  ToggleHomeSkgrepoMoveCommitReady = { module = 'skg.readiness',
+                                       fn = 'toggle_homeSkgrepo_move_commitReady',
+                                       desc = "Toggle the commit-readiness of the node's home-skgrepo move, and save" },
+  ToggleHomeSkgrepoMoveCommitReadyRecursive = {
     module = 'skg.readiness',
-    fn = 'mark_gnode_skgrepo_changes_commitReady_recursive',
+    fn = 'toggle_homeSkgrepo_move_commitReady_recursive',
     desc = 'Toggle the commit-readiness of every home move in the subtree like this one, and save' },
   DiffViewIntegrateUnshownChanges = {
     module = 'skg.integrate_unshown_changes',
@@ -267,8 +267,8 @@ M.content_view_bindings = {
   { 'sS', 'SetRepoRecursive' },        -- C-c s S
   { 'rr', 'CycleCommitReady' },          -- C-c r r
   { 'rR', 'CycleCommitReadyRecursive' }, -- C-u C-c r r
-  { 'rh', 'MarkGnodeSkgrepoChangesCommitReady' }, -- C-c r h
-  { 'rH', 'MarkGnodeSkgrepoChangesCommitReadyRecursive' }, -- C-u C-c r h
+  { 'rh', 'ToggleHomeSkgrepoMoveCommitReady' }, -- C-c r h
+  { 'rH', 'ToggleHomeSkgrepoMoveCommitReadyRecursive' }, -- C-u C-c r h
   { 'ru', 'DiffViewIntegrateUnshownChanges' }, -- C-c r u
   { 'rc', 'StageAndCommit' },            -- C-c r c
   { 'sx', 'SetFlagSearchMatching' },

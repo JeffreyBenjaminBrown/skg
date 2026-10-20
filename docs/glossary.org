@@ -681,7 +681,7 @@ validation, never by save extraction. The =(rels ...)= form renders it as
 
 A vognode standing for something that is not a current graph member
 ('Phantom' in 'server/types/viewnode.rs'). There are three kinds:
-*Historical* (in the total diff view, a node HEAD has and the worktree
+*Historical* (in the diff view, a node HEAD has and the worktree
 lacks; it shows HEAD's title and body), *Deleted* (a save just deleted
 it; it keeps its last title and body), and *Unknown* (a reference that
 resolves to nothing; see "unknown node"). Phantoms are save-inert.
@@ -699,7 +699,7 @@ references.
 *** save-inert
 
 A viewnode is *save-inert* if it emits no fieldIntents: phantoms,
-restricted vognodes, and the total diff view's properties, among
+restricted vognodes, and the diff view's properties, among
 them removed aliases and IDs. Its descendants may still emit them, so save
 extraction still visits them.
 
@@ -707,12 +707,12 @@ extraction still visits them.
 
 Headline is a term from org-mode. It refers to a line that begins with some asterisks, followed by at least one whitespace, followed by at least one non-whitespace. The text after the first chunk of adjacent whitespace is what I'm calling the 'title'.
 
-** Terms of the total diff view
+** Terms of the diff view
 
-The total diff view is specified in
+The diff view is specified in
 'TODO/total-diff-view/02_plan.org'; these are its terms.
 
-*** TDV = total diff view
+*** diff view
 
 Four buffers that show every change in the owned skgrepos since their
 last commits, with the context needed to understand them: "all
@@ -729,7 +729,7 @@ PCSVFs over subsets of the changes.
 *** graph straddle, before-graph, after-graph
 
 The *graph straddle* ('GraphStraddle { before, after }',
-'server/graph_straddle/') is what the TDV compares. A straddle stands
+'server/graph_straddle/') is what the diff view compares. A straddle stands
 with one foot in the committed graph and one in the live graph. The
 *before-graph* is an in-Rust graph built from each owned skgrepo at
 HEAD (each foreign skgrepo at its worktree); the *after-graph* is the
@@ -793,7 +793,7 @@ content relationships changed skgrepo") and the order-only marker
 *** removed alias, removed ID
 
 An alias or extra ID of a node that HEAD has and the worktree lacks.
-The TDV draws it in the node's alias or ID folder as its own kind
+The diff view draws it in the node's alias or ID folder as its own kind
 ('Property::RemovedAlias', 'Property::RemovedID'), where the LCS of
 the two lists puts it, with the '-' herald. It is save-inert by kind:
 the save reads no alias from it and does not count it among the
@@ -801,14 +801,15 @@ node's IDs. Marking it marks the leaf of the lost alias or ID.
 
 *** readiness summary
 
-The line a client shows after every save of a TDV buffer, after the
-"show unshown changes" command (C-c r u), and before a
+The line a client shows after every save of a diff-view buffer, after the
+"integrate unshown changes" command (C-c r u), and before a
 stage-and-commit that would leave changes behind: "12 of 14 changed
 files are ready", or "COMMIT READY. All 14 of 14 changed files are
 ready." It also counts the changed files of foreign skgrepos and the
-*unshown* changes: those owned by a node of which the buffer has no
-editable occurrence (nor a historical phantom in content position).
-A save never shows them; C-c r u does.
+*changes not editable in the view*: those recorded by a node of which
+the buffer has no editable occurrence (nor a historical phantom in
+content position). A save never makes them editable; C-c r u
+integrates them.
 
 *** readiness request, gesture
 
@@ -820,7 +821,7 @@ writes readiness requests on one or many headlines, then saves.
 *** in, out, "(this file)", "(other files)"
 
 A relationship is *out* from its recorder (the node whose file records
-it) and *in* to its member. In the TDV, a folder of out-relationships
+it) and *in* to its member. In the diff view, a folder of out-relationships
 that changed is labelled "its ... changed (this file)", and one of
 in-relationships "its ... changed (other files)". Changeset markers
 carry no suffix.

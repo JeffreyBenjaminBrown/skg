@@ -433,7 +433,7 @@ more public than a node's new home (an inbound relationship of a move
 to a more private skgrepo) is raised to that home, and the save's
 warnings say so. If it would leave others at their old, more private
 skgrepos, it saves nothing yet: it lists them and asks whether to
-re-level all of them to their new defaults, none, or each in turn;
+reset all of them to their new defaults, none, or each in turn;
 then it saves with that answer, or not at all if you quit.
 *** <localleader>sS : :SkgSetRepoRecursive
 Like 'SetRepo', but it also
@@ -460,19 +460,19 @@ and edits the acquirer's metadata to request a merge.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the merge.
-** <localleader>r : commit readiness, in the total diff view
-In a buffer of the total diff view (<localleader>vd), each change can
+** <localleader>r : commit readiness, in the diff view
+In a buffer of the diff view (<localleader>vd), each change can
 be marked commit-ready. A mark approves the change as it is now:
 editing the changed thing again makes the mark lapse. Marks live on
 the server, in '<data_root>/readiness-marks.json'. A headline whose
 change is ready shows ✓ after it; an aggregate (a folder of changes,
 a changeset marker) shows ✓ when all of its changes are.
 
-After every save of one of the total diff view's buffers, a
+After every save of one of the diff view's buffers, a
 notification shows the readiness summary: "12 of 14 changed files are
 ready", or "COMMIT READY. All 14 of 14 changed files are ready.". It
-adds how many changes the buffer does not show (<localleader>ru shows
-them) and how many files changed in foreign skgrepos.
+adds how many changes are not editable in this view (<localleader>ru
+integrates them) and how many files changed in foreign skgrepos.
 
 A gesture that would unmark more than one change (a recursive one, one
 on a folder of changes, or one on a changed node, which unmarks every
@@ -491,15 +491,15 @@ the node owns. Works on write-protected headlines too.
 *** <localleader>rR : :SkgCycleCommitReadyRecursive
 Marks every change in the subtree at point, or unmarks them if the
 headline at point is ready, then saves. (Emacs: C-u C-c r r.)
-*** <localleader>rh : :SkgMarkGnodeSkgrepoChangesCommitReady
+*** <localleader>rh : :SkgToggleHomeSkgrepoMoveCommitReady
 Toggles the commit-readiness of the home-skgrepo move of the node at
 point (or of the move at point), then saves: it unmarks the move if
 it is ready, else marks it. Works on write-protected headlines too.
-*** <localleader>rH : :SkgMarkGnodeSkgrepoChangesCommitReadyRecursive
+*** <localleader>rH : :SkgToggleHomeSkgrepoMoveCommitReadyRecursive
 Also toggles, in the same direction, every descendant whose home
 moved between the same two skgrepos. (Emacs: C-u C-c r h.)
-*** <localleader>ru : :SkgTdvShowUnshownChanges
-Shows every change the buffer of the total diff view does not show.
+*** <localleader>ru : :SkgDiffViewIntegrateUnshownChanges
+Integrates every change not editable in the buffer of the diff view.
 Each changed node with no editable occurrence becomes editable where
 the buffer first draws it, in content or else in a partner folder,
 with its change and its content drawn under it; when a change is
@@ -513,7 +513,7 @@ git-commits it, in every owned skgrepo that has changes, with that
 message. If not every changed file is ready, it first shows the
 readiness summary and proceeds only if you type the word "yes". Every
 open view must be saved or reverted first. Afterward the open buffers
-of the total diff view are rerendered: each keeps its roots, its
+of the diff view are rerendered: each keeps its roots, its
 folding and what it drew editable, and what was committed no longer
 shows as a change. The
 commit lapses the marks of everything it committed.
@@ -578,9 +578,9 @@ whose title is an =[[id:...][...]]= link to the original node.
 If the original headline title already contains a link, the
 command asks "Are you sure?" before proceeding.
 ** <localleader>v : view-level commands
-*** <localleader>vd : :SkgDiffView
+*** <localleader>vd : :SkgDiffViewOpen
 If you use git to manage your data,
-this opens the total diff view: every change in the owned skgrepos
+this opens the diff view: every change in the owned skgrepos
 since their last commits (how each worktree differs from HEAD), with
 the context needed to understand it. It opens up to four buffers,
 "skg://diff-view: all changes", "...: merges", "...: skgrepo changes"
@@ -591,9 +591,9 @@ what it draws anew by what changed: a new member that changed, or
 leads to a change, is editable with its content, and any other new
 member is a write-protected member drawn without its content. But a
 save makes nothing editable that the buffer already draws, and
-appends no root: a change since the buffer opened that it draws
-nowhere editable is unshown, and the
-readiness summary counts it. <localleader>ru shows such changes.
+appends no root: the readiness summary counts a change since the
+buffer opened that it draws nowhere editable as not editable in this
+view. <localleader>ru integrates such changes.
 Nothing the buffer draws editable is write-protected again by the
 server. An editable-view
 request (<localleader>sd) works as in any view, except that only the
@@ -601,7 +601,7 @@ expansion of a node outside U (the nodes the buffer unfolds anyway:
 those that changed and those leading to them) is charged to
 'initial_node_limit'; nothing else in the buffer is bounded by that
 limit.
-Why the total diff view commits all skgrepos, and offers nothing
+Why the diff view commits all skgrepos, and offers nothing
 more granular: a single-skgrepo commit is dangerous. The graph is one
 structure spread over many files in many repos. Committing some changed files
 and not others leaves HEAD inconsistent: it can reference nodes it

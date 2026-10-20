@@ -1332,3 +1332,53 @@ readiness forms' OBJECTS, the file paths, "a writable folder's
 viewparent", the sets recomputed after a save), 'docs/heralds.org'
 ("diff object") and both COMMANDS files ("write-protected member drawn
 without its content").
+** Slice 1: deviations
+*** names the plan's list did not give
+The server's remaining "total diff view" and "tdv" identifiers follow
+the 'diffView' rule: 'TotalDiffViewBuffer' is 'DiffViewBuffer',
+'handle_total_diff_view_request' is 'handle_diffView_request',
+'total_diff_view_buffer' is 'diffView_buffer',
+'total_diff_view_property_rules' is 'diffView_property_rules',
+'RequestType::TotalDiffView' and 'TcpToClient::TotalDiffView' are
+'DiffView' (response tag 'diff-view'), the 'tdv_buffer' fields and
+locals are 'diffView_buffer_kind', 'register_tdv_view' is
+'register_diffView_view' and 'stream_rerender_tdv_views' is
+'stream_rerender_diffView_views'. 'ShowUnshownChanges' is
+'IntegrateUnshownChanges' (response tag 'integrate-unshown-changes').
+The herald style key 'homeMove_skgrepo' is 'homeSkgrepoMove_skgrepo'.
+*** the clients
+Emacs has one home-skgrepo-move command, recursive under a prefix
+argument, so only 'skg-toggle-homeSkgrepo-move-commitReady' exists
+there; Neovim has both commands. The Lua functions are
+'diffView_open', 'diffView_integrate_unshown_changes' and
+'toggle_homeSkgrepo_move_commitReady' (and '_recursive'). The Emacs
+handler 'skg--show-unshown-changes-handler', which had no 'tdv'
+prefix, is 'skg--integrate-unshown-changes-handler'. The summary
+count is 'not-editable' / 'not_editable' in the clients.
+*** strandeds on the wire
+The confirmation's payload '(strands ...)' is '(strandeds ...)'. The
+prompts that said "Re-level" say "Reset ... to default" (the server's:
+"Reset them to their new defaults?"), as the identifiers say
+'reset_to_default'.
+*** "unshown" stays in the request's name
+The plan keeps "unshown" in "integrate unshown changes", so the grep
+still finds it there, in its files and in its commands. Everywhere
+else the count and the prose say "not editable".
+*** test files and data follow the renames
+'tests/tdv.rs' and 'tests/tdv/' are 'tests/diff_view.rs' and
+'tests/diff_view/'; 'tests/integration/total-diff-view/' is
+'tests/integration/diff-view/'; the client specs are
+'test-skg-diff-view.el', 'diff_view_spec.lua',
+'test-skg-integrate-unshown-changes.el',
+'integrate_unshown_changes_spec.lua' and
+'test-skg-strandeds-confirmation.el'. The fold-preservation
+integration tests' node IDs 'tdvr' and 'tdvc' are 'dvroot' and
+'dvchild'. The code map's slice 7 entry still names
+'tests/tdv/roundtrip/view.rs'.
+*** docs
+The glossary's "TDV = total diff view" entry is "diff view". The API
+doc's readiness-summary paragraph says which changes are not
+editable in the view, in the glossary's wording ("a buffer shows a
+node's changes where ..."). Both COMMANDS files reword the sentence
+about changes a save draws nowhere editable, since "is not editable
+in this view" would repeat "draws nowhere editable".
