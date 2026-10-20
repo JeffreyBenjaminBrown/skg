@@ -37,8 +37,9 @@ use crate::types::views_state::{DiffViewBufferKind, pids_from_viewforest};
 use crate::update_buffer::{complete_viewforest_with_graph_straddle, finish_viewforest};
 
 use ego_tree::{NodeId, NodeRef};
-use std::collections::{BTreeSet, HashSet, VecDeque};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::error::Error;
+use std::sync::OnceLock;
 
 /// The sets that define a PCSVF. See the module comment.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -61,8 +62,41 @@ impl<'a> DiffViewSource<'a> {
   pub fn sets (
     &self,
   ) -> &'a PcsvfSets {
-    self . straddle . pcsvf_sets_of_buffer (self . diffView_buffer_kind) }
+    pcsvf_sets_of_buffer (self . straddle, self . diffView_buffer_kind) }
 }
+
+/// The PCSVF sets of each buffer kind, each computed on first use.
+/// The graph straddle holds one ('GraphStraddle::pcsvf_cache'), so
+/// the sets are computed once per straddle and persist with it across
+/// requests.
+pub struct PcsvfCache {
+  sets_by_buffer_kind : HashMap<DiffViewBufferKind, OnceLock<PcsvfSets>>,
+}
+
+impl Default for PcsvfCache {
+  fn default (
+  ) -> PcsvfCache {
+    PcsvfCache {
+      sets_by_buffer_kind :
+        DiffViewBufferKind::ALL . into_iter ()
+        . map ( |diffView_buffer_kind| (diffView_buffer_kind, OnceLock::new ()) )
+        . collect () } }
+}
+
+/// The sets of the PCSVF that a buffer of the diff view draws. The
+/// order-only buffer draws no PCSVF: its sets are empty, so each of
+/// its roots is drawn with its content as unexpanded write-protected
+/// members. Computed once per straddle ('PcsvfCache').
+pub fn pcsvf_sets_of_buffer (
+  straddle             : &GraphStraddle,
+  diffView_buffer_kind : DiffViewBufferKind,
+) -> &PcsvfSets {
+  straddle . pcsvf_cache . sets_by_buffer_kind [&diffView_buffer_kind]
+    . get_or_init ( || match diffView_buffer_kind {
+      DiffViewBufferKind::AllChanges       => pcsvf_sets (straddle),
+      DiffViewBufferKind::Merges           => pcsvf_sets_for_merges (straddle),
+      DiffViewBufferKind::SkgrepoChanges   => pcsvf_sets_for_home_moves (straddle),
+      DiffViewBufferKind::OrderOnlyChanges => PcsvfSets::default (), } ) }
 
 /// The sets of the PCSVF over all of C.
 pub fn pcsvf_sets (

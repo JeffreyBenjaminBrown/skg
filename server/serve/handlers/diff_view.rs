@@ -69,7 +69,7 @@ pub fn handle_diffView_request (
 
 /// The named buffer, drawn from 'straddle'. The "all changes" buffer is
 /// the PCSVF over all of C; the merges and skgrepo-changes buffers
-/// are PCSVFs over subsets of it ('GraphStraddle::pcsvf_sets_of_buffer').
+/// are PCSVFs over subsets of it ('pcsvf_sets_of_buffer').
 /// The order-only buffer lists the nodes whose only change is the
 /// order of a list, in ID order. None when the buffer would be empty.
 pub fn diffView_buffer (

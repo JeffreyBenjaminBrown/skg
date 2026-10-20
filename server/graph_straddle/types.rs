@@ -1,18 +1,18 @@
 //! The types of the graph straddle ('server/graph_straddle/mod.rs'):
 //! the straddle itself, with the sets it computes once per straddle
-//! (C, the change-forest leaves, each buffer's PCSVF sets); the
+//! (C, the change-forest leaves) and the diff view's cache of each
+//! buffer's PCSVF sets ('PcsvfCache'), which it keeps but does not
+//! read; the
 //! presence of a node or relationship in its two graphs; a node's own
 //! changes ('NodeChanges'); a partner over the union of the two graphs
 //! ('Partner'); and the two halves of C ('ChangedPids').
 
 use crate::diff_view::change_leaves::ChangeLeaves;
-use crate::diff_view::pcsvf::{
-  PcsvfSets, pcsvf_sets, pcsvf_sets_for_home_moves, pcsvf_sets_for_merges};
+use crate::diff_view::pcsvf::PcsvfCache;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::git::Sign;
 use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use crate::types::nodes::complete::Flag;
-use crate::types::views_state::DiffViewBufferKind;
 
 use std::collections::BTreeSet;
 use std::sync::{Arc, OnceLock};
@@ -35,11 +35,9 @@ pub struct GraphStraddle {
   pub(super) changed_pids : OnceLock<ChangedPids>,
   /// Computed on first use; see 'GraphStraddle::change_leaves'.
   pub(super) change_leaves : OnceLock<ChangeLeaves>,
-  /// Computed on first use; see 'GraphStraddle::pcsvf_sets'.
-  pub(super) pcsvf_sets : OnceLock<PcsvfSets>,
-  /// Computed on first use; see 'GraphStraddle::pcsvf_sets_of_buffer'.
-  pub(super) merges_pcsvf_sets     : OnceLock<PcsvfSets>,
-  pub(super) home_moves_pcsvf_sets : OnceLock<PcsvfSets>,
+  /// The diff view's per-buffer sets; see 'pcsvf_sets_of_buffer'.
+  /// Kept here so that they persist with the straddle across requests.
+  pub(crate) pcsvf_cache : PcsvfCache,
 }
 
 /// Which graphs of the straddle hold a node or a relationship.
@@ -97,9 +95,7 @@ impl GraphStraddle {
     GraphStraddle { before, after, head_identity, foreign_changed_files,
                 changed_pids  : OnceLock::new (),
                 change_leaves : OnceLock::new (),
-                pcsvf_sets    : OnceLock::new (),
-                merges_pcsvf_sets     : OnceLock::new (),
-                home_moves_pcsvf_sets : OnceLock::new () } }
+                pcsvf_cache   : PcsvfCache::default () } }
 
   /// The change-forest of this straddle. Computed once per straddle.
   pub fn change_leaves (
@@ -107,32 +103,6 @@ impl GraphStraddle {
   ) -> &ChangeLeaves {
     self . change_leaves . get_or_init (
       || ChangeLeaves::from_graph_straddle (self) ) }
-
-  /// The sets of the PCSVF over all of C ('server/pcsvf.rs').
-  /// Computed once per straddle.
-  pub fn pcsvf_sets (
-    &self,
-  ) -> &PcsvfSets {
-    self . pcsvf_sets . get_or_init ( || pcsvf_sets (self) ) }
-
-  /// The sets of the PCSVF that a buffer of the diff view
-  /// draws. The order-only buffer draws no PCSVF: its sets are empty,
-  /// so each of its roots is drawn with its content as unexpanded
-  /// write-protected members. Computed once per straddle.
-  pub fn pcsvf_sets_of_buffer (
-    &self,
-    diffView_buffer_kind : DiffViewBufferKind,
-  ) -> &PcsvfSets {
-    static NO_SETS : PcsvfSets = PcsvfSets {
-      c : BTreeSet::new (), r : BTreeSet::new (),
-      u : BTreeSet::new (), d : BTreeSet::new () };
-    match diffView_buffer_kind {
-      DiffViewBufferKind::AllChanges => self . pcsvf_sets (),
-      DiffViewBufferKind::Merges => self . merges_pcsvf_sets . get_or_init (
-        || pcsvf_sets_for_merges (self) ),
-      DiffViewBufferKind::SkgrepoChanges => self . home_moves_pcsvf_sets . get_or_init (
-        || pcsvf_sets_for_home_moves (self) ),
-      DiffViewBufferKind::OrderOnlyChanges => &NO_SETS, } }
 
   /// The nodes whose file changed but whose change-forest has no
   /// leaf: only the order of some list changed.

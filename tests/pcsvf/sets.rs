@@ -8,7 +8,8 @@ use crate::git_fixture::graph_straddle;
 use crate::pcsvf::common::{ids, with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
-use skg::diff_view::pcsvf::PcsvfSets;
+use skg::diff_view::pcsvf::{PcsvfSets, pcsvf_sets_of_buffer};
+use skg::types::views_state::DiffViewBufferKind;
 
 use std::error::Error;
 
@@ -17,7 +18,8 @@ fn sets_fixture_sets (
   let mut sets : Option<PcsvfSets> = None;
   with_fixture ("sets", &["main"], |f| {
     let straddle : GraphStraddle = graph_straddle (f) ?;
-    sets = Some ( straddle . pcsvf_sets () . clone () );
+    sets = Some ( pcsvf_sets_of_buffer (
+      &straddle, DiffViewBufferKind::AllChanges ) . clone () );
     Ok (( )) }) ?;
   Ok ( sets . unwrap () ) }
 
