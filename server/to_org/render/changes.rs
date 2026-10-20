@@ -43,6 +43,7 @@ use crate::types::list::{Diff_Item, compute_interleaved_diff};
 use crate::types::misc::ID;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::nodes::complete::Flag;
+use crate::types::tree::forest::in_content_position;
 use crate::types::tree::moves::{
   arrange_first_children, arrange_last_children, move_before,
   move_to_first_child, move_to_last_child};
@@ -190,22 +191,25 @@ pub(crate) enum HistoricalPhantomVisit {
 /// holds already; a node drawn above itself holds nothing. In a
 /// folder it holds nothing new. A root whose node is back becomes an
 /// editable vognode, and one whose node is in neither graph (a
-/// deletion since committed) a deleted phantom.
+/// deletion since committed) a deleted phantom. A member of its old
+/// content that was editable before completion
+/// ('editable_before_completion') stays editable.
 pub(crate) fn process_historical_phantom_visit (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
   straddle : &GraphStraddle,
+  editable_before_completion : &HashSet<NodeId>,
 ) -> Result<HistoricalPhantomVisit, Box<dyn Error>> {
-  let (skgid, parent_kind) : (ID, ViewnodeKind) = {
+  let (skgid, at_root, in_content_position) : (ID, bool, bool) = {
     let node : NodeRef<Viewnode> = tree . get (treeid)
       . ok_or ("process_historical_phantom_visit: node not found") ?;
     let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =
       &node . value () . kind else {
         return Ok (HistoricalPhantomVisit::Done); };
     ( h . skgid . clone (),
-      node . parent () . map ( |parent| parent . value () . kind . clone () )
-      . unwrap_or (ViewnodeKind::DeadViewnode) ) };
-  let at_root : bool = parent_kind == ViewnodeKind::BufferRoot;
+      node . parent () . is_some_and ( |parent|
+        parent . value () . kind == ViewnodeKind::BufferRoot ),
+      in_content_position (node) ) };
   if at_root {
     if let Some (node) = straddle . after . get (&skgid) {
       tree . get_mut (treeid) . unwrap () . value () . kind =
@@ -237,11 +241,6 @@ pub(crate) fn process_historical_phantom_visit (
   if at_root {
     adopt_fresh_facts (
       tree . get_mut (treeid) . unwrap () . value (), &fresh_phantom ); }
-  let in_content_position : bool = matches! (
-    parent_kind,
-    ViewnodeKind::BufferRoot
-    | ViewnodeKind::Vognode (
-      Vognode::Unrestricted (_) | Vognode::Phantom (Phantom::Historical (_)) ));
   if ! in_content_position { return Ok (HistoricalPhantomVisit::Done); }
   let drawn_above_itself : bool =
     tree . get (treeid) . unwrap () . ancestors ()
@@ -252,10 +251,26 @@ pub(crate) fn process_historical_phantom_visit (
   if ! drawn_above_itself {
     let root : NodeId = fresh . root () . id ();
     append_historical_phantom_content (&mut fresh, root, straddle, &skgid); }
+  let editable_members : Vec<(NodeId, Editability)> =
+    // The fresh drawing write-protects them; nothing writable is
+    // write-protected again.
+    tree . get (treeid) . unwrap () . children ()
+    . filter ( |child| editable_before_completion . contains (&child . id ()) )
+    . filter_map ( |child| match &child . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+        if ! t . is_writeProtected () =>
+        Some (( child . id (), t . editability . clone () )),
+      _ => None, } )
+    . collect ();
   let kept : Vec<NodeId> = reconcile_children_with_fresh_drawing (
     tree, treeid, &fresh, fresh . root () . id (), &straddle . after,
     &|viewnode| match_key (viewnode, &straddle . after) . is_some (),
     &|viewnode| ! matches! ( viewnode . kind, ViewnodeKind::Vognode (_) )) ?;
+  for (member, editability) in editable_members {
+    if ! kept . contains (&member) { continue; }
+    if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+      &mut tree . get_mut (member) . unwrap () . value () . kind {
+      t . editability = editability; }}
   arrange_last_children (tree, treeid, &kept) ?;
   Ok (HistoricalPhantomVisit::Done) }
 

@@ -221,7 +221,9 @@ So far there are these endpoints:
     partner folder's members are compared with the node's partners in
     its relation as a set of node IDs, under the save's skgrepo
     restriction, not counting a member the diff view shows as
-    removed; a member carrying a relRepo request differs. A present
+    removed; a member drawn by an extra ID counts as its node, and an
+    unknown phantom by its raw ID, as the folder reconciler matches
+    them; a member carrying a relRepo request differs. A present
     flags folder, under any node, must likewise equal the node's flags.
   - Before mutation, the server computes the update-relevant neighborhood of
     every prepared write/delete identity independently in the before and
@@ -1160,8 +1162,9 @@ change-forest leaf ('LeafKey' in 'server/change_leaves.rs'): a node
 aspect ={"Node": {"pid": ..., "aspect": ...}}=, where the aspect is
 ="Existence"=, ="Text"=, ="Home"=, ={"Alias": TEXT}=, ={"ExtraId": ID}=
 or ={"Flag": FLAG}=; or a relationship aspect ={"Relationship":
-{"relation": ..., "recorder": ..., "member": ..., "aspect": ...}}=,
-where the aspect is ="Existence"= or ="RelRepo"=. N is the fingerprint
+{"relation": ..., "recorder": ..., "member": ..., "aspect": ...}}=
+(the leaf's 'RelationshipKey', flattened, beside its aspect), where
+the aspect is ="Existence"= or ="RelRepo"=. N is the fingerprint
 of the change the mark approved, a hash of the leaf's before and after
 values; a mark whose fingerprint no longer matches the current change
 counts as absent.

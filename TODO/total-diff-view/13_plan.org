@@ -962,7 +962,7 @@ removes the request and sets the editability, and leaves
 small forest, and for the four accessors over every kind (a kind
 without the pair returns None).
 
-** TODO Slice 5: the small reifications
+** DONE Slice 5: the small reifications
 Make the rest of that section: 'ChangedFile', 'SkgrepoChange',
 'LeafKey::Relationship' over 'RelationshipKey', 'RequestedReadiness'
 over 'NamedLeaves', the 'MemberId' accessor used by its four sites,

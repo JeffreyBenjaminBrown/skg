@@ -29,7 +29,7 @@ use crate::types::env::RuntimeGeneration;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoChange};
 use crate::types::nodes::complete::Graphnode;
-use crate::types::tree::forest::{ViewForest, editable_occurrences};
+use crate::types::tree::forest::{ViewForest, editable_occurrences, in_content_position};
 use crate::types::viewnode::{
   AffectsParent, Editability, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
   Vognode};
@@ -264,28 +264,13 @@ pub fn nodes_editable_in_diffView (
   let historical_in_content_position : HashSet<ID> =
     viewforest . nodes () . filter_map ( |node| match &node . value () . kind {
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))
-        if historical_phantom_in_content_position (node) =>
+        if in_content_position (node) =>
         Some ( h . skgid . clone () ),
       _ => None, } )
     . collect ();
   editable_occurrences (viewforest) . into_iter ()
     . chain (historical_in_content_position)
     . collect () }
-
-/// Whether a historical phantom stands where content does: under the
-/// buffer root or an unrestricted vognode, or in the old content of a
-/// historical phantom that does. Not in a partner folder.
-fn historical_phantom_in_content_position (
-  node : NodeRef<Viewnode>,
-) -> bool {
-  match node . parent () {
-    Some (parent) => match &parent . value () . kind {
-      ViewnodeKind::BufferRoot
-        | ViewnodeKind::Vognode (Vognode::Unrestricted (_)) => true,
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) =>
-        historical_phantom_in_content_position (parent),
-      _ => false, },
-    None => false, }}
 
 /// The stub the PCSVF's view completion starts from: each root drawn
 /// as 'append_stub_root' draws one.
@@ -416,8 +401,10 @@ pub fn ensure_editableOccurrences_exist (
     editable . insert (skgid); }
   Ok (( )) }
 
-/// The viewforest's unrestricted vognodes in content position (a root,
-/// or a member of an unrestricted vognode's content), in level order.
+/// The viewforest's unrestricted vognodes in content position
+/// ('in_content_position') that are roots or members there, in level
+/// order. The walk passes through a historical phantom in content
+/// position, to the members of its old content.
 fn content_occurrences_in_level_order (
   viewforest : &ViewForest,
 ) -> Vec<NodeId> {
@@ -425,16 +412,17 @@ fn content_occurrences_in_level_order (
   let mut queue : VecDeque<NodeRef<Viewnode>> =
     viewforest . roots () . collect ();
   while let Some (node) = queue . pop_front () {
-    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
-      &node . value () . kind else { continue; };
-    let in_content_position : bool =
-      match node . parent () . map ( |parent| &parent . value () . kind ) {
-        Some (ViewnodeKind::BufferRoot) => true,
-        Some (ViewnodeKind::Vognode (Vognode::Unrestricted (_))) =>
-          t . affectsParent == AffectsParent::True,
-        _ => false, };
-    if ! in_content_position { continue; }
-    occurrences . push ( node . id () );
+    if ! in_content_position (node) { continue; }
+    match &node . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
+        let is_root_or_member : bool =
+          t . affectsParent == AffectsParent::True
+          || node . parent () . is_some_and ( |parent| matches! (
+               parent . value () . kind, ViewnodeKind::BufferRoot ));
+        if ! is_root_or_member { continue; }
+        occurrences . push ( node . id () ); },
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => {},
+      _ => continue, }
     queue . extend ( node . children () ); }
   occurrences }
 

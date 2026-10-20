@@ -222,13 +222,19 @@ node is an ordinary editable node with ∃+; its existence is one leaf.
 Nothing that exists is drawn again. Each step builds a fresh drawing
 of what a viewnode should hold, in a scratch tree, and
 'reconcile_children_with_fresh_drawing' matches what the viewnode holds
-to it. A child that stands for a graphnode is matched by its ID; any
-other by its kind (a folder entry by its entry); within one parent
-each key appears at most once. A matched child is kept, with its fold
-state, and its kind and facts are updated in place: a member that
-loses its relationship becomes a removed member and back, a deleted
-phantom becomes a historical phantom and back. A child the fresh
-drawing lacks is detached; what only the fresh drawing has is created.
+to it. A child that stands for a graphnode is matched by the ID it
+stands for: a member or removed member by the pid the live graph
+resolves its ID to (so one drawn by an extra ID matches its node), an
+unknown phantom by its raw ID, a historical phantom by its ID at HEAD
+('skgid_a_folder_child_stands_for', which the partner-folder
+reconciler and the save's check of a write-protected occurrence read
+too); any other child by its kind (a folder entry by its entry);
+within one parent each key appears at most once. A matched child is
+kept, with its fold state, and its kind and facts are updated in
+place: a member that loses its relationship becomes a removed member
+and back, a deleted phantom becomes a historical phantom and back. A
+child the fresh drawing lacks is detached; what only the fresh drawing
+has is created.
 "Produced by the fresh drawing" is defined over the union of the two
 graphs, so a viewnode is detached only when what it stands for is in
 neither graph. The member role trees under a changed folder's members
@@ -307,6 +313,9 @@ date and recomputes the buffer's sets. Every node of U without an
 editable occurrence becomes editable (its body read from the live
 graph) at its first content occurrence in level order, else at its
 first partner-folder occurrence ('ensure_editableOccurrences_exist').
+The walk for content occurrences passes through a historical phantom
+in content position into its old content, whose members then stay
+editable at the phantom's visit.
 The buffer is then rerendered as after a save, which draws the
 content list of each node made editable, and last, each content
 origin of D that the buffer draws nowhere is appended as a root, in ID

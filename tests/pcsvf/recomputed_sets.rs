@@ -10,24 +10,31 @@
 // member.
 
 use crate::pcsvf::common::{
-  Fixture, collateral_view_content, node_lines, open_all_changes_buffer,
-  requesting_editable_at, rerendered_view_content, save,
-  send_stage_and_commit_request, integrate_unshown_changes, with_fixture};
+  Fixture, collateral_view_content, graph_straddle, node_lines,
+  open_all_changes_buffer, requesting_editable_at, rerendered_view_content,
+  save, send_stage_and_commit_request, integrate_unshown_changes,
+  with_fixture};
 use crate::pcsvf::common::git_fixture_helpers::mk_test_tcp_stream_pair;
 
+use skg::graph_straddle::types::GraphStraddle;
+use skg::pcsvf::{DiffViewSource, ensure_editableOccurrences_exist};
+use skg::readiness_store::ReadinessStore;
+use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{skg_env_from_parts, update_from_and_rerender_buffer_test};
 use skg::to_org::render::content_view::multi_root_view;
-use skg::types::env::SkgEnv;
+use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::misc::ID;
-use skg::types::views_state::ViewId;
-use skg::types::viewnode::Viewnode;
+use skg::types::tree::forest::ViewForest;
+use skg::types::views_state::{DiffViewBufferKind, ViewId};
+use skg::types::viewnode::{Phantom, Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::Tree;
 use futures::executor::block_on;
 use std::error::Error;
 use std::io::Read;
 use std::net::TcpStream;
+use std::sync::Arc;
 
 /// Save 'buffer' as the "all changes" buffer; it must save without
 /// errors. Returns the response.
@@ -520,3 +527,59 @@ fn an_editable_container_folder_member_outside_u_stays_editable (
     let again : String = save_cleanly (f, &after) ? . saved_view;
     assert_eq! ( again, after );
     Ok (( )) }) }
+
+/// The 'historical_content' fixture (one skgrepo, main): at HEAD r
+/// contains h and k, and h contains m. Since then h was deleted and m
+/// retitled, so the buffer draws h as a historical phantom under r,
+/// holding its old content m, a member of U drawn write-protected.
+/// The walk that finds the occurrences to make editable passes
+/// through a historical phantom in content position, so it makes m
+/// editable there.
+#[test]
+fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("historical_content", &["main"], |f| {
+    let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
+    let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
+    let straddle : GraphStraddle = graph_straddle (f) ?;
+    let drawing : DiffViewSource = DiffViewSource {
+      straddle : &straddle,
+      diffView_buffer_kind : DiffViewBufferKind::AllChanges };
+    let mut viewforest : ViewForest = diffView_buffer (
+      &runtime, &straddle, &ReadinessStore::default (),
+      DiffViewBufferKind::AllChanges ) ?
+      . expect ("the buffer is not empty") . viewforest;
+    let m_under_h = |viewforest : &ViewForest| -> Option<bool> {
+      viewforest . nodes () . find_map ( |node| match &node . value () . kind {
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+          if t . skgid == ID::from ("m")
+          && node . parent () . is_some_and ( |parent| matches! (
+               &parent . value () . kind,
+               ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))
+                 if h . skgid == ID::from ("h") )) =>
+          Some ( node . value () . editable_skgid () . is_some () ),
+        _ => None, } ) };
+    assert_eq! ( m_under_h (&viewforest), Some (false),
+                 "m is drawn write-protected under h" );
+    ensure_editableOccurrences_exist (
+      drawing, &mut viewforest, &runtime . graph, &runtime . config ) ?;
+    assert_eq! ( m_under_h (&viewforest), Some (true) );
+    Ok (( )) } ) }
+
+/// The same fixture: the command makes m editable under h, so every
+/// change is editable in the buffer, and m stays editable through a
+/// save of it.
+#[test]
+fn the_command_makes_a_member_under_a_historical_phantom_editable (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("historical_content", &["main"], |f| {
+    let m_line : &str = "*** (skg (node (id m) (repo main) (diff rel-))) m, retitled";
+    let buffer : String = open_all_changes_buffer (f) ?;
+    assert! ( ! buffer . contains (m_line), "{}", buffer );
+    let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
+    assert_eq! ( not_editable, 0, "{}", shown );
+    assert! ( shown . contains (m_line), "{}", shown );
+    let response : SaveResponse = save_cleanly (f, &shown) ?;
+    assert! ( response . saved_view . contains (m_line),
+              "{}", response . saved_view );
+    Ok (( )) } ) }

@@ -874,8 +874,8 @@ content relationships changed skgrepo") and the order-only marker
 
 A viewnode is in *content position* when its viewparent is the buffer
 root, an unrestricted vognode, or a historical phantom that is itself
-in content position. A historical phantom in content position draws
-its old content under it.
+in content position ('in_content_position'). A historical phantom in
+content position draws its old content under it.
 
 *** removed member, former member
 

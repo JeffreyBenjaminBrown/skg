@@ -2,7 +2,8 @@ use crate::types::maybe_placed_viewnode::{
   MpViewnode,
   maybePlaced_viewforest_root_viewnode};
 use crate::types::misc::ID;
-use crate::types::viewnode::{Viewnode, viewforest_root_viewnode};
+use crate::types::viewnode::{
+  Phantom, Viewnode, ViewnodeKind, Vognode, viewforest_root_viewnode};
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashSet;
@@ -42,6 +43,22 @@ pub fn editable_occurrences (
   viewforest . nodes ()
     . filter_map ( |node| node . value () . editable_skgid () . cloned () )
     . collect () }
+
+/// Whether 'node' stands where content does: its parent is the buffer
+/// root, an unrestricted vognode, or a historical phantom that is
+/// itself in content position. (Whether it is a member there, its
+/// 'affectsParent', is a separate question.)
+pub fn in_content_position (
+  node : NodeRef<Viewnode>,
+) -> bool {
+  match node . parent () {
+    Some (parent) => match &parent . value () . kind {
+      ViewnodeKind::BufferRoot
+        | ViewnodeKind::Vognode (Vognode::Unrestricted (_)) => true,
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) =>
+        in_content_position (parent),
+      _ => false, },
+    None => false, }}
 
 impl Forest<MpViewnode> {
   pub fn new () -> Self {

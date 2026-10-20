@@ -1559,3 +1559,95 @@ six the plan names: 'set_presence' ('child_data.rs'),
 'mk_member_viewnode' ('change_viewnodes.rs'). 'append_stub_root'
 builds its folded container folder as a 'Viewnode' literal, since
 'viewnode_of' draws it unfolded.
+** Slice 5: deviations
+*** 'MemberId' is the existing 'RelationshipMemberKey'
+'types/misc.rs' already had the plan's 'MemberId' under another name:
+'RelationshipMemberKey { ResolvedPid (ID), UnresolvedRawId (ID) }',
+with 'InRustGraph::relationship_member_key' tagging one ID. A second
+type would have been a synonym, so the slice uses that one (it gained
+'id', 'into_id' and 'is_unresolved'). The one accessor is
+'InRustGraph::outbound_member_keys_for_relation_gated', returning
+'RelPartner<RelationshipMemberKey>', since the content reconciler and
+'partners_in_graph' need each member's relRepo. It covers mentions
+too (relRepo: the recorder's home), so 'partners_in_graph''s helper
+'recorded_rel_partners' went, and 'relRepo_of_recorded_relationship',
+a fifth "pid, or the raw ID", calls it as well.
+**** how the drawing code reads the tag
+The content reconciler keeps the relRepos of the unresolved members
+only ('unresolved_relRepos'; only unknown phantoms read them), and
+draws an unresolved member as an unknown phantom without consulting
+disk. Before, it asked 'find_skgrepo_with_optional_tantivy', which
+falls back to disk, so a node on disk but not in the graph went on to
+a graph read that failed. The partner-folder reconciler takes its
+unknown members' relRepos from the tag.
+*** 'skgid_a_folder_child_stands_for'
+It is in 'to_org/complete/partner_folder/child_data.rs', where
+'goal_matchable_skgid' was. A member or removed member resolves
+through the live graph; an unknown phantom keeps its raw ID; a
+historical phantom keeps its before-graph ID, which the live graph
+may resolve to its acquirer after a nodeMerge. The live graph is now a
+parameter of 'reconcile_partnerFolder_children_against_goal_list'
+(and its '_with_deleted_extraIds' twin), 'apply_goal_shapes',
+'match_key', 'reconcile_children_with_fresh_drawing' and
+'detach_change_viewnodes' (the diff view's paths pass
+'straddle . after'). 'view_order_preserving_goal_list' takes the
+graph instead of a reader. Its read now also sees unknown phantoms and
+former members, which its filter to the graph's members drops unless
+listed. 'partnerFolder_members_in_view' keeps its filter (members not
+shown as removed, and unknown phantoms) and reads the ID by the new
+function. 'mark_goal_children_as_folder_members' still reads a
+child's raw skgid: it promotes any unrestricted child whose skgid is
+a goal item, and resolving would promote more.
+*** 'RelationshipKey' moved beside 'NodeRelation'
+It is in 'dbs/in_rust_graph/relation_accessors.rs', where both
+'strandeds.rs' and 'change_leaves.rs' import it. 'LeafKey' flattens it
+with serde, so a marks file keeps its form; a test loads and rewrites
+such a file ('tests/unit/readiness_store/marks_with_a_relationship.json').
+'NamedLeaves' became public with 'RequestedReadiness'.
+*** 'SkgrepoChange' and 'ChangedFile'
+'SkgrepoChange' is beside 'SkgrepoName'. The move properties and the
+save's 'SkgrepoMove' hold it as 'skgrepo_change';
+'NodeChanges.home' and 'viewStats.home_skgrepo_move' keep their names.
+'Partner''s 'relRepo_before' and 'relRepo_after' stay: they are
+Options, one per graph, not a pair. Fingerprints are unchanged.
+'ChangeLeaves::files_changed' is a set of 'ChangedFile', and
+'leaves_in_file' and 'readiness_of_file' take one.
+*** the 'CompletionContext' constructors
+There were three literal constructions, not four. 'for_rerender'
+takes the 'DiffViewSource' and, given one, starts from 'for_diffView''s
+settings, so 'rerender_view' passes its restriction and flags as they
+are. The empty sets the constructors give are 'LazyLock' statics in
+'complete.rs'. The diff view's guards inside completion (no override
+substitution, no default folders even under a request) stay: they
+are the switch's documented behavior, not a repeated setting.
+*** 'DrawnDiffViewBuffer'
+It is in 'pcsvf.rs', and 'diffView_buffer_viewforest' returns it too.
+*** 'in_content_position', and a historical phantom's old content
+'in_content_position' is in 'types/tree/forest.rs'. With the walker
+passing through a historical phantom, "integrate unshown changes"
+made a member of U under one editable, but the phantom's visit
+redrew its old content write-protected ('adopt_fresh_facts'), so the
+member ended write-protected, and a later occurrence that the walker
+would otherwise have made editable stayed write-protected too. The
+visit now restores the editability of an old-content member that was
+editable before completion, as "nothing writable is write-protected
+again" says. 'process_historical_phantom_visit' takes
+'editable_before_completion' for it. Its own check of content position
+is now the recursive one: a historical phantom under a historical
+phantom that is not in content position draws no old content.
+*** tests
+Besides the plan's four ('a_member_drawn_by_an_extra_id_passes_when_the_graph_lists_the_extra_id',
+'an_unknown_member_is_compared_by_raw_id',
+'the_occurrences_made_editable_include_a_member_under_a_historical_phantom',
+'tests/unit/completion_context.rs'): the reconciler keeps a member
+drawn by an extra ID ('a_member_drawn_by_an_extra_id_is_kept_for_its_node'),
+the tagged accessor's result, the flattened marks file, and the
+command end to end on the new fixture 'historical_content'
+('the_command_makes_a_member_under_a_historical_phantom_editable').
+*** docs
+'docs/diff-view.org' says what a fresh drawing's child is matched by
+and that the walk passes through a historical phantom; the API doc
+says how the write-protected check counts a member drawn by an extra
+ID and an unknown phantom, and that the marks file's relationship is
+the flattened 'RelationshipKey'; the glossary's "content position"
+names 'in_content_position'.

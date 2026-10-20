@@ -350,7 +350,8 @@ fn dispatch_node_update (
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_)))
       if context . diffView_source . is_some () => {
       let straddle : &GraphStraddle = context . diffView_source . unwrap () . straddle;
-      if process_historical_phantom_visit (tree, treeid, straddle) ?
+      if process_historical_phantom_visit (
+           tree, treeid, straddle, context . editable_before_completion ) ?
         == HistoricalPhantomVisit::RootIsLive {
         visit_normal_node (tree, treeid, context) ?; }},
     _ => {
@@ -388,7 +389,9 @@ fn visit_normal_node (
     if let Some (drawing) = context . diffView_source {
       // In a diff view, a node HEAD has is drawn as history.
       if deleted_phantom_becomes_historical (tree, treeid, drawing . straddle) ? {
-        process_historical_phantom_visit (tree, treeid, drawing . straddle) ?; }}
+        process_historical_phantom_visit (
+          tree, treeid, drawing . straddle,
+          context . editable_before_completion ) ?; }}
     return Ok (( )); }
   // A write-protect request is applied before anything else reads
   // the occurrence's editability, so that what follows -- the budget,
