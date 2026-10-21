@@ -1,0 +1,51 @@
+#+title: What Jeff should do, between and around plans
+
+These are the habits directed at Jeff rather than at the planner or
+the executing agents, distilled from the total diff view effort
+(October 2026; post-mortem in 'TODO/total-diff-view/12_total-review.org').
+They are short because most of the cost was elsewhere; the planner's
+habits are in 'plans.org' and the review method in 'code-reviews.org'.
+
+* Decide the shared model before the first plan that touches it
+The questions that took three review rounds to settle (which
+occurrence of a node is editable, what a write-protected occurrence's
+children are, what a request means on each kind of node) were
+answerable from first principles before any code was written, and
+you answered them that way in the end ("let's not think about how
+things got there, just what they are"). When a discussion document
+names a model that several slices will touch, settle it there, as
+states and transitions, before saying "write the plan".
+
+* Process a review in one sitting, or mark what is left
+A review processed in two halves led to a plan written from the
+first half, with the second half's decisions arriving after the run.
+When you cannot finish, mark the unprocessed items so they can be
+found ("jeff has yet to process"), as you did in the post-mortem, and
+say so; the planner then writes the plan from the processed part
+only and leaves the rest out, rather than guessing.
+
+* Keep one list of decisions, and point at it
+Decisions live in the discussion documents' resolved items and in
+review threads, and the planner has to find them. A decision that is
+on record and then forgotten (partial commits are dangerous; the save
+refusal you later retracted) costs a round either way. When you
+reverse a decision, say so where the original is, so that the list
+stays one list.
+
+* Ask for the vocabulary check after each plan
+The two-question check in 'plans.org' ("what terms did this plan
+coin; what does its code cite") costs one agent and ten minutes. Ask
+for it when a plan finishes, before the review, so that a confusing
+word is caught before the next plan spreads it.
+
+* Schedule the full post-mortem at milestones, not at the end of each plan
+Structure (where a feature should live, what to reify) is only
+visible once the behavior has settled. Ask for the full method of
+'code-reviews.org' when a feature's behavior has stopped changing,
+and the short check otherwise.
+
+* Mark your replies so the planner can find them, and expect the same back
+Your rule, which works: a reply of yours gets a keyword; a reply of
+the planner's under an item of yours is marked TODO so you can find
+it; where you merely agree, the planner changes your TODO to DONE
+without replying.

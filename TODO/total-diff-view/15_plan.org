@@ -1,0 +1,1164 @@
+#+title: Diff view: the three problems, two features, the nested facts and the vocabulary — execution plan
+#+TODO: TODO ONGOING | DONE
+
+* Assignment and authority
+Implement this plan. It is a complete, settled specification, and
+nothing here is open for discussion. Writing it has implemented
+nothing. It stands on its own: every term it uses is defined below or
+in 'docs/glossary.org', and the review that produced it
+([[file:14_review.org][14_review.org]]) is background that nobody needs to read; where the two
+differ, this document wins.
+
+Read [[file:../../coding-advice/ORIENTATION.org][the orientation]] and its code-change, architecture, testing and
+execution advice before starting. Preserve unrelated edits. Do not
+change branches or git configuration. Finish the agreed work and its
+verification without stopping for routine choices; stopping to ask is
+for the rare conditions that [[file:../../coding-advice/when-to-stop.org][when-to-stop.org]] describes, and this plan
+expects none. Record meaningful deviations, and any such question, in
+[[file:progress.org][progress.org]] beside this plan, under a top-level headline "Fixes,
+features and vocabulary" with one subheadline per slice. This plan's
+text stays as it is, except the keyword of a slice's headline. Write
+any log or scratch file of your own under 'tests/results/', never
+under 'TODO/'.
+
+** Commits
+Commit granularly, one or a few commits per slice, each message naming
+the slice and this document ("Slice 4 of
+TODO/total-diff-view/15_plan.org: ..."). A slice's last code-modifying
+commit also carries the slice's documentation changes and the change
+of its headline here from TODO to DONE; neither stands as a commit of
+its own. So update the docs and the keyword before making that last
+commit, and if something is left over after it, amend that commit
+('git commit --amend'; the branch is not pushed) rather than adding
+one.
+
+** Scope
+Thirteen slices, 0 to 12, in the order they must land. Slices 0 to 2
+prepare the structure: small housekeeping, the change facts and the
+readiness request moved onto the viewnode, the diff view's source
+type unbundled. Slices 3 to 5 change what a buffer shows: the diff
+view's facts nest under one '(diff ...)' form, a modified node gets
+the herald 'M' and one gesture marks its whole file, and a removed
+member follows the rule every member obeys, which closes the first
+problem the last run recorded. Slices 6 to 8 fix the save and the
+clients: skgrepo inheritance through phantoms and folders, the
+write-protected folder check, one sexp string printer, "already
+staged", the manifest warnings served, Neovim's set-repo, the
+prologues, and six navigation commands. Slices 9 and 10 rename:
+identifiers first, then the prose of "draw" and the glossary. Slices
+11 and 12 sweep comments: citations of plans, and all-caps words. The
+plan may be run as one run or as two ('bash/run-plan-slices.sh 0 8',
+then '9 12').
+
+Slices 0 to 8 edit code that still carries the names slices 9 and 10
+retire. They leave those names alone in existing code, and they write
+no new occurrence of a retired word: new code, comments, docs and
+tests written by any slice use the vocabulary below ("pruned change
+view", "extend", "render", "shallow model subtree", "home skgrepo
+move", "already staged", "commit readiness aggregate").
+
+* Words this plan uses
+The glossary ('docs/glossary.org') defines most of these; the rest are
+defined here, and slice 10 adds them to the glossary.
+- The diff view is the view opened by C-c v d: up to four buffers,
+  "all changes", "merges", "skgrepo changes" and "order-only changes",
+  each rendered over the graph straddle. A buffer kind is which of the
+  four a buffer is ('DiffViewBufferKind').
+- The graph straddle ('GraphStraddle', 'server/graph_straddle/') holds
+  the before-graph (the owned skgrepos as committed at HEAD) and the
+  after-graph (the live graph) and compares them. A node's presence is
+  Both, OnlyBefore or OnlyAfter. A partner of a node in some role is
+  one entry of the union of the two graphs' lists, with its presence
+  and its relRepo in each graph ('Partner').
+- The pruned change view (until slice 9 "the PCSVF") is the
+  viewforest the "all changes" buffer renders, defined by four sets
+  ('PcsvfSets', renamed in slice 9): C, the changed nodes; R, the
+  content origins reached from C by walking containerward through the
+  union of the straddle; U, the nodes to extend contentward (C, R and
+  every node on those walks); D, the deduplicated content origins, the
+  buffer's roots. 'docs/diff-view.org', "C, R, U and D", defines them.
+  A node is in C when its own file records a change, or when a
+  relationship leaf whose relationship exists in one graph only names
+  it as member ("in-changed"); so the node of every removed member is
+  in C, and so in U.
+- A change-forest leaf ('ChangeLeaves' in
+  'server/diff_view/change_leaves.rs') is one change a user can mark
+  commit-ready: a node and an aspect of it (existence, text, home
+  skgrepo, an alias, an extra ID, a flag) or a relationship and an
+  aspect of it (existence, relRepo). The recorder of a leaf is the
+  node whose file records it. The leaves a node records are
+  'ChangeLeaves::leaves_under'; a node's relationship to its
+  viewparent is recorded by the viewparent, not by the node.
+- A mark is a user's declaration that a leaf is commit-ready, stored
+  with the leaf's fingerprint in the readiness store. A readiness
+  request ('(readyRequest OBJECTS)' or '(unreadyRequest OBJECTS)' in a
+  headline's metadata) is what a readiness gesture (C-c r r, C-c r h
+  and their recursive forms) writes before saving; the save consumes
+  it. The readiness summary is the save's count of ready and changed
+  files; a file is ready when every leaf it records is marked
+  ('readiness_of_file').
+- A diff object is what a fact or a request names: 'node', the node's
+  own existence; 'rel', its relationship to its viewparent; 'all',
+  every leaf the node records. A headline's '(leaves N OBJECTS)' fact
+  lists the objects a gesture there may name and N, how many distinct
+  leaves they name together.
+- A node's sign is its presence as the diff view shows it: '+' (new
+  since HEAD, herald '∃+'), '-' (deleted, '∃-') or, from slice 4, '~'
+  (the node exists in both graphs and records at least one leaf,
+  herald 'M', "modified"). A relationship's sign is '+' or '-' ('~+',
+  '~-'). The signs are the '(presence ...)' part of '(diff ...)' from
+  slice 3, and the bare atoms of '(diff ...)' before it.
+- An occurrence of a graphnode is a viewnode that stands for it (an
+  unrestricted vognode). A buffer has at most one editable occurrence
+  of a node; the others are write-protected, and the server draws no
+  content under a write-protected one. A member is a child viewnode
+  whose 'affectsParent' is true; a non-member has it false. A removed
+  member is an unrestricted vognode, non-member, carrying the sign
+  '~-', standing where a relationship the before-graph had and the
+  after-graph lacks once stood ('is_unrestricted_removed_member'). A
+  historical phantom is the diff view's image of a deleted node,
+  write-protected, with its old content beneath it.
+- The editability rule (until slice 10 "the draw rule"; the module
+  comment of 'server/to_org/expand/editable.rs') decides, at each
+  occurrence view completion reaches in level order, whether it is
+  editable: an occurrence without a request is editable when its
+  node is unclaimed in the editable map and write-protected when
+  another occurrence claimed it first. The editable map is built
+  empty at every completion; only an editable occurrence claims.
+- View completion extends a viewforest: it adds viewnodes to one that
+  stands (until slices 9 and 10, "expands" and "draws"). The server
+  renders a viewforest when it produces its org text
+  ('server/org_to_text.rs'); a rerender is the request that recompletes
+  a view and sends its text. Org folding keeps the words "fold" and
+  "unfold" everywhere.
+- The per-visit step ('process_unrestrictedVognode_changes',
+  'server/diff_view/changes.rs') runs at an editable occurrence's visit
+  after the content reconciler and adds the diff view's viewnodes: the
+  members' signs, the removed members, and for a node in C its old
+  text, home skgrepo move, "it acquired" folder, changed alias, ID and
+  flags folders, changed partner folders and changeset markers.
+- The shallow model subtree (until slice 9 "the fresh drawing") is the
+  scratch 'Tree<Viewnode>' a visit builds of what a vognode should
+  hold, which the diff view's reconciler matches the vognode's
+  children against. It is shallow: it includes other vognodes but not
+  what their own visits draw. The folder reconciler's input, a
+  folder's goal list ('FolderGoalItem'), is a flat list of what each
+  member should be, not a tree, and keeps its name.
+- Two reconcilers run at an editable node's visit: the older one
+  ('complete_managed_children'), which reconciles the content list and
+  each folder's members, and the diff view's
+  ('reconcile_children_with_fresh_drawing', renamed in slice 9). A
+  managed child is one a reconciler drew and may detach; the user's
+  viewnode ('is_the_users_viewnode') is one neither drew: an
+  unrestricted vognode born 'Unremarkable', carrying no sign, and not
+  a member of the folder it stands in. A match key ('MatchKey') is
+  what identifies a viewnode among its siblings for the diff view's
+  reconciler: the ID it stands for, or its kind.
+- A commit readiness aggregate (until slice 10 "a derived
+  commit-readiness aggregate") is a thing with leaves under it: a
+  folder, a changeset marker, a node, a file, the whole changeset. It
+  is ready when every leaf under it that can be ready is.
+- A change headline (slice 8) is a headline whose metadata carries a
+  '(leaves ...)' fact; it is ready when its '(ready ...)' names every
+  object its '(leaves ...)' lists, and otherwise unready.
+- An already-staged entry (until slice 7 "a pre-staged entry") is an
+  entry git's index already holds when stage-and-commit runs, staged
+  by a hand or another tool.
+- The startup warnings channel: 'load_config' returns warnings beside
+  the config, 'main' records them once on the runtime
+  ('record_startup_warnings', 'server/types/env.rs'), the server serves
+  them on request, and each client shows them in its '*SKG Server
+  Warnings*' buffer on connect.
+
+* Agreed behavior
+** Small housekeeping (slice 0)
+- 'GraphSnapshot::id_claims' ('server/git_ops/git_snapshot_types.rs:20')
+  and 'skgrepos_claiming_skgid' (:25-32) go, with the builder's filling
+  of the field ('server/git_ops/git_snapshot.rs:253-259, 277',
+  'record_section_claims' :316-327). Nothing reads them.
+- Four test files use the shared fixture helpers of
+  'tests/shared/git_fixture_helpers.rs': 'tests/titles_by_ids.rs'
+  drops its 'configure_git_user' and 'commit_all' (the shared ones
+  unwrap where these returned a 'Result'; the tests adapt);
+  'tests/collateral_repo_move.rs' and 'tests/hidden_from_subscriptions.rs'
+  drop their 'mk_test_tcp_stream_pair';
+  'tests/editable_view_cascade_and_budget.rs' drops 'mk_test_tcp_stream'
+  and takes the write end of the shared pair.
+- 'server/heralds.rs:394' names the write-protected folders without
+  counting them ("The six WRITE-PROTECTED folders" is stale).
+- The local 'in_folder' of 'server/diff_view/fresh_drawing.rs' (:123,
+  :147, and the parameters at :170 and :185) becomes
+  'parent_is_a_folder'.
+- 'server/dbs/in_rust_graph/relation_accessors.rs:28' says "the
+  strandeds computation" for "strand analysis";
+  'server/types/git.rs:13' says "One step of change between the two
+  graphs of a straddle" for "One step of change along a diff axis".
+- The three integration-test banners say "SKG Diff View Integration
+  Test" ('tests/integration/diff-view/run-test.sh:32',
+  'test-emacs.el:206', 'test-nvim.lua:60').
+
+** The change facts and the readiness request live on the viewnode (slice 1)
+'Viewnode' ('server/types/viewnode.rs:114-119') gains two fields,
+'change_facts : ChangeFacts' and 'readiness_request :
+Option<ReadinessRequest>', and the thirteen kinds that carry them
+today lose them: 'UnrestrictedVognode', 'PhantomDeleted',
+'PhantomUnknown', 'PhantomHistorical', and the 'Property' variants
+'Alias', 'ID', 'Flag', 'RemovedAlias', 'RemovedID', 'OldText',
+'HomeSkgrepoMove', 'RelRepoMove' and 'ChangesetMarker'. A kind that
+never carries a change (a folder, a restricted vognode, the buffer
+root, a dead viewnode, 'BodyDiff') carries the empty defaults, which
+print nothing. Consequences:
+- The six accessors on 'ViewnodeKind' go ('change_facts',
+  'change_facts_mut', 'readiness_request', 'readiness_request_mut',
+  'change_facts_and_readiness_request' and its '_mut', :798-872), and
+  every reader reads the viewnode's field.
+- The three matches over kinds go: 'set_presence'
+  ('server/to_org/complete/partner_folder/child_data.rs:321', callers
+  :277 and :318) and the presence-setting match of 'mk_member_viewnode'
+  ('server/diff_view/change_viewnodes.rs:215-220') write the field;
+  'folder_change_facts' ('server/org_to_text.rs:133-169') reads each
+  member's facts, not its kind: a changed member is ready when its
+  '(ready ...)' names 'rel' if its '(leaves ...)' lists 'rel', and
+  otherwise when it carries any '(ready ...)'; the relRepo-move clause
+  stays. 'rel_change_ready' and 'single_change_ready' go. This keeps
+  today's folder readiness exactly.
+- A constructor or a 'Default' lets the 94 'Viewnode {' literals of
+  the server and the tests omit the two fields unless they set them.
+- 'change_fact_forms' ('server/org_to_text.rs:360-384') is called where
+  it is today (the property positions :324-353, 'node_sexp' :495-497,
+  the three phantoms :523, :546-547, :573-574) and reads the viewnode's
+  fields; the parser ('server/serve/parse_metadata_sexp.rs',
+  'parse_change_fact_form' :988-1026 and its dispatch :472-478, :664,
+  :744, :823) fills the viewnode's fields.
+- 'adopt_fresh_facts' ('server/diff_view/fresh_drawing.rs:211-229')
+  copies the presence and clears 'ready' and 'leaves' for every kind,
+  as it does for the unrestricted vognode today, since '*kind =
+  fresh_kind.clone()' no longer carries them.
+  'keep_stale_child_holding_the_users' ('server/update_buffer/util.rs')
+  clears the viewnode's facts where it cleared the kind's.
+- 'is_the_users_viewnode' and 'is_unrestricted_removed_member'
+  ('fresh_drawing.rs:168, :256') read 'viewnode.change_facts.presence'.
+- 'change_fact_atoms' ('server/heralds.rs:720-736') keeps its
+  exhaustiveness guard over 'ChangeFacts'.
+
+** The straddle and the buffer kind are two fields (slice 2)
+'DiffViewSource' ('server/diff_view/pcsvf.rs:57-70') goes. The
+completion context ('CompletionContext',
+'server/update_buffer/complete.rs:76') holds 'straddle :
+Option<&GraphStraddle>' and 'diffView_buffer_kind :
+Option<DiffViewBufferKind>', set together by its one diff-view
+constructor (:130-141) and 'None' by the others (:115, :163-179);
+'straddle.is_some()' is the switch the comment of 'diffView_source'
+describes. The functions that took the pair take the two parameters,
+'straddle : &GraphStraddle' and 'diffView_buffer_kind :
+DiffViewBufferKind': in 'pcsvf.rs' 'diffView_buffer_viewforest' (:221),
+'set_diffView_facts_in_viewforest' (:242), 'stub_viewforest_of_roots'
+(:329), 'append_stub_root' (:348), 'contentOrigins_missing_from_buffer'
+(:381), 'append_contentOrigins_to_buffer' (:399),
+'ensure_editableOccurrences_exist' (:430); in 'visit.rs'
+'diffView_visit_before_expansion' (:91) and
+'diffView_visit_after_expansion' (:131); in 'changes.rs'
+'process_unrestrictedVognode_changes' (:145); in 'completion.rs'
+'complete_viewforest_with_graph_straddle' (:56) and the caller at :115
+(which built the pair from 'rerender.source()' at :41-45); the builders
+in 'server/serve/handlers/diff_view.rs:81' and
+'server/update_buffer.rs:538-562' pass the two values. The three
+readers of 'sets()' call 'pcsvf_sets_of_buffer (straddle, kind)'. No
+local or field named 'drawing' remains.
+
+** The diff view's facts nest under '(diff ...)' (slice 3)
+A headline's diff-view facts and its readiness request form one list:
+'(diff (presence SIGN...) (leaves N OBJECT...) (ready OBJECT...)
+(readyRequest OBJECT...))', the last part being '(unreadyRequest
+OBJECT...)' for an unmark. The parts come in that order, and a part is
+absent when it has nothing to say: 'presence' when both signs are
+None, 'leaves' when no object names a leaf, 'ready' when nothing is
+ready (a bare '(ready)' keeps its meaning, "the single leaf is
+ready"), the request when none is pending. A headline with nothing to
+say carries no '(diff ...)'; '(diff)' is never written. The form sits
+where '(diff ...)' sits today: inside '(node ...)', '(deleted ...)',
+'(unknown ...)' and '(historical ...)', and at top level on the
+properties other than 'bodyDiff'. For instance '(skg (node (id 7)
+(repo main) (diff (presence node+ rel+) (leaves 2 node rel) (ready
+node))))'. A changed folder's '(KIND changed)' and bare '(ready)'
+('FolderChangeFacts', 'org_to_text.rs:300') stay as they are: a folder
+carries no leaves fact and no '(diff ...)'.
+
+Consequences:
+- Server: 'change_fact_forms' writes the one form; the parser's
+  'parse_change_fact_form' and its dispatch read it, and the top-level
+  check (:585-599) and its message speak of '(diff ...)'; the herald
+  rules ('change_fact_rules_for_two_objects' :276-289,
+  'change_fact_rules_for_one_object' :294-307,
+  'readiness_request_rule' :310-322) match the nested forms, and
+  'change_fact_atoms' gains 'presence'. The rendered heralds do not
+  change: '∃+✓ ~-✓', 'request:ready:all' and the rest read exactly as
+  today, which 'tests/shared/herald-rendering-cases.txt' asserts from
+  the new forms; if the herald engine cannot abut a '✓' from one
+  sub-form to a sign in another, extend the engine, not the output.
+- Emacs ('elisp/skg-readiness.el'): 'skg--readiness-host' (:99-108)
+  finds the element holding a 'diff' child (the sexp itself for a
+  property); 'skg--readiness-form' (:115-118) reads a part of that
+  'diff' form; 'skg--write-readiness-request' (:320-330) deletes and
+  writes the request inside the 'diff' form, which lies two levels
+  under 'skg' for a node (pitfalls). Neovim
+  ('nvim/lua/skg/readiness.lua'): 'M.host' (:39-49), 'M.form' (:62-68)
+  and 'M.write_request' (:202-220) likewise. Nothing else in the
+  clients reads these atoms.
+- Docs: 'docs/api-and-formats.org' "Metadata of the diff view"
+  (:1290-1372): the two subsections "Presence" and "Readiness"
+  (:1298-1324) become one, "Facts and requests: =(diff ...)=", with the
+  grammar above and the examples at :1362-1371 rewritten; :207-208
+  follows. 'docs/heralds.org' "Diff heralds" (:189-214),
+  'docs/diff-view.org' "Facts on the wire" (:435-450), "Readiness
+  requests and gestures" (:451-473) and the mentions at :160, :274,
+  :327, :341, and 'docs/glossary.org' :807, :813, :869, :890, :973-974
+  say the new forms.
+- Tests: every literal of the old forms in 'tests/change_facts_metadata.rs',
+  'tests/diff_view/roundtrip/{metadata,view}.rs',
+  'tests/new/buffer_to_viewnodes/validate_tree.rs:467',
+  'tests/pcsvf/*.rs', 'tests/readiness_requests.rs',
+  'tests/strandeds.rs:175', the in-crate tests of
+  'server/from_text/write_protected_edits.rs' (:509, :511, :622, :635),
+  'tests/shared/herald-rendering-cases.txt' and 'herald-rules.sexp',
+  'tests/elisp/test-skg-readiness.el', 'test-skg-id-search.el:397',
+  'test-skg-metadata.el:132', 'tests/nvim/readiness_spec.lua',
+  'id_search_spec.lua:96', 'metadata_spec.lua:117',
+  'sexpr_parse_spec.lua:125-128', and the integration scripts'
+  substrings ('tests/integration/diff-view/test-emacs.el:107, :151',
+  'test-nvim.lua:102, :141',
+  'tests/integration/view-magit-removed-member/test-emacs.el:34',
+  'test-nvim.lua:59').
+
+** The 'M' herald, and one gesture marks the file (slice 4)
+- A node's sign gains the third value '~', "modified": the node exists
+  in both graphs and records at least one leaf ('leaves_under' is
+  non-empty). On the wire it is 'node~'; its herald is 'M' in the
+  "nonstandard" style of '∃' and '~' (the 'diff' key of
+  'shared/herald-styles.json'). One function of the straddle and the
+  leaves decides a node's sign ('+' when OnlyAfter, '-' when
+  OnlyBefore, '~' when Both with a leaf, none otherwise), and every
+  site that sets 'presence.node' for an unrestricted vognode in content
+  position calls it: the member tagging
+  ('tag_content_members', 'server/diff_view/changes.rs:502-505'), the
+  removed member ('mk_removed_member_viewnode',
+  'server/diff_view/change_viewnodes.rs:195-198'), a historical
+  phantom's old content ('append_historical_phantom_content' :138-160,
+  through those two), and the roots: no site sets a root's node sign
+  today (a stub root carries none, and the per-visit step tags only
+  members), so the slice sets a root's sign at its own visit, and a
+  new or modified root shows '∃+' or 'M' as a member does. Folder
+  members keep no node sign ('mk_member_viewnode' :209,
+  'partner_folders.rs:100'). Phantoms never carry '~'. The agent
+  chooses the Rust shape (a third variant of 'Sign', or a separate
+  enum for the node slot; 'Sign' also signs relationships and folder
+  entries, which never take '~'); 'DiffPresence::EMITTABLE_ATOMS'
+  ('viewnode.rs:951') and the presence parser
+  ('parse_metadata_sexp.rs:1000-1004') follow.
+- The leaves fact ('leaves_fact_at',
+  'server/diff_view/readiness_requests.rs:270-297'): on an unrestricted
+  vognode whose sign is '~', 'all' is listed, beside 'rel' when that
+  names a leaf ('node' names none then); with the sign '+' or '-', or
+  none, the fact is as today. N counts distinct leaves
+  ('keys_named_at' names the existence leaf under both 'node' and
+  'all'; count the set).
+- 'set_ready_facts_in_viewforest' (:221-261): on an unrestricted vognode
+  whose leaves fact lists 'all', '(ready ...)' names 'all' when every
+  leaf the node records is marked ('object_is_ready' over
+  '[DiffObject::All]', which 'readiness_of_leaves' answers). The parser
+  accepts 'all' in '(ready ...)' (:1009-1017 refuses it today).
+- Heralds: 'change_fact_rules_for_two_objects' renders 'node~' as 'M'
+  and abuts a '✓' when '(ready ...)' names 'all', exactly as '∃+' gets
+  its '✓' for 'node'; 'M' stands where '∃' stands, since a node is
+  new, deleted or modified and never two of those. The one-object rule
+  set does not change (entries and phantoms are never modified).
+- The gestures (both clients): a plain gesture on a headline names
+  every object its leaves fact lists; the node-or-rel question goes
+  ('skg--readiness-ask-object', 'elisp/skg-readiness.el:314-318', and
+  the picker in 'M.requests_at_line', 'nvim/lua/skg/readiness.lua:264-295').
+  Every headline toggles by its own '(ready ...)': it is ready when
+  that names every listed object; the aggregate special case goes
+  ('skg--readiness-aggregate-node-p' :132-136,
+  'skg--readiness-children-ready-p' :299-312, 'M.aggregate_node_p'
+  :109-113, 'M.children_ready_p' :227), since the '✓' of 'all' is now
+  drawn. The recursive gesture names every listed object on each
+  headline, as today. The wide-unmark warning counts with N as today.
+  A headline that lists 'all' and 'rel' marks the file and the
+  relationship with one gesture.
+- Docs: 'docs/heralds.org' "Diff heralds" (:189-214) adds 'M' and its
+  '✓'; 'docs/diff-view.org' "Aggregates" (:427-434), "Facts on the
+  wire" and "Readiness requests and gestures" (:435-473) say the new
+  rule; 'docs/COMMANDS.org' (:594-661, the preamble :595-620) and
+  'docs/COMMANDS-nvim.org' (:485-551) describe 'M', its '✓' and the
+  one gesture, and drop the question; 'docs/api-and-formats.org'
+  lists 'node~' among the signs and 'all' among '(ready ...)' objects;
+  the glossary entry "diff object, diff aspect" (:811) and the entry
+  on the node's sign say it.
+
+** A removed member follows the editability rule (slice 5)
+A removed member in content position (under an unrestricted vognode or
+under a historical phantom) is no longer always write-protected: it is
+created editable, with its body from the after-graph, when its node is
+in U (it always is, see "Words"), and the editability rule at its own
+visit then keeps it editable when its node is unclaimed and
+write-protects it when another occurrence claimed first, exactly as
+for a member. An editable removed member's visit draws its content
+list and its change viewnodes like any editable occurrence's; a
+write-protected one draws nothing of its node, as today. A removed
+member in a partner folder stays as the folder's other members are
+('FolderGoalShape::Removed'). The one encoding of a removed
+relationship is then: an unrestricted vognode, a non-member, with the
+sign '~-'; "write-protected" leaves the encoding, and
+'is_unrestricted_removed_member' already tests nothing about
+editability.
+
+Consequences:
+- 'mk_removed_member_viewnode' ('server/diff_view/change_viewnodes.rs:186-199')
+  builds the viewnode editable ('Editability::Editable { body, ...}'
+  with 'node.body' from 'straddle.after'), 'AffectsParent::False', when
+  the node is in U, and write-protected otherwise; its callers,
+  'reconcile_removed_content_members' ('changes.rs:540-588') and
+  'append_historical_phantom_content' ('change_viewnodes.rs:138-160'),
+  pass U (the sets come from 'pcsvf_sets_of_buffer').
+- 'adopt_fresh_facts' ('fresh_drawing.rs:211-229') keeps its one
+  direction: it write-protects an existing occurrence when the fresh
+  one is write-protected, and otherwise leaves editability alone. So
+  a removed member that was editable when a rerender began stays
+  editable, and the restore block of 'process_historical_phantom_visit'
+  ('changes.rs:324-343', 'editable_members') becomes unnecessary and
+  goes; the test from slice 5 of plan 13 (a member made editable by
+  C-c r u under a historical phantom stays editable) must still pass.
+- 'ensure_editableOccurrences_exist' ('pcsvf.rs:430-454'):
+  'content_occurrences_in_level_order' (:460-482) counts a removed
+  member under any unrestricted vognode or historical phantom as a
+  content occurrence, not only one under a historical phantom.
+- Problem 1 closes by this alone: in the fixture 'removed_partners'
+  ('tests/pcsvf/fixtures/removed_partners/'), x is drawn under b as a
+  removed member and is x's first occurrence, so it is editable there,
+  with its content list and its folder "its containers changed (other
+  files)" listing b ('~-') and its kept container, each with a
+  containerward tree. The two rules 14_review once proposed for the
+  sets (an after-graph walk, an after-graph-rootless origin) are not
+  made; the sets stay as they are.
+- Docs: 'docs/diff-view.org' "One encoding of a removed relationship"
+  (:325-342), "A node of U is editable, with its whole content list"
+  (:349-353) and "Integrating unshown changes" (:377-379); the
+  glossary's "removed member" (:887-896).
+
+** The save inherits a skgrepo through phantoms and folders, and ignores a dangling removed member (slice 6)
+- A new headline with no '(repo NAME)' inherits its skgrepo from the
+  nearest ancestor that is an unrestricted vognode, through phantoms
+  and folders ('inherit_parent_skgrepo_if_possible',
+  'server/from_text/buffer_to_viewnodes/add_missing_info.rs:195-221',
+  inherits from the parent only today; its doc comment :189-194 and the
+  stale name at :89 follow). A write-protected ancestor's skgrepo comes
+  from 'writeProtected_skgrepos_after_save' as it does for a parent.
+  The buffer root and a dead viewnode supply none, as today, so a bare
+  headline at top level is still refused ("UnrestrictedVognode must
+  have a repo that exists in the config.",
+  'buffer_to_viewnodes/local.rs:634-636'). The home herald never
+  appears on a phantom or a folder, so the user expects this.
+- 'partnerFolder_members_in_view' ('server/from_text/write_protected_edits.rs:117-131')
+  skips an unknown phantom whose relationship sign is '-' (a dangling
+  removed member), as it skips an unrestricted removed member by its
+  non-membership; its header comment states the rule in full: which
+  children count as members for the check of a write-protected
+  occurrence's folder, and why a removed member of either kind does
+  not.
+- Docs: 'docs/diff-view.org:305-307' ("Below a phantom or in a folder
+  there is no unrestricted parent to inherit a skgrepo from, so a new
+  note there names its skgrepo") says instead that a new note there
+  inherits from the nearest unrestricted ancestor and is a non-member
+  in a folder.
+
+** One sexp string printer, "already staged", and the manifest warnings served (slice 7)
+- One public function, 'quote_sexp_string (text : &str) -> String' in a
+  new module 'server/sexp_string.rs', prints a string as a quoted sexp
+  atom: it escapes the backslash and the double quote and nothing
+  else, and adds the quotes. That is what both readers accept (Emacs
+  'read' decodes every escape; Neovim's 'read_string' in
+  'nvim/lua/skg/sexpr/parse.lua' decodes '\n' and '\t' and turns any
+  other escaped byte into itself; both pass a literal newline inside
+  the quotes). The six hand-written printers go, replaced by calls:
+  'escape_string' ('server/serve/handlers/skgrepo_sets.rs:170-175',
+  callers add no quotes of their own any more), 'escape'
+  ('delete_references_to_absent_node.rs:89-92'), 'quote_string'
+  ('server/heralds.rs:578-582'), and the three 'quoted'
+  ('link_statuses.rs:79-90', 'flag_state.rs:61-70',
+  'relRepo_info.rs:104-115'). The strings those handlers send read the
+  same in both clients after the change (a newline inside a quoted
+  atom is read as itself).
+- The already-staged paths of stage-and-commit are printed through
+  it: 'pre_staged_sexp' ('server/serve/handlers/stage_and_commit.rs:204-220')
+  builds its atoms as 'Atom::S', which the 'sexp' crate prints bare
+  unless they hold whitespace or a quote or look like a number; the
+  list is printed by hand through the printer instead (as the
+  hand-building handlers do), so a path holding ';' or '(' reads
+  correctly. 'tests/pcsvf/stage_and_commit.rs:179-188' expects quoted
+  paths; 'docs/api-and-formats.org:417' already shows them quoted.
+- "Pre-staged" becomes "already staged": the wire key
+  '(already-staged ((GITREPO PATH...) ...))' for '(pre-staged ...)';
+  'already_staged_entries_of_owned_gitrepos' and 'AlreadyStagedGitrepo'
+  ('server/git_ops/stage_and_commit.rs:44-64'), 'already_staged_sexp'
+  and the rest of 'server/serve/handlers/stage_and_commit.rs' (:18-19,
+  :47, :51, :135-139, :159, :163, :174, :177-178, :204-213);
+  'skg--stage-and-commit-already-staged-message' and the '(assq
+  'already-staged response)' ('elisp/skg-request-stage-and-commit.el:70-84');
+  'M.already_staged_message' and 'payload.field (response,
+  'already-staged')' ('nvim/lua/skg/stage_and_commit.lua:53-71'); the
+  prose "entries already staged", "an already-staged entry" in
+  'docs/api-and-formats.org:417, :421', 'docs/diff-view.org:508', the
+  comments, and the tests ('tests/pcsvf/stage_and_commit.rs',
+  'tests/elisp/test-skg-stage-and-commit.el:81, :89',
+  'tests/nvim/stage_and_commit_spec.lua:107').
+- The foreign-manifest order warnings join the startup warnings
+  channel: 'main' ('server/main.rs:81-87, :151-153') calls
+  'foreign_manifest_order_warnings (&config)'
+  ('server/telescope/dependencies_manifest.rs:141', which needs only
+  the config) after 'initialize_dbs' and records them with the config
+  warnings in 'record_startup_warnings'; the loop in
+  'server/dbs/init.rs:76-77' goes; the log lines stay ('tracing::warn!'
+  in 'main', as for the config warnings). The reload path
+  ('rebuild_session_lifetime_stores.rs:61-64') keeps discarding a
+  reload's warnings. The clients show them unchanged.
+
+** The clients: set-repo, the prologue, navigation (slice 8)
+- Neovim's ':SkgSetRepo' and ':SkgSetRepoRecursive' ('M.set_repo'
+  'nvim/lua/skg/metadata.lua:448-476', 'M.change_repo_recursive'
+  :487-505) skip a write-protected occurrence ('M.node_write_protected_p'
+  :316) and warn, as Emacs does: one message per skipped ID and a
+  summary; a repeat whose editable occurrence was also changed is
+  dropped from the warning, as 'skg--change-repo-recursive'
+  ('elisp/skg-metadata.el:731-759') does. Both clients' texts say the
+  save refuses a write-protected occurrence's skgrepo edit:
+  'elisp/skg-metadata.el:141-143, :180, :188, :194' say "would silently
+  ignore" today. 'docs/COMMANDS-nvim.org:463-464' drops the
+  deviation; 'docs/nvim-client-deviations.org' loses the item if it
+  lists it; 'docs/COMMANDS.org:438-469' already says "refuse".
+- One prologue for every streaming command, per client. Emacs:
+  'skg--send-streaming-request' ('elisp/skg-request-rerender-all-views.el:42-66')
+  serves the repo-set switch ('skg-restrict-repo-set',
+  'elisp/skg-request-repo-sets.el:55-89'), the import's rerender
+  ('skg--import-rerender-clean-views',
+  'elisp/skg-request-import-md-and-org.el:107-145') and
+  rerender-all-views ('skg-request-rerender-all-views',
+  'skg-request-rerender-all-views.el:22-40') as it serves its three
+  callers today. The function's one-shot answer handler becomes
+  optional; a caller may pass the retry closure of the over-private-text
+  confirmation, and the function then registers it through
+  'skg--register-rerender-overPrivateText-confirmation' (:75-103)
+  between the stream handlers and the reset, naming the one-shot
+  answer type as the type to cancel when a confirmation fires; the
+  repo-set switch's 'skgrepo-restriction' handler is that one-shot
+  handler, and the confirmation cancels it as today. The import's
+  hand-written unwind (:133-145) is the function's, or goes if the
+  function's own unwinding covers it. Neovim: 'M.send_streaming_request'
+  ('nvim/lua/skg/rerender.lua:92-102') likewise serves
+  'M.restrict_repo_set' ('repo_sets.lua:44-71') and
+  'M.request_rerender_all_views_with_approval' ('rerender.lua:39-77',
+  which already serves both rerender-all-views and the import). The
+  repo-set switch is the case to test in both clients: the
+  confirmation fires, the one-shot handler is cancelled, the retry
+  resends.
+- Six navigation commands. A change headline is defined in "Words".
+  Emacs: 'skg-diffView-goto-next-change' on 'C-c r n c',
+  'skg-diffView-goto-next-unready-change' on 'C-c r n u',
+  'skg-diffView-goto-next-ready-change' on 'C-c r n r', and
+  'skg-diffView-goto-previous-change', '...-previous-unready-change',
+  '...-previous-ready-change' on 'C-c r p c', 'C-c r p u', 'C-c r p r',
+  in 'skg-content-view-mode-map' beside the 'C-c r' bindings
+  ('elisp/skg-keymaps-and-aliases.el:150-154'; 'C-c r n' and 'C-c r p'
+  are free). Neovim: the commands 'DiffViewGotoNextChange',
+  'DiffViewGotoNextUnreadyChange', 'DiffViewGotoNextReadyChange',
+  'DiffViewGotoPreviousChange', 'DiffViewGotoPreviousUnreadyChange',
+  'DiffViewGotoPreviousReadyChange' (ex commands ':Skg...' as
+  'define_ex_commands' makes them), bound to '<localleader>rnc', 'rnu',
+  'rnr', 'rpc', 'rpu', 'rpr' in 'nvim/lua/skg/keymaps.lua' beside
+  :268-273, each with its 'M.commands' entry. Each command moves point
+  to the next (or previous) change headline of its kind after (before)
+  point, in buffer order, without wrapping, and at the buffer's end
+  says "No further change" (at its start, "No earlier change"), with
+  "unready" or "ready" inserted for the filtered forms. They read the
+  facts with the readers of 'skg-readiness.el' and 'readiness.lua' and
+  move as 'skg-id-next' / 'skg-id-prev' ('elisp/skg-id-search.el:178,
+  :203') and 'id_next' / 'id_prev' ('nvim/lua/skg/id_search.lua:201,
+  :228') do; Neovim gains a previous-headline helper in 'metadata.lua'
+  (it has 'next_headline_line' :78 and none backward). They work in
+  any skg buffer; outside the diff view no headline carries a leaves
+  fact, so they report no change. 'docs/COMMANDS.org' (:594-661) and
+  'docs/COMMANDS-nvim.org' (:485-551) gain the six entries, and
+  'docs/diff-view.org' names the keys where it lists the readiness
+  commands (:461-473).
+
+** Names (slice 9)
+Every rename below applies in the server, both clients, the tests and
+the docs, with 'git mv' for files and directories. An identifier used
+as a noun inside a longer snake-cased name is camel-cased
+('prunedChangeView_sets_over'); a module named for the thing itself is
+snake-cased ('pruned_change_view.rs'), as 'graph_straddle' is.
+*** "pruned change view" for PCSVF
+| old | new |
+|---+---|
+| module 'pcsvf' ('server/diff_view/mod.rs:24'), 'server/diff_view/pcsvf.rs' | 'pruned_change_view', 'pruned_change_view.rs' |
+| 'PcsvfSets' | 'PrunedChangeViewSets' |
+| 'PcsvfCache', field 'pcsvf_cache' ('server/graph_straddle/types.rs:40') | 'PrunedChangeViewCache', 'prunedChangeView_cache' |
+| 'pcsvf_sets', 'pcsvf_sets_over', 'pcsvf_sets_of_buffer', 'pcsvf_sets_for_merges', 'pcsvf_sets_for_skgrepo_changes' | 'prunedChangeView_sets', '..._sets_over', '..._sets_of_buffer', '..._sets_for_merges', '..._sets_for_skgrepo_changes' |
+| 'tests/pcsvf.rs' (13 '#[path]' lines), 'tests/pcsvf/' (13 files, 'fixtures/'), the mod in 'tests/grouped_repos.rs:32-33', 'FIXTURES' in 'tests/pcsvf/common.rs:39' | 'tests/pruned_change_view.rs', 'tests/pruned_change_view/' |
+| prose "PCSVF", "PCSVFs" (server 19 lines, docs 13, tests 5) | "pruned change view(s)" |
+| the acronym spelled out ('pcsvf.rs:1', 'docs/diff-view.org:91', 'docs/glossary.org:786') | gone; the glossary entry is "pruned change view" |
+| "the buffer's fresh PCSVF sets computed" ('docs/api-and-formats.org:459') | "the buffer's pruned change view sets recomputed" |
+*** "home skgrepo move" for "home move"
+| old | new |
+|---+---|
+| 'mk_home_move_viewnode' ('server/diff_view/change_viewnodes.rs:71') | 'mk_homeSkgrepoMove_viewnode' |
+| 'set_home_move_facts_in_viewforest' ('pcsvf.rs:259') | 'set_homeSkgrepoMove_facts_in_viewforest' |
+| locals 'is_home_move' ('server/from_text/buffer_to_viewnodes/local.rs:485'), 'home_move' ('changes.rs:431') | 'is_homeSkgrepoMove', 'homeSkgrepoMove' |
+| 'skg--readiness-home-move', 'skg--readiness-home-move-at-point' ('elisp/skg-readiness.el:166, :173') | 'skg--readiness-homeSkgrepo-move', '...-at-point' (as 'skg-toggle-homeSkgrepo-move-commitReady' spells it) |
+| 'M.home_move', 'M.home_move_at_line' ('nvim/lua/skg/readiness.lua:158, :387') | 'M.homeSkgrepoMove', 'M.homeSkgrepoMove_at_line' |
+| test names 'home_move_to_more_private_clamps_relRepos_up', 'same_save_child_home_move_allows_publicizing_its_parent_relationship', 'same_save_hidden_node_home_move_sets_the_new_hide_skgrepo' ('tests/unit/save_leveling.rs:148, :452, :486'), 'the_home_move_heralds_are_only_in_the_skgrepo_changes_buffer' ('tests/pcsvf/other_buffers.rs:174') | 'homeSkgrepoMove' in place of 'home_move' |
+| "Marked %d home move(s) ready.", "Unmarked %d home move(s)." ('skg-readiness.el:93-94', 'readiness.lua:428, :430'), the key description at 'keymaps.lua:166', the test titles at 'readiness_spec.lua:127, :204', the banners in 'tests/shared/herald-rendering-cases.txt:269, :313' | "home skgrepo move(s)" |
+| prose "home move", "home-move gesture" (server 13 lines, elisp 8 and one split at 'skg-request-save.el:586-587', nvim 7, docs 3, tests 5) | "home skgrepo move"; "home moved" (a verb) stays |
+*** "extend" for "expand", and for "viewforest-unfold"
+| old | new |
+|---+---|
+| 'server/to_org/expand/' (five files), 'server/to_org/expand.rs', the mod in 'to_org/mod.rs:2', the 8 'use' lines, the 10 comment paths, 'docs/override.org:319', 'docs/diff-view.org:348' | 'server/to_org/extend/', 'extend.rs' |
+| 'expand_true_content_at_unrestrictedVognode' ('server/update_buffer/reconcile/content.rs:73') | 'extend_true_content_at_unrestrictedVognode' |
+| 'diffView_visit_before_expansion', 'diffView_visit_after_expansion' ('server/diff_view/visit.rs:91, :131') | 'diffView_visit_before_extension', '..._after_extension' |
+| 'align_content_members_before_expansion' ('visit.rs:176') | 'align_content_members_before_extension' |
+| 'tests/expand_raw_overridden_children.rs' ('tests/grouped_overrides.rs:25-26'), 'tests/expand_partner_folder_member.rs' and its directory, 'tests/rebuild/fixtures-fork-expansion/' | 'extend_...', 'fixtures-fork-extension/' |
+| prose "expand", "expansion" in server comments (about 62 lines, mostly 'complete.rs', 'visit.rs', 'content.rs', 'editable.rs'), "unexpanded" ('changes.rs:9, :474', 'pcsvf.rs:92'), and the 11 doc lines ('COMMANDS-nvim.org:409, :635', 'COMMANDS.org:416, :764', 'api-and-formats.org:204, :846, :870, :1407', 'diff-view.org:358', 'glossary.org:349, :634') | "extend", "extension", "a member without its content" |
+| "unfold" in the viewforest sense: 'editable.rs:33', 'pcsvf.rs:9', 'elisp/skg-request-views.el:85', 'nvim/lua/skg/view_requests.lua:54', 'COMMANDS.org:415, :764', 'COMMANDS-nvim.org:408, :635', 'glossary.org:836', 'diff-view.org:114', 'api-and-formats.org:869' | "extend"; U is "the nodes to extend contentward" |
+"Unfold" in the org-folding sense ('skg-org-fold.el:61',
+'skg-request-text-search.el:49', 'skg-request-save.el:1034, :1042',
+'folds.lua:63, :147, :212', 'COMMANDS.org:106') and in the telescope
+sense ('server/types/nodes/fs.rs:181', 'complete.rs:84',
+'server/telescope/decompose.rs:1, :72') stays.
+*** "fill in the defaults" for the clients' "expand defaults"
+| old | new |
+|---+---|
+| 'skg-unrestrictedNode-expand-defaults-in-org' ('elisp/skg-sexpr/skg-unrestrictedNode-defaults.el:58'; caller 'skg-sexpr-edit.el:281'; 20 test calls) | 'skg-unrestrictedNode-fillIn-defaults-in-org' |
+| 'skg-unrestrictedNode--expand-headlines' (:87), '--expand-and-reorder' (:146), '--maybe-expand-field' (:203) | '--fillIn-headlines', '--fillIn-and-reorder', '--maybe-fillIn-field' |
+| 'M.expand_defaults_in_org' ('nvim/lua/skg/sexpr/unrestrictednode_defaults.lua:75'; caller 'metadata_edit.lua:49'), 'M.expand_headlines' (:100), 'M.expand_and_reorder' (:157), 'M.maybe_expand_field' (:207) | 'M.fillIn_defaults_in_org', 'M.fillIn_headlines', 'M.fillIn_and_reorder', 'M.maybe_fillIn_field' |
+| test names 'test-expand-*' ('tests/elisp/test-skg-unrestrictedNode-defaults.el'), the helper 'expanded_headlines' ('tests/nvim/unrestrictednode_defaults_spec.lua:15'), locals 'expanded', 'expanded-children', 'expanded_children' | 'test-fillIn-*', 'filledIn_headlines', 'filledIn', 'filledIn-children', 'filledIn_children' |
+| the header and section comments saying "Expand" (defaults.el :3-4, :9, :55, :60, :63, :88, :205, :208; defaults.lua :1-2, :6, :62, :64, :66, :200; the tests' comments) | "fill in" / "strip" |
+*** "shallow model subtree" for "fresh drawing"
+| old | new |
+|---+---|
+| 'server/diff_view/fresh_drawing.rs' (mod at 'mod.rs:22'; 'use' at 'changes.rs:40', 'partner_folders.rs:12', 'pcsvf.rs:28', 'child_data.rs:27'; comments 'changes.rs:24', 'update_buffer/util.rs:154', 'docs/diff-view.org:276') | 'shallow_model_subtree.rs' |
+| 'reconcile_children_with_fresh_drawing' (definition :88, its strings :99, :107, :114; calls :125, 'changes.rs:183, :306, :335, :403, :520, :562', 'partner_folders.rs:162') | 'reconcile_children_with_shallowModelSubtree' |
+| its parameters 'fresh', 'fresh_parent' (:91-92); 'adopt_fresh_facts' and its 'fresh' (:211-213); 'append_copy_of_subtree' and its 'fresh', 'fresh_node' (:232-236); 'fresh_children', 'fresh_child', 'fresh_ref' | 'model', 'model_parent'; 'adopt_model_facts'; 'model', 'model_node'; 'model_children', 'model_child', 'model_ref' |
+| locals 'fresh' ('changes.rs:179, :320, :425, :517, :549', 'partner_folders.rs:148'), 'fresh_member' ('partner_folders.rs:150'), 'fresh_root' ('changes.rs:378'), 'fresh_front_change_viewnodes' (:418) | 'model', 'model_member', 'model_root', 'model_of_front_change_viewnodes' |
+| prose "fresh drawing" ('update_buffer.rs:508', 'handlers/stage_and_commit.rs:88', 'changes.rs:22-23, :325, :377, :412', 'fresh_drawing.rs:2-4, :84, :86', 'mod.rs:11-12', 'docs/api-and-formats.org:399-400', 'docs/diff-view.org:230' (headline "The fresh drawing, and what it keeps"), :231, :245-248, 'docs/glossary.org:903-904') | "shallow model subtree"; the headline "The shallow model subtree, and what it keeps" |
+The fixture directory 'tests/pcsvf/fixtures/fresh/' is not about this
+and keeps its name.
+*** "commit readiness aggregate" for "aggregate"
+The identifiers that said "aggregate" go in slice 4. The prose stays
+to be reworded: the server comments ('server/types/viewnode.rs:69,
+:89, :440', 'change_leaves.rs:8', 'readiness_requests.rs:267'), the
+clients' comments that survive slice 4 ('skg-readiness.el:14, :21',
+'readiness.lua:144'), and the docs ('docs/diff-view.org:195, :427
+(headline "Aggregates"), :430-466', 'docs/api-and-formats.org:1310,
+:1322', 'docs/heralds.org:197', 'docs/COMMANDS.org:600',
+'docs/COMMANDS-nvim.org:490'). The rule: the full term "commit
+readiness aggregate" opens a passage, and "the aggregate" may follow
+within it. The "aggregated report" of 'server/telescope/invariants.rs'
+is another sense and stays, as does the verb in the test name
+'readiness_aggregates_over_the_leaves_that_exist'.
+
+** "Render", "extend" and the glossary (slice 10)
+*** The word "draw" goes
+"Draw", "draws", "drawn" and "drawing" (server 278 lines, docs 159,
+tests 239, elisp 7, nvim 4; the ten densest files are 'pcsvf.rs',
+'docs/diff-view.org', 'tests/pcsvf/recomputed_sets.rs',
+'docs/api-and-formats.org', 'docs/glossary.org', 'content.rs',
+'changes.rs', 'complete.rs', 'tests/editable_view_cascade_and_budget.rs',
+'tests/override_substitution.rs') are replaced by the word each
+sentence means: "render" when the buffer's text is produced; "extend"
+when viewnodes are added to a standing viewforest; "show", "hold" or
+"stand" when a buffer's content is described ("the buffer shows X
+under Y", "X stands under Y"); "editable", "shown", "rendered" for
+"drawn" as the sentence says. 'docs/diff-view.org' "Drawing a buffer"
+(:124) becomes "Rendering a buffer"; "the draw rule" becomes "the
+editability rule" everywhere ('server/to_org/extend/editable.rs'
+module comment, 'docs/diff-view.org:345-348', and the others). The
+identifiers:
+| old | new |
+|---+---|
+| 'DrawnDiffViewBuffer' ('pruned_change_view.rs', 10 uses) | 'RenderedDiffViewBuffer' |
+| 'DrawOutcome', 'apply_editable_draw_rule' ('to_org/extend/editable.rs:119, :138') | 'EditabilityOutcome', 'apply_editability_rule' |
+| 'is_drawn_by_the_diff_view' ('shallow_model_subtree.rs') | 'is_the_diffViews_viewnode' |
+| 'drawn_skgid' ('content.rs:55'), 'is_overridden_drawn_raw' (:438), 'affects_parent_raw_drawing_folder' (:445), 'drawing_of_goal_item' ('child_data.rs:253'), 'drawn_above_itself' ('changes.rs:315'), the locals 'drawn' ('child_data.rs:258', 'changes.rs:552', 'pruned_change_view.rs', 'content.rs:639, :881', 'write_protected_edits.rs:561'), the test helper 'drawn_editable' ('tests/pruned_change_view/recomputed_sets.rs:34') and the test names holding "draw" or "drawn" (about 26, listed by grep) | named by what each means (shown, rendered, extended, standing, editable); the agent records its table in 'progress.org' |
+After the slice no identifier under 'server/', 'elisp/', 'nvim/' or
+'tests/' holds "draw" except the org drawer ('org_drawer_metadata',
+'server/import_md_and_org/parse.rs:530, :626', 'uninterpreted.rs:149')
+and "redraw" in the clients, which means the screen; and no prose
+under those directories or 'docs/' says "draw" of a buffer.
+*** The glossary
+In 'docs/glossary.org', in the diff-view terms section (:774):
+- 'C, R, U, D, content origin' (:823): the long names beside the
+  letters, C "the changed nodes", R "the content origins", U "the nodes
+  to extend contentward", D "the deduplicated content origins"; the
+  definition of D (:837-839) corrected: an origin is discarded when its
+  own containerward walk within U reaches another origin still kept;
+  and the rule for messages: a user-visible message that must name one
+  of the sets says its long name, then the letter in parentheses, then
+  where the algorithm is described ('docs/diff-view.org', "C, R, U and
+  D", and the module comment of 'server/diff_view/pruned_change_view.rs').
+  No message names a letter today.
+- "derived commit-readiness aggregate" (:863) becomes "commit readiness
+  aggregate" and defines the thing; its readiness is "its readiness".
+- A new entry "editable in the diff view, visible in the diff view": a
+  buffer makes a node's changes editable when it holds an editable
+  occurrence of the node, wherever it sits, or the node's historical
+  phantom in content position ('nodes_editable_in_diffView'); a change
+  is visible when the buffer shows it, which at a write-protected
+  occurrence means the node's signs and what they name (its
+  relationship, its existence, or from slice 4 its file as a whole),
+  and nothing else of the node; a change can be neither. The entry
+  "changes not editable in the view" (:962) keeps the request's name,
+  and its "shows a node's changes" (:964) becomes "makes a node's
+  changes editable".
+- Seven new entries, each one or two sentences, in this plan's words:
+  "reconciler" (the two), "managed child", "per-visit step", "shallow
+  model subtree" (with the folder's goal list named as no tree),
+  "buffer kind", "match key", "the user's viewnode".
+- The entries slices 3 to 9 touched read in the new vocabulary
+  ("pruned change view" :786, "removed member" :887-896, the node's
+  sign, "extend" :836, "already staged" where stage-and-commit is
+  described).
+
+** Citations (slice 11)
+Code and docs cite 'docs/', never a plan or a discussion under 'TODO/'.
+The citations to fix: 19 comments under 'server/' and 'nvim/' that name
+a plan by bare file name ("5_plan.org", "forks plan.org",
+"4_discussion.org", "plan.org Q4"); the eight diff-view test files
+that cite '02_plan.org' and its successors ('tests/diff_view.rs:1',
+'tests/pcsvf/readiness.rs:5' among them); about 45 older test
+comments citing 'TODO/more.org' or plans under 'TODO/DONE/';
+'docs/nvim-client-deviations.org:7', whose path '../problems.org' does
+not resolve (it cites 'TODO/problems.org'; the path is corrected, that
+one citation being to the problems list, not a plan); and
+'bash/migrate-to-author-folders.sh:12'. 'docs/README.org:55' links
+'TODO/feasible-now-probably.org' on purpose and stays. Each citation
+is repointed to the section of 'docs/' (or the glossary entry) that
+now states the rule, or deleted where the comment states the rule
+itself. The procedure, by decision: the slice's agent (Opus) lists
+every citation with its candidate target or a reason to delete it; a
+Sonnet subagent judges each pair, reading the comment and the target,
+and accepts or rejects it; the agent digs into every rejected pair.
+Bare names are ambiguous ("1_plan.org", "more.org" name several
+files), so no target is chosen by name alone.
+
+** All-caps (slice 12)
+A word in running prose is lowercased unless it is an acronym or a
+proper name in letters (HEAD, UUID, TOML, JSON, YAML, LCS, BFS, TCP,
+ID, PID, SKG), a wire placeholder in a grammar (GITREPO, PATH, OBJECTS,
+NAME, ROLENAME), a label that heads a comment section ('PURPOSE:',
+'PITFALL:', 'ARISES:', 'USED:', 'DISTINCT INFO:', 'ENTRY POINTS:',
+'DEVIATION:', 'NOTE:'), an org keyword, or a word whose sentence warns
+of something whose neglect breaks the program or the data. Where the
+caps carried the sentence's stress, the sentence is reworded to carry
+it. The scope is every comment and docstring under 'server/', 'elisp/',
+'nvim/', 'tests/' and 'bash/', the prose of 'docs/', and the
+user-visible messages of both clients and the server (tests that match
+a message's text follow it). A rough count, outside the kept
+categories: 'server/' about 830 words in 147 files, 'tests/' about 640,
+'nvim/' about 300, 'elisp/' about 90, 'bash/' about 45, 'docs/' about
+100; the commonest are "NOT", "AND", "OR", "ANY", "ONE", "WHOLE",
+"BOTH". The procedure, by decision: a subagent lists every candidate
+with its file and line; the slice's agent (Opus) reads each in place
+and judges as a reader whether the caps earn their place by the rule
+above. The rule itself goes into 'coding-advice/formatting.org' as one
+short section, so that no later plan writes caps back.
+
+** What stays as it is
+- The folder's goal list ('FolderGoalItem', 'FolderGoalShape') and its
+  name; the two reconcilers, separate.
+- A changed folder's '(KIND changed)' and bare '(ready)'.
+- 'nodes_editable_in_diffView' and its count of historical phantoms;
+  the request name "integrate unshown changes".
+- 'is_unrestricted_removed_member', which tests non-membership, birth
+  and the sign and nothing about editability.
+- The sets C, R, U and D, computed over the union of the straddle as
+  today; 'kept_content_origins' and its walk.
+- The readiness summary and 'readiness_of_file'.
+- "Fold" and "unfold" for org folding, in both clients; "unfold" in the
+  telescope sense; "redraw" for the screen; the org "drawer".
+- The clients' "expand" that is Emacs's own ('expand-file-name').
+- 'docs/README.org:55'.
+- The herald labels, including "⌂ -OLD +NEW".
+
+* Pitfalls the slices must respect
+- The editable map is built empty at every completion
+  ('rerender_view', 'server/update_buffer.rs:547';
+  'complete_viewforest_with_graph_straddle', 'completion.rs:60'); only
+  an editable occurrence claims
+  ('make_writeProtected_if_repeat_then_extend_editable_map',
+  'server/to_org/util.rs:166-185'), and that function never makes an
+  occurrence editable: one that arrives write-protected stays so and
+  claims nothing. It does not read U; the U test happens where a
+  viewnode is created ('tag_content_members' for members, slice 5's
+  removed member). 'adopt_fresh_facts' only ever write-protects, and
+  runs at the parent's visit, before the child's own.
+- The level-order visit ('complete_nodes_in_level_order',
+  'complete.rs:231-247') pushes a node's current children after its
+  dispatch, so a viewnode the per-visit step creates is visited later,
+  in its final sibling order; it visits a non-member unrestricted
+  vognode exactly like a member ('visit_normal_node'), and an editable
+  one gets its content list from the live graph's 'Contains'.
+- 'Multiple_Defining_Viewnodes' ('validate_tree.rs:63'): a save refuses
+  two editable occurrences of one node. The editability rule
+  guarantees one.
+- 'editable_before_completion' ('update_buffer.rs:543-546') is the set
+  of viewnodes editable when a rerender began; it is empty on a first
+  rendering. "Nothing the buffer holds editable is write-protected
+  again by the server" is the rule it serves.
+- Both clients find a headline's facts by their 'leaves' child
+  ('skg--readiness-host', 'M.host'); slice 3 changes that lookup to the
+  'diff' child. The Emacs writer edits the parsed sexp through
+  'skg-edit-metadata-at-point' with '(DELETE ...)' forms nested under
+  the host's head; after slice 3 the request lies two levels under
+  'skg' for a node ('(skg (node (diff (readyRequest ...))))'); check
+  that the edit forms reach that depth, and extend them if not. The
+  Neovim writer nests under 'host[1]' likewise.
+- The herald rules are keyed on raw forms, and a '✓' abuts the sign of
+  its object by rule order ('heralds.rs:270-275'); 'change_fact_atoms'
+  (:720-736) lists every atom the rules may name and destructures
+  'ChangeFacts' as a guard; 'herald_styles_inconsistencies_of' (~:597)
+  runs as a unit test and at startup and flags any styled atom without
+  a style in 'shared/herald-styles.json'. 'tests/shared/herald-rules.sexp'
+  holds the serialized rule tree and changes with the rules.
+- The parser refuses 'all' in '(ready ...)' today
+  ('parse_metadata_sexp.rs:1009-1017'); 'leaves' is accepted and
+  ignored (:1018); a top-level fact is valid only on the listed
+  property kinds or as a bare 'ready' on a folder (:585-599).
+- 'leaves_under (pid)' is every leaf the node records; a node's own
+  relationship to its viewparent is not among them (the viewparent
+  records it), and neither are its members' existence leaves. A home
+  skgrepo move names two files and a relRepo move up to two, so one
+  node can count as two changed files in the summary; the 'M' check
+  reads the node's leaves, not the file count.
+- 'keys_named_at' with several objects can name one leaf twice (the
+  existence leaf under 'node' and under 'all'); N is the count of the
+  set.
+- Roots carry no node sign today: 'append_plain_stub_root' sets none and
+  the per-visit step tags members only; the only roots with a sign in
+  the expected buffers are historical phantoms ('node-'). Slice 4 adds
+  the root's sign at its visit.
+- 'startup_warnings' is a 'OnceLock' written once by 'main' after
+  'initialize_dbs' ('server/main.rs:151-153'); 'initialize_dbs' has one
+  caller; the reload path discards a reload's warnings on purpose.
+- The 'sexp' crate prints an atom bare unless it holds whitespace or a
+  quote or looks like a number; 'tests/pcsvf/stage_and_commit.rs:179-188'
+  expects bare paths today and will expect quoted ones.
+- 'inherit_parent_skgrepo_if_possible' runs inside a DFS closure of
+  'finish_missing_info_enrichment' ('add_missing_info.rs:118-130'),
+  after 'fill_skgrepo_from_graph_map' and before
+  'assign_new_skgid_if_absent', and the enrichment precedes validation
+  ('server/from_text.rs:100-102'); the integration tests
+  'save_collateral_delete_then_edit_under_it' state that the buffer
+  root and a dead viewnode supply no skgrepo, which stays true.
+- 'partnerFolder_members_in_view' keys children by
+  'skgid_a_folder_child_stands_for' ('child_data.rs:99-112'), which
+  returns an unknown phantom's raw ID whatever its sign; the in-crate
+  tests at 'write_protected_edits.rs:578-637' cover unknown members and
+  removed members separately, none an unknown with the sign '-'.
+- Lua's 'M.send_streaming_request' has no 'retry_after_empty_stream'
+  (the module field 'M.after_empty_stream' at 'rerender.lua:20' serves
+  that); rerender-all-views and the import share
+  'request_rerender_all_views_with_approval'; the repo-set switch
+  registers its one-shot handler before 'begin_stream' in both clients,
+  and the confirmation cancels it by 'unfired_response_type'. The
+  import's Emacs unwind removes four handler types and fixes the
+  pending count by hand.
+- A Neovim binding needs an 'M.commands' entry ('apply_bindings',
+  'keymaps.lua:328-335', indexes 'M.commands[name].desc' and errors
+  without one); 'docs/COMMANDS-nvim.org' says it is generated to match
+  'keymaps.lua', and no test enforces it, so edit it by hand. Neovim
+  has 'next_headline_line' and no backward twin.
+- 'tests/pcsvf.rs' gathers its 13 files by '#[path]'; 'FIXTURES' in
+  'common.rs:39' names the directory; 'tests/grouped_repos.rs:32-33'
+  declares the mod. A shared helper file '#[path]'-included twice in
+  one target duplicates its symbols.
+- The clients' tests use a fake network harness; the Neovim specs share
+  'tests/nvim/helpers.lua'. 'bash/integration-tests.sh' has one
+  baseline failure ('import-md-and-org', recorded in
+  'TODO/problems.org'). The test suites use fixed per-test temp paths:
+  never run two suites at once, and rerun a failure alone before
+  believing it.
+- 'nodes_editable_in_diffView' counts historical phantoms in content
+  position; 'content_occurrences_in_level_order' passes through them.
+- The glossary line numbers above are those of the tree this plan was
+  written against; earlier slices shift them, so find each entry by
+  its headline.
+
+* Code map
+- Slice 0: 'server/git_ops/git_snapshot_types.rs', 'git_snapshot.rs';
+  'tests/titles_by_ids.rs', 'tests/collateral_repo_move.rs',
+  'tests/hidden_from_subscriptions.rs',
+  'tests/editable_view_cascade_and_budget.rs',
+  'tests/shared/git_fixture_helpers.rs'; 'server/heralds.rs:394';
+  'server/diff_view/fresh_drawing.rs'; 'relation_accessors.rs:28';
+  'server/types/git.rs:13'; 'tests/integration/diff-view/{run-test.sh,test-emacs.el,test-nvim.lua}'.
+- Slice 1: 'server/types/viewnode.rs' ('Viewnode', 'ViewnodeKind',
+  'Vognode', 'Phantom', 'Property', the accessors :798-872,
+  'ChangeFacts' :56-64, 'LeavesFact' :72-76); 'server/org_to_text.rs'
+  ('change_fact_forms' :360, 'folder_change_facts' :133, the callers
+  :324-353, :495, :523, :546, :573); 'server/serve/parse_metadata_sexp.rs'
+  (:79-83, :472-478, :585-599, :664, :744, :823, :988-1026);
+  'child_data.rs' ('set_presence' :321, :277, :318);
+  'change_viewnodes.rs' ('mk_member_viewnode' :204-221);
+  'fresh_drawing.rs' ('adopt_fresh_facts' :211, 'is_the_users_viewnode'
+  :168, 'is_unrestricted_removed_member' :256);
+  'server/update_buffer/util.rs' ('keep_stale_child_holding_the_users');
+  'server/diff_view/readiness_requests.rs' (the setters :216-261);
+  'server/heralds.rs' ('change_fact_atoms' :720); every 'Viewnode {'
+  literal (94, server and tests); 'tests/change_facts_metadata.rs',
+  'tests/unit/*'.
+- Slice 2: 'server/diff_view/pcsvf.rs' (:57-70 and the eight
+  functions), 'completion.rs' (:41-45, :56, :115), 'visit.rs' (:91-98,
+  :131-139), 'changes.rs' (:145-152), 'server/update_buffer/complete.rs'
+  ('CompletionContext' :76, :115, :130-141, :163-179, :272, :361),
+  'server/update_buffer.rs:538-562', 'server/serve/handlers/diff_view.rs:81',
+  'tests/unit/completion_context.rs'.
+- Slice 3: 'org_to_text.rs' ('change_fact_forms'),
+  'parse_metadata_sexp.rs', 'heralds.rs' (:270-322, :720-736),
+  'shared/herald-styles.json'; 'elisp/skg-readiness.el' (:99-130,
+  :320-330), 'elisp/skg-sexpr-edit.el' ('skg-edit-metadata-at-point');
+  'nvim/lua/skg/readiness.lua' (:39-68, :202-220); the docs and tests
+  listed under slice 3 above.
+- Slice 4: 'server/types/viewnode.rs' ('DiffPresence' :56-64,
+  'atoms' :941-948, 'EMITTABLE_ATOMS' :951, 'DiffObject' :959-965,
+  'Sign' in 'server/types/git.rs'); 'readiness_requests.rs'
+  ('set_ready_facts_in_viewforest' :221-261, 'object_is_ready'
+  :229-231, 'leaves_fact_at' :270-297, 'keys_named_at' :301-309,
+  'leaves_named_at' :119-192, 'keys_in_forest' :195-214);
+  'change_leaves.rs' ('leaves_under' :233-241, 'readiness_of_leaves'
+  :297-304, 'readiness_of_file' :306-316); 'changes.rs'
+  ('tag_content_members' :480-527); 'change_viewnodes.rs'
+  ('mk_removed_member_viewnode' :186, 'mk_member_viewnode' :204,
+  'append_historical_phantom_content' :138); 'partner_folders.rs:100';
+  'to_org/util.rs' ('append_plain_stub_root'); 'heralds.rs'
+  (:167-178 helpers, :276-322 rules); 'parse_metadata_sexp.rs'
+  (:1000-1017); 'elisp/skg-readiness.el' (:132-145, :226-277,
+  :299-318); 'nvim/lua/skg/readiness.lua' (:109-128, :227-295);
+  'docs/heralds.org:189-214', 'docs/diff-view.org:427-473',
+  'docs/COMMANDS.org:594-661', 'docs/COMMANDS-nvim.org:485-551',
+  'docs/api-and-formats.org:1298-1324', 'docs/glossary.org:811';
+  'tests/pcsvf/readiness.rs', 'tests/change_facts_metadata.rs',
+  'tests/shared/herald-rendering-cases.txt',
+  'tests/elisp/test-skg-readiness.el', 'tests/nvim/readiness_spec.lua',
+  'tests/integration/diff-view/'.
+- Slice 5: 'change_viewnodes.rs' ('mk_removed_member_viewnode' :186-199,
+  'append_historical_phantom_content' :138-160); 'changes.rs'
+  ('reconcile_removed_content_members' :540-588,
+  'process_historical_phantom_visit' :267-345,
+  'process_unrestrictedVognode_changes' :145-199);
+  'fresh_drawing.rs' ('adopt_fresh_facts'); 'pcsvf.rs'
+  ('ensure_editableOccurrences_exist' :430-454,
+  'content_occurrences_in_level_order' :460-482); 'to_org/util.rs'
+  (:166-185); 'types/viewnode.rs' ('mk_editable_viewnode' :1187,
+  'mk_writeProtected_viewnode' :1235, 'Editability' :309-313);
+  'docs/diff-view.org:325-342, :349-353, :377-379',
+  'docs/glossary.org:887-896'; 'tests/pcsvf/{buffer,editing,folding,
+  readiness,users_notes,write_protecting}.rs',
+  'tests/pcsvf/fixtures/removed_partners/',
+  'tests/unit/to_org_util.rs:493'.
+- Slice 6: 'add_missing_info.rs' (:89, :118-130, :189-221);
+  'buffer_to_viewnodes/local.rs:634-636, :667';
+  'write_protected_edits.rs' (:90-131, the tests :578-637);
+  'tests/new/buffer_to_viewnodes/add_missing_info.rs',
+  'tests/pcsvf/partner_folder_check.rs'; 'docs/diff-view.org:305-307'.
+- Slice 7: the six printers' files; 'server/serve/handlers/stage_and_commit.rs',
+  'server/git_ops/stage_and_commit.rs'; 'server/main.rs:81-87, :151-153',
+  'server/dbs/init.rs:76-77', 'server/types/env.rs:48, :81-89',
+  'server/telescope/dependencies_manifest.rs:141',
+  'server/serve/handlers/server_warnings.rs';
+  'elisp/skg-request-stage-and-commit.el:70-84',
+  'nvim/lua/skg/stage_and_commit.lua:53-71'; 'docs/api-and-formats.org:417,
+  :421', 'docs/diff-view.org:508'; 'tests/pcsvf/stage_and_commit.rs',
+  'tests/elisp/test-skg-stage-and-commit.el',
+  'tests/nvim/stage_and_commit_spec.lua', 'tests/server_warnings.rs',
+  'tests/unit/dependencies_manifest.rs:155-191'.
+- Slice 8: 'elisp/skg-metadata.el' (:125-199, :731-759);
+  'nvim/lua/skg/metadata.lua' (:78, :316, :448-519);
+  'elisp/skg-request-rerender-all-views.el' (:22-103),
+  'elisp/skg-request-repo-sets.el:55-89',
+  'elisp/skg-request-import-md-and-org.el:92, :107-145';
+  'nvim/lua/skg/rerender.lua' (:20, :39-77, :79-102, :116),
+  'nvim/lua/skg/repo_sets.lua:44-71'; 'elisp/skg-keymaps-and-aliases.el:150-154',
+  'nvim/lua/skg/keymaps.lua' (:101-104, :155-172, :199-215, :218-224,
+  :266-273, :328-335); 'elisp/skg-id-search.el:178-227',
+  'nvim/lua/skg/id_search.lua:201-228'; 'docs/COMMANDS.org:438-469,
+  :594-661', 'docs/COMMANDS-nvim.org:431-464, :485-551',
+  'docs/diff-view.org:461-473', 'docs/nvim-client-deviations.org';
+  'tests/elisp/test-skg-set-relRepo.el:678-780',
+  'tests/elisp/test-skg-metadata.el', 'tests/elisp/test-skg-streaming-request.el',
+  'tests/elisp/test-skg-import-md-and-org.el:54-88',
+  'tests/nvim/metadata_spec.lua', 'tests/nvim/stream_consumers_spec.lua',
+  'tests/nvim/readiness_spec.lua', 'tests/elisp/test-skg-readiness.el'.
+- Slices 9 and 10: the tables above; 'docs/glossary.org',
+  'docs/diff-view.org', 'docs/api-and-formats.org', both COMMANDS
+  files, 'docs/heralds.org', 'docs/override.org:319'.
+- Slices 11 and 12: every file under 'server/', 'elisp/', 'nvim/',
+  'tests/', 'bash/' and 'docs/'; 'coding-advice/formatting.org'.
+
+* Implementation sequence
+Each slice ends with the suites it names passing, its docs updated,
+and its last commit made as the Commits section says. A rename slice
+leaves every suite passing with only the renamed identifiers changed
+in the tests. 'cargo nextest run' is the Rust suite ('bash/nextest.sh');
+'bash/emacs-tests.sh' and 'bash/nvim-tests.sh' are the clients';
+'bash/integration-tests.sh' is the integration suite, which a slice
+runs when it changes what the server writes into a buffer.
+
+** TODO Slice 0: small housekeeping
+Make the changes under "Small housekeeping" above. Tests: the Rust
+suite; the integration suite once, since the banners changed (the
+baseline failure stands).
+
+** TODO Slice 1: the change facts and the readiness request live on the viewnode
+Make the changes under "The change facts and the readiness request live
+on the viewnode" above. Order: the two fields and the constructor; the
+thirteen kinds lose theirs and every reader follows; the accessors go;
+the three matches go. Tests: the Rust suite passes unchanged in what it
+asserts (the wire does not change); a unit test that
+'folder_change_facts' gives today's answers over a folder holding a
+member with 'rel' ready, a member with 'rel' unready, an unknown
+phantom with a bare '(ready)' and an entry without one.
+
+** TODO Slice 2: the straddle and the buffer kind are two fields
+Make the changes under "The straddle and the buffer kind are two
+fields" above. Tests: the Rust suite; 'tests/unit/completion_context.rs'
+asserts the two fields of the diff-view constructor and 'None' of the
+others.
+
+** TODO Slice 3: the diff view's facts nest under '(diff ...)'
+Make the changes under "The diff view's facts nest under '(diff ...)'"
+above, server first (printer, parser, heralds, rendering cases), then
+both clients, then the docs. Tests: a round trip in
+'tests/change_facts_metadata.rs' of every part and of a form with one
+part; the herald rendering cases unchanged in output; the clients'
+readiness tests over the new forms, including a request written into
+a node's nested form and into a property's top-level form; all three
+unit suites and the integration suite.
+
+** TODO Slice 4: the 'M' herald, and one gesture marks the file
+Make the changes under "The 'M' herald, and one gesture marks the file"
+above: the sign function and its call sites (roots included), the
+leaves fact, the ready fact and the parser, the herald rules and
+styles, the clients' gestures, the docs. Tests: 'tests/pcsvf/readiness.rs'
+shows a modified node in an unchanged relationship as '(diff (presence
+node~) (leaves N all))' and, once every leaf it records is marked,
+'(ready all)'; a modified node in a new relationship as '(presence
+node~ rel+) (leaves N rel all)' with N the distinct count; a new node
+unchanged from today; a modified root with its sign; a rendering case
+"M✓"; a client test per client that a gesture on a headline listing
+two objects names both without asking, and that a headline listing
+'all' toggles by its own '(ready ...)'; the wide-unmark warning tests
+as they are; all three unit suites and the integration suite (the
+recursive gesture over every root still makes every file ready).
+
+** TODO Slice 5: a removed member follows the editability rule
+Make the changes under "A removed member follows the editability rule"
+above. Tests: on 'removed_partners', x is editable under b, carries
+its content list and its "its containers changed (other files)" folder
+with b marked '~-' and its kept container, and a role graft there
+keeps its '(birth roleGraft ...)' through a save (the end-to-end case
+slice 15 of plan 13 could not reach; its unit test
+'a_containers_claim_held_only_at_head_keeps_its_birth_in_the_diff_view'
+stays); a node whose only container dropped it is editable as the
+removed member, with its content list ('k1' of
+'a_content_change_tags_the_members_and_draws_the_removed_one' in
+'tests/pcsvf/buffer.rs:113' if it has no earlier occurrence, else a
+new fixture); a removed member whose node has an earlier occurrence
+stays write-protected; a removed member editable before a save stays
+editable after it; C-c r u makes a removed member under a live
+vognode editable when the node's editable occurrence was
+write-protected by the user; the expected buffers that pinned a
+removed member as 'writeProtected' ('buffer.rs:118, :151, :249, :262,
+:284', 'users_notes.rs:94', 'readiness.rs:57') change only where the
+removed member is its node's first occurrence; the slice-5-of-plan-13
+test under a historical phantom still passes without the restore
+block; the Rust suite and the integration suite.
+
+** TODO Slice 6: the save inherits a skgrepo through phantoms and folders, and ignores a dangling removed member
+Make the changes under the heading of that name above. Tests: in
+'tests/new/buffer_to_viewnodes/add_missing_info.rs', a bare headline
+under a historical phantom under an editable node inherits the node's
+skgrepo, one in a partner folder inherits it as a non-member, one
+under a write-protected occurrence inherits as today, one at top level
+is refused as today; in 'write_protected_edits.rs', a write-protected
+occurrence's folder showing an unknown phantom with the sign '-' saves
+unchanged, and one showing an unknown member without it is compared as
+today; the Rust suite.
+
+** TODO Slice 7: one sexp string printer, "already staged", and the manifest warnings served
+Make the changes under the heading of that name above, printer first,
+then the rename, then the warnings. Tests: a unit test of the printer
+(backslash, quote, newline, a path with ';' and '('); the pre-staged
+test expects quoted paths and the clients' stage-and-commit tests the
+new key; 'tests/server_warnings.rs' serves a manifest warning from a
+foreign skgrepo whose manifest contradicts the config (the fixture of
+'tests/unit/dependencies_manifest.rs:155-191'); the Rust, Emacs and
+Neovim suites.
+
+** TODO Slice 8: the clients: set-repo, the prologue, navigation
+Make the changes under "The clients: set-repo, the prologue,
+navigation" above, in that order. Tests: Neovim gains the three
+set-repo cases Emacs has ('test-skg-set-relRepo.el:693, :725, :756'),
+and the Emacs messages' tests follow their new text; the prologue:
+per client, the repo-set switch's confirmation cancels its one-shot
+handler and the retry resends, and the existing streaming-request
+tests pass; navigation: per client, a buffer with three change
+headlines, one ready, where each of the six commands lands where it
+should and the ends report "No further change" and "No earlier
+change"; the key lookups; the Emacs and Neovim suites.
+
+** TODO Slice 9: names
+Apply every table under "Names" above, with 'git mv' for the files and
+directories, in the server, both clients, the tests and the docs. Grep
+for 'pcsvf', 'PCSVF', 'home_move', 'home-move', 'home move', 'expand',
+'expansion', 'unexpanded', 'fresh_drawing', 'fresh drawing',
+'aggregate' and 'unfold' under 'server/', 'elisp/', 'nvim/', 'tests/',
+'docs/' and 'shared/' before finishing; what remains is only what this
+plan keeps ('expand-file-name', "home moved", the org-folding and
+telescope senses of "unfold", the telescope's "aggregated", the fixture
+'fixtures/fresh/'). Tests: all three unit suites, with only the renamed
+identifiers and texts changed.
+
+** TODO Slice 10: "render", "extend" and the glossary
+Make the changes under "'Render', 'extend' and the glossary" above:
+the identifiers, then the prose sweep file by file, then the glossary.
+Grep for 'draw' under 'server/', 'elisp/', 'nvim/', 'tests/' and
+'docs/' before finishing; what remains is the org drawer and "redraw".
+Tests: the Rust suite (renames), the Emacs and Neovim suites (prose
+only).
+
+** TODO Slice 11: citations
+Make the changes under "Citations" above, by the procedure there.
+Grep for 'plan.org', 'discussion.org', 'more.org', 'TODO/' and
+'problems.org' under 'server/', 'elisp/', 'nvim/', 'tests/', 'bash/'
+and 'docs/' before finishing; what remains is 'docs/README.org:55' and
+the corrected citation of the problems list. Tests: the three unit
+suites (comments only).
+
+** TODO Slice 12: all-caps
+Make the changes under "All-caps" above, by the procedure there, and
+write the rule into 'coding-advice/formatting.org'. Record the counts
+before and after in 'progress.org'. Tests: all three unit suites and
+the integration suite (messages may have changed).
+
+* Verification and completion
+'cargo nextest run' (through 'bash/nextest.sh'), 'bash/emacs-tests.sh'
+and 'bash/nvim-tests.sh' after every slice, one suite at a time;
+'bash/integration-tests.sh' after slices 0, 3, 4, 5 and 12 (the
+'import-md-and-org' test fails at baseline, as 'TODO/problems.org'
+records). After slice 12, grep once more for every retired name
+('pcsvf', 'home_move', 'expand' in the server, 'fresh_drawing',
+'DiffViewSource', 'pre-staged', 'pre_staged', 'aggregate-node',
+'draw'), for citations of 'TODO/' under 'server/', 'elisp/' and
+'nvim/', and for the old forms '(diff node', '(diff rel', '(ready ' and
+'(leaves ' outside a '(diff (' form under 'tests/' and 'docs/'; each
+comes back empty or lists only what this plan keeps. Done when all
+thirteen slices are committed and every suite passes.

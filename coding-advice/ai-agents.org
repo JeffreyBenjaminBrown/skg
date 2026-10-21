@@ -36,3 +36,17 @@ You'll get plenty of credit, don't worry.
 * Disregard Reverted Edits
 
 If you make an edit and then see in a system-reminder that the file has been modified (reverting your changes), this might mean I clobbered them by accident or on purpose. Stop to ask.
+
+* Delegate a survey; keep the judgment
+
+This applies to Opus (and to Fable); Sonnet, as the usual delegate, needs none.
+A question whose answer is a list --
+every occurrence of a word, every identifier that contains one,
+every file that cites a document, every all-caps word in a comment --
+goes to a subagent with a precise brief:
+what to count, where, what to exclude, and the shape of the report.
+Spawn several at once when they are independent.
+A question whose answer is a judgment --
+does this code path do what the plan says,
+how should this sentence read, which of two designs is simpler --
+stays with you, and you read the code yourself.

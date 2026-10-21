@@ -592,6 +592,7 @@ moved to the new default (see
 The command only edits metadata in the current buffer.
 Save the view afterward to apply the changes.
 ** C-c r : commit readiness, in the diff view
+*** preamble
 In a buffer of the diff view (C-c v d), each change can be
 marked commit-ready. A mark approves the change as it is now: editing
 the changed thing again makes the mark lapse. Marks live on the

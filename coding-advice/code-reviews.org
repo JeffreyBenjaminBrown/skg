@@ -1,0 +1,97 @@
+#+title: Reviewing a body of work: the post-mortem method
+
+How to review a finished feature, or a milestone of one, so that the
+next effort is better. Distilled from the post-mortem of the total
+diff view (October 2026, 'TODO/total-diff-view/12_total-review.org',
+with the agents' reports in '12_1_postmortem-reports/'). The
+per-plan reviews that precede it (what the agents built, what
+deviated, what to fix next) are a different, smaller thing; this is
+the review of the whole.
+
+* Scope it by commits
+Name the commit range (the merge base with 'main' to HEAD, or one
+plan's commits) and the files it touched. Every agent gets the same
+range, so the reports agree about what "the work" is.
+
+* Ask separable questions, one agent each
+Each question below is one subagent (Opus), reading the range
+read-only and writing a report of at most about 200 lines to a file,
+ranked findings first, each finding with file:line, the two or more
+places involved, which is older, what differs, and whether a fix is
+cheap, costly or unwise. The synthesis is written by the planner from
+the reports; the human reads the synthesis, not the reports.
+** Duplication
+Does the work implement the same thing in more than one way, within
+itself? Does it implement anything that already existed, so that two
+implementations now coexist? Look for: two reconcilers or matchers;
+several ways to compute one set or list; several readers of one
+encoding; several request handlers with the same pipeline; copies in
+the tests; copies between the two clients beyond the expected twin
+structure.
+** Vocabulary and reification
+Which terms did the work introduce? For each: did the codebase
+already have a word for it; is it used with one meaning everywhere;
+is it confusible with an existing term or with ordinary English
+(words with two meanings; one thing with several names; words the
+glossary has rules against). What does the work talk about without a
+name? Then both directions of reification: concepts reconstructed
+from tuples, strings or repeated matches that deserve a type or a
+function; and types, wrappers or modules with one use or in the
+wrong place.
+** Readability and arrangement
+Is every algorithm described in a place a coder would find from the
+code that implements it? Is the code arranged where its file names
+suggest (a feature with no module of its own; render files that
+render nothing; a handler file with no handler)? Are the calls
+readable (positional booleans)? Sample the doc comments against the
+code and list the stale ones. Are the clients parallel?
+** User documentation
+Enumerate every user-facing command from the source of truth (the
+'(interactive)' forms and the keymaps, both clients) and every
+request from the protocol, and check each against the docs: present,
+under the right binding, described as the code behaves today. Check
+the glossary for every term the docs use. Look for behavior nobody
+documented: refusals and their messages, what is written to disk,
+what happens on commit.
+** Tests
+List every behavior the plans' "Agreed behavior" sections state, as
+amended by later plans, and name the test that asserts each, or say
+none does. Check the fixtures and helpers for copies. Sample the
+tests for naming and for assertions on raw text where a structural
+check would be clearer.
+** Performance
+Measure what the work does on the real data, read-only: the costs
+that scale with the graph (a full comparison after every save, a
+walk per changed node, a file read per node). One number each, with
+the method, and a judgment of whether anything is worth optimizing.
+** The churn ledger
+What was built in one plan and removed or rewritten in a later one:
+commit hashes, lines, elapsed time, the stated reason quoted from the
+review that decided it, and a cause class: a requirement the plan
+got wrong; a requirement the human changed with new information; a
+design the executing agent chose and the reviewer rejected; a
+mechanism built on a false belief about the existing code; naming or
+housekeeping. Totals by plan and by cause. This is the one report
+the planner must read in full, because the lessons are in it.
+** What the user lost
+Which gestures or views that existed before the work are gone or
+changed, by decision or by accident.
+** Cost
+Hours of the human's time per round, estimated from the timestamps
+of reviews and commits, so that the next effort can be budgeted.
+
+* Synthesize, then let the human process it in org
+The synthesis answers the questions in the order asked, says in a
+verdict paragraph what survived and what needs work, and ends with
+what to do next as TODO items for the human. The human replies in
+the document under the '[Jeff]' protocol of 'org-discussions.org';
+the planner answers each reply, marks mere agreements DONE without
+replying, and turns the settled items into a plan.
+
+* When to do it
+A short check after every plan (two questions: what terms did this
+plan coin or reuse; what does its code cite), by one agent, before
+the next plan is written. The full method at milestones, when a
+feature's behavior has stopped changing, because structure is only
+visible then. Doing the full method after each plan would find
+problems that the next plan was about to change anyway.

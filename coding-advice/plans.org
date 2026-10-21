@@ -1,0 +1,107 @@
+#+title: Writing execution plans for unattended agents
+
+This is advice for whoever writes a plan that an agent will execute
+without supervision (the planner: usually Claude, sometimes Jeff). It
+was distilled from the total diff view effort of October 2026, five
+plans and 104 commits, whose post-mortem is
+'TODO/total-diff-view/12_total-review.org'. The runner is
+'bash/run-plan-slices.sh'; how to run a plan is described in
+'TODO/total-diff-view/11_review.org' under "How to run a plan
+unattended".
+
+* Before writing a rule about existing behavior, read the code path that decides it
+A plan that says "X happens when Y" is a claim about the code. Three
+such claims in the TDV effort were false, and each cost a round: that
+the graph pair identifies a text preserver (it does not; a title
+heuristic was built and then deleted), that the editable map
+write-protects a later occurrence so editability cannot move (only an
+editable occurrence claims its ID, so it can), and that a request on
+an editable node reaches the cascade (two save rules refused it; the
+run stopped). The habit: find the function that decides the behavior,
+read it, and cite it in the plan. If you cannot find it, say so in the
+plan as an open question rather than stating the rule.
+
+* Design the shared model once, before any plan
+When several slices will touch one model (for the TDV: editability,
+write-protection, members and non-members, view requests), write that
+model down first, in the discussion document, as a stateless
+description: what states a thing can be in, what moves it between
+them, and what the save does with each state. Do it before the first
+plan that touches it. The TDV redesigned this model three times across
+plans 04, 06 and 08; the stateless description that settled it was
+written last, in the 07 review thread, and would have saved two
+rounds written first. "Stateless" means: decide from what the buffer
+and the graph are now, never from what they were at an earlier save.
+
+* Keep the list of decisions already taken, and check "what stays" against it
+A plan's "What stays as it is" section must be checked against the
+decisions on record. Plan 02 kept the partial-staging commands
+although the discussion had already decided partial commits are
+dangerous; plan 04 then deleted them. Keep one list of decisions
+(the discussion document's resolved items are that list) and read it
+before writing each plan.
+
+* Prefer deleting a mechanism to adding a rule
+When a mechanism misbehaves, the first proposal is usually a rule to
+tame it: a refusal, a special case, a comparison with history. In the
+TDV, the save refusal for a node left without an editable occurrence,
+the automatic following of the fresh sets after every save, and the
+counterpart matching by path were all such rules, and in each case
+the fix Jeff chose once he saw it was to remove the mechanism (let
+the user write-protect; make the following a command; judge by the
+graph alone). Before proposing a rule, ask what would be lost if the
+mechanism it tames were removed.
+
+* Keep the "Pitfalls" section
+From plan 04 on, every plan had a section "Pitfalls the slices must
+respect": facts about the existing code, with file and function, that
+an agent would otherwise rediscover or trip over (a reconciler that
+runs first and reorders, a map rebuilt every rerender, a request that
+cascades). After it was introduced, no executing agent chose a design
+that the reviewer later rejected; before it, four did. Write it from
+the code, not from memory.
+
+* Order slices so a rule lands with the mechanism it depends on
+Plan 08 put "a member child under a write-protected occurrence is
+refused" in slice 0 and "the server leaves no member under what it
+write-protects" in slice 1. After slice 0 alone, every save after a
+move of editability was refused, and the agent had to pull slice 1's
+half forward. When a rule depends on a mechanism, they are one slice.
+
+* A slice that changes what the server writes into a buffer runs the integration tests
+The unit suites do not read a buffer as a client does. Slice 15 of
+plan 13 added one metadata atom to every buffer and broke three
+integration tests, in both clients' versions; slice 16 found them,
+because the plan ran 'bash/integration-tests.sh' only after slices 9
+and 16. So a slice that changes what the server writes into a buffer
+(a fact, an atom, a label, a buffer name) runs the integration suite
+before it ends, whatever the plan's verification section says, and
+the plan says so in that slice.
+
+* The form of a plan
+- It is a unitary declaration: "nothing here is open for discussion",
+  self-standing (every term defined in it or in 'docs/glossary.org'),
+  with the review that produced it named once as background nobody
+  needs to read.
+- Sections: assignment and authority; commits (one or a few per
+  slice, each naming the plan document and the slice; the slice's
+  last code commit carries its docs and its DONE keyword); scope;
+  vocabulary; agreed behavior (what); pitfalls (why); code map
+  (where); implementation sequence (how, one slice per headline, each
+  ending with its tests); verification and completion.
+- Write slice headlines as '** TODO Slice N: ...'. The runner looks
+  for DONE; agents remark on a bare headline every time.
+- Name one-time tools as one-time (a corpus check that answers a
+  question once should not become a workspace member).
+- Name the one stop the plan expects, if any, and say that stopping is
+  otherwise for the conditions in 'when-to-stop.org'.
+- Say where deviations go ('progress.org' beside the plan, under a
+  headline naming the plan).
+
+* After each plan, before the next
+Run a short review with two questions, by one agent: what terms did
+this plan's code coin or reuse, and does its code cite anything under
+'TODO/'. Vocabulary drift ("drawn", "fresh", "leaf") and plan
+citations in code each entered through one plan and spread through
+the next; both are cheap to catch per plan and expensive to catch at
+the end. The full post-mortem method is in 'code-reviews.org'.
