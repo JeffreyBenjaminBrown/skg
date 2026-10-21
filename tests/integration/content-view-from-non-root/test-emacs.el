@@ -48,8 +48,8 @@
                        (match-string 0 text))))
         (unless line
           (fail "no level-2 headline for parent; buffer:\n%s" text))
-        (unless (string-match-p "(affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))" line)
-          (fail "parent is not (affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1))); line: %S" line))
+        (unless (string-match-p "(affectsParent false) (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))" line)
+          (fail "parent is not (affectsParent false) (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1))); line: %S" line))
         (unless (string-match-p " writeProtected\\b" line)
           (fail "parent is not writeProtected; line: %S" line))))))
 

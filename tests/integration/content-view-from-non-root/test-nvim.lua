@@ -69,9 +69,9 @@ T.check(parent_line, string.format(
   'no level-2 headline for parent; buffer:\n%s', text))
 
 T.check(parent_line:find(
-    '(affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))', 1, true) ~= nil,
+    '(affectsParent false) (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))', 1, true) ~= nil,
   string.format(
-    'parent is not (affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1))); '
+    'parent is not (affectsParent false) (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1))); '
     .. 'line: %s', parent_line))
 T.check(parent_line:find(' writeProtected%f[%A]') ~= nil,
   string.format('parent is not writeProtected; line: %s', parent_line))
