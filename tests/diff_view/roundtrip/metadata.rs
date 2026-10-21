@@ -1,6 +1,7 @@
 // Each of the diff view's viewnodes renders its metadata, then
 // parses back to the same viewnode.
 
+use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
   ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
@@ -8,9 +9,9 @@ use skg::types::git::Sign;
 use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use skg::types::viewnode::{
-  ChangeFacts, ChangesetMarkerKind, DiffPresence, PartnerFolder, Phantom,
+  AffectsParent, Birth, ChangeFacts, ChangesetMarkerKind, DiffPresence, PartnerFolder, Phantom,
   PhantomHistorical, Property, DiffObject, ReadinessRequest, Viewnode,
-  ViewnodeKind, Vognode};
+  ViewnodeKind, Vognode, mk_writeProtected_viewnode_with_birth};
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -143,6 +144,29 @@ fn the_acquisition_folders_round_trip () {
   assert_round_trip (
     viewnode ( ViewnodeKind::PartnerFolder (PartnerFolder::Acquired) ),
     "acquiredFolder" ); }
+
+/// A role graft's birth survives a save, so the diff view's
+/// reconciler can tell a graft from a note the user added.
+#[test]
+fn a_role_graft_round_trips_with_its_birth () {
+  for (role, expected) in [
+    ( RelationRole::CONTAINER,
+      "(node (id g) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)" ),
+    ( RelationRole::SUBSCRIBEE,
+      "(node (id g) (repo main) (affectsParent false) (birth roleGraft subscribee) writeProtected)" ), ] {
+    let graft : Viewnode = mk_writeProtected_viewnode_with_birth (
+      ID::from ("g"), SkgrepoName::from ("main"), "g" . into (),
+      AffectsParent::False, Birth::RoleGraft (role) );
+    assert_round_trip (graft, expected); }}
+
+#[test]
+fn malformed_birth_metadata_is_refused () {
+  for metadata in [
+    "(skg (node (id g) (birth roleGraft)))",              // no role
+    "(skg (node (id g) (birth roleGraft content)))",      // no partner role
+    "(skg (node (id g) (birth unremarkable container)))", ] {
+    assert! ( parse_metadata_to_viewnodemd (metadata) . is_err (),
+              "should refuse {}", metadata ); }}
 
 #[test]
 fn malformed_diff_view_metadata_is_refused () {

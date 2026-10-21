@@ -86,9 +86,9 @@ async fn test_path_with_cycle_impl(
   let expected: &str = indoc! {"
     * (skg (node (id 1) (repo main))) 1
     ** (skg folded (node (id 2) (repo main))) 2
-    *** (skg (node (id 3) (repo main) (affectsParent false) writeProtected)) 3
-    **** (skg (node (id 4) (repo main) (affectsParent false) writeProtected)) 4
-    ***** (skg (node (id 1) (repo main) (affectsParent false) writeProtected)) 1
+    *** (skg (node (id 3) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)) 3
+    **** (skg (node (id 4) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)) 4
+    ***** (skg (node (id 1) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)) 1
     *** (skg (node (id off-path) (repo main))) off-path
   "};
 
@@ -163,10 +163,10 @@ async fn test_path_with_branches_no_cycle_impl(
     * (skg (node (id 0) (repo main))) 0
     ** (skg (node (id 1) (repo main))) 1
     *** (skg folded (node (id 2) (repo main))) 2
-    **** (skg (node (id 3) (repo main) (affectsParent false) writeProtected)) 3
-    ***** (skg (node (id 3) (repo main) (affectsParent false) writeProtected)) 3
-    ***** (skg (node (id 2) (repo main) (affectsParent false) writeProtected)) 2
-    ***** (skg (node (id 1) (repo main) (affectsParent false) writeProtected)) 1
+    **** (skg (node (id 3) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)) 3
+    ***** (skg (node (id 3) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)) 3
+    ***** (skg (node (id 2) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)) 2
+    ***** (skg (node (id 1) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)) 1
     **** (skg (node (id off-path) (repo main))) off-path
   "};
 
@@ -242,10 +242,10 @@ async fn test_path_with_branches_with_cycle_impl(
     * (skg (node (id 0) (repo main))) 0
     ** (skg (node (id 1) (repo main))) 1
     *** (skg folded (node (id 2) (repo main))) 2
-    **** (skg (node (id 3) (repo main) (affectsParent false) writeProtected)) 3
-    ***** (skg (node (id 3) (repo main) (affectsParent false) writeProtected)) 3
-    ***** (skg (node (id 2) (repo main) (affectsParent false) writeProtected)) 2
-    ***** (skg (node (id 1) (repo main) (affectsParent false) writeProtected)) 1
+    **** (skg (node (id 3) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)) 3
+    ***** (skg (node (id 3) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)) 3
+    ***** (skg (node (id 2) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)) 2
+    ***** (skg (node (id 1) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)) 1
     **** (skg (node (id off-path) (repo main))) off-path
   "};
 
@@ -295,12 +295,12 @@ async fn test_fork_expansion_at_origin_impl(
   // sub-branches similarly reversed.
   let expected: &str = indoc! {"
     * (skg (node (id a11) (repo main))) a11
-    ** (skg (node (id a2) (repo main) (affectsParent false) writeProtected)) a2
-    *** (skg (node (id b) (repo main) (affectsParent false) writeProtected)) b
-    *** (skg (node (id a) (repo main) (affectsParent false) writeProtected)) a
-    ** (skg (node (id a1) (repo main) (affectsParent false) writeProtected)) a1
-    *** (skg (node (id a1) (repo main) (affectsParent false) writeProtected)) a1
-    *** (skg (node (id a) (repo main) (affectsParent false) writeProtected)) a
+    ** (skg (node (id a2) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)) a2
+    *** (skg (node (id b) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)) b
+    *** (skg (node (id a) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)) a
+    ** (skg (node (id a1) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)) a1
+    *** (skg (node (id a1) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)) a1
+    *** (skg (node (id a) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)) a
   "};
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
   let expected_trees: Tree<Viewnode> =

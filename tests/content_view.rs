@@ -195,7 +195,7 @@ async fn test_multi_root_view_with_shared_nodes (
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
          * (skg (node (id 2) (repo main) (affectsParent na) (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1)))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (repo main) (affectsParent false) writeProtected omittedBody (rels (contains (out 2 (ancestors 1))) (hidesFromSubs (out 2)) (birth (contains out 1))))) title 1
+         ** (skg (node (id 1) (repo main) (affectsParent false) (birth roleGraft container) writeProtected omittedBody (rels (contains (out 2 (ancestors 1))) (hidesFromSubs (out 2)) (birth (contains out 1))))) title 1
          ** (skg subscribeeFolder)
          *** (skg (node (id 4) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 2 (ancestors 2))) (overrides (in 1)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2))))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (subscribesTo (in 2 (ancestors 2))) (overrides (out 2)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2))))) this title includes a [[id:22][textlink to another file]]
@@ -241,7 +241,7 @@ async fn test_multi_root_view_with_node_limit (
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
          * (skg (node (id 2) (repo main) (affectsParent na) (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1)))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (repo main) (affectsParent false) writeProtected omittedBody (rels (contains (out 2 (ancestors 1))) (hidesFromSubs (out 2)) (birth (contains out 1))))) title 1
+         ** (skg (node (id 1) (repo main) (affectsParent false) (birth roleGraft container) writeProtected omittedBody (rels (contains (out 2 (ancestors 1))) (hidesFromSubs (out 2)) (birth (contains out 1))))) title 1
          ** (skg subscribeeFolder)
          *** (skg (node (id 4) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 2 (ancestors 2))) (overrides (in 1)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2))))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (subscribesTo (in 2 (ancestors 2))) (overrides (out 2)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2))))) this title includes a [[id:22][textlink to another file]]

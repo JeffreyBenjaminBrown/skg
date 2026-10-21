@@ -634,9 +634,11 @@ fn parse_node_sexp (
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
             metadata . home_skgrepo = Some ( SkgrepoName::from (value) ); },
-          // Semantic relationship / birth facts are display-only.
-          // The client strips them before save; the view regenerates them.
+          // Semantic relationship facts are display-only; the view
+          // regenerates them.
           "rels" => {},
+          "birth" => {
+            metadata . birth = parse_birth_sexp ( &subitems[1..] ) ?; },
           "viewStats" => {
             parse_viewstats_sexp ( &subitems[1..], &mut metadata . viewStats ) ?; },
           "editRequest" => {
@@ -682,6 +684,19 @@ fn parse_node_sexp (
       _ => { return Err ( "Unexpected element in node"
                            . to_string () ); }} }
   Ok (( )) }
+
+/// Parse the contents of '(birth roleGraft ROLENAME)'.
+fn parse_birth_sexp (
+  items : &[Sexp],
+) -> Result<Birth, String> {
+  let atoms : Vec<String> =
+    items . iter () . map (atom_to_string) . collect::<Result<_, _>> () ?;
+  match atoms . as_slice () {
+    [kind, rolename] if kind == "roleGraft" =>
+      RelationRole::from_rolename (rolename)
+      . map (Birth::RoleGraft)
+      . ok_or_else ( || format! ( "Unknown birth role: {}", rolename )),
+    _ => Err ( "birth must be (birth roleGraft ROLENAME)" . to_string () ), }}
 
 /// Parse the (unknown (id X)) s-expression contents.
 /// Sets metadata.unknown_node_id when an id is found.

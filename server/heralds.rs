@@ -478,6 +478,8 @@ pub fn herald_rule_table () -> HeraldRule {
           vac ("na"),
           vac ("true"),
           leaf_styled_as ("affectsParent_false", "false", "⊥") ]),
+        // A role graft's birth: the (rels ...) facts already show it.
+        vac ("birth"),
         // The server emits the atom 'writeProtected'
         // (see org_to_text.rs); we match that here.
         leaf_abut ("writeProtected", "☮"),
@@ -689,6 +691,9 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     // Keys inside node / deleted / unknown forms:
     "id", "repo",
     "affectsParent", "writeProtected", "omittedBody",
+    // A role graft's '(birth roleGraft ROLENAME)'; its role is value
+    // position.
+    "birth",
     // The assembled relationship-herald atom, a payload of styled spans
     // (server/herald_tokens.rs); its span sub-forms are value position,
     // consumed by the client's renderer, so they are not match atoms.
