@@ -4,7 +4,9 @@
 //! The fresh drawing is built in a scratch tree. Each existing
 //! viewnode it also produces is kept, with its fold state, and its
 //! kind and facts are updated in place; each it does not is
-//! detached; what only it has is copied in. A viewnode that stands
+//! detached, unless something the user added stands below it
+//! ('keep_stale_child_holding_the_users', the rule both reconcilers
+//! obey); what only it has is copied in. A viewnode that stands
 //! for a graphnode is matched by the ID it stands for, any other by
 //! its kind (and a folder entry by the entry): within one parent each
 //! key appears at most once.
@@ -15,9 +17,10 @@ use crate::types::git::Sign;
 use crate::types::misc::ID;
 use crate::types::tree::moves::arrange_last_children;
 use crate::types::viewnode::{
-  AffectsParent, Birth, ChangeFacts, Property, PropertyFolder,
+  AffectsParent, Birth, ChangeFacts, DiffPresence, Property, PropertyFolder,
   Viewnode, ViewnodeKind, Vognode};
-use crate::update_buffer::util::detach_viewnode_transferring_focus;
+use crate::update_buffer::util::{
+  detach_viewnode_transferring_focus, keep_stale_child_holding_the_users};
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::error::Error;
@@ -124,8 +127,41 @@ pub fn reconcile_children_with_fresh_drawing (
       None => result . push (
         append_copy_of_subtree (tree, parent, fresh, fresh_child) ?), }}
   for (stale, _) in unmatched {
-    detach_viewnode_transferring_focus (tree, stale) ?; }
+    if ! keep_stale_child_holding_the_users (tree, stale, &holds_the_users) ? {
+      detach_viewnode_transferring_focus (tree, stale) ?; }}
   Ok (result) }
+
+/// Whether a viewnode below what the diff view drew is the user's:
+/// an unrestricted vognode born 'Unremarkable' that carries no
+/// '(diff ...)' fact and is not a member of the folder it stands in
+/// ('in_folder'). A role graft ('Birth::RoleGraft', which a buffer
+/// carries back), a removed member and a folder's member are the
+/// server's, as is every viewnode of another kind.
+pub fn is_the_users_viewnode (
+  viewnode  : &Viewnode,
+  in_folder : bool,
+) -> bool {
+  matches! ( &viewnode . kind,
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+      if t . birth == Birth::Unremarkable
+         && t . change_facts . presence == DiffPresence::default ()
+         && ! ( in_folder && t . affectsParent == AffectsParent::True )) }
+
+/// Whether something of the user's ('is_the_users_viewnode') stands
+/// anywhere below 'node'.
+pub fn holds_the_users (
+  node : NodeRef<Viewnode>,
+) -> bool {
+  node . descendants () . skip (1)
+    . any ( |below| is_the_users_viewnode (
+      below . value (),
+      below . parent () . is_some_and ( |parent| is_folder ( parent . value () )) )) }
+
+fn is_folder (
+  viewnode : &Viewnode,
+) -> bool {
+  matches! ( viewnode . kind,
+    ViewnodeKind::PartnerFolder (_) | ViewnodeKind::PropertyFolder (_) ) }
 
 /// Give 'existing' the kind and facts of 'fresh', keeping its fold
 /// state and focus. An unrestricted vognode keeps what the view

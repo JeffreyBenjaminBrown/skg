@@ -1,9 +1,9 @@
-use crate::types::viewnode::{AffectsParent, Viewnode, ViewnodeKind};
-use crate::types::viewnode::Vognode;
+use crate::types::viewnode::{
+  AffectsParent, Birth, ChangeFacts, Viewnode, ViewnodeKind, Vognode};
 use crate::types::tree::generic::{with_node_mut, write_at_ancestor_in_tree};
 use crate::types::tree::moves::move_to_last_child;
 
-use ego_tree::{NodeId, NodeRef, Tree};
+use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::hash::Hash;
@@ -136,6 +136,41 @@ impl<Orderkey> RepairSummary<Orderkey> {
       deleted_duplicates : Vec::new (), }}
 }
 
+/// The rule both reconcilers obey ('docs/diff-view.org', "What a
+/// reconciler keeps"): a reconciler detaches only what it drew, and
+/// what the user added survives. A stale child (one the reconciler
+/// manages but would no longer draw) under which 'holds_the_users'
+/// finds something of the user's is kept: an unrestricted vognode as
+/// a plain non-member occurrence of its node, its diff facts cleared;
+/// any other kind (a restricted vognode, a phantom, a property or a
+/// folder) deadened, so that the orphan pass keeps what is under it
+/// ('mark_orphans_under_dead_parents_false'). Returns whether it kept
+/// the child; one it did not keep is the caller's to detach.
+/// 'complete_managed_children_in_viewforest' never looks below the
+/// children it manages, so for it any child of a stale child is the
+/// user's; the diff view's reconciler draws below the children it
+/// manages, and asks 'holds_the_users' in
+/// 'server/diff_view/fresh_drawing.rs'.
+pub fn keep_stale_child_holding_the_users (
+  tree            : &mut Tree<Viewnode>,
+  stale           : NodeId,
+  holds_the_users : &dyn Fn (NodeRef<Viewnode>) -> bool,
+) -> Result<bool, Box<dyn Error>> {
+  { let node : NodeRef<Viewnode> = tree . get (stale)
+      . ok_or ("keep_stale_child_holding_the_users: node not found") ?;
+    if node . value () . kind == ViewnodeKind::BufferRoot
+       || ! holds_the_users (node) {
+      return Ok (false); }}
+  let mut node_mut : NodeMut<Viewnode> = tree . get_mut (stale) . unwrap ();
+  let kind : &mut ViewnodeKind = &mut node_mut . value () . kind;
+  match kind {
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
+      t . affectsParent = AffectsParent::False;
+      t . birth         = Birth::Unremarkable;
+      t . change_facts  = ChangeFacts::default (); },
+    _ => *kind = ViewnodeKind::DeadViewnode, }
+  Ok (true) }
+
 /// Viewnode-specialized version of complete_managed_children.
 /// See that one's description for more info.
 /// This one specializes it so that:
@@ -159,44 +194,14 @@ where Managed  : Fn (&Viewnode) -> bool,
       subtree_satisfies( tree, stale_treeid, &|n: &Viewnode| n . focused ) };
   let problem_discard_response =
     |n: &mut Viewnode| { n . focused = true; };
-  // The stale-member rule: a stale member (managed child not in the goal)
-  // that is an Unrestricted, affectsParent=true *branch* (has children) is demoted to
-  // non-member so the user's subtree survives; a stale RestrictedVognode
-  // *branch* is deadened to a DeadViewnode instead (it has no
-  // affectsParent to demote; the orphan handling then preserves its
-  // subtree as independent -- see the API doc's "Restricted-skgrepo nodes");
-  // everything else stale -- a leaf, a historical phantom, a property -- is
-  // deleted by the reconciler. Returns true iff it kept the node.
+  // A stale child (managed, not in the goal) that has children is
+  // kept as the rule says; only a childless one is detached.
   let demote_invalid =
     |tree: &mut Tree<Viewnode>, stale_treeid: NodeId|
       -> Result<bool, Box<dyn Error>> {
-      enum StaleTreatment { Demote, Deaden, Detach }
-      let treatment : StaleTreatment = {
-        let n : NodeRef<Viewnode> = tree . get (stale_treeid)
-          . ok_or ("demote_invalid: node not found") ?;
-        let has_children : bool = n . children () . next () . is_some ();
-        match &n . value () . kind {
-          ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-            if has_children && t . affectsParent == AffectsParent::True
-            => StaleTreatment::Demote,
-          ViewnodeKind::Vognode (Vognode::Restricted (_))
-            if has_children
-            => StaleTreatment::Deaden,
-          _ => StaleTreatment::Detach } };
-      match treatment {
-        StaleTreatment::Detach => Ok (false),
-        StaleTreatment::Demote => {
-          with_node_mut ( tree, stale_treeid, |mut n| {
-            if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-              = &mut n . value () . kind
-              { t . affectsParent = AffectsParent::False; } } )
-            . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
-          Ok (true) },
-        StaleTreatment::Deaden => {
-          with_node_mut ( tree, stale_treeid, |mut n| {
-            n . value () . kind = ViewnodeKind::DeadViewnode; } )
-            . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
-          Ok (true) }, }};
+      keep_stale_child_holding_the_users (
+        tree, stale_treeid,
+        &|stale : NodeRef<Viewnode>| stale . children () . next () . is_some () ) };
   complete_managed_children(
     tree,
     treeid,
