@@ -1115,7 +1115,7 @@ stale (commit the removal through stage-and-commit, rerender, and
 find the note under a plain non-member occurrence). 'docs/diff-view.org'
 describes the rule and the birth atom.
 
-** TODO Slice 16: the skgrepo-changes buffer widens
+** DONE Slice 16: the skgrepo-changes buffer widens
 Make the changes under "The skgrepo-changes buffer widens" above,
 with the rename. Tests: a fixture with one relRepo-only move draws the
 recorder in the skgrepo-changes buffer with the relRepo-move viewnode

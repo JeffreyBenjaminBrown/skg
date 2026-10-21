@@ -17,10 +17,6 @@ both COMMANDS files, under C-c v d and C-c r. The server's code is
 'server/diff_view/' (its 'mod.rs' lists the files), over the graph
 straddle of 'server/graph_straddle/'.
 
-A paragraph marked "(from slice N of 13_plan)" describes behavior a
-later slice of 'TODO/total-diff-view/13_plan.org' lands; that slice
-removes the mark.
-
 * The four buffers
 One command opens up to four buffers, in this order, and skips any
 that would be empty. The client sends one "diff view" request per
@@ -36,18 +32,17 @@ node only the before-graph has, which an after-graph node lists as an
 extra ID) and its acquirer. The acquiree's text preserver is not in
 C; it shows as a new member of the acquirer's content.
 ** "diff-view: skgrepo changes"
-A PCSVF over the nodes whose home skgrepo moved. In this buffer each
+A PCSVF over the skgrepo moves ('pcsvf_sets_for_skgrepo_changes'):
+its C is the recorders of the change-forest leaves whose aspect is
+the home skgrepo or the relRepo, that is, the nodes whose home skgrepo
+moved and the recorders of the relationships whose relRepo moved. A
+node of that C is drawn as in any buffer, with all of its changes.
+The readiness summary counts every leaf whatever buffer is open;
+only the count of changes not editable in the buffer depends on what
+this buffer draws. In this buffer each
 moved vognode's own heralds also read "-OLD +NEW", and "Δ⌂=a" when
 the nearest moved vognode ancestor (a, the viewparent; b, the
 grandparent; ...) moved the same way ('set_home_move_facts_in_viewforest').
-
-(from slice 16 of 13_plan) Its C is the recorders of the change-forest
-leaves whose aspect is the home skgrepo or the relRepo: the nodes
-whose home skgrepo moved, and the recorders of the relationships whose
-relRepo moved. A node of that C is drawn as in any buffer, with all
-of its changes. The readiness summary is unaffected (it counts every
-leaf whatever buffer is open); only this buffer's count of changes
-not editable in it shrinks.
 ** "diff-view: order-only changes"
 A flat list, in ID order, of the nodes whose file changed but which
 record no change-forest leaf: only the order of some list changed.

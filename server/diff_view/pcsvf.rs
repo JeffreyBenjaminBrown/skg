@@ -13,12 +13,14 @@
 //! 'diffView_source' set ('process_unrestrictedVognode_changes').
 //!
 //! The merges and skgrepo-changes buffers draw PCSVFs over subsets of
-//! C ('pcsvf_sets_for_merges', 'pcsvf_sets_for_home_moves'). The
+//! C ('pcsvf_sets_for_merges', 'pcsvf_sets_for_skgrepo_changes'). The
 //! order-only buffer draws no PCSVF: it is a flat list of the nodes
 //! whose only change is the order of a list.
 
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::graph_straddle::types::GraphStraddle;
+use crate::diff_view::change_leaves::{
+  ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};
 use crate::prominence::climb_containerward_to_content_origins_via;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::diff_view::readiness_requests::set_ready_facts_in_viewforest;
@@ -97,7 +99,7 @@ pub fn pcsvf_sets_of_buffer (
     . get_or_init ( || match diffView_buffer_kind {
       DiffViewBufferKind::AllChanges       => pcsvf_sets (straddle),
       DiffViewBufferKind::Merges           => pcsvf_sets_for_merges (straddle),
-      DiffViewBufferKind::SkgrepoChanges   => pcsvf_sets_for_home_moves (straddle),
+      DiffViewBufferKind::SkgrepoChanges   => pcsvf_sets_for_skgrepo_changes (straddle),
       DiffViewBufferKind::OrderOnlyChanges => PcsvfSets::default (), } ) }
 
 /// The sets of the PCSVF over all of C.
@@ -141,17 +143,30 @@ pub fn pcsvf_sets_for_merges (
     c . insert (acquirer); }
   pcsvf_sets_over (straddle, c) }
 
-/// The sets of the skgrepo-changes buffer's PCSVF, over the nodes
-/// whose home skgrepo changed.
-pub fn pcsvf_sets_for_home_moves (
+/// The sets of the skgrepo-changes buffer's PCSVF, over the recorders
+/// of the change leaves whose aspect is the home skgrepo or the
+/// relRepo: the nodes whose home skgrepo moved, and the recorders of
+/// the relationships whose relRepo moved.
+pub fn pcsvf_sets_for_skgrepo_changes (
   straddle : &GraphStraddle,
 ) -> PcsvfSets {
+  let leaves : &ChangeLeaves = straddle . change_leaves ();
   let c : BTreeSet<ID> =
-    straddle . changed_pids () . out_changed . iter ()
-    . filter ( |pid| straddle . node_changes (pid) . home . is_some () )
+    leaves . recorders ()
+    . filter ( |recorder|
+      leaves . leaves_under (recorder) . iter ()
+      . any ( |leaf| leaf_is_a_skgrepo_change (&leaf . key) ) )
     . cloned ()
     . collect ();
   pcsvf_sets_over (straddle, c) }
+
+/// A home skgrepo move or a relRepo move.
+fn leaf_is_a_skgrepo_change (
+  key : &LeafKey,
+) -> bool {
+  matches! ( key,
+             LeafKey::Node { aspect : NodeAspect::HomeSkgrepo, .. }
+             | LeafKey::Relationship { aspect : RelationshipAspect::RelRepo, .. } ) }
 
 /// The containers of a node in either graph of the straddle, sorted by ID.
 pub fn union_containers (

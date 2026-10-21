@@ -776,7 +776,9 @@ instead, and commit everything at once with C-c r c.
 The merges buffer shows each nodeMerge since HEAD: the acquiree and
 its acquirer, in context. The acquiree's text preserver appears as a
 new member of the acquirer's content. The skgrepo
-changes buffer shows the nodes whose home skgrepo changed; each one's
+changes buffer shows the nodes whose home skgrepo changed and the
+nodes that record a relationship whose relRepo changed, each with all
+of its changes; a moved node's
 heralds read "-OLD +NEW", followed by "Δ⌂=a" when its nearest moved
 ancestor (a, the viewparent; b, the grandparent; ...) moved the same
 way. The order-only buffer lists the nodes whose only change is the

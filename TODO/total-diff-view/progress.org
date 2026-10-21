@@ -2246,3 +2246,33 @@ four notes survive a save, a "rerender all views" and a
 stage-and-commit, after which the note under x stands under a plain
 non-member x, the notes under h and in the "it acquired" folder under
 deadened viewnodes, and the note under a beside a's redrawn role tree.
+** Slice 16: deviations
+*** the integration tests still expected no birth atom
+Slice 15 writes '(birth roleGraft ROLE)' on a role graft, but three
+integration tests, in both their Emacs and Neovim twins, expected the
+headline without it: 'containerward-view-request',
+'content-view-from-non-root' and 'mentionerward-view-request'. The
+plan runs 'bash/integration-tests.sh' only after slices 9 and 16, so
+slice 15 did not see them fail. Their expectations now carry the atom,
+in a commit of their own before the slice's last.
+*** the marks' explanation in 'docs/diff-view.org' went with the last mark
+The paragraph saying what a "(from slice N of 13_plan)" mark means
+cited 'TODO/' and described no remaining mark, so it went too; the
+plan's closing grep for "(from slice" in that doc is then empty.
+*** the test fixture
+The plan's test fixture with a relRepo-only move and a text-only
+change is the existing 'kinds' fixture (rr's containment of rm moved
+to private; txt retitled), so no fixture was added. The tests are in
+'tests/pcsvf/other_buffers.rs': the sets ('mv' and 'rr'), the buffer
+(rr a root with the relRepo-move viewnode under rm; no txt), and the
+buffer saving back unchanged.
+*** verification
+Counts: nextest 849, Emacs 374, Neovim 348. 'bash/integration-tests.sh',
+with each client ('SKG_TEST_CLIENT=nvim' for the Neovim twins): only
+the baseline 'import-md-and-org' fails. On an isolated server,
+'tests/results/hk-slice16/verify-kinds.sh' over the 'kinds' fixture:
+the skgrepo-changes buffer holds mv and rr, rr's relRepo move under
+rm, no txt; a save of it draws the same buffer, and so does reopening
+it. The closing greps (retired names, 'TODO/' citations under
+'server/', 'elisp/' and 'nvim/', "(from slice" in 'docs/diff-view.org')
+come back empty.

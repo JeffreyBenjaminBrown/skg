@@ -383,11 +383,11 @@ So far there are these endpoints:
       refusal applies to every buffer, so the client stops.
   - What each buffer draws: the "all changes" buffer is the PCSVF over
     every change in the owned skgrepos since HEAD; the merges and
-    skgrepo-changes buffers are PCSVFs over the nodeMerges and the home
-    moves; the order-only buffer lists the nodes whose only change is
-    the order of a list. Foreign skgrepos are excluded. See the
-    glossary's "Terms of the diff view", and "Metadata of the
-    diff view" below.
+    skgrepo-changes buffers are PCSVFs over the nodeMerges and over the
+    home skgrepo and relRepo moves; the order-only buffer lists the
+    nodes whose only change is the order of a list. Foreign skgrepos
+    are excluded. See the glossary's "Terms of the diff view", and
+    "Metadata of the diff view" below.
   - The server compares HEAD with the worktree through a graph straddle it
     keeps per connection, brought up to date at each request, at each
     save of a buffer of the diff view, and at each rerender of

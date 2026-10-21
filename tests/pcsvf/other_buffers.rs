@@ -7,13 +7,16 @@
 //   way, as did mvc's content mvg), mvr (moved the other way) and mvs
 //   (unmoved), whose content mvt moved like mvp.
 // - ord's content changed only in order: o1, o2 became o2, o1.
+// The 'kinds' fixture, described in 'buffer.rs', has a relRepo-only
+// move (rr's containment of rm) and a text-only change (txt).
 
 use crate::git_fixture::{Fixture, graph_straddle};
 use crate::pcsvf::common::{
-  ids, open_buffer, saves_back_unchanged, with_fixture};
+  assert_lines_in_order, ids, open_buffer, saves_back_unchanged,
+  with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
-use skg::diff_view::pcsvf::{PcsvfSets, pcsvf_sets_for_home_moves, pcsvf_sets_for_merges};
+use skg::diff_view::pcsvf::{PcsvfSets, pcsvf_sets_for_skgrepo_changes, pcsvf_sets_for_merges};
 use skg::types::views_state::DiffViewBufferKind;
 
 use std::error::Error;
@@ -24,8 +27,15 @@ const SKGREPOS : [&str; 2] = [ "public", "private" ];
 fn buffer (
   diffView_buffer_kind : DiffViewBufferKind,
 ) -> Result<String, Box<dyn Error>> {
+  buffer_of_case ("buffers", diffView_buffer_kind) }
+
+/// The text of a buffer of the fixture 'case'.
+fn buffer_of_case (
+  case                 : &str,
+  diffView_buffer_kind : DiffViewBufferKind,
+) -> Result<String, Box<dyn Error>> {
   let mut text : String = String::new ();
-  with_fixture ("buffers", &SKGREPOS, |f : &mut Fixture| {
+  with_fixture (case, &SKGREPOS, |f : &mut Fixture| {
     text = open_buffer (f, diffView_buffer_kind) ?
       . ok_or ("the fixture's buffer is empty") ?;
     Ok (( )) }) ?;
@@ -83,16 +93,41 @@ fn the_merges_sets_hold_the_acquiree_and_the_acquirer (
     Ok (( )) }) }
 
 #[test]
-fn the_home_move_sets_hold_the_moved_nodes (
+fn the_skgrepo_changes_sets_hold_the_moved_nodes (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &SKGREPOS, |f| {
     let straddle : GraphStraddle = graph_straddle (f) ?;
-    let sets : PcsvfSets = pcsvf_sets_for_home_moves (&straddle);
+    let sets : PcsvfSets = pcsvf_sets_for_skgrepo_changes (&straddle);
     assert_eq! ( sets . c, ids (&[ "mvc", "mvg", "mvp", "mvr", "mvt" ]) );
     assert_eq! ( sets . d, ids (&[ "mvp" ]) );
     assert! ( sets . u . contains (&"mvs" . into ()),
               "mvs is on the walk from mvt to mvp" );
     Ok (( )) }) }
+
+#[test]
+fn the_skgrepo_changes_sets_hold_the_recorder_of_a_relRepo_move (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("kinds", &SKGREPOS, |f| {
+    let straddle : GraphStraddle = graph_straddle (f) ?;
+    let sets : PcsvfSets = pcsvf_sets_for_skgrepo_changes (&straddle);
+    assert_eq! ( sets . c, ids (&[ "mv", "rr" ]) );
+    Ok (( )) }) }
+
+#[test]
+fn the_skgrepo_changes_buffer_draws_the_recorder_of_a_relRepo_move (
+) -> Result<(), Box<dyn Error>> {
+  let text : String =
+    buffer_of_case ("kinds", DiffViewBufferKind::SkgrepoChanges) ?;
+  assert_lines_in_order ( &text, &[
+    "* (skg (node (id rr)",
+    "** (skg (changesetMarker relRepo) (leaves 1 all))",
+    "** (skg (node (id rm)",
+    "*** (skg (relRepoMove (old public) (new private)) (leaves 1))" ] );
+  assert! ( ! headline_of (&text, "rr") . contains ("homeSkgrepoMove"),
+            "rr's home did not move:\n{}", text );
+  assert! ( ! text . contains ("(id txt)"),
+            "txt's only change is its text:\n{}", text );
+  Ok (( )) }
 
 #[test]
 fn the_merges_buffer_draws_only_the_merge (
@@ -166,6 +201,11 @@ fn the_merges_buffer_saves_back_unchanged (
 fn the_skgrepo_changes_buffer_saves_back_unchanged (
 ) -> Result<(), Box<dyn Error>> {
   saves_back_unchanged ("buffers", &SKGREPOS, DiffViewBufferKind::SkgrepoChanges) }
+
+#[test]
+fn a_skgrepo_changes_buffer_with_a_relRepo_move_saves_back_unchanged (
+) -> Result<(), Box<dyn Error>> {
+  saves_back_unchanged ("kinds", &SKGREPOS, DiffViewBufferKind::SkgrepoChanges) }
 
 #[test]
 fn the_order_only_buffer_saves_back_unchanged (

@@ -128,8 +128,11 @@ each move since HEAD as one change-forest leaf: a home skgrepo move as
 the property "⌂ -OLD +NEW" under the node, a relRepo move as the
 property "relationship moved from OLD to NEW" under the member, keyed
 by the relationship, so the same move seen from either end is the
-same leaf. A relRepo move puts only the recorder in C. Say "home
-skgrepo move", not "home move".
+same leaf. A relRepo move puts only the recorder in C. The
+skgrepo-changes buffer of the diff view draws the nodes whose home
+skgrepo moved and the recorders of the relationships whose relRepo
+moved, each with all of its changes. Say "home skgrepo move", not
+"home move".
 
 *** MSV = maybe specified vector
 
@@ -783,7 +786,8 @@ readiness summary only counts their changed files.
 
 The viewforest the "all changes" buffer draws ('server/diff_view/pcsvf.rs',
 functions 'pcsvf_...'). The merges and skgrepo-changes buffers draw
-PCSVFs over subsets of the changes.
+PCSVFs over subsets of the changes: the nodeMerges, and the home
+skgrepo and relRepo moves.
 
 *** graph straddle, before-graph, after-graph
 
