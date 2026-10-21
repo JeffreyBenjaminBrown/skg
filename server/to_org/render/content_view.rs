@@ -121,7 +121,7 @@ pub(crate) fn multi_root_view_via_runtime (
   let buffer_content : String =
     finish_viewforest (
       &mut viewforest, &runtime . graph, &runtime . config,
-      skgrepo_restriction ) ?;
+      skgrepo_restriction, None ) ?;
   // The pids the caller registers for this view -- the {Unrestricted, Restricted}
   // set, via the one shared skgrepo of which-kinds-count
   // (views_state::pids_from_viewforest), the same helper update_view uses post-save.

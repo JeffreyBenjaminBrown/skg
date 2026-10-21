@@ -415,8 +415,12 @@ fn validate_acquired_folder (
     tree, treeid, "acquiredFolder",
     |node| matches!(&node . kind,
                     MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))),
+    // An acquiree's phantom, or a note the user parked there.
     |node| matches!(&node . kind,
-                    MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))))) }
+                    MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))))
+           || matches!(&node . kind,
+                       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
+                       if t . affectsParent == AffectsParent::False)) }
 
 /// The checks shared by the two derived acquisition folders: which
 /// parent, which children, one per parent.

@@ -2158,3 +2158,91 @@ script on the one-skgrepo fixtures 'removed_partners' and
 'historical_content': the folders and h's old content draw their
 removed members as above, the saves report no error, and "integrate
 unshown changes" makes m editable under h ('(notEditable 0)').
+** Slice 15: deviations
+*** what "not a managed kind" means
+The plan's descent rule leaves to the user an unrestricted vognode
+born 'Unremarkable' with no '(diff ...)' fact "that is not a managed
+kind". Read literally as the kinds the user cannot type, every
+unrestricted vognode qualifies, and the acquirer in an "it was
+acquired by" folder (a write-protected member with no diff fact)
+would count as the user's: never matched, it would be drawn again at
+every rerender. So 'is_the_users_viewnode'
+('server/diff_view/fresh_drawing.rs') takes whether the viewnode
+stands in a folder, and a folder's member is the server's. A note the
+user parks in a folder is a non-member there, as the write-protected
+folders already require.
+*** the same rule beyond descents
+The plan names the 'managed' predicate of a descent. A note under a
+member of a changed folder and one under a historical phantom sit
+below top-level calls ('attach_memberRoleTrees_under_straddle_folder_members',
+'process_historical_phantom_visit', also its branch for a phantom
+whose node is in neither graph), which passed "has a match key". They
+now pass 'is_drawn_by_the_diff_view' too; without that the plan's
+first two tests fail.
+*** the "it acquired" folder accepts a parked note
+The review behind the plan said the validator allows a vognode in the
+"it acquired" folder; it allowed only historical phantoms.
+'validate_acquired_folder' ('server/from_text/buffer_to_viewnodes/local.rs')
+now also accepts an unrestricted non-member.
+*** a graft's birth is validated against either graph
+'validate_affectsParent_relationships' resets a role graft's birth
+when the live graph lacks its relationship. The member role trees are
+drawn over the union of the straddle, so a graft drawn from a
+before-only relationship would lose its birth at every render, read
+back as the user's after a save, and be drawn a second time. In a
+buffer of the diff view the claim now also holds in the before-graph:
+'finish_viewforest' takes the straddle's before-graph and calls
+'validate_affectsParent_relationships_in_straddle'
+('server/to_org/util.rs'). No fixture reached the case end to end (the
+PCSVF's roots climb past such a graft, the gap slice 14 recorded in
+'TODO/problems.org'); the unit test
+'a_containers_claim_held_only_at_head_keeps_its_birth_in_the_diff_view'
+holds it.
+*** the stale rule in the older reconciler
+'keep_stale_child_holding_the_users' ('server/update_buffer/util.rs')
+keeps a stale child with children of any unrestricted kind, not only
+a member, and deadens a phantom, property or folder as it did a
+restricted vognode; it also resets the kept vognode's birth and clears
+its diff facts. For 'complete_managed_children' that changes only a
+stale removed member, historical or unknown phantom that has
+children: kept (or deadened) instead of detached. No test changed.
+*** what the diff view's reconciler drops below a kept stale child
+Below a stale viewnode kept for a note of the user's, what the diff
+view drew there that holds nothing of the user's is detached
+('detach_the_servers_below'), as it would have been with the viewnode.
+Without it a deleted node's phantom, once the deletion was committed,
+was deadened still holding its old content with stale '(diff rel-)'
+facts. The historical phantom test checks this through a commit.
+*** the birth atom's herald rule
+'emittable_metadata_atoms' lists "birth" and the node rule matches it
+silently ('vac'), since the '(rels ...)' facts already show a birth;
+'tests/shared/herald-rules.sexp' was regenerated.
+*** a note below a phantom or in a folder names its skgrepo
+A new headline inherits its skgrepo only from an unrestricted parent,
+so a note under a historical phantom or in a folder must carry
+'(repo NAME)'; the tests write it. Recorded in 'TODO/problems.org'.
+*** tests
+'tests/pcsvf/users_notes.rs' over a new fixture 'users_notes': the
+plan's four (each saves the buffer with the note, then saves what the
+save drew and requires the same drawing), the historical phantom's
+extended through a commit. Each of the four fails with
+'is_the_users_viewnode' forced false. Unit tests: the birth round trip
+and its malformed forms ('tests/diff_view/roundtrip/metadata.rs'),
+the stale rule ('tests/unit/update_buffer_util.rs') and the
+straddle-aware birth check ('tests/unit/to_org_util.rs'). Expectations
+adapted for the birth atom: 'tests/rebuild/integrate_role_tree.rs' and
+'tests/content_view.rs'. 'insert_after_line_starting' and
+'assert_lines_in_order' moved from 'editing.rs' and 'buffer.rs' to
+'tests/pcsvf/common.rs'.
+*** verification
+Counts: nextest 846, Emacs 374, Neovim 348. One full nextest run had
+'merge::merge_hides_intersection::all_tests' fail; it passed in
+isolation and in the next full run. On isolated servers:
+'tests/results/hk-slice15/verify-birth.sh' (a content view's role
+graft keeps '(birth roleGraft container)' through a save),
+'verify-main.sh' on 'removed_partners' and 'historical_content' (same
+responses as slice 14's), and 'verify-notes.sh' on 'users_notes': the
+four notes survive a save, a "rerender all views" and a
+stage-and-commit, after which the note under x stands under a plain
+non-member x, the notes under h and in the "it acquired" folder under
+deadened viewnodes, and the note under a beside a's redrawn role tree.

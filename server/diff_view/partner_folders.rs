@@ -10,7 +10,7 @@ use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::diff_view::change_viewnodes::{
   mk_historical_viewnode, mk_relRepo_move_viewnode};
 use crate::diff_view::fresh_drawing::{
-  match_key,
+  is_drawn_by_the_diff_view,
   reconcile_children_with_fresh_drawing};
 use crate::graph_straddle::types::{GraphStraddle, Partner, Presence};
 use crate::to_org::complete::partner_folder::child_data::{
@@ -121,7 +121,9 @@ fn straddle_goal_item (
 /// move. Each member role tree is drawn afresh in a scratch tree and
 /// reconciled with what the member holds, by skgid (and the move by
 /// its kind) at each level, so that a member role tree that stays
-/// keeps its viewnodes and their fold state, in the order of the walk.
+/// keeps its viewnodes and their fold state, in the order of the walk;
+/// what the user added under the member stays where it stands, ahead
+/// of the member role tree.
 fn attach_memberRoleTrees_under_straddle_folder_members (
   tree        : &mut Tree<Viewnode>,
   folder      : NodeId,
@@ -159,6 +161,7 @@ fn attach_memberRoleTrees_under_straddle_folder_members (
           &runtime . config, None, RoleTreePartners::GraphStraddle (straddle) ) ?; }}
     let kept : Vec<NodeId> = reconcile_children_with_fresh_drawing (
       tree, member, &fresh, fresh_member, &straddle . after,
-      &|viewnode| match_key (viewnode, &straddle . after) . is_some (), &|_| true ) ?;
+      &|viewnode| is_drawn_by_the_diff_view (viewnode, false, &straddle . after),
+      &|_| true ) ?;
     arrange_last_children (tree, member, &kept) ?; }
   Ok (( )) }

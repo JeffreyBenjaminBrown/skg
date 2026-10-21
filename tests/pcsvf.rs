@@ -28,3 +28,5 @@ mod recomputed_sets;
 mod write_protecting;
 #[path = "pcsvf/partner_folder_check.rs"]
 mod partner_folder_check;
+#[path = "pcsvf/users_notes.rs"]
+mod users_notes;

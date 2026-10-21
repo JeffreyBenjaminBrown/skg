@@ -823,8 +823,12 @@ A role graft -- a node a role tree drew, playing a partner role toward
 its viewparent (e.g. =container= for a containerward role tree,
 =mentioner= for a node that links to it, also =mentioned=, =overrider=,
 =overridden=, =hider=, =hidden=, =subscriber=, =subscribee=) -- carries
-=(affectsParent false)=, and its =(rels ...)= carries a birth fact naming
-its role's relation (see "Stats metadata" below). The roles are the nine
+=(affectsParent false)= and =(birth roleGraft ROLENAME)=, and its =(rels
+...)= carries a birth fact naming its role's relation (see "Stats
+metadata" below). The parser reads =birth= back, so a role graft is
+still one after a save; the diff view relies on that to tell a graft
+from a node the user added (=docs/diff-view.org=, "What a reconciler
+keeps"). The roles are the nine
 in =PARTNER_ROLE_VOCAB= (=server/dbs/in_rust_graph/relation_accessors.rs=).
 A role graft's herald is not a fixed glyph: the clients render its
 semantic relation and ancestor facts, e.g. an =overrider= role graft
@@ -833,7 +837,7 @@ reads =Oa=, an =overridden= role graft =aO=.
 ** View requests: (viewRequests ...)
 
 =(viewRequests ...)= carries client→server REQUESTS for viewbranches
-(unlike =birth= and the stats below, which are server→client). On save
+(unlike =(rels ...)= and the stats below, which are server→client). On save
 the server fulfills each request during view completion and then drops
 the atom, so a request is transient. Request forms:
 
@@ -1339,7 +1343,8 @@ properties below other than =bodyDiff=.
 - =acquiredByFolder=, =acquiredFolder= -- under a historical phantom, the
   node that acquired it by a nodeMerge; under an acquirer, the
   historical phantoms of the nodes it acquired. Both are write-protected
-  and derived.
+  and derived; an =acquiredFolder= also accepts a non-member the user
+  parks there.
 
 *** Changed folders
 A partner, alias, ID or flags folder drawn because some relationship of

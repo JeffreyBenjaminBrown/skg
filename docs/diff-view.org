@@ -247,7 +247,8 @@ within one parent each key appears at most once. A matched child is
 kept, with its fold state, and its kind and facts are updated in
 place: a member that loses its relationship becomes a removed member
 and back, a deleted phantom becomes a historical phantom and back. A
-child the fresh drawing lacks is detached; what only the fresh drawing
+child the fresh drawing lacks is detached, unless something the user
+added stands below it (next section); what only the fresh drawing
 has is created.
 "Produced by the fresh drawing" is defined over the union of the two
 graphs, so a viewnode is detached only when what it stands for is in
@@ -262,6 +263,53 @@ A root stays until the buffer is closed, whatever becomes of the
 changes under it. A commit is an ordinary rerender: the roots stand
 as plain context with their change viewnodes gone, and a root whose
 node the commit deleted is drawn as a deleted phantom.
+** What a reconciler keeps
+Two reconcilers run at an editable node's visit. The older one,
+'complete_managed_children' ('server/update_buffer/util.rs'),
+reconciles the content list first, as in every view, and each folder's
+members at the folder's own visit; then the per-visit step runs the
+diff view's, 'reconcile_children_with_fresh_drawing', over the change
+viewnodes, the removed members and what the diff view draws below
+them. Both obey one rule: a reconciler detaches only what it drew, and
+what the user added survives.
+
+Below what the diff view drew -- where its reconciler descends, under
+a member of a changed folder (around the member role tree) and under a
+historical phantom -- an unrestricted vognode born 'Unremarkable' that
+carries no '(diff ...)' fact and is not the member of the folder it
+stands in is the user's ('is_the_users_viewnode' in
+'server/diff_view/fresh_drawing.rs'). Its reconciler leaves it where
+it stands, ahead of what it draws there. A role graft is the server's:
+its birth is written into its metadata as '(birth roleGraft ROLENAME)'
+and read back by the parser ('Birth::RoleGraft'), so it survives a
+save, and the clients, which rewrite metadata structurally and strip
+only what they know, carry the atom through. Since the member role
+trees are drawn over the union of the straddle, a graft's birth is
+validated against either graph of the straddle, not only the live
+one.
+
+A stale child, one a reconciler manages but would no longer draw, is
+treated by one function both call ('keep_stale_child_holding_the_users'
+in 'server/update_buffer/util.rs'). If something of the user's stands
+below it, it is kept: an unrestricted vognode as a plain non-member
+occurrence of its node, with its diff facts cleared; any other kind (a
+phantom, a property or a folder) deadened, so that the orphan pass
+keeps what is under it. A stale child with nothing of the user's below
+it is detached. The older reconciler never draws below the children it
+manages, so for it any child of a stale child is the user's; below a
+stale child the diff view's reconciler keeps, what it drew there that
+holds nothing of the user's is detached, as it would have been with
+the child (a deleted node's phantom, once the deletion is committed,
+is deadened holding the user's note but not its old content).
+
+So a note the user adds under a member of a changed folder, under a
+historical phantom, in the "it acquired" folder or under a removed
+member survives every rerender; when the removed member goes stale
+(a commit makes the removal part of HEAD, or the relationship
+returns), the note stands under a plain non-member occurrence of it.
+Below a phantom or in a folder there is no unrestricted parent to
+inherit a skgrepo from, so a new note there names its skgrepo
+('(repo NAME)'), and in a folder it is a non-member.
 ** Removed members and the LCS placement
 A removed member is a member of the before-graph's list that the
 after-graph's lacks. Membership is decided by set difference, so a

@@ -38,8 +38,8 @@ use crate::diff_view::change_viewnodes::{
   mk_changeset_marker_viewnode, mk_historical_viewnode, mk_home_move_viewnode,
   mk_relRepo_move_viewnode, mk_removed_member_viewnode};
 use crate::diff_view::fresh_drawing::{
-  adopt_fresh_facts, is_unrestricted_removed_member, match_key,
-  reconcile_children_with_fresh_drawing};
+  adopt_fresh_facts, is_drawn_by_the_diff_view,
+  is_unrestricted_removed_member, reconcile_children_with_fresh_drawing};
 use crate::types::git::Sign;
 use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
 use crate::types::misc::ID;
@@ -128,7 +128,17 @@ impl ChangedAspects {
     self . recorded . contains (&( relation, aspect )) }
 }
 
-/// See the module comment. 'created_in_this_completion' is whether
+/// See the module comment.
+/// Two reconcilers run at an editable node's visit. The older one,
+/// 'complete_managed_children' ('update_buffer/util.rs'), reconciles
+/// the content list first, as in every view (and each folder's
+/// members at the folder's own visit); then this step runs the diff
+/// view's, 'reconcile_children_with_fresh_drawing', over the change
+/// viewnodes, the removed members and what stands below them. They
+/// obey one rule: a reconciler detaches only what it drew, and what
+/// the user added survives, under a stale child too
+/// ('keep_stale_child_holding_the_users').
+/// 'created_in_this_completion' is whether
 /// view completion created the viewnode at 'treeid': only then does
 /// its body's fold state come from C. 'editable_before_completion'
 /// holds the viewnodes that were editable when completion began.
@@ -295,7 +305,7 @@ pub(crate) fn process_historical_phantom_visit (
       let empty : Tree<Viewnode> = Tree::new (fresh_root ());
       reconcile_children_with_fresh_drawing (
         tree, treeid, &empty, empty . root () . id (), &straddle . after,
-        &|viewnode| match_key (viewnode, &straddle . after) . is_some (),
+        &|viewnode| is_drawn_by_the_diff_view (viewnode, false, &straddle . after),
         &|_| false ) ?;
       return Ok (HistoricalPhantomVisit::Done); };
   if at_root {
@@ -324,7 +334,7 @@ pub(crate) fn process_historical_phantom_visit (
     . collect ();
   let kept : Vec<NodeId> = reconcile_children_with_fresh_drawing (
     tree, treeid, &fresh, fresh . root () . id (), &straddle . after,
-    &|viewnode| match_key (viewnode, &straddle . after) . is_some (),
+    &|viewnode| is_drawn_by_the_diff_view (viewnode, false, &straddle . after),
     &|viewnode| ! matches! ( viewnode . kind, ViewnodeKind::Vognode (_) )) ?;
   for (member, editability) in editable_members {
     if ! kept . contains (&member) { continue; }

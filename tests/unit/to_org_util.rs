@@ -486,3 +486,28 @@ fn moved_linksto_relationship_broken_flipped () {
   assert_eq! (affectsParent_if_normal (&viewforest, c_skgid), AffectsParent::False,
     "Moved linksToParent: C doesn't link to p_new — flip");
 }
+
+/// In a buffer of the diff view a role graft drawn from the
+/// before-graph keeps its birth: C contained P at HEAD only.
+#[test]
+fn a_containers_claim_held_only_at_head_keeps_its_birth_in_the_diff_view () {
+  let after : InRustGraph = graph_with (vec! [
+    mk_node ("P", &[], &[], &[]),
+    mk_node ("C", &[], &[], &[]) ]);
+  let before : InRustGraph = graph_with (vec! [
+    mk_node ("P", &[], &[],    &[]),
+    mk_node ("C", &[], &["P"], &[]) ]);
+  for (before_graph, expected) in [
+    ( Some (&before), Birth::RoleGraft (RelationRole::CONTAINER) ),
+    ( None,           Birth::Unremarkable ) ] {
+    let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = viewforest . root () . id ();
+    let p_treeid : NodeId = viewforest . get_mut (root) . unwrap () . append (
+      mk_writeProtected_viewnode (skgid ("P"), src (), "P" . to_string (),
+                                AffectsParent::True) ) . id ();
+    let c_treeid : NodeId = viewforest . get_mut (p_treeid) . unwrap () . append (
+      mk_writeProtected_viewnode_with_birth (
+        skgid ("C"), src (), "C" . to_string (),
+        AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
+    validate_affectsParent_relationships_in_straddle (&mut viewforest, &after, before_graph);
+    assert_eq! (birth_if_normal (&viewforest, c_treeid), expected); }}

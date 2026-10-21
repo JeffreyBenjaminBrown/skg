@@ -299,3 +299,32 @@ pub fn requesting_editable_at (
   format! ( "{}{}", &buffer [.. at],
             buffer [at ..] . replacen (
               "writeProtected", "writeProtected (viewRequests editableView)", 1 )) }
+
+/// 'buffer' with 'new_line' inserted after its first line starting
+/// 'prefix'.
+pub fn insert_after_line_starting (
+  buffer   : &str,
+  prefix   : &str,
+  new_line : &str,
+) -> String {
+  let mut inserted : bool = false;
+  let mut lines : Vec<&str> = Vec::new ();
+  for line in buffer . lines () {
+    lines . push (line);
+    if ! inserted && line . starts_with (prefix) {
+      lines . push (new_line);
+      inserted = true; }}
+  assert! ( inserted, "no line starts {:?}:\n{}", prefix, buffer );
+  lines . join ("\n") + "\n" }
+
+/// Panic unless 'lines' occur in 'buffer' in this order.
+pub fn assert_lines_in_order (
+  buffer : &str,
+  lines  : &[&str],
+) {
+  let mut rest : &str = buffer;
+  for line in lines {
+    match rest . find (line) {
+      Some (at) => rest = &rest [ at + line . len () .. ],
+      None => panic! ( "expected, in order, {:?}; missing {:?} in\n{}",
+                       lines, line, buffer ), }}}

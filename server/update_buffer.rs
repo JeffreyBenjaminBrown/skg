@@ -55,7 +55,7 @@ use crate::types::misc::{ID, SkgrepoName, SkgConfig};
 use crate::types::save::{NodeInstruction, ForkSpec};
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_prunable;
 use crate::types::tree::forest::ViewForest;
-use crate::to_org::util::{mark_view_roots_parent_na, validate_affectsParent_relationships, mark_orphans_under_dead_parents_false};
+use crate::to_org::util::{mark_view_roots_parent_na, validate_affectsParent_relationships_in_straddle, mark_orphans_under_dead_parents_false};
 use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
 use crate::types::viewnode::{Editability, Viewnode, ViewnodeKind};
 use crate::types::viewnode::{Vognode, PropertyFolder, ViewRequest};
@@ -576,7 +576,9 @@ pub fn rerender_view (
         viewforest,
         &context . runtime . graph,
         &context . runtime . config,
-        context . skgrepo_restriction ) } ?;
+        context . skgrepo_restriction,
+        diffView_rerender . as_ref ()
+          . map ( |rerender| &*rerender . source () . straddle . before )) } ?;
   tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   Ok (result) }
@@ -592,7 +594,9 @@ pub fn rerender_view (
 ///     never re-generates the containerward (it round-trips as ordinary content).
 ///   - marks view-root and orphan affectsParent,
 ///   - validates affectsParent against the captured graph (the de-novo path could
-///     skip it for speed, but running it in both keeps the tails one),
+///     skip it for speed, but running it in both keeps the tails one); in a
+///     diff view a role graft's birth holds if either graph of the straddle
+///     holds its relationship ('diffView_before_graph'),
 ///   - computes graph- then viewnode stats,
 ///   - applies the skgrepo restriction, and renders to a buffer string.
 /// Step order is immaterial between the affectsParent marks and graphnodestats:
@@ -603,6 +607,7 @@ pub fn finish_viewforest (
   graph              : &InRustGraph,
   config             : &SkgConfig,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
+  diffView_before_graph : Option<&InRustGraph>, // a diff view's: its straddle's before-graph
 ) -> Result<String, Box<dyn Error>> {
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "fulfill_root_containerward_requests" ). entered();
@@ -616,7 +621,8 @@ pub fn finish_viewforest (
   // Correct any affectsParent atoms whose claimed relation to the parent doesn't
   // hold in the captured graph (e.g. user moved a birth=linksToParent node
   // under a new parent it doesn't link to).
-  validate_affectsParent_relationships ( viewforest, graph );
+  validate_affectsParent_relationships_in_straddle (
+    viewforest, graph, diffView_before_graph );
   let ( container_to_contents, content_to_containers ) =
     match skgrepo_restriction {
       Some (restriction) =>

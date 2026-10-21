@@ -1096,7 +1096,7 @@ its members as non-members and a diff-view buffer showing them saves
 unchanged; the existing write-protected-occurrence tests pass with the
 clause gone. 'docs/diff-view.org' loses its "(from slice 14)" marks.
 
-** TODO Slice 15: the two reconcilers obey one rule about the user's structure
+** DONE Slice 15: the two reconcilers obey one rule about the user's structure
 Make the changes under "The two reconcilers obey one rule about the
 user's structure" above, in this order: the birth round trip (writer,
 parser arm, a unit test that a role graft's metadata parses back to

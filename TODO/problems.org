@@ -833,3 +833,14 @@ gap too. Details, options and questions:
    recorder showing that folder would be refused with "changed hidden
    nodes". Present before slice 14 too (the clause slice 14 removed
    applied only to unrestricted vognodes). Not reproduced in a test.
+* Problems found while executing slice 15 of TODO/total-diff-view/13_plan.org (2026-10-21)
+** A new headline below a phantom or in a folder gets no skgrepo
+   'inherit_parent_skgrepo_if_possible'
+   ('server/from_text/buffer_to_viewnodes/add_missing_info.rs')
+   inherits only from an unrestricted parent. A bare headline the user
+   types under a historical phantom, or parks in a folder, is refused
+   with "UnrestrictedVognode must have a repo that exists in the
+   config" unless it carries '(repo NAME)'. The diff view now keeps such
+   notes; typing one is still awkward. Inheriting from the nearest
+   unrestricted ancestor, or from the owned skgrepo of the recorder,
+   would fix it.

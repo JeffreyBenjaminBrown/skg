@@ -306,6 +306,19 @@ pub fn validate_affectsParent_relationships (
   viewforest : &mut Tree<Viewnode>,
   graph  : &InRustGraph,
 ) {
+  validate_affectsParent_relationships_in_straddle (viewforest, graph, None) }
+
+/// 'validate_affectsParent_relationships', where in a buffer of the
+/// diff view ('before_graph' the straddle's before-graph) a role
+/// graft's claim also holds when its relationship is in the
+/// before-graph: the diff view draws member role trees over the
+/// union of the straddle, and a graft keeps the birth that tells it
+/// from what the user added.
+pub fn validate_affectsParent_relationships_in_straddle (
+  viewforest   : &mut Tree<Viewnode>,
+  graph        : &InRustGraph,
+  before_graph : Option<&InRustGraph>,
+) {
   // Collect correction targets in a read-only first pass so the
   // &mut Tree write phase doesn't need simultaneous read access.
   let mut to_independent : Vec<NodeId> = Vec::new ();
@@ -345,14 +358,16 @@ pub fn validate_affectsParent_relationships (
           // The child plays 'role' toward the parent (the origin).
           // Resolve both through pid_of so extra_id aliasing (a
           // nodeMerge side-effect) doesn't produce a false mismatch.
-          let parent_pid : ID =
-            graph . pid_of (&parent_tn . skgid)
-              . unwrap_or_else ( || parent_tn . skgid . clone () );
-          let child_pid : ID =
-            graph . pid_of (&child_tn . skgid)
-              . unwrap_or_else ( || child_tn . skgid . clone () );
-          graph . relation_membership_is_real (
-            &parent_pid, &child_pid, role ) }
+          let is_real_in = |graph : &InRustGraph| -> bool {
+            let parent_pid : ID =
+              graph . pid_of (&parent_tn . skgid)
+                . unwrap_or_else ( || parent_tn . skgid . clone () );
+            let child_pid : ID =
+              graph . pid_of (&child_tn . skgid)
+                . unwrap_or_else ( || child_tn . skgid . clone () );
+            graph . relation_membership_is_real (
+              &parent_pid, &child_pid, role ) };
+          is_real_in (graph) || before_graph . is_some_and (is_real_in) }
         Birth::Unremarkable => true, };
       if ! birth_claim_ok { to_unremarkable . push ( child_ref . id () ); }}}
   for skgid in to_independent {

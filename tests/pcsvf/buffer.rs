@@ -10,8 +10,8 @@
 
 use crate::git_fixture::Fixture;
 use crate::pcsvf::common::{
-  all_changes_buffer, all_changes_buffer_with_marks, saves_back_unchanged,
-  with_fixture};
+  all_changes_buffer, all_changes_buffer_with_marks, assert_lines_in_order,
+  saves_back_unchanged, with_fixture};
 
 use skg::diff_view::change_leaves::{LeafKey, NodeAspect};
 use skg::types::misc::ID;
@@ -40,17 +40,6 @@ fn sets_buffer (
     buffer = buffer_of (f) ?;
     Ok (( )) }) ?;
   Ok (buffer) }
-
-fn assert_lines_in_order (
-  buffer : &str,
-  lines  : &[&str],
-) {
-  let mut rest : &str = buffer;
-  for line in lines {
-    match rest . find (line) {
-      Some (at) => rest = &rest [ at + line . len () .. ],
-      None => panic! ( "expected, in order, {:?}; missing {:?} in\n{}",
-                       lines, line, buffer ), }}}
 
 #[test]
 fn the_roots_are_d_in_id_order (

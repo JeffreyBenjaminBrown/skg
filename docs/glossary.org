@@ -733,7 +733,9 @@ Why a generated occurrence was drawn under its parent ('Birth' in
 'server/types/viewnode.rs'): either unremarkable, or a role graft naming
 its role. It is view history, used for display and stale-relation
 validation, never by save extraction. The =(rels ...)= form renders it as
-=(birth ...)= facts.
+=(birth ...)= facts. A role graft's birth is also written into its
+metadata as =(birth roleGraft ROLENAME)= and read back, so it survives a
+save; the diff view tells a graft from a node the user added by it.
 
 *** phantom
 

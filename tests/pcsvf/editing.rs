@@ -5,7 +5,8 @@
 
 use crate::git_fixture::{Fixture, skg_files};
 use crate::pcsvf::common::{
-  open_all_changes_buffer, save, view_id_of, with_fixture};
+  insert_after_line_starting, open_all_changes_buffer, save, view_id_of,
+  with_fixture};
 use crate::git_fixture_helpers::{
   mk_test_tcp_stream_pair, read_graphnode, without_lines_containing};
 
@@ -25,23 +26,6 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
-
-/// 'buffer' with 'new_line' inserted after its first line starting
-/// 'prefix'.
-fn insert_after_line_starting (
-  buffer   : &str,
-  prefix   : &str,
-  new_line : &str,
-) -> String {
-  let mut inserted : bool = false;
-  let mut lines : Vec<&str> = Vec::new ();
-  for line in buffer . lines () {
-    lines . push (line);
-    if ! inserted && line . starts_with (prefix) {
-      lines . push (new_line);
-      inserted = true; }}
-  assert! ( inserted, "no line starts {:?}:\n{}", prefix, buffer );
-  lines . join ("\n") + "\n" }
 
 /// Deleting the changed ID folders changes nothing: the save writes
 /// no file, and the reconciled buffer draws the folders again.

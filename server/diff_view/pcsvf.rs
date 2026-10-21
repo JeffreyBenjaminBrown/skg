@@ -215,7 +215,8 @@ pub fn diffView_buffer_viewforest (
   set_diffView_facts_in_viewforest (
     &mut viewforest, drawing, store, &runtime . graph );
   let text : String = finish_viewforest (
-    &mut viewforest, &runtime . graph, &runtime . config, None ) ?;
+    &mut viewforest, &runtime . graph, &runtime . config, None,
+    Some (&drawing . straddle . before) ) ?;
   let pids : Vec<ID> =
     pids_from_viewforest (&viewforest) . into_iter () . collect ();
   Ok ( DrawnDiffViewBuffer { text, pids, viewforest } ) }

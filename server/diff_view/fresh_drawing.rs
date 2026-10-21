@@ -80,8 +80,9 @@ fn property_kind (
 /// Under 'parent', make the children that 'managed' selects match
 /// the children of 'fresh_parent' in 'fresh'. A kept child whose
 /// fresh twin 'descend' selects has its own children reconciled the
-/// same way, every keyed child managed, and ordered as the fresh
-/// drawing orders them. Returns the kept and created children, in
+/// same way, every keyed child but the user's managed
+/// ('is_drawn_by_the_diff_view'), and ordered as the fresh drawing
+/// orders them. Returns the kept and created children, in
 /// the fresh drawing's order; where they stand among the others is
 /// the caller's to decide. 'graph' is the live graph ('match_key').
 pub fn reconcile_children_with_fresh_drawing (
@@ -119,17 +120,44 @@ pub fn reconcile_children_with_fresh_drawing (
         adopt_fresh_facts (
           tree . get_mut (existing) . unwrap () . value (), fresh_viewnode );
         if descend (fresh_viewnode) {
+          let in_folder : bool =
+            is_folder ( tree . get (existing) . unwrap () . value () );
           let kept : Vec<NodeId> = reconcile_children_with_fresh_drawing (
             tree, existing, fresh, fresh_child, graph,
-            &|viewnode| match_key (viewnode, graph) . is_some (), descend ) ?;
+            &|viewnode| is_drawn_by_the_diff_view (viewnode, in_folder, graph),
+            descend ) ?;
           arrange_last_children (tree, existing, &kept) ?; }
         result . push (existing); },
       None => result . push (
         append_copy_of_subtree (tree, parent, fresh, fresh_child) ?), }}
   for (stale, _) in unmatched {
-    if ! keep_stale_child_holding_the_users (tree, stale, &holds_the_users) ? {
+    if keep_stale_child_holding_the_users (tree, stale, &holds_the_users) ? {
+      detach_the_servers_below (tree, stale) ?;
+    } else {
       detach_viewnode_transferring_focus (tree, stale) ?; }}
   Ok (result) }
+
+/// Below a stale viewnode kept for what the user added under it,
+/// detach what the diff view drew there that holds nothing of the
+/// user's, as it would have been with the viewnode.
+fn detach_the_servers_below (
+  tree : &mut Tree<Viewnode>,
+  node : NodeId,
+) -> Result<(), Box<dyn Error>> {
+  let (in_folder, children) : (bool, Vec<NodeId>) = {
+    let node_ref : NodeRef<Viewnode> = tree . get (node)
+      . ok_or ("detach_the_servers_below: node not found") ?;
+    ( is_folder ( node_ref . value () ),
+      node_ref . children () . map ( |child| child . id () ) . collect () ) };
+  for child in children {
+    let (users, holds_users) : (bool, bool) = {
+      let child_ref : NodeRef<Viewnode> = tree . get (child) . unwrap ();
+      ( is_the_users_viewnode ( child_ref . value (), in_folder ),
+        holds_the_users (child_ref) ) };
+    if users { continue; }
+    if holds_users { detach_the_servers_below (tree, child) ?; }
+    else { detach_viewnode_transferring_focus (tree, child) ?; }}
+  Ok (( )) }
 
 /// Whether a viewnode below what the diff view drew is the user's:
 /// an unrestricted vognode born 'Unremarkable' that carries no
@@ -146,6 +174,19 @@ pub fn is_the_users_viewnode (
       if t . birth == Birth::Unremarkable
          && t . change_facts . presence == DiffPresence::default ()
          && ! ( in_folder && t . affectsParent == AffectsParent::True )) }
+
+/// What the diff view's reconciler manages below what it drew,
+/// where it descends and under a member of a changed folder or a
+/// historical phantom: every viewnode with a match key except the
+/// user's, which stays where it stands. 'in_folder' is whether its
+/// parent is a folder.
+pub fn is_drawn_by_the_diff_view (
+  viewnode  : &Viewnode,
+  in_folder : bool,
+  graph     : &InRustGraph,
+) -> bool {
+  match_key (viewnode, graph) . is_some ()
+  && ! is_the_users_viewnode (viewnode, in_folder) }
 
 /// Whether something of the user's ('is_the_users_viewnode') stands
 /// anywhere below 'node'.
