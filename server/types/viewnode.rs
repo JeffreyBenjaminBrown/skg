@@ -168,7 +168,7 @@ pub enum Phantom {
 ///
 /// USED: save-inert -- it generates no fieldIntents and is excluded from its
 /// parent's contains list. It is never "completed", yet it retains its children
-/// (which `mark_orphans_under_dead_parents_false` demotes to non-member)
+/// (which `mark_orphans_under_dead_parents_false` makes non-members)
 /// so the user's subtree under a vanished node survives. A childless Deleted is
 /// pruned by the postorder sweep (`is_self_deletable_when_empty`), and a Deleted
 /// may stand as a view root (validate_tree) so a deleted root still shows.
@@ -526,7 +526,7 @@ pub enum PartnerFolder {
 /// discard policy once planned for the filter folders in
 /// the glossary's "write-protected set"): during
 /// reconciliation, a stale member that is a leaf is deleted, and one
-/// with children is demoted to affectsParent=false, whatever the
+/// with children is made a non-member (affectsParent=false), whatever the
 /// policy. The policies differ in:
 /// - whether buffer membership is read at save extraction
 ///   ('EditableSet' and 'EditableFilter'),

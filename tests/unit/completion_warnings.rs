@@ -11,7 +11,7 @@ fn warnings_batch_per_folder_and_recorder () {
     CompletionWarning::FolderRepair {
       folder      : PartnerFolder::Subscriber,
       recorder : ID::from ("n"),
-      repair   : RepairKind::DemotedNonMember,
+      repair   : RepairKind::MadeNonMember,
       children : vec! [ ID::from ("x") ] },
     CompletionWarning::FolderRepair {
       folder      : PartnerFolder::Hider,
@@ -31,7 +31,7 @@ fn warnings_batch_per_folder_and_recorder () {
   assert! ( rendered [0] . contains ("subscriberFolder") );
   assert! ( rendered [0] . contains ("under node n") );
   assert! ( rendered [0] . contains ("restored 2 member(s): r, t") );
-  assert! ( rendered [0] . contains ("demoted 1 non-member(s)") );
+  assert! ( rendered [0] . contains ("made 1 child(ren) non-members") );
   assert! ( rendered [0] . contains ("edited from the other side"),
     "a restoration explains where membership is edited: {}",
     rendered [0] );

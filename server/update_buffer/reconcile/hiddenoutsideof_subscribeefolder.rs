@@ -75,7 +75,7 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
   let summary =
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       // The stale-member rule of 'complete_managed_children': a stale member of this write-protected folder is removed when a view-leaf
-      // (the common case) and demoted to non-member only if it has a user
+      // (the common case) and made a non-member only if it has a user
       // subtree. Handled uniformly by the reconciler.
       tree, node, kind,
       &goal_items, &child_data, &runtime . graph,

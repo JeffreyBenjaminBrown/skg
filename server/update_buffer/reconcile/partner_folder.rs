@@ -40,7 +40,7 @@ pub enum PartnerFolderGoalSource<'a> {
 /// 'diff_view/partner_folders.rs').
 /// Makes the folder's UnrestrictedVognode children marked affectsParent=true match a goal list,
 /// preserving reusable children and creating missing ones,
-/// then demotes stale children marked affectsParent=true to 'affectsParent=false'.
+/// then makes stale children marked affectsParent=true non-members ('affectsParent=false').
 pub fn reconcile_partnerFolder_children (
   node         : NodeId, // The PartnerFolder. Its parent is an UnrestrictedVognode.
   tree         : &mut Tree<Viewnode>,
@@ -108,7 +108,7 @@ pub fn reconcile_partnerFolder_children (
     build_child_data (
       tree, node, &goal_items, &relRepos, runtime ) ?;
   // The stale-member rule of 'complete_managed_children': the reconciler deletes a stale member that is a view-leaf and
-  // demotes one that is a branch, so a write-protected PartnerFolder
+  // makes one that is a branch a non-member, so a write-protected PartnerFolder
   // drops a stale leaf member instead of preserving it.
   let summary : RepairSummary<ID> =
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
@@ -184,7 +184,7 @@ pub fn push_repair_warnings (
 ) {
   let categories : [ (RepairKind, Vec<ID>); 4 ] = [
     (RepairKind::RestoredMember,   summary . created),
-    (RepairKind::DemotedNonMember, summary . demoted),
+    (RepairKind::MadeNonMember,    summary . made_nonMembers),
     (RepairKind::RemovedStaleLeaf, summary . deleted_stale),
     (RepairKind::RemovedDuplicate, summary . deleted_duplicates) ];
   for (repair, children) in categories {

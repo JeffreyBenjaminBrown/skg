@@ -143,7 +143,7 @@ fn deaden_disposes_each_child_kind () {
   let subscribee_folder : NodeId = child (&mut t, d, role_folder (PartnerFolder::Subscribee));
   // Member leaf -> delete.
   let leaf : NodeId = child (&mut t, subscribee_folder, normal ("L", AffectsParent::True));
-  // Member branch (has a child) -> demote to non-member, keep.
+  // Member branch (has a child) -> make it a non-member, keep.
   let branch : NodeId = child (&mut t, subscribee_folder, normal ("B", AffectsParent::True));
   let _bchild : NodeId = child (&mut t, branch, normal ("Bc", AffectsParent::True));
   // Nested folder -> leave it (self-deadens at its own visit).
@@ -159,7 +159,7 @@ fn deaden_disposes_each_child_kind () {
   assert! ( is_detached (&t, subscribee_folder, leaf),
     "a member leaf is deleted" );
   assert_eq! ( parentis_at (&t, branch), Some (AffectsParent::False),
-    "a member branch is demoted to non-member and kept" );
+    "a member branch is made a non-member and kept" );
   assert! ( ! is_detached (&t, subscribee_folder, branch) );
   assert! ( matches! ( kind_at (&t, nested),
                        ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) ),

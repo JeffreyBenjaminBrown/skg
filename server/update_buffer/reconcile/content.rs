@@ -247,8 +247,8 @@ fn reconcile_content_children (
   // A content child this save deleted stays here; at its own BFS visit it
   // becomes a PhantomDeleted whose folders generalized-orphan and deaden -- so no folder
   // reconciles against a missing Graphnode -- while any user subtree under it
-  // is preserved (demoted), and a now-childless PhantomDeleted is removed by the
-  // prune sweep ('prune_self_deletable_when_empty').
+  // is preserved (made a non-member), and a now-childless PhantomDeleted is
+  // removed by the prune sweep ('prune_self_deletable_when_empty').
   let substitution_for_children : bool =
     // The raw-drawn-override rule (generalized 2026-06-12 from the
     // plan-11 overridden-as-such case): when this node is itself
@@ -728,7 +728,7 @@ fn mark_erroneous_content_children_as_indep (
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         t . affectsParent == AffectsParent::True
         // collected_id: a drawn substitute is a member via its
-        // original, and must not be demoted to non-member.
+        // original, and must not be made a non-member.
         && !content_id_set . contains( &t . collected_skgid () ),
       _ => false },
     |vn : &mut Viewnode| {

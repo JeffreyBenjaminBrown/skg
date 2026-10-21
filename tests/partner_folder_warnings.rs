@@ -6,8 +6,8 @@
 // (TODO/DONE/full-schema/DONE/8_readonly-set-ergonomics.org):
 // - a deleted generated member is restored, with a warning that
 //   explains membership is edited from the other side;
-// - a non-member parked with affectsParent true and a subtree is
-//   demoted to affectsParent false, with a warning.
+// - a child parked with affectsParent true and a subtree, though not
+//   a member, is made a non-member (affectsParent false), with a warning.
 //
 // Fixture: r and t subscribe to n; the test explicitly asks for n's
 // subscription folders. x is an unrelated node the test parks inside that
@@ -95,7 +95,7 @@ async fn write_protected_folder_repairs_warn_impl (
       line_containing (&complete_buffer, "(id t)") . to_string ();
     let x_line : String = {
       // x: an editable member leaf parked inside the folder, with a
-      // (new) child so the repair is a demotion, not a removal.
+      // (new) child so the repair makes it a non-member rather than removing it.
       let mut l : String =
         r_line
         . replace ("(id r)", "(id x)")
@@ -129,7 +129,7 @@ async fn write_protected_folder_repairs_warn_impl (
   assert! ( warning . contains ("under node n"), "{}", warning );
   assert! ( warning . contains ("restored 1 member(s): r"),
             "{}", warning );
-  assert! ( warning . contains ("demoted 1 non-member(s) to false: x"),
+  assert! ( warning . contains ("made 1 child(ren) non-members, since they are not members: x"),
             "{}", warning );
   assert! ( warning . contains ("edited from the other side"),
             "{}", warning );

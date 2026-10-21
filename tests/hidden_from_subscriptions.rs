@@ -558,8 +558,8 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       "Expected one collateral view:\n{:?}",
       collateral_views);
     // e1 was hidden, so it appears under the HiddenInSubscribeeFolder. But e1's
-    // in-view subtree (e11) is a user branch, so §6.0 DEMOTES the visible
-    // occurrence to affectsParent=false rather than deleting it -- chaos-
+    // in-view subtree (e11) is a user branch, so §6.0 MAKES the visible
+    // occurrence A NON-MEMBER (affectsParent=false) rather than deleting it -- chaos-
     // monkey safety: the user may have deliberately placed content there, and
     // we must not lose it. So e1 shows twice: once hidden (write-protected), once as a
     // preserved non-member branch.
@@ -572,7 +572,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       collateral . lines() . any ( |line|
         line . starts_with ("**** (skg (node (id e1)")
         && line . contains ("(affectsParent false)") ),
-      "Expected hidden branch e1 demoted to non-member (subtree preserved):\n{}",
+      "Expected hidden branch e1 made a non-member (subtree preserved):\n{}",
       collateral );
 
     Ok (( )) }

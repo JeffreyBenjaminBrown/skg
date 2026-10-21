@@ -137,9 +137,9 @@ fn containerof_false_claim_flipped () {
 }
 
 #[test]
-fn orphan_under_dead_parent_demoted_member_under_folder_kept () {
+fn orphan_under_dead_parent_made_nonMember_but_folder_member_kept () {
   // §A (Jeff's invariant): a member Unrestricted node under a non-container
-  // parent (Deleted phantom / DeadViewnode) demotes to non-member; a legitimate
+  // parent (Deleted phantom / DeadViewnode) is made a non-member; a legitimate
   // folder MEMBER (member Unrestricted under a PartnerFolder) is left untouched.
   use crate::types::viewnode::{ ChangeFacts, PartnerFolder, Phantom, PhantomDeleted };
   let mut vf : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
@@ -172,9 +172,9 @@ fn orphan_under_dead_parent_demoted_member_under_folder_kept () {
   mark_orphans_under_dead_parents_false (&mut vf);
 
   assert_eq! (affectsParent_if_normal (&vf, under_phantom), AffectsParent::False,
-    "A member child under a Deleted phantom must demote to non-member");
+    "A member child under a Deleted phantom must be made a non-member");
   assert_eq! (affectsParent_if_normal (&vf, under_dead), AffectsParent::False,
-    "A member child under a DeadViewnode must demote to non-member");
+    "A member child under a DeadViewnode must be made a non-member");
   assert_eq! (affectsParent_if_normal (&vf, member), AffectsParent::True,
     "A member under a PartnerFolder must stay a member (legitimate membership)");
 }

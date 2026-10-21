@@ -15,7 +15,7 @@ use crate::types::viewnode::PartnerFolder;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RepairKind {
   RestoredMember,    // a generated member was missing from the buffer; completion restored it
-  DemotedNonMember,  // a child claiming membership was not a real member; its branch was demoted to affectsParent=false
+  MadeNonMember,     // a child claiming membership was not a real member; the child, a branch, was made a non-member (affectsParent=false)
   RemovedStaleLeaf,  // a child claiming membership was not a real member and had no subtree; it was removed
   RemovedDuplicate,  // a member appeared more than once; the duplicate was removed
 }
@@ -62,8 +62,8 @@ pub fn render_completion_warnings (
           RepairKind::RestoredMember => {
             any_restored = true;
             format! ("restored {} member(s): {}", n, skgids) },
-          RepairKind::DemotedNonMember =>
-            format! ("demoted {} non-member(s) to false: {}",
+          RepairKind::MadeNonMember =>
+            format! ("made {} child(ren) non-members, since they are not members: {}",
                      n, skgids),
           RepairKind::RemovedStaleLeaf =>
             format! ("removed {} stale member(s): {}", n, skgids),

@@ -15,7 +15,7 @@
 /// - A managed child is one this reconciliation pass is allowed to
 ///   manage: for PartnerFolders, an UnrestrictedVognode marked affectsParent=true.
 ///   Managed children whose IDs are not in the goal list are removed
-///   or otherwise demoted by the caller-specific cleanup step.
+///   or otherwise made non-members by the caller-specific cleanup step.
 /// - `ChildData` is the pre-fetched title/repo metadata
 ///   needed to create any missing goal child without querying while
 ///   the tree is being mutated.

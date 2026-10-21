@@ -336,10 +336,11 @@ folder cannot be changed from here" — the same sense ☮
 write-protected is already known from the folder atom.
 
 The stale-member rule is uniform across all policies (decided
-2026-06-10, demote-not-discard): a stale ~affectsParent=true~ member
-that is a leaf is deleted; one with children is demoted to
-~affectsParent=false~ so the user keeps any subtree they built under
-it; duplicates are deleted; missing graph members are restored.
+2026-06-10: a stale branch is made a non-member, not discarded): a
+stale ~affectsParent=true~ member that is a leaf is deleted; one with
+children is made a non-member (~affectsParent=false~) so the user
+keeps any subtree they built under it; duplicates are deleted; missing
+graph members are restored.
 
 *Default presentation is intentionally narrow.* An editable node gets a
 nonempty =subscribeeFolder= automatically. The other top-level relation

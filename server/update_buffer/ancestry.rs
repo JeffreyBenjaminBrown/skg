@@ -203,8 +203,8 @@ pub fn pid_and_skgrepo_from_required_ancestor (
 
 /// Deaden a generalized-orphan folder at its BFS visit: dispose each
 /// direct child, then convert the folder itself to a DeadViewnode and skip its
-/// reconcile. The BFS still visits the (disposed) children; a demoted-
-/// non-member survivor is visited normally, a DeadViewnode child is a no-op.
+/// reconcile. The BFS still visits the (disposed) children; a survivor
+/// made a non-member is visited normally, a DeadViewnode child is a no-op.
 pub fn deaden_generalized_orphan_folder (
   tree : &mut Tree<Viewnode>,
   folder  : NodeId,
@@ -222,7 +222,7 @@ pub fn deaden_generalized_orphan_folder (
 
 /// Dispose one direct child of a deadened orphan folder:
 /// - a member (affectsParent=true Unrestricted) view-leaf -> delete;
-/// - a member branch (has children) -> demote to affectsParent=false, so
+/// - a member branch (has children) -> make it a non-member (affectsParent=false), so
 ///   the user's subtree survives;
 /// - a nested folder (PropertyFolder / PartnerFolder) -> LEAVE it untouched: it is itself a
 ///   generalized orphan under this now-dead folder, so it deadens itself -- and

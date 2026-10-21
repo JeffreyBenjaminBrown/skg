@@ -71,7 +71,7 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       // The stale-member rule of 'complete_managed_children': a HiddenInSubscribeeFolder child that becomes stale (e.g. the user
       // moved it into the subscribee-as-such, 'unhiding' it) is removed when it
-      // is a view-leaf -- the common case for hidden members -- and demoted to
+      // is a view-leaf -- the common case for hidden members -- and made a
       // non-member only if it has a user subtree to preserve. The reconciler
       // applies this uniformly.
       tree, node, kind,

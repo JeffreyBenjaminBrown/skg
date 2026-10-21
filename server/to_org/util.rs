@@ -394,18 +394,18 @@ pub fn validate_affectsParent_relationships_in_straddle (
 /// non-container -- a historical phantom, a Deleted, or a DeadViewnode -- is exactly
 /// that: it survives (is not itself dead) but its container is gone, so its
 /// member claim (that it is part of that parent's membership) cannot hold.
-/// Demote it to non-member so it renders as its own graph-contains root rather
+/// Make it a non-member so it renders as its own graph-contains root rather
 /// than claiming to affect a parent that no longer contains anything.
 ///
 /// Scope, deliberately narrow:
-/// - PARENT is historical phantom / Deleted / DeadViewnode -> demote a member child.
+/// - PARENT is historical phantom / Deleted / DeadViewnode -> make a member child a non-member.
 /// - PARENT is a Folder (PropertyFolder / PartnerFolder): the child is a legitimate folder
 ///   MEMBER; membership is correct -> leave. (A folder whose own ancestry broke is
 ///   deadened to DeadViewnode first, and then THIS pass catches its members.)
 /// - PARENT is an Unrestricted vognode: handled by validate_affectsParent_relationships.
 /// - PARENT is BufferRoot: the child is a forest root, handled by
 ///   mark_view_roots_parent_na.
-/// Belt-and-suspenders: most cases are already demoted during the BFS
+/// Belt-and-suspenders: most such children are already made non-members during the BFS
 /// (mark_erroneous_content_children_as_indep for content children;
 /// dispose_orphaned_folder_child for a deadened folder's members). This final pass
 /// GUARANTEES the invariant for any survivor those miss, in both the

@@ -156,7 +156,7 @@ fn swap_lines ( buf : &str, a : &str, b : &str ) -> String {
 
 /// Fabricate an intruder member line (an editable public leaf) at the
 /// member's indentation, plus a child one level deeper, so the repair
-/// is a demotion-to-independent rather than a removal. Built fresh
+/// makes it a non-member rather than removing it. Built fresh
 /// (not cloned from a member line) so it never inherits a foreign
 /// skgrepo -- the overriderFolder's members are foreign.
 fn intruder_with_child (
@@ -268,20 +268,20 @@ async fn write_protected_insert (
   if ! resp . errors . is_empty () {
     fails . record (&scenario, format! (
       "save reported errors: {:?}", resp . errors)); return Ok (( )); }
-  // The intruder is demoted to affectsParent=false in the rerendered view.
+  // The intruder is made a non-member (affectsParent=false) in the rerendered view.
   { let intruder_after : &str = line_containing (
       &resp . saved_view, &format! ("(id {})", spec . intruder) );
     if ! intruder_after . contains ("(affectsParent false)") {
       fails . record (&scenario, format! (
-        "intruder must be demoted to affectsParent=false: {}",
+        "intruder must be made a non-member (affectsParent=false): {}",
         intruder_after )); } }
   // ... and a warning says so.
   if ! resp . warnings . iter () . any ( |w|
       w . contains (&format! ("Repaired {}", spec . atom))
-      && w . contains ("false")
+      && w . contains ("non-members, since they are not members")
       && w . contains (spec . intruder) ) {
     fails . record (&scenario, format! (
-      "expected an affectsParent=false warning naming {}: {:?}",
+      "expected a made-a-non-member warning naming {}: {:?}",
       spec . intruder, resp . warnings )); }
   Ok (( )) }
 

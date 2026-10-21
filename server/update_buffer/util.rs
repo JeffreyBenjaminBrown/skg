@@ -115,14 +115,15 @@ pub fn detach_viewnode_transferring_focus (
   Ok (()) }
 
 /// What 'complete_managed_children' changed while reconciling: the
-/// orderkeys it created, demoted to non-member (stale branches),
-/// detached as stale leaves, and detached as duplicates. Callers
+/// orderkeys it created, those of the stale branches it made
+/// non-members, those it detached as stale leaves, and those it
+/// detached as duplicates. Callers
 /// that warn about repairs to write-protected folders consume this
 /// ('CompletionWarning'); other callers ignore it.
 #[derive(Debug)]
 pub struct RepairSummary<Orderkey> {
   pub created            : Vec<Orderkey>,
-  pub demoted            : Vec<Orderkey>,
+  pub made_nonMembers    : Vec<Orderkey>,
   pub deleted_stale      : Vec<Orderkey>,
   pub deleted_duplicates : Vec<Orderkey>,
 }
@@ -131,7 +132,7 @@ impl<Orderkey> RepairSummary<Orderkey> {
   fn new () -> RepairSummary<Orderkey> {
     RepairSummary {
       created            : Vec::new (),
-      demoted            : Vec::new (),
+      made_nonMembers    : Vec::new (),
       deleted_stale      : Vec::new (),
       deleted_duplicates : Vec::new (), }}
 }
@@ -195,8 +196,9 @@ where Managed  : Fn (&Viewnode) -> bool,
   let problem_discard_response =
     |n: &mut Viewnode| { n . focused = true; };
   // A stale child (managed, not in the goal) that has children is
-  // kept as the rule says; only a childless one is detached.
-  let demote_invalid =
+  // kept as the rule says (an Unrestricted one as a non-member,
+  // anything else as a DeadViewnode); only a childless one is detached.
+  let make_stale_a_nonMember =
     |tree: &mut Tree<Viewnode>, stale_treeid: NodeId|
       -> Result<bool, Box<dyn Error>> {
       keep_stale_child_holding_the_users (
@@ -211,7 +213,7 @@ where Managed  : Fn (&Viewnode) -> bool,
     create_child,
     problem_discard,
     problem_discard_response,
-    demote_invalid ) }
+    make_stale_a_nonMember ) }
 
 /// PURPOSE:
 /// Reconciles a parent's "managed" children against a desired list of 'orderkeys'.
@@ -224,9 +226,9 @@ where Managed  : Fn (&Viewnode) -> bool,
 /// - Among managed children, identifies duplicates and "stale" members (those
 ///   whose orderkey is not in goal_list).
 ///   - Duplicates are always detached.
-///   - A stale member is offered to 'demote_invalid'; if that keeps it (returns
-///     true, e.g. by making a branch a non-member) it survives, otherwise it
-///     is detached.
+///   - A stale member is offered to 'make_stale_a_nonMember'; if that keeps
+///     it (returns true, e.g. by making a branch a non-member) it survives,
+///     otherwise it is detached.
 ///   Runs problem_discard on each node that is actually detached; if any returns
 ///   true, runs problem_discard_response on the parent afterward.
 /// - Reorders remaining children: unmanaged first, then managed in goal_list order.
@@ -237,9 +239,10 @@ where Managed  : Fn (&Viewnode) -> bool,
 ///   membership is generated and ordered, so a parked note stays but is
 ///   visibly separated from the live membership. Documented in docs/glossary.org
 ///   ("PartnerFolder") and docs/sharing-model.org.
-/// - Returns a RepairSummary of what it created, demoted and detached.
+/// - Returns a RepairSummary: which children it created, which it made
+///   non-members, and which it detached.
 pub fn complete_managed_children
-<Node, Orderkey, Managed, View, ProblemDiscard, ProblemResponse, DemoteInvalid> (
+<Node, Orderkey, Managed, View, ProblemDiscard, ProblemResponse, MakeStaleANonMember> (
   tree                     : &mut Tree<Node>,
   parent_skgid             : NodeId,
   managed                  : Managed,
@@ -248,7 +251,7 @@ pub fn complete_managed_children
   create_child             : impl Fn (&Orderkey) -> Result<Node, String>,
   problem_discard          : ProblemDiscard,
   mut problem_discard_response : ProblemResponse,
-  demote_invalid           : DemoteInvalid,
+  make_stale_a_nonMember   : MakeStaleANonMember,
 ) -> Result<RepairSummary<Orderkey>, Box<dyn Error>>
 where
   Managed         : Fn (&Node) -> bool,
@@ -259,7 +262,7 @@ where
   Orderkey        : Eq + Hash + Clone,
   ProblemDiscard  : Fn(&Tree<Node>, NodeId) -> Result<bool, String>,
   ProblemResponse : FnMut (&mut Node),
-  DemoteInvalid   : Fn(&mut Tree<Node>, NodeId) -> Result<bool, Box<dyn Error>>,
+  MakeStaleANonMember : Fn(&mut Tree<Node>, NodeId) -> Result<bool, Box<dyn Error>>,
 {
   let groups : HashMap<i32, Vec<NodeId>> =
     partition_children (
@@ -298,11 +301,12 @@ where
                    |mut n| { n . detach(); } )
       . map_err( |e| -> Box<dyn Error> { e . into() } )?;
     summary . deleted_duplicates . push( orderkey . clone() ); }
-  // Stale members: demote_invalid may keep one (a branch made a non-member); only a
-  // node it does NOT keep is detached, and only that detach can lose focus.
+  // Stale members: make_stale_a_nonMember may keep one (a branch made a
+  // non-member); only a node it does NOT keep is detached, and only that
+  // detach can lose focus.
   for ( treeid, orderkey ) in &invalid_skgids {
-    if demote_invalid( tree, *treeid )? {
-      summary . demoted . push( orderkey . clone() );
+    if make_stale_a_nonMember( tree, *treeid )? {
+      summary . made_nonMembers . push( orderkey . clone() );
       continue; }
     if problem_discard( tree, *treeid )? { discard_has_problem = true; }
     with_node_mut( tree, *treeid,
