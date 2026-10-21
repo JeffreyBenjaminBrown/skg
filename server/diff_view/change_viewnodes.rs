@@ -132,8 +132,9 @@ pub fn mk_historical_viewnode (
 /// content stands, what it holds: if a nodeMerge acquired it, an "it
 /// was acquired by" folder, and then its old content as removed
 /// members: a deleted member as a historical phantom (whose own visit
-/// draws its old content), a surviving one as a write-protected
-/// vognode, and a dangling one as an unknown phantom.
+/// draws its old content), a surviving one as a removed member
+/// ('mk_removed_member_viewnode'), and a dangling one as an unknown
+/// phantom.
 pub fn append_historical_phantom_content (
   tree     : &mut Tree<Viewnode>,
   phantom  : NodeId,
@@ -152,7 +153,8 @@ pub fn append_historical_phantom_content (
       match straddle . node_presence (&partner . id) {
         Some (Presence::OnlyBefore) =>
           mk_historical_viewnode (straddle, &partner . id, Some (Sign::Minus)),
-        _ => mk_member_viewnode (straddle, &partner . id, Some (Sign::Minus)), };
+        Some (_) => mk_removed_member_viewnode (straddle, &partner . id),
+        None => mk_member_viewnode (straddle, &partner . id, Some (Sign::Minus)), };
     if let Some (member) = member {
       tree . get_mut (phantom) ? . append (member); }}
   Some (( )) }
@@ -175,6 +177,26 @@ pub fn append_acquired_folder (
     if let Some (phantom) = mk_historical_viewnode (straddle, acquiree, None) {
       tree . get_mut (folder) ? . append (phantom); }}
   Some (folder) }
+
+/// A removed member: the write-protected image of a node of the
+/// after-graph whose relationship to its viewparent is only in the
+/// before-graph, drawn as a non-member with '(diff rel-)', the one
+/// encoding of a removed relationship ('is_unrestricted_removed_member'
+/// reads it). None if the after-graph lacks the node.
+pub fn mk_removed_member_viewnode (
+  straddle : &GraphStraddle,
+  pid      : &ID,
+) -> Option<Viewnode> {
+  let node : &GraphnodeInRust = straddle . after . get (pid) ?;
+  let mut member : Viewnode = mk_writeProtected_viewnode (
+    pid . clone (), node . home_skgrepo . clone (), node . title . clone (),
+    AffectsParent::False );
+  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut member . kind {
+    t . change_facts . presence = DiffPresence {
+      node : straddle . node_presence (pid)
+             . and_then ( |presence| presence . diff_sign () ),
+      rel  : Some (Sign::Minus) }; }
+  Some (member) }
 
 /// A write-protected image of a node of the after-graph, whose
 /// relationship to its viewparent has presence 'rel'; an unknown

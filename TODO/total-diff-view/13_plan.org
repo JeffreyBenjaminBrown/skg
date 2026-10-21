@@ -1082,7 +1082,7 @@ the acquirer's container in C. Run 'tests/results/perf/run.sh' before
 and after on the real data and record the 'changed_pids' numbers in
 'progress.org'.
 
-** TODO Slice 14: one ordering and one encoding
+** DONE Slice 14: one ordering and one encoding
 Make the changes under "One ordering and one encoding" above. The
 folder goal over the straddle computes the interleaved order with
 'compute_interleaved_diff' as the alias, ID and flags folders do; a

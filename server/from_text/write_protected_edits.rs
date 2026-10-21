@@ -4,7 +4,6 @@
 //! judged by the graph alone: it must say what the graph says.
 
 use crate::types::errors::BufferValidationError;
-use crate::types::git::Sign;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::tree::forest::ViewForest;
@@ -112,8 +111,7 @@ fn partnerFolder_differences_from_graph (
     . collect () }
 
 /// The members of a partner folder, each with its relRepo request: its
-/// unrestricted vognode children that affect it, less those whose
-/// relationship the diff view shows as removed, and its Unknown
+/// unrestricted vognode children that affect it, and its Unknown
 /// phantom children, each by the ID the folder reconciler matches it
 /// by ('skgid_a_folder_child_stands_for').
 fn partnerFolder_members_in_view (
@@ -123,8 +121,7 @@ fn partnerFolder_members_in_view (
   folder . children () . filter_map ( |child| {
     let relRepo_request : Option<SkgrepoName> = match &child . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (member))
-        if member . affectsParent == AffectsParent::True
-           && member . change_facts . presence . rel != Some (Sign::Minus) =>
+        if member . affectsParent == AffectsParent::True =>
         member . relRepo_request . clone (),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
         unknown . relRepo_request . clone (),
@@ -614,17 +611,29 @@ mod tests {
         extra_ids : vec! [ID::from ("x2")],
         .. node ("x") } ]) }
 
-  /// A member whose relationship the diff view shows as removed
-  /// is not counted, nor is a non-member.
+  /// A removed member, as the diff view draws one (a non-member with
+  /// '(diff rel-)'), is not counted, nor is any other non-member.
   #[test]
-  fn a_member_shown_as_removed_is_not_counted () {
+  fn a_removed_member_is_not_counted () {
     assert_eq! (errors_in (indoc! {"
       * (skg (node (id recorder) (repo main) writeProtected)) recorder
       ** (skg containerFolder)
       *** (skg (node (id root) (repo main) writeProtected)) root
-      *** (skg (node (id c1) (repo main) writeProtected (diff rel-))) c1
+      *** (skg (node (id c1) (repo main) (affectsParent false) writeProtected (diff rel-))) c1
       *** (skg (node (id c2) (repo main) writeProtected (affectsParent false))) c2
     "}), vec! []);
+  }
+
+  /// A member is counted whatever its diff facts say: a removed
+  /// member is never a member.
+  #[test]
+  fn a_member_marked_removed_is_counted () {
+    assert_eq! (refused_changes (&errors_in (indoc! {"
+      * (skg (node (id recorder) (repo main) writeProtected)) recorder
+      ** (skg containerFolder)
+      *** (skg (node (id root) (repo main) writeProtected)) root
+      *** (skg (node (id c1) (repo main) writeProtected (diff rel-))) c1
+    "})), vec! ["changed containers" . to_string ()]);
   }
 
   #[test]

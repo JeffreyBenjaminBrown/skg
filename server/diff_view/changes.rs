@@ -36,7 +36,7 @@ use crate::diff_view::pcsvf::{PcsvfSets, DiffViewSource};
 use crate::diff_view::change_viewnodes::{
   append_acquired_folder, append_historical_phantom_content, append_old_text,
   mk_changeset_marker_viewnode, mk_historical_viewnode, mk_home_move_viewnode,
-  mk_relRepo_move_viewnode};
+  mk_relRepo_move_viewnode, mk_removed_member_viewnode};
 use crate::diff_view::fresh_drawing::{
   adopt_fresh_facts, is_unrestricted_removed_member, match_key,
   reconcile_children_with_fresh_drawing};
@@ -54,7 +54,7 @@ use crate::types::viewnode::{
   AffectsParent, Birth, ChangeFacts, ChangesetMarkerKind, DiffPresence,
   Editability, PartnerFolder, Phantom, PhantomDeleted, Property,
   PropertyFolder, Viewnode, ViewnodeKind, Vognode,
-  mk_editable_viewnode, mk_writeProtected_viewnode, viewforest_root_viewnode,
+  mk_editable_viewnode, viewforest_root_viewnode,
   viewnode_of};
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
@@ -542,16 +542,9 @@ fn reconcile_removed_content_members (
     let drawn : Option<Viewnode> = match straddle . node_presence (&removed) {
       Some (Presence::OnlyBefore) =>
         mk_historical_viewnode (straddle, &removed, Some (Sign::Minus)),
-      Some (presence) => {
-        let node = straddle . after . get (&removed)
-          . ok_or ("reconcile_removed_content_members: a surviving member is not in the after-graph") ?;
-        let mut member : Viewnode = mk_writeProtected_viewnode (
-          removed . clone (), node . home_skgrepo . clone (),
-          node . title . clone (), AffectsParent::False );
-        if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut member . kind {
-          t . change_facts . presence = DiffPresence {
-            node : presence . diff_sign (), rel : Some (Sign::Minus) }; }
-        Some (member) },
+      Some (_) => Some (
+        mk_removed_member_viewnode (straddle, &removed)
+        . ok_or ("reconcile_removed_content_members: a surviving member is not in the after-graph") ? ),
       None => None, };
     if let Some (drawn) = drawn {
       fresh . root_mut () . append (drawn);

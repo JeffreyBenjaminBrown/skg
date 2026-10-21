@@ -273,26 +273,30 @@ the alias, ID and flags folders are placed this way, each removed
 member moved, not redrawn, to its slot at every visit, after the
 content reconciler has reordered the children.
 
-(from slice 14 of 13_plan) The partner folders drawn over the straddle
-place their removed members the same way, instead of appending them,
-so every drawing of the union of the two graphs places a removed entry
-by the LCS.
+The partner folders drawn over the straddle place their removed
+members the same way, since 'GraphStraddle::partners' gives the
+partners a node records in the order of the interleaved diff of the
+two lists ('interleaved_diff_without_reorders'); recorders, which no
+list orders, come sorted by ID. So every drawing of the union of the
+two graphs places a removed entry by the LCS.
 ** One encoding of a removed relationship
-In content, a removed member whose node survives is an unrestricted
-vognode drawn as a non-member, write-protected, with the fact
-'(diff rel-)': its relationship to its viewparent exists in the
-before-graph only. A removed dangling ID is not drawn (an unknown
-phantom there would read back as a member); its leaf is under the
-content changeset marker. A former member is any viewnode standing for
-a before-only relationship, historical phantoms included.
+A removed member whose node survives is an unrestricted vognode drawn
+as a non-member, write-protected, with the fact '(diff rel-)': its
+relationship to its viewparent exists in the before-graph only. That
+is the one encoding of a removed relationship, wherever it stands: in
+content, in a partner folder, and in a historical phantom's old
+content ('mk_removed_member_viewnode', 'FolderGoalShape::Removed').
+'is_unrestricted_removed_member' is its one reader. Since a removed
+member is never a member, the save's check of a write-protected
+occurrence's folders counts only members.
 
-(from slice 14 of 13_plan) A removed relationship has this one
-encoding everywhere: the write-protected-set folders and a historical
-phantom's old content draw their removed members as non-members with
-'(diff rel-)' too, and 'is_unrestricted_removed_member' is their one
-reader. Since a removed member is never a member, the save's check of
-a write-protected occurrence's folders needs no clause discounting
-members marked removed.
+A removed dangling ID is not drawn in content or in a folder whose
+membership the save reads (an unknown phantom there would read back
+as a member); its leaf in content is under the content changeset
+marker. In a write-protected-set folder and in a historical phantom's
+old content, where nothing reads back, it is an unknown phantom with
+'(diff rel-)'. A former member is any viewnode standing for a
+before-only relationship, historical phantoms included.
 
 * Editability in the diff view
 The diff view follows the rule that decides which occurrence is
@@ -328,8 +332,8 @@ editable occurrence becomes editable (its body read from the live
 graph) at its first content occurrence in level order, else at its
 first partner-folder occurrence ('ensure_editableOccurrences_exist').
 The walk for content occurrences passes through a historical phantom
-in content position into its old content, whose members then stay
-editable at the phantom's visit.
+in content position into its old content, whose removed members then
+stay editable at the phantom's visit.
 The buffer is then rerendered as after a save, which draws the
 content list of each node made editable, and last, each content
 origin of D that the buffer draws nowhere is appended as a root, in ID

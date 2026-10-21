@@ -2089,3 +2089,72 @@ Counts: nextest 833 (three new tests), Emacs 374, Neovim 348, at each
 of the three commits. 'tests/results/hk-slice13/verify.sh' (slice
 12's) gives the same responses as slice 12's run, apart from the
 order of the lock-views lists, which varies from run to run.
+** Slice 14: deviations
+*** the order lives in 'GraphStraddle::partners'
+The plan's default was to compute the interleaved order in the folder
+goal; it allows changing 'partners' instead if that is cleaner, and
+it is: 'partners' now gives the partners a node records in the order
+of 'interleaved_diff_without_reorders' of the two graphs' lists
+(moved from 'diff_view/changes.rs' to 'types/list.rs', where the
+content placement and the alias, ID and flags folders also read it).
+Recorders stay sorted by ID: no list orders them, and a sorted union
+of two sorted lists already places every removed entry by the LCS.
+Every caller was checked: the role trees and C read sets, the
+per-visit step's tagging reads a map, the historical phantom's old
+content comes from the before-graph only, and the change leaves'
+order within a recorder changes ('tests/unit/change_leaves.rs' and
+two 'tests/graph_straddle.rs' expectations adapted).
+*** one constructor of a removed member
+'mk_removed_member_viewnode' ('diff_view/change_viewnodes.rs') draws
+a removed member for the content placement and for a historical
+phantom's old content; a folder's removed member is drawn by the
+existing 'FolderGoalShape::Removed', now used by every folder policy.
+'mk_member_viewnode' stays for the "it was acquired by" folder's
+acquirer and for a dangling old-content member.
+*** a dangling removed member
+In an editable-set folder (as before) and in content a removed member
+whose ID resolves in neither graph is not drawn. In a
+write-protected-set folder and in a historical phantom's old content
+it stays an unknown phantom with '(diff rel-)', as before: an unknown
+phantom cannot be a non-member, and nothing reads it back there. The
+validator still counts such a phantom as a member of a
+write-protected occurrence's folder; recorded in 'TODO/problems.org'.
+*** the walk that makes occurrences editable
+'content_occurrences_in_level_order' ('diff_view/pcsvf.rs') counted
+the members of a historical phantom's old content; those are now
+removed members, so it accepts a removed member whose parent is a
+historical phantom. Without that, the two
+'..._member_under_a_historical_phantom' tests in
+'tests/pcsvf/recomputed_sets.rs' fail.
+*** tests
+'a_removed_container_is_drawn_between_the_kept_ones',
+'a_removed_subscribee_is_drawn_where_it_stood',
+'the_removed_partners_buffer_saves_back_unchanged' and
+'a_historical_phantoms_old_content_is_drawn_as_removed_members'
+('tests/pcsvf/buffer.rs'), over a new fixture 'removed_partners' (also
+added to the C test in 'tests/pcsvf/sets.rs'). A container folder's
+members are recorders, sorted by ID, so the container test held
+before this slice for the order and fails only on the encoding; the
+subscribee test fails on the order (s2 was appended after s3). The
+validator test of the removed clause became 'a_removed_member_is_not_counted'
+plus 'a_member_marked_removed_is_counted'. Expectations adapted for the
+new encoding and order: the kinds buffer's subscribee folder (s1 now
+before s2), its write-protected s1 test, and the historical_content
+command test.
+*** a pre-existing gap, seen
+Building the fixture showed that x, contained by a, b and c with only
+b's containment removed, is editable nowhere: D discards it through
+the removed relationship. Recorded in 'TODO/problems.org'; the
+fixture retitles a so that x is drawn editable in a's content.
+*** verification
+Counts: nextest 838 (five new tests), Emacs 374, Neovim 348. One
+full nextest run had 'rebuild::complete_aliasfolder::all_tests' fail;
+it passed in isolation and in the next full run (a fixture collision,
+unrelated). 'tests/results/hk-slice14/verify.sh' (slice 13's) on an
+isolated server: the kinds buffer's subscriber folder of s1 draws sub
+as a removed member, the save of "all changes" unchanged reports no
+error, and every redraw is identical. 'verify-main.sh' runs the same
+script on the one-skgrepo fixtures 'removed_partners' and
+'historical_content': the folders and h's old content draw their
+removed members as above, the saves report no error, and "integrate
+unshown changes" makes m editable under h ('(notEditable 0)').

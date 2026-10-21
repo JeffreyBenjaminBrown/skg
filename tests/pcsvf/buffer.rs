@@ -164,7 +164,8 @@ fn a_subscription_change_shows_on_both_sides (
   assert_lines_in_order ( &buffer, &[
     "* (skg (node (id s1)",
     "** (skg (subscriberFolder changed))",
-    "*** (skg (node (id sub)", "(diff rel-) (leaves 1 rel))) sub" ] );
+    "*** (skg (node (id sub) (repo public) (affectsParent false) writeProtected",
+    "(diff rel-) (leaves 1 rel))) sub" ] );
   Ok (( )) }
 
 #[test]
@@ -234,3 +235,62 @@ fn the_sets_buffer_saves_back_unchanged (
 fn the_kinds_buffer_saves_back_unchanged (
 ) -> Result<(), Box<dyn Error>> {
   saves_back_unchanged ("kinds", &["public", "private"], DiffViewBufferKind::AllChanges) }
+
+/// The 'removed_partners' fixture (one skgrepo, main): at HEAD a, b
+/// and c contain x, and s subscribes to s1, s2 and s3. Since then b
+/// stopped containing x, s stopped subscribing to s2, and a was
+/// retitled, so that x is drawn editable in a's content.
+fn removed_partners_buffer (
+) -> Result<String, Box<dyn Error>> {
+  let mut buffer : String = String::new ();
+  with_fixture ("removed_partners", &["main"], |f| {
+    buffer = buffer_of (f) ?;
+    Ok (( )) }) ?;
+  Ok (buffer) }
+
+/// x's container folder draws b, the container it lost, between the
+/// two it kept, as a removed member: a non-member with '(diff rel-)'.
+#[test]
+fn a_removed_container_is_drawn_between_the_kept_ones (
+) -> Result<(), Box<dyn Error>> {
+  assert_lines_in_order ( &removed_partners_buffer () ?, &[
+    "** (skg (node (id x) (repo main) (rels",
+    "*** (skg (containerFolder changed))",
+    "**** (skg (node (id a) (repo main) writeProtected",
+    "**** (skg (node (id b) (repo main) (affectsParent false) writeProtected (diff rel-) (leaves 1 rel))) b",
+    "**** (skg (node (id c) (repo main) writeProtected" ] );
+  Ok (( )) }
+
+/// s's subscribee folder draws s2, the subscribee it lost, where it
+/// stood in s's list, not after the subscribees it kept.
+#[test]
+fn a_removed_subscribee_is_drawn_where_it_stood (
+) -> Result<(), Box<dyn Error>> {
+  assert_lines_in_order ( &removed_partners_buffer () ?, &[
+    "* (skg (node (id s)",
+    "** (skg (subscribeeFolder changed))",
+    "*** (skg (node (id s1) (repo main) writeProtected",
+    "*** (skg (node (id s2) (repo main) (affectsParent false) writeProtected (diff rel-) (leaves 1 rel))) s2",
+    "*** (skg (node (id s3) (repo main) writeProtected" ] );
+  Ok (( )) }
+
+#[test]
+fn the_removed_partners_buffer_saves_back_unchanged (
+) -> Result<(), Box<dyn Error>> {
+  saves_back_unchanged ("removed_partners", &["main"], DiffViewBufferKind::AllChanges) }
+
+/// In the 'historical_content' fixture h, which contained m, was
+/// deleted: h's historical phantom draws its old content m as a
+/// removed member, a non-member with '(diff rel-)'. A buffer showing
+/// it saves back unchanged.
+#[test]
+fn a_historical_phantoms_old_content_is_drawn_as_removed_members (
+) -> Result<(), Box<dyn Error>> {
+  let mut buffer : String = String::new ();
+  with_fixture ("historical_content", &["main"], |f| {
+    buffer = buffer_of (f) ?;
+    Ok (( )) }) ?;
+  assert_lines_in_order ( &buffer, &[
+    "** (skg (historical (id h) (repo main) (diff node- rel-) (leaves 2 node rel))) h",
+    "*** (skg (node (id m) (repo main) (affectsParent false) writeProtected (diff rel-) (leaves 1 rel))) m, retitled" ] );
+  saves_back_unchanged ("historical_content", &["main"], DiffViewBufferKind::AllChanges) }

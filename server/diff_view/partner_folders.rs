@@ -86,11 +86,12 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
   Ok (( )) }
 
 /// The goal item of a partner of a straddle-drawn folder: a node only
-/// in the before-graph is its historical phantom; in a folder whose
-/// membership the save reads (an EditableSet), a member whose
-/// relationship is only in the before-graph is removed, and not drawn
-/// at all when it is dangling, so that saving the buffer does not
-/// restore it; any other is a member.
+/// in the before-graph is its historical phantom; a member whose
+/// relationship is only in the before-graph is removed (a non-member
+/// with '(diff rel-)', the one encoding of a removed relationship);
+/// any other is a member. In a folder whose membership the save reads
+/// (an EditableSet), a removed member that is dangling is not drawn at
+/// all, since an unknown phantom there would read back as a member.
 fn straddle_goal_item (
   straddle     : &GraphStraddle,
   partner      : &Partner,
@@ -103,8 +104,8 @@ fn straddle_goal_item (
   let shape : FolderGoalShape = match node_presence {
     Some (Presence::OnlyBefore) => FolderGoalShape::Historical (
       mk_historical_viewnode (straddle, &partner . id, presence . rel) ? ),
-    _ if editable_set && partner . presence == Presence::OnlyBefore => {
-      node_presence ?; // dangling
+    _ if partner . presence == Presence::OnlyBefore => {
+      if editable_set { node_presence ?; } // dangling
       FolderGoalShape::Removed },
     _ => FolderGoalShape::Member, };
   Some ( FolderGoalItem {

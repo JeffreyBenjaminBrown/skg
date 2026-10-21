@@ -65,10 +65,10 @@ pub enum FolderGoalShape {
   /// A member: a write-protected vognode marked affectsParent=true,
   /// or an unknown phantom when the live graph lacks its node.
   Member,
-  /// A member whose relationship is only in the before-graph, in a
-  /// folder whose membership the save reads: a write-protected
-  /// vognode marked affectsParent=false, so that saving the buffer
-  /// does not restore it.
+  /// A member whose relationship is only in the before-graph: a
+  /// write-protected vognode marked affectsParent=false (so that
+  /// saving the buffer does not restore it), or an unknown phantom
+  /// when the live graph lacks its node.
   Removed,
   /// A node only in the before-graph: this historical phantom.
   Historical (Viewnode),

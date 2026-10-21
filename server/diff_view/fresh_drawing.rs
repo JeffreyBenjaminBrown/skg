@@ -169,9 +169,13 @@ pub fn append_copy_of_subtree (
     append_copy_of_subtree (tree, copy, fresh, fresh_child) ?; }
   Ok (copy) }
 
-/// A member the diff view drew, outside the content list,
-/// because its relationship to its viewparent is only in the
-/// before-graph (or, while a visit reconciles, is about to be).
+/// A removed member: a viewnode the diff view drew as a non-member
+/// with '(diff rel-)', because its relationship to its viewparent is
+/// only in the before-graph (or, while a visit reconciles, is about
+/// to be). That is the one encoding of a removed relationship, in
+/// content, in a partner folder and in a historical phantom's old
+/// content ('mk_removed_member_viewnode', 'FolderGoalShape::Removed'),
+/// and this is its one reader.
 pub fn is_unrestricted_removed_member (
   viewnode : &Viewnode,
 ) -> bool {

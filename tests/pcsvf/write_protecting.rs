@@ -301,10 +301,10 @@ fn a_writeProtect_request_and_an_editable_request_move_editability_and_back (
     Ok (( )) }) }
 
 /// In the 'kinds' fixture the worktree removed sub's subscription to
-/// s1, so the buffer draws s1's subscriber folder holding sub, marked
-/// '(diff rel-)'. Write-protected, s1 saves unchanged: the check of a
-/// write-protected occurrence's partner folders does not count a
-/// member shown as removed.
+/// s1, so the buffer draws s1's subscriber folder holding sub as a
+/// removed member, a non-member marked '(diff rel-)'. Write-protected,
+/// s1 saves unchanged: the check of a write-protected occurrence's
+/// partner folders counts only members.
 #[test]
 fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
 ) -> Result<(), Box<dyn Error>> {
@@ -322,7 +322,7 @@ fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
               && s1_and_folder [1] == "** (skg (subscriberFolder changed))"
               && s1_and_folder [2] . starts_with ("*** (skg (node (id sub) ")
               && s1_and_folder [2] . ends_with ("(diff rel-) (leaves 1 rel))) sub")
-              && ! s1_and_folder [2] . contains ("affectsParent"),
+              && s1_and_folder [2] . contains ("(affectsParent false)"),
               "s1 must be write-protected, showing sub as a removed member:\n{}",
               text );
     let files_before : BTreeMap<String, String> = skg_files (f) ?;

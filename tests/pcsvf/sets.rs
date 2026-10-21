@@ -85,7 +85,7 @@ fn an_in_changed_only_change_is_drawn_under_its_new_container (
 #[test]
 fn c_is_the_recorders_and_the_members_of_presence_changed_relationship_leaves (
 ) -> Result<(), Box<dyn Error>> {
-  let fixtures : [(&str, &[&str], &[&str]); 10] = [
+  let fixtures : [(&str, &[&str], &[&str]); 11] = [
     ("buffers",            &["public", "private"], &[]),
     ("folder_member",      &["main"],              &[]),
     ("foreign",            &["main"],              &["foreign"]),
@@ -94,6 +94,7 @@ fn c_is_the_recorders_and_the_members_of_presence_changed_relationship_leaves (
     ("kinds",              &["public", "private"], &[]),
     ("overrides",          &["main"],              &[]),
     ("partner_ids",        &["main"],              &[]),
+    ("removed_partners",   &["main"],              &[]),
     ("sets",               &["main"],              &[]),
     ("shared",             &["main"],              &[]), ];
   for (case, skgrepos, foreign) in fixtures {

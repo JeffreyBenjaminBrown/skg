@@ -23,6 +23,7 @@ use crate::prominence::climb_containerward_to_content_origins_via;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::diff_view::readiness_requests::set_ready_facts_in_viewforest;
 use crate::diff_view::change_viewnodes::mk_historical_viewnode;
+use crate::diff_view::fresh_drawing::is_unrestricted_removed_member;
 use crate::to_org::util::{
   EditableMap, append_plain_stub_root, graphnode_and_viewnode_from_skgid};
 use crate::types::env::RuntimeGeneration;
@@ -439,7 +440,7 @@ pub fn ensure_editableOccurrences_exist (
 /// The viewforest's unrestricted vognodes in content position
 /// ('in_content_position') that are roots or members there, in level
 /// order. The walk passes through a historical phantom in content
-/// position, to the members of its old content.
+/// position, to its old content, the removed members under it.
 fn content_occurrences_in_level_order (
   viewforest : &ViewForest,
 ) -> Vec<NodeId> {
@@ -452,8 +453,11 @@ fn content_occurrences_in_level_order (
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
         let is_root_or_member : bool =
           t . affectsParent == AffectsParent::True
-          || node . parent () . is_some_and ( |parent| matches! (
-               parent . value () . kind, ViewnodeKind::BufferRoot ));
+          || node . parent () . is_some_and ( |parent| match parent . value () . kind {
+               ViewnodeKind::BufferRoot => true,
+               ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) =>
+                 is_unrestricted_removed_member ( node . value () ),
+               _ => false, } );
         if ! is_root_or_member { continue; }
         occurrences . push ( node . id () ); },
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => {},

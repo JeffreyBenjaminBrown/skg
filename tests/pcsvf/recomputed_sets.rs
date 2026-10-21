@@ -477,7 +477,8 @@ fn an_editable_container_folder_member_outside_u_stays_editable (
 /// The 'historical_content' fixture (one skgrepo, main): at HEAD r
 /// contains h and k, and h contains m. Since then h was deleted and m
 /// retitled, so the buffer draws h as a historical phantom under r,
-/// holding its old content m, a member of U drawn write-protected.
+/// holding its old content m, a node of U drawn as a write-protected
+/// removed member.
 /// The walk that finds the occurrences to make editable passes
 /// through a historical phantom in content position, so it makes m
 /// editable there.
@@ -519,7 +520,7 @@ fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
 fn the_command_makes_a_member_under_a_historical_phantom_editable (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("historical_content", &["main"], |f| {
-    let m_line : &str = "*** (skg (node (id m) (repo main) (diff rel-) (leaves 1 rel))) m, retitled";
+    let m_line : &str = "*** (skg (node (id m) (repo main) (affectsParent false) (diff rel-) (leaves 1 rel))) m, retitled";
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( ! buffer . contains (m_line), "{}", buffer );
     let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;

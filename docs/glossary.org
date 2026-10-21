@@ -881,7 +881,9 @@ content position draws its old content under it.
 
 A *removed member* is an unrestricted vognode drawn as a non-member,
 write-protected, with the fact '(diff rel-)': its node survives, but
-its relationship to its viewparent exists in the before-graph only. A
+its relationship to its viewparent exists in the before-graph only.
+It is drawn so in content, in a partner folder and in a historical
+phantom's old content alike. A
 *former member* is any viewnode standing for such a before-only
 relationship, historical phantoms included.
 
