@@ -18,7 +18,7 @@ use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::fs::GraphnodeOnDisk;
 
 use git2::{ObjectType, Repository, TreeWalkMode, TreeWalkResult};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::from_utf8;
@@ -227,8 +227,7 @@ fn profile_log (
     duration . subsec_millis ()); }
 
 /// Group sections by pid (sections must arrive in privacy order),
-/// normalize owned/non-owned pid collisions, compose each telescope,
-/// and record the retained sections' id claims.
+/// normalize owned/non-owned pid collisions, and compose each telescope.
 fn git_snapshot_from_sections (
   config   : &SkgConfig,
   sections : Vec<(SkgrepoName, GraphnodeOnDisk)>,
@@ -250,13 +249,6 @@ fn git_snapshot_from_sections (
         pid = %pid,
         ignored_skgrepos = ?collision . ignored_skgrepos,
         "git snapshot ignored non-owned files colliding with an owned telescope" ); }}
-  let mut id_claims
-    : HashMap<ID, BTreeMap<ID, BTreeSet<SkgrepoName>>> =
-    HashMap::new ();
-  for sections in sections_by_pid . values () {
-    for (skgrepo_name, node_fs) in sections {
-      record_section_claims (
-        &mut id_claims, node_fs, skgrepo_name ); }}
   let pid_of : HashMap<ID, ID> = {
     let mut m : HashMap<ID, ID> = HashMap::new ();
     for (pid, sections) in sections_by_pid . iter () {
@@ -274,7 +266,7 @@ fn git_snapshot_from_sections (
       fold_telescope_tolerating_homelessness (
         config, &pid, telescope_sections, &resolve ) ?;
     by_pid . insert (pid, node); }
-  Ok ( GraphSnapshot { nodes: by_pid, id_claims } )
+  Ok ( GraphSnapshot { nodes: by_pid } )
 }
 
 /// Compose one telescope, but where init would hard-error on a
@@ -310,21 +302,6 @@ fn fold_telescope_tolerating_homelessness (
       compose_telescope ( retry_telescope, resolve )
         . map_err ( |e| e . to_string () ) }}
 }
-
-/// Record one section's id claims: it claims its pid and every
-/// extra id it lists, all attributed to (pid, skgrepo).
-fn record_section_claims (
-  id_claims : &mut HashMap<ID, BTreeMap<ID, BTreeSet<SkgrepoName>>>,
-  node_fs   : &GraphnodeOnDisk,
-  skgrepo   : &SkgrepoName,
-) {
-  for skgid in std::iter::once (&node_fs . pid)
-    . chain (node_fs . extra_ids . iter ()) {
-    id_claims . entry (skgid . clone ())
-      . or_insert_with (BTreeMap::new)
-      . entry (node_fs . pid . clone ())
-      . or_insert_with (BTreeSet::new)
-      . insert (skgrepo . clone ()); }}
 
 fn read_skgrepo_from_head (
   config       : &SkgConfig,
