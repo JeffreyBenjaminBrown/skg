@@ -2427,3 +2427,64 @@ open showed them as '(ready ...)' parts. The save's own rerendered
 view, sent on a second connection under a hand-made view id, carried
 no '(leaves ...)' or '(ready ...)'; the pcsvf tests, which save
 through the registered view, see both, so this was not pursued.
+** Slice 4: deviations
+*** the node's slot takes its own enum
+'DiffPresence::node' is an 'Option<NodeSign>' ('Plus', 'Minus',
+'Modified', in 'server/types/git.rs'), with 'From<Sign>'; 'Sign' keeps
+its two values for relationships and entries. The one function is
+'GraphStraddle::node_sign' ('server/graph_straddle/union_walk.rs').
+A folder's member converts its 'Sign' and so never takes '~'. 'M'
+is styled under the 'presence' key of 'shared/herald-styles.json'
+(slice 3's name for 'diff'), so that file did not change.
+*** a root is signed in the per-visit step
+'sign_root' runs first in 'process_unrestrictedVognode_changes', for
+an editable or write-protected root alike, so a write-protected
+repeat of a modified root shows 'M' too.
+*** '~' does not make a viewnode the server's
+'is_the_users_viewnode' asked for an empty '(presence ...)'. A member
+the user put under a write-protected node is tagged at that node's
+visit, and with '~' its node's being modified would have made it the
+server's, for the diff view's reconciler to detach. So '~' alone
+leaves it the user's, which keeps the classification every viewnode
+had before this slice.
+*** below the headline a gesture acts on, only 'all' is dropped
+The clients named nothing on a headline below the one acted on whose
+objects included 'all'. A modified node in a new relationship now
+lists 'rel all', and dropping the headline would lose its 'rel' leaf,
+which only that headline names. So 'leaves-below' ('M.leaves_below')
+drops 'all' and keeps the other objects, nil when none is left. On
+every headline the clients met before this slice, that names what it
+named then.
+*** a bare '(ready)' covers every listed object
+A headline is ready when its '(ready ...)' names every listed object,
+or is a bare '(ready)', which names a headline's only leaf or
+aggregate: a changeset marker lists 'all' and carries a bare
+'(ready)'. A vognode never carries a bare one.
+*** a lone '✓' on a folder's modified member
+The server writes '(ready all)' on every unrestricted vognode whose
+leaves fact lists 'all', as the plan says, so that the clients'
+toggle by '(ready ...)' works there too. A modified member of a
+folder carries no sign and lists 'all' only, so its '✓' abuts the
+write-protection mark: '☮✓'. Seen, left as it is.
+*** the client tests that relied on the aggregate case
+The wide-unmark tests and the single-leaf unmark test put a changed
+node's readiness in its children; their node lines now carry
+'(presence node~)' and '(ready all)', as the server writes them, and
+assert what they asserted. The tests' helper lost its OBJECT
+argument and fails if a gesture prompts. 'skg--readiness-vognode-p'
+and 'M.vognode_p' went with their one caller.
+*** tests
+'tests/pcsvf/readiness.rs': 'a_modified_node_lists_all_and_one_mark_readies_its_file',
+'a_modified_node_in_a_new_relationship_lists_rel_and_all',
+'a_new_node_lists_node_and_rel', 'a_modified_root_carries_its_sign'.
+A round trip of 'node~' and '(ready rel all)' in
+'tests/change_facts_metadata.rs'; '(ready all)' left the malformed
+list. Two rendering cases, 'M' and 'M✓ ~+'. Two expectations of the
+retitled removed member m in the 'historical_content' fixture
+('tests/pcsvf/buffer.rs', 'recomputed_sets.rs') gained 'node~' and
+'(leaves 2 rel all)', a fixture adaptation.
+*** verification
+nextest 854 passed; Emacs 376; Neovim all specs passed;
+'bash/integration-tests.sh': only the baseline 'import-md-and-org'
+fails, and the diff-view test (the recursive gesture over every
+root) passes.

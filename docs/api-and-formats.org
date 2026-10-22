@@ -1310,8 +1310,10 @@ say; a headline with nothing to say carries no =(diff ...)=, and
 =(deleted ...)=, =(unknown ...)= and =(historical ...)=, and at top
 level on alias, id and flag leaves and on the properties below other
 than =bodyDiff=.
-- =(presence SIGN...)= -- SIGNs are taken from =node+ node- rel+ rel-=:
-  the node HEAD lacks (=node+=) or the worktree lacks (=node-=); the
+- =(presence SIGN...)= -- SIGNs are taken from =node+ node- node~
+  rel+ rel-=: the node HEAD lacks (=node+=) or the worktree lacks
+  (=node-=), or which both have and whose file records a change
+  (=node~=, "modified", on a member, a removed member or a root); the
   relationship to the viewparent that HEAD lacks (=rel+=) or the
   worktree lacks (=rel-=). On an alias, id or flag leaf, the single
   diff object is written =rel+= or =rel-=. A lost alias or ID is a
@@ -1319,19 +1321,22 @@ than =bodyDiff=.
   only. Absent when both signs are none.
 - =(leaves N OBJECT...)= -- on every viewnode that names leaves: the
   OBJECTs a request there may name (=node= and/or =rel= on a vognode
-  or historical phantom, each worth one leaf; =all= on a changed node
-  without a =(presence ...)= part or on a changeset marker; none where
-  a bare request names them), and N, how many leaves a request naming
-  all of them touches. The clients read it to build their requests and
+  or historical phantom, each worth one leaf; =all= on a =node~=
+  vognode, beside =rel= when that names a leaf; =all= on another
+  changed vognode neither of whose objects names a leaf, or on a
+  changeset marker; none where a bare request names them), and N, how
+  many distinct leaves a request naming all of them touches. The clients read it to build their requests and
   to count the leaves an unmark touches; the server's parser accepts
   and ignores it.
-- =(ready OBJECT...)= -- the diff objects (=node=, =rel=) whose
+- =(ready OBJECT...)= -- the diff objects (=node=, =rel=, and =all=
+  on a vognode whose =(leaves ...)= lists it) whose
   change-forest leaves are all marked commit-ready; a bare =(ready)=
   marks a single-object leaf, or a changeset marker, that is ready.
   Absent when nothing is ready.
 - =(readyRequest OBJECT...)= and =(unreadyRequest OBJECT...)= -- ask
   the save to set or clear the marks of those leaves; the object =all=
-  names every leaf of an aggregate, one level down. At most one, and
+  names every leaf a vognode's node records, or every leaf of an
+  aggregate, one level down. At most one, and
   absent when no request is pending.
 
 *** The diff view's viewnodes
@@ -1374,6 +1379,7 @@ in a vognode's =(viewStats ...)= in the skgrepo-changes buffer; see
 Examples:
 #+begin_example
 (skg (node (id 7) (repo main) (diff (presence node+ rel+) (leaves 2 node rel) (ready node))))
+(skg (node (id 8) (repo main) writeProtected (diff (presence node~ rel+) (leaves 3 rel all) (ready all))))
 (skg (node (id 9) (repo main) (affectsParent false) writeProtected (diff (presence rel-) (leaves 1 rel))))
 (skg alias (diff (presence rel+) (leaves 1) (readyRequest)))
 (skg removedAlias (diff (presence rel-) (leaves 1) (ready)))

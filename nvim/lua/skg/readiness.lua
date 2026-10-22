@@ -14,7 +14,6 @@
 local metadata = require('skg.metadata')
 local modify_graph = require('skg.modify_graph')
 local payload = require('skg.payload')
-local picker = require('skg.picker')
 local sexpr = require('skg.sexpr.parse')
 
 local M = {}
@@ -63,13 +62,6 @@ function M.diff_form (metadata_sexp)
   return child_with_head(M.host(metadata_sexp), 'diff')
 end
 
----@param metadata_sexp any
----@return boolean does it hold its change facts in a nested form, as
----a vognode or a phantom does?
-function M.vognode_p (metadata_sexp)
-  return M.host(metadata_sexp) ~= metadata_sexp
-end
-
 ---The (KEY ...) part of METADATA_SEXP's '(diff ...)' form, or nil.
 ---@param metadata_sexp any
 ---@param key string
@@ -106,36 +98,36 @@ function M.leaves (metadata_sexp)
            objects = vim.list_slice(atoms, 2) }
 end
 
----The same, for a headline below the one a gesture acts on: nil when
----its objects include 'all'.
+---The same, for a headline below the one a gesture acts on, without
+---'all': nil when 'all' was its only object.
 ---@param metadata_sexp any
 ---@return table|nil
 function M.leaves_below (metadata_sexp)
   local leaves = M.leaves(metadata_sexp)
-  if leaves and vim.tbl_contains(leaves.objects, 'all') then return nil end
-  return leaves
-end
-
----@param metadata_sexp any
----@return boolean is it a changed node's whose request may name only
----'all'? Its readiness is not drawn.
-function M.aggregate_node_p (metadata_sexp)
-  local leaves = M.leaves(metadata_sexp)
-  return M.vognode_p(metadata_sexp) and leaves ~= nil
-         and #leaves.objects == 1 and leaves.objects[1] == 'all'
+  if not (leaves and vim.tbl_contains(leaves.objects, 'all')) then
+    return leaves end
+  local objects = vim.tbl_filter(function (object)
+    return object ~= 'all' end, leaves.objects)
+  if #objects == 0 then return nil end
+  return { count = #objects, objects = objects }
 end
 
 ---@param metadata_sexp any
 ---@param objects string[]
----@return boolean is every one of OBJECTS ready? 'all' and no object
----at all are ready when '(ready ...)' is there.
+---@return boolean is every one of OBJECTS ready? One is when the
+---headline's '(ready ...)' names it, or is a bare '(ready)', which
+---names the headline's only leaf or aggregate.
 function M.objects_ready_p (metadata_sexp, objects)
   local ready = M.form(metadata_sexp, 'ready')
   if not ready then return false end
   local ready_objects = {}
-  for _, object in ipairs(arguments(ready)) do ready_objects[object] = true end
+  local bare = true
+  for _, object in ipairs(arguments(ready)) do
+    ready_objects[object] = true
+    bare = false
+  end
   for _, object in ipairs(objects) do
-    if object ~= 'all' and not ready_objects[object] then return false end
+    if not bare and not ready_objects[object] then return false end
   end
   return true
 end
@@ -153,12 +145,10 @@ function M.changed_folder_p (metadata_sexp)
 end
 
 ---Whether the headline is ready: a headline that names leaves, on all
----the objects it lists, or a folder that carries (ready). False for an
----aggregate node, whose readiness is not drawn.
+---the objects it lists, or a folder that carries (ready).
 ---@param metadata_sexp any
 ---@return boolean
 function M.ready_p (metadata_sexp)
-  if M.aggregate_node_p(metadata_sexp) then return false end
   local leaves = M.leaves(metadata_sexp)
   if leaves then return M.objects_ready_p(metadata_sexp, leaves.objects) end
   -- A folder's bare '(ready)' stands outside any '(diff ...)'.
@@ -239,22 +229,6 @@ function M.write_request (line_number, ready, objects)
   metadata.edit_metadata_at_line(line_number, instruction)
 end
 
----Whether every child of the headline at LINE_NUMBER that names a
----leaf, or is a changed folder, is ready, and at least one does.
----@param line_number integer
----@return boolean
-function M.children_ready_p (line_number)
-  local some = false
-  for _, line in ipairs(M.child_lines(line_number)) do
-    local child = metadata.metadata_sexp_at_line_or_nil(line)
-    if child and (M.leaves_below(child) or M.changed_folder_p(child)) then
-      some = true
-      if not M.ready_p(child) then return false end
-    end
-  end
-  return some
-end
-
 ---A request on the headline at LINE_NUMBER, with how many leaves it
 ---touches as the server counts them: N of the headline's '(leaves N
 ---OBJECT...)' when OBJECTS are the ones it lists, else one for each of
@@ -277,28 +251,19 @@ end
 -- count }, then writes them all or none.
 
 ---The requests of the one-level gesture on the headline at
----LINE_NUMBER. Empty when the object prompt is dismissed.
+---LINE_NUMBER: on a headline that names leaves, one naming every
+---object it lists.
 ---@param line_number integer
 ---@return table[]
 function M.requests_at_line (line_number)
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
   if not metadata_sexp then return {} end
-  if M.aggregate_node_p(metadata_sexp) then
-    return { M.request_at_line(line_number,
-                               not M.children_ready_p(line_number),
-                               { 'all' }) } end
   local leaves = M.leaves(metadata_sexp)
   if leaves then
-    local chosen = leaves.objects
-    if #chosen > 1 then
-      local object = picker.completing_read_with_cycle(
-        'Which change (node = ∃ its existence, rel = ~ its relationship here)? ',
-        { 'node', 'rel' }, { require_match = true })
-      if object ~= 'node' and object ~= 'rel' then return {} end
-      chosen = { object } end
-    return { M.request_at_line(line_number,
-                               not M.objects_ready_p(metadata_sexp, chosen),
-                               chosen) } end
+    return { M.request_at_line(
+               line_number,
+               not M.objects_ready_p(metadata_sexp, leaves.objects),
+               leaves.objects) } end
   if M.changed_folder_p(metadata_sexp) then
     local ready = not M.ready_p(metadata_sexp)
     local requests = {}
@@ -321,12 +286,7 @@ end
 function M.requests_for_subtree_at_line (line_number)
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
   if not metadata_sexp then return {} end
-  local headline_ready
-  if M.aggregate_node_p(metadata_sexp) then
-    headline_ready = M.children_ready_p(line_number)
-  else
-    headline_ready = M.ready_p(metadata_sexp) end
-  local ready = not headline_ready
+  local ready = not M.ready_p(metadata_sexp)
   local requests = {}
   for _, line in ipairs(M.subtree_lines(line_number)) do
     local headline = metadata.metadata_sexp_at_line_or_nil(line)
@@ -383,10 +343,11 @@ local function write_and_save (requests)
 end
 
 ---Toggle the commit-readiness of the change at point, then save. On a
----headline that names one leaf, toggle it; on a content member that
----names two (∃ and ~), ask which. On a changed folder, toggle each
----leaf one level down; on a changed node, every leaf it owns. Before
----unmarking more than one leaf, ask.
+---headline that names leaves, toggle every object it lists: on a new
+---member its existence and its relationship (∃ and ~), on a modified
+---node (M) every leaf its file records, beside its relationship when
+---that changed. On a changed folder, toggle each leaf one level down.
+---Before unmarking more than one leaf, ask.
 function M.cycle_commit_ready ()
   write_and_save(M.requests_at_line(metadata.current_line_number()))
 end

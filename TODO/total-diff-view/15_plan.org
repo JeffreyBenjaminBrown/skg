@@ -1043,7 +1043,7 @@ readiness tests over the new forms, including a request written into
 a node's nested form and into a property's top-level form; all three
 unit suites and the integration suite.
 
-** TODO Slice 4: the 'M' herald, and one gesture marks the file
+** DONE Slice 4: the 'M' herald, and one gesture marks the file
 Make the changes under "The 'M' herald, and one gesture marks the file"
 above: the sign function and its call sites (roots included), the
 leaves fact, the ready fact and the parser, the herald rules and

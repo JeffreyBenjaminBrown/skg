@@ -807,7 +807,11 @@ relationship it reports carries a *presence*: 'Both', 'OnlyBefore' or
 'OnlyAfter'. A view shows a presence as the atoms of the '(presence
 ...)' part of a headline's '(diff ...)' form: 'node+' and 'node-' on
 the node itself, 'rel+' and 'rel-' on its relationship to its
-viewparent.
+viewparent. The node's atom is its *sign*, which has a third value:
+'node~' (herald M, "modified") on a node in both graphs that records
+at least one change-forest leaf ('GraphStraddle::node_sign'). A
+member, a removed member and a root carry it; a folder's member and a
+phantom never do.
 
 *** diff object, diff aspect
 
@@ -815,9 +819,11 @@ A *diff object* is what a part of a '(diff ...)' form or a readiness request
 names on a headline: the node itself ('node'), or the node's
 relationship to its viewparent ('rel'). There are exactly these two.
 A change-forest leaf about a relationship has the relationship as its
-object, never the member. A readiness request may also say 'all',
-which names every leaf of an aggregate one level down; 'all' is
-request-only shorthand, not a third object. A *diff aspect* is what a
+object, never the member. A request, a '(leaves ...)' fact and a
+'(ready ...)' fact may also say 'all', which names every leaf a
+modified node records (so one gesture on it marks its file), or every
+leaf of an aggregate one level down; 'all' is shorthand, not a third
+object. A *diff aspect* is what a
 change-forest leaf is about: existence, text, home skgrepo, an alias,
 an extra ID, a flag, or relRepo.
 

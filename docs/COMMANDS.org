@@ -598,7 +598,9 @@ marked commit-ready. A mark approves the change as it is now: editing
 the changed thing again makes the mark lapse. Marks live on the
 server, in '<data_root>/readiness-marks.json'. A headline whose
 change is ready shows ✓ after it; an aggregate (a folder of changes,
-a changeset marker) shows ✓ when all of its changes are.
+a changeset marker) shows ✓ when all of its changes are. A node that
+existed at HEAD and whose file records a change shows M ("modified"),
+and M✓ once every change its file records is marked.
 
 After every save of one of the diff view's buffers, the
 minibuffer shows the readiness summary: "12 of 14 changed files are
@@ -611,7 +613,7 @@ integrates them)
 and how many files changed in foreign skgrepos.
 
 A gesture that would unmark more than one change (a recursive one, one
-on a folder of changes, or one on a changed node, which unmarks every
+on a folder of changes, or one on a modified node, which unmarks every
 change the node records) first asks "Unmarking this node commit-ready
 will unmark every contributing decision. You might discard a lot of
 hard-won information. Continue?", and does nothing unless you answer
@@ -621,11 +623,13 @@ many, in its metadata's '(leaves N ...)'.
 *** C-c r r : skg-cycle-commit-ready
 Toggles the commit-readiness of the change at point, then saves.
 On a headline that is one change (an old text, an alias, a move, a
-changeset marker), it toggles that one. On a content member that
-carries two changes (∃, its existence, and ~, its relationship to
-the headline above it), it asks which. On a folder of changes, it
-toggles each change one level down; on a changed node, every change
-the node records.
+changeset marker), it toggles that one. On a headline that carries
+several, it toggles them all: on a new member its existence and its
+relationship to the headline above it (∃ and ~); on a modified node
+(M) every change its file records, and its relationship (~) when that
+changed too, so one gesture marks the whole file. A headline counts
+as ready when every one of its changes is. On a folder of changes, it
+toggles each change one level down.
 
 With a prefix argument (C-u C-c r r), it marks every change in the
 subtree at point, or unmarks them if the headline at point is ready.

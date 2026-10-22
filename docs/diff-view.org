@@ -157,8 +157,9 @@ The skgrepo restriction plays no part, since the diff view requires
 At each editable occurrence's visit, after the content reconciler,
 'process_unrestrictedVognode_changes' draws the node's change
 viewnodes:
-- it tags each content member with the presence of its node and of
-  its relationship ('(presence node+ ...)', '(presence rel- ...)'), and draws a
+- it tags each content member with the sign of its node and the
+  presence of its relationship ('(presence node+ ...)', '(presence
+  node~ ...)', '(presence rel- ...)'), and draws a
   new member outside U as a write-protected member drawn without its
   content (one that was editable when the rerender began stays
   editable);
@@ -179,7 +180,14 @@ changed, since a mention is no leaf.
 A node in U but not in C is context: when completion creates it, its
 body starts folded. A write-protected occurrence gets none of this;
 what an earlier visit drew under it while it was editable goes, and
-its viewparent tags it.
+its viewparent tags it. A root has no viewparent to tag it, so its
+own visit, editable or not, signs its node.
+
+A node's sign is '+' when only the after-graph has it, '-' when only
+the before-graph does, and '~' ("modified", herald M) when both do and
+it records at least one leaf ('GraphStraddle::node_sign', which every
+site that signs a member, a removed member or a root asks). A folder's
+member and a phantom never carry '~'.
 ** What each kind of change looks like
 Every label is a herald rule on a metadata atom; 'docs/heralds.org'
 lists them, and the API doc's "Metadata of the diff view" the atoms.
@@ -191,8 +199,8 @@ holding the line diff when the body changed. The text change is one
 leaf, marked on the old-text headline.
 *** content
 Content has no folder. The members are the node's children, each
-tagged ∃+ / ∃- for its node's presence and ~+ / ~- for its
-relationship's; a removed member stands where it stood (below). The
+tagged ∃+ / ∃- / M for its node's sign and ~+ / ~- for its
+relationship's presence; a removed member stands where it stood (below). The
 content changeset marker, "its content changed", aggregates the
 relationship leaves of the content list.
 *** the in-folders and out-folders
@@ -432,7 +440,10 @@ derived commit-readiness aggregate). An unchanged member has no leaf
 and is never asked. The content changeset marker aggregates the
 content relationship leaves of its node; a member's existence leaf
 belongs to the member's own file. A file whose only change is order
-has no leaf and is ready.
+has no leaf and is ready. A modified node stands for every leaf it
+records, nearly its file (a home skgrepo move and a relRepo move name
+a second file): it shows M✓ when each of those is marked, wherever it
+stands.
 ** Facts on the wire
 A headline's facts and its readiness request form one form, '(diff
 (presence SIGN...) (leaves N OBJECT...) (ready OBJECT...) REQUEST)',
@@ -445,16 +456,18 @@ folder carries no '(diff ...)': its readiness is a bare top-level
 
 The part '(ready OBJECT...)' is a display fact the server writes after
 completion ('set_ready_facts_in_viewforest'): the diff objects
-('node', 'rel') whose leaves are all marked; a bare '(ready)' on a
-headline that names one leaf, or on a ready aggregate. Nothing reads
-it at save.
+('node', 'rel', and on a vognode that lists it 'all') whose leaves are
+all marked; a bare '(ready)' on a headline that names one leaf, or on
+a ready aggregate. Nothing reads it at save.
 
 Before it, a headline that names leaves
-carries the part '(leaves N OBJECT...)': N is the number of leaves a request
-naming every listed object would touch, and the OBJECTs are those a
-request on this headline may name ('node' and/or 'rel' on a vognode or
-phantom, each worth one leaf; 'all' on an aggregate, worth N; none on
-a headline that names exactly one leaf, which a bare request marks).
+carries the part '(leaves N OBJECT...)': N is the number of distinct
+leaves a request naming every listed object would touch, and the
+OBJECTs are those a request on this headline may name ('node' and/or
+'rel' on a vognode or phantom, each worth one leaf; 'all' on a
+modified node, every leaf it records, beside 'rel' when its
+relationship changed; 'all' on an aggregate, worth N; none on a
+headline that names exactly one leaf, which a bare request marks).
 The server's 'leaves_named_at' is the one rule; the fact is
 display-only, and the clients read it instead of keeping tables of
 headline kinds.
@@ -465,17 +478,21 @@ A gesture writes readiness requests, '(readyRequest OBJECTS)' or
 consumes them after its graph edits succeed (not when it stops for a
 confirmation), in any buffer, marking or unmarking the leaves each
 headline names at their current fingerprints. A request naming no
-current change is dropped with a warning. 'all' names every leaf of an
-aggregate one level down.
+current change is dropped with a warning. 'all' names every leaf a
+modified node records, or every leaf of an aggregate one level down.
 
 Every gesture toggles: it unmarks what is ready and marks what is
-not. C-c r r ('skg-cycle-commit-ready') acts on the headline at point:
-one leaf; on a content member with both objects, the one the user
-picks; on an aggregate, its leaves one level down; with a prefix
-argument, every leaf of the subtree. A gesture requests the objects
-that '(leaves ...)' lists, except that below the headline it acts on
-it names no 'all': an aggregate's leaves there are named by the
-headlines under it, or are not shown there. C-c r h
+not, and every headline is ready when its own '(ready ...)' names
+every object its '(leaves ...)' lists. C-c r r
+('skg-cycle-commit-ready') acts on the headline at point, naming every
+object it lists: one leaf; on a new member, its existence and its
+relationship; on a modified node, every leaf it records, and its
+relationship when that changed, so one gesture marks the file; on a
+changed folder, its leaves one level down; with a prefix argument,
+every leaf of the subtree. Below the headline it acts on, a gesture
+names no 'all': the leaves of a modified node or an aggregate there
+are named by the headlines under it, or are not shown there; the
+other objects such a headline lists are named. C-c r h
 ('skg-toggle-homeSkgrepo-move-commitReady') acts on the home skgrepo
 move of the node at point, and with a prefix argument on every
 descendant whose home moved between the same two skgrepos. Both work

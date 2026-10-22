@@ -12,15 +12,19 @@
 ;;; form, beside '(ready ...)'. The OBJECTs
 ;;; are those a request on the headline may name: 'node' (∃, its
 ;;; existence) and/or 'rel' (~, its relationship to its viewparent) on
-;;; a vognode or phantom, each worth one leaf; 'all' on an aggregate (a
-;;; changed node without a '(presence ...)' fact, a changeset marker); none
-;;; on a headline that names one leaf. N is how many leaves a request
-;;; naming every listed object touches. A folder drawn because of a
-;;; change names no leaf itself; a gesture on it acts on its children.
+;;; a vognode or phantom, each worth one leaf; 'all' on a modified node
+;;; (M, every leaf its file records, beside 'rel' when that names a
+;;; leaf) and on an aggregate (a changeset marker); none on a headline
+;;; that names one leaf. N is how many distinct leaves a request naming
+;;; every listed object touches. A gesture names every object the
+;;; headline lists, and toggles by the headline's own '(ready ...)':
+;;; it is ready when that names every listed object. A folder drawn
+;;; because of a change names no leaf itself; a gesture on it acts on
+;;; its children.
 ;;;
 ;;; Below the headline a gesture acts on, it names no 'all': the leaves
-;;; of an aggregate there are named by the headlines under it, or are
-;;; not shown there.
+;;; of a modified node or an aggregate there are named by the headlines
+;;; under it, or are not shown there.
 ;;;
 ;;; It also formats the readiness summary, which the save, stage-and-
 ;;; commit and integrate-unshown-changes show.
@@ -43,13 +47,14 @@
 
 (defun skg-cycle-commit-ready (&optional recursive)
   "Toggle the commit-readiness of the change at point, then save.
-On a headline that names one leaf, toggle it; on a content member
-that names two (∃ and ~), ask which. On a changed folder, toggle
-each leaf one level down; on a changed node, every leaf it owns.
-With a prefix argument RECURSIVE, mark (or, if the headline at point
-is ready, unmark) every leaf named in the subtree at point. Before
-unmarking more than one leaf, ask. Works on write-protected
-occurrences too."
+On a headline that names leaves, toggle every object it lists: on a
+new member its existence and its relationship (∃ and ~), on a
+modified node (M) every leaf its file records, beside its
+relationship when that changed. On a changed folder, toggle each
+leaf one level down. With a prefix argument RECURSIVE, mark (or, if
+the headline at point is ready, unmark) every leaf named in the
+subtree at point. Before unmarking more than one leaf, ask. Works on
+write-protected occurrences too."
   (interactive "P")
   (unless (org-at-heading-p)
     (user-error "Not on a headline"))
@@ -111,11 +116,6 @@ phantom's does, if one does, else the whole sexp, as a property's."
   "The '(diff ...)' form of METADATA-SEXP, or nil."
   (assq 'diff (cdr (skg--readiness-host metadata-sexp))))
 
-(defun skg--readiness-vognode-p (metadata-sexp)
-  "Non-nil when METADATA-SEXP holds its change facts in a nested form,
-as a vognode or a phantom does."
-  (not (eq (skg--readiness-host metadata-sexp) metadata-sexp)))
-
 (defun skg--readiness-form (metadata-sexp key)
   "The (KEY ...) part of METADATA-SEXP's '(diff ...)' form, or nil."
   (assq key (cdr (skg--readiness-diff-form metadata-sexp))))
@@ -126,25 +126,23 @@ as (N . OBJECTS), or nil when it names no leaf."
   (cdr (skg--readiness-form metadata-sexp 'leaves)))
 
 (defun skg--readiness-leaves-below (metadata-sexp)
-  "The same, for a headline below the one a gesture acts on: nil when
-its OBJECTS include `all'."
+  "The same, for a headline below the one a gesture acts on, without
+`all': nil when `all' was its only object."
   (let ((leaves (skg--readiness-leaves metadata-sexp)))
-    (unless (memq 'all (cdr leaves))
-      leaves)))
-
-(defun skg--readiness-aggregate-node-p (metadata-sexp)
-  "Non-nil when METADATA-SEXP is a changed node's whose request may
-name only `all'. Its readiness is not drawn."
-  (and (skg--readiness-vognode-p metadata-sexp)
-       (equal (cdr (skg--readiness-leaves metadata-sexp)) '(all))))
+    (if (not (memq 'all (cdr leaves)))
+        leaves
+      (let ((objects (remq 'all (cdr leaves))))
+        (when objects
+          (cons (length objects) objects))))))
 
 (defun skg--readiness-objects-ready-p (metadata-sexp objects)
-  "Non-nil when every one of OBJECTS is ready on METADATA-SEXP's headline.
-`all' and no object at all are ready when '(ready ...)' is there."
+  "Non-nil when every one of OBJECTS is ready on METADATA-SEXP's headline:
+when its '(ready ...)' names it, or is a bare '(ready)', which names
+the headline's only leaf or aggregate."
   (let ((ready (skg--readiness-form metadata-sexp 'ready)))
     (and ready
          (seq-every-p (lambda (object)
-                        (or (eq object 'all) (memq object (cdr ready))))
+                        (or (null (cdr ready)) (memq object (cdr ready))))
                       objects))))
 
 (defun skg--readiness-changed-folder-p (metadata-sexp)
@@ -158,11 +156,9 @@ name only `all'. Its readiness is not drawn."
 (defun skg--readiness-ready-p (metadata-sexp)
   "Non-nil when the headline with METADATA-SEXP is ready: a headline
 that names leaves, on all the objects it lists, or a folder that
-carries (ready). Nil for an aggregate node, whose readiness is not
-drawn."
+carries (ready)."
   (let ((leaves (skg--readiness-leaves metadata-sexp)))
-    (cond ((skg--readiness-aggregate-node-p metadata-sexp) nil)
-          (leaves (skg--readiness-objects-ready-p metadata-sexp (cdr leaves)))
+    (cond (leaves (skg--readiness-objects-ready-p metadata-sexp (cdr leaves)))
           ((skg--readiness-changed-folder-p metadata-sexp)
            ;; A folder's bare '(ready)' stands outside any '(diff ...)'.
            (assq 'ready (cdr metadata-sexp))))))
@@ -232,16 +228,10 @@ in buffer order."
   (let* ((metadata-sexp (skg--current-headline-metadata-sexp))
          (leaves (skg--readiness-leaves metadata-sexp)))
     (cond
-     ((skg--readiness-aggregate-node-p metadata-sexp)
-      (list (skg--readiness-request-here
-             (not (skg--readiness-children-ready-p)) '(all))))
      (leaves
-      (let ((chosen (if (cddr leaves)
-                        (list (skg--readiness-ask-object))
-                      (cdr leaves))))
-        (list (skg--readiness-request-here
-               (not (skg--readiness-objects-ready-p metadata-sexp chosen))
-               chosen))))
+      (list (skg--readiness-request-here
+             (not (skg--readiness-objects-ready-p metadata-sexp (cdr leaves)))
+             (cdr leaves))))
      ((skg--readiness-changed-folder-p metadata-sexp)
       (let ((ready (not (skg--readiness-ready-p metadata-sexp))))
         (skg--readiness-do-children
@@ -256,9 +246,7 @@ on every headline in the subtree that names leaves, readying them
 unless the headline at point is ready."
   (let* ((metadata-sexp (skg--current-headline-metadata-sexp))
          (root (line-beginning-position))
-         (ready (not (if (skg--readiness-aggregate-node-p metadata-sexp)
-                         (save-excursion (skg--readiness-children-ready-p))
-                       (skg--readiness-ready-p metadata-sexp)))))
+         (ready (not (skg--readiness-ready-p metadata-sexp))))
     (skg--readiness-walk-subtree
      (lambda (headline-sexp)
        (let ((leaves (if (= (line-beginning-position) root)
@@ -299,27 +287,6 @@ On refusal, write nothing and return nil."
           (skg--write-readiness-request (nth 1 request) (nth 2 request)))
         (set-marker (car request) nil)))
     confirmed))
-
-(defun skg--readiness-children-ready-p ()
-  "Non-nil when every child of the headline at point that names a
-leaf, or is a changed folder, is ready, and at least one does."
-  (let ((some nil)
-        (all t))
-    (save-excursion
-      (skg--readiness-do-children
-       (lambda (child-sexp)
-         (when (or (skg--readiness-leaves-below child-sexp)
-                   (skg--readiness-changed-folder-p child-sexp))
-           (setq some t)
-           (unless (skg--readiness-ready-p child-sexp)
-             (setq all nil))))))
-    (and some all)))
-
-(defun skg--readiness-ask-object ()
-  "Ask which of a content member's two changes to toggle."
-  (intern (completing-read
-           "Which change (node = ∃ its existence, rel = ~ its relationship here)? "
-           '("node" "rel") nil t)))
 
 (defun skg--write-readiness-request (ready objects)
   "Replace the readiness request of the headline at point with one

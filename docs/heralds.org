@@ -189,19 +189,24 @@ viewnode whose node was deleted.
 ** Diff heralds
 In the diff view (see the glossary's "Terms of the diff
 view"), a vognode's =∃+= or =∃-= says that HEAD lacks it or the
-worktree does, and =~+= or =~-= the same of its relationship to its
-viewparent. On an alias, ID or flag entry, which has one diff object,
-the same facts read =+= and =-=; a deleted phantom's one object reads
-=∃+= or =∃-=, and an unknown phantom's =~+= or =~-=. A =✓= after a diff object's facts
-says its changes are marked commit-ready, so =∃+✓ ~+= is a new node,
-approved, in a new relationship that is not. An aggregate (a folder or changeset marker)
-shows a =✓= when everything under it is ready. =request:ready= and
+worktree does, its =M= ("modified") that both have it and its file
+records a change, and =~+= or =~-= that HEAD or the worktree lacks its
+relationship to its viewparent. =M= stands where =∃= stands: a node
+is new, deleted or modified, never two of those. On an alias, ID or
+flag entry, which has one diff object, the same facts read =+= and
+=-=; a deleted phantom's one object reads =∃+= or =∃-=, and an unknown
+phantom's =~+= or =~-=. A =✓= after a diff object's facts says its
+changes are marked commit-ready, so =∃+✓ ~+= is a new node, approved,
+in a new relationship that is not; =M✓= is a modified node every
+change of whose file is marked. An aggregate (a folder or changeset
+marker) shows a =✓= when everything under it is ready. =request:ready= and
 =request:unready=, with =:node=, =:rel= or =:all=, are pending readiness
 requests, consumed by the next save.
 
 These heralds render the headline's one =(diff ...)= form (see
 'docs/api-and-formats.org', "Facts and requests"): the signs come
-from its =(presence ...)= part, each =✓= from its =(ready ...)= part,
+from its =(presence ...)= part, each =✓= from its =(ready ...)= part
+(=M='s from =all= there),
 and the request from its last part; its =(leaves ...)= part shows
 nothing. A changed folder's =✓= comes from its bare top-level
 =(ready)=. The rules match each part once per diff object, so a =✓=
