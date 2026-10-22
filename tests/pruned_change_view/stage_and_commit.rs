@@ -224,7 +224,7 @@ fn a_request_without_changes_commits_nothing (
 /// changes" buffer is rerendered in the rerender stream that follows:
 /// its roots remain, and carry no change facts.
 #[test]
-fn a_confirmed_resend_commits_and_redraws_the_open_buffers (
+fn a_confirmed_resend_commits_and_rerenders_the_open_buffers (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &SKGREPOS, |f| {
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);

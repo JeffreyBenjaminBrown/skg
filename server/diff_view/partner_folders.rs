@@ -10,7 +10,7 @@ use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::diff_view::change_viewnodes::{
   mk_historical_viewnode, mk_relRepo_move_viewnode};
 use crate::diff_view::shallow_model_subtree::{
-  is_drawn_by_the_diff_view,
+  is_the_diffViews_viewnode,
   reconcile_children_with_shallowModelSubtree};
 use crate::graph_straddle::types::{GraphStraddle, Partner, Presence};
 use crate::to_org::complete::partner_folder::child_data::{
@@ -163,7 +163,7 @@ fn attach_memberRoleTrees_under_straddle_folder_members (
           &runtime . config, None, RoleTreePartners::GraphStraddle (straddle) ) ?; }}
     let kept : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
       tree, member, &model, model_member, &straddle . after,
-      &|viewnode| is_drawn_by_the_diff_view (viewnode, false, &straddle . after),
+      &|viewnode| is_the_diffViews_viewnode (viewnode, false, &straddle . after),
       &|_| true ) ?;
     arrange_last_children (tree, member, &kept) ?; }
   Ok (( )) }

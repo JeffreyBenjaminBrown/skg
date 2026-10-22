@@ -131,7 +131,7 @@ fn deleted_images_of_removed_members_respawn (
 /// disk, and the reconciled buffer draws it as new, in a new
 /// relationship.
 #[test]
-fn a_new_child_is_created_and_drawn_as_new (
+fn a_new_child_is_created_and_shown_as_new (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;

@@ -6,7 +6,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::to_org::extend::editable::{ apply_editable_draw_rule, apply_writeProtect_request, DrawOutcome};
+use crate::to_org::extend::editable::{ apply_editability_rule, apply_writeProtect_request, EditabilityOutcome};
 use crate::to_org::util::EditableMap;
 use crate::types::env::RuntimeGeneration;
 use crate::types::misc::{ID, SkgrepoName};
@@ -432,14 +432,14 @@ fn update_normal_node (
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
     settled = true;
   } else if had_editableViewRequest {
-    match apply_editable_draw_rule (
+    match apply_editability_rule (
       tree, treeid, &context . runtime . graph,
       &context . runtime . config, context . editable_map ) ? {
-      DrawOutcome::Deferred => {
+      EditabilityOutcome::Deferred => {
         // Deferred to an existing Final occurrence: the node is now
         // write-protected; the content engine (settled) will clobber+return.
         settled = true; }
-      DrawOutcome::MadeFinal => {
+      EditabilityOutcome::MadeFinal => {
         settled = true; cascade = true; } } }
   settings . align_content_members_before_extension (tree, treeid) ?;
   extend_true_content_at_unrestrictedVognode (
@@ -470,7 +470,7 @@ fn update_normal_node (
       &context . runtime . config,
       context . skgrepo_restriction ) ?; }
   // Remaining view requests (Aliases / Containerward / Mentionerward); the
-  // Editable request was already consumed by apply_editable_draw_rule.
+  // Editable request was already consumed by apply_editability_rule.
   super::reconcile::view_requests::execute_unrestrictedVognode_view_requests (
     treeid, tree, &context . runtime . graph,
     &context . runtime . config,

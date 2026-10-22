@@ -7,7 +7,7 @@ use crate::diff_view::change_leaves::readiness_response_sexp;
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::diff_view::pruned_change_view::{
-  DrawnDiffViewBuffer, diffView_buffer_viewforest,
+  RenderedDiffViewBuffer, diffView_buffer_viewforest,
   prunedChangeView_sets_of_buffer};
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
@@ -37,7 +37,7 @@ pub fn handle_diffView_request (
   skgrepo_restriction : &SkgrepoRestriction,
 ) {
   let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
-  let response : Result<(Option<DrawnDiffViewBuffer>, DiffViewBufferKind, ViewId), String> =
+  let response : Result<(Option<RenderedDiffViewBuffer>, DiffViewBufferKind, ViewId), String> =
     ( || {
       require_skgrepo_set_all ("The diff view", skgrepo_restriction) ?;
       let view_id : ViewId = view_id_from_request (request) ?;
@@ -51,7 +51,7 @@ pub fn handle_diffView_request (
         . map_err ( |e| format! ( "Cannot open the diff view: {}", e )) ?;
       let store : MutexGuard<ReadinessStore> =
         env . runtime . lock_readiness_store ();
-      let buffer : Option<DrawnDiffViewBuffer> =
+      let buffer : Option<RenderedDiffViewBuffer> =
         diffView_buffer (&runtime, &straddle, &store, diffView_buffer_kind)
         . map_err ( |e| format! ( "Error generating the diff view: {}", e )) ?;
       Ok (( buffer, diffView_buffer_kind, view_id )) } ) ();
@@ -61,7 +61,7 @@ pub fn handle_diffView_request (
     Ok (( None, _, _ )) =>
       sexp_to_client_string ( &readiness_response_sexp (
         vec! [ true_entry_sexp ("empty") ], None, &[], &[] )),
-    Ok (( Some (DrawnDiffViewBuffer { text, pids, viewforest }),
+    Ok (( Some (RenderedDiffViewBuffer { text, pids, viewforest }),
           diffView_buffer_kind, view_id )) => {
       views_state . open_views . register_diffView_view (
         &runtime . graph, view_id, viewforest, &pids, diffView_buffer_kind );
@@ -80,7 +80,7 @@ pub fn diffView_buffer (
   straddle             : &GraphStraddle,
   store                : &ReadinessStore,
   diffView_buffer_kind : DiffViewBufferKind,
-) -> Result<Option<DrawnDiffViewBuffer>, Box<dyn std::error::Error>> {
+) -> Result<Option<RenderedDiffViewBuffer>, Box<dyn std::error::Error>> {
   let roots : Vec<ID> = match diffView_buffer_kind {
     DiffViewBufferKind::OrderOnlyChanges =>
       straddle . order_only_pids () . iter () . cloned () . collect (),

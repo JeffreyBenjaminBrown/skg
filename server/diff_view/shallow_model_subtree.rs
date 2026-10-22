@@ -81,7 +81,7 @@ fn property_kind (
 /// the children of 'model_parent' in 'model'. A kept child whose
 /// model twin 'descend' selects has its own children reconciled the
 /// same way, every keyed child but the user's managed
-/// ('is_drawn_by_the_diff_view'), and ordered as the shallow model subtree
+/// ('is_the_diffViews_viewnode'), and ordered as the shallow model subtree
 /// orders them. Returns the kept and created children, in
 /// the shallow model subtree's order; where they stand among the others is
 /// the caller's to decide. 'graph' is the live graph ('match_key').
@@ -124,7 +124,7 @@ pub fn reconcile_children_with_shallowModelSubtree (
             is_folder ( tree . get (existing) . unwrap () . value () );
           let kept : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
             tree, existing, model, model_child, graph,
-            &|viewnode| is_drawn_by_the_diff_view (viewnode, parent_is_a_folder, graph),
+            &|viewnode| is_the_diffViews_viewnode (viewnode, parent_is_a_folder, graph),
             descend ) ?;
           arrange_last_children (tree, existing, &kept) ?; }
         result . push (existing); },
@@ -184,7 +184,7 @@ pub fn is_the_users_viewnode (
 /// historical phantom: every viewnode with a match key except the
 /// user's, which stays where it stands. 'parent_is_a_folder' is
 /// whether its parent is a folder.
-pub fn is_drawn_by_the_diff_view (
+pub fn is_the_diffViews_viewnode (
   viewnode           : &Viewnode,
   parent_is_a_folder : bool,
   graph              : &InRustGraph,

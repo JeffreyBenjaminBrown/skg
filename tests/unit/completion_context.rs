@@ -89,7 +89,7 @@ fn for_content_view_gives_render_initial_views_settings () {
     editable_before_completion     : HashSet::new (), } ); }
 
 #[test]
-fn for_diffView_gives_the_first_drawings_settings () {
+fn for_diffView_gives_the_first_renderings_settings () {
   let runtime : RuntimeGeneration = runtime ();
   let graph_snap : Arc<InRustGraph> = runtime . graph . clone ();
   let straddle : GraphStraddle = straddle ();

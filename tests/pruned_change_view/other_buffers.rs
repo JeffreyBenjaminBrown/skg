@@ -116,7 +116,7 @@ fn the_skgrepo_changes_sets_hold_the_recorder_of_a_relRepo_move (
     Ok (( )) }) }
 
 #[test]
-fn the_skgrepo_changes_buffer_draws_the_recorder_of_a_relRepo_move (
+fn the_skgrepo_changes_buffer_shows_the_recorder_of_a_relRepo_move (
 ) -> Result<(), Box<dyn Error>> {
   let text : String =
     buffer_of_case ("kinds", DiffViewBufferKind::SkgrepoChanges) ?;
@@ -132,7 +132,7 @@ fn the_skgrepo_changes_buffer_draws_the_recorder_of_a_relRepo_move (
   Ok (( )) }
 
 #[test]
-fn the_merges_buffer_draws_only_the_merge (
+fn the_merges_buffer_shows_only_the_merge (
 ) -> Result<(), Box<dyn Error>> {
   let text : String = buffer (DiffViewBufferKind::Merges) ?;
   let roots : Vec<&str> = roots (&text);

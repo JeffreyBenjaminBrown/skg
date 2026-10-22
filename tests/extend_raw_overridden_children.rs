@@ -20,7 +20,7 @@ use ego_tree::Tree;
 use skg::types::viewnode::Viewnode;
 
 #[test]
-fn raw_drawn_overridden_root_children_are_raw
+fn raw_shown_overridden_root_children_are_raw
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
     "skg-test-extend-raw-overridden-children",

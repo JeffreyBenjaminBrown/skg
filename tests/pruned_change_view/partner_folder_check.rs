@@ -35,7 +35,7 @@ fn with_subscribee_folder_under_recorder (
 /// as an unknown phantom with its raw ID: the folder says what the
 /// graph says, and the buffer saves.
 #[test]
-fn a_member_drawn_by_an_extra_id_and_an_unknown_member_pass (
+fn a_member_shown_by_an_extra_id_and_an_unknown_member_pass (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("partner_ids", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;

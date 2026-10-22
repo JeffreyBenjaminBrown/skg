@@ -572,7 +572,7 @@ mod tests {
   /// matches it ('skgid_a_folder_child_stands_for'): by the pid the
   /// graph resolves its ID to.
   #[test]
-  fn a_member_drawn_by_an_extra_id_passes_when_the_graph_lists_the_extra_id () {
+  fn a_member_shown_by_an_extra_id_passes_when_the_graph_lists_the_extra_id () {
     let graph : InRustGraph = graph_listing_an_extra_id_and_a_dangling_id ();
     for drawn in ["x2", "x"] {
       let text : String = format! (

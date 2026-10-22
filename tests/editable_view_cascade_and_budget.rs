@@ -136,12 +136,12 @@ fn writeProtect_and_editable_requests_move_editability_and_back (
     |config, tantivy| Box::pin ( test_writeProtect_and_editable_requests_move_editability_and_back (config, tantivy) )) }
 
 #[test]
-fn parked_content_node_is_drawn_once (
+fn parked_content_node_is_shown_once (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
-    "skg-test-evcb-parked-content-node-is-drawn-once", FIXTURES,
-    "/tmp/tantivy-test-evcb-parked-content-node-is-drawn-once",
-    |config, tantivy| Box::pin ( test_parked_content_node_is_drawn_once (config, tantivy) )) }
+    "skg-test-evcb-parked-content-node-is-shown-once", FIXTURES,
+    "/tmp/tantivy-test-evcb-parked-content-node-is-shown-once",
+    |config, tantivy| Box::pin ( test_parked_content_node_is_shown_once (config, tantivy) )) }
 
 #[test]
 fn budget_aliasfolder_is_neutral (
@@ -1101,7 +1101,7 @@ async fn test_writeProtect_and_editable_requests_move_editability_and_back (
 // save of another view of 1 puts 13 back in 1's content. The first
 // view, rerendered as collateral, adopts the parked 13 as 1's member
 // instead of drawing a second 13 beside it.
-async fn test_parked_content_node_is_drawn_once (
+async fn test_parked_content_node_is_shown_once (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {

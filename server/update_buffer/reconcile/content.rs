@@ -52,13 +52,13 @@ struct ChildData {
   /// '(overridesHere goal-id)', in place of the goal member. The
   /// title/repo/body above are then R's. Only ContentReality::Real
   /// children substitute.
-  drawn_skgid : Option<ID>,
+  shown_skgid : Option<ID>,
 }
 
 /// UnrestrictedVognode content reconcile + content-child creation, for one node, in the
 /// level-order BFS visit. View completion (dispatch_node_update)
 /// settles the node's
-/// Finalizable state *before* calling this (via 'apply_editable_draw_rule')
+/// Finalizable state *before* calling this (via 'apply_editability_rule')
 /// and passes:
 /// - `settled`: the draw rule (see 'to_org/extend/editable.rs') already ran for this node (it carried a
 ///   ViewRequest::Editable), so its map entry and write-protected/def are already
@@ -92,7 +92,7 @@ pub fn extend_true_content_at_unrestrictedVognode (
                                 ViewnodeKind::Vognode (Vognode::Unrestricted (_))),
     "extend_true_content_at_unrestrictedVognode: expected Unrestricted vognode" ) ?;
   if ! settled {
-    // A EVR node was already resolved by apply_editable_draw_rule; running
+    // A EVR node was already resolved by apply_editability_rule; running
     // the dedup here would write-protect it against its own (just-inserted)
     // map entry. Ordinary nodes still dedup first-wins (Tentative).
     make_writeProtected_if_repeat_then_extend_editable_map(
@@ -259,7 +259,7 @@ fn reconcile_content_children (
     // substitution resumes there (matching the overridden-as-such
     // precedent).
     substitution_enabled
-    && ! is_overridden_drawn_raw (tree, node, config, graph_snap) ?;
+    && ! is_overridden_shown_raw (tree, node, config, graph_snap) ?;
   if substitute_existing_content_overrides {
     replace_raw_content_children_with_visible_overriders (
       tree, node, config, graph_snap, skgrepo_restriction,
@@ -433,14 +433,14 @@ pub(in crate::update_buffer) fn mutate_unrestrictedVognode_to_deletednode (
 /// - A node carrying an 'overridesHere' fact is a substitute, not a
 ///   raw original, so it is excluded (its children substitute as
 ///   usual).
-fn is_overridden_drawn_raw (
+fn is_overridden_shown_raw (
   tree       : &Tree<Viewnode>,
   node       : NodeId,
   config     : &SkgConfig,
   graph_snap : &Arc<InRustGraph>,
 ) -> Result<bool, Box<dyn Error>> {
   let in_raw_position : bool = {
-    let affects_parent_raw_drawing_folder : bool =
+    let affects_parent_raw_showing_folder : bool =
       read_at_ancestor_in_tree( tree, node, 1,
         |vn : &Viewnode| match &vn . kind {
           ViewnodeKind::PartnerFolder (pc)
@@ -455,7 +455,7 @@ fn is_overridden_drawn_raw (
         |vn : &Viewnode| matches!( &vn . kind,
           ViewnodeKind::BufferRoot ))
       . unwrap_or (false);
-    affects_parent_raw_drawing_folder || is_view_root };
+    affects_parent_raw_showing_folder || is_view_root };
   if ! in_raw_position { return Ok (false); }
   let (skgid, has_overridesHere) : (Option<ID>, bool) =
     read_at_node_in_tree( tree, node,
@@ -629,7 +629,7 @@ fn complete_content_children (
         skgid . 0 )) ?;
       Ok ( match d . kind {
         ContentReality::Real =>
-          match &d . drawn_skgid {
+          match &d . shown_skgid {
             None =>
               mk_editable_viewnode(
                 skgid . clone(), d . home_skgrepo . clone(),
@@ -843,7 +843,7 @@ fn build_child_creation_data (
                         kind         : ContentReality::Unknown,
                         relRepo:
                           unresolved_relRepos . get (skgid) . cloned (),
-                        drawn_skgid : None } );
+                        shown_skgid : None } );
           continue; } };
     if skgrepo_restriction
       . is_some_and ( |restriction| !restriction . contains_skgrepo (&child_skgrepo) )
@@ -857,9 +857,9 @@ fn build_child_creation_data (
                                  body: None,
                                  kind: ContentReality::Restricted,
                                  relRepo: None,
-                                 drawn_skgid : None } );
+                                 shown_skgid : None } );
       continue; }
-    let drawn_skgid : Option<ID> =
+    let shown_skgid : Option<ID> =
       if substitution_enabled {
         let resolution : OverrideResolution =
           resolve_override (
@@ -871,8 +871,8 @@ fn build_child_creation_data (
           Some ( resolution . effective )
         } else { None }
       } else { None };
-    let fetch_skgid : &ID = drawn_skgid . as_ref () . unwrap_or (skgid);
-    let fetch_skgrepo : SkgrepoName = match &drawn_skgid {
+    let fetch_skgid : &ID = shown_skgid . as_ref () . unwrap_or (skgid);
+    let fetch_skgrepo : SkgrepoName = match &shown_skgid {
       None => child_skgrepo,
       Some (drawn) =>
         // The overrider is owned and unrestricted (the resolver's
@@ -891,7 +891,7 @@ fn build_child_creation_data (
                                body: skg . body . clone(),
                                kind: ContentReality::Real,
                                relRepo: None,
-                               drawn_skgid } ); }
+                               shown_skgid } ); }
   Ok (result) }
 
 #[cfg(test)]

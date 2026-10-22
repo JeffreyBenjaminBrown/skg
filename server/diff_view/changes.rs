@@ -40,7 +40,7 @@ use crate::diff_view::change_viewnodes::{
   mk_changeset_marker_viewnode, mk_historical_viewnode, mk_homeSkgrepoMove_viewnode,
   mk_relRepo_move_viewnode, mk_removed_member_viewnode};
 use crate::diff_view::shallow_model_subtree::{
-  adopt_model_facts, is_drawn_by_the_diff_view,
+  adopt_model_facts, is_the_diffViews_viewnode,
   is_unrestricted_removed_member, reconcile_children_with_shallowModelSubtree};
 use crate::types::git::Sign;
 use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
@@ -326,27 +326,27 @@ pub(crate) fn process_historical_phantom_visit (
       let empty : Tree<Viewnode> = Tree::new (model_root ());
       reconcile_children_with_shallowModelSubtree (
         tree, treeid, &empty, empty . root () . id (), &straddle . after,
-        &|viewnode| is_drawn_by_the_diff_view (viewnode, false, &straddle . after),
+        &|viewnode| is_the_diffViews_viewnode (viewnode, false, &straddle . after),
         &|_| false ) ?;
       return Ok (HistoricalPhantomVisit::Done); };
   if at_root {
     adopt_model_facts (
       tree . get_mut (treeid) . unwrap () . value (), &model_phantom ); }
   if ! in_content_position { return Ok (HistoricalPhantomVisit::Done); }
-  let drawn_above_itself : bool =
+  let standing_above_itself : bool =
     tree . get (treeid) . unwrap () . ancestors ()
     . any ( |ancestor| matches! ( &ancestor . value () . kind,
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))
         if h . skgid == skgid ));
   let mut model : Tree<Viewnode> = Tree::new (model_root ());
-  if ! drawn_above_itself {
+  if ! standing_above_itself {
     let root : NodeId = model . root () . id ();
     append_historical_phantom_content (
       &mut model, root, straddle, &skgid,
       & prunedChangeView_sets_of_buffer (straddle, diffView_buffer_kind) . u ); }
   let kept : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
     tree, treeid, &model, model . root () . id (), &straddle . after,
-    &|viewnode| is_drawn_by_the_diff_view (viewnode, false, &straddle . after),
+    &|viewnode| is_the_diffViews_viewnode (viewnode, false, &straddle . after),
     &|viewnode| ! matches! ( viewnode . kind, ViewnodeKind::Vognode (_) )) ?;
   arrange_last_children (tree, treeid, &kept) ?;
   Ok (HistoricalPhantomVisit::Done) }

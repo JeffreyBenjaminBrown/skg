@@ -240,7 +240,7 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
     |skgid : &ID| {
       let item : &FolderGoalItem = items_by_skgid . get (skgid) . ok_or_else (
         || format! ( "{}: no goal item for {}", label, skgid . 0 )) ?;
-      drawing_of_goal_item (item, child_data, label) },
+      viewnode_of_goal_item (item, child_data, label) },
   ) ?;
   apply_goal_shapes (
     tree, folder_node, &items_by_skgid, child_data, graph, label ) ?;
@@ -250,7 +250,7 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
 
 /// How a goal item is drawn when no child matches it. See
 /// 'FolderGoalShape'.
-fn drawing_of_goal_item (
+fn viewnode_of_goal_item (
   item       : &FolderGoalItem,
   child_data : &HashMap<ID, ChildData>,
   label      : &str,
@@ -313,7 +313,7 @@ fn apply_goal_shapes (
           t . affectsParent = AffectsParent::False;
           t . write_protect (); }},
       _ => adopt_model_facts (
-        viewnode, &drawing_of_goal_item (item, child_data, label) ? ), }
+        viewnode, &viewnode_of_goal_item (item, child_data, label) ? ), }
     if let Some (presence) = item . presence {
       viewnode . change_facts . presence = presence; }}
   Ok (( )) }
@@ -373,7 +373,7 @@ mod tests {
   /// reconciler keeps it for the goal item x, as the save's
   /// write-protected-occurrence check counts it as x.
   #[test]
-  fn a_member_drawn_by_an_extra_id_is_kept_for_its_node () {
+  fn a_member_shown_by_an_extra_id_is_kept_for_its_node () {
     let graph : InRustGraph = InRustGraph::from_graphnodes (&[
       crate::types::nodes::complete::Graphnode {
         pid          : skgid ("x"),

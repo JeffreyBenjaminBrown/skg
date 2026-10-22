@@ -589,7 +589,7 @@ mod tests {
   }
 
   #[test]
-  fn only_links_to_documents_draw_path_warnings () {
+  fn only_links_to_documents_raise_path_warnings () {
     let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
     fs::create_dir (temp . path () . join ("assets")) . unwrap ();
     fs::write (temp . path () . join ("assets/chart.png"), "data") . unwrap ();

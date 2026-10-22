@@ -230,7 +230,7 @@ fn save_deleting (
 /// in the changed container folder of what it contained. Where it
 /// stood, its viewnode stays, with its folded body.
 #[test]
-fn a_member_deleted_in_the_buffer_is_redrawn_as_removed (
+fn a_member_deleted_in_the_buffer_is_rerendered_as_removed (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("sets", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
@@ -246,7 +246,7 @@ fn a_member_deleted_in_the_buffer_is_redrawn_as_removed (
     Ok (( )) }) }
 
 #[test]
-fn a_root_deleted_in_the_buffer_is_redrawn_as_removed (
+fn a_root_deleted_in_the_buffer_is_rerendered_as_removed (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;

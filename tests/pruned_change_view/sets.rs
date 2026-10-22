@@ -68,7 +68,7 @@ fn a_deleted_subtree_is_reached_through_its_former_containers (
   Ok (( )) }
 
 #[test]
-fn an_in_changed_only_change_is_drawn_under_its_new_container (
+fn an_in_changed_only_change_is_shown_under_its_new_container (
 ) -> Result<(), Box<dyn Error>> {
   let sets : PrunedChangeViewSets = sets_fixture_sets () ?;
   // lo has two containers in the union, so it is an origin; ln, a

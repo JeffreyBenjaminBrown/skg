@@ -80,7 +80,7 @@ fn a_multiply_contained_root_gets_a_folded_container_folder (
   Ok (( )) }
 
 #[test]
-fn a_deleted_subtree_is_drawn_where_it_stood (
+fn a_deleted_subtree_is_shown_where_it_stood (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &sets_buffer () ?, &[
     "* (skg (node (id r)",
@@ -113,7 +113,7 @@ fn a_text_change_shows_the_old_text_and_its_body_diff (
   Ok (( )) }
 
 #[test]
-fn a_content_change_tags_the_members_and_draws_the_removed_one (
+fn a_content_change_tags_the_members_and_shows_the_removed_one (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &kinds_buffer () ?, &[
     "* (skg (node (id ct)",
@@ -178,7 +178,7 @@ fn a_subscription_change_shows_on_both_sides (
   Ok (( )) }
 
 #[test]
-fn home_and_relRepo_moves_are_drawn (
+fn home_and_relRepo_moves_are_shown (
 ) -> Result<(), Box<dyn Error>> {
   let buffer : String = kinds_buffer () ?;
   assert_lines_in_order ( &buffer, &[
@@ -192,7 +192,7 @@ fn home_and_relRepo_moves_are_drawn (
   Ok (( )) }
 
 #[test]
-fn a_node_merge_draws_both_acquisition_folders (
+fn a_node_merge_shows_both_acquisition_folders (
 ) -> Result<(), Box<dyn Error>> {
   let buffer : String = kinds_buffer () ?;
   assert_lines_in_order ( &buffer, &[
@@ -227,7 +227,7 @@ fn marks_in_the_store_show_as_ready (
     Ok (( )) }) }
 
 #[test]
-fn a_deleted_subscriber_is_drawn_in_the_changed_subscriber_folder (
+fn a_deleted_subscriber_is_shown_in_the_changed_subscriber_folder (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &kinds_buffer () ?, &[
     "* (skg (node (id orph)",
@@ -261,7 +261,7 @@ fn removed_partners_buffer (
 /// x's container folder draws b, the container it lost, between the
 /// two it kept, as a removed member: a non-member with '(diff (presence rel-))'.
 #[test]
-fn a_removed_container_is_drawn_between_the_kept_ones (
+fn a_removed_container_stands_between_the_kept_ones (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &removed_partners_buffer () ?, &[
     "** (skg (node (id x) (repo main) (affectsParent false) (rels",
@@ -364,7 +364,7 @@ fn a_removed_member_editable_before_a_save_stays_editable_after_it (
 /// s's subscribee folder draws s2, the subscribee it lost, where it
 /// stood in s's list, not after the subscribees it kept.
 #[test]
-fn a_removed_subscribee_is_drawn_where_it_stood (
+fn a_removed_subscribee_is_shown_where_it_stood (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &removed_partners_buffer () ?, &[
     "* (skg (node (id s)",
@@ -386,7 +386,7 @@ fn the_removed_partners_buffer_saves_back_unchanged (
 /// editable, its old title beneath it. A buffer showing it saves back
 /// unchanged.
 #[test]
-fn a_historical_phantoms_old_content_is_drawn_as_removed_members (
+fn a_historical_phantoms_old_content_is_shown_as_removed_members (
 ) -> Result<(), Box<dyn Error>> {
   let mut buffer : String = String::new ();
   with_fixture ("historical_content", &["main"], |f| {

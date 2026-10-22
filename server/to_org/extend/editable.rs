@@ -23,7 +23,7 @@
 //!   write-protected and losing the request; otherwise it becomes
 //!   editable and Final, and a Tentative occurrence elsewhere is
 //!   write-protected with its whole content subtree
-//!   ('apply_editable_draw_rule'). Write-protecting an occurrence makes
+//!   ('apply_editability_rule'). Write-protecting an occurrence makes
 //!   its member children non-members, since it writes no content.
 //! - The cascade: a Final occurrence hands an editable-view request to
 //!   each of its member content children
@@ -91,7 +91,7 @@ pub fn execute_view_requests (
           viewforest, treeid, graph, config, errors ) ?; },
       ViewRequest::Editable =>
         // View completion (dispatch_node_update) settles every Editable
-        // request at the node's own visit (apply_editable_draw_rule, the
+        // request at the node's own visit (apply_editability_rule, the
         // draw rule and the cascade), before this post-content view-request pass
         // runs, so none should reach here. Fail loudly if one does, rather than
         // silently dropping it.
@@ -116,7 +116,7 @@ pub fn execute_view_requests (
 /// The result of applying the Tentative/Final draw rule (see the module
 /// comment) to a node that carries a 'ViewRequest::Editable' (a user
 /// EVR, or one the cascade passed down).
-pub enum DrawOutcome {
+pub enum EditabilityOutcome {
   /// An existing Final occurrence of this id won: the EVR was dropped and
   /// the node left write-protected. No content extension should follow.
   Deferred,
@@ -128,20 +128,20 @@ pub enum DrawOutcome {
 /// Apply the draw rule (see the module comment) for a node carrying
 /// 'ViewRequest::Editable', WITHOUT extending its content:
 /// - defer to an existing Final occurrence (drop the EVR, stay
-///   write-protected) -> 'DrawOutcome::Deferred';
+///   write-protected) -> 'EditabilityOutcome::Deferred';
 /// - otherwise write-protect any prior Tentative occurrence of the id, mark
 ///   this node Final (resyncing title/body from disk), register it in the map,
-///   and clear the request -> 'DrawOutcome::MadeFinal'.
+///   and clear the request -> 'EditabilityOutcome::MadeFinal'.
 /// Content drawing is the caller's job (and so is the cascade), so the rule settles
 /// Final-ness before view completion (complete_nodes_in_level_order) draws
 /// (and cascades) content.
-pub fn apply_editable_draw_rule (
+pub fn apply_editability_rule (
   viewforest : &mut Tree<Viewnode>,
   treeid     : NodeId,
   graph      : &InRustGraph,
   config     : &SkgConfig,
   visited    : &mut EditableMap,
-) -> Result < DrawOutcome, Box<dyn Error> > {
+) -> Result < EditabilityOutcome, Box<dyn Error> > {
   let node_pid : ID = get_skgid_from_viewnode_at (
     viewforest, treeid ) ?;
   if let Some (&prior) = visited . get (& node_pid) {
@@ -155,7 +155,7 @@ pub fn apply_editable_draw_rule (
         viewforest, treeid,
         |t| { t . write_protect (); } )
         . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-      return Ok ( DrawOutcome::Deferred ); }
+      return Ok ( EditabilityOutcome::Deferred ); }
     if prior . treeid () != treeid {
       writeProtect_content_subtree ( viewforest,
                                      prior . treeid (),
@@ -172,7 +172,7 @@ pub fn apply_editable_draw_rule (
       viewforest, treeid, graph, config ) ?;
     // A EVR target is Final: later EVRs for this ID defer to it.
     visited . insert ( node_pid . clone(), Finalizable::Final (treeid) ); }
-  Ok ( DrawOutcome::MadeFinal ) }
+  Ok ( EditabilityOutcome::MadeFinal ) }
 
 /// Apply a write-protect request -- 'ViewRequest::WriteProtected' or
 /// 'ViewRequest::WriteProtectedSubtree' -- that the occurrence at

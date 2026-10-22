@@ -45,8 +45,8 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-override-substitution",
     |s| Box::pin ( async move {
-      s . reset ("de_novo_draws_the_overrider_marked", fixtures) ?;
-      de_novo_draws_the_overrider_marked (
+      s . reset ("de_novo_rendering_shows_the_overrider_marked", fixtures) ?;
+      de_novo_rendering_shows_the_overrider_marked (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("save_roundtrips_to_original_and_is_idempotent", fixtures) ?;
       save_roundtrips_to_original_and_is_idempotent (
@@ -132,7 +132,7 @@ fn read_fixture_file (
   std::fs::read_to_string (&path)
     . unwrap_or_else ( |e| panic! ("reading {:?}: {}", path, e) ) }
 
-async fn de_novo_draws_the_overrider_marked (
+async fn de_novo_rendering_shows_the_overrider_marked (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {

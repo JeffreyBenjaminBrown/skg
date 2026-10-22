@@ -14,7 +14,7 @@ use skg::diff_view::readiness_store::ReadinessStore;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::serve::handlers::integrate_unshown_changes::handle_integrate_unshown_changes_request;
 use skg::serve::handlers::stage_and_commit::handle_stage_and_commit_request;
-use skg::diff_view::pruned_change_view::DrawnDiffViewBuffer;
+use skg::diff_view::pruned_change_view::RenderedDiffViewBuffer;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::test_utils::{
@@ -108,13 +108,13 @@ pub fn open_buffer (
   let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
   let straddle : Arc<GraphStraddle> = current_graph_straddle_in_slot (
     &mut f . views_state . graph_straddle, &f . config, runtime . graph . clone () ) ?;
-  let buffer : Option<DrawnDiffViewBuffer> = {
+  let buffer : Option<RenderedDiffViewBuffer> = {
     let store : MutexGuard<ReadinessStore> =
       env . runtime . readiness_store . lock () . unwrap ();
     diffView_buffer (&runtime, &straddle, &store, diffView_buffer_kind) ? };
   Ok ( match buffer {
     None => None,
-    Some (DrawnDiffViewBuffer { text, pids, viewforest }) => {
+    Some (RenderedDiffViewBuffer { text, pids, viewforest }) => {
       f . views_state . open_views . register_diffView_view (
         &runtime . graph, view_id_of (diffView_buffer_kind),
         viewforest, &pids, diffView_buffer_kind );

@@ -121,7 +121,7 @@ print('the public clone was forked into a private clone (repo rotated)')
 -- 7. Reopen P (all skgrepos unrestricted): the chain end D -- a PRIVATE-repo
 --    node -- is now drawn in N's place, still marked (overridesHere N).
 p_buf = reopen_P()
-local function chain_end_drawn ()
+local function chain_end_shown ()
   for _, line in ipairs(vim.api.nvim_buf_get_lines(p_buf, 0, -1, false)) do
     if line:find('(overridesHere N)', 1, true)
        and line:find('(repo private)', 1, true) then
@@ -130,8 +130,8 @@ local function chain_end_drawn ()
   end
   return false
 end
-local end_drawn = T.wait_for(chain_end_drawn, 10)
-T.check(end_drawn, 'the chain end D (a private node) was not drawn for N')
+local end_shown = T.wait_for(chain_end_shown, 10)
+T.check(end_shown, 'the chain end D (a private node) was not drawn for N')
 print("the chain end D (private) is drawn in N's place (overridesHere N)")
 
 -- 8. Saving the chain-end view succeeds (tamper check accepts the
