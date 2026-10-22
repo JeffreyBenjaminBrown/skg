@@ -84,7 +84,7 @@ pub struct SaveResponse {
   /// Fully tagged overPrivateText-telescope-confirmation response produced after the
   /// save's rerenders have been staged but before text or view-state release.
   pub text_release_confirmation : Option<String>,
-  /// Some when a home move would strand relationships and the request
+  /// Some when a home skgrepo move would strand relationships and the request
   /// carried no review of them: nothing was skgsave-committed, and the
   /// handler sends a 'strandeds-confirmation' listing these. Checked
   /// before every other confirmation.
@@ -504,7 +504,7 @@ fn nat_from_request (
 ) -> Option<usize> {
   value_from_request_sexp (key, request) . ok () ? . parse () . ok () }
 
-/// The request's review of the relationships a home move strands:
+/// The request's review of the relationships a home skgrepo move strands:
 /// '(strandeds-reviewed . "true")' marks a re-save after a
 /// strandeds-confirmation, and '(reset-strandeds (RELATION RECORDER
 /// MEMBER) ...)' names the ones the user chose to reset to default. Without
@@ -719,7 +719,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     apply_delete_propagation_cleanup (
       &mut nonmerge_nodeInstructions, &graph_snap, &runtime . config ); }
   let strandeds_warnings : Vec<String> =
-  { // What the home moves strand (server/from_text/strandeds.rs). This
+  { // What the home skgrepo moves strand (server/from_text/strandeds.rs). This
     // precedes the Hoist classification, which must see the recorders
     // that resetting strandeds to their defaults adds.
     let graph_snap = working_graph . load_full ();

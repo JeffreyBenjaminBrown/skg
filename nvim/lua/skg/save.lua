@@ -113,7 +113,7 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
     function (_payload_text, response)
       M.fork_confirmation_handler(save_buf, response, strandeds_review)
     end, false)
-  -- Another alternative terminal: a home move would strand
+  -- Another alternative terminal: a home skgrepo move would strand
   -- relationships. Retry this same save with the user's review.
   state.register_response_handler('strandeds-confirmation',
     function (_payload_text, response)
@@ -641,7 +641,7 @@ function M.telescope_hoist_confirmation_handler (
   end
 end
 
----Handle a strandeds-confirmation: the save's home moves would strand
+---Handle a strandeds-confirmation: the save's home skgrepo moves would strand
 ---the relationships it lists, and nothing was skgsave-committed. Show
 ---them, ask which to reset to default, and re-issue the same save with that
 ---review, carrying the other approvals along. Headless, only report.

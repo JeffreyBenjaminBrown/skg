@@ -67,7 +67,7 @@ pub fn mk_body_diff_viewnode (
   viewnode_of ( ViewnodeKind::Property ( Property::BodyDiff { diff } )) }
 
 /// "⌂ -old +new", when the node's home skgrepo changed.
-pub fn mk_home_move_viewnode (
+pub fn mk_homeSkgrepoMove_viewnode (
   straddle : &GraphStraddle,
   pid      : &ID,
 ) -> Option<Viewnode> {

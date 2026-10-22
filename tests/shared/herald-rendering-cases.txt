@@ -274,7 +274,7 @@
 (skg bodyDiff)
 ---- text: body diff
 ---- styles: message*9
-==== diff view: a home move, ready
+==== diff view: a home skgrepo move, ready
 (skg (homeSkgrepoMove (old pub) (new priv)) (diff (ready)))
 ---- text: ⌂ -pub +priv✓
 ---- styles: message*1 -*1 normal*4 -*1 normal*5 go*1

@@ -180,7 +180,7 @@ describe('skg.readiness', function ()
           1, readiness.cycle_commit_ready_recursive))
   end)
 
-  it('marks home moves, recursively only those like the first', function ()
+  it('marks home skgrepo moves, recursively only those like the first', function ()
     local lines = {
       '* (skg (node (id a) (repo b) (diff (leaves 1 all)))) a',
       '** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1)))',
@@ -257,7 +257,7 @@ describe('skg.readiness', function ()
           readiness.cycle_commit_ready))
   end)
 
-  it('unmarks a ready home move, asking only for several', function ()
+  it('unmarks a ready home skgrepo move, asking only for several', function ()
     local lines = {
       '* (skg (node (id a) (repo b) (diff (leaves 1 all)))) a',
       '** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (ready)))',

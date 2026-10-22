@@ -517,7 +517,7 @@ pub fn herald_rule_table () -> HeraldRule {
           crule ("relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
           crule ("homeRepoHerald", vec! [ any (vec! [RuleChild::It]) ]),
           // The skgrepo-changes buffer of the diff view: the
-          // node's home move, "-OLD +NEW", then "Δ⌂=a" when its
+          // node's home skgrepo move, "-OLD +NEW", then "Δ⌂=a" when its
           // nearest moved vognode ancestor (here a) moved the same way.
           rule ("homeSkgrepoMove", vec! [
             crule_styled_as ("homeSkgrepoMove_skgrepo", "old", vec! [

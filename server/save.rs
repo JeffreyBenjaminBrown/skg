@@ -604,7 +604,7 @@ pub(crate) fn prepare_fs_update (
   // telescope write above places every section in its skgrepo and
   // sweeps owned sections whose skgrepo lost its last member. An
   // explicit old-path delete here would even be WRONG for a
-  // private->public home move, where the old (more private) skgrepo
+  // private->public home skgrepo move, where the old (more private) skgrepo
   // legitimately retains a section holding the node's private
   // memberships. (repo_moves still matter to Tantivy, handled elsewhere.)
   Ok ( PreparedFilesystemUpdate {

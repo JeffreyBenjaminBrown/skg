@@ -401,7 +401,7 @@ pub struct ViewnodeStats {
   /// Some(OLD to NEW) in the skgrepo-changes buffer of the diff
   /// view, for a node whose home skgrepo moved from OLD to NEW since
   /// HEAD. Display-only; the buffer's pass sets it after completion
-  /// ('set_home_move_facts_in_viewforest'), and the parser discards
+  /// ('set_homeSkgrepoMove_facts_in_viewforest'), and the parser discards
   /// it. Herald "-OLD +NEW".
   pub home_skgrepo_move  : Option<SkgrepoChange>,
   /// Some(LETTER) beside 'home_skgrepo_move' when the nearest vognode

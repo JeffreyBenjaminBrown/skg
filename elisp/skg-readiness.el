@@ -78,7 +78,7 @@ its move. Works on write-protected occurrences too."
   (interactive "P")
   (unless (org-at-heading-p)
     (user-error "Not on a headline"))
-  (let* ((move (or (skg--readiness-home-move-at-point)
+  (let* ((move (or (skg--readiness-homeSkgrepo-move-at-point)
                    (user-error "This node's home skgrepo did not change")))
          (ready (save-excursion
                   (goto-char (car move))
@@ -92,13 +92,13 @@ its move. Works on write-protected occurrences too."
               (org-up-heading-safe)
               (skg--readiness-walk-subtree
                (lambda (metadata-sexp)
-                 (when (equal (skg--readiness-home-move metadata-sexp)
+                 (when (equal (skg--readiness-homeSkgrepo-move metadata-sexp)
                               (cdr move))
                    (skg--readiness-request-here ready nil))))))))
     (when (skg--readiness-write-requests-if-confirmed requests)
       (if ready
-          (message "Marked %d home move(s) ready." (length requests))
-        (message "Unmarked %d home move(s)." (length requests)))
+          (message "Marked %d home skgrepo move(s) ready." (length requests))
+        (message "Unmarked %d home skgrepo move(s)." (length requests)))
       (skg-request-save-buffer))))
 
 ;;; Reading a headline's change facts
@@ -164,25 +164,25 @@ carries (ready)."
            ;; A folder's bare '(ready)' stands outside any '(diff ...)'.
            (assq 'ready (cdr metadata-sexp))))))
 
-(defun skg--readiness-home-move (metadata-sexp)
-  "The (OLD NEW) skgrepos of METADATA-SEXP when it is a home move."
+(defun skg--readiness-homeSkgrepo-move (metadata-sexp)
+  "The (OLD NEW) skgrepos of METADATA-SEXP when it is a home skgrepo move."
   (let ((move (assq 'homeSkgrepoMove (cdr metadata-sexp))))
     (when move
       (list (cadr (assq 'old (cdr move)))
             (cadr (assq 'new (cdr move)))))))
 
-(defun skg--readiness-home-move-at-point ()
-  "(POSITION . (OLD NEW)) of the home move at point: the headline at
-point, or the child of the node at point that is its home move."
+(defun skg--readiness-homeSkgrepo-move-at-point ()
+  "(POSITION . (OLD NEW)) of the home skgrepo move at point: the headline at
+point, or the child of the node at point that is its home skgrepo move."
   (let* ((metadata-sexp (skg--metadata-sexp-at-point-or-nil))
-         (pair (and metadata-sexp (skg--readiness-home-move metadata-sexp))))
+         (pair (and metadata-sexp (skg--readiness-homeSkgrepo-move metadata-sexp))))
     (if pair
         (cons (line-beginning-position) pair)
       (save-excursion
         (let ((found nil))
           (skg--readiness-do-children
            (lambda (child-sexp)
-             (let ((pair (skg--readiness-home-move child-sexp)))
+             (let ((pair (skg--readiness-homeSkgrepo-move child-sexp)))
                (when (and pair (not found))
                  (setq found (cons (line-beginning-position) pair))))))
           found)))))
@@ -261,7 +261,7 @@ unless the headline at point is ready."
 of the headline at point, with how many leaves it touches as the
 server counts them: N of the headline's '(leaves N OBJECT...)' when
 OBJECTS are the ones it lists, else one for each of `node' and `rel'.
-A headline without the fact, which only the home-move gesture can
+A headline without the fact, which only the home skgrepo move gesture can
 reach, counts one."
   (let ((leaves (skg--readiness-leaves (skg--current-headline-metadata-sexp))))
     (list (copy-marker (line-beginning-position)) ready objects

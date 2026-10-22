@@ -243,10 +243,10 @@ function M.diffView_change_start_on_line (line_number, readiness)
   return #stars
 end
 
----The {old, new} skgrepos of METADATA_SEXP when it is a home move.
+---The {old, new} skgrepos of METADATA_SEXP when it is a home skgrepo move.
 ---@param metadata_sexp any
 ---@return string[]|nil
-function M.home_move (metadata_sexp)
+function M.homeSkgrepoMove (metadata_sexp)
   for i = 2, #metadata_sexp do
     local move = metadata_sexp[i]
     if head_name(move) == 'homeSkgrepoMove' then
@@ -320,7 +320,7 @@ end
 ---touches as the server counts them: N of the headline's '(leaves N
 ---OBJECT...)' when OBJECTS are the ones it lists, else one for each of
 ---'node' and 'rel'. A headline without the fact, which only the
----home-move gesture can reach, counts one.
+---home skgrepo move gesture can reach, counts one.
 ---@param line_number integer
 ---@param ready boolean
 ---@param objects string[]
@@ -447,17 +447,17 @@ function M.cycle_commit_ready_recursive ()
     M.requests_for_subtree_at_line(metadata.current_line_number()))
 end
 
----The line of the home move at LINE_NUMBER (that headline, or the
+---The line of the home skgrepo move at LINE_NUMBER (that headline, or the
 ---child of the node there that is its move) and its {old, new}.
 ---@param line_number integer
 ---@return integer|nil, string[]|nil
-function M.home_move_at_line (line_number)
+function M.homeSkgrepoMove_at_line (line_number)
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
-  local pair = metadata_sexp and M.home_move(metadata_sexp)
+  local pair = metadata_sexp and M.homeSkgrepoMove(metadata_sexp)
   if pair then return line_number, pair end
   for _, line in ipairs(M.child_lines(line_number)) do
     local child = metadata.metadata_sexp_at_line_or_nil(line)
-    pair = child and M.home_move(child)
+    pair = child and M.homeSkgrepoMove(child)
     if pair then return line, pair end
   end
   return nil, nil
@@ -471,7 +471,7 @@ end
 ---@param recursive boolean|nil
 function M.toggle_homeSkgrepo_move_commitReady (recursive)
   local move_line, pair =
-    M.home_move_at_line(metadata.current_line_number())
+    M.homeSkgrepoMove_at_line(metadata.current_line_number())
   if not move_line then
     error("This node's home skgrepo did not change") end
   local ready = not M.ready_p(
@@ -485,16 +485,16 @@ function M.toggle_homeSkgrepo_move_commitReady (recursive)
                                     metadata.outline_level(move_line))
     for _, line in ipairs(M.subtree_lines(node_line)) do
       local headline = metadata.metadata_sexp_at_line_or_nil(line)
-      local other = headline and M.home_move(headline)
+      local other = headline and M.homeSkgrepoMove(headline)
       if other and other[1] == pair[1] and other[2] == pair[2] then
         table.insert(requests, M.request_at_line(line, ready, {})) end
     end
   end
   if not M.write_requests_if_confirmed(requests) then return end
   if ready then
-    vim.notify(string.format('Marked %d home move(s) ready.', #requests))
+    vim.notify(string.format('Marked %d home skgrepo move(s) ready.', #requests))
   else
-    vim.notify(string.format('Unmarked %d home move(s).', #requests)) end
+    vim.notify(string.format('Unmarked %d home skgrepo move(s).', #requests)) end
   require('skg.save').request_save_buffer()
 end
 

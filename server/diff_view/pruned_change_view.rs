@@ -232,7 +232,8 @@ pub fn diffView_buffer_viewforest (
 
 /// What a buffer of the diff view gets after view completion:
 /// its '(ready ...)' facts, and in the skgrepo-changes buffer each
-/// moved vognode's home move ('set_home_move_facts_in_viewforest').
+/// moved vognode's home skgrepo move
+/// ('set_homeSkgrepoMove_facts_in_viewforest').
 pub fn set_diffView_facts_in_viewforest (
   viewforest           : &mut ViewForest,
   straddle             : &GraphStraddle,
@@ -243,7 +244,7 @@ pub fn set_diffView_facts_in_viewforest (
   set_ready_facts_in_viewforest (
     viewforest, straddle . change_leaves (), store, graph );
   if diffView_buffer_kind == DiffViewBufferKind::SkgrepoChanges {
-    set_home_move_facts_in_viewforest (viewforest, straddle ); }}
+    set_homeSkgrepoMove_facts_in_viewforest (viewforest, straddle ); }}
 
 /// On each unrestricted vognode whose home skgrepo moved: the move,
 /// and, when the nearest vognode ancestor whose home moved moved the
@@ -251,7 +252,7 @@ pub fn set_diffView_facts_in_viewforest (
 /// 'homeSkgrepoAtBoundary', against the nearest moved ancestor. On
 /// every other unrestricted vognode, neither (a rerender may follow
 /// a commit that made a move part of HEAD).
-pub fn set_home_move_facts_in_viewforest (
+pub fn set_homeSkgrepoMove_facts_in_viewforest (
   viewforest : &mut ViewForest,
   straddle   : &GraphStraddle,
 ) {
@@ -277,8 +278,8 @@ pub fn set_home_move_facts_in_viewforest (
       t . viewStats . moved_like_ancestor = moved_like_ancestor; }}}
 
 /// The ancestor generation (1 = viewparent, counting every viewnode
-/// between) and the home move of the nearest unrestricted vognode
-/// ancestor whose home skgrepo moved.
+/// between) and the home skgrepo move of the nearest unrestricted
+/// vognode ancestor whose home skgrepo moved.
 fn nearest_moved_vognode_ancestor (
   node     : NodeRef<Viewnode>,
   straddle : &GraphStraddle,

@@ -9,7 +9,7 @@
 //! were not editable already become unexpanded write-protected
 //! members, and the former members stand where
 //! 'phantom_insertion_plan' places them. A node in C also gets, ahead
-//! of its content, its old text, its home move, its "it acquired"
+//! of its content, its old text, its home skgrepo move, its "it acquired"
 //! folder, the alias, ID and flags folders that changed, the partner
 //! folders whose membership changed (which the BFS fills from the
 //! straddle), and its changeset markers. A node in U but not in C is
@@ -37,7 +37,7 @@ use crate::diff_view::pruned_change_view::{
   PrunedChangeViewSets, prunedChangeView_sets_of_buffer};
 use crate::diff_view::change_viewnodes::{
   append_acquired_folder, append_historical_phantom_content, append_old_text,
-  mk_changeset_marker_viewnode, mk_historical_viewnode, mk_home_move_viewnode,
+  mk_changeset_marker_viewnode, mk_historical_viewnode, mk_homeSkgrepoMove_viewnode,
   mk_relRepo_move_viewnode, mk_removed_member_viewnode};
 use crate::diff_view::fresh_drawing::{
   adopt_fresh_facts, is_drawn_by_the_diff_view,
@@ -421,7 +421,7 @@ fn detach_change_viewnodes (
 
 /// The fresh drawing of what an editable node holds ahead of its
 /// content, in order, partner folders aside: for a node in C, its old
-/// text, its home move, its "it acquired" folder, its alias, ID and
+/// text, its home skgrepo move, its "it acquired" folder, its alias, ID and
 /// flags folders that changed, and its content and relRepo markers,
 /// each as 'aspects' says; then, in the order-only buffer, its
 /// order-only marker.
@@ -438,8 +438,8 @@ fn fresh_front_change_viewnodes (
     if aspects . text {
       append_old_text (&mut fresh, root, straddle, pid); }
     if aspects . home_skgrepo {
-      if let Some (home_move) = mk_home_move_viewnode (straddle, pid) {
-        append (&mut fresh, root, home_move); }}
+      if let Some (homeSkgrepoMove) = mk_homeSkgrepoMove_viewnode (straddle, pid) {
+        append (&mut fresh, root, homeSkgrepoMove); }}
     append_acquired_folder (&mut fresh, root, straddle, pid);
     append_changed_property_folders (&mut fresh, root, straddle, pid, aspects);
     if aspects . recorded_changed (

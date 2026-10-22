@@ -145,7 +145,7 @@ fn sticky_round_trip_restores_a_resolved_extra_ids_raw_disk_spelling () {
 }
 
 #[test]
-fn home_move_to_more_private_clamps_relRepos_up (
+fn homeSkgrepoMove_to_more_private_clamps_relRepos_up (
 ) {
   let config : SkgConfig =
     config_with_order ( & ["public", "private"] );
@@ -449,7 +449,7 @@ fn explicit_lowering_moves_the_relationship_between_section_files (
 }
 
 #[test]
-fn same_save_child_home_move_allows_publicizing_its_parent_relationship (
+fn same_save_child_homeSkgrepoMove_allows_publicizing_its_parent_relationship (
 ) {
   // A skgrepo move and its parent's explicit relRepo request occur in one
   // save. The parent must calculate the relationship default from the child's NEW
@@ -470,7 +470,7 @@ fn same_save_child_home_move_allows_publicizing_its_parent_relationship (
 
   let planned = build_diskSupplemented_nodeInstructions (
     vec! [ parent_intent, child_intent ], &graph, &config, None )
-    . expect ("the same-save home move makes public the relationship's default");
+    . expect ("the same-save home skgrepo move makes public the relationship's default");
   let parent = planned . instructions . into_iter ()
     .find_map ( |instruction| match instruction {
       NodeInstruction::Save (SaveNode (node)) if node . pid == ID::new ("parent")
@@ -483,7 +483,7 @@ fn same_save_child_home_move_allows_publicizing_its_parent_relationship (
 }
 
 #[test]
-fn same_save_hidden_node_home_move_sets_the_new_hide_skgrepo (
+fn same_save_hidden_node_homeSkgrepoMove_sets_the_new_hide_skgrepo (
 ) {
   // Hides have an inferred relRepo rather than an explicit
   // relRepo request, but their endpoint floor must use the same pending

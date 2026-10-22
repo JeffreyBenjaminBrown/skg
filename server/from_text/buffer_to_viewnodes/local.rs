@@ -482,10 +482,10 @@ fn validate_skgrepo_move (
   treeid  : NodeId,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
-  let is_home_move : bool =
+  let is_homeSkgrepoMove : bool =
     tree . get (treeid) . is_some_and ( |n| matches! ( &n . value () . kind,
       MpViewnodeKind::Property (Property::HomeSkgrepoMove { .. }) ));
-  let label : &str = if is_home_move { "homeSkgrepoMove" } else { "relRepoMove" };
+  let label : &str = if is_homeSkgrepoMove { "homeSkgrepoMove" } else { "relRepoMove" };
   if !generation_exists_and_includes(
     tree, treeid, -1, false,
     |node| matches!(&node . kind, MpViewnodeKind::Vognode (_)))
@@ -495,8 +495,8 @@ fn validate_skgrepo_move (
   if !siblings_cannot_include(
     tree, treeid,
     |node| match &node . kind {
-      MpViewnodeKind::Property (Property::HomeSkgrepoMove { .. }) => is_home_move,
-      MpViewnodeKind::Property (Property::RelRepoMove { .. }) => ! is_home_move,
+      MpViewnodeKind::Property (Property::HomeSkgrepoMove { .. }) => is_homeSkgrepoMove,
+      MpViewnodeKind::Property (Property::RelRepoMove { .. }) => ! is_homeSkgrepoMove,
       _ => false, } )
     { errors . push(format!("{} must be unique among its siblings.", label)); }
   errors }

@@ -32,7 +32,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
 `skg-decline-fork'.
 
 STRANDEDS-REVIEW, when non-nil, is (reviewed . TRIPLES): the user has
-reviewed the relationships a home move strands (see
+reviewed the relationships a home skgrepo move strands (see
 `skg--strandeds-confirmation-handler'), and TRIPLES, each
 (RELATION RECORDER MEMBER), are the ones to reset to default."
   (interactive)
@@ -129,7 +129,7 @@ reviewed the relationships a home move strands (see
        (lambda (_tcp-proc payload)
          (skg--fork-confirmation-handler save-buffer payload strandeds-review))
        nil)
-      ;; Another alternative terminal: a home move would strand
+      ;; Another alternative terminal: a home skgrepo move would strand
       ;; relationships. Retry this same save with the user's review.
       (skg-register-response-handler
        'strandeds-confirmation
@@ -576,7 +576,7 @@ carried, which the approving re-save carries again."
             (skg-approve-fork)
           (skg-decline-fork))))))
 
-;;; Strandeds confirmation: a home move would leave relationships at their
+;;; Strandeds confirmation: a home skgrepo move would leave relationships at their
 ;;; old, more private skgrepos. The server decides which
 ;;; (server/from_text/strandeds.rs); the user chooses which to reset to default.
 
@@ -584,7 +584,7 @@ carried, which the approving re-save carries again."
     (save-buffer payload approved-forks fork-skgrepos
                  approved-hoist-pids text-approved-pids)
   "Handle a `strandeds-confirmation' message for SAVE-BUFFER: the save's home
-moves would strand the relationships it lists, and nothing was
+skgrepo moves would strand the relationships it lists, and nothing was
 skgsave-committed. Show them, ask which to reset to default, and re-issue the
 same save with that review, carrying the other approvals along."
   (dolist (response-type

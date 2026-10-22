@@ -71,8 +71,8 @@ pub fn build_diskSupplemented_nodeInstructions (
 
 /// Each Save nodeIntent's skgrepo is the node home after this save. Relationship
 /// floors must see these homes across the entire batch: a parent may name a
-/// child before the child nodeIntent is supplemented, and a same-save home move
-/// must make its newly public relationship legal.
+/// child before the child nodeIntent is supplemented, and a same-save home skgrepo
+/// move must make its newly public relationship legal.
 fn homes_declared_by_nodeSaveIntents (
   intents : &[NodeIntent],
 ) -> HashMap<ID, SkgrepoName> {
@@ -375,7 +375,7 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
           break 'unclamped d . relRepo . clone (); }}
       default_floor_for (member) };
     // Clamp: no section may be more public than the home (the
-    // "extends on the other side" junk shape), so when a HOME MOVE
+    // "extends on the other side" junk shape), so when a HOME SKGREPO MOVE
     // makes the node more private, its relationships rise with it. (The
     // converse move leaves old, more-private skgrepos in place:
     // publicizing memberships takes the explicit gesture.)

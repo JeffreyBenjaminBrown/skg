@@ -1,6 +1,6 @@
 // cargo nextest run --test grouped_saves -E 'test(strandeds::)'
 //
-// What a home move strands, decided by the save
+// What a home skgrepo move strands, decided by the save
 // (server/from_text/strandeds.rs). In the fixture, the public node p
 // contains the public node m, and the public node q contains the
 // private node n, recorded at private (q's private section). Each

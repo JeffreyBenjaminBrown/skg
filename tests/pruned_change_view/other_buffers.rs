@@ -173,7 +173,7 @@ fn the_skgrepo_changes_buffer_heralds_each_move_and_moves_like_an_ancestor (
   Ok (( )) }
 
 #[test]
-fn the_home_move_heralds_are_only_in_the_skgrepo_changes_buffer (
+fn the_homeSkgrepoMove_heralds_are_only_in_the_skgrepo_changes_buffer (
 ) -> Result<(), Box<dyn Error>> {
   let text : String = buffer (DiffViewBufferKind::AllChanges) ?;
   assert! ( ! headline_of (&text, "mvc") . contains ("homeSkgrepoMove"), "{}", text );
